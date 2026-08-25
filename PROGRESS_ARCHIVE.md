@@ -4183,3 +4183,101 @@ superseded rather than rerun, because a push had already started a newer run.
 ⛔ **NAMESPACES: NOTHING SPENT.** No migration — Lane B's block stays `2026_08_17_000109`. No ADR — `0021` stays free, `0010` stays reserved for H1d, `#16` stays free, ADR-0016's next free sub-decision is still `§D34`: the invariant already lived in `SubmissionDraftService`'s docblock and this increment made the code match it, so it landed in `docs/offline-first-sync-design.md` §5 and a new `docs/security-threat-model.md` §4 row instead.
 
 **Gates.** CI Pest **4490 / 19,043** (+13 cases, +66 assertions on 4477/18,977; same 2 pre-existing warnings) · PHPStan **18 = baseline, zero delta by file list** · four host lint gates **97 · 111 · 31 · 111/119/0**, unmoved, exit codes read without a pipe · `openapi.json` byte-identical · Pint proven with a deliberately misformatted probe under `app/` before its `PASS` was believed · both mutations restored byte-identical, sha-compared. Vitest **127 files / 2,151** and axe **42 suites / 299** asserted unmoved rather than re-measured, because no `.vue`, no `resources/` and no `tests/e2e/` file was edited at all. ⚠️ **E2E read `551 passed + 10 skipped` with no flaky line, and that is NOT a fix** — `builder-axe.spec.ts:198` on mobile (Lane A's known contrast row) simply passed on its first attempt; **551 and 550 + 1 flaky are the same measurement.**
+
+---
+
+## 2026-08-25 — 🅱️ LANE B · `M12` — the `promote()` pre-lock lost update (PR #199, `8114da0`, 6/6)
+
+The row the user deferred out of M11 on 2026-08-24, and the top `major` in `docs/feature-backlog.md`'s
+`### Submissions, drafts & the guest runtime`.
+
+**THE DEFECT.** `SubmissionDraftService::promote()` read the draft's answer document **outside any
+transaction**, ran the full Stage 3 and the DB attachment check over that copy for tens of milliseconds, took
+the row lock only afterwards, and then finalized with the **pre-lock** values — `SubmissionFinalizer` being a
+whole-document replace. A save committing inside that window was silently reverted, and the row was
+`submitted` afterwards, so **no later save could restore it**. The only in-lock guard was a status re-assert,
+which a concurrent autosave does not move. P3a closed the save-vs-save case in `updateDraft()` and
+structurally could not see this one: its guard compares the base a SAVE carries, and a promotion carries none.
+
+**AS BUILT.** The answer document's `answers_content_checksum` is captured from the **same row** the answers
+are read from — one read, one row version, the reasoning `GuestDraftResumeController::show()` already states
+for handing a resuming device its baseline — and re-compared **under the lock**. A mismatch raises the
+`409 draft_conflict` the save door has raised since P3a: one code, one wording, both write doors, so no client
+contract moved and `openapi.json` stayed byte-identical. It is unconditional, with no `$checkBaseline` flag,
+because it compares two SERVER reads inside one request rather than a client's claim. **The three services in
+this family now hold one check each, and each holds the one its own read/lock ordering makes authoritative** —
+`SubmissionAnswerEditService` both (its read precedes its lock), `updateDraft()` only the client one (its read
+follows its lock), `promote()` only the server one.
+
+⚠️ **THE ORDER IS LOAD-BEARING AND IS PINNED BY A TEST.** The checksum check runs AFTER the status re-assert.
+A concurrent promote moves the status AND the checksum — finalize rewrites both — and that case is a
+documented idempotent no-op rather than a conflict. Mutation M2 swaps them and reddens exactly that case.
+
+⚠️⚠️ **THE ROW WAS TRUE IN ALL SEVEN OF ITS CLAIMS — THIRTY-THREE-FOR-THIRTY-THREE — AND STILL POINTED AT THE
+WRONG FLOW, WHICH IS THE LESSON THIS INCREMENT ADDS.** The row motivates the defect with the two-device
+resume; on that flow **P3a's baseline check usually fires first**, because both DRAFT channels set
+`checkBaseline: true` unconditionally and say so in writing. The windows M12 uniquely closes are elsewhere:
+**`/api/v1/submissions/{submission}/promote`, which runs no `saveDraft()` at all and has therefore never had a
+first check** (and is the seam the OCR review-and-confirm flow reuses); a **SUBMIT that sends no baseline**,
+since the submit requests gate on `claimsBaseline()`; **`createDraft()`'s 23505 fold**, which passes
+`checkBaseline: false` by design; and the genuine sub-window during Stage 3. **Verify which flow the FIX
+covers, not only whether the ROW is right.**
+
+**FOUR MORE THINGS THE ROW DOES NOT NAME.** (1) `promote()` has FOUR call sites, not one. (2) **The damage
+was never only a missing answer** — `FinalizedStatus::for()` is handed the pre-lock `SemanticResult`, and its
+own docblock demands *"this finalize's OWN Stage-3 result — never a cached or borrowed one"*: a racing save
+that routes the respondent into a section is the difference between `submitted` and `screened_out`, and
+therefore between **consuming a purchased `max_responses` slot and not**, on a row simultaneously labelled
+*"was shown no questions"* about somebody who answered some. (3) `attachment_refs` and the attachment
+ownership re-point derive from the same pre-lock document. (4) A sweep of every `lockForUpdate()` in `app/`
+found **no other pre-lock-read → whole-document-write site** — `SubmissionPipeline::persist()` creates its row
+inside the transaction, and `PublishService`, `RestoreService`, `FormBuilderService`, `FormService`,
+`ScopeNodeService` and `SubmissionReviewService` all read after their lock. **`promote()` was the last door,
+and a clean sweep is a result rather than a non-event.**
+
+⛔⛔ **THE MUTATION PASS'S MOST EXPENSIVE FINDING WAS THAT TWO MUTATIONS REDDENED THE SAME SINGLE CASE.**
+M5 (hoist the guard out of the transaction) and M2 (swap the order) were indistinguishable to the suite,
+which meant *"the comparison reads UNDER THE LOCK"* was enforced by a comment and not by a test — every
+existing case stages its write during Stage 3, which a hoisted check still sees. A case staging the write
+AFTER the lock is granted separates them. **A mutation that reddens the same case as another mutation is
+telling you two different properties are sharing one test.** That case also **states what it cannot
+measure**: its writer takes no `submissions` lock, which no production path does, so it pins a property of
+the CODE rather than a reachable race; and its write shares promote's own transaction, so the refusal rolls
+it back and the *"the other device's answers survive"* assertion belongs to the pre-lock cases instead.
+
+**MUTATION PASS: 7, ZERO UNDEFENDED.** M1 (delete the guard) reddens **exactly the seven refusal cases**,
+both controls green. M2 reddens **exactly one**. M3 (compare the recomputed hash rather than the stored value)
+reddens **two, one a PRE-EXISTING test** whose planted row carries a null checksum. M6 (a semantically
+identical read) survives as a control must. **M4 (loose `!=`) survives BY CONSTRUCTION** — 64-hex-or-null,
+exactly M11's finding, kept strict because that is a property of the DOMAIN rather than of the operator.
+
+⚠️ **TWO ASSERTIONS WERE WRONG BEFORE THEY SHIPPED.** Two channel cases compared the surviving document with
+`toBe()`, which is **KEY-ORDER sensitive** on arrays while a jsonb round-trip returns the database's order —
+the identical trap `SubmissionAnswerEditService::sameAnswer()` documents for the audit diff; they ksort first
+and stay strict on the values. And **ask what the measurement could not have seen**: everything is staged
+inside RefreshDatabase's single transaction, so no test independently verifies the cross-connection READ
+COMMITTED premise — that reasoning is inherited from `updateDraft()`'s documented one and is stated rather
+than proven.
+
+⚠️ **PINT'S PROBE PAID FOR ITSELF A THIRD TIME.** A deliberately misformatted file under `app/` returned
+`FAIL … 1 style issue` with a real fixer list before `PASS` was believed — and the same run flagged **three
+genuine issues in this increment**.
+
+**FILED RATHER THAN FIXED** (the 2026-08-17 amendment working as intended): the version-status check has the
+identical pre-lock shape one field over; `/api/v1/submissions/{submission}/promote` documents no 409 though
+three causes reach it; and four P3a cases still assert the exception CLASS rather than the message. The
+already-filed 409-folding row is annotated — `draft_conflict` now arrives on the SUBMIT response too, so that
+row's fix has to land in two places.
+
+⛔ **NAMESPACES: NOTHING SPENT.** No migration — Lane B's block stays `2026_08_17_000109`. No ADR — `0021`
+stays free, `0010` stays reserved for H1d, `#16` stays free, ADR-0016's next free sub-decision is still
+`§D34`. No route. The claim was extended twice mid-build, each time by its own commit before the file was
+opened.
+
+**Gates.** CI Pest **4499 / 19,096** (+9 cases, +53 assertions on 4490/19,043 — exactly the nine new cases;
+same 2 pre-existing warnings) · PHPStan CI **`[OK] No errors`**, local **18 = baseline, zero delta by file
+list** · four lint gates **97 · 111 · 31 · 111/119/0**, unmoved · **`openapi.json` byte-identical**, proven
+locally and independently by CI's contract job · Vitest **127 files / 2,151** and axe **42 suites / 299**,
+unmoved and asserted rather than re-measured (no `.vue`, no `resources/`, no `tests/e2e/`, no `packages/`) ·
+E2E **550 passed + 1 flaky + 10 skipped**, the flaky being `builder-axe.spec.ts:198` on mobile — Lane A's
+known contrast row, unchanged, and the same measurement as `551 + 0 flaky`.

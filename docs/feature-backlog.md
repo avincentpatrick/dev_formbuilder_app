@@ -563,6 +563,7 @@ are still in place.
   **Gates:** four lint gates unchanged at **97 / 108 / 30 / 119** (M3 adds no controller, migration or job),
   Pint `passed`, `openapi.json` byte-identical, zero `.vue` / `.ts` / `packages/design-system/` / e2e movement.
 
+- ➡️ **MOVED TO `docs/claims/decisions.md` AS `D1` (2026-08-25) — IT IS A DECISION, NOT A DEFECT, AND NO LANE SHOULD TAKE IT AS A ROW.** An audit of all 62 open merge-gate rows confirmed this as the only genuinely cross-cutting one: the fix cannot avoid `scripts/job-payload-lint.php`, whose pass-1 scan of `app/` trips R1 on any listener implementing `ShouldQueue` and whose only escape is an `EXEMPT_JOBS` entry inside that script (a listener cannot extend `TenantAwareJob` — its `handle()` is `final`), and it must re-pin `tests/Feature/Connectors/ConnectorFanOutTest.php:163`, which **hard-asserts** these listeners are not queued. Nothing has decided that they should be. Original filing follows, kept because its reasoning is intact.
 - **`minor` · All sixteen synchronous dispatch listeners could now be `ShouldQueue`, and nothing has
   decided whether they should be.** ⚠️ **The count is SIXTEEN, not the seven this row first said** — eight
   per channel, all synchronous; seven is merely how many carried the docblock sentence M3 retired. Filed by **M3 (2026-08-19)** at the moment the decision was taken, because a

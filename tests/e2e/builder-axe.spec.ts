@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
-import { forceTheme, settleAnimations } from './support/axe';
+import { assertNoHorizontalOverflow, forceTheme, settleAnimations } from './support/axe';
 import { openBuilder, showBuilderPane } from './support/navigate';
 
 // Interaction-driven accessibility gate for the form builder (Increment D4b) — the single highest-risk
@@ -93,10 +93,12 @@ async function scan(page: Page, label: string): Promise<void> {
     // five days apart failed there and both merged green as "flaky". See D2 in docs/claims/decisions.md.
     await settleAnimations(page);
 
-    const overflows = await page.evaluate(
-        () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
-    );
-    expect(overflows, `${label}: horizontal overflow`).toBe(false);
+    // Shared with `assertClean` rather than re-inlined, which is how this file's copy came to be a
+    // document-only check that could not fail: `.app-shell` is `overflow-x: clip`, so an overrun in
+    // the builder never widened the document. The builder's shell is the `--fluid` variant
+    // (`overflow: hidden`), which unlike `clip` DOES mint a scroll container and can therefore be
+    // measured. See the docblock on `assertNoHorizontalOverflow`.
+    await assertNoHorizontalOverflow(page, label);
 
     const results = await new AxeBuilder({ page })
         .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])

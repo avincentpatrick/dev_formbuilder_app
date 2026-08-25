@@ -499,8 +499,61 @@ are still in place.
 
 ### ⚠️ The gate that is not measuring what three files say it measures
 
-- **`major` · THE END-TO-END HORIZONTAL-OVERFLOW ASSERTION IS STRUCTURALLY INERT ON EVERY `AppLayout`
-  PAGE — IT CANNOT FAIL, AND HAS NOT BEEN ABLE TO SINCE THE CLIP LANDED.** `tests/e2e/support/axe.ts:41-44`
+- ✅ **CLOSED BY `M17` (2026-08-26) — `major` · ~~THE END-TO-END HORIZONTAL-OVERFLOW ASSERTION IS
+  STRUCTURALLY INERT ON EVERY `AppLayout` PAGE.~~** The row is **correct in its diagnosis and wrong in
+  its evidence**, and both halves matter.
+  ⛔ **THE PROOF THE ROW OFFERS IS A NO-OP AND PROVES NOTHING.** It says *"delete `min-width: 0` from
+  the leaderboard name cell (`achievements/Index.vue:452-459`) and every scan still passes."* That rule
+  **also** carries `overflow: hidden`, and per CSS Sizing 3 a flex item whose main-axis overflow is not
+  `visible` already resolves `min-width: auto` to **0** — so the declaration is redundant and deleting
+  it changes nothing: **343/343 with it and without it**, measured in Chromium. The scan passing was the
+  *correct* result. **The gate was inert — but that is proven by the clip, not by this demonstration,
+  and for the whole life of the row its evidence was never evidence.**
+  ✅ **PROVEN INSTEAD WITH A MUTATION THAT DOES SOMETHING — THREE LEGS, ALL MEASURED.** Deleting the
+  load-bearing `overflow-wrap: anywhere` from `.dns__code` (`DnsRecordBlock.vue:127`, whose own comment
+  says *"The token has no break opportunities of its own"*) and scanning `/domains` at 375px, where
+  `E2eSeeder.php:1017-1047` guarantees a **64-hex** `verification_token` on an unverified domain:
+
+  | leg | mutation | gate | result |
+  |---|---|---|---|
+  | 1 | applied | **unfixed** | **2 passed** — green over **312px** of real overflow |
+  | 2 | applied | **fixed** | **2 failed**, `Received: 312` |
+  | 3 | reverted | fixed | **71 passed** across the mobile shard |
+
+  ⛔ **LEG 1 IS THE ROW.** `documentElement.scrollWidth - clientWidth` read **0** while
+  `.app-shell__content` was overrun by **312px**, and a test literally named *"— accessible & no
+  horizontal overflow"* passed, in both themes.
+  **AS FIXED.** `assertNoHorizontalOverflow()` in `support/axe.ts` measures **two boxes**: the document
+  (still the only real check where there is no shell — `AuthLayout`, `AdminLayout`, the guest runtime,
+  `Welcome.vue`, and anything teleported to `<body>`) **and** `.app-shell__content`, which is
+  `overflow-y: auto` (so `overflow-x` computes to `auto`) and `overflow: hidden` in the `--fluid`
+  builder variant — **both mint a scroll container, unlike `clip`, so `scrollWidth` genuinely grows.**
+  A third assertion fails loudly if `.app-shell` is present but `.app-shell__content` is not, so a
+  renamed class cannot silently restore the blindness. `builder-axe.spec.ts`'s twin now calls the same
+  helper instead of carrying its own copy — which is how it came to be inert in the first place.
+  ⚠️⚠️ **THE ~40 COMMENT LINES WERE NOT MERELY OPTIMISTIC — TWO OF THEM MISATTRIBUTED REAL CATCHES, AND
+  THAT IS THE FINDING ABOVE THE FIX.** `responsive-axe.spec.ts` claimed *"the 375px overflow trap that
+  has now caught Domains and the Audit log"* and *"a non-wrapping row in a shared primitive has reddened
+  this gate three times (H12b, H14, H15b)"*. **Checked: the clip landed 2026-07-21 in G11 (`506ff97`)
+  and all three of those merged on 07-26/07-27** — six days later, with the assertion already inert. So
+  those increments did go red, but on **axe violations**, credited to the neighbouring check. Corrected
+  **in place rather than deleted**, because the misattribution is the more useful record: **a comment
+  citing three specific saves is exactly what stops the next reader from testing the claim, and it is
+  how a gate comes to be trusted.**
+  ✅ **NO FALSE POSITIVES, MEASURED BEFORE THE GATE WAS WRITTEN.** A survey of 11 pages × 3 viewports
+  found `.app-shell__content` overflow of **0 everywhere**, including the `Checklist` 44px `::before`
+  overhang on `/dashboard` that `Checklist.vue:222-246` warns about by name (the top predicted risk),
+  the builder under `--fluid`, and `MdsDataTable`'s desktop scrollers. `.app-shell__content` is present
+  on every page, so the drift guard is not vacuous.
+  ⚠️ **What it still cannot see, stated in the file rather than discovered later:** a **top-nav** overrun
+  clips at `.app-shell` above the content region (`search-nav.spec.ts` measures bounding boxes for that),
+  and an element that is its own scroll container legitimately absorbs its own overflow
+  (`list-layout.spec.ts` owns that). This is a third instrument beside those two, not a replacement.
+  ⛔ **`AuthLayout`, `AdminLayout`, the guest runtime and `Welcome.vue` carry no clip and were NOT
+  touched** — the guest public-runtime scan was never affected, so its results across the whole
+  thirty-six-day period stand.
+
+  *The original row, preserved:* `tests/e2e/support/axe.ts:41-44`
   (twin at `tests/e2e/builder-axe.spec.ts:88-91`) measures
   `document.documentElement.scrollWidth > clientWidth + 1`, while `resources/js/Layouts/AppLayout.vue:147`
   sets `.app-shell { overflow-x: clip }` and `.app-shell__content` is `overflow-y: auto`, so its

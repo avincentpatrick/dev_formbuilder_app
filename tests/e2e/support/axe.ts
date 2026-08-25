@@ -5,6 +5,14 @@ import AxeBuilder from '@axe-core/playwright';
  * Shared composed-page gate helpers (used by both the authenticated responsive-axe scan and the guest
  * public-runtime scan): assert no horizontal overflow (Feature #5's responsive contract) and zero WCAG 2.2 AA
  * violations, and force the dark theme so axe measures the dark palette on the real composed page.
+ *
+ * ⛔ **THE OVERFLOW HALF OF THAT SENTENCE WAS FALSE FOR THIRTY-SIX DAYS, ON EVERY `AppLayout` PAGE.** It
+ * measured `documentElement.scrollWidth` only, while `.app-shell` has been `overflow-x: clip` since G11
+ * (`506ff97`, 2026-07-21) — and `clip` mints no scroll container, so the number it read could not move.
+ * M17 measured the gap at **312px of real overflow read as 0**. It now measures the shell's own scroll
+ * region too; `assertNoHorizontalOverflow` below owns the reasoning, including what it still cannot see.
+ * ⚠️ The guest public-runtime scan was never affected — that tree carries no clip — so its results across
+ * the whole period stand.
  */
 /**
  * Wait for the next paint to actually land.
@@ -71,6 +79,75 @@ export async function settleAnimations(page: Page): Promise<void> {
     await settlePaint(page);
 }
 
+/**
+ * Assert nothing runs off the side — of the DOCUMENT *and* of the shell's own scroll region.
+ *
+ * ⛔ ── WHY THE DOCUMENT-ONLY VERSION OF THIS COULD NOT FAIL, ON ANY `AppLayout` PAGE ──────────────
+ * This assertion used to read `documentElement.scrollWidth > clientWidth + 1` and nothing else, and
+ * `AppLayout.vue` sets `.app-shell { overflow-x: clip }`. `clip` mints **no scroll container**, so an
+ * overrun inside the shell neither scrolls nor widens the document: `documentElement.scrollWidth`
+ * is pinned flat and the assertion is **structurally incapable of failing**. It had been that way
+ * since the clip landed, while three files in this suite went on citing it as the reason their pages
+ * are scanned at all.
+ *
+ * ⚠️ **MEASURED, NOT ARGUED (M17).** Deleting the load-bearing `overflow-wrap: anywhere` from
+ * `.dns__code` — the 64-hex DNS verification token on `/domains` — put **312px** of real overflow
+ * inside `.app-shell__content` at 375px. The document reading stayed at **0**, and
+ * `responsive-axe.spec.ts`'s *"Domains — accessible & no horizontal overflow"* passed, twice, in
+ * both themes. A test named for the thing it cannot see.
+ *
+ * ── SO IT MEASURES TWO BOXES, AND BOTH ARE LOAD-BEARING ────────────────────────────────────────
+ * `.app-shell__content` catches every `AppLayout` page: it is `overflow-y: auto` (so its `overflow-x`
+ * computes to `auto`) and the `--fluid` builder variant is `overflow: hidden` — **both mint a scroll
+ * container, unlike `clip`, so `scrollWidth` genuinely grows.** The document check stays because it
+ * is the *only* real one where there is no shell: `AuthLayout`, `AdminLayout`, the guest runtime and
+ * `Welcome.vue` carry no clip, and anything teleported to `<body>` (modals, toasts) never enters the
+ * shell at all. **Neither box subsumes the other. Do not delete one for tidiness.**
+ *
+ * ⚠️ The third assertion is the one that keeps the second honest: a page carrying `.app-shell` but no
+ * `.app-shell__content` fails LOUDLY rather than quietly measuring nothing. A renamed class would
+ * otherwise restore the exact blindness this function exists to end, and it would look green.
+ *
+ * ── WHAT IT STILL DOES NOT SEE, STATED SO NOBODY READS IT AS MORE THAN IT IS ───────────────────
+ * An overrun of the **top nav** clips at `.app-shell`, above the content region, so neither box moves;
+ * `search-nav.spec.ts` measures bounding boxes for exactly that reason. An element that is its own
+ * scroll container (`MdsDataTable`'s wrapper on desktop) legitimately absorbs its own overflow —
+ * `list-layout.spec.ts` owns that case. This is a third instrument beside those two, not a
+ * replacement for either.
+ */
+export async function assertNoHorizontalOverflow(page: Page, label: string): Promise<void> {
+    const measured = await page.evaluate(() => {
+        const doc = document.documentElement;
+        const shell = document.querySelector('.app-shell');
+        const content = document.querySelector('.app-shell__content');
+
+        return {
+            document: doc.scrollWidth - doc.clientWidth,
+            content: content ? content.scrollWidth - content.clientWidth : null,
+            shellWithoutContentRegion: !!shell && !content,
+        };
+    });
+
+    expect(
+        measured.shellWithoutContentRegion,
+        `${label}: .app-shell is present but .app-shell__content was not found — the selector this ` +
+            'gate measures has drifted, and the page-level overflow check is silently measuring nothing',
+    ).toBe(false);
+
+    // 1px, not 0: sub-pixel layout rounding is not a regression. Same tolerance the three
+    // element-level checks in this suite already use.
+    expect(measured.document, `${label} scrolls the document horizontally at this viewport`).toBeLessThanOrEqual(1);
+
+    if (measured.content !== null) {
+        expect(
+            measured.content,
+            `${label} overflows the shell's content region horizontally at this viewport ` +
+                `(${measured.content}px). The document width does NOT move for this — .app-shell is ` +
+                'overflow-x: clip — so this is the assertion that can see it.',
+        ).toBeLessThanOrEqual(1);
+    }
+}
+
 export async function assertClean(page: Page, label: string): Promise<void> {
     // Park the pointer off every control so axe measures resting styles, not a `:hover` state left over from
     // the test's last click (a parked cursor over a primary button reads its lighter hover bg and mis-flags
@@ -97,10 +174,7 @@ export async function assertClean(page: Page, label: string): Promise<void> {
     // `reducedMotion: 'reduce'` in playwright.config.ts makes it a formality rather than a race.
     await settleAnimations(page);
 
-    const overflows = await page.evaluate(
-        () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
-    );
-    expect(overflows, `${label} scrolls horizontally at this viewport`).toBe(false);
+    await assertNoHorizontalOverflow(page, label);
 
     const results = await new AxeBuilder({ page })
         .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])

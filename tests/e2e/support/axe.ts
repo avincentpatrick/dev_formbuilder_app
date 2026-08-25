@@ -118,20 +118,63 @@ export async function settleAnimations(page: Page): Promise<void> {
 export async function assertNoHorizontalOverflow(page: Page, label: string): Promise<void> {
     const measured = await page.evaluate(() => {
         const doc = document.documentElement;
-        const shell = document.querySelector('.app-shell');
         const content = document.querySelector('.app-shell__content');
+
+        // ⚠️ THE DRIFT GUARD ASKS ABOUT A SHELL THAT IS SPECIFICALLY `clip`, AND BOTH LOOSER VERSIONS OF
+        // IT WERE WRONG — each in a way worth keeping, because both are easy to write again.
+        //
+        // v1 asked "is `.app-shell` present without `.app-shell__content`?" and reddened **48 tests** on
+        // the GUEST RUNTIME, which has an `.app-shell` of its own (`resources/public-runtime/App.vue:457`)
+        // that is a plain flex column with no clip at all. A pure class-name collision across two trees,
+        // invisible from `resources/js/` — the only place a Lane A grep would have looked.
+        //
+        // v2 over-corrected to "does ANY element clip or hide the horizontal axis?", which is true on
+        // essentially every page in the app: `overflow: hidden` is how every sr-only paragraph is drawn
+        // (`p.sync-status__sr`) and how a scroll lock is applied to `body` while a modal is open. It
+        // reddened the guest suite just as thoroughly, for entirely different reasons.
+        //
+        // What actually matters is narrow: **the page shell is `overflow-x: clip`** — the one property
+        // that makes `documentElement.scrollWidth` blind — **and the scroll region inside it was not
+        // found.** `hidden` is deliberately NOT included: it mints a scroll container, so its overflow is
+        // still measurable and it is not the blindness this gate exists for.
+        //
+        // ⚠️ Its limit, stated rather than discovered: renaming `.app-shell` ITSELF silences this. That is
+        // a layout rewrite rather than drift, and no guard survives one — but do not read this as broader
+        // than it is.
+        const shell = document.querySelector('.app-shell');
+        const shellIsClipped = shell !== null && getComputedStyle(shell).overflowX === 'clip';
+
+        // Name the widest thing sticking out, so a failure is actionable rather than a number. Elements
+        // that are their OWN scroll container are skipped: their overflow legitimately stops there
+        // (`MdsDataTable`'s wrapper on desktop is the designed case).
+        let worst: { tag: string; cls: string; spill: number } | null = null;
+        if (content) {
+            const right = content.getBoundingClientRect().right;
+            for (const el of content.querySelectorAll('*')) {
+                const overflowX = getComputedStyle(el).overflowX;
+                if (overflowX === 'auto' || overflowX === 'scroll') continue;
+                const box = el.getBoundingClientRect();
+                if (box.width === 0) continue;
+                const spill = Math.round(box.right - right);
+                if (spill > 1 && (!worst || spill > worst.spill)) {
+                    worst = { tag: el.tagName.toLowerCase(), cls: el.className?.toString().slice(0, 80) ?? '', spill };
+                }
+            }
+        }
 
         return {
             document: doc.scrollWidth - doc.clientWidth,
             content: content ? content.scrollWidth - content.clientWidth : null,
-            shellWithoutContentRegion: !!shell && !content,
+            clippedShellWithoutContentRegion: shellIsClipped && content === null,
+            worst,
         };
     });
 
     expect(
-        measured.shellWithoutContentRegion,
-        `${label}: .app-shell is present but .app-shell__content was not found — the selector this ` +
-            'gate measures has drifted, and the page-level overflow check is silently measuring nothing',
+        measured.clippedShellWithoutContentRegion,
+        `${label}: .app-shell is overflow-x: clip but .app-shell__content was not found — the selector ` +
+            'this gate measures has drifted, and the page-level overflow check is silently measuring ' +
+            'nothing, which is the exact blindness this assertion exists to end',
     ).toBe(false);
 
     // 1px, not 0: sub-pixel layout rounding is not a regression. Same tolerance the three
@@ -139,11 +182,16 @@ export async function assertNoHorizontalOverflow(page: Page, label: string): Pro
     expect(measured.document, `${label} scrolls the document horizontally at this viewport`).toBeLessThanOrEqual(1);
 
     if (measured.content !== null) {
+        const offender = measured.worst
+            ? ` Widest offender: <${measured.worst.tag} class="${measured.worst.cls}"> sticking out ` +
+              `${measured.worst.spill}px.`
+            : ' No single element sticks out — suspect an intrinsic minimum on a grid or flex track.';
+
         expect(
             measured.content,
             `${label} overflows the shell's content region horizontally at this viewport ` +
                 `(${measured.content}px). The document width does NOT move for this — .app-shell is ` +
-                'overflow-x: clip — so this is the assertion that can see it.',
+                `overflow-x: clip — so this is the assertion that can see it.${offender}`,
         ).toBeLessThanOrEqual(1);
     }
 }

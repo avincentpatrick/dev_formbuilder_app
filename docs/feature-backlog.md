@@ -573,6 +573,47 @@ are still in place.
   the correction owed with it is the ~40 misleading comment lines, in the same row. Filing this is the
   single most valuable output of the review: it invalidates a gate this project has been trusting.
 
+### ⚠️ Found by the repaired overflow gate on its first run (M17, 2026-08-26)
+
+**Provenance, so nobody re-derives these.** The horizontal-overflow assertion was structurally inert on
+every `AppLayout` page for thirty-six days (the row above). The moment it could fail, it found **three
+real overruns that no gate in this project could previously see** — none of which is a regression from
+M17, all pre-existing. They are **quarantined in `KNOWN_OVERFLOWING` (`tests/e2e/support/axe.ts`), a list
+the gate forces to shrink**: a quarantined page is asserted to *still* overflow under CI, so fixing one
+fails the build until its entry is deleted. That is `clipped-node-containment.test.ts`'s `KNOWN_UNGUARDED`
+discipline, applied to a runtime measurement.
+
+⛔ **WHY THEY ARE FILED RATHER THAN FIXED, STATED PLAINLY: NONE OF THE THREE REPRODUCES ON A WINDOWS HOST.**
+All three are text-driven, and **17/24/28px is the size of the difference between Linux and Windows font
+metrics for the same face.** A probe that inlined OpenDyslexic as a data URI — defeating the recorded
+cross-origin font trap, with `document.fonts.check()` returning `true` — measured **0 overflow across all
+six page × viewport combinations**, as did a plain tablet probe of the form hub. Guessing at CSS fixes
+verifiable only through 20-minute CI round-trips, for overruns nobody here can see, is how a
+plausible-but-wrong fix ships. **Whoever takes these should reproduce in CI first, or on Linux.**
+
+- **`major` · The submissions page header title overruns its region by 17px under maximum
+  personalization.** `personalization-axe.spec.ts:55` › *Submissions at extra_large + dyslexia font +
+  teal*, **[mobile] only**. Offender named by the gate: **`<h1 class="page-header__title">` sticking out
+  17px**. 375px × `extra_large` × OpenDyslexic × teal, dark. The likely shape is the `.dns__code` one — an
+  unbreakable or non-wrapping title with no `overflow-wrap`/`min-width: 0` escape — but that is a
+  hypothesis, not a measurement. **Live** for any user on that personalization combination.
+- **`major` · `MdsSegmentedControl` spills 30px out of the builder's content region under maximum
+  personalization.** `personalization-axe.spec.ts:83` › *Builder at extra_large + dyslexia font + teal*,
+  **[mobile] only**, 24px of region overflow with **`<label class="mds-segmented__seg">` sticking out
+  30px**. ⚠️ **THE FILE ALREADY DESCRIBES THIS EXACT MECHANISM AND ITS OWN CHECK DOES NOT CATCH IT**:
+  `personalization-axe.spec.ts:93-97` says `MdsSegmentedControl` is *"`inline-flex` with `white-space:
+  nowrap` and no wrap and no overflow handling, so a switcher that does not fit spills OUT of its bar
+  while the document width never moves"*, and measures `.builder__pane-switch`'s own `scrollWidth`. That
+  bespoke check passes while the control still overruns the **page**. **A component-level check and a
+  page-level one are not substitutes.** The fix is a design-system change to `SegmentedControl.vue` with
+  its own story and blast radius, which is why it is not folded into a gate row. **Live.**
+- **`major` · The form hub overruns its region by 28px at tablet, in both themes, with no personalization
+  at all.** `responsive-axe.spec.ts:252` › *Form hub*, **[tablet] only**, light **and** dark. The gate
+  reports **no single offending element**, which points at an intrinsic minimum on a grid or flex track
+  rather than one wide child — the hardest of the three to attribute and the one with the fewest
+  preconditions: **no personalization, no theme dependence, an ordinary 834px tablet.** **Live**, and the
+  most likely of the three to be visible to a real user.
+
 ### Connectors & webhooks
 
 - ✅ **CLOSED BY `M3` (2026-08-19) — `major` · ~~THE `webhook_deliveries` FAN-OUT PICKS ITS ENDPOINTS BY

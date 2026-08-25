@@ -82,10 +82,22 @@ retry is now red. Rejected: dropping retries to 0, which would lose the trace on
 infrastructure flake and give nothing back.
 
 ⚠️ **THIS TIGHTENS MERGES FOR BOTH LANES, WHICH IS WHY IT IS HERE AND NOT ONLY IN A PR.** Any test
-that passes only on a second attempt now blocks a merge, Lane B's included. The cost is believed to
-be zero today — the only flake on record in this suite is the one the same PR fixes, and the last two
-merge runs read `551 passed + 10 skipped` with no flaky line at all. **If that belief is wrong, the
-next flaky test to appear is a real defect that was previously invisible; fix it, do not re-run it.**
+that passes only on a second attempt now blocks a merge, Lane B's included. The last two merge runs
+read `551 passed + 10 skipped` with no flaky line at all. **If a flaky test does appear, it is a real
+defect that was previously invisible; fix it, do not re-run it.**
+
+⚠️ **AND THE FIRST DRAFT OF THIS ENTRY SAID "the cost is believed to be zero — the only flake on
+record is the one the same PR fixes", WHICH WAS WRONG AND IS CORRECTED HERE RATHER THAN QUIETLY.**
+`PROGRESS.md:1436` records a **second** flake in the same spec file — *"Builder — empty canvas
+(dark)"* at what was then `builder-axe.spec.ts:170` — and `support/axe.ts` describes this file's
+"standing reputation for contrast flakes at mobile+dark" as a known and until-then unmeasured
+artifact. **There is therefore a real chance this flag reddens a run that would previously have gone
+green, and that is the flag working rather than failing.** The scan-timing fix shipping beside it is
+the most likely cure for that one too — both are mid-transition sampling — but "likely" is not
+"measured", and the honest position is that the first such red run is information, not an obstacle.
+
+⛔ **WHAT TO DO IF IT FIRES ON LANE B'S ROW:** it is almost certainly not Lane B's change. Read the
+failure before touching anything, and check `support/axe.ts`'s incident notes first.
 
 ⛔ **Ordering is load-bearing:** the flag lands in the *same* PR as the scan-timing fix and *after*
 it, so CI is never red on the way through.

@@ -20,6 +20,57 @@ export async function settlePaint(page: Page): Promise<void> {
     );
 }
 
+/**
+ * Wait until nothing is animating, then let the resulting style land.
+ *
+ * ⚠️ THE TWO-FRAME WAIT ABOVE IS NOT THIS, AND THE GAP BETWEEN THEM COST TWO CI RUNS. `settlePaint`
+ * waits for the next PAINT; it says nothing about whether a 400ms transition is a tenth of the way
+ * through. Everything the file already knew about mid-transition sampling was about transitions the
+ * SCAN started (a theme flip, an un-hover) — and the one that actually bit was started by the TEST,
+ * on the way in, long before any of this code runs: the *share panel, live link* case in
+ * `builder-axe.spec.ts` (`:198` when the incident was recorded, `:205` after this change — cite the
+ * test's NAME, which is stable, rather than a line this file's own comments keep moving) opens
+ * `MdsModal`, whose
+ * `.mds-modal-enter-active` fades opacity over `--mds-duration-slow`, and axe sampled the primary
+ * action button at ~96.5% opacity. That composites `--mds-primary-600` `#0E6FE8` — 4.71:1 and
+ * PASSING — against the white page as `#1674e9`, which is 4.45 and fails. The backlog row read the
+ * hex as a token and filed it as a contrast defect; there is no such token in this repository.
+ *
+ * `playwright.config.ts` now sets `reducedMotion: 'reduce'` at context creation, which collapses
+ * every `--mds-duration-*` to 1ms and is the real fix. This is the belt to that pair of braces, and
+ * it earns its place by stating the invariant where the next reader will look for it: NOTHING IS
+ * ANIMATING WHEN AXE SAMPLES. It also covers anything a future component drives outside the token
+ * system — a Web Animations API call, or a hard-coded duration no media query reaches.
+ *
+ * Two deliberate limits. Infinite animations (spinners, skeletons) are filtered out, because their
+ * `finished` promise never settles by definition. And the whole wait is raced against a short cap, so
+ * a paused or pathologically long animation degrades to today's behaviour instead of hanging until
+ * the 60s test timeout — a gate that hangs teaches people to skip it.
+ */
+const ANIMATION_SETTLE_CAP_MS = 1_000;
+
+export async function settleAnimations(page: Page): Promise<void> {
+    await page.evaluate(async (capMs) => {
+        const running = document
+            .getAnimations()
+            .filter((animation) => animation.effect?.getComputedTiming().iterations !== Infinity)
+            // A rejected `finished` (an animation cancelled mid-flight, which a Vue <Transition>
+            // does routinely) is not a failure of the page — swallow it and keep waiting on the rest.
+            .map((animation) => animation.finished.catch(() => undefined));
+
+        if (running.length === 0) return;
+
+        await Promise.race([
+            Promise.all(running),
+            new Promise((resolve) => {
+                setTimeout(resolve, capMs);
+            }),
+        ]);
+    }, ANIMATION_SETTLE_CAP_MS);
+
+    await settlePaint(page);
+}
+
 export async function assertClean(page: Page, label: string): Promise<void> {
     // Park the pointer off every control so axe measures resting styles, not a `:hover` state left over from
     // the test's last click (a parked cursor over a primary button reads its lighter hover bg and mis-flags
@@ -36,7 +87,15 @@ export async function assertClean(page: Page, label: string): Promise<void> {
     // FOREGROUND was still an intermediate that appears in no token file, over
     // `.share__row--actions > .mds-button--secondary`: the button the test had just clicked. A `transparent`
     // secondary button whose only opaque state is `:hover` is precisely the shape that produces this.
-    await settlePaint(page);
+    //
+    // ⛔ AND THAT PARAGRAPH DESCRIBED THE CLASS CORRECTLY WHILE CLOSING ONLY THE HALF IT COULD SEE.
+    // Every incident recorded above is a transition THIS FUNCTION started — a theme flip, an un-hover —
+    // so waiting one more paint was enough for each of them. The one it could not reach was started by
+    // the TEST on the way in and was already running before `assertClean` was called at all: the share
+    // panel's own 400ms modal fade. Two CI runs five days apart failed on it and both merged green
+    // (D2 in docs/claims/decisions.md). `settleAnimations` closes the general case, and
+    // `reducedMotion: 'reduce'` in playwright.config.ts makes it a formality rather than a race.
+    await settleAnimations(page);
 
     const overflows = await page.evaluate(
         () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,

@@ -1458,8 +1458,50 @@ are still in place.
 
 ### Design system
 
-- **`major` · The builder's share-panel live link fails WCAG AA contrast at 4.45, and the e2e gate reports it
-  as FLAKY rather than red.** Observed by **M5's final CI run (2026-08-19, run 32250476088)**: the
+- ✅ **CLOSED BY `M16` (2026-08-26) — `major` · ~~The builder's share-panel live link fails WCAG AA contrast
+  at 4.45, and the e2e gate reports it as FLAKY rather than red.~~**
+  ⛔ **THE ROW'S FIRST CLAIM IS FALSIFIED: THERE IS NO CONTRAST DEFECT, AND `#1674e9` IS NOT A TOKEN IN THIS
+  REPOSITORY.** The button is `--mds-color-action-primary-bg` → `--mds-primary-600` → **`#0E6FE8`**
+  (`theme-overrides.css:125`), which is **4.71:1 against white and passes**. `#1674e9` is what `#0E6FE8`
+  *becomes* when composited at ~96.5% opacity over the white page: `0.965·0E + 0.035·FF = 16`,
+  `0.965·6F + 0.035·FF = 74`, `0.965·E8 + 0.035·FF = E9` — exact on all three channels. That opacity is
+  `.mds-modal-enter-active` (`Modal.vue:481-483`) still running its `--mds-duration-slow` **400ms** fade
+  when axe samples. **A scan-timing defect, not a colour one** — and retuning the token, which is what the
+  row as written invites, would have darkened a passing colour to hide a broken gate.
+  ⚠️ **MEASURED IN THE RUNNING APP RATHER THAN INFERRED, AND IT IS WORSE THAN TWO CI RUNS SUGGESTED.** A
+  probe that mirrors the spec step for step and reads the page at the exact instant `assertClean` hands it
+  to axe found the backdrop at **opacity 0.5138** with **three animations still running**, compositing the
+  button to `#83b5f3` — **2.13:1**, less than half the AA floor. CI caught it at 96.5% (4.45) purely by
+  where in the fade its scan happened to land. ⛔ **SO THE DEFECT IS A CONTINUUM, NOT AN INTERMITTENCY:**
+  the measured ratio is a function of elapsed fade time, anywhere from 2.13 to 4.71, and the case *passes*
+  only when the scan lands after the full 400ms. That is why it read as flaky, and it is why the retry
+  "worked".
+  ⛔ **AS FIXED.** `playwright.config.ts` sets **`contextOptions: { reducedMotion: 'reduce' }`** — at
+  context creation, so `theme-overrides.css:410-417` collapses every `--mds-duration-*` to 1ms from the
+  first frame. `forceTheme` has emulated reduced motion since J1e and its docblock names this exact hazard,
+  but it runs *after* the test opens what it came to scan, and **a CSS transition keeps the
+  `transition-duration` it started with** — so emulating mid-flight cannot collapse one already running.
+  `support/axe.ts` gains `settleAnimations()`, which awaits every **finite** in-flight animation (infinite
+  ones — spinners, skeletons — are filtered, and the whole wait is capped, so it can never hang) and
+  replaces the bare `settlePaint` in both `assertClean` and `builder-axe.spec.ts`'s twin.
+  ✅ **PROOF, all three legs measured.** Same probe, `reducedMotion` on: effective opacity **1**, empty
+  opacity chain, button reads **`#0e6fe8`** and **4.71:1** — the exact value `theme-overrides.css:125`
+  documents. The real spec then ran green locally on **"share panel, live link (light)", the precise case
+  that failed CI twice**, in 28.0s — well inside the 60s timeout, so `settleAnimations` demonstrably does
+  not stall. ⚠️ **The one animation still running under the fix has an infinite iteration count**, which is
+  exactly the hang `settleAnimations`' filter exists to avoid; the filter was designed before the probe
+  found it and the probe then justified it.
+  ⛔ **THE ROW'S SECOND CLAIM STANDS AND IS ANSWERED SEPARATELY.** "A gate that retries turns a
+  deterministic failure into an intermittent one" is correct, and the decision it asked for is **D2 in
+  `docs/claims/decisions.md`**: `failOnFlakyTests: !!process.env.CI` alongside the existing `retries: 1`,
+  so a result that needed the retry is red while the retry still produces its trace. ⚠️ Note
+  `PROGRESS.md:1436` records a **second** flake in this same file — *"Builder — empty canvas (dark)"* — of
+  the same shape; if it recurs it is now a hard failure rather than a line to skim past.
+  ⚠️ **Line numbers moved:** the live-link case was `builder-axe.spec.ts:198` and is `:205` after this
+  change. **Cite the test's NAME.** Historical records below preserve `:198` as the incident recorded it,
+  the same convention this repo already applies to the incident hexes in `support/axe.ts`.
+
+  *The original row, preserved:* Observed by **M5's final CI run (2026-08-19, run 32250476088)**: the
   `builder-axe.spec.ts` case *"Builder — share panel live link"* (light, mobile) failed axe
   `color-contrast` — *"insufficient color contrast of 4.45 (foreground #ffffff, background #1674e9, font
   size 10.5pt (14px))"* — then passed on Playwright's retry, so the summary read **550 passed + 1 flaky +

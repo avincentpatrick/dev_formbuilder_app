@@ -20,6 +20,7 @@
  */
 
 import type { BadgeVariant, StatusDescriptor } from '@meridian/design-system';
+import { conflictCopy } from './conflict-notice';
 import type { OutboxRow, OutboxStatus } from './db';
 import { deriveReference } from './reference-number';
 
@@ -130,9 +131,12 @@ export function describeRow(row: OutboxRow, syncing: boolean, reviewableHere: bo
         case 'conflict':
             return {
                 ...view,
-                detail: reviewableHere
-                    ? 'We found a conflict — the form changed after this was saved.'
-                    : 'Needs review — open this form to resolve it.',
+                // Increment M14 — WHY it conflicted comes from `lib/conflict-notice.ts`, which `App.vue`'s
+                // review banner also reads. Before M14 this branch hardcoded the form-was-updated sentence
+                // for every cause, so a content conflict read one way here and another way in the banner the
+                // Review button opens — two files disagreeing about one row. WHERE it can be resolved stays
+                // here, because that is a property of the current session rather than of the refusal.
+                detail: reviewableHere ? conflictCopy(row.conflict_code).listDetail : 'Needs review — open this form to resolve it.',
                 canReview: reviewableHere,
                 canDiscard: reviewableHere,
             };

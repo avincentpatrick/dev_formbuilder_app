@@ -767,7 +767,7 @@ it('409s (not 500) a guest draft save naming a uuid spent on ANOTHER form (M11)'
         'client_submission_uuid' => $uuid,
     ])
         ->assertStatus(409)
-        ->assertJsonPath('error.code', 'submission_conflict')
+        ->assertJsonPath('error.code', 'submission_uuid_claimed')
         ->assertJsonPath('error.message', 'This submission identifier already belongs to another response.');
 
     // Exactly one row, still form B's, still its answers.
@@ -800,7 +800,7 @@ it('refuses a uuid still reserved by a SOFT-DELETED row rather than failing on t
         'client_submission_uuid' => $uuid,
     ])
         ->assertStatus(409)
-        ->assertJsonPath('error.code', 'submission_conflict')
+        ->assertJsonPath('error.code', 'submission_uuid_claimed')
         ->assertJsonPath('error.message', 'This submission identifier already belongs to another response.');
 
     enterTenant($f->tenant->id);

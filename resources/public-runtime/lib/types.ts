@@ -318,6 +318,19 @@ export type ErrorKind =
     // `terminal`, and replay.ts maps terminal to markNeedsAttention — PARKING THE ROW FOR A HUMAN, which
     // is exactly wrong for a spam check that just needs re-solving. api-client re-solves and retries once.
     | 'challenge'
+    // Increment M14 — the four causes below all arrive as `409`, and until M14 the classifier read the status
+    // and never the code, so every one of them became `refresh` ("the form was republished"). They are their
+    // own kinds for the I8b reason one line up: `replay.ts` and both `RuntimeSession` folds branch on KIND,
+    // so a shared kind is a shared REMEDY — and these four remedies are mutually exclusive. The server names
+    // the right one in `error.code`; this union is where the client finally hears it.
+    //
+    // ⚠️ `refresh` KEEPS ITS EXACT PRE-M14 MEANING AND ITS EXACT PRE-M14 CONSUMERS. It is still `form_updated`
+    // / `submission_version_superseded` only, and still the DEFAULT for an unrecognised or bodyless 409 —
+    // failing toward the recovery that re-mints and re-fetches, which is safe for any cause.
+    | 'draft_stale' // 409 draft_conflict (P3a save / M12 promote) — RE-READ THE DRAFT AND KEEP THE UUID
+    | 'conflict' // 409 submission_conflict — a content conflict; park it for the G8c review flow
+    | 'uuid_claimed' // 409 submission_uuid_claimed (M11 cause, own code since M14) — mint a fresh uuid
+    | 'finalized' // 409 draft_already_finalized (H9a) — already submitted; stop saving, do not re-read
     | 'terminal' // 401 invalid / 403 disabled / 404 — unrecoverable
     | 'unknown';
 

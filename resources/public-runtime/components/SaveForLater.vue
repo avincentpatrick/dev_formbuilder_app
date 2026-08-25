@@ -9,8 +9,15 @@
  * me the link" action (which re-saves with `finish_later` so the backend queues the resume email). A version
  * drift during the save routes the whole session into the reschema remount (saveDraft returns null) and this
  * component unmounts — so the null branch just closes.
+ *
+ * ⚠️ INCREMENT M14 — `null` NOW MEANS *ONLY* "THE SESSION IS REMOUNTING", WHICH IS WHAT MAKES CLOSING SILENTLY
+ * CORRECT. It used to mean that OR "a 409 nobody handled", because `RuntimeSession` folded every 409 into the
+ * one drift branch — so a "Save and finish later" refused for a stale baseline produced no save, no resume
+ * link and no message, and the remount then minted a SECOND server draft with a second emailed link. Every
+ * refusal that does not remount is now thrown, and both catches below say what happened.
  */
 import { ref } from 'vue';
+import { ApiError } from '../lib/api-client';
 import { MdsButton, MdsFormField, MdsModal, MdsSpinner, MdsTextInput } from '@meridian/design-system';
 import { useDraftFlow } from '../composables/context';
 
@@ -43,9 +50,15 @@ async function onOpen(): Promise<void> {
         }
         resumeUrl.value = result.resumeUrl;
         phase.value = 'ready';
-    } catch {
+    } catch (error) {
         phase.value = 'error';
-        errorMessage.value = 'We couldn’t save your progress just now. Please try again.';
+        // ⚠️ INCREMENT M14 — THE ERROR IS BOUND NOW, AND THAT IS THE POINT. This `catch` took no argument, so
+        // every refusal the session did not absorb collapsed to one sentence that names no cause and no
+        // remedy. The server's own sentence is the only thing that tells a `draft_already_finalized` apart
+        // from a `submission_conflict` — `SubmissionConflictException` records that the message is all that
+        // separates two of its causes on the wire — so it is shown verbatim when there is one.
+        errorMessage.value =
+            error instanceof ApiError ? error.normalized.message : 'We couldn’t save your progress just now. Please try again.';
     }
 }
 
@@ -54,13 +67,21 @@ async function onEmail(): Promise<void> {
         return;
     }
     emailing.value = true;
+    // Increment M14 — clear the previous attempt's sentence, now that one can actually be on screen: a
+    // successful retry that left the old refusal showing would be its own small lie.
+    errorMessage.value = '';
     try {
         const result = await draft.saveDraft({ email: email.value.trim(), finishLater: true });
         if (result !== null) {
             emailed.value = result.emailed;
         }
-    } catch {
-        errorMessage.value = 'We couldn’t email the link. You can still copy it above.';
+    } catch (error) {
+        // Increment M14 — the same binding, for the same reason. This arm keeps naming the copy button as the
+        // way out, because unlike `onOpen` a link is already on screen here and still works.
+        errorMessage.value =
+            error instanceof ApiError
+                ? `${error.normalized.message} You can still copy the link above.`
+                : 'We couldn’t email the link. You can still copy it above.';
     } finally {
         emailing.value = false;
     }
@@ -138,6 +159,15 @@ async function onCopy(): Promise<void> {
                         </MdsButton>
                     </div>
                 </template>
+
+                <!--
+                    ⚠️ Increment M14 — WITHOUT THIS THE EMAIL ARM'S MESSAGE HAD NOWHERE TO RENDER, WHICH IS A
+                    SHARPER VERSION OF THE SWALLOW THE BACKLOG ROW NAMES. `onEmail` only runs while `phase`
+                    is `ready`, and the error paragraph below is the `v-else` of that same branch — so the
+                    sentence it set was unreachable markup, and a failed "Email me the link" left the panel
+                    looking exactly as it did before the click. The pre-M14 assignment was dead code.
+                -->
+                <p v-if="errorMessage !== ''" class="save-later__error" role="alert">{{ errorMessage }}</p>
             </template>
 
             <p v-else class="save-later__error" role="alert">{{ errorMessage }}</p>

@@ -113,10 +113,12 @@ final class SubmissionDraftController extends Controller
             // `draft_conflict` — another tab/device saved in between, so this tick is based on answers the
             // draft no longer holds. NOT terminal in the same way: the fix is to re-read the draft and carry
             // on, which is why the two carry distinct codes rather than one shared 409.
-            // `submission_conflict` — added in M11 and reachable here only as a RACE: resolveTarget() above
-            // already refuses a uuid spent outside this caller's scope, so reaching it through saveDraft()
-            // means the row was created between those two statements. Same envelope either way, which is why
-            // the code and the message are read off the exception rather than spelled out twice.
+            // `submission_uuid_claimed` — added in M11 and reachable here only as a RACE: resolveTarget()
+            // above already refuses a uuid spent outside this caller's scope, so reaching it through
+            // saveDraft() means the row was created between those two statements. ⚠️ IT CARRIED
+            // `submission_conflict` UNTIL INCREMENT M14 SPLIT THE TWO CAUSES; the code and the message are
+            // still read off the exception rather than spelled out twice, which is why that split reached
+            // this route without an edit here.
             return ApiErrorResponse::make(409, $e->code(), $e->getMessage());
         } catch (SubmissionValidationException $e) {
             // Structural (Stage 1) only — saveDraft() skips Stage 3 by design, so a half-filled document

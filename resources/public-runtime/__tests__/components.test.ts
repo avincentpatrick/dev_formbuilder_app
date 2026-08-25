@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 import RuntimeSession from '../components/RuntimeSession.vue';
 import type { ApiClient } from '../lib/api-client';
+import { ApiError } from '../lib/api-client';
+import { normalizeError } from '../lib/error-normalizer';
 import type { Bootstrap } from '../lib/types';
 import { field, schemaResponse, section } from './fixtures';
 
@@ -986,6 +988,123 @@ describe('RuntimeSession — single-page section removal (H21b §4.4)', () => {
         expect(wrapper.find('.relevance-note').text()).toContain('won’t be included');
         expect(wrapper.find('.relevance-note').text()).toContain('Second');
         expect(announced(wrapper)).toContain('saved in case');
+
+        wrapper.unmount();
+    });
+});
+
+describe('RuntimeSession — the 409 a respondent is told the truth about (Increment M14)', () => {
+    const conflictSchema = () =>
+        schemaResponse({
+            form: { save_and_resume: true },
+            fields: [field({ key: 'name', label: 'Full name' })],
+        });
+
+    function rejecting(code: string, message: string): () => never {
+        return () => {
+            throw new ApiError(normalizeError(409, { error: { code, message } }));
+        };
+    }
+
+    it('re-reads the DRAFT on a submit refused for a stale baseline, instead of re-fetching the schema', async () => {
+        // ⚠️ THE FIRST BACKLOG ROW, PINNED. `draft_conflict` means another device wrote this draft. Before
+        // M14 it normalized to `refresh` and took the drift branch: re-mint, re-fetch a schema nobody
+        // republished, then remount under a fresh uuid with `draftBaseline` null — abandoning the server
+        // draft mid-edit and resubmitting with no baseline at all.
+        const client = fakeClient({ submit: vi.fn(rejecting('draft_conflict', 'This draft was updated on another device.')) });
+        const wrapper = mount(RuntimeSession, {
+            props: { schema: conflictSchema(), bootstrap: { ...bootstrap, resumeToken: 'rt-boot' }, client },
+        });
+
+        await wrapper.find('input').setValue('Ada');
+        await wrapper.find('form').trigger('submit');
+        await settle();
+
+        expect(wrapper.emitted('redraft')?.[0]).toEqual([{ resumeToken: 'rt-boot' }]);
+        // NOT the drift path — the schema was never in question, and asking for it again is what made the
+        // recovery discard the uuid.
+        expect(wrapper.emitted('reschema')).toBeUndefined();
+        expect(client.remint).not.toHaveBeenCalled();
+        expect(client.fetchSchema).not.toHaveBeenCalled();
+
+        wrapper.unmount();
+    });
+
+    it('carries the resume token minted by the LAST SAVE, not only one from a resume link', async () => {
+        // ⚠️ THE LINE THIS PINS IS A DELETION THAT WAS NEVER NOTICED: `saveDraftAction` read three fields off
+        // the save result and dropped `resumeToken`, which `GuestDraftController` returns on EVERY save. So a
+        // respondent who had never opened a resume LINK — the ordinary case — had nothing to re-read with.
+        // `resumeToken: ''` here is what makes the bootstrap source unavailable and forces the save source.
+        const client = fakeClient({
+            saveDraft: vi
+                .fn()
+                .mockResolvedValueOnce({
+                    id: SUBMISSION_ID,
+                    completenessPercent: 50,
+                    resumeToken: 'rt-from-save',
+                    resumeUrl: 'https://acme.test/f/resume/rt-from-save',
+                    expiresAt: '',
+                    contentChecksum: 'sum-1',
+                })
+                .mockImplementationOnce(rejecting('draft_conflict', 'This draft was updated on another device.')),
+        });
+        const wrapper = mount(RuntimeSession, {
+            props: { schema: conflictSchema(), bootstrap: { ...bootstrap, resumeToken: '' }, client },
+        });
+        await settle();
+
+        // Two passes through the panel: the first mints the token, the second is refused.
+        await wrapper.findAll('button').filter((b) => b.text().includes('Save and finish later'))[0].trigger('click');
+        await settle();
+        await wrapper.findAll('button').filter((b) => b.text().includes('Save and finish later'))[0].trigger('click');
+        await settle();
+
+        expect(wrapper.emitted('redraft')?.[0]).toEqual([{ resumeToken: 'rt-from-save' }]);
+
+        wrapper.unmount();
+    });
+
+    it('names the CAUSE when a content conflict remounts, rather than asserting a republish', async () => {
+        // `submission_conflict` keeps the remount — a fresh uuid is a fine remedy for it — so the code, not
+        // the recovery, is what M14 changes here. The emit carries it so App.vue can pick a true sentence
+        // instead of "This form was updated", which is the false half of the first backlog row.
+        const client = fakeClient({
+            submit: vi.fn(rejecting('submission_conflict', 'This response conflicts with a copy already saved.')),
+            // `fakeClient`'s default `fetchSchema` throws, which `handleDrift` would swallow into its notice
+            // arm — so a case about the emit has to supply one or it measures the catch block instead.
+            fetchSchema: vi.fn(async () => conflictSchema()),
+        });
+        const wrapper = mount(RuntimeSession, { props: { schema: conflictSchema(), bootstrap, client } });
+
+        await wrapper.find('input').setValue('Ada');
+        await wrapper.find('form').trigger('submit');
+        await settle();
+
+        expect(wrapper.emitted('reschema')?.[0]).toEqual([
+            expect.objectContaining({ conflictCode: 'submission_conflict' }),
+        ]);
+        expect(wrapper.emitted('redraft')).toBeUndefined();
+
+        wrapper.unmount();
+    });
+
+    it('still calls a republish a republish, which is the one cause the old copy was right about', async () => {
+        // ⚠️ THE CONTROL, AND IT GUARDS A STRING AN E2E THIS HOST CANNOT RUN ASSERTS ON. `form_updated` must
+        // keep emitting a NULL code so App.vue reaches the unchanged drift wording;
+        // `tests/e2e/public-runtime-offline.spec.ts` matches /this form was updated/i against it.
+        const client = fakeClient({
+            submit: vi.fn(rejecting('form_updated', 'This form has been updated.')),
+            fetchSchema: vi.fn(async () => conflictSchema()),
+        });
+        const wrapper = mount(RuntimeSession, { props: { schema: conflictSchema(), bootstrap, client } });
+
+        await wrapper.find('input').setValue('Ada');
+        await wrapper.find('form').trigger('submit');
+        await settle();
+
+        expect(client.remint).toHaveBeenCalled();
+        expect(wrapper.emitted('reschema')?.[0]).toEqual([expect.objectContaining({ conflictCode: null })]);
+        expect(wrapper.emitted('redraft')).toBeUndefined();
 
         wrapper.unmount();
     });

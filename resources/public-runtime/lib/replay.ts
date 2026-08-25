@@ -15,7 +15,7 @@
 import { createApiClient } from './api-client';
 import { ApiError, normalizeError } from './error-normalizer';
 import type { MeridianDb, MediaQueueRow, OutboxRow } from './db';
-import type { SchemaResponse } from './types';
+import type { ErrorKind, SchemaResponse } from './types';
 import { listPending, markConflict, markNeedsAttention, markSynced, pruneSynced, recordAttempt, setAnswers } from './outbox';
 import {
     collectLocalMediaIds,
@@ -24,6 +24,54 @@ import {
     recordMediaAttempt,
     rewriteLocalMediaIds,
 } from './media-queue';
+
+/**
+ * Increment M14 — what a replayed submit does about each `ErrorKind`, EXHAUSTIVE BY CONSTRUCTION.
+ *
+ * ⚠️ THIS TABLE IS A `Record` RATHER THAN AN `if`-CHAIN BECAUSE THIS IS THE FILE WHERE A MISSED KIND COSTS
+ * THE MOST, AND M14 IS THE INCREMENT THAT MADE MISSING ONE POSSIBLE. The chain it replaces named `field`,
+ * `refresh` and `terminal` and let everything else fall through to `backoff()` — correct while every 409 was
+ * `refresh`, and a live defect the moment four of the five 409 causes stopped being. A conflict that falls
+ * through is retried five times, each attempt re-POSTing the identical `base_content_checksum` the server
+ * has already refused, before parking as `needs_attention` with the wrong reason attached.
+ *
+ * A `Record<ErrorKind, …>` makes that unrepresentable: vue-tsc refuses to compile the next `ErrorKind`
+ * member until this table says what happens to it. `lib/replay.ts` is inside `tsconfig.json`'s `include`
+ * (and `sw.ts` re-imports `replayOutbox`, so `tsconfig.sw.json` checks it a second time), which is what
+ * makes that a real gate rather than an intention.
+ *
+ * ⚠️ THE SEVEN PRE-M14 KINDS KEEP THEIR EXACT PRE-M14 OUTCOMES, INCLUDING THE ONES THAT LOOK WRONG.
+ * `schedule` retries: a form that closed mid-queue backs off and parks after five attempts rather than
+ * being refused outright. That is pre-existing behaviour, it is not what this increment is about, and
+ * changing it here would hide a behaviour change inside a refactor.
+ */
+const REPLAY_OUTCOME: Record<ErrorKind, 'needsAttention' | 'conflict' | 'retry'> = {
+    // Pre-M14, unchanged.
+    field: 'needsAttention',
+    terminal: 'needsAttention',
+    refresh: 'conflict',
+    remint: 'retry',
+    rate_limited: 'retry',
+    challenge: 'retry',
+    schedule: 'retry',
+    unknown: 'retry',
+
+    // Increment M14 — the three 409 causes that are not a republish. All three park for the G8c review flow,
+    // exactly as `refresh` does, and for the same reason: the answers are real and only a person can decide
+    // what to do with them. What changes is that `markConflict` now stores a code the review banner and the
+    // outbox list can both READ (`lib/conflict-notice.ts`), so the parked row finally says why it parked.
+    draft_stale: 'conflict',
+    conflict: 'conflict',
+    uuid_claimed: 'conflict',
+
+    // ⚠️ UNREACHABLE ON THIS CHANNEL, AND MAPPED ANYWAY. `draft_already_finalized` is raised by
+    // `SubmissionDraftService::updateDraft()`, i.e. by a DRAFT SAVE — and replay only ever submits. The
+    // submit door cannot raise it either: `GuestSubmissionController::existingDraft()` returns null once the
+    // row has been promoted, so a replayed duplicate routes to the pipeline and comes back an idempotent
+    // 200. `needsAttention` is the honest entry regardless: it would mean the response is already recorded,
+    // which no amount of retrying improves.
+    finalized: 'needsAttention',
+};
 
 const MAX_ATTEMPTS = 5;
 
@@ -283,21 +331,19 @@ async function replayRow(
         return { outcome: 'synced', reference: result.reference };
     } catch (error) {
         if (error instanceof ApiError) {
-            const kind = error.normalized.kind;
-            if (kind === 'field') {
-                await markNeedsAttention(db, uuid, error.normalized.message);
+            const { kind, code, message } = error.normalized;
+            if (REPLAY_OUTCOME[kind] === 'needsAttention') {
+                await markNeedsAttention(db, uuid, message);
+
                 return { outcome: 'needsAttention', reference: null };
             }
-            if (kind === 'refresh') {
-                await markConflict(db, uuid, error.normalized.message, error.normalized.code);
+            if (REPLAY_OUTCOME[kind] === 'conflict') {
+                await markConflict(db, uuid, message, code);
+
                 return { outcome: 'conflict', reference: null };
             }
-            if (kind === 'terminal') {
-                await markNeedsAttention(db, uuid, error.normalized.message);
-                return { outcome: 'needsAttention', reference: null };
-            }
         }
-        // rate_limited / unknown / a thrown network error — retry on the next pass.
+        // A `retry` kind, or a thrown network error — retry on the next pass.
         return backoff(db, uuid, error);
     }
 }

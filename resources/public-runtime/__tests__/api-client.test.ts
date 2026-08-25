@@ -250,7 +250,7 @@ describe('P3a draft lost-update baseline', () => {
         expect(result.contentChecksum).toBe('server-sum');
     });
 
-    it('maps a 409 draft_conflict as a distinct code the caller can branch on', async () => {
+    it('maps a 409 draft_conflict as a distinct code AND kind the caller can branch on', async () => {
         const client = createApiClient({
             token: 't',
             slug: 's',
@@ -258,6 +258,10 @@ describe('P3a draft lost-update baseline', () => {
         });
 
         await expect(client.saveDraft({ answers: {}, clientSubmissionUuid: 'u', locale: 'en', baseContentChecksum: 'stale' }))
-            .rejects.toMatchObject({ normalized: { code: 'draft_conflict' } });
+            // ⚠️ Increment M14 — `kind` IS THE HALF THAT WAS MISSING, AND ITS ABSENCE HERE WAS DELIBERATE.
+            // This case was written asserting the code alone, under a title promising the caller could branch
+            // on it — while the classifier folded every 409 to `refresh`, so no caller could. The assertion
+            // documented the defect instead of failing on it. It fails on it now.
+            .rejects.toMatchObject({ normalized: { code: 'draft_conflict', kind: 'draft_stale' } });
     });
 });

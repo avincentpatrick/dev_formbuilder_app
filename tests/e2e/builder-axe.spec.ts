@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
-import { forceTheme, settlePaint } from './support/axe';
+import { forceTheme, settleAnimations } from './support/axe';
 import { openBuilder, showBuilderPane } from './support/navigate';
 
 // Interaction-driven accessibility gate for the form builder (Increment D4b) — the single highest-risk
@@ -84,7 +84,14 @@ async function scan(page: Page, label: string): Promise<void> {
     // (`#6f99b5`, in no token file) over the settled dark `bg-surface` (`#123350` as it then was; JR1 moved
     // that token to `#1a2130` and the incident hexes are left as recorded), on the very button the
     // test had just clicked. Shared with `assertClean`, which owed the same wait.
-    await settlePaint(page);
+    //
+    // ⛔ AND THAT CLOSED THE HALF THIS FUNCTION STARTS, NOT THE HALF THE TEST STARTS. The share-panel
+    // case two hundred lines below opens `MdsModal`, whose `.mds-modal-enter-active` fades opacity over
+    // `--mds-duration-slow` (400ms) — already running before `scan()` is ever called, so no amount of
+    // waiting for the NEXT paint could reach it. axe sampled the primary action button at ~96.5% opacity
+    // and read `--mds-primary-600` `#0E6FE8` (4.71:1, PASSING) as `#1674e9` (4.45, failing). Two CI runs
+    // five days apart failed there and both merged green as "flaky". See D2 in docs/claims/decisions.md.
+    await settleAnimations(page);
 
     const overflows = await page.evaluate(
         () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,

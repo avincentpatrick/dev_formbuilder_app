@@ -16,10 +16,59 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM
+## CLAIMED — the share panel scans mid-transition, and a retry hides it (`m16-axe-scan-timing`)
 
-Lane A holds nothing. The two-lane protocol was established on 2026-08-25 with the board clean —
-no open PRs, no commits ahead in any worktree.
+Opened: 2026-08-26. **Numbered M16, not M15**: Lane B cut `m15-respondent-session-scope` on
+2026-08-25, and although it carries zero commits, two different rows answering to "M15" is the
+shared-namespace hazard 7(g) exists for. M17 is reserved for the row below it.
+
+Row: `docs/feature-backlog.md:1461` — *"The builder's share-panel live link fails WCAG AA contrast
+at 4.45, and the e2e gate reports it as FLAKY rather than red"* (`major`, Design system).
+
+**Files:** `playwright.config.ts` · `tests/e2e/support/axe.ts` · `tests/e2e/builder-axe.spec.ts` ·
+`docs/feature-backlog.md` · `docs/claims/decisions.md` · `PROGRESS.md` (Lane A's block only).
+
+**Shared artefacts taken:** `playwright.config.ts` (repo root, in neither lane's column in 7(b) —
+claimed rather than assumed) · `tests/e2e/support/axe.ts` and `tests/e2e/builder-axe.spec.ts` (the
+e2e tree, "claim first") · two `docs/`. **`ci.yml` is NOT taken** — the retry policy lands in the
+Playwright config, not in the workflow.
+
+**Paired files taken:** none. Nothing here adds a `clip: rect(0 0 0 0)`, so
+`clipped-node-containment.test.ts` cannot fire; no `NotificationType` and no ability key moves, so
+neither PHP parity gate is reachable. ⚠️ Lane B's `SyncStatus.vue` row still takes the clipped-node
+test with it — that is unaffected by this claim and remains Lane B's to take.
+
+**Namespaces spent:** nothing from either. No migration, so Lane B's block stays
+`2026_08_17_000109`. No ADR — `0021` stays free, `0010` stays reserved for H1d, `#16` stays free,
+ADR-0016's next sub-decision stays `§D34`. The invariant lands in the two gate files' own docblocks.
+
+### ⛔ THE ROW'S FRAMING IS FALSIFIED, AND THE FIX IS NOT A COLOUR CHANGE
+
+`#1674e9` **is not a token in this repository.** The button is `--mds-color-action-primary-bg` →
+`--mds-primary-600` → `#0E6FE8` (`theme-overrides.css:125`), which is **4.71:1 against white and
+passes.** `#1674e9` is what `#0E6FE8` becomes when composited at ~96.5% opacity over the white page:
+`0.965·0E + 0.035·FF = 16`, `0.965·6F + 0.035·FF = 74`, `0.965·E8 + 0.035·FF = E9` — to the byte, on
+all three channels. That opacity is `.mds-modal-enter-active` (`Modal.vue:481-483`) still running its
+`--mds-duration-slow: 400ms` fade when axe samples.
+
+**So this is a scan-timing defect, and retuning the token would darken a passing colour to hide a
+gate bug.** `forceTheme` already emulates reduced motion (`support/axe.ts:62`) and its own docblock
+at `:59-61` names this exact hazard — but it runs *after* the modal opens, and a CSS transition keeps
+the duration it started with, so emulating afterwards cannot collapse one already in flight.
+
+### Prediction, written before the run so the measurement has something to disagree with
+
+- **Vitest 129 files / 2,175 · Storybook axe 42 suites / 299 · PHPStan CI `[OK]` / local 18 by file
+  list · four host lint gates 97 · 111 · 31 · 111/119/0 · `openapi.json` byte-identical** — all
+  unmoved, and asserted rather than re-measured for the axe and PHP gates, because no `.vue`, no
+  `packages/` source, no `resources/`, and no PHP file is touched.
+- **CI Pest 4515 / 19,161** unmoved (2 pre-existing warnings), same reason.
+- **E2E reads `551 passed + 10 skipped` with no flaky line** — and unlike M13's and M14's identical
+  reading, that is an improvement rather than a coin-flip, because `failOnFlakyTests` makes the
+  absence of the line load-bearing instead of lucky.
+- ⚠️ **The prediction I most expect to be wrong**: that `reducedMotion: 'reduce'` at context level is
+  inert for the ten specs that never call `forceTheme`. Grepping found no e2e test asserting motion,
+  but "no test asserts it" is not "no test depends on it", and the honest answer comes from the run.
 
 ---
 

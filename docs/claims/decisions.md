@@ -16,7 +16,7 @@ Never wait. The user answers in batches.
 two server-paginated tables (2026-08-18) · fail **open** on an unseeded plan catalog (2026-08-18) ·
 password policy min-12 + HIBP + classes (2026-08-09) · Google-only social login (2026-08-09) ·
 gamification last (2026-08-09) · the held list stays held until the user signals, and they said
-*"not yet, ask again later"* on 2026-08-18.
+*"not yet, ask again later"* on 2026-08-18 · **a flaky e2e result fails CI** (2026-08-26, D2 below).
 
 ---
 
@@ -60,4 +60,32 @@ measured and found to matter, option 2 is the right shape — not option 3.
 
 ## ANSWERED
 
-*(none yet)*
+### D2 — May an axe violation be retryable at all? **No. A flaky e2e result now fails CI.**
+
+**Asked and answered 2026-08-26 (user decision), by Lane A while taking the share-panel row.** The
+backlog row at `:1461` delegated this explicitly — *"whoever fixes (1) should also decide whether an
+axe violation may be retryable at all"* — so it is recorded here rather than left in a PR body.
+
+**Why it needed deciding.** `playwright.config.ts` sets `retries: process.env.CI ? 1 : 0`. That is
+what turned a **deterministic** WCAG AA failure into a line that reads as noise: the same test, the
+same rule and the same element (`builder-axe.spec.ts:198` › *share panel, live link*,
+`color-contrast` on `footer > .mds-button--primary`) failed first-attempt and passed on retry in run
+`32250476088` (2026-08-19) and again in run `32711202891` (2026-08-24) — five days apart, on two
+unrelated diffs, neither of which touched a `.vue` or a design-system file. Both merged green. The
+passed count drops by one while the total is unchanged, which reads exactly like a test having been
+silently dropped.
+
+**As decided:** keep `retries: 1` — a retry still rescues a genuine infrastructure hiccup and is what
+produces the `trace: 'on-first-retry'` artefact — but add **`failOnFlakyTests: !!process.env.CI`**
+(Playwright 1.61; the flag's own documentation uses that exact expression). A result that needed a
+retry is now red. Rejected: dropping retries to 0, which would lose the trace on the first real
+infrastructure flake and give nothing back.
+
+⚠️ **THIS TIGHTENS MERGES FOR BOTH LANES, WHICH IS WHY IT IS HERE AND NOT ONLY IN A PR.** Any test
+that passes only on a second attempt now blocks a merge, Lane B's included. The cost is believed to
+be zero today — the only flake on record in this suite is the one the same PR fixes, and the last two
+merge runs read `551 passed + 10 skipped` with no flaky line at all. **If that belief is wrong, the
+next flaky test to appear is a real defect that was previously invisible; fix it, do not re-run it.**
+
+⛔ **Ordering is load-bearing:** the flag lands in the *same* PR as the scan-timing fix and *after*
+it, so CI is never red on the way through.

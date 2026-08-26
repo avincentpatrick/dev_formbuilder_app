@@ -83,6 +83,12 @@ final class TenantScopedTables
         'sso_auth_failures',
         'sso_auth_requests',
         'sso_connections',
+        // M18. Strict rather than exempt, and the contrast with `domains` two entries' worth of reasoning up
+        // is the point: that table is unprotected because it is read to decide WHICH TENANT a request is, so
+        // scoping it by tenant would be circular. This one is read only once a tenant is already established,
+        // by a host that resolved it — so nothing here is circular and the database does the scoping. Its
+        // isolation is asserted in `SsoDomainVerificationTest`, not merely classified here.
+        'sso_verified_domains',
         'submission_answer_index',
         'submission_answers',
         'submission_geo_index',

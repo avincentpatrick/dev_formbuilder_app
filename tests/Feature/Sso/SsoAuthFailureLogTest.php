@@ -8,6 +8,7 @@ use App\Enums\TenantUserStatus;
 use App\Models\SsoAuthFailure;
 use App\Models\SsoAuthRequest;
 use App\Models\SsoConnection;
+use App\Models\SsoVerifiedDomain;
 use App\Models\Tenant;
 use App\Models\TenantUser;
 use App\Models\User;
@@ -61,6 +62,18 @@ beforeEach(function (): void {
 
     enterTenant($this->tenant->id, $this->admin->id);
     $this->connection = FakeIdp::connection();
+
+    // ⚠️ M18 — WITHOUT THESE THREE CASES BELOW RECORD `domain_not_verified` INSTEAD OF THEIR OWN REASON,
+    // which is the domain check doing exactly what it is for: it runs BEFORE both adoption refusals so that
+    // an admin who has proven nothing about a domain cannot use this very panel as an account-existence
+    // oracle. Verifying the two fixture domains is what lets these cases keep certifying M1's and M9's
+    // refusals — and it makes them assert the STRONGER statement, that adoption is refused *even inside* a
+    // domain the workspace has proven it controls.
+    //
+    // ⛔ `evil.test` IS DELIBERATELY LEFT UNVERIFIED. It is the attacker fixture in the case below, and it
+    // now has a second, independent reason to be refused — which is the point rather than a redundancy.
+    SsoVerifiedDomain::factory()->verified()->forDomain('acme.test')->create();
+    SsoVerifiedDomain::factory()->verified()->forDomain('identity.test')->create();
 });
 
 afterEach(function (): void {

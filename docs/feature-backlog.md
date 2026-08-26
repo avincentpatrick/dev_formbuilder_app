@@ -1864,8 +1864,13 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   ⚠️ **THE REASON THIS SHIPPED IS A FIXTURE, NOT A SCANNER, AND THAT IS THE TRANSFERABLE PART.** The row
   is right that "the stories seed four options" — so the list never reached `max-height`, axe's
   `scrollable-region-focusable` had no scrollable region to look at, and the unit suite computes no
-  layout. Storybook now carries a 21-option `Scrolling` story (light + dark): **42 suites / 301 checks**,
-  up from 299, still green, and `scrollable-region-focusable` does **not** fire on the managed listbox.
+  layout. Storybook now carries a 21-option `Scrolling` story (light + dark), and `MdsDataTable` gains a
+  wrapping sortbar story below: **42 suites / 303 checks** in CI, up from 299 — four new stories, still
+  green, and `scrollable-region-focusable` does **not** fire on the managed listbox.
+  ⚠️ **AND 303 IS A CORRECTION OF THIS INCREMENT’S OWN NUMBER.** The local scan was run after the two
+  combobox stories and *before* the two DataTable ones, and reported 301; it was never re-run, so the
+  figure quoted while the work was in flight was stale by exactly the stories added after it. **A gate
+  measured mid-increment is a measurement of the tree at that moment, not of the increment.**
   Recorded in DSR §3.4.1 as an as-built amendment.
 
   *The original row, preserved:*

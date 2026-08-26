@@ -18,7 +18,52 @@ exact-equality `KNOWN_UNGUARDED` assertion, so the list shrinks in the *same* PR
 
 ---
 
-## Status: ACTIVE CLAIM — `M24`, the backfill that scores two review verbs the live engine never scores
+## Status: NO ACTIVE CLAIM
+
+Lane B holds nothing. **Namespaces after M23 + M24:** migration block stays **`2026_08_17_000111`** (M24
+spent none — it reads an existing `jsonb` column and adds no column, index or table); ADR-0016's next free
+sub-decision stays **`§D35`**. ⛔ **ADR `0022` STAYS FREE and stays Lane A's block-opener (`0022-0025`)** —
+M24 amended **ADR-0020** with **§D12** instead, because this is that ADR's own §D10(a) sentence being
+corrected in place, on the precedent §D10 itself set when it corrected §D5. **Fifth increment running to
+amend rather than mint.** ADR-0020's own sub-decision series is now §D1–§D12. `0010` stays reserved for
+H1d; `#16` stays free.
+
+⛔ **AND `docs/claims/decisions.md` GAINED NOTHING AGAIN, WHICH IS AGAIN A FINDING RATHER THAN AN
+OMISSION.** M24 carried a genuine architectural call — whether `ReplayableAudit` may carry a VALUE, against
+its own docblock's argued refusal — but it is not a *product* question and there was nothing to put to the
+user. The spec was not a matter of taste: a backfill exists to make history look as though the live
+listeners had been running, so *"which review verbs score"* has exactly one legitimate source, and it is
+`AwardPointsForSubmissionApproved` and `AwardPointsForSubmissionReturned`. Manufacturing a decision would
+have been worse than filing none. `D1` is untouched and still Lane A's or nobody's. ⚠️ **The NEXT row does
+carry a real one** — see the hand-off below.
+
+⚠️ **THE PROCESS DEVIATION OF RECORD, WRITTEN DOWN RATHER THAN QUIETLY ABSORBED.** M24 did **not** go
+through a PR. `git push origin HEAD:main`, used correctly for the claim commits, was run again for claim
+extension 2 at a point where the branch **already carried the fix commit** — so `be55d16` landed on `main`
+un-reviewed and un-gated, and `main` then went **red** on a Pint `ordered_imports` nit that had been fixed
+locally and never pushed. The user's decision (2026-08-26) was to verify by CI rather than revert or
+force-push, and the remedy was fix-forward: `d1d1d72` made `main` green at 6/6. **The lesson is one line:
+`HEAD:main` pushes the WHOLE branch, so it is safe for a claim ONLY while the branch contains nothing but
+claims.** After the first code commit, a claim update needs its own branch off `origin/main` — or the claim
+must be written and pushed before any code commit exists, which is what the protocol assumed and never
+said. ⚠️ **And note what the red actually cost: Lane A's PR #214 CI tested a merge with a `main` carrying
+that broken lint.** A gate reddening on a file the other lane's diff does not touch is a real cross-lane
+cost, and it is the mirror image of the note already in this file about a gate number moving on a diff that
+cannot move it.
+
+**Baseline on `origin/main` after M24 (`d1d1d72`), every figure from CI rather than quoted:** CI Pest
+**4554 / 2 warnings** (was 4544 — **+10, exactly what M24 added**: AuditReplayMapTest 29 → 36,
+BackfillTest 13 → 16) · Vitest **134 files / 2,292** (design-system 36/574 · resources/js 62/899 ·
+public-runtime 36/819 — **unchanged, and it had to be: M24 touches no JS at all**) · Storybook axe **42
+suites / 303** (unchanged) · E2E **551 passed + 10 skipped, no flaky line** · PHPStan CI `[OK]`, local
+**18 measured against the FILE LIST — zero gamification files in it** · four host lint gates
+**97 · 113 · 31 · 113/121/0**, run unpiped on the host · `openapi.json` **byte-identical** (contract tests
+green — no `/api/v1` route, resource or controller touched). ⚠️ **Only Pest moved, which is the mirror
+image of M22 and was predicted before the first file was opened.**
+
+---
+
+## RELEASED — M24, the backfill that scored two review verbs the live engine never scores (landed on `main` as `be55d16` + `d1d1d72`, CI 6/6 green, NO PR — see the deviation above)
 
 **Taken 2026-08-26.** Branch `m24-backfill-review-verbs`, cut from `origin/main` at `096d134`, PR into
 `main`. Row: the first `major` under **Gamification** in `docs/feature-backlog.md` — *the backfill awards

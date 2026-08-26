@@ -98,6 +98,25 @@ system already documents, not a decision — the M18 precedent for not minting a
 thing); no migration; no `§D<n>`. `0022` stays free and stays Lane A's block-opener; `0010` stays
 reserved for H1d; `#16` stays free; the next migration prefix stays `2026_08_17_000111`.
 
+### ⚠️ EXTENSION 1 — one new file, claimed before it was created
+
+ — **a file M19's own lesson says must
+be named here rather than appear in the diff.** (M19 claimed  and then created
+, which the claim never mentioned.)
+
+**WHY A SIBLING MODULE RATHER THAN A FUNCTION INSIDE THE SFC.** The fix is arithmetic — given the list's
+scroll position and the active option's box, what should  become — and **happy-dom computes no
+layout**, so a mounted assertion would pass whatever the code said. A pure function is the only shape this
+repository can actually gate. The precedent is already here twice:  and
+ are both logic lifted out of an SFC precisely so a unit test can reach
+it.
+
+⛔ **AND IT IS NOT , WHICH IS THE OBVIOUS FIX AND THE WRONG ONE HERE.**
+ walks **every** scrollable ancestor, so it can scroll the
+page as well as the listbox — in a repository whose last three increments were about a page gaining scroll
+it should not have. Writing  directly can only ever move the one box that is supposed to
+move.
+
 **Baseline this delta is measured against** — `origin/main` at `336d295`, after M18 + M19: CI Pest
 **4544 / 19,280** (2 pre-existing warnings) · Vitest **130 files / 2,213** (design-system 35/545 ·
 public-runtime 35/782 · resources/js 60/886) · Storybook axe **42 / 299** · E2E **551 passed + 10

@@ -18,7 +18,117 @@ exact-equality `KNOWN_UNGUARDED` assertion, so the list shrinks in the *same* PR
 
 ---
 
-## CLAIMED — M18, the SSO email-domain trust anchor (`m18-sso-domain-verification`)
+## Status: NO ACTIVE CLAIM
+
+Lane B holds nothing. **Namespaces after M18:** migration block advances to **`2026_08_17_000111`** (M18 spent
+`…000109` and `…000110`); ADR-0016's next free sub-decision is **`§D35`** (M18 spent `§D34`). ⛔ **ADR `0022`
+STAYS FREE and stays Lane A's block-opener** — M18 deliberately spent no ADR number, because this is an SSO
+trust decision inside ADR-0016's own scope and minting `0022` would have spent the scarcer namespace to say
+the same thing. `0010` stays reserved for H1d; `#16` stays free.
+
+**Baseline on `origin/main` after M18:** CI Pest **4544 / 19,280** (2 pre-existing warnings) · Vitest
+**130 files / 2,213** · Storybook axe **42 / 299** · E2E **551 passed + 10 skipped, no flaky line** ·
+PHPStan CI `[OK]`, local **18 by FILE LIST** · four host lint gates **97 · 113 · 31 · 113/121/0**.
+
+---
+
+## RELEASED — M18, the SSO email-domain trust anchor (merged as PR #209, `1eae4fc`, 6/6)
+
+**Every claimed file was edited except three, and all three were claimed on a stated prediction that they
+might not be.** `app/Support/Tenancy/ConstraintBoundaries.php`, `app/Support/Tenancy/TenantExtractColumns.php`
+and `tests/Feature/Sso/SsoStepUpWebTest.php` are absent from the diff — the claim said in words that they were
+taken *"on a prediction, not a plan… because a file that might get written to is a file another lane must not
+be holding"*, the M17 `DnsRecordBlock.vue` precedent. **Three released untouched by design is the claim
+working, not three wasted lines.** The step-up suite needed nothing because that arm never provisions, which
+the claim had already reasoned out; the two registries needed nothing because of schema decisions taken
+*after* the claim and recorded in its first extension.
+
+**The claim was extended TWICE, each time as its own pushed commit before the file was opened** (`1a14569`,
+`a9286f1`): once for `tests/Feature/Tenancy/TenantExtractColumnDriftTest.php`, found by **reading the gate**;
+once for `SsoAuthFailureLogTest` and `SsoSettingsWebTest`, found by **running the suite**. The second
+extension also records a path deviation rather than absorbing it quietly: the command shipped flat as
+`app/Console/Commands/SsoDomainCommand.php`, matching the three commands already there, not in the
+subdirectory the claim reserved.
+
+⛔ **ALL EIGHT CITATIONS HELD — THE FIRST ROW IN NINE TO BE RIGHT ABOUT ITS OWN EVIDENCE — AND IT WAS STILL
+WRONG IN TWO DIRECTIONS.** The eight-for-eight streak of finding the row's framing wrong ends on the
+citations and continues on the substance, which is a distinction worth keeping: *verifying the file:line
+claims is not the same as verifying the row.*
+
+**(1) It understated its severity.** *"NOT LIVE — both known exploits are closed"* was too generous. JIT is
+permitted to CREATE, and `SsoUserProvisioner::createUser()` stamps `email_verified_at`, defending it as
+*"the IdP's claim rather than a convenience"*. **`users` is a DEPLOYMENT-WIDE table**, so that line wrote a
+platform-global identity fact from a per-workspace trust root: a paying SSO tenant could mint a `users` row
+for any unregistered address carrying a **forged mailbox-control claim**. It did not stay local —
+`TenantMembershipService::identityIsEstablished():877` reads that exact column, so the forged stamp fed
+**M8's own predicate**, and the address's true owner, invited later by their real employer, was refused the
+password-setting arm and handed a sign-in-then-accept hop they could not complete. **Squatting, plus a denial
+of the recovery path M8 built.** That docblock is amended in place rather than left reading as settled — its
+sentence is true again, **and only because a guard elsewhere now runs first**, which is stated as the
+dependency it is.
+
+**(2) It missed a second defect entirely, which the fix's ORDERING closes for free.** The failures panel
+renders `existing_account_not_member` as *"Address already has an account elsewhere"* and `jit_disabled` as
+*"Nobody here matches that address"* — so an SSO-entitled admin could assert **any** address and read back,
+from their own settings page, whether it has an account **anywhere in the deployment**, having proven nothing
+about the domain. §D19's uniform 404 was intact the whole time; **the panel was the surface that leaked**, and
+§D26 built it precisely because that audience is entitled to answers. ⚠️ **This is the M15 shape recurring:
+the row named a disclosure and missed a worse one on the same surface.**
+
+✅ **THE "grandfathering call" THE ROW CALLED *"the part that makes it a decision rather than a feature"* WAS
+DISSOLVED RATHER THAN ANSWERED.** It priced a per-connection mode column or a backfill from members'
+addresses; **neither is built and neither is needed.** The check sits after the `Active` early return, so **an
+active membership IS the grandfather** — no live deployment loses a member on deploy, no public-mailbox
+exclusion list is maintained, and no column can be left in the wrong state. ⚠️ **That rests on an ENUMERATED
+fact rather than a reasoned one**: the four writers of `TenantUserStatus::Active` were listed and each asked
+what it demanded of the person. **Neither rejected alternative would have survived contact** — the backfill
+hands a workspace with `gmail.com` members authority over the whole of `gmail.com`, and the "enforce only once
+a domain is verified" shape is opt-in security whose switch is held by the threat actor.
+
+⚠️ **THE FIXTURE BLAST RADIUS WAS THE CONTROL WORKING, AND IT MADE M1's AND M9's OWN CASES STRONGER.** Seven
+cases across three suites went red because their workspaces had verified nothing — **the same thing that will
+happen to every real deployment.** Verifying the fixture domain in `beforeEach` means those cases now certify
+*"even inside a domain the workspace has proven it controls, single sign-on will not adopt an existing
+account"*. `evil.test` is left unverified deliberately, so the attacker fixture has two independent reasons to
+be refused. **The prediction that flagged "a fourth registry" as the most likely error was right about the
+SHAPE and wrong about the PLACE** — there was no fourth registry; `TenantScopedTables` and the extract census
+were the whole set, and the misses were test fixtures. The tell was exactly as written down: a red gate naming
+a file the diff does not touch.
+
+✅ **THREE SCHEMA DECISIONS WERE FORCED BY A GATE AND ARE RIGHT ON THE MERITS, WHICH IS THE GOOD CASE.**
+`ConstraintBoundaryDriftTest` pins two censuses by exact equality, so: the table is scoped to the **TENANT**
+with no FK to `sso_connections` (a workspace controls a domain, and re-importing IdP metadata must not destroy
+the proof); its unique key is **`(tenant_id, domain)`**, so **two workspaces may each verify the same domain**
+on their own token — a global unique would have let whichever claimed first deny the other, turning a control
+designed to stop squatting into a squatting primitive; and there is **no unique index on the token**, because
+nothing looks a row up by one, so it would have been a boundary-crossing key buying nothing. All three
+censuses stayed still, as the first claim extension predicted.
+
+⚠️ **THE ORPHANED `docker exec` TRAP FIRED TWICE, THE SECOND TIME ON PHPSTAN RATHER THAN PEST.** The tool's
+two-minute timeout kills the host side, the container process keeps running, and the redirect's stream is
+already severed — so the result is unrecoverable and the host `ps` count reads **0** while the container reads
+**1**. Both times the container probe is what found it. **Every long run went to the background afterwards**,
+which is the actual remedy rather than a faster check.
+
+✅ **PINT WAS PROVED NOT BLIND BEFORE IT WAS BELIEVED** — a deliberately misformatted probe under `app/`
+returned FAIL with exit 1 and was deleted before the real run, which then passed on 1410 files. **And PHPStan
+caught six real errors of mine before CI could**: missing `Collection` generics on `forTenant()`, three
+optional-offset reads the analyser cannot prove, and two redundant `?->` on the left of `??`. **Not one was a
+`property.notFound` phantom** — which is exactly why the local baseline is measured by FILE LIST and never by
+count, and the final run came back at 18 with none of my files in it.
+
+⛔ **WHAT WAS DELIBERATELY NOT BUILT, EACH FILED THE MOMENT THE DECISION WAS TAKEN** (the J4b1 rule, whose
+whole point is that a deliberately-unfixed finding recorded only in prose is invisible to a backlog search):
+the tenant-facing `/settings/sso` domains card — **a LANE A row**, and the reason `php artisan sso:domains`
+exists and is tested; periodic re-verification, where **the demotion rule is the hard half, not the lookup**;
+`MemberController::invite()`'s missing domain check, a product decision rather than a cleanup; and
+self-registration as the weakest of the four `Active` doors. **Residual 32 is rewritten from "nothing verifies
+this" to those three**, so nobody reads M18 as partial.
+
+---
+
+## SUPERSEDED CLAIM (kept for the record) — M18 (`m18-sso-domain-verification`)
+
 
 Opened: 2026-08-26, cut from `origin/main` at `eb45eb9`. **Numbered M18**: M16 and M17 are Lane A's and
 both merged; Lane A holds no claim, so the next free increment number is mine.

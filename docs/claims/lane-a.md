@@ -140,6 +140,23 @@ return and no exception. Expect byte-identical, and `cmp` it rather than assert 
 - `docs/claims/lane-a.md` · `PROGRESS.md` (Lane A's block and hand-off line only).
 - `openapi.json` — claimed as above; expected untouched.
 
+⚠️ **CLAIM CORRECTED BEFORE THE FIRST FILE WAS OPENED FOR EDIT — the behavioural test moves from
+`tests/Feature/Guest/GuestRuntimeTest.php` to `tests/Feature/Guest/GuestDraftRuntimeTest.php`.** The
+original line was reasoned from where the *existing rate-limit cases* live (`GuestRuntimeTest.php:460-481`,
+the mint and submit 429s) rather than from where the *affected route* is driven. `GuestDraftRuntimeTest.php`
+owns `GET /api/v1/public/drafts/{resumeToken}` — its own section header at `:203`, eight call sites, and the
+`draftFixture()` helper at `:86` that mints a real resume token through the save channel. Putting the case
+anywhere else would mean re-deriving that fixture. **`GuestRuntimeTest.php` is released untouched.**
+
+⚠️ **AND THE STRUCTURAL GATE'S SHAPE CHANGED WITH IT, WHICH IS THE MORE IMPORTANT CORRECTION.** The claim
+described asserting *"every route on `throttle:guest` carries a parameter the limiter actually reads"* —
+which requires the test to hold its own copy of the parameter-name list, i.e. the paired-list defect 7(b-bis)
+exists to warn about, one file later. **It instead invokes the limiter**: for each route bound to
+`throttle:guest`, bind two synthetic requests carrying two different token values and assert the two
+resulting bucket keys **differ**. That asks the question the defect is actually about — *does this route's
+traffic share a bucket with everyone else's* — and it cannot drift, because there is no list to keep in
+step. A sixth route with a third parameter name reddens it without the test knowing the name.
+
 ### ⛔ THREE FINDINGS THIS INCREMENT DELIBERATELY DOES NOT FIX, FILED IN THE BACKLOG THE MOMENT THE DECISION IS TAKEN
 
 The J4b1 rule: a deliberately-unfixed finding that exists only in a session transcript is invisible to every

@@ -2231,8 +2231,39 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the loop variable, and every workspace's historical points and badges are permanently absent — the
   backfill is a one-shot operator action nobody re-runs — while the operator is told "2 workspace(s)
   queued". **Latent.** Fix is a closure on `assertPushed`.
-- **`minor` · No gate in this repository detects a component used in a template but never imported.**
-  Found by M9 while scoping an unrelated row: `resources/js/Pages/invitations/Show.vue` rendered
+- ~~**`minor` · No gate in this repository detects a component used in a template but never imported.**~~
+  ✅ **DONE — M28 (2026-08-26).** `scripts/component-import-lint.php`, registered in `composer.json`
+  (script **and** the `quality` aggregate) **and as its own `ci.yml` step** — both, because `ci.yml`'s own
+  note says a composer-only registration would gate nothing since no CI job runs `composer run quality`.
+  **Baseline: 180 SFCs scanned, 0 violations**, so it ships merge-blocking with **no `KNOWN_*` quarantine
+  list** — the shape M19 spent a whole increment draining.
+  ⚠️ **PROTOTYPED READ-ONLY BEFORE THE CLAIM WAS WRITTEN, WHICH IS THE ONLY REASON IT HAS A CLEAN
+  BASELINE.** The row gives no false-positive estimate and that was the real risk. Measured: **180 `.vue`
+  files, ALL of them `<script setup>`** (so the rule needs exactly one shape, which the row does not say),
+  and a naive rule flags **2** — both real, and **two DIFFERENT bugs in the naive rule**:
+  **(a)** `packages/design-system/src/components/Badge/Badge.vue:40` is a tag **quoted inside an HTML
+  comment** — the project's standing *NAME THE THING, NEVER QUOTE IT* lesson arriving from a new
+  direction: a comment that quotes the construct it discusses booby-traps the tool that reads it. The gate
+  strips `<!-- … -->` first. **(b)** `resources/js/components/builder/ConditionRows.vue:85` is a
+  legitimate **recursive self-reference**, which Vue resolves by filename with no import. The gate allows
+  tag === basename.
+  ⛔ **THREE POSITIVE CONTROLS, THREE DISTINCT FAILURE MODES, EACH RESTORED BY sha256 BYTE COMPARISON.**
+  **R1** — deleting the `MdsBanner` import from `resources/js/Pages/invitations/Show.vue` (M9's actual
+  historical defect) reddens naming that file. **R2a** — a renamed scan root reddens with
+  *"scan root is missing"*. **R2b** — roots that exist but yield nothing reddens with *"scanned only 0
+  SFC(s), expected at least 100 … a DISCOVERY regression, not a clean run"*.
+  ✅ **AND THE GAP IS RE-MEASURED ON THIS TREE RATHER THAN INHERITED FROM M9's NOTE:** with that import
+  deleted, **`vue-tsc --noEmit` exits 0 and `vite build` exits 0** while the new gate exits 1. That is
+  precisely the hole, confirmed first-hand.
+  ⚠️ **THE R2 CONTROL FOUND A DEFECT IN THE GATE ITSELF, WHICH IS WHY IT WAS WORTH RUNNING.** The first
+  version printed the *"add the import"* footer for **every** violation — including a missing scan root,
+  whose remedy is entirely different. A gate whose failure message points at the wrong fix costs more than
+  the bug it caught. The footer is now scoped to R1 violations only.
+  ⚠️ **THE HOST LINT-GATE QUARTET IS NOW A QUINTET: `97 · 113 · 31 · 113/121/0 · 180`** — the four
+  existing figures re-measured and unmoved. PHPStan **18, this file not among them** (`phpstan.neon`
+  covers `app`/`database`/`routes` only). **Pint DOES scan `scripts/`, proven with a deliberate misformat
+  probe** rather than inferred from its `passed` line — M9's lesson applied. Original filing follows.
+  — *Found by M9 while scoping an unrelated row: `resources/js/Pages/invitations/Show.vue` rendered
   `<MdsBanner>` with no import from J3b until M9, and `resources/js/app.ts:29-32` registers no components
   globally (`.use(plugin)` is Inertia's), so Vue resolved it to nothing and the expired-invitation error
   banner never rendered. ⚠️ **MEASURED, NOT ASSUMED — the mutation was re-applied and both gates stayed
@@ -2242,8 +2273,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   **Not live** — this is a missing gate, not a defect; the one instance it hid is fixed. Cheapest honest
   shape is a lint rule over `<script setup>` SFCs comparing PascalCase template tags against the file's
   imports, with an allow-list for the globals (`component`/`template`/`transition`/Inertia's `Link`, `Head`).
-  ⛔ **It lands in `scripts/` and moves a gate baseline**, which is a tooling row rather than the page row
-  that found it — the same reasoning M7 used for the `§D<n>` citation gate directly below.
+  It lands in `scripts/` and moves a gate baseline, which is a tooling row rather than the page row
+  that found it — the same reasoning M7 used for the `§D<n>` citation gate directly below.*
 - **`minor` · Neither structural lint gate fails on an empty scan.**
   `scripts/constraint-boundary-lint.php:296-304` and `scripts/migration-lint.php:140` print the file count
   and `exit(0)` regardless, so a discovery regression — a moved directory, a mistyped iterator root — is

@@ -73,13 +73,15 @@
         "migration-lint": "@php scripts/migration-lint.php",
         "job-payload-lint": "@php scripts/job-payload-lint.php",
         "constraint-boundary-lint": "@php scripts/constraint-boundary-lint.php",
+        "component-import-lint": "@php scripts/component-import-lint.php",
         "quality": [
             "@lint",
             "@analyse",
             "@controller-gate",
             "@migration-lint",
             "@job-payload-lint",
-            "@constraint-boundary-lint"
+            "@constraint-boundary-lint",
+            "@component-import-lint"
         ],
         "post-autoload-dump": [
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",

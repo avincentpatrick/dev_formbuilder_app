@@ -86,6 +86,16 @@ jobs:
       - name: Constraint boundary linter (no FK or unique may span a tenant boundary)
         run: composer run constraint-boundary-lint
 
+      # M28. A PascalCase tag with no import resolves to NOTHING and renders as nothing, and BOTH
+      # front-end gates stay green on it: with a real import deleted, `vue-tsc --noEmit` exits 0 and
+      # `vite build` exits 0 (measured by M9, re-measured by M28 on this tree). The one historical
+      # instance shipped a silently-empty error banner on the invitation page for four increments.
+      # Registered here as its own step for the same reason every other linter in this job is — see
+      # the note above the job-payload step: no CI job runs `composer run quality`, so a
+      # composer.json-only registration would gate nothing.
+      - name: Component import linter (no template tag without an import)
+        run: composer run component-import-lint
+
       - name: Composer audit (SCA)
         run: composer audit
 

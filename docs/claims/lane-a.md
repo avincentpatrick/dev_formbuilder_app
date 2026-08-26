@@ -16,16 +16,95 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM
+## Status: ACTIVE CLAIM — `M20`, the three design-system merge-gate rows
 
-Lane A holds nothing. **Namespaces after M18 + M19:** next free ADR is **`0022`** and it is **Lane A's**
-block-opener (`0022-0025`); `0010` reserved for H1d; `#16` free; **ADR-0016 `§D34` is SPENT** (M18);
-next free migration prefix is **`2026_08_17_000111`** (M18 spent `000109` *and* `000110`). M19 spent
-nothing from either namespace.
+**Taken 2026-08-26.** Branch `m20-ds-merge-gate` off `origin/main` (`336d295`), PR into `main`.
+The three rows are the whole of the **Design system** heading in `docs/feature-backlog.md`'s merge-gate
+review that M16 did not already close, and they are grouped because all three live in
+`packages/design-system/src/components/` — **Lane A's exclusive column**, so nothing here can collide
+with Lane B on the merits. The shared artefacts below are the only reason this file needs to exist.
 
-**Baseline after M18 + M19:** CI Pest **4544 / 19,280** (2 pre-existing warnings) · Vitest **130 files / 2,213** (design-system 35/545 ·
+**THE ROWS.** (1) `major` — the combobox highlight leaves the 22rem box after ~the sixth option and
+cannot be brought back (WCAG 2.4.7). (2) `major` — the stacked sort chip ships a 32px touch target in
+the one layout that exists only on the touch band (DSR §4.4, stricter than SC 2.5.8). (3) `minor` —
+the pending-state ring measures below WCAG 1.4.11's 3:1 against its own ground, in two files that must
+move together or they disagree.
+
+**⛔ ALL EIGHT CITATIONS RE-VERIFIED BEFORE THIS CLAIM WAS WRITTEN, AND ONE IN THE ROW IS WRONG.**
+`Combobox.vue:353-358` (`max-height: 22rem` + `overflow-y: auto`), `:267-271` (rows carry no
+`tabindex`), `:176-192` (arrow keys `preventDefault`ed), `DataTable.vue:488-495` (`min-height: 32px`),
+`:472-473` (`display: none` default), `:702` (revealed in the container block),
+`PasswordStrength.vue:212-218` and `Checklist.vue:289-295` (`opacity: 0.55` on `currentColor`) **all
+hold**. ⚠️ **The container query is at `DataTable.vue:598`, not `:657-659` as the row states** — `:657`
+is the empty-row `grid-column` rule *inside* it. A `grep` for `scrollIntoView` across
+`packages/design-system/src` returns **0**, and a `grep` for `opacity: 0.55` across the package,
+`resources/js` and `resources/public-runtime` returns **exactly the two lines the row names**.
+
+**✅ AND THE CONTRAST ROW'S NUMBERS REPRODUCE TO TWO DECIMAL PLACES, WHICH IS WHY IT IS BEING FIXED
+RATHER THAN RE-ARGUED.** `currentColor` on the pending ring is `--mds-color-text-secondary` →
+`--mds-neutral-600`, composited at 55% over `--mds-color-bg-surface`. Light: `#5A6478` over `#FFFFFF`
+→ `#A4AAB5`, **2.334:1**. Dark: `#9AA5BD` over `#1a2130` → `#606A7E`, **2.961:1**. The row said 2.33
+and 2.96. **Nine rows running had their own framing wrong; this one does not.**
+
+### Files claimed
+
+**Lane A's own column — claimed for completeness, not because they are contested:**
+
+- `packages/design-system/src/components/Combobox/Combobox.vue` — the scroll fix
+- `packages/design-system/src/components/Combobox/Combobox.test.ts`
+- `packages/design-system/src/components/Combobox/Combobox.stories.ts` — **on a prediction**: the
+  stories seed four options, which is precisely why no gate sees this defect, so a long-list story is
+  the likely shape of the Storybook half
+- `packages/design-system/src/components/DataTable/DataTable.vue` — the hit area
+- `packages/design-system/src/components/DataTable/DataTable.test.ts`
+- `packages/design-system/src/components/PasswordStrength/PasswordStrength.vue` — the ring
+- `packages/design-system/src/components/PasswordStrength/PasswordStrength.test.ts`
+- `packages/design-system/src/components/Checklist/Checklist.vue` — the ring's other half
+- `packages/design-system/src/components/Checklist/Checklist.test.ts`
+
+**Shared artefacts, which are claimed and never owned:**
+
+- `docs/feature-backlog.md` — closing the three rows
+- `docs/ux/design-system-reference.md` — as-built amendments to §3.4.1 (the combobox pattern gains a
+  scroll obligation) and §4.4 (the sortbar's hit-area arithmetic). **Lane B is not in this file.**
+- `docs/claims/lane-a.md` — this file
+- `PROGRESS.md` — **Lane A's own Current Status block and Lane A's own hand-off line only**, per 7(d)
+- `MEMORY.md` and the files beside it — Lane A only, per 7(b); announced in chat when written
+
+**⚠️ CLAIMED ON A PREDICTION THAT IT MAY BE RELEASED UNTOUCHED — the M17 `DnsRecordBlock.vue` / M18
+three-file precedent, stated here rather than discovered later:**
+
+- `tests/e2e/list-layout.spec.ts` — the sort chip's 44px hit area **overhangs its 32px visual box by
+  6px vertically**, and this spec is the one that measures the table's own scroll wrapper rather than
+  `documentElement.scrollWidth` (`DataTable.vue:594-597` says so in as many words). If the overhang
+  needs a gate, it needs one here. **A file that might get written to is a file the other lane must
+  not be holding.**
+
+**⛔ NOTHING IN `resources/js/`, `resources/public-runtime/`, `app/`, `config/`, `scripts/`,
+`ci.yml`, `phpunit.xml` or `openapi.json`.** M20 touches no PHP and no `/api/v1` route, so
+`openapi.json` must come back byte-identical; if it moves, that is the other lane's merge, not this
+diff.
+
+**PAIRED FILES (7(b-bis)) — CHECKED, AND ONE IS IN RANGE.**
+`packages/design-system/src/theme/__tests__/clipped-node-containment.test.ts` scans
+`packages/design-system/src` and asserts `KNOWN_UNGUARDED` by **exact equality**. M20 adds a
+`position: relative` to `.mds-table__sortchip` and a `::before` overlay; neither is a clipped
+visually-hidden node, so the list must not move — **and if it does, that is a finding, not a
+rebaseline.** The other two paired gates read `notifications/types.ts` and `shell/nav-model.ts`, which
+M20 does not open.
+
+**Namespaces: M20 SPENDS NOTHING.** No ADR (these are three defect fixes inside components this
+system already documents, not a decision — the M18 precedent for not minting a number to say the same
+thing); no migration; no `§D<n>`. `0022` stays free and stays Lane A's block-opener; `0010` stays
+reserved for H1d; `#16` stays free; the next migration prefix stays `2026_08_17_000111`.
+
+**Baseline this delta is measured against** — `origin/main` at `336d295`, after M18 + M19: CI Pest
+**4544 / 19,280** (2 pre-existing warnings) · Vitest **130 files / 2,213** (design-system 35/545 ·
 public-runtime 35/782 · resources/js 60/886) · Storybook axe **42 / 299** · E2E **551 passed + 10
-skipped, no flaky line** · PHPStan `[OK]` · four host lint gates 97 · 111 · 31 · 111/119/0.
+skipped, no flaky line** · PHPStan CI `[OK]` · `openapi.json` byte-identical. ⚠️ **The two lane files
+disagree on the host lint gates** — `lane-a.md` carries `97 · 111 · 31 · 111/119/0` and `lane-b.md`
+carries `97 · 113 · 31 · 113/121/0`. M18 added two migrations, so **Lane B's is the post-M18 number
+and Lane A's is stale**; M20 touches no migration, so this is re-measured rather than assumed.
 
 ---
 

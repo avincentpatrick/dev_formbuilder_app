@@ -61,9 +61,22 @@ final class GamificationBackfill
      * The act rules, in `audits.id` order — which is chronological, because the column is a uuidv7.
      *
      * ⚠️ **THE `json_agg` OF `jsonb_object_keys` IS NOT A CONVENIENCE.** It is what keeps audit VALUES out
-     * of PHP entirely: {@see AuditReplayMap} needs only the SHAPE of `new_values` to tell a review from an
-     * edit, and a compliance ledger's redacted contents have no business travelling through a scoring
-     * service. `jsonb_typeof` guards it, because `jsonb_object_keys` raises on a non-object.
+     * of PHP: {@see AuditReplayMap} needs the SHAPE of `new_values` to tell a review from an edit, and a
+     * compliance ledger's redacted contents have no business travelling through a scoring service.
+     * `jsonb_typeof` guards it, because `jsonb_object_keys` raises on a non-object.
+     *
+     * ⚠️ **M24 ADDS EXACTLY ONE VALUE TO THAT, AND THE WORD "ENTIRELY" CAME OUT OF THE LINE ABOVE.** Key
+     * shape cannot tell the four REVIEW verbs apart — `snapshot()` is one fixed six-key literal serving all
+     * of them — so `new_values->>'status'` is projected as a scalar. It is a workflow enum rather than
+     * ledger material (`AuditRedactor::PII['submission']` does not contain it, so it is never a
+     * placeholder), and `->>` yields SQL NULL for a row whose payload has no `status` key, which the map
+     * treats as "score nothing" rather than guessing. ADR-0020 §D12.
+     *
+     * ⛔ **AND IT IS DELIBERATELY NOT `s.status`, WHICH THE LEFT JOIN BELOW ALREADY HAS IN SCOPE.** That is
+     * the submission's CURRENT status; this needs its status when the row was written. A submission
+     * approved in March and archived in July reads `archived` today, so keying on the join would erase the
+     * legitimate March award and keep nothing — the exact inversion of the bug being fixed. The historical
+     * value lives in `new_values` and nowhere else, which is why the ledger is read rather than the table.
      *
      * ⚠️ **THE LEFT JOIN IS ADR-0020 §D8 MADE STRUCTURAL.** Collection credits the member on the
      * SUBMISSION, and reading the audit's own actor instead would agree on every production row today and
@@ -83,7 +96,8 @@ final class GamificationBackfill
                s.respondent_user_id,
                CASE WHEN jsonb_typeof(a.new_values) = 'object'
                     THEN (SELECT json_agg(k) FROM jsonb_object_keys(a.new_values) AS k)
-                    ELSE NULL END AS new_value_keys
+                    ELSE NULL END AS new_value_keys,
+               a.new_values->>'status' AS new_status
         FROM audits a
         LEFT JOIN submissions s ON a.auditable_type = 'submission' AND s.id = a.auditable_id
         WHERE a.tenant_id = ?
@@ -210,7 +224,7 @@ final class GamificationBackfill
         $lastId = null;
 
         foreach ($rows as $row) {
-            /** @var object{id: string, auditable_type: string, event: string, auditable_id: string, user_id: ?string, created_at: string, respondent_user_id: ?string, new_value_keys: ?string} $row */
+            /** @var object{id: string, auditable_type: string, event: string, auditable_id: string, user_id: ?string, created_at: string, respondent_user_id: ?string, new_value_keys: ?string, new_status: ?string} $row */
             $lastId = (string) $row->id;
 
             $tally = $tally->plus($this->awardFor(
@@ -222,6 +236,7 @@ final class GamificationBackfill
                     actorUserId: $row->user_id === null ? null : (string) $row->user_id,
                     respondentUserId: $row->respondent_user_id === null ? null : (string) $row->respondent_user_id,
                     newValueKeys: self::decodeKeys($row->new_value_keys),
+                    newStatus: $row->new_status === null ? null : (string) $row->new_status,
                 ),
                 Carbon::parse((string) $row->created_at),
             ));

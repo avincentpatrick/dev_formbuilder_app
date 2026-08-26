@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\AuditEvent;
 use App\Enums\PointRule;
+use App\Enums\SubmissionStatus;
 use App\Services\Gamification\AuditReplayMap;
 use App\Services\Gamification\ReplayableAudit;
 
@@ -30,6 +31,7 @@ function replayRow(
     ?string $respondentUserId = null,
     array $newValueKeys = [],
     string $auditableId = 'subject-1',
+    ?string $newStatus = null,
 ): ReplayableAudit {
     return new ReplayableAudit(
         auditId: 'audit-1',
@@ -39,6 +41,7 @@ function replayRow(
         actorUserId: $actorUserId,
         respondentUserId: $respondentUserId,
         newValueKeys: $newValueKeys,
+        newStatus: $newStatus,
     );
 }
 
@@ -98,14 +101,92 @@ it('credits nobody for a guest submission, even with an actor on the row', funct
     expect($candidate)->toBeNull();
 });
 
-it('reads a real review payload as a review', function (): void {
+it('reads an APPROVED review payload as a review', function (): void {
     // Verbatim from SubmissionReviewService::snapshot(). `remarks` survives redaction as a KEY — the
     // redactor replaces the value in place and never unsets it — so this marker holds on redacted rows too.
+    // ⚠️ M24 ADDED THE STATUS TO THIS CASE, AND ITS ABSENCE WAS THE BUG. The six keys below are emitted
+    // identically by all four review verbs, so this fixture used to be simultaneously the correct-behaviour
+    // test and a passing test for the defect — it asserted "a review scores" against a payload that is
+    // equally a real `archive`. Without a status it now proves nothing about which verb ran, which is why
+    // it is named for the verb it actually pins.
     $candidate = replayMap()->candidate(replayRow('submission', 'updated', newValueKeys: [
         'status', 'validated_by', 'validated_at', 'finalized_at', 'returned_reason', 'remarks',
-    ]));
+    ], newStatus: 'approved'));
 
     expect($candidate?->rule)->toBe(PointRule::SubmissionReviewed);
+});
+
+it('reads a RETURNED review payload as a review too, because the live engine scores both', function (): void {
+    // ⚠️ THE CASE THE REPORTING ROW WOULD HAVE LOST. It is titled "two verbs the live engine never scores",
+    // which reads as "score approval only" — and `AwardPointsForSubmissionReturned` awards the SAME
+    // PointRule::SubmissionReviewed on the SAME subject as `AwardPointsForSubmissionApproved`. A fix that
+    // kept only `approved` would silently stop crediting every returned submission in every backfill.
+    $candidate = replayMap()->candidate(replayRow('submission', 'updated', newValueKeys: [
+        'status', 'validated_by', 'validated_at', 'finalized_at', 'returned_reason', 'remarks',
+    ], newStatus: 'returned'));
+
+    expect($candidate?->rule)->toBe(PointRule::SubmissionReviewed);
+});
+
+it('scores nothing for a review verb the live engine does not score', function (string $status): void {
+    // ⛔ THE DEFECT M24 FIXES, ASSERTED IN BOTH DIRECTIONS ABOVE AND HERE. `markUnderReview` and `archive`
+    // funnel through the same `apply()` and emit the same six keys as `approve` — `snapshot()` is one fixed
+    // literal and `applyRemarks()` decides only the VALUE — so the review marker fires for them too and
+    // this map used to award 3 points apiece. Neither raises a domain event, so no live listener has ever
+    // scored them: a replay that did would invent history the engine itself never wrote.
+    //
+    // ⚠️ These land in the `unmapped` bucket rather than at a cheaper rule. Scoring a claim as an EDIT to
+    // "not lose the row" would be inventing a different act that also never happened.
+    $candidate = replayMap()->candidate(replayRow('submission', 'updated', newValueKeys: [
+        'status', 'validated_by', 'validated_at', 'finalized_at', 'returned_reason', 'remarks',
+    ], newStatus: $status));
+
+    expect($candidate)->toBeNull();
+})->with(['under_review', 'archived']);
+
+it('refuses a review payload that carries no status at all rather than guessing at it', function (): void {
+    // Reachable on a hand-authored or pre-K1c row whose `new_values` has no `status` key — `->>` yields SQL
+    // NULL there. The honest answer is the same one the map gives every other ambiguous row: nothing.
+    // ⚠️ This is also the case that makes the fix fail CLOSED. If `newStatus` were ever silently dropped in
+    // plumbing — a renamed SELECT alias, a constructor argument lost — every review would stop scoring and
+    // this test would say so, where a fail-open default of 'approved' would restore the original defect.
+    $candidate = replayMap()->candidate(replayRow('submission', 'updated', newValueKeys: [
+        'status', 'validated_by', 'validated_at', 'finalized_at', 'returned_reason', 'remarks',
+    ], newStatus: null));
+
+    expect($candidate)->toBeNull();
+});
+
+it('still reads an edit of an APPROVED submission as an edit, never as a review', function (): void {
+    // ⛔ THE TRAP THE ORIGINAL FILE WARNED ABOUT AT THE EDIT CASE ABOVE, NOW LIVE. `statusSnapshot()` emits
+    // `status` too, so an edit to an already-approved submission carries exactly the status the review
+    // branch scores on. The `answers.` loop runs FIRST and returns FIRST, which is what keeps a 1-point
+    // correction from being priced as a 3-point review. Before M24 that ordering settled a payload that
+    // could not occur; it is load-bearing now, and this is the case that holds it there.
+    $candidate = replayMap()->candidate(replayRow('submission', 'updated', newValueKeys: [
+        'status', 'validated_by', 'validated_at', 'finalized_at', 'answers.full_name',
+    ], newStatus: 'approved'));
+
+    expect($candidate?->rule)->toBe(PointRule::SubmissionEdited);
+});
+
+it('names the scoring statuses exactly, and they are the ones SubmissionStatus still spells that way', function (): void {
+    // ⚠️ NOT A CONSTANT ASSERTED AGAINST ITSELF, WHICH IS THE THING THIS FILE REFUSES ELSEWHERE. The left
+    // side is a literal pinned to the ledger's historical contents; the right side is the enum's CURRENT
+    // vocabulary. They agree today. If somebody renames a case, `audits` keeps the old string forever —
+    // both tables are append-only — so this assertion goes red and forces the question "what about the rows
+    // already written?" to be answered deliberately rather than by a silent behaviour change in which every
+    // historical review quietly stops scoring.
+    expect(AuditReplayMap::SCORED_REVIEW_STATUSES)->toBe(['approved', 'returned'])
+        ->and(AuditReplayMap::SCORED_REVIEW_STATUSES)->toBe([
+            SubmissionStatus::Approved->value,
+            SubmissionStatus::Returned->value,
+        ]);
+
+    // And the two that must NOT be there — stated positively, because a set is as much what it excludes.
+    expect(AuditReplayMap::SCORED_REVIEW_STATUSES)
+        ->not->toContain(SubmissionStatus::UnderReview->value)
+        ->not->toContain(SubmissionStatus::Archived->value);
 });
 
 it('reads a real edit payload as an edit', function (): void {

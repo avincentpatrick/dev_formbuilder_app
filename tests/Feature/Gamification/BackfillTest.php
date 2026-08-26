@@ -9,6 +9,8 @@ use App\Enums\PointRule;
 use App\Enums\SubmissionSource;
 use App\Enums\SubmissionStatus;
 use App\Enums\TenantUserStatus;
+use App\Events\SubmissionApproved;
+use App\Events\SubmissionReturned;
 use App\Models\Audit;
 use App\Models\BadgeAward;
 use App\Models\Notification;
@@ -19,10 +21,12 @@ use App\Services\Entitlements\EntitlementService;
 use App\Services\Gamification\BackfillTally;
 use App\Services\Gamification\GamificationBackfill;
 use App\Services\Gamification\PointsRecorder;
+use App\Services\Submissions\SubmissionReviewService;
 use App\Services\Settings\TenantSettingRegistry;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 use Spatie\Permission\PermissionRegistrar;
@@ -182,6 +186,110 @@ it('tells a review apart from an edit, and prices them differently', function ()
         ->and($reviewed->subject_id)->toBe((string) $one->getKey())
         ->and($edited->points)->toBe(1)
         ->and($edited->subject_id)->toBe((string) $two->getKey());
+});
+
+it('scores an approval and a return, and scores neither a claim nor an archive', function (): void {
+    // ⛔ THE CALL-SITE SWEEP, AND IT IS THE WHOLE POINT OF THIS CASE. Every other assertion about the
+    // review/edit split in this repository — the unit file's literal key sets, and `replayAudit()` above —
+    // describes a payload somebody TYPED. A unit test proves what a function does when called; only a
+    // call-site test proves the production writer emits the shape the unit test assumed. This one drives
+    // the REAL `SubmissionReviewService` through all four of its verbs and then runs the REAL backfill over
+    // whatever rows that actually wrote. It fails on `main`: `markUnderReview` and `archive` each score 3.
+    //
+    // ⚠️ FOUR SEPARATE SUBMISSIONS, NOT ONE, AND THE IDEMPOTENCY INDEX IS WHY. The key is
+    // (tenant, user, rule, subject_type, subject_id), so claim-then-approve by one reviewer on ONE
+    // submission collapses to a single award and would hide the defect completely — which is exactly why
+    // the happy path has always been safe and nobody noticed. The leak is a verb applied to a submission
+    // that same actor never approved or returned, so each verb gets its own subject here.
+    $form = publishedInboxForm($this->tenant, $this->owner);
+
+    $claimed = seedInboxSubmission($form, $this->owner, SubmissionStatus::Submitted, ['full_name' => 'Ada']);
+    $approved = seedInboxSubmission($form, $this->owner, SubmissionStatus::Submitted, ['full_name' => 'Bea']);
+    $returned = seedInboxSubmission($form, $this->owner, SubmissionStatus::Submitted, ['full_name' => 'Cyd']);
+    $archived = seedInboxSubmission($form, $this->owner, SubmissionStatus::Submitted, ['full_name' => 'Dot']);
+
+    // ⚠️ THE TWO ANNOUNCING VERBS ARE FAKED, AND WITHOUT THIS THE CASE PROVES NOTHING. `approve()` and
+    // `returnToRespondent()` raise domain events post-commit, whose LIVE listeners award the very rule
+    // under test — so an unfaked run would leave awards on the table before the backfill started and
+    // "an award exists" would be true whatever the map did. Faking the events suppresses the listeners
+    // while leaving the audit rows untouched, because the audit write is a direct service call inside the
+    // transaction rather than an event subscriber. What survives is exactly what the backfill can see.
+    Event::fake([SubmissionApproved::class, SubmissionReturned::class]);
+
+    $service = app(SubmissionReviewService::class);
+    $service->markUnderReview($claimed, $this->owner);
+    $service->approve($approved, $this->owner);
+    $service->returnToRespondent($returned, $this->owner, 'Please attach the consent form.');
+    $service->archive($archived, $this->owner);
+
+    // Four rows written by one shared `apply()`, so the ledger cannot have been shaped by this test.
+    expect(Audit::query()->where('auditable_type', 'submission')->where('event', 'updated')->count())->toBe(4);
+
+    $tally = runBackfill();
+
+    $reviewed = PointAward::query()->where('rule', PointRule::SubmissionReviewed->value)->get();
+
+    expect($reviewed->pluck('subject_id')->sort()->values()->all())
+        ->toBe(collect([$approved->getKey(), $returned->getKey()])->map(strval(...))->sort()->values()->all())
+        ->and($reviewed)->toHaveCount(2)
+        ->and($tally->unmapped)->toBeGreaterThanOrEqual(2);
+
+    // Stated as an absence too: the claim and the archive must not have scored under ANY rule, so a future
+    // "don't lose the row" instinct that mapped them to SubmissionEdited would still turn this red.
+    expect(PointAward::query()->whereIn('subject_id', [
+        (string) $claimed->getKey(), (string) $archived->getKey(),
+    ])->count())->toBe(0);
+});
+
+it('does not mint a review badge for claiming and archiving alone', function (): void {
+    // ⚠️ THE HARM, ASSERTED WHERE IT IS ACTUALLY FELT — and the reporting row had the mechanism wrong.
+    // `BadgeAwarder::awardsOf()` counts award ROWS of one rule and compares that count against
+    // `BadgeKey::threshold()`; nothing anywhere reads a point TOTAL for badging. `FirstReview` is
+    // threshold 1, so before M24 the very first claimed-but-never-reviewed submission minted a review
+    // badge — permanently, since `point_awards` has no DELETE policy (ADR-0020 §D4) and `badge_awards`
+    // follows it. One archive is therefore a sharper reproduction than four hundred.
+    $form = publishedInboxForm($this->tenant, $this->owner);
+    $claimed = seedInboxSubmission($form, $this->owner, SubmissionStatus::Submitted, ['full_name' => 'Ada']);
+    $archived = seedInboxSubmission($form, $this->owner, SubmissionStatus::Submitted, ['full_name' => 'Bea']);
+
+    $service = app(SubmissionReviewService::class);
+    $service->markUnderReview($claimed, $this->owner);
+    $service->archive($archived, $this->owner);
+
+    runBackfill();
+
+    expect(BadgeAward::query()->whereIn('badge', [
+        BadgeKey::FirstReview->value, BadgeKey::Reviewer->value,
+    ])->count())->toBe(0);
+});
+
+it('reads the status out of the ledger, not off the submission as it stands today', function (): void {
+    // ⛔ THE REJECTED IMPLEMENTATION, PINNED SO IT STAYS REJECTED. `AUDITS_SQL` already LEFT JOINs
+    // `submissions`, so `s.status` is one word from where the discriminator lives — and it is the row's
+    // CURRENT state. Here a submission is genuinely approved and then archived, exactly as a real workspace
+    // would: the audit ledger holds `approved` then `archived`, while the table holds only `archived`.
+    //
+    // A map keyed on the join would see one archived submission, score nothing, and silently destroy a
+    // legitimate award — the inversion of the bug M24 fixes, and invisible to every other test here because
+    // both readings agree on a submission whose status never moved again.
+    $form = publishedInboxForm($this->tenant, $this->owner);
+    $submission = seedInboxSubmission($form, $this->owner, SubmissionStatus::Submitted, ['full_name' => 'Ada']);
+
+    Event::fake([SubmissionApproved::class]);
+
+    $service = app(SubmissionReviewService::class);
+    $service->approve($submission, $this->owner);
+    $service->archive($submission->fresh(), $this->owner);
+
+    expect($submission->fresh()->status)->toBe(SubmissionStatus::Archived);
+
+    runBackfill();
+
+    // The approval still scores, from the row that recorded it — and the archive still does not.
+    $reviewed = PointAward::query()->where('rule', PointRule::SubmissionReviewed->value)->get();
+
+    expect($reviewed)->toHaveCount(1)
+        ->and((string) $reviewed->first()->subject_id)->toBe((string) $submission->getKey());
 });
 
 it('counts a submission update that carries neither marker rather than guessing at it', function (): void {

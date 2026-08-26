@@ -39,10 +39,26 @@ use App\Enums\PointRule;
  * disjoint on exactly the markers below. Redaction cannot erase the signal: `AuditRedactor::apply()`
  * replaces a sensitive value in place and leaves its key.
  *
+ * ── ⛔ M24: AND HOW A SCORING REVIEW IS TOLD FROM A NON-SCORING ONE, WHICH THIS MAP USED TO GET WRONG ───
+ * The section above is true and was never sufficient. It tells a review from an edit; it does not tell the
+ * four REVIEW verbs apart, and `snapshot()` is one fixed six-key literal serving all four — `remarks`
+ * included, emitted unconditionally, because `applyRemarks()` decides only the value. So the review marker
+ * fires identically for `markUnderReview`, `approve`, `returnToRespondent` and `archive`, and this map
+ * scored every one of them as {@see PointRule::SubmissionReviewed}. Two of the four have no live listener
+ * at all, so a replay minted points for acts the live engine has never scored and never will — permanently,
+ * because `point_awards` has no DELETE policy (ADR-0020 §D4).
+ *
+ * **The discriminator is therefore `new_values.status`, and the spec is the LIVE LISTENERS.** A backfill
+ * exists to make history look as though they had been running, so {@see self::SCORED_REVIEW_STATUSES} is
+ * exactly the pair they fire on. ADR-0020 §D12 records the correction; §D10(a)'s sentence — *"a review
+ * always carries `remarks`"* — is where the defect came from, and it is corrected in place rather than
+ * here, so the next reader of that ADR cannot rebuild this bug from the same authority.
+ *
  * ⚠️ **ANYTHING MATCHING NEITHER MARKER IS UNMAPPED, NOT GUESSED.** An edit that changed no answers at all
  * would emit the four status keys and nothing else, and there is no honest way to read that as a review.
  * The backfill counts unmapped rows and reports them, which is the only way a future third writer of this
  * tuple becomes visible rather than becoming silently mis-scored at whichever rule the fallback picked.
+ * As of M24 a claimed or archived submission lands in that same bucket, for the same reason.
  */
 final class AuditReplayMap
 {
@@ -75,6 +91,37 @@ final class AuditReplayMap
 
     /** A review's marker: `SubmissionReviewService::snapshot()` emits it on every transition. */
     public const string REVIEW_MARKER = 'remarks';
+
+    /**
+     * The statuses of the two review verbs the LIVE engine actually scores — ADR-0020 §D12, added by M24.
+     *
+     * ⚠️ **THE REVIEW MARKER ALONE IS NOT A DISCRIMINATOR, AND BELIEVING IT WAS IS THE DEFECT THIS FIXES.**
+     * `snapshot()` is one fixed six-key literal serving all FOUR review verbs, and it emits `remarks`
+     * unconditionally — `applyRemarks()` decides only the VALUE. So `markUnderReview` and `archive` carry
+     * the marker exactly as `approve` and `returnToRespondent` do, and the map scored all four. Only two of
+     * them have a live listener: `AwardPointsForSubmissionApproved` and `AwardPointsForSubmissionReturned`,
+     * both awarding {@see PointRule::SubmissionReviewed} on the same subject. A replay is supposed to make
+     * a workspace's history look as though those listeners had been running all along, so the set below IS
+     * that pair and is defined by them.
+     *
+     * ⚠️ **BOTH, NOT JUST `approved` — AND THE ROW THAT REPORTED THIS BUG INVITED THE ONE-VERB FIX.** It is
+     * titled "two verbs the live engine never scores", which reads as "score only approval". Dropping
+     * `returned` would silently stop crediting every returned submission in every backfill: the same class
+     * of silent mis-scoring, pointed the other way, and no test in this file would have caught it before
+     * M24 added one.
+     *
+     * ⚠️ **PINNED AS LITERALS, NOT AS `SubmissionStatus` CASES, AND THE REASON IS NOT STYLE.** These are the
+     * strings as they appear in a `jsonb` column written months ago. An enum reference would silently stop
+     * matching historical rows the day somebody renamed a case — the ledger keeps the old string forever,
+     * because `point_awards` and `audits` are both append-only. The literal is an agreement with the
+     * ledger's contents, which no enum can enforce retroactively. `AuditReplayMapTest` asserts this set
+     * against `SubmissionStatus`'s current values, so a rename turns the gate red and forces the question
+     * "what about the rows already written?" to be answered deliberately instead of by accident. Same
+     * reasoning as the two markers above, one layer down.
+     *
+     * @var list<string>
+     */
+    public const array SCORED_REVIEW_STATUSES = ['approved', 'returned'];
 
     /**
      * The award this row evidences, or null if it evidences none.
@@ -148,7 +195,22 @@ final class AuditReplayMap
         };
     }
 
-    /** See the class docblock: the shape of `new_values`' key set is the only signal there is. */
+    /**
+     * See the class docblock: the shape of `new_values`' key set, and then — for a review — its status.
+     *
+     * ⚠️ **THE ORDER OF THE TWO CHECKS IS LOAD-BEARING AS OF M24, WHERE BEFORE IT WAS MERELY TIDY.** The
+     * `answers.` loop used to run first only to settle precedence on a payload that cannot occur; now it is
+     * doing real work, because `SubmissionAnswerEditService::statusSnapshot()` emits `status` TOO. An edit
+     * of an approved submission carries `status = 'approved'`, so a status test reached before the edit
+     * marker would price a 1-point correction as a 3-point review. The edit marker is checked first and
+     * returns first, exactly as it always did — do not "simplify" these into one `match`.
+     *
+     * ⚠️ **AND A ROW WITH THE MARKER BUT NO SCORING STATUS IS `null`, NOT A CHEAPER RULE.** A claimed or
+     * archived submission evidences no earnable act at all — the live engine awards nothing for either —
+     * so it belongs in the `unmapped` bucket with everything else this map refuses to guess at. Scoring it
+     * as {@see PointRule::SubmissionEdited} to "not lose the row" would be inventing an act that never
+     * happened.
+     */
     private function submissionUpdate(ReplayableAudit $row): ?PointRule
     {
         foreach ($row->newValueKeys as $key) {
@@ -157,7 +219,14 @@ final class AuditReplayMap
             }
         }
 
-        return in_array(self::REVIEW_MARKER, $row->newValueKeys, true)
+        if (! in_array(self::REVIEW_MARKER, $row->newValueKeys, true)) {
+            return null;
+        }
+
+        // The marker says "a review verb wrote this"; the status says WHICH, and only two of the four
+        // score. A null status — a pre-K1c or hand-authored row carrying no `status` key — scores nothing
+        // rather than being guessed at.
+        return in_array($row->newStatus, self::SCORED_REVIEW_STATUSES, true)
             ? PointRule::SubmissionReviewed
             : null;
     }

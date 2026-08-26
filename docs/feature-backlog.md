@@ -2252,19 +2252,57 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 ### Documentation & specs
 
-- **`major` · `npm run build` cannot bootstrap a fresh clone or worktree, and the README is the only
-  document that does not say so.** `resources/css/app.css:11` imports `@meridian/design-system/tokens.css`,
-  which is a **build artifact**: `.gitignore:21` is `/packages/*/dist`, and `git ls-files
-  packages/design-system/dist` returns nothing, so a tree that has just been cloned does not contain it.
-  The true sequence is `ds:install` → `ds:tokens` → `build`, which `ci.yml` performs and
-  `docs/deployment-infrastructure.md:39` documents — but `README.md:51-59` presents `npm run build` as a
-  first-class command with no prerequisite. **Live**, and it is the first thing a new contributor runs.
-  ⚠️ **PROVE IT IN A THROWAWAY `git worktree`, NOT BY MOVING `dist/` ASIDE** — the local tree has a
-  populated `dist/` from earlier increments, so any test that starts from it measures the wrong thing.
-  ⛔ **FILED BY `M23` (2026-08-26) WITHOUT BEING BUILT, AND THE FILING IS THE POINT.** This row had been
-  carried in Lane A's hand-off prompt alone for two increments and appeared in **no** document a backlog
-  search would reach — the same shape as J4b1's four defects, which were recorded in the tracker and
-  nowhere else. Its evidence was re-verified before this bullet was written: both citations hold.
+- ~~**`major` · `npm run build` cannot bootstrap a fresh clone or worktree, and the README is the only
+  document that does not say so.**~~ ✅ **DONE — M27 (2026-08-26), PROVEN IN A THROWAWAY WORKTREE IN BOTH
+  DIRECTIONS.** `README.md` is the only file that needed changing, which is the row's own finding holding
+  up: `ci.yml:208-218` and `docs/deployment-infrastructure.md:39` were already correct.
+  ⚠️ **NECESSARY AND SUFFICIENT, EACH HALF MEASURED** — a documentation fix is only worth as much as the
+  sequence it prescribes, so the sequence was run. `git worktree add --detach <scratch> origin/main`,
+  `dist/` confirmed absent by `ls` rather than inferred:
+
+  | Run | Result |
+  |---|---|
+  | `build` alone | **exit 1** — `Unable to resolve @import "@meridian/design-system/tokens.css"`, **twice** |
+  | `ds:tokens` without `ds:install` | **exit 1** — `Cannot find package 'style-dictionary'` from `build-tokens.mjs` |
+  | `ds:install` → `ds:tokens` → `build` | **exit 0** — `✓ built in 13.58s` |
+
+  ⚠️ **THE ROW UNDERSTATED ITSELF THREE TIMES, AND THE THIRD IS THE ONE THAT MATTERS.**
+  **(1) TWO entry points fail, not one** — the row names `resources/css/app.css:11`, but
+  `resources/public-runtime/public-runtime.css:4` imports the same artifact and `vite.config.ts:26` lists
+  both as build inputs; the error names both directories. (That file is Lane B's column — it was evidence
+  here, never a target.)
+  **(2) THREE README sites, not one.** The row cites `README.md:51-59`; the command is at `:63` (`:51` is
+  the section heading), the block listed **`build` BEFORE `ds:tokens`** under a comment calling the latter
+  a *"regenerate"* — reading as optional maintenance rather than a prerequisite — **`ds:install` appeared
+  nowhere in the file at all**, and a third site at `:97` (the e2e bootstrap) ran `ds:tokens && build`
+  correctly ordered while still omitting `ds:install`. So the defect was never a missing note; it was an
+  **ordering that actively misleads**, twice, plus an absent step.
+  **(3) ⛔ THE FAILURE PRINTS A SUCCESS AFTER IT.** The PWA plugin's service-worker build runs *after* the
+  client build fails and succeeds on its own — `✓ built in 329ms`, `public/build/sw.mjs 134.93 kB` — so
+  **the last thing on screen is a green tick**. Only the exit code and the eleven lines above it disagree.
+  A new contributor reads the tail, concludes the build worked, and then debugs a blank page. The row does
+  not mention this and it is the strongest argument for the fix; the README now says *trust the exit code,
+  not the tail*.
+  ➕ **Filed rather than fixed:** `packages/design-system/package.json`'s `exports` maps **two** `dist/`
+  artifacts — `./tokens.css` and `./tokens` → `dist/tokens.ts`. Nothing imports the latter today (grepped
+  `resources/` and `packages/design-system/src`), so it is not a live second failure, but it is the same
+  generated directory behind a second public export path. Noted in the README rather than changed.
+  ⚠️ **MECHANICS, because they cost time and will recur:** `docker run -w` is mangled by MSYS
+  (`MSYS_NO_PATHCONV=1` required), and vite writes `node_modules/.vite-temp`, so a `:ro` node_modules
+  mount fails with `EROFS` **before reaching the real error** — which looks like a different bug entirely.
+  Original filing follows.
+  — *`resources/css/app.css:11` imports `@meridian/design-system/tokens.css`, which is a build artifact:
+  `.gitignore:21` is `/packages/*/dist`, and `git ls-files packages/design-system/dist` returns nothing,
+  so a tree that has just been cloned does not contain it. The true sequence is `ds:install` →
+  `ds:tokens` → `build`, which `ci.yml` performs and `docs/deployment-infrastructure.md:39` documents —
+  but `README.md:51-59` presents `npm run build` as a first-class command with no prerequisite. Live, and
+  it is the first thing a new contributor runs. PROVE IT IN A THROWAWAY `git worktree`, NOT BY MOVING
+  `dist/` ASIDE — the local tree has a populated `dist/` from earlier increments, so any test that starts
+  from it measures the wrong thing. FILED BY `M23` (2026-08-26) WITHOUT BEING BUILT, AND THE FILING IS THE
+  POINT. This row had been carried in Lane A's hand-off prompt alone for two increments and appeared in no
+  document a backlog search would reach — the same shape as J4b1's four defects, which were recorded in
+  the tracker and nowhere else. Its evidence was re-verified before this bullet was written: both
+  citations hold.*
 - **`major` · ADR-0001 claims `citext` and `pgcrypto` are enabled by default, covering case-insensitive
   uniqueness for share slugs and user email.** `docs/adr/0001-postgresql-over-mysql.md:56` (restated `:83`,
   `:127`). Only PostGIS is enabled, and `0001_01_01_000000_create_users_table.php:26` is a plain

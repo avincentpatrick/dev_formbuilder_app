@@ -60,14 +60,30 @@ docker compose exec app composer run lint:fix     # auto-fix code style
 # Frontend — inside the container, like everything else. The Windows host has no `rolldown` win32
 # binding, so these fail on the host with a missing-native-module error rather than a useful one.
 # (The "node" service already runs `npm run dev` for you; the rest are on demand.)
+#
+# ⛔ ON A FRESH CLONE OR WORKTREE, RUN THE TWO DESIGN-SYSTEM STEPS FIRST — `npm run build` CANNOT
+#    BOOTSTRAP ONE, AND THE ORDER BELOW IS THE ORDER `ci.yml` USES. Both `resources/css/app.css` and
+#    `resources/public-runtime/public-runtime.css` open with
+#    `@import '@meridian/design-system/tokens.css'`, and that file is a BUILD ARTIFACT: `.gitignore`
+#    excludes `/packages/*/dist`, so a tree you have just cloned does not contain it.
+docker compose exec node npm run ds:install     # design-system deps — ONCE per clone (~4 min)
+docker compose exec node npm run ds:tokens      # writes packages/design-system/dist/tokens.{css,ts}
 docker compose exec node npm run build          # production assets
 docker compose exec node npm run type-check     # vue-tsc
 
-# Design system
-docker compose exec node npm run ds:tokens              # regenerate tokens (dist/tokens.css + tokens.ts)
+# Design system — the two above are the bootstrap; these are the rest.
+docker compose exec node npm run ds:tokens              # re-run after editing tokens/*.json
 docker compose exec node npm run ds:storybook:build     # build the component library docs
 docker compose exec node npm run ds:test                # axe every story (WCAG 2.2 AA)
 ```
+
+> **If you skip either step the failure does not look like a missing step.** Skipping `ds:install`
+> gives `Cannot find package 'style-dictionary'` from `build-tokens.mjs`. Skipping `ds:tokens` gives
+> `Unable to resolve @import "@meridian/design-system/tokens.css"` — twice, once per stylesheet — and
+> then **the service-worker build runs next and succeeds**, so the last line on your screen is
+> `✓ built in 329ms` and a file size. **Trust the exit code (`1`), not the tail of the output.**
+> (`@meridian/design-system` also exports `./tokens` → `dist/tokens.ts` from the same generated
+> directory. Nothing imports it today, but it is the same artifact behind a second export path.)
 
 ## Windows / Laragon gotchas
 
@@ -94,6 +110,7 @@ docker compose exec node npm run ds:test                # axe every story (WCAG 
 
   ```bash
   # 1. Serve BUILT, same-origin assets — the suite measures the wrong fonts otherwise (see below).
+  #    On a fresh clone, `npm run ds:install` comes first — see "Everyday commands" above for why.
   docker compose exec node npm run ds:tokens && docker compose exec node npm run build
   rm -f public/hot                      # `npm run dev` recreates it when you want Vite back
 

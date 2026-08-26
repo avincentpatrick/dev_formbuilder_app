@@ -1511,22 +1511,80 @@ plausible-but-wrong fix ships. **Whoever takes these should reproduce in CI firs
   hand-off the `prepareAcceptingUser()` docblock already calls "Increment C". **Needs a test that a
   password is not overwritten and a second factor is not skipped**, and `docs/security-threat-model.md`
   gains a row: it has none for invitation takeover today.
-- **`major` · Nothing verifies that a workspace controls the email domain its identity provider asserts.**
-  The root of two `major`s that are now closed — M1's *"SSO adopts an existing account that is not a
-  member"* and M9's *"SSO adopts the account behind an address a workspace merely invited"* — both of which
-  had to be fixed at the membership layer because this control does not exist. `SsoConnectionService` and
-  `UpdateSsoConnectionRequest` accept any IdP metadata; `SsoIdentityResolver` accepts whatever address the
-  assertion carries; and a grep of `app/Services/Sso/` and `app/Http/Controllers/Tenant/Sso/` for
-  `verified_domain|domain_verified|assertEmailDomain|domainOwn` returns **zero hits**. `CustomDomainService`
-  exists but governs public form hosting, not identity. ⚠️ **NOT LIVE — both known exploits are closed**, and
-  it is filed at `major` rather than `minor` because it is the ROOT rather than a sibling: every future path
-  that lets an assertion reach an existing account reopens the same class, and the two fixes so far are each a
-  membership-layer refusal standing in for a trust-layer fact. **Shape, priced honestly:** an
-  `sso_verified_domains` table, a DNS TXT challenge, an admin surface on `/settings/sso`, and — the part that
-  makes it a decision rather than a feature — a grandfathering call for every connection that already exists.
-  **Deliberately not taken in M9 and filed the moment that was decided**, because the takeover would have
-  stayed live for the whole of that work. Carried as `docs/security-threat-model.md` **residual 32** and named
-  as ADR-0016 §D33's revisit trigger.
+- ✅ **CLOSED BY `M18` (2026-08-26) — `major` · ~~Nothing verifies that a workspace controls the email domain its
+  identity provider asserts.~~** `sso_verified_domains` (one row per workspace × email domain, a 256-bit token,
+  a DNS TXT challenge at `_meridian-sso.<domain>`) reusing the `DnsTxtResolver` seam ADR-0012 built for custom
+  hosts, and `SsoUserProvisioner::provision()` refusing with a new `SsoFailureReason::DomainNotVerified`.
+  ⚠️ **ALL EIGHT OF THIS ROW'S CITATIONS HELD — the first row in nine to be right about its own evidence** —
+  and it was still wrong in two directions, both of which are worth keeping.
+  **(1) IT UNDERSTATED ITS SEVERITY.** *"NOT LIVE — both known exploits are closed"* was too generous: JIT is
+  permitted to CREATE, and `SsoUserProvisioner::createUser()` stamps `email_verified_at` on the strength of the
+  assertion. `users` is a **deployment-wide** table, so a paying SSO tenant could mint a global identity for any
+  unregistered address carrying a **forged mailbox-control claim** — and
+  `TenantMembershipService::identityIsEstablished()` reads that exact column, so the forged stamp fed **M8's own
+  predicate** and denied the address's true owner the password-setting arm of their later, genuine invitation.
+  **(2) IT MISSED A SECOND DEFECT ENTIRELY, WHICH THE FIX'S ORDERING CLOSES FOR FREE.** The failures panel
+  renders `existing_account_not_member` as *"Address already has an account elsewhere"* and `jit_disabled` as
+  *"Nobody here matches that address"*, so an SSO-entitled admin could assert **any** address and read back
+  whether it has an account anywhere in the deployment. §D19's uniform 404 was intact; the panel was the
+  surface that leaked.
+  ⛔ **AND THE "grandfathering call" IT CALLS "the part that makes it a decision rather than a feature" IS
+  DISSOLVED RATHER THAN ANSWERED.** The check sits AFTER the `Active` early return, so **an active membership
+  IS the grandfather**: no live deployment loses a member on deploy, and no mode column, backfill or
+  public-mailbox exclusion list exists to be left in the wrong state. That rests on the four writers of
+  `TenantUserStatus::Active` being enumerated rather than assumed — none mints one for a stranger's address on
+  an assertion alone. ADR-0016 §D34 carries the decision and six rejected alternatives; residual 32 is rewritten
+  to the three things that genuinely remain, each filed below.
+
+- **`minor` · A verified SSO email domain is trusted indefinitely — there is no re-verification sweep.**
+  Filed 2026-08-26 by M18, **the moment the decision not to build it was taken**, which is the rule the J4b1
+  post-mortem produced. `sso_verified_domains.verification_checked_at` exists and is written by
+  `SsoDomainService::verify()`, but nothing re-reads a verified domain on a cadence, so a workspace that later
+  loses control of a domain keeps the authority it earned. `CustomDomainService::sweep()` is the template and
+  `VerifyCustomDomainsJob` the shape. **Two reasons it was not taken:** `routes/console.php` records that
+  nothing runs the scheduler on the production box, so the sweep would be a control that exists in the
+  repository and not on the machine; and how long a proof of control should outlive the proving is a product
+  call rather than a defect. ⚠️ **The lookup is the easy half — the DEMOTION RULE is the hard one.**
+  `verified_at` is what stands between an assertion and an account, so an over-eager sweep converts somebody
+  else's DNS outage into a sign-in outage for every new joiner at that workspace. `verify()` already refuses to
+  demote on a `LookupFailed` (the null-versus-empty-array contract), and that is the floor rather than the whole
+  answer: N consecutive definitive `NotFound`s is the shape to consider, and ADR-0012 explicitly defers the same
+  question for custom hosts. Carried as `docs/security-threat-model.md` residual 32.
+
+- **`minor` · The tenant-facing SSO domains card on `/settings/sso` does not exist, so verification is
+  operator-assisted.** Filed 2026-08-26 by M18. ⚠️ **THIS IS A LANE A ROW AND THAT IS STRUCTURAL, NOT A
+  PREFERENCE**: the card is `resources/js/**`, Lane A's outright since the 2026-08-25 widening, and Standing
+  Rule 7(b-bis) says a paired change split across two lanes is the one thing that cannot work. The interim
+  surface is `php artisan sso:domains <tenant> [--claim|--verify|--release]`, which an operator runs on a
+  workspace's behalf — enough to make the control operable from the moment the refusal went live, which is why
+  M18 shipped without it rather than shipping enforcement nobody could satisfy. **Everything the card needs
+  already exists server-side**: `SsoDomainService` holds the whole lifecycle and every decision, and the
+  command's verbs are the right ones. What the card adds is an authenticated **actor** — and that is exactly
+  what `SsoDomainService`'s docblock records the missing audit rows as waiting for, so **claim + verify +
+  release should each emit a `domain`-style audit row in the same increment**. `SsoConnectionPresenter::page()`
+  gains a `domains` key; `SsoFailureRow` needs no change (its `reason` is a plain string with `reason_label`
+  composed server-side). Note the refusal's own hint deliberately names the DNS TXT record rather than a screen,
+  precisely so it was not a lie before this row lands — update it to name the card once it does.
+
+- **`minor` · `MemberController::invite()` validates `['required', 'email', 'max:255']` and a role, with no
+  domain-ownership check.** Filed 2026-08-26 by M18. The same root on the invitation door, and the first link in
+  the chain M9's own write-up traces. ⚠️ **NOT the takeover M8 and M9 closed** — both of those are shut, and
+  RBAC §7's *"an unaccepted invite grants nothing"* still holds — so what remains is narrower: an admin can
+  address an invitation into a domain their workspace has never proven it controls, which sends a real email to
+  a real stranger and binds a `tenant_users` row to their existing global identity. M18's own control is the
+  obvious shape to reuse (`SsoDomainService::isVerifiedFor()` is already phrased over an address), but applying
+  it here is a **product decision, not a cleanup**: today any workspace may invite anyone, including
+  contractors and personal addresses, and gating that on DNS would change what invitation means for every
+  workspace rather than only for SSO ones. Whoever takes it decides that first.
+
+- **`minor` · Self-registration remains a way to occupy an address in a domain you do not control.** Filed
+  2026-08-26 by M18, recorded because §D34's *"an active membership is the grandfather"* reasoning depends on
+  knowing exactly which doors mint one, and this is the weakest of the four. `joinOpenTenant()` is reachable on
+  any workspace whose `RegistrationGate` is open, so a registrant may take `victim@othercompany.test` and hold
+  it. ⚠️ **Materially weaker than what M18 closed, and the difference is what makes it a `minor`**: the
+  registrant sets their own password and **nothing forges `email_verified_at`**, so the account squats an
+  address without minting a false claim about mailbox control — which is the property `identityIsEstablished()`
+  reads. Older than SSO, and any fix touches the ordinary registration path for everybody.
 - ✅ **CLOSED BY `M9` (2026-08-24) — `major` · ~~SSO adopts an existing account whenever a PENDING INVITATION exists, so an SSO-entitled
   admin can be signed in as any stranger they invited — no emailed token required.** Found by M8's
   adversarial pass and **verified against the code by hand before filing**; it is the same conflation M8

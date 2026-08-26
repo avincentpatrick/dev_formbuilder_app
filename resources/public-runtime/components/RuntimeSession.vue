@@ -35,6 +35,7 @@ import { openDb } from '../lib/db';
 import { discardRow, enqueue } from '../lib/outbox';
 import { attachToSubmission, collectLocalMediaIds } from '../lib/media-queue';
 import { getDeviceId } from '../lib/device';
+import { touchRespondentSession } from '../lib/respondent-session';
 import { APP_VERSION } from '../lib/app-version';
 import type { ApiClient } from '../lib/api-client';
 import type { AnswerMap, Bootstrap, ScheduleAcceptance, SchemaResponse } from '../lib/types';
@@ -134,6 +135,14 @@ const autosave = createAutosave({
     currentStepKey: runtime.currentStepKey,
     // A conflict-review session must not autosave — the durable copy is the parked outbox row (Increment G8c).
     enabled: !props.resolving,
+    // Increment M21 — the visit read at `:124`, so an abandoned draft is never restored into the next
+    // respondent's form. `undefined` (a bare test mount, where the inject falls back to null) keeps the
+    // pre-M21 unscoped behaviour, which is M15's convention for this argument throughout the runtime.
+    sessionId: respondentSessionId ?? undefined,
+    // Increment M21 — the respondent typing is what keeps their visit alive. Without this the window
+    // measured elapsed-since-boot rather than idle, so a refresh part-way through a long fill issued a
+    // FRESH visit and this session's own draft became unrestorable. See `lib/respondent-session.ts`.
+    onActivity: touchRespondentSession,
 });
 
 // Restore a same-browser draft — but only on a FRESH session. A version-drift remount already carries the

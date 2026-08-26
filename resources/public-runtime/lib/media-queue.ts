@@ -41,12 +41,26 @@ export async function stash(db: MeridianDb, input: StashInput): Promise<MediaQue
     return row;
 }
 
-/** Link every still-unassigned local blob referenced by a finalized submission to its outbox row. */
+/**
+ * Link every still-unassigned local blob referenced by a finalized submission to its outbox row.
+ *
+ * ⛔ INCREMENT M21 — "STILL-UNASSIGNED" IS NOW ENFORCED RATHER THAN ASSERTED. This docblock has claimed it
+ * since G8b and the `.modify()` never filtered on it, so any `local:` ref already owned by another outbox
+ * row was silently RE-POINTED to this one. That is not theoretical: an abandoned draft restored into the
+ * next respondent's form carried the previous respondent's `local:` refs, `collectLocalMediaIds()` found
+ * them, and `replay.ts` uploaded that person's photo or signature as THIS submission's attachment. M21
+ * closes the restore that fed it; this narrows the write itself, because a claim a docblock makes and the
+ * code does not keep is the failure this project has now recorded five times.
+ */
 export async function attachToSubmission(db: MeridianDb, attachmentLocalIds: string[], uuid: string): Promise<void> {
     if (attachmentLocalIds.length === 0) {
         return;
     }
-    await db.media_queue.where('attachment_local_id').anyOf(attachmentLocalIds).modify({ client_submission_uuid: uuid });
+    await db.media_queue
+        .where('attachment_local_id')
+        .anyOf(attachmentLocalIds)
+        .filter((row) => row.client_submission_uuid === null)
+        .modify({ client_submission_uuid: uuid });
 }
 
 export function listForSubmission(db: MeridianDb, uuid: string): Promise<MediaQueueRow[]> {

@@ -40,6 +40,62 @@ export interface DraftRow {
     current_step_key: string;
     answers: AnswerMap;
     updated_at: string;
+    /**
+     * Increment M21 — which VISIT wrote this draft, so an ABANDONED fill is never restored into the next
+     * respondent's form. `respondent_session_id` on `OutboxRow` above answers the same question for
+     * FINALIZED rows; this is the same question one channel earlier, on the tier that carries answers the
+     * respondent is still typing. Un-indexed, so no `db.version()` bump — the rule
+     * `docs/offline-first-sync-design.md` §3 states outright and that `conflict_code`, `server_reference`,
+     * `synced_at`, `base_content_checksum` and M15's own session stamp have all now set.
+     *
+     * ⚠️ NULL IS A REAL VALUE AND IT MEANS "NOT THIS VISIT", exactly as on `OutboxRow`. A row written
+     * before M21 has no session, and the safe reading of an unknown owner is *somebody else*.
+     *
+     * ⛔ IT IS DELIBERATELY NOT PART OF THE PRIMARY KEY, AND THE FIRST REASON IS MEASURED RATHER THAN
+     * ARGUED: **DEXIE REFUSES.** `node_modules/dexie/dist/dexie.js:3832` throws
+     * `Upgrade('Not yet support for changing primary key')` inside the upgrade transaction, so moving
+     * `[form_version_id+local_draft_id]` to a three-part key does not degrade — **the database fails to
+     * open, on every device that already has one**, taking the outbox and the queued media with it. The
+     * comment at `:34` saying the compound key "leaves room for multi-draft" is about adding rows under the
+     * existing shape, not about re-shaping it.
+     *
+     * The second reason is what the shared key is FOR. This table has two readers
+     * (`useAutosave.restore()`, `App.vue`'s resume read), one deleter (`clear()`, which deletes only THIS
+     * session's key) and **no enumerator at all** — the seven-day TTL is a branch inside `restore()`, not a
+     * sweeper. An abandoned draft is collected by the next respondent's first keystroke landing on the SAME
+     * primary key; a per-visit key removes that and leaves the answers unreachable on shared hardware.
+     * ⚠️ Stated honestly, because it is a difference of RATE rather than of kind: uncollectable rows
+     * already exist here — a republish moves `form_version_id`, so the pre-republish row is orphaned with
+     * nothing able to reach it. That is a real pre-existing hole, filed in `docs/feature-backlog.md`, and
+     * it is not this field's job to close.
+     *
+     * Sharing the key is what collects the row; the stamp is what stops it being read.
+     * See `docs/adr/0021-respondent-scoped-device-outbox.md`.
+     */
+    respondent_session_id: string | null;
+}
+
+/**
+ * Increment M21 — may the visit on screen READ this draft? The single predicate both of this table's two
+ * readers consult, so they cannot drift apart.
+ *
+ * It lives here, beside the field it guards, rather than in `composables/useAutosave.ts`, for two reasons.
+ * `App.vue`'s resume read is the OTHER reader and must apply the identical rule — the two disagreeing is
+ * how the sibling `minor` came to exist one channel over. And this module is in `sw.ts`'s import graph,
+ * which `tsconfig.sw.json` re-checks with no DOM lib, so the predicate takes the id as a plain string and
+ * imports nothing: `lib/respondent-session.ts` reads `sessionStorage` and must never be pulled in here.
+ *
+ * ⚠️ `undefined` MEANS "DO NOT SCOPE" AND `null` MEANS "AN EARLIER VISIT" — two different absences, and
+ * conflating them is the whole defect. `undefined` is the caller saying it has no visit concept (a bare
+ * test mount), and it preserves every pre-M21 call shape. `null` on the ROW is a row written before M21 or
+ * by an unscoped caller, and it never matches a real id, because the safe reading of an unknown owner is
+ * *somebody else*. Same rule as `OutboxRow.respondent_session_id`, stated once for both.
+ */
+export function draftBelongsToVisit(
+    row: Pick<DraftRow, 'respondent_session_id'>,
+    sessionId: string | undefined,
+): boolean {
+    return sessionId === undefined || row.respondent_session_id === sessionId;
 }
 
 export type OutboxStatus = 'pending' | 'synced' | 'conflict' | 'needs_attention';

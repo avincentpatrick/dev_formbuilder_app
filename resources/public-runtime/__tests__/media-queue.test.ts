@@ -48,6 +48,20 @@ describe('media-queue helpers', () => {
         expect(linked[0]).toMatchObject({ status: 'queued', client_submission_uuid: 'u1' });
     });
 
+    it('never RE-POINTS a blob that already belongs to another submission (Increment M21)', async () => {
+        // The docblock has claimed "still-unassigned" since G8b and the `.modify()` never filtered on it.
+        // Reached for real through the abandoned-draft restore M21 closes: the previous respondent's
+        // `local:` refs rode their draft into the next respondent's answers, `collectLocalMediaIds()` found
+        // them, and their photo or signature was uploaded as THIS submission's attachment.
+        await stash(db, stashInput('l1'));
+        await attachToSubmission(db, ['l1'], 'u1');
+
+        await attachToSubmission(db, ['l1'], 'u2');
+
+        expect(await listForSubmission(db, 'u2')).toHaveLength(0);
+        expect(await listForSubmission(db, 'u1')).toHaveLength(1);
+    });
+
     it('collects local ids from top-level media answers only', () => {
         const answers = {
             full_name: 'Ada', // scalar — ignored

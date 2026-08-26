@@ -198,3 +198,147 @@ competing with it.
 **Not** on the strength of a report that a respondent lost sight of their own row after reopening
 the app: that is this decision working, and the count line plus the always-visible `Sync now` is the
 answer it was designed to give.
+
+---
+
+## ⚠️ AMENDED IN INCREMENT M21 (2026-08-26) — THE SAME DECISION, ONE CHANNEL EARLIER, ON THE TIER THAT CARRIES ANSWERS
+
+**This ADR did not mention drafts. Not once.** `grep -ic draft` over this file returned **0** before this
+amendment. Everything above reasons about `outbox` — **finalized** rows, whose answers I10d already scrubs
+at rest — and the phrase it kept using for the threat was *"the previous respondent's queue tags, server
+references and Discard buttons"*, i.e. **metadata**. One table over, `draft_answers` held the answers a
+respondent was **still typing**, keyed `[form_version_id + local_draft_id]` with no visit in it, and
+`useAutosave.restore()` handed them to whoever loaded the page next.
+
+⛔ **AND THE OMISSION WAS NOT THAT NOBODY NOTICED — M15's OWN SWEEP FOUND IT AND FILED IT THE SAME DAY.**
+It went into `docs/feature-backlog.md` and into the *Residual* clause of this decision's row in
+`docs/security-threat-model.md`, and **into no ADR**, so a reader arriving at M15's contract to learn what
+"a visit" means for device-local state could not discover that the larger of the two channels had been
+considered and left open. **A deferral recorded only in a backlog row is invisible to the document that
+defines the concept it defers.** That is the lesson worth keeping from this amendment, more than the fix.
+
+### What M21 changes
+
+`DraftRow` gains `respondent_session_id`, un-indexed, on the identical terms as `OutboxRow`'s — **no
+`version()` bump**, the precedent §*No schema change* above already sets. `useAutosave.persist()` stamps
+the visit; `useAutosave.restore()` and `App.vue`'s resume read both refuse a row the current visit did not
+write, through **one shared predicate** (`draftBelongsToVisit`, in `lib/db.ts` beside the field) rather than
+two copies of the rule — because two readers of one table disagreeing about ownership is exactly how the
+sibling defect in `reconcile.ts` came to exist.
+
+**Null still means "not this visit"** and `undefined` still means "do not scope"; §*Null means "not this
+visit"* governs both channels now, and the two absences are deliberately different — `undefined` is the
+CALLER having no visit concept, `null` is the ROW having none.
+
+### The refusal is on the READ, and the row is deliberately NOT deleted
+
+§*Nothing is ever deleted for privacy* holds here without amendment, and it is doing more work than it was
+for the outbox. The primary key is **shared**, so the next respondent's first keystroke overwrites the
+abandoned row within 800 ms: **containment and collection are the same mechanism.** Deleting a stranger's
+work on a *read* would be the harm `lib/outbox.ts` names, and it would also be unnecessary.
+
+⛔ **WHICH IS WHY THE VISIT IS NOT IN THE PRIMARY KEY, AND THE FIRST REASON IS MEASURED RATHER THAN
+ARGUED.** `node_modules/dexie/dist/dexie.js:3832` throws `Upgrade('Not yet support for changing primary
+key')` inside the upgrade transaction. A three-part key does not degrade — **the database fails to open on
+every device that already has one**, taking the outbox and the queued media with it. The second reason is
+the collection above: a per-visit key would leave abandoned answers unreachable on shared hardware, because
+this table has two readers, one deleter keyed to the current session, and **no enumerator at all** — its
+seven-day TTL is a branch inside `restore()`, not a sweeper.
+
+⚠️ **Stated honestly, because it is a difference of rate rather than of kind: uncollectable rows already
+exist here.** A republish moves `form_version_id`, so the pre-republish row is orphaned with nothing able to
+reach it. That is a real pre-existing hole; it is filed in `docs/feature-backlog.md` and it is not this
+decision's to close.
+
+### The harm was never only on screen, and that is why `major` was an understatement
+
+Three consequences followed a silent cross-respondent restore, none of them named by the row that filed it:
+
+1. **The UI affirmatively vouched for the stranger's answers.** `restoreAnswers()` writes into the reactive
+   map the autosave watcher observes, so the restore itself trips `schedule()` — the header pill reads
+   *"Saving…"*, then *"Saved"*. There was no banner (the welcome-back banner needs a resume seed) and no
+   announcement; the only moving pixel told the new respondent their work was being kept safe.
+2. **"Save and finish later" made it durable and mailed it.** A restored draft carries a **fresh**
+   `client_submission_uuid` and a **null** baseline, so the guest draft POST wrote the previous
+   respondent's answers as a **new server draft** under this respondent's identity, and emailed them a
+   30-day resume link to it.
+3. **Media followed the answers.** `attachToSubmission()` re-pointed the previous respondent's queued blob
+   onto this submission — its docblock had claimed *"still-unassigned"* since G8b while the `.modify()`
+   never filtered on it. M21 narrows the write as well as closing the restore that fed it.
+
+**And on the resume path the damage was worse than on plain entry, which is why its row is re-filed from
+`minor` to `major`.** `App.vue` seeds the session with the **local** tier's answers but the **server's**
+uuid and the **server's** baseline — deliberately, and correctly, for the case it was written for. With a
+stranger's draft winning `reconcileDraft`'s newest-wins rule, that respondent's next save wrote a stranger's
+answers over **their own** server record and **passed P3a's lost-update guard by construction**, because
+the baseline genuinely was theirs. A submit then promoted that row.
+
+### The kiosk-mode row was NOT this defect's precondition
+
+The backlog row deferred itself on the ground that *"telling a personal device from a kiosk needs an
+operator concept the guest runtime does not have… that row is this one's precondition."* §*C. A
+device-owner gate / kiosk unlock* above had already answered that: it deferred kiosk mode **and said in
+terms that doing so "would leave the defect live until it was built."** Kiosk mode adds operator *policy*;
+the mechanism was already wired — the visit id is read at `App.vue`'s composition root, provided, and
+injected **two lines above** the `createAutosave` call it never reached.
+
+### The cost, on the same terms as §*The cost, stated rather than discovered later*
+
+On a **personal** device, a respondent who closes the tab mid-fill and returns loses the draft where it
+would previously have been restored — `sessionStorage` dies with the tab. On a form with save-and-resume
+they have §5.2's emailed link, which is the channel `docs/ux/form-filling-ux-flow.md` reserves for exactly
+that journey; on a form without it, the work is gone.
+
+⚠️ **The UX spec does not settle this and it should not be quoted as though it does.** §5.1 opens
+*"session/device-scoped"* and continues, in the same sentence, *"so that a reload of the same browser tab
+**or the same device's browser** recovers the draft"* — both readings, one clause. What settles it is
+§*This is a more faithful reading of the UX spec, not a departure from it* above: every sentence in §5.1 is
+written about *the* respondent, definite article, singular, and the shared-device case is the one nobody
+wrote down. The trade is **one silent cross-respondent disclosure of answer content, plus a server-side
+overwrite and an emailed link, against one personal-device respondent losing an unfinished draft after
+closing their tab.** That is not close.
+
+### ⛔ A CORRECTION TO §*Ten minutes* ABOVE, WHICH WAS FALSE AS WRITTEN — AND M21 FIXES IT RATHER THAN FILING IT
+
+*"The stamp tracks idle time and is refreshed on every read, so an active fill never expires under its own
+reader"* — the first clause is true of the FUNCTION and the conclusion did not follow, because the runtime
+read the visit id **exactly once per page load**, at `App.vue`'s composition root. Nothing re-read it while
+a fill was in progress, so `lastSeen` recorded **boot time** and the window measured
+elapsed-since-last-boot. The same overstatement was in `lib/respondent-session.ts`'s own docblock, which
+described a `touch()` that did not exist in the module.
+
+⚠️ **AND M15's OWN TEST PINNED THE CLAIM AND PASSED.** `__tests__/respondent-session.test.ts` reads the
+session three windows apart, gets one id, and asserts *"refreshes the stamp on every read, so an active
+visit never expires under its own reader"*. It is a correct test of a contract that **nothing exercised**.
+A unit test proves what a function does when it is called; only a call-site sweep proves that it is called.
+Sixth intention-read-as-a-measurement in this project, and the first caught by grepping the call sites of a
+function whose own test was green.
+
+**It was live before M21 and it DELETED DATA.** A reload more than `IDLE_MS` after boot — including
+`App.vue`'s own `window.location.reload()` after a conflict discard — issued a fresh visit, and
+`pruneSynced()` then bulk-deleted the respondent's own delivered receipts as a stranger's: the single
+deletion §*Nothing is ever deleted for privacy* promised would only ever touch an earlier visit.
+
+⛔ **AND IT IS WHY THIS COULD NOT BE DEFERRED. Scoping the draft to a visit makes a wrong visit boundary
+into LOST WORK.** A respondent filling for twenty minutes on their own phone who refreshes would have been
+issued a fresh id, and their own half-filled draft would have become foreign and unrestorable — M21 would
+have turned a documented `minor` into silent data loss on a personal device, which is the exact harm this
+whole area exists to prevent. **A containment change inherits every defect in the boundary it starts
+trusting.** That is the general form, and it is the reason this amendment fixes rather than files.
+
+**As built:** `touchRespondentSession()` refreshes `lastSeen` only when a valid, unexpired marker already
+exists — it **never mints** (an absent marker stays absent) and **never revives** (an expired one stays
+expired, so a keystroke from the next respondent cannot resurrect the previous visit). It is called from
+respondent **input**, threaded into `useAutosave` as an `onActivity` callback rather than imported, and
+hung off `schedule()` rather than `persist()` — because `persist()` also runs from the 30-second backstop,
+so touching there would keep an abandoned tab's visit alive forever and defeat the rotation entirely. The
+window is now idle time, which is what §*Ten minutes* always claimed.
+
+### The backstop was a heartbeat, and that made an abandoned draft immortal
+
+`persist()` wrote unconditionally and `setInterval(persist, 30_000)` fired regardless of activity, so an
+open tab pushed `updated_at` forward every thirty seconds forever. **The seven-day TTL could therefore never
+fire on the one case it exists for**, because the only thing that expires a draft is a timestamp that stops
+moving; and `reconcile.ts`'s newest-wins compared a heartbeat against a real save, so a dead draft on a
+kiosk beat a genuinely newer server draft written from another device, by construction. `persist()` now
+skips the write when the content signature is unchanged, recorded only after the write commits.

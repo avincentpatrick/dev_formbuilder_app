@@ -22,7 +22,7 @@ import { useOnline } from './composables/useOnline';
 import { createSyncOutbox } from './composables/useSyncOutbox';
 import { createApiClient, resumeDraft } from './lib/api-client';
 import { conflictCopy } from './lib/conflict-notice';
-import { openDb } from './lib/db';
+import { draftBelongsToVisit, openDb } from './lib/db';
 import { localMediaRefId, stash } from './lib/media-queue';
 import { reconcileDraft, type LocalDraft } from './lib/reconcile';
 import { respondentSession, rotateRespondentSession } from './lib/respondent-session';
@@ -247,8 +247,19 @@ async function loadResume(resumeToken: string): Promise<void> {
     schema.value = await client.fetchSchema();
 
     const localRow = await db.draft_answers.get([server.formVersionId, props.bootstrap.slug]);
+    // Increment M21 — the SAME visit gate `useAutosave.restore()` applies, on the other of this table's two
+    // readers. Without it `reconcileDraft`'s newest-wins rule hands an ABANDONED stranger's draft to this
+    // respondent whenever it is the more recent of the two — and the damage is worse here than on the plain
+    // entry path, because the seed pins the SERVER's uuid (`:267`) and the SERVER's baseline (`:276`) while
+    // taking the LOCAL tier's answers. Their next "Save and finish later" therefore writes a stranger's
+    // answers into THEIR server draft, past P3a's lost-update guard, which cannot fire because the baseline
+    // is genuinely theirs; a submit then promotes that row.
+    //
+    // A foreign row degrades to `undefined`, which is `reconcile.ts:70`'s first branch: the server draft
+    // wins, silently and without a note. That closes the sibling `minor` row without touching
+    // `LOCAL_WINS_NOTE` — the sentence is correct English for every case that can now reach it.
     const local: LocalDraft | undefined =
-        localRow === undefined
+        localRow === undefined || !draftBelongsToVisit(localRow, respondentSessionId)
             ? undefined
             : {
                   checksum: localRow.checksum,

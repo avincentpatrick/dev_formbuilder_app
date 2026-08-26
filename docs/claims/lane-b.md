@@ -185,7 +185,47 @@ work can actually trip.
 
 ---
 
-## STILL HELD — M29, CODE COMPLETE AND PUSHED, PR #219 OPEN, HELD ON A CI RUNNER OUTAGE
+## RELEASED — M29, the PII screenshot whose gate had no test, and the sibling route that walked around it (merged as PR #219, `7892f7f`, CI 6/6 green with real step counts)
+
+⛔⛔ **`#219` MERGED FIRST, SO `M33` MUST REBASE ONTO `origin/main` BEFORE IT OPENS ITS PR — THIS IS THE
+BRANCH ABOVE TELLING ITSELF SO.** The M33 claim predicted this exact fork and named the remedy: *"if `#219`
+merges first, `M33` rebases onto it and its `match` grows arms."* That is the branch taken. `M33` is cut
+from `d71e4ea`, which does **not** contain `AttachmentPolicy::view()`'s `match` or
+`tests/Feature/Attachments/AttachmentPolicyTest.php`, so **`git rebase origin/main` will conflict in both
+files and both conflicts are expected rather than a symptom.** Resolve by keeping M29's `match` and
+**adding** M33's arms to it, and by keeping M29's five cases and **appending** M33's. ⚠️ **`M33` MUST ALSO
+RE-READ `AttachmentPolicyTest`'s `form_editor` case before flipping it** — M29 wrote that assertion to
+record the CURRENT behaviour precisely so the row could not be closed by accident, and closing the row is
+what M33 is for. **It is the assertion that has to flip, and it is not a regression.**
+
+✅ **THE OUTAGE LIFTED AND THE PATIENCE PAID.** CI ran on `32988697084` and returned **6/6 green with real
+step counts, parsed individually rather than trusted from a tick**: E2E **20** · Static analysis **19** ·
+Design-system axe **11** · Pest **11** · Contract **16** · Frontend **12**. Not one `steps: []`. Three
+earlier runs had failed or sat queued 30–57 minutes with an empty job list; **nothing was merged blind, and
+the thing that made that affordable was that the diff was finished and pushed while the waiting happened.**
+
+⛔⛔ **AND THE CI NUMBER SETTLES A DISAGREEMENT BETWEEN THE TWO LANES' QUOTED BASELINES — MEASURE THE DELTA,
+NEVER THE ABSOLUTE.** CI Pest on the merge commit is **4564 passed / 19,345 assertions (2 pre-existing
+warnings)**. M29 adds exactly **seven** tests (five in `AttachmentPolicyTest`, two in `FeedbackTest`), and
+**4557 + 7 = 4564** — the post-M26 figure lands on the nose. Lane A's hand-off quoted **4544** as the
+post-M28 baseline, which is **13 low**; M25, M27 and M28 added no PHP tests, so it could not have fallen.
+**Anyone measuring against 4544 would have read a phantom `+20` and gone looking for thirteen tests that do
+not exist.** The corrected baseline is **4564 / 19,345**.
+
+⚠️ **THE LOCAL FULL-SUITE NUMBER IS NOT THE CI NUMBER AND MUST NEVER BE QUOTED AS ONE.** Local was
+**4229 passed / 17,970 assertions / 0 failed**; CI is **4564 / 19,345**. A 335-test gap between the two
+harnesses on the same tree — quote the wrong one into a hand-off and the next lane's delta is nonsense.
+
+✅ **AND EVERY GATE THIS CLAIM RECORDED AS *UNMEASURED* IS NOW MEASURED AND GREEN**: Vitest, Storybook axe,
+E2E and the contract job all passed on the merge. The earlier entry deliberately called them unmeasured
+rather than green, and that was the right call at the time — but the record should not be left implying a
+gap that no longer exists.
+
+**The claim, and the M33 merge-order note that was written while it was still held, follow unedited.**
+
+---
+
+## THE RECORD AS IT STOOD WHILE HELD — M29, CODE COMPLETE AND PUSHED, PR #219 OPEN, HELD ON A CI RUNNER OUTAGE
 
 ⛔ **RE-CHECKED AT THE OPEN OF THE M33 SESSION, 2026-08-26 ~16:20 UTC: THE OUTAGE HAS NOT LIFTED AND #219 IS
 STILL UNMERGED.** `gh api .../actions/runs/32985349087/jobs` returns `{"total_count":0,"jobs":[]}` — **not

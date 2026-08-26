@@ -127,6 +127,35 @@ workspace-search box, where pressing Enter silently converts "filter this list" 
 The fix is therefore gated on `page.component === 'search/Index'` (`SearchController.php:31`), which also
 fixes the pre-existing full-page-load bleed rather than widening it.
 
+### ⚠️ CLAIM EXTENSION 2 — the new gate is a PAIRED FILE, and it is being registered rather than narrowed
+
+**One more edit, outside "own block only": `PROGRESS.md`'s Standing Rule 7(b-bis) table.** The
+primitive-ban case added to `token-references.test.ts` scans `resources/` **entire**, which includes
+`resources/public-runtime/` — Lane B's tree outright. That is precisely 7(b-bis)'s definition (*"a gate in
+one lane's tree that reads another lane's tree off disk"*), and that paragraph's closing instruction is to
+**add it to the table when you find it**. So it is registered, not routed around.
+
+**⛔ THE ALTERNATIVE WAS TO NARROW `APP_SCAN_ROOT` TO `resources/js`, AND IT WAS REJECTED ON THE MERITS.**
+The invariant is *"application code names semantics, not ramp steps"*, and the guest runtime is
+application code. Narrowing would leave the one tree this project ships to unauthenticated respondents
+free to reintroduce the exact defect this increment proves no other gate can see. Measured before
+choosing: **zero** primitive references exist anywhere under `resources/` today, Lane B's tree included,
+so the gate is green on both lanes at the moment it lands and constrains nobody retroactively.
+
+⚠️ **IT DIFFERS IN KIND FROM THE THREE ENTRIES ALREADY IN THAT TABLE, AND THE ROW SAYS SO.** Those three
+are *parity* assertions — two lists that must move together, where whichever lane lands first breaks the
+other. This one is a *prohibition*: it is green until someone writes a primitive, it names the offending
+file in its own failure message, and it fires inside the PR of whichever lane wrote it. There is no second
+half to move in the same PR. Recording that distinction matters more than the row itself, because the
+table's stated remedy — *"claim and edit both halves in the same PR"* — does not apply here and a reader
+following it literally would be looking for a file that does not exist.
+
+**And one fragility removed rather than documented.** The gate strips `/* */` comments, so the fix
+comments in `achievements/Index.vue` and `LogicRail.vue` originally survived only because of that
+stripping — a comment moved into HTML syntax would have made the gate report its own documentation as the
+offender. Both are now written **without** the `var(` prefix, so the raw count of banned strings under
+`resources/` is **zero with no stripping at all**.
+
 ⚠️ **THE HOST LINT NUMBERS IN THIS FILE WERE STALE AND ARE NOW CORRECTED BY MEASUREMENT.** The four gates
 are **97 · 113 · 31 · 113/121/0**, run unpiped on the host on a tree that touches no PHP. `lane-b.md` had
 it right after M18; this file was still carrying **111 · 111/119/0**, the pre-M18 migration count.

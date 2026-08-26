@@ -4520,3 +4520,114 @@ asserts that was only ever true of the path you borrowed it from.**
 ⚠️ **ONE CLAIMED FILE WAS RELEASED UNTOUCHED AND THAT WAS THE PLAN.** `DnsRecordBlock.vue` was claimed *"for the MUTATION ONLY … reverted before the PR opens"* — restored from **saved bytes** (never `git checkout --`, per M9), **sha256-identical**, absent from the diff.
 
 **Gates.** E2E **551 passed + 10 skipped, no flaky line** — load-bearing now, thanks to M16's `failOnFlakyTests`. Pest **4515 / 19,161**, PHPStan `[OK]`, four lint gates **97 · 111 · 31 · 111/119/0**, `openapi.json` byte-identical, **Vitest 130 / 2,213** (post-M15) and axe **42 / 299** all unmoved — no `.vue`, no `packages/`, no `resources/`, no PHP in the final diff. Six jobs, real step counts **16 · 11 · 11 · 18 · 20 · 12**.
+
+---
+
+## 2026-08-26 — `M19` (Lane A): the four overruns the repaired gate found, and a Linux e2e loop (PR #210)
+
+M17 quarantined five scan labels in `KNOWN_OVERFLOWING` because *"none of them reproduces on a Windows
+host"*. **That reason was wrong, and why it was wrong is worth more than the three declarations that
+fixed them.**
+
+⛔⛔ **THE PROBE WAS AIMED AT A FONT THAT CANNOT REACH THE ELEMENTS THAT FAILED.** It inlined
+**OpenDyslexic**, confirmed `document.fonts.check()` returned `true`, and measured 0 overflow across all
+six page × viewport combinations. Both halves true; the conclusion did not follow.
+`theme-overrides.css:404-406` re-points **only** `--mds-font-family-body`, and its own docblock at
+`:389-395` states the Display role is untouched — while `.page-header__title` and `.builder__title` are
+both `--mds-font-family-display`, and the form hub carried **no personalization at all**. The variable
+that actually differs is the **display stack's platform fallback**: with `"Segoe UI Variable Display"`
+absent, `system-ui` resolves to Segoe UI on Windows and **DejaVu Sans** on a CI runner, **~27% wider** —
+**256px against 324px** for the word "Submissions" at 48px/750. **A probe that measures zero has told
+you nothing until you know it exercised the thing that broke.**
+
+✅ **REPRODUCED TO THE PIXEL BEFORE A LINE OF CSS CHANGED — 17 / 24 / 28, CI's three numbers exactly —
+THEN 0 / 0 / 0.** Three one-line declarations, each the escape its own file already used elsewhere:
+`.page-header__title` and `.mds-stat-tile__value` take `overflow-wrap: anywhere`; `.builder__title-row`
+takes `align-self: stretch`. ⛔ **`anywhere`, not `break-word`: only `anywhere` reduces min-content,
+which is precisely what a flex item's automatic minimum size reads.** ⛔ **And `min-width: 0` was
+already present on four of the elements involved** — inert on three (wrong axis, or beside an `overflow`
+that had already resolved the minimum to 0) and the **cause** on the fourth, where `.mds-segmented` uses
+it to remove the fieldset's floor. **Re-applying the declaration that is already there and calling it a
+fix is the shape that made M17's own proof mutation a no-op.**
+
+⛔⛔ **TWO OF THE FIVE ENTRIES WERE MISATTRIBUTED BY THE GATE'S OWN OFFENDER HEURISTIC, SO THE BACKLOG
+ROWS INHERITED A DEFECT FROM THE TOOL THAT FILED THEM.** (a) It walked the **descendants of scroll
+containers it skipped** — a box spilling inside an `overflow: auto` ancestor is *absorbed* and
+contributes **nothing** to the number being asserted. The reported *"30px `mds-segmented__seg`"* is
+`ConfigPanel`'s Requiredness control inside `.config`; the 24px was always `.builder__title-row`.
+(b) It **iterated elements only**, so an overflowing anonymous line box had nothing to report and the
+message fell back to *"suspect an intrinsic minimum on a grid or flex track"* — provably the wrong
+suspect on the form hub, where `repeat(auto-fit, minmax(200px, 1fr))`'s **fixed** min track function
+resolves every tile's `min-width: auto` to 0 and no tile box can blow out. Both closed, and **both
+proved on the defect that exposed them**: the hub now reads *"the text \"Accepting\" inside
+`<p class=\"mds-stat-tile__value\">` runs 28px past the region"*, and the builder now names
+`.builder__title-row` with the segmented control demoted to *"NOT the cause"*.
+
+⚠️ **THE PREDICTION FLAGGED AS MOST LIKELY WRONG WAS RIGHT — AND THE GUARD BEHIND IT WAS VERIFIED
+RATHER THAN INFERRED.** One `align-self: stretch` retired all three builder entries. That mattered
+because `showBuilderPane` returns **`false`** when the pane switcher is hidden, which would have made
+two `assertClean` calls **silently vanish rather than pass**. Measured at 375px:
+`switchVisible=true fields=true canvas=true`. **A conditional around an assertion is a way for a suite
+to go green by not running.**
+
+✅ **THE ENVIRONMENTAL EXCUSE IS GONE, AND THE README HAD ALREADY PROMISED IT WAS.** `README.md:88-89`
+asserted *"Playwright / e2e run in Linux (containers / CI) … so local and CI results match"* — **false
+as built**, and believing it is how four live defects came to be recorded as unreproducible.
+`docker compose run --rm e2e test …` now does it, behind a profile so `docker compose up` never starts
+it. ⛔ **Two prerequisites, both silent when unmet:** built, same-origin assets (with `public/hot`
+present the stylesheet comes from `:5173` while the document is on `:8080`, so `/fonts/*.woff2` is
+cross-origin and OpenDyslexic never loads — while `document.fonts.ready` resolves perfectly happily,
+which is why nothing complained), and **`fonts-dejavu-core`**, which `mcr.microsoft.com/playwright`
+does **not** ship: it carries exactly the `--with-deps` set, where `system-ui` resolves to **WenQuanYi
+Zen Hei**, a CJK face *narrower* than either real answer. ⛔ **`dev_formbuilder_app-node-1` cannot do
+this and its own markers say otherwise** — Alpine/musl, zero fonts, no fontconfig, and a Chromium
+carrying `INSTALLATION_COMPLETE` **and** `DEPENDENCIES_VALIDATED` whose `--version` returns `not found`
+on a file that exists. **A validated-dependencies marker is not evidence.**
+
+⚠️ **A FAILURE THAT READ EXACTLY LIKE A FIXTURE PROBLEM WAS MY OWN ORPHANED CONTAINER.** Cancelling a
+background sweep killed the `docker run` **client** and left the container running for 21 more minutes,
+driving the app container to a load average of 5 while the *next* run's `globalSetup` timed out logging
+in. Every tell pointed at seeded data — a `waitFor`, a navigation, a page that had passed twenty
+minutes earlier — and I had already started checking the DB. **`docker ps` answered it in one command.**
+Recorded on the compose service itself.
+
+⚠️ **A MECHANISM CLAIM WAS WRONG IN TWO FILES, HAVING PROPAGATED BY CITATION.** `white-space: nowrap`
+is **not** on `.mds-segmented__seg` — the only two in `SegmentedControl.vue` are the sr-only `legend`
+and `input`. `personalization-axe.spec.ts` said it was, and a backlog row then quoted that comment
+**verbatim**, which reads as corroboration rather than repetition. ⚠️ **`ThemeQuickToggle.vue` was
+reported as a third copy and is not** — it says *"inline-flex with no wrap and no overflow handling"*,
+which is exactly right. **Two files, counted rather than assumed**, and the claim extension that would
+have been needed to edit it was returned unused.
+
+➕ **FILED, NOT FIXED, AT THE MOMENT THE DECISION WAS MADE.** The `MdsSegmentedControl` spill is real —
+a horizontal scrollbar inside the builder's config pane nobody looks for — but **absorbed**, so it owns
+none of the five entries. It also **falsifies J8's "measured every consumer" claim**
+(`exceptions-log` #13): `.config__group` and `members/Index.vue`'s `MdsFormField` both carry the
+stretch-clamped shape J8 concluded only the topnav had. **J8 measured at every width, in the wrong
+typeface.** Fixing it means a wrap or shrink affordance on a component with **nine** consumers, with
+`flex-wrap` foreclosed for the topnav.
+
+⚠️ **NUMBERED M19 BECAUSE LANE B TOOK M18 BETWEEN THIS SESSION'S FETCH AND ITS PUSH** — the second such
+race in two days, and the reason the claim protocol is read again immediately before writing rather than
+once at the start. ⚠️ **And `docker/e2e/Dockerfile` was created without being named in the claim**,
+which named only the `docker-compose.yml` that references it: **a claim that names a config file must
+also name the files that config brings into existence.**
+
+**Files.** `PageHeader.vue` · `Builder.vue` · `StatTile.vue` · `tests/e2e/support/axe.ts` ·
+`personalization-axe.spec.ts` · `docker-compose.yml` · **`docker/e2e/Dockerfile` (new)** · `README.md` ·
+`docs/feature-backlog.md` · `docs/ux/exceptions-log.md` · `docs/ux/design-system-reference.md`.
+⚠️ **`ConfigPanel.vue` and `SegmentedControl.vue` were claimed and released untouched** — the
+M8/M11/M17 shape, and correct: the measurement falsified the prediction that they owned an entry.
+
+**Gates.** Vitest **35/545 + 60/886 exactly unmoved** — predicted to MOVE, and **wrong**; Storybook axe
+**42 / 299**; four host lint gates pass; `vue-tsc` clean on both programs; **no PHP in the diff**, so
+Pest, PHPStan and `openapi.json` are structurally unmovable.
+
+⚠️ **AND CI READ PEST AT 4544 / 19,280 AGAINST A 4515 / 19,161 BASELINE, ON A DIFF WITH NO PHP IN IT.**
+None of the +29 tests or +119 assertions is M19's. A `pull_request` run tests a **merge of the branch
+into the current `main`**, and Lane B's M18 landed at 01:11Z — eight minutes before this run started.
+**A gate number that moves on a diff that structurally cannot move it is the other lane, not a
+mystery**: check what merged since the branch was cut before reaching for any other explanation. The
+new baseline for both lanes is **4544 / 19,280** (2 pre-existing warnings). Everything else was exactly
+as predicted and exactly unmoved: E2E **551 passed + 10 skipped with no flaky line**, Vitest **2,213**,
+Storybook axe **42 / 299**. Six jobs, real step counts **20 · 18 · 11 · 11 · 12 · 16**.

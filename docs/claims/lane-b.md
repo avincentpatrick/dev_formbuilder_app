@@ -156,6 +156,67 @@ actually wrote.** A unit test proves what a function does when called; only a ca
 production payload is the shape the unit test assumed. That test is added here, and it is the one that
 fails on `main` today.
 
+### ⚠️ CLAIM EXTENSION 1 — the file list is UNCHANGED; the row's magnitude story is not
+
+**No file is added or dropped.** This extension exists because an adversarial pass over the row's
+*consequence* half changed what the row means, and the claim above asserted one figure that does not
+survive. Recording it before the fix is written, rather than discovering it in the backlog wording
+afterwards.
+
+**⛔ THE 400-ROW RETENTION SWEEP DOES NOT EXIST. THE FIGURE IS FICTIONAL AND THE CLAIM ABOVE REPEATED IT.**
+`SubmissionReviewService::archive()` has exactly **one** caller in the entire tree —
+`app/Http/Controllers/Tenant/SubmissionReviewController.php:35` — one submission per HTTP request, from
+the inbox detail view, by one authenticated human. There is no bulk archiver, no retention job, no
+scheduler entry, no `/api/v1` route. "One retention sweep of 400 archived rows" would be **400 individual
+clicks by one reviewer.** The defect is real; the illustration is invented. The claim above said
+*"400 × 3 = 1,200. Arithmetic holds"* — the arithmetic holds and the premise it multiplies does not.
+
+**⛔ AND THE ROW LEADS WITH THE WRONG VERB.** Measured against the idempotency key, `archive` is **partly
+self-cancelling** and `markUnderReview` is the larger leak:
+
+- The happy path is already safe. Claim → approve by the *same* reviewer writes three audit rows but
+  **one** award, because both live listeners key on `('submission', $submissionId)` with the reviewer as
+  user — the identical key the backfill builds. The unique index collapses them.
+- The real inflation is only where a reviewer touched a submission they never approved or returned:
+  an **abandoned `under_review` claim**, which is a routine queue state rather than an edge case, or
+  archiving somebody else's work. So the row's *"every archive scores"* framing **overstates**, and its
+  silence on stale claims **understates**. The true magnitude is `3 × |{(actor, submission)}|` where that
+  actor's only qualifying row for that submission is a claim or an archive.
+
+**⛔ THE BADGE MECHANISM IN THE ROW IS WRONG, THOUGH ITS CONCLUSION IS RIGHT.** `BadgeAwarder::awardsOf()`
+(`:213-227`) counts **award ROWS of one rule**, and `:187` compares that count against
+`BadgeKey::threshold()`. `Reviewer` is **50** (`BadgeKey.php:117`) — fifty *awards*, not 1,200 *points*.
+The row's phrasing invites the reading that a point total crosses a threshold; nothing anywhere reads a
+point total for badging. Worth correcting because `FirstReview` is threshold **1**, so the very first
+spurious award already mints a badge — which is a sharper statement of the same harm than the row's.
+
+**⚠️ TWO READERS THE ROW MISSES, AND ONE OF THEM IS WORSE THAN THE LEADERBOARD.** Beyond `TeamProgress`
+and the ladder (both confirmed, neither filtered by `rule`), the inflation also reaches
+`BadgeShelfService:79` (per-rule counts) and **`StreakCalculator:53`, which walks `DISTINCT
+awarded_at::date`**. The backfill stamps `awarded_at` with the *act's* date (ADR-0020 §D5), so spurious
+awards manufacture spurious **streak days** — a member's longest streak becomes partly a record of days
+they archived things. That is not recoverable either.
+
+**⛔ AND THE PERMANENCE IS WORSE THAN "NO DELETE POLICY".** ADR-0020 `:127` names adding a DELETE policy as
+an explicit **reversal trigger** for the ADR, and §D4 argues the absence as a feature. So the inflation is
+not merely *undeleted by default* — it is uncorrectable without a migration that the ADR and a test both
+argue against. The row understates this, and it is the strongest reason to fix the map before anyone runs
+the command rather than after.
+
+**⛔ ONE TRAP FOR THE IMPLEMENTATION, FOUND BEFORE IT WAS FALLEN INTO.** `AUDITS_SQL` already carries a
+`LEFT JOIN submissions s` (`:88`), so `s.status` is one word away and is the **wrong answer**. That is the
+submission's *current* status, not its status when the row was written: a submission approved and later
+archived reads `archived` today, so keying on it would erase the **legitimate** award and keep nothing.
+The value must come from `new_values`, which is the historical record. Stated here so that the cheaper
+join is visibly rejected rather than never considered.
+
+**✅ AND THREE THINGS THAT SURVIVED THE ADVERSARIAL PASS INTACT**, which is worth recording because the
+whole point of the pass was to break them: `return` really does score `SubmissionReviewed` live; the
+`answers.` precedence loop really does have to stay first, and **becomes load-bearing for the first time**
+once the fix keys on `status`, because both writers emit that key; and a no-answer-change edit really is
+reachable (`answerDiff()` returns `[]` with no guard) but can never carry `remarks`, so it is not a third
+ambiguity — it maps to `unmapped`, exactly as the map's docblock already anticipates.
+
 ### Blast radius, stated rather than discovered
 
 **`openapi.json` must stay byte-identical** — no `/api/v1` route, resource or controller is touched

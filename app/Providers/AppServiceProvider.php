@@ -360,14 +360,33 @@ class AppServiceProvider extends ServiceProvider
 
         // Guest runtime limits (Increment F5). The submit/schema surface is limited per token AND per IP
         // (technical-architecture.md §7.2), so a single leaked link and a single enumerating IP are both
-        // bounded; the mint surface is limited per IP. Keyed on the raw {shareToken} string (no verification
+        // bounded; the mint surface is limited per IP. Keyed on the raw token string (no verification
         // needed — this is velocity, not authenticity — so `throttle:guest` may run before the token middleware).
-        RateLimiter::for('guest', fn (Request $request): array => [
-            Limit::perMinute((int) config('guest.rate_limit.submit_per_token'))
-                ->by('gtok:'.hash('sha256', (string) $request->route('shareToken'))),
-            Limit::perMinute((int) config('guest.rate_limit.submit_per_ip'))
-                ->by('gip:'.$request->ip()),
-        ]);
+        //
+        // ⚠️ THE PER-TOKEN KEY IS A CONTRACT WITH THE ROUTE'S PARAMETER NAMES, AND UNTIL M30 IT NAMED ONLY ONE
+        // OF THE TWO SHAPES THIS LIMITER GUARDS. F5 keyed on `{shareToken}` when every route here carried
+        // that segment; the draft-resume route (`routes/api.php:549`) later reused `throttle:guest` — rightly,
+        // it is the same gate as the draft-save channel — but declares `{resumeToken}`. A parameter the route
+        // does not have reads back null, `(string) null` is '', and `hash('sha256', '')` is a CONSTANT, so
+        // every draft-resume request in the deployment shared ONE bucket. The throttle also sits ahead of
+        // `EstablishGuestDraftContext`, so a garbage token spent that budget before anything verified it.
+        //
+        // The fallback arm keys on the IP so that the worst case of a future mismatch is per-caller rather
+        // than deployment-wide. It is a floor, not the design: `RateLimiterBindingTest` invokes this closure
+        // for every live route bound to `throttle:guest` and fails if any of them cannot tell two tokens
+        // apart — which is the question, and which no list of parameter names in a test could keep answering.
+        RateLimiter::for('guest', function (Request $request): array {
+            $token = $request->route('shareToken') ?? $request->route('resumeToken');
+
+            return [
+                Limit::perMinute((int) config('guest.rate_limit.submit_per_token'))
+                    ->by(is_string($token) && $token !== ''
+                        ? 'gtok:'.hash('sha256', $token)
+                        : 'gtok-ip:'.$request->ip()),
+                Limit::perMinute((int) config('guest.rate_limit.submit_per_ip'))
+                    ->by('gip:'.$request->ip()),
+            ];
+        });
 
         RateLimiter::for('guest-mint', fn (Request $request): Limit => Limit::perMinute(
             (int) config('guest.rate_limit.mint_per_ip'),

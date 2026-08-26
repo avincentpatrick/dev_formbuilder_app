@@ -18,17 +18,202 @@ exact-equality `KNOWN_UNGUARDED` assertion, so the list shrinks in the *same* PR
 
 ---
 
-## Status: NO ACTIVE CLAIM
+## CLAIMED — `M21`, the abandoned draft that is restored into the next respondent's form
 
-Lane B holds nothing. **Namespaces after M18:** migration block advances to **`2026_08_17_000111`** (M18 spent
-`…000109` and `…000110`); ADR-0016's next free sub-decision is **`§D35`** (M18 spent `§D34`). ⛔ **ADR `0022`
-STAYS FREE and stays Lane A's block-opener** — M18 deliberately spent no ADR number, because this is an SSO
-trust decision inside ADR-0016's own scope and minting `0022` would have spent the scarcer namespace to say
-the same thing. `0010` stays reserved for H1d; `#16` stays free.
+**Taken 2026-08-26.** Branch `m21-draft-respondent-scope`, cut from `origin/main` at `336d295`, PR into
+`main`. Row: `docs/feature-backlog.md:1099` — *"An abandoned local draft is restored into the NEXT
+respondent's form, silently, with their answers on screen"* (`major`) — plus the `minor` immediately
+below it, *"`reconcile.ts:43`'s local-wins note tells a respondent a stranger's answers are theirs"*,
+which the row itself says is closed by closing the major.
 
-**Baseline on `origin/main` after M18:** CI Pest **4544 / 19,280** (2 pre-existing warnings) · Vitest
-**130 files / 2,213** · Storybook axe **42 / 299** · E2E **551 passed + 10 skipped, no flaky line** ·
-PHPStan CI `[OK]`, local **18 by FILE LIST** · four host lint gates **97 · 113 · 31 · 113/121/0**.
+**⚠️ NUMBERED `M21`, NOT `M20`, AND THE PROTOCOL WORKED FOR THE THIRD TIME IN THREE DAYS.** This session
+opened on a `git fetch` at `336d295`, where **both** lane files read `NO ACTIVE CLAIM`, and reasoned — as
+M18's claim did, correctly on what it could see — that the next free increment number was mine. It was
+right when read. **Lane A pushed `claim(M20)` at 10:34:46 while this lane was still in read-only recon**
+(`987c571`, then extensions `17da814` and `f3fc136`), so **M20 is Lane A's and this is M21.** Caught by
+re-reading the ref immediately before writing this file rather than trusting the opening fetch, which is
+the whole of 7(g). ⛔ **THE COST OF THE OPENING FETCH IS NOW MEASURED RATHER THAN ARGUED: it was stale
+within four minutes.** Recon took forty; a claim written from a forty-minute-old read of `origin/main`
+would have collided on the number and been discovered at push time.
+
+**No collision on the merits.** Lane A's M20 is *"the three design-system merge-gate rows"*, wholly inside
+`packages/design-system/src/components/{Combobox,DataTable,PasswordStrength,Checklist}/`. This row is
+wholly inside `resources/public-runtime/`, which 7(b) grants Lane B outright. The two columns do not meet.
+
+---
+
+### What was verified against the code BEFORE this claim was written
+
+**The defect is LIVE, and the walk is four statements long.** `RuntimeSession.vue:142-162`'s `onMounted`
+returns early only for a resume seed (`:145-153`); on plain entry `props.initialAnswers` is `undefined`,
+so `:155` calls `autosave.restore()`, `:157-159` push the result into `runtime.restoreAnswers()`, the
+locale and the step. `useAutosave.ts:139` reads `db.draft_answers.get(pk)` where `pk` is
+`[options.formVersionId, options.slug]` (`:73`) — **no respondent dimension** — and `fresh()` at `:128-134`
+gates on the schema checksum and a seven-day TTL (`:14`) and on nothing else. Respondent A abandons;
+respondent B loads the same share link on the same browser; **B's fields render A's answers with no
+banner**, because `WelcomeBackBanner` is `v-if="resume && resume.greet !== false"` (`:481`) and there is
+no resume seed on plain entry.
+
+**⚠️ SIX OF THE ROW'S TEN CITATIONS HAVE DRIFTED, AND THE DRIFT IS UNIFORMLY *FORWARD* — the file grew
+under them.** Every claim is TRUE; six of the line numbers are not, so a reader who trusts them lands in
+the wrong function.
+
+| The row says | Actually at | Verdict |
+|---|---|---|
+| `useAutosave.ts:14` — 7-day TTL | `:14` | **holds exactly** |
+| `useAutosave.ts:136-155` — the `draft_answers` read | `:136-182`; the `get(pk)` is `:139` | holds; the range stops mid-function |
+| `db.ts:127` — the compound key | `:130` declares `Table<DraftRow, [string, string]>`; `:139` is the index string | **off by 3 / 12** |
+| `RuntimeSession.vue:149-156` — `autosave.restore()` | `:155`, inside `onMounted` at `:142-162` | holds; range straddles |
+| `RuntimeSession.vue:262`, `:313`, `:344` — `clear()` on the submit paths | `:267`, `:322`, `:353` | **off by 5 / 9 / 9** |
+| `RuntimeSession.vue:471` — the banner's `v-if` | `:481` | **off by 10** |
+| `App.vue:230` — the respondent-blind resume read | `:249`; `:230` is `loadResume()`'s signature | **off by 19** |
+| `reconcile.ts:43` — the local-wins note | `:43` | **holds exactly** |
+| `WelcomeBackBanner.vue:47` — renders the note | `:47` | **holds exactly** |
+| `useAutosave.ts:14` — the TTL as the only other gate | plus `fresh()` at `:128-134` | holds |
+
+⛔ **AND THE ROW IS WRONG ABOUT THE ONE THING THAT DECIDES WHETHER IT CAN BE FIXED AT ALL — SO THE
+CITATIONS HOLDING IS AGAIN NOT THE ROW HOLDING, WHICH IS NOW TEN-FOR-TEN.** The row defers itself in two
+sentences: *"the draft has **no analogue** [to the outbox's degraded surface] — its legitimate feature *is*
+cross-visit restore, so scoping it to a visit would delete the feature rather than contain it"*, and
+*"telling a personal device from a kiosk needs an operator concept the guest runtime does not have, which
+is exactly the unbuilt **Kiosk mode** row — **that row is this one's precondition**."* Both halves are
+false, and each is falsified by a document that predates the row.
+
+**(1) THE ANALOGUE EXISTS AND M15 BUILT IT.** `SyncStatus.vue:123-128` renders *"One response from an
+earlier session on this device is still waiting to send."* — existence, a count, and no content. That is
+precisely the shape this row says the draft channel lacks.
+
+**(2) THE SPEC ALREADY SAYS THE DRAFT IS SESSION-SCOPED, SO SCOPING IT IMPLEMENTS THE SPEC RATHER THAN
+NARROWING IT.** `docs/ux/form-filling-ux-flow.md:148`: *"This save is **session/device-scoped**, not a
+durable resume-later feature… This is deliberately positioned to respondents as 'your progress is saved
+while you're filling this out,' **never as 'come back later'** — the latter promise is reserved for §5.2."*
+Appendix A #8 (`:336`) repeats it as a decision of record. **The "session" half of "session/device-scoped"
+was never built.** §5.2's emailed resume link is the sanctioned come-back-later channel, and it is
+respondent-bound by a signed token. **The kiosk-mode row is therefore NOT this row's precondition**, and
+nothing here waits on it.
+
+### Three defects the row does not mention, found by grepping the shape rather than the row
+
+- **⛔ THE LEAK HAS A SECOND DOOR, AND A FIX THAT GUARDS ONLY DEXIE LEAVES IT OPEN.**
+  `useAutosave.ts:157-181` migrates a pre-G8b **localStorage** draft — `meridian:draft:{formId}:{slug}`
+  (`:19-21`), also respondent-blind — into Dexie *and returns it* on first restore, reached whenever the
+  Dexie `get` returns `undefined` **or throws** (`:153`). Same disclosure, different store.
+- **`major` · An abandoned fill's MEDIA is never deleted, on the hardware `outbox.ts` names as the
+  threat.** `media_queue` rows are removed at exactly two call sites, `outbox.ts:107` and `:159`, both
+  `where('client_submission_uuid').equals(uuid)`. A blob stashed mid-fill by `App.vue:154-160` carries
+  `client_submission_uuid: null` until finalize (`media-queue.ts:45-50`), so an **abandoned** fill's photo
+  or signature is orphaned with no uuid, no TTL and no prune — permanently. I10d's own principle is
+  *"the moment the server has the data there is no reason for a copy of someone's answers to stay on the
+  device"*; here the server never got it, and the copy stays anyway.
+- **`minor` · `lib/respondent-session.ts`'s docblock states a mechanism the build does not have.**
+  `:26-27` says *"`touch()` runs on every read, and the runtime reads this on every refresh of the sync
+  surface, so a respondent filling a long form never crosses [IDLE_MS]."* `respondentSession()` has
+  **exactly one** non-test call site — `App.vue:140`, at the composition root, once per page load — so the
+  `lastSeen` stamp is never refreshed during a fill. The **conclusion** survives (within one page load the
+  id is a constant and cannot rotate at all), but the stated reason is an intention read as a measurement,
+  which this project has now recorded four times. The real consequence is one the docblock does not name:
+  a respondent who **reloads** after ten idle minutes gets a fresh visit id and loses sight of their own
+  outbox rows. Filed, not fixed here.
+
+### The design, and the alternative it rejects
+
+**Stamp `respondent_session_id` on `DraftRow`, un-indexed, and scope the RESTORE — never the write.**
+Exactly M15's shape, deliberately, so the runtime keeps one convention rather than two: `sessionId` is an
+optional **argument** and never an import (`outbox.ts:31-38` — `lib/db.ts` is in `sw.ts`'s import graph and
+`tsconfig.sw.json` re-checks it with no `Storage` type); `undefined` means *do not scope*, preserving every
+pre-M21 call shape; and **`null` on a row means an EARLIER visit, never a wildcard** (`db.ts:63-66`).
+
+**No Dexie `version()` bump**, and the document already states the rule rather than my inferring it:
+`docs/offline-first-sync-design.md:124` — *"a new STORE requires a version bump, an un-indexed field on an
+existing row shape does not"* — the precedent `conflict_code`, `server_reference` and M15's own
+`respondent_session_id` all set.
+
+**A draft this visit did not write is never applied silently. It is offered, content-free, or it is not
+offered at all.** A matching session id restores exactly as today — which is what keeps
+`form-filling-ux-flow.md:148`'s *"a reload of the same browser tab"* working, and is the case
+`respondent-session.ts:10-16` chose `sessionStorage` for. A non-matching or null id renders a notice that
+names **existence and a date and nothing else**, with an explicit choice.
+
+**⚠️ THE REJECTED ALTERNATIVE IS THE ONE THE ROW ASSUMES, AND IT IS REJECTED ON A MEASUREMENT.** Putting
+the session id into the **primary key** (`[form_version_id+local_draft_id]` → three parts) is stricter and
+simpler and wrong twice: it needs a `version(3)` with an upgrade that would orphan every existing draft,
+and it deletes the honest respondent's recovery outright, because `sessionStorage` dies with the tab. The
+row's *"scoping it to a visit would delete the feature"* is a true statement **about that design only**.
+
+### Files claimed
+
+**`resources/public-runtime/` — Lane B's outright under 7(b)'s CRDT grant:**
+
+- `lib/db.ts` — `respondent_session_id` on `DraftRow`
+- `composables/useAutosave.ts` — stamp on write, scope on restore, **and close the localStorage door**
+- `components/RuntimeSession.vue` — thread the id already injected at `:124` into `createAutosave`, render
+  the notice
+- `components/EarlierDraftNotice.vue` — **NEW.** The content-free affordance, page-local for the reason
+  `WelcomeBackBanner.vue:5-7` gives (DSR §1.2: don't add an Mds component for a one-off)
+- `App.vue` — scope the resume path's local read at `:249` so a stranger's draft cannot win reconciliation
+- `lib/reconcile.ts` — **on a prediction it may be released untouched.** The `minor` may close entirely in
+  `App.vue` by never handing `reconcileDraft` a foreign draft, in which case `:43`'s copy is correct as
+  written and this file does not move. Claimed because a file that might be written to is a file the other
+  lane must not be holding — the M17 `DnsRecordBlock.vue` / M18 three-file precedent.
+- `lib/types.ts` — `DraftBlob` may gain the stamp; **also on a prediction**
+- `__tests__/autosave.test.ts` · `__tests__/components.test.ts` · `__tests__/reconcile.test.ts` ·
+  `__tests__/db.test.ts` · `__tests__/respondent-session.test.ts`
+
+**Shared artefacts, claimed and never owned:**
+
+- `docs/feature-backlog.md` — see the disjoint-region note below
+- `docs/security-threat-model.md:75` — that row's **Residual** paragraph names this exact defect and
+  repeats both false premises; it is corrected in the same PR that closes it. **Lane A is not in this file.**
+- `docs/offline-first-sync-design.md` — §3's table row for `draft_answers` (`:119`) and a §8 amendment
+  beside M15's at `:219-236`, where P3a, M12 and M14 also landed theirs
+- `docs/adr/0021-respondent-scoped-device-outbox.md` — **Lane B's own ADR** (M15), amended rather than
+  superseded: same decision, second channel
+- `docs/ux/form-filling-ux-flow.md` — §5.1 records as-built what `:148` has always specified
+- `docs/claims/lane-b.md` — this file
+- `PROGRESS.md` — **Lane B's own Current Status block and Lane B's own hand-off line only**, per 7(d)
+
+⚠️ **`docs/feature-backlog.md` IS HELD BY BOTH LANES RIGHT NOW, DELIBERATELY, AND THE REGIONS ARE NAMED SO
+THE OVERLAP IS A MERGE AND NOT A COLLISION.** Lane A's live M20 claim takes the three rows under the
+**Design system** heading of the merge-gate review. This row takes **`:1099`** and the `minor` directly
+below it, and appends the three new findings above. Disjoint by inspection, in a file that appends rather
+than restructures — the same reasoning 7(d) already applies to `PROGRESS.md`. **A rebase before the push is
+what proves it rather than assumes it.**
+
+**⛔ NOT TAKEN, and each for a stated reason rather than by omission:** nothing in `app/`, `config/`,
+`scripts/`, `resources/js/`, `packages/design-system/src/components/`, `ci.yml`, `phpunit.xml`. **No
+`/api/v1` route is reached** — the guest draft channel's server half is untouched — so `openapi.json` must
+come back **byte-identical**; if it moves, that is a finding, not a rebaseline. `MEMORY.md` is Lane A's.
+`tests/e2e/` is claim-first and **is not claimed**: no selector this row can invalidate appears in it —
+`public-runtime-offline.spec.ts` has **zero** matches for `draft`, `autosave`, `restore` or `Welcome`, and
+its three reloads (`:52`, `:79`, `:225`) all sit inside one browser context, so `sessionStorage` survives
+them and the visit id does not rotate. **Grepped, not assumed.**
+
+**PAIRED FILES (7(b-bis)) — CHECKED, AND THE ONE IN RANGE IS ALREADY IN LANE A'S HAND, SO IT IS
+DELIBERATELY *NOT* CLAIMED HERE.**
+`packages/design-system/src/theme/__tests__/clipped-node-containment.test.ts` scans
+`resources/public-runtime` (`SCAN_ROOTS`, `:39`) and asserts `KNOWN_UNGUARDED` (`:71-79`) by exact equality
+at `:162`; the public-runtime entry is `RuntimeShell.vue`, which this row does not open. Lane A's M20 claim
+says the same file *"is in range"* for them. **Two lanes cannot both hold it, so this design is built not
+to move it**: the new component gives its root a `position: relative` if it carries any `clip: rect(0 0 0
+0)` node at all, which is the exact fix M15 applied to `.sync-status`. ⛔ **If the list moves anyway, that
+is a finding and a coordination event with Lane A — never a silent edit to a file the other lane is
+holding.** The other two paired gates need a new `NotificationType` or ability key; this row mints neither,
+which is checked and not assumed.
+
+**Namespaces spent: NOTHING from either, and the reasoning is written down before the fact so the
+measurement has something to disagree with.** **ADR `0022` STAYS FREE and stays Lane A's block-opener** —
+this is ADR-0021's own decision applied to the second channel, and minting `0022` would spend the scarcer
+namespace to restate an accepted decision, which is exactly M18's reasoning for not minting it either. No
+migration: **`2026_08_17_000111` stays free**, because nothing server-side moves. `0010` stays reserved for
+H1d; `#16` stays free; ADR-0016's next free sub-decision stays **`§D35`**.
+
+**Baseline measured on THIS tree at `336d295`, not quoted:** Vitest `resources/public-runtime` **35 files /
+782 tests passed**, exit 0, **no `Failed to start forks worker` lines** — the file count checked, per the
+trap that fails green. Four host lint gates **97 · 113 · 31 · 113/121/0**, all exit 0, read unpiped.
+⚠️ **The lint numbers disagree with the ones Lane A released after M19 (`97 · 111 · 31 · 111/119/0`) and
+the difference is exactly M18's two migrations** — their line was written against a pre-M18 tree. Recorded
+rather than reconciled quietly, because a gate number moving on a diff that cannot move it is the standing
+tell for the other lane's merge.
 
 ---
 

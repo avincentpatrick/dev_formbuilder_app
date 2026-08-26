@@ -47,10 +47,24 @@ const iconSize = computed(() => (props.size === 'lg' ? 'md' : 'sm'));
 
 // While loading the button stays focusable (aria-disabled, not native disabled) but must not
 // fire a second submit — guard the click. Native disabled already blocks clicks.
+//
+// ⛔ `stopImmediatePropagation`, NOT `stopPropagation`, AND THE DIFFERENCE IS THE WHOLE GUARD (M23).
+// The consumer's `@click` is a fallthrough listener on THIS SAME ELEMENT, not an ancestor, so bubbling
+// never enters into it: `stopPropagation()` stopped a journey the handler was never going to make and
+// left the consumer's handler to run anyway. For four increments this function has read as a working
+// in-flight guard while blocking nothing, and the cost was a `:loading` button whose second click
+// provisioned a second Google spreadsheet in the tenant's Drive that Meridian can never delete.
+//
+// MEASURED RATHER THAN REASONED, because two facts had to hold and neither is obvious. Vue merges a
+// component's own template handler with the parent's fallthrough handler into one array, and (a) the
+// component's own handler runs FIRST — order came back `["inner", "consumer"]` — and (b) Vue patches
+// `stopImmediatePropagation` on the event specifically so it breaks out of that array, which a plain
+// DOM listener array would not do. With the array probe: `stopPropagation()` → consumer called once;
+// `stopImmediatePropagation()` → consumer called zero times.
 function onClick(event: MouseEvent) {
     if (props.loading || props.disabled) {
         event.preventDefault();
-        event.stopPropagation();
+        event.stopImmediatePropagation();
     }
 }
 </script>

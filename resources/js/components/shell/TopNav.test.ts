@@ -12,16 +12,30 @@ import { describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
     page: {
+        component: 'Dashboard',
         url: '/dashboard',
         props: { auth: { user: { name: 'Demo Owner', email: 'owner@demo.test' }, can: {} } },
     },
+    /** The reactive proxy the component actually reads. Assigned by the factory below. */
+    live: null as null | { component: string; url: string; props: Record<string, unknown> },
 }));
 
-vi.mock('@inertiajs/vue3', () => ({
-    Link: { name: 'Link', props: ['href'], template: '<a :href="href"><slot /></a>' },
-    router: { post: vi.fn(), visit: vi.fn() },
-    usePage: () => mocks.page,
-}));
+// ⚠️ THE PROXY IS REQUIRED BY EXACTLY ONE CASE AND HARMLESS TO THE REST — the same shape, and the same
+// reason, as `AppLayout.test.ts`. `usePage()` is reactive in Inertia, and M23's search-query computed
+// depends on it; against a PLAIN object the arrival case still passes while the reactivity case cannot,
+// so a half-extended stub would report the fix as broken rather than the stub as too weak. Setting values
+// on `mocks.page` before mount still works for every pre-M23 case, because reads pass through the proxy;
+// only change NOTIFICATION has to go through `mocks.live`.
+vi.mock('@inertiajs/vue3', async () => {
+    const { reactive } = await import('vue');
+    mocks.live = reactive(mocks.page);
+
+    return {
+        Link: { name: 'Link', props: ['href'], template: '<a :href="href"><slot /></a>' },
+        router: { post: vi.fn(), visit: vi.fn() },
+        usePage: () => mocks.live,
+    };
+});
 
 const TopNav = (await import('./TopNav.vue')).default;
 
@@ -32,7 +46,10 @@ const stubs = {
     ThemeQuickToggle: true,
 };
 
-function render(drawerOpen: boolean): VueWrapper {
+function render(drawerOpen: boolean, component = 'Dashboard', url = '/dashboard'): VueWrapper {
+    mocks.page.component = component;
+    mocks.page.url = url;
+
     return mount(TopNav, { props: { scrolled: false, drawerOpen }, global: { stubs } });
 }
 
@@ -72,6 +89,82 @@ describe('TopNav — the hamburger is a disclosure control', () => {
         // rendering the drawer only below 480px would silently break this attribute at every other width.
         const wrapper = render(false);
         expect(wrapper.get('.topnav__hamburger').attributes('aria-controls')).toBe('app-drawer');
+        wrapper.unmount();
+    });
+});
+
+/**
+ * The global search field's seeded value (Increment M23).
+ *
+ * ⛔ THE BUG WAS THAT THIS BAR IS NEVER REMOUNTED. `app.ts` assigns `AppLayout` at module level, so Inertia
+ * patches one layout instance for the life of the tab, and the field seeded itself from a computed over
+ * `window.location.search` — no reactive dependency, so it evaluated once and held that value through every
+ * client-side visit underneath it. The docblock it replaced asserted that a browser Back "arrives as a
+ * fresh render"; Inertia intercepts popstate and swaps the page in place, so Back was broken too.
+ *
+ * ⛔ AND THE HALF THE BACKLOG ROW DID NOT HAVE: `q` is NOT this feature's private parameter. Six other list
+ * pages — forms, members, webhooks, the audit ledger, feedback, the submissions inbox — use `?q=` as their
+ * own filter key and commit it client-side with `preserveState`. Reading it unconditionally would put the
+ * audit ledger's filter term into a box labelled "Search this workspace", where pressing Enter posts it to
+ * `/search`. The last two cases are that regression, pinned so it cannot be reintroduced by a "simplifying"
+ * removal of the component gate.
+ */
+describe('TopNav — the global search field shows the active query', () => {
+    const field = (wrapper: VueWrapper) => wrapper.get('#topnav-search').element as HTMLInputElement;
+
+    it('shows the query the results page is running, on arrival', () => {
+        const wrapper = render(false, 'search/Index', '/search?q=clinic%20intake&entity=forms');
+
+        // Also pins the decode (%20 → space) and that a second parameter does not confuse the parse.
+        expect(field(wrapper).value).toBe('clinic intake');
+
+        wrapper.unmount();
+    });
+
+    it('tracks a client-side visit, because this component is never remounted', async () => {
+        // ⭐ THE DEFECT ITSELF, and the only case that cannot pass against the old code under any
+        // environment: a computed with no reactive dependency never invalidates, so the field stays ''.
+        // It is also the case that needs the reactive proxy — against a plain-object stub it fails even
+        // WITH the fix, which is why the stub had to be extended rather than reused.
+        const wrapper = render(false);
+        expect(field(wrapper).value).toBe('');
+
+        mocks.live!.component = 'search/Index';
+        mocks.live!.url = '/search?q=clinic';
+        await wrapper.vm.$nextTick();
+
+        expect(field(wrapper).value).toBe('clinic');
+        wrapper.unmount();
+    });
+
+    it('stays empty on a list page that uses ?q= as its own filter', async () => {
+        // ⭐ THE REGRESSION THE ROW WOULD HAVE SHIPPED. Mutation: delete the `page.component` gate from
+        // `activeQuery` and this reddens with 'overdue'. The workspace-search box would then be pre-filled
+        // with the audit ledger's filter term, and Enter would post it to /search — silently turning
+        // "filter this list" into "search everything".
+        const wrapper = render(false, 'audit/Index', '/audit-log?q=overdue');
+
+        expect(field(wrapper).value).toBe('');
+
+        mocks.live!.url = '/audit-log?q=overdue&actor=me';
+        await wrapper.vm.$nextTick();
+
+        expect(field(wrapper).value).toBe('');
+        wrapper.unmount();
+    });
+
+    it('does not clobber what the user is typing when an unrelated visit lands', async () => {
+        // The field is deliberately uncontrolled — `:model-value` with no `v-model` — so it only re-renders
+        // when the computed's VALUE changes. This pins that a visit which leaves `q` alone leaves the
+        // half-typed text alone, and turns red the moment someone "improves" the binding with a watcher, a
+        // mirror ref, or a v-model, all of which would write the field on every url change.
+        const wrapper = render(false, 'search/Index', '/search?q=clinic');
+        await wrapper.get('#topnav-search').setValue('clinic intake');
+
+        mocks.live!.url = '/search?q=clinic&entity=forms';
+        await wrapper.vm.$nextTick();
+
+        expect(field(wrapper).value).toBe('clinic intake');
         wrapper.unmount();
     });
 });

@@ -23,6 +23,7 @@
  * that is half the assertion, and copying it verbatim would leave the right edge unguarded.
  */
 import { computed } from 'vue';
+import { usePage } from '@inertiajs/vue3';
 import { MdsIcon, MdsTextInput } from '@meridian/design-system';
 import ThemeQuickToggle from './ThemeQuickToggle.vue';
 import NotificationBell from './NotificationBell.vue';
@@ -32,13 +33,41 @@ import AccountMenu from './AccountMenu.vue';
 defineProps<{ scrolled: boolean; drawerOpen: boolean }>();
 const emit = defineEmits<{ 'toggle-drawer': [] }>();
 
+const page = usePage();
+
 /**
- * Seeded from the URL so the field still shows the active query after a full page load — the nav is inside
- * a persistent layout, but a browser Back or a direct visit both arrive as a fresh render.
+ * The query the search RESULTS page is currently showing — and nothing else's.
+ *
+ * ⛔ READ FROM `usePage()`, NEVER FROM `window.location`, BECAUSE THIS BAR IS NEVER REMOUNTED. `app.ts`
+ * assigns `AppLayout` at module level, so Inertia patches one layout instance for the life of the tab. A
+ * computed over `window.location.search` therefore has NO reactive dependency: it evaluates once and holds
+ * that value through every client-side visit underneath it. The docblock this replaces claimed a browser
+ * Back "arrives as a fresh render" — it does not. Inertia intercepts popstate and swaps the page in place,
+ * with no document load, so Back was broken too.
+ *
+ * ⛔ AND IT IS GATED ON THE COMPONENT, WHICH IS THE HALF THE BACKLOG ROW DID NOT HAVE. `q` is NOT this
+ * feature's private parameter — it is the shared filter key on six OTHER list pages (forms, members,
+ * webhooks, audit log, feedback, the submissions inbox), every one of which commits it through a
+ * client-side `router.get(..., { preserveState: true })`. Reading it unconditionally would put the audit
+ * ledger's filter term into a box labelled "Search this workspace", where pressing Enter posts it to
+ * `/search` and silently converts "filter this list" into "search everything". Gating on the rendered
+ * component also fixes the pre-existing full-page-load version of that bleed rather than widening it.
+ *
+ * The gate is a second benefit that is easy to miss: because the value only changes when the search page's
+ * own `q` changes, an unrelated visit cannot clobber text the user is part-way through typing here.
+ *
+ * `page.url` is path + search + hash with no origin, so the hash is stripped before parsing and no base is
+ * needed. `URLSearchParams` decodes `%20` (the palette's `encodeURIComponent`) and `+` (a native form GET)
+ * alike, and a url with no query string yields ''.
  */
-const initialQuery = computed(() => {
-    if (typeof window === 'undefined') return '';
-    return new URLSearchParams(window.location.search).get('q') ?? '';
+const activeQuery = computed(() => {
+    if (page.component !== 'search/Index') return '';
+
+    // Split on '?' and re-join the tail: a literal '?' inside a value is legal, and taking [1] alone
+    // would truncate the query at it.
+    const [, ...query] = page.url.split('#')[0].split('?');
+
+    return new URLSearchParams(query.join('?')).get('q') ?? '';
 });
 </script>
 
@@ -81,7 +110,7 @@ const initialQuery = computed(() => {
                     id="topnav-search"
                     name="q"
                     type="search"
-                    :model-value="initialQuery"
+                    :model-value="activeQuery"
                     placeholder="Search"
                     autocomplete="off"
                 />

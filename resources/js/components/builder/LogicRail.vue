@@ -291,7 +291,13 @@ function summary(reading: ConditionReading): string {
     height: 28px;
     flex-shrink: 0;
     border-radius: var(--mds-radius-full);
-    background-color: var(--mds-color-bg-sunken);
+    /* ⛔ M23 — SEMANTIC IS NOT THE SAME THING AS VISIBLE, AND THIS DOT IS THE PROOF. It read
+       --mds-color-bg-sunken, which the primitive-ban gate added this increment PERMITS, and it was
+       still exactly as invisible as the achievements medallion: this dot nearest painting ancestor is
+       .builder (Builder.vue:643) = --mds-color-bg-canvas, and in dark theme-overrides.css re-points
+       bg-sunken to neutral-50 while bg-canvas is ALREADY neutral-50 — so the disc was 1.000:1 against
+       its own ground. status-neutral-bg is neutral-200 in dark (1.55:1 here) and unchanged in light. */
+    background-color: var(--mds-color-status-neutral-bg);
     color: var(--mds-color-text-secondary);
     font-size: var(--mds-type-caption-font-size);
     font-variant-numeric: tabular-nums;

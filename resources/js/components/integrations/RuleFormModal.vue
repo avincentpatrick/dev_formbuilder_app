@@ -115,6 +115,30 @@ const availableEvents = computed<Option[]>(() =>
     isTabular.value ? props.eventTypes.filter((opt) => opt.value.startsWith('submission.')) : props.eventTypes,
 );
 
+/**
+ * ⛔ THE SAME NARROWING AS A MEMBERSHIP TEST, AND IT EXISTS SO THERE IS EXACTLY ONE OF THEM (M23).
+ * Until this increment the modal narrowed what it RENDERED and submitted `form.event_types` whole, so a
+ * rule holding an event this grant can no longer deliver — one written before H16b's guard existed — had
+ * no checkbox to untick and was re-sent on every save. The server then rejected it under
+ * `event_types.{index}`, a DOTTED key nothing in this front end renders, so the tenant got a 422 with no
+ * visible cause and no way to clear it: they could not rename the rule, rescope it, or fix its
+ * destination. The seed and the transform both read THIS, so "what is rendered" and "what is sent" cannot
+ * be narrowed independently again.
+ */
+const availableEventValues = computed<Set<string>>(
+    () => new Set(availableEvents.value.map((opt) => opt.value)),
+);
+
+/**
+ * Events the stored rule carries that this grant cannot deliver. Held rather than silently discarded
+ * because filtering at seed time CHANGES STORED DATA on the next save for any reason — a tenant who opens
+ * this modal to rename a rule would otherwise drop an event without being told. The fieldset says so.
+ */
+const droppedEvents = ref<string[]>([]);
+const droppedLabels = computed<string[]>(() =>
+    droppedEvents.value.map((value) => props.eventTypes.find((opt) => opt.value === value)?.label ?? value),
+);
+
 const selectedFormTitle = computed<string | null>(
     () => props.forms.find((f) => f.value === form.form_id)?.label ?? null,
 );
@@ -157,7 +181,11 @@ watch(
     (open) => {
         if (!open) return;
         form.name = props.rule?.name ?? '';
-        form.event_types = [...(props.rule?.event_types ?? [])];
+        // Seeded THROUGH the narrowing, so the model and the checkboxes agree from the first frame —
+        // including the case where the user opens a legacy rule and immediately hits save.
+        const seeded = [...(props.rule?.event_types ?? [])];
+        droppedEvents.value = seeded.filter((value) => !availableEventValues.value.has(value));
+        form.event_types = seeded.filter((value) => availableEventValues.value.has(value));
         form.form_id = props.rule?.form_id ?? '';
         form.channel_id = props.rule?.channel_id ?? '';
         form.channel_name = props.rule?.channel_name ?? '';
@@ -191,7 +219,10 @@ function close(): void {
 function submit(): void {
     const shaped = form.transform((data) => ({
         name: data.name,
-        event_types: data.event_types,
+        // Filtered AGAIN here, and not redundantly: the seed keeps the model honest for the parents that
+        // exist today, and this keeps the WIRE honest for a future parent that flips `destinationKind`
+        // under an already-open modal. The watch is keyed on `open` alone, so it would not re-fire.
+        event_types: data.event_types.filter((value) => availableEventValues.value.has(value)),
         form_id: data.form_id === '' ? null : data.form_id,
         config: isTabular.value
             ? {
@@ -247,6 +278,16 @@ function submit(): void {
                             ? 'Which submissions get a row. Only submission events carry answers, so only those can be written to a spreadsheet.'
                             : 'Which events get posted to the channel.'
                     }}
+                </p>
+                <!-- Says WHY a box the tenant remembers ticking is not on screen. A plain <p>, deliberately
+                     not a live region: it is present from the moment the modal opens, and this form already
+                     carries one aria-live status below. Without it, a legacy rule whose ONLY event this
+                     destination cannot deliver seeds to an empty array, so the tenant sees an untouched form,
+                     presses Save, and is told "Choose at least one event" — a legible sentence with the wrong
+                     cause. It is also what makes the dropped event a STATED write rather than a silent one. -->
+                <p v-if="droppedLabels.length" class="rule-form__help">
+                    This rule also listened for {{ droppedLabels.join(', ') }}, which this destination can’t
+                    receive. Saving removes {{ droppedLabels.length === 1 ? 'it' : 'them' }}.
                 </p>
                 <div class="rule-form__events">
                     <MdsCheckbox

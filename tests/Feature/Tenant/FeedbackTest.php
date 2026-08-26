@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\AttachmentKind;
+use App\Enums\FeedbackStatus;
 use App\Models\Attachment;
 use App\Models\FeedbackReport;
 use App\Models\Tenant;
@@ -258,5 +259,73 @@ it('serves a screenshot to the workspace and 404s a report that has none', funct
 
     $this->actingAs($owner)
         ->get("http://acme.meridian.test/feedback/{$withoutShot->id}/screenshot")
+        ->assertNotFound();
+});
+
+it('refuses a screenshot to a member who lacks feedback.view', function (): void {
+    Storage::fake('local');
+
+    $tenant = Tenant::create(['name' => 'Acme', 'slug' => 'acme']);
+    $tenant->domains()->create(['domain' => 'acme']);
+    $viewer = User::factory()->create();
+    enterTenant($tenant->id, $viewer->id);
+    makeActiveMember($viewer, 'viewer');
+
+    // ONE CALLER for the whole case, which `viewer` makes possible: it holds feedback.submit, so it can
+    // create the very report it is then refused. A second actor would resolve its permissions from this
+    // request's state.
+    $this->actingAs($viewer)->post('http://acme.meridian.test/feedback', [
+        'route' => '/dashboard',
+        'remarks' => 'A capture of my own screen.',
+        'screenshot' => feedbackScreenshotFile(),
+    ])->assertRedirect();
+
+    enterTenant($tenant->id, $viewer->id);
+    $report = FeedbackReport::query()->whereNotNull('screenshot_attachment_id')->firstOrFail();
+
+    // ⚠️ THE REPORT IS IN THE VIEWER'S OWN TENANT, DELIBERATELY. `SubstituteBindings` runs BEFORE
+    // `Authorize` (bootstrap/app.php), so a foreign id 404s at binding and never reaches the gate — which
+    // is why the cross-tenant case below cannot stand in for this one. THIS is the assertion that pins
+    // `can:feedback.view` on the screenshot route: it is a SEPARATE Route::get from the index, so
+    // deleting or mistyping that one middleware call leaves the index's own refusal green.
+    $this->actingAs($viewer)
+        ->get("http://acme.meridian.test/feedback/{$report->id}/screenshot")
+        ->assertForbidden();
+});
+
+it('404s another workspace screenshot at route-model binding, before the permission gate is consulted', function (): void {
+    Storage::fake('local');
+
+    $stranger = Tenant::create(['name' => 'Northwind', 'slug' => 'northwind']);
+    $stranger->domains()->create(['domain' => 'northwind']);
+    $strangerOwner = User::factory()->create();
+    enterTenant($stranger->id, $strangerOwner->id);
+    makeActiveMember($strangerOwner, 'owner');
+
+    // Built with the factory under enterTenant() rather than by a second HTTP caller, so this case keeps
+    // to one request as well. The screenshot is REAL: without it the 404 below would be the
+    // "report has no screenshot" 404 from the controller, and the test would pass for the wrong reason.
+    $foreignReport = FeedbackReport::create([
+        'user_id' => $strangerOwner->id,
+        'route' => '/forms',
+        'remarks' => 'Another workspace has its own problems.',
+        'status' => FeedbackStatus::New,
+    ]);
+    $foreign = Attachment::factory()->feedbackScreenshot($stranger->id, $foreignReport->id)->create();
+    Storage::disk($foreign->disk)->put($foreign->path, 'FOREIGNBYTES');
+    $foreignReport->forceFill(['screenshot_attachment_id' => $foreign->id])->save();
+
+    $acme = Tenant::create(['name' => 'Acme', 'slug' => 'acme']);
+    $acme->domains()->create(['domain' => 'acme']);
+    $owner = User::factory()->create();
+    enterTenant($acme->id, $owner->id);
+    makeActiveMember($owner, 'owner');
+
+    // ⚠️ THIS CASE IS NOT A SUBSTITUTE FOR THE ONE ABOVE AND MUST NOT BE READ AS ONE. It exercises the
+    // tenant scope and RLS, not the permission gate — it passes unchanged with `can:feedback.view`
+    // deleted from the route. An Owner is used precisely to make that explicit: the caller holds every
+    // feedback permission there is, so the only thing refusing it is isolation.
+    $this->actingAs($owner)
+        ->get("http://acme.meridian.test/feedback/{$foreignReport->id}/screenshot")
         ->assertNotFound();
 });

@@ -16,7 +16,112 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M25`, the axe scans that assert nothing about which page they landed on
+## Status: ACTIVE CLAIM — `M27`, `npm run build` cannot bootstrap a fresh clone
+
+**Taken 2026-08-26.** Branch `m27-fresh-clone-bootstrap`, cut from `origin/main` at `6c5494e`, PR into
+`main`. Row: the first `major` under **Documentation & specs** in `docs/feature-backlog.md` — *`npm run
+build` cannot bootstrap a fresh clone or worktree, and the README is the only document that does not say
+so*.
+
+**⚠️ NUMBERED `M27`, AND `lane-b.md` WAS RE-READ IMMEDIATELY BEFORE THIS FILE WAS WRITTEN.** It reads
+**NO ACTIVE CLAIM** — `M24` and `M26` are both merged and released — so `M27` is the next free number.
+**Lane B holds nothing, so there is no live boundary to negotiate**, and this claim touches no PHP at all.
+
+### ⛔ NAMESPACES — THIS CLAIM SPENDS NOTHING
+
+**No ADR** — `0022` stays free and stays Lane A's block-opener (`0022-0025`), **seventh consecutive Lane A
+increment to spend nothing**. A README correcting itself to match `ci.yml` is not a decision; the decision
+(four ordered steps) was taken when `ci.yml` was written. **No migration** (`2026_08_17_000111` still
+free). **No ADR-0016 `§D<n>`**, no threat-model row. `0010` reserved for H1d; `#16` free.
+
+### Every file this claim touches, named before it is opened
+
+- `README.md` — **the only file that needs fixing**, and that is the row's own finding: every other
+  document already states the sequence correctly. Three sites, not one (see below).
+
+Shared, claimed here: `docs/feature-backlog.md` (this row only), `docs/claims/lane-a.md`, `PROGRESS.md`
+(Lane A's block and hand-off line only). **If this list grows, the claim is extended as its own pushed
+commit before the file is opened.**
+
+⚠️ **`docs/deployment-infrastructure.md` IS DELIBERATELY NOT IN THAT LIST.** The row cites `:39` as
+documenting the true sequence and it does, correctly — *"`npm ci` + design-system deps + `npm run
+ds:tokens` + `npm run build`"*. Nothing there needs changing, and opening it would be scope the row does
+not ask for.
+
+**No code, no test, no `.vue`, no PHP.** Every gate is unmoved **by construction**: Pest, Vitest,
+Storybook axe, PHPStan, the four host lint gates, `openapi.json` and the E2E figure. **This is a
+documentation-only PR and will be green by construction — which is exactly the shape that let the
+1,086-line PROGRESS.md deletion merge in M16.** So the proof here is not CI; it is the worktree
+reproduction below, which was done BEFORE this claim was written.
+
+### ✅ ALREADY PROVEN, IN A THROWAWAY WORKTREE, BEFORE CLAIMING
+
+Done during M25's e2e wait, exactly as the row demands (*"PROVE IT IN A THROWAWAY `git worktree`, NOT BY
+MOVING `dist/` ASIDE"*). `git worktree add --detach <scratch>/fresh origin/main` at `a457b7d`;
+`packages/design-system/dist` confirmed **absent** by `ls`, not inferred. Run with the main tree's root
+`node_modules` bind-mounted so the toolchain is real and only the *repository* content is fresh.
+
+**Step 3 without step 2 — `vite build`, exit 1:**
+
+    Unable to resolve `@import "@meridian/design-system/tokens.css"` from /fresh/resources/css
+    Unable to resolve `@import "@meridian/design-system/tokens.css"` from /fresh/resources/public-runtime
+    ✗ Build failed in 11.18s
+
+**Step 2 without step 1 — `ds:tokens`, exit 1:** `Cannot find package 'style-dictionary' imported from
+/fresh/packages/design-system/build-tokens.mjs`. So **all three steps are load-bearing and each has a
+measured failure**, rather than the row's assertion that the sequence is merely "documented elsewhere".
+
+⚠️ **TWO MECHANICS WORTH KEEPING:** `-w` is mangled by MSYS (`MSYS_NO_PATHCONV=1` is required, the same
+shape as the `docker exec -w` note in Lane B's hand-off), and vite writes `node_modules/.vite-temp`, so a
+`:ro` mount fails with `EROFS` **before reaching the real error** — a read-only mount looks like a
+different bug entirely.
+
+### ⚠️ THE ROW IS RIGHT AND UNDERSTATES ITSELF THREE TIMES
+
+**(1) TWO ENTRY POINTS FAIL, NOT ONE.** The row names only `resources/css/app.css:11`. The guest runtime's
+`resources/public-runtime/public-runtime.css:4` imports the same artifact, and `vite.config.ts:26` lists
+both as build inputs — the error output names both directories. ⚠️ **`resources/public-runtime/` is LANE
+B's column, and this claim does not touch it**: it is evidence, not a target, and the fix is in `README.md`.
+
+**(2) THE README HAS THREE SITES, NOT ONE.** The row cites `README.md:51-59`; the actual command is `:63`
+(`:51` is the `## Everyday commands` heading). And the frontend block lists **`build` at `:63` BEFORE
+`ds:tokens` at `:67`**, under a comment calling `ds:tokens` a *"regenerate"* — which reads as optional
+maintenance rather than a prerequisite. **`ds:install` appears nowhere in the README at all.** There is
+also a **third** site at `:97`, the e2e bootstrap, which runs `ds:tokens && build` correctly ordered but
+still omits `ds:install`. So the defect is not a missing note; it is an **ordering that actively
+misleads**, in two places, plus a step that is absent from the document entirely.
+
+**(3) THE FAILURE PRINTS A SUCCESS AFTER IT — AND THIS IS THE SHARPEST PART.** The PWA plugin's
+service-worker build runs *after* the client build fails and succeeds on its own: `✓ built in 329ms`,
+`public/build/sw.mjs 134.93 kB`. **The last thing on screen is a green tick.** Only the exit code (`1`)
+and the eleven lines above it disagree. A new contributor reading the tail of the output concludes the
+build worked and then debugs a blank page. The row does not mention this and it is the strongest argument
+for the fix.
+
+### One thing found and deliberately NOT fixed
+
+`packages/design-system/package.json`'s `exports` maps **two** `dist/` artifacts: `./tokens.css` →
+`./dist/tokens.css` **and** `./tokens` → `./dist/tokens.ts`. Nothing imports the latter today (grepped
+`resources/` and `packages/design-system/src`), so it is not a live second failure — a second build
+artifact behind a public export path, worth a sentence in the README's note rather than a change.
+**Filed here at the moment the decision not to fix it was taken**, per the standing rule that a
+deliberately-unfixed finding goes in writing immediately or becomes invisible.
+
+**Baseline on `origin/main` after M25, every figure from CI rather than quoted:** CI Pest **4544 /
+19,280** · Vitest **134 files / 2,292** (design-system **36/574** · resources/js **62/899** ·
+public-runtime **36/819**) · Storybook axe **42 suites / 303** · E2E **551 passed + 10 skipped, no flaky
+line** (re-measured on M25's own run, 17.9m) · PHPStan CI `[OK]` · four host lint gates
+**97 · 113 · 31 · 113/121/0** · `openapi.json` byte-identical.
+
+⚠️ **M25 MOVED NOTHING, AND THAT IS THE MEASUREMENT RATHER THAN AN OMISSION** — it adds assertions to
+existing tests and creates none, so an unchanged E2E count is the *prediction being confirmed*. A moved
+count would have meant a test was accidentally created or dropped. ⚠️ **Lane B's `M24` and `M26` both
+landed against this same base**; neither moves a Lane A figure, but the standing warning holds — a gate
+number that moves on a diff that cannot move it is the OTHER LANE.
+
+---
+
+## RELEASED — M25, the axe scans that assert nothing about which page they landed on (merged as PR #216, `6c5494e`, 6/6 green)
 
 **Taken 2026-08-26.** Branch `m25-axe-landing-assertions`, cut from `origin/main` at `d1d1d72`, PR into
 `main`. Row: the first `major` under **Test suite & CI gates** in `docs/feature-backlog.md` — *the 16-page
@@ -143,16 +248,27 @@ image via `docker compose run --rm e2e`. `playwright.config.ts` pins `workers: 1
 3–4 hours locally — **the rest of the suite is CI's, and this claim will say which specs were run rather
 than implying the whole matrix.**
 
-**Baseline on `origin/main` after M23, every figure from CI rather than quoted:** CI Pest **4544 /
-19,280** (unchanged — M23 touches no PHP) · Vitest **134 files / 2,292** (design-system **36/574** ·
-resources/js **62/899** · public-runtime **36/819**) · Storybook axe **42 suites / 303** (unchanged — no
-story added, and the `Button.vue` diff is script-only) · E2E **551 passed + 10 skipped** · PHPStan CI
-`[OK]` · four host lint gates **97 · 113 · 31 · 113/121/0** (re-measured, not carried) · `openapi.json`
-byte-identical.
+### ✅ WHAT THE GATES ACTUALLY MEASURED, AGAINST WHAT THIS CLAIM PREDICTED
 
-⚠️ **THE VITEST MOVE IS TWO LANES AND IT RECONCILES EXACTLY:** 130 → 134 files and 2,258 → 2,292 tests is
-**Lane A +3 files / +20** and **Lane B's M22 +1 file / +14**, which landed mid-increment. A total quoted
-without that split reads as one lane's delta and is wrong by a third.
+**6/6 green, every job with a real steps count** (E2E 20 · a11y 11 · static 18 · Pest 11 · contract 16 ·
+frontend 12 — no `steps: []`). **CI E2E `551 passed + 10 skipped`, NO flaky line — the baseline exactly**,
+which is what this claim predicted rather than hoped: assertions were added to existing tests and no test
+was created, so the count *must not* move. Every other gate unmoved by construction, as claimed.
+
+⛔ **AND THE LOCAL RUN DISAGREED WITH CI IN BOTH DIRECTIONS, WHICH IS THE TRANSFERABLE PART.** The full
+261-test local sweep returned **253 passed / 8 failed**, and NEITHER failure was the diff's:
+
+- **6 × `Sheets rule detail — drift`** — reproduced **identically with the change reverted** on
+  `origin/main`, and **pass in CI**. A stale drift fixture in this host's long-lived hybrid dev DB.
+  Proving it took one extra 6.4m control run and was worth it: the alternative was reverting a correct fix.
+- **2 × `Builder` (tablet)** — did **not** reproduce in the control run and passed cleanly on re-run
+  (2 passed, 1.7m, ~30s each). A **load flake** inside a 1.1-hour saturated run, not a defect.
+
+⚠️ **SO A LOCAL RED HAS AT LEAST THREE CAUSES AND THEY LOOK IDENTICAL FROM OUTSIDE:** the diff, the local
+DB, and load. The only thing that separates them is re-running the failing subset with the change reverted
+— which is cheap (6.4m for 12 tests) and was, this time, the difference between shipping and not.
+⚠️ **AND `failOnFlakyTests` MAKES A FLAKY RESULT RED IN CI**, so a load flake reproduced there would have
+blocked the merge; it did not appear in CI's 17.9m run.
 
 ---
 

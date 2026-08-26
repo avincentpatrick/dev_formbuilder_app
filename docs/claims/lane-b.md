@@ -18,48 +18,174 @@ exact-equality `KNOWN_UNGUARDED` assertion, so the list shrinks in the *same* PR
 
 ---
 
-## Status: NO ACTIVE CLAIM
+## Status: ACTIVE CLAIM — `M26`, the workspace headcount served with no permission at all
 
-Lane B holds nothing. **Namespaces after M23 + M24:** migration block stays **`2026_08_17_000111`** (M24
-spent none — it reads an existing `jsonb` column and adds no column, index or table); ADR-0016's next free
-sub-decision stays **`§D35`**. ⛔ **ADR `0022` STAYS FREE and stays Lane A's block-opener (`0022-0025`)** —
-M24 amended **ADR-0020** with **§D12** instead, because this is that ADR's own §D10(a) sentence being
-corrected in place, on the precedent §D10 itself set when it corrected §D5. **Fifth increment running to
-amend rather than mint.** ADR-0020's own sub-decision series is now §D1–§D12. `0010` stays reserved for
-H1d; `#16` stays free.
+**Taken 2026-08-26.** Branch `m26-standing-headcount-gate`, cut from `origin/main` at `d429add`, PR into
+`main`. Row: the `major` under **Gamification** in `docs/feature-backlog.md` — *`standing.of`
+discloses the workspace headcount with no permission at all*.
 
-⛔ **AND `docs/claims/decisions.md` GAINED NOTHING AGAIN, WHICH IS AGAIN A FINDING RATHER THAN AN
-OMISSION.** M24 carried a genuine architectural call — whether `ReplayableAudit` may carry a VALUE, against
-its own docblock's argued refusal — but it is not a *product* question and there was nothing to put to the
-user. The spec was not a matter of taste: a backfill exists to make history look as though the live
-listeners had been running, so *"which review verbs score"* has exactly one legitimate source, and it is
-`AwardPointsForSubmissionApproved` and `AwardPointsForSubmissionReturned`. Manufacturing a decision would
-have been worse than filing none. `D1` is untouched and still Lane A's or nobody's. ⚠️ **The NEXT row does
-carry a real one** — see the hand-off below.
+**⚠️ NUMBERED `M26`, AND `lane-a.md` WAS RE-READ IMMEDIATELY BEFORE THIS FILE WAS WRITTEN, NOT AT SESSION
+OPEN.** The opening fetch returned `d1d1d72`; by the time the branch was cut `main` was `d429add`, two
+commits further on (`claim(M25)` from Lane A, then M24's own release doc). `lane-a.md` reads **ACTIVE CLAIM
+`M25`** in both reads, so `M26` is the next free number. Lane A's M25 touches
+`tests/e2e/responsive-axe.spec.ts` and `tests/e2e/auth-axe.spec.ts` and **explicitly commits to no `.vue`,
+no `.ts` under `resources/`, and no PHP** — so no file in this claim is in that set.
 
-⚠️ **THE PROCESS DEVIATION OF RECORD, WRITTEN DOWN RATHER THAN QUIETLY ABSORBED.** M24 did **not** go
-through a PR. `git push origin HEAD:main`, used correctly for the claim commits, was run again for claim
-extension 2 at a point where the branch **already carried the fix commit** — so `be55d16` landed on `main`
-un-reviewed and un-gated, and `main` then went **red** on a Pint `ordered_imports` nit that had been fixed
-locally and never pushed. The user's decision (2026-08-26) was to verify by CI rather than revert or
-force-push, and the remedy was fix-forward: `d1d1d72` made `main` green at 6/6. **The lesson is one line:
-`HEAD:main` pushes the WHOLE branch, so it is safe for a claim ONLY while the branch contains nothing but
-claims.** After the first code commit, a claim update needs its own branch off `origin/main` — or the claim
-must be written and pushed before any code commit exists, which is what the protocol assumed and never
-said. ⚠️ **And note what the red actually cost: Lane A's PR #214 CI tested a merge with a `main` carrying
-that broken lint.** A gate reddening on a file the other lane's diff does not touch is a real cross-lane
-cost, and it is the mirror image of the note already in this file about a gate number moving on a diff that
-cannot move it.
+### ⛔ NAMESPACES — THIS CLAIM SPENDS ONE SUB-DECISION AND NOTHING ELSE
 
-**Baseline on `origin/main` after M24 (`d1d1d72`), every figure from CI rather than quoted:** CI Pest
-**4554 / 2 warnings** (was 4544 — **+10, exactly what M24 added**: AuditReplayMapTest 29 → 36,
-BackfillTest 13 → 16) · Vitest **134 files / 2,292** (design-system 36/574 · resources/js 62/899 ·
-public-runtime 36/819 — **unchanged, and it had to be: M24 touches no JS at all**) · Storybook axe **42
-suites / 303** (unchanged) · E2E **551 passed + 10 skipped, no flaky line** · PHPStan CI `[OK]`, local
-**18 measured against the FILE LIST — zero gamification files in it** · four host lint gates
-**97 · 113 · 31 · 113/121/0**, run unpiped on the host · `openapi.json` **byte-identical** (contract tests
-green — no `/api/v1` route, resource or controller touched). ⚠️ **Only Pest moved, which is the mirror
-image of M22 and was predicted before the first file was opened.**
+**ADR-0020 gains `§D13`** (series becomes §D1–§D13). ⛔ **ADR `0022` STAYS FREE and stays Lane A's
+block-opener.** This is the sixth increment running to amend rather than mint, and for the reason the
+previous five recorded: §D7's own criterion is being corrected in place, and a correction filed away from
+the sentence it corrects is one nobody finds. **Migration block `2026_08_17_000111` stays free** — no
+column, index or table. **ADR-0016 `§D35` stays free.** `0010` stays reserved for H1d. `#16` stays free.
+
+**⛔ NO NEW ABILITY AND NO THIRTIETH PERMISSION KEY**, which is what keeps both parity gates still. The fix
+reuses `can('viewAny', PointAward::class)`, already resolved two fields away in the same method.
+`ShellAbilityParityTest` fires on a new ability key and `NotificationTypeParityTest` on a new
+`NotificationType`; **neither moves.** The third paired file
+(`packages/design-system/src/theme/__tests__/clipped-node-containment.test.ts`) covers `RuntimeShell.vue`
+and `SyncStatus.vue` — untouched.
+
+### Every file this claim touches, named before it is opened
+
+**Lane B's own column:**
+
+- `app/Http/Controllers/Tenant/AchievementsController.php` — `of` at `:103` resolved against the same
+  permission `scoreboard` already uses at `:115-120`.
+- `app/Http/Resources/Api/V1/MemberProgressResource.php` — the same at `:41`.
+- `app/Http/Controllers/Tenant/DashboardController.php` — `rank` and `of` **deleted** at `:123-124`. See
+  the sixth-consumer note below: they are serialized and rendered nowhere.
+- `app/Services/Gamification/MemberStanding.php` — the `:11-14` docblock, which states §D7's criterion in
+  the form this increment corrects.
+- `tests/Feature/Gamification/AchievementsPageTest.php` and `tests/Feature/Api/GamificationApiTest.php` —
+  existing assertions that pin the defect as a requirement, plus new negative cases.
+
+**Shared, claimed here:** `openapi.json` (**it WILL move** — `of` becomes nullable in
+`MemberProgressResource`; regenerated with `php artisan scramble:export --path=openapi.json`, which CI
+diffs for byte-identity at `ci.yml:329-332`), `docs/adr/0020-gamification-awarding-substrate.md`,
+`docs/feature-backlog.md` (this row only), `docs/claims/lane-b.md`, `docs/claims/decisions.md` (**`D3`**),
+`PROGRESS.md` (Lane B's block and hand-off line only).
+
+**⚠️ LANE A'S COLUMN, CLAIMED PER-ROW UNDER 7(b) AND SAID SO HERE:**
+
+- `resources/js/Pages/achievements/Index.vue` — `of: number | null` at `:56`, and the `standingLabel`
+  degrade at `:87-93`.
+- `resources/js/Pages/Dashboard.vue` — two now-dead prop fields deleted from `:91`.
+- `resources/js/Pages/achievements/index.test.ts` — the `4th of 12` assertions at `:61,104-105,116,130`.
+
+**Checked first, per the hand-off's instruction: the prop CANNOT be withheld without a Vue edit.**
+`Index.vue:92` renders the label as `${ordinal(rank)} of ${number(of)}` and guards only on `rank === null`,
+so omitting `of` from the payload would reach `undefined.toLocaleString()` and throw. Nulling it therefore
+obliges the guard, and the guard is Lane A's file. **Three files, named, no more.** If this list grows, the
+claim is extended as its own pushed commit from `origin/main` before the file is opened — the M24 lesson,
+which is the one process rule this claim is written under.
+
+**`docker restart fb-lane-b-node-1` is owed** (three `.vue`/`.ts` edits under `resources/`), after the
+`ps -eo args` probe.
+
+### ⚠️ THE ROW IS RIGHT ABOUT THE MECHANISM, WRONG ABOUT ONE CITATION, AND INVERTED ON ITS HEADLINE EXAMPLE
+
+Re-walked against the tree at `d429add`. **Twelve-for-twelve becomes thirteen.**
+
+- ✅ **`MemberStanding.php:33` HOLDS** — the `of` property, `public int $of`.
+- ✅ **`AchievementsController.php:103` HOLDS** exactly, and **`:115-120` HOLDS** exactly: `scoreboard` is
+  `$user->can('viewAny', PointAward::class) ? … : null`.
+- ✅ **`MemberProgressResource.php:41` HOLDS** exactly.
+- ❌ **`routes/api.php:440-442` IS WRONG — IT IS COMMENT PROSE, NOT A ROUTE.** Lines 437-455 are the §D7
+  explanation block; the route is **`:456-458`**, sixteen lines further on. The row's *claim* about it
+  holds: `:457` carries `ability:read:gamification` and `module:gamification` and **no `can:` gate**.
+- ⚠️ **`DashboardMetricsService.php:55,60` ARE THE RIGHT LINES, AND THE ROW DRAWS THE WRONG CONCLUSION FROM
+  THEM.** See below.
+- ⚠️ **"THE IDENTICAL INTEGER" IS TWO DERIVATIONS OF ONE QUANTITY, NOT ONE NUMBER.** `standing.of` is
+  `count()` of the ranked roster — `users` joined to active `tenant_users`, **no `withTrashed()`** and
+  RLS-filtered (`LeaderboardService::roster()` at `:118-136`, `Leaderboard::fromRoster()` at `:85`).
+  `kpis.members` is `count()` of `tenant_users` at `status = 'active'`
+  (`DashboardMetricsService::activeMembersCount()` at `:319-324`). They agree except where a member's
+  `users` row is soft-deleted, and `AchievementsController:231-234` **already says so** about the same pair.
+  Same secret, two spellings; the row's word "identical" overstates it and nothing in the fix depends on
+  the difference.
+
+### ⛔⛔ THE CENSUS WAS A FLOOR, AND THE SIXTH CONSUMER IS THE ONE THAT INDICTS THE ROW'S OWN EXAMPLE
+
+The row names five consumers and offers `/dashboard` as the surface that **correctly withholds** the
+integer. **`/dashboard` leaks it too.**
+
+`DashboardController::gamificationProgress()` emits `'of' => $standing->of` at **`:124`**, ungated, into the
+**same Inertia payload** whose `kpis.members` is nulled at `:45` for the **same reader**. One `Inertia::render`
+call, two fields, opposite answers to one question. `tests/Feature/Gamification/AchievementsPageTest.php:324`
+pins it — `->where('progress.of', 2)` for a `form_editor` on `/dashboard`.
+
+**And it is rendered NOWHERE.** `Dashboard.vue` declares `rank: number | null; of: number` at `:91` and its
+template reads only `points`, `badges` and `streak` (`:450-457`). `dashboard.test.ts` asserts neither field.
+So on the dashboard the headcount is **pure wire-level disclosure with zero product value** — which is why
+that half of this fix is a deletion carrying no product question at all, and why it is worth more than the
+half the row actually asked for.
+
+**Full census (`of` as a value, not the English word), sixteen sites:** `MemberStanding.php:33` ·
+`Leaderboard.php:110` · `LeaderboardService.php:95` · `AchievementsController.php:103` ·
+`DashboardController.php:124` · `MemberProgressResource.php:41` · `openapi.json:6105` ·
+`Index.vue:56,88,92` · `Dashboard.vue:91` · `achievements/index.test.ts:61,104,105,116,130` ·
+`AchievementsPageTest.php:111,324` · `GamificationApiTest.php:125,133,145` · `LeaderboardTest.php` ·
+`GroupBPolicyGateTest.php:70`. **Seeders and factories were grepped and write nothing here** — `of` is
+computed at read time from the roster, so unlike M24's `('submission','updated')` tuple there is no
+table for a seeder to write behind the census's back. That check was run because M24's near-miss says to
+run it, and it came back clean.
+
+### ⚠️ THE FIX IS A PATCH, NOT A RATIFICATION — AND THE CODE DECIDES THAT, NOT THE ROW
+
+The hand-off warned this might be a ratification. It is not, and three independent surfaces built by three
+increments are the evidence. **A Form Editor has no other route to the workspace headcount:**
+
+| Surface | Withheld by |
+|---|---|
+| `/dashboard` `kpis.members` | `dashboard.org.view` (`DashboardMetricsService:55,60`) |
+| `/members` page | `can:tenant.members.invite` (`routes/tenant.php:409-410`) |
+| Member search arm | the same key; `MemberSearchArm::allowed()` at `:88-94`, whose docblock `:79` reads *Form Editor / Reviewer / Viewer — arm REFUSED — they cannot reach `/members` either* |
+| `/achievements` `scoreboard.team.active_members` | `can('viewAny', PointAward::class)` (`AchievementsController:115-120`) |
+
+So the number is treated as privileged everywhere it was considered, and handed over in the two places it
+was not. Ratifying would mean un-gating `kpis.members` and `team.active_members` to match — a widening
+nobody asked for, in the direction the product has consistently refused.
+
+**⛔ AND THE ROOT CAUSE IS NOT A DISAGREEMENT WITH §D7 — IT IS §D7'S CRITERION BEING MOVED AND ONE FIELD NOT
+RE-WALKED AGAINST THE NEW ONE.** §D7 gates *"the **named** ranked list"*: its criterion is **names**. K1e's
+`AchievementsController` docblock at `:49-60` explicitly **rejects that criterion** — *"The tempting split
+is 'names are gated, plain counts are not' … It is not"* — and re-gates `team` on **workspace-wide numbers
+about other people's work**, calling the alternative *"a widening of an existing permission, performed by a
+new page"*. `team.active_members` was moved behind the new line. **`standing.of` is the same number under
+the same criterion and was not.** The defect is one file failing to finish applying its own paragraph, and
+that is what §D13 records.
+
+### ⚠️ `rank` STAYS, AND THE ADR HAS TO SAY WHY OR SOMEBODY WILL "COMPLETE" THIS SWEEP
+
+A rank of 4 discloses that at least four members exist. That is a **floor, not the headcount**, and §D7
+grants a member their own position in terms this increment does not touch. Removing `rank` would withhold
+the one thing §D7 unambiguously approves in order to blur a bound the reader can already infer from having
+colleagues. §D13 states this so the next reader does not read the sweep as unfinished.
+
+### The gate, and the positive control it is proven with
+
+**The defect is currently pinned as a requirement**, which is the whole reason `D3` exists:
+`AchievementsPageTest.php:85` is titled *renders a members own points, badges, streak and standing with no
+permission*, acts as a **`form_editor`** against the **real controller**, and asserts
+`progress.standing.of === 2`. That is a genuine call-site test, not a hand-built prop array — the M21/M22/M24
+lesson already applied by whoever wrote it. It changes in this PR, deliberately and visibly.
+
+**Two mutations, red sets checked disjoint**, per the standing rule: (1) never-withhold — `of` always
+emitted; (2) never-emit — `of` always null. The mechanism is committed before either is applied, the tree is
+asserted green first, and the bytes are saved and compared back by sha256 (`git checkout --` is not a
+restore).
+
+### Predicted gate movement
+
+**Pest moves** (assertions change; new negative cases added). **Vitest moves** (`achievements/index.test.ts`).
+**`openapi.json` moves** — one property's type and description. **Storybook axe unmoved** (no design-system
+file). **PHPStan unmoved in kind.** **Four host lint gates: Vue/TS counts unmoved, Pint run BEFORE the push.**
+
+⚠️ **E2E MUST NOT MOVE, AND THE REASON IS MEASURED RATHER THAN HOPED.** `responsive-axe.spec.ts:52` states
+that *the seeded acme owner holds `dashboard.org.view`*, so every scanned page renders the **granted** branch
+of this gate and the visible markup is byte-identical for that user. **551 passed + 10 skipped is a
+prediction this claim commits to**, and a move in it means the seeded role is not what that comment says.
 
 ---
 

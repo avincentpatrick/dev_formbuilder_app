@@ -58,6 +58,67 @@ measured and found to matter, option 2 is the right shape — not option 3.
 
 ---
 
+### D3 — ADR-0020 §D7 approves *"4th of 12"* for every member. Three other surfaces withhold the twelve. Which moves?
+
+**Filed 2026-08-26 by Lane B, during `M26`.** Proceeding on the recommendation below rather than
+waiting — Standing Rule 5. If the answer comes back the other way, the revert is one commit and it
+is named at the bottom.
+
+**The collision, in one payload.** `AchievementsController::__invoke()` emits
+`progress.standing.of` — the workspace's active-member count — with **no permission at all**
+(`:103`), and two fields later withholds `scoreboard` behind `can('viewAny', PointAward::class)`
+(`:115-120`), whose gated `team.active_members` is **the same quantity**. The same controller's own
+docblock (`:49-60`) argues at length that serving `team.active_members` ungated would be *"a
+widening of an existing permission, performed by a new page"*. Both sentences are in one file and
+they cannot both be right.
+
+**It is a real disclosure, not theatre.** A Form Editor has no other route to that number:
+`/dashboard`'s Members tile is nulled without `dashboard.org.view`
+(`DashboardMetricsService:55,60`), `/members` needs `tenant.members.invite`
+(`routes/tenant.php:409-410`), and the member search arm refuses the same three roles
+(`MemberSearchArm:88-94`, docblock `:79`). It is also reachable off the page: every role may mint a
+`read:gamification` token (`GamificationApiTest:104`) and `GET /api/v1/gamification/me` returns it.
+
+**Why it happened — worth reading before choosing.** §D7's criterion is **names**: it gates *"the
+**named** ranked list"*. K1e explicitly **replaced** that criterion for `team`, on the grounds that
+plain workspace-wide counts are the sensitive thing, not just names. `standing.of` is the same
+number under the replacement criterion and was never re-walked against it. So this is **not** a
+disagreement with §D7 — it is §D7's line having moved once already, in a direction the product
+chose, with one field left behind.
+
+**Option 1 — withhold `of` from readers without `dashboard.org.view`; the label degrades to
+"4th". (RECOMMENDED.)** No new permission key: it reuses the check already resolved two fields
+away, so the 29-key catalog stays closed and both cross-lane parity gates stay still. `rank`
+survives untouched, so §D7's actual grant — *a member sees their own position* — is honoured in
+full. Cost: three of five roles see *"4th"* instead of *"4th of 12"*, and one existing test that
+asserts the current behaviour for a `form_editor` changes.
+
+**Option 2 — ratify: declare the headcount non-sensitive.** Honest about the fact that team size
+is not much of a secret, and it costs no UX. But to be coherent it must **un-gate the other two**:
+`kpis.members` on the dashboard and `team.active_members` on the achievements page. That is a
+deliberate widening of `dashboard.org.view` across three surfaces to preserve one label, and it
+contradicts the reasoning three separate increments wrote down.
+
+**Option 3 — mint a `gamification.view_headcount` key.** Rejected in advance; §D7 rejected the
+same shape for the same reason, and a thirtieth key means re-litigating which of five roles hold
+it.
+
+**Recommendation: option 1.** Every surface that ever *considered* this number withheld it; the two
+that disclose it did so without deciding to. Option 1 aligns the outlier with the three, option 2
+would move three to match the outlier, and only option 1 leaves §D7's actual promise intact.
+
+⚠️ **The `/dashboard` half is NOT part of this question and is fixed either way.**
+`DashboardController:124` emits `of` (and `rank`) into every dashboard payload, and `Dashboard.vue`
+renders **neither** — they are declared at `:91` and never read. That is dead wire-level disclosure
+with no product value, so it is deleted regardless of how D3 is answered.
+
+**If the answer is option 2**, the revert is: restore `of` unconditionally in
+`AchievementsController` and `MemberProgressResource`, drop the two negative tests, regenerate
+`openapi.json`, and open a follow-up row to un-gate `kpis.members` and `team.active_members` — the
+dashboard deletion above still stands.
+
+---
+
 ## ANSWERED
 
 ### D2 — May an axe violation be retryable at all? **No. A flaky e2e result now fails CI.**

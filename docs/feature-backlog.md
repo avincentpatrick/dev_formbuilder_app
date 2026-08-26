@@ -2311,6 +2311,39 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the loop variable, and every workspace's historical points and badges are permanently absent — the
   backfill is a one-shot operator action nobody re-runs — while the operator is told "2 workspace(s)
   queued". **Latent.** Fix is a closure on `assertPushed`.
+  ⚠️ **SCOUTED BY M29's CENSUS (2026-08-26) AND NOT FIXED — READ THIS BEFORE PLANNING AGAINST THE ROW.**
+  M29 verified this row read-only while taking its neighbour, and the row's **headline holds with its line
+  numbers exact and landing on code**. Three corrections and three additions follow. ⛔ **THEY ARE SUBAGENT
+  CENSUS OUTPUT, ADVERSARIALLY RE-VERIFIED BUT NOT OPENED BY THE INCREMENT'S OWN AUTHOR — RE-CHECK EACH
+  file:line BEFORE ACTING, exactly as this project requires of a row.**
+  **(1) THE "DISPATCH THE SLUG" MUTATION IS LOUD, NOT SILENT, ON BOTH PATHS.** `TenantAwareJob.php:295-296`
+  regex-checks the uuid shape and throws `InvalidJobPayloadException` as the first statement of `handle()`,
+  so a slug fails every queued job by name; and on the inline path `TenantContext.php:215` binds the value
+  straight into `set_config` with no validation, so the RLS policy's `current_setting(...)::uuid` cast
+  raises Postgres **22P02**. **The only genuinely SILENT identity mutation left in the command is a
+  well-formed uuid aimed at the wrong workspace** — i.e. hoisting the loop variable. That is what the
+  count-only `assertPushed` cannot see, and it narrows the row rather than weakening it.
+  **(2) THE BLAST RADIUS IS SIX SITES, NOT ONE.** Five sibling maintenance fan-outs use the byte-identical
+  dispatch expression and have **zero** `assertPushed` coverage of any kind:
+  `SweepWebhookRetriesJob.php:26` · `SweepScheduledFormsJob.php:30` · `RollUpUsageCountersJob.php:27` ·
+  `RefreshConnectorTokensJob.php:26` · `ReapExpiredDraftsJob.php:25`.
+  **(3) THE PROPOSED FIX IS NOT THIS REPOSITORY'S IDIOM.** `UsageRollupTest.php:28`/`:40` and
+  `DraftReaperTest.php:38`/`:69` cover a fan-out by enqueueing on the real `database` driver, draining, and
+  asserting **per-tenant effects** — neither calls `Queue::fake` at all. `BackfillCommandTest.php:84` is the
+  only `Queue::fake` fan-out test in the repo. Asserting effects proves identity **and** the chain at once,
+  which a closure on `assertPushed` does not.
+  ➕ **THREE FURTHER UNCOVERED THINGS IN THE SAME COMMAND.** A non-null `afterAuditId` on the first dispatch
+  silently skips **every membership award** (`ReplayTenantHistoryJob.php:89-90`; asserted only on the
+  `--sync` path and on a direct dispatch, never on the fan-out). The `--tenant` path asserts only a count of
+  **1** while **two** tenants exist (`BackfillCommandTest.php:113-114`), so a wrong `TenantLocator::find`
+  resolution passes — and that one has a live resolver behind it, which makes it the higher-probability
+  mutation. And `runInline` returns `self::FAILURE` **after** `DB::commit()` has already run per workspace
+  (`:179-182` against `:224`), naming no workspace — while the job side decided the opposite for the
+  identical invariant.
+  ✅ **AND ONE THING THE ROW IMPLIES THAT IS PROVABLY HARMLESS**: a corrupted non-positive `limit` does not
+  loop forever — `GamificationBackfill.php:245` returns a null cursor when `count($rows) < $limit` is false,
+  which `0 < 0` makes it, so the chain terminates. Of the three payload fields, only `tenantId` and
+  `afterAuditId` carry real uncovered risk.
 - ~~**`minor` · No gate in this repository detects a component used in a template but never imported.**~~
   ✅ **DONE — M28 (2026-08-26).** `scripts/component-import-lint.php`, registered in `composer.json`
   (script **and** the `quality` aggregate) **and as its own `ci.yml` step** — both, because `ci.yml`'s own

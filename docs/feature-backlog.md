@@ -1365,16 +1365,56 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 ### Gamification
 
-- **`major` · The backfill awards review points for two verbs the live engine never scores.**
-  `app/Services/Gamification/AuditReplayMap.php:160` maps every `('submission','updated')` audit row
-  carrying a `remarks` key to `PointRule::SubmissionReviewed`, but
-  `app/Services/Submissions/SubmissionReviewService.php:156-162` writes that row from **four** verbs and
-  `snapshot()` (`:189-200`) emits `remarks` unconditionally — so `markUnderReview` and `archive` score too.
-  One retention sweep of 400 archived rows hands the actor 1,200 points and the `reviewer` badge for
-  archiving. `point_awards` is append-only with **no DELETE policy** (ADR-0020 §D4), so the inflation is
-  permanent and feeds `TeamProgress` and the leaderboard for the life of the workspace. **Latent** until
-  `gamification:backfill` is run — which is a one-shot operator action nobody repeats. Not a double-award:
-  the unique index refuses the later real approval.
+- ✅ **CLOSED BY `M24` (2026-08-26, straight to `main` as `be55d16` + `d1d1d72`, no PR, CI 6/6) — `major` · ~~The backfill awards review points for two
+  verbs the live engine never scores.~~** `AuditReplayMap::submissionUpdate()` now requires the `remarks`
+  marker **and** a status in `SCORED_REVIEW_STATUSES` — `['approved', 'returned']`, which is exactly the pair
+  the live listeners fire on. ADR-0020 gains **§D12**, correcting §D10(a)'s *"a review always carries
+  `remarks`"* in place: every clause of that sentence is true, and it treats one act as four, which is where
+  the map was built from and where the next reader would have rebuilt it.
+  ⚠️ **THE ROW'S MECHANISM WAS EXACT AND THREE OF ITS FOUR CONSEQUENCE CLAIMS WERE NOT** — the twelfth row
+  running to be wrong about itself, and the second running to be wrong about *cost* rather than *facts*.
+  **(1) The 400-row retention sweep does not exist.** `archive()` has exactly one caller
+  (`SubmissionReviewController.php:35`), one submission per HTTP request; 400 archives is 400 human clicks,
+  not a sweep. The true floor is far sharper and the row never found it: `BadgeKey::FirstReview` is
+  threshold **1**, so a *single* claimed-but-never-reviewed submission already minted a review badge.
+  **(2) Badges never read points.** `BadgeAwarder::awardsOf():213-227` counts award ROWS of one rule against
+  `BadgeKey::threshold()`; the row's "1,200 points and the `reviewer` badge" invites a reading of the
+  mechanism that does not exist. **(3) "Not a double-award" is vacuous for the verb the row leads with** —
+  `archived` is terminal and absent from `approve()`'s source states, so there is no later approval for the
+  index to refuse. Conversely the row **understates** the blast radius: the command defaults to every active
+  workspace, `--dry-run` cannot reveal it (below), and `StreakCalculator`'s day walk has no rule predicate,
+  so spurious awards extended **streaks** too.
+  ⛔ **AND THE FIX'S REAL COST WAS THE PART THE ROW COULD NOT SEE.** `snapshot()` is one fixed six-key
+  literal serving all four verbs and `AuditLogger::record()` stores it without diffing, so `newValueKeys` is
+  byte-identical across them: **key shape was structurally incapable of discriminating**, and the map was
+  never reasoning badly — it was being handed insufficient evidence. `ReplayableAudit` therefore admits one
+  value, `new_values.status`, and **deliberately not** the `LEFT JOIN`ed `s.status` already in scope, which
+  is *current* state and would have erased legitimate awards instead of spurious ones.
+  ⚠️ **THE NEAR-MISS IS WORTH MORE THAN THE FIX.** `DemoSeeder:1027-1029` and `E2eSeeder` write
+  `('submission','updated')` with `['status' => 'approved', 'guest_contact_email' => …]` — status-bearing and
+  **marker-less**, fully creditable in a seeded database. So *"two writers of this tuple"*, asserted by both
+  the map's docblock and §D10(a), is true of `app/` and **false of the table the backfill actually reads**.
+  Had the fix replaced the marker with the status test — the obvious simplification — the first backfill of a
+  demo tenant would have minted a **brand-new** false award. The conjunction is now §D12(c-bis) and a unit
+  case pins the seeder's exact payload. **The backfill does not read application code; it reads `audits`,
+  and a census by grepping `app/` is a floor.**
+  **Gates:** AuditReplayMapTest 29 → **36**, BackfillTest 13 → **16**. Mutation harness run twice from a
+  committed mechanism with a sha256-verified byte restore: *never refuses* and *never accepts* redden **5
+  each**, intersecting in exactly the one call-site test that asserts both directions. **Both call-site
+  tests are red under mutation A**, which is what makes the wiring asserted rather than assumed — and their
+  absence is why this survived three increments: every prior assertion described a payload somebody typed,
+  including `BackfillTest`'s own helper, whose review fixture happened to carry `'status' => 'approved'` and
+  was green before and after.
+- **`minor` · `gamification:backfill --dry-run` cannot reveal a mis-scoring defect, by construction.**
+  Filed by `M24` rather than fixed, because it is a reporting-shape row in `BackfillTally` and the command,
+  not a scoring row. `BackfillTally` (`app/Services/Gamification/BackfillTally.php:27-36`) carries
+  `scanned / created / existing / unmapped / uncredited` and **no per-rule breakdown**, so the rehearsal the
+  command advertises (`BackfillGamificationCommand.php:49` — *"real numbers, no writes"*) prints a clean,
+  balanced tally while every spurious `submission.reviewed` row is invisible in it. An operator doing exactly
+  the cautious thing learns nothing. **Not live** — this is a blind spot rather than a defect, and the one
+  defect it hid is fixed. Cheapest honest shape is a per-rule counter on the tally plus one line in the
+  command's output; it moves `BackfillCommandTest` and pairs naturally with the open row below about that
+  file's `Queue::assertPushed(…, 2)` asserting job count alone.
 - **`major` · `standing.of` discloses the workspace headcount with no permission at all.**
   `app/Services/Gamification/MemberStanding.php:33`, emitted unconditionally at
   `app/Http/Controllers/Tenant/AchievementsController.php:103` and

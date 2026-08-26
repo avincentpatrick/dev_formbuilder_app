@@ -217,6 +217,63 @@ once the fix keys on `status`, because both writers emit that key; and a no-answ
 reachable (`answerDiff()` returns `[]` with no guard) but can never carry `remarks`, so it is not a third
 ambiguity — it maps to `unmapped`, exactly as the map's docblock already anticipates.
 
+### ⛔ CLAIM EXTENSION 2 — a THIRD and FOURTH writer of the tuple exists, and it is not in `app/`
+
+**Still no file added or dropped.** This extension records the one refutation that survived the
+adversarial pass, because it changes what the fix's shape *means* even though it does not change the fix.
+
+**`AuditReplayMap`'s own docblock and ADR-0020 §D10(a) both say `('submission','updated')` is written by
+TWO services. That is true of `app/` and FALSE of the table the backfill reads.** Verified firsthand at
+`database/seeders/DemoSeeder.php:1027-1029`, which writes that tuple with
+`new_values = ['status' => 'approved', 'guest_contact_email' => …]` — **status-bearing and marker-less** —
+and `E2eSeeder` writes the same shape through the real logger. A grep of `app/` cannot see either, which
+is exactly how the count stood at two for three increments and how both authorities came to be confidently
+wrong in the same direction.
+
+**⚠️ AND THOSE ROWS ARE FULLY CREDITABLE, WHICH IS WHAT MAKES THIS A NEAR-MISS RATHER THAN A CURIOSITY.**
+In the seeded database they carry a real `tenant_id`, a real non-null `user_id`, and a submission the join
+resolves — and there is no pre-existing `submission.reviewed` award on that subject, so the idempotency
+index would not refuse them either. Had the fix been written as *"score when status is `approved` or
+`returned`"* **replacing** the `remarks` marker — which is the obvious simplification, because a status of
+`approved` reads like proof enough on its own — the very first `gamification:backfill` on a demo tenant
+would have minted a **brand-new** false award plus the `first_review` badge at threshold 1, permanently,
+per §D4. That would have been a worse defect than the one being fixed: this one at least required a real
+human to have clicked something.
+
+**✅ THE FIX AS WRITTEN ALREADY HANDLES IT, AND THAT WAS LUCK RATHER THAN FORESIGHT.** The predicate is
+conjunctive — the `remarks` marker is tested first and returns `null` when absent, and only then is the
+status consulted — so a seeder row maps to nothing exactly as it did before M24. **What was missing was
+any test that said so.** The pre-existing *"refuses to guess when a submission update carries neither
+marker"* case leaves the status null, so it does not reach this shape at all. One unit case is added
+pinning the seeder's exact payload, and it is the case a future *"these two checks are redundant, keep the
+status one"* would break.
+
+**So the conjunction is promoted from an implementation detail to a decision**, recorded as ADR-0020
+§D12(c-bis), and the map's docblock is corrected in place rather than left saying "two".
+
+⚠️ **THE GENERAL LESSON, WHICH IS THE REASON THIS IS WRITTEN DOWN AT ALL: the backfill does not read
+application code, it reads `audits`.** Every census of "who writes this tuple" taken by grepping `app/`
+is a floor and not a census, because seeders, factories and fixtures write the same table and their rows
+are indistinguishable from real ones once written. That is the same shape as Standing Rule 7(b-bis)'s note
+that its paired-file sweep matched literal path strings and is therefore a floor — a second instance of
+the same reasoning error, found in a different subsystem on the same day.
+
+### ⚠️ AND THE MUTATION HARNESS WAS RUN TWICE, WITH DISJOINT RED SETS
+
+The mechanism was committed at `be55d16` **before** either mutation, the tree was proven green first
+(AuditReplayMapTest 35, BackfillTest 16), and the restore was by **saved bytes compared back by sha256**
+(`ec347436…9755c` both times) rather than by `git checkout --`.
+
+- **Mutation A — the gate never refuses** (`return true` in place of the status test): **5 red.** Both
+  `does not score` cases, the null-status refusal, and **both call-site feature tests**.
+- **Mutation B — the gate never accepts** (`return false`): **5 red.** The approved case, the returned
+  case, the pre-existing review-vs-edit feature case, and the ledger-vs-table case.
+
+**Four red each way, and the sets intersect in exactly one test** — the call-site case that deliberately
+asserts both directions in one body. A gate proven only by its refusal is indistinguishable from one that
+refuses everybody; this one is proven in both directions, and the two call-site tests reddening under
+mutation A is what makes the wiring asserted rather than assumed.
+
 ### Blast radius, stated rather than discovered
 
 **`openapi.json` must stay byte-identical** — no `/api/v1` route, resource or controller is touched

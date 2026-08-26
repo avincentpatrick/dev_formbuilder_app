@@ -285,13 +285,31 @@ function stateLabel(done: boolean): string {
 /* ⚠️ 16px, NOT `1em`. `MdsIcon`'s `sm` is a fixed 16×16 box while `1em` resolves against `body-sm`, so a
    ring narrower than the check replacing it would shift every label sideways as a row ticks over — and
    these rows tick over while the user is looking at them. Fixed rather than relative for the same reason
-   the icon is: both must stay identical at every `[data-font-size]` setting. */
+   the icon is: both must stay identical at every `[data-font-size]` setting.
+
+   ⛔ AND IT CARRIES NO ALPHA AT ALL (M20) — BUT NOT BECAUSE THIS RING FAILED WCAG 1.4.11, WHICH IS THE
+   PART WORTH READING. The merge-gate row that produced this change cited this file and
+   `PasswordStrength.vue` together, with one pair of numbers for both, because the two carried a
+   character-identical declaration. **Measured, they were never the same ring.** `currentColor` here is
+   `--mds-color-text-body`, not `--mds-color-text-secondary`, so at 55% over `--mds-color-bg-canvas` this
+   one composited to **3.60:1 light and 5.37:1 dark** — above the 3:1 floor. Its twin measured 2.28:1 and
+   was a real failure. **An identical line is not an identical defect.**
+
+   ⚠️ SO WHY CHANGE IT. Because an alpha composite is a function of THE GROUND BEHIND IT and this
+   component does not own its ground: 3.60:1 is a pass with 0.6 of headroom that any darker surface
+   spends, and nothing in the gate stack would notice it being spent. The declaration was also the
+   system's only reason to believe the two components agreed. Solid ink removes both problems, and the
+   ring now measures **14.84:1 light and 15.70:1 dark**.
+
+   ⚠️ THE TWO COMPONENTS NOW RENDER AT DIFFERENT WEIGHTS, DELIBERATELY — 14.84:1 here against 5.55:1
+   there. That is the RULE being consistent rather than the components disagreeing: in both, the ring is
+   exactly the ink of the label beside it, which is what an empty checkbox should be. Hard-coding one
+   token across both to make the numbers match would break that, not fix it. */
 .mds-checklist__mark--pending {
     width: 16px;
     height: 16px;
     border: 1.5px solid currentColor;
     border-radius: var(--mds-radius-full);
-    opacity: 0.55;
 }
 
 .mds-checklist__text {

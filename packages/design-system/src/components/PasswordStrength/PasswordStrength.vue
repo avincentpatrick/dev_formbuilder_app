@@ -208,13 +208,29 @@ function stateLabel(state: RowState): string {
    check that replaces it makes every label in the list shift sideways as a rule flips — on a control
    whose whole purpose is to change state while somebody is typing and watching it. Matched exactly, and
    fixed rather than relative for the same reason the icon is: both must stay identical at every
-   `[data-font-size]` setting. */
+   `[data-font-size]` setting.
+
+   ⛔ AND IT CARRIES NO ALPHA AT ALL (M20). A 55% alpha on `currentColor` measured **2.28:1** against this
+   component's own ground — below WCAG 1.4.11's 3:1 for a non-text indicator, on the one element here
+   whose entire job is to be seen. Measured in a browser, not computed: `currentColor` is
+   `--mds-color-text-secondary`, and at 55% over `--mds-color-bg-canvas` the ring composites to 2.28:1
+   light and **3.08:1** dark. Solid, the same ink reads **5.55:1** and **7.51:1**.
+
+   ⚠️ DARK WAS ALREADY PASSING BY 0.08, AND THAT IS THE ARGUMENT FOR THIS FIX RATHER THAN A FOOTNOTE.
+   The same declaration measures 2.96:1 on `--mds-color-bg-surface` and 3.08:1 on `--mds-color-bg-canvas`
+   — it fails on a card and passes on the page, and NOTHING in the component decides which one it gets.
+   An alpha composite is a function of the ground behind it; this component does not own its ground.
+   Raising the alpha to 0.75 would have cleared the bar today (3.43:1 light) and left exactly the same
+   fragility in place, re-derivable by any future surface with no gate able to notice.
+
+   The de-emphasis the alpha was reaching for is carried by the SHAPE — an outline against the met
+   state's filled check — which is what the paragraph above already claims the signifier is. See
+   `Checklist.vue`, which carried the identical declaration and, measured, did NOT carry the defect. */
 .mds-pw__mark--pending {
     width: 16px;
     height: 16px;
     border: 1.5px solid currentColor;
     border-radius: var(--mds-radius-full);
-    opacity: 0.55;
 }
 
 .mds-pw__text {

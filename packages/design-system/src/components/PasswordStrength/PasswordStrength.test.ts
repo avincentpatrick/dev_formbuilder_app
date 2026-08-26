@@ -177,3 +177,39 @@ describe('MdsPasswordStrength — the visually-hidden nodes stay inside the comp
         expect(hidden).not.toMatch(/display:\s*none/);
     });
 });
+
+/**
+ * M20 — WCAG 1.4.11 on the pending ring, asserted as SOURCE TEXT because nothing else here can.
+ *
+ * happy-dom computes no styles, so `getComputedStyle` would return whatever was asked of it; axe has no
+ * rule that resolves an `opacity` composite against an ancestor's background; and the ring is not text,
+ * so `color-contrast` would not look at it even if it did. What broke was an alpha of 0.55 on
+ * `currentColor` measuring 2.33:1 light / 2.96:1 dark — and the same declaration existed in TWO
+ * components, so a fix to one alone would have left the system disagreeing with itself.
+ */
+describe('MdsPasswordStrength — the pending ring is a non-text indicator and must clear 3:1', () => {
+    const ringSource = readFileSync(
+        join(process.cwd(), 'packages/design-system/src/components/PasswordStrength/PasswordStrength.vue'),
+        'utf8',
+    );
+
+    const rule = /^\.mds-pw__mark--pending\s*\{([^}]*)\}/m.exec(ringSource)?.[1] ?? '';
+
+    it('has a pending-ring rule to assert about at all', () => {
+        expect(rule, 'the pending-mark rule was renamed — re-point this test, do not delete it').not.toBe('');
+    });
+
+    it('paints the ring in solid ink, never through an alpha the component cannot see the ground behind', () => {
+        // An alpha composite is a function of the surface underneath, and this component does not own its
+        // surface. Solid `currentColor` is the same ink as the label beside it — 5.95:1 light, 6.51:1
+        // dark — and stays that way on any ground the label already works on.
+        expect(rule).not.toMatch(/opacity\s*:/);
+        expect(rule).toContain('currentColor');
+    });
+
+    it('keeps the ring a BORDER, so the shape is what distinguishes it from the met state', () => {
+        // The docblock's claim is that the glyph is the signifier. A filled swatch here would make the
+        // two states differ only by colour, which is the 1.4.1 failure the outline exists to avoid.
+        expect(rule).toMatch(/border:\s*[\d.]+px solid/);
+    });
+});

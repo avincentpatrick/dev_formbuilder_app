@@ -41,6 +41,24 @@ named as ADR-0016 §D33's revisit trigger.
 `docs/adr/0016-sso-saml-federation.md` · `docs/security-threat-model.md` · `docs/feature-backlog.md` ·
 `docs/data-dictionary.md` · `docs/claims/lane-b.md` · `PROGRESS.md` (Lane B's block only).
 
+⚠️ **EXTENDED 2026-08-26, BEFORE THE FILE WAS OPENED — `tests/Feature/Tenancy/TenantExtractColumnDriftTest.php`.**
+A new tenant-scoped table joins `TenantScopedTables::STRICT`, which is the list the P2b extractor walks, so its
+`EXTRACTED_COLUMN_CENSUS` gains an entry the moment the table exists — and that constant lives in the **test
+file**, not in `TenantExtractColumns`. **Found by reading the gate rather than by CI reddening**, and it is
+exactly the shape this claim's own prediction flagged as most likely wrong: a registry the `sso_auth_failures`
+grep did not reach.
+
+✅ **AND THE SAME READ SETTLED TWO SCHEMA DECISIONS, SO `ConstraintBoundaries.php` AND ITS DRIFT TEST STAY
+UNTOUCHED — BY DESIGN NOW, NOT BY ASSUMPTION.** `ConstraintBoundaryDriftTest` pins two censuses by exact
+equality: composite FKs whose key contains `tenant_id`, and unique indexes on a `tenant_id`-carrying table whose
+key does **not**. So (a) the table is scoped to the **TENANT** and carries **no** FK to `sso_connections` — a
+workspace controls a domain, an IdP does not, and a metadata re-import must not destroy the proof of control —
+which keeps the FK census still; and (b) its unique key is **`(tenant_id, domain)`**, never a global unique on
+`domain`, which keeps the second sweep still. ⚠️ **(b) has a product consequence worth stating rather than
+discovering: two workspaces may each verify the same email domain**, each with its own token. That is correct —
+one controller can legitimately run two workspaces — and a global unique would have let whichever claimed first
+deny the other.
+
 ⚠️ **THE THREE `app/Support/Tenancy/` REGISTRIES AND `SsoStepUpWebTest.php` ARE CLAIMED ON A PREDICTION,
 NOT A PLAN** — a new tenant-scoped table may oblige all three registries, and the step-up suite may not
 need touching at all because that arm never provisions. **Claimed anyway, because a file that might get

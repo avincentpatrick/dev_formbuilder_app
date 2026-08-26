@@ -18,7 +18,195 @@ exact-equality `KNOWN_UNGUARDED` assertion, so the list shrinks in the *same* PR
 
 ---
 
-## Status: ACTIVE CLAIM — M29, CODE COMPLETE AND PUSHED, PR #219 OPEN, HELD ON A CI RUNNER OUTAGE
+## Status: ACTIVE CLAIM — M33, the attachment id that defeats every per-form boundary
+
+**Taken 2026-08-26.** Branch `m33-attachment-scope`, cut from `origin/main` at `d71e4ea`, PR into `main`.
+Row: the `major` under **`### Submissions, drafts & the guest runtime`** (heading at
+`docs/feature-backlog.md:891`, row at `:893`), inside the *Merge-gate review of `main` → `phase1-completion`*
+section (`:480`) — *`AttachmentPolicy::view()` is flat where `SubmissionPolicy::view()` is scoped, so an id
+defeats every per-form boundary*.
+
+⛔⛔ **NUMBERED `M33`, NOT `M31`, AND THE ARITHMETIC WOULD HAVE COLLIDED.** `lane-a.md` was re-read at
+**write time** — not from the opening fetch — and it does not merely hold `M30`. Its
+`### THE QUEUE BEHIND IT` block (`:185`) **pre-claims `M31` and `M32` as well**, deliberately and in
+writing, on Rule 7's *"the lane queue is the claim"*. Lane A says why in its own words: *"because Lane B is
+taking rows from this exact section right now."* The highest number spoken for is therefore `M32`, and the
+next free one is **`M33`**. ⚠️ **Had this lane computed the number the obvious way — `M30` is the highest
+merged, so take `M31` — it would have collided with a claim that was pushed and readable.** The rule that
+saved it is the one M29 recorded and M30 sharpened: **re-read at WRITE time, and read the whole file, not
+the `## Status` line.** A lane's forward queue is a claim and it does not live under that heading.
+
+⚠️ **AND THE FALLBACK ROW NAMED IN THIS LANE'S OWN NEXT-PROMPT IS GONE — IT IS LANE A'S `M32`.** The
+hand-off named *the queued half of `gamification:backfill`* as the natural second row if this one proved too
+large. Lane A claimed it as `M32` and has already scouted it. **There is no fallback; this row is the
+increment.** A next-prompt's suggested second row is a suggestion made before the other lane's claim
+existed, and it expires exactly the way a namespace reservation does.
+
+**`git worktree list` was run too**, per M30's finding: `dev_formbuilder_app` on `m30-guest-limiter-key`
+(Lane A, matching its claim), `fb-lane-b` on this lane's own `m29-feedback-screenshot-deny`, and
+`fb-lane-c` on `lane-c-bootstrap` at `b44a36c` — **stale, M14-era, not a live lane** (no `docs/claims/lane-c.md`,
+no `lane-c` branch on origin), as `PROGRESS.md:1837` already records. Three worktrees, two lanes.
+
+**NO FILE COLLISION WITH LANE A'S THREE.** `M30` is `config/fortify.php` and the login/2FA limiters; `M31`
+is `tests/Feature/Submissions/SubmissionAnswerEditTest.php`, `SubmissionEditRoutesTest.php` and
+`database/factories/SubmissionAnswerFactory.php`; `M32` is the gamification backfill command tests and
+`tests/Feature/Connectors/ConnectorTokenRefreshTest.php`. **All three sit under `### Test suite & CI gates`;
+this row sits under `### Submissions, drafts & the guest runtime`.** No file below is in any of those sets —
+the nearest approach is `database/factories/`, where Lane A may touch `SubmissionAnswerFactory.php` and this
+lane may touch `AttachmentFactory.php`.
+
+---
+
+### THE ROW IS TRUE — AND FOR THE FIRST TIME IN FIFTEEN INCREMENTS, EVERY CITATION IS RIGHT
+
+Verified read-only before this claim was written, every file:line opened first-hand:
+
+- `routes/tenant.php:751-752` — `GET /attachments/{attachment}` → `AttachmentController@show`, `can:view,attachment`. ✅
+- `app/Policies/SubmissionPolicy.php:87` — `view()` is `submissions.view` **AND** (org-wide **OR** collaboration **OR** respondent). ✅
+- `:96` — `export()` requires the same scope again. ✅
+- `:190` — `hasOrgWideVisibility()` is `dashboard.org.view`. ✅
+- `RolePermissionSeeder` `:98-103` `form_editor`, `:105-109` `reviewer` — both hold `submissions.view` with only `dashboard.form.view`; **`viewer` (`:111-114`) holds `dashboard.org.view`**, so owner/admin/viewer have no gap and the affected roles are **exactly `form_editor` and `reviewer`**, as the row says. ✅
+- `SubmissionPdfStorage.php:105` — `'kind' => AttachmentKind::ExportArtifact`, `is_pii => true`. ✅
+- `WebhookPayloadArchive.php:55-68` — kind at `:55`, `ScanStatus::Skipped` at `:68`, directly under the comment at `:67` asserting the file is *"never served to a browser"*. `ScanStatus::servable()` admits `Skipped`. **The route makes that comment false.** ✅
+- `tests/Feature/Attachments/AttachmentPolicyTest.php:125-137` — asserts a `form_editor` gets **200** on submission media, with a comment naming itself the filed-not-fixed boundary. **That is the assertion that flips.** ✅
+
+**The streak of rows that are wrong about themselves breaks here on the evidence — and continues on the
+remedy.** See the next two sections.
+
+### ⚠️ WHAT THE ROW UNDERSTATES: THERE IS A SIXTH REACHABLE KIND, AND IT ENUMERATED FOUR
+
+The row lists *"respondent uploads and media captures, the per-submission PDF, and archived webhook
+envelopes."* **A census run on the RESOURCE rather than on the row — every `AttachmentKind::` producer under
+`app/` and `database/` — returns five production writers, not three**, and the fifth is one the row never
+names:
+
+| Producer | Kind | `attachable_type` |
+|---|---|---|
+| `AttachmentStorageService.php:60` (`forFieldType`) | `SubmissionFile` / `FieldMediaSample` / `SignatureCapture` | `submission` (persisted) or `form_field` (staged, `:77`) |
+| `AttachmentStorageService.php:148` | **`BrandingLogo`** | **`tenant`** (`:164`) |
+| `AttachmentStorageService.php:245` | `FeedbackScreenshot` | `feedback_report` (`:261`) — closed by M29 |
+| `SubmissionPdfStorage.php:105` | `ExportArtifact` | `submission` |
+| `WebhookPayloadArchive.php:55` | `WebhookPayloadArchive` | `webhook_delivery` |
+
+`OcrSourceScan` and `Avatar` are declared in the enum and **produced by nothing** — so the nine kinds are
+six live ones and two unwired, plus the screenshot already gated. **This is M29's census lesson holding for
+a second increment: the unit is the resource, not the feature.**
+
+### ⛔⛔ WHAT THE ROW GETS WRONG: ITS PRESCRIBED REMEDY IS THE ONE MECHANISM A TEST EXISTS TO FORBID
+
+The row says the fix *"means resolving each kind's owner **through the morph map** first."* **It cannot, and
+the repository has an explicit, tested decision against it.**
+
+`attachments.attachable_type` holds **five** aliases in production. Only three are registered
+(`AppServiceProvider.php:340-346`: `submission`, `form_field`, `webhook_delivery`, plus `form`/`scope_node`
+from `ResourceScopeable::morphMap()`). **`tenant` and `feedback_report` are deliberately absent**, and
+`tests/Feature/Branding/BrandingMorphAliasTest.php` exists for the sole purpose of pinning that absence —
+because registering `tenant` globally would change how Sanctum's `tokenable_type` and Spatie's `model_type`
+serialize a Tenant and split existing rows between alias and FQCN. **That is the `enforceMorphMap` break
+that cost 90 test failures**, and both `AttachmentStorageService.php:117-123` and `:205-208` restate it.
+
+That test also **prescribes this increment's design, in advance and by name**:
+
+> *"If a future increment genuinely needs `$attachment->attachable` on a branding logo, the fix is a LOCAL
+> resolution (a match on `kind`, or a dedicated relation), never a global registration."*
+> — `BrandingMorphAliasTest.php:20-21`
+
+**This is that increment.** So the design is not open: resolve the owner with a **local match**, never
+`$attachment->attachable`, never a global morph registration. ⚠️ **`BrandingMorphAliasTest` is therefore a
+SIXTH paired-file-shaped gate for this work** — it reddens if the obvious implementation is written, which
+is precisely what it is for. It is not in the 7(b-bis) table because it guards a decision rather than a
+cross-lane contract; it is named here so the next reader does not rediscover it at CI.
+
+**The generalisation, and it is this increment's finding: a backlog row's EVIDENCE and a backlog row's
+PRESCRIBED FIX are separately trustworthy, and the fix half is checked far less often.** Fifteen increments
+have verified the evidence half; this is the first row whose evidence survived intact and whose one-sentence
+remedy pointed straight at a tested prohibition. ⚠️ **Lane A independently found the identical shape in its
+`M32` scouting the same session** — *"REAL, and the row's own prescribed fix does not work"* — so this is
+two for two on the same day, from two lanes, on two unrelated rows. **Verify the remedy, not just the
+citations.**
+
+---
+
+### THE SHAPE OF THE FIX
+
+`AttachmentPolicy::view()` enumerates all nine kinds explicitly — no `default` arm, so PHPStan flags a tenth
+kind rather than a silent absorption, which is M29's §D9 argument carried one step further:
+
+- **`FeedbackScreenshot`** → `feedback.view`. Unchanged; M29's.
+- **`WebhookPayloadArchive`** → `webhooks.manage`. **A narrowing, and the increment's one real product
+  question** (see `D4` below): a delivery envelope carries the full payload of whatever form fired it, so it
+  crosses every per-form boundary at once and is tenant infrastructure rather than per-form data. Today it is
+  readable by all five roles.
+- **`BrandingLogo`** → any member (`submissions.view`, which all five seeded roles hold). **Deliberately not
+  narrowed**: `/branding/logo` (`routes/tenant.php:1060`) serves these same bytes **unauthenticated** to email
+  clients, so tightening this route protects nothing that is not already public.
+- **`SubmissionFile` / `FieldMediaSample` / `SignatureCapture` / `ExportArtifact` / `OcrSourceScan`** →
+  `submissions.view` **AND** the owner's scope, resolved locally off `attachable_type`:
+  `submission` delegates to `SubmissionPolicy::view()` (so the two cannot disagree by construction, which is
+  the same argument `Submission::scopeVisibleTo()`'s mirror-pin makes); `form_field` resolves the staged
+  file's form and requires collaboration; **anything else fails closed.**
+- **`Avatar`** → fails closed. Unwired today; a real avatar feature must make its own decision at this site.
+
+⚠️ **`SubmissionPolicy` takes `ResourceGrantResolver` in its constructor (`:30`) — delegating means
+injecting it here too, not re-implementing `collaboratesWith()`.**
+
+### THE PRODUCT QUESTION — FILED AS `D4` IN `docs/claims/decisions.md`
+
+*What does "scope" mean for an attachment whose owner is a webhook delivery rather than a form?* The
+recommendation implemented is `webhooks.manage` (Owner/Admin). **Proceeding on the recommendation with the
+revert path named in the entry, per the `M26`/`D3` precedent** — `D1` and `D3` are still open and unanswered
+and this lane does not re-ask, re-litigate, or block on them. `D4` is the next free id.
+
+### NAMESPACES
+
+**ADR-0015 §D10.** The rule is *the ADR whose own sub-decision created the defect*: **§D6** put a second
+owner-class into the shared table, and **§D9** — M29's, added last increment — is already the running
+commentary on that table having a shared *reader*. §D10 continues that exact thread one step out: the shared
+route needs the **scope** to reach the gate, not only the kind. ADR-0002 was the other candidate and is
+rejected — **it has no §D-series at all.** ⚠️ **ADR-0016 §D35 is again NOT the home** (it is SAML SSO); M29
+already caught and recorded that, and this lane did not have to rediscover it — **which is the first time a
+recorded namespace lesson has paid out on the very next increment.**
+
+**Left free and unspent:** ADR-0016 `§D35`, migration block `2026_08_17_000111`, ADR `0022` (Lane A's
+block-opener), `0010` (H1d), `#16`.
+
+### FILES
+
+`app/Policies/AttachmentPolicy.php` · `tests/Feature/Attachments/AttachmentPolicyTest.php` ·
+`database/factories/AttachmentFactory.php` (states for the export-artifact and webhook-envelope kinds) ·
+`docs/adr/0015-feedback-screenshot-capture.md` (§D10) · `docs/claims/decisions.md` (`D4`) ·
+`docs/feature-backlog.md` (close the row) · `PROGRESS.md` (own block only).
+
+**No `.vue`, no `resources/`, no `tests/e2e/`, no `/api/v1` route — `openapi.json` stays byte-identical.**
+Of the five 7(b-bis) paired gates, this diff moves **none**: no new ability key
+(`ShellAbilityParityTest`), no new `NotificationType`, no front-end file for either theme scanner or for
+`scripts/component-import-lint.php`. The sixth gate named above, `BrandingMorphAliasTest`, is the one this
+work can actually trip.
+
+---
+
+## STILL HELD — M29, CODE COMPLETE AND PUSHED, PR #219 OPEN, HELD ON A CI RUNNER OUTAGE
+
+⛔ **RE-CHECKED AT THE OPEN OF THE M33 SESSION, 2026-08-26 ~16:20 UTC: THE OUTAGE HAS NOT LIFTED AND #219 IS
+STILL UNMERGED.** `gh api .../actions/runs/32985349087/jobs` returns `{"total_count":0,"jobs":[]}` — **not
+one job has started**, now **43 minutes** after the run was created. Not this branch and not this lane:
+`M30`'s run (`32985770877`, Lane A) and a plain `main` push (`32984912723`) are queued **40 and 57 minutes**
+with the same empty job list, and the last run that executed anywhere in the account finished at
+**14:47 UTC**. A 60-second poll held across this session's whole verification pass never saw a job start.
+**So the claim below stays held, the PR stays open, and nothing was merged blind.** Branch
+`m29-feedback-screenshot-deny` at `cac6224`, three commits ahead of `d71e4ea`.
+
+⚠️⚠️ **AND `M33`, CLAIMED ABOVE, TOUCHES THE SAME TWO FILES ON PURPOSE — READ THIS BEFORE MERGING EITHER.**
+`M33` extends the very `match` that `M29` introduced in `app/Policies/AttachmentPolicy.php`, and it adds
+cases to `M29`'s own `tests/Feature/Attachments/AttachmentPolicyTest.php`. **`M33` is cut from `origin/main`
+at `d71e4ea`, NOT from this branch**, so the two diffs overlap by design rather than by accident: this is one
+defect — a shared table reached through a shared route — being closed in two halves, split at the increment
+boundary rather than at a seam in the code. **Whichever merges second must be rebased first**, and the
+conflict will be in both files. If `#219` merges first, `M33` rebases onto it and its `match` grows arms; if
+`M33` merges first, `#219` must be rebased before it is merged and **must not be force-merged past the
+conflict.**
+
+**The original M29 claim, unedited, follows.**
 
 ⛔⛔ **LANE B STILL HOLDS THIS CLAIM, AND THAT IS THE CORRECT STATE RATHER THAN AN OVERSIGHT.** Every file is
 written, committed and pushed on `m29-feedback-screenshot-deny`; **PR #219 is open and NOT merged.** The

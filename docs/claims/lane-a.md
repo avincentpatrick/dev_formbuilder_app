@@ -100,21 +100,27 @@ reserved for H1d; `#16` stays free; the next migration prefix stays `2026_08_17_
 
 ### ⚠️ EXTENSION 1 — one new file, claimed before it was created
 
- — **a file M19's own lesson says must
-be named here rather than appear in the diff.** (M19 claimed  and then created
-, which the claim never mentioned.)
+`packages/design-system/src/components/Combobox/scroll-reveal.ts` — **a file M19's own lesson says must
+be named here rather than appear in the diff.** (M19 claimed `docker-compose.yml` and then created
+`docker/e2e/Dockerfile`, which the claim never mentioned.)
+
+⚠️ **AND THE FIRST PUSH OF THIS EXTENSION LOST EVERY FILE NAME IN IT, WHICH IS THE FAILURE IT EXISTS TO
+PREVENT.** The text was passed to `node -e` inside a double-quoted shell string, so bash ran every
+backticked path as a command substitution and committed the paragraph with the names deleted —
+`17da814` on `main` is that commit, and this one repairs it. **A claim is only worth the names in it**,
+so prose for this file goes through a quoted heredoc to a scratchpad file from here on, never inline.
 
 **WHY A SIBLING MODULE RATHER THAN A FUNCTION INSIDE THE SFC.** The fix is arithmetic — given the list's
-scroll position and the active option's box, what should  become — and **happy-dom computes no
+scroll position and the active option's box, what should `scrollTop` become — and **happy-dom computes no
 layout**, so a mounted assertion would pass whatever the code said. A pure function is the only shape this
-repository can actually gate. The precedent is already here twice:  and
- are both logic lifted out of an SFC precisely so a unit test can reach
+repository can actually gate. The precedent is already here twice: `Modal/focus-target.ts` and
+`PasswordStrength/describedby.ts` are both logic lifted out of an SFC precisely so a unit test can reach
 it.
 
-⛔ **AND IT IS NOT , WHICH IS THE OBVIOUS FIX AND THE WRONG ONE HERE.**
- walks **every** scrollable ancestor, so it can scroll the
+⛔ **AND IT IS NOT `scrollIntoView`, WHICH IS THE OBVIOUS FIX AND THE WRONG ONE HERE.**
+`Element.scrollIntoView({ block: 'nearest' })` walks **every** scrollable ancestor, so it can scroll the
 page as well as the listbox — in a repository whose last three increments were about a page gaining scroll
-it should not have. Writing  directly can only ever move the one box that is supposed to
+it should not have. Writing `list.scrollTop` directly can only ever move the one box that is supposed to
 move.
 
 **Baseline this delta is measured against** — `origin/main` at `336d295`, after M18 + M19: CI Pest

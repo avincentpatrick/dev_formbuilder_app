@@ -18,24 +18,100 @@ exact-equality `KNOWN_UNGUARDED` assertion, so the list shrinks in the *same* PR
 
 ---
 
-## Status: NO ACTIVE CLAIM
+## Status: ACTIVE CLAIM — `M22`, the guest device's missing enumerator and reaper for abandoned answer content
 
-Lane B holds nothing. **Namespaces after M21:** migration block stays **`2026_08_17_000111`** (M21 spent no
-migration — nothing server-side moved); ADR-0016's next free sub-decision stays **`§D35`**. ⛔ **ADR `0022`
-STAYS FREE and stays Lane A's block-opener** — M21 deliberately spent no ADR number, because this is
-`ADR-0021`'s own decision applied to its second channel, and minting `0022` would have spent the scarcer
-namespace to restate an accepted decision. That is M18's reasoning, reused. `0010` stays reserved for H1d;
-`#16` stays free.
+**Taken 2026-08-26.** Branch `m22-guest-orphan-reaper`, cut from `origin/main` at `88ba1e8`, PR into
+`main`. Row: the `major` in `docs/feature-backlog.md` — *"The guest device has no enumerator and no reaper
+for abandoned answer content"* — filed by M21 the moment M21 decided not to fix it.
 
-**Baseline on `origin/main` after M21:** CI Pest **4544 / 19,280** (2 pre-existing warnings, unmoved — no
-PHP in the diff) · Vitest **130 files / 2,236** (design-system 35/545 · **public-runtime 35/805** ·
-resources/js 60/886) · Storybook axe **42 / 299** · E2E **551 passed + 10 skipped, no flaky line** ·
-PHPStan CI `[OK]` · four host lint gates **97 · 113 · 31 · 113/121/0**.
-⚠️ **Only the public-runtime chunk moved (+23), which is what the row predicted and the mirror image of
-M18.** Lane A's post-M19 line recorded the lint gates as `97 · 111 · 31 · 111/119/0`; the difference is
-exactly M18's two migrations, so that line was written against a pre-M18 tree and **97 · 113 · 31 ·
-113/121/0** is the current truth, re-measured on this one.
+**⚠️ NUMBERED `M22`, AND THE REF WAS RE-READ TWICE.** The opening fetch and the fetch taken immediately
+before this file was written both return `88ba1e8`, and `docs/claims/lane-a.md` reads **ACTIVE CLAIM
+`M20`** on branch `m20-ds-merge-gate` in both. `M21` is merged and released (PR #211, `15dc10b`). So the
+next free number is `M22`, not `M21` and not `M20`. M21 measured the opening fetch going stale in four
+minutes; this claim was written from a read taken minutes before the push, not from the session-open read.
 
+**No collision on the merits.** Lane A's `M20` is wholly inside
+`packages/design-system/src/components/{Combobox,DataTable,PasswordStrength,Checklist}/`. This row is
+wholly inside `resources/public-runtime/`, which Standing Rule 7(b) grants Lane B outright. The two
+columns do not meet. The only overlap is `docs/feature-backlog.md`, by disjoint region — Lane A closes
+rows under **Design system**, this closes one under the guest-runtime review — so it rebases as a merge.
+
+---
+
+### What was verified against the code BEFORE this claim was written
+
+The row is M21's own, which is **no protection at all** — M15 wrote the row M21 took, and that row argued
+the fix was impossible on two grounds and was wrong on both. So both halves were re-walked:
+
+**(a) `media_queue` orphans — CONFIRMED.** `lib/media-queue.ts:40` `put`s a row and the caller supplies
+`client_submission_uuid: null` for a mid-fill pick. The table's only two deleters are
+`lib/outbox.ts:107` and `:159`, both `db.media_queue.where('client_submission_uuid').equals(uuid).delete()`
+against a uuid **string**. A `null` value is not merely unequal to that string — **IndexedDB does not index
+`null` at all**, so an orphan row is absent from the `client_submission_uuid` index and no `where()` on it
+can ever reach the row, by any argument.
+
+**(b) `draft_answers` pre-republish orphans — CONFIRMED.** Two readers (`App.vue:249`,
+`useAutosave.ts:229`), two writers (`:153`, `:279`), one deleter (`:196`, `db.draft_answers.delete(pk)` for
+the *current* pk only), and **no `where`/`orderBy`/`toArray`/`each`/`count` anywhere in the tree**. The
+seven-day TTL is a branch inside `restore()` against the key it just fetched, so a row whose
+`form_version_id` moved under a republish is never written, read or deleted again.
+
+**⛔ ONE THING THE ROW DOES NOT SAY, AND IT CHANGES THE COST.** `draft_answers` is declared
+`'[form_version_id+local_draft_id], form_version_id, updated_at'` (`lib/db.ts:195`) — **`updated_at` is
+already a secondary index.** A TTL sweep over it is `where('updated_at').below(cutoff)`, not a table scan,
+and it needs no `db.version()` bump. `media_queue` is `'attachment_local_id, client_submission_uuid,
+status'` and has no time index, but `status` is indexed and every orphan is `queued`. So the enumerator
+this table "has never had" costs no schema change on either store — which is a strictly better position
+than the row assumed, and is why this is one increment rather than a migration.
+
+**⚠️ A `db.version(3)` IS OFF THE TABLE AND THE REASON IS MEASURED.** `db.test.ts` asserts
+`expect(db.verno).toBe(2)`, and `node_modules/dexie/dist/dexie.js:3832` throws
+`Upgrade('Not yet support for changing primary key')` — the database fails to open on every device that
+already has one. Un-indexed fields need no bump; a new **store** would. This increment adds neither.
+
+---
+
+### The hard half is a decision, and it is filed rather than guessed
+
+*How long, on what trigger, and whether it runs in the service worker* is a genuine product call, so it
+goes to `docs/claims/decisions.md` with a recommendation and this lane proceeds on that recommendation
+rather than idling — Standing Rule 5. ⛔ **The service-worker half is not a preference, it is a
+constraint**: `tsconfig.sw.json` re-checks `sw.ts`'s import graph with `types: []`, and that graph already
+contains `lib/db.ts`, `lib/replay.ts`, `lib/outbox.ts` and `lib/media-queue.ts`. `sessionStorage` does not
+exist there, so a visit cannot be read and `lib/respondent-session.ts` can never be imported into it.
+
+**⚠️ THIS IS A RETENTION DEFECT, NOT A DISCLOSURE ONE.** M21 closed every read that could surface this
+content: `listForSubmission` is by uuid, a `local:` ref only renders if the answers are restored, and
+both `draft_answers` readers now refuse a foreign row through `draftBelongsToVisit`. It will not be
+re-filed or re-argued as a security row.
+
+---
+
+### Shared and paired artefacts this claim touches
+
+- `docs/feature-backlog.md` — closes one row under the guest-runtime review; Lane A's `M20` closes three
+  under **Design system**. Disjoint regions, so **rebase before push and it is a merge, not a collision**.
+- `docs/claims/decisions.md` — appends the retention decision as `D3`. `D1` (the sixteen `ShouldQueue`
+  listeners) is not touched and is not this lane's to take.
+- `PROGRESS.md` — Lane B's own status block and Lane B's own hand-off line only, per 7(d).
+- ⛔ **`packages/design-system/src/theme/__tests__/clipped-node-containment.test.ts` is NOT touched.**
+  It is Lane A's tree and lists `RuntimeShell.vue` and `SyncStatus.vue` in an exact-equality
+  `KNOWN_UNGUARDED`. This increment adds and removes no `clip: rect(0 0 0 0)` in `resources/public-runtime`,
+  so the list must not move — and that will be **proved by running the design-system chunk**, not assumed.
+  `NotificationTypeParityTest` and `ShellAbilityParityTest` are unreachable without a new `NotificationType`
+  or ability key; neither is minted here.
+
+**Namespaces unspent so far:** migration block `2026_08_17_000111` (nothing server-side moves here),
+ADR-0016 `§D35`, ADR `0022` — which **stays free and stays Lane A's block-opener**; if this increment
+needs an ADR the reasoning belongs as a sub-decision of `ADR-0021`, whose subject is exactly the
+respondent-scoped device stores this row lives in. `0010` stays reserved for H1d; `#16` stays free.
+
+**Baseline this branch starts from (`origin/main` @ `88ba1e8`, after M21):** CI Pest **4544 / 19,280**
+(2 pre-existing warnings) · Vitest **130 files / 2,236** (design-system 35/545 · **public-runtime 35/805**
+· resources/js 60/886) · axe **42 / 299** · E2E **551 passed + 10 skipped, no flaky line** · PHPStan CI
+`[OK]`, local **18 against the FILE LIST** · four host lint gates **97 · 113 · 31 · 113/121/0** ·
+`openapi.json` byte-identical. ⚠️ **This row is again `.ts` under `resources/public-runtime/`, so expect
+the public-runtime chunk to move and Pest not to** — the chunk is what gets re-measured, never the total.
 ---
 
 ## RELEASED — M21, the abandoned draft that is restored into the next respondent's form (merged as PR #211, `15dc10b`, 6/6)

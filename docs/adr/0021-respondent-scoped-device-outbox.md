@@ -342,3 +342,174 @@ fire on the one case it exists for**, because the only thing that expires a draf
 moving; and `reconcile.ts`'s newest-wins compared a heartbeat against a real save, so a dead draft on a
 kiosk beat a genuinely newer server draft written from another device, by construction. `persist()` now
 skips the write when the content signature is unchanged, recorded only after the write commits.
+
+---
+
+## ⚠️ AMENDED IN INCREMENT M22 (2026-08-26) — CONTAINMENT WAS ONLY HALF OF IT; THE DEVICE ALSO NEEDS A COLLECTOR
+
+- **Status:** Accepted
+- **Increment:** M22 — `resources/public-runtime/lib/reap.ts`
+- **Amends:** §*Nothing is ever deleted for privacy* (narrowed, and the narrowing is the decision) ·
+  §*The refusal is on the READ, and the row is deliberately NOT deleted* (its closing concession is now closed)
+- **Row:** `docs/feature-backlog.md` — *"The guest device has no enumerator and no reaper for abandoned
+  answer content"* (`major`), filed **by M21, in the same commit that decided not to fix it**
+
+### The two sentences this ADR wrote about its own remainder, and what they turned out to be worth
+
+M21's amendment closed every **read** that could surface an abandoned draft, and then said this, twice —
+once here and once in `lib/db.ts`:
+
+> Stated honestly, because it is a difference of rate rather than of kind: uncollectable rows already exist
+> here. A republish moves `form_version_id`, so the pre-republish row is orphaned with nothing able to reach
+> it. That is a real pre-existing hole; it is filed in `docs/feature-backlog.md` and it is not this
+> decision's to close.
+
+It was right to file it and right not to take it mid-increment. **It was wrong about what it would cost.**
+The filed row argued the fix needed "a mechanism this table has never had — an enumerating sweeper plus a
+retention decision (how long, on what trigger, and whether it runs in the service worker …). That is its own
+increment with its own ADR question." Two of those three turned out to be already answered in the tree, and
+the third answered itself once the first was looked at properly:
+
+- **"How long"** is not a new number. `DRAFT_TTL_MS` — seven days — has gated `useAutosave.restore()` since
+  F6b and is `docs/ux/form-filling-ux-flow.md` §5.1's own inactivity expiry. The defect was never that the
+  window was unspecified; it was that **nothing could apply it to a key no reader holds.** M22 imports the
+  existing constant rather than minting a second one, which is why it moved from `useAutosave.ts` to
+  `lib/db.ts` (a composable cannot be imported from `sw.ts`'s graph).
+- **"On what trigger"** has a precedent in this same runtime: `pruneSynced()` is called from
+  `useSyncOutbox.refresh()` **and** from `replay.ts`'s drain, so it runs at boot with a tab and on
+  Background Sync without one. `reapAbandoned()` is called from both, in the same two places, for the same
+  two reasons.
+- **"Whether it runs in the service worker"** was the one that looked like a question and was a
+  **constraint**. It runs there — and the reason it *can* is the design below.
+
+⛔ **SO THIS AMENDMENT SPENDS NO NEW ADR NUMBER, AND THAT IS DELIBERATE FOR THE THIRD INCREMENT RUNNING.**
+`0022` stays free and stays Lane A's block-opener. This is `ADR-0021`'s own threat model — shared kiosk
+hardware, guest runtime, device-local stores — carried from *disclosure* to *retention*. Minting a number to
+restate an accepted decision's premise would spend the scarcer namespace for nothing. Same reasoning as M18
+and M21.
+
+### Decision
+
+**The guest device gets one sweeper, `lib/reap.ts`, and it tests REACHABILITY rather than ownership.**
+
+A `draft_answers` row is deleted when its `updated_at` is older than `DRAFT_TTL_MS`. A `media_queue` row is
+deleted when its `client_submission_uuid` is `null`, **no answer document on the device still carries its
+`local:` ref**, and it is older than `MEDIA_ORPHAN_GRACE_MS`. Nothing else is touched — the sweeper reads
+`outbox` and never writes it.
+
+### Why ownership could not be the test, and why that is the better outcome
+
+The obvious design is the one this ADR already uses everywhere else: reap what does not belong to the visit
+on screen. **It is unavailable here, and not as a matter of taste.** `sw.ts` imports `lib/db.ts` and
+`lib/replay.ts`; `tsconfig.sw.json` re-checks that entire graph under `lib: ["ESNext", "WebWorker"],
+types: []`. A module reachable from there cannot import `lib/respondent-session.ts`, cannot read
+`sessionStorage`, and therefore cannot know whose visit anything is. That is the same wall §*The session id
+is an argument, never an import* describes, hit from the other side: there the id could be threaded in from
+the composition root, because the caller had one. **A Background-Sync event has no composition root.**
+
+Reachability turns out to be the stronger test anyway, on three counts.
+
+1. **It gets the device-wide drain right, which ownership would have broken.** §*The drain stays
+   device-wide* is load-bearing: an earlier visit's queued submission still sends from whoever picks the
+   device up next, because sending a stranger's submission is what they wanted. Its media must therefore
+   survive too — and an ownership test would have eaten exactly those blobs. The reachability test spares
+   them without needing to know they are anyone's in particular.
+2. **It cannot drift from the linker.** `attachToSubmission()` decides which blobs belong to a finalized
+   submission by walking the answers with `collectLocalMediaIds()`. The sweeper decides which blobs are
+   live by walking the answers with **the same function**. If instance-addressed media is ever allowed
+   (`StructuralValidationGate` refuses it today), the linker breaks in the same commit as the sweeper,
+   loudly, instead of the sweeper quietly eating live blobs on its own.
+3. **It needs no clock for the part that matters.** An abandoned blob does not wait out a window; it dies
+   with the draft that named it, and the next respondent's first keystroke replaces that draft on the
+   shared primary key within 800 ms. §*The refusal is on the READ* argued that shared key was what made
+   containment and collection the same mechanism. It still is. **The sweeper is the floor under that, not
+   a replacement for it.**
+
+### §*Nothing is ever deleted for privacy* is NARROWED, and this is the narrowing
+
+That section says a previous respondent's **unsent** row is hidden, not dropped, at any age, by any
+predicate. **It still says that, and M22 does not weaken it by one row.** `reapAbandoned()` does not delete
+from `outbox` at all — it reads it, to learn what to spare. Nothing that could still be sent is touched, at
+any age, by any predicate.
+
+What the section did not distinguish, because until M22 nothing acted on the difference, is **submission
+intent** from **the two tiers that hold no intent at all**:
+
+- a `draft_answers` row is answers the respondent was still typing, under a **seven-day expiry the product
+  has always promised**. Deleting an expired one is keeping that promise, not overriding this section.
+- an orphaned `media_queue` blob is a file **no answer document names**. It cannot be uploaded (replay
+  reaches media by uuid), cannot be rendered (a `local:` ref only paints if the answers are restored, which
+  M21 scoped), and cannot be linked (`attachToSubmission` walks answers). It is not a respondent's pending
+  work; it is a file with no remaining referent.
+
+⚠️ **AND THE SECTION'S OWN JUSTIFICATION ALREADY REACHED THIS CONCLUSION WITHOUT BEING APPLIED HERE.** It
+prunes an earlier visit's delivered receipt because "retaining it would keep a server reference on shared
+hardware in exchange for nothing." An orphaned ID scan is that argument with the stakes raised by an order
+of magnitude, and the answer cannot be different.
+
+### The grace window is engineering, not policy — and the conflict-review session sets it
+
+`MEDIA_ORPHAN_GRACE_MS` is one hour. It is **not** a retention window: retention here is "as long as
+something references it." It covers only the interval in which a genuinely live `local:` ref exists in
+memory and not yet in any row the sweeper can read.
+
+The ordinary case needs 800 ms — `stash()` returns the ref, the answer map changes, autosave commits.
+⛔ **The case that sets the number is the conflict-review session, which runs `createAutosave` with
+`enabled: false` and therefore writes NO draft row at all** (Increment G8c, deliberately: a transient review
+must not clobber a live fill on the shared key). A media pick made during a review is referenced by nothing
+on disk until the resubmit, while `refresh()` can fire underneath it on `online` or `visibilitychange`. A
+review takes minutes; an hour covers it with room, and still bounds kiosk exposure to an hour instead of
+"until the browser evicts the origin."
+
+It doubles as the concurrency guard, which is why no transaction spans the mark and the sweep: a pick that
+lands between building the live set and running the delete is younger than the cutoff by construction.
+
+⚠️ **THE RESIDUAL, STATED RATHER THAN LEFT TO BE DISCOVERED: a conflict review that runs longer than the
+grace loses that pick's blob**, and the submission then parks as `needs_attention` with *"queued media is
+incomplete"* rather than failing silently. Filed in `docs/feature-backlog.md` as a `minor`. The real fix is
+to stop the review session being invisible to the mark set, not to lengthen the window.
+
+### No schema change, which is the second thing the filed row was wrong about
+
+§*No schema change* holds, and M22 adds no field, no store and no `db.version()`. Both indexes the sweeper
+needs were declared in **v1**: `draft_answers` carries `updated_at`, so the TTL is an indexed range query
+rather than a table scan, and `primaryKeys()` returns the compound keys without ever loading a respondent's
+answer document.
+
+⚠️ **`media_queue` is walked in full, and the index it declines to use is the point of the whole defect.**
+`client_submission_uuid` **is** indexed — and is useless, because **IndexedDB does not index `null`**. An
+orphan is absent from that index, so no argument to `where('client_submission_uuid')` can ever reach it;
+that is precisely why `markSynced()` and `deleteRow()` have never collected one. `status` is indexed and
+every orphan is `queued` today, but only as a consequence of a call graph (`markUploaded()` is reachable
+only through `listForSubmission(db, uuid)`, which needs a non-null uuid) — keying the sweep on that would
+make the reaper depend on a proof staying true. The walk gates on the field itself.
+
+⚠️ **The range query is lexicographic on an ISO string, which is sound only because every write of
+`updated_at` is provably `toISOString()`.** There are exactly two writers: `persist()` stamps
+`new Date(now()).toISOString()`, and the one-time localStorage migration writes `migrated.savedAt` **only
+after `fresh()` has accepted it** — and `fresh()` rejects anything `Date.parse` cannot read. Fixed-width UTC
+ISO-8601 sorts lexicographically exactly as it sorts chronologically.
+
+### The kiosk-mode row is where configurability lives, and that is a precedent rather than a deferral
+
+§*Ten minutes, and why the number is not a guess* already settled this shape once: a shorter or
+operator-configurable window belongs to the unbuilt kiosk-mode row (`docs/feature-backlog.md` — "lock to
+one form, auto-reset, clear PII on timeout"), not to the module that needs a defensible default today. The
+same holds for both constants here. **No question was filed to `docs/claims/decisions.md`, and that is a
+finding rather than an omission:** the row predicted "its own ADR question", and once the sweeper tested
+reachability instead of ownership there was no product call left to make — the window was already specified,
+the trigger already had a precedent, and the service-worker half was a type-check constraint with one
+answer.
+
+### It is a retention fix and not a disclosure one, and it stays that way
+
+M21 closed every read. Nothing in M22 re-opens one, and nothing here should be re-filed as a security row:
+before this increment an orphan was already unreachable from every UI. What it was not was **gone**.
+
+### Revisit when
+
+- **instance-addressed media is allowed** — `collectLocalMediaIds()` gains a nested walk, and the linker and
+  the sweeper must move together in that commit (they share the function precisely so they cannot not).
+- **the conflict-review session gains durable state of its own** — the grace window's stated reason
+  disappears with it and the number should shrink.
+- **kiosk mode is built** — both constants become operator settings there, per §*Ten minutes*.

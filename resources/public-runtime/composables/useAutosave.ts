@@ -29,10 +29,9 @@
  */
 
 import { ref, watch, type Ref, type WatchStopHandle } from 'vue';
-import { draftBelongsToVisit, plainClone, type MeridianDb } from '../lib/db';
+import { DRAFT_TTL_MS, draftBelongsToVisit, plainClone, type MeridianDb } from '../lib/db';
 import type { AnswerMap, DraftBlob } from '../lib/types';
 
-const DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const DEBOUNCE_MS = 800;
 const BACKSTOP_MS = 30_000;
 

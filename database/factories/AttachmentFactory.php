@@ -114,6 +114,47 @@ class AttachmentFactory extends Factory
         ]);
     }
 
+    /**
+     * The per-submission PDF export ({@see App\Services\Submissions\SubmissionPdfStorage::store()}), M33.
+     * Owned by the submission, `is_pii = true`, and `skipped()` because that is the verdict a real scan
+     * returns in Phase-1 — {@see ScanStatus::servable()} admits it, so the route serves these bytes.
+     */
+    public function exportArtifact(Submission $submission): static
+    {
+        return $this->state(fn (): array => [
+            'attachable_type' => 'submission',
+            'attachable_id' => $submission->id,
+            'kind' => AttachmentKind::ExportArtifact,
+            'mime_type' => 'application/pdf',
+            'original_filename' => 'submission.pdf',
+            'is_pii' => true,
+            'virus_scan_status' => ScanStatus::Skipped,
+            'width' => null,
+            'height' => null,
+        ]);
+    }
+
+    /**
+     * An archived webhook delivery envelope ({@see App\Services\Webhooks\WebhookPayloadArchive::archive()}),
+     * M33. The owner alias is `webhook_delivery`, and the id needs no real row: nothing resolves
+     * `$attachment->attachable`, and {@see App\Policies\AttachmentPolicy} answers this kind on the
+     * permission alone precisely because a delivery has no form to be scoped to.
+     */
+    public function webhookEnvelope(?string $deliveryId = null): static
+    {
+        return $this->state(fn (): array => [
+            'attachable_type' => 'webhook_delivery',
+            'attachable_id' => $deliveryId ?? (string) Str::uuid(),
+            'kind' => AttachmentKind::WebhookPayloadArchive,
+            'mime_type' => 'application/json',
+            'original_filename' => 'payload.json',
+            'is_pii' => false,
+            'virus_scan_status' => ScanStatus::Skipped,
+            'width' => null,
+            'height' => null,
+        ]);
+    }
+
     public function pending(): static
     {
         return $this->state(fn (): array => ['virus_scan_status' => ScanStatus::Pending]);

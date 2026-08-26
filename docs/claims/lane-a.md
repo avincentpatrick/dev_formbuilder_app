@@ -16,122 +16,140 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M20`, the three design-system merge-gate rows
+## Status: NO ACTIVE CLAIM
 
-**Taken 2026-08-26.** Branch `m20-ds-merge-gate` off `origin/main` (`336d295`), PR into `main`.
-The three rows are the whole of the **Design system** heading in `docs/feature-backlog.md`'s merge-gate
-review that M16 did not already close, and they are grouped because all three live in
-`packages/design-system/src/components/` — **Lane A's exclusive column**, so nothing here can collide
-with Lane B on the merits. The shared artefacts below are the only reason this file needs to exist.
+Lane A holds nothing. **Namespaces after M20 + M21:** next free ADR is still **`0022`** and it is still
+**Lane A's** block-opener (`0022-0025`) — **M20 spent no ADR, no migration prefix and no `§D<n>`**;
+`0010` reserved for H1d; `#16` free; next free migration prefix still **`2026_08_17_000111`**.
 
-**THE ROWS.** (1) `major` — the combobox highlight leaves the 22rem box after ~the sixth option and
-cannot be brought back (WCAG 2.4.7). (2) `major` — the stacked sort chip ships a 32px touch target in
-the one layout that exists only on the touch band (DSR §4.4, stricter than SC 2.5.8). (3) `minor` —
-the pending-state ring measures below WCAG 1.4.11's 3:1 against its own ground, in two files that must
-move together or they disagree.
+⚠️ **THE HOST LINT NUMBERS IN THIS FILE WERE STALE AND ARE NOW CORRECTED BY MEASUREMENT.** The four gates
+are **97 · 113 · 31 · 113/121/0**, run unpiped on the host on a tree that touches no PHP. `lane-b.md` had
+it right after M18; this file was still carrying **111 · 111/119/0**, the pre-M18 migration count.
 
-**⛔ ALL EIGHT CITATIONS RE-VERIFIED BEFORE THIS CLAIM WAS WRITTEN, AND ONE IN THE ROW IS WRONG.**
-`Combobox.vue:353-358` (`max-height: 22rem` + `overflow-y: auto`), `:267-271` (rows carry no
-`tabindex`), `:176-192` (arrow keys `preventDefault`ed), `DataTable.vue:488-495` (`min-height: 32px`),
-`:472-473` (`display: none` default), `:702` (revealed in the container block),
-`PasswordStrength.vue:212-218` and `Checklist.vue:289-295` (`opacity: 0.55` on `currentColor`) **all
-hold**. ⚠️ **The container query is at `DataTable.vue:598`, not `:657-659` as the row states** — `:657`
-is the empty-row `grid-column` rule *inside* it. A `grep` for `scrollIntoView` across
-`packages/design-system/src` returns **0**, and a `grep` for `opacity: 0.55` across the package,
-`resources/js` and `resources/public-runtime` returns **exactly the two lines the row names**.
-
-**✅ AND THE CONTRAST ROW'S NUMBERS REPRODUCE TO TWO DECIMAL PLACES, WHICH IS WHY IT IS BEING FIXED
-RATHER THAN RE-ARGUED.** `currentColor` on the pending ring is `--mds-color-text-secondary` →
-`--mds-neutral-600`, composited at 55% over `--mds-color-bg-surface`. Light: `#5A6478` over `#FFFFFF`
-→ `#A4AAB5`, **2.334:1**. Dark: `#9AA5BD` over `#1a2130` → `#606A7E`, **2.961:1**. The row said 2.33
-and 2.96. **Nine rows running had their own framing wrong; this one does not.**
-
-### Files claimed
-
-**Lane A's own column — claimed for completeness, not because they are contested:**
-
-- `packages/design-system/src/components/Combobox/Combobox.vue` — the scroll fix
-- `packages/design-system/src/components/Combobox/Combobox.test.ts`
-- `packages/design-system/src/components/Combobox/Combobox.stories.ts` — **on a prediction**: the
-  stories seed four options, which is precisely why no gate sees this defect, so a long-list story is
-  the likely shape of the Storybook half
-- `packages/design-system/src/components/DataTable/DataTable.vue` — the hit area
-- `packages/design-system/src/components/DataTable/DataTable.test.ts`
-- `packages/design-system/src/components/PasswordStrength/PasswordStrength.vue` — the ring
-- `packages/design-system/src/components/PasswordStrength/PasswordStrength.test.ts`
-- `packages/design-system/src/components/Checklist/Checklist.vue` — the ring's other half
-- `packages/design-system/src/components/Checklist/Checklist.test.ts`
-
-**Shared artefacts, which are claimed and never owned:**
-
-- `docs/feature-backlog.md` — closing the three rows
-- `docs/ux/design-system-reference.md` — as-built amendments to §3.4.1 (the combobox pattern gains a
-  scroll obligation) and §4.4 (the sortbar's hit-area arithmetic). **Lane B is not in this file.**
-- `docs/claims/lane-a.md` — this file
-- `PROGRESS.md` — **Lane A's own Current Status block and Lane A's own hand-off line only**, per 7(d)
-- `MEMORY.md` and the files beside it — Lane A only, per 7(b); announced in chat when written
-
-**⚠️ CLAIMED ON A PREDICTION THAT IT MAY BE RELEASED UNTOUCHED — the M17 `DnsRecordBlock.vue` / M18
-three-file precedent, stated here rather than discovered later:**
-
-- `tests/e2e/list-layout.spec.ts` — the sort chip's 44px hit area **overhangs its 32px visual box by
-  6px vertically**, and this spec is the one that measures the table's own scroll wrapper rather than
-  `documentElement.scrollWidth` (`DataTable.vue:594-597` says so in as many words). If the overhang
-  needs a gate, it needs one here. **A file that might get written to is a file the other lane must
-  not be holding.**
-
-**⛔ NOTHING IN `resources/js/`, `resources/public-runtime/`, `app/`, `config/`, `scripts/`,
-`ci.yml`, `phpunit.xml` or `openapi.json`.** M20 touches no PHP and no `/api/v1` route, so
-`openapi.json` must come back byte-identical; if it moves, that is the other lane's merge, not this
-diff.
-
-**PAIRED FILES (7(b-bis)) — CHECKED, AND ONE IS IN RANGE.**
-`packages/design-system/src/theme/__tests__/clipped-node-containment.test.ts` scans
-`packages/design-system/src` and asserts `KNOWN_UNGUARDED` by **exact equality**. M20 adds a
-`position: relative` to `.mds-table__sortchip` and a `::before` overlay; neither is a clipped
-visually-hidden node, so the list must not move — **and if it does, that is a finding, not a
-rebaseline.** The other two paired gates read `notifications/types.ts` and `shell/nav-model.ts`, which
-M20 does not open.
-
-**Namespaces: M20 SPENDS NOTHING.** No ADR (these are three defect fixes inside components this
-system already documents, not a decision — the M18 precedent for not minting a number to say the same
-thing); no migration; no `§D<n>`. `0022` stays free and stays Lane A's block-opener; `0010` stays
-reserved for H1d; `#16` stays free; the next migration prefix stays `2026_08_17_000111`.
-
-### ⚠️ EXTENSION 1 — one new file, claimed before it was created
-
-`packages/design-system/src/components/Combobox/scroll-reveal.ts` — **a file M19's own lesson says must
-be named here rather than appear in the diff.** (M19 claimed `docker-compose.yml` and then created
-`docker/e2e/Dockerfile`, which the claim never mentioned.)
-
-⚠️ **AND THE FIRST PUSH OF THIS EXTENSION LOST EVERY FILE NAME IN IT, WHICH IS THE FAILURE IT EXISTS TO
-PREVENT.** The text was passed to `node -e` inside a double-quoted shell string, so bash ran every
-backticked path as a command substitution and committed the paragraph with the names deleted —
-`17da814` on `main` is that commit, and this one repairs it. **A claim is only worth the names in it**,
-so prose for this file goes through a quoted heredoc to a scratchpad file from here on, never inline.
-
-**WHY A SIBLING MODULE RATHER THAN A FUNCTION INSIDE THE SFC.** The fix is arithmetic — given the list's
-scroll position and the active option's box, what should `scrollTop` become — and **happy-dom computes no
-layout**, so a mounted assertion would pass whatever the code said. A pure function is the only shape this
-repository can actually gate. The precedent is already here twice: `Modal/focus-target.ts` and
-`PasswordStrength/describedby.ts` are both logic lifted out of an SFC precisely so a unit test can reach
-it.
-
-⛔ **AND IT IS NOT `scrollIntoView`, WHICH IS THE OBVIOUS FIX AND THE WRONG ONE HERE.**
-`Element.scrollIntoView({ block: 'nearest' })` walks **every** scrollable ancestor, so it can scroll the
-page as well as the listbox — in a repository whose last three increments were about a page gaining scroll
-it should not have. Writing `list.scrollTop` directly can only ever move the one box that is supposed to
-move.
-
-**Baseline this delta is measured against** — `origin/main` at `336d295`, after M18 + M19: CI Pest
-**4544 / 19,280** (2 pre-existing warnings) · Vitest **130 files / 2,213** (design-system 35/545 ·
-public-runtime 35/782 · resources/js 60/886) · Storybook axe **42 / 299** · E2E **551 passed + 10
-skipped, no flaky line** · PHPStan CI `[OK]` · `openapi.json` byte-identical. ⚠️ **The two lane files
-disagree on the host lint gates** — `lane-a.md` carries `97 · 111 · 31 · 111/119/0` and `lane-b.md`
-carries `97 · 113 · 31 · 113/121/0`. M18 added two migrations, so **Lane B's is the post-M18 number
-and Lane A's is stale**; M20 touches no migration, so this is re-measured rather than assumed.
+**Baseline on `origin/main` after M20 (`836a182`), every figure from CI rather than quoted:** CI Pest
+**4544 / 19,280** (2 pre-existing warnings) · Vitest **130 files / 2,258** (design-system **35/567** ·
+public-runtime **35/805** · resources/js 60/886) · Storybook axe **42 suites / 303** · E2E **551 passed +
+10 skipped, no flaky line** · PHPStan CI `[OK]` · four host lint gates **97 · 113 · 31 · 113/121/0** ·
+`openapi.json` byte-identical. ⚠️ **Only Vitest and axe moved, and both by exactly what M20 and M21 added
+(+22 / +23 tests, +4 stories).** Pest and E2E are unchanged to the digit — which is the point: a diff of
+design-system CSS, one scroll behaviour and no selector changes must not move them.
 
 ---
+
+## RELEASED — M20, the three design-system merge-gate rows (merged as PR #212, `836a182`, 6/6 green)
+
+**All three fixed, all three measured in a browser, and one of them was only half a defect.**
+
+⛔ **THE HEADLINE FINDING: A CHARACTER-IDENTICAL DECLARATION IS NOT AN IDENTICAL DEFECT.** The pending-ring
+row cited `PasswordStrength.vue:212-218` and `Checklist.vue:289-295` together, with **one pair of numbers
+for both**, because a repo-wide grep returned exactly those two lines and they matched to the character.
+Measured, they were never the same ring: `currentColor` is `--mds-color-text-secondary` in one and
+`--mds-color-text-body` in the other.
+
+| | as shipped (0.55 alpha) | as fixed (solid) | verdict |
+|---|---|---|---|
+| `MdsPasswordStrength` light | **2.28:1** | 5.55:1 | a real 1.4.11 failure |
+| `MdsPasswordStrength` dark | **3.08:1** | 7.51:1 | already passing, by 0.08 |
+| `MdsChecklist` light | **3.60:1** | 14.84:1 | already passing |
+| `MdsChecklist` dark | **5.37:1** | 15.70:1 | already passing |
+
+**One of four filed cases was actually below the bar.** Both were still fixed, and the dark row is why: the
+same declaration reads **2.96:1 on `--mds-color-bg-surface` and 3.08:1 on `--mds-color-bg-canvas`** — it
+fails on a card and passes on the page, and **nothing in the component decides which one it gets.** An
+alpha composite is a function of the ground behind it; a shared component does not own its ground. Raising
+the alpha to 0.75 clears the bar today (3.43:1) and leaves that fragility exactly where it was.
+
+⛔ **AND THE REASON ALL THREE SHIPPED BEHIND A GREEN GATE STACK IS FIXTURES, NOT SCANNERS — WHICH IS M19'S
+LESSON ARRIVING FROM THE OTHER DIRECTION.** M19 learned that a probe measuring zero proves nothing unless
+it exercised the defect. Here, three separate gates were reporting zero over fixtures too small to reach
+the thing they were pointed at:
+
+- Every `MdsCombobox` story seeded **four** options, so `max-height: 22rem` was never reached: axe's
+  `scrollable-region-focusable` had **no scrollable region to look at**, and happy-dom computes no layout.
+- Every stacked `MdsDataTable` story declared **one** sortable column, so the sortbar has rendered a single
+  chip for as long as it has existed — **it had never wrapped**, never had a second row to be 8px away
+  from, and never had a short header to overhang.
+- And for the touch target there is no scanner at all: **SC 2.5.8's floor is 24×24, so axe passes a 32px
+  control and always will.** What is breached is DSR §4.4's stricter 44×44.
+
+Two new fixtures now reach all of it — a 21-option `Scrolling` story and a five-column `StackedSortWrap`
+story, both light and dark. **Storybook axe 42 suites / 303 in CI, up from 299 — four new stories, still green.**
+
+### What each row cost, and the one citation that was wrong
+
+**(1) The combobox highlight — all three citations HELD, and the row was right end to end.** Measured with
+a positive control before the fix was trusted: at the palette's real worst case the list is **1195px in a
+352px band**, pinned to the top **exactly five of twenty-one rows are visible**, and the last option sits
+**843px** below the box. After the fix, arrowing through all 21 options put **zero** out of view.
+⛔ **Not `scrollIntoView`** — `block: 'nearest'` walks *every* scrollable ancestor, and this listbox sits
+inside a dialog inside a page whose horizontal scroll M17 and M19 spent two increments removing. A new
+sibling module, `Combobox/scroll-reveal.ts`, computes a `scrollTop` and returns `null` for "already
+visible", so a reader scrolling by wheel or touch is never fought. The watcher is `flush: 'post'` because a
+pre-flush watcher measures the row highlighted a moment ago — **consistently**, which reads as "the fix
+does not work" rather than as a timing bug.
+
+**(2) The sort chip — the row is right on the merits and WRONG ON ONE CITATION.** The container query is
+`DataTable.vue:598`, **not `:657-659`**; `:657` is the empty-row `grid-column` rule *inside* it. That makes
+five rows running whose own evidence was wrong somewhere. ⚠️ **The `::before` idiom alone would have left
+this half-fixed**: §4.4 asks for 8px between **hit areas**, and a 44px target on a 32px chip overhangs 6px
+each way, so two *wrapped* rows at the uniform 8px gap overlapped by **4px of invisible target**. The gap
+is now two values (`row-gap` 20px = 8 + 2×6, `column-gap` 8px) with a gate that fails on anyone tidying
+them back into one. The horizontal overhang is designed out rather than measured away —
+`min-width: calc(44px + 2px)`, where the **2px is the border that `box-sizing: border-box` folds inward**
+while an absolutely positioned child's `width: 100%` resolves against the *padding* box. Hit-tested at
+320px: overlay **44×44 on every chip**, **8px horizontal / 9px vertical** clearance, **0px overhang past
+the frame**, `scrollWidth === clientWidth`.
+
+**(3) The pending ring — see the table above.**
+
+### Claimed files: what was touched, and what was released untouched
+
+Every file in the claim was edited **except one**, and it was claimed on a stated prediction that it might
+not be — the M17 `DnsRecordBlock.vue` / M18 three-file precedent. **`tests/e2e/list-layout.spec.ts` is
+released untouched**: it was taken because the 44px hit area overhangs its 32px visual box and that spec is
+the one that measures the table's own scroll wrapper. The overhang turned out to be **vertical only** — the
+`min-width` designs the horizontal one out entirely — so there was nothing for a horizontal-overflow gate
+to assert. **One file released untouched on a prediction that was written down first is the claim working.**
+
+**The claim was extended once**, as its own pushed commit before the file was opened, for
+`Combobox/scroll-reveal.ts`.
+
+⚠️ **AND THAT EXTENSION IS ITS OWN LESSON, BECAUSE THE FIRST PUSH OF IT LOST EVERY FILE NAME.** The text was
+passed to `node -e` inside a double-quoted shell string, so bash ran each backticked path as a command
+substitution and committed a paragraph whose entire job is to *name a file* with the names deleted
+(`17da814`; repaired in `f3fc136`). **Prose for these files goes through the Write tool, never inline** —
+and note the same shell collapses a doubled backslash to a single one, which silently broke two regexes in
+a test file until they were rewritten as plain substring reads, and which made a long heredoc of this very
+document fail to parse. Lane B's recorded rule — *Write tool for prose, shell for the splice* — is correct
+and now has a Lane A sighting.
+
+⚠️ **PAIRED FILES: CHECKED AND UNMOVED.** `clipped-node-containment.test.ts` was run directly — 3 passed,
+`KNOWN_UNGUARDED` unchanged in both directions, exactly as the claim predicted.
+
+⚠️ **`packages/design-system/package-lock.json` WAS REVERTED, NOT COMMITTED.** Installing Storybook to run
+the axe gate locally (`npm --prefix packages/design-system install`) rewrites that tracked lockfile —
+here, dropping `"peer": true` markers on four packages. It is churn, it was not in the claim, and it has
+nothing to do with M20. **Anyone running the axe gate locally will hit this; revert it before committing.**
+
+### How the gates were actually run, because two of them cannot run where you would expect
+
+- ⛔ **Storybook axe CANNOT run in `dev_formbuilder_app-node-1`** — that container is musl-based and
+  Playwright's Chromium is a glibc build, so the launch fails with `spawn ... ENOENT` **while the binary is
+  present and executable**, which reads as a missing browser and is not one. Build Storybook in the node
+  container (`npm run ds:storybook:build`) and run the scan in **M19's e2e image** instead, via
+  `docker compose run --rm --entrypoint sh e2e`, serving `storybook-static` with `npx http-server` on 6006
+  and pointing `npx test-storybook --url` at it. ⚠️ The design-system deps are **not installed in either
+  tree by default** — that install is a 4-minute step and is what rewrites the lockfile above.
+- ✅ **The same image runs standalone probe scripts**, which is how every number in this record was
+  measured: `docker compose run --rm -v "<scratchpad>:/probe" --entrypoint sh e2e`, with
+  `createRequire('/work/')` inside the script to resolve `playwright` from the repo's own `node_modules`.
+- ⚠️ **`playwright.config.ts` sets `workers: 1`, so the full e2e suite is ~3-4 hours locally** — a full run
+  reached 34 of 551 in the first stretch and was stopped deliberately. M20 ran the three specs its diff can
+  reach and left the full suite to CI, which is the authority. **Say which one you ran.**
+- ⚠️ **A hit-test probe measures one pixel short and it is the probe, not the code.**
+  `document.elementFromPoint` treats a box as `[top, bottom)`, so walking outward from an element's edge
+  loses the far boundary and a true 44px target reports 43. Read `getComputedStyle(el, '::before')` for the
+  authoritative box and keep the walk as an independent reachability check with a 1px tolerance.
 
 ## RELEASED — M19, draining `KNOWN_OVERFLOWING` (merged as PR #210, `8ab9ae8`, 6/6 green)
 

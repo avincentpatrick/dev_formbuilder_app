@@ -16,11 +16,132 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM
+## Status: ACTIVE CLAIM — `M25`, the axe scans that assert nothing about which page they landed on
 
-Lane A holds nothing. **Namespaces after M23:** next free ADR is still **`0022`** and it is still **Lane
-A's** block-opener (`0022-0025`) — **M23 spent no ADR, no migration prefix and no `§D<n>`**; `0010`
-reserved for H1d; `#16` free; next free migration prefix still **`2026_08_17_000111`**.
+**Taken 2026-08-26.** Branch `m25-axe-landing-assertions`, cut from `origin/main` at `d1d1d72`, PR into
+`main`. Row: the first `major` under **Test suite & CI gates** in `docs/feature-backlog.md` — *the 16-page
+responsive scan asserts nothing about which page it landed on*.
+
+**⚠️ NUMBERED `M25`, AND `lane-b.md` WAS RE-READ IMMEDIATELY BEFORE THIS FILE WAS WRITTEN, NOT AT SESSION
+OPEN — WHICH IS THE ONLY REASON THE NUMBER IS RIGHT.** The opening fetch returned `0e9c48d`; by the time
+the branch was cut `main` was `d1d1d72`, one commit further on (`fix(M24)`, Lane B, pushed mid-read).
+`lane-b.md` reads **ACTIVE CLAIM `M24`** in both reads, so `M25` is the next free number. Lane B's M24
+touches `app/Services/Gamification/`, `tests/{Unit,Feature}/Gamification/` and `docs/adr/0020` — **no
+file in this claim is in that set**, and the only shared artefacts are `docs/feature-backlog.md` (a
+different row) and `PROGRESS.md` (own block only).
+
+### ⛔ NAMESPACES — THIS CLAIM SPENDS NOTHING
+
+**No ADR.** `0022` **stays free and stays Lane A's block-opener (`0022-0025`)** — sixth consecutive
+increment to spend nothing. This is a test-fixture correction, not a decision: it adds no mechanism, no
+option was weighed and rejected, and the reasoning it records belongs in the spec's own comment beside
+the assertion. **No migration** (`2026_08_17_000111` stays free — no schema, no PHP at all). **No
+ADR-0016 `§D<n>`.** No threat-model row. `0010` stays reserved for H1d; `#16` stays free.
+
+### Every file this claim touches, named before it is opened
+
+- `tests/e2e/responsive-axe.spec.ts` — the 16-page loop at `:148-156` gains **one** landing assertion,
+  plus the comment recording why. **Shared artefact** (`tests/e2e/*.spec.ts`), claimed here.
+- `tests/e2e/auth-axe.spec.ts` — the 5-page unauthenticated loop at `:81-89` gains the same one line.
+  **Shared artefact**, claimed here. See the extension note below for why it is in scope and why the
+  other three look-alikes are not.
+
+Shared, claimed here: `docs/feature-backlog.md` (this row only), `docs/claims/lane-a.md`, `PROGRESS.md`
+(Lane A's block and hand-off line only). **If this list grows, the claim is extended as its own pushed
+commit before the file is opened.**
+
+**No `.vue`, no `.ts` under `resources/`, no PHP.** So: no `docker restart` of the node container, no
+Vitest movement, no Storybook axe movement, `openapi.json` byte-identical, PHPStan and the four host lint
+gates unmoved. **Only the E2E figure can move, and it must not** — this claim adds assertions to existing
+tests and creates no new test, so **551 passed + 10 skipped is a prediction, not a baseline to beat.**
+
+### ⚠️ THE ROW'S CITATION IS WRONG, AND SO IS THE ONE IT OFFERS AS THE FIX
+
+Both were re-walked against the tree at `d1d1d72` before this claim was written.
+
+- **The row cites `responsive-axe.spec.ts:124-132`. That is inside the `pages` ARRAY** — the comment block
+  on the `Two-factor required` entry. The `goto` → `forceTheme` → `assertClean` loop it means is
+  **`:148-156`** (`goto` at `:151`, `assertClean` at `:153`).
+- **The row cites the `filteredToZero` loop as `:154-163`. It is `:175-188`** (`goto` at `:178`, the
+  `No matching` heading check at `:183`).
+- **`support/console.ts:34` HOLDS exactly** — `expect(page.url(), …).toContain(path)`. That is the house
+  idiom this fix adopts rather than inventing one.
+- **`bootstrap/app.php:315-334` HOLDS** — `FeatureGateException` at `:323-329` and `ModuleDisabledException`
+  at `:336-342` both `return back()->with('toast', …)`. **The row says "every plan/module refusal"; it is
+  broader still — SEVEN handlers in that file return the same toast redirect** (`ScopeNodeException`
+  `:286`, `GrantException` `:297`, `QuotaExceededException` `:310`, `FeatureGateException` `:323`,
+  `ModuleDisabledException` `:336`, `XlsformImportException` `:389`, `FormNotAcceptingSubmissionException`
+  `:458`), so the 302 is this application's standard web refusal rather than a special case.
+- **`/achievements` is `module:gamification`** (`routes/tenant.php:258-259`), `RequireModule:60-62` throws
+  `ModuleDisabledException` when the setting is off, and `E2eSeeder` enables no module — its only
+  `gamification` mention is a comment at `:1134`. The row's example holds in full.
+
+### ⚠️ WHERE THE ROW UNDERSTATES ITSELF — FOUR PAGES ARE EXPOSED, NOT ONE
+
+The row names `/achievements` and leaves the impression it is the single instance. **Four of the sixteen
+sit behind a gate that answers a web GET with a 302**, and the other three are gated on the tenant's
+PLAN rather than a module default:
+
+| Page | Gate | `routes/tenant.php` |
+|---|---|---|
+| `/achievements` | `module:gamification` | `:258-259` |
+| `/analytics` | `feature:advanced_analytics` | `:891-892` |
+| `/webhooks` | `feature:webhooks` | `:762-763` |
+| `/integrations` | `feature:native_connectors` | `:823-824` |
+
+The remaining twelve carry `can:` gates only, which raise **403** — a different and much weaker exposure
+(a scan of an error page), **not** this defect. It is named here so a later reader does not "complete"
+the sweep by adding assertions for a redirect that cannot happen.
+
+⛔ **AND THE FILE ALREADY KNEW.** The `Analytics` entry's own comment (`:35-37`) says acme is reachable
+"only because `E2eSeeder` upserts acme onto a Business plan (ADR-0011 §D9 names seeding that tenant as a
+blocking obligation, **precisely so this gate cannot stay green over a page it never loads**)". The
+obligation is real and it is discharged — **and nothing in this spec asserts that it was.** Three scans
+are load-bearing on a seeder promise recorded in an ADR and enforced by nobody. That is the finding
+above the fix.
+
+### ⚠️ THREE LOOK-ALIKES ARE ALREADY PASSING — THE M20 LESSON, RE-MEASURED
+
+A grep for `goto` → `assertClean` finds five more sites. **Three are already protected, and adding an
+assertion to them would be noise dressed as diligence:**
+
+- `tests/e2e/templates-axe.spec.ts:12-17` — `/forms/templates` IS `feature:form_templates`-gated
+  (`routes/tenant.php:486-487`), the strongest-looking candidate of the five, **and it already asserts
+  `Use this template` is visible**, which no dashboard can satisfy.
+- `tests/e2e/admin-console-axe.spec.ts:45-52` — routes through `openConsole()`, which **ends** in
+  `console.ts:34`'s URL assertion.
+- `responsive-axe.spec.ts`'s own `filteredToZero` loop — already asserts the `No matching` heading, which
+  is why `/webhooks?q=…` is covered while bare `/webhooks` twenty lines above is not.
+
+**One is a genuine instance and is claimed** — `auth-axe.spec.ts:81-89`. Its five pages carry `guest`,
+which redirects an authenticated visitor to `/dashboard` (`config/fortify.php:80`), and the ONLY thing
+standing between it and ten green scans of the dashboard is the `test.use({ storageState: empty })` at
+`:65`. **The file's own header names that exact hazard** — *"would be scanned as the LOGIN page it
+redirects to and would pass while covering nothing"* — and then asserts nothing about it. Same class,
+same one-line fix, same file family.
+
+**One is NOT and is deliberately left** — `personalization-axe.spec.ts:36-42` and `:56-68` scan `/forms`,
+`/settings` and `/submissions`. `/settings` carries no middleware at all (`:267`) and the other two are
+`can:`-gated, so there is no 302 to catch. Filed here rather than swept in.
+
+### The fix, and the positive control that will prove it
+
+One line per loop — not per test — because both are `for` loops: **2 inserted lines cover 42 tests.**
+The assertion is `console.ts:34`'s idiom verbatim, so the repository gains no new vocabulary.
+
+**⛔ THE POSITIVE CONTROL IS THE ROW'S OWN SCENARIO, RUN BOTH WAYS.** Flip the `gamification` module
+default off so `/achievements` genuinely 302s, then run the two Achievements tests **with** the assertion
+(must go red naming `/achievements`) and **with it reverted** (must stay green — that green is the
+defect, and it is the whole reason this row exists). Restore by **saved-bytes sha256 comparison**, never
+`git checkout --`. The mutation is local and uncommitted; Lane B's tree and DB are separate checkouts and
+a separate stack, so it cannot reach them.
+
+### What will be run, and what will not
+
+`responsive-axe.spec.ts` and `auth-axe.spec.ts` are the two specs this diff reaches, run in M19's e2e
+image via `docker compose run --rm e2e`. `playwright.config.ts` pins `workers: 1`, so the full suite is
+3–4 hours locally — **the rest of the suite is CI's, and this claim will say which specs were run rather
+than implying the whole matrix.**
 
 **Baseline on `origin/main` after M23, every figure from CI rather than quoted:** CI Pest **4544 /
 19,280** (unchanged — M23 touches no PHP) · Vitest **134 files / 2,292** (design-system **36/574** ·

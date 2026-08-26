@@ -16,157 +16,141 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M23`, the four App-UI rows, taken as one increment
+## Status: NO ACTIVE CLAIM
 
-**Taken 2026-08-26.** Branch `m23-app-ui-quartet`, cut from `origin/main` at `e14d73b`, PR into `main`.
-Rows: all four bullets under **App UI** in `docs/feature-backlog.md` — one `major` (the double-clicked
-"Create" that provisions two spreadsheets) and three `minor` (the rule modal's unfiltered submit, the
-unearned-badge medallion in dark, the top-nav search field on an Inertia arrival).
+Lane A holds nothing. **Namespaces after M23:** next free ADR is still **`0022`** and it is still **Lane
+A's** block-opener (`0022-0025`) — **M23 spent no ADR, no migration prefix and no `§D<n>`**; `0010`
+reserved for H1d; `#16` free; next free migration prefix still **`2026_08_17_000111`**.
 
-**⚠️ NUMBERED `M23`, AND THE REF WAS RE-READ IMMEDIATELY BEFORE THIS FILE WAS WRITTEN, NOT AT SESSION
-OPEN.** Both reads return `e14d73b`; `docs/claims/lane-b.md` reads **ACTIVE CLAIM `M22`** in both. M20 is
-merged and released (PR #212, `836a182`). So the next free number is `M23`.
+**Baseline on `origin/main` after M23, every figure from CI rather than quoted:** CI Pest **4544 /
+19,280** (unchanged — M23 touches no PHP) · Vitest **134 files / 2,292** (design-system **36/574** ·
+resources/js **62/899** · public-runtime **36/819**) · Storybook axe **42 suites / 303** (unchanged — no
+story added, and the `Button.vue` diff is script-only) · E2E **551 passed + 10 skipped** · PHPStan CI
+`[OK]` · four host lint gates **97 · 113 · 31 · 113/121/0** (re-measured, not carried) · `openapi.json`
+byte-identical.
 
-**No collision on the merits.** Every file this increment edits is under `resources/js/**` or
-`packages/design-system/**`, both of which Standing Rule 7(b) grants Lane A outright as widened
-2026-08-25. `M22` is wholly inside `resources/public-runtime/`, which is Lane B's outright. The two
-columns do not meet. The only overlaps are shared artefacts by disjoint region — `docs/feature-backlog.md`
-(Lane A closes the four **App UI** rows; Lane B closes one under the guest-runtime review) and
-`PROGRESS.md` (own block only, per 7(d)).
+⚠️ **THE VITEST MOVE IS TWO LANES AND IT RECONCILES EXACTLY:** 130 → 134 files and 2,258 → 2,292 tests is
+**Lane A +3 files / +20** and **Lane B's M22 +1 file / +14**, which landed mid-increment. A total quoted
+without that split reads as one lane's delta and is wrong by a third.
 
-**⛔ NAMESPACES — THIS INCREMENT SPENDS NOTHING FROM ANY OF THEM.** No ADR, no migration prefix, no
-`§D<n>`, no threat-model row. Next free ADR remains **`0022`** and remains Lane A's block-opener
-(`0022-0025`); `0010` reserved for H1d; `#16` free; next free migration prefix remains
-**`2026_08_17_000111`**. This diff touches no PHP, so `openapi.json` must stay byte-identical.
+---
 
-### Every file this claim brings into existence, named before it is created
+## RELEASED — M23, the four App-UI rows (merged as PR #214, 6/6 green)
 
-- `resources/js/components/integrations/SheetsRuleFields.test.ts` — new; the double-provision guard.
-- `resources/js/components/integrations/RuleFormModal.test.ts` — new; what is rendered equals what is sent.
-- `packages/design-system/src/components/Button/Button.test.ts` — new; the component-level in-flight guard,
-  and the handler-ordering fact it depends on, measured rather than reasoned about.
+**All four fixed, every fix mutation-proven, and two of the four rows were wrong about something that
+mattered.**
 
-Files edited, all inside Lane A's column: `SheetsRuleFields.vue`, `RuleFormModal.vue`,
-`Pages/achievements/Index.vue`, `components/shell/TopNav.vue`, `components/shell/TopNav.test.ts`,
-`Pages/achievements/index.test.ts`, and `packages/design-system/src/components/Button/Button.vue`
-(+ its `Button.stories.ts`). Shared, claimed here: `docs/feature-backlog.md`, `docs/claims/lane-a.md`,
-`PROGRESS.md` (Lane A's block and hand-off line only). **If this list grows, the claim is extended as its
-own pushed commit before the file is opened.**
+⛔ **THE HEADLINE: A GUARD THAT READS AS WORKING AND BLOCKS NOTHING.** `Button.vue`'s in-flight guard
+called `event.stopPropagation()`. The consumer's `@click` is a **fallthrough listener on the same
+element** — Vue merges it onto the component's own root — so bubbling was never what stood between it and
+a second request. For four increments the docblock promised *"must not fire a second submit"* and the
+function delivered that only for a native `type="submit"`, where the sibling `preventDefault()` happened to
+do the real work. The cost was the one button in the tree whose second click provisions a second Google
+spreadsheet in the tenant's Drive.
 
-### What was verified against the code BEFORE this claim was written
+**MEASURED BEFORE IT WAS WRITTEN, because two facts had to hold and neither is obvious:**
 
-M20 makes it five rows running whose own evidence was wrong somewhere, so every citation was re-walked
-against the tree at `e14d73b`. **All four rows HOLD, and their line numbers hold too** — which is itself
-worth recording, because it is the first clean sweep in six increments.
+| probe | consumer's `@click` fires? |
+|---|---|
+| `stopPropagation()` (as shipped) | **yes** — 1 call |
+| `stopImmediatePropagation()` | **no** — 0 calls |
 
-- **`SheetsRuleFields.vue:168`** is `async function create()`; `busy.value = true` at `:171`,
-  `busy.value = false` at `:190`, and no `inFlight` guard between them. `:276-278` is the button:
-  `:loading="busy"` and `:disabled="!connectionId || destination !== null"`. `destination` is assigned at
-  `:180`, i.e. **after** the awaited `createDestination()` returns, so the disabled expression is false for
-  the entire flight and `MdsButton` renders **no native `disabled`**.
-- **`Button.vue`** — `:disabled` binds the **native** attribute at `:68`, `aria-disabled` is a separate
-  binding at `:70`, and the internal guard at `:50-53` calls `event.stopPropagation()`, not
-  `stopImmediatePropagation()`. The consumer's `@click` is a fallthrough listener on the **same** element,
-  so bubbling never enters into it and `create` runs a second time.
-- **`RuleFormModal.vue:114-116`** narrows `availableEvents` to `submission.*` for a tabular grant;
-  `:194` sends `data.event_types` whole; and `:160` is the seed that puts the stale value there in the
-  first place. The checkbox `v-for` at `:253` iterates the narrowed list, so the unrendered event is
-  unreachable by `toggleEvent()` at `:182`.
-- **`Pages/achievements/Index.vue:391`** is `background-color: var(--mds-neutral-100)` on
-  `.ach__badge-mark`. A repo-wide grep for primitive ramp tokens under `resources/js/` returns exactly two
-  lines and **the second is a prose comment** (`Pages/audit/Index.vue:367`), so this is the only live
-  primitive-token reference in the whole of `resources/js/`.
-- **`TopNav.vue:39-42`** is `computed(() => new URLSearchParams(window.location.search).get('q') ?? '')`.
-  `window.location` is not reactive, the bar lives in a persistent layout, and the computed therefore
-  caches for the life of the page load.
+Handler order came back `["inner","consumer"]` — the component's own handler runs **first**, which is the
+only reason a design-system-level fix existed at all. Had the order been reversed, the local guard would
+have been the only option. Vue patches `stopImmediatePropagation` on the event precisely so it breaks out
+of a merged handler array; a plain DOM listener array would not honour it.
 
-### ⛔ M20's lesson applied to the sibling, and it changed the answer
+⚠️ **AND THE ROW'S CLOSING JUSTIFICATION WAS WRONG WHILE ITS CONCLUSION WAS RIGHT — DO NOT REUSE THE
+REASONING.** It argued every other `:loading` button is safe because Inertia's stream is
+`maxConcurrent: 1, interruptible: true`. That is the constructor, not a dedupe: `interruptInFlight()`
+aborts the in-flight XHR and sends the second request anyway, and the first POST has already reached the
+server. What actually protects the rest of the tree is that they are `type="submit"` inside a
+`@submit.prevent` form.
 
-`AirtableRuleFields.vue` is the other tabular editor, takes an identical prop set and emits an identical
-`change` — the exact shape that made M20 file one row against two files. **Measured, it does not have this
-defect and it is not because it guards better: it has no create-destination button at all.** The two
-`busy`-aware `:disabled` bindings in that file (`:227`, `:245`) are on `MdsSelect`, not `MdsButton`, and
-`createDestination()` in `integrationsClient.ts:96` has exactly one caller. A census of every `:loading=`
-binding under `resources/js/` was taken rather than sampled, and the remainder are re-checked below rather
-than waved past — the row's claim that this is the *only* such button is the row's own framing, and framing
-is what has been wrong five rows running.
+### ⛔ THE TEST THAT PASSED WITH THE FIX REVERTED, AND WHY IT IS THE MOST TRANSFERABLE THING HERE
 
-### ⚠️ CLAIM EXTENSION 1 — two more files, named before they are opened
+The first draft of `SheetsRuleFields.test.ts` stubbed the button as `MdsButton` and asserted one call for
+three clicks. It was **green with the local guard removed** — because Vue Test Utils matches a stub against
+the component's own **inferred name**, which for a `<script setup>` SFC is its **filename**. `Button.vue`
+gives `Button`; `MdsButton` is only the barrel's export alias and matches nothing, so the real component
+rendered and *its* guard absorbed the extra clicks. The same three-click case reports **1** call under the
+`MdsButton` key and **2** under `Button`.
 
-**No new test file beyond the three already named.** Two EDITS were not in the original list, both inside
-Lane A's column, both found by verifying the rows rather than by planning them:
+**Only the mutation found it.** A green run said nothing, and the assertion was correct — the fixture was
+not. ⚠️ **THIS IS REPO-WIDE: thirteen stubs across four other files key on the same alias** and are
+therefore silently inert, so four suites are exercising more component than they claim. Filed as its own
+row rather than fixed, because repairing them changes what those suites cover.
 
-- `packages/design-system/src/theme/__tests__/token-references.test.ts` — the medallion fix is a CSS token
-  in an SFC, and `happy-dom` applies no scoped styles, so a mounted test cannot see it. The honest gate is
-  a source-text scan, and this file already walks `resources/` with block-comment stripping and
-  Style-Dictionary flattening. One added `describe` bans primitive ramp references in application code.
-  **Zero new Vitest FILES; the design-system chunk goes 567 → 569 tests.**
-- `resources/js/components/builder/LogicRail.vue` — a SECOND live instance of the medallion defect, found
-  by the adversarial pass and confirmed by hand (below).
+### The two rows whose framing was wrong
 
-**Dropped from the original list:** `Button.stories.ts`. `Loading` and `Disabled` stories already exist,
-so the fix needs no new story and the Storybook axe baseline (42 suites / 303) must not move.
+- **THE TOP-NAV ROW'S OWN FIX WOULD HAVE SHIPPED A REGRESSION.** It says to read `q` from `usePage()`. Read
+  unconditionally, the workspace-search field shows **any** page's `q` — and `q` is the shared filter key
+  on six list pages (forms, members, webhooks, audit log, feedback, the submissions inbox), all committing
+  client-side with `preserveState`. The box labelled "Search this workspace" would have carried the audit
+  ledger's filter term, and Enter posts that box to `/search`: "filter this list" silently becomes "search
+  everything." Shipped gated on `page.component === 'search/Index'`, which also fixes the pre-existing
+  full-page-load version instead of widening it. ⚠️ The file's own docblock also asserted that a browser
+  Back "arrives as a fresh render" — it does not, Inertia swaps in place on popstate — and that false
+  sentence was the stated justification for the implementation.
+- **THE RULE-MODAL ROW DESCRIBED THE MILDER OUTCOME.** "Silently sends the unfiltered set" is true only for
+  a disconnected grant. On a live one the server **does** reject it — under `event_types.{index}`, a dotted
+  key this modal never renders — so the tenant got a 422 with no visible cause, on a modal that stays open,
+  and could no longer rename the rule, rescope it, or repair its destination.
 
-**⛔ THE PRIMITIVE-BAN GATE DOES NOT COVER THE DEFECT CLASS, AND THE SECOND INSTANCE IS THE PROOF.**
-`LogicRail.vue:294` paints `.rail__dot` with `var(--mds-color-bg-sunken)` — a *semantic* token, so the new
-gate is green on it — and the dot's nearest painting ancestor is `.builder` (`Builder.vue:643`), which is
-`--mds-color-bg-canvas`. In dark, `bg-sunken` and `bg-canvas` are **both** `--mds-neutral-50`, so that disc
-measures **1.000:1** exactly as the medallion did. Same bug, same signature (the glyph inside stays
-legible, so it reads as "the disc vanished" rather than "the icon vanished"), reached through a token the
-gate is designed to permit. It is fixed here, in the same increment, because it is one token in Lane A's
-own column and shipping "the medallions are visible now" beside a knowingly-invisible identical disc is
-incoherent — but the gate is reported as catching the primitive half only, never as closing the class.
+### ⛔ A SEMANTIC TOKEN IS NOT A VISIBLE ELEMENT, AND THE GATE THIS INCREMENT ADDED CANNOT SEE THAT
 
-**⚠️ AND THE TOPNAV FIX CHANGED SHAPE UNDER THE ADVERSARIAL PASS, WHICH IS THE ROW'S FRAMING BEING WRONG
-FOR THE SIXTH TIME.** The row says the field must show `q` from `usePage()`. Read unconditionally that is
-a REGRESSION: `q` is not the global search's private parameter, it is the shared filter key on **six** list
-pages — `forms/Index.vue:60`, `audit/Index.vue:59`, `feedback/Index.vue:47`, `submissions/Inbox.vue:144`,
-`members/Index.vue:63`, `webhooks/Index.vue:73` — every one committing through a client-side
-`router.get(..., { preserveState: true })`. An unscoped read puts the audit ledger's filter term into the
-workspace-search box, where pressing Enter silently converts "filter this list" into "search everything".
-The fix is therefore gated on `page.component === 'search/Index'` (`SearchController.php:31`), which also
-fixes the pre-existing full-page-load bleed rather than widening it.
+The medallion row was one token: in dark, `--mds-neutral-100` **is** `--mds-color-bg-surface`, so the disc
+was painted its own card's colour at exactly **1.00:1** — absent, not faint. A primitive-ban gate was added
+so the class cannot recur, proven by positive control (revert the token, it reddens naming the file).
 
-### ⚠️ CLAIM EXTENSION 2 — the new gate is a PAIRED FILE, and it is being registered rather than narrowed
+**Then the adversarial pass found the identical defect wearing a token the gate permits.**
+`LogicRail.vue`'s `.rail__dot` was `--mds-color-bg-sunken` on a `--mds-color-bg-canvas` ground, and in dark
+**both resolve to `--mds-neutral-50`** — 1.000:1, live, and green under the new gate. Fixed in the same
+increment. **The gate closes the cheap half only** and must never be reported as closing the class: the
+real check is "does every painted element differ from the ground it actually lands on, in both themes",
+which needs the resolved ancestor chain and is not a source-text scan.
 
-**One more edit, outside "own block only": `PROGRESS.md`'s Standing Rule 7(b-bis) table.** The
-primitive-ban case added to `token-references.test.ts` scans `resources/` **entire**, which includes
-`resources/public-runtime/` — Lane B's tree outright. That is precisely 7(b-bis)'s definition (*"a gate in
-one lane's tree that reads another lane's tree off disk"*), and that paragraph's closing instruction is to
-**add it to the table when you find it**. So it is registered, not routed around.
+⚠️ **THE GATE ALMOST DOCUMENTED ITSELF INTO FAILING.** It strips `/* */` comments, and the fix comments
+originally quoted the banned string — so moving either into HTML comment syntax would have made the gate
+report its own documentation as the offender. Both are now written without the `var(` prefix, so the raw
+count of banned strings under `resources/` is **zero with no stripping at all**.
 
-**⛔ THE ALTERNATIVE WAS TO NARROW `APP_SCAN_ROOT` TO `resources/js`, AND IT WAS REJECTED ON THE MERITS.**
-The invariant is *"application code names semantics, not ramp steps"*, and the guest runtime is
-application code. Narrowing would leave the one tree this project ships to unauthenticated respondents
-free to reintroduce the exact defect this increment proves no other gate can see. Measured before
-choosing: **zero** primitive references exist anywhere under `resources/` today, Lane B's tree included,
-so the gate is green on both lanes at the moment it lands and constrains nobody retroactively.
+⚠️ **AND IT READS LANE B'S TREE, SO IT IS REGISTERED RATHER THAN NARROWED.** `APP_SCAN_ROOT` is
+`resources/` entire, which includes `resources/public-runtime/`. That is 7(b-bis)'s shape exactly, and that
+paragraph says to add it to the table when found — so it is the table's fourth row, flagged as a
+**prohibition rather than a parity assertion**, because the table's stated remedy ("edit both halves in the
+same PR") has no second half to apply to here. Narrowing to `resources/js` was rejected on the merits: the
+guest runtime is application code, and it is the one tree shipped to unauthenticated respondents.
 
-⚠️ **IT DIFFERS IN KIND FROM THE THREE ENTRIES ALREADY IN THAT TABLE, AND THE ROW SAYS SO.** Those three
-are *parity* assertions — two lists that must move together, where whichever lane lands first breaks the
-other. This one is a *prohibition*: it is green until someone writes a primitive, it names the offending
-file in its own failure message, and it fires inside the PR of whichever lane wrote it. There is no second
-half to move in the same PR. Recording that distinction matters more than the row itself, because the
-table's stated remedy — *"claim and edit both halves in the same PR"* — does not apply here and a reader
-following it literally would be looking for a file that does not exist.
+### What was left for someone else, filed the moment it was decided
 
-**And one fragility removed rather than documented.** The gate strips `/* */` comments, so the fix
-comments in `achievements/Index.vue` and `LogicRail.vue` originally survived only because of that
-stripping — a comment moved into HTML syntax would have made the gate report its own documentation as the
-offender. Both are now written **without** the `var(` prefix, so the raw count of banned strings under
-`resources/` is **zero with no stripping at all**.
+The modal's GET-only refresh button (same shape, no irreversible side effect); the semantic-token audit
+above; and the thirteen inert stubs. All three are rows in `docs/feature-backlog.md` — **not** notes in
+this file, because a finding that lives only in a claim is invisible to a backlog search.
 
-⚠️ **THE HOST LINT NUMBERS IN THIS FILE WERE STALE AND ARE NOW CORRECTED BY MEASUREMENT.** The four gates
-are **97 · 113 · 31 · 113/121/0**, run unpiped on the host on a tree that touches no PHP. `lane-b.md` had
-it right after M18; this file was still carrying **111 · 111/119/0**, the pre-M18 migration count.
+### Two things measured rather than assumed, both of which changed an answer
 
-**Baseline on `origin/main` after M20 (`836a182`), every figure from CI rather than quoted:** CI Pest
-**4544 / 19,280** (2 pre-existing warnings) · Vitest **130 files / 2,258** (design-system **35/567** ·
-public-runtime **35/805** · resources/js 60/886) · Storybook axe **42 suites / 303** · E2E **551 passed +
-10 skipped, no flaky line** · PHPStan CI `[OK]` · four host lint gates **97 · 113 · 31 · 113/121/0** ·
-`openapi.json` byte-identical. ⚠️ **Only Vitest and axe moved, and both by exactly what M20 and M21 added
-(+22 / +23 tests, +4 stories).** Pest and E2E are unchanged to the digit — which is the point: a diff of
-design-system CSS, one scroll behaviour and no selector changes must not move them.
+- **`AirtableRuleFields.vue` does not share the double-provision defect** — and not because it guards
+  better: it has no create-destination button at all, and its two `busy`-aware `:disabled` bindings are on
+  `MdsSelect`. Checked because it is the other tabular editor with an identical prop set, which is exactly
+  the shape that made M20 file one row against two files.
+- **`WebhookFormModal.vue` does not share the unfiltered-submit defect** — it iterates the unfiltered
+  `eventTypes` prop, so rendered already equals sendable there.
+
+**THE FILE RECORD.** New: `packages/design-system/src/components/Button/Button.test.ts` (this component's
+first spec, ever) · `resources/js/components/integrations/SheetsRuleFields.test.ts` ·
+`resources/js/components/integrations/RuleFormModal.test.ts`. Amended: `Button.vue` ·
+`token-references.test.ts` · `Pages/achievements/Index.vue` · `components/builder/LogicRail.vue` ·
+`RuleFormModal.vue` · `SheetsRuleFields.vue` · `TopNav.vue` · `TopNav.test.ts`. Shared:
+`docs/feature-backlog.md` · `docs/claims/lane-a.md` · `PROGRESS.md` (own block, own hand-off line, **and
+Standing Rule 7(b-bis)'s new fourth row**).
+
+⚠️ **ONE PROCESS NOTE WORTH THE LINE.** `main` moved twice mid-increment — Lane B merged `M22` while this
+was building, so a claim-extension push was rejected non-fast-forward and needed
+`git rebase --autostash origin/main`. That is the normal shape of two live lanes, not an incident; it is
+recorded because the reflex on a rejected push is `--force`, and here that would have discarded a merged
+increment. ⚠️ And a `git reset --hard` used to re-sync after the merge **silently ate an uncommitted
+docs edit** — the same lesson M9 recorded about `git checkout --`, arriving through a different command.
 
 ---
 

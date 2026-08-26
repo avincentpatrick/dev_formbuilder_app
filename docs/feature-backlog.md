@@ -2157,6 +2157,19 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 ### Documentation & specs
 
+- **`major` · `npm run build` cannot bootstrap a fresh clone or worktree, and the README is the only
+  document that does not say so.** `resources/css/app.css:11` imports `@meridian/design-system/tokens.css`,
+  which is a **build artifact**: `.gitignore:21` is `/packages/*/dist`, and `git ls-files
+  packages/design-system/dist` returns nothing, so a tree that has just been cloned does not contain it.
+  The true sequence is `ds:install` → `ds:tokens` → `build`, which `ci.yml` performs and
+  `docs/deployment-infrastructure.md:39` documents — but `README.md:51-59` presents `npm run build` as a
+  first-class command with no prerequisite. **Live**, and it is the first thing a new contributor runs.
+  ⚠️ **PROVE IT IN A THROWAWAY `git worktree`, NOT BY MOVING `dist/` ASIDE** — the local tree has a
+  populated `dist/` from earlier increments, so any test that starts from it measures the wrong thing.
+  ⛔ **FILED BY `M23` (2026-08-26) WITHOUT BEING BUILT, AND THE FILING IS THE POINT.** This row had been
+  carried in Lane A's hand-off prompt alone for two increments and appeared in **no** document a backlog
+  search would reach — the same shape as J4b1's four defects, which were recorded in the tracker and
+  nowhere else. Its evidence was re-verified before this bullet was written: both citations hold.
 - **`major` · ADR-0001 claims `citext` and `pgcrypto` are enabled by default, covering case-insensitive
   uniqueness for share slugs and user email.** `docs/adr/0001-postgresql-over-mysql.md:56` (restated `:83`,
   `:127`). Only PostGIS is enabled, and `0001_01_01_000000_create_users_table.php:26` is a plain

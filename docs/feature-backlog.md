@@ -890,34 +890,51 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 ### Submissions, drafts & the guest runtime
 
-- **`major` · `AttachmentPolicy::view()` is flat where `SubmissionPolicy::view()` is scoped, so an id defeats every per-form boundary.**
-  `app/Policies/AttachmentPolicy.php` · `routes/tenant.php:751-752` · `app/Policies/SubmissionPolicy.php:87`.
-  `SubmissionPolicy::view()` requires `submissions.view` **AND** org-wide visibility or per-form
-  collaboration or being the respondent; `export()` (`:96`) requires the same scope again.
-  `AttachmentPolicy::view()` requires **only the permission** — M29 taught it the `kind`, not the scope.
-  So `GET /attachments/{attachment}` reads any stored object in the tenant by id with no per-form check at
-  all, while every surface that *lists* those objects is scoped.
-  ⚠️ **THE AFFECTED ROLES ARE EXACTLY `form_editor` AND `reviewer`, AND THAT IS CHECKABLE RATHER THAN
-  ASSUMED.** `hasOrgWideVisibility()` (`:190`) is `dashboard.org.view`, which `RolePermissionSeeder` grants
-  to owner, admin **and viewer** — so for those three `SubmissionPolicy` already grants tenant-wide and
-  there is no gap. `form_editor` (`:98-103`) and `reviewer` (`:105-109`) hold `submissions.view` with only
-  `dashboard.form.view`, so they are collaboration-scoped by `SubmissionPolicy` and **unscoped by this
-  one**. Reachable kinds: respondent uploads and media captures, the per-submission PDF
-  (`SubmissionPdfStorage.php:105`), and archived webhook envelopes
-  (`WebhookPayloadArchive.php:55-68`) — the last written `ScanStatus::Skipped`, which `servable()` admits,
-  under a comment asserting it is *"never served to a browser"*. **The route makes that comment false.**
-  ⛔ **THE SHARPEST CONSEQUENCE IS THAT REVOCATION DOES NOT REVOKE.** Remove a `form_editor` from a form's
-  collaborators and `SubmissionPolicy` refuses them the submission on the next request — while every
-  attachment id they ever saw keeps working through this route, indefinitely. That is the difference
-  between a scoped read and an id-addressed one, and it is why "hard to guess" is not the mitigation it
-  looks like: the ids were legitimately theirs once.
-  **Not fixed in M29 and deliberately so.** Replacing the default arm with the scoped predicate means
-  resolving each kind's owner through the morph map first — and deciding what "scope" even means for a kind
-  whose owner is a webhook delivery rather than a form. That is its own increment with its own positive
-  controls, not a footnote to a feedback-screenshot row; folding it in as one is precisely how ADR-0015 §D6
-  produced the defect M29 fixed. ⚠️ **`tests/Feature/Attachments/AttachmentPolicyTest.php` ALREADY ASSERTS
-  THE CURRENT BEHAVIOUR** — a `form_editor` gets 200 — so whoever closes this sees exactly which assertion
-  has to flip, and the row cannot be closed by accident.
+- ~~**`major` · `AttachmentPolicy::view()` is flat where `SubmissionPolicy::view()` is scoped, so an id
+  defeats every per-form boundary.**~~ ✅ **DONE — M33 (2026-08-26). Every file:line in this row was correct,
+  which is the first time in fifteen increments the evidence half needed no correction. Its one-sentence
+  REMEDY was wrong, and that is the transferable finding.** `AttachmentPolicy::view()` is now an exhaustive
+  `match` over all nine kinds with **no `default` arm** — so PHPStan reports a tenth kind rather than
+  absorbing it, which is what absorbed the seventh and produced M29. The five submission-domain kinds require
+  `submissions.view` **and** their owner's scope; the submission arm **delegates to `SubmissionPolicy::view()`
+  through the Gate** rather than copying its predicate, so a third surface agrees by construction instead of
+  by review. ADR-0015 gained **§D10**, continuing §D6/§D9's own thread. **20 passed / 36 assertions** in
+  `tests/Feature/Attachments/`.
+  ⛔ **THE ROW'S PRESCRIBED FIX — *"resolving each kind's owner through the morph map"* — IS THE ONE MECHANISM
+  A TEST EXISTS TO FORBID.** `attachable_type` carries five aliases and only three are registered;
+  **`tenant` and `feedback_report` are deliberately absent**, because registering them would change how
+  Sanctum's `tokenable_type` and Spatie's `model_type` serialize and split existing rows between alias and
+  FQCN — the `enforceMorphMap` break that cost 90 test failures. `tests/Feature/Branding/BrandingMorphAliasTest.php`
+  exists solely to pin that absence, **and prescribes this increment's design by name**: *"a LOCAL resolution
+  (a match on `kind`, or a dedicated relation), never a global registration."* Nothing in the policy touches
+  `$attachment->attachable`. ⚠️ **A ROW'S EVIDENCE AND A ROW'S REMEDY ARE SEPARATELY TRUSTWORTHY, AND THE
+  REMEDY HALF IS CHECKED FAR LESS OFTEN** — Lane A found the identical shape in `M32`'s row the same day
+  (*"REAL, and the row's own prescribed fix does not work"*), so it is two for two from two lanes on two
+  unrelated rows.
+  ⚠️ **THE ROW ENUMERATED FOUR REACHABLE KINDS AND THERE ARE SIX.** A census run on the RESOURCE — every
+  `AttachmentKind::` producer under `app/` — returns five production writers, and the one the row never names
+  is the **brand logo** (`AttachmentStorageService.php:148`, owner alias `tenant`). It is deliberately
+  **not** narrowed and **not** scoped: `GET /branding/logo` serves the same bytes *unauthenticated* to email
+  clients, so tightening this route would protect nothing already private. `OcrSourceScan` and `Avatar` are
+  declared and produced by nothing; `Avatar` **fails closed** rather than inheriting a submission scope that
+  is meaningless for a file owned by a user.
+  ⚠️ **ONE KIND WAS A PRODUCT QUESTION RATHER THAN A SCOPING — FILED AS `D4` IN `docs/claims/decisions.md`.**
+  An archived webhook envelope is owned by a delivery, not a form: it is the full payload of whatever form
+  fired it, so it crosses every per-form boundary at once and there is nothing to scope it *to*. It moved
+  from `submissions.view` (all five roles) to **`webhooks.manage`** (Owner/Admin) — a NARROWING, which J2d
+  says belongs to the user, so it is recommended-and-implemented with the revert named rather than decided
+  silently. The row's own note that this kind is written `ScanStatus::Skipped` *"under a comment asserting it
+  is never served to a browser"* is what made the kind findable at all.
+  ⚠️ **WHAT NO LONGER WORKS, DELIBERATELY.** The *"your PDF is ready"* link (`GeneratePdfJob:175`) points at
+  this route. Its recipient necessarily passed `SubmissionPolicy::export()` — the same scope plus
+  `submissions.export` — so every legitimate link still resolves. **The links that stop working are exactly
+  the ones held by someone since removed from the form**, which is the defect the row calls *revocation does
+  not revoke*.
+  ⚠️ **AND A FIXTURE THE FIX QUIETLY INVALIDATED, WHICH IS WHY THE SUITE IS THE GATE.** `Attachment::factory()`
+  defaults to a `form_field` alias with a **random uuid**; M29's positive control used it, and under a policy
+  that resolves the owner it would 403 for every role and prove nothing about permissions. Both M29 cases now
+  own real rows. A green suite after a scoping change is not evidence until the fixtures are checked for
+  owners that never existed.
 - ~~**`major` · `promote()` reads the answer document before it takes the lock, and a concurrent autosave is
   terminally lost.**~~ ✅ **DONE — M12 (2026-08-25). The row was true verbatim in all seven of its claims, and
   the reach it describes is not the reach the fix has.** `SubmissionDraftService::promote()` now captures the

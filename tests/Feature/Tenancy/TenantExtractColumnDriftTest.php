@@ -71,6 +71,12 @@ const EXTRACTED_COLUMN_CENSUS = [
     'sso_auth_failures' => 'created_at id ip_address occurred_at reason request_id sso_connection_id subject_email tenant_id updated_at',
     'sso_auth_requests' => 'completed_at consumed_at created_at expires_at force_authn id intent ip_address issued_at request_id resolved_user_id return_to sso_connection_id tenant_id updated_at user_id verified_at',
     'sso_connections' => 'attribute_map created_at created_by default_role_name id idp_certificates idp_certificates_fingerprint idp_entity_id idp_metadata_imported_at idp_metadata_sha256 idp_sso_url jit_provisioning_enabled last_login_at name_id_format protocol status tenant_id updated_at',
+    // M18. `verification_token` IS extracted and is NOT withheld, matching `domains` above rather than
+    // diverging from it: the token is published in public DNS at a name only the zone's controller can
+    // write, so it is not a credential — the decision recorded at
+    // `2026_08_04_000001_add_custom_domain_verification_to_domains.php`, applied to its sibling. Nothing
+    // else here is a fact about a subject outside this tenant.
+    'sso_verified_domains' => 'created_at created_by domain id tenant_id token_issued_at updated_at verification_checked_at verification_failure_reason verification_token verified_at',
     'submission_answer_index' => 'created_at field_key form_field_id form_version_id id submission_id tenant_id updated_at value_boolean value_date value_datetime value_number value_text',
     'submission_answers' => 'answers answers_content_checksum answers_schema_checksum attachment_refs completeness_percent created_at form_version_id last_saved_at submission_id tenant_id updated_at',
     'submission_geo_index' => 'captured_accuracy created_at field_key form_field_id form_version_id geom geometry_type id submission_id tenant_id updated_at',

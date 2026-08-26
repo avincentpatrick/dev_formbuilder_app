@@ -257,4 +257,29 @@ return [
     */
     'default_name_id_format' => 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress',
 
+    /*
+    |--------------------------------------------------------------------------
+    | Verified email domains (M18 — ADR-0016 §D34)
+    |--------------------------------------------------------------------------
+    |
+    | A workspace proves it controls an email domain by publishing a TXT record, exactly as it proves it
+    | controls a custom HOST under `tenancy.custom_domains`. The two are deliberately separate settings
+    | rather than one shared block, and the separation is not tidiness: they answer different questions
+    | (may we SERVE this host, versus may this IdP SPEAK FOR this address space), they are consumed by
+    | different subsystems, and a workspace may hold one without the other. ADR-0012 §D1 already confines
+    | custom hosts to the public guest runtime for the same reason.
+    |
+    */
+    'verified_domains' => [
+        // A DISTINCT RFC 8552 leaf from `_meridian-challenge`, and that is the point of naming it here.
+        // Proving control of a zone proves it once, so a shared label would let a host claim silently
+        // satisfy an identity claim — and, worse, releasing one would invite an admin to delete a record
+        // the other still depends on. Two questions, two records, each removable on its own.
+        'txt_record_name' => env('SSO_DOMAIN_TXT_NAME', '_meridian-sso'),
+
+        // Prefixed so a TXT set shared with other vendors — and with this product's own host challenge —
+        // stays unambiguous.
+        'txt_value_prefix' => 'meridian-sso-domain-verification=',
+    ],
+
 ];

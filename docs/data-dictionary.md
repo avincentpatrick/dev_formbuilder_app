@@ -1135,6 +1135,38 @@ One refused SAML sign-in, kept so a tenant's own admin can see why (P1c; ADR-001
 
 ---
 
+## 29a. `sso_verified_domains`
+
+The email domains a workspace has **proven** it controls (M18; ADR-0016 §D34). A SAML connection is metadata a workspace installed for itself, so a valid signature says somebody authenticated at a provider *they chose* and nothing about which addresses that provider may speak for. This table holds the second fact, and it is the reason M1's and M9's adoption refusals no longer have to stand in for one.
+
+**Writer:** `SsoDomainService` — the only one. **Readers:** `SsoUserProvisioner::provision()` (the authentication path, through `isVerifiedFor()`) and `php artisan sso:domains`.
+
+⚠️ **A PENDING ROW GRANTS NOTHING.** The row exists from the moment a claim is made so the token has somewhere to live between minting and publication; `verified_at` is the whole of its authority, which is why the provisioner asks a service method rather than loading a row and reading a column.
+
+| Column | Type | Nullable | Default | PII? | Description |
+|---|---|---|---|---|---|
+| `id` | `uuid` | No | `uuidv7()` | No | Primary key. |
+| `tenant_id` | `uuid` | No | — | No | FK to `tenants.id`, `ON DELETE CASCADE`. **Scoped to the tenant, not to the connection** — a workspace controls a domain, an identity provider does not, and an FK to `sso_connections` would destroy the proof the moment an admin re-imported metadata. |
+| `domain` | `varchar(253)` | No | — | No | The email domain, lower-cased and stripped of a trailing root dot (253 = the maximum DNS presentation-form length). ⚠️ **Matched by EXACT equality against the domain half of an assertion's address, never by suffix**: a workspace that proved `acme.test` has proved nothing about `mail.acme.test`, which can be delegated to a third party. |
+| `verification_token` | `char(64)` | No | — | No | 256-bit CSPRNG, hex. ⚠️ **Deliberately plaintext and deliberately NOT in `AuditRedactor::SECRETS`** — it is published in public DNS at a name only the zone's controller can write, so it is not a credential. Same decision as `domains.verification_token`, and the two must stay in agreement. Random rather than an HMAC of `(tenant, domain)`: a derived token would be unrotatable per claim and would make an `APP_KEY` compromise a domain-claim primitive. |
+| `token_issued_at` | `timestamptz` | No | — | No | When the current token was minted. A re-claim of a **pending** domain rotates it; a re-claim of a **verified** one deliberately does not, or a button press would revoke the workspace's own proof. |
+| `verified_at` | `timestamptz` | Yes | `NULL` | No | **The authority.** Non-null means this workspace's identity provider may assert addresses in this domain. |
+| `verification_checked_at` | `timestamptz` | Yes | `NULL` | No | When the TXT lookup last ran. ⚠️ **Nothing writes this on a cadence today** — there is no re-verification sweep, so a verified domain is trusted indefinitely. The column exists so the sweep, when it lands, does not need a migration; the gap is residual 32 and a backlog row. |
+| `verification_failure_reason` | `varchar(40)` — PHP enum: `DomainVerificationFailure` | Yes | `NULL` | No | `not_found` / `mismatch` / `lookup_failed`, CHECK-generated from the enum. ⚠️ **The `lookup_failed` split is load-bearing** — only `not_found` is evidence about the tenant, and a lookup failure **never demotes** a verified domain, or one upstream DNS outage becomes a sign-in outage for every new joiner. |
+| `created_by` | `uuid` | Yes | `NULL` | No | FK to `users.id`, `ON DELETE SET NULL` — a departed admin must not take a workspace's proof of domain control with them. Null for every row claimed through the artisan command, which has no actor. |
+| `created_at` / `updated_at` | `timestamptz` | No | `now()` | No | — |
+
+**Uniqueness**: `(tenant_id, domain)`. ⚠️ **`domain` alone is NOT unique, and that is a decision rather than an oversight.** ADR-0002 §D5 forbids a unique key spanning tenant boundaries, and it is right on the merits here: **two workspaces may each verify the same domain**, each on its own token, because one controller legitimately runs two workspaces — a global unique would let whichever claimed first deny the other, turning a control designed to stop squatting into a squatting primitive. Contrast `domains.domain`, which IS globally unique and correctly so, because that table answers *which tenant a host resolves to* and two answers there would be a routing ambiguity.
+
+> **Design Notes**
+> - **RLS**: strict (`withTenantIsolation('sso_verified_domains')`), and unlike `domains` — which is RLS-exempt because it is read to decide *which tenant a request is*, making tenant-scoping circular — nothing here is circular: it is read only once a host has already established the tenant. `SsoDomainService` therefore carries **no** `where('tenant_id', …)` and relies on the database, which diverges from `CustomDomainService` on purpose and is asserted in `SsoDomainVerificationTest` rather than merely claimed.
+> - **Two CHECK constraints, one of which is a real backstop.** `sso_verified_domains_failure_reason_check` pins the enum. `sso_verified_domains_verified_has_no_failure_chk` refuses a row holding both `verified_at` and a failure reason — the state where a reader would have to guess which field to believe, and the reason `verify()`'s re-check arm clears the reason rather than writing one.
+> - **No `activated_at`, no `is_primary`, no operator gate.** Custom domains have those because activation puts respondents on an origin needing a hand-installed certificate (ADR-0012 §D6). Nothing is served from an email domain, so the tenant may finish this flow alone.
+> - **No audit rows yet, and the reason is mechanical.** Every verb is reachable only from `php artisan sso:domains`, which has no tenant context and no actor, and `AuditLogger` calls a row with `user_id = null` beside `is_system_action = false` malformed — verbatim `CustomDomainService::activate()`'s argument. The tenant-facing card on `/settings/sso` brings an actor, and the audit rows become both possible and owed with it.
+> - **A separate TXT leaf from `_meridian-challenge`.** Proving control of a zone proves it once, so a shared label would let a host claim silently satisfy an identity claim — and releasing one would invite an admin to delete a record the other still depends on. Two questions, two records, each removable on its own.
+
+---
+
 ## 30. `google_auth_requests`
 
 One in-flight first-party Google sign-in (J3c2; ADR-0019 §D7). Its life is three writes on two hosts: **mint** on the tenant host (a `state_id` and nothing asserted), **attach** on the central callback (stamps `consumed_at`, the four `google_*` columns and a handoff hash), **redeem** back on the tenant host (stamps `completed_at`; the session is created only after that succeeds).
@@ -1377,6 +1409,12 @@ sso_auth_requests.resolved_user_id     -> users.id           (external, nullable
 sso_auth_failures.tenant_id            -> tenants.id
 sso_auth_failures.(tenant_id,
                    sso_connection_id)  -> sso_connections (tenant_id, id)   (composite, CASCADE)
+
+sso_verified_domains.tenant_id         -> tenants.id                        (CASCADE)
+sso_verified_domains.created_by        -> users.id           (external, nullable, SET NULL)
+                                          (no sso_connections FK, deliberately: a WORKSPACE controls a
+                                           domain, so re-importing IdP metadata must not destroy the
+                                           proof — see §29a and ADR-0016 §D34)
 
 google_auth_requests.tenant_id         -> tenants.id                        (CASCADE)
                                           (no user FK: the user is the OUTCOME of this flow, and the

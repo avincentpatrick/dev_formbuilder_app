@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Enums\PlanTier;
 use App\Enums\SsoConnectionStatus;
 use App\Models\SsoConnection;
+use App\Models\SsoVerifiedDomain;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Entitlements\EntitlementService;
@@ -303,6 +304,14 @@ it('completes the whole round trip once a connection is active — P1a’s canar
     // claim being made is about that surface: "Active" now means what the status card says it means.
     enterTenant($this->tenant->id, $this->admin->id);
     FakeIdp::connection();
+
+    // ⚠️ M18 — SEEDED IN THIS CASE RATHER THAN IN `beforeEach`, BECAUSE IT IS THE ONLY CASE IN THIS FILE
+    // THAT PROVISIONS ANYBODY. `SsoUserProvisioner` now refuses an address whose email domain this
+    // workspace has not proven it controls, so the round trip below would 404 at the ACS — and the canary
+    // would report a routing failure for what is actually a configuration one. Putting it here keeps the
+    // dependency visible at the case that has it, and keeps every settings-surface case around it running
+    // against a workspace with no verified domain, which is the ordinary state.
+    SsoVerifiedDomain::factory()->verified()->forDomain('acme.test')->create();
 
     expect(config('saml.allow_unsolicited'))->toBeFalse();
 

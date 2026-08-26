@@ -35,6 +35,19 @@ use Illuminate\Support\Str;
  * the default connection before anything writes through it — and the exact-email rule that keeps a
  * cross-tenant read from becoming a cross-tenant directory.
  *
+ * ── ⚠️ THE FIRST QUESTION IS NOT A MEMBERSHIP QUESTION AT ALL (M18 — ADR-0016 §D34) ────────────────
+ * Before any of the outcomes below is reached, the assertion's email domain must be one this workspace has
+ * PROVEN it controls ({@see SsoDomainService::isVerifiedFor()}). Everything under this heading, and M1's and
+ * M9's refusals with it, are membership-layer answers to a trust-layer question — each correct, none able to
+ * establish that `acme.test`'s connection is entitled to speak for `acme.test` at all.
+ *
+ * The check sits AFTER the `Active` early return and BEFORE every other branch, and both halves of that
+ * placement are load-bearing: after `Active`, so **an active membership is the grandfather** and no live
+ * deployment loses a member on deploy; before the rest, so an unproven workspace cannot use the failures
+ * panel as a cross-tenant account-existence oracle.
+ * {@see SsoAuthenticationException::domainNotVerified()} carries the full chain and the enumeration that
+ * makes "an active membership is enough" a checked claim rather than a hopeful one.
+ *
  * ── THE MEMBERSHIP OUTCOMES ─────────────────────────────────────────────────────────────────────────
  * ⛔ **AMENDED BY M9, AND THE OLD VERSION OF THIS BLOCK WAS THE DEFECT RATHER THAN A DESCRIPTION OF IT.**
  * It said `Invited` is *"an admin who invited someone as an Admin expressed an intent about that person"* and
@@ -73,7 +86,10 @@ use Illuminate\Support\Str;
  */
 final class SsoUserProvisioner
 {
-    public function __construct(private readonly TenantMembershipService $memberships) {}
+    public function __construct(
+        private readonly TenantMembershipService $memberships,
+        private readonly SsoDomainService $domains,
+    ) {}
 
     /**
      * @throws SsoAuthenticationException
@@ -90,6 +106,32 @@ final class SsoUserProvisioner
 
             if ($membership?->status === TenantUserStatus::Suspended) {
                 throw SsoAuthenticationException::membershipSuspended($identity->email);
+            }
+
+            // ⚠️⚠️ THE TRUST-LAYER QUESTION, AND IT IS ASKED BEFORE EVERY MEMBERSHIP-LAYER ONE (M18 — §D34).
+            // A connection is metadata this workspace installed for itself, so a valid signature establishes
+            // that somebody authenticated at a provider THEY chose — never which addresses that provider may
+            // speak for. Every refusal below stands in for this fact and none of them could state it.
+            //
+            // ⚠️ THE POSITION IS THE FIX FOR A SECOND DEFECT, NOT A STYLE CHOICE. Placed after the two guards
+            // below, an admin who has proven nothing about a domain could still assert any address and read
+            // back from their own failures panel whether it has an account anywhere in the deployment —
+            // `existing_account_not_member` renders as "Address already has an account elsewhere" while
+            // `jit_disabled` renders as "Nobody here matches that address". Asked first, the only thing an
+            // unproven workspace learns is that it has not proven the domain, which is also the only thing
+            // it can act on. §D19's uniform 404 was always intact; the panel was the surface that leaked.
+            //
+            // ⚠️ AND IT IS AFTER THE `Active` RETURN, WHICH IS THE WHOLE GRANDFATHERING STORY. An active
+            // membership IS the grandfather, so no live deployment loses a member on deploy and no
+            // per-connection mode column, backfill or public-mailbox exclusion list is needed. That holds
+            // because of what the four writers of `Active` require — see
+            // SsoAuthenticationException::domainNotVerified(), which enumerates them rather than asserting
+            // it. What DOES stop is a new joiner at an unverified domain, which is the control working.
+            if (! $this->domains->isVerifiedFor($identity->email)) {
+                throw SsoAuthenticationException::domainNotVerified(
+                    $identity->email,
+                    SsoDomainService::domainOf($identity->email) ?? '(none)',
+                );
             }
 
             // ⚠️ JIT MAY CREATE AN ACCOUNT; IT MAY NEVER ADOPT ONE. `resolveUserByEmail()` runs on
@@ -178,6 +220,17 @@ final class SsoUserProvisioner
      * email that could tell us more than that. It matters beyond tidiness: `MustVerifyEmail` is implemented
      * on this model, and an SSO user who could never complete a verification round trip would be locked
      * out the moment the `verified` middleware guards anything.
+     *
+     * ⛔ **AND THAT PARAGRAPH WAS LOAD-BEARING FOR A DEFECT UNTIL M18, WHICH IS WHY IT IS AMENDED RATHER
+     * THAN LEFT TO READ AS SETTLED.** *"Signed by the tenant's own trust anchor"* is a statement about the
+     * signature, not about the address — and `users` is a DEPLOYMENT-WIDE table, so this line writes a
+     * platform-global identity fact from a per-workspace trust root. For an address in a domain the
+     * workspace did not control, the stamp was simply untrue, and it did not stay local:
+     * `TenantMembershipService::identityIsEstablished()` reads this exact column, so a forged stamp fed M8's
+     * own authentication predicate and denied the address's real owner the password-setting arm of their
+     * later, genuine invitation. The sentence is true again — and only because the domain check now runs
+     * before anything reaches here. **It is a conclusion that depends on a guard elsewhere, so it is stated
+     * as one.**
      *
      * ⚠️ NO ToS OR PRIVACY STAMP. Both columns stay null. Nothing gates on them today, and recording an
      * acceptance that never happened is a worse default than leaving the absence visible — the placeholder

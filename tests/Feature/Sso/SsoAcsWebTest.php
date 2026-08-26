@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 use App\Enums\PlanTier;
 use App\Enums\SettingKey;
+use App\Enums\SsoFailureReason;
 use App\Enums\TenantUserStatus;
 use App\Models\Audit;
 use App\Models\Plan;
 use App\Models\Role;
+use App\Models\SsoAuthFailure;
 use App\Models\SsoAuthRequest;
 use App\Models\SsoConnection;
+use App\Models\SsoVerifiedDomain;
 use App\Models\Tenant;
 use App\Models\TenantUser;
 use App\Models\User;
@@ -23,6 +26,7 @@ use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Str;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\Support\Sso\FakeIdp;
 
@@ -80,6 +84,26 @@ beforeEach(function (): void {
 
     enterTenant($this->tenant->id, $this->admin->id);
     $this->connection = FakeIdp::connection();
+
+    // ⚠️⚠️ M18 — WITHOUT THESE TWO ROWS EVERY PROVISIONING CASE BELOW REFUSES, AND THAT IS THE CONTROL
+    // WORKING RATHER THAN A FIXTURE CHORE. `SsoUserProvisioner` now asks whether this workspace has PROVEN
+    // it controls the domain an assertion names, before it asks anything about the account behind it. The
+    // suite's two fixture domains are `acme.test` (`FakeIdp`'s NameID) and `identity.test`
+    // (`committedTenantIdentity()`), so Acme verifies both and every pre-M18 case keeps meaning exactly what
+    // it meant.
+    //
+    // ⚠️ IT MAKES M1's AND M9's REFUSAL CASES ASSERT THE **STRONGER** STATEMENT, WHICH IS WHY THIS IS THE
+    // RIGHT PLACE FOR IT RATHER THAN A PER-CASE OPT-IN. Those cases use `@identity.test` addresses, and with
+    // that domain verified they now certify *"even for a domain this workspace has proven it controls,
+    // single sign-on will not adopt an existing account"* — the two controls are independent, and a fixture
+    // that let the domain gate refuse first would have quietly stopped exercising either adoption guard.
+    // The cases proving the domain gate fires AHEAD of them use a THIRD, unverified domain on purpose.
+    //
+    // ⚠️ `identity.test` IS A FIXED DOMAIN WITH A RANDOM LOCAL PART — checked, not assumed
+    // (`tests/Pest.php`). A faker-generated domain here would make these cases pass or fail on a dice roll,
+    // which is M9's own post-mortem.
+    SsoVerifiedDomain::factory()->verified()->forDomain('acme.test')->create();
+    SsoVerifiedDomain::factory()->verified()->forDomain('identity.test')->create();
 });
 
 afterEach(function (): void {
@@ -118,6 +142,21 @@ function startLogin(Tenant $tenant, User $actor, string $slug = 'acme'): SsoAuth
     expect($request)->not->toBeNull();
 
     return $request;
+}
+
+/**
+ * A committed identity whose DOMAIN is chosen and whose LOCAL PART is not (M18).
+ *
+ * ⚠️ BOTH HALVES ARE FORCED, AND BY OPPOSING CONSTRAINTS THIS FILE ALREADY CARRIES. The domain must be
+ * fixed because it is the thing under comparison — a `fake()->domainName()` here would make a case pass or
+ * fail on a dice roll, which is M9's own post-mortem. The local part must be random because
+ * `committedTenantIdentity()` writes through `pgsql_privileged`, OUTSIDE the transaction: a fixed address
+ * survives `RefreshDatabase`'s rollback and collides on the very next run, which is what the header warns
+ * about and the reason every other case in this file names `$member->email` rather than a literal.
+ */
+function committedIdentityAt(string $domain, string $name = 'Ada Lovelace'): User
+{
+    return committedTenantIdentity($name, email: Str::lower(Str::random(12)).'@'.$domain);
 }
 
 /** An IdP configured to answer that exact request, at this tenant's canonical ACS. */
@@ -1015,4 +1054,163 @@ it('refuses rather than admitting a seatless member, and orphans no account doin
 
     completeSamlLogin($second, answering($second)->as('grace@acme.test')->response())
         ->assertRedirect('/dashboard');
+});
+
+/*
+|--------------------------------------------------------------------------
+| M18 — the trust-layer question, asked before every membership-layer one (ADR-0016 §D34)
+|--------------------------------------------------------------------------
+|
+| ⚠️ EVERY CASE ABOVE RUNS AGAINST A WORKSPACE THAT HAS VERIFIED `acme.test` AND `identity.test`, seeded in
+| `beforeEach`. These use `othercompany.test`, which Acme has NOT verified, and that single difference is
+| the whole subject. See the `beforeEach` comment for why the seeding belongs there rather than per-case.
+|
+*/
+
+it('refuses an address in a domain this workspace has not proven it controls', function (): void {
+    // ⚠️ THE ROOT OF M1's AND M9's TAKEOVERS, AND THE FIRST CASE IN THIS FILE TO STATE IT AS A FACT RATHER
+    // THAN AS A CAVEAT. Both of those refusals are membership-layer answers to a trust-layer question, and
+    // the caveat their comments carry — "nothing requires that the address an IdP asserts belongs to a
+    // domain this workspace controls" — is what this asserts is no longer true.
+    $request = startLogin($this->tenant, $this->admin);
+
+    $this->post(ACME_ACS, ['SAMLResponse' => answering($request)->as('victim@othercompany.test')->response()])
+        ->assertNotFound();
+
+    $this->assertGuest();
+
+    enterTenant($this->tenant->id, $this->admin->id);
+
+    // ⚠️⚠️ **NO ACCOUNT WAS CREATED, AND THAT IS THE HALF THE BACKLOG ROW DID NOT NAME.** JIT is allowed to
+    // CREATE, and `SsoUserProvisioner::createUser()` stamps `email_verified_at` — so before this guard, a
+    // paying SSO tenant could mint a DEPLOYMENT-WIDE `users` row for any unregistered address carrying a
+    // forged mailbox-control claim. That column is read by
+    // `TenantMembershipService::identityIsEstablished()`, so the forged stamp fed M8's own predicate and
+    // denied the address's real owner the password-setting arm of their later, genuine invitation.
+    expect(User::query()->where('email', 'victim@othercompany.test')->exists())->toBeFalse()
+        ->and(TenantUser::query()->count())->toBe(1);
+});
+
+it('records the refusal with a reason the database itself accepts', function (): void {
+    // ⚠️ THIS IS THE MIGRATION'S GATE, NOT THE PROVISIONER'S. `sso_auth_failures.reason` is CHECK-constrained
+    // to the enum, so a new case without the widening turns the guard into a 23514 AT THE MOMENT IT FIRES —
+    // and the recorder swallows its own errors by design, so the row would simply be absent and the panel
+    // would show nothing. Asserting the ROW is the only way to tell the widening happened.
+    $request = startLogin($this->tenant, $this->admin);
+
+    $this->post(ACME_ACS, ['SAMLResponse' => answering($request)->as('victim@othercompany.test')->response()])
+        ->assertNotFound();
+
+    enterTenant($this->tenant->id, $this->admin->id);
+    $failure = SsoAuthFailure::query()->latest('occurred_at')->first();
+
+    expect($failure)->not->toBeNull()
+        ->and($failure->reason)->toBe(SsoFailureReason::DomainNotVerified)
+        // The address is carried structurally, and it is safe here for the reason every post-validation
+        // refusal is: a signature over the assertion naming it has verified.
+        ->and($failure->subject_email)->toBe('victim@othercompany.test');
+});
+
+it('signs an ACTIVE member in from a domain the workspace never verified — the grandfather', function (): void {
+    // ⚠️⚠️ **THIS CASE IS THE ENTIRE GRANDFATHERING STORY, AND IT IS WHY NO MODE COLUMN OR BACKFILL EXISTS.**
+    // The check sits AFTER the `Active` early return, so an active membership IS the grandfather: not one
+    // member of any live deployment is locked out on deploy, and no public-mailbox exclusion list is needed.
+    // That is safe because of what the four writers of `Active` require — `accept()` an emailed token plus
+    // M8's identity fork, `joinOpenTenant()` a self-registration, `joinViaGoogle()` Google's own mailbox
+    // verification, and `joinViaSso()` runs downstream of this very guard. None mints an Active row for a
+    // stranger's address on an assertion alone.
+    enterTenant($this->tenant->id, $this->admin->id);
+    $member = committedIdentityAt('othercompany.test');
+    makeActiveMember($member, 'form_editor');
+
+    $request = startLogin($this->tenant, $this->admin);
+
+    completeSamlLogin($request, answering($request)->as($member->email)->response())
+        ->assertRedirect('/dashboard');
+
+    $this->assertAuthenticatedAs($member);
+});
+
+it('asks the domain question BEFORE the adoption one, so an unproven workspace learns nothing', function (): void {
+    // ⚠️⚠️ **THE SECOND DEFECT M18 CLOSES, AND IT IS NOT THE ONE THE ROW WAS FILED FOR.** The failures panel
+    // renders `existing_account_not_member` as "Address already has an account elsewhere" and `jit_disabled`
+    // as "Nobody here matches that address" — so an SSO-entitled admin could assert ANY address and read
+    // back, from their own settings page, whether it has an account anywhere in the deployment. §D19's
+    // uniform 404 was always intact; the panel was the surface that leaked. Ordering the domain check first
+    // is the fix, and this case is what pins the ordering: the same stranger, at an unverified domain, must
+    // produce `domain_not_verified` and NOT `existing_account_not_member`.
+    enterTenant($this->tenant->id, $this->admin->id);
+    $stranger = committedIdentityAt('othercompany.test');
+
+    $request = startLogin($this->tenant, $this->admin);
+
+    $this->post(ACME_ACS, ['SAMLResponse' => answering($request)->as($stranger->email)->response()])
+        ->assertNotFound();
+
+    enterTenant($this->tenant->id, $this->admin->id);
+
+    expect(SsoAuthFailure::query()->latest('occurred_at')->value('reason'))
+        ->toBe(SsoFailureReason::DomainNotVerified);
+});
+
+it('still refuses a SUSPENDED member first, because a sanction outranks a configuration gap', function (): void {
+    // The other half of the ordering, and it runs the opposite way on purpose. `Suspended` is refused ABOVE
+    // the domain check, so a workspace that let its domain verification lapse still cannot have its sanctions
+    // reported as a configuration problem — the admin's action for a suspended member is nothing, and telling
+    // them to publish a DNS record would send them somewhere useless.
+    enterTenant($this->tenant->id, $this->admin->id);
+    $member = committedIdentityAt('othercompany.test');
+    makeActiveMember($member, 'viewer');
+    TenantUser::query()->where('user_id', $member->id)->update(['status' => TenantUserStatus::Suspended->value]);
+
+    $request = startLogin($this->tenant, $this->admin);
+
+    $this->post(ACME_ACS, ['SAMLResponse' => answering($request)->as($member->email)->response()])
+        ->assertNotFound();
+
+    enterTenant($this->tenant->id, $this->admin->id);
+
+    expect(SsoAuthFailure::query()->latest('occurred_at')->value('reason'))
+        ->toBe(SsoFailureReason::MembershipSuspended);
+});
+
+it('admits the same new joiner the moment the domain is verified, so the refusal is a gap and not a wall', function (): void {
+    // ⚠️ THE CONTROL PROVED IN BOTH DIRECTIONS. A guard asserted only by its refusals is indistinguishable
+    // from a guard that refuses everything, which would be a total outage rather than a security control —
+    // and every case above this one is a refusal.
+    $refused = startLogin($this->tenant, $this->admin);
+
+    $this->post(ACME_ACS, ['SAMLResponse' => answering($refused)->as('newhire@othercompany.test')->response()])
+        ->assertNotFound();
+
+    enterTenant($this->tenant->id, $this->admin->id);
+    SsoVerifiedDomain::factory()->verified()->forDomain('othercompany.test')->create();
+
+    $admitted = startLogin($this->tenant, $this->admin);
+
+    completeSamlLogin($admitted, answering($admitted)->as('newhire@othercompany.test')->response())
+        ->assertRedirect('/dashboard');
+
+    enterTenant($this->tenant->id, $this->admin->id);
+    expect(User::query()->where('email', 'newhire@othercompany.test')->exists())->toBeTrue();
+});
+
+it('does not let one workspace ride on another workspace’s verified domain', function (): void {
+    // The isolation `SsoDomainService` relies on RLS for, asserted here through the REAL endpoint rather
+    // than through the service — because the ACS is unauthenticated and reaches these rows with nothing but
+    // a hostname to go on, which is the only context in which the guarantee actually has to hold.
+    $globex = Tenant::create(['name' => 'Globex', 'slug' => 'globex', 'default_locale' => 'en']);
+    $globex->domains()->create(['domain' => 'globex']);
+
+    TenantContext::runFor((string) $globex->getKey(), function (): void {
+        SsoVerifiedDomain::factory()->verified()->forDomain('othercompany.test')->create();
+    });
+
+    enterTenant($this->tenant->id, $this->admin->id);
+    $request = startLogin($this->tenant, $this->admin);
+
+    $this->post(ACME_ACS, ['SAMLResponse' => answering($request)->as('victim@othercompany.test')->response()])
+        ->assertNotFound();
+
+    $this->assertGuest();
 });

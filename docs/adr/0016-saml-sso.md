@@ -347,9 +347,135 @@ permissive control that a never-used placeholder still signs in at the invited r
 CHECK-constrained, so a new case without its widening migration would raise 23514 **while the refusal was
 being recorded**, on the one endpoint anyone on the internet can post to.
 
-**Revisit trigger:** domain-ownership verification shipping, which would let an assertion carry evidence
-about the address for the first time and make this refusal narrower than it needs to be; or
-`users.password_set_at`, which would let the placeholder question be asked directly instead of inferred.
+**Revisit trigger:** ~~domain-ownership verification shipping, which would let an assertion carry evidence
+about the address for the first time and make this refusal narrower than it needs to be~~ ✅ **DISCHARGED BY
+M18 (§D34)** — and it did **not** make this refusal narrower, which is the part worth recording. The two
+controls answer different questions and compose: §D34 establishes that the connection may speak for the
+address space at all, and this one still refuses to adopt an established account **inside** a domain the
+workspace has proven it controls. `SsoAcsWebTest` now asserts exactly that, because M18 verifies
+`identity.test` in its fixture and these cases still refuse. Still open: `users.password_set_at`, which would
+let the placeholder question be asked directly instead of inferred.
+
+
+### The M18 sub-decision (2026-08-26)
+
+**§D34 — a workspace's trust anchor vouches for an IdP, not for an address space, so single sign-on admits
+only addresses in a domain the workspace has PROVEN it controls.**
+
+§D33's own revisit trigger was *"domain-ownership verification shipping"*. This is it.
+
+**What the gap actually was.** A SAML connection is metadata the workspace installed for itself, so a valid
+signature establishes that somebody authenticated at a provider **they chose** and nothing whatsoever about
+which addresses that provider may speak for. `SsoConnectionService` and `UpdateSsoConnectionRequest` accept
+any IdP metadata; a grep of `app/`, `database/` and `config/` for
+`verified_domain|domain_verified|assertEmailDomain|domainOwn` returned **zero hits**. So §D7's identity
+resolution, §D20's membership outcomes and both adoption refusals — M1's `existingAccountNotMember()` and
+M9's `establishedIdentityNotJoined()` — were **membership-layer answers standing in for a trust-layer fact**.
+Each closed a real takeover; none could establish that `acme.test`'s connection is entitled to speak for
+`acme.test` at all. `docs/security-threat-model.md` residual 32 named that as the root rather than the
+sibling, which is why it is closed here and not by a fourth membership refusal.
+
+**As built.** `sso_verified_domains` — one row per (workspace, email domain), a 256-bit CSPRNG token, a DNS
+TXT challenge at `_meridian-sso.<domain>` — reusing the `DnsTxtResolver` seam ADR-0012 built for custom
+hosts. `SsoUserProvisioner::provision()` asks `SsoDomainService::isVerifiedFor()` and refuses with a new
+`SsoFailureReason::DomainNotVerified`.
+
+---
+
+**⛔ THE POSITION OF THE CHECK IS THE DECISION. Two placements, each load-bearing, and they point in
+opposite directions.**
+
+**AFTER the `Active` early return, which dissolves the grandfathering question rather than answering it.**
+The backlog row called *"a grandfathering call for every connection that already exists"* the part that made
+this a decision rather than a feature, and priced a per-connection mode column or a backfill. Neither is
+built, and neither is needed: **an active membership IS the grandfather.** Not one member of any live
+deployment is locked out on deploy, no exclusion list for public mailbox domains is maintained, and no
+column can be left in the wrong state.
+
+That is safe because of what the four writers of `TenantUserStatus::Active` require — enumerated rather
+than assumed:
+
+| writer | what it demanded of the person |
+|---|---|
+| `accept()` | the emailed token **and**, since M8, either a never-used identity or the real person signed in as themselves |
+| `joinOpenTenant()` | a self-registration, with a password they chose |
+| `joinViaGoogle()` | Google's own verification of mailbox control (ADR-0019 §D4) |
+| `joinViaSso()` | runs **downstream of this very check** |
+
+**No door mints an Active row for a stranger's address on an assertion alone.** ⚠️ The honest boundary:
+self-registration remains a way to occupy an address in a domain you do not control. That is an older and
+separate door where nothing is forged and the registrant's own password is the only credential — this
+decision narrows the SSO reach, and does not claim to be the last word on address squatting.
+
+**BEFORE both adoption refusals, which closes a second defect the row does not name.** The failures panel
+renders `existing_account_not_member` as *"Address already has an account elsewhere"* and `jit_disabled` as
+*"Nobody here matches that address"*. An SSO-entitled admin could therefore assert **any** address and read
+back, from their own settings page, whether it has an account anywhere in the deployment — having proven
+nothing about the domain. §D19's uniform 404 was always intact; **the panel was the surface that leaked, and
+§D26 built it precisely because that audience is entitled to answers.** Asked first, an unproven workspace
+learns exactly one thing, which is also the only thing it can act on. ⚠️ `Suspended` still refuses **above**
+the domain check: an administrative sanction outranks a configuration gap, and telling an admin to publish a
+DNS record for a member they themselves suspended would send them somewhere useless.
+
+---
+
+**⚠️ AND THE ROW UNDERSTATED ITS OWN SEVERITY. It reads "NOT LIVE — both known exploits are closed"; a
+consequence survived M9 and it reaches an authentication predicate.** JIT is allowed to CREATE, and
+`SsoUserProvisioner::createUser()` stamps `email_verified_at`, defending it as *"the IdP's claim rather than
+a convenience"*. `users` is a **deployment-wide** table, so that line wrote a platform-global identity fact
+from a per-workspace trust root: a paying SSO tenant could mint a `users` row for any unregistered address
+carrying a **forged mailbox-control claim**. It did not stay local —
+`TenantMembershipService::identityIsEstablished()` reads that exact column, so the forged stamp fed **M8's
+own predicate**, and the address's true owner, invited later by their real employer, was refused the
+password-setting arm and handed a sign-in-then-accept hop they could not complete. Squatting, plus a denial
+of the recovery path M8 built. The `createUser()` docblock is amended in place rather than left reading as
+settled: its sentence is true again, **and only because a guard elsewhere now runs first.**
+
+---
+
+**Rejected alternatives.**
+
+- ⛔ **Enforce only once a connection has verified at least one domain** ("fail open until configured").
+  Non-breaking and worthless: the switch is held by the threat actor. An attacker's workspace simply
+  verifies nothing and keeps asserting anything, so the control would close nothing at all while appearing
+  in the schema, the settings page and this document.
+- ⛔ **Backfill each existing connection's domain set from its current members' addresses.** Ships a real
+  control and grandfathers honestly, but a workspace with members at `gmail.com` or a contractor's domain
+  would be handed authority over the whole of it — and the remedy is a public-mailbox exclusion list, which
+  is unmaintainable and wrong at the edges on day one.
+- ⛔ **A per-connection `domain_enforcement` mode column.** Collapses into the first alternative for existing
+  rows and into "unusable until configured" for new ones, at the cost of a column that can be left in the
+  wrong state and a second thing to reason about at every read.
+- ⛔ **A global unique on `sso_verified_domains.domain`.** Forbidden by ADR-0002 §D5, and wrong on the merits
+  anyway: one controller legitimately runs two workspaces, so a global unique would let whichever claimed
+  first deny the other — turning a control designed to stop squatting into a squatting primitive. The key is
+  `(tenant_id, domain)` and two workspaces may each verify the same domain, each on its own token.
+- ⛔ **Suffix matching, so `acme.test` covers `mail.acme.test`.** A subdomain can be delegated to a third
+  party; per-subtree trust is a deliberate feature with its own decision, never a relaxed comparison.
+- ⛔ **Reusing `_meridian-challenge` and the `domains` table.** ADR-0012 §D1 already separates hosting from
+  identity. Sharing the label would let a host claim silently satisfy an identity claim, and releasing one
+  would invite an admin to delete a record the other still depends on.
+
+**The cost, stated rather than discovered.** A workspace that has not verified its domain can admit **no new
+members** through single sign-on after deploy. Existing active members are unaffected, and the failures panel
+names the domain and the remedy. That is a deliberate fail-closed posture on a door whose whole purpose is to
+create members, and it is the same trade ADR-0012 §D6 makes for custom hosts.
+
+⚠️ **AND THE TENANT-FACING SURFACE IS NOT IN THIS INCREMENT, WHICH IS A REAL LIMITATION AND NOT AN OVERSIGHT.**
+`/settings/sso`'s domains card is `resources/js/**` — the other lane's tree under Standing Rule 7(b), where
+splitting one paired change across two lanes is the thing that cannot work — so it is filed as its own row.
+Until it lands the surface is `php artisan sso:domains`, which is operator-run on a workspace's behalf. That
+also explains an absence a reader would otherwise have to guess at: **`SsoDomainService` emits no audit rows**,
+because every verb is reachable only from a console process with no actor, and `AuditLogger` calls a row with
+`user_id = null` beside `is_system_action = false` malformed — verbatim `CustomDomainService::activate()`'s
+argument. The card brings an authenticated actor, and the audit rows become both possible and owed with it.
+
+**Revisit trigger:** periodic re-verification (a verified domain is trusted indefinitely today, where
+`CustomDomainService::sweep()` re-reads a host on a cadence as its dangling-DNS control — filed, because
+`routes/console.php` records that nothing runs the scheduler on the production box, and because how long a
+proof of control should outlive the proving is a product call); the tenant-facing card, which brings the
+audit rows with it; and `MemberController::invite()`, which validates `['required', 'email', 'max:255']` with
+no domain check and is the same root on the invitation door.
 
 ## Consequences
 
@@ -390,3 +516,5 @@ about the address for the first time and make this refusal narrower than it need
 - **`SESSION_SAME_SITE` ever being set to `none`.** §D23's completion hop exists solely because the ACS receives no cookie, and since P1e there are TWO such hops (§D27). Loosening that setting would make them look redundant, and removing either would silently drop the only place its arm asks who is holding the browser — `user_id` against the signed-in member on the step-up arm, the pending flow id against the arriving browser on the login arm. If the setting changes, this ADR is the reason both hops stay. ⚠️ Note the login hop would still be needed even then: it is also where `resolved_user_id` is turned into a session, and the ACS deliberately creates none (§D29).
 - **Anything that gives `TenantUserStatus::Suspended` a producer.** P1c added the refusal in `attachMember()` as a latent guard; the day an admin can actually suspend a member, that guard becomes live and both doors (self-registration and SSO JIT) need a test that exercises the real surface rather than the service directly.
 - **A workspace asking for "our IdP already performs MFA", or for its opposite.** §D32 is a constant today: the identity provider is the authentication authority at this door and a member's own TOTP is not challenged. A tenant that wants either half configurable turns it into a per-workspace setting — the same trigger ADR-0019 §D11 names from the other side, so the two doors would become one policy with two defaults rather than two decisions.
+- **A verified SSO domain that has silently changed hands (§D34).** `sso_verified_domains` is checked once and trusted indefinitely, where `CustomDomainService::sweep()` re-reads a host on a cadence as its dangling-DNS control. Two reasons it is not built: `routes/console.php` records that nothing runs the scheduler on the production box, so a sweep would be a control that exists in the repository and not on the machine; and how long a proof of control should outlive the proving is a product call, not a defect. **Filed in `docs/feature-backlog.md`.** ⚠️ Whoever builds it: the demotion rule is the hard half, not the lookup — `verified_at` is what stands between an assertion and an account, so an over-eager sweep turns somebody else's DNS outage into a sign-in outage, and `verify()`'s "a lookup failure never demotes" arm is the floor rather than the whole answer.
+- **The tenant-facing domains card on `/settings/sso` (§D34).** It brings an authenticated actor, and with it the audit rows `SsoDomainService` deliberately does not emit today — see §D34's closing paragraph for why they are absent rather than forgotten.

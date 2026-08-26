@@ -170,6 +170,55 @@ final class SsoAuthenticationException extends RuntimeException
         return new self(SsoFailureReason::NoEmail, 'The assertion carries no usable email address for this connection.');
     }
 
+    /**
+     * ⚠️ A WORKSPACE'S TRUST ANCHOR VOUCHES FOR AN IdP, NOT FOR AN ADDRESS SPACE (M18 — ADR-0016 §D34).
+     *
+     * The two refusals below this one, and M1's and M9's before them, are membership-layer answers to a
+     * trust-layer question. Each is correct and neither could ask the question this one asks: a SAML
+     * connection is metadata the workspace itself installed, so "the assertion is signed by the tenant's own
+     * trust anchor" establishes that somebody authenticated at a provider that workspace chose — and nothing
+     * at all about which addresses that provider is entitled to speak for. `SsoConnectionService` and
+     * `UpdateSsoConnectionRequest` accept any IdP metadata; nothing in `app/`, `database/` or `config/`
+     * mentioned domain ownership before this increment.
+     *
+     * ⛔ **TWO CONSEQUENCES SURVIVED M9, AND THE BACKLOG ROW NAMED NEITHER.**
+     *
+     * 1. **A PLATFORM-GLOBAL IDENTITY FACT WRITTEN FROM A TENANT-SCOPED TRUST ROOT.** JIT is allowed to
+     *    CREATE, and `SsoUserProvisioner::createUser()` stamps `email_verified_at` — defending it as
+     *    "the IdP's claim rather than a convenience". For an address in a domain the workspace does not
+     *    control, that claim is unfounded, and it is not local: `users` is a deployment-wide table.
+     *    `TenantMembershipService::identityIsEstablished()` then READS that column, so the stamp feeds
+     *    M8's own authentication predicate — the address's true owner, invited later by their real employer,
+     *    is refused the password-setting arm and handed a sign-in-then-accept hop they cannot complete.
+     *    Squatting plus a denial of the recovery path M8 built.
+     * 2. **A CROSS-TENANT ACCOUNT-EXISTENCE ORACLE.** {@see self::existingAccountNotMember()} renders on the
+     *    failures panel as "Address already has an account elsewhere" while {@see self::provisioningDisabled()}
+     *    renders as "Nobody here matches that address". An SSO-entitled admin could therefore assert any
+     *    address and read back, from their own settings page, whether it has an account anywhere in the
+     *    deployment. §D19's uniform 404 is intact and is simply not the surface that leaked.
+     *
+     * **THIS REFUSAL IS RAISED BEFORE EITHER OF THEM, AND THAT ORDER IS THE FIX FOR (2).** An admin who has
+     * not proven the domain now learns exactly one thing — that they have not proven the domain — which is
+     * also the only thing they can act on.
+     *
+     * ⚠️ **WHAT IT DOES NOT REFUSE, AND WHY THAT NEEDS NO GRANDFATHERING COLUMN.** It sits AFTER the `Active`
+     * early return, so **an active membership is the grandfather**: no existing member of any live deployment
+     * is locked out, and no backfill, per-connection mode or public-mailbox exclusion list is required. That
+     * rests on an enumerated fact rather than a hopeful one — the only writers of `Active` are
+     * `accept()` (an emailed token AND, since M8, either a fresh identity or the real person signed in as
+     * themselves), `joinOpenTenant()` (self-registration, an older door where nothing is forged),
+     * `joinViaGoogle()` (Google verified the mailbox) and `joinViaSso()` (downstream of this check). None
+     * mints an Active row for a stranger's address on an assertion alone.
+     */
+    public static function domainNotVerified(string $email, string $domain): self
+    {
+        return new self(
+            SsoFailureReason::DomainNotVerified,
+            "{$email} is in the domain {$domain}, which this workspace has not verified; single sign-on will not bring in an address from a domain it cannot prove it controls.",
+            subject: $email,
+        );
+    }
+
     /** A subject this workspace has never seen, on a connection whose admin turned JIT off. */
     public static function provisioningDisabled(string $email): self
     {

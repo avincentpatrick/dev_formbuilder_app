@@ -84,6 +84,16 @@ enum SsoFailureReason: string
     |--------------------------------------------------------------------------
     */
     case NoEmail = 'no_email';
+
+    /**
+     * M18 — the assertion named an address in a domain this workspace has not proven it controls.
+     *
+     * Listed HERE, immediately after `no_email`, because that is where the check fires: an address must
+     * exist before it can have a domain, and the domain must be trusted before any question is asked about
+     * the account behind it. The three refusals below are all reached only once this one has passed.
+     */
+    case DomainNotVerified = 'domain_not_verified';
+
     case JitDisabled = 'jit_disabled';
     case ExistingAccountNotMember = 'existing_account_not_member';
     case EstablishedIdentityNotJoined = 'established_identity_not_joined';
@@ -120,6 +130,7 @@ enum SsoFailureReason: string
             self::InvalidAssertion => 'Response failed validation',
             self::AssertionOutsideConditions => 'Response was outside its validity window',
             self::NoEmail => 'No email address in the response',
+            self::DomainNotVerified => 'Email domain not verified for this workspace',
             self::JitDisabled => 'Not a member, and automatic provisioning is off',
             self::ExistingAccountNotMember => 'Address already has an account elsewhere',
             self::EstablishedIdentityNotJoined => 'Invitation was not completed by the person invited',
@@ -152,6 +163,11 @@ enum SsoFailureReason: string
             self::InvalidAssertion => 'The signature, audience or destination did not check out. Re-import the identity provider metadata — this is what a ROTATED signing certificate looks like, where the provider has moved to a key this connection has never been given.',
             self::AssertionOutsideConditions => 'The identity provider’s clock is out by more than the allowance. Check time synchronisation on that server.',
             self::NoEmail => 'The response carried no usable email address. Map an email attribute on the policy card, or set the NameID format to emailAddress.',
+            // ⚠️ NAMES THE MECHANISM, NOT A SCREEN. The tenant-facing card for this is a separate increment
+            // (`resources/js/**` is the other lane's), and a hint that pointed at a card nobody can see would
+            // be a lie the moment it shipped. A DNS TXT record is the thing an admin actually has to publish,
+            // and it stays true whichever surface eventually walks them through it.
+            self::DomainNotVerified => 'Single sign-on only brings in people whose email domain this workspace has proven it controls, and this address is not in one of them. Prove it by publishing the DNS TXT challenge for that domain, then try again. Anyone already an active member here signs in as normal in the meantime.',
             self::JitDisabled => 'Nobody here matches that address and automatic provisioning is off. Invite them, or turn on just-in-time provisioning.',
             self::ExistingAccountNotMember => 'That address already has an account on this platform but no membership here, so single sign-on will not adopt it. Invite them by email instead — an invitation is an administrator naming them, which is what makes a claim on somebody else’s address safe.',
             self::EstablishedIdentityNotJoined => 'That address already has an account on this platform, and single sign-on will not claim an existing account on an invitation’s behalf — an invitation names an ADDRESS, which is not the same as knowing who is behind it. Ask them to open the invitation link and accept it signed in as themselves; single sign-on works normally afterwards.',

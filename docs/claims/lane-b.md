@@ -48,6 +48,28 @@ file**, not in `TenantExtractColumns`. **Found by reading the gate rather than b
 exactly the shape this claim's own prediction flagged as most likely wrong: a registry the `sso_auth_failures`
 grep did not reach.
 
+⚠️ **EXTENDED AGAIN 2026-08-26 — two more suites, and this time CI's local proxy found them rather than a
+read of the gate: `tests/Feature/Sso/SsoAuthFailureLogTest.php` and `tests/Feature/Sso/SsoSettingsWebTest.php`.**
+Four cases across them refuse with `domain_not_verified` where they used to refuse (or succeed) for their
+own reason — three of M1's and M9's failure-panel cases, plus P1a's whole-round-trip canary. **Every one is
+the control working on a fixture that has not verified a domain, which is the same thing that will happen to
+every live deployment**, and the fix is the `SsoAcsWebTest` one: verify the suite's fixture domain in
+`beforeEach` so each case keeps certifying what it was written to certify. `evil.test` in the failure-log
+suite is deliberately left UNVERIFIED — it is an attacker fixture and now has a second reason to be refused.
+
+⛔ **AND A PATH DEVIATION, RECORDED RATHER THAN QUIETLY ABSORBED: the artisan command shipped as
+`app/Console/Commands/SsoDomainCommand.php`, not the `app/Console/Commands/Sso/SsoDomainsCommand.php` this
+claim reserved.** All three existing commands in this repository sit flat in `app/Console/Commands/`, so a
+one-file subdirectory would have been a new convention introduced by accident. The claim's substantive
+property — that no other lane could be holding it — held either way, since the whole directory is
+unassigned and Lane A has no console work. Corrected here because a claim nobody can trust to be accurate
+is worse than no claim, which is M16's own lesson about a stale one.
+
+✅ **THE PREDICTION THAT SAID THIS WOULD HAPPEN WAS RIGHT ABOUT THE SHAPE AND WRONG ABOUT THE PLACE.** It
+named "a fourth registry" as the likely miss and said the tell would be a red gate naming a file the diff
+does not touch. There was no fourth registry — `TenantScopedTables` and the extract census were the whole
+set — and the misses were **test fixtures** instead. The tell was exactly as described.
+
 ✅ **AND THE SAME READ SETTLED TWO SCHEMA DECISIONS, SO `ConstraintBoundaries.php` AND ITS DRIFT TEST STAY
 UNTOUCHED — BY DESIGN NOW, NOT BY ASSUMPTION.** `ConstraintBoundaryDriftTest` pins two censuses by exact
 equality: composite FKs whose key contains `tenant_id`, and unique indexes on a `tenant_id`-carrying table whose

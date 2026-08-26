@@ -16,7 +16,124 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M27`, `npm run build` cannot bootstrap a fresh clone
+## Status: ACTIVE CLAIM — `M28`, the gate that detects a component used in a template but never imported
+
+**Taken 2026-08-26.** Branch `m28-component-import-gate`, cut from `origin/main` at `4c97c8b`, PR into
+`main`. Row: the `minor` under **Test suite & CI gates** in `docs/feature-backlog.md` — *no gate in this
+repository detects a component used in a template but never imported*.
+
+**⚠️ NUMBERED `M28`, AND `lane-b.md` WAS RE-READ IMMEDIATELY BEFORE THIS FILE WAS WRITTEN.** It reads
+**NO ACTIVE CLAIM**; `M24` and `M26` are merged and released. `M25` and `M27` are mine and both merged
+(PRs #216, #217). So `M28` is the next free number.
+
+### ⛔ THIS CLAIM CROSSES THE LANE BOUNDARY ON PURPOSE, AND THAT IS WHY IT RAN LAST
+
+Two of the files below are **not Lane A's**, which is exactly why the row was scheduled last rather than
+taken opportunistically:
+
+- **`scripts/` is LANE B's column** under Standing Rule 7(b).
+- **`.github/workflows/ci.yml` is in the "NEITHER — claim in this file FIRST" column.**
+
+**Lane B holds nothing at this moment**, verified in the same read that fixed the increment number, so
+this is the cheapest possible window for it. **This claim is the permission**; it is pushed before either
+file is opened. ⚠️ **The row itself flagged this** — *"it lands in `scripts/` and moves a gate baseline,
+which is a tooling row rather than the page row that found it"* — and it was right.
+
+### ⛔ NAMESPACES — THIS CLAIM SPENDS NOTHING
+
+**No ADR.** `0022` stays free and stays Lane A's block-opener (`0022-0025`) — **eighth consecutive Lane A
+increment to spend nothing**. Adding a lint gate that enforces an existing, unwritten invariant is not a
+decision; nothing was weighed and rejected. **No migration** (`2026_08_17_000111` still free). **No
+ADR-0016 `§D<n>`**, no threat-model row. `0010` reserved for H1d; `#16` free.
+
+### Every file this claim touches, named before it is opened
+
+- `scripts/component-import-lint.php` — **NEW.** Lane B's column, claimed above. Named to match the four
+  siblings (`constraint-boundary-lint`, `controller-gate`, `job-payload-lint`, `migration-lint`).
+- `composer.json` — a `component-import-lint` script plus an entry in the `quality` aggregate. In neither
+  lane's column; claimed here.
+- `.github/workflows/ci.yml` — **one step** in the *Static analysis, style & security* job. Claimed above.
+- `docs/feature-backlog.md` (this row only), `docs/claims/lane-a.md`, `PROGRESS.md` (Lane A's block and
+  hand-off line only).
+
+**If this list grows, the claim is extended as its own pushed commit before the file is opened.**
+
+⛔ **THE `ci.yml` STEP IS NOT OPTIONAL AND `ci.yml:73-76` SAYS SO IN ITS OWN WORDS**: *"no CI job runs
+`composer run quality` — the four steps above invoke the scripts individually, so a composer.json-only
+registration would gate nothing."* A gate registered only in `composer.json` is a gate nobody runs, which
+is this project's most-repeated lesson. Both registrations, or neither.
+
+### ✅ ALREADY MEASURED BEFORE CLAIMING — THE ROW GIVES NO FALSE-POSITIVE ESTIMATE AND THAT IS THE RISK
+
+A gate that fires on two hundred files is not a gate anybody will run, so the rule was **prototyped
+read-only against the tree before this claim was written**:
+
+- **180 `.vue` files** across `resources/js`, `resources/public-runtime` and `packages/design-system/src`.
+- **All 180 are `<script setup>`** — no Options-API tail to special-case. The rule needs exactly one shape.
+- Naive rule (imports + local declarations + a Vue/Inertia allow-list): **2 files flagged**.
+
+**Both flags are real, and they are two DIFFERENT bugs in the naive rule** — which is the whole value of
+prototyping first:
+
+1. **`packages/design-system/src/components/Badge/Badge.vue:40` — a tag inside an HTML comment.** The
+   template carries a long `<!-- … -->` that *quotes markup*: `` `<Badge :variant :icon :label />` ``.
+   ⚠️ **This is the `NAME THE THING, NEVER QUOTE IT` lesson arriving from a new direction** — a comment
+   that quotes the construct it discusses booby-traps the tool that reads it. **The rule must strip
+   `<!-- … -->` before extracting tags.**
+2. **`resources/js/components/builder/ConditionRows.vue:85` — a genuine RECURSIVE self-reference.**
+   `<ConditionRows v-if="child.kind === 'group'">` inside its own template; Vue resolves a `<script
+   setup>` SFC's own filename with no import. Correct code. **The rule must allow tag === basename.**
+
+**With those two exemptions plus the globals allow-list, the baseline is ZERO** — so the gate ships
+merge-blocking on day one with **no `KNOWN_*` quarantine list**, which is the shape M19 spent an entire
+increment draining.
+
+### ⛔ THE GATE MUST FAIL ON AN EMPTY SCAN, AND ITS OWN NEIGHBOURS DO NOT
+
+`docs/feature-backlog.md` carries a live `minor` immediately below this row: *"Neither structural lint
+gate fails on an empty scan"* — `scripts/constraint-boundary-lint.php:296-304` and
+`scripts/migration-lint.php:140` print the file count and `exit(0)` regardless, so a discovery regression
+is indistinguishable from a clean run. **This gate will assert a non-zero file count and fail if it finds
+none**, because writing a fifth instance of a defect filed one bullet away would be indefensible.
+⚠️ **That sibling row is NOT being closed here** — fixing the two existing scripts is its own change to
+Lane B's files with its own baseline movement, and it is not this row.
+
+### The positive control, stated before it is run
+
+Per the standing rule, a gate is not proven by a green CI run. **Delete the `MdsBanner` import from
+`resources/js/Pages/invitations/Show.vue`** — M9's actual historical instance, the defect that motivated
+this row — and the gate must go **red naming that file**. `vue-tsc --noEmit` and `vite build` both exit 0
+in that state (M9 measured it), which is precisely why this gate is owed. Restore by **saved-bytes
+sha256 comparison**, never `git checkout --`.
+
+### Blast radius, stated rather than discovered
+
+⚠️ **THE HOST LINT-GATE QUARTET BECOMES A QUINTET.** The standing baseline `97 · 113 · 31 · 113/121/0` is
+quoted in every hand-off; a fifth number joins it and the hand-off line must say so rather than leaving
+the next reader to reconcile four against five.
+
+**PHPStan does not cover `scripts/`** (`phpstan.neon` paths are `app`, `database`, `routes`) and **Pint's
+Laravel preset does not list it either** — ⚠️ both to be **verified by running them**, not trusted, on
+M9's lesson that *Pint's `passed` is not evidence it scanned anything*. No `.vue`, no `resources/`, no
+test file, no route: **Vitest, Storybook axe, E2E, Pest and `openapi.json` are unmoved by construction.**
+
+**Baseline on `origin/main` after M27, every figure from CI rather than quoted:** CI Pest **4544 /
+19,280** · Vitest **134 files / 2,292** (design-system **36/574** · resources/js **62/899** ·
+public-runtime **36/819**) · Storybook axe **42 suites / 303** · E2E **551 passed + 10 skipped, no flaky
+line** (re-measured on M25's own run, 17.9m) · PHPStan CI `[OK]` · four host lint gates
+**97 · 113 · 31 · 113/121/0** · `openapi.json` byte-identical.
+
+⚠️ **M25 MOVED NOTHING, AND THAT IS THE MEASUREMENT RATHER THAN AN OMISSION** — it adds assertions to
+existing tests and creates none, so an unchanged E2E count is the *prediction being confirmed*. A moved
+count would have meant a test was accidentally created or dropped. ⚠️ **Lane B's `M24` and `M26` both
+landed against this same base**; neither moves a Lane A figure, but the standing warning holds — a gate
+number that moves on a diff that cannot move it is the OTHER LANE.
+
+---
+
+---
+
+## RELEASED — M27, the README can bootstrap a fresh clone (merged as PR #217, `4c97c8b`, 6/6 green)
 
 **Taken 2026-08-26.** Branch `m27-fresh-clone-bootstrap`, cut from `origin/main` at `6c5494e`, PR into
 `main`. Row: the first `major` under **Documentation & specs** in `docs/feature-backlog.md` — *`npm run
@@ -107,17 +224,17 @@ artifact behind a public export path, worth a sentence in the README's note rath
 **Filed here at the moment the decision not to fix it was taken**, per the standing rule that a
 deliberately-unfixed finding goes in writing immediately or becomes invisible.
 
-**Baseline on `origin/main` after M25, every figure from CI rather than quoted:** CI Pest **4544 /
-19,280** · Vitest **134 files / 2,292** (design-system **36/574** · resources/js **62/899** ·
-public-runtime **36/819**) · Storybook axe **42 suites / 303** · E2E **551 passed + 10 skipped, no flaky
-line** (re-measured on M25's own run, 17.9m) · PHPStan CI `[OK]` · four host lint gates
-**97 · 113 · 31 · 113/121/0** · `openapi.json` byte-identical.
+### ✅ WHAT THE GATES MEASURED
 
-⚠️ **M25 MOVED NOTHING, AND THAT IS THE MEASUREMENT RATHER THAN AN OMISSION** — it adds assertions to
-existing tests and creates none, so an unchanged E2E count is the *prediction being confirmed*. A moved
-count would have meant a test was accidentally created or dropped. ⚠️ **Lane B's `M24` and `M26` both
-landed against this same base**; neither moves a Lane A figure, but the standing warning holds — a gate
-number that moves on a diff that cannot move it is the OTHER LANE.
+**6/6 green, every job with a real steps count** (20 · 11 · 18 · 11 · 16 · 12). Documentation-only, so
+every figure is unmoved as predicted — and that is the weakness of this PR's CI rather than its strength.
+**The proof is the worktree reproduction, not the green tick**, which is the same reasoning that makes
+M16's 1,086-line PROGRESS.md deletion the standing warning about docs-only PRs.
+
+⚠️ **THE SEQUENCE WAS RUN FORWARD AS WELL AS BACKWARD, AND ONLY THE FORWARD RUN PROVES THE FIX.**
+Reproducing the failure shows the row was real; running `ds:install` → `ds:tokens` → `build` to
+**exit 0, `✓ built in 13.58s`** shows the sequence now written in the README is *sufficient* and not
+merely *different*. A documentation fix that is never executed is a guess with better formatting.
 
 ---
 

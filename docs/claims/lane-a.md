@@ -91,6 +91,42 @@ binding under `resources/js/` was taken rather than sampled, and the remainder a
 than waved past — the row's claim that this is the *only* such button is the row's own framing, and framing
 is what has been wrong five rows running.
 
+### ⚠️ CLAIM EXTENSION 1 — two more files, named before they are opened
+
+**No new test file beyond the three already named.** Two EDITS were not in the original list, both inside
+Lane A's column, both found by verifying the rows rather than by planning them:
+
+- `packages/design-system/src/theme/__tests__/token-references.test.ts` — the medallion fix is a CSS token
+  in an SFC, and `happy-dom` applies no scoped styles, so a mounted test cannot see it. The honest gate is
+  a source-text scan, and this file already walks `resources/` with block-comment stripping and
+  Style-Dictionary flattening. One added `describe` bans primitive ramp references in application code.
+  **Zero new Vitest FILES; the design-system chunk goes 567 → 569 tests.**
+- `resources/js/components/builder/LogicRail.vue` — a SECOND live instance of the medallion defect, found
+  by the adversarial pass and confirmed by hand (below).
+
+**Dropped from the original list:** `Button.stories.ts`. `Loading` and `Disabled` stories already exist,
+so the fix needs no new story and the Storybook axe baseline (42 suites / 303) must not move.
+
+**⛔ THE PRIMITIVE-BAN GATE DOES NOT COVER THE DEFECT CLASS, AND THE SECOND INSTANCE IS THE PROOF.**
+`LogicRail.vue:294` paints `.rail__dot` with `var(--mds-color-bg-sunken)` — a *semantic* token, so the new
+gate is green on it — and the dot's nearest painting ancestor is `.builder` (`Builder.vue:643`), which is
+`--mds-color-bg-canvas`. In dark, `bg-sunken` and `bg-canvas` are **both** `--mds-neutral-50`, so that disc
+measures **1.000:1** exactly as the medallion did. Same bug, same signature (the glyph inside stays
+legible, so it reads as "the disc vanished" rather than "the icon vanished"), reached through a token the
+gate is designed to permit. It is fixed here, in the same increment, because it is one token in Lane A's
+own column and shipping "the medallions are visible now" beside a knowingly-invisible identical disc is
+incoherent — but the gate is reported as catching the primitive half only, never as closing the class.
+
+**⚠️ AND THE TOPNAV FIX CHANGED SHAPE UNDER THE ADVERSARIAL PASS, WHICH IS THE ROW'S FRAMING BEING WRONG
+FOR THE SIXTH TIME.** The row says the field must show `q` from `usePage()`. Read unconditionally that is
+a REGRESSION: `q` is not the global search's private parameter, it is the shared filter key on **six** list
+pages — `forms/Index.vue:60`, `audit/Index.vue:59`, `feedback/Index.vue:47`, `submissions/Inbox.vue:144`,
+`members/Index.vue:63`, `webhooks/Index.vue:73` — every one committing through a client-side
+`router.get(..., { preserveState: true })`. An unscoped read puts the audit ledger's filter term into the
+workspace-search box, where pressing Enter silently converts "filter this list" into "search everything".
+The fix is therefore gated on `page.component === 'search/Index'` (`SearchController.php:31`), which also
+fixes the pre-existing full-page-load bleed rather than widening it.
+
 ⚠️ **THE HOST LINT NUMBERS IN THIS FILE WERE STALE AND ARE NOW CORRECTED BY MEASUREMENT.** The four gates
 are **97 · 113 · 31 · 113/121/0**, run unpiped on the host on a tree that touches no PHP. `lane-b.md` had
 it right after M18; this file was still carrying **111 · 111/119/0**, the pre-M18 migration count.

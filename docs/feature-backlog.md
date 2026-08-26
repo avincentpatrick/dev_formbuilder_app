@@ -573,62 +573,80 @@ are still in place.
   the correction owed with it is the ~40 misleading comment lines, in the same row. Filing this is the
   single most valuable output of the review: it invalidates a gate this project has been trusting.
 
-### ⚠️ Found by the repaired overflow gate on its first run (M17, 2026-08-26)
+### ✅ Found by the repaired overflow gate (M17) — ALL FOUR FIXED AND ALL FIVE ENTRIES DELETED (M19, 2026-08-26)
 
-**Provenance, so nobody re-derives these.** The horizontal-overflow assertion was structurally inert on
-every `AppLayout` page for thirty-six days (the row above). The moment it could fail, it found **three
-real overruns that no gate in this project could previously see** — none of which is a regression from
-M17, all pre-existing. They are **quarantined in `KNOWN_OVERFLOWING` (`tests/e2e/support/axe.ts`), a list
-the gate forces to shrink**: a quarantined page is asserted to *still* overflow under CI, so fixing one
-fails the build until its entry is deleted. That is `clipped-node-containment.test.ts`'s `KNOWN_UNGUARDED`
-discipline, applied to a runtime measurement.
+**`KNOWN_OVERFLOWING` is empty.** M17 quarantined five scan labels; M19 fixed the four underlying
+defects and deleted all five. Three one-line CSS declarations did it, and each one is the escape the
+file it lives in already used somewhere else.
 
-⛔ **WHY THEY ARE FILED RATHER THAN FIXED, STATED PLAINLY: NONE OF THE THREE REPRODUCES ON A WINDOWS HOST.**
-All three are text-driven, and **17/24/28px is the size of the difference between Linux and Windows font
-metrics for the same face.** A probe that inlined OpenDyslexic as a data URI — defeating the recorded
-cross-origin font trap, with `document.fonts.check()` returning `true` — measured **0 overflow across all
-six page × viewport combinations**, as did a plain tablet probe of the form hub. Guessing at CSS fixes
-verifiable only through 20-minute CI round-trips, for overruns nobody here can see, is how a
-plausible-but-wrong fix ships. **Whoever takes these should reproduce in CI first, or on Linux.**
+| # | scan label | measured | cause | fix |
+|---|---|---|---|---|
+| 1 | `Submissions at extra_large + dyslexia font + teal` @375 | 17px | `.page-header__title` — a flex item whose `min-width: auto` **is** its min-content, i.e. one unbreakable word | `overflow-wrap: anywhere` (`PageHeader.vue`) |
+| 2 | `Builder at extra_large + dyslexia font + teal` @375 | 24px | `.builder__title-row` — **not** the segmented control, see below | `align-self: stretch` (`Builder.vue`) |
+| 3 | same, `— Add` @375 | 24px | same element, same cause | same one-line fix |
+| 4 | same, `— Form` @375 | 24px | same element, same cause | same one-line fix |
+| 5 | `Form hub` @834, both themes | 28px | the single word `"Accepting"` in `.mds-stat-tile__value`, 204px into a 123px column | `overflow-wrap: anywhere` (`StatTile.vue`) |
 
-- **`major` · The submissions page header title overruns its region by 17px under maximum
-  personalization.** `personalization-axe.spec.ts:55` › *Submissions at extra_large + dyslexia font +
-  teal*, **[mobile] only**. Offender named by the gate: **`<h1 class="page-header__title">` sticking out
-  17px**. 375px × `extra_large` × OpenDyslexic × teal, dark. The likely shape is the `.dns__code` one — an
-  unbreakable or non-wrapping title with no `overflow-wrap`/`min-width: 0` escape — but that is a
-  hypothesis, not a measurement. **Live** for any user on that personalization combination.
-- **`major` · `MdsSegmentedControl` spills 30px out of the builder's content region under maximum
-  personalization.** `personalization-axe.spec.ts:83` › *Builder at extra_large + dyslexia font + teal*,
-  **[mobile] only**, 24px of region overflow with **`<label class="mds-segmented__seg">` sticking out
-  30px**. ⚠️ **THE FILE ALREADY DESCRIBES THIS EXACT MECHANISM AND ITS OWN CHECK DOES NOT CATCH IT**:
-  `personalization-axe.spec.ts:93-97` says `MdsSegmentedControl` is *"`inline-flex` with `white-space:
-  nowrap` and no wrap and no overflow handling, so a switcher that does not fit spills OUT of its bar
-  while the document width never moves"*, and measures `.builder__pane-switch`'s own `scrollWidth`. That
-  bespoke check passes while the control still overruns the **page**. **A component-level check and a
-  page-level one are not substitutes.** The fix is a design-system change to `SegmentedControl.vue` with
-  its own story and blast radius, which is why it is not folded into a gate row. **Live.**
-- **`major` · `.builder__title-row` overruns the builder's region by 24px on BOTH the Add and Form panes
-  under maximum personalization — a second, distinct builder defect.** Same test
-  (`personalization-axe.spec.ts:83`, **[mobile]**), two further scan labels — *"— Add"* and *"— Form"* —
-  and in both the offender is **`<div class="builder__title-row">` sticking out 24px**, not the segmented
-  control. **One defect in shared chrome above the panes, visible on two of them**, so a single fix
-  should retire both `KNOWN_OVERFLOWING` entries at once. **Live.**
-  ⚠️⚠️ **NEITHER WAS VISIBLE UNTIL THE SCAN BEFORE IT WAS QUARANTINED, AND THAT IS THE GENERAL LESSON.**
-  A Playwright test aborts at its first failed assertion, and this test calls `assertClean` **three**
-  times — base, `— Add`, `— Form`. While the base scan failed, the other two never ran; quarantining the
-  base revealed `— Add`, and quarantining `— Add` revealed `— Form`. **A single red test can hide an
-  arbitrary number of further defects behind it, and each one costs a full CI cycle to uncover.** Three
-  runs, three findings, in a test that had reported exactly one problem.
-  ⛔ **AND NONE OF THE THREE WAS PRE-LISTED ON A HUNCH, DELIBERATELY.** `KNOWN_OVERFLOWING` asserts that a
-  quarantined page *still* overflows, so a speculative entry fails **exactly as loudly** as a missing one
-  — the list is symmetric, and guessing buys nothing. Listing only what has been measured is the whole
-  point of it.
-- **`major` · The form hub overruns its region by 28px at tablet, in both themes, with no personalization
-  at all.** `responsive-axe.spec.ts:252` › *Form hub*, **[tablet] only**, light **and** dark. The gate
-  reports **no single offending element**, which points at an intrinsic minimum on a grid or flex track
-  rather than one wide child — the hardest of the three to attribute and the one with the fewest
-  preconditions: **no personalization, no theme dependence, an ordinary 834px tablet.** **Live**, and the
-  most likely of the three to be visible to a real user.
+⛔⛔ **THE REASON THESE WERE QUARANTINED WAS WRONG, AND THAT IS WORTH MORE THAN THE FIXES.** M17 filed
+rather than fixed them because *"none of them reproduces on a Windows host … a probe that inlined
+OpenDyslexic as a data URI (`document.fonts.check` returned true) measured 0 overflow on all six page ×
+viewport combinations."* **Both halves of that were true and the conclusion did not follow: OpenDyslexic
+cannot reach the elements that failed.** `theme-overrides.css:404-406` re-points **only**
+`--mds-font-family-body`, and its own docblock at `:389-395` says the Display role is untouched — while
+`.page-header__title` and `.builder__title` are both `--mds-font-family-display`. The form hub had no
+personalization at all. **The face that actually differs is the display stack's fallback**: with
+`"Segoe UI Variable Display"` absent, `system-ui` resolves to Segoe UI on Windows and **DejaVu Sans** on
+a CI runner, ~27% wider — measured at **256px against 324px** for the word "Submissions" at 48px/750.
+**A probe that measures zero has told you nothing until you know it exercised the thing that broke.**
+
+⛔⛔ **TWO OF THE FIVE ENTRIES WERE MISATTRIBUTED BY THE GATE'S OWN OFFENDER HEURISTIC, SO THE ROWS BELOW
+INHERITED A DEFECT FROM THE TOOL THAT FILED THEM — AND BOTH BLIND SPOTS ARE NOW CLOSED IN `axe.ts`.**
+- **It walked the descendants of scroll containers it skipped.** A box spilling inside an
+  `overflow: auto` ancestor is *absorbed* and contributes **nothing** to the number being asserted, so
+  naming it hands the reader a culprit that cannot be the cause. The reported *"30px
+  `mds-segmented__seg`"* is `ConfigPanel`'s Requiredness control inside `.config`
+  (`overflow-y: auto`) — filed on its own below. The 24px was always `.builder__title-row`. The walker
+  now stops at a scroll container and reports absorbed spills last, explicitly labelled *not the cause*.
+- **It iterated elements only, so an overflowing line box had nothing to report** and the message fell
+  back to *"suspect an intrinsic minimum on a grid or flex track"*. On the form hub that was provably
+  the wrong suspect: `.hub__tiles` is `repeat(auto-fit, minmax(200px, 1fr))`, and a **fixed** min track
+  function resolves each tile's `min-width: auto` to 0, so no tile box can blow out. A `Range` over the
+  text node now measures the line box directly and names the word.
+
+✅ **AND THE ENVIRONMENTAL EXCUSE IS GONE: `docker compose run --rm e2e` REPRODUCES CI TO THE PIXEL.**
+M19 measured **17 / 24 / 28** locally — CI's three numbers exactly — then **0 / 0 / 0** after the fixes,
+from a Linux container with `fonts-dejavu-core` and the app serving **built, same-origin** assets. The
+two prerequisites are documented on the compose service and in `README.md`, whose claim that *"Playwright
+/ e2e run in Linux … so local and CI results match"* was **false as built** and is what made this class
+of defect look unreproducible for a fortnight.
+
+⚠️ **THE PREDICTION FLAGGED AS MOST LIKELY WRONG WAS RIGHT, WHICH IS WORTH RECORDING TOO.** The claim
+said the three identical 24px readings *probably* shared one cause but that entries 3 and 4 had never
+been measured against a fixed entry 2, because Playwright aborts a test at its first failed assertion.
+One `align-self: stretch` retired all three — **and the guard was verified rather than inferred**:
+`showBuilderPane` returns `false` if the pane switcher is hidden, which would have made two `assertClean`
+calls silently vanish rather than pass. Measured at 375px: `switchVisible=true fields=true canvas=true`.
+
+- **`minor` · `MdsSegmentedControl` spills 30px INSIDE the builder's config pane — a real horizontal
+  scrollbar, and not the page-overflow defect it was filed as.** ⛔ **This row replaces the M17 row that
+  claimed the control *"spills 30px out of the builder's content region"*, which is falsified**: it
+  spills out of `.config` (`ConfigPanel.vue:546-553`, `overflow-y: auto`), which absorbs it, so it
+  contributed nothing to the 24px that failed the scan. The offender is the **Requiredness** control
+  (`ConfigPanel.vue:307-312`, `Optional / Required / Conditional` — no icons, non-compact, 24px of
+  padding per segment) inside `.config__group`, which is a flex column with implicit `align-items:
+  stretch`. ⚠️ **The mechanism the old row gave is also wrong and the error propagated by citation**:
+  `white-space: nowrap` is **not** on `.mds-segmented__seg` — the only two in `SegmentedControl.vue` are
+  the sr-only `legend` and `input`. The real construction is `inline-flex` with no `flex-wrap`, a `__seg`
+  carrying neither `min-width: 0` nor `flex-shrink`, and `min-width: 0` on the fieldset, which does not
+  mitigate the spill but **enables** it by removing the fieldset's floor. ⚠️ **It also falsifies J8's
+  "measured every consumer" claim** (`exceptions-log.md` #13): `.config__group` here and
+  `members/Index.vue`'s `MdsFormField` both have the stretch-clamped shape J8 concluded only the topnav
+  had — J8 measured on a host where the wide face never loads, which is the same blindness this whole
+  section is about. **Deliberately NOT fixed in M19**, filed at the moment that decision was made: the
+  honest fix is a wrap or shrink affordance on a design-system component with **nine** consumers, and
+  `flex-wrap` is foreclosed for the topnav instance (`.topnav` is a fixed 64px with `flex-shrink: 0`),
+  so it needs its own increment with a story, a DSR note and a re-measure of every consumer under the
+  Linux font stack. **Live**, and now reproducible locally.
 
 ### Connectors & webhooks
 

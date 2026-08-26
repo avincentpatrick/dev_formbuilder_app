@@ -118,30 +118,36 @@ export async function settleAnimations(page: Page): Promise<void> {
 /**
  * Pages that ALREADY overflow their content region, keyed `<assertClean label> @<viewport width>`.
  *
+ * ✅ **EMPTY SINCE M19, AND THE MECHANISM STAYS BECAUSE IT IS WHAT EMPTIED IT.** M17 filled this with
+ * five entries; M19 fixed all four underlying defects and deleted all five. The list is kept — not the
+ * entries — so the next real find has somewhere to go that cannot rot.
+ *
  * ⛔ **THIS LIST MAY ONLY EVER SHRINK, AND THE CODE BELOW ENFORCES THAT RATHER THAN ASKING.** A listed
  * page is asserted to *still* overflow; the moment somebody fixes one, its entry fails with an
  * instruction to delete it. So it cannot rot into a list of things that used to be broken — the exact
  * discipline `clipped-node-containment.test.ts`'s `KNOWN_UNGUARDED` already applies in this repo, and
  * the reason that one is trusted.
  *
- * ⚠️ **THESE ARE REAL DEFECTS THIS GATE FOUND ON ITS FIRST RUN — NOT A TOLERANCE, AND NOT NOISE.** Each
- * is filed in `docs/feature-backlog.md` with its measured overrun and its offending element. They are
- * quarantined rather than fixed **because none of them reproduces on a Windows host**: all three are
- * text-driven, and 17/24/28px is the size of the difference between Linux and Windows font metrics for
- * the same face. A probe that inlined OpenDyslexic as a data URI (defeating the recorded cross-origin
- * font trap — `document.fonts.check` returned true) measured **0 overflow on all six page × viewport
- * combinations**. Guessing at CSS fixes verifiable only through 20-minute CI round-trips, for overruns
- * nobody here can see, is how a plausible-but-wrong fix gets shipped.
+ * ⛔⛔ **THE REASON THE FIVE WERE QUARANTINED WAS WRONG, AND IT IS WORTH MORE THAN THE FIXES.** This
+ * block used to say they could not be reproduced here — *"none of them reproduces on a Windows host …
+ * a probe that inlined OpenDyslexic as a data URI measured 0 overflow on all six page × viewport
+ * combinations."* Both halves were true and the conclusion did not follow. **OpenDyslexic cannot reach
+ * the elements that failed**: `theme-overrides.css` re-points only `--mds-font-family-body`, and its own
+ * docblock says the Display role is untouched — while `.page-header__title` and `.builder__title` are
+ * both `--mds-font-family-display`. The form hub had no personalization at all. **The face that differs
+ * is the DISPLAY stack's fallback**: `system-ui` resolves to Segoe UI Variable Display on Windows and to
+ * DejaVu Sans on a CI runner, ~27% wider — 256px against 324px for the word "Submissions" at 48px.
+ * **A probe that measures 0 has told you nothing until you know it exercised the thing that broke.**
+ *
+ * ✅ **AND THE ENVIRONMENT IS NO LONGER AN EXCUSE: `docker compose run --rm e2e test …` REPRODUCES CI
+ * TO THE PIXEL.** M19 measured 17 / 24 / 28 locally — the same three numbers CI reported — from a
+ * Linux container with DejaVu present and the app serving BUILT, same-origin assets. Two prerequisites,
+ * both silent when unmet, are documented on that compose service and in `README.md`. **Before
+ * quarantining anything here again, run it there.**
  *
  * ⛔ **DO NOT ADD TO THIS LIST TO GET A BUILD GREEN.** A new entry means a page regressed; fix the page.
  */
-const KNOWN_OVERFLOWING: ReadonlySet<string> = new Set([
-    'Submissions (max personalization) @375',
-    'Builder (max personalization) @375',
-    'Builder (max personalization) — Add @375',
-    'Builder (max personalization) — Form @375',
-    'Form hub @834',
-]);
+const KNOWN_OVERFLOWING: ReadonlySet<string> = new Set([]);
 
 export async function assertNoHorizontalOverflow(page: Page, label: string): Promise<void> {
     const measured = await page.evaluate(() => {
@@ -172,20 +178,93 @@ export async function assertNoHorizontalOverflow(page: Page, label: string): Pro
         const shell = document.querySelector('.app-shell');
         const shellIsClipped = shell !== null && getComputedStyle(shell).overflowX === 'clip';
 
-        // Name the widest thing sticking out, so a failure is actionable rather than a number. Elements
-        // that are their OWN scroll container are skipped: their overflow legitimately stops there
-        // (`MdsDataTable`'s wrapper on desktop is the designed case).
-        let worst: { tag: string; cls: string; spill: number } | null = null;
+        // Name the widest thing sticking out, so a failure is actionable rather than a number.
+        //
+        // ⛔ A BOX INSIDE A SCROLL CONTAINER IS SKIPPED WITH THE WHOLE SUBTREE, AND THE FIRST VERSION
+        // SKIPPED ONLY THE CONTAINER ITSELF — WHICH IS WORSE THAN NAMING NOTHING AT ALL. Anything that
+        // spills inside an `overflow: auto` ancestor is ABSORBED there and contributes exactly nothing to
+        // the number this function asserts on, so naming it hands the reader a culprit that cannot be the
+        // cause. Measured in M19: the builder's reported "30px `mds-segmented__seg`" is `ConfigPanel`'s
+        // Requiredness control spilling inside `.config`, which is `overflow-y: auto`; the 24px actually
+        // measured was `.builder__title-row`, a different element in a different component. That
+        // misattribution reached `docs/feature-backlog.md` as a row of its own and cost the real defect
+        // its name for a fortnight.
+        //
+        // Absorbed spills are still collected, separately and reported last, because "something does
+        // overflow in here, and it is not what failed this assertion" is worth saying once rather than
+        // leaving the next reader to re-derive it.
+        //
+        // A plain object rather than three `let`s: TypeScript does not track assignments made inside the
+        // nested walker, and narrows a bare `let x: T | null = null` back to `null` for every read after
+        // the loop.
+        type Hit = { tag: string; cls: string; spill: number };
+        const found: { worst: Hit | null; absorbed: Hit | null; text: (Hit & { text: string }) | null } = {
+            worst: null,
+            absorbed: null,
+            text: null,
+        };
+
         if (content) {
             const right = content.getBoundingClientRect().right;
-            for (const el of content.querySelectorAll('*')) {
-                const overflowX = getComputedStyle(el).overflowX;
-                if (overflowX === 'auto' || overflowX === 'scroll') continue;
+            const scrolls = (el: Element): boolean => {
+                const o = getComputedStyle(el).overflowX;
+                return o === 'auto' || o === 'scroll';
+            };
+            const describe = (el: Element) => ({
+                tag: el.tagName.toLowerCase(),
+                cls: el.className?.toString().slice(0, 80) ?? '',
+            });
+
+            // Descend by hand rather than with `querySelectorAll`, so a scroll container can stop the walk
+            // for its entire subtree instead of only for itself.
+            const visit = (el: Element, inScroller: boolean): void => {
                 const box = el.getBoundingClientRect();
-                if (box.width === 0) continue;
                 const spill = Math.round(box.right - right);
-                if (spill > 1 && (!worst || spill > worst.spill)) {
-                    worst = { tag: el.tagName.toLowerCase(), cls: el.className?.toString().slice(0, 80) ?? '', spill };
+                if (box.width > 0 && spill > 1) {
+                    if (inScroller) {
+                        if (!found.absorbed || spill > found.absorbed.spill) found.absorbed = { ...describe(el), spill };
+                    } else if (!found.worst || spill > found.worst.spill) {
+                        found.worst = { ...describe(el), spill };
+                    }
+                }
+                const childrenInScroller = inScroller || scrolls(el);
+                for (const child of Array.from(el.children)) visit(child, childrenInScroller);
+            };
+            for (const child of Array.from(content.children)) visit(child, false);
+
+            // ⚠️ AND WHEN NO *ELEMENT* STICKS OUT, THE OVERFLOW IS USUALLY A LINE BOX — WHICH HAS NO
+            // ELEMENT TO NAME. `querySelectorAll` returns elements, so unbreakable text overrunning its own
+            // block was invisible here, and the message fell back to blaming "an intrinsic minimum on a grid
+            // or flex track". That is a guess, and on the form hub it was the wrong one: `.hub__tiles` is
+            // `repeat(auto-fit, minmax(200px, 1fr))`, and a FIXED min track function resolves each tile's
+            // `min-width: auto` to 0, so no tile box can blow out — the old message pointed at the one thing
+            // that was provably innocent. A Range over the text node measures the line box directly.
+            // Measured in M19: the hub's 28px is the single word "Accepting" in `.mds-stat-tile__value`.
+            if (!found.worst) {
+                const walker = document.createTreeWalker(content, NodeFilter.SHOW_TEXT);
+                for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+                    const raw = node.nodeValue ?? '';
+                    if (raw.trim() === '') continue;
+                    const parent = node.parentElement;
+                    if (parent === null) continue;
+
+                    let inScroller = false;
+                    for (let a: Element | null = parent; a !== null && a !== content; a = a.parentElement) {
+                        if (scrolls(a)) {
+                            inScroller = true;
+                            break;
+                        }
+                    }
+                    if (inScroller) continue;
+
+                    const range = document.createRange();
+                    range.selectNodeContents(node);
+                    for (const rect of Array.from(range.getClientRects())) {
+                        const spill = Math.round(rect.right - right);
+                        if (spill > 1 && (!found.text || spill > found.text.spill)) {
+                            found.text = { ...describe(parent), spill, text: raw.trim().slice(0, 40) };
+                        }
+                    }
                 }
             }
         }
@@ -194,7 +273,9 @@ export async function assertNoHorizontalOverflow(page: Page, label: string): Pro
             document: doc.scrollWidth - doc.clientWidth,
             content: content ? content.scrollWidth - content.clientWidth : null,
             clippedShellWithoutContentRegion: shellIsClipped && content === null,
-            worst,
+            worst: found.worst,
+            absorbed: found.absorbed,
+            overflowingText: found.text,
         };
     });
 
@@ -234,16 +315,32 @@ export async function assertNoHorizontalOverflow(page: Page, label: string): Pro
             return;
         }
 
+        // The order is the order of usefulness: an element that really sticks out, else the line box that
+        // does, else an honest admission. ⚠️ The absorbed note comes LAST and is never the headline — it
+        // names something that overflows without being the cause, which is the misreading this gate itself
+        // produced in M17 and which reached the backlog as a row of its own.
         const offender = measured.worst
             ? ` Widest offender: <${measured.worst.tag} class="${measured.worst.cls}"> sticking out ` +
               `${measured.worst.spill}px.`
-            : ' No single element sticks out — suspect an intrinsic minimum on a grid or flex track.';
+            : measured.overflowingText
+              ? ` No element sticks out — the overflow is a LINE BOX: the text "${measured.overflowingText.text}" ` +
+                `inside <${measured.overflowingText.tag} class="${measured.overflowingText.cls}"> runs ` +
+                `${measured.overflowingText.spill}px past the region. Unbreakable text in a box with no ` +
+                '`overflow-wrap`/`hyphens` escape — not a grid or flex track.'
+              : ' Nothing measurable sticks out: no element and no line box. Suspect a pseudo-element, a ' +
+                'transform, or padding on the region itself — and say which, rather than guessing again.';
+
+        const absorbedNote = measured.absorbed
+            ? ` (Also, but NOT the cause: <${measured.absorbed.tag} class="${measured.absorbed.cls}"> spills ` +
+              `${measured.absorbed.spill}px inside a scroll container, which absorbs it. Real, separately ` +
+              'filed, and it contributes nothing to the number above.)'
+            : '';
 
         expect(
             measured.content,
             `${label} overflows the shell's content region horizontally at this viewport ` +
                 `(${measured.content}px). The document width does NOT move for this — .app-shell is ` +
-                `overflow-x: clip — so this is the assertion that can see it.${offender}`,
+                `overflow-x: clip — so this is the assertion that can see it.${offender}${absorbedNote}`,
         ).toBeLessThanOrEqual(1);
     }
 }

@@ -72,6 +72,17 @@ defineProps<{ title: string; icon?: IconName }>();
        token beside the size it belongs to — three copies of a magic number could drift, a token cannot. */
     letter-spacing: var(--mds-type-heading-1-letter-spacing);
     color: var(--mds-color-text-heading);
+    /* M19: the escape this rule never had, and the reason it is `anywhere` rather than `break-word`.
+       The h1 is a flex item of `.page-header__heading`, so its automatic minimum size IS its min-content
+       size — one unbreakable word — and `break-word` does not reduce min-content, only `anywhere` does.
+       `min-width: 0` on the PARENT (`:49`) was the guard that looked like it covered this and cannot:
+       it lets the heading box shrink, and the h1 then spills out of the shrunken box instead.
+       Measured at 375px × extra_large: "Submissions" renders 324px into 276px of room and overruns the
+       content region by 17px — invisible locally because `.app-shell` is `overflow-x: clip` AND because
+       this host resolves the display stack to Segoe UI while CI resolves it to DejaVu Sans, ~27% wider.
+       ⚠️ The worse instance is not the one that was filed: `Pages/forms/Show.vue` passes `form.title`
+       here, so this is arbitrary tenant text at 48px with no wrapping escape at all. */
+    overflow-wrap: anywhere;
 }
 
 /* Wrap rather than overflow: an action slot can carry several buttons (the webhook detail page runs to

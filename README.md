@@ -85,8 +85,30 @@ docker compose exec node npm run ds:test                # axe every story (WCAG 
 - **Lockfile drift (`name: "html"`):** `package.json` has no `name` field, so `npm install` **inside the
   container** (`/var/www/html`) rewrites `package-lock.json`'s `name` to `html` plus peer/optional-dep
   churn. That diff is environmental noise — `git restore package-lock.json` it; don't commit it.
-- **Playwright / e2e** run in Linux (containers / CI), not against Windows-installed browsers, so
-  local and CI results match.
+- **Playwright / e2e** must run in Linux, not against the Windows-installed browsers — and until M19
+  this line asserted that as a fact rather than telling you how, which is worse than saying nothing.
+  It was **false**: nothing in the repo could run Chromium on Linux, `npm run e2e` used the Windows
+  browsers, and the two do not agree. Four real defects were quarantined in
+  `tests/e2e/support/axe.ts` as *"does not reproduce on a Windows host"* when what could not
+  reproduce was the **font stack**. There is now a runner, behind a compose profile:
+
+  ```bash
+  # 1. Serve BUILT, same-origin assets — the suite measures the wrong fonts otherwise (see below).
+  docker compose exec node npm run ds:tokens && docker compose exec node npm run build
+  rm -f public/hot                      # `npm run dev` recreates it when you want Vite back
+
+  # 2. Run any spec, any project. Everything after `test` is passed straight to Playwright.
+  docker compose run --rm e2e test tests/e2e/responsive-axe.spec.ts --project=tablet
+  ```
+
+  ⚠️ **Both steps matter and both fail silently.** With `public/hot` present the stylesheet is served
+  from `:5173` while the document is on `:8080`, so the `/fonts/*.woff2` request is cross-origin,
+  `artisan serve` sends no CORS header, and OpenDyslexic never loads — while `document.fonts.ready`
+  resolves perfectly happily, so every personalization scan quietly measures the fallback face.
+  And `system-ui` resolves to Segoe UI Variable Display on Windows against DejaVu Sans on a CI
+  runner, which is **~27% wider** for the same string: 256px against 324px for one page title.
+  `docker/e2e/Dockerfile` installs `fonts-dejavu-core` for exactly that reason — the Playwright base
+  image ships the `--with-deps` font set, which does **not** include DejaVu.
 
 ## CI
 

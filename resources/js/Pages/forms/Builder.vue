@@ -672,6 +672,17 @@ function submitImport(): void {
     align-items: center;
     gap: var(--mds-space-3);
     min-width: 0;
+    /* M19: `min-width: 0` above is INERT for the defect this row actually had, and re-applying it is the
+       trap. It governs how this row behaves as a flex item of a ROW container; the parent is a COLUMN
+       (`.builder__title-group`, `align-items: flex-start`), so the row's cross size is `fit-content`,
+       which resolves to its own MIN-CONTENT when that exceeds the space available — and then overflows.
+       The row's min-content is large because `.builder__title` is `white-space: nowrap`: `overflow:
+       hidden` lets the h1 shrink during flex resolution but does NOT reduce the min-content its parent's
+       intrinsic sizing reads, and `.builder__version` is `flex-shrink: 0` beside it.
+       `align-self: stretch` clamps the row to the group instead, which is what makes the ellipsis the
+       title has always declared finally reachable. Measured at 375px × extra_large × OpenDyslexic:
+       24px of region overrun on all three panes, on every tablet and mobile run this suite has made. */
+    align-self: stretch;
 }
 
 .builder__title {

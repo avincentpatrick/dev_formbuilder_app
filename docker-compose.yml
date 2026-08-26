@@ -117,5 +117,44 @@ services:
     ports:
       - "5173:5173"   # Vite dev server / HMR
 
+
+  # ── Linux Playwright runner (M19) ───────────────────────────────────────────────────────────────
+  # `docker compose run --rm e2e test tests/e2e/responsive-axe.spec.ts --project=tablet`
+  #
+  # Behind a profile, so `docker compose up` never starts it — it is a one-shot command, not a service.
+  #
+  # ⛔ TWO PREREQUISITES, BOTH LEARNED THE EXPENSIVE WAY, BOTH SILENT WHEN UNMET.
+  # (1) THE APP MUST BE SERVING BUILT ASSETS. With `public/hot` present the stylesheet is served from
+  #     :5173 while the document is on :8080, so `/fonts/*.woff2` is a cross-origin request that
+  #     `artisan serve` answers with no CORS header — OpenDyslexic silently fails to load and every
+  #     personalization scan measures the fallback face. `document.fonts.ready` resolves happily in
+  #     that state, which is why nothing ever complained. Run `npm run ds:tokens && npm run build`
+  #     and remove `public/hot` first; CI does exactly this (`ci.yml`, "Build frontend").
+  # (2) `CI` MUST STAY UNSET HERE. It flips four things in `playwright.config.ts` at once, and the
+  #     fourth is the trap: `reuseExistingServer` becomes false, so Playwright tries to boot
+  #     `php artisan serve` itself — inside an image that has no PHP.
+  #
+  # ⚠️ AND IF YOU ABORT A RUN, CHECK `docker ps` — KILLING THE CLIENT DOES NOT KILL THE CONTAINER.
+  #     Measured in M19: a cancelled sweep left its container running for 21 more minutes, driving the
+  #     app container to a load average of 5 while the *next* run's `globalSetup` timed out logging in.
+  #     That failure read exactly like a fixture problem — a `waitFor` on seeded data — and was not one.
+  #     `docker stop <name>` it before concluding anything about the suite.
+  #
+  # `network_mode: service:app` rather than a published port: sharing the app container's network
+  # namespace puts the app on `localhost:80` AND lets Chromium resolve `acme.localhost` to loopback
+  # by itself, so no `--add-host` is needed and `.env`'s `CENTRAL_DOMAIN=localhost` stays untouched.
+  # `centralOrigin` (tests/e2e/support/hosts.ts) is `acme.localhost` minus the subdomain, which is
+  # `localhost` — the same container, so both origins resolve with nothing else configured.
+  e2e:
+    profiles: ["e2e"]
+    build:
+      context: ./docker/e2e
+    working_dir: /work
+    network_mode: "service:app"
+    volumes:
+      - .:/work
+    environment:
+      E2E_BASE_URL: http://acme.localhost
+    entrypoint: ["node", "node_modules/@playwright/test/cli.js"]
 volumes:
   pgdata:

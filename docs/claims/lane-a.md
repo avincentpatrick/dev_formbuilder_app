@@ -16,11 +16,80 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM
+## Status: ACTIVE CLAIM — `M23`, the four App-UI rows, taken as one increment
 
-Lane A holds nothing. **Namespaces after M20 + M21:** next free ADR is still **`0022`** and it is still
-**Lane A's** block-opener (`0022-0025`) — **M20 spent no ADR, no migration prefix and no `§D<n>`**;
-`0010` reserved for H1d; `#16` free; next free migration prefix still **`2026_08_17_000111`**.
+**Taken 2026-08-26.** Branch `m23-app-ui-quartet`, cut from `origin/main` at `e14d73b`, PR into `main`.
+Rows: all four bullets under **App UI** in `docs/feature-backlog.md` — one `major` (the double-clicked
+"Create" that provisions two spreadsheets) and three `minor` (the rule modal's unfiltered submit, the
+unearned-badge medallion in dark, the top-nav search field on an Inertia arrival).
+
+**⚠️ NUMBERED `M23`, AND THE REF WAS RE-READ IMMEDIATELY BEFORE THIS FILE WAS WRITTEN, NOT AT SESSION
+OPEN.** Both reads return `e14d73b`; `docs/claims/lane-b.md` reads **ACTIVE CLAIM `M22`** in both. M20 is
+merged and released (PR #212, `836a182`). So the next free number is `M23`.
+
+**No collision on the merits.** Every file this increment edits is under `resources/js/**` or
+`packages/design-system/**`, both of which Standing Rule 7(b) grants Lane A outright as widened
+2026-08-25. `M22` is wholly inside `resources/public-runtime/`, which is Lane B's outright. The two
+columns do not meet. The only overlaps are shared artefacts by disjoint region — `docs/feature-backlog.md`
+(Lane A closes the four **App UI** rows; Lane B closes one under the guest-runtime review) and
+`PROGRESS.md` (own block only, per 7(d)).
+
+**⛔ NAMESPACES — THIS INCREMENT SPENDS NOTHING FROM ANY OF THEM.** No ADR, no migration prefix, no
+`§D<n>`, no threat-model row. Next free ADR remains **`0022`** and remains Lane A's block-opener
+(`0022-0025`); `0010` reserved for H1d; `#16` free; next free migration prefix remains
+**`2026_08_17_000111`**. This diff touches no PHP, so `openapi.json` must stay byte-identical.
+
+### Every file this claim brings into existence, named before it is created
+
+- `resources/js/components/integrations/SheetsRuleFields.test.ts` — new; the double-provision guard.
+- `resources/js/components/integrations/RuleFormModal.test.ts` — new; what is rendered equals what is sent.
+- `packages/design-system/src/components/Button/Button.test.ts` — new; the component-level in-flight guard,
+  and the handler-ordering fact it depends on, measured rather than reasoned about.
+
+Files edited, all inside Lane A's column: `SheetsRuleFields.vue`, `RuleFormModal.vue`,
+`Pages/achievements/Index.vue`, `components/shell/TopNav.vue`, `components/shell/TopNav.test.ts`,
+`Pages/achievements/index.test.ts`, and `packages/design-system/src/components/Button/Button.vue`
+(+ its `Button.stories.ts`). Shared, claimed here: `docs/feature-backlog.md`, `docs/claims/lane-a.md`,
+`PROGRESS.md` (Lane A's block and hand-off line only). **If this list grows, the claim is extended as its
+own pushed commit before the file is opened.**
+
+### What was verified against the code BEFORE this claim was written
+
+M20 makes it five rows running whose own evidence was wrong somewhere, so every citation was re-walked
+against the tree at `e14d73b`. **All four rows HOLD, and their line numbers hold too** — which is itself
+worth recording, because it is the first clean sweep in six increments.
+
+- **`SheetsRuleFields.vue:168`** is `async function create()`; `busy.value = true` at `:171`,
+  `busy.value = false` at `:190`, and no `inFlight` guard between them. `:276-278` is the button:
+  `:loading="busy"` and `:disabled="!connectionId || destination !== null"`. `destination` is assigned at
+  `:180`, i.e. **after** the awaited `createDestination()` returns, so the disabled expression is false for
+  the entire flight and `MdsButton` renders **no native `disabled`**.
+- **`Button.vue`** — `:disabled` binds the **native** attribute at `:68`, `aria-disabled` is a separate
+  binding at `:70`, and the internal guard at `:50-53` calls `event.stopPropagation()`, not
+  `stopImmediatePropagation()`. The consumer's `@click` is a fallthrough listener on the **same** element,
+  so bubbling never enters into it and `create` runs a second time.
+- **`RuleFormModal.vue:114-116`** narrows `availableEvents` to `submission.*` for a tabular grant;
+  `:194` sends `data.event_types` whole; and `:160` is the seed that puts the stale value there in the
+  first place. The checkbox `v-for` at `:253` iterates the narrowed list, so the unrendered event is
+  unreachable by `toggleEvent()` at `:182`.
+- **`Pages/achievements/Index.vue:391`** is `background-color: var(--mds-neutral-100)` on
+  `.ach__badge-mark`. A repo-wide grep for primitive ramp tokens under `resources/js/` returns exactly two
+  lines and **the second is a prose comment** (`Pages/audit/Index.vue:367`), so this is the only live
+  primitive-token reference in the whole of `resources/js/`.
+- **`TopNav.vue:39-42`** is `computed(() => new URLSearchParams(window.location.search).get('q') ?? '')`.
+  `window.location` is not reactive, the bar lives in a persistent layout, and the computed therefore
+  caches for the life of the page load.
+
+### ⛔ M20's lesson applied to the sibling, and it changed the answer
+
+`AirtableRuleFields.vue` is the other tabular editor, takes an identical prop set and emits an identical
+`change` — the exact shape that made M20 file one row against two files. **Measured, it does not have this
+defect and it is not because it guards better: it has no create-destination button at all.** The two
+`busy`-aware `:disabled` bindings in that file (`:227`, `:245`) are on `MdsSelect`, not `MdsButton`, and
+`createDestination()` in `integrationsClient.ts:96` has exactly one caller. A census of every `:loading=`
+binding under `resources/js/` was taken rather than sampled, and the remainder are re-checked below rather
+than waved past — the row's claim that this is the *only* such button is the row's own framing, and framing
+is what has been wrong five rows running.
 
 ⚠️ **THE HOST LINT NUMBERS IN THIS FILE WERE STALE AND ARE NOW CORRECTED BY MEASUREMENT.** The four gates
 are **97 · 113 · 31 · 113/121/0**, run unpiped on the host on a tree that touches no PHP. `lane-b.md` had

@@ -88,6 +88,32 @@ class AttachmentFactory extends Factory
         ]);
     }
 
+    /**
+     * A feedback screenshot (I7a, ADR-0015 §D6) — the fourth morph alias, owned by a `feedback_report`.
+     *
+     * Deliberately `is_pii = true` and `clean()`, which is what the real write path produces once its
+     * queued scan lands: ADR-0015 §D8 marks the row PII because the image is a photograph of whatever was
+     * on the reporter's screen, and a fixture left `pending()` would make an authorization test assert a
+     * 409 for a reason that has nothing to do with authorization. `clean()` rather than `skipped()` for
+     * the same reason `brandingLogo()` chooses it — the strongest servable state, so the scan gate is
+     * never the thing under test.
+     */
+    public function feedbackScreenshot(string $tenantId, string $reportId): static
+    {
+        return $this->state(fn (): array => [
+            'attachable_type' => 'feedback_report',
+            'attachable_id' => $reportId,
+            'kind' => AttachmentKind::FeedbackScreenshot,
+            'mime_type' => 'image/png',
+            'original_filename' => 'capture.png',
+            'path' => "tenants/{$tenantId}/feedback_screenshot/".date('Ym').'/'.Str::uuid().'.png',
+            'virus_scan_status' => ScanStatus::Clean,
+            'is_pii' => true,
+            'width' => 1_600,
+            'height' => 900,
+        ]);
+    }
+
     public function pending(): static
     {
         return $this->state(fn (): array => ['virus_scan_status' => ScanStatus::Pending]);

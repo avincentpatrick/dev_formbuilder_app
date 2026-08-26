@@ -890,6 +890,34 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 ### Submissions, drafts & the guest runtime
 
+- **`major` · `AttachmentPolicy::view()` is flat where `SubmissionPolicy::view()` is scoped, so an id defeats every per-form boundary.**
+  `app/Policies/AttachmentPolicy.php` · `routes/tenant.php:751-752` · `app/Policies/SubmissionPolicy.php:87`.
+  `SubmissionPolicy::view()` requires `submissions.view` **AND** org-wide visibility or per-form
+  collaboration or being the respondent; `export()` (`:96`) requires the same scope again.
+  `AttachmentPolicy::view()` requires **only the permission** — M29 taught it the `kind`, not the scope.
+  So `GET /attachments/{attachment}` reads any stored object in the tenant by id with no per-form check at
+  all, while every surface that *lists* those objects is scoped.
+  ⚠️ **THE AFFECTED ROLES ARE EXACTLY `form_editor` AND `reviewer`, AND THAT IS CHECKABLE RATHER THAN
+  ASSUMED.** `hasOrgWideVisibility()` (`:190`) is `dashboard.org.view`, which `RolePermissionSeeder` grants
+  to owner, admin **and viewer** — so for those three `SubmissionPolicy` already grants tenant-wide and
+  there is no gap. `form_editor` (`:98-103`) and `reviewer` (`:105-109`) hold `submissions.view` with only
+  `dashboard.form.view`, so they are collaboration-scoped by `SubmissionPolicy` and **unscoped by this
+  one**. Reachable kinds: respondent uploads and media captures, the per-submission PDF
+  (`SubmissionPdfStorage.php:105`), and archived webhook envelopes
+  (`WebhookPayloadArchive.php:55-68`) — the last written `ScanStatus::Skipped`, which `servable()` admits,
+  under a comment asserting it is *"never served to a browser"*. **The route makes that comment false.**
+  ⛔ **THE SHARPEST CONSEQUENCE IS THAT REVOCATION DOES NOT REVOKE.** Remove a `form_editor` from a form's
+  collaborators and `SubmissionPolicy` refuses them the submission on the next request — while every
+  attachment id they ever saw keeps working through this route, indefinitely. That is the difference
+  between a scoped read and an id-addressed one, and it is why "hard to guess" is not the mitigation it
+  looks like: the ids were legitimately theirs once.
+  **Not fixed in M29 and deliberately so.** Replacing the default arm with the scoped predicate means
+  resolving each kind's owner through the morph map first — and deciding what "scope" even means for a kind
+  whose owner is a webhook delivery rather than a form. That is its own increment with its own positive
+  controls, not a footnote to a feedback-screenshot row; folding it in as one is precisely how ADR-0015 §D6
+  produced the defect M29 fixed. ⚠️ **`tests/Feature/Attachments/AttachmentPolicyTest.php` ALREADY ASSERTS
+  THE CURRENT BEHAVIOUR** — a `form_editor` gets 200 — so whoever closes this sees exactly which assertion
+  has to flip, and the row cannot be closed by accident.
 - ~~**`major` · `promote()` reads the answer document before it takes the lock, and a concurrent autosave is
   terminally lost.**~~ ✅ **DONE — M12 (2026-08-25). The row was true verbatim in all seven of its claims, and
   the reach it describes is not the reach the fix has.** `SubmissionDraftService::promote()` now captures the
@@ -2217,13 +2245,65 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   concurrency check — and the suite stays fully green while post-submission editing is **permanently broken
   for every submission that exists in production**. **Latent.** The file's own `submitForEdit()` helper
   (`:750`) already produces production-shaped rows and is used by none of the concurrency cases.
-- **`major` · `GET /feedback/{report}/screenshot` serves PII and has no DENY test at all.**
-  `tests/Feature/Tenant/FeedbackTest.php:230` drives it as Owner only (200 with an image, 404 without);
-  `:154` establishes the sensitivity in the file's own words and asserts `is_pii => true`. The gate is real
-  today (`routes/tenant.php:429-430`, `can:feedback.view`) but it is a **separate** `Route::get` from the
-  index, whose refusal is the only one asserted. Drop or mistype that one middleware call and every member
-  can enumerate colleagues' screen captures. **Latent.** One `assertForbidden()` as a Viewer plus one
-  cross-tenant `assertNotFound` closes it.
+- ~~**`major` · `GET /feedback/{report}/screenshot` serves PII and has no DENY test at all.**~~
+  ✅ **DONE — M29 (2026-08-26), AND THE ROW'S OWN FIX WOULD HAVE LEFT THE HOLE OPEN.** Both assertions the
+  row asks for are in `tests/Feature/Tenant/FeedbackTest.php` — a same-tenant Viewer `assertForbidden` and a
+  cross-tenant `assertNotFound`. ⚠️ **THEY ARE NOT WORTH THE SAME AND THE FILE NOW SAYS SO.** `bootstrap/app.php`
+  runs `SubstituteBindings` **before** `Authorize`, so the cross-tenant case 404s at route-model binding and
+  **passes unchanged with `can:feedback.view` deleted** — proven, not argued: mutation 3 of this increment's
+  harness removed that middleware and reddened the Viewer case alone. Only the same-tenant Viewer assertion
+  pins the gate. The cross-tenant case is kept because it pins RLS at binding, and it carries a comment
+  saying in as many words that it is not a substitute.
+  ⛔⛔ **AND THE CENSUS FOUND THE GATE IS WALKED AROUND BY A SIBLING ROUTE — LIVE, NOT LATENT.**
+  `GET /attachments/{attachment}` (`routes/tenant.php:751-752`) is authorized by `AttachmentPolicy::view()`,
+  whose entire body was `$user->can('submissions.view')` — **it never read its `$attachment` argument**.
+  ADR-0015 §D6 filed the screenshot into that same shared table, and `RolePermissionSeeder` grants
+  `submissions.view` to `viewer`, `reviewer` and `form_editor` while granting `feedback.view` to none of
+  them. So the id-addressed route served the PII image to exactly the three roles the dedicated route
+  refuses — and `FeedbackController.php:59-65` says in its own words that it declines to route through
+  `AttachmentController` **precisely to avoid that coupling**, which was open in the other direction the
+  whole time. Fixed: the policy now reads the kind through a `match`, so a feedback screenshot is read under
+  `feedback.view` on every route that serves it or on none. **No permission key minted**, so no paired file
+  moved. ADR-0015 gains **§D9**.
+  ⚠️ **`AttachmentPolicy` HAD NO TEST OF ANY KIND AND NO HTTP TEST ANYWHERE DROVE THAT ROUTE** —
+  `AttachmentRlsTest` is four DB-level cases and every other `attachments` mention under `tests/` is
+  `TenantUrl` string-building. `tests/Feature/Attachments/AttachmentPolicyTest.php` is its first, with the
+  **viewer-200-on-submission-media positive control named rather than assumed** — without it a policy that
+  refused everything would have satisfied every other case in the file.
+  ⚠️ **CITATION DRIFT IN THE ROW, THE THIRD INCREMENT RUNNING.** `:154` is a `Storage::assertExists` call;
+  the `is_pii => true` assertion is `:150` and the "file's own words" comment is `:149`. `:230` and
+  `routes/tenant.php:429-430` were exact.
+  ⛔ **THE METHOD IS THE TRANSFERABLE PART: A GATE IS ONLY AS NARROW AS THE WIDEST ROUTE THAT REACHES THE
+  SAME BYTES.** Walking the surfaces this row names finds nothing; enumerating *every endpoint in the
+  repository that serves stored bytes* and asking of each which test asserts a refusal found that **four of
+  ten had one**. The unfixed remainder is filed below and under *Submissions, drafts & the guest runtime*.
+- **`major` · Three streamed exports of tenant data have no authorization deny test at all.**
+  Found by M29's stored-bytes census, which enumerated every endpoint in the repository that serves file
+  bytes (ten) and asked of each which test asserts a refusal (four). The three with none:
+  **`GET /analytics/export`** — `AnalyticsPageGateTest.php:110` looks like coverage and is not: it asserts
+  an entitlement **redirect**, never a 403, and the only 403 in that gate suite targets the `/analytics`
+  index page instead. **`GET /api/v1/analytics/report/export`** — the ability-denial test that appears to
+  cover it targets the non-export twin `/api/v1/analytics/report`. **`GET /api/v1/forms/{form}/versions/{version}/xlsform`**
+  — no test issues a request to that URI at all. ⚠️ **THE API PAIR'S ONLY COVERAGE IS STRUCTURAL**: a
+  route-table walk asserts every `api.v1.*` route carries a `can:` gate, but it never issues an HTTP
+  request and never asserts a status code, so a gate naming a permission nobody holds — or one holding the
+  wrong subject — passes it. **Latent.** The pattern to copy is the strongest in the repo,
+  `GET /forms/{form}/submissions/export`, which asserts BOTH a role denial and a scope denial.
+- **`minor` · The `409` quarantine branch is asserted on no stored-file route in the repository.**
+  `FeedbackController.php:75` and `AttachmentController.php:43` both `abort_unless($attachment->virus_scan_status->servable(), 409)`,
+  and `ScanStatus`'s own docblock (`app/Enums/ScanStatus.php:12`) calls `servable()` *the serving gate the
+  threat model relies on*. No test asserts a 409 on either route — `BrandingLogoRouteTest.php:98`
+  only *mentions* it in prose while asserting the anonymous route's 404. Delete or invert either guard and
+  a `pending` or `infected` object is served with the whole suite green. **Latent.** `AttachmentFactory`
+  already has `pending()` and `infected()` states, and M29's `AttachmentPolicyTest` already builds a stored
+  object with bytes on a fake disk, so the fixture cost is one state call.
+- **`minor` · `AttachmentController`'s docblock calls `GET /attachments/{attachment}` a "signed read-back", and nothing about it is signed.**
+  `app/Http/Controllers/Tenant/AttachmentController.php:20`. The repository contains exactly one signed URL
+  — `User.php:146`, email verification — and no `temporaryUrl`, no `ValidateSignature`, no
+  `hasValidSignature` anywhere in `app/` or `routes/`. The route is session-auth plus a policy and nothing
+  else. Harmless today and dangerous later: a docblock is what the next reader checks *instead of* the
+  middleware, and this one describes a control that does not exist. **Documentation defect, not a
+  behaviour one.** Fix is to strike the word, or to build the thing.
 - **`major` · The queued half of `gamification:backfill` is asserted by job count alone.**
   `tests/Feature/Gamification/BackfillCommandTest.php:80-92` — `Queue::assertPushed(…, 2)` inspects no
   payload, and the queued loop (`BackfillGamificationCommand.php:119`) is the production default while only

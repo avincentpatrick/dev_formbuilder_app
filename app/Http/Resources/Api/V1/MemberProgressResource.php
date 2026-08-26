@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Resources\Api\V1;
 
 use App\Services\Gamification\MemberProgress;
+use App\Services\Gamification\MemberStanding;
 use App\Services\Gamification\MemberStreak;
 use Illuminate\Http\Request;
 
@@ -15,6 +16,13 @@ use Illuminate\Http\Request;
  * number**. `rank` is nullable because a caller who is not an active member of the workspace has no
  * position on the ladder at all — a state the type models explicitly rather than reporting as `0`, which
  * would render as a place.
+ *
+ * ⚠️ **ONE FIELD IN HERE IS NO LONGER UNGATED, AND THIS CLASS IS DELIBERATELY NOT THE PLACE THAT DECIDES IT.**
+ * `standing.of` is the workspace headcount rather than the caller's own number, and M26 (ADR-0020 §D13)
+ * withholds it from a caller without `dashboard.org.view`. The decision is made in
+ * `GamificationController::me()`, which hands this a {@see MemberStanding} that already has `of` nulled —
+ * because **no `/api/v1` resource in this repository performs authorization**, and making this the first
+ * would hide a permission check in a serializer. This class stays dumb on purpose; it cannot leak what it is never given.
  *
  * `current` and `longest` are both emitted and they are not the same measurement:
  * {@see MemberStreak} records that `current` decays to zero after a missed day
@@ -37,7 +45,8 @@ final class MemberProgressResource extends ApiResource
                 // Competition rank: one plus the number of members strictly ahead, so a tie skips the next
                 // place. Null when the caller holds no active membership here.
                 'rank' => $this->standing->rank,
-                // Active members, NOT the number of people who have scored — see MemberStanding.
+                // Active members, NOT the number of people who have scored. Null when the caller may not be
+                // told the workspace headcount — `dashboard.org.view` decides it, upstream. See MemberStanding.
                 'of' => $this->standing->of,
             ],
             'streak' => [

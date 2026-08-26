@@ -106,6 +106,30 @@ describe('Achievements — your own progress, which needs no permission', () => 
             .toContain('1st of 3');
     });
 
+    it('drops the denominator but keeps the rank when the headcount is withheld', () => {
+        // ADR-0020 §D13. `of` is the WORKSPACE HEADCOUNT rather than this member's own number, so the server
+        // nulls it for a reader without `dashboard.org.view` — the same key `/dashboard`'s Members tile,
+        // `/members` and the member search arm already withhold it behind. §D7's grant is the member's own
+        // POSITION, which is untouched: the tile stays and says "4th".
+        const wrapper = render({
+            progress: {
+                points: 140,
+                badges: 3,
+                standing: { rank: 4, of: null },
+                streak: { current: 7, longest: 21, last_active_on: '2026-08-18T00:00:00+00:00' },
+            },
+        });
+
+        expect(wrapper.text()).toContain('Your place');
+        expect(wrapper.text()).toContain('4th');
+        // ⚠️ THE LOAD-BEARING HALF. `toContain('4th')` alone passes on "4th of 12" too, so it would go green
+        // against the very defect this asserts. The denominator's absence is what is actually being tested.
+        expect(wrapper.text()).not.toContain('4th of');
+
+        // The caption explains the denominator, so a fixed string would describe a number no longer on screen.
+        expect(wrapper.text()).not.toContain('Counts everyone on the team');
+    });
+
     it('says nothing about a place when the reader holds no active membership', () => {
         // `rank: null` is the deliberate empty value — never 0, which renders as a position. The tile is
         // absent rather than showing "—", because "you have no place" is not a fact worth a tile.

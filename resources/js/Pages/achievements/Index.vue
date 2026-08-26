@@ -52,8 +52,14 @@ const props = defineProps<{
     progress: {
         points: number;
         badges: number;
-        /** `rank` is null when this reader holds no active membership here — never 0, which reads as a place. */
-        standing: { rank: number | null; of: number };
+        /**
+         * `rank` is null when this reader holds no active membership here — never 0, which reads as a place.
+         * `of` is null when this reader may not be told the workspace headcount (ADR-0020 §D13): it is the
+         * team's size, not this member's own number, and `dashboard.org.view` decides it server-side. The
+         * page reads the null and drops the denominator; it never re-derives the condition — the same
+         * contract `scoreboard` below and `kpis.members` on the dashboard already hold to.
+         */
+        standing: { rank: number | null; of: number | null };
         /** `current` decays after a full missed day; `longest` only ever rises. Different measurements. */
         streak: { current: number; longest: number; last_active_on: string | null };
     };
@@ -89,8 +95,27 @@ const standingLabel = computed(() => {
 
     if (rank === null) return null;
 
+    // "4th" alone for a reader without `dashboard.org.view` (§D13). The rank is this member's own and §D7
+    // grants it unconditionally; the DENOMINATOR is the workspace headcount, which three other surfaces
+    // already withhold from the same reader. Dropping it is what keeps the tile honest rather than showing
+    // a number the server did not send.
+    if (of === null) return ordinal(rank);
+
     return `${ordinal(rank)} of ${number(of)}`;
 });
+
+/**
+ * The tile's caption, which CANNOT be a constant — it describes the denominator.
+ *
+ * "Counts everyone on the team…" explains a number that is not on screen when `of` is withheld, so leaving it
+ * fixed would have the page assert something it is no longer showing. The nearest honest sentence for that
+ * reader talks about the rank instead.
+ */
+const standingCaption = computed(() =>
+    props.progress.standing.of === null
+        ? 'Where you sit on the team leaderboard.'
+        : 'Counts everyone on the team, including teammates who have not earned anything yet.',
+);
 
 function ordinal(value: number): string {
     const lastTwo = value % 100;
@@ -153,7 +178,7 @@ function earnedDate(iso: string): string {
                     label="Your place"
                     icon="users"
                     :value="standingLabel"
-                    caption="Counts everyone on the team, including teammates who have not earned anything yet."
+                    :caption="standingCaption"
                 />
             </div>
         </section>

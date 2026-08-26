@@ -108,7 +108,51 @@ it('renders a members own points, badges, streak and standing with no permission
             ->where('progress.streak.longest', 2)
             // Two active members (the owner and this editor); the editor has scored, the owner has not.
             ->where('progress.standing.rank', 1)
-            ->where('progress.standing.of', 2));
+            // ⚠️ THIS LINE READ `2` UNTIL M26, AND THAT IS THE DEFECT ADR-0020 §D13 RECORDS — asserted here
+            // as a requirement, for a role the same test names as the least privileged one. The rank is the
+            // member's own and §D7 grants it; `of` is the workspace headcount, which `/dashboard`, `/members`
+            // and the member search arm all withhold from exactly this reader.
+            ->where('progress.standing.of', null));
+});
+
+it('withholds the workspace headcount from a member without dashboard.org.view', function (): void {
+    $this->withoutVite();
+
+    // ⛔ ADR-0020 §D13. The controller argued in its own docblock that a plain workspace-wide COUNT is the
+    // sensitive thing rather than merely a colleague's NAME — and then served `standing.of` three fields
+    // ahead of the gated `scoreboard.team.active_members`, which is the same number.
+    $editor = memberIn('form_editor');
+    awardOn($editor, PointRule::SubmissionCollected, now()->toDateString(), 'sub-a');
+
+    $this->actingAs($editor)
+        ->get(ACHIEVEMENTS_URL)
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            // Present-but-null, the `kpis.members` contract: the page reads the null and drops the
+            // denominator rather than re-deriving the permission client-side.
+            ->where('progress.standing.of', null)
+            // §D7's grant is untouched — a withheld field, not a degraded page.
+            ->where('progress.standing.rank', 1)
+            ->where('progress.points', PointRule::SubmissionCollected->points())
+            // The gated payload is null for this reader too, which is what makes the two consistent. Before
+            // §D13 this assertion and the one above disagreed about the same workspace figure.
+            ->where('scoreboard', null));
+});
+
+it('still gives the headcount to a member who may see workspace-wide numbers', function (): void {
+    $this->withoutVite();
+
+    // ⚠️ THE POSITIVE CONTROL, AND IT IS NOT OPTIONAL. Without it the gate above passes just as well when
+    // `of` is deleted from the payload outright — a green test proving the opposite of what it claims. This
+    // is also the pairing that makes a mutation in either direction red.
+    awardOn($this->owner, PointRule::SubmissionCollected, now()->toDateString(), 'sub-owner');
+
+    $this->actingAs($this->owner)
+        ->get(ACHIEVEMENTS_URL)
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('progress.standing.of', 1)
+            ->where('progress.standing.rank', 1));
 });
 
 it('reports current and longest separately, because they are different measurements', function (): void {
@@ -320,8 +364,17 @@ it('puts the members own progress on the dashboard', function (): void {
         ->assertInertia(fn ($page) => $page
             ->where('progress.points', PointRule::SubmissionCollected->points())
             ->where('progress.streak', 1)
-            ->where('progress.rank', 1)
-            ->where('progress.of', 2));
+            // ⛔ `progress.rank` AND `progress.of` WERE ASSERTED HERE AND ARE NOW ABSENT (M26, §D13). They
+            // were serialized into every dashboard payload and rendered by nothing: `Dashboard.vue` declared
+            // both in its prop type and its card shows points, badges and streak. `of` is the workspace
+            // headcount — the same integer `kpis.members` is nulled out of for this very reader, in this very
+            // payload. Deleted rather than gated, because a field nothing displays has no gated form worth
+            // keeping.
+            ->missing('progress.rank')
+            ->missing('progress.of')
+            // And the tile that DOES carry this number is still withheld from the same reader, which is what
+            // makes the dashboard's two answers agree for the first time.
+            ->where('kpis.members', null));
 });
 
 it('withholds the dashboard card when the workspace switched gamification off', function (): void {

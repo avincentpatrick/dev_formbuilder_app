@@ -18,7 +18,35 @@ exact-equality `KNOWN_UNGUARDED` assertion, so the list shrinks in the *same* PR
 
 ---
 
-## Status: ACTIVE CLAIM — `M26`, the workspace headcount served with no permission at all
+## Status: NO ACTIVE CLAIM
+
+Lane B holds nothing. **Namespaces after M24 + M26:** migration block stays **`2026_08_17_000111`** (M26 spent
+none — it changes one property's nullability and adds no column, index or table); ADR-0016's next free
+sub-decision stays **`§D35`**. ⛔ **ADR `0022` STAYS FREE and stays Lane A's block-opener (`0022-0025`)** —
+M26 amended **ADR-0020** with **§D13**, because this is that ADR's own §D7 being corrected in place, on the
+precedent §D10, §D11 and §D12 set. **Sixth increment running to amend rather than mint.** ADR-0020's own
+sub-decision series is now §D1–§D13. `0010` stays reserved for H1d; `#16` stays free.
+
+✅ **`docs/claims/decisions.md` GAINED `D3` — the first entry either lane has filed since `D1`.** §D7 approves
+*"4th of 12"* for every member; three other surfaces withhold the twelve. One of the two had to move, and
+that is a product call rather than an engineering one. Filed with the two real options, the rejected third,
+and a recommendation — then **proceeded on the recommendation in the same turn** rather than idling, per
+Standing Rule 5. The revert path is named in the entry if the answer comes back the other way. `D1` is still
+untouched and still Lane A's or nobody's.
+
+⚠️ **THE PROCESS NOTE OF RECORD, AND IT IS THE ONE M24 PAID FOR.** M26 went through a **PR** (#215).
+`git push origin HEAD:main` was used exactly once, for the claim commit, while the branch contained nothing
+but that claim — and **not again**, because the branch then carried code. That is the rule M24 wrote after
+landing a fix on `main` un-gated and turning it red. It cost nothing to follow.
+
+⚠️ **AND ONE CLAIM DETAIL WAS WRONG AT WRITING TIME AND CORRECTED BEFORE THE FIRST FILE WAS OPENED.** The
+claim named the row as the `major` under *Security & authorization*; it is under **Gamification**. Caught by
+reading the section heading rather than the row, and fixed in the same commit — a reminder that a row's
+neighbourhood is as checkable as its file:line and gets checked half as often.
+
+---
+
+## RELEASED — M26, the workspace headcount served with no permission at all (merged as PR #215, `7fe2260`, CI 6/6 green)
 
 **Taken 2026-08-26.** Branch `m26-standing-headcount-gate`, cut from `origin/main` at `d429add`, PR into
 `main`. Row: the `major` under **Gamification** in `docs/feature-backlog.md` — *`standing.of`

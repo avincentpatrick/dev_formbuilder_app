@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import Combobox, { type ComboboxOption } from './Combobox.vue';
+import { scrollTopToReveal } from './scroll-reveal';
 
 /**
  * MdsCombobox (DSR §3.4.1 / §4.5, J4c).
@@ -299,5 +300,135 @@ describe('MdsCombobox — the containing-block guard, which no other gate can se
         const root = /\.mds-combobox\s*\{([^}]*)\}/.exec(SOURCE)?.[1] ?? '';
 
         expect(root).toContain('position: relative');
+    });
+});
+
+/**
+ * M20 — the highlight must stay inside the 22rem box.
+ *
+ * ⚠️ THE ARITHMETIC IS TESTED DIRECTLY AND THE WIRING IS TESTED SEPARATELY, BECAUSE happy-dom COMPUTES NO
+ * LAYOUT. Every box in this environment is 0, so a mounted "did it scroll?" assertion would pass whatever
+ * the component did — which is the same reason `scroll-reveal.ts` exists as a module at all. The mounted
+ * case below therefore asserts only what happy-dom CAN answer: that the watcher fires, finds the element
+ * `aria-activedescendant` names, and reads the container. The numbers are asserted on the pure function.
+ */
+describe('MdsCombobox — scrollTopToReveal, the arithmetic behind the highlight', () => {
+    // A 352px band (22rem at the default root size) over a list of 48px rows, which is the palette's
+    // real geometry rather than a convenient one.
+    const BAND = 352;
+
+    it('returns null when the option is already fully inside the band, so the reader is never fought', () => {
+        expect(
+            scrollTopToReveal({ scrollTop: 0, viewportHeight: BAND, optionTop: 48, optionHeight: 48 }),
+        ).toBeNull();
+    });
+
+    it('aligns an option above the band to the TOP, moving by the least amount that works', () => {
+        expect(
+            scrollTopToReveal({ scrollTop: 200, viewportHeight: BAND, optionTop: 96, optionHeight: 48 }),
+        ).toBe(96);
+    });
+
+    it('aligns an option below the band to the BOTTOM, not to the top', () => {
+        // The seventh row (index 6) of a 48px list starts at 288 and ends at 336 — visible. The EIGHTH
+        // ends at 384, which is 32px past a 352px band, so the list moves exactly 32px and no further.
+        expect(
+            scrollTopToReveal({ scrollTop: 0, viewportHeight: BAND, optionTop: 336, optionHeight: 48 }),
+        ).toBe(32);
+    });
+
+    it('never returns a negative scrollTop', () => {
+        expect(
+            scrollTopToReveal({ scrollTop: 40, viewportHeight: BAND, optionTop: -20, optionHeight: 48 }),
+        ).toBe(0);
+    });
+
+    /**
+     * ⚠️ THIS IS THE CASE THAT KEEPS THE UNIT SUITE HONEST RATHER THAN A DEFENSIVE BRANCH. happy-dom
+     * reports 0 for every box, and so does a real browser inside a `display: none` ancestor. Without the
+     * guard both would compute `optionTop + optionHeight - 0` and slam the list to the bottom — and in
+     * happy-dom that wrong answer would be indistinguishable from "nothing happened".
+     */
+    it('declines to move a container it cannot measure', () => {
+        expect(
+            scrollTopToReveal({ scrollTop: 0, viewportHeight: 0, optionTop: 0, optionHeight: 0 }),
+        ).toBeNull();
+    });
+
+    it('shows the START of an option taller than the band, rather than oscillating between its edges', () => {
+        expect(
+            scrollTopToReveal({ scrollTop: 500, viewportHeight: BAND, optionTop: 120, optionHeight: 400 }),
+        ).toBe(120);
+
+        // Already aligned to its start — nothing to do, and no write.
+        expect(
+            scrollTopToReveal({ scrollTop: 120, viewportHeight: BAND, optionTop: 120, optionHeight: 400 }),
+        ).toBeNull();
+    });
+});
+
+describe('MdsCombobox — the reveal is wired to the highlight, not to focus', () => {
+    /**
+     * The three decisions that make this necessary are all in the component ON PURPOSE, so a source-text
+     * assertion is what stops a later author "simplifying" one of them away and silently re-opening the
+     * WCAG 2.4.7 failure: the list scrolls, the rows carry no tabindex, and the arrows are prevented.
+     */
+    const SOURCE = readFileSync(
+        join(process.cwd(), 'packages/design-system/src/components/Combobox/Combobox.vue'),
+        'utf8',
+    );
+
+    it('still scrolls its list, so the reveal is not dead code', () => {
+        const list = /\.mds-combobox__list\s*\{([^}]*)\}/.exec(SOURCE)?.[1] ?? '';
+
+        expect(list).toContain('overflow-y: auto');
+        expect(list).toContain('max-height');
+    });
+
+    it('reveals on a POST-flush watcher, or it measures the row that was highlighted a moment ago', () => {
+        // A pre-flush watcher runs before Vue patches the DOM. It would scroll to the previous row every
+        // time — consistently, which reads as "the fix does not work" rather than as a timing bug.
+        // ⚠️ SLICED RATHER THAN PATTERN-MATCHED, AND THE FIRST TWO VERSIONS OF THIS LINE WERE REGEXES
+        // THAT DID NOT WORK. The text between the two anchors contains a paren of its own — the options
+        // getter's arrow — so a negated-paren class stopped dead at it. Reading the call site as a plain
+        // substring is both shorter and impossible to get subtly wrong.
+        const watchCall = SOURCE.slice(SOURCE.indexOf('watch([activeIndex'), SOURCE.length);
+
+        expect(watchCall.slice(0, 160)).toContain("flush: 'post'");
+    });
+
+    it('never reaches for scrollIntoView, which would be free to scroll the page as well', () => {
+        // `block: 'nearest'` walks EVERY scrollable ancestor, and this listbox sits inside a dialog inside
+        // the page. M17 and M19 were both about a page gaining scroll it should not have.
+        //
+        // ⚠️ MATCHED AS A CALL, NOT AS A SUBSTRING, AND THE FIRST VERSION OF THIS TEST GOT IT WRONG.
+        // The component's docblock NAMES the API it rejects, so a bare `toContain` fails on the very
+        // comment explaining why the code is correct — this repository's standing "name the thing,
+        // never quote it" lesson, arriving for once inside a gate rather than inside a document.
+        expect(SOURCE).not.toContain('.scrollIntoView(');
+    });
+
+    it('looks the option up by the id aria-activedescendant names, so the two cannot disagree', async () => {
+        const wrapper = mountCombobox();
+        const list = wrapper.get('[role="listbox"]').element as HTMLElement;
+
+        // happy-dom cannot lay this out, so the assertion is about IDENTITY, not about pixels: after an
+        // arrow press the id the input announces must resolve to a real element inside the list.
+        await wrapper.get('input').trigger('keydown', { key: 'ArrowDown' });
+
+        const announced = wrapper.get('input').attributes('aria-activedescendant');
+
+        expect(announced).toBeDefined();
+        expect(list.querySelector(`[id="${announced}"]`)).not.toBeNull();
+    });
+
+    it('survives a list that is replaced under the highlight without throwing', async () => {
+        const wrapper = mountCombobox();
+
+        await wrapper.get('input').trigger('keydown', { key: 'End' });
+        // The palette's real race: a shorter list lands 250ms behind the keystroke.
+        await wrapper.setProps({ options: OPTIONS.slice(0, 1) });
+
+        expect(wrapper.get('input').attributes('aria-activedescendant')).toBeDefined();
     });
 });

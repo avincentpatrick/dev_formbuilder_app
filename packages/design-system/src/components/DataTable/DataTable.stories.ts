@@ -97,6 +97,40 @@ export const StackedDark: Story = { decorators: [narrow, dark] };
 /* The `colspan` cell is the part of the stacked grid most likely to ship wrong — a colspan means nothing
    to a grid, so without `grid-column: 1 / -1` the empty state is squeezed into one 20em track. axe
    cannot see a layout; a person looking at this story is the gate. */
+/* ⛔ THE ONLY FIXTURE IN WHICH THE SORT CHIPS WRAP, ADDED IN M20 — AND ITS ABSENCE IS WHY THE 32px TOUCH
+   TARGET SURVIVED. Every stacked story above declares exactly ONE sortable column, so the sortbar has
+   rendered a single chip for as long as it has existed: it has never wrapped, never had a second row to
+   be 8px away from, and never had a short header to overhang. A fixture that cannot reach the defect is
+   a gate reporting zero and telling you nothing.
+
+   20em (320px) with five sortable columns is the phone shape rather than a contrivance — the stacked
+   layout applies from 56em all the way down, and `docs/ACCESS-MATRIX.md`'s list pages carry four and
+   five sortable columns, and the five chips here measure 282px against a 320px box, so they WRAP.
+   `ID` is deliberately two characters: it is the header that would render a
+   ~38px chip and push a 44px hit area past the frame's left edge on every wrapped row. */
+const wrappingColumns: DataTableColumn[] = [
+    { key: 'id', header: 'ID', sortable: true },
+    { key: 'name', header: 'Name', sortable: true },
+    { key: 'email', header: 'Email', sortable: true },
+    { key: 'role', header: 'Role', sortable: true },
+    { key: 'status', header: 'Status', sortable: true },
+];
+
+const phone: Decorator = (story) => ({
+    components: { story },
+    template: '<div style="max-width:20em"><story /></div>',
+});
+
+export const StackedSortWrap: Story = {
+    args: { columns: wrappingColumns },
+    decorators: [phone],
+};
+
+export const StackedSortWrapDark: Story = {
+    args: { columns: wrappingColumns },
+    decorators: [phone, dark],
+};
+
 export const StackedEmpty: Story = {
     ...Empty,
     decorators: [narrow],

@@ -92,5 +92,42 @@ export const Ungrouped: Story = {
     render: framed(PLAIN),
 };
 
+/**
+ * ⛔ THE STORY THAT MAKES THE LIST ACTUALLY SCROLL, ADDED IN M20 BECAUSE ITS ABSENCE IS WHY NO GATE EVER
+ * SAW THE HIGHLIGHT LEAVE THE BOX. Every story above seeds three or four options, so `max-height: 22rem`
+ * was never reached, axe's `scrollable-region-focusable` had no scrollable region to look at, and
+ * happy-dom computes no layout in the unit suite. A fixture too small to reach the defect is a gate
+ * measuring zero and telling you nothing — the M19 lesson, arriving here as a missing story rather than
+ * as a missing font.
+ *
+ * 21 rows is not a round number: it is the palette's real worst case, `SearchService::PER_ENTITY_PREVIEW`
+ * (5) across four arms plus the trailing "See all" row. The rich two-line rows are what the palette
+ * actually renders, and they are what makes 22rem show five or six of them.
+ */
+const CROWDED = ['Forms', 'Submissions', 'Members', 'Pages'].flatMap((group, groupIndex) =>
+    Array.from({ length: 5 }, (_, index) => ({
+        key: `${group.toLowerCase()}:${groupIndex}-${index}`,
+        label: `${group.slice(0, -1)} result ${index + 1}`,
+        group,
+    })),
+);
+
+export const Scrolling: Story = {
+    args: {
+        options: [...CROWDED, { key: 'see-all', label: 'See all results for “clinic”' }],
+        status: '21 results',
+    },
+    render: framed(RICH),
+};
+
+export const ScrollingDark: Story = {
+    args: {
+        options: [...CROWDED, { key: 'see-all', label: 'See all results for “clinic”' }],
+        status: '21 results',
+    },
+    render: framed(RICH),
+    decorators: [dark],
+};
+
 export const DefaultDark: Story = { render: framed(PLAIN), decorators: [dark] };
 export const WithRichOptionsDark: Story = { render: framed(RICH), decorators: [dark] };

@@ -1837,7 +1837,40 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   AA violation into a line that reads as noise**, which is the more expensive half of the defect. M9 did not
   take it: it is Lane A's column and the retryability question is a gate-policy decision, not a colour fix.
 
-- **`major` · The combobox highlight leaves the visible box after roughly the sixth option and cannot be
+- ✅ **CLOSED BY `M20` (2026-08-26) — `major` · ~~The combobox highlight leaves the visible box after
+  roughly the sixth option and cannot be brought back.~~**
+  ⛔ **ALL THREE CITATIONS HELD AND SO DID THE ROW — the first merge-gate row in some time to be right
+  about its own evidence end to end.** `Combobox.vue:353-358` is `max-height: 22rem` + `overflow-y: auto`;
+  `:267-271` carries the comment saying rows have no `tabindex` by design; `:176-192` `preventDefault`s
+  both arrows. A `grep` for `scrollIntoView` across `packages/design-system/src` returned **0**.
+  ✅ **AND THE NUMBERS ARE BETTER THAN THE ROW GUESSED — MEASURED IN A REAL BROWSER, NOT ESTIMATED.** The
+  row said "22rem shows five or six". At the palette's true worst case (21 rows — `PER_ENTITY_PREVIEW` 5
+  × four arms + "See all") the list is **1195px inside a 352px band**; pinned to the top, **exactly five
+  of twenty-one rows are visible** and the last option sits **843px** below the box.
+  ⛔ **AS FIXED.** `MdsCombobox` reveals the active option itself, on a **`flush: 'post'`** watcher over
+  `[activeIndex, options]` — pre-flush measures the row highlighted a moment ago, consistently, which
+  reads as "the fix does not work" rather than as a timing bug. The option is looked up **by the id
+  `aria-activedescendant` names**, so what is scrolled is provably what is announced. ⚠️ **Not
+  `scrollIntoView`:** `block: 'nearest'` is specified to walk *every* scrollable ancestor — the dialog
+  and the page included — which is the exact defect class M17 and M19 spent two increments removing.
+  The arithmetic is a new sibling module, `Combobox/scroll-reveal.ts`, which returns `null` for "already
+  visible" so a reader scrolling by wheel or touch is never fought, and which is a pure function because
+  **happy-dom computes no layout** and a mounted assertion would have passed whatever the code did.
+  ✅ **PROVEN WITH A POSITIVE CONTROL, WHICH IS THE M19 LESSON APPLIED.** The probe first establishes that
+  the fixture *reaches* the defect (1195 > 352; last row 843px out of view), then arrows through all 21
+  options asserting the announced row is fully inside the band after every press: **0 out of view**, list
+  scrolled to its maximum 843. A probe that measures zero has told you nothing until you know it
+  exercised the thing that broke.
+  ⚠️ **THE REASON THIS SHIPPED IS A FIXTURE, NOT A SCANNER, AND THAT IS THE TRANSFERABLE PART.** The row
+  is right that "the stories seed four options" — so the list never reached `max-height`, axe's
+  `scrollable-region-focusable` had no scrollable region to look at, and the unit suite computes no
+  layout. Storybook now carries a 21-option `Scrolling` story (light + dark): **42 suites / 301 checks**,
+  up from 299, still green, and `scrollable-region-focusable` does **not** fire on the managed listbox.
+  Recorded in DSR §3.4.1 as an as-built amendment.
+
+  *The original row, preserved:*
+
+  **`major` · The combobox highlight leaves the visible box after roughly the sixth option and cannot be
   brought back.** `packages/design-system/src/components/Combobox/Combobox.vue:353-358` —
   `max-height: 22rem` + `overflow-y: auto`, with the highlight moved by `aria-activedescendant` only:
   nothing calls `scrollIntoView`, the rows deliberately carry no `tabindex` (`:267-271`), and arrow keys are
@@ -1846,7 +1879,48 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   × four arms + "See all"), and 22rem shows five or six. A sighted keyboard user then presses Enter blind.
   **Live**, WCAG 2.4.7. No gate sees it: the stories seed four options, so axe's
   `scrollable-region-focusable` never fires and happy-dom computes no layout.
-- **`major` · The stacked sort chip ships a 32px touch target in the one layout that exists only on the
+
+- ✅ **CLOSED BY `M20` (2026-08-26) — `major` · ~~The stacked sort chip ships a 32px touch target in the
+  one layout that exists only on the touch band.~~**
+  ⚠️ **THE ROW IS RIGHT ON THE MERITS AND WRONG ON ONE CITATION.** `DataTable.vue:488-495` is the 32px
+  chip, `:472-473` its `display: none` default and `:702` where the container block reveals it — all
+  three hold. **The container query is at `:598`, not `:657-659`**; `:657` is the empty-row
+  `grid-column` rule *inside* it. Four rows running have now had their own evidence wrong somewhere.
+  ⛔ **AS FIXED, AND THE GAP MATTERS AS MUCH AS THE TARGET.** `.mds-table__sortchip` gains
+  `position: relative` and a `::before` overlay at `min-width/min-height: 44px` — the identical
+  construction `Button.vue:104-114`, `Alert.vue:180-190`, `Checklist.vue` and `Toast.vue` already use,
+  and §4.4's own prescribed remedy (expand the hit area, do not inflate the glyph). ⚠️ **The overlay
+  alone would have left the row HALF fixed.** §4.4's last bullet asks for 8px between adjacent **hit
+  areas**, not visual boxes: a 44px target on a 32px chip overhangs 6px above and below, so two *wrapped*
+  rows of chips at the uniform 8px `gap` would have overlapped by **4px of invisible target**. The
+  sortbar now splits the gap — `row-gap: var(--mds-space-5)` (20px = 8 required + 2 × 6 overhang) and
+  `column-gap: var(--mds-space-2)` — and a source-text gate fails on anyone tidying the two back into one.
+  ⛔ **THE HORIZONTAL OVERHANG IS DESIGNED OUT RATHER THAN MEASURED AWAY.** `MdsChecklist`'s own docblock
+  records what the alternative costs — a 24px control whose 44px target overhangs 10px each side and
+  reports a 10px `scrollWidth` excess that only its *container's* padding absorbs — and
+  `.mds-table__frame` has **no padding**. The chips therefore carry `min-width: calc(44px + 2px)`, so the
+  overlay's `width: 100%` is never the smaller of the two. ⚠️ **The `+ 2px` is not a fudge:** an
+  absolutely positioned child's `width: 100%` resolves against the **padding** box while
+  `box-sizing: border-box` folds the rule's 1px borders inward, so a flat `min-width: 44px` yields a 42px
+  padding box and overhangs by exactly 1px each side — caught by re-deriving the arithmetic, not by a
+  scanner.
+  ✅ **MEASURED IN A BROWSER AT 320px, HIT-TESTED RATHER THAN READ OFF THE STYLESHEET.** Overlay
+  **44×44 on every chip**; clearances **8px horizontal, 9px vertical**; **0px overhang past the frame**;
+  `documentElement.scrollWidth === clientWidth`. The hit walk itself reports 43 because
+  `elementFromPoint` treats a box as `[top, bottom)` and loses one boundary pixel — the computed
+  pseudo-element box is the authoritative number and the walk is a second, independent check that the
+  target is genuinely reachable.
+  ⛔ **AND THE REASON IT SURVIVED A GREEN GATE STACK IS THE FIXTURE, AGAIN.** SC 2.5.8's floor is 24×24,
+  so **axe passes a 32px control and always will** — what is breached is §4.4's stricter 44×44, which no
+  scanner here implements. Worse, all three stacked stories declared **one** sortable column, so the
+  sortbar has rendered a single chip for as long as it has existed: it had never wrapped, never had a
+  second row to be 8px away from, and never had a short header to overhang. A `StackedSortWrap` story
+  (five sortable columns incl. a two-character `ID`, 20em box, light + dark) now reaches all three.
+  Recorded in DSR §4.4 as an as-built amendment.
+
+  *The original row, preserved:*
+
+  **`major` · The stacked sort chip ships a 32px touch target in the one layout that exists only on the
   touch band.** `packages/design-system/src/components/DataTable/DataTable.vue:488-495`, rendered only
   below `@container (max-width: 56em)` (`:657-659`) where `thead` is `display: none`, so it is the *only*
   sort affordance on an 834px tablet — 32px tall, 8px apart, wrapping. DSR §4.4 binds 44×44 with ≥8px
@@ -1854,7 +1928,41 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `::before` idiom (`Button.vue:102-114`, `Alert.vue:178-190`, `Checklist.vue:222-246`, `Toast.vue`).
   **Live.** ⚠️ It does **not** fail WCAG 2.2 AA (SC 2.5.8's floor is 24×24), so axe stays green — what is
   breached is the DSR's own stricter rule, and `docs/ux/exceptions-log.md` carries no entry for it.
-- **`minor` · The pending-state ring measures 2.33:1 (light) / 2.96:1 (dark) against its own ground** —
+
+- ✅ **CLOSED BY `M20` (2026-08-26) — `minor` · ~~The pending-state ring measures 2.33:1 (light) /
+  2.96:1 (dark) against its own ground.~~**
+  ⛔ **HALF THIS ROW IS FALSIFIED, AND THE HALF THAT SURVIVES IS WORSE THAN IT LOOKS.** Both citations
+  hold as *text* — `PasswordStrength.vue:212-218` and `Checklist.vue:289-295` carried a
+  character-identical 55% alpha on `currentColor`, and a repo-wide grep returned exactly those two lines.
+  **They were never the same ring.** `currentColor` is `--mds-color-text-secondary` in one and
+  `--mds-color-text-body` in the other, so measured in a browser against the real ground:
+
+  | | as shipped (0.55 alpha) | as fixed (solid) | verdict |
+  |---|---|---|---|
+  | `MdsPasswordStrength` light | **2.28:1** | 5.55:1 | a real 1.4.11 failure |
+  | `MdsPasswordStrength` dark | **3.08:1** | 7.51:1 | already passing, by 0.08 |
+  | `MdsChecklist` light | **3.60:1** | 14.84:1 | already passing |
+  | `MdsChecklist` dark | **5.37:1** | 15.70:1 | already passing |
+
+  **One of the four cases the row filed was actually below the bar.** The row's own 2.33/2.96 are right
+  arithmetic against `--mds-color-bg-surface` and were then applied to a second component that does not
+  share the ink and to a story that does not share the ground. ⚠️ **When a defect is filed against two
+  files because the text matches, measure both before believing it is one defect.**
+  ⛔ **BOTH WERE STILL FIXED, AND NOT TO SPLIT THE DIFFERENCE.** The dark row is the argument: the same
+  declaration measures **2.96:1 on `--mds-color-bg-surface` and 3.08:1 on `--mds-color-bg-canvas`** — it
+  fails on a card and passes on the page, and nothing in the component decides which one it gets. An
+  alpha composite is a function of the ground behind it and a shared component does not own its ground;
+  raising the alpha to 0.75 clears the bar today (3.43:1 light) and leaves that fragility exactly where
+  it was. The alpha is gone from both; the ring is the same solid ink as the label beside it.
+  ⚠️ **THE TWO NOW RENDER AT DIFFERENT WEIGHTS — 5.55:1 AND 14.84:1 — DELIBERATELY.** That is the rule
+  being consistent rather than the components disagreeing: in both, the ring is exactly the ink of its
+  own label, which is what an empty checkbox should be. Hard-coding one token across both to make the
+  numbers match would break that. Guarded in both test files (no alpha in the rule; the ring stays a
+  border) and recorded in DSR §4.1 as an as-built amendment.
+
+  *The original row, preserved:*
+
+  **`minor` · The pending-state ring measures 2.33:1 (light) / 2.96:1 (dark) against its own ground** —
   below WCAG 1.4.11's 3:1 for a non-text indicator — at
   `packages/design-system/src/components/PasswordStrength/PasswordStrength.vue:212-218` and
   `Checklist/Checklist.vue:289-295`, while both docblocks assert the glyph is the signifier. **Live.**

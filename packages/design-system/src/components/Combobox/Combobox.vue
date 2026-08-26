@@ -46,6 +46,7 @@
  */
 import { computed, ref, useId, watch } from 'vue';
 import TextInput from '../TextInput/TextInput.vue';
+import { scrollTopToReveal } from './scroll-reveal';
 
 export interface ComboboxOption {
     /** Identity for the list. Never rendered. */
@@ -204,6 +205,69 @@ function onInput(event: Event): void {
     emit('update:modelValue', (event.target as HTMLInputElement).value);
 }
 
+/**
+ * ⛔ THE HIGHLIGHT MUST BE SCROLLED, BECAUSE NOTHING ELSE IN THIS COMPONENT CAN SCROLL IT (M20).
+ *
+ * Three decisions elsewhere in this file each individually correct, and together a WCAG 2.4.7 failure the
+ * merge-gate review found: the list is `max-height: 22rem` + `overflow-y: auto`; the rows deliberately
+ * carry **no `tabindex`**, because DOM focus never leaves the input; and the arrow keys are
+ * `preventDefault`ed, because otherwise the caret jumps to the end of the query. So the browser's own two
+ * ways of revealing a control — focusing it, and scrolling the region with the arrows — are both
+ * unavailable **by design**, and `aria-activedescendant` moves a highlight the sighted keyboard user can
+ * no longer see. The palette renders up to 21 two-line options and 22rem shows five or six; after that
+ * the reader is pressing Enter blind.
+ *
+ * ⚠️ NO GATE IN THIS REPOSITORY SAW IT, AND THAT IS A FACT ABOUT THE FIXTURES RATHER THAN THE SCANNERS.
+ * The stories seeded four options, so the list never scrolled: axe's `scrollable-region-focusable` never
+ * fired because there was no scrollable region, and happy-dom computes no layout in the unit suite.
+ * `Combobox.stories.ts` now carries a 21-option story at the palette's real worst case.
+ *
+ * The arithmetic lives in `scroll-reveal.ts` — see that file for why it is not `scrollIntoView`.
+ */
+const listEl = ref<HTMLElement | null>(null);
+
+function revealActiveOption(): void {
+    const list = listEl.value;
+    const activeId = activeDescendantId.value;
+
+    if (list === null || activeId === undefined) return;
+
+    // ⚠️ LOOKED UP BY THE ID `aria-activedescendant` POINTS AT, never by index into a `querySelectorAll`.
+    // The two would agree today, and an index-based lookup would go on agreeing right up until the
+    // template grows a row that is not an option — which is exactly what the group headings above nearly
+    // were. What is scrolled into view is then provably the element being announced.
+    const option = list.querySelector<HTMLElement>(`[id="${activeId}"]`);
+
+    if (option === null) return;
+
+    const listBox = list.getBoundingClientRect();
+    const optionBox = option.getBoundingClientRect();
+
+    const next = scrollTopToReveal({
+        scrollTop: list.scrollTop,
+        viewportHeight: list.clientHeight,
+        // Viewport coordinates -> the container's scrollable-content coordinates.
+        optionTop: optionBox.top - listBox.top + list.scrollTop,
+        optionHeight: optionBox.height,
+    });
+
+    if (next !== null) list.scrollTop = next;
+}
+
+/**
+ * ⚠️ `flush: 'post'` IS LOAD-BEARING. A pre-flush watcher runs BEFORE Vue patches the DOM, so it would
+ * measure the option that was highlighted a moment ago and scroll to the wrong row — and it would do it
+ * consistently rather than intermittently, which is the kind of wrong that reads as "the fix does not
+ * work" instead of "the fix runs too early". The `MdsModal` focus-return note records the same tick
+ * problem from the other side.
+ *
+ * `options` is watched alongside the index because the id can be unchanged while the row underneath it is
+ * not: replacing the list leaves `activeIndex` at 0 and `scrollTop` wherever the reader left it, so the
+ * newly-highlighted first row can be well above the visible band with nothing having "changed".
+ */
+watch([activeIndex, () => props.options], revealActiveOption, { flush: 'post' });
+
+
 function onOptionClick(index: number): void {
     activeIndex.value = index;
     activate();
@@ -250,7 +314,14 @@ function onOptionClick(index: number): void {
             @keydown="onKeydown"
         />
 
-        <div v-if="hasOptions" :id="listboxId" class="mds-combobox__list" role="listbox" :aria-label="listboxLabel">
+        <div
+            v-if="hasOptions"
+            :id="listboxId"
+            ref="listEl"
+            class="mds-combobox__list"
+            role="listbox"
+            :aria-label="listboxLabel"
+        >
             <template v-for="(run, runIndex) in runs" :key="run.group ?? `ungrouped-${runIndex}`">
                 <!--
                     A run with no group name renders its options as DIRECT children of the listbox. A

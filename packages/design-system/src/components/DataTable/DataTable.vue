@@ -468,12 +468,21 @@ watch(() => [props.rows, props.columns, props.loading], () => queueMicrotask(mea
 
 /* The stacked-mode sort control (JR4). `display: none` is its DEFAULT state and the container block at
    the foot of this file is the only thing that reveals it — so above the threshold it costs nothing, not
-   even a tab stop, and the header row remains the single sort affordance. */
+   even a tab stop, and the header row remains the single sort affordance.
+
+   ⛔ THE GAP IS TWO VALUES, NOT ONE, AND THE ROW GAP IS DERIVED RATHER THAN CHOSEN (M20). DSR §4.4 asks
+   for 8px between adjacent **hit areas**, not between visual boxes — and the chips below are 32px tall
+   with a 44px hit area, so each one overhangs its own box by (44 − 32) / 2 = 6px above and below. A
+   uniform 8px gap would therefore leave two WRAPPED rows of chips overlapping by 4px of invisible target,
+   which is the mis-tap §4.4's last bullet exists to prevent and which nothing in the gate stack can see.
+   20px = 8px required + 2 × 6px overhang. The column gap stays 8px because the chips carry a
+   `min-width` of their own and therefore have no horizontal overhang at all — see the note on that rule. */
 .mds-table__sortbar {
     display: none;
     flex-wrap: wrap;
     align-items: center;
-    gap: var(--mds-space-2);
+    column-gap: var(--mds-space-2);
+    row-gap: var(--mds-space-5);
     margin-bottom: var(--mds-space-3);
 }
 .mds-table__sortbar-label {
@@ -486,13 +495,57 @@ watch(() => [props.rows, props.columns, props.loading], () => queueMicrotask(mea
    header's caps precisely because `__sort` inherits `text-transform`/`letter-spacing` and this parent is
    not the uppercase `__th` — the JR2 inheritance finding paying off in the other direction. */
 .mds-table__sortchip {
+    /* The `::before` overlay's containing block. Without it the 44px target resolves against whatever is
+       positioned further up and lands somewhere else entirely — the failure mode this file's own
+       `.mds-table__scroll` docblock calls "a latent bug in this component". */
+    position: relative;
+    justify-content: center;
     min-height: 32px;
+    /* ⛔ THIS IS WHAT KEEPS THE HIT AREA FROM BECOMING PAGE OVERFLOW, AND IT IS BY CONSTRUCTION RATHER
+       THAN BY MEASUREMENT (M20). `MdsChecklist`'s own docblock records the cost of the alternative: its
+       24px dismiss button's 44px target overhangs by 10px each side and shows up as a 10px `scrollWidth`
+       excess that only its container's padding absorbs. `.mds-table__frame` has no padding to absorb one
+       with, and a two-character column header would otherwise render a ~38px chip that overhangs 3px at
+       the left edge of every wrapped row. Give the chip its own 44px and the overlay below can never
+       exceed it, so there is no overhang to absorb in the first place.
+
+       ⚠️ +2px, AND THE TWO PIXELS ARE THE POINT RATHER THAN A FUDGE. An absolutely positioned child's
+       `width: 100%` resolves against its containing block's PADDING box, while `box-sizing: border-box`
+       (set globally at `resources/css/app.css:19-23`) folds this rule's 1px borders INWARD. A flat
+       `min-width: 44px` therefore yields a 42px padding box, the overlay's own `min-width: 44px` wins,
+       and the target overhangs by exactly 1px each side — small, real, and precisely the kind of thing
+       that is discovered later at a viewport edge. `justify-content` above centres the label in the
+       wider pill. */
+    min-width: calc(44px + 2px);
     padding: 0 var(--mds-space-3);
     border: 1px solid var(--mds-color-border-default);
     border-radius: var(--mds-radius-full);
     font-size: var(--mds-type-label-font-size);
     color: var(--mds-color-text-secondary);
 }
+
+/* ⛔ WCAG 2.2 §2.5.8 PASSES AT 32px AND DSR §4.4 DOES NOT, WHICH IS THE WHOLE OF THIS RULE (M20). SC
+   2.5.8's floor is 24×24, so axe stays green over a 32px control and always would have; §4.4 binds 44×44
+   on every touch-capable viewport, and `docs/ux/exceptions-log.md` carries no entry excusing this one.
+   The chip is also the ONLY sort affordance that exists down here — the container block at the foot of
+   this file sets `thead { display: none }` — so on an 834px tablet a mis-tap has nothing to fall back to.
+
+   The hit area is expanded rather than the glyph inflated, per §4.4's second bullet, with the identical
+   construction `MdsButton` (`Button.vue`), `MdsAlert`, `MdsChecklist` and `MdsToast` already use. Read
+   the `row-gap` note on `.mds-table__sortbar` before changing either value: the 6px of vertical overhang
+   this creates is what that gap is sized against, and the two only work as a pair. */
+.mds-table__sortchip::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 100%;
+    height: 100%;
+    min-width: 44px;
+    min-height: 44px;
+    transform: translate(-50%, -50%);
+}
+
 .mds-table__sortchip[aria-pressed='true'] {
     border-color: var(--mds-color-action-primary-bg);
     background-color: color-mix(in srgb, var(--mds-color-action-primary-bg) 10%, transparent);

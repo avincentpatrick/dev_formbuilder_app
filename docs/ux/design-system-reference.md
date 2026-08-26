@@ -767,6 +767,30 @@ Be precise about the precedent, because copying it verbatim is not enough. `resp
 
 ⚠️ **`/` is NOT a shortcut, and this is a conformance decision rather than a preference.** WCAG **2.1.4 Character Key Shortcuts is Level A**, and it requires a single-character shortcut to be disableable, remappable, or active only on focus. Shipping a bare `/` would oblige us to build a shortcut-preference UI to stay conformant, and would need a tag guard that breaks silently inside any `role="textbox"`. `Ctrl/Cmd+K` is a modifier combination and is explicitly exempt. **Do not re-propose `/`.**
 
+> **As-built amendment (M20): THE HIGHLIGHT HAS TO BE SCROLLED, AND THREE CORRECT DECISIONS ABOVE ADD UP
+> TO IT NOT BEING.** The keyboard table's `↓`/`↑` row says the arrows move the active option "with
+> `preventDefault()` (otherwise the caret jumps)"; the `Tab` row says "rows are not [tabbable], by
+> design"; and the listbox is `max-height: 22rem` with `overflow-y: auto`. Each is right on its own, and
+> together they remove **both** ways a browser reveals a control by itself — focusing it, and scrolling
+> the region with the arrow keys. `aria-activedescendant` then moves a highlight a sighted keyboard user
+> can no longer see. **Measured**: the palette's real worst case is 21 rows
+> (`SearchService::PER_ENTITY_PREVIEW` × four arms + "See all"), the list is **1195px in a 352px band**,
+> and pinned to the top **five of twenty-one rows are visible** while the last sits **843px** below it.
+> After the sixth press the reader is pressing `Enter` blind. WCAG **2.4.7**.
+>
+> **`MdsCombobox` now reveals the active option itself**, on a `flush: 'post'` watcher over the index and
+> the option list. ⛔ **Not with `scrollIntoView`**, whose `block: 'nearest'` is specified to walk *every*
+> scrollable ancestor — the dialog and the page included — in a product that has spent two increments
+> removing scroll a page should not have. It computes a new `scrollTop` and assigns it, which can only
+> move the one box that is supposed to move; the arithmetic is `Combobox/scroll-reveal.ts` and returns
+> `null` for "already visible", so a reader scrolling the list by wheel or touch is never fought.
+>
+> ⚠️ **THE REASON THIS SHIPPED AT ALL IS A FIXTURE, NOT A SCANNER.** Every story seeded three or four
+> options, so the list never reached `max-height`: axe's `scrollable-region-focusable` had no scrollable
+> region to look at, and happy-dom computes no layout in the unit suite. A 21-option story now exists,
+> and it changes nothing about the scanners — **a gate that reports zero has told you nothing until you
+> know its fixture reached the defect.**
+
 **ARIA.** The palette implements the ARIA 1.2 Combobox pattern of §4.5: a `role="combobox"` input with `aria-autocomplete="list"`, `aria-expanded`, `aria-controls`, and `aria-activedescendant` tracking the highlighted option **without moving DOM focus**; the results are a `role="listbox"` of `role="option"` children carrying `aria-selected`.
 
 - **`aria-controls` and `aria-activedescendant` are omitted, never left dangling.** ⚠️ **Do not rely on the a11y gate to enforce this — it largely will not, and the reason is worth knowing before someone "tests" the rule and concludes it is folklore.** Read from `axe-core`'s `ariaValidAttrValueEvaluate`: `aria-controls` carries a **pre-check** that skips validation entirely when `aria-expanded="false"` — which is exactly the empty-query state — and its `idrefs` type passes if *any* referenced id resolves, so a partly-dangling list is green too. `aria-labelledby`/`aria-describedby` downgrade to *incomplete*, not violation. Only **`aria-activedescendant`** (no pre-check, single `idref`) actually fails the build. The rule stands on its own merits — a dangling reference is a real bug for AT regardless of what axe reports — but it is enforced by review and by Vitest, not by the merge gate.
@@ -1263,6 +1287,24 @@ WCAG 2.2 AA is the baseline for the entire product, not only the guest-facing ru
 
 - **Text**: minimum **4.5:1** contrast between text and its background for normal-size text; **3:1** for large text (≥24px regular weight, or ≥19px bold) — matching the plan's stated WCAG AA target exactly.
 - **UI component boundaries**: minimum **3:1** contrast for the visual boundaries of interactive components and meaningful graphical objects (input borders, focus rings, icon-only button boundaries, chart/data-viz element boundaries) against their adjacent background — this is the WCAG 1.4.11 "Non-text Contrast" criterion, distinct from (and easier to satisfy than) the 4.5:1 text criterion, and is called out separately here because it is easy to satisfy text contrast while forgetting that a very light input border also needs to clear its own, lower bar.
+> **As-built amendment (M20): A NON-TEXT INDICATOR MAY NOT EXPRESS ITS DE-EMPHASIS AS `opacity`, BECAUSE
+> `opacity` IS A CONTRAST DECISION THE COMPONENT IS NOT ENTITLED TO MAKE.** An alpha composite is a
+> function of the ground *behind* it, and a shared component does not own its ground. Measured on
+> `MdsPasswordStrength`'s pending ring — `currentColor` at 55% — the same declaration reads **2.96:1 on
+> `--mds-color-bg-surface` and 3.08:1 on `--mds-color-bg-canvas`**: it fails on a card and passes on the
+> page, and nothing in the component decides which one it gets. Raising the alpha does not fix the shape
+> of the problem, it just moves the surface at which the failure begins. **Solid ink at the strength the
+> adjacent label already uses has no such dependency**, and de-emphasis is then carried by form — an
+> outline against a filled glyph — which is a channel that survives every ground and every theme.
+>
+> ⛔ **AND A CHARACTER-IDENTICAL DECLARATION IS NOT AN IDENTICAL DEFECT — THE FINDING THAT ACTUALLY
+> COST TIME HERE.** The same rule existed verbatim in `MdsChecklist`, and the merge-gate row cited both
+> files with one pair of numbers. Measured, they were never the same ring: `currentColor` is
+> `--mds-color-text-secondary` in one and `--mds-color-text-body` in the other, so the twin composited to
+> **3.60:1 light / 5.37:1 dark** and was **already passing** while its sibling sat at 2.28:1. Both were
+> changed — the alpha is fragile in both — but only one was a 1.4.11 failure. **When a defect is filed
+> against two files because the text matches, measure both before believing it is one defect.**
+
 - **Data-visualization specifics** (added 2026-08-03; contract pinned by ADR-0011 §D11–§D12, **emitted by H24b1** — the measured table is at the end of this section). The 1.4.11 rule above applies to **data marks** — a line, a bar, a legend swatch — and to any boundary whose *identification* carries meaning. It does **not** apply to gridlines, which are decorative scaffolding and should deliberately sit *below* 3:1 so they do not compete with the data; axis tick labels are text and take the 4.5:1 rule. Where two fills touch (any stacked or adjacent mark), 3:1 is required **between the neighbours**, not merely against the background — the standard mitigation is a 1px surface-coloured separator stroke so each segment is judged against the surface, and the difficulty of getting this right is why stacked bars are deliberately not in the first primitive set. Three further constraints: **the categorical series scale is capped at five**, because satisfying 3:1 against *both* the light and dark surfaces with one token set confines a mark to a narrow luminance band that leaves too little room for marks to remain distinguishable from one another — which also makes the dark re-point of the series tokens mandatory, not optional; **series tokens are immune to `data-accent`** and alias none of the primary/success/warning/danger/accent scales, for the same reason Moss and Brass are excluded from the accent whitelist (a data series encodes meaning, and two people looking at one screenshot must see the same series in the same colour); and **colour is never the only channel** — a single-series chart uses no categorical colour at all, and multi-series charts add a dash pattern or a shared `--mds-chart-pattern-*` fill. Finally, a limit of the tooling worth stating here rather than discovering: **axe cannot detect a missing text alternative for an SVG that carries a plausible `aria-label`**, so the merge-blocking gate will pass a chart that is an unreadable picture. Every chart primitive therefore ships a real data table alongside `role="img"`, guarded by a unit assertion rather than by axe.
 - **Verified reference ratios** (computed via the WCAG relative-luminance formula, cited here as concrete evidence rather than an unverified assertion — the full token-pair contrast matrix lives as generated metadata in the Storybook a11y addon per §1.2, not reproduced cell-by-cell here):
 
@@ -1377,6 +1419,32 @@ One consistent focus treatment, applied via `:focus-visible` (not bare `:focus`,
 - **44×44 CSS px minimum** hit area for every interactive element on any touch-capable viewport (mobile and tablet breakpoints, §2.7) — matching (and exceeding) WCAG 2.2 AA's 2.5.8 Target Size (Minimum) criterion, which sets a 24×24 CSS px floor; this product targets the stricter 44×44 used by platform touch guidance, and applies it, per Feature #5's acceptance criteria, to *every* screen (builder, dashboard, submissions inbox, settings), not only the guest-facing runtime.
 - Where a component's **visual** size is intentionally smaller than 44px (e.g., a `sm` 32px-height button, a table row's inline icon action), the **hit area** is expanded via padding/pseudo-element beyond the visual box to reach 44×44px, rather than the visual size itself being inflated — preserving dense-table visual density while still meeting the touch-target rule.
 - Adjacent touch targets (e.g., a row of icon actions in a table row) maintain at least `--mds-space-2` (8px) of spacing between their 44px hit areas, so overlapping/adjacent hit areas never cause accidental mis-taps.
+> **As-built amendment (M20): THE THIRD BULLET IS ABOUT HIT AREAS AND WAS BEING READ AS BEING ABOUT
+> BOXES, WHICH IS THE ONE MISREADING THAT SILENTLY BREAKS IT.** Expanding a target beyond its visual box
+> (bullet two) means adjacent targets can overlap while their *boxes* still sit a comfortable
+> `--mds-space-2` apart. `MdsDataTable`'s stacked sort chips are the worked example: 32px chips in a
+> wrapping flex row at a uniform 8px `gap`, whose 44px hit areas overhang by (44 − 32) / 2 = **6px above
+> and below**, so two wrapped rows overlapped by **4px of invisible target**. The sortbar now declares
+> `row-gap: var(--mds-space-5)` (20px = 8 required + 2 × 6 overhang) and `column-gap: var(--mds-space-2)`
+> — **two values, because the overhang is not the same on both axes**, and anyone tidying them back into
+> one `gap` re-opens it. Measured in a browser at 320px: overlay 44×44 on every chip, 8px horizontal and
+> 9px vertical clearance between hit areas.
+>
+> ⚠️ **AND THE HORIZONTAL OVERHANG IS DESIGNED OUT RATHER THAN ABSORBED.** `MdsChecklist`'s dismiss
+> button documents the alternative — a 24px control whose 44px target overhangs 10px each side and
+> shows up as a 10px `scrollWidth` excess that only its *container's* padding absorbs. `.mds-table__frame`
+> has no padding, so the chips carry `min-width: calc(44px + 2px)` instead: the overlay's `width: 100%`
+> is then never the smaller of the two and cannot extend past the chip at all. The `+ 2px` is the 1px
+> border on each side, which `box-sizing: border-box` folds inward while an absolutely positioned child's
+> `width: 100%` resolves against the **padding** box — a 1px overhang that is easy to reason past and
+> would surface later at a viewport edge.
+>
+> ⛔ **NONE OF THIS IS REACHABLE BY axe, AND THAT IS THE POINT OF STATING IT HERE.** SC 2.5.8's floor is
+> 24×24, so a 32px control passes every automated check this repository runs, in every theme, forever.
+> §4.4 is stricter *on purpose*, which means §4.4 is enforced by review and by source-text gates — and
+> the chips shipped at 32px behind a fully green stack for as long as the stacked layout has existed,
+> because the only stacked fixture declared **one** sortable column and therefore never wrapped.
+
 
 ### 4.5 ARIA patterns for custom components
 

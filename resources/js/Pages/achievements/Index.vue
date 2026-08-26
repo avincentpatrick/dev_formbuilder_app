@@ -388,7 +388,14 @@ function earnedDate(iso: string): string {
     width: 40px;
     height: 40px;
     border-radius: var(--mds-radius-full);
-    background-color: var(--mds-neutral-100);
+    /* ⛔ M23 — SEMANTIC, NOT PRIMITIVE, AND THE PRIMITIVE WAS INVISIBLE IN DARK. This read
+       the primitive --mds-neutral-100 — written WITHOUT the var() prefix here on purpose, because the
+       gate below bans exactly that string and would otherwise report its own documentation.
+       In dark that token IS --mds-color-bg-surface (theme-overrides.css:113 re-points the surface at
+       neutral-100), so the disc was painted the card own colour at 1.00:1 and simply was not there.
+       --mds-color-status-neutral-bg tracks the ramp in light (#EEF3FE on #FFFFFF, unchanged) and moves
+       to neutral-200 in dark (#2c374c on #1a2130, 1.35:1), so the disc exists in both themes. */
+    background-color: var(--mds-color-status-neutral-bg);
     /* Muted for an unearned badge — but the state is NEVER colour alone (DSR §4.1): the earned row is the
        only one carrying a date, and the unearned row is the only one carrying a meter. */
     color: var(--mds-color-text-secondary);

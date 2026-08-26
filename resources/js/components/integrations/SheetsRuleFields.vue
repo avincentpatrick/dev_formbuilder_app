@@ -166,7 +166,22 @@ async function changeTab(tab: string): Promise<void> {
 }
 
 async function create(): Promise<void> {
-    if (!props.connectionId) return;
+    // ⛔ `busy`, NOT `destination`, IS THE RE-ENTRY GATE, AND THIS IS THE ONE IRREVERSIBLE BUTTON IN THE
+    // TREE. `destination` is not assigned until the response lands below, so the `:disabled` expression on
+    // the Create button stays false for the WHOLE round trip and MdsButton renders no native `disabled`.
+    // A second click therefore provisions a SECOND spreadsheet in the tenant Drive — a file Meridian will
+    // never write to and only they can delete. Both responses then assign `destination`, so the rule binds
+    // to the second sheet and the FIRST is the orphan.
+    //
+    // ⚠️ THE SIBLING HAZARD NOTE BELOW WAS WRITTEN ABOUT EXACTLY THIS FAILURE MODE — an irreversible Drive
+    // file orphaned by client state — for the scope watcher, four functions down, without noticing that
+    // `create()` itself reproduces it. MdsButton own guard now stops the duplicate click too, but this
+    // guard is the one that survives a design-system refactor and covers a programmatic re-entry.
+    //
+    // ⚠️ DO NOT INSTEAD ADD `busy` TO THE `:disabled` EXPRESSION. Natively disabling a button the user has
+    // just pressed moves focus to <body> mid-request; RuleFormModal reasoned that out for its sibling
+    // control and contradicting it here would be a silent a11y regression.
+    if (!props.connectionId || busy.value) return;
 
     busy.value = true;
     problem.value = null;

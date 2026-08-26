@@ -2010,26 +2010,91 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 ### App UI
 
-- **`major` · Double-clicking "Create" provisions two spreadsheets in the tenant's Drive.**
-  `resources/js/components/integrations/SheetsRuleFields.vue:168,276-278` — `create()` has no `inFlight`
-  guard and `:disabled` is `destination !== null`, which stays false for the whole request, so `MdsButton`
-  renders no native `disabled`. **`Button.vue`'s own click guard does not cover this**: it calls
-  `stopPropagation()`, not `stopImmediatePropagation()`, and the consumer's `@click` falls through onto the
-  same element, so Vue runs both handlers. The second file is an orphan Meridian will never write to and
-  only the tenant can delete. **Live**, and the only `:loading` button in the tree that reaches a raw
-  `fetch` with an irreversible external side effect — every other one is Inertia, whose stream is
-  `maxConcurrent: 1, interruptible: true`.
-- **`minor` · The unearned-badge medallion disappears in dark mode.**
-  `resources/js/Pages/achievements/Index.vue:391` paints it with the *primitive* `--mds-neutral-100`, which
-  resolves to the card's own colour in dark — the only primitive-token reference in the whole of
-  `resources/js/Pages/`. **Live**, one token.
-- **`minor` · The top-nav search field never shows the active query on an Inertia arrival.**
-  `resources/js/components/shell/TopNav.vue:39` — `initialQuery` is a `computed` with no reactive
-  dependencies, so inside the persistent layout it evaluates once per full page load. **Live.**
-- **`minor` · The rule modal filters the rendered checkboxes but submits the unfiltered set.**
-  `resources/js/components/integrations/RuleFormModal.vue:114,194` — `availableEvents` narrows to
-  `submission.*` for a tabular grant while `submit()` sends `form.event_types` whole, so a pre-existing
-  non-submission event is unremovable from the UI and still sent. **Live.**
+- ✅ **CLOSED BY `M23` (2026-08-26) — `major` · ~~Double-clicking "Create" provisions two spreadsheets in
+  the tenant's Drive.~~** Fixed in BOTH places, because they are two different defects that happen to meet
+  at this button. `SheetsRuleFields.vue`'s `create()` now early-returns on `busy`, and `Button.vue`'s guard
+  now calls `stopImmediatePropagation()` instead of `stopPropagation()`.
+  ⛔ **THE ROW'S DIAGNOSIS OF `Button.vue` WAS EXACTLY RIGHT AND ITS CLOSING JUSTIFICATION WAS EXACTLY
+  WRONG.** It says the other `:loading` buttons are safe because Inertia's stream is
+  `maxConcurrent: 1, interruptible: true`. That is a property of the constructor, not a dedupe:
+  `interruptInFlight()` **aborts the in-flight XHR and sends the second request anyway**, and the first
+  POST has already reached the server. What actually protects the rest of the tree is unrelated — they are
+  `type="submit"` inside a `@submit.prevent` form, and the guard's own `preventDefault()` suppresses the
+  implicit second submission. The conclusion (Sheets is the only irreversible-external one) survives; the
+  mechanism does not, so do not reuse the reasoning.
+  ⛔ **AND THE COMPONENT-LEVEL FIX ONLY WORKS BECAUSE OF A VUE MERGE ORDER, WHICH WAS MEASURED RATHER THAN
+  ASSUMED.** Vue merges a component's own template handler with the parent's fallthrough `@click` into one
+  array, the component's own runs **first**, and Vue patches `stopImmediatePropagation` on the event
+  specifically so it breaks out of that array. Probe: `stopPropagation()` → consumer handler called once;
+  `stopImmediatePropagation()` → called zero times; order came back `["inner","consumer"]`. Had the order
+  been reversed, no design-system fix would have existed at all.
+  ⚠️ **`as="a"` PLUS `:loading` HAD NO GUARD OF ANY KIND** — an anchor ignores native `disabled`, and
+  `pointer-events: none` is keyed on `isLink && disabled`, never on loading. Latent (no call site combines
+  them) and now closed by the same one-word change. Pinned by a case in the new `Button.test.ts`.
+  ⚠️ **`AirtableRuleFields.vue` WAS MEASURED, NOT ASSUMED, AND DOES NOT SHARE THE DEFECT** — it has no
+  create-destination button at all; its two `busy`-aware `:disabled` bindings are on `MdsSelect`.
+- ✅ **CLOSED BY `M23` (2026-08-26) — `minor` · ~~The unearned-badge medallion disappears in dark mode.~~**
+  Now `--mds-color-status-neutral-bg`: unchanged in light (`#EEF3FE` on `#FFFFFF`), and `#2c374c` on
+  `#1a2130` in dark, which is **1.35:1** against the exactly **1.00:1** it was. ⚠️ **THE ROW UNDERSTATED
+  IT IN ONE DIRECTION AND OVERSTATED IT IN ANOTHER.** Understated: in dark the primitive *is*
+  `--mds-color-bg-surface` (`theme-overrides.css:113` re-points the surface at `neutral-100`), so the disc
+  was painted its own card's colour — not merely low-contrast but mathematically absent. Overstated: it
+  called this the only primitive reference under `resources/js/Pages/`; measured, it was the only one in
+  the whole of `resources/`, which is what made the gate below cost nothing.
+- ✅ **CLOSED BY `M23` (2026-08-26) — `minor` · ~~The top-nav search field never shows the active query on
+  an Inertia arrival.~~** ⛔ **THE ROW'S FIX WOULD HAVE SHIPPED A REGRESSION, AND THAT IS THE FINDING.**
+  Read from `usePage().url` unconditionally, as the row describes, the field displays **any** page's `q` —
+  and `q` is the shared filter key on six other list pages (`forms/Index.vue:60`, `audit/Index.vue:59`,
+  `feedback/Index.vue:47`, `submissions/Inbox.vue:144`, `members/Index.vue:63`, `webhooks/Index.vue:73`),
+  every one committing client-side with `preserveState`. The workspace-search box would have shown the
+  audit ledger's filter term, where pressing Enter posts it to `/search` and silently turns "filter this
+  list" into "search everything". Shipped gated on `page.component === 'search/Index'`, which also fixes
+  the pre-existing full-page-load version of that bleed instead of widening it.
+  ⚠️ **THE BROWSER BACK BUTTON WAS BROKEN TOO, AND THE FILE'S OWN DOCBLOCK SAID OTHERWISE** — it asserted
+  that Back "arrives as a fresh render"; Inertia intercepts popstate and swaps in place with no document
+  load. The false sentence was the stated justification for the implementation and is gone.
+- ✅ **CLOSED BY `M23` (2026-08-26) — `minor` · ~~The rule modal filters the rendered checkboxes but
+  submits the unfiltered set.~~** Both the seed and the transform now read one shared narrowing, and the
+  fieldset names any event it is dropping. ⛔ **"SILENTLY SENDS THE UNFILTERED SET" IS THE MILDER OF THE
+  TWO OUTCOMES AND NOT THE COMMON ONE.** On a live tabular grant the server *does* reject it — under
+  `event_types.{index}`, a **dotted** key, while this modal renders only the bare `event_types`. So the
+  tenant got a 422 with no visible cause on a modal that stays open, and could no longer rename the rule,
+  rescope it, or repair its destination. A dead end, not a dirty payload.
+  ⚠️ **THE HINT IS NOT POLISH.** Filtering at seed time changes stored data on the next save for any
+  reason, and a rule whose only event is undeliverable seeds to an empty array — so without the sentence
+  the tenant sees an untouched form and is told "choose at least one event", which is legible and has the
+  wrong cause.
+  ⚠️ **`WebhookFormModal.vue:110-116` WAS CHECKED INDIVIDUALLY AND IS NOT THE SAME DEFECT** — it iterates
+  the unfiltered `eventTypes` prop, so rendered already equals sendable there.
+
+- **`minor` · The delivery-rule modal's channel-refresh button is the same unguarded shape, GET-only.**
+  `resources/js/components/integrations/RuleFormModal.vue:350-359` — a `:loading`-bound `MdsButton` whose
+  `@click` reaches a raw `fetch`, with the component's own `channelsLoaded && !force` re-entry check
+  bypassed by `force = true`. `MdsButton`'s repaired guard now stops the duplicate click, so this is
+  **not live**; it is filed because the row above it was closed on the argument that the *side effect* is
+  what makes a button dangerous, and the next fetch-backed button written in that file should not be
+  written this way. Fix is the same one-line `if (channelsLoading.value) return;`.
+- **`minor` · Thirteen Vitest stubs across four files are silently inert.**
+  `resources/js/Pages/submissions/show.test.ts:109-113,266-270` · `resources/js/components/sso/cards.test.ts:37`
+  · `resources/js/components/sso/SsoPolicyCard.test.ts:84` · `resources/js/Layouts/AppLayout.test.ts:47` —
+  all key `global.stubs` on the **barrel export alias** (`MdsCard`, `MdsBadge`, `MdsModal`, `MdsTextarea`,
+  `MdsFormField`, `MdsToastHost`). Vue Test Utils matches a stub against the component's own inferred name,
+  which for a `<script setup>` SFC is its **filename** — `Card.vue` gives `Card`. So none of them matches
+  and the real component renders in every case. **MEASURED, NOT INFERRED**, and found the expensive way:
+  M23's first draft of `SheetsRuleFields.test.ts` keyed on `MdsButton`, the real button rendered, its own
+  guard absorbed the extra clicks, and the spec passed **with the fix reverted** — the same three-click
+  case reports 1 call under the `MdsButton` key and 2 under `Button`. **Not live** — no production defect —
+  but every one of those four suites is exercising more component than it says it is, and any of them could
+  be silently vacuous the way M23's nearly was. ⚠️ Fixing them changes what four suites actually cover, so
+  it is its own increment, not a rename.
+- **`minor` · A semantic token is no guarantee of a visible element, and one more instance is probably out
+  there.** M23 added a gate banning *primitive* ramp references in application code, then immediately found
+  the identical defect wearing a *semantic* token: `LogicRail.vue`'s `.rail__dot` was
+  `--mds-color-bg-sunken` on a `--mds-color-bg-canvas` ground, and in dark **both resolve to
+  `--mds-neutral-50`** — 1.000:1, fixed in the same increment. The general check is "does every painted
+  element differ from the ground it actually lands on, in both themes", which needs the resolved ancestor
+  chain and is not a source-text scan. **Not live** as far as two hand-audits reach; filed because the gate
+  that shipped covers the cheap half only and must not be read as closing the class.
 
 ### Test suite & CI gates
 

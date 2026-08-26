@@ -18,32 +18,154 @@ exact-equality `KNOWN_UNGUARDED` assertion, so the list shrinks in the *same* PR
 
 ---
 
-## Status: NO ACTIVE CLAIM
+## Status: ACTIVE CLAIM — `M24`, the backfill that scores two review verbs the live engine never scores
 
-Lane B holds nothing. **Namespaces after M20 + M21 + M22:** migration block stays **`2026_08_17_000111`**
-(M22 spent none — nothing server-side moved, and nothing client-side needed a `db.version()` bump either);
-ADR-0016's next free sub-decision stays **`§D35`**. ⛔ **ADR `0022` STAYS FREE and stays Lane A's
-block-opener (`0022-0025`)** — M22 amended `ADR-0021` instead, because this is that ADR's own threat model
-(shared kiosk hardware, guest runtime, device-local stores) carried from *disclosure* to *retention*.
-Minting a number to restate an accepted decision's premise spends the scarcer namespace for nothing. That
-is M18's reasoning, reused for the third increment running. `0010` stays reserved for H1d; `#16` stays free.
+**Taken 2026-08-26.** Branch `m24-backfill-review-verbs`, cut from `origin/main` at `096d134`, PR into
+`main`. Row: the first `major` under **Gamification** in `docs/feature-backlog.md` — *the backfill awards
+review points for two verbs the live engine never scores*.
 
-⛔ **AND `docs/claims/decisions.md` GAINED NOTHING, WHICH IS A FINDING RATHER THAN AN OMISSION.** The row
-M22 took predicted *"a retention decision (how long, on what trigger, and whether it runs in the service
-worker) … its own ADR question."* Verified against the code, two of the three were already answered in the
-tree and the third was a type-check constraint with exactly one answer. There was no product call left to
-put to the user, and manufacturing one would have been worse than filing nothing. `D1` is untouched and
-still Lane A's or nobody's.
+**⚠️ NUMBERED `M24`, AND THE REF WAS RE-READ IMMEDIATELY BEFORE THIS FILE WAS WRITTEN, NOT AT SESSION
+OPEN.** Both reads return `096d134`; `docs/claims/lane-a.md` reads **ACTIVE CLAIM `M23`** in both, with two
+pushed claim extensions. `M22` is merged (PR #213) and released. So the next free number is `M24`.
 
-**Baseline on `origin/main` after M22:** CI Pest **4544 / 19,280** (2 pre-existing warnings, unmoved — no
-PHP in the diff) · Vitest **131 files / 2,272** (design-system 35/567 · **public-runtime 36/819** ·
-resources/js 60/886) · Storybook axe **42 / 303** · E2E **551 passed + 10 skipped, no flaky line** ·
-PHPStan CI `[OK]` · four host lint gates **97 · 113 · 31 · 113/121/0**, re-measured unpiped ·
-`openapi.json` byte-identical.
-⚠️ **Only the public-runtime chunk moved (+1 file, +14 tests), which is what the row predicted and the
-third increment running to predict it correctly.** The design-system chunk is quoted from Lane A's post-M20
-line **and was re-run here rather than trusted**, because `clipped-node-containment.test.ts` is a paired
-file that reads `resources/public-runtime` off disk.
+**No collision on the merits, and the reason has to be argued rather than asserted.** Standing Rule 7(b)
+grants Lane B `app/Services/{Sso,Tenancy,Connectors}/` — **not** `app/Services/` wholesale, and the rule
+that makes the table hold says so explicitly. `app/Services/Gamification/` is therefore **unclaimed, and
+taken per-row here**, which is exactly what that paragraph provides for. Lane A's `M23` is entirely
+`resources/js/**` and `packages/design-system/**`. The two columns do not meet: this diff contains no
+`.vue`, no `.ts`, and nothing under `resources/`. The only overlaps are shared artefacts by disjoint
+region — `docs/feature-backlog.md` (Lane A closes the four **App UI** rows; Lane B closes one under
+**Gamification**) and `PROGRESS.md` (own block only, per 7(d)).
+
+**⛔ THE DELIBERATE RE-ORDER IS PRESERVED, NOT SILENTLY UNDONE.** The higher-priority sibling —
+*`standing.of` discloses the workspace headcount with no permission at all* — is **not** taken here. Gating
+`of` changes what `AchievementsController` puts in the Inertia props, and `resources/js/Pages/
+achievements/Index.vue` renders them and is **inside Lane A's ACTIVE `M23` claim**, which 7(b-bis) says is
+the one split that cannot work. It is taken the moment `M23` merges, and it carries a genuine product call
+for `docs/claims/decisions.md` (ADR-0020 §D7 approves *"4th of 12"* for everyone; the dashboard `null`s the
+identical integer without `dashboard.org.view`; one of the two has to move).
+
+### ⛔ NAMESPACES
+
+**ADR-0020 gains `§D12`** — its own sub-decision series runs §D1–§D11 and this is a correction to **§D10's
+own factual claim**, filed beside the decision it corrects on the precedent §D10 itself used to correct §D5
+(*"a cross-document discharge nobody would find"*). ⛔ **ADR `0022` STAYS FREE and stays Lane A's
+block-opener (`0022-0025`)** — fourth increment running to amend rather than mint, on the M18/M21/M22
+reasoning: minting a number to restate an accepted decision's premise spends the scarcer namespace for
+nothing. **No migration** (block `2026_08_17_000111` stays free — this reads an existing `jsonb` column and
+adds no column, no index and no table). **No ADR-0016 `§D35`.** No threat-model row. `0010` stays reserved
+for H1d; `#16` stays free.
+
+### Every file this claim touches, named before it is opened
+
+Edited, all inside the per-row claim above:
+
+- `app/Services/Gamification/AuditReplayMap.php` — the discriminator and a new pinned constant.
+- `app/Services/Gamification/ReplayableAudit.php` — one added readonly field.
+- `app/Services/Gamification/GamificationBackfill.php` — `AUDITS_SQL` gains one scalar extraction; the
+  single construction site follows it.
+- `tests/Unit/Gamification/AuditReplayMapTest.php` — the `replayRow()` helper gains one optional
+  parameter, new cases are added, and **one existing case is rewritten** (see below).
+- `tests/Feature/Gamification/BackfillTest.php` — the archive / under-review cases, and the call-site test.
+- `docs/adr/0020-gamification-awarding-substrate.md` — §D12.
+
+Shared, claimed here: `docs/feature-backlog.md`, `docs/claims/lane-b.md`, `PROGRESS.md` (Lane B's block and
+hand-off line only). **If this list grows, the claim is extended as its own pushed commit before the file
+is opened.**
+
+### What was verified against the code BEFORE this claim was written
+
+The streak is eleven-for-eleven on rows being wrong about themselves, so every citation was re-walked
+against the tree at `096d134`. **The row's file:line facts all HOLD. Its framing and its implied cost do
+not.**
+
+- **`AuditLogger::record()` does NOT diff, and this is the load-bearing check.** `:78-96` is a
+  `forceFill` of the whole `$new` array — there is no old-vs-new comparison and no null-stripping anywhere
+  in the class. Had it diffed, an `archive()` with no remarks argument would leave `remarks` unchanged, the
+  key would never appear, and the row would have been substantially wrong. It does not. **The premise
+  holds for all four verbs, including the ones that pass no remarks at all.**
+- **`AuditReplayMap.php:160`** is the `in_array(self::REVIEW_MARKER, …)` return, exactly as cited.
+  `SubmissionReviewService.php:156` opens the `$this->audit->record(` call (the row says `:156-162`; the
+  call actually closes at `:163`). `snapshot()` is `:189-201` with `remarks` at `:199` (the row says
+  `:189-200`). Both off by one line, neither materially.
+- **`AuditRedactor::PII['submission']` (`:76`)** is `['guest_ip', 'guest_user_agent',
+  'guest_contact_email', 'remarks']`. **`status` is not redacted**, so it survives verbatim on every
+  historical row — which is what makes a read-side fix possible at all.
+- **`PointRule::SubmissionReviewed` is 3 points** (`PointRule.php:75`). 400 × 3 = 1,200. Arithmetic holds.
+- **The idempotency index** is `(tenant_id, user_id, rule, subject_type, subject_id)`
+  (`2026_08_17_000101_create_point_awards_table.php:70-72`) with `ON CONFLICT DO NOTHING`
+  (`PointsRecorder`), and `point_awards` has **no UPDATE or DELETE policy** (ADR-0020 §D4). Both halves of
+  the row's consequence claim hold.
+- **Exactly two writers of `('submission','updated')` today** — `SubmissionReviewService:156` and
+  `SubmissionAnswerEditService:263`. The map's own docblock asserts this, and it is still true, which is
+  what makes the fix safe rather than merely plausible.
+- **`ReplayableAudit` has exactly two construction sites** — `GamificationBackfill:217` and the
+  `replayRow()` helper at `AuditReplayMapTest:34`. The blast radius is genuinely that small.
+
+### ⚠️ WHERE THE ROW IS WRONG ABOUT ITSELF, AND BOTH WAYS MATTER
+
+**(1) IT NEVER SAYS WHICH TWO VERBS ARE *GOOD*, AND THE OBVIOUS READING IS A REGRESSION.** The title says
+*"two verbs the live engine never scores"*, which invites the fix *"score only `approve`"*. Measured, that
+is wrong: **`AwardPointsForSubmissionReturned` awards `PointRule::SubmissionReviewed` too**, from
+`SubmissionReturned`. The live engine scores **two** verbs — `approve` **and** `return` — and a fix that
+kept only `approve` would silently stop crediting every returned submission in every backfill, which is
+the same class of silent under-scoring the row exists to complain about, pointed the other way.
+
+**(2) ITS IMPLIED COST IS UNDERSTATED — M22'S LESSON, RECURRING IMMEDIATELY.** M22's row had exact facts
+and a wrong difficulty estimate; this one does too, in the opposite direction. The row reads as a predicate
+bug in one `match`. It is not. **`ReplayableAudit` carries key NAMES ONLY, deliberately and with an argued
+docblock** (*"a compliance ledger's redacted contents have no business travelling through a scoring
+service"*), and **all four verbs emit an identical six-key set** from one shared `snapshot()`. Key shape is
+therefore **structurally incapable** of telling them apart — the map is not reasoning badly, it is being
+handed insufficient evidence. The fix has to widen what the enumerator extracts (`GamificationBackfill`'s
+`AUDITS_SQL`, whose `jsonb_object_keys` projection has its own *"is not a convenience"* docblock), which is
+why this needs an ADR amendment and not a one-line change.
+
+**(3) THE INFLATION IS BOUNDED, WHICH THE ROW'S ARITHMETIC GLOSSES.** The unique index is keyed on
+`(…, rule, subject_type, subject_id)`, so at most **one** `SubmissionReviewed` per (member, submission).
+"400 archived rows → 1,200 points" is therefore true only for submissions that actor never legitimately
+reviewed — which is exactly a retention sweep over never-reviewed rows, so the headline survives, but the
+mechanism is not the one the sentence describes.
+
+### ⛔ THE ADR IS WHERE THE DEFECT CAME FROM, AND THAT IS WHY §D12 IS THE RIGHT SHAPE
+
+ADR-0020 **§D10(a)** says, in the sentence that specifies this very map: *"a review always carries
+`remarks`; an edit carries flattened `answers.<key>` entries and never does."* Every clause is true. The
+sentence is still the bug: **all four review verbs carry `remarks`**, and §D10 never noticed that
+*"a review"* was four different acts of which two score. The map was built from that sentence and is a
+faithful implementation of it. Correcting the code without correcting the sentence would leave the next
+reader to rebuild the same defect from the same authority — which is precisely the argument §D10 made when
+it corrected §D5 in place.
+
+### ⚠️ THE GATE, INCLUDING THE ONE EXISTING CASE THAT MUST GO RED
+
+`AuditReplayMapTest:101` (*"reads a real review payload as a review"*) hands the map the six snapshot keys
+with **no status at all** — which is equally a real `approve`, a real `archive` and a real
+`markUnderReview` payload. **That test cannot fail on this defect, and after the fix it is wrong as
+written**; it is rewritten in the same commit rather than deleted. `:184-197` pins `SCORED_PAIRS` in both
+directions, so removing the tuple is not available — the fix must live inside `submissionUpdate()`.
+`:194` probes that tuple with `['answers.x']` and stays green either way. And `:113` already warns, in a
+comment, that *"a discriminator that keyed on `status` alone would call this a review"* — so the predicate
+is `remarks` present **AND** status in the scoring set, with the existing `answers.` precedence untouched.
+
+**⛔ AND THE GATE THAT WOULD HAVE CAUGHT THIS DOES NOT EXIST, WHICH IS M21/M22'S LESSON THIRD TIME
+RUNNING.** `BackfillTest` proves the review/edit split with `replayAudit()`, a **hand-authored** row — and
+its review fixture happens to carry `'status' => 'approved'`, so it is green before and after. **No test
+anywhere drives the real `SubmissionReviewService` and then runs the real backfill over the rows it
+actually wrote.** A unit test proves what a function does when called; only a call-site sweep proves the
+production payload is the shape the unit test assumed. That test is added here, and it is the one that
+fails on `main` today.
+
+### Blast radius, stated rather than discovered
+
+**`openapi.json` must stay byte-identical** — no `/api/v1` route, resource or controller is touched
+(`MemberProgressResource` and `GamificationController` belong to the *next* row, not this one).
+**Expect Pest to move and Vitest not to** — the mirror image of M22. No `.vue` file, so no
+`docker restart` of the node container and no Storybook axe movement. **No paired file is reached**:
+`ShellAbilityParityTest` fires on a new ability key (none is minted), `NotificationTypeParityTest` on a new
+`NotificationType` (none), and `clipped-node-containment.test.ts` scans `resources/` (untouched).
+`tests/e2e/responsive-axe.spec.ts:54` drives `/achievements`, but as a rendering and axe gate that asserts
+no point values — grepped before claiming, not assumed.
 
 ---
 

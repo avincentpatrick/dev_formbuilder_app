@@ -83,14 +83,31 @@ false, and each is falsified by a document that predates the row.
 earlier session on this device is still waiting to send."* — existence, a count, and no content. That is
 precisely the shape this row says the draft channel lacks.
 
-**(2) THE SPEC ALREADY SAYS THE DRAFT IS SESSION-SCOPED, SO SCOPING IT IMPLEMENTS THE SPEC RATHER THAN
-NARROWING IT.** `docs/ux/form-filling-ux-flow.md:148`: *"This save is **session/device-scoped**, not a
-durable resume-later feature… This is deliberately positioned to respondents as 'your progress is saved
-while you're filling this out,' **never as 'come back later'** — the latter promise is reserved for §5.2."*
-Appendix A #8 (`:336`) repeats it as a decision of record. **The "session" half of "session/device-scoped"
-was never built.** §5.2's emailed resume link is the sanctioned come-back-later channel, and it is
-respondent-bound by a signed token. **The kiosk-mode row is therefore NOT this row's precondition**, and
-nothing here waits on it.
+**(2) THE SPEC BOUNDS THE PROMISE EVEN WHERE IT IS LOOSE ABOUT THE MECHANISM.**
+`docs/ux/form-filling-ux-flow.md:148` opens *"This save is **session/device-scoped**, not a durable
+resume-later feature"* and closes *"deliberately positioned to respondents as 'your progress is saved while
+you're filling this out,' **never as 'come back later'** — the latter promise is reserved for §5.2."*
+Appendix A #8 (`:336`) repeats the first half as a decision of record. §5.2's emailed resume link is the
+sanctioned come-back-later channel and is respondent-bound by a signed token.
+
+⚠️ **AMENDED BEFORE THE FIRST FILE WAS OPENED — THIS CLAIM ORIGINALLY OVERSTATED IT, AND THE ADVERSARIAL
+PASS ON ITS OWN EVIDENCE IS WHAT CAUGHT IT.** The first version of this paragraph read *"the spec already
+says the draft is session-scoped, so scoping it implements the spec rather than narrowing it"* and leaned on
+the words *"session/device-scoped"* as decisive. **The same sentence continues *"so that a reload of the
+same browser tab **or the same device's browser** recovers the draft"*** — which authorises the broader
+reading in the same clause. So `:148` is **not** the arbiter this claim first made it. What survives is the
+narrower and sufficient point: the *promise* is bounded to the fill in progress, and the come-back-later
+promise is §5.2's. **The honest justification is ADR-0021's own move** (`:78-85`): a more faithful reading
+of a case the spec never considered — every sentence at `:148` is written about *the* respondent, definite
+article, singular, and the shared-device case is the one nobody wrote down. ⛔ **Recorded rather than
+quietly rewritten, because a claim that overstated its authority and was corrected by its own verification
+pass is worth more to the next reader than one that was right the first time.**
+
+**The kiosk-mode row is NOT this row's precondition, and that is refuted by the ADR rather than by the
+spec.** `ADR-0021:119-123` considered the device-owner / kiosk-unlock gate and **deferred** it in terms:
+*"It needs an operator concept the guest runtime does not have, **and it would leave the defect live until
+it was built**."* Kiosk mode adds operator *policy*; the mechanism this row needs is already wired and one
+argument short.
 
 ### Three defects the row does not mention, found by grepping the shape rather than the row
 

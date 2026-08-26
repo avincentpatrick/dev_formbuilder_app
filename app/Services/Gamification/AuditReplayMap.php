@@ -24,7 +24,11 @@ use App\Enums\PointRule;
  *      of all, writes neither an audit row nor an event.
  *   3. **`('submission', 'updated')` is written by TWO services** — `SubmissionReviewService::apply()` and
  *      `SubmissionAnswerEditService::edit()` — so `(auditable_type, event)` cannot tell a 3-point review
- *      from a 1-point edit.
+ *      from a 1-point edit. ⚠️ **M24: "two" is true of `app/` and FALSE of the table this reads.**
+ *      `DemoSeeder` and `E2eSeeder` write the same tuple with `['status' => 'approved',
+ *      'guest_contact_email' => …]` — status-bearing and marker-less — and those rows are fully
+ *      creditable. A grep of `app/` cannot see them, which is why this list said two for three
+ *      increments. The marker check below is what refuses them; see {@see self::SCORED_REVIEW_STATUSES}.
  *
  * So this class maps the five ACT rules only, and the two MEMBERSHIP rules are read from `tenant_users`
  * instead — `invited_by` / `invited_at` / `joined_at`, which is the authority on membership and is complete

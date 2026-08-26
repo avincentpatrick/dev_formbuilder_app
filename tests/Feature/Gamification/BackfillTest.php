@@ -21,13 +21,13 @@ use App\Services\Entitlements\EntitlementService;
 use App\Services\Gamification\BackfillTally;
 use App\Services\Gamification\GamificationBackfill;
 use App\Services\Gamification\PointsRecorder;
-use App\Services\Submissions\SubmissionReviewService;
 use App\Services\Settings\TenantSettingRegistry;
+use App\Services\Submissions\SubmissionReviewService;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Str;
 use Spatie\Permission\PermissionRegistrar;
 

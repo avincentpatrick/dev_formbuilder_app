@@ -157,6 +157,30 @@ it('refuses a review payload that carries no status at all rather than guessing 
     expect($candidate)->toBeNull();
 });
 
+it('refuses a scoring STATUS that arrives without the review marker, which is a shape a real database holds today', function (): void {
+    // ⛔ THE CASE THAT STOPS THE NEXT SIMPLIFICATION, AND IT IS NOT HYPOTHETICAL. The two checks below the
+    // `answers.` loop read as redundant — "if it has `remarks` and the status scores, score it" invites
+    // somebody to drop the marker test and keep the status test, since a status of `approved` looks like
+    // proof enough on its own. It is not.
+    //
+    // `DemoSeeder` and `E2eSeeder` both write `('submission','updated')` rows whose payload is
+    // `['status' => 'approved', 'guest_contact_email' => …]` — **status-bearing and marker-less**. That is
+    // a third and fourth writer of this tuple, invisible to a grep of `app/` (which is why this class's own
+    // docblock and ADR-0020 §D10(a) both say "two services" and both are right about the wrong scope), and
+    // it is the ONLY shape of this tuple present in the seeded dev database. It is fully creditable — a
+    // real actor, a real submission, no existing award — so the unique index would not refuse it either.
+    //
+    // Dropping the marker test would therefore not merely relax a guard: the very first
+    // `gamification:backfill` on a demo tenant would mint a brand-new false `submission.reviewed` award,
+    // plus the `first_review` badge at threshold 1, and ADR-0020 §D4 means neither can ever be removed.
+    // A seeded row is evidence of nothing anybody did.
+    $candidate = replayMap()->candidate(replayRow('submission', 'updated', newValueKeys: [
+        'status', 'guest_contact_email',
+    ], newStatus: 'approved'));
+
+    expect($candidate)->toBeNull();
+});
+
 it('still reads an edit of an APPROVED submission as an edit, never as a review', function (): void {
     // ⛔ THE TRAP THE ORIGINAL FILE WARNED ABOUT AT THE EDIT CASE ABOVE, NOW LIVE. `statusSnapshot()` emits
     // `status` too, so an edit to an already-approved submission carries exactly the status the review

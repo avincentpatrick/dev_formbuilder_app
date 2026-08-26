@@ -149,6 +149,32 @@ for (const p of pages) {
     for (const theme of themes) {
         test(`${p.name} (${theme}) — accessible & no horizontal overflow`, async ({ page }) => {
             await page.goto(p.path, { waitUntil: 'networkidle' });
+
+            // ⛔ THE SCAN HAS TO PROVE WHICH PAGE IT IS ON, AND UNTIL M25 NOTHING HERE DID. Every
+            // plan/module refusal in this application answers a web GET with `back()->with('toast')`
+            // — SEVEN handlers in `bootstrap/app.php` do it (`ScopeNodeException` :286,
+            // `GrantException` :297, `QuotaExceededException` :310, `FeatureGateException` :323,
+            // `ModuleDisabledException` :336, `XlsformImportException` :389,
+            // `FormNotAcceptingSubmissionException` :458) — i.e. a 302 that `goto` follows in
+            // silence. A scan of a page this tenant cannot reach is therefore a scan of whatever
+            // `back()` resolves to, and it PASSES: same shell, same axe result, same green tick.
+            //
+            // FOUR of the sixteen entries above are exposed, not one. `/achievements` sits behind
+            // `module:gamification` (routes/tenant.php:258-259) and `E2eSeeder` enables no module at
+            // all, so it rides entirely on `ToggleableModules`' default; `/analytics`, `/webhooks` and
+            // `/integrations` sit behind `feature:` PLAN gates (:891-892, :762-763, :823-824) whose
+            // only guarantee is that `E2eSeeder` upserts acme onto Business. The Analytics entry's own
+            // comment thirty lines up calls that seeding "a blocking obligation, precisely so this gate
+            // cannot stay green over a page it never loads" (ADR-0011 §D9) — the obligation is
+            // real, it is discharged, and this line is the first thing that checks.
+            //
+            // The other twelve are `can:`-gated, which raises 403 rather than redirecting. That is a
+            // different and much weaker exposure, so do not read this assertion as covering it.
+            //
+            // The idiom is `support/console.ts:34`'s, deliberately — the console scans have had it
+            // since I10e and this file's own `filteredToZero` loop below has the heading-check form.
+            expect(page.url(), `expected to be on ${p.path}, not ${page.url()}`).toContain(p.path);
+
             await forceTheme(page, theme);
             await assertClean(page, p.name);
         });

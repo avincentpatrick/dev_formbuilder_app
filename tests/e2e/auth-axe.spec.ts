@@ -82,6 +82,25 @@ for (const p of pages) {
     for (const theme of themes) {
         test(`${p.name} (${theme}) — accessible & no horizontal overflow`, async ({ page }) => {
             await page.goto(p.path, { waitUntil: 'networkidle' });
+
+            // ⛔ THE HAZARD THIS FILE'S OWN HEADER NAMES, FINALLY ASSERTED (M25). The header warns
+            // that a page behind `auth` added to the list below "would be scanned as the LOGIN page it
+            // redirects to and would pass while covering nothing" — and the inverse is live right
+            // now: all five entries carry `guest`, which bounces an AUTHENTICATED visitor to
+            // `config/fortify.php:80`'s /dashboard. The only thing between this loop and ten green
+            // scans of the dashboard is the `test.use({ storageState: … })` above; delete or
+            // mistype that one line and every test here still passes, having scanned the wrong page in
+            // both themes at all three viewports.
+            //
+            // Path only, unlike the sibling assertion in `responsive-axe.spec.ts`, which compares
+            // `p.path` entire: the reset-password entry carries `?email=demo%40meridian.test` and a
+            // percent-encoded query is not guaranteed to survive a round trip through the browser
+            // byte-for-byte. Page IDENTITY is what is at stake here, and the redirect being guarded
+            // against changes the path, so the query adds risk without adding coverage.
+            expect(page.url(), `expected to be on ${p.path}, not ${page.url()}`).toContain(
+                p.path.split('?')[0],
+            );
+
             await forceTheme(page, theme);
             await assertClean(page, p.name);
         });

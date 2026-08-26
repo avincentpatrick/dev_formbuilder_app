@@ -163,18 +163,40 @@ row's *"scoping it to a visit would delete the feature"* is a true statement **a
 
 - `lib/db.ts` — `respondent_session_id` on `DraftRow`
 - `composables/useAutosave.ts` — stamp on write, scope on restore, **and close the localStorage door**
-- `components/RuntimeSession.vue` — thread the id already injected at `:124` into `createAutosave`, render
-  the notice
-- `components/EarlierDraftNotice.vue` — **NEW.** The content-free affordance, page-local for the reason
-  `WelcomeBackBanner.vue:5-7` gives (DSR §1.2: don't add an Mds component for a one-off)
+- `components/RuntimeSession.vue` — thread the id already injected at `:124` into `createAutosave`
 - `App.vue` — scope the resume path's local read at `:249` so a stranger's draft cannot win reconciliation
-- `lib/reconcile.ts` — **on a prediction it may be released untouched.** The `minor` may close entirely in
-  `App.vue` by never handing `reconcileDraft` a foreign draft, in which case `:43`'s copy is correct as
-  written and this file does not move. Claimed because a file that might be written to is a file the other
-  lane must not be holding — the M17 `DnsRecordBlock.vue` / M18 three-file precedent.
-- `lib/types.ts` — `DraftBlob` may gain the stamp; **also on a prediction**
-- `__tests__/autosave.test.ts` · `__tests__/components.test.ts` · `__tests__/reconcile.test.ts` ·
-  `__tests__/db.test.ts` · `__tests__/respondent-session.test.ts`
+- `lib/media-queue.ts` — **ADDED AFTER THE CLAIM, and named here rather than absorbed quietly.**
+  `attachToSubmission()` re-points an already-owned blob, so the previous respondent's photo or signature
+  was uploaded as this submission's attachment. Found by the sweep, inside `resources/public-runtime/`
+  which 7(b) already grants Lane B outright — so it needed no extension commit, only this line.
+- `lib/respondent-session.ts` — **ALSO ADDED AFTER THE CLAIM, and it is the one that had to be fixed
+  rather than filed.** M15's ten-minute window was documented as idle time and was elapsed-since-boot.
+  Scoping the draft to a visit turns a wrong visit boundary into LOST WORK, so shipping the scope without
+  this would have traded a disclosure for silent data loss on a personal device. **A containment change
+  inherits every defect in the boundary it starts trusting.**
+- `__tests__/autosave.test.ts` · `__tests__/db.test.ts` · `__tests__/media-queue.test.ts` ·
+  `__tests__/respondent-session.test.ts`
+
+⛔ **THREE CLAIMED FILES WERE RELEASED UNTOUCHED, AND ONE OF THEM IS A DESIGN THIS CLAIM GOT WRONG.**
+
+- `components/EarlierDraftNotice.vue` — **NEVER CREATED, AND THE CLAIM WAS WRONG TO PLAN IT.** It was to be
+  a content-free "unfinished answers from an earlier visit — Resume / Start fresh" affordance. **The click
+  IS the leak**: the runtime has no evidence of ownership to attach to that button, so its copy cannot
+  distinguish *"yours"* from *"this device's"* — which is **verbatim the reason the sibling `minor` row
+  existed**. It would have converted a silent disclosure into a *consented-looking* one, which is worse for
+  the audit trail and no better for the previous respondent. Killed by the adversarial pass over this
+  claim's own design, not by a gate. ⚠️ **It would also have made a Lane A file paired**, since
+  `clipped-node-containment.test.ts` scans `resources/public-runtime` — so the wrong design was also the
+  one that reached across the boundary.
+- `lib/reconcile.ts` — released untouched **exactly as the claim predicted it might be**. The `minor`
+  closes entirely in `App.vue` by never handing `reconcileDraft` a foreign draft, so `LOCAL_WINS_NOTE` is
+  correct English for every case that can now reach it.
+- `lib/types.ts` — released untouched. `DraftBlob` is what `restore()` hands its caller; the visit stays
+  internal to the table and never needed to reach it.
+- `__tests__/components.test.ts` and `__tests__/reconcile.test.ts` — released untouched, and **that is a
+  measurement rather than an oversight**: `sessionId` defaults to *do not scope*, so all forty bare
+  `RuntimeSession` mounts and all five pure-function reconcile cases behave exactly as before. The
+  `undefined`-means-unscoped convention is what bought that, and it was chosen for it.
 
 **Shared artefacts, claimed and never owned:**
 

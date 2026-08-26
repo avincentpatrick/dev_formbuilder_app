@@ -214,8 +214,9 @@ function onInput(event: Event): void {
  * `preventDefault`ed, because otherwise the caret jumps to the end of the query. So the browser's own two
  * ways of revealing a control — focusing it, and scrolling the region with the arrows — are both
  * unavailable **by design**, and `aria-activedescendant` moves a highlight the sighted keyboard user can
- * no longer see. The palette renders up to 21 two-line options and 22rem shows five or six; after that
- * the reader is pressing Enter blind.
+ * no longer see. Measured at the palette’s real worst case (21 two-line options): the list is 1195px
+ * inside a 352px band, EXACTLY FIVE of the twenty-one rows are visible, and the last sits 843px below
+ * the box. From the sixth press on, the reader is pressing Enter blind.
  *
  * ⚠️ NO GATE IN THIS REPOSITORY SAW IT, AND THAT IS A FACT ABOUT THE FIXTURES RATHER THAN THE SCANNERS.
  * The stories seeded four options, so the list never scrolled: axe's `scrollable-region-focusable` never
@@ -266,7 +267,6 @@ function revealActiveOption(): void {
  * newly-highlighted first row can be well above the visible band with nothing having "changed".
  */
 watch([activeIndex, () => props.options], revealActiveOption, { flush: 'post' });
-
 
 function onOptionClick(index: number): void {
     activeIndex.value = index;

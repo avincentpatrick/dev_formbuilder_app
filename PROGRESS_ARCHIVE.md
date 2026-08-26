@@ -4679,3 +4679,58 @@ the green tick, is what proves the new gate actually runs; its log line was read
 
 Also recorded: `git worktree list` shows a third entry, `fb-lane-c` at `b44a36c` (PR #204, M14-era). It is
 **stale, not a live lane** — no `docs/claims/lane-c.md`, no `lane-c` branch on origin.
+
+### 2026-08-26 — 🅱️ LANE B · `M29`: the screenshot's gate had no test, and a sibling route walked around it (PR #219 — OPEN, NOT MERGED)
+
+⛔ **CI NEVER RAN. PR #219 IS OPEN AND THE LANE B CLAIM IS STILL ACTIVE.** The first run failed after 55s with all six jobs `queued` and **`steps: []`** — the no-runner-ran signature — and the re-run, plus both of Lane A's M30 runs, then sat queued 30–47 minutes with not one job started. Account-wide, not the diff. Self-merge requires 6/6 green with real step counts, so the PR was left open rather than merged blind. **Verified locally instead: full Pest 4229 passed / 17,970 assertions / 0 failed; Pint PASS over 1373 files; PHPStan 18 across 10 files, none of them this diff's. Vitest, Storybook axe, E2E and contract were NOT run and are recorded as unmeasured rather than green.**
+
+Took the `major` under *Test suite & CI gates* — *`GET /feedback/{report}/screenshot` serves PII and has no
+DENY test at all*. The row was true and was the smaller half.
+
+**The finding: a gate is only as narrow as the widest route that reaches the same bytes.**
+`GET /attachments/{attachment}` is authorized by `AttachmentPolicy::view()`, whose entire body was
+`$user->can('submissions.view')` — it never touched its `$attachment` argument. ADR-0015 §D6 filed the
+feedback screenshot into that same shared table, and `submissions.view` is held by `viewer`, `reviewer` and
+`form_editor` while `feedback.view` is held by none of them. The id-addressed sibling therefore served the
+PII image to exactly the three roles the dedicated route refuses — while `FeedbackController`'s own docblock
+said it declined to route through `AttachmentController` *precisely to avoid that coupling*. **Live, not
+latent.** `AttachmentPolicy` had no test of any kind and no HTTP test anywhere drove that route.
+
+**The census unit has to be the RESOURCE, not the feature — M26's lesson at one more remove.** M26 learned
+to enumerate consumers of a field from the code rather than the report. Not enough here: "who serves this
+screenshot" finds two routes and stops. What found the defect was enumerating **every endpoint in the
+repository that serves stored bytes — ten** — and asking of each which test asserts a refusal. **Four of ten
+had one.** Two routes reaching the same bytes under two different permissions is invisible to any sweep
+organised by feature.
+
+**The row's own proposed fix was half-inert, and it was measured.** `SubstituteBindings` runs before
+`Authorize`, so the cross-tenant `assertNotFound` the row asks for 404s at route-model binding and passes
+unchanged with the middleware deleted. Mutation 3 removed that middleware and reddened the same-tenant
+Viewer case alone. Both cases ship; the cross-tenant one now carries a comment saying it is not a substitute.
+
+**Three mutations, pairwise disjoint red sets** — 1 / 2 / 1 against a green 19-passed baseline, with the
+named positive control in mutation 2's set. **And the harness failed first, in the way hardest to notice:**
+v1 spliced by index arithmetic and produced syntactically invalid PHP, where every test errors — which reads
+as *"the mutation was detected"* if you only count red. v2 replaces one literal token per mutation and adds
+two checks the standing rule does not name: **`php -l` the mutant, and assert its sha256 actually moved.**
+
+**`TaskStop` on a background shell is not `kill` on what that shell spawned.** Stopping the harness killed
+the tool's wrapper and not the `bash` script, which kept running and mutating; its `docker exec` host side
+died while the container's Pest kept going, and a new PID appeared after the first kill. Three kills —
+wrapper, host script, container process — before the tree could be restored.
+
+**A namespace handed over in a next-prompt is a reservation, not a destination.** The claim reserved
+ADR-0016 §D35 because the hand-off named it; ADR-0016 is SAML SSO. ADR-0015 §D6 created this coupling, §D7
+already says *"both screenshot routes"*, §D8 marks the row PII — so the decision is **ADR-0015 §D9** and the
+reserved slot was never spent. Seventh consecutive Lane B increment amending rather than minting.
+
+**Six findings filed, not fixed**, each the moment it was decided. Largest: `AttachmentPolicy::view()` is
+still flat where `SubmissionPolicy::view()` is scoped, affecting exactly `form_editor` and `reviewer`.
+Sharpest consequence: **revocation does not revoke** — remove a `form_editor` from a form and
+`SubmissionPolicy` refuses them on the next request while every attachment id they ever saw keeps working.
+
+**Also recorded, from Lane A's side of the parallel run:** the other lane's **worktree HEAD is observable
+before its claim file is**. Lane A saw `fb-lane-b` on a branch named `m29-feedback-screenshot-deny` with zero
+commits four minutes before the claim was pushed. Rule 7(g) is still right that an unpushed claim does not
+exist; `git worktree list` is a second, earlier signal and costs one command.
+

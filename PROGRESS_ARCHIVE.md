@@ -4631,3 +4631,51 @@ mystery**: check what merged since the branch was cut before reaching for any ot
 new baseline for both lanes is **4544 / 19,280** (2 pre-existing warnings). Everything else was exactly
 as predicted and exactly unmoved: E2E **551 passed + 10 skipped with no flaky line**, Vitest **2,213**,
 Storybook axe **42 / 299**. Six jobs, real step counts **20 · 18 · 11 · 11 · 12 · 16**.
+
+---
+
+### 2026-08-26 — LANE A · `M25` + `M27` + `M28`: the three-row queue, discharged in one session
+
+Three rows handed over after M23, all merged 6/6 with real step counts: **M25** (PR #216, `6c5494e`) put
+a landing assertion on the axe scans, **M27** (PR #217, `4c97c8b`) made the README able to bootstrap a
+fresh clone, **M28** (PR #218, `d0a5452`) added the component-import gate. **None spent a namespace** —
+ADR `0022` is still free and still Lane A's block-opener, eight consecutive increments now.
+
+**All three rows had correct evidence and understated their own scope**, which is the streak continuing
+rather than breaking. M25's row named one exposed page when **four** are, and cited two wrong line ranges
+(the loop is `:148-156`, not `:124-132` — that is inside the `pages` array). M27's named one CSS entry
+point when **two** fail, and one README site when **three** needed changing. M28's gave no
+false-positive estimate at all, which was the actual risk in it.
+
+**The measurement that mattered in M25 was the one that went the wrong way.** With `modules.gamification`
+disabled for `acme`, the pre-fix spec reported **`2 passed`** on two tests named *"Achievements"* that had
+scanned the dashboard in both themes. That green *is* the defect, and it is the only thing that proved the
+row described something real rather than something plausible.
+
+**A local red has at least three causes and they are indistinguishable from outside.** M25's full local
+e2e sweep returned **253 passed / 8 failed** and neither failure was the diff's: six `Sheets rule detail —
+drift` cases reproduce identically with the change **reverted** and pass in CI (this host's dev database
+is a long-lived hybrid and is not CI's), and two Builder/tablet cases were a **load flake** inside a
+1.1-hour saturated run that pass cleanly on re-run in 1.7m. Two extra runs, about six minutes of the
+right one, and it was the difference between shipping and reverting a correct fix.
+
+**M27's forward run is the half that proves a documentation fix.** Reproducing the failure shows the row
+was real; running `ds:install` → `ds:tokens` → `build` to **exit 0** shows the sequence now in the README
+is *sufficient* and not merely *different*. Its sharpest finding is one the row never mentions: **the
+build's failure prints a success after it** — the PWA service-worker build runs next and succeeds, so the
+last line on screen is `✓ built in 329ms`. Trust the exit code, not the tail.
+
+**M28's own control found a defect in M28.** Three positive controls, three distinct failure modes; the
+second reddened with the right exit code and the **wrong message**, handing *"add the import"* advice to a
+missing scan root. **A control that only checks the exit code is half a control**, and a gate whose
+failure message points at the wrong fix costs more than the bug it caught. Prototyping the rule read-only
+before claiming also turned up two distinct false-positive classes in 180 files — a tag **quoted inside an
+HTML comment** (the *name the thing, never quote it* lesson, now biting a tool rather than a script) and a
+legitimate **recursive self-reference** Vue resolves by filename.
+
+**Baseline change other sessions must carry: the host lint quartet is a quintet** —
+`97 · 113 · 31 · 113/121/0 · 180`. CI's *Static analysis* job went **18 → 19 steps**, and that delta, not
+the green tick, is what proves the new gate actually runs; its log line was read out by name.
+
+Also recorded: `git worktree list` shows a third entry, `fb-lane-c` at `b44a36c` (PR #204, M14-era). It is
+**stale, not a live lane** — no `docs/claims/lane-c.md`, no `lane-c` branch on origin.

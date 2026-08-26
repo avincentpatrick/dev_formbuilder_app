@@ -16,7 +16,39 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M28`, the gate that detects a component used in a template but never imported
+## Status: NO ACTIVE CLAIM
+
+Lane A holds nothing. **The three-row queue handed over after M23 is fully discharged** — `M25` (PR #216),
+`M27` (PR #217) and `M28` (PR #218), all merged 6/6 with real steps counts. **Rule 7(f) governs from
+here**: take from the gap backlog, or the unassigned remainder, and claim it here first.
+
+**Namespaces after M28:** next free ADR is still **`0022`** and it is still **Lane A's** block-opener
+(`0022-0025`) — **M25, M27 and M28 each spent nothing**, which makes it eight consecutive Lane A
+increments; `0010` reserved for H1d; `#16` free; next free migration prefix still **`2026_08_17_000111`**.
+
+**Baseline on `origin/main` after M28, every figure from CI rather than quoted:** CI Pest **4544 /
+19,280** · Vitest **134 files / 2,292** (design-system **36/574** · resources/js **62/899** ·
+public-runtime **36/819**) · Storybook axe **42 suites / 303** · E2E **551 passed + 10 skipped, no flaky
+line** (re-measured on M25's own run, 17.9m) · PHPStan CI `[OK]` · **FIVE** host lint gates
+**97 · 113 · 31 · 113/121/0 · 180** · `openapi.json` byte-identical.
+
+⚠️ **M25 MOVED NOTHING, AND THAT IS THE MEASUREMENT RATHER THAN AN OMISSION** — it adds assertions to
+existing tests and creates none, so an unchanged E2E count is the *prediction being confirmed*. A moved
+count would have meant a test was accidentally created or dropped. ⚠️ **Lane B's `M24` and `M26` both
+landed against this same base**; neither moves a Lane A figure, but the standing warning holds — a gate
+number that moves on a diff that cannot move it is the OTHER LANE.
+
+---
+
+---
+
+⚠️ **THE HOST LINT QUARTET IS A QUINTET FROM M28 ONWARD — `97 · 113 · 31 · 113/121/0 · 180`.**
+The fifth is `component-import-lint` (180 SFCs). A hand-off quoting four numbers is quoting a
+pre-M28 baseline.
+
+---
+
+## RELEASED — M28, the component-import gate (merged as PR #218, `d0a5452`, 6/6 green)
 
 **Taken 2026-08-26.** Branch `m28-component-import-gate`, cut from `origin/main` at `4c97c8b`, PR into
 `main`. Row: the `minor` under **Test suite & CI gates** in `docs/feature-backlog.md` — *no gate in this
@@ -117,19 +149,26 @@ Laravel preset does not list it either** — ⚠️ both to be **verified by run
 M9's lesson that *Pint's `passed` is not evidence it scanned anything*. No `.vue`, no `resources/`, no
 test file, no route: **Vitest, Storybook axe, E2E, Pest and `openapi.json` are unmoved by construction.**
 
-**Baseline on `origin/main` after M27, every figure from CI rather than quoted:** CI Pest **4544 /
-19,280** · Vitest **134 files / 2,292** (design-system **36/574** · resources/js **62/899** ·
-public-runtime **36/819**) · Storybook axe **42 suites / 303** · E2E **551 passed + 10 skipped, no flaky
-line** (re-measured on M25's own run, 17.9m) · PHPStan CI `[OK]` · four host lint gates
-**97 · 113 · 31 · 113/121/0** · `openapi.json` byte-identical.
+### ✅ WHAT THE GATES MEASURED, AND THE ONE THING WORTH CHECKING TWICE
 
-⚠️ **M25 MOVED NOTHING, AND THAT IS THE MEASUREMENT RATHER THAN AN OMISSION** — it adds assertions to
-existing tests and creates none, so an unchanged E2E count is the *prediction being confirmed*. A moved
-count would have meant a test was accidentally created or dropped. ⚠️ **Lane B's `M24` and `M26` both
-landed against this same base**; neither moves a Lane A figure, but the standing warning holds — a gate
-number that moves on a diff that cannot move it is the OTHER LANE.
+**6/6 green with real steps counts** — and **Static analysis went 18 → 19 steps**, which is the new gate
+itself. ⛔ **THAT DELTA IS THE MEASUREMENT THAT MATTERS, NOT THE GREEN TICK.** A gate registered but not
+running is this project's most-repeated failure, so the step was read out of the CI log by name:
+`Component import linter … success`, step 11, printing **`Component-import linter passed (180 SFC(s)
+scanned)`**. The same 180 as locally, so CI's checkout and the host agree on discovery — which is itself
+worth knowing, because container file discovery has silently under-counted here before.
 
----
+**Five host linters — `97 · 113 · 31 · 113/121/0 · 180`**, the four prior figures re-measured and unmoved.
+PHPStan **18**, this file not among them. **Pint scans `scripts/`**, proven by a deliberate misformat
+probe rather than inferred from its `passed` line. E2E, Vitest, Storybook axe, Pest and `openapi.json`
+unmoved by construction.
+
+⚠️ **THE R2 CONTROL IS THE TRANSFERABLE PART OF THIS INCREMENT.** It was run as a genuine question rather
+than a formality, and it found a defect in the gate: the first version handed *"add the import"* advice to
+a **missing scan root**, whose remedy is entirely different. **A gate whose failure message points at the
+wrong fix costs more than the bug it caught** — and nothing but running the control in its own right would
+have surfaced it, because the exit code was already correct. A control that only checks the exit code is
+half a control.
 
 ---
 

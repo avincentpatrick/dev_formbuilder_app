@@ -17,6 +17,7 @@ import { ApiError, normalizeError } from './error-normalizer';
 import type { MeridianDb, MediaQueueRow, OutboxRow } from './db';
 import type { ErrorKind, SchemaResponse } from './types';
 import { listPending, markConflict, markNeedsAttention, markSynced, pruneSynced, recordAttempt, setAnswers } from './outbox';
+import { reapAbandoned } from './reap';
 import {
     collectLocalMediaIds,
     listForSubmission,
@@ -170,6 +171,17 @@ async function run(db: MeridianDb, fetchFn: typeof fetch, hooks: ReplayHooks): P
     // Prune HERE and not only in the composable: sw.ts calls replayOutbox() directly with no tab open, so a
     // device that only ever syncs through Background Sync would otherwise accumulate receipts forever.
     await pruneSynced(db);
+
+    // Increment M22 — and the same argument, one store wider. `pruneSynced` collects delivered receipts;
+    // this collects the two stores nothing collected at all: expired `draft_answers` rows whose key a
+    // republish moved out from under every reader, and `media_queue` blobs whose null
+    // `client_submission_uuid` puts them outside the only index that names the field.
+    //
+    // ⛔ SAFE IN THE SERVICE WORKER, WHICH IS NOT TRUE OF MOST OF THIS RUNTIME'S SCOPING. `reap.ts` tests
+    // REACHABILITY, not ownership, so it imports only `./db` and `./media-queue` — both already in this
+    // module's graph — and never `lib/respondent-session.ts`, which reads a `sessionStorage` that does not
+    // exist here and that `tsconfig.sw.json` has no types for.
+    await reapAbandoned(db);
 
     return result;
 }

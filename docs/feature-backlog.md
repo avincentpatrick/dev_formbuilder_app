@@ -1138,24 +1138,60 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `LOCAL_WINS_NOTE` is **untouched and did not need to change**: the sentence is correct English for every
   case that can now reach it, which is the narrower fix the row itself asked for.
 
-- **`major` · The guest device has no enumerator and no reaper for abandoned answer content.** Two shapes,
-  one missing mechanism. **(a)** `media_queue` orphans: `stash()` writes `client_submission_uuid: null`, and
-  the table's only two deleters are in `lib/outbox.ts`, both `where('client_submission_uuid').equals(uuid)`
-  — a uuid string, which can never match a null row. A photo, signature or ID scan picked mid-fill and then
-  **abandoned** has no uuid, no TTL and no prune, and lives until the browser evicts the origin. **(b)**
-  `draft_answers` pre-republish orphans: `clear()` deletes only the *current* `[form_version_id, slug]`.
-  After a republish the session remounts on the **new** `form_version_id`, so the old row is never written,
-  read or deleted again — including by the seven-day TTL, which is a branch inside `restore()` that only
-  ever fires against the key it just fetched. There is no `where`/`orderBy`/`toArray`/`each`/`count` on
-  `draft_answers` anywhere in the tree.
-  **Filed rather than fixed, and the reason is scope rather than difficulty:** the fix is a mechanism this
-  table has never had — an enumerating sweeper plus a retention decision (how long, on what trigger, and
-  whether it runs in the service worker, where `sessionStorage` does not exist and a visit cannot be read).
-  That is its own increment with its own ADR question. ⚠️ **It is a RETENTION defect and not a disclosure
-  one once M21 landed**: an orphan blob is unreachable from every UI (`listForSubmission` is by uuid, and a
-  `local:` ref only renders if the answers are restored, which is now scoped), and an orphan draft row is
-  unreachable from both readers. Note `useSyncOutbox`'s quota line currently blames the outbox for the
-  storage this consumes. **Live.**
+- ~~**`major` · The guest device has no enumerator and no reaper for abandoned answer content.**~~
+  ✅ **CLOSED — Increment M22 (2026-08-26).** `resources/public-runtime/lib/reap.ts` is the sweeper both
+  tables had never had, wired exactly where `pruneSynced()` already is: `useSyncOutbox.refresh()` for the
+  boot pass with a tab, and `replay.ts`'s drain for the Background-Sync pass without one. **(a)** A
+  `media_queue` row with a null `client_submission_uuid` that no answer document still names, past a
+  one-hour in-flight grace, is deleted. **(b)** A `draft_answers` row past `DRAFT_TTL_MS` is deleted over
+  `updated_at`'s **v1** index — so the seven-day expiry finally reaches keys no reader holds, which is what
+  a republish creates. Reasoning in `docs/adr/0021-respondent-scoped-device-outbox.md`, amended again.
+  **Both shapes verified against the code before anything was written, and both were exactly as filed.**
+  The two deleters are `lib/outbox.ts:107` and `:159`, both `where('client_submission_uuid').equals(uuid)`
+  — and the row understated *why* that can never match: a null is not merely unequal to a uuid string,
+  **IndexedDB does not index `null` at all**, so an orphan is absent from the index and no argument to that
+  `where()` could ever reach it. `draft_answers` had `.get`, `.put` and `.delete` and nothing else.
+  ⛔ **BUT THE ROW WAS WRONG ABOUT ITS OWN COST, WHICH IS ELEVEN FILED ROWS IN A ROW NOW WRONG ABOUT
+  THEMSELVES.** It deferred itself as needing *"an enumerating sweeper plus a retention decision (how long,
+  on what trigger, and whether it runs in the service worker) … its own increment with its own ADR
+  question."* **No decision was filed to `docs/claims/decisions.md` and no ADR number was minted, and
+  neither is an omission.** *How long* is `DRAFT_TTL_MS` — the seven-day window `useAutosave.fresh()` has
+  gated the restore on since F6b and UX §5.1 specifies; the defect was never that it was unspecified, only
+  that nothing could apply it to an unreachable key. *On what trigger* had a precedent in the same runtime:
+  `pruneSynced` is called from both places, so this is too. *Whether it runs in the service worker* looked
+  like a question and was a **constraint** — `tsconfig.sw.json` re-checks `sw.ts`'s graph with `types: []`,
+  so a module it reaches cannot read `sessionStorage` and cannot know whose visit anything is. That is what
+  forced the design to test **reachability rather than ownership**, and reachability is the better test
+  anyway: it spares an earlier visit's blobs while their queued submission is still draining (the drain is
+  device-wide on purpose), and it asks through `collectLocalMediaIds()` — **the same function
+  `attachToSubmission()` links with**, so the linker and the sweeper cannot drift.
+  ⚠️ **AND IT COST NO SCHEMA CHANGE, WHICH THE ROW ALSO DID NOT KNOW.** `updated_at` on `draft_answers` and
+  `status` on `media_queue` were both declared in **v1**, so there is no `db.version()` bump — which
+  matters more than convenience here, because `db.test.ts` pins `verno` at 2 and Dexie throws outright on a
+  primary-key change (`dexie.js:3832`), failing to open on every device that already has one.
+  ⚠️ **Nothing UNSENT is reaped, at any age, by any predicate** — `pruneSynced`'s contract governs here and
+  this module is stricter, never writing `outbox` at all. It **reads** it, to learn what to spare: a ref
+  that failed to link leaves an orphaned blob while the queued submission still carries its `local:`
+  placeholder, and `replay.ts` refuses to POST one (*"queued media is incomplete"* → five attempts →
+  `needs_attention`), so reaping that blob would park a real respondent's real submission forever.
+  Still true, and still filed separately below: `useSyncOutbox`'s quota line blames the outbox for storage
+  this consumed.
+
+- **`minor` · A media pick made during a conflict review is protected only by the reaper's grace window.**
+  Filed 2026-08-26 by M22, **the moment M22 decided not to fix it.** `lib/reap.ts` spares an orphaned blob
+  while some answer document still names its `local:` ref — but the conflict-review session runs
+  `createAutosave` with `enabled: false` (Increment G8c, deliberately: a transient review must not clobber
+  a live fill on the shared `[form_version_id+slug]` key), so it writes **no `draft_answers` row at all**.
+  A blob picked during a review is therefore referenced by nothing on disk until the resubmit, while
+  `refresh()` can fire underneath it on `online` or `visibilitychange`. `MEDIA_ORPHAN_GRACE_MS` is one hour
+  **because of this case and not because of the 800 ms autosave debounce**, so a review that outlasts an
+  hour loses that pick. It fails safe rather than silently — the resubmit parks as `needs_attention` with
+  *"queued media is incomplete"* rather than posting a dead ref — and it needs a respondent to leave a
+  review open for an hour on a device something else then syncs from.
+  **The fix is to stop the review session being invisible to the mark set, not to lengthen the window**:
+  either thread the live `local:` ids from `App.vue`'s `OfflineMediaKey` provider into the sweep as a
+  protected set (app-side only; a service worker has no such set), or give the review session durable state
+  of its own. The second is the better shape and is larger than this row. **Live.**
 
 - **`minor` · The storage-quota line counts strangers' submissions.** `useSyncOutbox` computes `queued` from
   the device-wide count and renders *"N responses waiting to send"*, while `mine`, `earlierUnsent` and

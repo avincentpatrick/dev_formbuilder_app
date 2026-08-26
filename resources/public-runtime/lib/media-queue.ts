@@ -27,7 +27,17 @@ export interface StashInput {
     size: number;
 }
 
-/** Stash a picked file offline; the parent submission uuid is linked later, at finalize. */
+/**
+ * Stash a picked file offline; the parent submission uuid is linked later, at finalize.
+ *
+ * ⚠️ `client_submission_uuid: null` IS THE WHOLE OF INCREMENT M22's SUBJECT, AND IT IS CORRECT HERE. The
+ * submission does not exist yet, so there is nothing honest to write. What was missing is what happens when
+ * the fill is ABANDONED and finalize never runs: this row's null puts it outside the
+ * `client_submission_uuid` index — IndexedDB does not index null — so neither of `lib/outbox.ts`'s two
+ * uuid-keyed deleters could ever reach it, and a respondent's photo, signature or ID scan stayed on shared
+ * hardware until the browser evicted the origin. `lib/reap.ts` collects it by REACHABILITY instead: once no
+ * answer document still carries its `local:` ref, nothing can use it and it goes.
+ */
 export async function stash(db: MeridianDb, input: StashInput): Promise<MediaQueueRow> {
     const row: MediaQueueRow = {
         ...input,

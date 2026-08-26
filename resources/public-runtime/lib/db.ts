@@ -4,10 +4,14 @@
  *  - `cached_manifests` — a pinned form version's schema, keyed by form_version_id (forward-compatible with the
  *    authenticated sync/manifest surface; the guest schema itself is still served by the G8a SW schema cache).
  *  - `draft_answers`    — in-progress, not-yet-finalized answers (the G8a localStorage autosave migrates here).
+ *                         From M22 an EXPIRED row is swept by `lib/reap.ts` rather than only by the reader
+ *                         that happens to hold its key, so a republish can no longer strand one forever.
  *  - `outbox`           — FINALIZED submissions queued for replay, keyed by the time-sortable client_submission_uuid.
  *                         From I10d a DELIVERED row is RETAINED (status `synced`, answers scrubbed) rather
  *                         than deleted, so the respondent can see what was sent; see outbox.ts.
  *  - `media_queue`      — respondent media blobs awaiting upload, referencing their parent outbox row by uuid.
+ *                         A blob picked mid-fill has NO uuid yet; from M22 `lib/reap.ts` collects the ones
+ *                         no answer document still names, which the uuid-keyed deleters cannot see.
  *  - `app_state`        — (H23b) small device-scoped scalars that outlive a page load and belong to no form.
  *
  * The SAME db name is opened from both the Vue app and the service worker, so a `sync` event can replay the
@@ -60,14 +64,20 @@ export interface DraftRow {
      * existing shape, not about re-shaping it.
      *
      * The second reason is what the shared key is FOR. This table has two readers
-     * (`useAutosave.restore()`, `App.vue`'s resume read), one deleter (`clear()`, which deletes only THIS
-     * session's key) and **no enumerator at all** — the seven-day TTL is a branch inside `restore()`, not a
-     * sweeper. An abandoned draft is collected by the next respondent's first keystroke landing on the SAME
-     * primary key; a per-visit key removes that and leaves the answers unreachable on shared hardware.
-     * ⚠️ Stated honestly, because it is a difference of RATE rather than of kind: uncollectable rows
-     * already exist here — a republish moves `form_version_id`, so the pre-republish row is orphaned with
-     * nothing able to reach it. That is a real pre-existing hole, filed in `docs/feature-backlog.md`, and
-     * it is not this field's job to close.
+     * (`useAutosave.restore()`, `App.vue`'s resume read) and one keyed deleter (`clear()`, which deletes
+     * only THIS session's key). An abandoned draft is collected by the next respondent's first keystroke
+     * landing on the SAME primary key; a per-visit key removes that and leaves the answers unreachable on
+     * shared hardware.
+     * ⚠️ INCREMENT M22 CLOSED THE HOLE THE NEXT SENTENCE USED TO CONCEDE, AND THE SENTENCE IS AMENDED
+     * RATHER THAN DELETED BECAUSE THE CONCESSION IS WHY THE SWEEPER EXISTS. This paragraph read "**no
+     * enumerator at all** — the seven-day TTL is a branch inside `restore()`, not a sweeper", and went on:
+     * "uncollectable rows already exist here — a republish moves `form_version_id`, so the pre-republish
+     * row is orphaned with nothing able to reach it. That is a real pre-existing hole, filed in
+     * `docs/feature-backlog.md`, and it is not this field's job to close." It was true, it was filed, and
+     * `lib/reap.ts` is the increment that took it: the TTL now has a sweeper that reaches keys nobody
+     * holds, over `updated_at`'s existing index. The reasoning ABOVE is untouched by that — Dexie still
+     * refuses a primary-key change, and the shared key is still what makes the ordinary case collect in
+     * 800ms rather than in seven days. The sweeper is the floor, not the mechanism.
      *
      * Sharing the key is what collects the row; the stamp is what stops it being read.
      * See `docs/adr/0021-respondent-scoped-device-outbox.md`.
@@ -97,6 +107,22 @@ export function draftBelongsToVisit(
 ): boolean {
     return sessionId === undefined || row.respondent_session_id === sessionId;
 }
+
+/**
+ * How long an in-progress draft survives without being touched (Increment F6b, UX §5.1's seven-day
+ * inactivity expiry).
+ *
+ * ⛔ INCREMENT M22 MOVED IT HERE FROM `composables/useAutosave.ts`, WHERE IT WAS A PRIVATE CONSTANT, AND
+ * THE MOVE IS THE WHOLE POINT RATHER THAN TIDYING. The window now has a second consumer — `lib/reap.ts`,
+ * the sweeper that finally reaches the rows whose key nobody holds — and that module cannot import the
+ * composable: `useAutosave.ts` imports `vue`, and `reap.ts` is reached from `sw.ts`'s graph, which
+ * `tsconfig.sw.json` re-checks with `types: []`. The alternative was a second copy of the number, and two
+ * copies of a retention window disagreeing is a defect this project has already recorded more than once.
+ *
+ * It sits beside `DraftRow` and `draftBelongsToVisit()` for the reason stated on that function: the rules
+ * that govern this table live next to the table, so its readers cannot drift apart.
+ */
+export const DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 export type OutboxStatus = 'pending' | 'synced' | 'conflict' | 'needs_attention';
 

@@ -25,6 +25,7 @@ import {
     retryAll,
     retryRow,
 } from '../lib/outbox';
+import { reapAbandoned } from '../lib/reap';
 import { replayOne, replayOutbox, type ReplayHooks } from '../lib/replay';
 
 /** Background Sync's `SyncManager` is not in the standard TS lib typings. */
@@ -203,6 +204,20 @@ export function createSyncOutbox(db: MeridianDb, options: SyncOutboxOptions = {}
         // hands it the session too: an EARLIER visit's delivered receipt can never be rendered or counted
         // again, so keeping a server reference for it on shared hardware buys nothing.
         await pruneSynced(db, Date.now(), options.sessionId);
+
+        // Increment M22 — and the OTHER two stores, which until now nothing collected at all. `pruneSynced`
+        // above only ever touched `outbox`; an expired draft whose key a republish moved, and an abandoned
+        // media blob whose `client_submission_uuid` is null, were unreachable by every query in the tree.
+        //
+        // ⛔ HERE AS WELL AS IN `replay.ts`, FOR THE REASON THE PRUNE IS IN BOTH PLACES AND ONE MORE.
+        // `run()` reaps too, so a device that only ever syncs through Background Sync still collects; but
+        // the sync events fire only when there is something to SEND, and the device this row is about is
+        // one somebody walked away from. `refresh()` runs unconditionally at boot, which is the pass that
+        // matters — the next respondent picking the tablet up is the trigger.
+        //
+        // Fire-and-forget would be wrong: `rows`/`counts` are read immediately below, and a reap that
+        // resolved afterwards would leave the surface describing rows that had just gone.
+        await reapAbandoned(db);
 
         // ⚠️ STILL DEVICE-WIDE, AND M15 LEFT THEM THAT WAY ON PURPOSE — see the interface note. The boot
         // drain below and `checkQuota` are statements about the DEVICE, and a session-scoped `pending`

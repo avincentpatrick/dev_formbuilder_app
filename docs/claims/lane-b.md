@@ -18,7 +18,27 @@ exact-equality `KNOWN_UNGUARDED` assertion, so the list shrinks in the *same* PR
 
 ---
 
-## CLAIMED — `M21`, the abandoned draft that is restored into the next respondent's form
+## Status: NO ACTIVE CLAIM
+
+Lane B holds nothing. **Namespaces after M21:** migration block stays **`2026_08_17_000111`** (M21 spent no
+migration — nothing server-side moved); ADR-0016's next free sub-decision stays **`§D35`**. ⛔ **ADR `0022`
+STAYS FREE and stays Lane A's block-opener** — M21 deliberately spent no ADR number, because this is
+`ADR-0021`'s own decision applied to its second channel, and minting `0022` would have spent the scarcer
+namespace to restate an accepted decision. That is M18's reasoning, reused. `0010` stays reserved for H1d;
+`#16` stays free.
+
+**Baseline on `origin/main` after M21:** CI Pest **4544 / 19,280** (2 pre-existing warnings, unmoved — no
+PHP in the diff) · Vitest **130 files / 2,236** (design-system 35/545 · **public-runtime 35/805** ·
+resources/js 60/886) · Storybook axe **42 / 299** · E2E **551 passed + 10 skipped, no flaky line** ·
+PHPStan CI `[OK]` · four host lint gates **97 · 113 · 31 · 113/121/0**.
+⚠️ **Only the public-runtime chunk moved (+23), which is what the row predicted and the mirror image of
+M18.** Lane A's post-M19 line recorded the lint gates as `97 · 111 · 31 · 111/119/0`; the difference is
+exactly M18's two migrations, so that line was written against a pre-M18 tree and **97 · 113 · 31 ·
+113/121/0** is the current truth, re-measured on this one.
+
+---
+
+## RELEASED — M21, the abandoned draft that is restored into the next respondent's form (merged as PR #211, `15dc10b`, 6/6)
 
 **Taken 2026-08-26.** Branch `m21-draft-respondent-scope`, cut from `origin/main` at `336d295`, PR into
 `main`. Row: `docs/feature-backlog.md:1099` — *"An abandoned local draft is restored into the NEXT

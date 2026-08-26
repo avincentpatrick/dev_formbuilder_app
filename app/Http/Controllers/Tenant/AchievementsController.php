@@ -58,6 +58,14 @@ use Inertia\Response;
  * the org-wide totals the dashboard is careful to withhold — **a widening of an existing permission,
  * performed by a new page**, which is the shape §D7 minted no thirtieth key in order to avoid. So one
  * gated payload, matching the API's, and `scoreboard` is null for everyone else.
+ *
+ * ⛔ **AND FOR TWO INCREMENTS THIS FILE DID NOT FINISH APPLYING ITS OWN PARAGRAPH (M26, ADR-0020 §D13).**
+ * The argument above is that a plain workspace-wide COUNT is the sensitive thing, not merely a colleague's
+ * name — which is why `team.active_members` is inside the gated payload. **`standing.of` is that same count**,
+ * and it sat three fields earlier with no permission at all, so this controller asserted both halves of the
+ * split it had just rejected. It is now resolved from the one `$orgWide` variable that decides `scoreboard`,
+ * so the two cannot disagree again. `rank` is untouched: §D7 grants a member their own position, and a rank
+ * discloses a floor rather than the headcount.
  */
 final class AchievementsController extends Controller
 {
@@ -86,8 +94,16 @@ final class AchievementsController extends Controller
         $userId = (string) $user->id;
         $tenantId = TenantContext::currentTenantId();
 
+        // Resolved ONCE and read twice, which is the fix M26 made rather than the fix it could have made.
+        // §D13: `standing.of` and `scoreboard.team.active_members` are the same workspace figure, and they
+        // disagreed here for two increments precisely because two lines decided it separately. One variable
+        // is what makes them unable to drift apart again.
+        $orgWide = $user->can('viewAny', PointAward::class);
+
+        $standing = $this->leaderboard->standingFor($userId);
+
         $progress = new MemberProgress(
-            standing: $this->leaderboard->standingFor($userId),
+            standing: $orgWide ? $standing : $standing->withoutHeadcount(),
             streak: $this->streakFor($tenantId, $userId),
         );
 
@@ -99,7 +115,9 @@ final class AchievementsController extends Controller
                     // Competition rank — one plus the number strictly ahead — so a tie shares a place and
                     // the next one skips it. Null when this reader holds no active membership here.
                     'rank' => $progress->standing->rank,
-                    // ACTIVE MEMBERS, never the number who have scored. See MemberStanding.
+                    // ACTIVE MEMBERS, never the number who have scored — and NULL for a reader without
+                    // `dashboard.org.view`, who may not have the workspace headcount (§D13). The page
+                    // degrades the label to "4th"; it does not re-derive the condition.
                     'of' => $progress->standing->of,
                 ],
                 'streak' => [
@@ -112,7 +130,7 @@ final class AchievementsController extends Controller
             ],
             'shelf' => $this->shelfProps($this->shelfFor($tenantId, $userId)),
             // Null unless this reader may see workspace-wide numbers about colleagues. See the class docblock.
-            'scoreboard' => $user->can('viewAny', PointAward::class)
+            'scoreboard' => $orgWide
                 ? $this->scoreboardProps(new Scoreboard(
                     ladder: $this->leaderboard->forCurrentTenant(),
                     team: $this->team->forCurrentTenant(),

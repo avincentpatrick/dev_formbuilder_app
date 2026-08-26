@@ -85,10 +85,15 @@ const props = defineProps<{
     /**
      * K1e — this member's own gamification numbers, or `null` when the workspace has switched the module
      * off. The page reads the null and omits the card; it does NOT re-derive the condition, which is the
-     * `checklist` and `kpis.members` contract on this same page. `rank` is null in turn when the reader
-     * holds no active membership here — never 0, which would render as a place.
+     * `checklist` and `kpis.members` contract on this same page.
+     *
+     * ⛔ **`rank` AND `of` WERE DECLARED HERE AND READ BY NOTHING (M26, ADR-0020 §D13).** The card renders
+     * points, badges and streak; the two extra fields were serialized into every dashboard payload and
+     * displayed nowhere — and `of` is the workspace headcount, the exact integer `kpis.members` four lines
+     * up is nulled for readers without `dashboard.org.view`. The server no longer sends them. A standing
+     * belongs on `/achievements`, which this card already links to.
      */
-    progress: { points: number; badges: number; streak: number; rank: number | null; of: number } | null;
+    progress: { points: number; badges: number; streak: number } | null;
 }>();
 
 const page = usePage();

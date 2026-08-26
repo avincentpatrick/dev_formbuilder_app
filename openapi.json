@@ -2961,7 +2961,7 @@
         "/gamification/me": {
             "get": {
                 "operationId": "v1.gamification.me",
-                "description": "Readable by any member of the workspace, with no permission: ADR-0020 \u00a7D7 gives everyone their own\nnumbers and gates only the named list. `standing.rank` is a competition rank \u2014 one plus the number of\nmembers strictly ahead \u2014 so a tie shares a place and the next one skips it, and `standing.of` counts\nACTIVE MEMBERS rather than the members who have scored, so somebody who has earned nothing is last\nrather than absent. `rank` is null when the caller holds no active membership here.\n\n`streak.current` decays to zero after a full missed day while `streak.longest` only ever rises; they\nare different measurements and neither substitutes for the other. Days are cut at UTC midnight, stated\nas a literal rather than inherited from any configuration (ADR-0020 \u00a7D10(b)).",
+                "description": "Readable by any member of the workspace, with no permission: ADR-0020 \u00a7D7 gives everyone their own\nnumbers and gates only the named list. `standing.rank` is a competition rank \u2014 one plus the number of\nmembers strictly ahead \u2014 so a tie shares a place and the next one skips it. `rank` is null when the\ncaller holds no active membership here.\n\n`standing.of` counts ACTIVE MEMBERS rather than the members who have scored, so somebody who has earned\nnothing is last rather than absent \u2014 and it is **null for a caller without `dashboard.org.view`**, which\nis the workspace headcount and not the caller's own number (ADR-0020 \u00a7D13). The ROUTE stays ungated:\nevery role may mint `read:gamification` and every member still gets their own points, badges, streak and\nposition. Only that one field is resolved per-caller, which is the `kpis.members` shape the dashboard\nalready uses rather than a 403 at the door.\n\n`streak.current` decays to zero after a full missed day while `streak.longest` only ever rises; they\nare different measurements and neither substitutes for the other. Days are cut at UTC midnight, stated\nas a literal rather than inherited from any configuration (ADR-0020 \u00a7D10(b)).",
                 "summary": "Fetch the calling member's own points, badges, streak and standing",
                 "tags": [
                     "Gamification"
@@ -6101,8 +6101,11 @@
                                 "description": "Competition rank: one plus the number of members strictly ahead, so a tie skips the next\nplace. Null when the caller holds no active membership here."
                             },
                             "of": {
-                                "type": "integer",
-                                "description": "Active members, NOT the number of people who have scored \u2014 see MemberStanding."
+                                "type": [
+                                    "integer",
+                                    "null"
+                                ],
+                                "description": "Active members, NOT the number of people who have scored. Null when the caller may not be\ntold the workspace headcount \u2014 `dashboard.org.view` decides it, upstream. See MemberStanding."
                             }
                         },
                         "required": [

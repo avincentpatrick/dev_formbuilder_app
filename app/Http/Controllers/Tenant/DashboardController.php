@@ -90,7 +90,16 @@ final class DashboardController extends Controller
      * by two implementations agreeing today. The dashboard already pays more than this for its trend
      * breakdowns, and every read here is served by an index whose leading column is `tenant_id`.
      *
-     * @return array{points: int, badges: int, streak: int, rank: int|null, of: int}|null
+     * ⚠️ **AND M26 WEAKENED THAT ARGUMENT WITHOUT ACTING ON IT, WHICH IS FILED RATHER THAN LEFT IMPLICIT.**
+     * The paragraph above justifies ranking the whole tenant because this card needed a RANK. §D13 deleted
+     * `rank` and `of` from the payload, so the three fields that remain — points, badges, streak — are
+     * properties of one member and need no ranking at all: the four reads now buy two numbers a direct
+     * per-member query would return. It was NOT changed here, because "the same number by construction"
+     * is still worth something and swapping the source is a behavioural change that belongs in a row of its
+     * own rather than riding a security fix. Filed as a `minor` under *Gamification* in
+     * `docs/feature-backlog.md`.
+     *
+     * @return array{points: int, badges: int, streak: int}|null
      */
     private function gamificationProgress(
         User $user,
@@ -120,8 +129,13 @@ final class DashboardController extends Controller
             // `current`, never `longest`: the card is a nudge about now, and MemberStreak records that
             // showing one and labelling it the other tells somebody they lost something they still hold.
             'streak' => $streaks->for($tenantId, $userId)->current,
-            'rank' => $standing->rank,
-            'of' => $standing->of,
+            // ⛔ `rank` AND `of` USED TO BE HERE AND WERE RENDERED BY NOTHING (M26, ADR-0020 §D13).
+            // `Dashboard.vue` declared both in its prop type and read neither; the card shows points, badges
+            // and streak. `of` is the workspace headcount, so this payload disclosed — to every reader, on
+            // every dashboard render — the exact integer `kpis.members` is nulled out of four lines above for
+            // readers without `dashboard.org.view`. One `Inertia::render`, two fields, opposite answers.
+            // Deleted rather than gated: a field nothing displays has no gated form worth keeping, and
+            // `/achievements` remains the surface that actually states a standing.
         ];
     }
 

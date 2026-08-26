@@ -142,7 +142,36 @@ it('serves a member who has earned nothing a real position rather than an absenc
         ->assertJsonPath('data.points', 0)
         // Joint second with the other scoreless member -- competition ranking, so the tie shares a place.
         ->assertJsonPath('data.standing.rank', 2)
-        ->assertJsonPath('data.standing.of', 3);
+        // ⚠️ NULL, NOT 3, AND THIS LINE USED TO READ 3 (ADR-0020 §D13). The caller is a Form Editor, who
+        // holds no org permission: the RANK is theirs and §D7 grants it, but the denominator is the
+        // workspace headcount. The owner's identical request two tests up still reads 3.
+        ->assertJsonPath('data.standing.of', null);
+});
+
+it('withholds the workspace headcount from a caller without dashboard.org.view', function (): void {
+    // ⛔ ADR-0020 §D13, the API half. `read:gamification` is mintable by all five roles (see the ability
+    // test above), so this token is the cheapest route to the number — the page is not the only door.
+    PointAward::factory()->forRule(PointRule::FormPublished)->create(['user_id' => $this->owner->id]);
+
+    // ⚠️ ONE CALLER PER TEST, AND THE SECOND DRAFT OF THIS TEST LEARNED WHY THE HARD WAY. Driving the editor
+    // and then the owner inside ONE test fails twice over: minting the second token after the first request
+    // raises `42501` on `personal_access_tokens` (the request leaves the RLS tenant GUC set to whoever made
+    // it), and minting both up front instead still reads `of` as null for the OWNER, because the resolved
+    // permission state from the first request survives into the second. Neither is a defect in the fix —
+    // both are two auth contexts sharing one container. The positive half therefore lives in its own test.
+    $this->withToken(gamificationToken($this->editor))
+        ->getJson(gamificationUrl('me'))
+        ->assertOk()
+        // The KEY is still present: a client distinguishes "withheld" from "this endpoint changed shape".
+        ->assertJsonStructure(['data' => ['standing' => ['rank', 'of']]])
+        ->assertJsonPath('data.standing.of', null)
+        // Everything §D7 actually grants survives, so this is a withheld field and not a degraded endpoint.
+        ->assertJsonPath('data.standing.rank', 2);
+
+    // ⛔ THE POSITIVE CONTROL FOR THIS GATE IS `it serves a members own points, badges, standing and streak`
+    // ABOVE, which drives the same endpoint as the OWNER and pins `data.standing.of` at 3. It is named here
+    // rather than assumed: without it, deleting `of` from the payload outright would turn this test green
+    // while breaking the feature, and the two together are what a mutation in either direction reddens.
 });
 
 it('lets a Form Editor read their own card even though they hold no org permission', function (): void {

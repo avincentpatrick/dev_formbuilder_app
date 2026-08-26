@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Api\V1\MemberProgressResource;
 use App\Http\Resources\Api\V1\ScoreboardResource;
+use App\Models\PointAward;
 use App\Models\User;
 use App\Policies\PointAwardPolicy;
 use App\Services\Gamification\LeaderboardService;
@@ -53,9 +54,15 @@ final class GamificationController extends Controller
      *
      * Readable by any member of the workspace, with no permission: ADR-0020 §D7 gives everyone their own
      * numbers and gates only the named list. `standing.rank` is a competition rank — one plus the number of
-     * members strictly ahead — so a tie shares a place and the next one skips it, and `standing.of` counts
-     * ACTIVE MEMBERS rather than the members who have scored, so somebody who has earned nothing is last
-     * rather than absent. `rank` is null when the caller holds no active membership here.
+     * members strictly ahead — so a tie shares a place and the next one skips it. `rank` is null when the
+     * caller holds no active membership here.
+     *
+     * `standing.of` counts ACTIVE MEMBERS rather than the members who have scored, so somebody who has earned
+     * nothing is last rather than absent — and it is **null for a caller without `dashboard.org.view`**, which
+     * is the workspace headcount and not the caller's own number (ADR-0020 §D13). The ROUTE stays ungated:
+     * every role may mint `read:gamification` and every member still gets their own points, badges, streak and
+     * position. Only that one field is resolved per-caller, which is the `kpis.members` shape the dashboard
+     * already uses rather than a 403 at the door.
      *
      * `streak.current` decays to zero after a full missed day while `streak.longest` only ever rises; they
      * are different measurements and neither substitutes for the other. Days are cut at UTC midnight, stated
@@ -70,8 +77,13 @@ final class GamificationController extends Controller
 
         $userId = (string) $user->id;
 
+        $standing = $this->leaderboard->standingFor($userId);
+
         return MemberProgressResource::make(new MemberProgress(
-            standing: $this->leaderboard->standingFor($userId),
+            // The headcount is withheld HERE rather than in the resource, and deliberately so: no `/api/v1`
+            // resource in this repository performs authorization, and making this one the first would put a
+            // permission check somewhere nobody looks for one. `MemberProgressResource` stays a serializer.
+            standing: $user->can('viewAny', PointAward::class) ? $standing : $standing->withoutHeadcount(),
             streak: $this->streakFor($userId),
         ));
     }

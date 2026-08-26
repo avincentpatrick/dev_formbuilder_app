@@ -18,31 +18,73 @@ exact-equality `KNOWN_UNGUARDED` assertion, so the list shrinks in the *same* PR
 
 ---
 
-## Status: NO ACTIVE CLAIM
+## Status: ACTIVE CLAIM — M29, the PII screenshot whose gate has no test, and the sibling route that walks around it
 
-Lane B holds nothing. **Namespaces after M24 + M26:** migration block stays **`2026_08_17_000111`** (M26 spent
-none — it changes one property's nullability and adds no column, index or table); ADR-0016's next free
-sub-decision stays **`§D35`**. ⛔ **ADR `0022` STAYS FREE and stays Lane A's block-opener (`0022-0025`)** —
-M26 amended **ADR-0020** with **§D13**, because this is that ADR's own §D7 being corrected in place, on the
-precedent §D10, §D11 and §D12 set. **Sixth increment running to amend rather than mint.** ADR-0020's own
-sub-decision series is now §D1–§D13. `0010` stays reserved for H1d; `#16` stays free.
+**Taken 2026-08-26.** Branch `m29-feedback-screenshot-deny`, cut from `origin/main` at `c7b8aae`, PR into
+`main`. Row: the `major` under **`### Test suite & CI gates`** (`:2155`), inside the *Merge-gate review of
+`main` → `phase1-completion`* section (`:480`), at `docs/feature-backlog.md:2220` —
+*`GET /feedback/{report}/screenshot` serves PII and has no DENY test at all*.
 
-✅ **`docs/claims/decisions.md` GAINED `D3` — the first entry either lane has filed since `D1`.** §D7 approves
-*"4th of 12"* for every member; three other surfaces withhold the twelve. One of the two had to move, and
-that is a product call rather than an engineering one. Filed with the two real options, the rejected third,
-and a recommendation — then **proceeded on the recommendation in the same turn** rather than idling, per
-Standing Rule 5. The revert path is named in the entry if the answer comes back the other way. `D1` is still
-untouched and still Lane A's or nobody's.
+⚠️ **THE NEIGHBOURHOOD WAS CHECKED BEFORE THIS LINE WAS WRITTEN, BECAUSE M26 GOT IT WRONG.** The first
+draft of this claim said *Security & authorization* — inherited from what the row is ABOUT rather than read
+off the file. `awk` over the headings says **`### Test suite & CI gates`**. M26 recorded that a row's
+neighbourhood is as checkable as its file:line and gets checked half as often; this is the same slip
+caught one step earlier.
 
-⚠️ **THE PROCESS NOTE OF RECORD, AND IT IS THE ONE M24 PAID FOR.** M26 went through a **PR** (#215).
-`git push origin HEAD:main` was used exactly once, for the claim commit, while the branch contained nothing
-but that claim — and **not again**, because the branch then carried code. That is the rule M24 wrote after
-landing a fix on `main` un-gated and turning it red. It cost nothing to follow.
+**⚠️ NUMBERED `M29`, AND `lane-a.md` WAS RE-READ IMMEDIATELY BEFORE THIS FILE WAS WRITTEN, NOT AT SESSION
+OPEN.** Both reads returned `c7b8aae` and both read **`Status: NO ACTIVE CLAIM`** — Lane A discharged its
+whole three-row queue (`M25` #216, `M27` #217, `M28` #218) and holds nothing. `M28` is the highest number
+either lane has spent, so `M29` is the next free one.
 
-⚠️ **AND ONE CLAIM DETAIL WAS WRONG AT WRITING TIME AND CORRECTED BEFORE THE FIRST FILE WAS OPENED.** The
-claim named the row as the `major` under *Security & authorization*; it is under **Gamification**. Caught by
-reading the section heading rather than the row, and fixed in the same commit — a reminder that a row's
-neighbourhood is as checkable as its file:line and gets checked half as often.
+**THE ROW IS TRUE, AND IT IS THE SMALLER HALF OF WHAT IS THERE.** Verified before this claim was written,
+read-only, on the M28 precedent:
+
+- `routes/tenant.php:429-430` is the construct, not prose — `Route::get('/feedback/{feedbackReport}/screenshot', …)->middleware('can:feedback.view')`, a **separate** `Route::get` from the index at `:427-428`.
+- `tests/Feature/Tenant/FeedbackTest.php:230` is the construct — *serves a screenshot to the workspace and 404s a report that has none*, Owner only.
+- ⚠️ **The row's `:154` DRIFTED.** `is_pii => true` is asserted at **`:150`**; `:154` is now a `Storage::disk('local')->assertExists(…)` call. The claim it supports is true; the citation is four lines stale. **Fourteen-for-fourteen on the row being real, and the third consecutive increment whose citation half needed correcting.**
+- No test anywhere asserts a refusal on that route. The index's refusal at `:196` is the only one in the file, and it is the index's.
+
+**⛔ THE CENSUS FOUND A SECOND DOOR, AND IT IS OPEN TODAY RATHER THAN LATENT.** `GET /attachments/{attachment}`
+(`routes/tenant.php:751-752`) is gated `can:view,attachment` → `AttachmentPolicy::view()`, whose entire body is
+`return $user->can('submissions.view');` — **with no test of the `kind`**. A feedback screenshot is an
+ordinary `attachments` row (`kind = feedback_screenshot`, `is_pii = true`), so the same bytes are served by
+that route to anyone holding `submissions.view`. `RolePermissionSeeder` grants `submissions.view` to
+**`viewer`, `reviewer` and `form_editor`** and grants `feedback.view` to **none of them**. The dedicated
+route's own docblock (`FeedbackController.php:59-65`) says in the file's own words that it exists precisely
+so a workspace that revoked `submissions.view` does not lose its feedback screenshots — **the coupling it
+was built to avoid is live through the sibling route in the other direction.**
+
+⚠️ **Discovery of an attachment id is hard — `HasUuidv7`, and no tenant surface hands a non-`feedback.view`
+reader one (`has_screenshot` is a boolean in both `FeedbackPresenter.php:85` and `SuperAdminService.php:464`).
+So this is a wrong authorization decision rather than a one-request exploit, and it is reported that way.**
+It is still the row's own thesis one layer out: the gate that *is* written is the wrong gate, and nothing
+would have said so.
+
+**⛔ AND `AttachmentPolicy` HAS NO TEST AT ALL — NOT ONE HTTP TEST DRIVES `GET /attachments/{attachment}`.**
+`tests/Feature/Attachments/AttachmentRlsTest.php` is four DB-level cases; every other `attachments` hit in
+`tests/` is `TenantUrl` string-building. The only role gate on the whole authenticated media read path is
+unasserted.
+
+**SCOPE — files this claim takes.** `tests/Feature/Tenant/FeedbackTest.php` · `app/Policies/AttachmentPolicy.php`
+· a new `tests/Feature/Attachments/AttachmentPolicyTest.php` · `docs/feature-backlog.md` (row close + any
+deliberately-unfixed finding filed the moment it is decided) · `docs/claims/lane-b.md` · `PROGRESS.md`
+(own block + own hand-off line only). All PHP, all Lane B's under 7(b)'s widened statement.
+
+**PAIRED FILES: NONE MOVE.** `ShellAbilityParityTest` fires on a **new** ability key — this reuses
+`feedback.view`, which the catalog has carried since Phase 0, so no key is minted. `NotificationTypeParityTest`
+needs a new `NotificationType`; none. `clipped-node-containment.test.ts` and `token-references.test.ts` scan
+`resources/**`; nothing here is under `resources/`. **No `resources/js` edit — that is Lane A's tree, and the
+census confirms no component builds a feedback screenshot URL.**
+
+**NAMESPACES: THIS INCREMENT SPENDS NOTHING.** No migration (no column, index or table), so
+`2026_08_17_000111` stays free. **ADR `0022` STAYS FREE and stays Lane A's block-opener** — the
+authorization decision belongs in **ADR-0016** as **`§D35`**, its next free sub-decision, because it is that
+ADR's own permission model being refined rather than a new architecture. **Seventh consecutive Lane B
+increment amending rather than minting.** `0010` stays reserved for H1d; `#16` stays free.
+`openapi.json` must stay **byte-identical** — this is a web route, not `/api/v1`.
+
+`D1` and `D3` in `docs/claims/decisions.md` are untouched and stay open; neither is re-asked here.
+
 
 ---
 

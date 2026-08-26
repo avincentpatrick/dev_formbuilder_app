@@ -1415,17 +1415,33 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   defect it hid is fixed. Cheapest honest shape is a per-rule counter on the tally plus one line in the
   command's output; it moves `BackfillCommandTest` and pairs naturally with the open row below about that
   file's `Queue::assertPushed(…, 2)` asserting job count alone.
-- **`major` · `standing.of` discloses the workspace headcount with no permission at all.**
-  `app/Services/Gamification/MemberStanding.php:33`, emitted unconditionally at
-  `app/Http/Controllers/Tenant/AchievementsController.php:103` and
-  `app/Http/Resources/Api/V1/MemberProgressResource.php:41` (route `routes/api.php:440-442`, no `can:`
-  gate). The identical integer is `null`ed out of `/dashboard` for readers without `dashboard.org.view`
-  (`DashboardMetricsService.php:55,60`) and correctly withheld two fields away in the same payload
-  (`AchievementsController.php:115-120`). A Form Editor reads it on the page or via a mintable
-  `read:gamification` token. **Live.** ⚠️ **The fix may be a ratification rather than a patch** — ADR-0020
-  §D7 approves *"4th of 12"* for every member — but no document reconciles that with the dashboard's
-  deliberate withholding, and this increment's own controller argues the opposite principle three fields
-  earlier. One of the two has to move, explicitly.
+- ✅ **CLOSED BY `M26` (2026-08-26) — `major` · ~~`standing.of` discloses the workspace headcount with no permission at all.~~**
+  Fixed. `MemberStanding::$of` is now `?int`, withheld by `withoutHeadcount()` for a reader without
+  `dashboard.org.view` — the same key `/dashboard`'s Members tile, `/members` and the member search arm
+  already answer this question with. No new ability and no thirtieth permission key: the gate reuses
+  `can('viewAny', PointAward::class)`, resolved once and read twice, so `standing.of` and
+  `scoreboard.team.active_members` cannot disagree again. `rank` deliberately survives — it discloses a
+  floor, not the headcount, and §D7's actual grant is a member's own position. Recorded as **ADR-0020 §D13**;
+  the product call is `D3` in `docs/claims/decisions.md`, filed with this as the recommendation and proceeded
+  on rather than waited for.
+  ⚠️ **THE ROW'S ROUTE CITATION WAS WRONG AND ITS HEADLINE EXAMPLE WAS INVERTED.** `routes/api.php:440-442`
+  is comment prose; the route is `:456-458`. And the row offered `/dashboard` as the surface that *correctly
+  withholds* the integer — **it disclosed it too**, at `DashboardController.php:124`, in the same Inertia
+  payload whose `kpis.members` is nulled four lines above for the same reader. That sixth consumer was
+  outside the row's census of five, and **nothing rendered it**: `Dashboard.vue` declared `rank` and `of` and
+  its card shows points, badges and streak. Both fields are deleted rather than gated.
+- **`minor` · the dashboard card ranks the whole tenant to compute three numbers that need no ranking.**
+  Filed by `M26` rather than fixed. `DashboardController::gamificationProgress()` calls
+  `LeaderboardService::standingFor()`, which is a roster read plus two grouped aggregates over the whole
+  workspace, and its own cost paragraph justifies that expense **because the card needed a rank**. §D13
+  deleted `rank` and `of` from that payload, so the three surviving fields — points, badges, streak — are
+  properties of one member: `SUM(points)` and `COUNT(*)` for one `user_id`, plus the streak walk that already
+  runs separately. **Not a defect and not live** — the numbers are correct and the reads are indexed on
+  `tenant_id`; it is now-unnecessary work on a page every member loads. Left alone deliberately, because
+  `LeaderboardService` is also what makes this card and `/achievements` agree *by construction* rather than by
+  two implementations happening to match, and trading that away is a behavioural change that should not ride
+  a security fix. Cheapest honest shape is a `pointsAndBadgesFor()` on the same service so one class still
+  owns both readings; it moves `AchievementsPageTest`'s dashboard-card case.
 
 ### SSO, auth & session
 

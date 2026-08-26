@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { IDLE_MS, RESPONDENT_SESSION_KEY, respondentSession, rotateRespondentSession } from '../lib/respondent-session';
+import {
+    IDLE_MS,
+    RESPONDENT_SESSION_KEY,
+    respondentSession,
+    rotateRespondentSession,
+    touchRespondentSession,
+} from '../lib/respondent-session';
 
 /**
  * Increment M15 — the visit identifier the outbox surface is scoped to.
@@ -123,5 +129,65 @@ describe('respondentSession', () => {
         rotateRespondentSession(hostile);
 
         expect(respondentSession(hostile, 1_100)).not.toBe(first);
+    });
+});
+
+/**
+ * Increment M21 — the window is IDLE time, and before M21 it was elapsed-since-boot.
+ *
+ * ⛔ THE CASE THAT MATTERS IS THE FIRST ONE, AND IT IS THE ONE `respondentSession` ALONE CANNOT MAKE PASS.
+ * `describe('respondentSession')` above already contains "refreshes the stamp on every read, so an active
+ * visit never expires under its own reader" — three reads a window apart, one id — and it was GREEN for the
+ * whole of M15 while the invariant was false in the product, because the runtime read the session exactly
+ * once per page load. A unit test proves what a function does when it is called; only a call-site sweep
+ * proves that it is. These cases pin the mechanism that makes the runtime actually make those reads.
+ */
+describe('touchRespondentSession (Increment M21)', () => {
+    let store: Storage;
+
+    beforeEach(() => {
+        store = memoryStorage();
+        rotateRespondentSession(store);
+    });
+
+    it('keeps a visit alive across a gap longer than the window when the respondent kept typing', () => {
+        const first = respondentSession(store, 0);
+
+        // Typing every five minutes for half an hour: each touch resets the idle clock, so the reload at
+        // the end is still the same visit. Without the touches this is a fresh id and the respondent's own
+        // half-filled draft becomes unrestorable.
+        touchRespondentSession(store, IDLE_MS / 2);
+        touchRespondentSession(store, IDLE_MS);
+        touchRespondentSession(store, IDLE_MS * 1.5);
+        touchRespondentSession(store, IDLE_MS * 2);
+        touchRespondentSession(store, IDLE_MS * 2.5);
+
+        expect(respondentSession(store, IDLE_MS * 3)).toBe(first);
+    });
+
+    it('REGRESSION — without a touch, the same gap rotates the visit', () => {
+        // The negative half of the case above. If this ever starts returning the same id, the window has
+        // stopped being a window and the kiosk containment is gone.
+        const first = respondentSession(store, 0);
+
+        expect(respondentSession(store, IDLE_MS + 1)).not.toBe(first);
+    });
+
+    it('never REVIVES an expired visit — a keystroke from the next respondent must not resurrect it', () => {
+        const first = respondentSession(store, 0);
+        touchRespondentSession(store, IDLE_MS + 1); // too late: the visit is already stale
+
+        expect(respondentSession(store, IDLE_MS + 2)).not.toBe(first);
+    });
+
+    it('never MINTS — an absent marker stays absent', () => {
+        touchRespondentSession(store, 1_000);
+
+        expect(store.getItem(RESPONDENT_SESSION_KEY)).toBeNull();
+    });
+
+    it('is inert when storage is unavailable or hostile', () => {
+        expect(() => touchRespondentSession(null, 1_000)).not.toThrow();
+        expect(() => touchRespondentSession(hostileStorage(), 1_000)).not.toThrow();
     });
 });

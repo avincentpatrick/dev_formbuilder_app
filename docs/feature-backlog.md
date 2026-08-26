@@ -1096,32 +1096,94 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   exact-equality `KNOWN_UNGUARDED`, so `.sync-status` gained the `position: relative` its sr-only region had
   always needed and the entry was deleted in the same commit. **The gate was proven to bite before it was
   trusted**: removing the declaration puts the file straight back in the offender list.
-- **`major` · An abandoned local draft is restored into the NEXT respondent's form, silently, with their
-  answers on screen.** Found by M15's sweep and filed the moment it was decided not to fix, rather than
-  after. `components/RuntimeSession.vue:149-156` calls `autosave.restore()` on every fresh session, and
-  `composables/useAutosave.ts:136-155` reads `draft_answers` keyed `[form_version_id + slug]` (`db.ts:127`)
-  — **a key with no respondent dimension at all** — gated only by a schema checksum and a **seven-day** TTL
-  (`useAutosave.ts:14`). `clear()` fires only on the submit paths (`RuntimeSession.vue:262`, `:313`, `:344`),
-  so an ABANDONED fill survives: respondent A starts a form on the kiosk and walks away, respondent B opens
-  the same form and B's fields are populated with **A's answers**. There is **no banner** —
-  `WelcomeBackBanner` renders only when `resume` is set (`RuntimeSession.vue:471`) — so the plain-entry
-  restore is silent, and if B submits, A's answers are submitted under B's session.
-  ⛔ **THIS IS STRICTLY WORSE THAN THE ROW M15 CLOSED**, which leaked metadata; this leaks answer content.
-  It was left out of M15 deliberately and not for size: the outbox had a spec-sanctioned degraded surface to
-  fall back to (`docs/ux/form-filling-ux-flow.md` §7.3's count-plus-action), and the draft has **no
-  analogue** — its legitimate feature *is* cross-visit restore, so scoping it to a visit would delete the
-  feature rather than contain it. Telling a personal device from a kiosk needs an operator concept the guest
-  runtime does not have, which is exactly the unbuilt **Kiosk mode** row above (*"lock to one form,
-  auto-reset, clear PII on timeout"*) — **that row is this one's precondition.** Shortening the TTL is not a
-  fix: respondent B arrives five minutes later, not seven days later. **Live.**
-- **`minor` · `reconcile.ts:43`'s local-wins note tells a respondent a stranger's answers are theirs.**
-  Same root cause as the row above, one channel over. On the resume path `App.vue:230` reads the same
-  respondent-blind `[form_version_id + slug]` key; if the previous respondent's local draft is newer than
-  the server copy, `reconcileDraft` returns **their** answers as `source: 'local'` and
-  `WelcomeBackBanner.vue:47` renders *"You have more recent answers saved on this device, so we kept
-  those."* — a sentence in the second person about the first person's data. Closing the `major` above closes
-  this; it is filed separately because the copy is wrong even after the leak is fixed (nothing on that path
-  distinguishes "yours" from "this device's"). **Live.**
+- ~~**`major` · An abandoned local draft is restored into the NEXT respondent's form, silently, with their
+  answers on screen.**~~ ✅ **CLOSED — Increment M21 (2026-08-26).** `DraftRow` carries an un-indexed
+  `respondent_session_id`; both readers of the table refuse a row the current visit did not write, through
+  the one shared predicate `draftBelongsToVisit()` in `lib/db.ts`. The row is **not** deleted — the primary
+  key stays shared, so the next respondent's first keystroke collects it, which makes containment and
+  collection the same mechanism.
+  ⛔ **THIS ROW DEFERRED ITSELF ON TWO CLAIMS AND BOTH WERE FALSE, WHICH IS WHY IT SAT FOR AN INCREMENT.**
+  It said *"scoping it to a visit would delete the feature rather than contain it"* — true only of putting
+  the visit in the **primary key**, which was never the design and which Dexie **refuses** outright
+  (`node_modules/dexie/dist/dexie.js:3832` throws `Upgrade('Not yet support for changing primary key')`, so
+  the database fails to open on every device that already has one). And it said the unbuilt kiosk-mode row
+  *"is this one's precondition"* — refuted by `docs/adr/0021…` §*C*, which had already deferred the kiosk
+  gate **saying in terms that doing so "would leave the defect live until it was built."** The mechanism was
+  wired the whole time: the visit id is injected **two lines above** the `createAutosave` call that never
+  received it.
+  ⚠️ **AND THE ROW UNDERSTATED IT THREE WAYS.** (1) The restore trips the autosave watcher, so the header
+  pill read *"Saving…"* then *"Saved"* — the only moving pixel **vouched for** a stranger's answers as the
+  new respondent's own work; there was no banner because `WelcomeBackBanner` needs a resume seed. (2) A
+  restored draft carries a **fresh** `client_submission_uuid` and a **null** baseline, so "Save and finish
+  later" POSTed those answers as a **new server draft** under the next respondent's identity and **emailed
+  them a 30-day resume link to it** — the disclosure left the device. (3) `attachToSubmission()` re-pointed
+  the previous respondent's queued photo or signature onto this submission, its docblock having claimed
+  *"still-unassigned"* since G8b while the `.modify()` never filtered on it; M21 narrows that write too.
+  ⚠️ **Six of its ten citations had drifted forward** (`db.ts:127`→`:130`/`:139`; the three `clear()` sites
+  `:262/:313/:344`→`:267/:322/:353`; the banner `:471`→`:481`; `App.vue:230`→`:249`). Every claim was true;
+  the line numbers were not. Full reasoning in `docs/adr/0021-respondent-scoped-device-outbox.md`, amended.
+
+- ~~**`minor` · `reconcile.ts:43`'s local-wins note tells a respondent a stranger's answers are theirs.**~~
+  ✅ **CLOSED — Increment M21, AND RE-CLASSIFIED `minor` → `major` ON THE WAY OUT.** It was filed as a copy
+  defect and it was a **durable cross-respondent write into a finalized submission**. `App.vue` seeds the
+  resumed session with the **local** tier's answers but keeps the **server's** `client_submission_uuid` and
+  the **server's** `content_checksum` — deliberately and correctly, per P3a, for the case it was written
+  for. So when a stranger's abandoned draft won `reconcileDraft`'s newest-wins rule, the resuming
+  respondent's next save wrote **that stranger's answers over their own server record**, and **passed P3a's
+  lost-update guard by construction** — the guard compares the baseline the saving device carries, and the
+  baseline genuinely was theirs. A submit then promoted that row. P3a and M12 closed the two-**device**
+  lost-update doors; neither had considered two **respondents**.
+  **As built:** `App.vue`'s resume read applies the same `draftBelongsToVisit()` predicate, so a foreign row
+  degrades to `undefined` — `reconcile.ts`'s first branch, server-wins, silently and without a note.
+  `LOCAL_WINS_NOTE` is **untouched and did not need to change**: the sentence is correct English for every
+  case that can now reach it, which is the narrower fix the row itself asked for.
+
+- **`major` · The guest device has no enumerator and no reaper for abandoned answer content.** Two shapes,
+  one missing mechanism. **(a)** `media_queue` orphans: `stash()` writes `client_submission_uuid: null`, and
+  the table's only two deleters are in `lib/outbox.ts`, both `where('client_submission_uuid').equals(uuid)`
+  — a uuid string, which can never match a null row. A photo, signature or ID scan picked mid-fill and then
+  **abandoned** has no uuid, no TTL and no prune, and lives until the browser evicts the origin. **(b)**
+  `draft_answers` pre-republish orphans: `clear()` deletes only the *current* `[form_version_id, slug]`.
+  After a republish the session remounts on the **new** `form_version_id`, so the old row is never written,
+  read or deleted again — including by the seven-day TTL, which is a branch inside `restore()` that only
+  ever fires against the key it just fetched. There is no `where`/`orderBy`/`toArray`/`each`/`count` on
+  `draft_answers` anywhere in the tree.
+  **Filed rather than fixed, and the reason is scope rather than difficulty:** the fix is a mechanism this
+  table has never had — an enumerating sweeper plus a retention decision (how long, on what trigger, and
+  whether it runs in the service worker, where `sessionStorage` does not exist and a visit cannot be read).
+  That is its own increment with its own ADR question. ⚠️ **It is a RETENTION defect and not a disclosure
+  one once M21 landed**: an orphan blob is unreachable from every UI (`listForSubmission` is by uuid, and a
+  `local:` ref only renders if the answers are restored, which is now scoped), and an orphan draft row is
+  unreachable from both readers. Note `useSyncOutbox`'s quota line currently blames the outbox for the
+  storage this consumes. **Live.**
+
+- **`minor` · The storage-quota line counts strangers' submissions.** `useSyncOutbox` computes `queued` from
+  the device-wide count and renders *"N responses waiting to send"*, while `mine`, `earlierUnsent` and
+  `conflictHere` beside it are all visit-scoped — so a respondent can read three consecutive sentences whose
+  numbers only reconcile if they count a stranger's rows. Filed rather than fixed: it discloses a count and
+  nothing else, which is exactly the shape ADR-0021 sanctioned for an earlier visit, and touching the
+  device-wide count risks the boot drain that ADR-0021 makes load-bearing. **Live.**
+
+- **`minor` · Resume-link shells sit in Cache Storage, and the brand refresh re-fetches them.** A resume
+  link is a path under `/f/`, and `sw.ts` NetworkFirst-caches every same-origin navigate under `/f/` into
+  `guest-shell-html` for seven days; the cached body carries `data-resume-token`, and the resume endpoint
+  returns the full answer map to whoever holds that token. `brand-cache.ts` enumerates `cache.keys()` and,
+  on a brand change, silently re-fetches and re-`put`s each URL — including a resume link — from the *next*
+  respondent's boot. Filed rather than fixed: it is device-local, needs devtools, and the token is already
+  in the address bar and browser history, so the cache's marginal contribution is surviving a history clear.
+  The fix touches `sw.ts`, which is the second type-check program and a different blast radius from the row
+  it was found under. ⚠️ **Worth recording beside it:** `routes/api.php` carries an explicit warning that a
+  GET under `/api/v1/public/f/` would be service-worker cached, and the resume read **is** such a GET
+  returning full answers — it escapes only because its path prefix is `drafts/`. One route rename re-opens
+  it. **Live.**
+
+- **`minor` · The two `draft_answers` readers disagree about which `form_version_id` they mean.** The
+  autosave writes with the **currently published** version; `App.vue`'s resume read fetches with the version
+  the **server draft** was pinned to. They coincide only until a republish intervenes, after which the
+  resume path probes a key the live session never writes — the orphan slot in the row above. Benign today
+  only because `reconcile.ts`'s checksum guard rejects the hit, which means **the checksum guard is the only
+  thing standing between the resume path and a pile of pre-republish drafts.** Filed so that whoever tidies
+  the mismatch knows what it is load-bearing for. **Live.**
 - **`minor` · `useServerAutosave.dispose()` fires without consulting `inFlight`.**
   `resources/js/composables/useServerAutosave.ts:425-431` sends a `keepalive` POST carrying a **stale**
   `base_content_checksum` on an Inertia navigation during a save, so the server refuses it as

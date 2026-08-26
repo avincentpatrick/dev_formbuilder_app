@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { openDb, type OutboxRow } from '../lib/db';
+import { draftBelongsToVisit, openDb, type OutboxRow } from '../lib/db';
 
 let n = 0;
 const freshDb = () => openDb(`db-test-${(n += 1)}`);
@@ -95,5 +95,35 @@ describe('MeridianDb', () => {
         expect(stored).toMatchObject({ field_key: 'photo', name: 'a.txt', mime: 'text/plain', status: 'queued' });
         expect(stored?.blob).toBeDefined();
         await db.delete();
+    });
+});
+
+/**
+ * Increment M21 — the one predicate both `draft_answers` readers consult.
+ *
+ * ⚠️ IT IS TESTED HERE RATHER THAN THROUGH ITS CALLERS BECAUSE ONE OF THE TWO CALLERS CANNOT BE REACHED.
+ * `App.vue` — the resume path's read — is mounted by NO test in this suite (it appears only in comments in
+ * `components.test.ts`), so the resume arm of this rule would otherwise ship with no coverage at all. That
+ * is exactly why the rule was extracted out of `useAutosave` into a shared function: the two readers
+ * disagreeing is how the sibling defect one channel over came to exist.
+ */
+describe('draftBelongsToVisit (Increment M21)', () => {
+    it('admits a row this visit wrote', () => {
+        expect(draftBelongsToVisit({ respondent_session_id: 'visit-a' }, 'visit-a')).toBe(true);
+    });
+
+    it('refuses a row another visit wrote', () => {
+        expect(draftBelongsToVisit({ respondent_session_id: 'visit-a' }, 'visit-b')).toBe(false);
+    });
+
+    it('refuses a NULL stamp — an unknown owner reads as somebody else, never as a wildcard', () => {
+        expect(draftBelongsToVisit({ respondent_session_id: null }, 'visit-b')).toBe(false);
+    });
+
+    it('admits everything when the caller has no visit concept (undefined = do not scope)', () => {
+        // The two absences are different on purpose: `undefined` is the CALLER having no visit,
+        // `null` is the ROW having none. Conflating them is the whole defect.
+        expect(draftBelongsToVisit({ respondent_session_id: null }, undefined)).toBe(true);
+        expect(draftBelongsToVisit({ respondent_session_id: 'visit-a' }, undefined)).toBe(true);
     });
 });

@@ -116,7 +116,7 @@ Five Dexie tables, each namespaced by `form_version_id` where relevant so multip
 | Table | Key | Purpose |
 |---|---|---|
 | `cached_manifests` | `form_version_id` | The manifest response (§2), keyed so a device can hold several forms' schemas simultaneously (a field enumerator often collects for more than one active form). |
-| `draft_answers` | `(form_version_id, local_draft_id)` | In-progress, not-yet-finalized answers — autosaved continuously while filling, per the existing sequence diagram's "save draft answers per field (autosave)" step. |
+| `draft_answers` | `(form_version_id, local_draft_id)` | In-progress, not-yet-finalized answers — autosaved continuously while filling, per the existing sequence diagram's "save draft answers per field (autosave)" step. **(M21)** Rows carry an un-indexed `respondent_session_id`, and both readers refuse a row the current visit did not write; the key is deliberately unchanged, because Dexie **throws** on a primary-key change (`dexie.js:3832`) and because the shared key is what collects an abandoned row. |
 | `outbox` | `client_submission_uuid` | Finalized submissions queued for replay — `status: pending / synced / conflict`, matching the sequence diagram's three outcomes. |
 | `media_queue` | `attachment_local_id` | Queued respondent-submitted media awaiting the independent resumable upload (§5), referencing its parent `outbox` row by `client_submission_uuid`. |
 | `app_state` | `key` | **(H23b, schema v2)** Device-scoped scalars belonging to no form. One key today — `brand_version`, the tenant-ramp fingerprint the cached guest shells were last refreshed for (§4.1). |
@@ -233,6 +233,49 @@ Not addressed by any prior doc: browser-enforced IndexedDB storage quotas are a 
 >
 > Nothing above changes: two devices still produce two independent `client_submission_uuid`s, and the
 > last-write-wins policy is untouched.
+
+> ⚠️ **INCREMENT M21 (2026-08-26) — M15 SCOPED THE OUTBOX AND LEFT THE LARGER CHANNEL OPEN, AND THE
+> DEFERRAL WAS RECORDED WHERE THE DOCUMENTS DEFINING THE CONCEPT COULD NOT SEE IT.** M15's own sweep found
+> that `draft_answers` had the identical shared-device shape — keyed `(form_version_id, local_draft_id)`
+> with no visit in it — and filed it in `docs/feature-backlog.md` and in the *Residual* clause of the
+> threat model's M15 row, **and in no ADR and not here**. So the paragraph above, which defines what "a
+> visit" means for device-local state, gave a reader no way to learn that the channel carrying **answers a
+> respondent is still typing** had been considered and left live. **A deferral recorded only in a backlog
+> row is invisible to the document that defines the concept it defers.**
+>
+> **As built:** `DraftRow` carries `respondent_session_id`, un-indexed, so **no `db.version()` bump** — the
+> rule §3 states outright and that `conflict_code`, `server_reference`, `synced_at`,
+> `base_content_checksum` and M15's own stamp have all set. Both readers of the table — the autosave
+> restore and `App.vue`'s resume read — consult **one shared predicate**, because two readers of one table
+> disagreeing about ownership is exactly how the sibling defect in `reconcile.ts` came to exist. Null
+> still means *an earlier visit*; `undefined` still means *do not scope*.
+>
+> ⛔ **THE VISIT IS DELIBERATELY NOT IN THE PRIMARY KEY, AND THE FIRST REASON IS MEASURED:** Dexie throws
+> `Upgrade('Not yet support for changing primary key')` (`node_modules/dexie/dist/dexie.js:3832`), so a
+> three-part key does not degrade — **the database fails to open on every device that already has one**,
+> taking the outbox and the queued media with it. The second reason is that the shared key is what
+> **collects** an abandoned row: the next respondent's first keystroke overwrites it. Containment and
+> collection are the same mechanism, which is also why nothing is deleted on a read.
+>
+> ⚠️ **AND THE HARM CROSSED INTO THIS DOCUMENT'S OWN SUBJECT, WHICH IS WHY IT IS RECORDED HERE RATHER THAN
+> ONLY IN THE ADR.** A restored stranger's draft carried a **fresh** `client_submission_uuid` and a **null**
+> baseline, so the guest draft POST wrote those answers as a **new server draft** under the next
+> respondent's identity and emailed them a resume link to it. On the RESUME path it was worse: the seed
+> keeps the **server's** uuid and the **server's** `content_checksum` (deliberately, per P3a) while taking
+> the **local** tier's answers, so a stranger's draft winning §5's newest-wins precedence was written over
+> the resuming respondent's own server record and **passed P3a's lost-update guard by construction** —
+> the guard cannot fire, because the baseline genuinely is theirs. **P3a and M12 close the two-device
+> lost-update door; M21 closes the two-RESPONDENT one, which neither had considered.**
+>
+> ⛔ **A CORRECTION TO THE VISIT BOUNDARY ITSELF, BECAUSE SCOPING THE DRAFT MADE A WRONG BOUNDARY INTO LOST
+> WORK.** M15's ten-minute window was documented as **idle** time and was in fact **elapsed-since-boot**:
+> the visit id had exactly one production call site, at the composition root, once per page load, so
+> `lastSeen` recorded boot time. Live consequence before M21: a reload more than ten minutes after boot —
+> including the app's own reload after a conflict discard — issued a fresh visit, and `pruneSynced()`
+> deleted the respondent's **own** delivered receipts as a stranger's. After M21 it would additionally have
+> thrown away their own half-filled form. `touchRespondentSession()` now refreshes the stamp on real
+> respondent input — never minting, never reviving an expired visit — so the window is idle time as
+> documented. **A containment change inherits every defect in the boundary it starts trusting.**
 
 ---
 

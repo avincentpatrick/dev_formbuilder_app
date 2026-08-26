@@ -91,10 +91,20 @@ test('Builder at extra_large + dyslexia font + teal — accessible & no horizont
     await assertClean(page, 'Builder (max personalization)');
 
     // The `overflow-x: clip` blind spot, third instance (after MdsDataTable and the notification panel).
-    // `MdsSegmentedControl` is `inline-flex` with `white-space: nowrap` and no wrap and no overflow
-    // handling, so a switcher that does not fit spills OUT of its bar while the document width never
-    // moves — invisible to `assertClean` by construction. 375px × extra_large × OpenDyslexic is the exact
-    // combination the width arithmetic in Builder.vue is about, so it is measured here rather than assumed.
+    // `MdsSegmentedControl` has no wrap and no overflow handling, so a switcher that does not fit spills
+    // OUT of its bar while the document width never moves — invisible to `assertClean` by construction.
+    // 375px × extra_large × OpenDyslexic is the exact combination the width arithmetic in Builder.vue is
+    // about, so it is measured here rather than assumed.
+    //
+    // ⚠️ M19 — THIS COMMENT SAID `white-space: nowrap` AND THAT IS NOT IN THE COMPONENT. The only two
+    // `white-space: nowrap` declarations in `SegmentedControl.vue` are the sr-only `legend` and `input`,
+    // neither of which affects layout. The real construction is `inline-flex` with no `flex-wrap`, a
+    // `__seg` carrying neither `min-width: 0` nor `flex-shrink`, and `min-width: 0` on the fieldset —
+    // which does not mitigate the spill, it ENABLES it by removing the fieldset's floor. Corrected here
+    // and in the backlog row that QUOTES this comment verbatim — the error had propagated by citation,
+    // which is how a wrong mechanism comes to look corroborated. ⚠️ `ThemeQuickToggle.vue` was checked
+    // and is NOT a third copy: it says "inline-flex with no wrap and no overflow handling", which is
+    // exactly right. Two files, not three — counted rather than assumed.
     const strip = page.locator('.builder__pane-switch');
     if (await strip.isVisible()) {
         const spill = await strip.evaluate((el) => el.scrollWidth - el.clientWidth);

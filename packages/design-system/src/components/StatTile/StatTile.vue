@@ -212,6 +212,17 @@ const deltaText = computed(() => {
     letter-spacing: var(--mds-type-heading-1-letter-spacing);
     font-variant-numeric: tabular-nums;
     color: var(--mds-color-text-heading);
+    /* M19: the same escape `__note` and `__caption` below have always carried, finally on the one role
+       that is rendered at 38px and therefore needs it most.
+       ⚠️ THE NOTE ABOVE ALREADY KNEW CALLERS PASS PROSE — it names `forms/Show.vue` and quotes
+       "Not open yet" and "Capacity reached" — and it fixed the consequence of WRAPPING (the leading).
+       Every value it considered was multi-word and wrapped at a space. It never considered a value that
+       CANNOT wrap: the same map's `open` arm is the single word "Accepting", which at 38px/750 renders
+       204px into a 123px text column. Measured on the form hub at 834px, where `auto-fit` yields exactly
+       three tracks and that tile lands in the last one: 28px of region overrun, in BOTH themes, with no
+       personalization at all. `anywhere` rather than `break-word` because only `anywhere` reduces
+       min-content, and the text column is a flex item sized from it. */
+    overflow-wrap: anywhere;
 }
 
 /* JR2 — the approved direction's signature, and the one place in the system a text colour does not

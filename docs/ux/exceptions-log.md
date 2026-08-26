@@ -601,6 +601,25 @@ full-screen sheet — and none of those moved.
    control is a flex item in a `space-between` bar with `min-width: 0` competing against five siblings — which
    is the top bar and nowhere else. So J8's fix is shell-only and this component was deliberately not touched.
 
+   ⛔ **CORRECTED 2026-08-26 BY M19 — "EVERY CONSUMER" WAS MEASURED ON A HOST THAT COULD NOT SEE THE FACE,
+   AND THERE IS AT LEAST ONE MORE.** The paragraph above is right that the topnav is the worst instance and
+   right that the component is not universally at fault. It is wrong that the topnav is the only place the
+   latent property is reached. **`ConfigPanel`'s Requiredness control spills 30px** — `Optional / Required /
+   Conditional`, no icons, non-compact — inside `.config__group`, a flex column with *implicit*
+   `align-items: stretch`, which clamps the fieldset below the sum of its segments' minimums. It is invisible
+   rather than harmless: `.config` is `overflow-y: auto`, so it absorbs the spill into a horizontal scrollbar
+   nobody looks for. `members/Index.vue`'s two `MdsFormField` instances have the same stretch-clamped shape.
+   ⚠️ **The reason J8's sweep missed them is the reason this whole class stayed hidden**: the dyslexia face
+   never loaded on the dev host (`public/hot` makes `/fonts/*.woff2` cross-origin), and `system-ui` resolves
+   ~27% narrower on Windows than on a CI runner. **"Measured at every width" was true; the widths were
+   measured in the wrong typeface.** `docker compose run --rm e2e` is now the way to measure this honestly.
+
+   ⚠️ **AND THE MECHANISM SENTENCE ABOVE HAS BEEN REPEATED WITH AN ERROR ATTACHED.** `white-space: nowrap`
+   is **not** on `.mds-segmented__seg` — the only two in `SegmentedControl.vue` are the sr-only `legend` and
+   `input`. This entry states it correctly (*"inline-flex with no wrap and no overflow handling"*); the copy
+   in `personalization-axe.spec.ts` did not, and a backlog row then quoted that copy verbatim. Both are
+   corrected. **An error propagated by citation reads as corroboration.**
+
 **Disposition:** accepted. If the sidebar widths, the pane widths, or `body`'s font-size token ever change,
 re-derive 60em from the same two edges rather than adjusting it by eye.
 

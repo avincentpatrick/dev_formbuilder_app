@@ -2138,14 +2138,53 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 ### Test suite & CI gates
 
-- **`major` · The 16-page responsive scan asserts nothing about which page it landed on.**
-  `tests/e2e/responsive-axe.spec.ts:124-132` is `goto` → `forceTheme` → `assertClean` with no
+- ~~**`major` · The 16-page responsive scan asserts nothing about which page it landed on.**~~
+  ✅ **DONE — M25 (2026-08-26), AND THE DEFECT WAS MEASURED LIVE RATHER THAN ARGUED.** One assertion per
+  *loop* — `expect(page.url(), …).toContain(p.path)`, which is `support/console.ts:34`'s idiom rather
+  than a new one — so **two inserted lines cover 42 tests**: the 32 of this file's 16-page loop, and the
+  10 of `auth-axe.spec.ts`'s unauthenticated loop, which had the identical hole and whose own header
+  already named the hazard without asserting it.
+  ⚠️ **PROVEN BOTH WAYS WITH THE ROW'S OWN SCENARIO, WHICH IS WHY THIS ROW IS WORTH ITS LENGTH.** With
+  `modules.gamification` set `false` for `acme`, the two Achievements tests fail with
+  `expected to be on /achievements, not http://acme.localhost/dashboard`. With the assertion reverted and
+  the module still off, the same two report **`2 passed` in 1.1m** — having scanned the dashboard in both
+  themes under a test name ending *"Achievements"*. **That green is the defect**, and reproducing it was
+  the only way to know the row was describing something real rather than something plausible.
+  ⚠️ **BOTH OF THE ROW'S OWN CITATIONS WERE WRONG AND ARE CORRECTED HERE.** The loop is **`:148-156`**,
+  not `:124-132` — that is inside the `pages` ARRAY, in the `Two-factor required` entry's comment block.
+  The `filteredToZero` idiom is **`:175-188`**, not `:154-163`. `bootstrap/app.php:315-334` and
+  `support/console.ts:34` both hold; the former is narrower than the truth, since **seven** handlers in
+  that file return the same toast redirect (`:286`, `:297`, `:310`, `:323`, `:336`, `:389`, `:458`), so a
+  302 is this application's standard web refusal rather than a special case.
+  ⚠️ **AND THE ROW UNDERSTATED ITSELF — FOUR PAGES ARE EXPOSED, NOT ONE.** `/achievements` on
+  `module:gamification` (`routes/tenant.php:258-259`; `TenantSettingRegistry.php:145-150` defaults a
+  MISSING row to true, which is the only reason it loads), plus `/analytics`, `/webhooks` and
+  `/integrations` on `feature:` PLAN gates (`:891-892`, `:762-763`, `:823-824`) whose only guarantee is
+  that `E2eSeeder` upserts `acme` onto Business. Verified in the running database rather than assumed:
+  `acme` is on `business` and carries **no `modules.*` row at all**. The file's own Analytics comment
+  calls that seeding *"a blocking obligation, precisely so this gate cannot stay green over a page it
+  never loads"* (ADR-0011 §D9) — the obligation is real, it is discharged, and **nothing checked that it
+  was** until this row closed. The other twelve entries are `can:`-gated and raise **403**, a different
+  and much weaker exposure; that is named in the spec's own comment so a later reader does not
+  "complete" the sweep by adding assertions for a redirect that cannot happen.
+  ⚠️ **THREE LOOK-ALIKES WERE ALREADY PASSING AND WERE DELIBERATELY LEFT ALONE** — M20's lesson that a
+  character-identical declaration is not an identical defect, re-measured and holding for a second
+  increment. `templates-axe.spec.ts:12-17` was the strongest-looking candidate of the five (
+  `/forms/templates` genuinely IS `feature:form_templates`-gated, `routes/tenant.php:486-487`) and
+  **already asserts `Use this template` is visible**, which no dashboard can satisfy;
+  `admin-console-axe.spec.ts:45-52` routes through `openConsole()`, which **ends** in `console.ts:34`'s
+  URL assertion; and this file's own `filteredToZero` loop already asserts its `No matching` heading —
+  which is precisely why `/webhooks?q=…` was covered while bare `/webhooks` twenty lines above was not.
+  **`personalization-axe.spec.ts:36-42` and `:56-68` were checked and left**: `/settings` carries no
+  middleware at all (`routes/tenant.php:267`) and `/forms` and `/submissions` are `can:`-gated, so there
+  is no 302 there to catch. Original filing follows.
+  — *`tests/e2e/responsive-axe.spec.ts:124-132` is `goto` → `forceTheme` → `assertClean` with no
   `waitForURL`, `toHaveURL` or heading check — and every plan/module refusal in this app answers a web
   request with `back()->with('toast')` (`bootstrap/app.php:315-334`), i.e. a 302 the goto follows
   silently. `/achievements` is gated by `module:gamification` and `E2eSeeder` never enables the module —
-  it relies entirely on `ToggleableModules`' default — so flipping that default gives **six green scans of
-  the dashboard**. **Latent**, and the idiom is present everywhere else in the shard, including the
-  `filteredToZero` loop twenty lines below (`:154-163`) and `support/console.ts:34`. One line per test.
+  it relies entirely on `ToggleableModules`' default — so flipping that default gives six green scans of
+  the dashboard. Latent, and the idiom is present everywhere else in the shard, including the
+  `filteredToZero` loop twenty lines below (`:154-163`) and `support/console.ts:34`. One line per test.*
 - **`major` · The login and 2FA-challenge rate limiters are asserted by no test in the repository.**
   `config/fortify.php:169-172` maps them by string and `FortifyServiceProvider.php:159,165` registers the
   closures; Fortify `array_filter`s the middleware, so nulling either config value or renaming either

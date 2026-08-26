@@ -18,10 +18,39 @@ exact-equality `KNOWN_UNGUARDED` assertion, so the list shrinks in the *same* PR
 
 ---
 
-## Status: ACTIVE CLAIM — `M22`, the guest device's missing enumerator and reaper for abandoned answer content
+## Status: NO ACTIVE CLAIM
 
-**Taken 2026-08-26.** Branch `m22-guest-orphan-reaper`, cut from `origin/main` at `88ba1e8`, PR into
-`main`. Row: the `major` in `docs/feature-backlog.md` — *"The guest device has no enumerator and no reaper
+Lane B holds nothing. **Namespaces after M20 + M21 + M22:** migration block stays **`2026_08_17_000111`**
+(M22 spent none — nothing server-side moved, and nothing client-side needed a `db.version()` bump either);
+ADR-0016's next free sub-decision stays **`§D35`**. ⛔ **ADR `0022` STAYS FREE and stays Lane A's
+block-opener (`0022-0025`)** — M22 amended `ADR-0021` instead, because this is that ADR's own threat model
+(shared kiosk hardware, guest runtime, device-local stores) carried from *disclosure* to *retention*.
+Minting a number to restate an accepted decision's premise spends the scarcer namespace for nothing. That
+is M18's reasoning, reused for the third increment running. `0010` stays reserved for H1d; `#16` stays free.
+
+⛔ **AND `docs/claims/decisions.md` GAINED NOTHING, WHICH IS A FINDING RATHER THAN AN OMISSION.** The row
+M22 took predicted *"a retention decision (how long, on what trigger, and whether it runs in the service
+worker) … its own ADR question."* Verified against the code, two of the three were already answered in the
+tree and the third was a type-check constraint with exactly one answer. There was no product call left to
+put to the user, and manufacturing one would have been worse than filing nothing. `D1` is untouched and
+still Lane A's or nobody's.
+
+**Baseline on `origin/main` after M22:** CI Pest **4544 / 19,280** (2 pre-existing warnings, unmoved — no
+PHP in the diff) · Vitest **131 files / 2,272** (design-system 35/567 · **public-runtime 36/819** ·
+resources/js 60/886) · Storybook axe **42 / 303** · E2E **551 passed + 10 skipped, no flaky line** ·
+PHPStan CI `[OK]` · four host lint gates **97 · 113 · 31 · 113/121/0**, re-measured unpiped ·
+`openapi.json` byte-identical.
+⚠️ **Only the public-runtime chunk moved (+1 file, +14 tests), which is what the row predicted and the
+third increment running to predict it correctly.** The design-system chunk is quoted from Lane A's post-M20
+line **and was re-run here rather than trusted**, because `clipped-node-containment.test.ts` is a paired
+file that reads `resources/public-runtime` off disk.
+
+---
+
+## RELEASED — M22, the guest device's missing enumerator and reaper for abandoned answer content (merged as PR #213, `d4013c0`, 6/6 green)
+
+**Taken 2026-08-26, merged the same day.** Branch `m22-guest-orphan-reaper`, cut from `origin/main` at `88ba1e8`,
+merged into `main` as PR #213 (`d4013c0`), 6/6 green with every job's step count read individually (11-20, none empty). Row: the `major` in `docs/feature-backlog.md` — *"The guest device has no enumerator and no reaper
 for abandoned answer content"* — filed by M21 the moment M21 decided not to fix it.
 
 **⚠️ NUMBERED `M22`, AND THE REF WAS RE-READ TWICE.** The opening fetch and the fetch taken immediately
@@ -112,6 +141,62 @@ respondent-scoped device stores this row lives in. `0010` stays reserved for H1d
 `[OK]`, local **18 against the FILE LIST** · four host lint gates **97 · 113 · 31 · 113/121/0** ·
 `openapi.json` byte-identical. ⚠️ **This row is again `.ts` under `resources/public-runtime/`, so expect
 the public-runtime chunk to move and Pest not to** — the chunk is what gets re-measured, never the total.
+
+---
+
+### What the gates actually measured, against what this claim predicted
+
+Every prediction in the paragraph above held, and the one that mattered most was the narrowest: **only the
+public-runtime chunk moved.**
+
+| Gate | Predicted | Measured (CI, PR #213) |
+|---|---|---|
+| Vitest | +1 file, +14 tests, public-runtime only | **131 files / 2,272** — public-runtime **36/819**, design-system 35/567, resources/js 60/886 ✅ |
+| Pest | unmoved, no PHP in the diff | **4,544 / 19,280 assertions, 2 pre-existing warnings** — unmoved to the digit ✅ |
+| Storybook axe | unmoved | **42 / 303** ✅ |
+| E2E | unmoved, **no flaky line** | **551 passed + 10 skipped**, no flaky line ✅ |
+| `openapi.json` | byte-identical | Contract tests green, 16 steps ✅ |
+| PHPStan + four lint gates | unmoved | Static analysis green (18 steps); gates re-measured **97 · 113 · 31 · 113/121/0** unpiped on the host ✅ |
+
+6/6 with every job's step count read individually — 16 · 18 · 12 · 20 · 11 · 11, **none empty**.
+
+⛔ **THE PAIRED FILE WAS RUN, NOT ASSUMED.** `packages/design-system/src/theme/__tests__/clipped-node-containment.test.ts`
+lives in Lane A's tree, scans `resources/public-runtime` off disk, and asserts `KNOWN_UNGUARDED` with exact
+equality **in both directions** — so it reddens whether the list grows or shrinks. This increment adds and
+removes no `clip: rect(0 0 0 0)`, and that was proved by running the chunk: **3/3 green, including its
+anti-vacuity case.** The other two paired files were unreachable (no new `NotificationType`, no new ability key).
+
+### The mutation harness ran twice, and the disjoint red sets are the finding
+
+M21's lesson was that a gate proven only by its refusal is indistinguishable from one that refuses
+everybody. M22 makes that mechanical: **one mutation is not enough.**
+
+| Mutation | Red | Green |
+|---|---|---|
+| **A** — `reapAbandoned()` returns `{0,0}` without doing anything | **8 of 14**, every *"collects"* case, **including both call-site tests** | all six *"spares"* cases — a do-nothing reaper trivially spares everything |
+| **B** — drop the `live.has()` reachability spare | **exactly 2**, the two reachability cases | the other 12, including every *"collects"* case |
+
+**Neither red set contains a member of the other.** A reaps-nothing bug and a reaps-everything bug are
+therefore both caught, by different tests, which is the property a single mutation cannot demonstrate.
+`lib/reap.ts` was restored from **saved bytes** and confirmed **sha256-identical** after each mutation —
+never `git checkout --`, per the M9 lesson.
+
+⚠️ **AND THE TWO CALL-SITE TESTS ARE THE DIRECT DESCENDANT OF M21's DEEPEST FINDING.** *A unit test proves
+what a function does when called; only a call-site sweep proves that it is called.* M15 shipped a docblock
+claiming `respondentSession()` refreshed its stamp "on every read", pinned it in a green unit test, and ran
+a whole increment while the runtime made that read once, at boot. So this increment's wiring is asserted
+through the real entry points — `createSyncOutbox(...).refresh()` and `replayOutbox()` — and deliberately
+against **real elapsed time**, because an injected clock is the one thing the production callers do not
+have. Mutation A reddened both, which is what makes the wiring measured rather than assumed.
+
+### Filed rather than fixed, the moment the decision was made
+
+One `minor`: **a media pick made during a conflict review is protected only by the grace window.** That
+session runs `createAutosave` with `enabled: false` (G8c, deliberately), so it writes **no `draft_answers`
+row at all** and nothing on disk names its `local:` ref until the resubmit — which is why
+`MEDIA_ORPHAN_GRACE_MS` is an hour rather than the five minutes the 800 ms autosave debounce would justify.
+It fails safe (`needs_attention`, *"queued media is incomplete"*) rather than silently. The fix is to stop
+the review session being invisible to the mark set, not to lengthen the window.
 ---
 
 ## RELEASED — M21, the abandoned draft that is restored into the next respondent's form (merged as PR #211, `15dc10b`, 6/6)

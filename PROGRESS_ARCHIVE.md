@@ -4871,7 +4871,7 @@ E2E **551 + 10 skipped, no flaky**, axe **42 / 303**, PHPStan CI `[OK]`, `openap
 are now quoted out of a CI log, never out of a hand-off. Namespaces: nothing spent; `0022` still free and
 still Lane A's block-opener, ninth consecutive.
 
-## 2026-08-27 — 🅱️ LANE B, `M34`: three streamed exports with no deny test, and a remedy that was impossible rather than merely wrong (PR #<n>, `<sha>`, CI 6/6 green with real step counts)
+## 2026-08-27 — 🅱️ LANE B, `M34`: three streamed exports with no deny test, and a remedy that was impossible rather than merely wrong (PR #222, `b6adb2e`, CI 6/6 green with real step counts)
 
 `GET /analytics/export`, `GET /api/v1/analytics/report/export` and
 `GET /api/v1/forms/{form}/versions/{version}/xlsform` all streamed tenant data behind gates nothing had ever
@@ -4940,6 +4940,9 @@ unchecked assumption would have written.
 
 ### Gates
 
+**CI 6/6 with real step counts** — E2E **20** · Static **19** · Contract **16** · Frontend **12** ·
+axe **11** · Pest **11**; **CI Pest `4591 / 19,400`**, **+11 tests and +17 assertions on `4580 / 19,383`, exactly
+what was added**; **E2E `551 + 10 skipped`, no flaky line**.
 Local **213 passed / 1,346 assertions** across `Analytics`, `Xlsform`, `Attachments`, `Tenant`, zero
 failures, zero infrastructure errors. Pint **PASS over 1374 files**, **proven live first** by a deliberately
 misformatted probe (exit 1, file and fixers named). PHPStan local = baseline **by file list**, and

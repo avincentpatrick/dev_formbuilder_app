@@ -39,10 +39,28 @@ correction lives here and in `PROGRESS.md`'s Lane B block; Lane A should take it
 
 ---
 
-## RELEASED — M34, three streamed exports with no authorization deny test (merged as PR #<n>, `<sha>`, CI 6/6 green with real step counts)
+## RELEASED — M34, three streamed exports with no authorization deny test (merged as PR #222, `b6adb2e`, CI 6/6 green with real step counts)
 
 **Shipped 2026-08-27.** Branch `m34-export-deny-tests`. Row closed in `docs/feature-backlog.md` as its own
 micro-commit.
+
+### ✅ GATES
+
+- **All six jobs `success` with real step counts** — E2E **20**, Static analysis **19**, Contract **16**,
+  Frontend **12**, Design-system axe **11**, Pest **11**. **Not one `steps: []`.**
+- **CI Pest `4591 passed / 19,400 assertions`** (2 pre-existing warnings) — up from M30's `4580 / 19,383`:
+  **+11 tests, exactly the eleven added, and +17 assertions, exactly the seventeen.** A delta against the base
+  this branch actually merged into, never an absolute quoted from a hand-off.
+- **E2E `551 passed + 10 skipped`, NO flaky line** — unchanged, and load-bearing (`failOnFlakyTests`).
+- **Local `213 passed / 1,346 assertions`** across `Analytics`, `Xlsform`, `Attachments`, `Tenant`; zero failures,
+  zero infrastructure errors.
+- **PHPStan local 18 across 10 FILES = baseline, zero delta BY FILE LIST**, and structurally so: `phpstan.neon`
+  scans `app`, `database`, `routes` — **not `tests`** — so a test-only diff cannot move it. CI `[OK]`.
+- **Pint `PASS` over `1374` files, exit 0 — AND PROVEN LIVE FIRST.** A bare `passed` is not evidence a scan
+  happened, so a deliberately misformatted probe went into `app/Policies/` and was run: exit **1**, the file
+  named, its fixers listed. Only then was the real `PASS` believed.
+- **`openapi.json` untouched** — the prediction written before the files were opened held: this increment adds
+  tests, and Scramble infers from a controller's own returns.
 
 ### ⛔ THE ROW'S EVIDENCE WAS FLAWLESS AND ITS REMEDY WAS STRUCTURALLY IMPOSSIBLE
 

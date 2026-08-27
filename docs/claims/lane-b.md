@@ -18,24 +18,92 @@ exact-equality `KNOWN_UNGUARDED` assertion, so the list shrinks in the *same* PR
 
 ---
 
-## Status: NO ACTIVE CLAIM
+## Status: ACTIVE CLAIM — `M35`, the super-admin console gate asserted by a hand-written list of three route names
 
-**Lane B holds nothing as of 2026-08-27.** `M29` (PR #219, `7892f7f`), `M33` (PR #221, `f329e1b`) and
-`M34` are merged and released. Their entries follow.
+**Taken 2026-08-27.** Branch `m35-admin-console-gate-walk`, cut from `origin/main` at `6714d20`, PR into `main`.
+Row: the `major` under **Test suite & CI gates** in `docs/feature-backlog.md:2470` — *`GET /admin/feedback/{feedback}/screenshot`
+streams cross-tenant PII from the central host and no test asserts a refusal on it* — **plus the sibling
+finding the same row states in its closing paragraph**, which is the larger half and is taken with it.
 
-⛔⛔ **BEFORE YOU NUMBER ANYTHING: READ THE WHOLE OF `lane-a.md`, NOT ITS `## Status` LINE.** This is `M33`'s
-process finding and it still binds. Lane A's file did not merely hold `M30` — its `### THE QUEUE BEHIND IT`
-block **pre-claimed `M31` and `M32` as well**, in writing, and said why in its own words: *"because Lane B is
-taking rows from this exact section right now."* **A lane's forward queue is a claim and it does not live
-under the `## Status` heading.** As of `M34`'s close, `lane-a.md` reads *"NO ACTIVE CLAIM — but the forward
-queue `M31` and `M32` IS STILL A CLAIM"*, so **`M35` is the next free number** and `M31`/`M32` are not yours.
+⛔⛔ **NUMBERED `M35` AFTER READING THE WHOLE OF `lane-a.md` AND RUNNING `git worktree list`.** Lane A's file
+reads **ACTIVE CLAIM `M31`** (branch `m31-answer-edit-checksum`, cut at `659c6ca`) and its body **pre-claims
+`M32`** behind it in writing — a forward queue is a claim and does not live under the `## Status` heading.
+`git worktree list` agrees: `c:\laragon\www\dev_formbuilder_app` sits on `m31-answer-edit-checksum`.
+**`M35` is the next free number**; `M31` and `M32` are Lane A's and are not mine to take.
 
-⛔ **AND A NAMESPACE FIGURE IN THE OTHER LANE'S FILE CAN BE WRONG — THIS ONE IS.** `lane-a.md:43` and Lane A's
-own hand-off both state *"ADR-0016's next free sub-decision is `§D36` — M29 spent `§D35`."* **`M29` spent no
-`§D` at all.** `docs/adr/0016-saml-sso.md` runs to **`§D34`** and a repository-wide grep for `§D35` returns
-**only the two claim files arguing about it**. `M29` *reserved* `§D35` in its claim and released it unspent,
-which `lane-b.md:449` records in as many words. **`§D35` IS FREE.** Lane B does not edit `lane-a.md`, so the
-correction lives here and in `PROGRESS.md`'s Lane B block; Lane A should take it from either.
+**Namespaces this claim spends: NOTHING.** No ADR (`0022` free, and it stays Lane A's block-opener). No
+migration (`2026_08_17_000111` free). No `§D<n>` anywhere. `0010` stays reserved for H1d; `#16` free.
+
+⚠️ **AND THE `§D35` CORRECTION IN THE BLOCK BELOW IS RE-VERIFIED THIS SESSION RATHER THAN CARRIED.**
+`docs/adr/0016-saml-sso.md` runs to **`§D34`**; a repository-wide grep for the next number returns **only the
+two claim files and `PROGRESS.md` arguing about it**. Nothing has spent it. It is free, and it is still the
+wrong home for almost every row — ADR-0016 is SAML SSO.
+
+### Every file this claim touches, named before it is opened
+
+- `tests/Feature/Admin/AdminConsoleGateTest.php` — **NEW.** The route-table walk: every route under the
+  `admin/` prefix, discovered rather than listed.
+- `tests/Feature/Auth/StepUpReauthenticationTest.php` — `:135-146`, the hand-maintained manifest whose
+  comment claims it covers every page of the console and which names three of the fourteen.
+- `tests/Feature/Feedback/FeedbackConsoleTest.php` — the behavioural denials on the screenshot route, and
+  the positive control they need in order not to be vacuous.
+- `tests/Pest.php` — the shared console-route helper, and an extension to the committed-fixture purge if the
+  positive control commits an `attachments` row. **Claimed because it will probably be written to; released
+  untouched and said so if it is not.**
+- `docs/feature-backlog.md` (this row only), `docs/claims/lane-b.md`, `PROGRESS.md` (Lane B's block and Lane
+  B's hand-off line only).
+
+**Claimed for the MUTATION ONLY, reverted by byte comparison before the PR opens:** `routes/admin.php`. It is
+the subject of both controls and appears in no diff.
+
+**Read-only, not edited:** `app/Http/Controllers/Admin/FeedbackConsoleController.php`,
+`app/Services/Admin/SuperAdminService.php`, `app/Http/Middleware/EnsureSuperAdmin.php`,
+`app/Http/Middleware/EnsureSuperAdminMfa.php`, `app/Http/Middleware/RequireRecentPassword.php`.
+**The production code is correct** — the console's four gates are all present on all fourteen routes,
+measured from the live route table this session. This row is a coverage gap, not a fix.
+
+⚠️ **NO FILE COLLISION WITH LANE A'S `M31` OR ITS QUEUED `M32`.** `M31`'s diff is
+`tests/Feature/Submissions/` plus `database/factories/SubmissionAnswerFactory.php`; `M32`'s is the
+gamification backfill and `tests/Feature/Connectors/ConnectorTokenRefreshTest.php`. Not one path above
+appears in either. **`tests/Pest.php` is the one file worth naming as a near miss** — it is shared by every
+suite, and if `M31` moves a submission helper into it this PR will conflict there and nowhere else.
+
+### ✅ THE ROW IS VERIFIED AGAINST THE CODE — THIRD ROW RUNNING WHOSE EVERY CITATION IS EXACT
+
+`routes/admin.php:83-84` is the screenshot route. `FeedbackConsoleTest.php:153` / `:158` / `:162` are the
+index's three denials, to the line. `:338-348` is the screenshot's only case, and its own comment really does
+say the 404 proves the lookup resolved. `StepUpReauthenticationTest.php:135-146` really does name three admin
+route names under a comment claiming it covers every page of the console. Measured from the live route table:
+**fourteen routes** under `admin/`, all on the central host — thirteen carrying all four gates, one (the
+enrollment landing) deliberately carrying two. The manifest names **three of the thirteen**.
+
+### ⛔ AND THE ROW'S PRESCRIBED FIX IS THE HALF THAT NEEDED CHECKING — IT SURVIVES, WITH ONE TRAP IT DOES NOT NAME
+
+The remedy — *walk the route table and assert the property* — transfers, unlike `M33`'s and `M34`'s. But the
+row's other suggestion, the three copied deny assertions, has a **vacuity trap it does not mention and that
+this repository has already paid for once**: `EnsureSuperAdmin` answers **404** for non-disclosure, and the
+controller answers **404** for a report it cannot resolve. A non-super-admin denial written against a report
+that does not exist — or that exists without a screenshot, which is the only fixture the console suite can
+build today — **passes with the middleware deleted**. `tests/Feature/Tenant/FeedbackTest.php:307-309` states
+exactly this trap in its own words on the tenant-side twin. **So the deny test owes a positive control that
+returns something other than 404 on the same URI**, and that control does not exist yet: no test of any kind
+has ever driven that route to a success.
+
+### The controls this increment owes
+
+Two mutations, both against `routes/admin.php`, each with a baseline of the same scope run first:
+
+1. **Delete `'superadmin'` from the group's middleware.** Reddens the walk's gate case and the console's
+   non-super-admin denials. This is the mutation the *existing* index tests already catch, so its red set is
+   the check that the new gate agrees with them rather than replacing them.
+2. **Move the screenshot route out of the inner `superadmin.mfa` + `step-up` group into the outer one.**
+   This is the mutation the row names as the realistic silent one, and the manifest cannot see it because a
+   route it does not name cannot fail it. **A pre-change baseline must show this mutation green**, or the
+   increment has proved nothing.
+
+Every control restored by **sha256 byte comparison**, never `git checkout --`, per M9. The harness refuses to
+start while another Pest process lives — per M34, whose verification subagent ran `artisan test` and dropped
+the schema under a live mutation run.
 
 ---
 

@@ -117,6 +117,58 @@ with no product value, so it is deleted regardless of how D3 is answered.
 `openapi.json`, and open a follow-up row to un-gate `kpis.members` and `team.active_members` — the
 dashboard deletion above still stands.
 
+### D4 — An archived webhook envelope has no form to be scoped to. Which permission reads it?
+
+**Filed 2026-08-26 by Lane B, during `M33`.** Proceeding on the recommendation below rather than
+waiting — Standing Rule 5. The revert is one enum arm and it is named at the bottom.
+
+**Why the question exists at all.** `M33` closes the row that `AttachmentPolicy::view()` is flat where
+`SubmissionPolicy::view()` is scoped: `GET /attachments/{attachment}` read any stored object in the
+tenant by id with no per-form check, so `form_editor` and `reviewer` — the two roles holding
+`submissions.view` without `dashboard.org.view` — could read media on forms they had never
+collaborated on, **and on forms they had been removed from.** For four of the six live kinds the fix
+is mechanical: resolve the owner, apply the submission's own scope. **One kind has no owner the
+scope means anything for.**
+
+`WebhookPayloadArchive::archive()` writes an attachment owned by a `webhook_delivery`. A delivery
+belongs to a tenant-configured endpoint, and **its envelope is the full outbound payload of whatever
+form fired it** — so it does not belong to one form, it crosses every form boundary at once. There
+is nothing to scope it *to*. Under the pre-M33 policy it was readable by **all five seeded roles**
+on `submissions.view`, and it is servable: the row is written `ScanStatus::Skipped`, which
+`servable()` admits, **under a comment at `WebhookPayloadArchive.php:67` asserting these bytes are
+"never served to a browser."** The route makes that comment false, which is how the kind was found.
+
+**The options, all three real.**
+
+1. **`webhooks.manage` — Owner/Admin.** The authority that configures the endpoint the payload was
+   sent to is the authority that reads what was sent. Narrows from five roles to two.
+2. **`submissions.view` unchanged — all five roles.** Treat the envelope as submission data. Keeps
+   today's behaviour, and keeps a tenant-wide cross-form read available to `form_editor` and
+   `reviewer` — the precise pair the rest of `M33` exists to scope.
+3. **`audit_log.view` — Owner/Admin.** Treat the envelope as a forensic record rather than
+   configuration. Same audience as (1) today, but it would bind envelope access to the audit
+   permission if those two ever diverge.
+
+**Recommendation, and what is implemented: (1) `webhooks.manage`.** It is the smallest permission
+whose holders are already trusted with the whole of what an envelope contains — a `webhooks.manage`
+holder can already read every outbound payload by reconfiguring the endpoint, so this grants no new
+authority to anybody. (2) is rejected because it leaves the increment's own defect open for one kind
+while closing it for four. (3) is rejected as a coincidence of the current role matrix rather than an
+argument: `audit_log.view` is about the audit trail, and an envelope is not in it.
+
+⚠️ **This is a NARROWING, which is the class of change the J2d precedent says belongs to the user** —
+recorded here for exactly that reason rather than decided silently in a policy file. It is
+implemented rather than deferred because the alternative is leaving a live tenant-wide cross-form
+read open while the question waits, and Standing Rule 5 exists to stop that trade.
+
+**If the answer comes back the other way**, the revert is one arm of the `match` in
+`app/Policies/AttachmentPolicy.php` — change `AttachmentKind::WebhookPayloadArchive` from
+`$user->can('webhooks.manage')` back to `$user->can('submissions.view')` — plus the two cases in
+`tests/Feature/Attachments/AttachmentPolicyTest.php` that name it (*refuses an archived webhook
+envelope to a collaborating form_editor* and its owner-side positive control), and the §D10
+paragraph in `docs/adr/0015-feedback-screenshot-capture.md`. No migration, no data, no client
+contract: `openapi.json` is untouched by `M33`.
+
 ---
 
 ## ANSWERED

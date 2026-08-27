@@ -88,6 +88,73 @@ class AttachmentFactory extends Factory
         ]);
     }
 
+    /**
+     * A feedback screenshot (I7a, ADR-0015 §D6) — the fourth morph alias, owned by a `feedback_report`.
+     *
+     * Deliberately `is_pii = true` and `clean()`, which is what the real write path produces once its
+     * queued scan lands: ADR-0015 §D8 marks the row PII because the image is a photograph of whatever was
+     * on the reporter's screen, and a fixture left `pending()` would make an authorization test assert a
+     * 409 for a reason that has nothing to do with authorization. `clean()` rather than `skipped()` for
+     * the same reason `brandingLogo()` chooses it — the strongest servable state, so the scan gate is
+     * never the thing under test.
+     */
+    public function feedbackScreenshot(string $tenantId, string $reportId): static
+    {
+        return $this->state(fn (): array => [
+            'attachable_type' => 'feedback_report',
+            'attachable_id' => $reportId,
+            'kind' => AttachmentKind::FeedbackScreenshot,
+            'mime_type' => 'image/png',
+            'original_filename' => 'capture.png',
+            'path' => "tenants/{$tenantId}/feedback_screenshot/".date('Ym').'/'.Str::uuid().'.png',
+            'virus_scan_status' => ScanStatus::Clean,
+            'is_pii' => true,
+            'width' => 1_600,
+            'height' => 900,
+        ]);
+    }
+
+    /**
+     * The per-submission PDF export ({@see App\Services\Submissions\SubmissionPdfStorage::store()}), M33.
+     * Owned by the submission, `is_pii = true`, and `skipped()` because that is the verdict a real scan
+     * returns in Phase-1 — {@see ScanStatus::servable()} admits it, so the route serves these bytes.
+     */
+    public function exportArtifact(Submission $submission): static
+    {
+        return $this->state(fn (): array => [
+            'attachable_type' => 'submission',
+            'attachable_id' => $submission->id,
+            'kind' => AttachmentKind::ExportArtifact,
+            'mime_type' => 'application/pdf',
+            'original_filename' => 'submission.pdf',
+            'is_pii' => true,
+            'virus_scan_status' => ScanStatus::Skipped,
+            'width' => null,
+            'height' => null,
+        ]);
+    }
+
+    /**
+     * An archived webhook delivery envelope ({@see App\Services\Webhooks\WebhookPayloadArchive::archive()}),
+     * M33. The owner alias is `webhook_delivery`, and the id needs no real row: nothing resolves
+     * `$attachment->attachable`, and {@see App\Policies\AttachmentPolicy} answers this kind on the
+     * permission alone precisely because a delivery has no form to be scoped to.
+     */
+    public function webhookEnvelope(?string $deliveryId = null): static
+    {
+        return $this->state(fn (): array => [
+            'attachable_type' => 'webhook_delivery',
+            'attachable_id' => $deliveryId ?? (string) Str::uuid(),
+            'kind' => AttachmentKind::WebhookPayloadArchive,
+            'mime_type' => 'application/json',
+            'original_filename' => 'payload.json',
+            'is_pii' => false,
+            'virus_scan_status' => ScanStatus::Skipped,
+            'width' => null,
+            'height' => null,
+        ]);
+    }
+
     public function pending(): static
     {
         return $this->state(fn (): array => ['virus_scan_status' => ScanStatus::Pending]);

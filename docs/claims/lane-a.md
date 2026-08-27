@@ -16,15 +16,27 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — but the forward queue `M32` IS STILL A CLAIM
+## Status: ACTIVE CLAIM — `M32`, the queued half of `gamification:backfill` asserted by job count alone
 
-**`M31` is merged (PR #223, `5419ddf`, CI 6/6 green with real step counts).** Lane A holds no *active* row. ⛔ **IT DOES STILL HOLD `M32`**,
-pre-claimed on Rule 7's *"the lane queue is the claim"* since M30 and scoped in the M30 block below with the
-correction that **the row's own prescribed fix does not work**. It is not free for the other lane to take.
+**Taken 2026-08-27.** Branch `m32-backfill-fanout-payload`, cut from `origin/main` at `6c08476`, PR into `main`.
+Row: the `major` under **Test suite & CI gates** at `docs/feature-backlog.md:2586` — *the queued half of
+`gamification:backfill` is asserted by job count alone* — **plus the second instance the row does not name**,
+`tests/Feature/Connectors/ConnectorTokenRefreshTest.php:188-196`, which is the identical hole in a different
+command and is taken with it.
 
-⛔⛔ **BEFORE YOU NUMBER ANYTHING: READ THE WHOLE OF `lane-b.md`, NOT ITS `## Status` LINE, AND RUN
-`git worktree list`.** **The highest number spent is `M34`** (Lane B, PR #222, `b6adb2e`), so **`M35` is the
-next free one after this lane's own `M32`.**
+⛔⛔ **NUMBERED `M32` AFTER READING THE WHOLE OF `lane-b.md` AND RUNNING `git worktree list`.** Lane B's file
+reads **ACTIVE CLAIM `M35`** (branch `m35-admin-console-gate-walk`, cut at `6714d20`) and `git worktree list`
+puts `c:\laragon\www\fb-lane-b` on that same branch, **two commits deep with four files dirty** — the claim
+file and the worktree agree for the first time in four increments. `M32` was pre-claimed by this lane under
+Rule 7's *"the lane queue is the claim"* since M30 and is not free for the other lane to take; the highest
+number spent is `M35`, so `M36` is the next free one after this.
+
+⛔ **THIS ROW'S OWN PRESCRIBED FIX IS KNOWN-WRONG BEFORE THE FIRST LINE IS WRITTEN, AND THAT IS THE THIRD IN
+A ROW.** The row closes *"Fix is a closure on `assertPushed`"*. `Queue::assertPushed($class, $closure)` is an
+**at-least-one-match** predicate, so the literal reading — one closure asserting the id is one of the two —
+stays **green** under the silent hoist mutation that is the only thing the row is actually about. M30's
+prescribed fix was wrong in both of its mechanisms and M31's was wrong in its probe. **Measure the mutation
+before writing the test, and make the mutation print the line it changed.**
 
 ⚠️ **AND M31 IS THE THIRD CONSECUTIVE INCREMENT WHERE THE NUMBER WAS DECIDED BY THE WORKTREE, NOT THE CLAIM
 FILES.** At M31's session open `lane-b.md` on `origin/main` read `## Status: NO ACTIVE CLAIM`, its `M29` and

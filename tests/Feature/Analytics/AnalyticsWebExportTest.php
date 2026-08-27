@@ -155,10 +155,11 @@ it('defaults the export window to the same range the page opens on', function ()
 |--------------------------------------------------------------------------
 | M34 — the authorization gate on this route, which nothing asserted until now.
 |
-| The one assertion that pointed at /analytics/export before this (AnalyticsPageGateTest.php:110) drives it
-| as an OWNER on a Professional plan and asserts a REDIRECT. That is `feature:advanced_analytics` answering;
-| an Owner passes `can:` on the way to it, so the authorization middleware on this route was never exercised
-| by anything. Deleting `can:viewAny,SavedReportView` from routes/tenant.php:894 left the whole suite green.
+| Nine requests in THIS file already drove /analytics/export; not one of them was about its GATE. The only
+| assertion anywhere that touched the gate's own arm is AnalyticsPageGateTest.php:115, which drives the route
+| as an OWNER on a Professional plan and asserts a REDIRECT — `feature:advanced_analytics` answering, with the
+| Owner passing `can:` on the way to it. Deleting `can:viewAny,SavedReportView` from routes/tenant.php:894
+| left the whole suite green; M34's mutation harness proved exactly that, and reddened only the case below.
 |--------------------------------------------------------------------------
 */
 

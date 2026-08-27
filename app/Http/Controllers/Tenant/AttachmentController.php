@@ -17,7 +17,12 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 /**
  * The authenticated media write path (Increment G6): a staff member's manual-encode upload
  * (`POST /forms/{form}/attachments`, gated `can:create,Submission,form` — the same policy as the encode
- * page) and the tenant-side signed read-back (`GET /attachments/{attachment}`, gated `can:view,attachment`).
+ * page) and the tenant-side read-back (`GET /attachments/{attachment}`, gated `can:view,attachment`).
+ * NOTHING ABOUT THAT READ-BACK IS SIGNED, and this line said it was until M34 struck the word. The
+ * controls are session auth, that policy — which since M33 resolves the attachment's KIND and its
+ * OWNER rather than a bare permission — and the scan-status guard below. The repository contains
+ * exactly one signed URL (email verification, User.php:146) and no `temporaryUrl`,
+ * `ValidateSignature` or `hasValidSignature` anywhere in `app/` or `routes/`.
  * A thin channel adapter over {@see AttachmentStorageService}; the file stages against the form's published
  * version and is re-pointed to the submission at persist. Serving is withheld until the scan status is
  * servable (an unscanned/infected file 409s regardless of permission).

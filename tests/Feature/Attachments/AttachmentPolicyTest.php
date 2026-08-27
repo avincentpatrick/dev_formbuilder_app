@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\FeedbackStatus;
 use App\Enums\ResourceCapacity;
+use App\Enums\ScanStatus;
 use App\Enums\SubmissionStatus;
 use App\Models\Attachment;
 use App\Models\FeedbackReport;
@@ -313,4 +314,41 @@ it('sends a caller with no session to login rather than serving bytes', function
     // No actingAs. The `auth` middleware on the tenant group is the outermost gate and is asserted here
     // because nothing else in the suite asserts it for this route.
     $this->get(attachmentUrl($attachment))->assertRedirect();
+});
+
+/*
+|--------------------------------------------------------------------------
+| M34 — the 409 quarantine branch, which no stored-file route in the repository asserted.
+|
+| AttachmentController.php:43 and FeedbackController.php:75 both
+| `abort_unless($attachment->virus_scan_status->servable(), 409)`, and ScanStatus's own docblock
+| (app/Enums/ScanStatus.php:26-27) calls servable() the serving gate the threat model relies on. Nothing
+| asserted either: BrandingLogoRouteTest.php:98 only mentions 409 in prose while asserting a 404. Delete or
+| invert either guard and a pending or infected object is served with the whole suite green.
+|
+| It lives beside the policy cases deliberately, because it is the SECOND half of the same question: the
+| policy decides who may read this object, and servable() decides whether the object may be read AT ALL.
+| The guard runs after `can:view,attachment`, so a caller who fails the policy never reaches it — which is
+| why both cases below use an OWNER, the principal the policy admits.
+|
+| POSITIVE CONTROL: 'serves respondent media to a viewer' (:162) and 'still serves a feedback screenshot to
+| an owner' (:184), both of which build the same fixture with ->clean() and assert 200.
+|--------------------------------------------------------------------------
+*/
+
+it('409s a stored object whose scan has not finished, for a caller the policy admits', function (): void {
+    [$owner, $attachment] = memberWithStoredObject('owner', 'submission_media');
+    $attachment->update(['virus_scan_status' => ScanStatus::Pending]);
+
+    $this->actingAs($owner)->get(attachmentUrl($attachment))->assertStatus(409);
+});
+
+it('409s a quarantined object rather than serving the bytes', function (): void {
+    // The arm that matters: `infected` is not "not ready yet", it is a file the scanner has positively
+    // identified. servable() admits Clean and Skipped only (ScanStatus.php:31), so both non-servable cases
+    // are covered and neither depends on the other's enum value.
+    [$owner, $attachment] = memberWithStoredObject('owner', 'submission_media');
+    $attachment->update(['virus_scan_status' => ScanStatus::Infected]);
+
+    $this->actingAs($owner)->get(attachmentUrl($attachment))->assertStatus(409);
 });

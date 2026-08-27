@@ -322,3 +322,31 @@ it('refuses the API export to a form_editor who is not a collaborator on that fo
         ->get("http://acme.meridian.test/api/v1/forms/{$form->id}/versions/{$version->id}/xlsform")
         ->assertForbidden();
 });
+
+it('refuses the WEB export to a viewer, the arm the existing collaborator case cannot reach', function (): void {
+    // M34, and it is a second code path rather than a second spelling of the first. FormPolicy::canEdit is
+    // `forms.edit.any || (forms.edit.own && holdsEditorGrant)` (:131-135). The form_editor case above fails
+    // the SECOND clause — it holds forms.edit.own and lacks the grant. A viewer holds neither key
+    // (RolePermissionSeeder:111-112 gives it submissions.view and the two dashboard reads), so it fails the
+    // FIRST, and deleting either clause leaves one of the two cases green.
+    //
+    // No plan is assigned anywhere in this suite, deliberately: RequireFeature fails open on a null plan
+    // (RequireFeature.php:33), so this is a 403 from the policy and not the 402-shaped redirect a Free
+    // tenant gets — which FeatureGateWebTest.php:84-86 asserts separately and is a different question.
+    //
+    // POSITIVE CONTROL: the owner's 200 on this same URI at :239.
+    $tenant = inboxTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    makeActiveMember($owner, 'owner');
+    $form = publishedInboxForm($tenant, $owner);
+    $version = FormVersion::findOrFail($form->current_published_version_id);
+
+    $viewer = User::factory()->create();
+    enterTenant($tenant->id, $viewer->id);
+    makeActiveMember($viewer, 'viewer');
+
+    $this->actingAs($viewer)
+        ->get("http://acme.meridian.test/forms/{$form->id}/versions/{$version->id}/xlsform")
+        ->assertForbidden();
+});

@@ -2515,6 +2515,32 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   bytes, so they fall outside a stored-bytes census and belong with whoever takes the analytics write surface.
   **Latent.**
 
+- **`minor` · A `can:` gate that names the WRONG SUBJECT is invisible to every test in the repository, including the one written to catch it.**
+  Found by M34's adversarial pass over its own committed diff — the mutation nobody thinks to try, because it
+  changes no behaviour for any principal a test happens to use. Swap `can:viewAny,SavedReportView::class` for
+  `can:viewAny,Submission::class` at `routes/api.php:369` (**the alternative `routes/api.php:359-362` says in
+  its own comment was considered and rejected**) and **every test stays green**: `GroupBPolicyGateTest`
+  resolves only that the middleware IS `Authorize::class` (`:97` discards everything after the first colon),
+  and M34's two new deny cases both use a role-less member who holds `submissions.view` no more than the
+  dashboard keys, so both gates refuse them identically. **The rejection is defended by a prose comment and
+  nothing executable.** ⚠️ **It is closeable, and the recipe is the finding**: grant a constructed principal
+  **exactly `submissions.view` and neither dashboard key** — they must be **200 under the wrong subject and
+  403 under the right one**, which is the only fixture that can tell two gates apart. **Deliberately NOT
+  folded into M34**: an assertion about *which permission a gate names* is a new species for this repo, and it
+  wants designing once across the whole Group-B surface — where it would strengthen
+  `GroupBPolicyGateTest` from "a gate is present" to "the gate names the subject its route intends" — rather
+  than being bolted onto the one route that happened to be under repair. **Latent.**
+
+- **`minor` · `routes/api.php:114-116` describes a middleware ordering the priority sorter does not produce.**
+  Re-read at source rather than taken from the report: the comment states that `feature:api_access` runs *"before throttle so a no-feature tenant is refused before
+  consuming a burst slot"*. **Measured with `route:list`, which prints the SORTED list: `ThrottleRequests:api`
+  is hoisted to FIRST**, ahead of tenancy, auth and the feature gate — so a no-feature tenant **does** consume
+  a burst slot, and the stated protection does not exist. Same species as the *"signed read-back"* docblock
+  M34 struck: **a comment describing a control that is not there is worse than no comment, because it is what
+  the next reader checks instead of the middleware.** Harmless today (the slot is a rate-limit bucket, not
+  data), so **documentation defect, not a behaviour one** — but the fix is a decision rather than an edit:
+  either strike the claim, or hoist `api_access` into the priority list so the comment becomes true.
+
 - **`minor` · Two byte-serving routes gate on a subject their own comments question.**
   Surfaced by M34's resource census and **not verified beyond the route declaration** — treat each as a lead,
   not a finding, and re-read the file before acting. `GET /submissions/{submission}/pdf` gates `can:view`

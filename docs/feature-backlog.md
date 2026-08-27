@@ -2384,33 +2384,173 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   SAME BYTES.** Walking the surfaces this row names finds nothing; enumerating *every endpoint in the
   repository that serves stored bytes* and asking of each which test asserts a refusal found that **four of
   ten had one**. The unfixed remainder is filed below and under *Submissions, drafts & the guest runtime*.
-- **`major` · Three streamed exports of tenant data have no authorization deny test at all.**
-  Found by M29's stored-bytes census, which enumerated every endpoint in the repository that serves file
-  bytes (ten) and asked of each which test asserts a refusal (four). The three with none:
-  **`GET /analytics/export`** — `AnalyticsPageGateTest.php:110` looks like coverage and is not: it asserts
-  an entitlement **redirect**, never a 403, and the only 403 in that gate suite targets the `/analytics`
-  index page instead. **`GET /api/v1/analytics/report/export`** — the ability-denial test that appears to
-  cover it targets the non-export twin `/api/v1/analytics/report`. **`GET /api/v1/forms/{form}/versions/{version}/xlsform`**
-  — no test issues a request to that URI at all. ⚠️ **THE API PAIR'S ONLY COVERAGE IS STRUCTURAL**: a
-  route-table walk asserts every `api.v1.*` route carries a `can:` gate, but it never issues an HTTP
-  request and never asserts a status code, so a gate naming a permission nobody holds — or one holding the
-  wrong subject — passes it. **Latent.** The pattern to copy is the strongest in the repo,
-  `GET /forms/{form}/submissions/export`, which asserts BOTH a role denial and a scope denial.
-- **`minor` · The `409` quarantine branch is asserted on no stored-file route in the repository.**
-  `FeedbackController.php:75` and `AttachmentController.php:43` both `abort_unless($attachment->virus_scan_status->servable(), 409)`,
-  and `ScanStatus`'s own docblock (`app/Enums/ScanStatus.php:12`) calls `servable()` *the serving gate the
-  threat model relies on*. No test asserts a 409 on either route — `BrandingLogoRouteTest.php:98`
-  only *mentions* it in prose while asserting the anonymous route's 404. Delete or invert either guard and
-  a `pending` or `infected` object is served with the whole suite green. **Latent.** `AttachmentFactory`
-  already has `pending()` and `infected()` states, and M29's `AttachmentPolicyTest` already builds a stored
-  object with bytes on a fake disk, so the fixture cost is one state call.
-- **`minor` · `AttachmentController`'s docblock calls `GET /attachments/{attachment}` a "signed read-back", and nothing about it is signed.**
-  `app/Http/Controllers/Tenant/AttachmentController.php:20`. The repository contains exactly one signed URL
-  — `User.php:146`, email verification — and no `temporaryUrl`, no `ValidateSignature`, no
-  `hasValidSignature` anywhere in `app/` or `routes/`. The route is session-auth plus a policy and nothing
-  else. Harmless today and dangerous later: a docblock is what the next reader checks *instead of* the
-  middleware, and this one describes a control that does not exist. **Documentation defect, not a
-  behaviour one.** Fix is to strike the word, or to build the thing.
+- ~~**`major` · Three streamed exports of tenant data have no authorization deny test at all.**~~
+  ✅ **DONE — M34 (2026-08-27). EVERY CITATION IN THE ROW HELD; ITS PRESCRIBED FIX DID NOT TRANSFER.**
+  Two rows running now whose file:line were all exact — and the second one running whose *remedy* was the
+  defective half. `AnalyticsPageGateTest.php:110` really is an entitlement redirect driven by an Owner on a
+  Professional plan; the suite's only 403 really is on the `/analytics` index; the ability denial really
+  does target the twin, because `analyticsUrl()` defaults to the `'report'` suffix; and no test of any kind,
+  positive or negative, had ever issued a request to the API xlsform URI.
+  ⛔ **THE PRESCRIBED FIX IS HALF-INAPPLICABLE, AND THE HALF THAT FAILS IS THE ONE THE ROW CALLS STRONGEST.**
+  `GET /forms/{form}/submissions/export` can assert a scope denial because `can:export,Submission::class,form`
+  binds a **Form instance**. Both analytics exports gate on `can:viewAny,SavedReportView`, whose policy method
+  (`SavedReportViewPolicy.php:43`) **takes no model** — there is no instance to be out of scope of, so a scope
+  denial there is not weak, it is *structurally impossible*. Only the xlsform route takes both arms. The
+  per-form narrowing for analytics is `AnalyticsFormSet`'s, applied to the **rows inside the exporter**, and
+  it is a row-level concern rather than a 403 one; it is already pinned as a layer by
+  `FormAnalyticsPageTest.php:177` and `DashboardMetricsServiceTest.php:154-172`.
+  ⚠️ **AND THE ROW'S ROLE HALF NEEDED A FIXTURE THE ROW DOES NOT NAME.** All five seeded roles hold
+  `dashboard.form.view` and `viewAny` is `dashboard.org.view || dashboard.form.view`, so **no seeded role can
+  be refused**: a role-less active member (`makeActiveMember` then `syncRoles([])`) is the only construction
+  that reaches the gate. Copying the row's viewer-based fixture would have produced a 200 and a green test.
+  ✅ **MEASURED RATHER THAN ARGUED — `route:list` resolves all three as `ability → Authorize → RequireFeature`.**
+  The entitlement answers **last**, so every 403 added here is a token or permission refusal and never a plan
+  one; both analytics suites already assign Business in `beforeEach`, which removes the ambiguity entirely.
+  This was the increment's largest risk (a deny test that trips the entitlement measures the entitlement) and
+  it was refuted by measurement rather than reasoned away.
+  ✅ **PROVEN BY MUTATION, NOT BY GREEN.** Three mutations, each one literal token in a unique context, each
+  `php -l`'d with its sha256 asserted moved, each restored by byte-comparison rather than `git checkout --`.
+  Red sets **disjoint, one test each**: dropping `can:` from `analytics.export` reddened only the web role
+  case; dropping `can:view,form` from the API xlsform route reddened only its scope case; dropping
+  `ability:` from `analytics.report.export` reddened only its ability case — **and left the twin green**,
+  which is the row's own thesis demonstrated from the other direction.
+  ⚠️ **THE API PAIR'S STRUCTURAL COVERAGE IS WEAKER THAN THE ROW SAYS, AND THE FILE ADMITS IT.**
+  `GroupBPolicyGateTest.php:97` is `explode(':', $middleware, 2)[0]` — everything after the first colon is
+  discarded, so a gate naming a permission nobody holds and one naming the wrong subject are
+  byte-indistinguishable from a correct one. Its own header at `:33` says it "cannot judge whether an
+  allowlisted reason is TRUE". Two corrections to the row: it walks **Group B only** (`:114-115` filter out
+  `api.v1.public.*` and `api.v1.tokens.*`), and it resolves the router alias map rather than matching the
+  string `can:` — deliberately, per `:81-86`.
+  ⚠️ **THE ROW SAYS "THREE" AND THE RESOURCE CENSUS SAYS SIXTEEN.** Re-running M29's census with the
+  **resource** as its unit rather than the feature found **sixteen** byte-returning routes where the
+  antecedent counted ten. Fifteen carry tenant data. The six never counted: `/forms/{form}/versions/{version}/print`,
+  `/forms/{form}/share/qr.svg`, `/sso/saml/metadata`, `/f/{slug}/manifest.webmanifest`, `/sw.js`, and
+  `GET /admin/feedback/{feedback}/screenshot` — the last of which is filed as its own row below.
+  ⛔ **ONE CANDIDATE WAS ALREADY PASSING, AND CHECKING IT COST ONE `grep` AND SAVED AN INCREMENT.** The web
+  twin `GET /forms/{form}/versions/{version}/xlsform` looked like a fourth uncovered route and is not:
+  `XlsformExportTest.php:228` has driven it as a non-collaborating `form_editor` since G7a and asserts
+  `assertForbidden()` at `:246`. The row omits it because it is **covered**, not because the row missed it.
+  That is M20's *a character-identical declaration is not an identical defect*, holding for a fourth
+  increment. What it DID lack was the **role** arm — a `viewer` fails `FormPolicy::canEdit`'s first clause
+  where the `form_editor` fails its second — so that one test was added rather than the four assumed.
+  **Nine tests: six for the row's three routes, one for the web twin's missing role arm, two for the 409 row
+  below.** `AnalyticsPageGateTest:106` gains a comment saying in as many words that it asserts the
+  entitlement and not the gate — the M29 precedent, because a test that *looks* like coverage is what filed
+  this row.
+- ~~**`minor` · The `409` quarantine branch is asserted on no stored-file route in the repository.**~~
+  ✅ **DONE — M34 (2026-08-27).** Three tests, both routes: `AttachmentPolicyTest` gets a `pending` and an
+  `infected` case on `GET /attachments/{attachment}`, and `FeedbackTest` gets an `infected` case on
+  `GET /feedback/{report}/screenshot`. Both controllers carry their own copy of the guard —
+  `FeedbackController.php:59-65` says in its own words why it declines to route through
+  `AttachmentController` — so asserting one proves nothing about the other and both are pinned.
+  ⚠️ **THE ROW'S FIXTURE-COST CLAIM WAS EXACTLY RIGHT, WHICH IS WORTH RECORDING BECAUSE IT USUALLY IS NOT.**
+  `AttachmentFactory` really does carry `pending()` (`:158`), `clean()` (`:163`) and `infected()` (`:173`),
+  and M29's `memberWithStoredObject()` really does build a stored object with bytes on a fake disk — so the
+  attachment half cost one `update()` call per case and no helper change.
+  ⛔ **THE CASES USE AN OWNER DELIBERATELY, AND THAT IS THE WHOLE DESIGN OF THE TEST.** `abort_unless` runs
+  *inside* the controller, i.e. **after** `can:view,attachment`, so a caller who fails the policy never
+  reaches the guard and a 409 test written against a refused principal would pass on the 403 instead. Both
+  cases therefore use the principal the policy admits, and their positive controls are the existing 200s on
+  the same URI with the same fixture one column apart (`AttachmentPolicyTest:162`, `:184`; `FeedbackTest:256`).
+  ⚠️ **`infected` AND `pending` ARE BOTH ASSERTED RATHER THAN ONE STANDING FOR THE OTHER.** `servable()` is
+  `Clean || Skipped` (`ScanStatus.php:31`), so the two non-servable states are independent enum values; a
+  test covering only `pending` stays green if `infected` is later added to the servable set.
+  ⚠️ **CITATION DRIFT, THE FOURTH INCREMENT RUNNING, AND MINOR THIS TIME.** The row cites
+  `app/Enums/ScanStatus.php:12` for the *"serving gate the threat model relies on"* docblock; it is at
+  `:26-27`. `FeedbackController.php:75` and `AttachmentController.php:43` were both exact.
+- ~~**`minor` · `AttachmentController`'s docblock calls `GET /attachments/{attachment}` a "signed read-back", and nothing about it is signed.**~~
+  ✅ **DONE — M34 (2026-08-27).** Citation exact: `app/Http/Controllers/Tenant/AttachmentController.php:20`.
+  The word is struck, and the docblock now names the controls that **do** exist rather than leaving a hole
+  where the false one was — because "strike the word" alone hands the next reader the same question with no
+  answer, and a docblock is what they check *instead of* the middleware. The route is session auth, plus
+  `can:view,attachment`, plus — since M33 — a policy that resolves the attachment's **kind and owner** and
+  not merely a permission. Nothing anywhere signs it: the repository still contains exactly one signed URL
+  (`User.php:146`, email verification) and no `temporaryUrl`, `ValidateSignature` or `hasValidSignature` in
+  `app/` or `routes/`, re-verified this increment rather than carried over from the row.
+- **`major` · `GET /admin/feedback/{feedback}/screenshot` streams cross-tenant PII from the central host and no test asserts a refusal on it.**
+  Found by M34's re-run of M29's stored-bytes census with the **resource** as its unit rather than the
+  feature — the same method that found the attachment route in M29 and the fourth kind in M33, producing a
+  third result on its third outing. `routes/admin.php:83-84` →
+  `FeedbackConsoleController@screenshot`, which serves the **same screenshot bytes** as the tenant-side
+  `GET /feedback/{report}/screenshot` but **across every tenant**, on the central host, to the one principal
+  who is a super-admin over the whole deployment. `route:list` resolves its gates as
+  `Authenticate → EnsureSuperAdmin → EnsureSuperAdminMfa → RequireRecentPassword`; there is no `can:` and it
+  needs none, because super-admin *is* the authorization. **No test issues a refused request to that URI.**
+  The console **index** has all three denials — `FeedbackConsoleTest.php:153` (un-enrolled 2FA → redirect),
+  `:158` (non-super-admin → 404), `:162` (guest → redirect). The screenshot route has none of them; its only
+  test, `:338-348`, asserts a **404 for a report that has no screenshot**, and its own comment says that is
+  proof the lookup resolved rather than proof anyone was refused.
+  ⚠️ **WEAKER THAN IT LOOKS, AND SAYING SO IS THE POINT — THIS IS THE M20 DISCIPLINE APPLIED TO A FINDING OF
+  MY OWN.** All three routes sit in **one route group** and inherit that middleware from it, so the index's
+  three denials do transitively pin the group today: the realistic silent mutation is not "delete
+  `EnsureSuperAdmin`" (the index catches that) but **a route declared outside the group**, or the group's
+  membership changing. It is filed as `major` rather than `minor` because of what is behind the door — every
+  tenant's PII screenshots, on the central host — not because a green suite is one edit away.
+  ⛔ **AND THE STEP-UP MANIFEST HAS THE SAME SHAPE, WHICH IS THE TRANSFERABLE PART.**
+  `StepUpReauthenticationTest.php:135-146` is a hand-maintained list of route **names**, prefaced by a
+  comment claiming it covers *"every page of the console"*. It names `admin.tenants.index`,
+  `admin.settings.update` and `admin.tenants.assign-plan` — and **neither `admin.feedback.index` nor
+  `admin.feedback.screenshot`**. The prose asserts universality; the test asserts three strings. That is the
+  paired-list defect Standing Rule 7(b-bis) exists to warn about, in a single file. The fix is the M30
+  shape: **walk the route table and assert the property, rather than keeping a list in step by hand.**
+  **Left unfixed by M34 deliberately** — it is `tests/Feature/Auth/` and `tests/Feature/Feedback/`, neither of
+  which this row's diff touches, and a route-table walk over the admin console is its own increment with its
+  own positive control.
+
+- **`minor` · The `can:` arm on `GET /api/v1/analytics/report` — the non-export twin — is asserted by nothing.**
+  The mirror image of the row M34 closed, and found while closing it. `AnalyticsApiTest.php:87` pins the twin's
+  **ability** arm and `:99` pins a Viewer's intended 200, but nothing anywhere drives that route with a caller
+  who carries `read:analytics` and fails `can:viewAny,SavedReportView`. Delete the `can:` middleware from
+  `routes/api.php:366` and the suite stays green. **Latent, and cheap**: M34 added exactly this test to the
+  export twin (`AnalyticsExportTest.php`), so the fixture — an active member with `syncRoles([])` holding a
+  correctly-scoped token — can be copied one file over. ⚠️ **The reason it is not folded in here is the
+  M20 rule read forwards**: it is a different route, and this row's whole thesis is that a test aimed at the
+  twin is not coverage of its sibling. Fixing the sibling by aiming at the twin would repeat the defect.
+
+- **`minor` · Three saved-view verbs are gated by an entitlement assertion that no permission test backs.**
+  `AnalyticsPageGateTest.php:106` drives `POST /analytics/views`, `PATCH /analytics/views/{view}` and
+  `DELETE /analytics/views/{view}` as an **Owner** on a Professional plan and asserts a redirect from each —
+  the `feature:` refusal, exactly the shape that filed the export row. M34 added a comment there saying so in
+  as many words, and pinned the export's gate, but left these three: they are writes rather than streamed
+  bytes, so they fall outside a stored-bytes census and belong with whoever takes the analytics write surface.
+  **Latent.**
+
+- **`minor` · A `can:` gate that names the WRONG SUBJECT is invisible to every test in the repository, including the one written to catch it.**
+  Found by M34's adversarial pass over its own committed diff — the mutation nobody thinks to try, because it
+  changes no behaviour for any principal a test happens to use. Swap `can:viewAny,SavedReportView::class` for
+  `can:viewAny,Submission::class` at `routes/api.php:369` (**the alternative `routes/api.php:359-362` says in
+  its own comment was considered and rejected**) and **every test stays green**: `GroupBPolicyGateTest`
+  resolves only that the middleware IS `Authorize::class` (`:97` discards everything after the first colon),
+  and M34's two new deny cases both use a role-less member who holds `submissions.view` no more than the
+  dashboard keys, so both gates refuse them identically. **The rejection is defended by a prose comment and
+  nothing executable.** ⚠️ **It is closeable, and the recipe is the finding**: grant a constructed principal
+  **exactly `submissions.view` and neither dashboard key** — they must be **200 under the wrong subject and
+  403 under the right one**, which is the only fixture that can tell two gates apart. **Deliberately NOT
+  folded into M34**: an assertion about *which permission a gate names* is a new species for this repo, and it
+  wants designing once across the whole Group-B surface — where it would strengthen
+  `GroupBPolicyGateTest` from "a gate is present" to "the gate names the subject its route intends" — rather
+  than being bolted onto the one route that happened to be under repair. **Latent.**
+
+- **`minor` · `routes/api.php:114-116` describes a middleware ordering the priority sorter does not produce.**
+  Re-read at source rather than taken from the report: the comment states that `feature:api_access` runs *"before throttle so a no-feature tenant is refused before
+  consuming a burst slot"*. **Measured with `route:list`, which prints the SORTED list: `ThrottleRequests:api`
+  is hoisted to FIRST**, ahead of tenancy, auth and the feature gate — so a no-feature tenant **does** consume
+  a burst slot, and the stated protection does not exist. Same species as the *"signed read-back"* docblock
+  M34 struck: **a comment describing a control that is not there is worse than no comment, because it is what
+  the next reader checks instead of the middleware.** Harmless today (the slot is a rate-limit bucket, not
+  data), so **documentation defect, not a behaviour one** — but the fix is a decision rather than an edit:
+  either strike the claim, or hoist `api_access` into the priority list so the comment becomes true.
+
+- **`minor` · Two byte-serving routes gate on a subject their own comments question.**
+  Surfaced by M34's resource census and **not verified beyond the route declaration** — treat each as a lead,
+  not a finding, and re-read the file before acting. `GET /submissions/{submission}/pdf` gates `can:view`
+  where its sibling export route uses `can:export`, and the route's own comment flags the asymmetry.
+  `GET /forms/{form}/share/qr.svg` gates `can:update,form` — an **edit** permission to read a QR code of an
+  already-public URL, which is a gate that is too tight rather than too loose, but is still a gate naming a
+  subject nobody chose deliberately. Both have deny tests (`GeneratePdfJobTest.php:393`,
+  `FormShareTest.php:364`), so neither is a coverage hole; the question is whether the gates name the right
+  permission.
+
 - **`major` · The queued half of `gamification:backfill` is asserted by job count alone.**
   `tests/Feature/Gamification/BackfillCommandTest.php:80-92` — `Queue::assertPushed(…, 2)` inspects no
   payload, and the queued loop (`BackfillGamificationCommand.php:119`) is the production default while only

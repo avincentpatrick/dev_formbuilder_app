@@ -18,149 +18,187 @@ exact-equality `KNOWN_UNGUARDED` assertion, so the list shrinks in the *same* PR
 
 ---
 
-## Status: ACTIVE CLAIM — M34, the three streamed exports of tenant data with no authorization deny test
+## Status: NO ACTIVE CLAIM
 
-**Taken 2026-08-27.** Branch `m34-export-deny-tests`, cut from `origin/main` at `5e58c05`, PR into `main`.
-Row: the `major` under **`### Test suite & CI gates`** (heading at `docs/feature-backlog.md:2200`, row at
-`:2297`) — *three streamed exports of tenant data have no authorization deny test at all*. It was filed by
-`M29`'s own stored-bytes census and continues the `M29` → `M33` arc, which is why it is Lane B's.
+**Lane B holds nothing as of 2026-08-27.** `M29` (PR #219, `7892f7f`), `M33` (PR #221, `f329e1b`) and
+`M34` are merged and released. Their entries follow.
 
-⛔ **THIS CLAIM IS PUSHED BEFORE THE READ-ONLY VERIFICATION PASS COMPLETES, AND IT WILL BE CORRECTED
-BEFORE THE FIRST FILE IS OPENED FOR EDIT.** That is Lane A's `M30` precedent applied deliberately, not a
-shortcut: 7(g)'s race is over the *number*, and the number cannot wait for a census. The file list below is
-a first pass from four greps; every line of it is falsifiable and the correction will be marked in place.
+⛔⛔ **BEFORE YOU NUMBER ANYTHING: READ THE WHOLE OF `lane-a.md`, NOT ITS `## Status` LINE.** This is `M33`'s
+process finding and it still binds. Lane A's file did not merely hold `M30` — its `### THE QUEUE BEHIND IT`
+block **pre-claimed `M31` and `M32` as well**, in writing, and said why in its own words: *"because Lane B is
+taking rows from this exact section right now."* **A lane's forward queue is a claim and it does not live
+under the `## Status` heading.** As of `M34`'s close, `lane-a.md` reads *"NO ACTIVE CLAIM — but the forward
+queue `M31` and `M32` IS STILL A CLAIM"*, so **`M35` is the next free number** and `M31`/`M32` are not yours.
 
-### ⛔ NUMBERING — `M34`, AND THE WHOLE OF `lane-a.md` WAS READ, NOT ITS `## Status` LINE
+⛔ **AND A NAMESPACE FIGURE IN THE OTHER LANE'S FILE CAN BE WRONG — THIS ONE IS.** `lane-a.md:43` and Lane A's
+own hand-off both state *"ADR-0016's next free sub-decision is `§D36` — M29 spent `§D35`."* **`M29` spent no
+`§D` at all.** `docs/adr/0016-saml-sso.md` runs to **`§D34`** and a repository-wide grep for `§D35` returns
+**only the two claim files arguing about it**. `M29` *reserved* `§D35` in its claim and released it unspent,
+which `lane-b.md:449` records in as many words. **`§D35` IS FREE.** Lane B does not edit `lane-a.md`, so the
+correction lives here and in `PROGRESS.md`'s Lane B block; Lane A should take it from either.
 
-`lane-a.md` reads **ACTIVE CLAIM `M30`** under its `## Status` heading — but its
-`### THE QUEUE BEHIND IT` block at `lane-a.md:185` **pre-claims `M31` and `M32` as well**, in writing, and
-says why in its own words: *"because Lane B is taking rows from this exact section right now."* `M30` is
-merged (PR #220, `5e58c05`); `M31` and `M32` are claimed and unstarted. `M33` is Lane B's and merged
-(PR #221, `f329e1b`). **`M34` is the next genuinely free number** — the obvious arithmetic (highest merged
-is `M33`, so take `M34`) happens to agree this time, and it agreed by luck rather than by method, because
-the same arithmetic one increment ago would have taken `M31` and collided.
+---
 
-⚠️ **AND THE FALLBACK ROWS NAMED IN THE HAND-OFF WERE RE-CHECKED AS RESERVATIONS, WHICH IS THE `M33`
-LESSON APPLIED.** The hand-off names two adjacent cheap seconds — the `minor` at `:2309` (the `409`
-quarantine branch, asserted on no stored-file route) and the `minor` at `:2317` (`AttachmentController`'s
-docblock calls an unsigned route a *"signed read-back"*). **Neither appears anywhere in `lane-a.md`**, whose
-declared queue is `:2249` (`M30`, merged), `:2256` (`M31`) and `:2324` (`M32`). Both are free. Both are
-claimed here as in-scope-if-cheap, and both will be closed or explicitly released rather than left
-ambiguous.
+## RELEASED — M34, three streamed exports with no authorization deny test (merged as PR #<n>, `<sha>`, CI 6/6 green with real step counts)
 
-⚠️ **A THIRD WORKTREE EXISTS AND RULE 7 DOES NOT DESCRIBE IT.** `git worktree list` returns
-`fb-lane-c` on `lane-c-bootstrap` at `b44a36c` — a merge commit from the `M14` era, i.e. **eight
-increments stale** — with one uncommitted edit (`packages/design-system/package-lock.json`). There is no
-`docs/claims/lane-c.md`, so under 7(g) it holds nothing and can be treated as parked. **Recorded rather
-than assumed away**: a checkout nobody claims is exactly the shape that cost `M33` a surprise merge.
+**Shipped 2026-08-27.** Branch `m34-export-deny-tests`. Row closed in `docs/feature-backlog.md` as its own
+micro-commit.
 
-### ⛔ NAMESPACES — THIS CLAIM EXPECTS TO SPEND NOTHING
+### ⛔ THE ROW'S EVIDENCE WAS FLAWLESS AND ITS REMEDY WAS STRUCTURALLY IMPOSSIBLE
 
-**No ADR.** `0022` stays free and stays Lane A's block-opener. **No `ADR-0016 §D<n>`** — and the hand-off's
-own warning is the reason rather than an afterthought: `§D35` has been handed over twice and spent neither
-time **because ADR-0016 is the SAML SSO decision record and is the wrong home for an export-authorization
-finding**. A namespace named in a next-prompt is a reservation, not a destination. If this increment owes a
-written decision, its home is the ADR whose own sub-decision created the surface — `ADR-0015` (the
-attachment/stored-bytes record, now running `§D1`–`§D10` after `M33`) or the analytics/entitlements ADR,
-**decided by reading the candidate's own §D-series, not by taking the number that was offered.**
-**No migration** — `2026_08_17_000111` stays free. **No new ability, no new permission key, no new
-`NotificationType`**, so `ShellAbilityParityTest` and `NotificationTypeParityTest` both stay still. `0010`
-stays reserved for H1d; `#16` stays free.
+**Two rows running whose every citation held** — `M33` was the first in fifteen, and `M34` is the second.
+`AnalyticsPageGateTest.php:110` really is an Owner on a Professional plan asserting a redirect; the suite's
+only 403 really is on the `/analytics` index; the ability denial really does target the twin, because
+`analyticsUrl()` defaults to the `'report'` suffix; and **no test of any kind had ever issued a request to
+the API xlsform URI**.
 
-**PAIRED FILES: NONE ARE EXPECTED TO MOVE.** All five gates in 7(b-bis) read front-end trees
-(`resources/js`, `resources/public-runtime`, `packages/design-system/src`) or the two parity lists. This
-claim expects to touch no `.vue`, no `.ts`, no CSS and no `tests/e2e/` spec. **`tests/e2e/` will be
-grepped before anything that could reach a selector**, per the standing rule, even though nothing here
-should.
+⛔ **And the prescribed fix — copy `GET /forms/{form}/submissions/export`, "which asserts BOTH a role denial
+and a scope denial" — does not transfer, for a reason no amount of care with the *evidence* would have
+caught.** That pattern binds a **Form instance** (`can:export,Submission::class,form`). Both analytics
+exports gate on `can:viewAny,SavedReportView`, whose policy method **takes no model**. A scope denial there
+is not weak — it is *structurally impossible*, because there is nothing to be out of scope of. Only the
+xlsform route takes both arms. **A row's evidence and a row's remedy are separately trustworthy, and this is
+the second consecutive increment where the remedy was the defective half** — Lane A hit the identical shape
+in `M32`'s row on the same day, two lanes, two unrelated rows. That is now a pattern, not a coincidence.
 
-⚠️ **`openapi.json` IS CLAIMED BECAUSE IT MIGHT MOVE, AND THE PREDICTION — WRITTEN BEFORE THE FILE IS
-OPENED, SO THE MEASUREMENT HAS SOMETHING TO DISAGREE WITH — IS THAT IT WILL NOT.** Two of the three routes
-are under `/api/v1`, which is the trigger condition. But this increment is expected to add **tests only**:
-Scramble infers from a controller's own returns, and a test issuing a request changes no return. **If a
-production file moves after all — which the verification pass may yet force — the prediction is void and
-the document gets regenerated and `cmp`'d rather than argued about.** `M13` predicted correctly about one
-mechanism and was still wrong, because the artefact had a second one.
+⚠️ **THE ROLE HALF NEEDED A FIXTURE THE ROW DOES NOT NAME EITHER.** All five seeded roles hold
+`dashboard.form.view` and `viewAny` is `dashboard.org.view || dashboard.form.view`, so **no seeded role can be
+refused**. A role-less active member (`makeActiveMember` then `syncRoles([])`) is the only construction that
+reaches the gate. Copying the row's viewer-based fixture would have produced a 200 and a green test that
+proved nothing — the exact failure mode the row was filed about, reproduced by following the row.
 
-### The row, and what is already measured against the code before claiming
+### ✅ THE INCREMENT'S LARGEST RISK WAS REFUTED BY MEASUREMENT RATHER THAN REASONED AWAY
 
-Four greps, read-only, before this file was written:
+Every one of these routes carries a `feature:` entitlement gate alongside its `can:`. If the entitlement ran
+**first**, a deny test would measure the plan and the permission gate could be deleted with the test green —
+which is precisely the defect this row reports. `route:list` resolves all three as
+**`ability → Authorize → RequireFeature`**: the entitlement answers **last**. Both analytics suites already
+assign Business in `beforeEach`, so the ambiguity is removed twice over. **The plan named this risk before
+the first file was opened and the measurement settled it in one command.**
 
-- **`GET /analytics/export`** — `routes/tenant.php:893-894`, `AnalyticsController@export`, gated
-  `can:viewAny,SavedReportView` + `feature:advanced_analytics`. Candidate suites:
-  `tests/Feature/Analytics/AnalyticsPageGateTest.php`, `tests/Feature/Analytics/AnalyticsWebExportTest.php`.
-- **`GET /api/v1/analytics/report/export`** — `routes/api.php:368-370`, `AnalyticsReportController@export`,
-  gated `ability:read:analytics` + `can:viewAny,SavedReportView` + `feature:advanced_analytics` — **the
-  identical middleware triple to its non-export twin `analytics/report` at `:365-367`**, which is exactly
-  why a test aimed at the twin looks like coverage. Candidate suite:
-  `tests/Feature/Analytics/AnalyticsExportTest.php`.
-- **`GET /api/v1/forms/{form}/versions/{version}/xlsform`** — `routes/api.php:153-156`,
-  `FormXlsformApiController@export`, gated `ability:read:forms` + `can:view,form` + `feature:xlsform_export`.
-  Candidate suite: `tests/Feature/Xlsform/XlsformExportTest.php`.
+### ✅ PROVEN BY MUTATION — FOUR, EACH REDDENING ONLY WHAT IT SHOULD
 
-⛔⛔ **AND THE FIRST THING THE CODE SAYS THAT THE ROW DOES NOT: THERE IS A FOURTH ROUTE.**
-`routes/tenant.php:521-523` is a **web** `GET /forms/{form}/versions/{version}/xlsform`
-(`FormXlsformController@export`), gated `can:view,form` + `feature:xlsform_export` — the same bytes, the
-same feature flag, a different controller and no API ability in front of it. The row names the API half
-only. **This is `M33`'s *enumerate from the code, because a census's unit is the RESOURCE and not the
-feature* recurring on the very next row**, and it is why the verification pass below is a census rather
-than a check of three citations.
+| Mutation | Red set | Totals |
+|---|---|---|
+| `analytics.export` loses `can:viewAny,SavedReportView` | *403s the export for a member holding neither dashboard permission* | **1 failed / 123 passed / 867** |
+| API xlsform loses `can:view,form` | *refuses the API export to a form_editor who is not a collaborator* | **1 failed / 123 passed / 867** |
+| `analytics.report.export` loses `ability:read:analytics` | *refuses the EXPORT to a token holding every OTHER ability but not read:analytics* | **1 failed / 123 passed / 867** |
 
-⚠️ **THE `SubstituteBindings`-BEFORE-`Authorize` TRAP IS LIVE ON HALF OF THESE AND IS STATED NOW SO IT
-CANNOT BE DISCOVERED LATE.** `bootstrap/app.php:217-218` runs binding first, so on the two `{form}`-bound
-xlsform routes a **cross-tenant** caller gets `404` at binding and the test passes with the `can:` gate
-deleted — it is not a permission test. The denied caller must hold a resource in their **own** tenant. The
-two analytics routes are not resource-bound, so they do not have this shape; they have the other one — a
-`feature:` gate that answers with a **redirect**, which is what `AnalyticsPageGateTest.php:110` asserts and
-why it is not the coverage it looks like.
+⚠️ **THE RED SETS ARE SCOPE-BOUND, AND SAYING SO MATTERS.** They were measured over
+`tests/Feature/Analytics` + `tests/Feature/Xlsform`. A verifier pointed out that `GroupBPolicyGateTest` sits
+in `tests/Feature/Api/` and would also catch mutation 2 — so rather than assume it (*a gate you cannot run is
+not a gate you may assume*), it was **run**: baseline **4 passed / 11 assertions**, mutated **1 failed /
+3 passed**, failing at `:129` with the offending route named in its own message. **Mutation 2's true red set
+is two tests, not one** — the behavioural scope case and the structural gate, which is the structural gate
+doing exactly the job its header claims. Mutations 1 and 3 touch no Group-B `can:` gate and leave it green.
 
-### Every file this claim touches, named before it is opened — FIRST PASS, TO BE CORRECTED
+Each replaced **one literal token in a unique context** (occurrence count asserted `== 1` before writing),
+was `php -l`'d, had its **sha256 asserted moved**, and was restored **by byte-comparison against a saved
+copy** rather than by `git checkout --`. The mechanism was committed before any mutation ran.
+⚠️ **The third mutation is the row's own thesis proved from the other direction:** dropping the export's
+ability gate left the **twin's** test green, which is exactly why the twin's coverage was never this route's.
 
-**PHP tests (Lane B's column under 7(b)'s widened statement; claimed):**
-- `tests/Feature/Analytics/AnalyticsPageGateTest.php` — the web export's role denial.
-- `tests/Feature/Analytics/AnalyticsWebExportTest.php` — claimed as the alternative home for the same case;
-  which of the two receives it is decided by where the fixture already lives, not by the row.
-- `tests/Feature/Analytics/AnalyticsExportTest.php` — the API export's ability denial, aimed at the export
-  URI rather than at its twin.
-- `tests/Feature/Xlsform/XlsformExportTest.php` — the API xlsform export, and the web one the row omits.
-- **NEW, if the census shows the pattern is worth pinning structurally** — a route-table walk that does
-  more than the existing `api.v1.*` `can:`-presence walk, which issues no request and asserts no status.
-  ⚠️ **Its shape is not yet decided and it will not hold a hand-maintained list of route names** — that is
-  the paired-list defect 7(b-bis) exists to warn about, and Lane A's `M30` had to correct exactly that.
+### ⛔⛔ THE FIRST MUTATION-2 RUN WAS CONTAMINATED, AND THE CULPRIT WAS MY OWN SUBAGENT — RULE 7(c) INSIDE ONE LANE
 
-**Production PHP — claimed defensively, expected untouched:**
-- `app/Http/Controllers/Tenant/AnalyticsController.php` ·
-  `app/Http/Controllers/Api/V1/AnalyticsReportController.php` ·
-  `app/Http/Controllers/Api/V1/FormXlsformApiController.php` ·
-  `app/Http/Controllers/Tenant/FormXlsformController.php`.
-  **Claimed because a deny test that cannot be made to fail is a finding, not a test** — if any of these
-  four turns out to authorize on the wrong subject, the fix lands here and the prediction above is void.
-- `app/Http/Controllers/Tenant/AttachmentController.php` — **the `:2317` docblock `minor` only**, one word.
+It reported **`4 failed, 120 passed (856 assertions)`**: the real red plus three unrelated analytics
+failures reading `SQLSTATE[42P01]: relation "tenants" does not exist` and
+`column "acting_as_user_id" of relation "audits" does not exist`. **A concurrent `migrate:fresh` dropped the
+schema mid-run.** The writer was a verification subagent of this increment's own analysis workflow, which ran
+`docker exec fb-lane-b-app-1 php artisan test tests/Feature/Analytics/AnalyticsExportTest.php` to check a
+claim. Its brief said *"READ-ONLY … DO NOT EDIT ANY FILE"* — **and a file-scoped prohibition does not stop an
+agent running the test suite.** Standing Rule 7(c) exists for two lanes sharing one database; this was **one
+lane sharing a database with itself**, and it is not covered anywhere.
+⛔ **THE RULE THIS ADDS: a read-only brief must forbid the DATABASE, not just the files — and a mutation
+harness must refuse to start while any other test process is alive.** The re-run does exactly that
+(`ps aux | grep -cE '[v]endor/bin/pest|[a]rtisan test'`, abort if non-zero) and returned
+**`1 failed, 123 passed (867 assertions)`, zero infrastructure errors** — the clean, disjoint result above.
+⚠️ **The tell was in the assertion count, not the failure count**: 856 against a known 867. **A red run whose
+assertion total moved is an infrastructure event until proven otherwise.**
 
-**Shared, claimed and never owned:**
-- `docs/feature-backlog.md` — this row, the two adjacent `minor`s if taken, and every finding deliberately
-  left, filed the moment the decision is taken (the J4b1 rule).
-- `docs/claims/lane-b.md` · `PROGRESS.md` (Lane B's block and hand-off line only).
-- `docs/security-threat-model.md` — one row, only if the census finds an unfixed live exposure.
-- `openapi.json` — claimed as above; expected untouched and `cmp`'d rather than assumed.
+### ⚠️ ADVERSARIAL VERIFICATION FOUND THREE DEFECTS IN MY OWN COMMITTED DIFF
 
-### What the verification pass must answer before a single test is written
+Worth recording because they are the kind that survive a self-review:
+1. **Both API deny tests asserted only `assertForbidden()`.** An ability refusal and a permission refusal are
+   **both 403** and differ only in `error.code` (`bootstrap/app.php:255` vs `:258`), so status alone cannot
+   say which gate answered — the test would have passed if the wrong one refused. Both now assert the code,
+   as the twin's own test already did.
+2. **A header comment claimed `:110` was "the one assertion that pointed at /analytics/export"** when **nine
+   requests in that very file** point at it. What was unique was the assertion about its *gate*.
+3. **That same cross-reference was already stale inside my own diff** — the five-line comment the same commit
+   inserted into `AnalyticsPageGateTest.php` pushed `:110` to `:115`. **A citation into a file your own diff
+   edits must be re-read after the edit.**
 
-The `M33` rule, sharpened by its own outcome: `M33` was the first row in fifteen whose every citation held,
-**and its prescribed remedy still pointed at a mechanism a test exists to forbid.** So both halves get
-checked here, and the second half is the one nobody checks:
+### ⛔ ONE CANDIDATE WAS ALREADY PASSING, AND CHECKING IT COST ONE GREP
 
-1. Does `AnalyticsPageGateTest.php:110` assert a redirect rather than a 403, and is the suite's only 403 on
-   the `/analytics` index? **(The row's claim. Verify, do not assume.)**
-2. Which test appears to cover `api/v1/analytics/report/export` and actually targets the twin?
-3. Does any test in the repository issue a request to either xlsform export URI?
-4. **Is the prescribed fix sound?** The row says to copy `GET /forms/{form}/submissions/export`, which
-   asserts *both* a role denial and a scope denial. **A scope denial may not exist for analytics** — the
-   two analytics routes authorize on `SavedReportView::viewAny`, a class-level gate with no instance to be
-   scoped to. Copying a pattern that cannot apply is how a green test gets written against a defect it
-   cannot reach.
-5. **The census**: every endpoint in the repository that streams tenant data, enumerated from the routing
-   table rather than from this row — the web xlsform route is already one the row does not name, and one
-   found means the unit was wrong.
+The claim opened by declaring a **fourth** route the row omits — the web twin
+`GET /forms/{form}/versions/{version}/xlsform`. It is omitted because it is **covered**:
+`XlsformExportTest.php:228` has driven it as a non-collaborating `form_editor` since G7a and asserts
+`assertForbidden()` at `:246`. **That is M20's *a character-identical declaration is not an identical defect*
+holding for a fourth increment** — and the claim was corrected in place before the first file was opened, as
+it said it would be. What that route *did* lack was the **role** arm (a `viewer` fails
+`FormPolicy::canEdit`'s first clause where the `form_editor` fails its second), so **one** test was added
+rather than the four an unchecked assumption would have produced.
+
+### ⚠️ THE CENSUS UNIT WAS WRONG AGAIN, AND IT FOUND A LIVE SURFACE
+
+Re-run with the **resource** as its unit, the stored-bytes census returned **sixteen** byte-returning routes
+where M29's antecedent counted **ten**. The one that matters is filed as its own `major`:
+**`GET /admin/feedback/{feedback}/screenshot`** (`routes/admin.php:83-84`) streams the same PII screenshot
+bytes **cross-tenant, from the central host**, and no test asserts a refusal on it — while the console
+**index** beside it has all three (`FeedbackConsoleTest.php:153`, `:158`, `:162`). ⚠️ **Filed with its own
+weakness stated:** all three routes inherit that middleware from **one group**, so the index's denials do
+transitively pin it today. It is `major` for what is behind the door, not for how close the suite is to green
+on a mutation.
+
+### ⛔⛔ THE ADVERSARIAL PASS FOUND A GATE THIS INCREMENT HAD LEFT NAKED — ON THE VERY ROUTE IT WAS REPAIRING
+
+The sharpest single finding of the increment, and it is about **M34's own first commit**. Having closed the
+API export's `ability:` and `can:` gates, a refuter asked the killer question of the third: **delete
+`feature:advanced_analytics` from `routes/api.php:369` and the whole repository stays green.** The 402 that
+looks like coverage (`AnalyticsApiTest.php:113`) asserts against `analyticsUrl()`, whose default suffix is
+`'report'` — **the twin, again**. Every other case touching the export URI runs on Business, the contract test
+asserts spec shape only, and `GroupBPolicyGateTest` looks for `Authorize::class` alone.
+⛔ **That is the row's own defect, one gate over, on the route being repaired.** Closing two of a route's
+three gates and leaving the third with the exact hole the row was filed about is how a row gets re-filed a
+month later — so the 402 is now asserted on `exportUrl()`, and this increment's **fourth mutation** proves it.
+⚠️ **My own header comment had cited the twin's test as if it covered this route.** It now points at the
+new one. **A comment that borrows a sibling's coverage is the prose form of the defect being fixed.**
+
+### ⚠️ TWO MORE FOUND AND DELIBERATELY LEFT, BOTH FILED
+
+- **A `can:` gate naming the WRONG SUBJECT is invisible to everything**, including `GroupBPolicyGateTest`,
+  which discards everything after the first colon (`:97`). Swap `SavedReportView::class` for
+  `Submission::class` — the alternative `routes/api.php:359-362` says it *considered and rejected* — and every
+  test stays green, because M34's role-less principal holds `submissions.view` no more than the dashboard
+  keys. **The rejection is defended by a prose comment and nothing executable.** Left because an assertion
+  about *which permission a gate names* is a new species here and wants designing once across the whole
+  Group-B surface, not bolted onto the one route under repair. The fixture that would close it is named in
+  the row.
+- **`routes/api.php:114-116` describes an ordering the priority sorter does not produce** — it claims
+  `feature:api_access` runs *"before throttle so a no-feature tenant is refused before consuming a burst
+  slot"*, and `route:list` shows `ThrottleRequests:api` hoisted to **first**. Re-read at source rather than
+  taken from the report (the reporter said `:115-116`). Same species as the *"signed read-back"* docblock this
+  increment struck, and left because the fix is a decision — strike the claim, or make it true — rather than
+  an edit.
+
+### ⛔ NAMESPACES — THIS CLAIM SPENT NOTHING, AND THE OFFERED ONE WAS AGAIN THE WRONG HOME
+
+**No ADR, no `§D<n>`, no migration, no new ability, permission key or `NotificationType`** — so
+`ShellAbilityParityTest` and `NotificationTypeParityTest` both stayed still, and **no paired file moved**.
+`ADR-0022` stays free and stays Lane A's block-opener; `2026_08_17_000111` stays free; `0010` stays reserved
+for H1d; `#16` stays free. **`ADR-0016 §D35` STAYS FREE — offered to this lane a third time and spent a third
+time not**, because ADR-0016 is the SAML SSO record and an export-authorization finding has no business in it.
+⚠️ **No decision was owed at all**: every change here is test coverage plus one docblock, and nothing about
+the product's behaviour was decided. `D1`, `D3` and `D4` in `docs/claims/decisions.md` remain open and were
+not re-litigated.
+
+### ⚠️ AND ONE PROCESS FINDING ABOUT MY OWN READING
+
+The claim recorded the row at `docs/feature-backlog.md:2297`; it is at **`:2387`**. The early greps ran in
+`fb-lane-b` **before** `git checkout -b … origin/main` — i.e. against the stale `m33-release` checkout the
+worktree happened to be sitting on, which predates `M30`'s ~90-line row closure. **Cutting the branch from
+`origin/main` protects the branch; it does nothing for the reading you did five minutes earlier.**
+⛔ **Fetch and check out FIRST, then read.**
 
 ---
 

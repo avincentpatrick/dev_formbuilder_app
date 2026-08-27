@@ -4738,3 +4738,85 @@ before its claim file is**. Lane A saw `fb-lane-b` on a branch named `m29-feedba
 commits four minutes before the claim was pushed. Rule 7(g) is still right that an unpushed claim does not
 exist; `git worktree list` is a second, earlier signal and costs one command.
 
+---
+
+## 2026-08-26 — 🅱️ LANE B, `M33`: the attachment id that defeated every per-form boundary (PR #221, `f329e1b`, CI 6/6 green with real step counts)
+
+**The row.** `AttachmentPolicy::view()` required only `submissions.view` where `SubmissionPolicy::view()`
+requires that permission **and** org-wide visibility or per-form collaboration or being the respondent. So
+`GET /attachments/{attachment}` read **any stored object in the tenant by id with no per-form check at
+all**, while every surface that *lists* those objects is scoped. Affected roles: exactly `form_editor` and
+`reviewer` — `hasOrgWideVisibility()` is `dashboard.org.view`, held by owner, admin **and viewer**.
+**Revocation did not revoke:** remove a `form_editor` from a form and `SubmissionPolicy` refuses them the
+submission on the next request, while every attachment id they ever saw kept working indefinitely.
+
+**As built.** An exhaustive `match` over all nine kinds with **no `default` arm**. Three kinds answer on a
+permission alone because they have no form to scope to (feedback screenshot `feedback.view`; brand logo any
+member — deliberately *not* narrowed, since `/branding/logo` serves the same bytes unauthenticated to email
+clients; webhook envelope `webhooks.manage`). The five submission-domain kinds require the permission **and**
+their owner's scope, and the submission arm **delegates to `SubmissionPolicy::view()` through the Gate rather
+than copying its predicate**. `Avatar` fails closed. ADR-0015 gained **§D10**; the webhook narrowing is `D4`.
+
+### The finding: a row's EVIDENCE and a row's PRESCRIBED FIX are separately trustworthy
+
+**All eight of the row's citations held — the first time in fifteen increments the evidence half needed no
+correction.** And its one-sentence remedy was still wrong: *"resolving each kind's owner through the morph
+map"* is impossible **and forbidden**. Two of the five `attachable_type` aliases are deliberately
+unregistered (registering them splits Sanctum's `tokenable_type` and Spatie's `model_type` between alias and
+FQCN — the `enforceMorphMap` break that cost 90 test failures), and `BrandingMorphAliasTest` exists solely to
+pin that **and prescribes this increment's design by name**. ⚠️ **Lane A independently hit the identical
+shape in `M32`'s row the same day** — *"REAL, and the row's own prescribed fix does not work."* Two lanes,
+two unrelated rows, one day. **Fifteen increments have taught this project to verify a row's citations;
+nothing has been verifying its remedy — the half that decides what gets built.**
+
+### What the row did not name
+
+1. **A sixth reachable kind.** It enumerated four; a census by **resource** (every `AttachmentKind::`
+   producer under `app/` and `database/`) found five production writers, including the unnamed **brand
+   logo**. M29's census lesson held a second time: **the unit is the resource, not the feature.**
+2. **A fixture the fix silently invalidated.** `Attachment::factory()` defaults to a `form_field` alias with
+   a **random uuid**; M29's positive control used it, and under a policy that resolves the owner it would 403
+   for *every* role. **A green suite after a scoping change is not evidence until the fixtures are checked
+   for owners that never existed.**
+3. **A link that keeps working and one that correctly stops.** `GeneratePdfJob`'s PDF-ready link resolves for
+   every legitimate recipient (they passed `SubmissionPolicy::export()`); it stops only for someone since
+   removed from the form — which is the defect.
+
+### Two process findings
+
+⛔ **WHEN YOUR ROW EXTENDS AN UNMERGED PR OF YOUR OWN, `origin/main` IS THE WRONG BASE.** M33 cut from `main`
+and got **17 passed / 3 failed** on a factory method M29 adds — **the failures had nothing to do with the
+diff and looked exactly like a broken test.** Re-cut from the dependency branch, after which
+`git rebase origin/main` was clean in both files, and the conflict the M29 release note predicted never
+happened. **Saving bytes protects you from losing work, not from having saved the wrong work:** one saved
+file had to be re-derived because its copy was itself built on the wrong base.
+
+⚠️⚠️ **TWO LANE-B WRITERS SHARED ONE WORKTREE, AND RULE 7 DOES NOT COVER IT.** `fb-lane-b` was checked out
+onto a branch this session did not create, with live uncommitted edits to `PROGRESS.md` and
+`docs/claims/lane-b.md`; a `gh pr merge 219` returned *"already merged"* because the other writer merged
+seconds first. **The claim protocol held and the worktree did not** — that writer read the pushed M33 claim,
+preserved it as the `## Status` heading, released only M29's, corrected the Pest baseline to the same figure
+this session measured independently, and left an explicit rebase instruction. Nothing was lost. **But Rule 7
+assumes one worktree per lane: the claim file protects the FILES; nothing protects the CHECKOUT.** Detect it
+with `git worktree list` plus `git reflog` (a checkout you did not issue); the discipline that made it
+recoverable is **commit and push before you switch branches**.
+
+### Gates
+
+CI Pest **4575 / 19,359** (2 pre-existing warnings) — **+11 cases on M29's 4564 / 19,345, exactly the eleven
+added**, measured as a delta against the base actually merged into. All six jobs `success` with real step
+counts (E2E 20 · Static 19 · Contract 16 · Frontend 12 · Pest 11 · axe 11), **not one `steps: []`**. E2E
+**551 passed + 10 skipped, no flaky line**. Local: `tests/Feature/Attachments/` **20 / 36**; blast radius
+(`Submissions`, `Branding`, `Webhooks`, `Tenant`) **612 / 2,620 / 0 failed**. PHPStan local **18 across 10
+FILES = baseline, zero delta by FILE LIST**; CI `[OK]`. Pint `passed` over **1373** files — **and proven live
+first** with a deliberately misformatted probe (exit 1, file and seven fixers named), because a bare `passed`
+is not evidence of a scan. Two mutations, red sets **disjoint** (1 and 4), each `php -l`'d with its sha256
+asserted to have moved and the original bytes compared back by hash. `openapi.json` byte-identical; no
+`.vue`, no `resources/`; **`tests/e2e/` contains no reference to attachments at all**. **Vitest and Storybook
+axe not run and recorded as UNMEASURED rather than green** — the diff is PHP-only, and "should not move" is
+not "measured".
+
+⚠️ **Also of record: GitHub dropped a `pull_request` event during outage recovery.** PR #221 sat at
+`check-runs: total_count 0` across **two different head shas** for ~25 minutes before a run appeared on its
+own. *"No checks reported"* is **pending, not a result**, and `gh api .../commits/<sha>/check-runs` is what
+separates "never created" from "queued". Waiting was correct.

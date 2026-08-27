@@ -18,7 +18,160 @@ exact-equality `KNOWN_UNGUARDED` assertion, so the list shrinks in the *same* PR
 
 ---
 
-## Status: ACTIVE CLAIM — M33, the attachment id that defeats every per-form boundary
+## Status: NO ACTIVE CLAIM
+
+**Lane B holds nothing as of 2026-08-26.** `M29` (PR #219, `7892f7f`) and `M33` (PR #221, `f329e1b`) are
+both merged, both 6/6 green with real step counts, and both released. Their entries follow.
+
+⛔⛔ **BEFORE YOU NUMBER ANYTHING: READ THE WHOLE OF `lane-a.md`, NOT ITS `## Status` LINE.** This is the
+process finding of `M33` and it nearly cost a collision. Lane A's file did not merely hold `M30` — its
+`### THE QUEUE BEHIND IT` block **pre-claimed `M31` and `M32` as well**, in writing, on Rule 7's *"the lane
+queue is the claim"*, and said why in its own words: *"because Lane B is taking rows from this exact section
+right now."* **The obvious arithmetic — `M30` is the highest merged, so take `M31` — would have collided
+with a claim that was already pushed and readable.** `M33` was the next genuinely free number. **A lane's
+forward queue is a claim and it does not live under the `## Status` heading.**
+
+⚠️ **AND THE FALLBACK ROW A HAND-OFF NAMES CAN EXPIRE THE SAME WAY.** `M33`'s own next-prompt named the
+`gamification:backfill` row as its natural second if the first proved too large. Lane A had claimed it as
+`M32` and already scouted it. **A suggested second row is a suggestion made before the other lane's claim
+existed — re-check it, exactly like a namespace reservation.**
+
+---
+
+## RELEASED — M33, the attachment id that defeated every per-form boundary (merged as PR #221, `f329e1b`, CI 6/6 green with real step counts)
+
+**Shipped 2026-08-26.** Branch `m33-attachment-scope`. Row closed in `docs/feature-backlog.md` as its own
+micro-commit.
+
+### GATES
+
+- **CI Pest `4575 passed / 19,359 assertions`** (2 pre-existing warnings) — up from `4564 / 19,345` on the
+  post-M29 tree, **+11 cases, exactly the eleven added**, measured as a DELTA against the base this branch
+  actually merged into rather than quoted as an absolute.
+- **All six jobs `success` with real step counts** — E2E **20**, Static analysis **19**, Contract **16**,
+  Frontend **12**, Pest **11**, Design-system axe **11**. **Not one `steps: []`.**
+- **E2E `551 passed + 10 skipped`, NO flaky line** — unchanged, and load-bearing (`failOnFlakyTests`).
+- **Local**: `tests/Feature/Attachments/` **20 passed / 36 assertions**; the wider blast radius
+  (`Submissions`, `Branding`, `Webhooks`, `Tenant`) **612 passed / 2,620 assertions / 0 failed**.
+- **PHPStan local 18 across 10 FILES = baseline, zero delta BY FILE LIST**, and neither of this diff's PHP
+  files appears in it. CI `[OK]`.
+- **Pint `passed` over `1373` files — and PROVEN LIVE FIRST.** A bare `passed` is not evidence a scan
+  happened, so a deliberately misformatted probe was written into `app/Policies/` and run: exit **1**, the
+  file named, seven fixers listed. Only then was the real `passed` believed.
+- **`openapi.json` byte-identical**; no `.vue`, no `resources/`, no `packages/`, and **`tests/e2e/` contains
+  no reference to attachments at all** (grepped — *a gate you cannot run is not a gate you may assume*).
+  Vitest and Storybook axe **not run, and recorded as UNMEASURED rather than green**: this diff is PHP-only
+  so neither *should* move, and "should not move" is not "measured".
+
+### ⛔⛔ THE FINDING: A ROW'S EVIDENCE AND A ROW'S PRESCRIBED FIX ARE SEPARATELY TRUSTWORTHY
+
+**Every file:line in this row was correct.** All eight citations were opened first-hand and all eight held —
+**the first time in fifteen increments the evidence half needed no correction at all.**
+
+**And its one-sentence remedy was still wrong.** The row said the fix *"means resolving each kind's owner
+**through the morph map** first."* That is impossible **and forbidden**. `attachable_type` carries five
+aliases; only three are registered. **`tenant` and `feedback_report` are deliberately absent**, because
+registering them would change how Sanctum's `tokenable_type` and Spatie's `model_type` serialize and split
+existing rows between alias and FQCN — the `enforceMorphMap` break that cost 90 test failures.
+`tests/Feature/Branding/BrandingMorphAliasTest.php` exists **solely** to pin that absence, **and prescribes
+this increment's design by name**: *"a LOCAL resolution (a match on `kind`, or a dedicated relation), never a
+global registration."* **This was that increment, and the repository had already decided it.**
+
+⚠️ **`BrandingMorphAliasTest` IS A SIXTH PAIRED-FILE-SHAPED GATE.** It reddens if the obvious implementation
+is written, which is exactly what it is for. It is not in the 7(b-bis) table because it guards a *decision*
+rather than a cross-lane contract — but it behaves identically, so it is named here.
+
+⚠️ **LANE A FOUND THE IDENTICAL SHAPE THE SAME DAY, INDEPENDENTLY, IN `M32`'s ROW** — *"REAL, and the row's
+own prescribed fix does not work."* **Two lanes, two unrelated rows, one day.** Fifteen increments have
+taught this project to verify a row's citations; **nothing has been verifying its prescribed fix — and that
+is the half that decides what gets built.**
+
+### WHAT THE ROW DID NOT NAME
+
+1. **A SIXTH REACHABLE KIND.** The row enumerates four. A census run on the **resource** — every
+   `AttachmentKind::` producer under `app/` and `database/` — returns **five production writers**, and the
+   one it never names is the **brand logo** (`AttachmentStorageService.php:148`, owner alias `tenant`). It
+   is deliberately **neither scoped nor narrowed**: `GET /branding/logo` serves the same bytes
+   **unauthenticated** to email clients, so tightening this route protects nothing already public.
+   `OcrSourceScan` and `Avatar` are declared and produced by nothing. **M29's census lesson held for a second
+   increment: the unit is the resource, not the feature.**
+2. **A FIXTURE THE FIX SILENTLY INVALIDATED.** `Attachment::factory()` defaults to a `form_field` alias with
+   a **random uuid**. M29's positive control used it — and under a policy that resolves the owner it would
+   403 for **every** role and prove nothing about permissions. Both M29 cases now own real rows.
+   ⚠️ **A green suite after a scoping change is not evidence until the fixtures are checked for owners that
+   never existed.**
+3. **A LINK THAT KEEPS WORKING, AND ONE THAT CORRECTLY STOPS.** `GeneratePdfJob:175` mails a
+   `/attachments/{id}` link; its recipient necessarily passed `SubmissionPolicy::export()` — the same scope
+   plus `submissions.export` — so **every legitimate link still resolves**. The links that stop are exactly
+   the ones held by someone since removed from the form, which *is* the defect.
+
+### THE BUILD
+
+The `match` is **exhaustive over all nine kinds with no `default` arm**, so PHPStan reports a tenth kind
+rather than absorbing it — a default is what absorbed the seventh and produced `M29`. Three kinds are
+answered on a permission alone because they have no form to be scoped to (feedback screenshot on
+`feedback.view`; brand logo on any member; webhook envelope on `webhooks.manage`); the five
+submission-domain kinds require `submissions.view` **and** their owner's scope; `Avatar` **fails closed**.
+
+**The submission arm DELEGATES to `SubmissionPolicy::view()` through the Gate rather than copying its
+predicate**, so a third surface agrees by construction rather than by review — the divergence
+`Submission::scopeVisibleTo()`'s mirror-pin already exists to prevent. **The respondent test case is what
+proves the delegation is real**: it passes only because the third arm came along with it, and a hand-copied
+predicate that forgot it would satisfy every other case in the file.
+
+**Two mutations, red sets DISJOINT.** *Never-narrows-the-webhook-envelope* reddened **1**;
+*never-scopes-the-submission-kinds* reddened **4**. Each mutant was `php -l`'d and its **sha256 asserted to
+have moved**; the original bytes were saved and compared back by hash. The M29 harness rules were followed
+and cost nothing this time.
+
+### ⚠️ THE BASE WAS WRONG ONCE, AND THE FAILURE LOOKED EXACTLY LIKE A BROKEN TEST
+
+`M33` was first cut from `origin/main` — where `M29`'s code did not yet exist — and the suite came back
+**17 passed / 3 failed** on `AttachmentFactory::feedbackScreenshot()`, a method `M29` adds. **The three
+failures had nothing to do with the diff.** The branch was re-cut from `m29-feedback-screenshot-deny` and
+the work replayed, after which `git rebase origin/main` was **clean in both files** — the conflict the M29
+release note predicted never happened, *because the work was built on its dependency rather than beside it*.
+⛔ **WHEN YOUR ROW EXTENDS AN UNMERGED PR OF YOUR OWN, `origin/main` IS THE WRONG BASE.** The saved-bytes
+discipline made the re-cut cheap — though one file (the factory) had to be **re-derived rather than
+restored**, because its saved copy was itself built on the wrong base. **Saving bytes protects you from
+losing work; it does not protect you from having saved the wrong work.**
+
+### ⚠️⚠️ TWO LANE-B WRITERS SHARED THIS WORKTREE, AND RULE 7 DOES NOT COVER IT
+
+Mid-increment, `c:\laragon\www\fb-lane-b` was checked out from `m33-attachment-scope` onto a branch
+`m29-release` that this session did not create, with live uncommitted edits to `PROGRESS.md`,
+`PROGRESS_ARCHIVE.md` and this file. The reflog showed a checkout nobody here issued, and mtimes were moving
+**31 seconds** before it was noticed. It also explains a `gh pr merge 219` returning
+*"already merged"* — **the other writer merged `#219` seconds first.**
+
+⛔ **THE CLAIM PROTOCOL HELD; THE WORKTREE DID NOT.** That writer read the pushed `M33` claim, **preserved it
+as the `## Status` heading**, released only `M29`'s, corrected the Pest baseline to `4564 / 19,345` (the
+figure this session had independently measured off the CI log), and left an explicit instruction to rebase.
+Nothing was lost. **But Rule 7 assumes ONE WORKTREE PER LANE: the claim file protects the FILES, and nothing
+protects the CHECKOUT.** Two agents in one worktree share a working tree and a `HEAD`, so a branch switch by
+one silently relocates the other. **The cheap detection is the same one M30 found for claims —
+`git worktree list` plus the reflog — and the cheap discipline is: commit and push before you switch, which
+is what made this recoverable.**
+
+### NAMESPACES AFTER M33
+
+**ADR-0016 `§D35` STILL FREE** — reserved for this lane a second time and spent neither time.
+⚠️ **The hand-off named it again and it is again the wrong home: ADR-0016 is SAML SSO.** M29 caught that and
+wrote it down, so **M33 did not have to rediscover it — the first time a recorded namespace lesson paid out
+on the very next increment.** The right home was **ADR-0015 §D10**, by the rule *the ADR whose own
+sub-decision created the defect*: §D6 filed a second owner-class into the shared table and §D9 is already the
+running commentary on it. ADR-0002 was the other candidate and was rejected — **it has no §D-series at all.**
+ADR-0015's series is now **§D1–§D10**.
+
+Migration block **`2026_08_17_000111` STILL FREE** (no column, index or table). **ADR `0022` STILL FREE** and
+still Lane A's block-opener. `0010` stays reserved for H1d; `#16` stays free.
+`docs/claims/decisions.md` gained **`D4`** (the webhook envelope's permission — a NARROWING, recommended and
+implemented with the revert named, on the `D3`/`M26` precedent). **`D1` and `D3` stay OPEN and untouched;
+this lane did not re-ask or re-litigate either.**
+
+**The original M33 claim, as written when the row was taken, follows unedited.**
+
+### ORIGINAL CLAIM (M33)
 
 **Taken 2026-08-26.** Branch `m33-attachment-scope`, cut from `origin/main` at `d71e4ea`, PR into `main`.
 Row: the `major` under **`### Submissions, drafts & the guest runtime`** (heading at

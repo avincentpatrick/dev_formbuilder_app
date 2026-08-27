@@ -258,6 +258,48 @@ it('cannot read another tenant\'s draft even with a validly-signed resume token 
         ->assertJsonPath('error.code', 'draft_not_found');
 });
 
+/*
+|--------------------------------------------------------------------------
+| Increment M30 — one exhausted resume link must not 429 everybody else's.
+|--------------------------------------------------------------------------
+| `throttle:guest` guards two route SHAPES: the share-token group ({shareToken}) and this route
+| ({resumeToken}). Until M30 the limiter keyed its per-token bucket on `route('shareToken')` alone, which
+| this route does not declare — so the key hashed the empty string and every draft-resume request in the
+| deployment, across every tenant, shared ONE 30/min bucket.
+|
+| ⚠️ THE ASSERTION THAT MATTERS IS THE THIRD REQUEST, NOT THE 429. A test that only exhausted one token and
+| asserted 429 passes on the BROKEN code too — the global bucket 429s just as readily, and rather more
+| eagerly. The discriminating observation is that a SECOND, unrelated resume token is still served after the
+| first one's budget is gone. The structural half of this fix (`RateLimiterBindingTest`) inspects the key
+| directly; this case is here because a key is an implementation and a refused visitor is the consequence.
+*/
+it('meters each resume token separately, so one exhausted link does not refuse another', function (): void {
+    // Per-token budget of 1, per-IP budget high enough to stay out of the way — the file's own idiom from
+    // `GuestRuntimeTest`'s rate-limit cases. Both drafts are minted before the budget is narrowed, since the
+    // save channel shares this limiter and would otherwise spend the very bucket under test.
+    $f = draftFixture();
+
+    $resumeA = $this->postJson("http://acme.meridian.test/api/v1/public/f/{$f->token}/draft", [
+        'answers' => ['age' => '30', 'full_name' => 'Ada'], 'client_submission_uuid' => Uuid::uuid7()->toString(),
+    ])->assertCreated()->json('data.resume_token');
+
+    $resumeB = $this->postJson("http://acme.meridian.test/api/v1/public/f/{$f->token}/draft", [
+        'answers' => ['age' => '41', 'full_name' => 'Grace'], 'client_submission_uuid' => Uuid::uuid7()->toString(),
+    ])->assertCreated()->json('data.resume_token');
+
+    expect($resumeA)->not->toBe($resumeB);
+
+    config(['guest.rate_limit.submit_per_token' => 1, 'guest.rate_limit.submit_per_ip' => 99]);
+
+    $this->getJson("http://acme.meridian.test/api/v1/public/drafts/{$resumeA}")->assertOk();
+    $this->getJson("http://acme.meridian.test/api/v1/public/drafts/{$resumeA}")->assertStatus(429);
+
+    // ⛔ THE WHOLE CASE. On the pre-M30 key this is a 429: A's two requests emptied the one bucket every
+    // resume link shared, so B — a different draft, and in production a different tenant — is refused by
+    // somebody else's traffic.
+    $this->getJson("http://acme.meridian.test/api/v1/public/drafts/{$resumeB}")->assertOk();
+});
+
 // ── Draft-aware finalize (POST .../submissions promotes an existing draft) ─────────────────────
 
 it('finalizes a saved draft in place via promote(), metering it exactly once', function (): void {

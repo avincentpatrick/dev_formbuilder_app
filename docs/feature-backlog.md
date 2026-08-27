@@ -2246,13 +2246,103 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   it relies entirely on `ToggleableModules`' default — so flipping that default gives six green scans of
   the dashboard. Latent, and the idiom is present everywhere else in the shard, including the
   `filteredToZero` loop twenty lines below (`:154-163`) and `support/console.ts:34`. One line per test.*
-- **`major` · The login and 2FA-challenge rate limiters are asserted by no test in the repository.**
-  `config/fortify.php:169-172` maps them by string and `FortifyServiceProvider.php:159,165` registers the
+- ~~**`major` · The login and 2FA-challenge rate limiters are asserted by no test in the repository.**~~
+  ✅ **DONE — M30 (2026-08-26). THE HEADLINE HELD, BOTH STATED MECHANISMS DID NOT, AND VERIFYING THEM FOUND
+  A LIVE DEFECT ONE DOOR OVER THAT IS WORTH MORE THAN THE ROW.** `tests/Feature/Auth/RateLimiterBindingTest.php`
+  (new, 4 cases / 18 assertions) closes the row; `app/Providers/AppServiceProvider.php` and one case in
+  `tests/Feature/Guest/GuestDraftRuntimeTest.php` close what the sweep found.
+  ⛔ **THE LIVE DEFECT: ONE GLOBAL RATE-LIMIT BUCKET FOR THE WHOLE DEPLOYMENT.** `RateLimiter::for('guest')`
+  keyed its per-token `Limit` on `route('shareToken')`. **MEASURED from the live route table** (matched on
+  the resolved `ThrottleRequests` class, because `route:list` prints the class while `gatherMiddleware()`
+  returns the alias — M13's lesson, reused): five routes carry `throttle:guest`, four declare
+  `{shareToken}`, and `GET /api/v1/public/drafts/{resumeToken}` does not. A parameter a route does not
+  declare reads back null, `(string) null` is `''`, and `hash('sha256', '')` is a **constant** — so every
+  draft-resume request in the deployment, across every tenant, shared **one** 30/min bucket. The throttle is
+  middleware index **0** on that route, ahead of `EstablishGuestDraftContext`, so a **garbage** token spent
+  that budget before anything verified it; the per-IP arm allows 60/min, so one unauthenticated IP could
+  refuse every legitimate resume link platform-wide for free. `EnforceGuestFormRateLimit` is not on that
+  route. Full row in `docs/security-threat-model.md` §4.
+  ⛔ **A LIMITER'S KEY IS A CONTRACT WITH THE ROUTE'S PARAMETER *NAMES*, AND NOTHING EXPRESSED IT.** F5's
+  comment (*"Keyed on the raw {shareToken} string"*) was accurate when every route on the limiter carried
+  that segment. H9b's resume group then reused `throttle:guest` **correctly** — same gate as the draft-save
+  channel — and reused a key that had silently stopped applying. **Neither change was wrong on its own.**
+  ⚠️ **THE ROW'S TWO MECHANISMS, BOTH CORRECTED AGAINST THE VENDOR SOURCE RATHER THAN ARGUED.**
+  **(a)** *"unmetered credential stuffing"* on the login half is **wrong**: nulling `fortify.limiters.login`
+  drops `throttle:login`, but vendor `AuthenticatedSessionController.php:86` re-inserts
+  `EnsureLoginIsNotThrottled` into the default pipeline on exactly that condition, and this app sets no
+  `pipelines` key and never calls `Fortify::authenticateThrough`, so the branch **is** reached — 5 *failed*
+  attempts/min on `lower(email)|ip`, the same key `FortifyServiceProvider.php:160` builds. A degradation,
+  not an absence. **(b)** The **rename** mutation is **already covered, loudly**: on `laravel/framework`
+  v13.18.1 `ThrottleRequests::resolveMaxAttempts()` throws `MissingRateLimiterException` for an unregistered
+  name, so a rename 500s every login POST and reddens `AuthenticationTest.php:48` and
+  `TwoFactorChallengeTest.php:174` today. **A test written to the row's stated rationale would have been
+  aimed at a mutation the suite already catches.** **(c)** What survives is the severe half: nulling
+  `fortify.limiters.two-factor` leaves TOTP and recovery-code guessing with **no bound anywhere** — the
+  vendor controller counts nothing, the form request counts nothing, no `Lockout` listener exists.
+  ⛔ **FOUR POSITIVE CONTROLS, EACH RESTORED BY sha256 BYTE COMPARISON, AND ONE OF THEM FOUND A VACUOUS
+  TEST A GREEN RUN WOULD HAVE SHIPPED.** **C1** dropping the `resumeToken` arm reddens the key case *naming
+  `api/v1/public/drafts/{resumeToken}`*. **C2** nulling `fortify.limiters.two-factor` reddens the binding
+  case and **leaves the registration case green** — proving the two measure genuinely different facts.
+  **C3** a mistyped limiter name in the route walk reddens the non-vacuity guard with its own message.
+  **C4** the behavioural case fails on the pre-M30 key at exactly the third request, and **only** that case
+  in a 31-case file. ⚠️ **C1 IS WHY THE IP-FALLBACK CASE EXISTS AT ALL IN WORKING FORM:** its first draft
+  was `->not->toContain($key, $message)` and stayed **green** with the offending key sitting in the array,
+  because **Pest's `toContain` takes VARIADIC NEEDLES, not a needle and a message** — the explanatory
+  sentence was being asserted as a second thing the array should not contain. Only reading what the control
+  PRINTED, rather than its exit code, caught it.
+  ⚠️ **THE STRUCTURAL GATE ASKS THE QUESTION INSTEAD OF CHECKING A LIST, WHICH IS THE DESIGN.** It *invokes*
+  the limiter for every live route bound to it with two different token values and asserts the two bucket
+  keys differ. Holding its own copy of the parameter names would have been the paired-list hazard of
+  Standing Rule 7(b-bis) reproduced one file later; as written, a sixth route with a third parameter name
+  reddens it **without the test knowing the name**. The fallback arm keys on the IP so a future mismatch is
+  per-caller rather than deployment-wide, and a second case fails if any live route ever reaches it — a
+  floor that announces itself rather than a silent degradation.
+  **GATES.** Local `tests/Feature/Auth` **127 → 131 / 615 → 633** (exactly the four new cases);
+  `tests/Feature/Guest` **77 / 319** green. PHPStan local **18 = baseline, zero delta by FILE LIST**
+  (`AppServiceProvider.php` appears in none of them). Pint **PASS, 3 files** — the printed count, not the
+  word. `openapi.json` **byte-identical**, confirmed by `cmp` against a fresh `scramble:export`; the claim
+  predicted this in writing before the file was opened, on the ground that a 429 comes from route middleware
+  no controller mentions. Original filing follows.
+  — *`config/fortify.php:169-172` maps them by string and `FortifyServiceProvider.php:159,165` registers the
   closures; Fortify `array_filter`s the middleware, so nulling either config value or renaming either
   registration produces a route with **no throttle at all** — an exhaustible 6-digit TOTP and unmetered
   credential stuffing, with nothing red. **Latent.** The project already guards exactly this elsewhere:
   `SsoLoginWebTest.php:285` asserts every SAML limiter it names actually exists, precisely because a
-  `throttle:` alias naming an unregistered limiter *"resolves to an UNLIMITED PASSTHROUGH"*.
+  `throttle:` alias naming an unregistered limiter "resolves to an UNLIMITED PASSTHROUGH".*
+- **`major` · `POST /user/confirm-password` carries no rate limit at all.**
+  **MEASURED (M30) from the live route table:** its middleware is
+  `[web, RequirePlatformHost, AppSecurityHeaders, GateRegistration, Authenticate:web, EstablishTenantDatabaseContext]`
+  — no `ThrottleRequests`. Vendor `ConfirmablePasswordController::store()` counts nothing and `app/`
+  registers no listener or bespoke middleware for it, so it is **unlimited online password guessing against
+  an authenticated session**. It is the redemption door for this app's own step-up gate:
+  `RequireRecentPassword` extends `Illuminate\Auth\Middleware\RequirePassword`, and
+  `StepUpReauthenticationTest.php:135-147` pins `members.role`, `members.remove`, `members.ownership`,
+  `settings.sso.metadata`, `admin.tenants.assign-plan`, `admin.tenants.index` and `admin.settings.update`
+  behind it; Fortify's 2FA management (`two-factor.confirm`, `two-factor.disable`) sits behind the same
+  gate. ⛔ **THE ASYMMETRY IS WHAT MAKES IT A DEFECT RATHER THAN A DECISION:** the SAML step-up path is
+  bounded (`throttle:saml-step-up`, 20/min) and `POST /two-factor-challenge` is bounded — the **password**
+  step-up path, verifying the same credential to unlock the same actions, is not. **Live.** Fix is one
+  `RateLimiter::for()` plus one `->middleware('throttle:…')`, and it should carry a binding assertion in
+  `RateLimiterBindingTest.php`, which already has the helper. **Deliberately left by M30** because it adds a
+  limiter to a route that increment does not otherwise touch.
+- **`minor` · `throttle:saml-acs`'s route BINDING is asserted by nothing, while its registration is.**
+  `SsoLoginWebTest.php:285-291` loops six limiter names and asserts each resolves — which stays green when
+  the binding at `routes/tenant.php:1172` is deleted, because the registration at `AppServiceProvider.php:421`
+  is untouched. The only test inspecting that route's middleware (`SsoAcsWebTest.php:753-758`) asserts only
+  **absences**. Its four siblings (`saml-login`, `saml-metadata`, `saml-login-complete`,
+  `saml-step-up-complete`) all carry a positive `toContain('throttle:…')` assertion, so the gap is an
+  asymmetry **inside the very test family the closed row above held up as the model**. **Latent.**
+  `routesThrottledBy()` in `tests/Feature/Auth/RateLimiterBindingTest.php` is the reusable helper.
+  **Deliberately left by M30** — `tests/Feature/Sso/` is Lane B's most active subsystem and that increment
+  was already crossing the boundary.
+- **`minor` · Two SSO test files justify a real assertion with a rationale that is false on this framework version.**
+  `SsoLoginWebTest.php:286-287` and `SsoLoginCompletionWebTest.php:466-469` both say a `throttle:` alias
+  naming an unregistered limiter *"resolves to an UNLIMITED PASSTHROUGH"*. **MEASURED (M30):** on
+  `laravel/framework` v13.18.1 `ThrottleRequests::resolveMaxAttempts()` throws `MissingRateLimiterException`
+  instead — true on Laravel ≤ 9, false here. **The tests are still worth having; the stated reason is not
+  the true one**, and this project has recorded three times that a false claim about a control is worse than
+  a missing one because it stops the next reader looking. **Not live** — a comment. **Deliberately left by
+  M30** for the same lane-boundary reason as the row above, and filed so the correction is not lost.
 - **`major` · Every accepted write in the answer-edit concurrency suite compares `null === null`.**
   `tests/Feature/Submissions/SubmissionEditRoutesTest.php:62` ·
   `tests/Feature/Submissions/SubmissionAnswerEditTest.php:579` — `SubmissionAnswerFactory` never stamps

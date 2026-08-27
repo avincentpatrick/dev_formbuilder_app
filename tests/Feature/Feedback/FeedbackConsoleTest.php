@@ -2,8 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Enums\AttachmentKind;
 use App\Enums\AuditEvent;
 use App\Enums\FeedbackStatus;
+use App\Enums\ScanStatus;
 use App\Models\Audit;
 use App\Models\FeedbackReport;
 use App\Models\Tenant;
@@ -13,6 +15,7 @@ use App\Support\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Ramsey\Uuid\Uuid;
 
@@ -113,6 +116,70 @@ function consoleReport(Tenant $tenant, User $user, FeedbackStatus $status, strin
     ]);
 
     return $report;
+}
+
+/** The bytes {@see consoleScreenshot()} stores, so a case can assert the body it got is the body it wrote. */
+const CONSOLE_SCREENSHOT_BYTES = 'CONSOLE-SCREENSHOT-BYTES';
+
+/**
+ * A committed screenshot for a committed report, plus the pointer that links them and the object on disk.
+ *
+ * ⚠️ **THE ATTACHMENT HAS TO BE COMMITTED TOO, AND THE REASON IS AN FK RATHER THAN A CONNECTION.**
+ * `feedback_reports.screenshot_attachment_id` is a real foreign key onto `attachments`, so pointing a
+ * COMMITTED report at a row that only exists inside RefreshDatabase's open transaction makes the privileged
+ * UPDATE wait on a lock the test itself is holding — a hang, not an error. Both rows therefore go in on
+ * `pgsql_privileged`, which is a superuser and bypasses RLS.
+ *
+ * The query builder rather than the model, for the reason {@see consoleTenant()} gives at length: a model's
+ * traits and global scopes get a vote on the connection and on `tenant_id`, and here they would be voting
+ * with no tenant context set at all.
+ *
+ * **Nothing is added to {@see purgeCommittedFeedbackFixtures()} and that is checked, not assumed:**
+ * `attachments.tenant_id` is `cascadeOnDelete`, and the purge deletes the reports before the tenants — so
+ * the tenant delete takes the attachment with it. Caller must have called `Storage::fake('local')` first,
+ * or this writes a real object into the local disk.
+ */
+function consoleScreenshot(FeedbackReport $report, ScanStatus $scan = ScanStatus::Clean): string
+{
+    $id = Uuid::uuid7()->toString();
+    $path = "tenants/{$report->tenant_id}/feedback_screenshot/".date('Ym')."/{$id}.png";
+    $connection = DB::connection('pgsql_privileged');
+
+    $connection->table('attachments')->insert([
+        'id' => $id,
+        'tenant_id' => $report->tenant_id,
+        // No morph-map entry and none needed: there is no DB FK on the morph columns and the console never
+        // resolves the owner back to a class. This is the alias production writes.
+        'attachable_type' => 'feedback_report',
+        'attachable_id' => $report->id,
+        'kind' => AttachmentKind::FeedbackScreenshot->value,
+        'disk' => 'local',
+        'path' => $path,
+        'original_filename' => 'capture.png',
+        'mime_type' => 'image/png',
+        'size_bytes' => strlen(CONSOLE_SCREENSHOT_BYTES),
+        'checksum_sha256' => hash('sha256', CONSOLE_SCREENSHOT_BYTES),
+        'width' => 1_600,
+        'height' => 900,
+        'is_encrypted_at_rest' => false,
+        'is_pii' => true,
+        // Defaults to Clean rather than to the column default: `ScanStatus::servable()` gates the stream,
+        // and a `pending` row 409s before any of this reaches the disk. The parameter exists so the
+        // quarantine case can ask for exactly that.
+        'virus_scan_status' => $scan->value,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    // No `updated_at` in the SET list: `feedback_reports` carries `submitted_at` and `resolved_at` and no
+    // Eloquent timestamps at all, so naming one is an undefined-column error rather than a no-op.
+    $connection->table('feedback_reports')->where('id', $report->id)->update([
+        'screenshot_attachment_id' => $id,
+    ]);
+
+    Storage::disk('local')->put($path, CONSOLE_SCREENSHOT_BYTES);
+
+    return $path;
 }
 
 function adminUrl(string $path): string
@@ -348,4 +415,115 @@ it('reads a screenshot through adopted tenant context, without an attachments by
     $this->actingAs($admin)->get(adminUrl("/feedback/{$report->id}/screenshot"))->assertNotFound();
 
     expect(app(SuperAdminService::class)->feedbackScreenshot($report))->toBeNull();
+});
+
+/*
+|--------------------------------------------------------------------------
+| Increment M35 — the four gate arms of the screenshot route itself.
+|--------------------------------------------------------------------------
+| The console INDEX has carried all three denials since I7a (above). The screenshot route carried none of
+| them, and it is the one that streams bytes: every tenant's feedback screenshots, `is_pii = true`, on the
+| central host. The three routes do inherit their middleware from one group, so the index's denials pin the
+| group transitively — but they cannot see a route DECLARED IN THE WRONG GROUP, which is the cheap
+| mutation, and `AdminConsoleGateTest` is the structural half that can. These are the behavioural half:
+| what a refused caller actually receives at this URI.
+|
+| ⛔ THE 404 ARM NEEDS A REAL SCREENSHOT AND THAT IS NOT BELT-AND-BRACES. `EnsureSuperAdmin` answers 404
+| for non-disclosure and the controller answers 404 for a report it cannot resolve — the same status from
+| two different decisions. A non-super-admin case written against a random id, or against a report with no
+| screenshot (the only fixture this file could build before now), PASSES WITH THE MIDDLEWARE DELETED. The
+| tenant-side twin states the identical trap in its own words at `tests/Feature/Tenant/FeedbackTest.php`.
+| So that one case builds a report that a super-admin really does get 200 bytes from — which is the
+| positive control immediately below it, and is also the first test in this repository ever to drive this
+| route to a success.
+|
+| The other three arms answer with a REDIRECT, which no 404 can be confused with, so they use a random id
+| and never pay for a committed fixture. Stated rather than left to be re-derived by the next reader.
+*/
+
+it('streams a cross-tenant screenshot to an enrolled super-admin', function (): void {
+    Storage::fake('local');
+
+    $tenant = consoleTenant('Console Shutter', 'console-shutter-'.Str::random(6));
+    $reporter = consoleUser(Str::random(8).'@feedbackconsoletest.local');
+    $report = consoleReport($tenant, $reporter, FeedbackStatus::New, 'A picture of the problem '.Str::random(8));
+    consoleScreenshot($report);
+
+    $admin = User::factory()->superAdmin()->confirmedTwoFactor()->create();
+
+    $response = $this->actingAs($admin)->get(adminUrl("/feedback/{$report->id}/screenshot"))
+        ->assertOk()
+        ->assertHeader('Content-Type', 'image/png')
+        ->assertHeader('X-Content-Type-Options', 'nosniff');
+
+    // The bytes, not just the status: the console reads them by ADOPTING the reporting tenant's context
+    // (there is no super-admin carve-out on `attachments`, which FeedbackRlsTest pins from the other side),
+    // so a 200 with an empty body would mean the adoption silently failed.
+    expect($response->streamedContent())->toBe(CONSOLE_SCREENSHOT_BYTES);
+});
+
+it('404s a screenshot for a non-super-admin, on a report that streams for a super-admin', function (): void {
+    // ⚠️ THE POSITIVE CONTROL IS THE CASE DIRECTLY ABOVE, and this test is worthless without it: the same
+    // URI, the same fixture, 200 for the right caller. Delete `superadmin` from the group and this request
+    // reaches the controller, which resolves the report AND the screenshot and streams it — so the 404
+    // below can only have come from the gate.
+    Storage::fake('local');
+
+    $tenant = consoleTenant('Console Shutter', 'console-shutter-'.Str::random(6));
+    $reporter = consoleUser(Str::random(8).'@feedbackconsoletest.local');
+    $report = consoleReport($tenant, $reporter, FeedbackStatus::New, 'A picture of the problem '.Str::random(8));
+    consoleScreenshot($report);
+
+    // 404 rather than 403, like the index: the console does not disclose its own existence.
+    $this->actingAs(User::factory()->create())
+        ->get(adminUrl("/feedback/{$report->id}/screenshot"))
+        ->assertNotFound();
+});
+
+it('409s a console screenshot whose scan has not cleared', function (): void {
+    // ⛔ NOT AN AUTHORIZATION ARM, AND IN SCOPE FOR EXACTLY THAT REASON. M34 pinned this guard on the two
+    // routes it was looking at — `FeedbackController.php:75` and `AttachmentController.php:43` — and the
+    // console's own copy at `FeedbackConsoleController.php:78` was the third, asserted by nothing. Deleting
+    // that line served quarantined bytes to the one principal who reads across every tenant, with the whole
+    // repository green. The rule M34 leaves behind is to ask the question of EVERY gate on a route you
+    // touch rather than only the ones the row names, and this is that question answered here.
+    //
+    // The positive control is the streaming case above: same URI, same caller, same fixture, one column
+    // apart. Infected rather than Pending, because Phase-1's own pipeline lands screenshots on `skipped`
+    // — which IS servable — so `pending` would be a state the product never reaches.
+    Storage::fake('local');
+
+    $tenant = consoleTenant('Console Quarantine', 'console-quarantine-'.Str::random(6));
+    $reporter = consoleUser(Str::random(8).'@feedbackconsoletest.local');
+    $report = consoleReport($tenant, $reporter, FeedbackStatus::New, 'A picture that failed a scan '.Str::random(8));
+    consoleScreenshot($report, ScanStatus::Infected);
+
+    $admin = User::factory()->superAdmin()->confirmedTwoFactor()->create();
+
+    $this->actingAs($admin)
+        ->get(adminUrl("/feedback/{$report->id}/screenshot"))
+        ->assertStatus(409);
+});
+
+it('sends a super-admin who has not enrolled in 2FA to enrollment rather than to the bytes', function (): void {
+    $admin = User::factory()->superAdmin()->create();
+
+    $this->actingAs($admin)
+        ->get(adminUrl('/feedback/'.Uuid::uuid7()->toString().'/screenshot'))
+        ->assertRedirect(route('admin.mfa.setup'));
+});
+
+it('bounces a super-admin whose password confirmation has gone stale', function (): void {
+    // Overrides this file's beforeEach, which confirms at 0 seconds ago. `auth.step_up_timeout` is 900.
+    confirmPasswordNow(20 * 60);
+
+    $admin = User::factory()->superAdmin()->confirmedTwoFactor()->create();
+
+    $this->actingAs($admin)
+        ->get(adminUrl('/feedback/'.Uuid::uuid7()->toString().'/screenshot'))
+        ->assertRedirect('http://'.config('tenancy.central_domain').'/user/confirm-password');
+});
+
+it('redirects a guest away from a screenshot', function (): void {
+    $this->get(adminUrl('/feedback/'.Uuid::uuid7()->toString().'/screenshot'))->assertRedirect();
 });

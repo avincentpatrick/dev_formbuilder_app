@@ -164,3 +164,80 @@ it('streams a valid XLSX that round-trips through the reader', function (): void
     expect($read[0])->toBe(['Section', 'Key', 'Value'])
         ->and(count($read))->toBeGreaterThan(1);
 });
+
+/*
+|--------------------------------------------------------------------------
+| M34 — the two gates on THIS route, as opposed to on its twin.
+|
+| /api/v1/analytics/report and /api/v1/analytics/report/export carry an IDENTICAL middleware triple
+| (routes/api.php:365-370). AnalyticsApiTest.php:87 asserts the ability refusal against `analyticsUrl()`,
+| whose default suffix is 'report' — so the coverage that reads as this route's belongs to the twin, and
+| both of this route's gates could be deleted with the whole suite green.
+|
+| Order matters and was measured with `route:list` rather than assumed:
+| CheckForAnyAbility:read:analytics → Authorize:viewAny,SavedReportView → RequireFeature:advanced_analytics.
+| The entitlement answers LAST, and beforeEach() assigns Business anyway, so every 403 below is a token or
+| permission refusal and never a plan one — the API's plan refusal is a 402, asserted on THIS route by the
+| last test in this file rather than borrowed from the twin's (AnalyticsApiTest.php:113), which was the
+| whole defect one gate over.
+|
+| POSITIVE CONTROL for both: 'streams a NON-EMPTY body' (:77), the Owner's entitled 200 on this same URI.
+|--------------------------------------------------------------------------
+*/
+
+it('refuses the EXPORT to a token holding every OTHER ability but not read:analytics', function (): void {
+    // Every-other-ability rather than no-ability, borrowing AnalyticsApiTest.php:90's construction: a token
+    // with an empty ability list would be refused by Sanctum for reasons that have nothing to do with this
+    // route's own gate.
+    $abilities = array_values(array_diff(ApiAbilities::all(), [ApiAbilities::READ_ANALYTICS]));
+    $token = $this->owner->createToken('ci', $abilities)->plainTextToken;
+
+    // The CODE is asserted, not just the status. An ability refusal and a permission refusal are BOTH 403
+    // and differ only here (bootstrap/app.php:255 vs :258), so a status-only assertion cannot tell which
+    // gate answered — and this test would still pass if the `can:` gate happened to be the one refusing.
+    $this->withToken($token)->get(exportUrl())
+        ->assertForbidden()
+        ->assertJsonPath('error.code', 'insufficient_ability');
+});
+
+it('refuses the EXPORT to a correctly-scoped token whose owner holds neither dashboard permission', function (): void {
+    // The `can:` arm, which the ability test above cannot reach: this token carries read:analytics, so
+    // Sanctum passes it through and only Authorize:viewAny,SavedReportView is left to refuse. Nothing in the
+    // repository asserted this arm on either analytics API route — the twin's is unpinned too, and that is
+    // filed rather than fixed here because the twin is not this row's subject.
+    $nobody = User::factory()->create();
+    enterTenant($this->tenant->id, $nobody->id);
+    makeActiveMember($nobody, 'viewer');
+    $nobody->syncRoles([]);
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    $token = $nobody->createToken('ci', [ApiAbilities::READ_ANALYTICS])->plainTextToken;
+
+    // `forbidden` rather than `insufficient_ability` — the same distinction as above, read the other way:
+    // this proves the ability gate PASSED and the policy is what refused.
+    $this->withToken($token)->get(exportUrl())
+        ->assertForbidden()
+        ->assertJsonPath('error.code', 'forbidden');
+});
+
+it('returns 402 on the EXPORT when the plan lacks advanced_analytics', function (): void {
+    // M34, second pass. This route's THIRD gate, and it had the IDENTICAL twin-aimed hole the two above
+    // were filed for: AnalyticsApiTest.php:113 asserts exactly this 402 against `analyticsUrl()`, whose
+    // default suffix is 'report'. Delete `feature:advanced_analytics` from routes/api.php:369 and — before
+    // this test — the whole repository stayed green, because every other case that touches this URI runs on
+    // Business. Closing two of a route's three gates and leaving the third with the defect the row was
+    // filed about is how a row gets re-filed a month later.
+    //
+    // assignPlanTier() is MANDATORY rather than scene-setting: RequireFeature FAILS OPEN on a null plan
+    // (RequireFeature.php:33), so a version of this test that forgot it would pass while proving nothing.
+    // It overrides the Business tier beforeEach() assigns, which is what every other gate here relies on.
+    //
+    // POSITIVE CONTROL: 'streams a NON-EMPTY body' (:77) — the same token on the same URI under Business,
+    // asserting ROWS rather than status.
+    assignPlanTier(PlanTier::Professional);
+
+    $this->withToken(exportToken())->get(exportUrl())
+        ->assertStatus(402)
+        ->assertJsonPath('error.code', 'feature_not_available')
+        ->assertJsonPath('error.details.feature', 'advanced_analytics');
+});

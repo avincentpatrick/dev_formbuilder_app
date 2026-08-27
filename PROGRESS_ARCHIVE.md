@@ -4870,3 +4870,80 @@ E2E **551 + 10 skipped, no flaky**, axe **42 / 303**, PHPStan CI `[OK]`, `openap
 ⚠️ **Two figures in the previous hand-off were stale and low — Pest by 13, Vitest by 1** — so gate numbers
 are now quoted out of a CI log, never out of a hand-off. Namespaces: nothing spent; `0022` still free and
 still Lane A's block-opener, ninth consecutive.
+
+## 2026-08-27 — 🅱️ LANE B, `M34`: three streamed exports with no deny test, and a remedy that was impossible rather than merely wrong (PR #<n>, `<sha>`, CI 6/6 green with real step counts)
+
+`GET /analytics/export`, `GET /api/v1/analytics/report/export` and
+`GET /api/v1/forms/{form}/versions/{version}/xlsform` all streamed tenant data behind gates nothing had ever
+driven. The first had one assertion pointed at it — an **Owner** on a Professional plan asserting a
+**redirect**, the entitlement answering, with the Owner passing `can:` on the way. The second's ability
+denial targeted the **non-export twin**, because `analyticsUrl()` defaults to the `'report'` suffix and both
+routes carry a character-identical middleware triple. The third **had never been requested by any test**.
+Their only structural cover, `GroupBPolicyGateTest`, does `explode(':', $middleware, 2)[0]` — everything
+after the colon discarded — and its own header says at `:33` that it "cannot judge whether an allowlisted
+reason is TRUE".
+
+### The finding: a remedy can fail STRUCTURALLY, not just narrowly
+
+Every one of the row's citations held — the **second row running**, after `M33`. Its prescribed fix did not.
+*"Copy `GET /forms/{form}/submissions/export`, which asserts BOTH a role denial and a scope denial"* binds a
+**Form instance**; both analytics exports gate on `can:viewAny,SavedReportView`, whose policy method **takes
+no model**. A scope denial there is not weak — there is nothing to be out of scope of. And the **role** half
+needed a fixture the row never names: all five seeded roles hold `dashboard.form.view` while `viewAny` is
+`dashboard.org.view || dashboard.form.view`, so **no seeded role can be refused**, and copying the row's own
+viewer fixture would have produced a 200 and a green test proving nothing — **the exact failure the row was
+filed about, reproduced by obeying it.** Lane A hit the identical evidence-good/remedy-bad shape in `M32`'s
+row the same day. **That is now a pattern.**
+
+### What measurement settled that argument could not
+
+Every target carries a `feature:` gate beside its `can:`; had the entitlement answered first, every new test
+would have measured the plan. `route:list` resolves all three as **`ability → Authorize → RequireFeature`** —
+entitlement **last**. One command, risk closed.
+
+### Four mutations, and the fourth is about this increment's own work
+
+Mutations 1–3 reddened one test each (`1 failed / 123 passed / 867`), each replacing one literal token in a
+unique context, `php -l`'d, sha256 asserted moved, restored **by byte-comparison** rather than
+`git checkout --`. ⚠️ **A red set is scope-bound**: `GroupBPolicyGateTest` sits outside the scope run and was
+**measured rather than assumed** — baseline `4 passed`, mutated `1 failed / 3 passed`, so mutation 2's true
+red set is **two** tests. ⛔⛔ **Mutation 4 exists because an adversarial pass asked the killer question of a
+gate this increment had already walked past.** Having closed the API export's `ability:` and `can:` gates,
+nobody had asked about its **third**: delete `feature:advanced_analytics` from `routes/api.php:369` and the
+whole repository stayed green, because the 402 that looks like coverage hits **the twin, again**. The row's
+own defect, one gate over, on the route being repaired — and this increment's own header comment had cited
+the twin's test as if it covered this route. **Closing two of three gates and leaving the third is how a row
+gets re-filed a month later.**
+
+### Two process findings
+
+⛔⛔ **A "read-only" subagent brief must forbid the DATABASE, not just the files.** This increment's own
+verification agent ran `php artisan test`, whose `migrate:fresh` **dropped the schema under a live mutation
+run** — three phantom failures reading `SQLSTATE[42P01]: relation "tenants" does not exist`. **Standing Rule
+7(c) reproduced inside ONE lane.** ⚠️ **The tell was the ASSERTION TOTAL, not the failure count: 856 against
+a known 867. A red run whose assertion total moved is an infrastructure event until proven otherwise.** The
+harness now aborts when another test process is alive.
+⚠️ **Fetch and check out BEFORE you read.** The claim cited the row at `:2297`; it was at `:2387`, because
+the opening greps ran against the stale branch the worktree was sitting on. **Cutting from `origin/main`
+protects the branch, not the reading you did five minutes earlier.**
+
+### What the census found, and what was already passing
+
+Re-run with the **resource** as its unit, the stored-bytes census returned **sixteen** byte-returning routes
+where M29's counted **ten**. The one that matters is filed as its own `major`:
+**`GET /admin/feedback/{feedback}/screenshot`** streams the same PII **cross-tenant from the central host**
+with no refusal test — filed with its own weakness stated, since all three console routes inherit that
+middleware from one group. ⛔ **And one candidate was already passing**: the web xlsform twin looked like a
+fourth uncovered route and has had a real scope denial since G7a — **M20's rule holding for a fourth
+increment**. What it genuinely lacked was the *role* arm, so **one** test was added rather than the four an
+unchecked assumption would have written.
+
+### Gates
+
+Local **213 passed / 1,346 assertions** across `Analytics`, `Xlsform`, `Attachments`, `Tenant`, zero
+failures, zero infrastructure errors. Pint **PASS over 1374 files**, **proven live first** by a deliberately
+misformatted probe (exit 1, file and fixers named). PHPStan local = baseline **by file list**, and
+structurally so — it covers `app`, `database`, `routes` only, and this diff is tests plus one docblock.
+Namespaces: **nothing spent** — `0022` free and still Lane A's, `2026_08_17_000111` free, no `§D`, no parity
+list moved. ⛔ **`lane-a.md` says `M29` spent `§D35` and the next free is `§D36`; it spent none — ADR-0016
+runs to `§D34` and a repo-wide grep for `§D35` returns only the two claim files. `§D35` IS FREE.**

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\AttachmentKind;
 use App\Enums\FeedbackStatus;
+use App\Enums\ScanStatus;
 use App\Models\Attachment;
 use App\Models\FeedbackReport;
 use App\Models\Tenant;
@@ -328,4 +329,36 @@ it('404s another workspace screenshot at route-model binding, before the permiss
     $this->actingAs($owner)
         ->get("http://acme.meridian.test/feedback/{$foreignReport->id}/screenshot")
         ->assertNotFound();
+});
+
+it('409s a feedback screenshot whose scan has not cleared, on the route that serves it', function (): void {
+    // M34 — the second of the two `abort_unless(...->servable(), 409)` guards. FeedbackController.php:75
+    // carries its own copy rather than routing through AttachmentController (the file says at :59-65 why),
+    // so asserting one proves nothing about the other and both are pinned.
+    //
+    // The upload path leaves a real screenshot SERVABLE — Phase-1 stores it `skipped`, which is why the
+    // test above gets a 200 on this same URI — so the quarantine state has to be set explicitly here.
+    // That 200 is this test's POSITIVE CONTROL: same fixture, same caller, same route, one column apart.
+    Storage::fake('local');
+
+    $tenant = Tenant::create(['name' => 'Acme', 'slug' => 'acme']);
+    $tenant->domains()->create(['domain' => 'acme']);
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    makeActiveMember($owner, 'owner');
+
+    $this->actingAs($owner)->post('http://acme.meridian.test/feedback', [
+        'route' => '/dashboard',
+        'remarks' => 'With a picture that has not been scanned.',
+        'screenshot' => feedbackScreenshotFile(),
+    ])->assertRedirect();
+
+    enterTenant($tenant->id, $owner->id);
+    $report = FeedbackReport::query()->whereNotNull('screenshot_attachment_id')->firstOrFail();
+    Attachment::query()->whereKey($report->screenshot_attachment_id)
+        ->update(['virus_scan_status' => ScanStatus::Infected]);
+
+    $this->actingAs($owner)
+        ->get("http://acme.meridian.test/feedback/{$report->id}/screenshot")
+        ->assertStatus(409);
 });

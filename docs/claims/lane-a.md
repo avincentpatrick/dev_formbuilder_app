@@ -96,11 +96,17 @@ M31 is a **test-only** diff, so most gates cannot move and that is stated rather
 **Two test files, no production change.** `tests/Feature/Gamification/BackfillCommandTest.php` (+67) and
 `tests/Feature/Connectors/ConnectorTokenRefreshTest.php` (+30/-1).
 
-✅ **CI 6/6 GREEN WITH REAL STEP COUNTS, PARSED INDIVIDUALLY** (run `33108016145`) — E2E **20** ·
-Static analysis **19** · Contract **16** · Frontend **12** · Pest **11** · Design-system axe **11**.
-Not one `steps: []`. **CI Pest `4597 passed / 19,439 assertions`** (2 pre-existing warnings) — **+2 tests
-and +6 assertions on M31's `4595 / 19,433`**, and it reconciles counted both ways: Gamification
-**134 / 479 → 136 / 483** (+2/+4) and the connector file **38 → 40 assertions** (+0/+2).
+✅ **CI 6/6 GREEN WITH REAL STEP COUNTS, PARSED INDIVIDUALLY, TWICE** — E2E **20** · Static analysis **19** ·
+Contract **16** · Frontend **12** · Pest **11** · Design-system axe **11**. Not one `steps: []`.
+
+⚠️ **TWO PEST NUMBERS, AND THE DIFFERENCE BETWEEN THEM IS THE OTHER LANE.** Run `33108016145`, on this branch
+**before** Lane B's `M35` merged, is the clean measurement of *this* diff: **`4597 / 19,439`** against M31's
+`4595 / 19,433` — **+2 tests and +6 assertions, reconciling counted both ways**: Gamification
+**134 / 479 → 136 / 483** (+2/+4) and the connector file **38 → 40 assertions** (+0/+2). Run `33109949970`,
+on the **merge with current `main`** and therefore the authority for what lands, reads **`4611 / 19,465`** —
+the extra **+14 tests / +26 assertions are `M35`'s**, which merged mid-flight. **A gate number that moves more
+than your own diff explains is the other lane, not a defect** — and the only way to tell them apart is to have
+measured your own branch before the merge.
 **Vitest `134 files / 2,293`** · **Storybook axe `42 / 303`** · **E2E `551 passed + 10 skipped` (17.3m),
 NO flaky line** — all three unchanged, as a PHP-test-only diff requires. **PHPStan CI `[OK]`**; local
 gates: `tests/Feature/Connectors` **246 / 932**, five host lint gates unchanged at

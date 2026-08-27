@@ -16,212 +16,203 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — M30, the guest limiter that keys on a parameter one of its five routes does not have
+## Status: NO ACTIVE CLAIM — but the forward queue `M31` and `M32` IS STILL A CLAIM
 
-**Taken 2026-08-26.** Branch `m30-guest-limiter-key`, cut from `origin/main` at `b2089aa`, PR into `main`.
-Row: the `major` under **`### Test suite & CI gates`** (heading at `docs/feature-backlog.md:2155`, row at
-`:2204`) — *the login and 2FA-challenge rate limiters are asserted by no test in the repository*.
+**`M30` is merged (PR #220, `5e58c05`, 6/6 green).** Lane A holds no *active* row. ⛔ **IT DOES STILL HOLD
+`M31` AND `M32`**, pre-claimed in the M30 claim below on Rule 7's *"the lane queue is the claim"*, and Lane
+B's `M33` release records that this nearly caused a collision: the obvious arithmetic (*"`M30` is the
+highest merged, so take `M31`"*) would have landed on a claim that was already pushed and readable.
+**Lane B read the whole file, found the queue, and took `M33` instead — the protocol worked.** Both rows are
+verified real and scoped below; the next Lane A session takes `M31` and needs no re-verification pass.
 
-**⚠️ NUMBERED `M30`, AND `lane-b.md` WAS RE-READ IMMEDIATELY BEFORE THIS FILE WAS WRITTEN, NOT AT SESSION
-OPEN.** It reads **ACTIVE CLAIM `M29`** at `b2089aa` — Lane B is building *right now*, and its claim names
-`tests/Feature/Tenant/FeedbackTest.php`, `app/Policies/AttachmentPolicy.php` and a new
-`tests/Feature/Attachments/AttachmentPolicyTest.php`. **No file in this claim is in that set.** `M29` is
-the highest number either lane has spent, so `M30` is the next free one.
+⛔⛔ **BEFORE YOU NUMBER ANYTHING: READ THE WHOLE OF `lane-b.md`, NOT ITS `## Status` LINE** — the mirror of
+what Lane B wrote here about this file, and it now binds both ways. **The highest number spent is `M33`, so
+`M34` is the next free one after this lane's own `M31`/`M32`.**
 
-⚠️ **AND LANE B WAS DETECTED BEFORE ITS CLAIM EXISTED, WHICH IS THE PROCESS FINDING OF THIS INCREMENT.**
-At session open `lane-b.md` read **NO ACTIVE CLAIM** and `git worktree list` put `fb-lane-b` on
-`ad34e62 [m26-release]`. Four minutes later the same worktree was on a branch named
-`m29-feedback-screenshot-deny` at `c7b8aae` with **zero commits and a clean tree** — the row taken, the
-number taken, and nothing yet pushed for anyone to read. Rule 7(g) is right that an unpushed claim does not
-exist; what this adds is that **the other lane's WORKTREE HEAD is observable and its claim file is not, so
-`git worktree list` is a second, earlier signal and costs one command.** Had this lane trusted the opening
-read, it would have taken the screenshot row and the number `M29`, and both lanes would have been correct.
-**Re-read at write time is necessary and was not sufficient here; the worktree check is what caught it.**
+⛔ **AND ONE SIGNAL THAT IS EARLIER THAN EITHER CLAIM FILE: `git worktree list`.** At M30's session open
+`lane-b.md` read NO ACTIVE CLAIM and the other worktree sat on `ad34e62 [m26-release]`; four minutes later
+the same worktree was on a branch named `m29-feedback-screenshot-deny` with **zero commits and a clean
+tree** — the row taken, the number taken, and nothing yet pushed for anyone to read. Rule 7(g) is right that
+an unpushed claim does not exist; what M30 adds is that **the other lane's WORKTREE HEAD is observable when
+its claim file is not.** Trusting the opening read would have taken both that row and that number.
+**Re-read at write time was necessary and NOT sufficient. One command closes the gap.**
 
-### ⛔ THE ROW IS TRUE IN ITS HEADLINE AND WRONG IN BOTH OF ITS MECHANISMS, AND VERIFYING IT FOUND A LIVE DEFECT ONE DOOR OVER
+**Namespaces after M30:** next free ADR is still **`0022`** and it is still **Lane A's** block-opener
+(`0022-0025`) — **ninth consecutive Lane A increment to spend nothing**; `0010` reserved for H1d; `#16`
+free; next free migration prefix still **`2026_08_17_000111`**. ⚠️ **ADR-0016's next free sub-decision is
+`§D36`** — M29 spent `§D35`. ⚠️ **ADR-0015 now runs to `§D10`** (M33). M30 deliberately spent **no**
+`§D<n>` at all: Lane B's `M29` was live and holding `§D35` at write time, and claiming `§D36` against an
+unmerged allocation is the one shape 7(g) cannot arbitrate — the reasoning went to
+`docs/security-threat-model.md` §4 instead, where a guest-endpoint denial-of-service row belongs anyway.
 
-Verified read-only before this claim was written, on the M28 precedent. **The row's headline holds:**
-`grep` over `tests/` for `fortify.limiters`, `RateLimiter::limiter('login'|'two-factor')`, `login.store` and
-`two-factor.login.store` returns **zero hits**. Nothing asserts either limiter, structurally or
-behaviourally. Its two stated mechanisms do not:
+### ⛔⛔ BASELINE — TWO OF THE FIVE FIGURES THE PREVIOUS HAND-OFF QUOTED WERE WRONG, BOTH LOW, AND BOTH ARE CORRECTED HERE FROM CI
 
-- ⚠️ **THE LOGIN HALF IS A DEGRADATION, NOT "UNMETERED CREDENTIAL STUFFING".** Nulling
-  `config/fortify.php:170` does drop `throttle:login` from the route — but vendor
-  `AuthenticatedSessionController.php:86` then re-inserts `EnsureLoginIsNotThrottled` into the default login
-  pipeline on exactly that condition (`config('fortify.limiters.login') ? null : EnsureLoginIsNotThrottled::class`),
-  and this app never calls `Fortify::authenticateThrough` and sets no `pipelines` key, so that branch **is**
-  reached. Fortify's own `LoginRateLimiter` then allows 5 *failed* attempts per minute on `lower(email)|ip`
-  — byte-for-byte the key `FortifyServiceProvider.php:160` builds. All-requests → failures-only is worth a
-  test; it is not the row's claim.
-- ⛔ **THE RENAME MUTATION IS ALREADY COVERED, LOUDLY, AND THE ROW INHERITED ITS PREMISE FROM A STALE
-  COMMENT.** On `laravel/framework` v13.18.1 an unregistered named limiter does **not** pass through
-  unlimited: `ThrottleRequests::resolveMaxAttempts()` throws `MissingRateLimiterException`. Renaming either
-  `RateLimiter::for()` 500s every login POST and reddens `tests/Feature/Auth/AuthenticationTest.php:48` and
-  `tests/Feature/Auth/TwoFactorChallengeTest.php:174` today. The *"resolves to an UNLIMITED PASSTHROUGH"*
-  rationale the row quotes lives at `tests/Feature/Sso/SsoLoginWebTest.php:286-287` and again at
-  `SsoLoginCompletionWebTest.php:466-469`; it was true on Laravel ≤9 and is false here. **A test written to
-  the row's stated rationale would be aimed at a mutation the suite already catches.**
-- ✅ **WHAT SURVIVES IS THE SEVERE HALF.** `throttle:two-factor` is the **only** bound on guessing a
-  6-digit TOTP or a recovery code: vendor `TwoFactorAuthenticatedSessionController::store()` counts
-  nothing, `TwoFactorLoginRequest` counts nothing, and `app/` registers no `Lockout` or
-  `TwoFactorAuthenticationFailed` listener. Nulling `config/fortify.php:171` removes it and **nothing goes
-  red**. That is the row's real content.
+**Every figure below is read out of a CI log, not carried forward.** Measured on `origin/main` after
+`M30` (run `33026093781`, the PR run whose merge base already contained `M29` and `M33`):
 
-### ⛔⛔ AND THE SWEEP FOUND A LIVE DEFECT THE ROW DOES NOT NAME — ONE GLOBAL RATE-LIMIT BUCKET FOR THE WHOLE DEPLOYMENT
+- **CI Pest `4580 passed / 19,383 assertions`** (2 pre-existing warnings). ⚠️ **The post-M28 hand-off said
+  `4544`, which was THIRTEEN LOW** — Lane B caught it on M29 and it is corrected here too. The chain now
+  reconciles to the test: M29's merge run `4564 / 19,345` → M33's PR run `4575 / 19,359` (+11) → M30
+  `4580 / 19,383` (**+5 tests, +24 assertions — exactly** RateLimiterBindingTest's four cases at 18
+  assertions plus GuestDraftRuntimeTest's one at 6).
+- **Vitest `134 files / 2,293`.** ⚠️ **The post-M28 hand-off said `2,292`, which was ONE LOW.** M30 touches
+  no JavaScript, so the `+1` looked like the other lane — and it was neither lane: **the M29 release run on
+  `main`, which contains no code from either M30 or M33, already read `134 / 2,293`.** Chased rather than
+  attributed, because a gate number nobody can explain is the one that hides the next defect. ⛔ **TWO
+  STALE BASELINES IN ONE HAND-OFF IS A PATTERN, NOT AN ACCIDENT: quote gate numbers out of a CI LOG, never
+  out of the previous hand-off.**
+- **Storybook axe `42 suites / 303`** · **E2E `551 passed + 10 skipped, no flaky line`** (17.6m) ·
+  **PHPStan CI `[OK]`**, local **18 = baseline, zero delta by FILE LIST** · **FIVE** host lint gates
+  **97 · 113 · 31 · 113/121/0 · 180** · **`openapi.json` byte-identical**, `cmp`'d against a fresh
+  `scramble:export`.
 
-`RateLimiter::for('guest')` (`app/Providers/AppServiceProvider.php:365-370`) keys its per-token `Limit` on
-`'gtok:'.hash('sha256', (string) $request->route('shareToken'))`. **MEASURED from the live route table**
-(`artisan route:list --json`, filtered on `ThrottleRequests:` because the command prints the resolved class
-and not the alias — the M13 lesson): exactly **five** routes carry `throttle:guest`. Four have a
-`{shareToken}` segment. The fifth is `GET api/v1/public/drafts/{resumeToken}`
-(`api.v1.public.drafts.resume`, declared `routes/api.php:549` under the group throttle at `:541`), whose
-parameter is named `resumeToken`.
+⚠️ **A LOCAL FULL-SUITE PEST NUMBER IS NOT THE CI NUMBER AND MUST NEVER BE QUOTED AS ONE** — Lane B measured
+the gap at **335 tests** on one tree (local 4229, CI 4564). M30's local figures are per-directory deltas
+only: `tests/Feature/Auth` **127 → 131 / 615 → 633**, `tests/Feature/Guest` **77 / 319**,
+`tests/Feature/Submissions`+`Forms` **805 / 3,147**.
 
-On that one route `$request->route('shareToken')` is **null**, `(string) null` is `''`, and the key is
-`hash('sha256', '')` — **a constant**. Every draft-resume request in the entire deployment, across every
-tenant, shares **one** bucket at `submit_per_token` = 30/min (`config/guest.php:39`).
+---
 
-⚠️ **THE MIDDLEWARE ORDER IS WHAT MAKES IT REACHABLE RATHER THAN THEORETICAL, AND IT WAS MEASURED, NOT
-ASSUMED.** On that route the order is `[0] ThrottleRequests:guest`, `[1] EstablishGuestDraftContext`,
-`[2] EnforceTenantMaintenance`, `[3] SubstituteBindings`, `[4] RequireFeature:save_and_resume`. The
-throttle is **index 0** — so an anonymous request carrying a **garbage** resume token spends the shared
-budget before the token is verified, before tenancy is established, and before the paid-feature gate. The
-per-IP half of the same limiter allows 60/min, so a single IP can spend the 31 requests needed to 429 every
-legitimate resume link platform-wide, unauthenticated and for free. `EnforceGuestFormRateLimit` — the
-per-form limiter — is **not** on this route, so nothing mitigates it downstream.
+## RELEASED — M30, the guest limiter that keys on a parameter one of its five routes does not have (merged as PR #220, `5e58c05`, 6/6 green)
 
-⚠️ **THE COMMENT ABOVE THE CLOSURE IS THE TELL, AND IT IS HONEST RATHER THAN WRONG.**
-`AppServiceProvider.php:363` says *"Keyed on the raw {shareToken} string"* — accurate when F5 wrote it and
-every route on this limiter carried that parameter. The resume group (Group C, `routes/api.php:538-550`)
-was added later, deliberately reusing `throttle:guest` because it is *"the same gate as the draft-save
-channel"*, and reused the limiter without reading what it keys on. **A limiter's key is a contract with the
-route's parameter NAMES, and nothing in this repository expressed it.**
+**CI 6/6 with real step counts, parsed individually rather than trusted from a tick:** E2E **20** · Pest
+**11** · Static analysis **19** · Contract **16** · Design-system axe **11** · Frontend **12**. Not one
+`steps: []`.
 
-### ⛔ NAMESPACES — THIS CLAIM SPENDS NOTHING
+⚠️ **THE FIRST CI RUN WAS A ZOMBIE AND WAITING ON IT WOULD HAVE COST THE SESSION.** Run `32985770877` sat
+**queued for 8h53m and never started a single job**, while runs *submitted later* on other branches
+completed normally — so it was not a busy queue, it was an orphaned run. Lane B recorded the same outage
+shape on M29 (three runs failed or sat queued 30–57 minutes with empty job lists). ⛔ **THE TELL THAT
+SEPARATES "BUSY" FROM "DEAD" IS A LATER RUN FINISHING FIRST**, and it costs one `gh run list`. The fix was
+to merge current `main` into the branch and push — which restarted CI on a fresh run *and* picked up M29 and
+M33 — rather than to keep waiting. **Merging `main` in was also what avoided a force-push:** rebasing a
+pushed branch would have needed one, and this repository's standing instruction is never to force.
 
-**No ADR.** `0022` stays free and stays Lane A's block-opener (`0022-0025`) — **ninth consecutive Lane A
-increment to spend nothing.** **No `ADR-0016 §D<n>` DELIBERATELY, AND THE REASON IS A RACE RATHER THAN A
-JUDGEMENT:** Lane B's live `M29` claim takes **`§D35`**, so this lane taking `§D36` against an unmerged
-allocation is reading-the-maximum-is-not-a-reservation in the one shape 7(g) cannot arbitrate. The
-reasoning lands in `docs/security-threat-model.md` §4 beside the other guest-endpoint rows, where a
-denial-of-service finding on a guest route belongs anyway. **No migration** (`2026_08_17_000111` stays
-free). **No new ability, no new permission key, no new `NotificationType`** — so `ShellAbilityParityTest`
-and `NotificationTypeParityTest` both stay still. `0010` stays reserved for H1d; `#16` stays free.
+### What was actually wrong
 
-**PAIRED FILES: NONE MOVE.** The two `resources/`-scanning gates
-(`clipped-node-containment.test.ts`, `token-references.test.ts`) read `resources/**`,
-`packages/design-system/src` and `resources/public-runtime`; **this claim touches none of those trees** — no
-`.vue`, no `.ts`, no CSS, and no `tests/e2e/` spec.
+**The row was a coverage gap; the sweep found a live defect one door over.** `RateLimiter::for('guest')`
+keyed its per-token `Limit` on `'gtok:'.hash('sha256', (string) $request->route('shareToken'))`. **MEASURED
+from the live route table** — matched on the resolved `ThrottleRequests` class rather than the printed
+alias, M13's lesson reused — five routes carry `throttle:guest`, four declare `{shareToken}`, and
+`GET /api/v1/public/drafts/{resumeToken}` does not. A parameter a route does not declare reads back null,
+`(string) null` is `''`, `hash('sha256', '')` is a **constant**, and every draft-resume request in the
+deployment across every tenant shared **one** bucket at 30/min.
 
-⚠️ **`openapi.json` IS CLAIMED BECAUSE IT MIGHT MOVE, AND THE PREDICTION IS THAT IT WILL NOT — WRITTEN DOWN
-BEFORE THE FILE IS OPENED SO THE MEASUREMENT HAS SOMETHING TO DISAGREE WITH (the M13/M14 rule).** The
-affected route *is* under `/api/v1`, which is the trigger condition. But Scramble infers from a
-**controller's own returns**, and a 429 is produced by route middleware that no controller mentions; this
-increment edits a `RateLimiter::for()` closure in a service provider and adds no route, no controller
-return and no exception. Expect byte-identical, and `cmp` it rather than assert it.
+⚠️ **THE MIDDLEWARE ORDER IS WHAT MADE IT REACHABLE RATHER THAN THEORETICAL, AND IT WAS MEASURED.** On that
+route the throttle is index **0**, ahead of `EstablishGuestDraftContext`, `SubstituteBindings` and
+`RequireFeature:save_and_resume` — so a **garbage** token spent the shared budget before the token was
+verified, before tenancy existed, and before the paid-feature gate. The per-IP arm allows 60/min, so one
+unauthenticated IP could spend the 31 requests needed to 429 **every legitimate resume link platform-wide**,
+indefinitely and for free. `EnforceGuestFormRateLimit` is not on that route.
 
-### Every file this claim touches, named before it is opened
+⛔ **NEITHER CHANGE THAT CAUSED IT WAS WRONG ON ITS OWN, AND THAT IS THE TRANSFERABLE PART.** F5's comment
+said *"Keyed on the raw {shareToken} string"* and was accurate when every route on the limiter carried that
+segment. H9b's resume group then reused `throttle:guest` **correctly** — it is the same gate as the
+draft-save channel — and reused a key that had silently stopped applying. **A limiter's key is a contract
+with the route's parameter NAMES, and nothing in this repository expressed it.** ⚠️ **Generalised: any
+middleware alias that reads `$request->route('<literal>')` is coupled to every route that will ever carry
+it, and that coupling is invisible at both ends.**
 
-**Lane B's column under 7(b)'s widened statement — claimed here, and this claim is the permission:**
-- `app/Providers/AppServiceProvider.php` — the `guest` limiter closure and its comment. **The only
-  production file in this increment.** Not in Lane B's `M29` claim, which was re-read at write time.
+### The row's headline held and BOTH of its mechanisms failed — the first time a row has been wrong in the SAFE direction
 
-**PHP tests (Lane B's column by the same statement; claimed):**
-- `tests/Feature/Guest/GuestRuntimeTest.php` — behavioural cases, extending the file's own
-  `config([...])`-then-hit-twice idiom already at `:460-481`.
-- `tests/Feature/Auth/RateLimiterBindingTest.php` — **NEW.** The structural half: the two Fortify limiters
-  are registered *and* bound to their routes, and — on the `GroupBPolicyGateTest` precedent (M13) — a walk
-  of the **live route table** asserting every route on `throttle:guest` carries a parameter the limiter
-  actually reads, so the sixth route cannot collapse the key silently the way the fifth did.
+Corrected against the vendor source for the version actually installed, not argued.
 
-**Shared, claimed and never owned:**
-- `docs/security-threat-model.md` — §4 (Guest/Public Endpoint Attack Surface), one row.
-- `docs/feature-backlog.md` — this row only, rewritten to as-built, plus every finding deliberately left.
-- `docs/claims/lane-a.md` · `PROGRESS.md` (Lane A's block and hand-off line only).
-- `openapi.json` — claimed as above; expected untouched.
+- **(a) "unmetered credential stuffing" is a DEGRADATION.** Nulling `fortify.limiters.login` drops
+  `throttle:login`, but vendor `AuthenticatedSessionController.php:86` re-inserts `EnsureLoginIsNotThrottled`
+  into the default pipeline on exactly that condition, and this app sets no `pipelines` key and never calls
+  `Fortify::authenticateThrough`, so the branch **is** reached — 5 *failed* attempts/min on
+  `lower(email)|ip`, byte-for-byte the key `FortifyServiceProvider.php:160` builds.
+- **(b) THE RENAME MUTATION IS ALREADY COVERED, LOUDLY.** On `laravel/framework` v13.18.1
+  `ThrottleRequests::resolveMaxAttempts()` throws `MissingRateLimiterException` for an unregistered name, so
+  a rename 500s every login POST and reddens `AuthenticationTest.php:48` and `TwoFactorChallengeTest.php:174`
+  today. **The row inherited its "resolves to an UNLIMITED PASSTHROUGH" premise from
+  `SsoLoginWebTest.php:286`, which was true on Laravel ≤ 9 and is false here.** ⛔ **A test written to the
+  row's stated rationale would have been aimed at a mutation the suite already catches — READ THE VENDOR
+  SOURCE FOR THE VERSION INSTALLED; A PROJECT'S OWN COMMENT IS NOT A CITATION.**
+- **(c) What survives is the severe half.** `throttle:two-factor` is the **only** bound on guessing a
+  6-digit TOTP or a recovery code: the vendor controller counts nothing, `TwoFactorLoginRequest` counts
+  nothing, and `app/` registers no `Lockout` or `TwoFactorAuthenticationFailed` listener.
 
-⚠️ **CLAIM CORRECTED BEFORE THE FIRST FILE WAS OPENED FOR EDIT — the behavioural test moves from
-`tests/Feature/Guest/GuestRuntimeTest.php` to `tests/Feature/Guest/GuestDraftRuntimeTest.php`.** The
-original line was reasoned from where the *existing rate-limit cases* live (`GuestRuntimeTest.php:460-481`,
-the mint and submit 429s) rather than from where the *affected route* is driven. `GuestDraftRuntimeTest.php`
-owns `GET /api/v1/public/drafts/{resumeToken}` — its own section header at `:203`, eight call sites, and the
-`draftFixture()` helper at `:86` that mints a real resume token through the save channel. Putting the case
-anywhere else would mean re-deriving that fixture. **`GuestRuntimeTest.php` is released untouched.**
+### The gate asks the question instead of checking a list
 
-⚠️ **AND THE STRUCTURAL GATE'S SHAPE CHANGED WITH IT, WHICH IS THE MORE IMPORTANT CORRECTION.** The claim
-described asserting *"every route on `throttle:guest` carries a parameter the limiter actually reads"* —
-which requires the test to hold its own copy of the parameter-name list, i.e. the paired-list defect 7(b-bis)
-exists to warn about, one file later. **It instead invokes the limiter**: for each route bound to
-`throttle:guest`, bind two synthetic requests carrying two different token values and assert the two
-resulting bucket keys **differ**. That asks the question the defect is actually about — *does this route's
-traffic share a bucket with everyone else's* — and it cannot drift, because there is no list to keep in
-step. A sixth route with a third parameter name reddens it without the test knowing the name.
+`tests/Feature/Auth/RateLimiterBindingTest.php` **invokes** the limiter for every live route bound to it,
+with two different token values, and asserts the two bucket keys differ. Holding its own copy of the
+parameter names would have reproduced 7(b-bis)'s paired-list hazard one file later; as written **a sixth
+route with a third parameter name reddens it without the test knowing the name.** The production fallback
+keys on the IP so a future mismatch is per-caller rather than deployment-wide — **a floor, not the design** —
+and a second case fails if any live route ever reaches it, because the set comparison cannot see two
+IP-keyed arms differing from nothing.
 
-### ⛔ THREE FINDINGS THIS INCREMENT DELIBERATELY DOES NOT FIX, FILED IN THE BACKLOG THE MOMENT THE DECISION IS TAKEN
+### ⛔ FOUR POSITIVE CONTROLS, EACH RESTORED BY sha256 BYTE COMPARISON — AND ONE FOUND A VACUOUS TEST A GREEN RUN WOULD HAVE SHIPPED
 
-The J4b1 rule: a deliberately-unfixed finding that exists only in a session transcript is invisible to every
-later backlog search. All three were **measured** during this claim's read-only pass.
+| Control | Result |
+|---|---|
+| **C1** drop the `resumeToken` arm | key case reddens, **naming `api/v1/public/drafts/{resumeToken}`** |
+| **C2** null `fortify.limiters.two-factor` | binding case reddens; **registration case stays GREEN**, proving the two measure different facts |
+| **C3** mistyped limiter name in the route walk | non-vacuity guard fires with its own message |
+| **C4** pre-M30 key vs the behavioural case | fails at exactly the third request, and **only** that case in a 31-case file |
 
-1. **`POST /user/confirm-password` carries no throttle at all** — live middleware measured as
-   `[web, RequirePlatformHost, AppSecurityHeaders, GateRegistration, Authenticate:web, EstablishTenantDatabaseContext]`.
-   Vendor `ConfirmablePasswordController::store()` counts nothing and `app/` registers no listener for it.
-   It is unlimited online password guessing against an authenticated session, and it is the redemption door
-   for this app's own step-up gate (`RequireRecentPassword`, pinned by `StepUpReauthenticationTest:135-147`
-   over seven member/admin routes). **The asymmetry is what makes it a defect rather than a decision:** the
-   SAML step-up path is bounded (`throttle:saml-step-up`) and `POST /two-factor-challenge` is bounded — the
-   password step-up path, verifying the same credential to unlock the same actions, is not. **Left because
-   it is a new limiter on a route this increment does not otherwise touch, i.e. its own row.**
-2. **`throttle:saml-acs`'s route BINDING is unasserted** while its registration is. `SsoLoginWebTest:285-291`
-   asserts six limiter names exist — which stays green when the binding at `routes/tenant.php:1172` is
-   deleted. Its four siblings all carry a positive `toContain('throttle:…')` assertion; this one does not.
-   **Left because `tests/Feature/Sso/` is Lane B's most active subsystem and this lane is crossing the
-   boundary already.**
-3. **The *"resolves to an UNLIMITED PASSTHROUGH"* rationale is false on this framework version**, in two
-   files (`SsoLoginWebTest.php:286-287`, `SsoLoginCompletionWebTest.php:466-469`). The tests it justifies
-   are still worth having; the stated reason is not the true one, and a false claim about a control stops
-   the next reader looking. **Left for the same boundary reason as (2), and filed so the correction is not
-   lost.**
+⛔⛔ **C1 IS WHY THE IP-FALLBACK CASE EXISTS IN WORKING FORM. Its first draft was
+`->not->toContain($key, $message)` and stayed GREEN with the offending key sitting in the array, because
+PEST'S `toContain` TAKES VARIADIC NEEDLES, NOT A NEEDLE AND A MESSAGE** — the explanatory sentence was being
+asserted as a second thing the array should not contain. The probe that caught it dumped the actual keys;
+the exit code alone said nothing. **Third increment running where the control was worth more than the fix,
+and a second instance of the standing rule that a control which only checks the exit code is half a
+control.** ⚠️ **Check the SIGNATURE of any expectation you pass a message to** — `toBe`, `toBeFalse` and
+`toBeGreaterThanOrEqual` take one; `toContain` does not.
 
-### THE QUEUE BEHIND IT — `M31` AND `M32`, CLAIMED NOW RATHER THAN WHEN THEY START
+⚠️ **THE BEHAVIOURAL CASE'S DISCRIMINATING ASSERTION IS THE THIRD REQUEST, NOT THE 429.** A case that
+exhausts one token and asserts 429 passes on the **broken** code too — the global bucket 429s more eagerly,
+not less. Only *"a second, unrelated resume token is still served"* separates the two.
 
-⚠️ **BECAUSE LANE B IS TAKING ROWS FROM THIS EXACT SECTION RIGHT NOW.** `M29` is the third `major` under
-`### Test suite & CI gates`; these are the other two. Rule 7's *"the lane queue is the claim"* makes a
-declared queue legitimate, and leaving them unclaimed while the other lane pulls from the same heading is
-how two lanes each read the map correctly and still collide. Both are verified real, read-only, this
-session:
+**THE FILE RECORD.** Amended: `app/Providers/AppServiceProvider.php` · `tests/Feature/Guest/GuestDraftRuntimeTest.php`
+· `docs/security-threat-model.md` (§4, one row) · `docs/feature-backlog.md` · `docs/claims/lane-a.md` ·
+`PROGRESS.md`. New: `tests/Feature/Auth/RateLimiterBindingTest.php`. **Every claimed file was edited except
+`openapi.json`**, which was claimed because it might move and predicted in writing not to — the M8/M11/M14
+shape recurring by design, and the prediction held.
 
-- **`M31`** — *every accepted write in the answer-edit concurrency suite compares `null === null`*
-  (`:2211`). **REAL, and the row is precise.** Traced every hop: `SubmissionAnswerFactory` stamps no
+### ➕ THREE FINDINGS FILED, NOT FIXED, AT THE MOMENT THE DECISION WAS TAKEN
+
+All three are in `docs/feature-backlog.md` under `### Test suite & CI gates`, per the J4b1 rule that a
+deliberately-unfixed finding living only in a transcript is invisible to every later backlog search.
+
+1. **`POST /user/confirm-password` carries no rate limit at all** — `major`, **LIVE**. Unlimited online
+   password guessing against an authenticated session, on the redemption door for `RequireRecentPassword`,
+   which `StepUpReauthenticationTest.php:135-147` pins over seven member/admin routes. **The asymmetry is
+   the argument:** SAML step-up and `POST /two-factor-challenge` are both bounded; the password step-up
+   path, verifying the same credential to unlock the same actions, is not. `routesThrottledBy()` in the new
+   test file is the helper it wants. **The strongest single row M30 leaves behind.**
+2. **`throttle:saml-acs`'s route BINDING is unasserted** while its registration is — an asymmetry inside the
+   very test family the closed row held up as its model.
+3. **The *"UNLIMITED PASSTHROUGH"* rationale is false on this framework version**, in two SSO test files.
+
+(2) and (3) were left because `tests/Feature/Sso/` is Lane B's most active subsystem and M30 already crossed
+the lane boundary once.
+
+### THE QUEUE STILL HELD — `M31` AND `M32`, VERIFIED THIS SESSION AND NEEDING NO SECOND PASS
+
+- **`M31`** — *every accepted write in the answer-edit concurrency suite compares `null === null`*.
+  **REAL, and the row is precise.** Every hop traced: `SubmissionAnswerFactory` stamps no
   `answers_content_checksum`, `baselineOf()` casts to `''`, `ConvertEmptyStringsToNull` turns it back to
   `null`, and all **three** accepted writes reach `SubmissionAnswerEditService.php:135` with null on both
-  sides. ⚠️ **One sharpening the row does not have: DELETING the guard outright IS caught** (editor B
+  sides. ⚠️ **ONE SHARPENING THE ROW DOES NOT HAVE: DELETING the guard outright IS caught** — editor B
   re-reads `$stored` at `:114`, so the under-lock check at `:202` compares a value against itself and B's
-  write is accepted, reddening three cases). The suite is blind to **weakening** the comparison, not to
-  removing it — so the test owed is a real-checksum comparison, not another deletion probe. Files:
-  `tests/Feature/Submissions/SubmissionAnswerEditTest.php`, `tests/Feature/Submissions/SubmissionEditRoutesTest.php`,
-  possibly `database/factories/SubmissionAnswerFactory.php`.
-- **`M32`** — *the queued half of `gamification:backfill` is asserted by job count alone* (`:2228`).
+  write is accepted, reddening three cases. The suite is blind to **weakening** the comparison, not to
+  removing it, **so the test owed is a real-checksum comparison, not another deletion probe.** The file's
+  own `submitForEdit()` helper already produces production-shaped rows and no concurrency case uses it.
+  Files: `tests/Feature/Submissions/SubmissionAnswerEditTest.php`,
+  `tests/Feature/Submissions/SubmissionEditRoutesTest.php`, possibly
+  `database/factories/SubmissionAnswerFactory.php`.
+- **`M32`** — *the queued half of `gamification:backfill` is asserted by job count alone*.
   **REAL, and the row's own prescribed fix does not work.** `Queue::assertPushed($class, $closure)` is
   *"at least one match"*, so the literal reading — one closure asserting the id is one of the two — stays
   **green** under the silent mutation. It needs one closure **per expected id**, with the existing count
-  assertion **kept** (it is the one mutation the test catches today). ⚠️ **A second instance the row does
-  not name:** `tests/Feature/Connectors/ConnectorTokenRefreshTest.php:188-196` fakes the child and asserts
-  `Bus::assertDispatchedTimes(…, 2)` with no payload — the identical hole. Six sibling maintenance fan-outs
-  were checked individually and are **not** defects (they drain the child and assert a DB effect), which is
-  M20's *a character-identical declaration is not an identical defect* holding for a third increment.
-
-**Baseline on `origin/main` after M28, every figure from CI rather than quoted:** CI Pest **4544 /
-19,280** · Vitest **134 files / 2,292** (design-system **36/574** · resources/js **62/899** ·
-public-runtime **36/819**) · Storybook axe **42 suites / 303** · E2E **551 passed + 10 skipped, no flaky
-line** · PHPStan CI `[OK]` · **FIVE** host lint gates **97 · 113 · 31 · 113/121/0 · 180** ·
-`openapi.json` byte-identical.
-
-**Local per-directory Pest baselines measured on `b2089aa` before any file was opened**, so this
-increment's delta is a subtraction rather than a recollection: `tests/Feature/Gamification` **134 passed /
-479 assertions** · `tests/Feature/Submissions` **415 / 1,652** · `tests/Feature/Auth` **127 / 615**.
-⚠️ These are LOCAL numbers against a hybrid dev database and are **not** CI's — they are here to measure a
-delta, never to be reported as a suite total.
-
+  assertion **KEPT**, because a deleted loop is the one mutation the test catches today. ⚠️ **A second
+  instance the row does not name:** `tests/Feature/Connectors/ConnectorTokenRefreshTest.php:188-196` fakes
+  the child and asserts `Bus::assertDispatchedTimes(…, 2)` with no payload — the identical hole. Six sibling
+  maintenance fan-outs were checked **individually** and are **not** defects (they drain the child and
+  assert a DB effect), which is M20's *a character-identical declaration is not an identical defect* holding
+  for a third increment. Local baseline `tests/Feature/Gamification` **134 / 479**.
 ---
 
 ---

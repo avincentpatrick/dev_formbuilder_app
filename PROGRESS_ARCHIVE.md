@@ -4820,3 +4820,53 @@ not "measured".
 `check-runs: total_count 0` across **two different head shas** for ~25 minutes before a run appeared on its
 own. *"No checks reported"* is **pending, not a result**, and `gh api .../commits/<sha>/check-runs` is what
 separates "never created" from "queued". Waiting was correct.
+
+### 2026-08-26/27 — Lane A, `M30`: the guest limiter keyed on a parameter one of its five routes does not have (PR #220, `5e58c05`, 6/6 green)
+
+Row: the `major` under `### Test suite & CI gates` — *the login and 2FA-challenge rate limiters are asserted
+by no test*. **The row was a coverage gap and verifying it found a LIVE defect one door over.**
+`RateLimiter::for('guest')` keyed its per-token `Limit` on `route('shareToken')`; measured from the live
+route table, five routes carry `throttle:guest`, four declare `{shareToken}`, and
+`GET /api/v1/public/drafts/{resumeToken}` does not — so `(string) null` is `''`, `hash('sha256','')` is a
+constant, and **every draft-resume request in the deployment shared one 30/min bucket**. The throttle is
+middleware index 0 there, so a garbage token spent the budget before anything verified it, and the per-IP
+arm's 60/min let one unauthenticated IP refuse every legitimate resume link platform-wide for free.
+
+**Neither change that caused it was wrong on its own** — F5's key was accurate when every route on the
+limiter carried `{shareToken}`, and H9b's resume group reused `throttle:guest` correctly. **A limiter's key
+is a contract with the route's parameter NAMES, and nothing expressed it.** Generalised: any middleware
+alias reading `$request->route('<literal>')` is coupled to every route that will ever carry it, invisibly at
+both ends.
+
+**Both of the row's mechanisms were wrong on the installed framework version**, and it had inherited its
+*"resolves to an UNLIMITED PASSTHROUGH"* premise from this repository's own `SsoLoginWebTest.php:286` — true
+on Laravel ≤ 9, false on v13.18.1, where an unregistered limiter throws `MissingRateLimiterException`. A
+test written to the row's rationale would have targeted a mutation the suite already catches. **Read the
+vendor source for the version installed; a project's own comment is not a citation.**
+
+**Four positive controls, each restored by sha256 byte comparison, and one found a vacuous test a green run
+would have shipped:** the IP-fallback case's first draft was `->not->toContain($key, $message)` and stayed
+GREEN with the offending key in the array, because **Pest's `toContain` takes variadic needles, not a needle
+and a message.** Only reading what the control printed caught it. The structural gate **invokes** the
+limiter per live route and asserts two tokens yield two keys, rather than holding its own copy of the
+parameter names — which would have been 7(b-bis)'s paired-list hazard one file later.
+
+**Protocol findings.** (a) Lane B was detected four minutes into an increment whose claim file still read
+NO ACTIVE CLAIM, via `git worktree list` — **the other lane's worktree HEAD is observable when its claim
+file is not**; re-reading at write time was necessary and not sufficient. (b) Lane A's forward queue
+(`M31`, `M32`) was pre-claimed in writing and **Lane B read the whole file, found it, and took `M33`** —
+the obvious arithmetic would have collided. (c) The first CI run was a **zombie**: queued 8h53m with no job
+ever started while later runs passed; the tell is a later run finishing first, and merging current `main`
+into the branch restarted it while also avoiding the force-push a rebase would have needed.
+
+**Filed, not fixed:** `POST /user/confirm-password` carries **no rate limit at all** (`major`, live —
+unlimited online password guessing on the redemption door for `RequireRecentPassword`, while SAML step-up
+and `POST /two-factor-challenge` are both bounded); `throttle:saml-acs`'s route binding is unasserted; and
+the false passthrough rationale in two SSO files.
+
+**Gates (CI run `33026093781`):** Pest **4580 / 19,383**, reconciling exactly — M29's `4564 / 19,345` →
+M33's `4575 / 19,359` → **+5 tests, +24 assertions**, precisely this increment's. Vitest **134 / 2,293**,
+E2E **551 + 10 skipped, no flaky**, axe **42 / 303**, PHPStan CI `[OK]`, `openapi.json` byte-identical.
+⚠️ **Two figures in the previous hand-off were stale and low — Pest by 13, Vitest by 1** — so gate numbers
+are now quoted out of a CI log, never out of a hand-off. Namespaces: nothing spent; `0022` still free and
+still Lane A's block-opener, ninth consecutive.

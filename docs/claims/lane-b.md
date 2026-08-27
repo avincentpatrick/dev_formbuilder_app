@@ -18,92 +18,158 @@ exact-equality `KNOWN_UNGUARDED` assertion, so the list shrinks in the *same* PR
 
 ---
 
-## Status: ACTIVE CLAIM — `M35`, the super-admin console gate asserted by a hand-written list of three route names
+## Status: NO ACTIVE CLAIM
 
-**Taken 2026-08-27.** Branch `m35-admin-console-gate-walk`, cut from `origin/main` at `6714d20`, PR into `main`.
-Row: the `major` under **Test suite & CI gates** in `docs/feature-backlog.md:2470` — *`GET /admin/feedback/{feedback}/screenshot`
-streams cross-tenant PII from the central host and no test asserts a refusal on it* — **plus the sibling
-finding the same row states in its closing paragraph**, which is the larger half and is taken with it.
+**Lane B holds nothing as of 2026-08-27.** `M29` (PR #219, `7892f7f`), `M33` (PR #221, `f329e1b`), `M34`
+(PR #222, `b6adb2e`) and `M35` (PR #224) are merged and released. Their entries follow.
 
-⛔⛔ **NUMBERED `M35` AFTER READING THE WHOLE OF `lane-a.md` AND RUNNING `git worktree list`.** Lane A's file
-reads **ACTIVE CLAIM `M31`** (branch `m31-answer-edit-checksum`, cut at `659c6ca`) and its body **pre-claims
-`M32`** behind it in writing — a forward queue is a claim and does not live under the `## Status` heading.
-`git worktree list` agrees: `c:\laragon\www\dev_formbuilder_app` sits on `m31-answer-edit-checksum`.
-**`M35` is the next free number**; `M31` and `M32` are Lane A's and are not mine to take.
+⛔⛔ **BEFORE YOU NUMBER ANYTHING: READ THE WHOLE OF `lane-a.md`, NOT ITS `## Status` LINE.** A lane's
+forward queue is a claim and it does not live under that heading — `M33` learned it, `M35` reconfirmed it.
+At `M35`'s close `lane-a.md` reads **ACTIVE CLAIM `M32`** and, in its own words, *"the highest number spent
+is `M35`, so `M36` is the next free one after this"*. **`M36` IS THE NEXT FREE NUMBER.** ⛔ **AND RUN
+`git worktree list` TOO** — three consecutive increments had the number decided by the worktree rather than
+by the claim files, in both directions.
 
-**Namespaces this claim spends: NOTHING.** No ADR (`0022` free, and it stays Lane A's block-opener). No
-migration (`2026_08_17_000111` free). No `§D<n>` anywhere. `0010` stays reserved for H1d; `#16` free.
+✅ **THE `§D35` CORRECTION LANDED, AND THE DIRECTION IT TRAVELLED IS THE POINT.** `M34` wrote into this file
+that `lane-a.md:43` was wrong — `M29` spent no `§D` at all, ADR-0016 runs to `§D34` — because Lane B may not
+edit `lane-a.md`. The next Lane A session **read it, verified it independently, and corrected its own file**:
+`lane-a.md` now states `§D35` free. The rule that prevents number collisions is what carried a correction
+across a boundary neither lane may write through. **A reserved-then-released allocation is exactly the shape
+that rots into a phantom, because the reservation is loud and the release is quiet.**
 
-⚠️ **AND THE `§D35` CORRECTION IN THE BLOCK BELOW IS RE-VERIFIED THIS SESSION RATHER THAN CARRIED.**
-`docs/adr/0016-saml-sso.md` runs to **`§D34`**; a repository-wide grep for the next number returns **only the
-two claim files and `PROGRESS.md` arguing about it**. Nothing has spent it. It is free, and it is still the
-wrong home for almost every row — ADR-0016 is SAML SSO.
+---
 
-### Every file this claim touches, named before it is opened
+## RELEASED — M35, a super-admin console gated by a hand-written list of three route names (merged as PR #224)
 
-- `tests/Feature/Admin/AdminConsoleGateTest.php` — **NEW.** The route-table walk: every route under the
-  `admin/` prefix, discovered rather than listed.
-- `tests/Feature/Auth/StepUpReauthenticationTest.php` — `:135-146`, the hand-maintained manifest whose
-  comment claims it covers every page of the console and which names three of the fourteen.
-- `tests/Feature/Feedback/FeedbackConsoleTest.php` — the behavioural denials on the screenshot route, and
-  the positive control they need in order not to be vacuous.
-- `tests/Pest.php` — the shared console-route helper, and an extension to the committed-fixture purge if the
-  positive control commits an `attachments` row. **Claimed because it will probably be written to; released
-  untouched and said so if it is not.**
-- `docs/feature-backlog.md` (this row only), `docs/claims/lane-b.md`, `PROGRESS.md` (Lane B's block and Lane
-  B's hand-off line only).
+**Shipped 2026-08-27.** Branch `m35-admin-console-gate-walk`. Row closed in `docs/feature-backlog.md` as its
+own micro-commit.
 
-**Claimed for the MUTATION ONLY, reverted by byte comparison before the PR opens:** `routes/admin.php`. It is
-the subject of both controls and appears in no diff.
+### ⛔ THE ROW WAS RIGHT, AND ITS OWN STATED WEAKNESS WAS THE PART WORTH BUILDING FOR
 
-**Read-only, not edited:** `app/Http/Controllers/Admin/FeedbackConsoleController.php`,
-`app/Services/Admin/SuperAdminService.php`, `app/Http/Middleware/EnsureSuperAdmin.php`,
-`app/Http/Middleware/EnsureSuperAdminMfa.php`, `app/Http/Middleware/RequireRecentPassword.php`.
-**The production code is correct** — the console's four gates are all present on all fourteen routes,
-measured from the live route table this session. This row is a coverage gap, not a fix.
+Every citation exact — **third row running**. `routes/admin.php:83-84`; the index's three denials at
+`FeedbackConsoleTest.php:153`/`:158`/`:162`; the screenshot's only case at `:338-348`, whose own comment says
+the 404 proves the lookup resolved rather than that anyone was refused; and
+`StepUpReauthenticationTest.php:135-146`, three route names under a comment claiming it covered *"every page
+of the console"*.
 
-⚠️ **NO FILE COLLISION WITH LANE A'S `M31` OR ITS QUEUED `M32`.** `M31`'s diff is
-`tests/Feature/Submissions/` plus `database/factories/SubmissionAnswerFactory.php`; `M32`'s is the
-gamification backfill and `tests/Feature/Connectors/ConnectorTokenRefreshTest.php`. Not one path above
-appears in either. **`tests/Pest.php` is the one file worth naming as a near miss** — it is shared by every
-suite, and if `M31` moves a submission helper into it this PR will conflict there and nowhere else.
+⛔ **THE ROW SAID ITS FINDING WAS WEAKER THAN IT LOOKED AND NAMED THE MUTATION THAT MATTERS — A ROUTE
+DECLARED OUTSIDE THE GROUP — SO THAT MUTATION WAS RUN FIRST, AGAINST THE UNCHANGED TREE.** Moving
+`admin.feedback.screenshot` into the outer group, confirmed at the live route table to drop `superadmin.mfa`
+**and** `step-up`, left `tests/Feature/{Admin,Auth,Feedback}` at **238 passed / 1,156 assertions — identical
+to the baseline in both numbers.** A route streaming every tenant's feedback screenshots became reachable by
+a super-admin with no confirmed second factor and no recent password, and nothing in this repository noticed.
+**That measurement is the whole justification for the increment, and it could only be taken before the fix.**
 
-### ✅ THE ROW IS VERIFIED AGAINST THE CODE — THIRD ROW RUNNING WHOSE EVERY CITATION IS EXACT
+**This is the first row in five whose prescribed remedy was CORRECT** — *walk the table and assert the
+property* transfers exactly, where `M33`'s, `M34`'s, `M31`'s and `M32`'s did not. **The row's OTHER
+suggestion still was not**: see the vacuity trap below. A row can be right in its evidence, right in its main
+remedy, and still carry a second suggestion that would have produced a green test proving nothing.
 
-`routes/admin.php:83-84` is the screenshot route. `FeedbackConsoleTest.php:153` / `:158` / `:162` are the
-index's three denials, to the line. `:338-348` is the screenshot's only case, and its own comment really does
-say the 404 proves the lookup resolved. `StepUpReauthenticationTest.php:135-146` really does name three admin
-route names under a comment claiming it covers every page of the console. Measured from the live route table:
-**fourteen routes** under `admin/`, all on the central host — thirteen carrying all four gates, one (the
-enrollment landing) deliberately carrying two. The manifest names **three of the thirteen**.
+### ✅ GATES
 
-### ⛔ AND THE ROW'S PRESCRIBED FIX IS THE HALF THAT NEEDED CHECKING — IT SURVIVES, WITH ONE TRAP IT DOES NOT NAME
+- **All six jobs `success` with real step counts, parsed individually rather than trusted from a tick** —
+  E2E **20**, Static analysis **19**, Contract **16**, Frontend **12**, Design-system axe **11**, Pest **11**.
+  **Not one `steps: []`.** Merged as `8aa6ea4`.
+- **CI Pest `4609 passed / 19,459 assertions`** (2 pre-existing warnings) — **+14 tests and +26 assertions
+  on the `4595 / 19,433` base this branch actually merged into after Lane A's `M31`, exactly the fourteen
+  added and exactly the twenty-six.** Both halves of the prediction were exact. ⚠️ **The base moved MID-SESSION**:
+  Lane A merged `M31` while this branch was building, so a delta quoted against `M34`'s `4591` would have
+  been wrong by four. Fetch before you subtract.
+- **E2E `551 passed + 10 skipped`, NO flaky line** — unchanged, and load-bearing (`failOnFlakyTests`).
+- **Vitest `134 files`; Storybook axe `42 suites / 303`** — both unchanged, as a PHP-only diff must leave them.
+- **Local Pest scope `252 passed / 1,182 assertions`** — 238 baseline + exactly the 14 added, zero failures.
+- **Pint `PASS` over `1375` files, exit 0 — AND PROVEN LIVE FIRST.** A deliberately misformatted probe in
+  `app/Policies/` returned exit **1** with the file named and its fixers listed; only then was the real
+  `PASS` believed. **1374 + 1 new test file**, so the count itself is a check.
+- **PHPStan local 18 across the same 10 FILES — zero delta BY FILE LIST**, and structurally so: it scans
+  `app`, `database`, `routes`, never `tests`. ⚠️ **The probe file lived in `app/`, so it reddened PHPStan as
+  well as Pint while it existed** — a probe placed inside an analysed path is a gate you have to remember to
+  clean up, and deleting it is step one of the finish rather than an afterthought.
+- **Five host lint gates unmoved** — 97 · 113 · 31 · 113/121/0 · 180.
+- **`openapi.json` byte-identical** — predicted in the claim before the files were opened, and held.
+- **Not run LOCALLY, and said so rather than implied:** Vitest, Storybook axe and E2E were left to CI, because
+  the diff is PHP tests only — no `.ts`, no `.vue`, no selector. CI ran all three and all three are unmoved,
+  which is the check on that reasoning rather than a restatement of it.
 
-The remedy — *walk the route table and assert the property* — transfers, unlike `M33`'s and `M34`'s. But the
-row's other suggestion, the three copied deny assertions, has a **vacuity trap it does not mention and that
-this repository has already paid for once**: `EnsureSuperAdmin` answers **404** for non-disclosure, and the
-controller answers **404** for a report it cannot resolve. A non-super-admin denial written against a report
-that does not exist — or that exists without a screenshot, which is the only fixture the console suite can
-build today — **passes with the middleware deleted**. `tests/Feature/Tenant/FeedbackTest.php:307-309` states
-exactly this trap in its own words on the tenant-side twin. **So the deny test owes a positive control that
-returns something other than 404 on the same URI**, and that control does not exist yet: no test of any kind
-has ever driven that route to a success.
+### ⛔ THE VACUITY TRAP THE ROW DID NOT NAME, AND THE MUTATION THAT PROVES IT WAS AVOIDED
 
-### The controls this increment owes
+`EnsureSuperAdmin` answers **404** for non-disclosure; the controller answers **404** for a report it cannot
+resolve. **Same status, two different decisions.** A non-super-admin case written against a random id — or
+against a report with no screenshot, which is the only fixture the console suite could build before this
+increment — **passes with the middleware deleted**. `tests/Feature/Tenant/FeedbackTest.php:307-309` states
+the identical trap on the tenant-side twin, so the repository had already paid for it once.
 
-Two mutations, both against `routes/admin.php`, each with a baseline of the same scope run first:
+The arm therefore runs against a report a super-admin really does get 200 image bytes from — the first test
+here ever to drive that route to a success — which needed `consoleScreenshot()`, the console suite's first
+committed-screenshot fixture. ⚠️ **The attachment has to be COMMITTED for an FK reason, not a connection
+reason**: `feedback_reports.screenshot_attachment_id` is a real foreign key, so pointing a committed report
+at a row inside RefreshDatabase's open transaction makes the privileged UPDATE wait on a lock the test itself
+holds — a hang, not an error. **And nothing was added to the purge, checked rather than assumed**:
+`attachments.tenant_id` is `cascadeOnDelete` and the purge deletes reports before tenants.
 
-1. **Delete `'superadmin'` from the group's middleware.** Reddens the walk's gate case and the console's
-   non-super-admin denials. This is the mutation the *existing* index tests already catch, so its red set is
-   the check that the new gate agrees with them rather than replacing them.
-2. **Move the screenshot route out of the inner `superadmin.mfa` + `step-up` group into the outer one.**
-   This is the mutation the row names as the realistic silent one, and the manifest cannot see it because a
-   route it does not name cannot fail it. **A pre-change baseline must show this mutation green**, or the
-   increment has proved nothing.
+### ⛔ ASKING THE KILLER QUESTION OF EVERY GATE FOUND A THIRD NAKED ONE
 
-Every control restored by **sha256 byte comparison**, never `git checkout --`, per M9. The harness refuses to
-start while another Pest process lives — per M34, whose verification subagent ran `artisan test` and dropped
-the schema under a live mutation run.
+`FeedbackConsoleController.php:78`'s `abort_unless($attachment->virus_scan_status->servable(), 409)` was
+asserted by **nothing**. M34 pinned that guard on the two routes it was looking at (`FeedbackController.php:75`,
+`AttachmentController.php:43`) and **this console copy is the third** — so quarantined bytes could be served
+to the one principal who reads across every tenant, with the whole repository green. **M34's rule paid out on
+its first outing**: ask the question of every gate on the route you touch, not only the ones the row names.
+
+### ✅ THREE MUTATIONS, EACH WITH A BASELINE OF THE SAME SCOPE FIRST
+
+All against `routes/admin.php`, `php -l`'d, sha256 asserted to have MOVED, restored by **byte comparison**,
+harness refusing to start while another test process lives.
+
+| Mutation | Red set |
+|---|---|
+| screenshot route out of the gated group | **4** — exactly the four gates added, **zero pre-existing** |
+| drop the console's `Route::domain()` constraint | **1** — only the new central-host case |
+| drop `superadmin` from the group | **10** — the walk, **eight pre-existing denials**, and the new 404 |
+
+⚠️ **THE THIRD IS THE ONE THAT MATTERS AND IT IS NOT ABOUT COVERAGE.** It is what proves the 404 case is not
+vacuous: with the gate deleted the request reaches the controller, resolves the report AND the screenshot,
+and streams it — so the case goes red **because the fixture is real**. Against a random id it would have
+stayed green. A deny test's non-vacuity is a property of its FIXTURE, and only a mutation can show it.
+
+⚠️ **THE SECOND FOUND A BLIND SPOT NOBODY HAD NAMED.** Dropping `Route::domain()` from the whole console —
+which would serve every cross-tenant page on every tenant subdomain, where a tenant's context is already on
+the connection — was invisible to the entire pre-existing suite, and is now caught by exactly one assertion.
+It was not in the row. It came out of writing the walk.
+
+### THE FILE RECORD
+
+Edited: `tests/Feature/Auth/StepUpReauthenticationTest.php` · `tests/Feature/Feedback/FeedbackConsoleTest.php`
+· `tests/Pest.php` · `docs/feature-backlog.md` · `docs/claims/lane-b.md` · `PROGRESS.md`.
+New: `tests/Feature/Admin/AdminConsoleGateTest.php`.
+**Every claimed file was edited, and `routes/admin.php` was claimed FOR THE MUTATION ONLY and released
+byte-identical** at `8e330a5c1d9d…`, absent from the diff — the M17/M19 shape, predicted in writing and held.
+⚠️ **`tests/Pest.php` was claimed as "probably", was needed, and was placed deliberately away from the file's
+tail** because Lane A's live `M31` worked in the submission-answer helpers that live there. The merge of
+current `main` into this branch was **clean, with no conflict in any file** — the near miss the claim named
+did not happen.
+
+**Namespaces: NOTHING SPENT.** ADR `0022` free and still Lane A's block-opener; migration
+`2026_08_17_000111` free; **ADR-0016 `§D35` free** (re-verified this session rather than carried); `0010`
+reserved for H1d; `#16` free. Adding tests that pin an existing, correctly-implemented guard is not a
+decision — nothing was weighed and nothing rejected.
+
+### ⚠️ TWO MEASURED THINGS WORTH MORE THAN THIS ROW
+
+**(1) A WEB-ROUTE 409 ASSERTION COSTS ~60–100 SECONDS IN THIS SUITE, AND IT IS NOT NEW.** The new console
+case runs **59.4 s**; the *pre-existing* M34 tenant-side twin runs **97.5 s**. So the cost is the error-page
+render, not this increment — **measured on the pre-existing case rather than assumed**, which is the only
+way to tell "my test is slow" from "this shape is slow". `withoutVite()` is **not** the cause: adding it made
+the case **slower** (82 s), so that hypothesis is tested and dead rather than left as folklore. The pattern
+should not be multiplied casually.
+
+**(2) DOCKER DESKTOP DIED MID-SESSION AND THE FIRST SYMPTOM LOOKED LIKE A GATE FAILURE.** Pint exited **1**
+and the Pest run failed — with `failed to connect to the docker API at npipe:...`. **A gate whose failure
+message names the DAEMON is an infrastructure event, not a result**, and the tell is the same one M34 records
+for a contaminated mutation run: read what the failure actually says before believing the number. Lane A's
+stack restarted itself; **Lane B's did not** — app, postgres, redis, node and mailpit all sat `Exited (255)`
+until `docker compose up -d` was run from the lane-b worktree. The `pgdata` volume survived, so nothing was
+lost, but a lane that comes back half-up is indistinguishable from a lane that is fine until you list
+containers with `-a`.
 
 ---
 

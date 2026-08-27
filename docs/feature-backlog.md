@@ -2199,6 +2199,16 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 ### Test suite & CI gates
 
+- **`minor` · `baselineOf()` turns "no checksum" into `''`, and only middleware turns it back.**
+  `tests/Feature/Submissions/SubmissionEditRoutesTest.php:62` returns `(string) $value`, so a null
+  `answers_content_checksum` reaches the request body as an **empty string**, and it is
+  `ConvertEmptyStringsToNull` — not the helper, and not anything in the test — that restores the null the
+  service actually compares. **The round trip is correct by coincidence of two unrelated behaviours.**
+  ⚠️ **Not a bug today and unlikely to become one**, because M31 added cases that drive the real-checksum
+  path directly and would redden if the coercion started mattering. Filed because the `''` is a **cast
+  artefact rather than a value anybody chose**, and a reader who assumes it is meaningful will mis-model the
+  guard. **Deliberately left by M31** — changing the return type touches every case in the file, which is a
+  larger diff than the finding justifies. **Latent.**
 - ~~**`major` · The 16-page responsive scan asserts nothing about which page it landed on.**~~
   ✅ **DONE — M25 (2026-08-26), AND THE DEFECT WAS MEASURED LIVE RATHER THAN ARGUED.** One assertion per
   *loop* — `expect(page.url(), …).toContain(p.path)`, which is `support/console.ts:34`'s idiom rather

@@ -18,7 +18,7 @@ Standing Rule 7(b-bis).
 
 ## Status: NO ACTIVE CLAIM — but the forward queue `M32` IS STILL A CLAIM
 
-**`M31` is merged (PR #223, 6/6 green).** Lane A holds no *active* row. ⛔ **IT DOES STILL HOLD `M32`**,
+**`M31` is merged (PR #223, `5419ddf`, CI 6/6 green with real step counts).** Lane A holds no *active* row. ⛔ **IT DOES STILL HOLD `M32`**,
 pre-claimed on Rule 7's *"the lane queue is the claim"* since M30 and scoped in the M30 block below with the
 correction that **the row's own prescribed fix does not work**. It is not free for the other lane to take.
 
@@ -59,9 +59,15 @@ consecutive Lane A increment to spend nothing**. Next free migration prefix **`2
 
 M31 is a **test-only** diff, so most gates cannot move and that is stated rather than left as a bare number.
 
-- **CI Pest** — M34's merge run measured `4591 / 19,400`. M31 adds **+4 tests / +33 assertions**, so the
-  expected figure is **`4595 / 19,433`**. ⚠️ Read the real number off M31's own run; this is arithmetic, not
-  a measurement.
+- **CI Pest `4595 passed / 19,433 assertions`** (2 pre-existing warnings), **measured on M31's own run
+  `33043669731`** — M34's `4591 / 19,400` **+4 tests / +33 assertions**, exactly the four cases added and
+  exactly their assertions, counted both ways. ⚠️ **The prediction was written into this file BEFORE the run
+  and then replaced by the measurement**, which is the only way a predicted figure may ever appear here.
+- **CI 6/6 with real step counts, parsed individually rather than trusted from a tick:** E2E **20** ·
+  Static analysis **19** · Contract **16** · Frontend **12** · Pest **11** · Design-system axe **11**. Not
+  one `steps: []`. **Vitest `134 files / 2,293`** · **Storybook axe `42 suites / 303`** ·
+  **E2E `551 passed + 10 skipped` (18.0m), NO flaky line** — all three unchanged, as a PHP-test-only diff
+  requires.
 - **PHPStan CANNOT MOVE ON THIS DIFF AND THE REASON IS STRUCTURAL** — `phpstan.neon` scans `app`, `database`
   and `routes`, not `tests`. Local **18 errors across 10 files**, and **not one of the 10 is a file this
   increment touched**. Lane B's M34 made the same point on its own test-only diff; a gate that *cannot* move
@@ -77,7 +83,7 @@ M31 is a **test-only** diff, so most gates cannot move and that is stated rather
 
 ---
 
-## RELEASED — M31, the concurrency guard that was pinned from one side only (merged as PR #223, 6/6 green)
+## RELEASED — M31, the concurrency guard that was pinned from one side only (merged as PR #223, `5419ddf`, CI 6/6 green with real step counts)
 
 **Taken 2026-08-27.** Branch `m31-answer-edit-checksum`, cut from `origin/main` at `659c6ca`, PR into `main`.
 Row: the `major` under **Test suite & CI gates** in `docs/feature-backlog.md`.

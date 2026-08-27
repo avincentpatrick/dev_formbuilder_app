@@ -4950,3 +4950,131 @@ structurally so — it covers `app`, `database`, `routes` only, and this diff is
 Namespaces: **nothing spent** — `0022` free and still Lane A's, `2026_08_17_000111` free, no `§D`, no parity
 list moved. ⛔ **`lane-a.md` says `M29` spent `§D35` and the next free is `§D36`; it spent none — ADR-0016
 runs to `§D34` and a repo-wide grep for `§D35` returns only the two claim files. `§D35` IS FREE.**
+
+## 2026-08-27 — 🅰️ LANE A, `M31`: the concurrency guard that was pinned from one side only (PR #223, CI 6/6 green with real step counts)
+
+Row: the `major` under `### Test suite & CI gates` — *every accepted write in the answer-edit concurrency
+suite compares `null === null`*. **Test-only diff**; two files amended, none created.
+
+### The headline held, the probe did not, and the damage was under-stated
+
+`SubmissionAnswerFactory` stamps no `answers_content_checksum`, so `seedInboxSubmission()` produces the
+*legacy* row, `baselineOf()` casts null to `''`, `ConvertEmptyStringsToNull` returns it to null, and all
+three accepted writes reached `SubmissionAnswerEditService.php:135` with null on both sides. **Every hop the
+row named was true.**
+
+⛔ **Its prescribed probe was not.** *"Drop the client token from the guard and the suite stays fully green"*
+is false: **deleting the guard reddens three cases**, because editor B re-reads the answer row at `:114`, so
+the under-lock check at `:202` compares a value against itself and B's write is accepted. M30 predicted this
+in its queue block and it held. **The suite was never blind to REMOVING this guard — only to WEAKENING it**,
+so a test written to the row's stated rationale would have been aimed at a mutation the suite already
+catches. **Second consecutive increment where that was true**, after M30's `throttle:login` rename.
+
+### Three mutations measured, two survived, and they point in opposite directions
+
+| Mutation | Before | After | Damage if shipped |
+|---|---|---|---|
+| **(1)** `$baseline === null && $stored->… !== null` — presence-only | **60 passed, GREEN** | **2 failed** | Two editors each holding a real, *different* token never conflict; the lost update returns silently. |
+| **(2)** `$baseline !== null \|\| $stored->… !== $baseline` — reject every non-null | **60 passed, GREEN** | **4 failed** | Every pipeline-written submission **permanently uneditable** — the row's own phrase, and the direction it never named. |
+| **(3)** `answers_schema_checksum` for `answers_content_checksum` | **2 failed** | 2 failed | *Already caught.* |
+
+⛔⛔ **(3) IS THE FINDING, NOT THE FOOTNOTE.** Because `null === null` is trivially **true**, any mutant that
+breaks the equality outright throws on the accepted writes and reddens them — the adjacent-column typo, the
+inverted operator, a recomputed checksum, a transformed token. **The only survivors are those that preserve
+`(null, null)` equality AND `(real, null)` inequality — i.e. those discriminating on nullness alone.** That
+is a far narrower and more useful statement than *"the suite compares null to null"*: **the suite pinned
+exactly one bit, and the guard has two.** It also explains why the first two candidate mutations were
+discarded before they were run, and why the third was run anyway — the reasoning was checked against a
+measurement rather than trusted.
+
+### Four cases, and the fix that was deliberately not made
+
+Two per file, all through the real submit pipeline so the rows carry production-shaped checksums —
+`SubmissionAnswerEditTest`'s own `submitForEdit()` helper, which the row correctly noted **no concurrency
+case used**, and a sibling defined locally in the routes file. ⚠️ **Defined locally on purpose**: Pest's
+helper functions are global, so calling `submitForEdit()` across files passes on a whole-suite run and dies
+with `Call to undefined function` on a per-file run — the same global-namespace trap `editableIndexedForm`'s
+docblock already records, arriving from the other direction.
+
+⛔ **NOT FIXED IN `SubmissionAnswerFactory`, AND THE CLAIM REFUSED TO PREJUDGE IT.** Stamping a checksum
+there would **convert** the legacy rows rather than **add** the production ones. Three reasons in increasing
+order of weight: it changes the fixture shape under every caller of `seedInboxSubmission()` in **both**
+lanes' suites; it deletes the only coverage the nullable path has; and **that path is a supported production
+state rather than a fixture artefact** — `EditSubmissionAnswersRequest` uses `present` + `nullable`
+deliberately, and says in its own words that `required` *"would make those rows permanently uneditable"*.
+**The obvious "fix the fixture" move would have destroyed real coverage to buy new coverage.** The old cases
+stay and still pass.
+
+### ⛔⛔ The process finding: a positive control that failed silently, and returned GREEN
+
+Every new case asserts its baseline is a non-empty string before using it — without which each degrades back
+into a fourth `null === null` the moment the pipeline stops stamping. **Control D proves the guard fires:**
+nulling `SubmissionFinalizer.php:96`'s stamp fails all four **at that assertion**, printing *"Failed
+asserting that null is of type string"* and *"Expecting '' not to be ''"* against the exact lines.
+
+**Control D's first run was a false negative and nothing in the test output said so.** The mutation was
+written as `perl -0pi -e "s/…\$contentChecksum,/…null,/"` inside **double** quotes; the shell consumed the
+escaping, **the substitution never applied**, and the suite returned **`64 passed`** — a result
+indistinguishable from *"the guard is decorative and the control disproves it."* It was caught only because
+the command **printed the mutated line** and the line was unchanged.
+
+⚠️ **A CONTROL MUST PROVE ITS OWN MUTATION LANDED BEFORE ITS RESULT MEANS ANYTHING.** A green positive
+control is either a real disproof or a no-op edit, and the test output cannot tell them apart. Every
+mutation in this increment therefore greps the mutated line and aborts on no match. **This widens the
+standing shell rule: it eats backticks, and it eats `\$` inside double quotes — a silently-unapplied
+`perl`/`sed` mutation is a false negative that flatters the code.** Third increment running where reading
+what the control *printed*, rather than its exit status, was the thing that worked.
+
+### A second process finding: the line-count delta caught a swallowed bullet
+
+The `PROGRESS.md` splice reported **delta 0 where +1 was asserted**. The inserted bullet file had no trailing
+newline, so `cat` fused it with the line below and **Lane B's `M34` status bullet vanished into the tail of
+Lane A's**. The standing *"assert a line-count delta on every `PROGRESS.md` edit"* rule caught it on the
+first try, and the restore touched **only** `PROGRESS.md` — never the two doc files carrying uncommitted
+work, per M9's rule that `git checkout --` is not a restore mechanism.
+
+### A namespace this lane carried wrong for three increments, corrected by the other lane
+
+`lane-a.md` and every Lane A hand-off since M29 stated *"ADR-0016's next free sub-decision is `§D36` — M29
+spent `§D35`."* **M29 spent no `§D` at all.** Verified here rather than accepted: `docs/adr/0016-saml-sso.md`
+runs to **`§D34`**, and a repo-wide grep for `§D35` returns only `PROGRESS.md`, `PROGRESS_ARCHIVE.md` and
+`lane-b.md` — **three files arguing about a number that appears in no ADR.** M29 *reserved* `§D35` and
+released it unspent. **`§D35` is free.**
+
+⚠️ **The direction it travelled is the transferable part.** Lane B may not edit `lane-a.md`, so it could only
+write the correction into its own file and rely on the next Lane A session reading it. **It did, because
+Rule 7 makes reading the whole of the other lane's file mandatory** — the same discipline that prevents
+number collisions is what carried a correction across a boundary neither lane may write through. **A
+reserved-then-released allocation is exactly the shape that rots into a phantom, because the reservation is
+loud and the release is quiet.**
+
+### The number came from the worktree again, for the third increment running
+
+At session open `lane-b.md` on `origin/main` read `## Status: NO ACTIVE CLAIM`, its `M29` and `M33` both
+merged and released, and **nothing in its body pre-claimed a forward number** — read alone, that file said
+`M31` through `M34` were free. `git worktree list` said otherwise: `fb-lane-b` sat on
+**`m34-export-deny-tests`**, two commits deep, and Lane B's claim commit reached `origin/main` while this
+branch was being cut. **M30 recorded the worktree running AHEAD of the claim file; M31 is the case where the
+claim file caught up within the same minutes.** Both directions now have a measurement and the conclusion is
+identical: one command closes a gap both files agree to leave open.
+
+### Gates
+
+`tests/Feature/Submissions` **415 / 1652 → 419 / 1685** (+4 / +33, reconciling exactly to the four cases);
+the two files alone **60 / 229 → 64 / 262**. **PHPStan cannot move on this diff and that is stated rather
+than left as a bare number** — `phpstan.neon` scans `app`, `database`, `routes`, not `tests`; local **18
+errors across 10 files, none of them touched here**. ⚠️ **Local PHPStan needs `php -d memory_limit=1G`**; the
+default 128M dies with a `FatalError` inside `/tmp/phpstan/resultCache.php`, which reads as a code failure
+and is not one. Five host lint gates unchanged: **97 · 113 · 31 · 113/121/0 · 180**. No JavaScript, Vue,
+selector or route in the diff, so Vitest, Storybook axe, E2E and `openapi.json` are structurally untouched.
+Both service files were mutated in the working tree and restored by **sha256 byte comparison** after every
+run — every restore verified `OK`.
+
+### One finding filed, not fixed
+
+`baselineOf()` in `SubmissionEditRoutesTest.php` returns `(string) $value`, coercing a null checksum to `''`,
+and only `ConvertEmptyStringsToNull` turns it back into null before the service compares it. **The round trip
+is correct by coincidence of two unrelated behaviours.** Left alone because changing the helper's return type
+touches every case in the file and the new cases assert the real path directly — **named so the next reader
+does not have to rediscover that the `''` is a cast artefact rather than a value anybody chose.** Filed in
+`docs/feature-backlog.md` at the moment the decision was taken, per the J4b1 rule.

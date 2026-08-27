@@ -18,23 +18,149 @@ exact-equality `KNOWN_UNGUARDED` assertion, so the list shrinks in the *same* PR
 
 ---
 
-## Status: NO ACTIVE CLAIM
+## Status: ACTIVE CLAIM — M34, the three streamed exports of tenant data with no authorization deny test
 
-**Lane B holds nothing as of 2026-08-26.** `M29` (PR #219, `7892f7f`) and `M33` (PR #221, `f329e1b`) are
-both merged, both 6/6 green with real step counts, and both released. Their entries follow.
+**Taken 2026-08-27.** Branch `m34-export-deny-tests`, cut from `origin/main` at `5e58c05`, PR into `main`.
+Row: the `major` under **`### Test suite & CI gates`** (heading at `docs/feature-backlog.md:2200`, row at
+`:2297`) — *three streamed exports of tenant data have no authorization deny test at all*. It was filed by
+`M29`'s own stored-bytes census and continues the `M29` → `M33` arc, which is why it is Lane B's.
 
-⛔⛔ **BEFORE YOU NUMBER ANYTHING: READ THE WHOLE OF `lane-a.md`, NOT ITS `## Status` LINE.** This is the
-process finding of `M33` and it nearly cost a collision. Lane A's file did not merely hold `M30` — its
-`### THE QUEUE BEHIND IT` block **pre-claimed `M31` and `M32` as well**, in writing, on Rule 7's *"the lane
-queue is the claim"*, and said why in its own words: *"because Lane B is taking rows from this exact section
-right now."* **The obvious arithmetic — `M30` is the highest merged, so take `M31` — would have collided
-with a claim that was already pushed and readable.** `M33` was the next genuinely free number. **A lane's
-forward queue is a claim and it does not live under the `## Status` heading.**
+⛔ **THIS CLAIM IS PUSHED BEFORE THE READ-ONLY VERIFICATION PASS COMPLETES, AND IT WILL BE CORRECTED
+BEFORE THE FIRST FILE IS OPENED FOR EDIT.** That is Lane A's `M30` precedent applied deliberately, not a
+shortcut: 7(g)'s race is over the *number*, and the number cannot wait for a census. The file list below is
+a first pass from four greps; every line of it is falsifiable and the correction will be marked in place.
 
-⚠️ **AND THE FALLBACK ROW A HAND-OFF NAMES CAN EXPIRE THE SAME WAY.** `M33`'s own next-prompt named the
-`gamification:backfill` row as its natural second if the first proved too large. Lane A had claimed it as
-`M32` and already scouted it. **A suggested second row is a suggestion made before the other lane's claim
-existed — re-check it, exactly like a namespace reservation.**
+### ⛔ NUMBERING — `M34`, AND THE WHOLE OF `lane-a.md` WAS READ, NOT ITS `## Status` LINE
+
+`lane-a.md` reads **ACTIVE CLAIM `M30`** under its `## Status` heading — but its
+`### THE QUEUE BEHIND IT` block at `lane-a.md:185` **pre-claims `M31` and `M32` as well**, in writing, and
+says why in its own words: *"because Lane B is taking rows from this exact section right now."* `M30` is
+merged (PR #220, `5e58c05`); `M31` and `M32` are claimed and unstarted. `M33` is Lane B's and merged
+(PR #221, `f329e1b`). **`M34` is the next genuinely free number** — the obvious arithmetic (highest merged
+is `M33`, so take `M34`) happens to agree this time, and it agreed by luck rather than by method, because
+the same arithmetic one increment ago would have taken `M31` and collided.
+
+⚠️ **AND THE FALLBACK ROWS NAMED IN THE HAND-OFF WERE RE-CHECKED AS RESERVATIONS, WHICH IS THE `M33`
+LESSON APPLIED.** The hand-off names two adjacent cheap seconds — the `minor` at `:2309` (the `409`
+quarantine branch, asserted on no stored-file route) and the `minor` at `:2317` (`AttachmentController`'s
+docblock calls an unsigned route a *"signed read-back"*). **Neither appears anywhere in `lane-a.md`**, whose
+declared queue is `:2249` (`M30`, merged), `:2256` (`M31`) and `:2324` (`M32`). Both are free. Both are
+claimed here as in-scope-if-cheap, and both will be closed or explicitly released rather than left
+ambiguous.
+
+⚠️ **A THIRD WORKTREE EXISTS AND RULE 7 DOES NOT DESCRIBE IT.** `git worktree list` returns
+`fb-lane-c` on `lane-c-bootstrap` at `b44a36c` — a merge commit from the `M14` era, i.e. **eight
+increments stale** — with one uncommitted edit (`packages/design-system/package-lock.json`). There is no
+`docs/claims/lane-c.md`, so under 7(g) it holds nothing and can be treated as parked. **Recorded rather
+than assumed away**: a checkout nobody claims is exactly the shape that cost `M33` a surprise merge.
+
+### ⛔ NAMESPACES — THIS CLAIM EXPECTS TO SPEND NOTHING
+
+**No ADR.** `0022` stays free and stays Lane A's block-opener. **No `ADR-0016 §D<n>`** — and the hand-off's
+own warning is the reason rather than an afterthought: `§D35` has been handed over twice and spent neither
+time **because ADR-0016 is the SAML SSO decision record and is the wrong home for an export-authorization
+finding**. A namespace named in a next-prompt is a reservation, not a destination. If this increment owes a
+written decision, its home is the ADR whose own sub-decision created the surface — `ADR-0015` (the
+attachment/stored-bytes record, now running `§D1`–`§D10` after `M33`) or the analytics/entitlements ADR,
+**decided by reading the candidate's own §D-series, not by taking the number that was offered.**
+**No migration** — `2026_08_17_000111` stays free. **No new ability, no new permission key, no new
+`NotificationType`**, so `ShellAbilityParityTest` and `NotificationTypeParityTest` both stay still. `0010`
+stays reserved for H1d; `#16` stays free.
+
+**PAIRED FILES: NONE ARE EXPECTED TO MOVE.** All five gates in 7(b-bis) read front-end trees
+(`resources/js`, `resources/public-runtime`, `packages/design-system/src`) or the two parity lists. This
+claim expects to touch no `.vue`, no `.ts`, no CSS and no `tests/e2e/` spec. **`tests/e2e/` will be
+grepped before anything that could reach a selector**, per the standing rule, even though nothing here
+should.
+
+⚠️ **`openapi.json` IS CLAIMED BECAUSE IT MIGHT MOVE, AND THE PREDICTION — WRITTEN BEFORE THE FILE IS
+OPENED, SO THE MEASUREMENT HAS SOMETHING TO DISAGREE WITH — IS THAT IT WILL NOT.** Two of the three routes
+are under `/api/v1`, which is the trigger condition. But this increment is expected to add **tests only**:
+Scramble infers from a controller's own returns, and a test issuing a request changes no return. **If a
+production file moves after all — which the verification pass may yet force — the prediction is void and
+the document gets regenerated and `cmp`'d rather than argued about.** `M13` predicted correctly about one
+mechanism and was still wrong, because the artefact had a second one.
+
+### The row, and what is already measured against the code before claiming
+
+Four greps, read-only, before this file was written:
+
+- **`GET /analytics/export`** — `routes/tenant.php:893-894`, `AnalyticsController@export`, gated
+  `can:viewAny,SavedReportView` + `feature:advanced_analytics`. Candidate suites:
+  `tests/Feature/Analytics/AnalyticsPageGateTest.php`, `tests/Feature/Analytics/AnalyticsWebExportTest.php`.
+- **`GET /api/v1/analytics/report/export`** — `routes/api.php:368-370`, `AnalyticsReportController@export`,
+  gated `ability:read:analytics` + `can:viewAny,SavedReportView` + `feature:advanced_analytics` — **the
+  identical middleware triple to its non-export twin `analytics/report` at `:365-367`**, which is exactly
+  why a test aimed at the twin looks like coverage. Candidate suite:
+  `tests/Feature/Analytics/AnalyticsExportTest.php`.
+- **`GET /api/v1/forms/{form}/versions/{version}/xlsform`** — `routes/api.php:153-156`,
+  `FormXlsformApiController@export`, gated `ability:read:forms` + `can:view,form` + `feature:xlsform_export`.
+  Candidate suite: `tests/Feature/Xlsform/XlsformExportTest.php`.
+
+⛔⛔ **AND THE FIRST THING THE CODE SAYS THAT THE ROW DOES NOT: THERE IS A FOURTH ROUTE.**
+`routes/tenant.php:521-523` is a **web** `GET /forms/{form}/versions/{version}/xlsform`
+(`FormXlsformController@export`), gated `can:view,form` + `feature:xlsform_export` — the same bytes, the
+same feature flag, a different controller and no API ability in front of it. The row names the API half
+only. **This is `M33`'s *enumerate from the code, because a census's unit is the RESOURCE and not the
+feature* recurring on the very next row**, and it is why the verification pass below is a census rather
+than a check of three citations.
+
+⚠️ **THE `SubstituteBindings`-BEFORE-`Authorize` TRAP IS LIVE ON HALF OF THESE AND IS STATED NOW SO IT
+CANNOT BE DISCOVERED LATE.** `bootstrap/app.php:217-218` runs binding first, so on the two `{form}`-bound
+xlsform routes a **cross-tenant** caller gets `404` at binding and the test passes with the `can:` gate
+deleted — it is not a permission test. The denied caller must hold a resource in their **own** tenant. The
+two analytics routes are not resource-bound, so they do not have this shape; they have the other one — a
+`feature:` gate that answers with a **redirect**, which is what `AnalyticsPageGateTest.php:110` asserts and
+why it is not the coverage it looks like.
+
+### Every file this claim touches, named before it is opened — FIRST PASS, TO BE CORRECTED
+
+**PHP tests (Lane B's column under 7(b)'s widened statement; claimed):**
+- `tests/Feature/Analytics/AnalyticsPageGateTest.php` — the web export's role denial.
+- `tests/Feature/Analytics/AnalyticsWebExportTest.php` — claimed as the alternative home for the same case;
+  which of the two receives it is decided by where the fixture already lives, not by the row.
+- `tests/Feature/Analytics/AnalyticsExportTest.php` — the API export's ability denial, aimed at the export
+  URI rather than at its twin.
+- `tests/Feature/Xlsform/XlsformExportTest.php` — the API xlsform export, and the web one the row omits.
+- **NEW, if the census shows the pattern is worth pinning structurally** — a route-table walk that does
+  more than the existing `api.v1.*` `can:`-presence walk, which issues no request and asserts no status.
+  ⚠️ **Its shape is not yet decided and it will not hold a hand-maintained list of route names** — that is
+  the paired-list defect 7(b-bis) exists to warn about, and Lane A's `M30` had to correct exactly that.
+
+**Production PHP — claimed defensively, expected untouched:**
+- `app/Http/Controllers/Tenant/AnalyticsController.php` ·
+  `app/Http/Controllers/Api/V1/AnalyticsReportController.php` ·
+  `app/Http/Controllers/Api/V1/FormXlsformApiController.php` ·
+  `app/Http/Controllers/Tenant/FormXlsformController.php`.
+  **Claimed because a deny test that cannot be made to fail is a finding, not a test** — if any of these
+  four turns out to authorize on the wrong subject, the fix lands here and the prediction above is void.
+- `app/Http/Controllers/Tenant/AttachmentController.php` — **the `:2317` docblock `minor` only**, one word.
+
+**Shared, claimed and never owned:**
+- `docs/feature-backlog.md` — this row, the two adjacent `minor`s if taken, and every finding deliberately
+  left, filed the moment the decision is taken (the J4b1 rule).
+- `docs/claims/lane-b.md` · `PROGRESS.md` (Lane B's block and hand-off line only).
+- `docs/security-threat-model.md` — one row, only if the census finds an unfixed live exposure.
+- `openapi.json` — claimed as above; expected untouched and `cmp`'d rather than assumed.
+
+### What the verification pass must answer before a single test is written
+
+The `M33` rule, sharpened by its own outcome: `M33` was the first row in fifteen whose every citation held,
+**and its prescribed remedy still pointed at a mechanism a test exists to forbid.** So both halves get
+checked here, and the second half is the one nobody checks:
+
+1. Does `AnalyticsPageGateTest.php:110` assert a redirect rather than a 403, and is the suite's only 403 on
+   the `/analytics` index? **(The row's claim. Verify, do not assume.)**
+2. Which test appears to cover `api/v1/analytics/report/export` and actually targets the twin?
+3. Does any test in the repository issue a request to either xlsform export URI?
+4. **Is the prescribed fix sound?** The row says to copy `GET /forms/{form}/submissions/export`, which
+   asserts *both* a role denial and a scope denial. **A scope denial may not exist for analytics** — the
+   two analytics routes authorize on `SavedReportView::viewAny`, a class-level gate with no instance to be
+   scoped to. Copying a pattern that cannot apply is how a green test gets written against a defect it
+   cannot reach.
+5. **The census**: every endpoint in the repository that streams tenant data, enumerated from the routing
+   table rather than from this row — the web xlsform route is already one the row does not name, and one
+   found means the unit was wrong.
 
 ---
 

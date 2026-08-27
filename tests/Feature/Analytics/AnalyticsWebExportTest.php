@@ -150,3 +150,44 @@ it('defaults the export window to the same range the page opens on', function ()
         ->assertOk()
         ->assertHeader('content-disposition', "attachment; filename=analytics-{$from}-to-{$to}.csv");
 });
+
+/*
+|--------------------------------------------------------------------------
+| M34 — the authorization gate on this route, which nothing asserted until now.
+|
+| The one assertion that pointed at /analytics/export before this (AnalyticsPageGateTest.php:110) drives it
+| as an OWNER on a Professional plan and asserts a REDIRECT. That is `feature:advanced_analytics` answering;
+| an Owner passes `can:` on the way to it, so the authorization middleware on this route was never exercised
+| by anything. Deleting `can:viewAny,SavedReportView` from routes/tenant.php:894 left the whole suite green.
+|--------------------------------------------------------------------------
+*/
+
+it('403s the export for a member holding neither dashboard permission', function (): void {
+    // WHY THIS IS A PERMISSION ASSERTION AND NOT AN ENTITLEMENT ONE, which is the trap the row this closes
+    // was filed about: `route:list` resolves this route as `Authorize:viewAny,SavedReportView` BEFORE
+    // `RequireFeature:advanced_analytics` — measured, not assumed. beforeEach() already assigns Business, so
+    // the feature gate cannot answer, and the only middleware left that can produce a 403 is the `can:` one.
+    //
+    // A role-less active member is the ONLY construction that reaches that arm. Every seeded role holds at
+    // least `dashboard.form.view` and SavedReportViewPolicy::viewAny is
+    // `dashboard.org.view || dashboard.form.view`; AnalyticsPageGateTest.php:69-72 records the same
+    // reasoning for the /analytics page, and this is that argument carried to the route that streams the
+    // numbers rather than renders them.
+    //
+    // POSITIVE CONTROL: the Owner's 200 on this exact URI is this file's first test (:71), which asserts
+    // ROWS rather than status per the header doctrine above — so this 403 cannot be a route refusing
+    // everybody.
+    //
+    // THERE IS DELIBERATELY NO SCOPE-DENIAL HALF, and that is a correction to the row rather than an
+    // omission. GET /forms/{form}/submissions/export can assert one because `can:view,form` binds an
+    // instance; this gate is class-level `viewAny` with no instance to be out of scope of. The per-form
+    // narrowing for analytics is AnalyticsFormSet's, applied to the ROWS inside the exporter, and it is
+    // pinned as a layer by FormAnalyticsPageTest.php:177 and DashboardMetricsServiceTest.php:154-172.
+    $nobody = User::factory()->create();
+    enterTenant($this->tenant->id, $nobody->id);
+    makeActiveMember($nobody, 'viewer');
+    $nobody->syncRoles([]);
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    $this->actingAs($nobody)->get(webExportUrl())->assertForbidden();
+});

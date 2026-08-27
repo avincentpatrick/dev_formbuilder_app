@@ -164,3 +164,47 @@ it('streams a valid XLSX that round-trips through the reader', function (): void
     expect($read[0])->toBe(['Section', 'Key', 'Value'])
         ->and(count($read))->toBeGreaterThan(1);
 });
+
+/*
+|--------------------------------------------------------------------------
+| M34 — the two gates on THIS route, as opposed to on its twin.
+|
+| /api/v1/analytics/report and /api/v1/analytics/report/export carry an IDENTICAL middleware triple
+| (routes/api.php:365-370). AnalyticsApiTest.php:87 asserts the ability refusal against `analyticsUrl()`,
+| whose default suffix is 'report' — so the coverage that reads as this route's belongs to the twin, and
+| both of this route's gates could be deleted with the whole suite green.
+|
+| Order matters and was measured with `route:list` rather than assumed:
+| CheckForAnyAbility:read:analytics → Authorize:viewAny,SavedReportView → RequireFeature:advanced_analytics.
+| The entitlement answers LAST, and beforeEach() assigns Business anyway, so every 403 below is a token or
+| permission refusal and never a plan one — the API's plan refusal is a 402 (AnalyticsApiTest.php:113).
+|
+| POSITIVE CONTROL for both: 'streams a NON-EMPTY body' (:77), the Owner's entitled 200 on this same URI.
+|--------------------------------------------------------------------------
+*/
+
+it('refuses the EXPORT to a token holding every OTHER ability but not read:analytics', function (): void {
+    // Every-other-ability rather than no-ability, borrowing AnalyticsApiTest.php:90's construction: a token
+    // with an empty ability list would be refused by Sanctum for reasons that have nothing to do with this
+    // route's own gate.
+    $abilities = array_values(array_diff(ApiAbilities::all(), [ApiAbilities::READ_ANALYTICS]));
+    $token = $this->owner->createToken('ci', $abilities)->plainTextToken;
+
+    $this->withToken($token)->get(exportUrl())->assertForbidden();
+});
+
+it('refuses the EXPORT to a correctly-scoped token whose owner holds neither dashboard permission', function (): void {
+    // The `can:` arm, which the ability test above cannot reach: this token carries read:analytics, so
+    // Sanctum passes it through and only Authorize:viewAny,SavedReportView is left to refuse. Nothing in the
+    // repository asserted this arm on either analytics API route — the twin's is unpinned too, and that is
+    // filed rather than fixed here because the twin is not this row's subject.
+    $nobody = User::factory()->create();
+    enterTenant($this->tenant->id, $nobody->id);
+    makeActiveMember($nobody, 'viewer');
+    $nobody->syncRoles([]);
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    $token = $nobody->createToken('ci', [ApiAbilities::READ_ANALYTICS])->plainTextToken;
+
+    $this->withToken($token)->get(exportUrl())->assertForbidden();
+});

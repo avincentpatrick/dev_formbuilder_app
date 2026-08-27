@@ -104,6 +104,11 @@ it('passes the feature gate VACUOUSLY with no plan at all, which is why every ga
 });
 
 it('gates the export and all three saved-view verbs on the same feature', function (): void {
+    // THIS IS AN ENTITLEMENT ASSERTION AND NOT AN AUTHORIZATION ONE, and saying so is the point of the
+    // comment (M34). The caller is an Owner, who passes every `can:` gate below on the way to the
+    // `feature:` refusal, so nothing here exercises the authorization middleware on any of these four
+    // routes. The permission gate on /analytics/export is pinned in AnalyticsWebExportTest.php; the
+    // three saved-view verbs are still unpinned and that is filed in docs/feature-backlog.md.
     $this->withoutVite();
     assignPlanTier(PlanTier::Professional);
 

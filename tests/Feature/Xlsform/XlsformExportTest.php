@@ -9,6 +9,7 @@ use App\Models\FormSection;
 use App\Models\FormVersion;
 use App\Models\User;
 use App\Services\Xlsform\XlsformExporter;
+use App\Support\Api\ApiAbilities;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -243,5 +244,81 @@ it('authorizes export exactly like form view (edit access)', function (): void {
     makeActiveMember($editor, 'form_editor');
     $this->actingAs($editor)
         ->get("http://acme.meridian.test/forms/{$form->id}/versions/{$version->id}/xlsform")
+        ->assertForbidden();
+});
+
+/*
+|--------------------------------------------------------------------------
+| M34 — the API twin of the export, which no test in the repository issued a request to.
+|
+| The web route above has had a real deny test since G7a ('authorizes export exactly like form view'). The
+| /api/v1 twin — same bytes, same feature flag, a DIFFERENT controller and an extra ability gate — had
+| nothing: not a 200, not a 403, not a request. Its only coverage was structural, GroupBPolicyGateTest,
+| which walks the route table for the literal string `can:` and — in its own header's words at :33 — "cannot
+| judge whether an allowlisted reason is TRUE". It issues no request and asserts no status, so a gate naming
+| a permission nobody holds passes it.
+|
+| Middleware order measured with `route:list`, not assumed:
+| CheckForAnyAbility:read:forms → Authorize:view,form → RequireFeature:xlsform_export. The entitlement
+| answers LAST, and this suite assigns no plan at all (RequireFeature fails open on a null plan,
+| RequireFeature.php:33), so both 403s below are token or policy refusals.
+|
+| BOTH DENIED CALLERS USE A FORM IN THEIR OWN TENANT, DELIBERATELY. bootstrap/app.php:217-218 runs
+| SubstituteBindings BEFORE Authorize, so a cross-tenant caller 404s at route-model binding and would pass
+| with `can:view,form` deleted. That is not a permission test, and this file does not pretend otherwise.
+|--------------------------------------------------------------------------
+*/
+
+it('streams the XLSForm over the API to an owner token carrying read:forms', function (): void {
+    // THE POSITIVE CONTROL for the two refusals below, and the first request any test has made to this URI.
+    // Without it a controller that refused everybody would satisfy both of them.
+    $tenant = inboxTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    makeActiveMember($owner, 'owner');
+    $form = publishedInboxForm($tenant, $owner);
+    $version = FormVersion::findOrFail($form->current_published_version_id);
+    $token = $owner->createToken('ci', [ApiAbilities::READ_FORMS])->plainTextToken;
+
+    $this->withToken($token)
+        ->get("http://acme.meridian.test/api/v1/forms/{$form->id}/versions/{$version->id}/xlsform")
+        ->assertOk();
+});
+
+it('refuses the API export to a write-only token, which never reaches the policy', function (): void {
+    // The ability arm. Mirrors XlsformImportTest.php:277's read-only refusal in the opposite direction, and
+    // asserts the envelope code too so a 403 arriving from some other layer cannot satisfy it.
+    $tenant = inboxTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    makeActiveMember($owner, 'owner');
+    $form = publishedInboxForm($tenant, $owner);
+    $version = FormVersion::findOrFail($form->current_published_version_id);
+    $token = $owner->createToken('ci', [ApiAbilities::WRITE_FORMS])->plainTextToken;
+
+    $this->withToken($token)
+        ->get("http://acme.meridian.test/api/v1/forms/{$form->id}/versions/{$version->id}/xlsform")
+        ->assertForbidden()
+        ->assertJsonPath('error.code', 'insufficient_ability');
+});
+
+it('refuses the API export to a form_editor who is not a collaborator on that form', function (): void {
+    // The SCOPE arm, and the one the row this closes actually asked for: a caller whose token scope is
+    // correct and whose role holds the permission, refused because THIS form is not theirs. The token is
+    // minted with read:forms so Sanctum passes it and only Authorize:view,form is left to answer.
+    $tenant = inboxTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    makeActiveMember($owner, 'owner');
+    $form = publishedInboxForm($tenant, $owner);
+    $version = FormVersion::findOrFail($form->current_published_version_id);
+
+    $editor = User::factory()->create();
+    enterTenant($tenant->id, $editor->id);
+    makeActiveMember($editor, 'form_editor');
+    $token = $editor->createToken('ci', [ApiAbilities::READ_FORMS])->plainTextToken;
+
+    $this->withToken($token)
+        ->get("http://acme.meridian.test/api/v1/forms/{$form->id}/versions/{$version->id}/xlsform")
         ->assertForbidden();
 });

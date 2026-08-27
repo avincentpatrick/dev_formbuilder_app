@@ -2584,7 +2584,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   permission.
 
 - ~~**`major` · The queued half of `gamification:backfill` is asserted by job count alone.**~~
-  ✅ **DONE — M32 (2026-08-28), PR #224.** Two test files, no production change. The defect was **measured
+  ✅ **DONE — M32 (2026-08-28), PR #225.** Two test files, no production change. The defect was **measured
   before a line of test was written**, which is the only reason this row closed correctly: **the fix the row
   prescribes below does not work.**
   ⛔ **`Queue::assertPushed($class, $closure)` IS AT-LEAST-ONE-MATCH.** Read from the vendor source for the

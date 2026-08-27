@@ -18,7 +18,7 @@ Standing Rule 7(b-bis).
 
 ## Status: NO ACTIVE CLAIM — `M32` is merged and the lane holds nothing forward
 
-**`M32` is merged (PR #224, CI 6/6 green with real step counts).** Lane A holds no active row and — unlike
+**`M32` is merged (PR #225, CI 6/6 green with real step counts).** Lane A holds no active row and — unlike
 every hand-off since M30 — **pre-claims no forward number either.** The next row is taken under Rule 7(f)
 from `docs/feature-backlog.md`, and the claim must be written here and **pushed** before the first file is
 opened.
@@ -91,7 +91,7 @@ M31 is a **test-only** diff, so most gates cannot move and that is stated rather
 
 ---
 
-## RELEASED — M32, the backfill fan-out asserted by job count alone (merged as PR #224)
+## RELEASED — M32, the backfill fan-out asserted by job count alone (merged as PR #225)
 
 **Two test files, no production change.** `tests/Feature/Gamification/BackfillCommandTest.php` (+67) and
 `tests/Feature/Connectors/ConnectorTokenRefreshTest.php` (+30/-1). CI step counts are recorded in the
@@ -258,7 +258,7 @@ rather than a value anybody chose.**
 
 ### THE QUEUE BEHIND IT — `M32` — RELEASED, AND ITS SCOPING NOTE IS SPENT
 
-**`M32` merged as PR #224 (2026-08-28); see its own `## RELEASED` section above.** The note that stood
+**`M32` merged as PR #225 (2026-08-28); see its own `## RELEASED` section above.** The note that stood
 here was right that the row was real and that its prescribed fix did not work, and **wrong in one claim a
 reader would have acted on**: it recorded the six sibling maintenance fan-outs as *"checked individually
 and not defects"*. That holds for their production code and fails for their coverage — four of them are

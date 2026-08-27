@@ -94,8 +94,17 @@ M31 is a **test-only** diff, so most gates cannot move and that is stated rather
 ## RELEASED — M32, the backfill fan-out asserted by job count alone (merged as PR #225)
 
 **Two test files, no production change.** `tests/Feature/Gamification/BackfillCommandTest.php` (+67) and
-`tests/Feature/Connectors/ConnectorTokenRefreshTest.php` (+30/-1). CI step counts are recorded in the
-post-merge commit, parsed individually.
+`tests/Feature/Connectors/ConnectorTokenRefreshTest.php` (+30/-1).
+
+✅ **CI 6/6 GREEN WITH REAL STEP COUNTS, PARSED INDIVIDUALLY** (run `33108016145`) — E2E **20** ·
+Static analysis **19** · Contract **16** · Frontend **12** · Pest **11** · Design-system axe **11**.
+Not one `steps: []`. **CI Pest `4597 passed / 19,439 assertions`** (2 pre-existing warnings) — **+2 tests
+and +6 assertions on M31's `4595 / 19,433`**, and it reconciles counted both ways: Gamification
+**134 / 479 → 136 / 483** (+2/+4) and the connector file **38 → 40 assertions** (+0/+2).
+**Vitest `134 files / 2,293`** · **Storybook axe `42 / 303`** · **E2E `551 passed + 10 skipped` (17.3m),
+NO flaky line** — all three unchanged, as a PHP-test-only diff requires. **PHPStan CI `[OK]`**; local
+gates: `tests/Feature/Connectors` **246 / 932**, five host lint gates unchanged at
+**97 · 113 · 31 · 113/121/0 · 180**, `openapi.json` untouched.
 
 ### THE ROW'S OWN PRESCRIBED FIX WAS WRONG, AND THIS TIME THAT WAS KNOWN BEFORE THE FIRST LINE
 

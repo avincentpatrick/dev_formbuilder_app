@@ -3,12 +3,15 @@
 declare(strict_types=1);
 
 use App\Enums\ResourceCapacity;
+use App\Enums\SubmissionSource;
 use App\Enums\SubmissionStatus;
 use App\Models\FormVersion;
 use App\Models\Submission;
 use App\Models\SubmissionAnswer;
 use App\Models\User;
 use App\Services\Forms\PublishService;
+use App\Services\Submissions\SubmissionPayload;
+use App\Services\Submissions\SubmissionPipeline;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -62,6 +65,37 @@ function seedEditable(SubmissionStatus $status = SubmissionStatus::Submitted, ar
 function baselineOf(Submission $submission): string
 {
     return (string) SubmissionAnswer::where('submission_id', $submission->id)->value('answers_content_checksum');
+}
+
+/**
+ * A submission written by the REAL pipeline, so its answer row carries a real `answers_content_checksum`
+ * exactly as production writes one.
+ *
+ * ⚠️ `seedEditable()` DELIBERATELY DOES NOT DO THIS AND MUST NOT START. It goes through
+ * `SubmissionAnswerFactory`, which stamps no checksum — the LEGACY row, which
+ * {@see EditSubmissionAnswersRequest} keeps editable on purpose and which every case above is the right
+ * fixture for. Converting it would delete the nullable path's only coverage and change the fixture shape
+ * under every caller of `seedInboxSubmission()` in the suite. This is an ADDITION, not a replacement.
+ *
+ * ⚠️ AND IT IS DEFINED HERE RATHER THAN REUSING `SubmissionAnswerEditTest`'s `submitForEdit()`. Pest's
+ * helper functions are GLOBAL, so calling that one from this file passes on a whole-suite run and dies with
+ * `Call to undefined function` on a per-file run — the same global-namespace trap `editableIndexedForm`'s
+ * docblock in that file already records, arriving from the other direction.
+ *
+ * @param  array<string, mixed>  $answers
+ */
+function seedEditableWithRealChecksum(array $answers = ['full_name' => 'Ada', 'color' => 'r']): Submission
+{
+    $version = FormVersion::findOrFail(test()->form->current_published_version_id);
+
+    $result = app(SubmissionPipeline::class)->submit(new SubmissionPayload(
+        version: $version,
+        answers: $answers,
+        source: SubmissionSource::Manual,
+        respondentUserId: null,
+    ));
+
+    return $result->submission->refresh();
 }
 
 /*
@@ -266,6 +300,65 @@ it('refuses a PATCH whose baseline is stale, so a second editor cannot silently 
     // A's correction survives — the whole point.
     expect(SubmissionAnswer::where('submission_id', $submission->id)->value('answers')['full_name'])
         ->toBe('Ada Lovelace');
+});
+
+/*
+| ⛔ THE TWO CASES BELOW CARRY A REAL TOKEN OVER THE WIRE, AND EVERY PATCH ABOVE CARRIES AN EMPTY STRING.
+| `baselineOf()` reads a column the factory never stamps and casts it, so it returns `''`;
+| `ConvertEmptyStringsToNull` then turns that back into null before validation. So the requests above prove
+| the LEGACY row is still editable — which matters, and is why they stay — but they cannot show that this
+| route transports a real checksum, because none of them has ever sent one. Both mutations named in
+| `SubmissionAnswerEditTest`'s section 9b survived the whole 60-test concurrency suite, so this gap is
+| measured rather than hypothetical, and it is closed at the HTTP layer too: a token that the service
+| compares correctly is still worthless if the request never delivers it intact.
+*/
+
+it('accepts a PATCH carrying the document\'s REAL checksum, and hands back a moved one', function (): void {
+    $submission = seedEditableWithRealChecksum();
+    $baseline = baselineOf($submission);
+
+    // ⚠️ NON-VACUITY. Without this the case degrades into a fourth empty-string PATCH the moment the
+    // pipeline stops stamping the column, and it would keep passing while measuring nothing.
+    expect($baseline)->not->toBe('');
+
+    $this->actingAs($this->owner)
+        ->patch("http://acme.meridian.test/submissions/{$submission->id}/answers", [
+            'answers' => ['full_name' => 'Ada Lovelace', 'color' => 'r'], 'baseline' => $baseline,
+        ])
+        ->assertRedirect("/submissions/{$submission->id}")
+        ->assertSessionHas('toast');
+
+    editReenter();
+    expect(SubmissionAnswer::where('submission_id', $submission->id)->value('answers')['full_name'])
+        ->toBe('Ada Lovelace')
+        ->and(baselineOf($submission))->not->toBe($baseline);
+});
+
+it('refuses a PATCH whose real baseline is stale, with both editors holding a real token', function (): void {
+    $submission = seedEditableWithRealChecksum(['full_name' => 'Ada', 'color' => 'r']);
+    $stale = baselineOf($submission);
+    expect($stale)->not->toBe('');
+
+    // Editor A saves first, from a token that is current at the time.
+    $this->actingAs($this->owner)
+        ->patch("http://acme.meridian.test/submissions/{$submission->id}/answers", [
+            'answers' => ['full_name' => 'Ada Lovelace', 'color' => 'r'], 'baseline' => $stale,
+        ])->assertRedirect("/submissions/{$submission->id}");
+
+    editReenter();
+
+    // Both tokens are now real and they differ — the condition the sibling case above can never reach.
+    expect(baselineOf($submission))->not->toBe('')->and(baselineOf($submission))->not->toBe($stale);
+
+    // Editor B is still on the page rendered before A saved.
+    $this->actingAs($this->owner)
+        ->patch("http://acme.meridian.test/submissions/{$submission->id}/answers", [
+            'answers' => ['full_name' => 'Ada', 'color' => 'b'], 'baseline' => $stale,
+        ])->assertSessionHas('toast');
+
+    editReenter();
+    expect(SubmissionAnswer::where('submission_id', $submission->id)->value('answers'))
+        ->toMatchArray(['full_name' => 'Ada Lovelace', 'color' => 'r']);
 });
 
 /*

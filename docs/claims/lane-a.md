@@ -16,60 +16,73 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — but the forward queue `M31` and `M32` IS STILL A CLAIM
+## Status: ACTIVE CLAIM — `M31`, the answer-edit concurrency suite that compares `null === null`
 
-**`M30` is merged (PR #220, `5e58c05`, 6/6 green).** Lane A holds no *active* row. ⛔ **IT DOES STILL HOLD
-`M31` AND `M32`**, pre-claimed in the M30 claim below on Rule 7's *"the lane queue is the claim"*, and Lane
-B's `M33` release records that this nearly caused a collision: the obvious arithmetic (*"`M30` is the
-highest merged, so take `M31`"*) would have landed on a claim that was already pushed and readable.
-**Lane B read the whole file, found the queue, and took `M33` instead — the protocol worked.** Both rows are
-verified real and scoped below; the next Lane A session takes `M31` and needs no re-verification pass.
+**Taken 2026-08-27.** Branch `m31-answer-edit-checksum`, cut from `origin/main` at `659c6ca`, PR into `main`.
+Row: the `major` under **Test suite & CI gates** in `docs/feature-backlog.md:2346` — *every accepted write in
+the answer-edit concurrency suite compares `null === null`*.
 
-⛔⛔ **BEFORE YOU NUMBER ANYTHING: READ THE WHOLE OF `lane-b.md`, NOT ITS `## Status` LINE** — the mirror of
-what Lane B wrote here about this file, and it now binds both ways. **The highest number spent is `M33`, so
-`M34` is the next free one after this lane's own `M31`/`M32`.**
+⛔ **`M32` REMAINS CLAIMED BEHIND THIS ROW**, on Rule 7's *"the lane queue is the claim"* — the queued half of
+`gamification:backfill`, scoped in the M30 release block below with the correction that **the row's own
+prescribed fix does not work**. It is not free for the other lane to take.
 
-⛔ **AND ONE SIGNAL THAT IS EARLIER THAN EITHER CLAIM FILE: `git worktree list`.** At M30's session open
-`lane-b.md` read NO ACTIVE CLAIM and the other worktree sat on `ad34e62 [m26-release]`; four minutes later
-the same worktree was on a branch named `m29-feedback-screenshot-deny` with **zero commits and a clean
-tree** — the row taken, the number taken, and nothing yet pushed for anyone to read. Rule 7(g) is right that
-an unpushed claim does not exist; what M30 adds is that **the other lane's WORKTREE HEAD is observable when
-its claim file is not.** Trusting the opening read would have taken both that row and that number.
-**Re-read at write time was necessary and NOT sufficient. One command closes the gap.**
+⛔⛔ **NUMBERED `M31` AFTER READING THE WHOLE OF `lane-b.md` AND RUNNING `git worktree list`, AND THE SECOND
+CHECK IS THE ONE THAT MATTERED.** `lane-b.md` on `origin/main` reads `## Status: NO ACTIVE CLAIM` — its
+`M29`/`M33` are both merged and released, and nothing in its body pre-claims a forward number. **Read alone,
+that file says `M31` through `M34` are all free.** `git worktree list` at session open said otherwise:
+`c:\laragon\www\fb-lane-b` sits on **`m34-export-deny-tests`**, two commits deep, and by the time this branch
+was cut its claim commit `659c6ca` was already on `origin/main`. **`M34` is Lane B's and `M35` is the next
+free number**, not `M32`. This is M30's finding paying out in the other direction: there, the worktree was
+ahead of the claim file; here, the claim file caught up in the same minutes. **One command closed a gap that
+both files agreed to leave open.**
 
-**Namespaces after M30:** next free ADR is still **`0022`** and it is still **Lane A's** block-opener
-(`0022-0025`) — **ninth consecutive Lane A increment to spend nothing**; `0010` reserved for H1d; `#16`
-free; next free migration prefix still **`2026_08_17_000111`**. ⚠️ **ADR-0016's next free sub-decision is
-`§D36`** — M29 spent `§D35`. ⚠️ **ADR-0015 now runs to `§D10`** (M33). M30 deliberately spent **no**
-`§D<n>` at all: Lane B's `M29` was live and holding `§D35` at write time, and claiming `§D36` against an
-unmerged allocation is the one shape 7(g) cannot arbitrate — the reasoning went to
-`docs/security-threat-model.md` §4 instead, where a guest-endpoint denial-of-service row belongs anyway.
+**Namespaces this claim spends: NOTHING.** Next free ADR is still **`0022`** and still Lane A's block-opener
+(`0022-0025`) — **tenth consecutive Lane A increment to spend nothing**. Adding a test that pins an existing,
+correctly-implemented guard is not a decision; nothing is weighed and nothing is rejected. **No migration**
+(`2026_08_17_000111` still free). **No ADR-0016 `§D<n>`** (next free `§D36`); ADR-0015 runs to `§D10`.
+`0010` reserved for H1d; `#16` free. ⚠️ **Lane B's `M34` is live, so claiming `§D36` against an unmerged
+allocation is the shape 7(g) cannot arbitrate — M30 declined it for the same reason and so does this row.**
 
-### ⛔⛔ BASELINE — TWO OF THE FIVE FIGURES THE PREVIOUS HAND-OFF QUOTED WERE WRONG, BOTH LOW, AND BOTH ARE CORRECTED HERE FROM CI
+### Every file this claim touches, named before it is opened
 
-**Every figure below is read out of a CI log, not carried forward.** Measured on `origin/main` after
-`M30` (run `33026093781`, the PR run whose merge base already contained `M29` and `M33`):
+- `tests/Feature/Submissions/SubmissionAnswerEditTest.php` — the concurrency cases. Lane A's row.
+- `tests/Feature/Submissions/SubmissionEditRoutesTest.php` — `:62`, the second `baselineOf()` caller.
+- `database/factories/SubmissionAnswerFactory.php` — **only if** the fix belongs in the factory rather than
+  in the tests, which is the open question this increment answers rather than assumes.
+- `docs/feature-backlog.md` (this row only), `docs/claims/lane-a.md`, `PROGRESS.md` (Lane A's block and
+  hand-off line only).
 
-- **CI Pest `4580 passed / 19,383 assertions`** (2 pre-existing warnings). ⚠️ **The post-M28 hand-off said
-  `4544`, which was THIRTEEN LOW** — Lane B caught it on M29 and it is corrected here too. The chain now
-  reconciles to the test: M29's merge run `4564 / 19,345` → M33's PR run `4575 / 19,359` (+11) → M30
-  `4580 / 19,383` (**+5 tests, +24 assertions — exactly** RateLimiterBindingTest's four cases at 18
-  assertions plus GuestDraftRuntimeTest's one at 6).
-- **Vitest `134 files / 2,293`.** ⚠️ **The post-M28 hand-off said `2,292`, which was ONE LOW.** M30 touches
-  no JavaScript, so the `+1` looked like the other lane — and it was neither lane: **the M29 release run on
-  `main`, which contains no code from either M30 or M33, already read `134 / 2,293`.** Chased rather than
-  attributed, because a gate number nobody can explain is the one that hides the next defect. ⛔ **TWO
-  STALE BASELINES IN ONE HAND-OFF IS A PATTERN, NOT AN ACCIDENT: quote gate numbers out of a CI LOG, never
-  out of the previous hand-off.**
-- **Storybook axe `42 suites / 303`** · **E2E `551 passed + 10 skipped, no flaky line`** (17.6m) ·
-  **PHPStan CI `[OK]`**, local **18 = baseline, zero delta by FILE LIST** · **FIVE** host lint gates
-  **97 · 113 · 31 · 113/121/0 · 180** · **`openapi.json` byte-identical**, `cmp`'d against a fresh
-  `scramble:export`.
+**Read-only, not edited:** `app/Services/Submissions/SubmissionAnswerEditService.php`,
+`app/Services/Submissions/SubmissionFinalizer.php`. **The production guard is correct** — this row is a
+coverage gap, and a claim that names the service as editable would be claiming a fix nobody asked for.
+**If this list grows, the claim is extended as its own pushed commit before the file is opened.**
 
-⚠️ **A LOCAL FULL-SUITE PEST NUMBER IS NOT THE CI NUMBER AND MUST NEVER BE QUOTED AS ONE** — Lane B measured
-the gap at **335 tests** on one tree (local 4229, CI 4564). M30's local figures are per-directory deltas
-only: `tests/Feature/Auth` **127 → 131 / 615 → 633**, `tests/Feature/Guest` **77 / 319**,
-`tests/Feature/Submissions`+`Forms` **805 / 3,147**.
+⚠️ **NO FILE COLLISION WITH LANE B'S `M34`.** Its diff is
+`tests/Feature/{Analytics,Xlsform}/` plus `routes/tenant.php`; not one path above appears in it. The only
+shared artefacts are `docs/feature-backlog.md` and `PROGRESS.md`, both edited per-row and per-block.
+
+### ⛔ THE ROW IS RIGHT AND ITS OBVIOUS TEST IS THE WRONG ONE — VERIFIED AT `M30`, CARRIED HERE, NO SECOND PASS OWED
+
+Every hop was traced in the M30 session: `SubmissionAnswerFactory` stamps no `answers_content_checksum`,
+`baselineOf()` casts to `''`, `ConvertEmptyStringsToNull` turns it back to `null`, and all **three** accepted
+writes reach `SubmissionAnswerEditService.php:135` with `null` on both sides.
+
+⛔ **THE SHARPENING THE ROW DOES NOT HAVE: DELETING THE GUARD OUTRIGHT IS ALREADY CAUGHT.** Editor B re-reads
+`$stored` at `:114`, so the under-lock check at `:202` compares a value against itself, B's write is accepted,
+and three cases redden. **The suite is blind to WEAKENING the comparison, not to removing it — so the test
+owed is a REAL-CHECKSUM COMPARISON, NOT ANOTHER DELETION PROBE.** A positive control that deletes the guard
+would pass and prove nothing, which is this project's *"a probe measuring zero proves nothing unless it
+touched the defect"* arriving from a new direction.
+
+**The file's own `submitForEdit()` helper (`:750`) already produces production-shaped rows and is used by
+none of the concurrency cases** — so the shape the fix needs already exists in the file that needs it.
+
+### The controls this increment owes
+
+The mutation that must redden, and did not before: **drop the client token from the guard** at
+`SubmissionAnswerEditService.php:135` — the single most natural simplification of an optimistic-concurrency
+check. A green run after that edit is the defect; a red one naming a concurrency case is the fix. Every
+control restored by **sha256 byte comparison**, never `git checkout --`, per M9.
 
 ---
 

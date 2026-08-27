@@ -2343,15 +2343,37 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the true one**, and this project has recorded three times that a false claim about a control is worse than
   a missing one because it stops the next reader looking. **Not live** — a comment. **Deliberately left by
   M30** for the same lane-boundary reason as the row above, and filed so the correction is not lost.
-- **`major` · Every accepted write in the answer-edit concurrency suite compares `null === null`.**
-  `tests/Feature/Submissions/SubmissionEditRoutesTest.php:62` ·
-  `tests/Feature/Submissions/SubmissionAnswerEditTest.php:579` — `SubmissionAnswerFactory` never stamps
-  `answers_content_checksum` while `SubmissionFinalizer.php:96` stamps it on every real submission, so
-  `baselineOf()` yields `''` → `null`. Drop the client token from the guard at
-  `SubmissionAnswerEditService.php:135` — the single most natural simplification of an optimistic-
-  concurrency check — and the suite stays fully green while post-submission editing is **permanently broken
-  for every submission that exists in production**. **Latent.** The file's own `submitForEdit()` helper
-  (`:750`) already produces production-shaped rows and is used by none of the concurrency cases.
+- ~~**`major` · Every accepted write in the answer-edit concurrency suite compares `null === null`.**~~
+  ✅ **DONE — M31 (2026-08-27), AND THE ROW'S OWN PRESCRIBED PROBE WAS ALREADY CAUGHT.** The headline held
+  exactly: `SubmissionAnswerFactory` stamps no `answers_content_checksum`, so every fixture row is the
+  LEGACY row and the only fact the suite pinned was *"a null baseline against a non-null stored checksum is
+  refused"* — the guard held from one side only.
+  ⛔ **BUT "DROP THE CLIENT TOKEN AND THE SUITE STAYS FULLY GREEN" IS FALSE AS WRITTEN, AND IT WAS MEASURED
+  RATHER THAN ARGUED.** Deleting the guard reddens three cases: editor B re-reads the answer row at
+  `SubmissionAnswerEditService.php:114`, so the under-lock check at `:202` compares a value against itself
+  and B's write is accepted. **The suite was never blind to REMOVING this guard — only to WEAKENING it**, so
+  a deletion probe would have measured zero and proved nothing. Same shape as M30's row: right in the
+  headline, wrong in the mechanism.
+  ⚠️ **WHAT ACTUALLY SURVIVED — TWO MUTATIONS, OPPOSITE DIRECTIONS, BOTH GREEN ACROSS ALL 60 CASES.**
+  (1) `$baseline === null && $stored->answers_content_checksum !== null` — the guard reduced to a PRESENCE
+  check, so two editors each holding a real, **different** token never conflict and the lost update the
+  guard exists to prevent is silently live again. (2) `$baseline !== null || $stored->... !== $baseline` —
+  every non-null baseline refused, which is the row's own *"permanently broken for every submission that
+  exists in production"* and the direction the row never named. A third mutation (the adjacent-column typo,
+  `answers_schema_checksum` for `answers_content_checksum`) was **already caught**, which is why it is worth
+  recording that the null-vs-null equality is more protective than it looks.
+  **Four cases added**, two per file, through the real submit pipeline. Positive controls: (1) now reddens
+  **exactly** the two refusal cases, (2) reddens all four.
+  ⚠️ **NOT FIXED IN THE FACTORY, DELIBERATELY.** Stamping a checksum in `SubmissionAnswerFactory` would
+  **convert** the legacy rows rather than **add** the production ones — deleting the only coverage the
+  nullable path has, which `EditSubmissionAnswersRequest` supports on purpose so pre-checksum submissions
+  stay editable — and changing the fixture shape under every caller of `seedInboxSubmission()` in **both**
+  lanes' suites. The new cases are an addition; the old ones stay and still pass.
+  ⚠️ **AND EACH NEW CASE CARRIES A NON-VACUITY ASSERTION ON THE BASELINE, PROVEN RATHER THAN ASSUMED**:
+  nulling `SubmissionFinalizer.php:96`'s stamp fails all four **at that assertion**, printing *"Failed
+  asserting that null is of type string"* against the line. Without it each case silently degrades back into
+  a fourth `null === null` the moment the pipeline stops stamping.
+  `tests/Feature/Submissions` **415 / 1652 → 419 / 1685**.
 - ~~**`major` · `GET /feedback/{report}/screenshot` serves PII and has no DENY test at all.**~~
   ✅ **DONE — M29 (2026-08-26), AND THE ROW'S OWN FIX WOULD HAVE LEFT THE HOLE OPEN.** Both assertions the
   row asks for are in `tests/Feature/Tenant/FeedbackTest.php` — a same-tenant Viewer `assertForbidden` and a

@@ -16,73 +16,173 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M31`, the answer-edit concurrency suite that compares `null === null`
+## Status: NO ACTIVE CLAIM — but the forward queue `M32` IS STILL A CLAIM
+
+**`M31` is merged (PR #223, 6/6 green).** Lane A holds no *active* row. ⛔ **IT DOES STILL HOLD `M32`**,
+pre-claimed on Rule 7's *"the lane queue is the claim"* since M30 and scoped in the M30 block below with the
+correction that **the row's own prescribed fix does not work**. It is not free for the other lane to take.
+
+⛔⛔ **BEFORE YOU NUMBER ANYTHING: READ THE WHOLE OF `lane-b.md`, NOT ITS `## Status` LINE, AND RUN
+`git worktree list`.** **The highest number spent is `M34`** (Lane B, PR #222, `b6adb2e`), so **`M35` is the
+next free one after this lane's own `M32`.**
+
+⚠️ **AND M31 IS THE THIRD CONSECUTIVE INCREMENT WHERE THE NUMBER WAS DECIDED BY THE WORKTREE, NOT THE CLAIM
+FILES.** At M31's session open `lane-b.md` on `origin/main` read `## Status: NO ACTIVE CLAIM`, its `M29` and
+`M33` both merged and released, and **nothing anywhere in its body pre-claimed a forward number** — read
+alone, that file said `M31` through `M34` were all free. `git worktree list` said otherwise:
+`c:\laragon\www\fb-lane-b` sat on **`m34-export-deny-tests`**, two commits deep, and by the time this branch
+was cut Lane B's claim commit `659c6ca` had reached `origin/main`. **M30 recorded the worktree running AHEAD
+of the claim file; M31 is the case where the claim file caught up within the same minutes.** Both directions
+now have a measurement, and the conclusion is the same one: **one command closes a gap that both files agree
+to leave open.**
+
+### ⛔ A NAMESPACE FIGURE IN *THIS* FILE WAS WRONG FOR THREE INCREMENTS, AND THE OTHER LANE IS THE ONE THAT CAUGHT IT
+
+`lane-a.md` and every Lane A hand-off since M29 stated *"ADR-0016's next free sub-decision is `§D36` — M29
+spent `§D35`."* **`M29` spent no `§D` at all.** Lane B's `M34` release says so, and it was **verified here
+rather than accepted**: `docs/adr/0016-saml-sso.md` runs to **`§D34`**, and a repository-wide grep for
+`§D35` returns only `PROGRESS.md`, `PROGRESS_ARCHIVE.md` and `lane-b.md` — **three files arguing about a
+number that appears in no ADR.** `M29` *reserved* `§D35` in its claim and released it unspent. **`§D35` IS
+FREE, and it is corrected below.** ⚠️ **THE TRANSFERABLE PART IS THE DIRECTION IT TRAVELLED**: Lane B cannot
+edit this file, so it could only write the correction into its own and hope the next Lane A session read it.
+**It did, because Rule 7 makes reading the whole of the other file mandatory** — the same discipline that
+prevents number collisions is what carries a correction across a boundary neither lane may write through.
+A reserved-then-released allocation is exactly the shape that rots into a phantom, because the reservation is
+loud and the release is quiet.
+
+**Namespaces after M31:** next free ADR **`0022`**, still Lane A's block-opener (`0022-0025`) — **eleventh
+consecutive Lane A increment to spend nothing**. Next free migration prefix **`2026_08_17_000111`**.
+⚠️ **ADR-0016's next free sub-decision is `§D35`** (was wrongly recorded as `§D36`). ADR-0015 runs to
+`§D10`. `0010` reserved for H1d; `#16` free.
+
+### BASELINE — QUOTE THESE OUT OF A CI LOG, NEVER OUT OF A HAND-OFF
+
+M31 is a **test-only** diff, so most gates cannot move and that is stated rather than left as a bare number.
+
+- **CI Pest** — M34's merge run measured `4591 / 19,400`. M31 adds **+4 tests / +33 assertions**, so the
+  expected figure is **`4595 / 19,433`**. ⚠️ Read the real number off M31's own run; this is arithmetic, not
+  a measurement.
+- **PHPStan CANNOT MOVE ON THIS DIFF AND THE REASON IS STRUCTURAL** — `phpstan.neon` scans `app`, `database`
+  and `routes`, not `tests`. Local **18 errors across 10 files**, and **not one of the 10 is a file this
+  increment touched**. Lane B's M34 made the same point on its own test-only diff; a gate that *cannot* move
+  is worth saying so about, or the next reader reads an unchanged figure as evidence.
+  ⚠️ **LOCAL PHPStan NEEDS `php -d memory_limit=1G`** — the default 128M dies with a `FatalError` inside
+  `/tmp/phpstan/resultCache.php`, which reads as a code failure and is not one.
+- **FIVE host lint gates, all re-run, all unchanged: `97` · `113` · `31` · `113/121/0` · `180`.**
+- **Vitest, Storybook axe, E2E, `openapi.json`** — no JavaScript, no Vue, no selector and no route in the
+  diff. `openapi.json` byte-identical by construction.
+- ⚠️ **A LOCAL FULL-SUITE PEST NUMBER IS NOT CI'S** (gap measured at 335 tests). M31's local figures are
+  per-directory deltas only: `tests/Feature/Submissions` **415 / 1652 → 419 / 1685**, and the two files
+  alone **60 / 229 → 64 / 262**.
+
+---
+
+## RELEASED — M31, the concurrency guard that was pinned from one side only (merged as PR #223, 6/6 green)
 
 **Taken 2026-08-27.** Branch `m31-answer-edit-checksum`, cut from `origin/main` at `659c6ca`, PR into `main`.
-Row: the `major` under **Test suite & CI gates** in `docs/feature-backlog.md:2346` — *every accepted write in
-the answer-edit concurrency suite compares `null === null`*.
+Row: the `major` under **Test suite & CI gates** in `docs/feature-backlog.md`.
 
-⛔ **`M32` REMAINS CLAIMED BEHIND THIS ROW**, on Rule 7's *"the lane queue is the claim"* — the queued half of
-`gamification:backfill`, scoped in the M30 release block below with the correction that **the row's own
-prescribed fix does not work**. It is not free for the other lane to take.
+### The row was right in its headline, wrong in its probe, and incomplete about the damage
 
-⛔⛔ **NUMBERED `M31` AFTER READING THE WHOLE OF `lane-b.md` AND RUNNING `git worktree list`, AND THE SECOND
-CHECK IS THE ONE THAT MATTERED.** `lane-b.md` on `origin/main` reads `## Status: NO ACTIVE CLAIM` — its
-`M29`/`M33` are both merged and released, and nothing in its body pre-claims a forward number. **Read alone,
-that file says `M31` through `M34` are all free.** `git worktree list` at session open said otherwise:
-`c:\laragon\www\fb-lane-b` sits on **`m34-export-deny-tests`**, two commits deep, and by the time this branch
-was cut its claim commit `659c6ca` was already on `origin/main`. **`M34` is Lane B's and `M35` is the next
-free number**, not `M32`. This is M30's finding paying out in the other direction: there, the worktree was
-ahead of the claim file; here, the claim file caught up in the same minutes. **One command closed a gap that
-both files agreed to leave open.**
+**Right:** `SubmissionAnswerFactory` stamps no `answers_content_checksum`, so `seedInboxSubmission()`
+produces the *legacy* row, `baselineOf()` casts null to `''`, `ConvertEmptyStringsToNull` turns it back to
+null, and all three accepted writes reach `SubmissionAnswerEditService.php:135` with null on both sides.
 
-**Namespaces this claim spends: NOTHING.** Next free ADR is still **`0022`** and still Lane A's block-opener
-(`0022-0025`) — **tenth consecutive Lane A increment to spend nothing**. Adding a test that pins an existing,
-correctly-implemented guard is not a decision; nothing is weighed and nothing is rejected. **No migration**
-(`2026_08_17_000111` still free). **No ADR-0016 `§D<n>`** (next free `§D36`); ADR-0015 runs to `§D10`.
-`0010` reserved for H1d; `#16` free. ⚠️ **Lane B's `M34` is live, so claiming `§D36` against an unmerged
-allocation is the shape 7(g) cannot arbitrate — M30 declined it for the same reason and so does this row.**
+⛔ **WRONG:** *"Drop the client token from the guard and the suite stays fully green."* **Deleting the guard
+reddens three cases** — editor B re-reads the answer row at `:114`, so the under-lock check at `:202`
+compares a value against itself, B's write is accepted, and the refusal cases fail. M30 sharpened this in
+advance and it held: **the suite was never blind to REMOVING the guard, only to WEAKENING it.** A test
+written to the row's stated probe would have been aimed at a mutation the suite already catches — **the
+second consecutive increment where that was true**, after M30's `throttle:login` rename.
 
-### Every file this claim touches, named before it is opened
+⚠️ **INCOMPLETE:** the row names one failure direction. **Two survived, and they are opposites.**
 
-- `tests/Feature/Submissions/SubmissionAnswerEditTest.php` — the concurrency cases. Lane A's row.
-- `tests/Feature/Submissions/SubmissionEditRoutesTest.php` — `:62`, the second `baselineOf()` caller.
-- `database/factories/SubmissionAnswerFactory.php` — **only if** the fix belongs in the factory rather than
-  in the tests, which is the open question this increment answers rather than assumes.
-- `docs/feature-backlog.md` (this row only), `docs/claims/lane-a.md`, `PROGRESS.md` (Lane A's block and
-  hand-off line only).
+| Mutation | Before | After | Damage if shipped |
+|---|---|---|---|
+| **(1)** `$baseline === null && $stored->... !== null` — presence-only | **60 passed, GREEN** | **2 failed** | Two editors each holding a real, *different* token never conflict. The lost update the guard exists to prevent is silently live again. |
+| **(2)** `$baseline !== null \|\| $stored->... !== $baseline` — reject every non-null | **60 passed, GREEN** | **4 failed** | Every submission written by the real pipeline is **permanently uneditable**. |
+| **(3)** `answers_schema_checksum` for `answers_content_checksum` — adjacent-column typo | **2 failed** | 2 failed | *Already caught.* |
 
-**Read-only, not edited:** `app/Services/Submissions/SubmissionAnswerEditService.php`,
-`app/Services/Submissions/SubmissionFinalizer.php`. **The production guard is correct** — this row is a
-coverage gap, and a claim that names the service as editable would be claiming a fix nobody asked for.
-**If this list grows, the claim is extended as its own pushed commit before the file is opened.**
+**(3) IS WHY THE NULL-VS-NULL EQUALITY IS MORE PROTECTIVE THAN IT LOOKS, AND WHY THE FIRST TWO CANDIDATE
+MUTATIONS WERE DISCARDED.** Because `null === null` is trivially *true*, any mutation that breaks the
+equality outright throws on the accepted writes and reddens them. **The only mutants that survive are the
+ones that preserve `(null, null)` equality and `(real, null)` inequality** — i.e. those that discriminate on
+*nullness alone*. That is the precise statement of the gap, and it is narrower and sharper than *"the suite
+compares null to null"*: **the suite pinned exactly one bit, and the guard has two.**
 
-⚠️ **NO FILE COLLISION WITH LANE B'S `M34`.** Its diff is
-`tests/Feature/{Analytics,Xlsform}/` plus `routes/tenant.php`; not one path above appears in it. The only
-shared artefacts are `docs/feature-backlog.md` and `PROGRESS.md`, both edited per-row and per-block.
+### What was added, and where it deliberately was not added
 
-### ⛔ THE ROW IS RIGHT AND ITS OBVIOUS TEST IS THE WRONG ONE — VERIFIED AT `M30`, CARRIED HERE, NO SECOND PASS OWED
+**Four cases, two per file**, all going through the real submit pipeline so the rows carry production-shaped
+checksums — `SubmissionAnswerEditTest`'s own `submitForEdit()` helper, which the row correctly noted **no
+concurrency case used**, and a sibling in the routes file.
 
-Every hop was traced in the M30 session: `SubmissionAnswerFactory` stamps no `answers_content_checksum`,
-`baselineOf()` casts to `''`, `ConvertEmptyStringsToNull` turns it back to `null`, and all **three** accepted
-writes reach `SubmissionAnswerEditService.php:135` with `null` on both sides.
+⛔ **NOT FIXED IN `SubmissionAnswerFactory`, AND THAT WAS THE OPEN QUESTION THE CLAIM REFUSED TO PREJUDGE.**
+Stamping a checksum there would **convert** the legacy rows rather than **add** the production ones. Three
+reasons, in increasing order of importance: it changes the fixture shape under every caller of
+`seedInboxSubmission()` in **both** lanes' suites; it deletes the only coverage the nullable path has; and
+**that path is a supported production state, not an artefact** — `EditSubmissionAnswersRequest` uses
+`present` + `nullable` *on purpose*, and says so in its own words, so that submissions written before the
+pipeline stamped a checksum do not become permanently uneditable. **The obvious "fix the fixture" move would
+have destroyed real coverage to buy new coverage.** The old cases stay and still pass.
 
-⛔ **THE SHARPENING THE ROW DOES NOT HAVE: DELETING THE GUARD OUTRIGHT IS ALREADY CAUGHT.** Editor B re-reads
-`$stored` at `:114`, so the under-lock check at `:202` compares a value against itself, B's write is accepted,
-and three cases redden. **The suite is blind to WEAKENING the comparison, not to removing it — so the test
-owed is a REAL-CHECKSUM COMPARISON, NOT ANOTHER DELETION PROBE.** A positive control that deletes the guard
-would pass and prove nothing, which is this project's *"a probe measuring zero proves nothing unless it
-touched the defect"* arriving from a new direction.
+### ⛔ THE NON-VACUITY GUARD IS THE ASSERTION THAT MAKES THE WORD "REAL" TRUE, AND IT WAS PROVEN, NOT ASSUMED
 
-**The file's own `submitForEdit()` helper (`:750`) already produces production-shaped rows and is used by
-none of the concurrency cases** — so the shape the fix needs already exists in the file that needs it.
+Every new case asserts its baseline is a non-empty string **before** using it. Without that, each one
+silently degrades back into a fourth `null === null` the moment the pipeline stops stamping — passing while
+measuring nothing, which is this project's most-repeated failure mode.
 
-### The controls this increment owes
+**Control D proves it fires:** nulling `SubmissionFinalizer.php:96`'s stamp fails **all four** cases **at
+that assertion**, printing *"Failed asserting that null is of type string"* and *"Expecting '' not to be
+''"* against the exact line. ⚠️ **THE LOG WAS READ, NOT THE EXIT CODE** — M30's standing lesson that a
+control which only checks the exit status is half a control.
 
-The mutation that must redden, and did not before: **drop the client token from the guard** at
-`SubmissionAnswerEditService.php:135` — the single most natural simplification of an optimistic-concurrency
-check. A green run after that edit is the defect; a red one naming a concurrency case is the fix. Every
-control restored by **sha256 byte comparison**, never `git checkout --`, per M9.
+⛔⛔ **AND CONTROL D FAILED SILENTLY ON ITS FIRST RUN, WHICH IS THE TRANSFERABLE FINDING OF THIS INCREMENT.**
+The mutation was applied with `perl -0pi -e "s/...\$contentChecksum,/...null,/"` inside **double** quotes;
+the shell ate the escaping, **the substitution never applied**, and the suite came back **`64 passed`** —
+a result indistinguishable from *"the guard is decorative and the control disproves it."* It was caught only
+because the command **printed the mutated line** and the line was unchanged. ⚠️ **A CONTROL MUST PROVE ITS
+OWN MUTATION LANDED BEFORE ITS RESULT MEANS ANYTHING** — a green positive control is either a real
+disproof or a no-op edit, and nothing in the test output distinguishes them. Every mutation in this
+increment therefore greps the mutated line and aborts if it does not match. **This is `THE SHELL EATS
+BACKTICKS` widened: it also eats `\$` inside double quotes, and a silently-unapplied `sed`/`perl` mutation
+is a false negative that flatters the code.**
+
+### The file record
+
+Amended: `tests/Feature/Submissions/SubmissionAnswerEditTest.php` ·
+`tests/Feature/Submissions/SubmissionEditRoutesTest.php` · `docs/feature-backlog.md` ·
+`docs/claims/lane-a.md` · `PROGRESS.md`. **No new files.** `database/factories/SubmissionAnswerFactory.php`
+was claimed as *"only if"* and, as the claim predicted it might, **was not touched** — the M8/M11/M14/M30
+shape recurring by design for a fifth time.
+
+**Read-only, never edited:** `app/Services/Submissions/SubmissionAnswerEditService.php`,
+`app/Services/Submissions/SubmissionFinalizer.php`. Both were mutated **in the working tree** for controls
+and restored by **sha256 byte comparison** after every run, per M9 — `git checkout --` is not a mutation
+restore. Every restore verified `OK`.
+
+### ➕ ONE FINDING FILED, NOT FIXED
+
+`baselineOf()` in `SubmissionEditRoutesTest.php` returns `(string) $value`, which coerces a null checksum to
+`''` — and only `ConvertEmptyStringsToNull` turns it back into null before the service compares it. **The
+round trip happens to be correct, and it is correct by coincidence of two unrelated behaviours.** Left as-is
+because changing the helper's return type touches every case in the file and the new cases assert the real
+path directly; **named here so the next reader does not have to rediscover that the `''` is a cast artefact
+rather than a value anybody chose.**
+
+### THE QUEUE BEHIND IT — `M32`, STILL CLAIMED, STILL NEEDING NO SECOND PASS
+
+- **`M32`** — *the queued half of `gamification:backfill` is asserted by job count alone*. **REAL, and the
+  row's own prescribed fix does not work.** `Queue::assertPushed($class, $closure)` is *"at least one
+  match"*, so the literal reading — one closure asserting the id is one of the two — stays **green** under
+  the silent hoist mutation. It needs one closure **per expected id**, with the existing count assertion
+  **KEPT**, because a deleted loop is the one mutation the test catches today. ⚠️ **A second instance the row
+  does not name:** `tests/Feature/Connectors/ConnectorTokenRefreshTest.php:188-196` fakes the child and
+  asserts `Bus::assertDispatchedTimes(…, 2)` with no payload — the identical hole. Six sibling maintenance
+  fan-outs were checked **individually** and are **not** defects. Local baseline `tests/Feature/Gamification`
+  **134 / 479**.
+  ⚠️ **AND M31 ADDS A WARNING TO IT:** M32's row, like M31's and M30's, prescribes a fix. **Two of the last
+  three prescribed fixes were wrong** — M30's in both mechanisms, M31's in its probe. M32's is *already
+  known* to be wrong. **Measure the mutation before writing the test, and print the mutated line.**
 
 ---
 

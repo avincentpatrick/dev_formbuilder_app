@@ -2610,7 +2610,52 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `FormShareTest.php:364`), so neither is a coverage hole; the question is whether the gates name the right
   permission.
 
-- **`major` · The queued half of `gamification:backfill` is asserted by job count alone.**
+- ~~**`major` · The queued half of `gamification:backfill` is asserted by job count alone.**~~
+  ✅ **DONE — M32 (2026-08-28), PR #225.** Two test files, no production change. The defect was **measured
+  before a line of test was written**, which is the only reason this row closed correctly: **the fix the row
+  prescribes below does not work.**
+  ⛔ **`Queue::assertPushed($class, $closure)` IS AT-LEAST-ONE-MATCH.** Read from the vendor source for the
+  version installed (Laravel 13.18.1, `QueueFake.php:130-134`): the closure form asserts
+  `pushed($job, $callback)->count() > 0`. A single closure asking *"is this job's tenantId one of the two?"*
+  is satisfied by the **first of two identical jobs** and stays green under precisely the hoist mutation it
+  would have been added to catch. `assertPushed($job, 2)` routes to `assertPushedTimes` (`:122-124`) — a pure
+  count that never reads a payload.
+  ✅ **WHAT WORKS INSTEAD:** `Queue::pushed($job)` returns the job **objects** (`:364-375`, `->pluck('job')`),
+  and `Bus::dispatched()` the same (`BusFake.php:564-573`). Comparing the whole pushed set as sorted
+  `[tenantId, afterAuditId, limit]` tuples pins the multiset in **both** directions — nothing missing,
+  duplicated, or extra — in one assertion, and subsumes the count. The existing count assertions were **kept**
+  regardless: a deleted loop was the one mutation they already caught.
+  **MEASURED, each mutation printing the line it changed and aborting if the substitution did not land, and
+  restoring by saved bytes with a sha256 check** (`tests/Feature/Gamification` baseline **134 / 479**):
+
+  | Mutation | Before | After |
+  |---|---|---|
+  | hoist the loop variable — every child gets `$targets[0]` | **SURVIVED**, 8 passed / 19, exit 0 | CAUGHT |
+  | non-null `afterAuditId` on the fan-out | **SURVIVED** | CAUGHT |
+  | `--tenant` resolves to the wrong workspace | **SURVIVED** | CAUGHT |
+  | the same hoist in `RefreshConnectorTokensJob::sweep()` | **SURVIVED**, 9 passed / 38, exit 0 | CAUGHT |
+  | delete the loop entirely | CAUGHT | CAUGHT (not weakened) |
+
+  ⚠️ **THE SECOND INSTANCE WAS THE SHARPER ONE, AND THE ROW DID NOT NAME IT.**
+  `tests/Feature/Connectors/ConnectorTokenRefreshTest.php:188` is the **only place in the repository where
+  `RefreshConnectorTokensJob::sweep()`'s loop executes at all** — the file's own `runRefreshSweep()` helper
+  (`:74-89`) dispatches the **child** directly, so its other seven tests never reach the parent. Its sole
+  assertion was `Bus::assertDispatchedTimes(…, 2)`, and unlike the backfill it has no `--sync` sibling proving
+  a usable id ever reaches the child. The failure also **recurs hourly** rather than once: every non-first
+  tenant's OAuth grants simply expire at their own TTL, with no failed job and no log line. Fixed in the same
+  PR, plus the second half of that test's own name — *"holds no tenant context itself"* — which it had never
+  asserted.
+  ⚠️ **AND A SILENT MUTATION CLASS THE ROW'S OWN CENSUS MISSED:** a well-formed uuid that is **no tenant at
+  all**. `TenantAwareJob`'s guard (`:280-298`) is shape-only, so the job finds no row and **deletes itself**
+  with an `info` log — silent in production *and* in the suite, with **zero** workspaces backfilled. The
+  census's phrase *"aimed at the wrong workspace"* does not cover it. The set-equality assertion catches it,
+  because it compares against the real ids.
+  ⛔ **CORRECTION TO ITEM (2) BELOW — "the blast radius is six sites" IS RIGHT, "five siblings have zero
+  coverage" IS NOT.** Verified first-hand rather than from the census: `RefreshConnectorTokensJob` **does**
+  have a dedicated two-tenant fan-out test, and it is count-only — the row's own defect, in a second command.
+  The other four assert real per-tenant effects on a real `database` queue, which is the stronger idiom. The
+  honest statement is **"two of the six are asserted by count; the other four are asserted by a fixture too
+  small to tell the difference"** — filed as its own row below.
   `tests/Feature/Gamification/BackfillCommandTest.php:80-92` — `Queue::assertPushed(…, 2)` inspects no
   payload, and the queued loop (`BackfillGamificationCommand.php:119`) is the production default while only
   the `--sync` loop (`:142`) is proven to pass a usable id. Dispatch the slug instead of the key, or hoist
@@ -2650,6 +2695,47 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   loop forever — `GamificationBackfill.php:245` returns a null cursor when `count($rows) < $limit` is false,
   which `0 < 0` makes it, so the chain terminates. Of the three payload fields, only `tenantId` and
   `afterAuditId` carry real uncovered risk.
+- **`major` · Four maintenance fan-outs are asserted by a fixture too small to see a wrong tenant id.**
+  `SweepWebhookRetriesJob.php:26` · `SweepScheduledFormsJob.php:30` · `RollUpUsageCountersJob.php:27` ·
+  `ReapExpiredDraftsJob.php:25`. **Filed by M32 (2026-08-28), which fixed the other two of the six and
+  deliberately did not fix these** — a different failure mode needing a different fix, and a user decision of
+  record that it be its own row.
+  ⛔ **THIS CORRECTS A HAND-OFF THAT SAID THESE WERE CHECKED AND CLEARED.** They were checked as *production
+  code*, and the production code is correct at all six sites. As *coverage* they are blind: each drives its
+  parent end-to-end through a real `database` queue and asserts real per-tenant effects — the stronger idiom,
+  not the weaker one — but **every fixture holds exactly one active tenant**, so hoisting the loop variable is
+  a no-op mutation there and nothing can go red. The helper comments say so themselves:
+  *"the sweep enqueues one child (acme is the only active tenant)"* — `ScheduledFormSweepTest.php:42`,
+  `UsageRollupTest.php:41`, `DraftReaperTest.php:70`. This is M20's lesson verbatim: **a green gate is often a
+  fixture too small to reach the defect.**
+  ⛔ **AND THE OBVIOUS FIX PRODUCES A NEW GREEN TEST THAT STILL CANNOT SEE IT.** Each helper's drain is
+  hard-coded to exactly two `workOneJob('scheduled-maintenance')` calls — parent, then *one* child. Add a
+  second tenant and the second child is simply never worked, so every downstream assertion reads identically.
+  **The fix is a drain loop plus per-tenant effects on both tenants**, in four files
+  (`WebhookRetrySweepTest.php:33-39`, `ScheduledFormSweepTest.php:39-44`, `UsageRollupTest.php:38-43`,
+  `DraftReaperTest.php:68-72`). ⚠️ Changing a shared fixture's width is the hazard M31 names — **add tenants
+  and cases, do not convert the existing single-tenant ones**, or the old coverage is deleted rather than
+  extended.
+  ➕ **A grep-visibility note worth keeping:** `SweepTenantWebhookRetriesJob` appears **nowhere** under
+  `tests/` — not once, not even in a comment — and `SweepTenantScheduledFormsJob`, `ReconcileTenantUsageJob`
+  and `ReapTenantDraftsJob` appear only inside comment blocks. A child job class being un-greppable is itself
+  the tell that no test names it.
+
+- **`minor` · `gamification:backfill --sync` reports failure after it has already committed every award.**
+  `BackfillGamificationCommand.php:179-182` returns `self::FAILURE` on a non-balancing tally, but `:224` has
+  already run `DB::commit()` for **every** workspace by then, and the error line names no workspace. **Filed
+  by M32 (2026-08-28) and deliberately not fixed** — it is a production-behaviour and operator-signal
+  question, not an assertion-strength one, so it sat outside the remit of the row M32 closed. User decision of
+  record that it be its own row.
+  **Two nuances the original observation omitted, both verified:** (i) on `--dry-run` the same branch returns
+  FAILURE with nothing committed (`:221-222` rolls back), so *"after commit"* is true of `--sync` only; and
+  (ii) the per-workspace table at `:167` does carry each workspace's five bucket counts, so an operator **can**
+  derive the culprit by hand — the attribution is missing from the error line, not from the output.
+  ⚠️ **"The job side decided the opposite for the identical invariant" overstates it.** Neither side rolls
+  back and neither throws; the job logs a non-balancing tally as a field while the command reports it as a
+  non-zero exit status. The divergence is in the **operator signal**, not in two opposite transaction
+  postures — worth settling deliberately rather than by drift.
+
 - ~~**`minor` · No gate in this repository detects a component used in a template but never imported.**~~
   ✅ **DONE — M28 (2026-08-26).** `scripts/component-import-lint.php`, registered in `composer.json`
   (script **and** the `quality` aggregate) **and as its own `ci.yml` step** — both, because `ci.yml`'s own

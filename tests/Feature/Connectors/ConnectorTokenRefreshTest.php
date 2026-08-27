@@ -188,12 +188,40 @@ it('does not retry a grant it already marked dead', function (): void {
 it('fans out one child per active tenant and holds no tenant context itself', function (): void {
     Bus::fake([RefreshTenantConnectorTokensJob::class]);
 
-    Tenant::create(['name' => 'Other', 'slug' => 'other', 'default_locale' => 'en']);
+    $other = Tenant::create(['name' => 'Other', 'slug' => 'other', 'default_locale' => 'en']);
 
     TenantContext::flush();
     (new RefreshConnectorTokensJob)->handle();
 
     Bus::assertDispatchedTimes(RefreshTenantConnectorTokensJob::class, 2);
+
+    // ⚠️ THE COUNT ABOVE WAS THE ONLY ASSERTION THIS TEST MADE, AND THIS IS THE ONLY PLACE IN THE REPOSITORY
+    // WHERE THE PARENT'S LOOP RUNS AT ALL — `runRefreshSweep()` above dispatches the CHILD directly, so no
+    // other test in this file reaches `RefreshConnectorTokensJob::sweep()`. Hoisting its loop variable keeps
+    // the count at 2 and leaves every tenant but the first with grants nobody refreshes: they expire at their
+    // own TTL, hourly and silently, with no failed job and no log line to trace back from. Unlike
+    // `gamification:backfill` there is no `--sync` sibling here proving a usable id ever reaches the child.
+    //
+    // Compared as a whole SET rather than through `Bus::assertDispatched($class, $closure)`, which is an
+    // AT-LEAST-ONE-MATCH predicate and is therefore satisfied by the first of two identical jobs — the same
+    // trap the gamification half of this pair documents. `Bus::dispatched()` returns the commands themselves
+    // (`BusFake.php:564-573`), so the multiset can be pinned in both directions at once.
+    $expected = collect([$this->tenant, $other])
+        ->map(fn (Tenant $tenant): string => (string) $tenant->getKey())
+        ->sort()
+        ->values()
+        ->all();
+
+    expect(Bus::dispatched(RefreshTenantConnectorTokensJob::class)
+        ->map(fn (RefreshTenantConnectorTokensJob $job): string => $job->tenantId)
+        ->sort()
+        ->values()
+        ->all())
+        ->toBe($expected);
+
+    // The SECOND half of this test's own name, which it has never actually asserted. A sweep is cross-tenant
+    // by definition, so a context left behind here would be inherited by whatever ran next on the worker.
+    expect(TenantContext::currentTenantId())->toBeNull();
 });
 
 // ── M6 — an irreversible rotation is never left inside a transaction that can undo it ────────────────────

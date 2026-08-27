@@ -9,8 +9,10 @@ use App\Enums\TenantStatus;
 use App\Jobs\Gamification\ReplayTenantHistoryJob;
 use App\Models\Audit;
 use App\Models\PointAward;
+use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Entitlements\EntitlementService;
+use App\Services\Gamification\GamificationBackfill;
 use App\Services\Settings\TenantSettingRegistry;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
@@ -92,6 +94,47 @@ it('queues one job per active workspace and writes nothing itself', function ():
         ->and($second->slug)->toBe('northwind');
 });
 
+it('names each workspace on its own job, and starts every one at the beginning of its own ledger', function (): void {
+    $second = inboxTenant('northwind');
+    TenantContext::applyLocal(null);
+
+    Queue::fake();
+
+    expect(Artisan::call('gamification:backfill'))->toBe(0);
+
+    // ⚠️ THE COUNT ASSERTION IN THE TEST ABOVE CANNOT SEE THE DEFECT THIS ONE EXISTS FOR, AND THAT WAS
+    // MEASURED RATHER THAN REASONED. Hoisting the loop variable in `fanOut()` so every child is dispatched
+    // with `$targets[0]`'s id leaves this whole file at 8 passed / 19 assertions, exit 0 — while every
+    // workspace but the alphabetically-first is left permanently unbackfilled and the operator is told
+    // "2 workspace(s) queued". The backfill is a one-shot operator action nobody re-runs, so there is no
+    // later pass that repairs it.
+    //
+    // ⛔ AND `Queue::assertPushed($class, $closure)` IS NOT THE FIX, THOUGH IT READS LIKE ONE — it is what
+    // the backlog row prescribed. `QueueFake::assertPushed()` asserts `pushed($job, $callback)->count() > 0`
+    // (Laravel 13.18.1, `QueueFake.php:130-134`): AT LEAST ONE MATCH. One closure asking "is this job's
+    // tenantId one of the two?" is satisfied by the first of two identical jobs and stays green under
+    // precisely the mutation it would have been added to catch. `Queue::pushed()` returns the job objects
+    // themselves (`:364-375`, `->pluck('job')`), so the whole set is comparable at once — which pins the
+    // multiset in BOTH directions: nothing missing, nothing duplicated, nothing extra, no ordering assumed.
+    $expected = collect([$this->tenant, $second])
+        ->map(fn (Tenant $tenant): array => [(string) $tenant->getKey(), null, GamificationBackfill::CHUNK])
+        ->sortBy(fn (array $payload): string => $payload[0])
+        ->values()
+        ->all();
+
+    // The middle field is the one a count is furthest from seeing. A non-null `afterAuditId` on a FIRST
+    // dispatch skips the membership rules outright — `ReplayTenantHistoryJob` keys them on the cursor being
+    // absent — so every workspace on the box would silently lose every `member.joined` award while every
+    // count in sight stayed right. The third field pins that the fan-out takes the default chunk rather
+    // than naming one, and does it against the constant, so tuning `CHUNK` does not redden this.
+    expect(Queue::pushed(ReplayTenantHistoryJob::class)
+        ->map(fn (ReplayTenantHistoryJob $job): array => [$job->tenantId, $job->afterAuditId, $job->limit])
+        ->sortBy(fn (array $payload): string => $payload[0])
+        ->values()
+        ->all())
+        ->toBe($expected);
+});
+
 it('never fans out to a suspended workspace', function (): void {
     $this->tenant->update(['status' => TenantStatus::Suspended->value]);
     TenantContext::applyLocal(null);
@@ -117,6 +160,30 @@ it('targets one named workspace by slug, and refuses an unknown one', function (
     // stack trace instead of a sentence. TenantLocator's guard is what prevents it.
     expect(Artisan::call('gamification:backfill', ['--tenant' => 'no-such-workspace']))->toBe(1);
     Queue::assertPushed(ReplayTenantHistoryJob::class, 1);
+});
+
+it('queues the workspace the operator named, and not merely one workspace', function (): void {
+    $northwind = inboxTenant('northwind');
+    TenantContext::applyLocal(null);
+
+    Queue::fake();
+
+    expect(Artisan::call('gamification:backfill', ['--tenant' => 'northwind']))->toBe(0);
+
+    // ⚠️ A COUNT OF ONE IS SATISFIED BY THE WRONG WORKSPACE, AND THIS ARM HAS A LIVE RESOLVER BEHIND IT
+    // RATHER THAN A LOOP — which makes it the likelier mutation of the two, not the lesser.
+    // `TenantLocator::find()` accepts an id, a slug OR a domain, so "resolved something" and "resolved what
+    // the operator typed" are genuinely different claims and only one of them is the operator's. MEASURED:
+    // replacing the resolve with `Tenant::query()->active()->orderBy('slug')->first()` — which returns
+    // `acme` here, never `northwind` — leaves this file green at 8 passed.
+    //
+    // Asserting the whole pushed list rather than one member also keeps the count in this assertion: a
+    // second, unnamed workspace queued alongside the right one is a cross-tenant write the operator did
+    // not ask for, and it would satisfy any `assertPushed` closure.
+    expect(Queue::pushed(ReplayTenantHistoryJob::class)
+        ->map(fn (ReplayTenantHistoryJob $job): string => $job->tenantId)
+        ->all())
+        ->toBe([(string) $northwind->getKey()]);
 });
 
 it('replays for real with --sync', function (): void {

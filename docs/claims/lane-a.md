@@ -16,27 +16,23 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M32`, the queued half of `gamification:backfill` asserted by job count alone
+## Status: NO ACTIVE CLAIM — `M32` is merged and the lane holds nothing forward
 
-**Taken 2026-08-27.** Branch `m32-backfill-fanout-payload`, cut from `origin/main` at `6c08476`, PR into `main`.
-Row: the `major` under **Test suite & CI gates** at `docs/feature-backlog.md:2586` — *the queued half of
-`gamification:backfill` is asserted by job count alone* — **plus the second instance the row does not name**,
-`tests/Feature/Connectors/ConnectorTokenRefreshTest.php:188-196`, which is the identical hole in a different
-command and is taken with it.
+**`M32` is merged (PR #225, CI 6/6 green with real step counts).** Lane A holds no active row and — unlike
+every hand-off since M30 — **pre-claims no forward number either.** The next row is taken under Rule 7(f)
+from `docs/feature-backlog.md`, and the claim must be written here and **pushed** before the first file is
+opened.
 
-⛔⛔ **NUMBERED `M32` AFTER READING THE WHOLE OF `lane-b.md` AND RUNNING `git worktree list`.** Lane B's file
-reads **ACTIVE CLAIM `M35`** (branch `m35-admin-console-gate-walk`, cut at `6714d20`) and `git worktree list`
-puts `c:\laragon\www\fb-lane-b` on that same branch, **two commits deep with four files dirty** — the claim
-file and the worktree agree for the first time in four increments. `M32` was pre-claimed by this lane under
-Rule 7's *"the lane queue is the claim"* since M30 and is not free for the other lane to take; the highest
-number spent is `M35`, so `M36` is the next free one after this.
+⛔⛔ **BEFORE YOU NUMBER ANYTHING: READ THE WHOLE OF `lane-b.md`, NOT ITS `## Status` LINE, AND RUN
+`git worktree list`.** **The highest number spent is `M35`** (Lane B, claimed 2026-08-27), so **`M36` is the
+next free one.**
 
-⛔ **THIS ROW'S OWN PRESCRIBED FIX IS KNOWN-WRONG BEFORE THE FIRST LINE IS WRITTEN, AND THAT IS THE THIRD IN
-A ROW.** The row closes *"Fix is a closure on `assertPushed`"*. `Queue::assertPushed($class, $closure)` is an
-**at-least-one-match** predicate, so the literal reading — one closure asserting the id is one of the two —
-stays **green** under the silent hoist mutation that is the only thing the row is actually about. M30's
-prescribed fix was wrong in both of its mechanisms and M31's was wrong in its probe. **Measure the mutation
-before writing the test, and make the mutation print the line it changed.**
+✅ **AND M32 IS THE FIRST INCREMENT IN FOUR WHERE THE TWO SOURCES AGREED.** M30 caught the worktree running
+*ahead* of the claim file; M31 caught the claim file catching up *mid-session*; at M32's open `lane-b.md` read
+`ACTIVE CLAIM M35` and `git worktree list` put `c:\laragon\www\fb-lane-b` on `m35-admin-console-gate-walk`,
+two commits deep with four files dirty — the same answer from both. **That is not evidence the check is
+unnecessary; it is the first clean reading of a check that has been load-bearing three times running.** It
+still costs one command.
 
 ⚠️ **AND M31 IS THE THIRD CONSECUTIVE INCREMENT WHERE THE NUMBER WAS DECIDED BY THE WORKTREE, NOT THE CLAIM
 FILES.** At M31's session open `lane-b.md` on `origin/main` read `## Status: NO ACTIVE CLAIM`, its `M29` and
@@ -92,6 +88,94 @@ M31 is a **test-only** diff, so most gates cannot move and that is stated rather
 - ⚠️ **A LOCAL FULL-SUITE PEST NUMBER IS NOT CI'S** (gap measured at 335 tests). M31's local figures are
   per-directory deltas only: `tests/Feature/Submissions` **415 / 1652 → 419 / 1685**, and the two files
   alone **60 / 229 → 64 / 262**.
+
+---
+
+## RELEASED — M32, the backfill fan-out asserted by job count alone (merged as PR #225)
+
+**Two test files, no production change.** `tests/Feature/Gamification/BackfillCommandTest.php` (+67) and
+`tests/Feature/Connectors/ConnectorTokenRefreshTest.php` (+30/-1).
+
+✅ **CI 6/6 GREEN WITH REAL STEP COUNTS, PARSED INDIVIDUALLY, TWICE** — E2E **20** · Static analysis **19** ·
+Contract **16** · Frontend **12** · Pest **11** · Design-system axe **11**. Not one `steps: []`.
+
+⚠️ **TWO PEST NUMBERS, AND THE DIFFERENCE BETWEEN THEM IS THE OTHER LANE.** Run `33108016145`, on this branch
+**before** Lane B's `M35` merged, is the clean measurement of *this* diff: **`4597 / 19,439`** against M31's
+`4595 / 19,433` — **+2 tests and +6 assertions, reconciling counted both ways**: Gamification
+**134 / 479 → 136 / 483** (+2/+4) and the connector file **38 → 40 assertions** (+0/+2). Run `33109949970`,
+on the **merge with current `main`** and therefore the authority for what lands, reads **`4611 / 19,465`** —
+the extra **+14 tests / +26 assertions are `M35`'s**, which merged mid-flight. **A gate number that moves more
+than your own diff explains is the other lane, not a defect** — and the only way to tell them apart is to have
+measured your own branch before the merge.
+**Vitest `134 files / 2,293`** · **Storybook axe `42 / 303`** · **E2E `551 passed + 10 skipped` (17.3m),
+NO flaky line** — all three unchanged, as a PHP-test-only diff requires. **PHPStan CI `[OK]`**; local
+gates: `tests/Feature/Connectors` **246 / 932**, five host lint gates unchanged at
+**97 · 113 · 31 · 113/121/0 · 180**, `openapi.json` untouched.
+
+### THE ROW'S OWN PRESCRIBED FIX WAS WRONG, AND THIS TIME THAT WAS KNOWN BEFORE THE FIRST LINE
+
+Three rows running now. M30's was wrong in both mechanisms, M31's in its probe, and M32's was already flagged
+wrong in the hand-off. **The habit that closed this one is the whole content of the increment: measure the
+mutation, and make the harness prove its own mutation landed.**
+
+`Queue::assertPushed($class, $closure)` is an **at-least-one-match** predicate — read from the vendor source
+for the version installed (Laravel 13.18.1, `QueueFake.php:130-134`: `pushed($job, $callback)->count() > 0`),
+never from memory of the docs. One closure asking *"is this id one of the two?"* is satisfied by the **first
+of two identical jobs**.
+
+✅ **WHAT ACTUALLY WORKS, AND IT IS STRONGER THAN THE HAND-OFF'S CORRECTION TOO.** The hand-off prescribed
+*one closure per expected id*. That works, but `Queue::pushed($job)` returns the job **objects**
+(`:364-375`, `->pluck('job')`) and `Bus::dispatched()` the same (`BusFake.php:564-573`) — so the whole set
+compares at once as sorted `[tenantId, afterAuditId, limit]` tuples. **One assertion, pinning the multiset in
+both directions** (nothing missing, duplicated, extra, no ordering assumed), which subsumes N closures *and*
+the count. The count assertions were **kept** regardless: a deleted loop was the one mutation they caught.
+
+### MEASURED — every mutation printed the line it changed, and restored by saved bytes with a sha256 check
+
+Local baseline `tests/Feature/Gamification` **134 / 479**; `BackfillCommandTest.php` alone **8 / 19**.
+
+| Mutation | Before | After |
+|---|---|---|
+| hoist the loop variable — every child gets `$targets[0]` | **SURVIVED**, 8 passed / 19, exit 0 | CAUGHT |
+| non-null `afterAuditId` on the fan-out (kills *every* membership award) | **SURVIVED** | CAUGHT |
+| `--tenant` resolves to the wrong workspace | **SURVIVED** | CAUGHT |
+| the same hoist in `RefreshConnectorTokensJob::sweep()` | **SURVIVED**, 9 passed / 38, exit 0 | CAUGHT |
+| delete the loop entirely | CAUGHT | CAUGHT — **not weakened** |
+
+⚠️ **TWO CONTROLS IN THIS INCREMENT WERE INVALID BEFORE THEY WERE FIXED, AND BOTH WOULD HAVE READ AS RESULTS.**
+(a) The first `connectorhoist` mutation used `$this->activeTenants()->first()` — but `activeTenants()` returns
+a **Generator** (`MaintenanceJob.php:123-129`), so it would have fataled. **A control that dies loudly proves
+nothing about a silent defect.** (b) The "before" measurement of that mutation was first taken against
+`git cat-file blob HEAD:…` — and `HEAD` had by then moved onto **this increment's own commit**, so it
+re-measured the new test and reported it CAUGHT. Re-run against `0d0c590` it read **9 passed / 38, exit 0 —
+SURVIVED**. ⛔ **`HEAD` IS NOT A SYNONYM FOR "BEFORE MY CHANGE" — NAME THE COMMIT.**
+
+### WHAT THE ROW GOT WRONG, VERIFIED FIRST-HAND RATHER THAN FROM THE CENSUS
+
+⛔ **"Six sibling fan-outs were checked individually and are NOT defects" is wrong as a coverage claim** — it
+is true of the *production code*, which is correct at all six sites, and false of the *tests*. Two of the six
+(gamification, connector) assert a bare integer count under a fake. The other four assert real per-tenant
+effects on a real `database` queue — the stronger idiom — but **every fixture holds exactly one active
+tenant**, so a hoist is a no-op mutation there. Their helper comments say it out loud: *"acme is the only
+active tenant."* Filed as its own row, with the note that **adding a second tenant alone produces a new green
+test**, because each drain is hard-coded to exactly two `workOneJob()` calls.
+
+⚠️ **The second instance was the sharper of the two and the row never named it.**
+`ConnectorTokenRefreshTest.php:188` is the **only place in the repository where `RefreshConnectorTokensJob`'s
+loop runs at all** (`runRefreshSweep()` at `:74-89` dispatches the *child*), it has no `--sync` sibling
+proving a usable id reaches the child, and its failure **recurs hourly** rather than once. The second half of
+that test's own name — *"holds no tenant context itself"* — had also never been asserted; it is now.
+
+➕ **A silent mutation class the census missed:** a well-formed uuid that is **no tenant at all**.
+`TenantAwareJob`'s guard is shape-only, so the job finds no row and **deletes itself** with an `info` log —
+silent in production *and* in the suite, with **zero** workspaces backfilled. Set-equality catches it.
+
+### FILED, NOT FIXED — both user decisions of record (2026-08-28), do not re-ask
+
+1. The four single-tenant sibling fan-outs (`major`).
+2. `--sync` returning FAILURE after `DB::commit()` has already made every award durable (`minor`).
+
+**Namespaces spent: none** — no ADR, no migration, no `§D`. Twelfth consecutive increment.
 
 ---
 
@@ -187,20 +271,15 @@ because changing the helper's return type touches every case in the file and the
 path directly; **named here so the next reader does not have to rediscover that the `''` is a cast artefact
 rather than a value anybody chose.**
 
-### THE QUEUE BEHIND IT — `M32`, STILL CLAIMED, STILL NEEDING NO SECOND PASS
+### THE QUEUE BEHIND IT — `M32` — RELEASED, AND ITS SCOPING NOTE IS SPENT
 
-- **`M32`** — *the queued half of `gamification:backfill` is asserted by job count alone*. **REAL, and the
-  row's own prescribed fix does not work.** `Queue::assertPushed($class, $closure)` is *"at least one
-  match"*, so the literal reading — one closure asserting the id is one of the two — stays **green** under
-  the silent hoist mutation. It needs one closure **per expected id**, with the existing count assertion
-  **KEPT**, because a deleted loop is the one mutation the test catches today. ⚠️ **A second instance the row
-  does not name:** `tests/Feature/Connectors/ConnectorTokenRefreshTest.php:188-196` fakes the child and
-  asserts `Bus::assertDispatchedTimes(…, 2)` with no payload — the identical hole. Six sibling maintenance
-  fan-outs were checked **individually** and are **not** defects. Local baseline `tests/Feature/Gamification`
-  **134 / 479**.
-  ⚠️ **AND M31 ADDS A WARNING TO IT:** M32's row, like M31's and M30's, prescribes a fix. **Two of the last
-  three prescribed fixes were wrong** — M30's in both mechanisms, M31's in its probe. M32's is *already
-  known* to be wrong. **Measure the mutation before writing the test, and print the mutated line.**
+**`M32` merged as PR #225 (2026-08-28); see its own `## RELEASED` section above.** The note that stood
+here was right that the row was real and that its prescribed fix did not work, and **wrong in one claim a
+reader would have acted on**: it recorded the six sibling maintenance fan-outs as *"checked individually
+and not defects"*. That holds for their production code and fails for their coverage — four of them are
+blind to a hoisted loop variable because each fixture carries exactly one active tenant, which no amount
+of reading the dispatch line reveals. It is now its own backlog row.
+⛔ **The lane pre-claims no forward number: Rule 7(f) governs from here.**
 
 ---
 

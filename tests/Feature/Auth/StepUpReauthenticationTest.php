@@ -132,7 +132,8 @@ it('gates exactly the intended routes and no others', function (): void {
         strict: true,
     );
 
-    // Gated: the three tenant mutations PRD #14 names, plus every page of the console.
+    // Gated: the three tenant mutations PRD #14 names, the SSO metadata import, and — below, and by
+    // enumeration rather than by name — every page of the super-admin console.
     expect($gated('members.role'))->toBeTrue();
     expect($gated('members.remove'))->toBeTrue();
     expect($gated('members.ownership'))->toBeTrue();
@@ -141,9 +142,32 @@ it('gates exactly the intended routes and no others', function (): void {
     // radius than any of the three above. Only the import is gated: not the read, and not the status
     // toggle or the delete, which ADR-0016 §D5 keeps reachable for a downgraded tenant.
     expect($gated('settings.sso.metadata'))->toBeTrue();
-    expect($gated('admin.tenants.assign-plan'))->toBeTrue();
-    expect($gated('admin.tenants.index'))->toBeTrue();
-    expect($gated('admin.settings.update'))->toBeTrue();
+
+    // ⛔ THESE THREE LINES USED TO BE THREE ROUTE NAMES — `admin.tenants.assign-plan`,
+    // `admin.tenants.index` and `admin.settings.update` — under the comment above, which claimed to cover
+    // "every page of the console". The console has FOURTEEN routes. It named three, and neither
+    // `admin.feedback.index` nor `admin.feedback.screenshot` was among them: the prose asserted
+    // universality and the test asserted three strings. MEASURED (M35): moving the screenshot route out of
+    // the gated group left `tests/Feature/{Admin,Auth,Feedback}` at an identical 238 passed / 1,156
+    // assertions, because a route a list does not name cannot fail it.
+    //
+    // So the console half is now an ENUMERATION over the live route table. `AdminConsoleGateTest` owns the
+    // other three gates and the host constraint; this file keeps `step-up` because that is what it is
+    // about, and because the alias assertion above is the thing that gives either file meaning.
+    $ungated = [];
+
+    foreach (adminConsoleRoutes() as $route) {
+        $name = (string) $route->getName();
+
+        if ($name !== 'admin.mfa.setup' && ! $gated($name)) {
+            $ungated[] = $route->methods()[0].' '.$route->uri().' ('.$name.')';
+        }
+    }
+
+    expect($ungated)->toBe([], "Console routes with no `step-up`:\n".implode("\n", $ungated));
+    // The enumeration is worthless over an empty set, and `admin.mfa.setup` is skipped above rather than
+    // asserted false — it is asserted false by name in the NOT-gated block below, where its reason is.
+    expect(count(adminConsoleRoutes()))->toBeGreaterThan(10);
 
     // NOT gated, and each absence is a decision:
     //  · members.index / members.invite — a read, and an invitation that creates no authority until it is

@@ -2499,35 +2499,62 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   not merely a permission. Nothing anywhere signs it: the repository still contains exactly one signed URL
   (`User.php:146`, email verification) and no `temporaryUrl`, `ValidateSignature` or `hasValidSignature` in
   `app/` or `routes/`, re-verified this increment rather than carried over from the row.
-- **`major` · `GET /admin/feedback/{feedback}/screenshot` streams cross-tenant PII from the central host and no test asserts a refusal on it.**
-  Found by M34's re-run of M29's stored-bytes census with the **resource** as its unit rather than the
-  feature — the same method that found the attachment route in M29 and the fourth kind in M33, producing a
-  third result on its third outing. `routes/admin.php:83-84` →
-  `FeedbackConsoleController@screenshot`, which serves the **same screenshot bytes** as the tenant-side
-  `GET /feedback/{report}/screenshot` but **across every tenant**, on the central host, to the one principal
-  who is a super-admin over the whole deployment. `route:list` resolves its gates as
-  `Authenticate → EnsureSuperAdmin → EnsureSuperAdminMfa → RequireRecentPassword`; there is no `can:` and it
-  needs none, because super-admin *is* the authorization. **No test issues a refused request to that URI.**
-  The console **index** has all three denials — `FeedbackConsoleTest.php:153` (un-enrolled 2FA → redirect),
-  `:158` (non-super-admin → 404), `:162` (guest → redirect). The screenshot route has none of them; its only
-  test, `:338-348`, asserts a **404 for a report that has no screenshot**, and its own comment says that is
-  proof the lookup resolved rather than proof anyone was refused.
-  ⚠️ **WEAKER THAN IT LOOKS, AND SAYING SO IS THE POINT — THIS IS THE M20 DISCIPLINE APPLIED TO A FINDING OF
-  MY OWN.** All three routes sit in **one route group** and inherit that middleware from it, so the index's
-  three denials do transitively pin the group today: the realistic silent mutation is not "delete
-  `EnsureSuperAdmin`" (the index catches that) but **a route declared outside the group**, or the group's
-  membership changing. It is filed as `major` rather than `minor` because of what is behind the door — every
-  tenant's PII screenshots, on the central host — not because a green suite is one edit away.
-  ⛔ **AND THE STEP-UP MANIFEST HAS THE SAME SHAPE, WHICH IS THE TRANSFERABLE PART.**
-  `StepUpReauthenticationTest.php:135-146` is a hand-maintained list of route **names**, prefaced by a
-  comment claiming it covers *"every page of the console"*. It names `admin.tenants.index`,
-  `admin.settings.update` and `admin.tenants.assign-plan` — and **neither `admin.feedback.index` nor
-  `admin.feedback.screenshot`**. The prose asserts universality; the test asserts three strings. That is the
-  paired-list defect Standing Rule 7(b-bis) exists to warn about, in a single file. The fix is the M30
-  shape: **walk the route table and assert the property, rather than keeping a list in step by hand.**
-  **Left unfixed by M34 deliberately** — it is `tests/Feature/Auth/` and `tests/Feature/Feedback/`, neither of
-  which this row's diff touches, and a route-table walk over the admin console is its own increment with its
-  own positive control.
+- ~~**`major` · `GET /admin/feedback/{feedback}/screenshot` streams cross-tenant PII from the central host and no test asserts a refusal on it.**~~
+  ✅ **DONE — M35 (2026-08-27).** Every citation exact, the third row running: `routes/admin.php:83-84`,
+  the index's three denials at `FeedbackConsoleTest.php:153`/`:158`/`:162`, and the screenshot's only case at
+  `:338-348` whose own comment says the 404 proves the lookup resolved rather than that anyone was refused.
+  ⛔ **THE ROW'S STATED WEAKNESS WAS THE PART WORTH BUILDING FOR, AND IT WAS MEASURED RATHER THAN ARGUED.**
+  The realistic silent mutation it names is a route declared outside the group, so that mutation was run
+  FIRST, against the unchanged tree: moving the screenshot route into the outer group — confirmed at the live
+  route table to drop `superadmin.mfa` **and** `step-up` — left `tests/Feature/{Admin,Auth,Feedback}` at
+  **238 passed / 1,156 assertions, identical to the baseline in both numbers.** Nothing in this repository
+  noticed. So the fix is the route-table walk the row prescribes, as a new
+  `tests/Feature/Admin/AdminConsoleGateTest.php`: the console is DISCOVERED from the live table by URI prefix
+  and asserted to carry `auth` + `superadmin` everywhere, `superadmin.mfa` + `step-up` everywhere but one
+  allowlisted route (the enrollment landing, with its reason written down), and the central-host domain
+  constraint everywhere — plus a count floor, two discovery anchors, an allowlist-freshness case, and an
+  alias-resolution case, because re-pointing a name at a permissive class leaves every forall green.
+  ⛔ **THE SIBLING FINDING IS FIXED IN THE SAME PR AND IT WAS THE LARGER HALF.**
+  `StepUpReauthenticationTest.php:135-146`'s hand-maintained manifest is now an ENUMERATION over
+  `adminConsoleRoutes()`, so the comment claiming it covers "every page of the console" is true for the first
+  time. It named three of the fourteen.
+  ⚠️ **THE ROW'S OTHER SUGGESTION — three copied deny assertions — CARRIES A VACUITY TRAP IT DOES NOT NAME,
+  AND THIS REPOSITORY HAD ALREADY PAID FOR IT ONCE.** `EnsureSuperAdmin` answers **404** for non-disclosure
+  and the controller answers **404** for a report it cannot resolve: the same status from two different
+  decisions. A non-super-admin case written against a random id — or against a report with no screenshot, the
+  only fixture the console suite could build — **passes with the middleware deleted**.
+  `tests/Feature/Tenant/FeedbackTest.php:307-309` states the identical trap on the tenant-side twin. So the
+  404 arm runs against a report a super-admin really does get 200 image bytes from, which meant building the
+  first committed-screenshot fixture the console suite has ever had (`consoleScreenshot()`); that positive
+  control is itself the first test in this repository to drive this route to a success. **Proven, not
+  assumed:** deleting `superadmin` from the group turns that case red *because* the request then reaches the
+  controller and streams the bytes. The other three arms answer with a redirect, which no 404 can be confused
+  with, and say so rather than paying for a fixture they do not need.
+  ⛔ **AND ASKING THE KILLER QUESTION OF EVERY GATE ON THE ROUTE — NOT ONLY THE ONES THE ROW NAMES — FOUND A
+  THIRD NAKED ONE.** `FeedbackConsoleController.php:78`'s `abort_unless(...->servable(), 409)` was asserted
+  by **nothing**: M34 pinned that guard on the two routes it was looking at (`FeedbackController.php:75`,
+  `AttachmentController.php:43`) and this console copy is the third, so quarantined bytes could be served to
+  the one principal who reads across every tenant with the whole repository green. Covered here, with the
+  streaming case one column apart as its positive control.
+  ⚠️ **MEASURED COST, RECORDED SO IT IS NOT REDISCOVERED:** a web-route 409 assertion in this suite runs
+  **~60–100 s** — the new console case is 59.4 s and the *pre-existing* M34 tenant-side twin is 97.5 s — so
+  the cost is the error-page render and not this increment. `withoutVite()` is **not** the cause; adding it
+  made the case slower (82 s). The pattern should not be multiplied casually.
+- **`minor` · `GET /admin/users` — the cross-tenant user list — has exactly one test, and it is a 200.**
+  Found by M35's census of what the console's fourteen routes are actually driven by.
+  `SuperAdminConsoleTest.php:100` requests it as an enrolled super-admin and asserts `assertOk()`; **no
+  request to that URI is ever refused, by any caller, in any suite** — no guest, no non-super-admin, no
+  un-enrolled operator, no stale confirmation. It reads every user in the deployment through the
+  `superadmin_bypass` RLS carve-out, which is a wider read than the feedback screenshot M35 closed.
+  ⚠️ **STATED WEAKNESS, in the M20 discipline and for the same reason the row above carried one:** since M35
+  the four gates on this route are pinned STRUCTURALLY by `AdminConsoleGateTest`, and six sibling pages carry
+  behavioural denials against the same group — so this is a missing behavioural arm on a route whose
+  middleware is now enumerated, not an open door. Filed `minor` for that reason and not lower, because a
+  structural gate cannot see a middleware that stops refusing.
+  **Left unfixed by M35 deliberately**: it is `tests/Feature/Admin/SuperAdminConsoleTest.php`, which that
+  increment's diff does not touch, and the same is true of the three other console routes that have positive
+  requests and no denials of their own — `admin.tenants.reactivate`, `admin.tenants.assign-plan` and
+  `admin.feedback.update`. One increment, one file of behavioural arms, with M35's fixture already in place.
 
 - **`minor` · The `can:` arm on `GET /api/v1/analytics/report` — the non-export twin — is asserted by nothing.**
   The mirror image of the row M34 closed, and found while closing it. `AnalyticsApiTest.php:87` pins the twin's

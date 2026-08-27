@@ -49,11 +49,13 @@ use Carbon\CarbonImmutable;
 use Database\Factories\SsoConnectionFactory;
 use Database\Seeders\PlanSeeder;
 use Illuminate\Http\Client\Request as HttpClientRequest;
+use Illuminate\Routing\Route as RoutingRoute;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Ramsey\Uuid\Uuid;
@@ -801,6 +803,34 @@ function purgeCommittedFeedbackFixtures(): void
     if ($userIds !== []) {
         $connection->table('users')->whereIn('id', $userIds)->delete();
     }
+}
+
+/*
+|--------------------------------------------------------------------------
+| The super-admin console's own surface (Increment M35)
+|--------------------------------------------------------------------------
+| `AdminConsoleGateTest` asserts four gates over this set and
+| `StepUpReauthenticationTest` asserts `step-up` over it, so it lives here
+| rather than in either: Pest loads every test file into ONE process, and a
+| helper declared in a test file resolves only when THAT file has been
+| loaded — the failure this file's header already records paying for twice.
+|
+| Keyed on the URI prefix rather than the route-NAME prefix, deliberately. A
+| name is a label an author picks, so a console route named anything else
+| escapes a name-keyed filter; a route that answers under `admin/` IS a page
+| of the console whatever it is called. Both callers assert a floor on the
+| count, because a filter that silently stopped matching would leave every
+| assertion over it passing on an empty set.
+*/
+
+/** @return list<RoutingRoute> every route the central-host console serves. */
+function adminConsoleRoutes(): array
+{
+    return array_values(array_filter(
+        Route::getRoutes()->getRoutes(),
+        static fn (RoutingRoute $route): bool => $route->uri() === 'admin'
+            || str_starts_with($route->uri(), 'admin/'),
+    ));
 }
 
 /*

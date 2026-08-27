@@ -598,6 +598,98 @@ it('tells the refused editor what to DO, not just that there was a conflict', fu
     expect(SubmissionEditException::concurrentlyModified()->getMessage())->toContain('Reload');
 });
 
+/*
+|--------------------------------------------------------------------------
+| 9b. The baseline guard, exercised against REAL checksums on BOTH sides
+|--------------------------------------------------------------------------
+| ⛔ EVERY ACCEPTED WRITE ABOVE COMPARES null AGAINST null, AND THAT IS NOT A COINCIDENCE.
+| `SubmissionAnswerFactory` stamps no `answers_content_checksum`, so `seedInboxSubmission()` produces the
+| LEGACY row — a submission written before the pipeline stamped one. {@see EditSubmissionAnswersRequest}
+| supports that row on purpose (`present` + `nullable`, so it stays editable), and the cases above are the
+| right cases for it. What they cannot show is anything about a document that HAS a checksum, because the
+| only fact they pin is "null baseline against a non-null stored checksum is refused".
+|
+| ⚠️ THAT LEAVES THE GUARD PINNED FROM ONE SIDE ONLY, AND BOTH FAILURE DIRECTIONS WERE MEASURED, NOT ARGUED.
+| Two mutations of the comparison at {@see SubmissionAnswerEditService::edit()} left the whole 60-test
+| concurrency suite GREEN before these cases existed:
+|
+|   (1) `$baseline === null && $stored->answers_content_checksum !== null` — the guard reduced to a PRESENCE
+|       check. Two editors each holding a real, DIFFERENT token never conflict, so the lost update the guard
+|       exists to prevent is silently live again. Killed by `refuses a second editor when BOTH tokens are
+|       real` below.
+|   (2) `$baseline !== null || $stored->answers_content_checksum !== $baseline` — every non-null baseline
+|       refused. Every submission written by the real pipeline becomes PERMANENTLY UNEDITABLE, which is the
+|       backlog row's own phrase. Killed by `accepts an edit whose baseline is the document's real checksum`
+|       below.
+|
+| ⚠️ AND THE OBVIOUS PROBE IS THE WRONG ONE. DELETING the guard outright is ALREADY caught: editor B re-reads
+| the answer row at `edit()`'s top, so the under-lock re-check compares a value against itself, B's write is
+| accepted and the cases above redden. The suite was never blind to REMOVING this guard — only to WEAKENING
+| it. A deletion probe here would have measured zero and proved nothing.
+|
+| ⚠️ THE FIX IS NOT IN THE FACTORY. Stamping a checksum in `SubmissionAnswerFactory` would convert the legacy
+| rows rather than add the production ones — deleting the only coverage the nullable path has, and changing
+| the fixture shape under every other caller of `seedInboxSubmission()` in both lanes' suites. These cases go
+| through `submitForEdit()`, the file's own pipeline helper, which no concurrency case used.
+*/
+
+it('accepts an edit whose baseline is the document\'s REAL checksum, and moves that checksum', function (): void {
+    $version = FormVersion::findOrFail(publishedInboxForm($this->tenant, $this->owner)->current_published_version_id);
+    $submission = submitForEdit($version, ['full_name' => 'Ann', 'color' => 'r']);
+
+    $baseline = SubmissionAnswer::where('submission_id', $submission->id)->value('answers_content_checksum');
+
+    // ⚠️ THE NON-VACUITY GUARD, AND WITHOUT IT THIS CASE SILENTLY BECOMES ANOTHER null === null. If a future
+    // change stops the pipeline stamping the column, every assertion below still passes while measuring the
+    // legacy path a second time. This is the assertion that makes the word "REAL" in the name true.
+    expect($baseline)->toBeString()->not->toBe('');
+
+    $fresh = $this->service->edit($submission, $version, [
+        'full_name' => 'Anna', 'color' => 'r',
+    ], $this->owner, checkBaseline: true, baseline: $baseline);
+
+    expect($fresh->status)->toBe(SubmissionStatus::Submitted);
+
+    $after = SubmissionAnswer::where('submission_id', $submission->id)->value('answers_content_checksum');
+
+    // The correction landed, and the token MOVED. A guard that accepted the write but left the checksum
+    // stale would hand the next editor a baseline that matches a document it no longer describes.
+    expect(SubmissionAnswer::where('submission_id', $submission->id)->value('answers')['full_name'])->toBe('Anna')
+        ->and($after)->toBeString()->not->toBe('')
+        ->and($after)->not->toBe($baseline);
+});
+
+it('refuses a second editor when BOTH tokens are real and only B\'s is stale', function (): void {
+    // The case in section 9 runs this race with a null token on both sides. This one runs it the way
+    // production runs it — two pages, each rendered from a checksum that actually exists — so the guard has
+    // to compare the VALUES rather than merely notice that one was supplied.
+    $version = FormVersion::findOrFail(publishedInboxForm($this->tenant, $this->owner, 'Race')->current_published_version_id);
+    $submission = submitForEdit($version, ['full_name' => 'Ann', 'color' => 'r']);
+
+    $stale = SubmissionAnswer::where('submission_id', $submission->id)->value('answers_content_checksum');
+    expect($stale)->toBeString()->not->toBe('');
+
+    // Editor A saves from that baseline and moves the token.
+    $this->service->edit($submission->fresh(), $version, [
+        'full_name' => 'Anna', 'color' => 'r',
+    ], $this->owner, checkBaseline: true, baseline: $stale);
+
+    $current = SubmissionAnswer::where('submission_id', $submission->id)->value('answers_content_checksum');
+
+    // ⚠️ BOTH SIDES NON-NULL AND DIFFERENT — the fact this whole section exists for. Asserted rather than
+    // assumed, because if A's write did not move the token the refusal below would be testing nothing.
+    expect($current)->toBeString()->not->toBe('')->and($current)->not->toBe($stale);
+
+    // Editor B's page was rendered before A saved, so B holds a real token for a document that has moved on.
+    expect(fn () => $this->service->edit($submission, $version, [
+        'full_name' => 'Ann', 'color' => 'b',
+    ], $this->owner, checkBaseline: true, baseline: $stale))->toThrow(SubmissionEditException::class);
+
+    // A's correction survives and B's revert never landed.
+    expect(SubmissionAnswer::where('submission_id', $submission->id)->value('answers'))
+        ->toMatchArray(['full_name' => 'Anna', 'color' => 'r']);
+});
+
 it('re-asserts the state UNDER THE LOCK, not only on the caller\'s copy', function (): void {
     // The pre-check at the top of edit() reads the model the caller passed in. A reviewer archiving the row
     // between page load and Save is an ordinary race — updating the row underneath a stale model is how it

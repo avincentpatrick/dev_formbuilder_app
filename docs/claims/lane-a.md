@@ -16,24 +16,109 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M41` is merged and the lane holds nothing forward
+## Status: ACTIVE CLAIM — `M42`, the numbers become derivable and the hand-off generated (`m42-state-and-claude-md`)
 
-**`M41` is merged (PR #231, 6/6 green).** Lane A holds no active row and pre-claims no forward number.
-The next row is taken under Rule 7(f), and the claim is written here and **pushed** before the first
-file is opened.
+**Taken 2026-08-29.** Branch `m42-state-and-claude-md`, cut from `origin/main` at `0641ae2`, PR into
+`main`. Fifth increment of the operating-loop realignment, and the one that ends the project's last two
+hand-transcribed artefacts: the namespace numbers and the hand-off itself.
 
-⛔⛔ **THE NEXT INCREMENT NUMBER IS ONE PAST THE HIGHEST `## RELEASED — M<n>` HEADING ACROSS BOTH LANE
-FILES, AND IS DELIBERATELY NOT WRITTEN AS A LITERAL ANYWHERE IN THIS FILE.** `preflight` takes the
-maximum `M<n>` literal over both claim files, so any mention — a forecast, or a sentence about the bug
-— raises its answer. Carrying no forward literal keeps the tool accidentally correct. That is a
-mitigation, not a fix.
+⚠️ **Numbered from the `## RELEASED` headings across both claim files, each truncated at its own
+`^## Template` heading: 25 M-numbered headings, highest 41.** Cross-checked independently against
+`gh pr list --state merged`, which also tops out at 41. `preflight` agrees. Lane B reads **NO ACTIVE
+CLAIM**; `git worktree list` shows `fb-lane-b` on `main` at `aff3cd9` and `fb-lane-c` on
+`lane-c-bootstrap`. Both claim files re-read in full at write time, not at session open.
 
-✅ **THE TRACKER IS NOW 514 KB, DOWN FROM 1.42 MB — READABLE IN ~5 `Read` CALLS INSTEAD OF ~58.** Keep
-it that way: **status bullets are pointers now, not narratives.** The full record of an increment
-belongs in this file and in `PROGRESS_ARCHIVE.md`, not in `PROGRESS.md`.
+⛔⛔ **THIS CLAIM TAKES `scripts/`, WHICH IS LANE B's COLUMN UNDER RULE 7(b), AND NAMES IT RATHER THAN
+ASSUMING IT.** That column is the exact constraint that stopped `M38` fixing `preflight.php` when it
+filed the defect. Taken under Rule 7(f): Lane B holds no active claim, the user has locked the collapse
+to one writer, and the approved realignment plan assigns these files to this increment.
 
-⛔ **A REMOVAL OF MORE THAN 200 LINES FROM `PROGRESS.md` NEEDS `[tracker-surgery]` AT THE START OF A
-LINE IN THE COMMIT MESSAGE.** Mentioning it mid-sentence deliberately does not count.
+✅ **`main` WAS CONFIRMED GREEN BEFORE ANY OF THIS.** Run `33187714817` on `f08559e` is 6/6 with real
+step counts (Pest 11 · axe 11 · Contract 16 · Static 20 · Frontend 12 · E2E 20). `origin/main` is one
+commit past it, and that commit touches `PROGRESS.md` alone — a `paths-ignore` path on the `push`
+trigger, so it produced **no run at all**, which is *correctly skipped*, never *pending*. Verified by
+`gh api …/actions/runs?head_sha=…`, which returns only two skipped `Deploy` entries and no CI run.
+
+### Row
+
+From the approved realignment plan, not a `docs/feature-backlog.md` row — **but it closes one**:
+`docs/feature-backlog.md:2213`, *"`scripts/preflight.php` derives the next increment number from prose,
+so a FORECAST reads as a SPEND."*
+
+### Evidence verified — the row holds, and it understates itself
+
+`preflight.php:66` scrapes `'/\bM(\d{1,3})\b/'` over the **whole** of both claim files and takes the
+maximum. Every citation in the row holds against the merged tree, and two things it does not say are
+measurable today:
+
+- **`docs/claims/lane-b.md:29` still declares "`M36` IS THE NEXT FREE NUMBER"** — six increments stale.
+  It is inert only because `lane-a.md` carries a higher literal; the mitigation, not the tool, is what
+  keeps the answer right.
+- **The row names one consumer. There are two.** The same wrong number is printed into every hand-off
+  line, which is the artefact a fresh session actually reads.
+
+Four further prose-versus-state disagreements were measured while verifying it, none of them in the row:
+`docs/gate-baselines.md` is **10 commits and two merged increments** behind `origin/main` (provenance
+`33175202807` / `454d9ba`, M39's merge — M40 and M41 both skipped the regeneration); `docs/backlog-triage.md`
+says 68 open rows and the tree has **70** (12 `major`, 58 `minor`); `ls docs/adr/` gives `0022` and
+`ls database/migrations/` gives `2026_08_17_000111`, neither derivable from any sentence.
+
+### Remedy verdict
+
+**The row's prescribed remedy is SOUND and is exactly what ships** — *"derive it from the
+`## RELEASED — M<n>` headings or from `gh pr list --state merged`"*. Both are implemented, and they
+cross-check each other rather than one being trusted.
+
+⛔ **BUT THE PLAN'S PRESCRIBED FIRST ACT FOR THIS INCREMENT IS WRONG, AND FOLLOWING IT WOULD FALSIFY THE
+LOG.** It asks for *"deleting the six stale 'next free ADR is 0021' claims and the wrong `000109`."*
+Measured against the tree: **`M38` already deleted both live ones** and recorded at `lane-a.md:777-780`
+that it deliberately left five historical `RELEASED` bullets alone, because *"a dated record is not a
+stale forward claim, and editing one would falsify the log."* Every remaining `0021` site
+(`PROGRESS.md:174, 235, 238, 239, 243, 255`) and every `000109` site (`:126, :130, :139, :146, :153,
+:158, :163`) sits inside a dated `RELEASED` / `CLAIMED` / `CLOSED` bullet.
+
+**Exactly two live forward declarations remain in the tracker:** `PROGRESS.md:123` (the ADR number,
+*currently correct* at `0022`, and whose own text already argues for its deletion) and `PROGRESS.md:232`
+(the `docs/exceptions-log.md` namespace). **So the act is restated: replace those two with derive-it
+pointers, leave every dated record byte-identical, and say so** — the same discipline `M41` applied to
+its unreachable 40 KB target.
+
+⛔ **AND THE MEASUREMENT FOUND WHY THE CONSTITUTION CANNOT BE LOADED IN ONE CALL, WHICH IS NOT WHAT THE
+PLAN ASSUMED.** Rule 7 is **196,596 bytes — 94.8% of the whole `## Standing Rules` section — and
+163,680 of those (lines 123–259) are a claim ledger with zero imperatives**, duplicating what
+`docs/claims/lane-*.md` now holds. Filed as its own row and taken as its own PR, decided with the user:
+mixing a 163 KB docs surgery into a scripts increment makes the diff unreviewable.
+
+### Files
+
+`CLAUDE.md` (new) · `scripts/state.php` (new) · `scripts/next.php` (new) · `scripts/preflight.php` ·
+`scripts/tracker-lint.php` · `composer.json` · `PROGRESS.md` (Lane A's own block and hand-off line, plus
+the two live namespace declarations) · `docs/feature-backlog.md` · `docs/claims/lane-a.md`.
+
+Shared artefacts taken: `docs/**`, `PROGRESS.md` (own block only). Paired files taken: none.
+**Namespaces spent: NOTHING** — eighteenth consecutive. No ADR, no migration prefix, no `§D`.
+
+### Prediction
+
+`Static analysis` stays at **20 steps** — the new rule group lands inside the already-registered
+`tracker-lint` step, and `state.php` / `next.php` are instruments, which `preflight.php:13-18` forbids
+registering as CI steps. Pest, Vitest (134 files), Storybook axe and E2E are all unmoved: nothing under
+`app/`, `database/`, `routes/`, `tests/`, `resources/` or `packages/` is touched. PHPStan is unmoved and
+**structurally unable to move** — it scans `app`, `database` and `routes` only. `tracker-lint` goes from
+7 rule groups to 8, and `PROGRESS.md` drops from 519,566 bytes to roughly 503,000.
+
+⚠️ **Pint's file count moves, 1417 → 1419**, because two new files land under `scripts/` and CI runs a
+**bare** `pint --test` over the whole project. Named here rather than discovered in the diff — and the
+verification uses the bare invocation, never `pint --test app tests database`, which misses `scripts/`
+entirely.
+
+⚠️⚠️ **THE ONE I MOST EXPECT TO BE WRONG: the `## RELEASED` parse, because its failure mode is
+silent.** Three independent reasons it is fragile — lane-b's headings are bare `M35,` while lane-a's
+newest are backticked; two lane-a headings carry **no `M` at all**; and **both files contain a verbatim
+`## RELEASED — <row name>` template example**, which is precisely the shape that deleted 1,086 lines on
+2026-08-16. An off-by-one truncation yields a *lower maximum*, not an error, and a lower maximum is a
+number collision. **That is why the assertion pins the COUNT at 25 rather than trusting the max**, and
+why the number is cross-checked against a second, independent source.
 
 ---
 

@@ -16,13 +16,108 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M39`, CI's post-merge verification is being cancelled by construction (`m39-ci-truth`)
+## Status: NO ACTIVE CLAIM — `M39` is merged and the lane holds nothing forward
+
+**`M39` is merged (PR #229, `454d9ba`, 6/6 green with real step counts).** Lane A holds no active row
+and pre-claims no forward number. The next row is taken under Rule 7(f), and the claim is written here
+and **pushed** before the first file is opened.
+
+⛔⛔ **THE NEXT INCREMENT NUMBER IS ONE PAST THE HIGHEST `## RELEASED — M<n>` HEADING ACROSS BOTH LANE
+FILES — AND IT IS DELIBERATELY NOT WRITTEN AS A LITERAL ANYWHERE IN THIS FILE.** `preflight` takes the
+maximum `M<n>` literal over the whole of both claim files, so **any** mention of a number raises its
+answer, including a forecast or a sentence about the bug. `M38` proved it by discussing `M39` while
+filing that row, which moved the tool's answer one increment past the truth. **By
+not writing a forward literal here, the tool is now accidentally correct** — that is a mitigation, not
+a fix, and the fix is filed as a `minor` in `docs/feature-backlog.md`.
+
+⛔ **AND READ `docs/backlog-triage.md` BEFORE TAKING ANY BACKLOG ROW.** All 68 open rows were
+re-validated on 2026-08-28; **eight prescribed remedies do not work.**
+
+---
+
+## RELEASED — `M39`, CI's post-merge verification stopped being cancelled (merged as PR #229, `454d9ba`, 6/6 green)
+
+**Every claimed file was edited.** `.github/workflows/ci.yml`, `scripts/gate-baselines.php` and
+`docs/gate-baselines.md` (regenerated, never hand-edited). **Namespaces spent: NOTHING** — fifteenth
+consecutive Lane A increment.
+
+### ✅ The measurement that closes the row — and it is the first of its kind here
+
+**Run `33175202807`, `M39`'s own merge-commit run on `main`: `completed/success`, `event=push`,
+`headBranch=main`,** six jobs with real step counts (Static **19** · Contract **16** · E2E **20** ·
+Frontend **12** · axe **11** · Pest **11**). ⛔ **That is the first merge-commit run to SURVIVE on
+`main` in seven increments** — #222, #223, #224, #226 and #228 were all cancelled, along with M36's
+and M38's close-outs.
+
+### ⛔ The control the PR could not give, and why the obvious one was not enough
+
+⚠️ **CONTROL 2 (PR-SIDE CANCELLATION STILL FIRES) IS NECESSARY AND NOT SUFFICIENT, WHICH WAS NEARLY
+MISSED.** Run `33173580512` was cancelled by a second push to the PR branch, proving the expression is
+evaluated rather than ignored. **But an `always-true` `cancel-in-progress` passes that identical test
+while leaving `main` exactly as broken** — a PR-side control cannot distinguish *correctly evaluated*
+from *always true*. **The reasoning that "the expression is evaluated, therefore `push` yields false"
+is an argument, not a measurement**, and this project's standing rule is that a gate you just added is
+proven by a positive control.
+
+✅ **SO THE CONTENTION WAS FORCED ON PURPOSE.** A real finding — `deploy.yml`'s trigger meaning changed
+with this fix — was filed as its own backlog row and **pushed to `main` at 21:25:08 while
+`33175202807` was in flight**, on a path deliberately outside the new `paths-ignore` set so that it
+would create a contending run. Under the old configuration the merge run would have been dead inside
+thirty seconds. **It was still `in_progress` at 21:25:18, :50, 21:26:21, :52 and 21:27:23, and it went
+on to `success` at 21:43:33.** ⛔ **Two CI runs coexisted on `main` — `33175202807` and `33175297787` —
+which has never happened in this repository before.** The main-side arm is proven by measurement.
+
+### The guard, proven in both directions
+
+| Control | Run | Result |
+|---|---|---|
+| the run that stamped the live baseline file | `33132909007` (`pull_request` on `m36-loop-verification-harness`) | **REFUSED, exit 1** |
+| `M38`'s own PR run | `33171176804` (`pull_request`) | **REFUSED, exit 1** |
+| **negative — a real push on `main`** | `33135990415` | **ACCEPTED, exit 0** |
+
+⛔ **A GUARD THAT REFUSES EVERYTHING IS NOT A GUARD**, which is the whole reason the third row exists.
+⚠️ **The second refusal first read `EXIT=0` because it was measured through a pipe** — `head`'s status,
+not the script's. **A pipe hides the exit status**; it is written down in this project and it still
+cost a re-measurement.
+
+### ⚠️ The prescribed remedy was wrong in one detail that would have broken a designed feature
+
+The plan said refuse any run whose **`event != push`**. That rejects the **nightly `schedule` run on
+`main`** (`33079934859`), a genuine successful measurement of the trunk added on purpose as insurance
+against an outage-skipped verification. **Implemented instead: refuse `pull_request`, and refuse any
+`headBranch != main`** — which closes the defect and admits `push`, `schedule` and `workflow_dispatch`.
+`--run=` was **kept**: the escape hatch was never the defect, the missing validation was.
+
+### ✅ Baselines stamped from a post-merge `main` run for the first time ever
+
+`docs/gate-baselines.md` now names run `33175202807` — `push` on `main`, sha `454d9ba`. The previous
+generation named a `pull_request` run on a feature branch, and the one before that was a **docs-only
+push**, because every merge run had been cancelled. ⚠️ **Only the provenance line changed: not one gate
+number moved**, exactly as the claim predicted for a diff touching only `ci.yml` and `scripts/`.
+
+### How the prediction fared
+
+Every gate held as predicted, and the one flagged as *"most likely to be wrong — that the PR run proves
+the concurrency fix"* was **correct to flag and is the reason the contending push exists**. Pint was
+proven not blind on `scripts/` by a deliberately misformatted probe (exit 1, twelve fixers, deleted and
+verified absent) — a bare `pint --test` had returned `{"tool":"pint","result":"passed"}` **with no file
+count at all**, which is precisely the shape of *"`passed` is not evidence it scanned anything"*.
+
+### ➕ One row filed, not fixed
+
+**`deploy.yml`'s effective trigger changed meaning with this fix and nothing says so at the site.**
+Before `M39` the only runs that could ever reach its `workflow_run` gate were docs-only close-out runs
+— a production deploy path that could only ever have shipped a documentation commit. It will now fire
+on real merge runs, which is correct and is also a material change to a latent path. **Latent, not
+live:** `DEPLOY_ENABLED` is unset. Filed because the day that variable is set is the wrong day to
+discover it.
+
 
 **Taken 2026-08-28.** Branch `m39-ci-truth`, cut from `origin/main` at `c532d59`, PR into `main`.
 Second increment of the operating-loop realignment, and **the correctness fix of the pair**.
 
 ⚠️ **NUMBERED `M39` FROM THE `## RELEASED` HEADINGS AND `gh pr list --state merged`, NOT FROM
-`preflight`** — which currently answers *"next free is `M40`"* because `M38`'s claim discusses `M39`
+`preflight`** — which currently answers **one increment too high** because `M38`'s claim discusses `M39`
 while filing the row about that very behaviour. Lane A's highest released is `M38` (PR #228,
 `44e79a9`); Lane B's is `M35`; `lane-b.md` reads **NO ACTIVE CLAIM**. Both files re-read in full at
 write time.
@@ -186,7 +281,7 @@ the corrected number.
 The tracker contains **verbatim examples of its own headings**: Standing Rule 7(e) at `:88` quotes the
 hand-off marker, and a first-draft status bullet quoted the status heading. Substring counts went to 2
 and 3 and the writes were refused. **Every assertion is now line-anchored — which is exactly why
-`preflight.php` anchors its own, and why M41's surgery must split by pre-measured line index rather
+`preflight.php` anchors its own, and why the coming tracker surgery must split by pre-measured line index rather
 than search.** M31's 1,086-line deletion in miniature, caught by an assertion rather than by a reader.
 
 ### ⛔ Baselines deliberately NOT regenerated, and the reason is `M39`'s row

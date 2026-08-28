@@ -5188,3 +5188,43 @@ anchors its own, and why the coming tracker surgery must split by pre-measured l
 search. **Two rows filed, not fixed:** `preflight` reads any `M<n>` literal in either claim file as a
 spend — and M38's own claim, discussing M39 while filing that row, moved the tool's answer to
 *"next free is M40"*. **Namespaces spent: nothing — fourteenth consecutive.**
+
+### 2026-08-28 — M39 (Lane A): main's post-merge verification stopped being cancelled — PR #229, `454d9ba`, 6/6 green
+
+`concurrency.cancel-in-progress` was an unconditional `true`. An increment pushes to `main` two or three
+times within minutes — a claim, a merge, a close-out — and those are not competing versions of one
+thing, so each push killed the previous run. **Seven cancelled runs measured, five of them merge
+commits** (#222, #223, #224, #226, #228, and M36's and M38's close-outs). ⛔ **`ci.yml` asserted the
+opposite in its own words**, calling the post-merge push run the re-verification — which is why it
+survived seven increments: an auditor reads the assertion, not the run list.
+
+⚠️ **`deploy.yml` inherited it.** Gated on a successful CI run on `main`, the only runs that could ever
+have reached it were **docs-only close-out runs** — a production deploy path that could only have
+shipped a documentation commit. Latent only because `DEPLOY_ENABLED` is unset; filed as its own row,
+because the day that variable is set is the wrong day to discover it.
+
+✅ **THE MAIN-SIDE FIX IS PROVEN BY MEASUREMENT, AND THE OBVIOUS CONTROL WAS INSUFFICIENT.** PR-side
+cancellation still firing proves the expression is *evaluated* — but **an always-true value passes that
+same test while leaving `main` broken.** So contention was forced deliberately: a real finding was
+pushed to `main` on a non-ignored path **while merge run `33175202807` was in flight**. It survived
+five checks and reached **`success`** — the first merge run to survive on `main` in seven increments,
+and the first time **two CI runs have coexisted** there.
+
+`paths-ignore` on the **push trigger only**, verified safe two ways: the only test reading a tracked
+docs file is `QueuedMailContractTest.php:135` reading `docs/deployment-infrastructure.md`, deliberately
+not in the set; and the last four close-outs touch the five listed paths and nothing else. ⛔ **A
+skipped run is not a run, and not a pending one either** — written into `ci.yml` and the baseline file
+as a third member of the vacuous-success family, failing in a new direction because such a run *does
+not exist at all*.
+
+`gate-baselines.php` validates the **selected** run wherever it came from, because the baseline file was
+itself stamped from a `pull_request` run on a feature branch. `--run=` kept — the escape hatch was never
+the defect, the missing validation was. ⚠️ **The prescribed remedy was wrong in one detail:** refusing
+any event that is not `push` would reject the nightly `schedule` run added as outage insurance. Proven
+both ways, including **a real push-on-main run ACCEPTED** — a guard that refuses everything is not a
+guard. Pint proven not blind on `scripts/` by probe, after a bare `passed` printed **no file count**.
+
+✅ **`docs/gate-baselines.md` stamped from a post-merge `main` run for the first time ever**, and only
+the provenance line moved. ⛔ **The numbering defect compounds:** documenting it adds literals, and
+`preflight` reached **+3** because M39's release named a *planned, unspent* increment. `lane-a.md` now
+carries no forward literal — a mitigation with a real cost to the writing, not a fix.

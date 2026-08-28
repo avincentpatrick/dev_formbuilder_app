@@ -38,9 +38,11 @@ added, **1,086 deleted**, in the `j4b1-tracker` window (PR #160). **It is a J-se
 
 | Attribution in the corpus | Sites | Verdict |
 |---|---|---|
-| *"M31's 1,086-line deletion"* | 4 (`PROGRESS.md:292`, `lane-a.md:285/394/498`) | **WRONG** — `M38`/`M39` wrote three |
-| *"M16's 1,086-line deletion"* | 2 (`PROGRESS.md:351`, `lane-a.md:1073`) | **WRONG** |
+| *"M31's 1,086-line deletion"* | 4 live | **WRONG** — `M38`/`M39` wrote three of them |
+| *"M16's 1,086-line deletion"* | 2 live | **WRONG** |
 | The original record, `PROGRESS.md:90` | 1 | **RIGHT** — mechanism plus the date, claiming no `M` number |
+
+**Line numbers are deliberately not cited for those six.** The first draft of this table gave them, and splicing this very claim into this very file moved every one of them — a citation that its own commit invalidates is the `~30 false or moved citations` class M37 measured, reproduced live. Counts and file names are stable; line numbers in a file being edited are not.
 
 ⚠️ **THE ONE SITE THAT NEVER NAMED AN INCREMENT IS THE ONLY ONE THAT STAYED TRUE.** Every later
 retelling added a number, and every added number was invented. That is this project's
@@ -81,6 +83,65 @@ misattributions).
 
 ⛔ **CROSSES THE LANE BOUNDARY ON PURPOSE; LANE B HOLDS NOTHING, VERIFIED AT WRITE TIME. THIS CLAIM IS
 THE PERMISSION** — the `M28`/`M39` shape. **Namespaces spent: NOTHING.** Sixteenth consecutive.
+
+### ⛔ THE CONTROLS FOUND A VACUOUS SUCCESS INSIDE THE GATE WRITTEN TO END VACUOUS SUCCESSES
+
+**`R7` — the one rule that would have caught the 2026-08-16 deletion — was permanently blind on this
+host, and it reported success.** The check used `HEAD^`. PHP's `exec()` runs through **cmd.exe** on
+Windows, where **the caret is the escape character**, so the shell delivered `HEAD`. Measured:
+
+| Command through `exec()` | Returned |
+|---|---|
+| `git rev-parse --short HEAD` | `216ea25` |
+| `git rev-parse --short HEAD` + caret | **`216ea25`** — the caret was eaten |
+| `git rev-parse --short HEAD~1` | `f537bea` |
+
+So the rule compared `PROGRESS.md` **against itself** and printed `+0` forever. ⚠️ **And the
+cannot-measure guard could not save it**: `rev-parse --verify --quiet` *succeeded*, because `HEAD`
+resolves perfectly well. The check did not skip loudly — **it passed quietly.**
+
+⛔ **IT WOULD HAVE BEEN GREEN ON LINUX CI AND BLIND ON EVERY LOCAL RUN**, which is the worse half: CI
+would have been correct while every local proof of `R7` was a lie, including all future ones.
+
+✅ **IT WAS FOUND ONLY BECAUSE ONE CONTROL COMMITTED ITS MUTATION INSTEAD OF LEAVING IT IN THE WORKING
+TREE.** The first harness mutated the file in place and `R7` reported **CAUGHT** — correctly, but for
+the wrong reason: with the change uncommitted, `HEAD` still held the unmutated file, so comparing
+against `HEAD` accidentally gave the right answer. **A control that does not reproduce CI's actual
+condition can confirm a broken check.** Fixed to `HEAD~1` throughout, and the trap is written into the
+script rather than into a hand-off.
+
+### The controls, all measured, all restored by sha256 byte comparison
+
+**Eight violations, one per rule group, each run against the real script — 8/8 CAUGHT**, and both
+tracker files verified byte-identical afterwards:
+
+| Control | Verdict |
+|---|---|
+| `R1` push `PROGRESS.md` past the ceiling | CAUGHT, naming the byte count |
+| `R2` a second `Current Status` at line start | CAUGHT |
+| `R3` a **third** `Next Session` — the hazard the plan named | CAUGHT |
+| `R4` the archive grows a `Current Status` | CAUGHT |
+| `R5` trailing newline stripped · a CR byte introduced | CAUGHT, both |
+| `R6` the Lane A hand-off marker duplicated | CAUGHT |
+| `R7` 300 lines removed, undeclared | CAUGHT |
+
+⛔ **AND THE ESCAPE HATCH WAS PROVEN SEPARATELY, BECAUSE THE SURGERY CANNOT MERGE WITHOUT IT.** With
+the mutation **committed** — the real CI condition — a 300-line drop with no marker **fails**
+(`exit 1`, naming `f565ac9`), and the identical drop with `[tracker-surgery]` in the message **passes**
+(`exit 0`, printing `DECLARED SURGERY: 300 lines removed`). A gate with an untested escape is a gate
+that blocks the next increment.
+
+⚠️ **The first attempt at that control was itself invalid and is recorded rather than quietly
+rerun:** it cut the last 301 lines, which removed the `Next Session` heading and both hand-off markers,
+so `R2`, `R3` and `R6` fired and `R7`'s result was buried. Cutting from the **middle** isolates the
+rule under test.
+
+### ⚠️ This claim's own citations went stale inside the commit that wrote them
+
+The first draft of the attribution table cited line numbers — and **splicing this claim into this file
+moved every one of them.** A citation invalidated by its own commit is exactly the *"~30 citations
+false or moved"* class `M37` measured across the backlog, reproduced live. The table now cites counts
+and file names only. **Counts and filenames are stable; line numbers in a file being edited are not.**
 
 ### Prediction
 
@@ -344,7 +405,7 @@ The tracker contains **verbatim examples of its own headings**: Standing Rule 7(
 hand-off marker, and a first-draft status bullet quoted the status heading. Substring counts went to 2
 and 3 and the writes were refused. **Every assertion is now line-anchored — which is exactly why
 `preflight.php` anchors its own, and why the coming tracker surgery must split by pre-measured line index rather
-than search.** M31's 1,086-line deletion in miniature, caught by an assertion rather than by a reader.
+than search.** J4b1's 1,086-line deletion (2026-08-16, `f565ac9`) in miniature, caught by an assertion rather than by a reader.
 
 ### ⛔ Baselines deliberately NOT regenerated, and the reason is `M39`'s row
 
@@ -453,7 +514,7 @@ and `openapi.json` are unmoved by construction, and Pint does not scan `docs/`. 
 real step counts.
 
 ⚠️ **THE ONE I MOST EXPECT TO BE WRONG IS THAT THIS PR'S GREEN TICK MEANS ANYTHING.** It cannot —
-nothing in CI reads `decisions.md`, and this is exactly the docs-only shape that let M31's 1,086-line
+nothing in CI reads `decisions.md`, and this is exactly the docs-only shape that let J4b1's 1,086-line deletion (2026-08-16, `f565ac9`)'s
 `PROGRESS.md` deletion merge green. **The proof is the read-back, not the tick**, and the close-out
 must report what it read rather than that CI passed.
 
@@ -557,7 +618,7 @@ the whole argument for making it executable.
    instead of `\n`. They printed correctly, so only Pint caught it. **Build an escape as `chr(92)`.**
    ✅ A **quoted** heredoc is otherwise safe: 60 backticks and every glyph survived one intact, measured.
 3. **A line-count assertion caught an off-by-one and refused to write** — the `lane-a.md` splice
-   asserted a delta of 16 where the truth was 17. That is M31's 1,086-line deletion prevented rather
+   asserted a delta of 16 where the truth was 17. That is J4b1's 1,086-line deletion (2026-08-16, `f565ac9`) prevented rather
    than described.
 4. **`/tmp` is not visible to Windows PHP** — a probe read nothing and "proved" two regexes broken. The
    real cause was ANSI arriving as the literal two characters caret-bracket, with **zero ESC bytes** in
@@ -1132,7 +1193,7 @@ deliberately-unfixed finding goes in writing immediately or becomes invisible.
 **6/6 green, every job with a real steps count** (20 · 11 · 18 · 11 · 16 · 12). Documentation-only, so
 every figure is unmoved as predicted — and that is the weakness of this PR's CI rather than its strength.
 **The proof is the worktree reproduction, not the green tick**, which is the same reasoning that makes
-M16's 1,086-line PROGRESS.md deletion the standing warning about docs-only PRs.
+J4b1's 1,086-line deletion (2026-08-16, `f565ac9`) the standing warning about docs-only PRs.
 
 ⚠️ **THE SEQUENCE WAS RUN FORWARD AS WELL AS BACKWARD, AND ONLY THE FORWARD RUN PROVES THE FIX.**
 Reproducing the failure shows the row was real; running `ds:install` → `ds:tokens` → `build` to

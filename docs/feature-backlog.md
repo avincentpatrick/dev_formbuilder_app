@@ -2199,6 +2199,17 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 ### Test suite & CI gates
 
+- **`minor` · `deploy.yml`'s effective trigger CHANGED in `M39`, and nothing says so at the site.**
+  It fires on `workflow_run` of CI `completed` on `main` gated on `conclusion == 'success'`. Before `M39`
+  every merge run on `main` was cancelled, so **the only runs that could ever have reached it were
+  docs-only close-out runs** — a deploy path that could only ever have shipped a documentation commit.
+  `M39` fixed the cancellation, so it will now fire on **real merge runs**, which is correct and is also a
+  material change to a latent production path that `deploy.yml` itself does not mention. **Latent, not
+  live:** `DEPLOY_ENABLED` is unset (`gh variable list` is empty), so the job is skipped. ⚠️ **The row
+  exists because the day that variable is set is the wrong day to discover that the trigger's meaning
+  changed.** Filed by `M39 (2026-08-28)`; not fixed there because `deploy.yml` was outside that claim and
+  the remedy is a comment plus a decision about whether `paths-ignore` should also guard deploys. **Live.**
+
 - **`minor` · `scripts/preflight.php` derives the next increment number from prose, so a FORECAST reads
   as a SPEND.** Its *"highest M seen in either claim file"* check scrapes the highest `M<n>` **literal**
   out of `docs/claims/lane-a.md` and `docs/claims/lane-b.md`. But `lane-a.md` announces the next free

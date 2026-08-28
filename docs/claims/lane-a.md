@@ -1356,17 +1356,12 @@ the duration it started with, so emulating afterwards cannot collapse one alread
 
 ## Template
 
-```
-## CLAIMED — <row name> (<branch>)
-Opened: <date>. Row: <the backlog row, quoted enough to identify it>.
-Files: <every file to be edited, repo-relative>.
-Shared artefacts taken: <docs/…, openapi.json, … — or "none">.
-Paired files taken: <7(b-bis) entries, and the other half of each — or "none">.
-Namespaces spent: <migration prefix / ADR number — or "nothing from either namespace">.
-Prediction: <what you expect the gates to do, written BEFORE the run so it can be measured
-             against rather than explained afterwards>.
+**Moved to [TEMPLATE.md](TEMPLATE.md) in M36, and deliberately not duplicated here.** It lived as
+a copy in this file and another in `lane-b.md`, which is two copies of one fact free to drift —
+the defect Standing Rule 7(b) records about the lane boundary and `docs/gate-baselines.md` ends
+for gate numbers. Restating it here would be the defect, not a convenience.
 
-## RELEASED — <row name> (merged as PR #<n>, <sha>, 6/6)
-<what was actually taken; whether every claimed file was edited; anything the claim was
- extended to mid-build, each of which was its own pushed commit before the file was opened>
-```
+It gained two required fields in M36: **Evidence verified** and **Remedy verdict**. They are
+separate because a row's evidence and its remedy are separately trustworthy, and four consecutive
+rows — M30, M31, M32, M34 — had sound evidence and a broken prescribed fix. The reasoning and the
+count are in that file.

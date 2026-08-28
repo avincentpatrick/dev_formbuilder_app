@@ -2780,11 +2780,57 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   imports, with an allow-list for the globals (`component`/`template`/`transition`/Inertia's `Link`, `Head`).
   It lands in `scripts/` and moves a gate baseline, which is a tooling row rather than the page row
   that found it — the same reasoning M7 used for the `§D<n>` citation gate directly below.*
-- **`minor` · Neither structural lint gate fails on an empty scan.**
-  `scripts/constraint-boundary-lint.php:296-304` and `scripts/migration-lint.php:140` print the file count
-  and `exit(0)` regardless, so a discovery regression — a moved directory, a mistyped iterator root — is
-  indistinguishable from a clean run. **Live**, and it belongs with this project's standing lesson that a
-  gate nobody can tell is blind is a gate nobody is running.
+- ~~**`minor` · Neither structural lint gate fails on an empty scan.**~~
+  ✅ **DONE — M36 (2026-08-28), AND THE ROW UNDERSTATED ITSELF: FOUR GATES, NOT TWO.** The row names
+  `constraint-boundary-lint.php` and `migration-lint.php`. `scripts/controller-gate.php:101-102` and
+  `scripts/job-payload-lint.php:246-247` carry the identical shape and it names neither;
+  `component-import-lint.php` was the only one of the five with a floor, and it is the gate whose author
+  filed the row. All four now carry a named `MIN_EXPECTED_*` constant asserted before the success path,
+  in `component-import-lint.php`'s own R2 shape. **Its two citations held** — `:297-304` rather than
+  `:296-304` (`:296` is blank) and `:140-141` exactly.
+  ⛔ **AND THE UNDER-SCAN IS NOT HYPOTHETICAL ON THIS HOST — IT IS REPRODUCIBLE TODAY, WHICH THE ROW DID
+  NOT KNOW.** Run these gates *inside* the app container and `RecursiveDirectoryIterator` descends the
+  Windows bind mount only partially, while `find` on the same path sees every file. Measured on the same
+  tree, both sides, with CI as the tie-breaker:
+
+  | Gate | Host | Container | CI |
+  |---|---|---|---|
+  | `controller-gate` | **97** | 49 | **97** |
+  | `migration-lint` | **113** | 86 | **113** |
+  | `constraint-boundary-lint` | **113 / 121 / 0** | 86 / 81 / 0 | **113 / 121 / 0** |
+  | `job-payload-lint` | 31 | 31 | 31 |
+  | `component-import-lint` | 180 | 180 | 180 |
+
+  **Every one of those container runs printed "passed" and exited 0.** `controller-gate` scanned 49 of 97
+  controllers and called it a clean run. That is this row's defect in its live form — partial rather than
+  empty — and it is the measured mechanism behind the project's standing *"lint gates on HOST"* note,
+  which until now carried no number. **CI agrees with the host, which is what makes the host
+  authoritative rather than merely different.**
+  ⚠️ **THE FLOOR'S LIMIT IS STATED RATHER THAN DISCOVERED.** It catches a broken or renamed scan root,
+  and it catches the controller case at 49 < 55. It does **not** catch `migration-lint` or
+  `constraint-boundary-lint` at 86 > 65, and it was never going to: a floor high enough to catch a 76%
+  scan trips on ordinary deletion. The remedy for that case is running the gates where CI runs them,
+  which `scripts/preflight.php --with-gates` now asserts and explains.
+  **Positive control:** with the floors in place the container run of `controller-gate` exits 1 naming
+  the mechanism, while all five still pass on the host at 97 · 113 · 31 · 113/121/0 · 180.
+
+- **`minor` · Every hand-off prescribes a Pint command that scans ~40 fewer files than CI does.**
+  Found by M36 while adding files to `scripts/`. Both lanes' hand-offs say
+  `vendor/bin/pint --test app tests database` — **1375 files**. CI runs `composer run lint`, which is a
+  **bare** `pint --test` with no paths and no `pint.json` in the repository — **1414 files**. The local
+  command misses `scripts/`, `config/`, `routes/` and `bootstrap/` entirely, so a style violation in any
+  of them passes locally and reddens CI. **Measured, not inferred**: M36's four floor edits are all in
+  `scripts/`, all four were flagged by bare Pint, and none of them would have been seen by the
+  prescribed command. **Live** — the fix is one word in two hand-off lines, but it is filed here because
+  the hand-offs are rewritten every increment and a fix that is not written down does not survive one.
+
+- **`minor` · `fb-lane-c` is an abandoned worktree that every numbering check must now read past.**
+  `git worktree list` reports three worktrees; `c:\laragon\www\fb-lane-c` sits on `lane-c-bootstrap`, an
+  M14-era merge commit **104 commits behind `origin/main`**, with one dirty file and no
+  `docs/claims/lane-c.md` anywhere. Standing Rule 7 describes exactly two lanes, so a third entry is
+  noise in the one command the protocol tells every session to run before numbering — and that command
+  has decided the increment number three times running. `git worktree remove` is the whole fix.
+  **Live**, and deliberately not taken by M36, which had no reason to touch another lane's checkout.
 
 ### Documentation & specs
 

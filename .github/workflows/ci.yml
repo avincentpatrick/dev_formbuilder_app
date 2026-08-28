@@ -1,27 +1,50 @@
 name: CI
 
-# phase1-completion (I0, 2026-08-06) is the long-lived integration branch for the Phase-1
-# completion wave: increment PRs target IT, merge into it when green, and main receives one
-# reviewed PR at the end. It gets the same two triggers as main so every increment PR runs the
-# full pipeline and every post-merge integration state is re-verified.
 on:
   push:
-    branches: [main, phase1-completion]
+    branches: [main]
+
+    # ── M39. Tracker/claim docs that no gate reads, skipped on PUSH ONLY ──────────────────────
+    # An increment pushes to `main` two or three times within minutes — the claim, the merge, the
+    # close-out — and the last of those is always documentation. Skipping it stops a docs-only push
+    # queueing a full ~18-minute pipeline behind a merge that has already been verified, and stops
+    # it being the run that triggers `deploy.yml`.
+    #
+    # ⛔ THE FILTER IS ON `push` ONLY AND MUST NEVER BE COPIED TO `pull_request`. A PR always runs
+    # the full pipeline: a docs change can still be wrong, and the PR run is the only gate standing
+    # between it and `main`. M16's 1,086-line PROGRESS.md deletion merged green precisely because
+    # nothing examined a docs-only diff.
+    #
+    # ✅ VERIFIED SAFE RATHER THAN ASSUMED, TWO WAYS. (a) Exactly one test reads a tracked docs file
+    # at runtime — tests/Feature/Mail/QueuedMailContractTest.php:135 reads
+    # docs/deployment-infrastructure.md, which is deliberately NOT in this list; every other `docs/`
+    # mention under tests/ is a comment. (b) The last four close-out commits touch these five paths
+    # AND NOTHING ELSE, which is where the list came from. GitHub evaluates the filter over ALL
+    # files in the push, so a mixed code+docs merge commit still runs.
+    #
+    # ⛔ A SKIPPED RUN IS NOT A RUN — AND IT IS NOT A PENDING ONE EITHER. This project already
+    # catalogues two vacuous successes: a job reporting `steps: []` never acquired a runner and
+    # proves nothing (I5), and a gate that never executed is green for free (Pint, before its
+    # probe). This adds a third, and it fails in a new direction: a push filtered out here DOES NOT
+    # EXIST — `gh run list` returns nothing for it at all. Anything deciding whether `main` is
+    # verified must read "no run" as CORRECTLY SKIPPED, never as still pending.
+    paths-ignore:
+      - 'PROGRESS.md'
+      - 'PROGRESS_ARCHIVE.md'
+      - 'docs/claims/**'
+      - 'docs/gate-baselines.md'
+      - 'docs/backlog-triage.md'
+
   pull_request:
-    branches: [main, phase1-completion]
+    branches: [main]
 
   # ── Re-verification after a GitHub-side outage (added 2026-08-06, I5) ─────────────────────
   # I5 merged with only 2 of 6 jobs confirmed: GitHub Actions was in a MAJOR OUTAGE (status page
   # "Incident with Actions", critical) and four jobs never acquired a runner — they failed with
-  # `Service Unavailable` / `not acquired by Runner of type hosted`, never on our code. The
-  # post-merge `push` run above is the re-verification, but a run that fails for infrastructure
-  # reasons stays failed until somebody re-runs it, and "somebody remembers" is not a control.
-  #
-  # ⚠️ BOTH TRIGGERS BELOW ARE INERT UNTIL THIS FILE REACHES `main`, and that is a GitHub rule,
-  # not an oversight: scheduled and manually-dispatched workflows are read from the DEFAULT
-  # BRANCH only. `main` receives nothing until the single final integration PR at the end of the
-  # I-queue, so until then the working control is the tracker's OUTSTANDING VERIFICATION line
-  # plus `gh run rerun <id> --failed`. They arm themselves the moment the queue lands on main.
+  # `Service Unavailable` / `not acquired by Runner of type hosted`, never on our code. A run that
+  # fails for infrastructure reasons stays failed until somebody re-runs it, and "somebody
+  # remembers" is not a control. These two triggers are that control, and they are LIVE: they arm
+  # from the default branch, and this file has been on `main` since PR #179 (2026-08-18).
   workflow_dispatch:
     inputs:
       reason:
@@ -32,12 +55,31 @@ on:
   # Nightly re-verification of the default branch. Cheap insurance against exactly the failure
   # above — an outage-skipped verification heals itself by morning instead of waiting for a human
   # to notice. Free: the repository is public, so standard-runner minutes are not billed.
+  #
+  # ⚠️ `scripts/gate-baselines.php` ACCEPTS THIS RUN. Its guard rejects `pull_request` and any
+  # head branch that is not `main` — not "anything that is not a push" — because a scheduled run on
+  # `main` is a genuine measurement of the trunk and refusing it would disarm this insurance.
   schedule:
     - cron: "0 3 * * *"
 
+# ⛔ M39 — `cancel-in-progress` IS CONDITIONAL, AND THE CONDITION IS THE WHOLE POINT.
+# It was an unconditional `true`, which is right for a PR (a new push supersedes the old proposal)
+# and WRONG for `main`, where consecutive pushes are not competing versions of one thing — they are
+# a claim, a merge and a close-out, each verifying different content. The merge run was therefore
+# killed by the close-out that followed it, minutes later, EVERY TIME.
+#
+# Measured on `main` before the fix — six cancelled runs, five of them merge commits:
+#   33039884109 (#222) · 33044944615 (#223) · 33109182225 (#224) · 33133951888 (#226)
+#   33134073337 (M36 close-out) · 33172633170 (#228, watched in_progress -> cancelled on purpose)
+#
+# ⛔ AND THE COMMENT THAT USED TO SIT ABOVE THIS BLOCK ASSERTED THE OPPOSITE — "the post-merge
+# `push` run above is the re-verification" — which is why the defect survived seven increments: an
+# auditor reads the assertion, not the run list. `deploy.yml` fires on a successful CI run on
+# `main`, so before this fix the ONLY runs that could ever have triggered a deploy were docs-only
+# close-out runs. `DEPLOY_ENABLED` is unset, so that was latent rather than live.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   PHP_VERSION: "8.4"

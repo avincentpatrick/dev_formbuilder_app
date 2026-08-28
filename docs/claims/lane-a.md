@@ -16,52 +16,64 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M37`, a read-only re-validation of the open backlog
+## Status: NO ACTIVE CLAIM — `M37` is merged and the lane holds nothing forward
 
-**Taken 2026-08-28.** Branch `m37-backlog-triage`, cut from `origin/main` at `f2a663f`, PR into `main`.
-Row: **not a backlog row** — the second half of the same user-directed process work `M36` began. The
-backlog is the queue every later row is taken from, and nothing has ever checked whether its rows are
-still true.
+**`M37` is merged.** Lane A holds no active row and pre-claims no forward number. The next row is taken
+under Rule 7(f) and the claim is written here and **pushed** before the first file is opened.
 
-### Evidence verified
+⛔⛔ **START WITH `php scripts/preflight.php --lane=a`** — it prints both lanes' status, `git worktree
+list` and the highest M in one command. **`M38` is the next free number**, and that figure is a FLOOR:
+a forward queue is a claim and does not live under the `## Status` heading, so still read the whole of
+`lane-b.md`.
 
-The premise, measured on `origin/main` rather than assumed: **81 open bullet rows, of which 68 carry a
-severity tag — 12 `major`, 56 `minor`** — across eight sections. The staleness premise has one hard
-data point rather than a rate: **M20 found three of its four filed cases already passing.** This row
-exists to replace that anecdote with a census, so the number it produces IS the finding.
+⛔ **AND READ `docs/backlog-triage.md` BEFORE TAKING ANY ROW.** All 68 open rows were re-validated on
+2026-08-28; it carries a ranked queue and, for each row, whether its citations still resolve and whether
+its prescribed remedy actually works. **Eight remedies do not.**
 
-### Remedy verdict
+---
 
-No remedy is prescribed and none is invented. **This row changes no application code and fixes no
-defect.** It produces a triaged queue; acting on it is the next row's business. That boundary is
-deliberate — a pass that both triages and fixes cannot report honestly on its own accuracy.
+## RELEASED — M37, a read-only re-validation of the open backlog (merged as PR #227)
 
-**Files:** `docs/backlog-triage.md` (new) · `docs/claims/lane-a.md` · `PROGRESS.md` (own block only) ·
-`PROGRESS_ARCHIVE.md`.
+**Every claimed file was edited and `docs/feature-backlog.md` was deliberately NOT**, as claimed — it is
+a shared artefact both lanes claim and a fan-out must not contend for it. **Namespaces spent: NOTHING**
+(ADR `0022` free, still Lane A's block-opener, thirteenth consecutive increment; migration
+`2026_08_17_000111` free; no `§D<n>`).
 
-⛔ **`docs/feature-backlog.md` IS DELIBERATELY NOT EDITED BY THIS ROW.** It is a shared artefact both
-lanes claim, and a fan-out must not contend for it. The triage lands in its own file; folding verdicts
-back into the backlog is a later, serial decision.
+### How the prediction fared — it was wrong, and the way it was wrong is the finding
 
-**Shared artefacts taken:** `docs/backlog-triage.md`, `PROGRESS.md` (own block only). **Not** the
-backlog, **not** `openapi.json`, **not** `phpunit.xml`.
+The claim predicted **"a large minority of rows will be stale"**, reasoning from M20's three-of-four.
+**Of 68 rows, 65 are LIVE.** One was already fixed and never struck through, one had been promoted to
+`decisions.md`, one cannot be settled by reading.
 
-**Paired files taken:** none.
+**The backlog is accurate about *whether* defects exist and unreliable about *scope* and *remedy*:** 14
+rows understate themselves, 4 overstate, **8 prescribe a fix that is wrong, incomplete or would fatal**,
+and ~30 citations are false or moved. M36 added `Evidence verified` and `Remedy verdict` on the strength
+of four rows; this puts it at eight and shows **the evidence half is the reliable one**.
 
-**Namespaces spent:** NOTHING. ADR `0022` free and still Lane A's block-opener (thirteenth consecutive
-increment). Migration `2026_08_17_000111` free. No `§D<n>`.
+⚠️ **The second prediction — that the agents would disagree about what "still live" means — did not
+materialise.** The verdict vocabulary held across all six passes without amendment; the ambiguity landed
+instead on *overstated* rows, which the brief had not anticipated as a category at all.
 
-⛔ **THE SUB-AGENT BRIEF FORBIDS THE DATABASE, NOT MERELY THE FILES.** M34's "read-only" verification
-agent ran `php artisan test`, whose `migrate:fresh` dropped the schema under a live mutation run and
-produced three phantom failures that read as real ones — **Rule 7(c) reproduced inside one lane.** The
-tell was the assertion total moving, not the failure count. So: no `artisan`, no `pest`, no
-migrations, no writing `docker exec`, no file edits. Reading is the entire permitted surface.
+### ⛔ The finding the row did not contain
 
-**Prediction:** a large minority of rows will be stale — either already fixed, or citations moved by an
-intervening increment. **The prediction most likely to be wrong is that the agents agree with each
-other about what "still live" means**; a row whose defect is real but whose consequence was overstated
-is the ambiguous case, and I expect the triage to need a verdict vocabulary the brief does not yet
-supply. I also expect at least one row to **understate itself**, since that is now five-for-five.
+The filed row names `POST /user/confirm-password`, which needs a session. Verifying it found **eight
+unthrottled Fortify routes, three of which need no session at all** — `POST /forgot-password`,
+`POST /reset-password`, `POST /register`. Verified independently rather than taken on report, and **the
+row's prescribed remedy does not work**: Fortify has no per-route middleware hook, which
+`config/fortify.php` states three times.
+
+### ⚠️ Two rows M36 filed the day before were already wrong, and one was mine
+
+The Pint under-scan row says *"every hand-off"* — M36 fixed Lane A's in the same increment that filed it.
+The `fb-lane-c` row's remedy is wrong: `git worktree remove` refuses on a worktree with modified tracked
+files, and **that row itself reports the dirty file**. It also said 104 commits behind; it is now 120.
+**A row can be stale in hours, and its author is not exempt.**
+
+### On trusting a fan-out
+
+**Six verdicts were re-checked by hand and all six held.** That, and not the agents' own confidence
+ratings, is why the aggregate is actionable. ⛔ The brief forbade the **DATABASE**, not merely the files —
+M34's "read-only" agent ran `artisan test` and its `migrate:fresh` dropped the schema under a live run.
 ---
 
 ## RELEASED — M36, the loop's traps made executable (merged as PR #226, `ca6f802`, 6/6 green)

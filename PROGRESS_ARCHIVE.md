@@ -5113,3 +5113,40 @@ files where CI's bare `pint --test` scans 1414, missing `scripts/`, `config/`, `
 `bootstrap/`; the container under-scan above; and `fb-lane-c`, an abandoned worktree 104 commits behind
 with no claim file that every numbering check now reads past. Namespaces: **nothing spent** — twelfth
 consecutive Lane A increment.
+
+### 2026-08-28 — M37 (Lane A): every open backlog row re-validated — PR #227
+
+Six independent read-only passes over `docs/feature-backlog.md`, one per section, each answering four
+questions per row: is the defect still live · have its citations moved · **is the prescribed remedy
+actually correct** · does the row understate itself. Output is `docs/backlog-triage.md`; the backlog
+itself was deliberately not edited, being a shared artefact a fan-out must not contend for.
+
+⛔ **THE CENSUS CONTRADICTED THE ROW'S OWN PREDICTION, AND THAT IS THE FINDING.** M37 was claimed
+expecting a large minority of rows to be stale, reasoning from M20's three-of-four. **Of 68 rows, 65 are
+LIVE.** The backlog is accurate about *whether* defects exist; it is unreliable about **scope and
+remedy** — 14 rows understate themselves, 4 overstate, **8 prescribe a fix that is wrong, incomplete or
+would fatal**, and ~30 citations are false or moved. M36 added `Evidence verified` and `Remedy verdict`
+on the strength of four rows; this puts it at eight and shows the evidence half is the reliable one.
+
+⛔ **THE HEADLINE IS A SECURITY FINDING THE FILED ROW DID NOT CONTAIN.** It names
+`POST /user/confirm-password`, which needs a session. Verifying it found **eight unthrottled Fortify
+routes, three needing no session at all** — `POST /forgot-password` (reset-mail flooding, account
+enumeration), `POST /reset-password` (token guessing), `POST /register`. Verified independently:
+`throttle:` appears four times in Fortify 13.18.1's route file, `config/fortify.php` maps only `login`
+and `two-factor`, and none of the 16 `RateLimiter::for` registrations covers the rest. ⚠️ **The row's
+prescribed remedy does not work** — Fortify has no per-route middleware hook.
+
+⚠️ **TWO ROWS M36 FILED THE DAY BEFORE WERE ALREADY WRONG, AND BOTH WERE THIS LANE'S.** The Pint
+under-scan row says *"every hand-off"* when M36 fixed Lane A's in the same increment; the `fb-lane-c`
+row's remedy is wrong because `git worktree remove` refuses on a dirty worktree — **which that row
+itself reports**. A row can be stale in hours, and its author is not exempt.
+
+Also recorded: a green `### ✅ … ALL FOUR FIXED` heading sitting directly over a live `minor` filed by
+that same work; a row whose own citations have rotted faster than the code it tracks (9 of ~25 now point
+at blank lines or table separators, so it must be re-derived before it is worked); and a confidentiality
+question left explicitly for the user — the corpus names a real third-party client and publishes an
+audit of its weaknesses across 11+ sites, and the row's own "decide at the merge" deadline has expired.
+
+**Six verdicts were re-checked by hand and all six held** — that, not the agents' confidence ratings, is
+why the aggregate is actionable. The brief forbade the **database**, not merely the files (M34).
+Namespaces: **nothing spent** — thirteenth consecutive Lane A increment.

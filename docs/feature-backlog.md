@@ -2199,6 +2199,19 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 ### Test suite & CI gates
 
+- **`minor` · `scripts/preflight.php` derives the next increment number from prose, so a FORECAST reads
+  as a SPEND.** Its *"highest M seen in either claim file"* check scrapes the highest `M<n>` **literal**
+  out of `docs/claims/lane-a.md` and `docs/claims/lane-b.md`. But `lane-a.md` announces the next free
+  number inside its own `## Status` block — *"`M38` is the next free number"* — so on a tree whose highest
+  **merged** increment is `M37`, the tool reports **"highest M seen: `M38` → next free is `M39`"**. One
+  too high, and it will be one too high on every future increment, because every close-out writes that
+  sentence again. **Measured during `M38`, whose number the tool would have skipped**; the claim was
+  numbered from the merged PR titles and the `## RELEASED` headings instead. ⚠️ **The authority is what
+  is MERGED — `## RELEASED — M<n>` headings, or `gh pr list --state merged` — never a line that merely
+  mentions a number.** This is the same defect the `D5`/`D6`/`D7` increment is about, one level down: a
+  figure derived from prose rather than from state. Filed by `M38 (2026-08-28)`, and deliberately **not**
+  fixed there — `scripts/` is Lane B's column under Standing Rule 7(b) and that increment is docs-only.
+  **Live.**
 - **`minor` · `baselineOf()` turns "no checksum" into `''`, and only middleware turns it back.**
   `tests/Feature/Submissions/SubmissionEditRoutesTest.php:62` returns `(string) $value`, so a null
   `answers_content_checksum` reaches the request body as an **empty string**, and it is
@@ -2943,6 +2956,18 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   constraint (`:34`) rather than the one that shipped (`:40`), so a backfill or fixture setting
   `acting_as_user_id = user_id` gets a 23514 from a constraint the canonical schema reference denies.
   **Live**, and the section enumerates CHECKs exhaustively elsewhere, so the negative reads as complete.
+- ➡️ **MOVED TO `docs/claims/decisions.md` AS `D6` (2026-08-28) — IT IS A DECISION, NOT A DEFECT, AND NO
+  LANE SHOULD TAKE IT AS A ROW.** ⛔ **AND IT IS THE ONE ITEM AN AUTOMATED LOOP MAY NEVER TOUCH**, because
+  every increment adds documents and history and therefore makes it strictly worse rather than better.
+  ⚠️ **THE ROW BELOW UNDERSTATES ITSELF BY NEARLY THREE TIMES, AND SO DID THE CENSUS THAT RE-VALIDATED
+  IT** — the row cites **6** sites and `docs/backlog-triage.md` said **"11+"**; the measurement taken when
+  it was moved is **17 occurrences of `dev_pk_new` / "Purok Kalusugan" across 9 tracked files**, adding
+  `docs/adr/0003`, `docs/domain-glossary.md` and `docs/competitive-feature-parity-matrix.md` to the list
+  below. That M37's census reproduced the very under-counting it was built to detect is the sharper half
+  of the finding. ⛔ **AND THE ROW'S OWN DEFERRAL IS SPENT:** it filed itself against *"the merge as the
+  natural last moment to make redaction a conscious decision rather than a default"*, and that merge
+  (PR #179) landed **2026-08-18** — the deadline passed unnoticed and nothing acted on it, so the default
+  won by silence. Original filing follows, kept because its reasoning is intact.
 - **`major` · The corpus names a real third-party client and publishes an audit of its weaknesses.**
   `docs/PRD.md:35`, `:39`; `docs/architecture/technical-architecture.md:376`; two hits each in
   `docs/adr/0001` and `0002`; three in `PROGRESS_ARCHIVE.md` — naming `dev_pk_new` / "Purok Kalusugan",

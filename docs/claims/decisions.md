@@ -16,7 +16,8 @@ Never wait. The user answers in batches.
 two server-paginated tables (2026-08-18) · fail **open** on an unseeded plan catalog (2026-08-18) ·
 password policy min-12 + HIBP + classes (2026-08-09) · Google-only social login (2026-08-09) ·
 gamification last (2026-08-09) · the held list stays held until the user signals, and they said
-*"not yet, ask again later"* on 2026-08-18 · **a flaky e2e result fails CI** (2026-08-26, D2 below).
+*"not yet, ask again later"* on 2026-08-18 · **a flaky e2e result fails CI** (2026-08-26, D2 below) · **the M-series ends at zero open
+`major` rows plus three consecutive increments filing none** (2026-08-28, D5 below).
 
 ---
 
@@ -171,46 +172,182 @@ contract: `openapi.json` is untouched by `M33`.
 
 ---
 
-### D5 — What bar ends the M-series?
+### D6 — The corpus names a real third-party client and publishes an audit of its weaknesses, on a public repository. Redact?
 
-**Filed 2026-08-28 by Lane A, during `M36`.** Not a defect and not a blocker — an undecided question
-that nothing in the loop currently asks, filed here rather than put to the user as a blocking question
-because D1/D3/D4 set that precedent and because the series continues perfectly well without an answer.
+**Filed 2026-08-28 by Lane A, during `M38`.** **Moved** here out of `docs/feature-backlog.md`
+§ *Documentation & specs*, where it sat as a `major` row — moved rather than copied, because two
+copies of one question drift apart. That is the defect Standing Rule 7(b) records about the lane
+boundary and `docs/gate-baselines.md` records about gate numbers, and this file's own header names
+the class.
 
-**Why the question exists.** The post-merge remediation series has run **M1 → M36** as one row per PR
-into `main`, taken from `docs/feature-backlog.md`. It has no exit criterion. Nothing anywhere says what
-"done" looks like, so the honest description of the current plan is *"until the backlog is empty"* —
-and the backlog does not drain monotonically. **M36 is the worked example**: it closed one row and
-filed three, two of which it found by measuring rather than by reading. That is the series working
-exactly as intended, and it is also why it does not obviously terminate.
+⛔ **THIS IS THE ONE ITEM AN AUTOMATED LOOP MAY NEVER TOUCH.** Every increment adds documents and
+history, so a faster loop makes this **strictly worse** — more sites, more commits carrying them.
+It is sequenced first in the realignment for exactly that reason, and no unattended run may take it.
 
-**The facts.** The file has grown across the series, not shrunk. Rows arrive from three sources: the
-original merge-gate review, defects found while building an unrelated row, and — increasingly — rows a
-row's own verification uncovers. The third source is the productive one and it scales with effort
-spent, so more thoroughness produces more backlog rather than less.
+**The facts, measured on the merged tree rather than read off the row.** The row cites **6** sites;
+M37's census, which re-validated all 68 open rows, said **"11+"**. The actual figure is **17
+occurrences of `dev_pk_new` / "Purok Kalusugan" across 9 tracked files**:
 
-**Three shapes an answer could take**, offered so the question is cheap to answer rather than to
-argue:
+| File | Hits |
+|---|---|
+| `PROGRESS_ARCHIVE.md` | 3 |
+| `docs/PRD.md` | 2 |
+| `docs/domain-glossary.md` | 2 |
+| `docs/competitive-feature-parity-matrix.md` | 2 |
+| `docs/adr/0001-postgresql-over-mysql.md` | 2 |
+| `docs/adr/0002-multi-tenancy-shared-db-rls.md` | 2 |
+| `docs/adr/0003-hosting-laravel-cloud.md` | 2 |
+| `docs/architecture/technical-architecture.md` | 1 |
+| `docs/feature-backlog.md` | 1 |
 
-1. **A severity bar.** The series ends when no `major` remains and every `minor` is either closed or
-   explicitly accepted as latent. Countable today, and it does not pretend the file will empty.
-2. **A category bar.** The series ends when nothing correctness- or security-shaped remains; style,
-   documentation and test-ergonomics rows move to a standing backlog worked opportunistically.
-3. **A budget.** A fixed number of further increments, after which whatever remains is re-triaged
-   against the held pipeline rather than continued by default.
+⚠️ **THE ROW UNDERSTATES ITSELF BY NEARLY THREE TIMES — AND SO DID THE CENSUS THAT RE-VALIDATED IT.**
+That is worth more than the count: M37's whole finding was that rows understate their *scope*, and
+this row is a case of the census reproducing the very failure it was measuring.
 
-**Recommendation: (2), with (1) as the visible measure.** The held list — OCR, uploading/import,
-payments, Track B, GDPR — is product work that has been waiting since 2026-08-18, and the argument for
-continuing remediation indefinitely gets weaker the further it drifts from correctness and security
-into ergonomics. ⚠️ **This is genuinely the user's call and is not being proceeded on** — unlike D4,
-there is no revert-in-one-enum-arm here, because the decision is about what to spend the next several
-increments on rather than about a line of code.
+What is published, on a repository confirmed `"visibility": "PUBLIC"`: the client is named as a
+**Philippine Department of Health** project, and the corpus describes its `users.id === 1` god-mode
+convention (*"duplicated across four code layers, silently transferable if user #1 were ever deleted
+and the ID reused"* — `docs/adr/0002:373`), its missing form versioning, its CI gaps, and a
+repository-state audit in ADR-0003.
 
-⚠️ **AND THE SERIES SHOULD NOT STALL WAITING FOR THIS.** Standing Rule 5 is unchanged: the next row is
-taken under Rule 7(f) and built. This question changes when to stop, not whether to continue.
+⛔ **THE ROW'S OWN DEFERRAL IS SPENT, WHICH IS WHY THIS IS NOT SIMPLY LEFT WHERE IT WAS.** It filed
+itself against *"the merge as the natural last moment to make redaction a conscious decision rather
+than a default"*. That merge — PR #179 — landed **2026-08-18**. The deadline passed ten days ago and
+nothing acted on it, so the default won by silence. **A deferral whose deadline expires unnoticed is
+not a deferral; it is a decision taken by not deciding.**
+
+**Option 1 — redact to a non-identifying description. (RECOMMENDED.)** Replace the client name and
+project name with something like *"a prior government health-sector project"* across the 9 files,
+and keep **every technical lesson intact**. The lessons are what ADR-0001 and ADR-0002 cite as their
+rationale, and not one of them needs the client's identity to work: *"an `id === 1` super-admin
+convention duplicated across four code layers"* is exactly as strong an argument for
+`is_super_admin` without a name attached. Cost: one increment, ~17 replacements, and
+`PROGRESS_ARCHIVE.md` is history so its three hits are a judgement call of their own.
+
+**Option 2 — ratify: leave it as it is.** Defensible on the grounds that the legacy audit *is* the
+provenance for this project's architecture decisions, and that anonymising a citation weakens the
+chain a reader follows to check the reasoning. It is also the status quo, so it costs nothing. What
+it accepts is that a named third party's security weaknesses stay published, indefinitely and
+indexed, on a repository nobody outside this project has asked to be a party to that.
+
+**Option 3 — make the repository private.** Closes the exposure completely and immediately, and
+costs no editing. Rejected as an answer *to this question*: it is a much larger decision about the
+project, it would silently disarm the free-Actions-minutes premise several CI decisions rest on, and
+it treats a documentation problem with an infrastructure lever.
+
+**Recommendation: option 1.** The identification buys the corpus nothing — every argument survives
+the redaction word-for-word — and it is the only option that separates *keeping the engineering
+lesson* from *publishing a named organisation's weaknesses*. Option 2 is coherent but it is the one
+that has effectively been in force by default since the deferral expired, and it should be chosen on
+purpose if it is chosen at all.
+
+⚠️ **GENUINELY THE USER'S CALL AND NOT BEING PROCEEDED ON.** Unlike D3 and D4, there is no
+revert-in-one-line here: a redaction rewrites the provenance of two ADRs, and a wrong guess in
+either direction is expensive to undo. Standing Rule 5 still applies to everything *else* — the
+series does not stall waiting for this.
+
+---
+
+### D7 — Should `main` get branch protection, with the repository owner as a bypass actor?
+
+**Filed 2026-08-28 by Lane A, during `M38`.** Filed rather than decided because it **changes settings
+on a public repository**, which is the class of change the J2d precedent and D4's narrowing note both
+put with the user. It gates the realignment's later increments — the merge-verdict script and the
+Rule 7 rewrite both assume an answer.
+
+**Why it comes up now.** Every merge in this series is a self-merge on a green run, and the check
+that the run was really green is **the model parsing `gh` output**. That has already failed once, in
+a way nobody caught at the time: I5 merged during a GitHub Actions major outage with four of six jobs
+never having acquired a runner, reporting `steps: []` — a **vacuous success**. Every hand-off since
+has carried *"parse each job's step count individually"* as prose, and prose has to be remembered.
+
+**The facts, verified rather than assumed.** `gh api repos/:owner/:repo/branches/main/protection`
+returns **`404 Branch not protected`** and `.../rulesets` returns **`[]`**. There is nothing to amend;
+this would be a net-new control. `main` currently accepts a direct push from anyone with write access,
+which is also **exactly how the claim protocol works** — Rule 7(g) requires `git push origin HEAD:main`
+for the claim commit *before* any file is opened, so blanket protection would break the one mechanism
+that makes concurrent work safe.
+
+⚠️ **THE CONTEXT COUNT IS SIX, NOT FIVE — CORRECTED HERE BECAUSE THE PLAN THAT PROPOSED THIS SAID
+FIVE.** Read from a real run: `Static analysis, style & security` · `Tests (Pest on PostgreSQL)` ·
+`Frontend build & type-check` · `Design system a11y (axe)` · `Contract tests (OpenAPI)` ·
+`E2E (Playwright + axe)`. A ruleset written to the wrong number leaves one gate non-blocking, which is
+the failure it was built to prevent.
+
+**Option 1 — a ruleset requiring all six contexts, with bypass actor = repository owner.
+(RECOMMENDED.)** GitHub refuses the merge until every required context reports `success`, so the
+`steps: []` trap **disappears mechanically**: a required check that never acquired a runner is
+*pending*, not *passed*, and nothing merges. The owner bypass keeps Rule 7(g)'s direct claim push
+working. Cost: the bypass is a real hole — it is exactly as strong as the owner's discipline about
+using it, and it must be used for claim commits only.
+
+**Option 2 — no protection; keep today's convention-only discipline.** Costs nothing and changes
+nothing. It leaves the merge verdict with the model, which is where it was during I5, and the
+mitigation stays "the hand-off reminds you to parse step counts."
+
+**Option 3 — full protection with no bypass.** Strongest, and it breaks the claim protocol: claims
+would need a PR each, which turns a one-commit lock into a multi-minute round trip and removes the
+property that makes it a lock at all. Rejected unless the claim protocol changes first.
+
+**Recommendation: option 1.** It retires a known, measured failure mode with a mechanism instead of a
+reminder — the same move Rule 8 made for the local checks — and it is the only option that does so
+without breaking Rule 7(g). ⚠️ **It is not being proceeded on**: it alters repository settings that
+are visible publicly and that this project cannot un-ring by editing a file, so it waits for an
+explicit yes.
+
 ---
 
 ## ANSWERED
+
+### D5 — What bar ends the M-series? **Zero open `major` rows, plus three consecutive increments filing no new `major`.**
+
+**Filed 2026-08-28 by Lane A during `M36`; answered 2026-08-28 (user decision); recorded by Lane A
+during `M38`.** The series ran M1 → M37 with no exit criterion at all, so the honest description of
+the plan was *"until the backlog is empty"* — and the backlog does not drain monotonically. M29 closed
+one row and filed six; M36 closed one and filed three; M37 closed none.
+
+**As decided:** the series ends when **no `major` remains open** *and* **three consecutive increments
+have gone by without a new `major` being filed.** The second clause is what makes it an exit rather
+than a moment: the first clause alone is satisfiable at any instant by an increment that has not yet
+been verified, and this project's own record is that a row's verification is where the next row comes
+from.
+
+⚠️ **THIS IS NOT THE RECOMMENDATION THAT WAS FILED, AND THE ENTRY SAYS SO RATHER THAN RETRO-FITTING
+ONE.** D5 recommended **option 2** — a *category* bar, ending on correctness and security and moving
+style/docs/ergonomics rows to a standing backlog. The answer is closer to **option 1**, a severity
+bar, with a stability clause option 1 did not have. The difference is real and worth keeping visible:
+a category bar would have ended the series with `major` documentation-parity rows still open, and
+**eight of the twelve open majors are exactly that** — documentation asserting things the code does
+not do. The answer keeps them in scope.
+
+⛔ **AND THE BAR IS NOT MEASURABLE TODAY. THIS IS MEASURED, NOT ESTIMATED.**
+
+| | |
+|---|---|
+| Rows carrying the `major` marker | **12** |
+| Of those, actually open *defects* | **11** — the twelfth is the disclosure row, which became `D6` in this same increment and is a decision, not a defect |
+| Of the twelve, naming the increment that filed them | **1** (the `M32` fan-out row) |
+
+⚠️ **THE FIRST CLAUSE IS NOT EVEN CLEANLY COUNTABLE, AND `M38` ITSELF IS THE PROOF.** A moved row keeps
+its original bullet — that is `D1`'s established convention, so its reasoning survives for the reader —
+which means `grep -c` still returns **12** the moment after one of them stopped being a defect. The
+honest number is **11**, and nothing mechanical can tell them apart today.
+
+**And the second clause cannot be evaluated at all.** *"Three consecutive increments with no new
+`major`"* requires knowing which increment filed each `major` — and **eleven of the twelve do not record
+it**. Provenance across the file appears in at least **15 distinct free-text shapes** (`Filed <date> by
+<M>`, `Filed <date> from <J>`, `Found by <M>`, `Filed by **<M>**`, `(found by P3a, filed by K1c)`, and
+more), so there is no single form to parse.
+
+**What must land before this bar can be evaluated:** provenance normalised to one parseable form
+across `docs/feature-backlog.md`, with a lint gate holding it there. Until then the exit condition is
+recorded but not operable, and **saying so is the point** — a bar that cannot be measured is a bar
+that will be declared met by whoever wants to stop.
+
+⚠️ **THE SERIES DOES NOT STALL ON THIS AND NEVER DID.** Standing Rule 5 is unchanged: the next row is
+taken under Rule 7(f) and built. This answers *when to stop*, not *whether to continue*.
+
+---
 
 ### D2 — May an axe violation be retryable at all? **No. A flaky e2e result now fails CI.**
 

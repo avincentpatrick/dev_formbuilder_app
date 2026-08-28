@@ -74,6 +74,7 @@
         "job-payload-lint": "@php scripts/job-payload-lint.php",
         "constraint-boundary-lint": "@php scripts/constraint-boundary-lint.php",
         "component-import-lint": "@php scripts/component-import-lint.php",
+        "tracker-lint": "@php scripts/tracker-lint.php",
         "preflight": "@php scripts/preflight.php",
         "gate-baselines": "@php scripts/gate-baselines.php",
         "mutate": "@php scripts/mutate.php",
@@ -84,7 +85,8 @@
             "@migration-lint",
             "@job-payload-lint",
             "@constraint-boundary-lint",
-            "@component-import-lint"
+            "@component-import-lint",
+            "@tracker-lint"
         ],
         "post-autoload-dump": [
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",

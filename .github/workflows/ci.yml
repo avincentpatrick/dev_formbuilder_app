@@ -92,6 +92,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # M40. tracker-lint's R7 compares PROGRESS.md against HEAD~1 and reads the commit messages
+          # in HEAD~1..HEAD for the [tracker-surgery] marker, so the parent must be REACHABLE. The
+          # default shallow checkout is depth 1 and would leave R7 unable to measure.
+          #
+          # ⛔ IT DOES NOT SKIP IN THAT CASE, IT EXITS 2. A delta silently not measured is a vacuous
+          # success, and R7 exists precisely because a 1,086-line deletion once merged green.
+          fetch-depth: 2
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
@@ -137,6 +145,13 @@ jobs:
       # composer.json-only registration would gate nothing.
       - name: Component import linter (no template tag without an import)
         run: composer run component-import-lint
+
+      # M40. The tracker is documentation, and NOTHING in CI has ever read a documentation diff —
+      # which is why commit f565ac9 (2026-08-16) deleted 1,086 lines from PROGRESS.md and MERGED
+      # GREEN. A local-only check would not have caught it, so this is registered here as its own
+      # step for the same reason every linter above is: no CI job runs `composer run quality`.
+      - name: Tracker lint (PROGRESS.md structure, encoding and deletion guard)
+        run: composer run tracker-lint
 
       - name: Composer audit (SCA)
         run: composer audit

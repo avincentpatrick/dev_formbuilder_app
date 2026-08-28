@@ -16,17 +16,84 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M42` is merged and the lane holds nothing forward
+## Status: ACTIVE CLAIM — every credential-verifying Fortify route gets a bound (`m43-fortify-rate-limits`)
 
-**`M42` is merged (PR #232, 6/6 green).** Lane A holds no active row and pre-claims no forward number.
-The next row is taken under Rule 7(f), and the claim is written here and **pushed** before the first
-file is opened.
+Taken 2026-08-29. Branch `m43-fortify-rate-limits`, cut from `origin/main` at `0c8d855`, PR into `main`.
 
-✅ **THE NUMBER NO LONGER HAS TO BE PROTECTED BY SILENCE.** This block used to carry a warning that no
-forward literal could be written here, because `preflight` scraped the highest `M<n>` in the file and a
-forecast read as a spend. `preflight` now asks `scripts/state.php`, which reads only `## RELEASED`
-headings. ⛔ **The mitigation is still worth keeping while `lane-b.md` is unfixed** — that file declares
-a next-free number six increments stale, and Lane A may not correct it.
+**Row:** `docs/feature-backlog.md`, under `### Test suite & CI gates` — *"**`major` · `POST
+/user/confirm-password` carries no rate limit at all.**"*, the item ranked **#1** in
+`docs/backlog-triage.md`. ⚠️ **Cited by heading and opening sentence rather than by line number,
+deliberately: this increment edits that file, and `M40` had its own citations go stale inside the commit
+that wrote them.**
+
+### Evidence verified
+
+Every citation opened against the merged tree, and the row's own claim re-measured rather than taken on
+report:
+
+- *"its middleware is `[web, RequirePlatformHost, AppSecurityHeaders, GateRegistration, Authenticate:web,
+  EstablishTenantDatabaseContext]` — no `ThrottleRequests`"* — **HELD.** `config/fortify.php`'s
+  `middleware` array is exactly those five entries (`web` first), and `vendor/laravel/fortify/routes/routes.php`
+  adds only `auth:web` to `POST /user/confirm-password`.
+- *"`config/fortify.php:169-172` maps only `login` and `two-factor`"* — **HELD**, and it understates: there is
+  no `verification` key either, so the two email-verification routes carry Fortify's **vendor literal**
+  `throttle:6,1` rather than anything this app chose.
+- *"the SAML step-up path is bounded (`throttle:saml-step-up`, 20/min)"* — **HELD**,
+  `AppServiceProvider.php:466`.
+- *"`RequireRecentPassword` … `StepUpReauthenticationTest.php:135-147` pins `members.role`,
+  `members.remove`, `members.ownership`, `settings.sso.metadata`, `admin.tenants.assign-plan`,
+  `admin.tenants.index`, `admin.settings.update`"* — **HELD.**
+
+⛔ **THE ROW UNDERSTATES ITSELF, 1 → 8, AND THREE OF THE EIGHT NEED NO SESSION AT ALL.** Read from the
+vendor route file: `throttle:` occurs exactly four times, on `POST /login`, `POST /two-factor-challenge`
+and the two verification routes. Unbounded and credential-bearing: **`POST /forgot-password`** (unlimited
+reset-mail dispatch and account enumeration), **`POST /reset-password`** (unlimited reset-token guessing),
+**`POST /register`** (unlimited account creation) — all three reachable by anyone — plus `PUT
+/user/password`, the row's own `POST /user/confirm-password`, `POST
+/user/confirmed-two-factor-authentication` (**an exhaustible 6-digit TOTP**), and the `two-factor.enable` /
+`two-factor.disable` / recovery-code-regeneration verbs.
+
+### Remedy verdict
+
+⛔ **STRUCTURALLY IMPOSSIBLE — not merely wrong.** The row prescribes *"one `RateLimiter::for()` plus one
+`->middleware('throttle:…')`"*. The second half has nowhere to land: **Fortify has no per-route middleware
+hook**, and `config/fortify.php` records that in its own comments three times — at the `GateRegistration`
+note (*"`Features::registration()` registers both verbs with THIS list"*), at the
+`EstablishTenantDatabaseContext` note, and again where it explains why `bootstrap/app.php`'s `priority()`
+cannot substitute (*priority reorders middleware a route already carries and never adds one*). This is the
+fifth row in six whose evidence is sound and whose remedy is not.
+
+**What is being built instead** — the shape `docs/backlog-triage.md` names as the real option: a
+path-checking middleware in the `GateRegistration` mould, mounted on the same config array, matching on
+**route name** and delegating to the framework's `ThrottleRequests`, so `/login` is not double-throttled
+and the 429, `Retry-After` and `X-RateLimit-*` headers stay the framework's.
+
+Files: `app/Http/Middleware/ThrottleFortifyEndpoints.php` (new), `app/Providers/FortifyServiceProvider.php`,
+`config/fortify.php`, `bootstrap/app.php`, `tests/Feature/Auth/FortifyRateLimitTest.php` (new),
+`docs/security-threat-model.md`, `docs/feature-backlog.md`, `PROGRESS.md`, this file.
+Shared artefacts taken: `docs/security-threat-model.md`, `docs/feature-backlog.md`, `PROGRESS.md` (own
+block only). **`openapi.json` is NOT taken** — predicted byte-identical below.
+Paired files taken: none. No `KNOWN_*` allowlist, no parity list, no `tests/e2e/*.spec.ts`.
+Namespaces spent: **nothing from either namespace** — no ADR, no migration prefix, no `§D`. `0022` and
+`2026_08_17_000111` stay free; `0010` stays reserved for H1d; `#16` stays free. **Nineteenth consecutive.**
+
+Prediction, written before the first file was opened:
+
+- **Pest** gains the new cases and nothing else in it moves; the delta is reconciled case-by-case against a
+  pre-change baseline **of the same scope**, not against a hand-off figure.
+- **PHPStan CAN move**, and saying so beats the usual "a test-only diff cannot touch it": `phpstan.neon`
+  scans `app`, and this adds a class there. Measured by **FILE LIST** against the base tree, because local
+  reports ~18 phantom errors CI does not.
+- **Pint** touches 4–5 files, and its `PASS` is not believed until a deliberately misformatted probe has
+  made it fail — with the probe placed **outside** `app/`, so it cannot redden PHPStan too, which is the
+  clean-up trap `M35` recorded.
+- **Vitest and Storybook axe** cannot move — no front-end diff.
+- **`openapi.json` byte-identical**, confirmed by `cmp` against a fresh `scramble:export`: a 429 comes from
+  route middleware no controller mentions. `M30` predicted exactly this for the same reason and it held.
+- ⚠️ **THE ONE I MOST EXPECT TO BE WRONG IS E2E.** `tests/e2e/support/console.ts` posts the
+  confirm-password form on **every** console visit, and `docs/security-threat-model.md` §8 already records
+  that `ThrottleRequests` **counts successes as well as failures and never clears the bucket**. If 10/min
+  per user is too tight, the console specs go red for a reason that has nothing to do with what they test.
 
 ⛔ **RUN `php scripts/state.php` FOR EVERY NUMBER.** Increment, ADR, migration prefix, exceptions-log
 entry, open rows, open decisions, and how far behind the trunk `docs/gate-baselines.md` has fallen.

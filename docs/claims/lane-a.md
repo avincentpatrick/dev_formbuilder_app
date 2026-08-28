@@ -16,26 +16,97 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M38` is merged and the lane holds nothing forward
+## Status: ACTIVE CLAIM — `M39`, CI's post-merge verification is being cancelled by construction (`m39-ci-truth`)
 
-**`M38` is merged (PR #228, `44e79a9`, 6/6 green with real step counts: Static analysis **19** · E2E
-**20** · Contract **16** · Frontend **12** · axe **11** · Pest **11**, not one `steps: []`).** Lane A
-holds no active row and pre-claims no forward number. The next row is taken under Rule 7(f), and the
-claim is written here and **pushed** before the first file is opened.
+**Taken 2026-08-28.** Branch `m39-ci-truth`, cut from `origin/main` at `c532d59`, PR into `main`.
+Second increment of the operating-loop realignment, and **the correctness fix of the pair**.
 
-⛔⛔ **DO NOT TAKE THE NEXT INCREMENT NUMBER FROM `preflight` — IT IS WRONG RIGHT NOW, AND THIS FILE IS
-WHY.** It takes `preg_match_all('/\bM(\d{1,3})\b/')` over the **whole of both claim files** and returns
-the maximum, so **every mention of a number is read as a spend** — a forecast, a released record, or a
-sentence about the bug itself. **`M38`'s claim discusses `M39` three times while filing the row about
-this exact defect, so the tool now answers *"next free is `M40`"*.** ⚠️ **The increment that documented
-the defect made the tool's answer worse by documenting it**, which is a sharper statement of the row
-than the row was originally filed with. **Derive the number from the `## RELEASED — M<n>` headings
-across both lane files, or from `gh pr list --state merged` — never from `preflight` and never from
-prose.** Filed as a `minor` in `docs/feature-backlog.md` under *Test suite & CI gates*; `scripts/` is
-Lane B's column, so `M38` did not fix it.
+⚠️ **NUMBERED `M39` FROM THE `## RELEASED` HEADINGS AND `gh pr list --state merged`, NOT FROM
+`preflight`** — which currently answers *"next free is `M40`"* because `M38`'s claim discusses `M39`
+while filing the row about that very behaviour. Lane A's highest released is `M38` (PR #228,
+`44e79a9`); Lane B's is `M35`; `lane-b.md` reads **NO ACTIVE CLAIM**. Both files re-read in full at
+write time.
 
-⛔ **AND READ `docs/backlog-triage.md` BEFORE TAKING ANY BACKLOG ROW.** All 68 open rows were
-re-validated on 2026-08-28; **eight prescribed remedies do not work.**
+### Row
+
+Not a `docs/feature-backlog.md` row. Taken from the approved realignment plan, whose highest-value
+single line this is.
+
+### Evidence verified
+
+**Every claim below re-measured on this tree; one was measured deliberately an hour ago.**
+
+- ⛔ **`ci.yml:38-40` cancels `main`'s post-merge verification.** `concurrency.cancel-in-progress` is an
+  unconditional `true`, and an increment pushes to `main` two or three times within minutes, so each
+  push kills the previous run. **Measured across `main`'s recent history — six cancelled runs, five of
+  them merge commits:** `33039884109` (#222) · `33044944615` (#223) · `33109182225` (#224) ·
+  `33133951888` (#226) · `33134073337` (M36 close-out) · **`33172633170` (#228, `M38`'s own merge run,
+  cancelled by `M38`'s close-out push at 12:5x today — watched from `in_progress` to `cancelled` on
+  purpose, as the last clean "before" measurement).** `M38` also cancelled `33170390017`, its own
+  **claim** run, with its claim-extension push.
+- ⛔ **And `ci.yml:16-17` asserts the opposite in its own words** — *"the post-merge `push` run above is
+  the re-verification."* It is not; it is being killed by construction. That comment is the reason the
+  defect survived: anyone auditing the file reads the assertion, not the run list.
+- ⚠️ **`deploy.yml` inherits it.** It fires on `workflow_run` of CI `completed` on `main` gated on
+  `conclusion == 'success'`, so **the only runs that could ever trigger a deploy today are docs-only
+  close-out runs** — every code merge is cancelled. `DEPLOY_ENABLED` is unset (`gh variable list` is
+  **empty**), so it is latent rather than live, and it detonates the day it is set.
+- ⛔ **`docs/gate-baselines.md` is stamped from a PR-branch run.** Its provenance names run
+  `33132909007`; verified **`event=pull_request`, `headBranch=m36-loop-verification-harness`**. The file
+  written to end stale numbers was measured off a proposal, not the trunk. The script's *default* path
+  is correct; the `--run=` escape hatch walked around it.
+- ⚠️ **`phase1-completion` is still a live trigger, not dead config.** It is on both `push` and
+  `pull_request` in `ci.yml`, and the branch **still exists on the remote** (`f4fb535`) despite being
+  retired by PR #179 on 2026-08-18.
+- ✅ **The `paths-ignore` set is safe, and it was measured twice.** (a) The only test that reads a
+  tracked docs file at runtime is `tests/Feature/Mail/QueuedMailContractTest.php:135` →
+  `docs/deployment-infrastructure.md`, which is **not** in the set; every other `docs/` hit under
+  `tests/` is a comment. (b) **The last four close-out commits touch only the five proposed paths and
+  nothing else** — `PROGRESS.md`, `PROGRESS_ARCHIVE.md`, `docs/claims/**`, `docs/gate-baselines.md`,
+  `docs/backlog-triage.md`. The set was derived from the right observation.
+
+### Remedy verdict
+
+**The plan's prescribed fix is right in its main clause and WRONG in one detail, and the detail would
+have broken a designed feature.** It says `gate-baselines.php` should refuse any run whose
+**`event != push`**. That rejects the **nightly `schedule` run on `main`** — a real, successful
+measurement of the trunk (`33079934859`), added deliberately as *"cheap insurance"* against an
+outage-skipped verification. **The guard implemented instead rejects `pull_request` and any
+`headBranch != main`**, which closes the actual defect and admits `push`, `schedule` and
+`workflow_dispatch`. ⚠️ **And `--run=` is KEPT**: the escape hatch was never the defect, the missing
+validation was — a check that only guards the default guards the case nobody gets wrong.
+
+⚠️ **A second figure in the same plan is wrong and is corrected in `D7` rather than here:** it names
+**five** required CI contexts. There are **six**.
+
+### Files
+
+`.github/workflows/ci.yml` · `scripts/gate-baselines.php` · `docs/gate-baselines.md` (regenerated, not
+hand-edited) · `docs/claims/lane-a.md` · `PROGRESS.md` (Lane A's block and hand-off line only) ·
+`PROGRESS_ARCHIVE.md` (close-out entry).
+
+⛔ **THIS CLAIM CROSSES THE LANE BOUNDARY ON PURPOSE, WHICH IS WHY IT IS WRITTEN BEFORE ANY FILE IS
+OPENED.** `scripts/` is **Lane B's column** under Standing Rule 7(b), and `.github/workflows/ci.yml` is
+in the **"NEITHER — claim in this file FIRST"** column. **Lane B holds nothing**, verified in the same
+read that fixed the number, so this is the cheapest available window. **This claim is the permission**
+— the same shape as `M28`. **Namespaces spent: NOTHING** — no ADR, no migration, no `§D<n>`. Fifteenth
+consecutive Lane A increment spending nothing.
+
+### Prediction
+
+No `app/`, `database/`, `routes/`, `.vue` or test file is touched, so **Pest, Vitest, Storybook axe,
+E2E, PHPStan, `openapi.json` and all five host lint gates are unmoved by construction.** `scripts/` **is**
+on Pint's path (M28 proved it with a deliberate misformat probe), so bare `pint --test` must stay green
+— **not** `pint --test app tests database`, which misses `scripts/` entirely. Six jobs green.
+
+⚠️ **THE ONE I MOST EXPECT TO BE WRONG: that the PR run proves the concurrency fix.** It cannot. A green
+PR run is exactly as green with the expression right or wrong, and the arm that matters only fires on
+`main`. **So the fix gets three positive controls, stated before they are run:** (1) replaying
+`--run=33132909007` — the run that produced today's baseline file — must now be **refused**, naming its
+event and branch; (2) two rapid pushes to this PR branch must still leave the first run **cancelled**,
+proving the expression evaluates `true` for `pull_request` rather than having disabled cancellation
+everywhere; (3) after merge, the merge-commit run on `main` must reach **`success`**, and the close-out
+push must produce **no run at all** — read as *correctly skipped*, never as *pending*.
 
 ---
 

@@ -17,6 +17,12 @@ declare(strict_types=1);
  * this is not one. It is an instrument you run at session open and again before you push. Do not
  * "fix" it by adding a CI step.
  *
+ * ⛔ THE INCREMENT NUMBER IS NO LONGER PARSED HERE (M42). It comes from `php scripts/state.php --json`,
+ * which derives it from the `## RELEASED` headings rather than from any literal in prose. The scrape
+ * this file used to do read a FORECAST as a SPEND and climbed every time an increment documented the
+ * problem — measured on the tree that fixed it, where the old block answered "next free is M43" because
+ * this increment's own claim names its own number.
+ *
  * Usage:
  *   php scripts/preflight.php [--lane=a|b] [--with-pint] [--with-gates]
  *
@@ -61,17 +67,40 @@ foreach (LANES as $key => $config) {
     info('lane-'.$key.' status', $status === null ? '(no ## Status heading found)' : trim($status));
 }
 
-$highest = 0;
-foreach (LANES as $config) {
-    if (preg_match_all('/\bM(\d{1,3})\b/', show_from_main($config['claim']), $m) === false) {
-        continue;
-    }
-    foreach ($m[1] as $n) {
-        $highest = max($highest, (int) $n);
+// ⛔ THE NUMBER COMES FROM scripts/state.php AND IS NOT PARSED HERE. Until M42 this block scraped the
+//    highest `M<n>` LITERAL out of both claim files and took the maximum — so a forecast, a quoted
+//    hand-off fragment, or a sentence about that very defect all read as a SPEND. Measured: it answered
+//    "next free is M42" when the truth was M40, and it climbed every time an increment documented the
+//    problem. The mitigation was to forbid lane-a.md from naming a planned increment in prose, which
+//    made the tool accidentally correct at a real cost to the writing. This is the fix instead: one
+//    authority, referenced rather than copied, exactly as Rule 7(b) requires of the lane boundary.
+$stateStatus = 0;
+$stateJson = sh('php '.escapeshellarg('scripts/state.php').' --json --no-rows 2>&1', $stateStatus);
+$state = json_decode($stateJson, true);
+
+if ($stateStatus !== 0 || ! is_array($state)) {
+    $failures[] = 'state.php could not measure';
+    fail('scripts/state.php exited '.$stateStatus.' — the numbering cannot be derived.');
+    note(trim(last_line($stateJson)));
+} else {
+    info('highest released', 'M'.$state['increment']['highest_released'].'  ->  next free is M'.$state['increment']['next_free']);
+    note('Derived from the `## RELEASED` headings of both claim files, truncated at each file\'s');
+    note('`## Template` heading — NEVER from a literal in prose. Run `php scripts/state.php` for the');
+    note('ADR and migration namespaces, the open rows, and how stale the gate baselines are.');
+
+    if ($state['increment']['sources_agree'] === true) {
+        pass('merged pull-request titles agree independently (max M'.$state['increment']['remote_max'].')');
+    } elseif ($state['increment']['sources_agree'] === false) {
+        $failures[] = 'numbering sources disagree';
+        fail('merged pull-request titles top out at M'.$state['increment']['remote_max'].' — the two sources disagree.');
+        note('A mis-truncated scan fails SILENTLY, by returning a LOWER maximum, and a low maximum is a');
+        note('number collision. Settle it before claiming anything.');
+    } else {
+        warn('no independent cross-check: '.(string) $state['increment']['remote_reason']);
     }
 }
-info('highest M seen in either claim file', 'M'.$highest.'  ->  next free is M'.($highest + 1));
-note('That is a FLOOR, not an allocation. Read the other lane\'s file in full and run `git worktree');
+
+note('Still a FLOOR, not an allocation. Read the other lane\'s file in full and run `git worktree');
 note('list` — a forward queue is a claim and does not live under the `## Status` heading.');
 
 // ── Rule 7(a). A branch cut from local HEAD is cut from a stale base and inherits none of what the

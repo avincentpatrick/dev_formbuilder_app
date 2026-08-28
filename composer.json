@@ -78,6 +78,8 @@
         "preflight": "@php scripts/preflight.php",
         "gate-baselines": "@php scripts/gate-baselines.php",
         "mutate": "@php scripts/mutate.php",
+        "state": "@php scripts/state.php",
+        "next": "@php scripts/next.php",
         "quality": [
             "@lint",
             "@analyse",

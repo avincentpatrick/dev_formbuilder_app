@@ -214,8 +214,14 @@ it('names only live write routes in the map', function (): void {
     }
 
     foreach (array_keys(ThrottleFortifyEndpoints::limiters()) as $name) {
-        expect($live)->toHaveKey($name, "the map names {$name}, which is not a live Fortify route");
-        expect($live[$name])->not->toBe([], "the map names {$name}, which is a READ route — the .store trap");
+        // ⚠️ `array_key_exists` rather than `expect($live)->toHaveKey($name, $message)`, and the difference
+        // cost a red run here. **A Pest expectation's second argument is not universally a message**:
+        // `toHaveKey()`'s is the expected VALUE, so the explanatory sentence was being asserted as the
+        // value stored under that key. Same family as the `toContain` trap M30 recorded — except that one
+        // stayed GREEN with the wrong value in the array, and this one failed loudly. The lesson is the
+        // same and only the luck differed: check the signature, do not assume the slot is for a message.
+        expect(array_key_exists($name, $live))->toBeTrue("the map names {$name}, which is not a live Fortify route");
+        expect($live[$name] ?? [])->not->toBe([], "the map names {$name}, which is a READ route — the .store trap");
     }
 });
 

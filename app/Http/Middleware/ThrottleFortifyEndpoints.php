@@ -75,6 +75,11 @@ use Symfony\Component\HttpFoundation\Response;
  * Routes NOT in the map fall straight through, so nothing is throttled twice — `POST /login` keeps
  * `throttle:login` and nothing else, which is the failure mode of the alternative design (a group-wide
  * `throttle:` entry on the config array above).
+ *
+ * ⚠️ TWO WRITE ROUTES ARE UNBOUND BY DECISION RATHER THAN BY OVERSIGHT — `logout` and
+ * `user-profile-information.update`. Both are named in `FortifyRateLimitTest`'s decided-unbound list with
+ * their reasons, and the coverage gate passes *because that decision is recorded*: remove either from that
+ * list and it goes red naming the route. The reasons live there rather than here so there is one copy.
  */
 final class ThrottleFortifyEndpoints
 {

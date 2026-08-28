@@ -16,74 +16,81 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M36`, the loop's traps made executable
+## Status: NO ACTIVE CLAIM — `M36` is merged and the lane holds nothing forward
 
-**Taken 2026-08-28.** Branch `m36-loop-verification-harness`, cut from `origin/main` at `f3abfb4`, PR into `main`.
+**`M36` is merged (PR #226, `ca6f802`, CI 6/6 green with real step counts: E2E 20 · Static 19 ·
+Contract 16 · Frontend 12 · axe 11 · Pest 11 — not one `steps: []`).** Lane A holds no active row and
+pre-claims no forward number. The next row is taken under Rule 7(f), and the claim is written here and
+**pushed** before the first file is opened.
 
-⛔ **THIS ROW IS NOT TAKEN FROM `docs/feature-backlog.md`, AND SAYING SO IS PART OF THE CLAIM.** It is a
-user-directed process increment. The traps this project has paid for in prose become executable checks, and the
-verification debt that four consecutive rows have demonstrated becomes structure rather than advice. It does
-close one filed backlog row on the way — the `minor` at `docs/feature-backlog.md:2783`.
+⛔⛔ **BEFORE YOU NUMBER ANYTHING, RUN `php scripts/preflight.php --lane=a`.** It prints both lanes'
+`## Status` lines, `git worktree list` and the highest M seen anywhere, in one command — which is the
+check that has decided the increment number three increments running, in both directions. **`M37` is
+the next free number.** The preflight's figure is a FLOOR, not an allocation: a forward queue is a
+claim and does not live under the `## Status` heading, so still read the whole of `lane-b.md`.
 
-### Evidence verified — NEW FIELD, INTRODUCED BY THIS ROW
+---
 
-The one backlog row this claim closes, checked against the merged tree rather than accepted:
+## RELEASED — M36, the loop's traps made executable (merged as PR #226, `ca6f802`, 6/6 green)
 
-- `scripts/constraint-boundary-lint.php` — **HELD**, at `:297-304`; the row says `:296-304` and `:296` is blank.
-- `scripts/migration-lint.php:140-141` — **HELD** exactly.
+**Every claimed file was edited, and two were claimed and then deliberately NOT edited.**
+`docs/claims/lane-b.md` was never opened — one writer each is what makes a claim conflict structurally
+impossible, so Lane B adopts `TEMPLATE.md` by deleting its own copy, and `TEMPLATE.md` says so rather
+than leaving it to be noticed. `fb-lane-c` was left alone: it is another lane's checkout and this row
+had no reason to touch it. Both are filed in `docs/feature-backlog.md` rather than only here.
 
-⚠️ **AND THE ROW UNDERSTATES ITSELF — FOUR GATES LACK A FLOOR, NOT TWO.** `scripts/controller-gate.php:101-102`
-and `scripts/job-payload-lint.php:246-247` carry the identical shape and the row names neither. Only
-`scripts/component-import-lint.php` has one (`MIN_EXPECTED_SFCS` at `:73`, asserted at `:145`) — and that is the
-gate whose author filed the row. **So four of the five merge-blocking lint gates would print
-"passed (0 file(s) scanned)" and exit 0 on a moved or mistyped iterator root.** Fifth row in this project to
-understate itself, after M25's four-pages-not-one and M34's second-instance.
+**Namespaces spent: NOTHING.** ADR `0022` stays free and stays Lane A's block-opener — **twelfth
+consecutive Lane A increment spending nothing.** Migration `2026_08_17_000111` free. No `§D<n>`.
 
-### Remedy verdict — NEW FIELD, INTRODUCED BY THIS ROW
+### How the prediction fared
 
-The row prescribes no remedy beyond *"fixing those two scripts is its own change"*, so there is nothing to
-disprove — **the first row in six whose remedy is not wrong, because it does not offer one.** The remedy taken
-is `component-import-lint.php`'s own shape: a named floor constant asserted before the success path, applied to
-**four** gates rather than the two named.
+The claim predicted Pest, Vitest, axe and E2E could not move, PHPStan could not move, `openapi.json`
+stayed byte-identical, bare Pint went 1414 → 1417, and the job list stayed at six. **All held.** The
+one flagged as most likely to be wrong — *"all five lint gates still pass with a floor added"* — also
+held, on the host. It did **not** hold in the container, which is the finding below rather than a miss.
 
-### ⛔ A SECOND DEFECT, FOUND WHILE MEASURING RATHER THAN FILED: THE LOCAL PINT COMMAND UNDER-SCANS CI
+### ⛔ The finding the row did not contain: the gates under-scan in the container and print "passed"
 
-Every Lane A and Lane B hand-off prescribes `vendor/bin/pint --test app tests database`. That scans **1375**
-files. CI runs `composer run lint`, which is a **bare** `pint --test` with no paths and no `pint.json` in the
-repository — **1414 files**. The local gate misses 39, including the whole of `scripts/`, `config/`, `routes/`
-and `bootstrap/`. A style violation in any of them passes locally and reddens CI. It matters to this row in
-particular, which adds three files to `scripts/`.
+`RecursiveDirectoryIterator` descends the Windows bind mount only partially while `find` on the same
+path sees every file. Measured on one tree, three ways:
 
-**Files:**
-- `scripts/preflight.php`, `scripts/gate-baselines.php`, `scripts/mutate.php` — new
-- `scripts/controller-gate.php`, `scripts/job-payload-lint.php`, `scripts/constraint-boundary-lint.php`,
-  `scripts/migration-lint.php` — the empty-scan floor, four gates
-- `composer.json` — register the new commands
-- `docs/gate-baselines.md`, `docs/claims/TEMPLATE.md` — new
-- `docs/claims/lane-a.md` (this claim), `docs/claims/decisions.md` (file `D5`)
-- `docs/feature-backlog.md` — close `:2783`, file the Pint under-scan
-- `PROGRESS.md` — Lane A's block and hand-off only, plus a short Rule 7 amendment
-- `tests/Feature/Gamification/BackfillCommandTest.php` — carry M32's two citation corrections
+| Gate | Host | Container | CI |
+|---|---|---|---|
+| `controller-gate` | **97** | 49 | **97** |
+| `migration-lint` | **113** | 86 | **113** |
+| `constraint-boundary-lint` | **113 / 121 / 0** | 86 / 81 / 0 | **113 / 121 / 0** |
 
-**Shared artefacts taken:** `docs/` (backlog, decisions, the two new files), `PROGRESS.md` (own block only),
-`composer.json`. ⚠️ **`scripts/` IS LANE B'S COLUMN UNDER RULE 7(b) AND IS CLAIMED HERE EXPLICITLY** — Lane B
-reads NO ACTIVE CLAIM, holds nothing, and `fb-lane-b` is parked on `main`, so this is claimed rather than
-assumed.
+`controller-gate` scanned **49 of 97** controllers and exited 0. **CI agrees with the host**, which is
+what makes the host authoritative rather than merely different — and that is the measured mechanism
+behind the standing *"lint gates on HOST"* note, which had carried no number until now. It also gave
+the floors a **real** positive control instead of a synthetic one.
 
-**Paired files taken:** none. No 7(b-bis) entry is touched.
+⚠️ **A floor does not fix it and was never going to.** It catches the controller case at 49 < 55; it
+does not catch 86 > 65, because a floor high enough would trip on ordinary deletion. The remedy is
+running the gates where CI runs them, which `preflight --with-gates` now asserts and explains.
 
-**Namespaces spent:** NOTHING. No ADR (`0022` stays free and stays Lane A's block-opener — twelfth consecutive
-increment spending nothing). No migration (`2026_08_17_000111` free). No sub-decision anywhere.
+### ⚠️ Four traps this increment hit WHILE BUILDING THE TOOL THAT PREVENTS THEM
 
-**Prediction, written before the run so it can be measured against rather than explained afterwards:**
-Pest, Vitest, Storybook axe and E2E **cannot move** — no application code is touched and the only test-file edit
-is two words inside a comment. PHPStan **cannot move**: it scans `app`, `database`, `routes` only, and every new
-file is in `scripts/`. `openapi.json` stays byte-identical; no `/api/v1` route is opened. The five lint gates
-keep their current counts and all five still pass — **that is the prediction most likely to be wrong**, because
-adding a floor to four of them is exactly the change that reddens a gate if the floor is set above the real
-count. Bare Pint moves **1414 → 1417**. The new scripts are not registered as CI steps, deliberately, so the
-job list stays at six.
+Recorded because each is a case of the project's own written knowledge failing to transfer, which is
+the whole argument for making it executable.
 
+1. **`grep -c` exits 1 on zero matches** — the standing note says use `wc -l`; a watcher written this
+   session used `grep -c` anyway and its break condition never fired.
+2. **The tool layer collapses doubled backslashes** — the floor messages went in with literal newlines
+   instead of `\n`. They printed correctly, so only Pint caught it. **Build an escape as `chr(92)`.**
+   ✅ A **quoted** heredoc is otherwise safe: 60 backticks and every glyph survived one intact, measured.
+3. **A line-count assertion caught an off-by-one and refused to write** — the `lane-a.md` splice
+   asserted a delta of 16 where the truth was 17. That is M31's 1,086-line deletion prevented rather
+   than described.
+4. **`/tmp` is not visible to Windows PHP** — a probe read nothing and "proved" two regexes broken. The
+   real cause was ANSI arriving as the literal two characters caret-bracket, with **zero ESC bytes** in
+   a three-megabyte log.
+
+### Baselines
+
+`docs/gate-baselines.md` regenerated from run `33132909007`, which is the run that tested this merge.
+⚠️ **It is a PR run rather than a post-merge `main` run** — stated because provenance is the point of
+that file. Pint moved 1414 → 1417; nothing else moved.
 ---
 
 ## RELEASED — M32, the backfill fan-out asserted by job count alone (merged as PR #225)

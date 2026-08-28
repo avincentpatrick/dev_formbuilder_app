@@ -5078,3 +5078,38 @@ is correct by coincidence of two unrelated behaviours.** Left alone because chan
 touches every case in the file and the new cases assert the real path directly — **named so the next reader
 does not have to rediscover that the `''` is a cast artefact rather than a value anybody chose.** Filed in
 `docs/feature-backlog.md` at the moment the decision was taken, per the J4b1 rule.
+
+### 2026-08-28 — M36 (Lane A): the loop's traps made executable — PR #226, `ca6f802`, 6/6 green
+
+A user-directed process increment rather than a backlog row. Four consecutive rows (M30, M31, M32,
+M34) had shipped a **wrong prescribed remedy while their evidence held**; a positive control had
+returned green having never applied its mutation; two hand-off baselines had been stale; a "read-only"
+agent had dropped the schema mid-run. All of it was already written down, in a hand-off running to
+~4,000 words per lane. **Prose has to be remembered at the right moment; a check does not.**
+
+Shipped `scripts/preflight.php` (branch base · claim actually published · concurrent suites ·
+`PROGRESS.md` splice safety · both lanes' status and the highest M · optional gates and Pint),
+`scripts/mutate.php` (tokens from files, sha256 must move, mutated line printed, green baseline
+required, byte-comparison restore), `scripts/gate-baselines.php` → `docs/gate-baselines.md` (gate
+numbers generated from a named CI run with provenance), an empty-scan floor on **four** lint gates,
+`docs/claims/TEMPLATE.md` as the single claim template with two new required fields — **Evidence
+verified** and **Remedy verdict** — plus Standing Rule 8 and `D5`.
+
+⛔ **The finding the closed row did not contain:** the lint gates **under-scan inside the app
+container and print "passed" while doing it** — `controller-gate` reports **49 of 97** controllers,
+`migration-lint` 86 of 113. CI agrees with the host, which is what makes the host authoritative. That
+is the measured mechanism behind the standing "lint gates on HOST" note, which had carried no number,
+and it gave the floors a real positive control rather than a synthetic one. ⚠️ A floor does not fix
+the 86-of-113 case and was never going to.
+
+⚠️ **The row understated itself — four gates lacked a floor, not the two it named.** Fifth row of that
+shape, after M25 and M34.
+
+⚠️ **And the hand-off's own Pest baseline was already stale**: it quoted 4595 / 19,433 where the run
+reported **4611 / 19465**, one increment later. That is exactly what `docs/gate-baselines.md` ends.
+
+Three findings filed and deliberately not fixed, all `minor`: the prescribed Pint command scans 1375
+files where CI's bare `pint --test` scans 1414, missing `scripts/`, `config/`, `routes/` and
+`bootstrap/`; the container under-scan above; and `fb-lane-c`, an abandoned worktree 104 commits behind
+with no claim file that every numbering check now reads past. Namespaces: **nothing spent** — twelfth
+consecutive Lane A increment.

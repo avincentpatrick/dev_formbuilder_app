@@ -16,19 +16,83 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M37` is merged and the lane holds nothing forward
+## Status: ACTIVE CLAIM — `M38`, three decisions filed in `decisions.md` (`m38-decisions-d5-d6-d7`)
 
-**`M37` is merged.** Lane A holds no active row and pre-claims no forward number. The next row is taken
-under Rule 7(f) and the claim is written here and **pushed** before the first file is opened.
+**Taken 2026-08-28.** Branch `m38-decisions-d5-d6-d7`, cut from `origin/main` at `4a1ebc8`, PR into
+`main`. **Docs-only.** First increment of the operating-loop realignment; `M39` (CI truth) follows it.
 
-⛔⛔ **START WITH `php scripts/preflight.php --lane=a`** — it prints both lanes' status, `git worktree
-list` and the highest M in one command. **`M38` is the next free number**, and that figure is a FLOOR:
-a forward queue is a claim and does not live under the `## Status` heading, so still read the whole of
-`lane-b.md`.
+⚠️ **NUMBERED `M38`, AND BOTH CLAIM FILES WERE RE-READ IN FULL AT WRITE TIME.** `lane-b.md` reads
+**NO ACTIVE CLAIM** and its highest released is `M35`; Lane A's highest released is `M37` (PR #227).
+The only `M38` string anywhere in either file is this file's own floor-announcement.
 
-⛔ **AND READ `docs/backlog-triage.md` BEFORE TAKING ANY ROW.** All 68 open rows were re-validated on
-2026-08-28; it carries a ranked queue and, for each row, whether its citations still resolve and whether
-its prescribed remedy actually works. **Eight remedies do not.**
+⛔ **`scripts/preflight.php` REPORTS "next free is M39", AND THAT IS WRONG — IT IS THE FIRST FINDING
+OF THIS INCREMENT.** It scrapes the highest `M<n>` **literal** out of both claim files, so it reads a
+FORECAST (*"`M38` is the next free number"*) as a SPEND. A number must be derived from what is
+merged, never from prose that merely mentions a number — which is the same defect these decisions are
+about, one level down. **Filed in `docs/feature-backlog.md`, not fixed here**: `scripts/` is Lane B's
+column and this row is docs-only.
+
+### Row
+
+Not a `docs/feature-backlog.md` row. Taken from the approved realignment plan, whose diagnosis is that
+three questions gate later increments and none of them is the lane's to answer. One of the three — the
+named-client disclosure — **is** a backlog row (`docs/feature-backlog.md`, under *Documentation &
+specs*) and is being **moved** to `decisions.md`, not copied.
+
+### Evidence verified
+
+Every figure measured first-hand against the merged tree, not carried from the plan:
+
+- **`D6` — the corpus names a real third-party client.** The row cites **6** sites; M37's census said
+  **"11+"**. **Measured: 17 occurrences of `dev_pk_new` / "Purok Kalusugan" across 9 tracked files** —
+  `docs/PRD.md`, `docs/architecture/technical-architecture.md`, `docs/adr/0001`, `0002`, `0003`,
+  `docs/domain-glossary.md`, `docs/competitive-feature-parity-matrix.md`, `docs/feature-backlog.md`,
+  `PROGRESS_ARCHIVE.md`. **The row understates itself by nearly three times — and so did the census
+  that re-validated it.** Repo confirmed `visibility=PUBLIC`.
+- **`D7` — branch protection is net-new.** `gh api repos/:owner/:repo/branches/main/protection` returns
+  **404 `Branch not protected`**; `rulesets` returns **`[]`**. There is nothing to amend, only to create.
+- **`D5` — the exit bar is not measurable today.** **12 open `major` rows**, which matches
+  `docs/backlog-triage.md`'s independent count of 12.
+
+### Remedy verdict
+
+**None of the three offers a remedy to measure — they are questions, not defects**, which is precisely
+what makes `decisions.md` their home rather than the backlog. The one testable claim in the vicinity is
+the disclosure row's own deferral clause, *"the merge is the natural last moment"*, and it is **SPENT**:
+that merge (PR #179) landed 2026-08-18, so the row's stated deadline expired ten days ago and nothing
+acted on it. A deferral whose deadline passes silently is not a deferral.
+
+### Files
+
+`docs/claims/decisions.md` · `docs/feature-backlog.md` (the disclosure row struck with a pointer, plus
+one new row for the preflight defect above) · `docs/claims/lane-a.md` · `PROGRESS.md` (Lane A's status
+block and hand-off line only) · `PROGRESS_ARCHIVE.md` (one archive entry).
+
+**Shared artefacts taken:** `docs/claims/decisions.md`, `docs/feature-backlog.md`, `PROGRESS.md`,
+`PROGRESS_ARCHIVE.md`. **Paired files taken:** none. **Namespaces spent: NOTHING** — no ADR, no
+migration, no `§D<n>`. **Fourteenth consecutive Lane A increment spending nothing.**
+
+⛔ **TWO NAMESPACE FIGURES IN THE CORPUS ARE WRONG RIGHT NOW, AND ARE CORRECTED IN THIS INCREMENT'S
+HAND-OFF RATHER THAN CARRIED FORWARD.** `docs/adr/0021-respondent-scoped-device-outbox.md` **exists**,
+so every *"next free ADR is `0021`"* line is spent — it is **`0022`**. `database/migrations/` contains
+**`…000110`**, so Lane A's hand-off figure `000109` is spent twice over — it is
+**`2026_08_17_000111`**. Both derived from `ls`, never from prose.
+
+### Prediction
+
+Docs-only, so **no gate can move**: Pest, Vitest, Storybook axe, E2E, PHPStan, all five host lint gates
+and `openapi.json` are unmoved by construction, and Pint does not scan `docs/`. Six jobs green with
+real step counts.
+
+⚠️ **THE ONE I MOST EXPECT TO BE WRONG IS THAT THIS PR'S GREEN TICK MEANS ANYTHING.** It cannot —
+nothing in CI reads `decisions.md`, and this is exactly the docs-only shape that let M31's 1,086-line
+`PROGRESS.md` deletion merge green. **The proof is the read-back, not the tick**, and the close-out
+must report what it read rather than that CI passed.
+
+⚠️ **AND THIS INCREMENT WILL ITSELF BE HIT BY THE DEFECT `M39` FIXES.** Its merge-commit run on `main`
+will be cancelled by the close-out push, exactly as happened to M31, M34, M35 and M36. That is
+expected, recorded here in advance so it is read as a prediction rather than an incident, and harmless
+for a docs-only diff. **It is the last increment that will suffer it.**
 
 ---
 

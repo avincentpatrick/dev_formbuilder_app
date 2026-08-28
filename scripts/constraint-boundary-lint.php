@@ -73,6 +73,19 @@ $traverser = new NodeTraverser(new ParentConnectingVisitor);
 /** Tables known to carry `tenant_id`, plus any a migration under scan declares for the first time. */
 $tenantTables = TenantScopedTables::everyTenantIdCarrier();
 
+/**
+ * A plausible floor for the discovery check below (M36).
+ *
+ * The tree held 113 migration file(s) when this floor was set; it sits well below that so ordinary deletion does
+ * not trip it, and well above zero so a broken or renamed scan root does.
+ *
+ * Measured rather than guessed: this gate run INSIDE the app container on this host reports
+ * 86, because RecursiveDirectoryIterator descends the Windows bind mount only partially while
+ * `find` on the same path sees every file. An under-scan here is a reproducible event today,
+ * not a hypothetical one — which is why the floor is a hard failure and not a warning.
+ */
+const MIN_EXPECTED_MIGRATIONS = 65;
+
 $violations = [];
 $scanned = 0;
 $constraints = 0;
@@ -284,6 +297,24 @@ foreach ($files as $file) {
             );
         }
     }
+}
+
+if ($scanned < MIN_EXPECTED_MIGRATIONS && $violations === []) {
+    // A gate nobody can tell is blind is a gate nobody is running. Mirrors R2 in
+    // scripts/component-import-lint.php, which was the only one of the five gates to have a floor.
+    fwrite(STDERR, sprintf(
+        "Constraint boundary linter FAILED: scanned only %d migration file(s), expected at least %d.
+".
+        "  This is a DISCOVERY regression, not a clean run — a scan root has moved, or the gate is
+".
+        "  running somewhere its iterator cannot see the whole tree. Run it on the HOST, not inside
+".
+        "  the app container — on this host the container reports 86 of 113.
+",
+        $scanned,
+        MIN_EXPECTED_MIGRATIONS
+    ));
+    exit(1);
 }
 
 if ($violations !== []) {

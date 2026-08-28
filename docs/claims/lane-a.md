@@ -129,6 +129,12 @@ the case rather than into a commit nobody re-reads.
   **+8 tests and +50 assertions, exactly the eight cases and exactly their fifty**, reconciling in both
   numbers. The baseline was taken **with the production change active and the test file held aside**, so it
   also proves the middleware moved no existing count; restored byte-identically.
+- ✅ **AND THE TWO MEASUREMENTS AGREE WITHOUT HAVING BEEN MADE THE SAME WAY.** The post-merge run's
+  whole-suite Pest delta is **+8 tests and +50 assertions** — identical to the local per-directory delta
+  above, arrived at from a different total on a different machine. Pint's file count moved by **exactly
+  two**, which is the two files added, so the count is itself a check that it scanned them. The absolute
+  figures are **not** restated here; they live in `docs/gate-baselines.md`, regenerated from this
+  increment's own post-merge run on the trunk.
 - ⚠️ **WRONG, in the safe direction: PHPStan did not move.** The claim said it *could*, because
   `phpstan.neon` scans `app` and this adds a class there — a deliberate correction to the usual "a
   test-only diff cannot touch it". Measured: **18 errors across 10 files, the recorded baseline, and

@@ -72,11 +72,41 @@ block and hand-off line only) · `PROGRESS_ARCHIVE.md` (one archive entry).
 `PROGRESS_ARCHIVE.md`. **Paired files taken:** none. **Namespaces spent: NOTHING** — no ADR, no
 migration, no `§D<n>`. **Fourteenth consecutive Lane A increment spending nothing.**
 
-⛔ **TWO NAMESPACE FIGURES IN THE CORPUS ARE WRONG RIGHT NOW, AND ARE CORRECTED IN THIS INCREMENT'S
-HAND-OFF RATHER THAN CARRIED FORWARD.** `docs/adr/0021-respondent-scoped-device-outbox.md` **exists**,
-so every *"next free ADR is `0021`"* line is spent — it is **`0022`**. `database/migrations/` contains
-**`…000110`**, so Lane A's hand-off figure `000109` is spent twice over — it is
-**`2026_08_17_000111`**. Both derived from `ls`, never from prose.
+### ⛔ CLAIM EXTENDED — two lines in `PROGRESS.md` outside Lane A's own block
+
+**Pushed as its own commit before either line was opened**, per Rule 7(g). Lane B holds **NO ACTIVE
+CLAIM**, so there is no live boundary to negotiate.
+
+⚠️ **AND THIS EXTENSION CORRECTS THIS CLAIM'S OWN FIRST DRAFT, WHICH WAS WRONG.** It asserted that
+*"Lane A's hand-off figure `000109` is spent twice over"*. **It is not.** `PROGRESS.md:1891` already
+reads `next free ADR 0022` and `migration 2026_08_17_000111` — **both correct**. That figure was
+inherited from a planning document describing a state `M37`'s close-out had already fixed, and it was
+carried into a claim without being checked against the file. **A stale figure taken from a document
+rather than from the tree is precisely the defect this increment is about, and it got into the claim
+that says so.**
+
+⛔ **WHAT IS ACTUALLY WRONG INVERTS THE PREMISE, AND THAT IS THE FINDING.** The artefact that is
+rewritten from scratch every increment — the hand-off — is **correct**. The artefact that is supposed
+to be stable — the constitution — is **stale**:
+
+| Site | Says | Truth |
+|---|---|---|
+| `PROGRESS.md:123` — **Standing Rule 7(g) itself** | `NEXT FREE ADR NUMBER: 0021` | `0022` |
+| `PROGRESS.md:1889` — `## Next Session` | `Next free ADR is 0021` | `0022` |
+
+`docs/adr/0021-respondent-scoped-device-outbox.md` **exists on `main`**, so both are spent. ⚠️ **Rule
+7(g)'s line boasts, in its own next sentence, that it *"said `0020` for three increments after K1a
+spent it"* — and it has now done exactly the same thing again.** A rule that records its own past
+failure in the same breath as repeating it is the strongest available argument for deriving the number
+from `ls docs/adr/` rather than from prose.
+
+**Not touched:** `PROGRESS.md:235`, `:238`, `:239`, `:255` and `:465` also name `0021`/`000109`, and
+they are **correct** — each sits inside a `RELEASED` bullet and records what was true at that
+increment. A historical record is not a stale forward claim, and editing one would be falsifying the
+log. Only the two live forward claims above are changed.
+
+**Namespaces spent: still NOTHING.** No ADR, no migration, no `§D<n>`. Both figures derived from `ls`,
+never from prose.
 
 ### Prediction
 

@@ -2934,6 +2934,25 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   down on the host made this unavoidable rather than merely inconvenient** — with no container there is
   no harness at all. **Live.**
 
+- **`minor` · `scripts/next.php` takes each release's LEAD paragraph, and a lead paragraph is often a
+  file manifest rather than the lesson.** The generator renders the newest four `## RELEASED` sections
+  into the hand-off so the traps are derived rather than retyped, which works: `M39`, `M40` and `M41`
+  each open with a substantive sentence and read well. **`M42` does not.** Its lead paragraph is
+  *"Every claimed file was edited. `CLAUDE.md` (new, 167 lines) · `scripts/state.php` (new) · …"*, so
+  the rendered hand-off spends its whole 220-character budget on a file list and clips before reaching
+  a single finding — while the actual lesson, *natural language cannot carry a machine token*, sits two
+  paragraphs below under its own `###` heading. ⚠️ **Measured on the very first hand-off the generator
+  produced**, which is the good case for catching it: the defect is in what a fresh session reads
+  first. **The remedy is a choice, not an obvious fix:** prefer the first paragraph that is not a file
+  manifest; or render the first `###` subsection heading, which every release already writes as a
+  one-line summary of its own finding; or have the claim template mark one paragraph as the lesson.
+  ⛔ **The third is the only one that is not a heuristic** — and this project has now been bitten four
+  times by heuristics over prose, which is the same argument that produced the positional `[state …]`
+  block in the same increment. **Filed by M42 (2026-08-29)**, not fixed because `scripts/` changes need
+  a PR and pushing one straight to `main` would bypass the gate that makes the trunk trustworthy.
+  **Live.**
+
+
 
 ### Documentation & specs
 

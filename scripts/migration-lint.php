@@ -146,14 +146,10 @@ if ($scanned < MIN_EXPECTED_MIGRATIONS && $violations === []) {
     // A gate nobody can tell is blind is a gate nobody is running. Mirrors R2 in
     // scripts/component-import-lint.php, which was the only one of the five gates to have a floor.
     fwrite(STDERR, sprintf(
-        "Migration linter FAILED: scanned only %d migration file(s), expected at least %d.
-".
-        "  This is a DISCOVERY regression, not a clean run — a scan root has moved, or the gate is
-".
-        "  running somewhere its iterator cannot see the whole tree. Run it on the HOST, not inside
-".
-        "  the app container — on this host the container reports 86 of 113.
-",
+        "Migration linter FAILED: scanned only %d migration file(s), expected at least %d.\n".
+        "  This is a DISCOVERY regression, not a clean run — a scan root has moved, or the gate is\n".
+        "  running somewhere its iterator cannot see the whole tree. Run it on the HOST, not inside\n".
+        "  the app container — on this host the container reports 86 of 113.\n",
         $scanned,
         MIN_EXPECTED_MIGRATIONS
     ));

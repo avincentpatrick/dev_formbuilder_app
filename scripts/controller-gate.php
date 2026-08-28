@@ -107,14 +107,10 @@ if ($scanned < MIN_EXPECTED_CONTROLLERS && $violations === []) {
     // A gate nobody can tell is blind is a gate nobody is running. Mirrors R2 in
     // scripts/component-import-lint.php, which was the only one of the five gates to have a floor.
     fwrite(STDERR, sprintf(
-        "Controller gate FAILED: scanned only %d controller file(s), expected at least %d.
-".
-        "  This is a DISCOVERY regression, not a clean run — a scan root has moved, or the gate is
-".
-        "  running somewhere its iterator cannot see the whole tree. Run it on the HOST, not inside
-".
-        "  the app container — on this host the container reports 49 of 97.
-",
+        "Controller gate FAILED: scanned only %d controller file(s), expected at least %d.\n".
+        "  This is a DISCOVERY regression, not a clean run — a scan root has moved, or the gate is\n".
+        "  running somewhere its iterator cannot see the whole tree. Run it on the HOST, not inside\n".
+        "  the app container — on this host the container reports 49 of 97.\n",
         $scanned,
         MIN_EXPECTED_CONTROLLERS
     ));

@@ -251,12 +251,9 @@ if ($scanned < MIN_EXPECTED_JOBS && $violations === []) {
     // A gate nobody can tell is blind is a gate nobody is running. Mirrors R2 in
     // scripts/component-import-lint.php, which was the only one of the five gates to have a floor.
     fwrite(STDERR, sprintf(
-        "Job payload linter FAILED: scanned only %d job class(es), expected at least %d.
-".
-        "  This is a DISCOVERY regression, not a clean run — a scan root has moved, or the gate is
-".
-        "  running somewhere its iterator cannot see the whole tree.
-",
+        "Job payload linter FAILED: scanned only %d job class(es), expected at least %d.\n".
+        "  This is a DISCOVERY regression, not a clean run — a scan root has moved, or the gate is\n".
+        "  running somewhere its iterator cannot see the whole tree.\n",
         $scanned,
         MIN_EXPECTED_JOBS
     ));

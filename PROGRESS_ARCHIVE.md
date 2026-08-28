@@ -6902,3 +6902,45 @@ updated by that increment.
 quietly missed:** Standing Rules (207,468) + Next Session (226,452) + tail = 462,646 bytes on their
 own. One-call loading needs those to move too — a decision about what the constitution keeps, not a
 splice. Namespaces spent: nothing, seventeenth consecutive.
+
+### 2026-08-29 — M42 (Lane A): the numbers become derivable and the hand-off is generated — PR #232, 6/6 green
+
+**`scripts/state.php` derives every namespace from the tree; `scripts/next.php` renders the hand-off;
+`CLAUDE.md` is the new imperative layer and carries no number at all.** `preflight.php` now asks
+`state.php` for the increment number instead of scraping `M<n>` literals, which closes the backlog row
+on that defect. `tracker-lint` gains R8 over `CLAUDE.md` — 7 rule groups to 8, and no new CI step, so
+`Static analysis` stayed at 20. `PROGRESS.md` 519,566 → 505,226 bytes; the Lane A hand-off 18,425 → 2,812.
+
+⛔ **NATURAL LANGUAGE CANNOT CARRY A MACHINE TOKEN, WHICH IS STRONGER THAN "CONSTRAIN THE FORM".** The
+check took three attempts. Gating a claim file's Status block went red on the claim that introduced it,
+because that claim *quotes* the stale declaration it is filing. Gating the hand-off as prose went red on
+all 69 increments the line narrates. The form that works is **positional** — an anchored `[state …]`
+block immediately after the hand-off arrow — and it is proven both ways: corrupting a value reddens it,
+quoting the whole block verbatim later in the same line does not.
+
+⛔ **THE PLAN'S PRESCRIBED FIRST ACT WOULD HAVE FALSIFIED THE LOG.** It asked to delete six stale ADR
+claims; `M38` had already removed both *live* ones and deliberately left the dated `RELEASED` bullets.
+Exactly two live declarations remained and those became pointers; every dated record is byte-identical.
+
+⛔ **AND THE CONSTITUTION IS UNREADABLE BECAUSE OF ITS LEDGER, NOT ITS IMPERATIVES.** Rule 7 is 196,596
+bytes — 94.8% of `## Standing Rules` — and 163,680 of that is a claim ledger with zero imperatives,
+duplicating `docs/claims/`. Filed as a `major` row and its own increment, decided with the user.
+
+➕ **`\R` MATCHES A BYTE INSIDE A UTF-8 CHARACTER.** Without the `u` modifier PCRE reads `0x85` as a
+Unicode NEL, and that byte is a *continuation* byte in ordinary characters. The first draft split
+`lane-a.md` into 2,297 lines where it has 2,273 (check marks are `E2 9C 85`), shifting every reported
+line number. One live occurrence is filed rather than fixed: `Å` is `C3 85`, so the faker name
+`Åsa Lindqvist` shifts the positional assertions in
+`tests/Feature/Audit/ImpersonationAttributionTest.php:204` — the `M9` dice-roll shape.
+
+⚠️ **A STALE BASELINE PRODUCES A CONFIDENT WRONG PREDICTION.** The claim predicted Pint at 1419 from
+`docs/gate-baselines.md`'s committed 1417; CI reported 1420, because that baseline is eleven commits
+stale and predates `M40`'s script. Right arithmetic, wrong input, and nothing announced the staleness —
+which is the argument for the row this increment filed about it.
+
+⚠️ **`scripts/mutate.php` could not drive a single one of the ten positive controls**: its `--tests`
+argument is Pest paths executed via `docker exec`, and Docker was down. The controls reimplement its
+discipline at the call site — green baseline first, tokens read from files, abort unless the sha256
+moves, restore by byte comparison. Filed as its own row.
+
+**One row closed, six filed. Namespaces spent: nothing, eighteenth consecutive.**

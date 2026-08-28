@@ -16,109 +16,165 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M42`, the numbers become derivable and the hand-off generated (`m42-state-and-claude-md`)
+## Status: NO ACTIVE CLAIM — `M42` is merged and the lane holds nothing forward
 
-**Taken 2026-08-29.** Branch `m42-state-and-claude-md`, cut from `origin/main` at `0641ae2`, PR into
-`main`. Fifth increment of the operating-loop realignment, and the one that ends the project's last two
-hand-transcribed artefacts: the namespace numbers and the hand-off itself.
+**`M42` is merged (PR #232, 6/6 green).** Lane A holds no active row and pre-claims no forward number.
+The next row is taken under Rule 7(f), and the claim is written here and **pushed** before the first
+file is opened.
 
-⚠️ **Numbered from the `## RELEASED` headings across both claim files, each truncated at its own
-`^## Template` heading: 25 M-numbered headings, highest 41.** Cross-checked independently against
-`gh pr list --state merged`, which also tops out at 41. `preflight` agrees. Lane B reads **NO ACTIVE
-CLAIM**; `git worktree list` shows `fb-lane-b` on `main` at `aff3cd9` and `fb-lane-c` on
-`lane-c-bootstrap`. Both claim files re-read in full at write time, not at session open.
+✅ **THE NUMBER NO LONGER HAS TO BE PROTECTED BY SILENCE.** This block used to carry a warning that no
+forward literal could be written here, because `preflight` scraped the highest `M<n>` in the file and a
+forecast read as a spend. `preflight` now asks `scripts/state.php`, which reads only `## RELEASED`
+headings. ⛔ **The mitigation is still worth keeping while `lane-b.md` is unfixed** — that file declares
+a next-free number six increments stale, and Lane A may not correct it.
 
-⛔⛔ **THIS CLAIM TAKES `scripts/`, WHICH IS LANE B's COLUMN UNDER RULE 7(b), AND NAMES IT RATHER THAN
-ASSUMING IT.** That column is the exact constraint that stopped `M38` fixing `preflight.php` when it
-filed the defect. Taken under Rule 7(f): Lane B holds no active claim, the user has locked the collapse
-to one writer, and the approved realignment plan assigns these files to this increment.
+⛔ **RUN `php scripts/state.php` FOR EVERY NUMBER.** Increment, ADR, migration prefix, exceptions-log
+entry, open rows, open decisions, and how far behind the trunk `docs/gate-baselines.md` has fallen.
+Nothing in this file or in `PROGRESS.md` is the authority for any of them any more.
 
-✅ **`main` WAS CONFIRMED GREEN BEFORE ANY OF THIS.** Run `33187714817` on `f08559e` is 6/6 with real
-step counts (Pest 11 · axe 11 · Contract 16 · Static 20 · Frontend 12 · E2E 20). `origin/main` is one
-commit past it, and that commit touches `PROGRESS.md` alone — a `paths-ignore` path on the `push`
-trigger, so it produced **no run at all**, which is *correctly skipped*, never *pending*. Verified by
-`gh api …/actions/runs?head_sha=…`, which returns only two skipped `Deploy` entries and no CI run.
+✅ **`CLAUDE.md` IS THE IMPERATIVE LAYER AND IS AUTO-LOADED.** Read it before this file. It carries no
+numbers at all, and `tracker-lint` R8 keeps it that way.
 
-### Row
+⛔ **A REMOVAL OF MORE THAN 200 LINES FROM `PROGRESS.md` NEEDS `[tracker-surgery]` AT THE START OF A
+LINE IN THE COMMIT MESSAGE.** Mentioning it mid-sentence deliberately does not count.
 
-From the approved realignment plan, not a `docs/feature-backlog.md` row — **but it closes one**:
-`docs/feature-backlog.md:2213`, *"`scripts/preflight.php` derives the next increment number from prose,
-so a FORECAST reads as a SPEND."*
+---
 
-### Evidence verified — the row holds, and it understates itself
+## RELEASED — `M42`, the numbers become derivable and the hand-off generated (merged as PR #232, 6/6 green)
 
-`preflight.php:66` scrapes `'/\bM(\d{1,3})\b/'` over the **whole** of both claim files and takes the
-maximum. Every citation in the row holds against the merged tree, and two things it does not say are
-measurable today:
+**Every claimed file was edited.** `CLAUDE.md` (new, 167 lines) · `scripts/state.php` (new) ·
+`scripts/next.php` (new) · `scripts/preflight.php` · `scripts/tracker-lint.php` · `composer.json` ·
+`PROGRESS.md` · `docs/feature-backlog.md` · this file. **Namespaces spent: NOTHING** — eighteenth
+consecutive.
 
-- **`docs/claims/lane-b.md:29` still declares "`M36` IS THE NEXT FREE NUMBER"** — six increments stale.
-  It is inert only because `lane-a.md` carries a higher literal; the mitigation, not the tool, is what
-  keeps the answer right.
-- **The row names one consumer. There are two.** The same wrong number is printed into every hand-off
-  line, which is the artefact a fresh session actually reads.
+`PROGRESS.md` 519,566 → 505,226 bytes, +1 line. The Lane A hand-off went from **18,425 bytes to 2,812**
+and is now rendered rather than written. Lane B's line was not touched.
 
-Four further prose-versus-state disagreements were measured while verifying it, none of them in the row:
-`docs/gate-baselines.md` is **10 commits and two merged increments** behind `origin/main` (provenance
-`33175202807` / `454d9ba`, M39's merge — M40 and M41 both skipped the regeneration); `docs/backlog-triage.md`
-says 68 open rows and the tree has **70** (12 `major`, 58 `minor`); `ls docs/adr/` gives `0022` and
-`ls database/migrations/` gives `2026_08_17_000111`, neither derivable from any sentence.
+### ⛔ Three attempts were needed to find a form the check could safely read, and the first two failed in this project's signature way
 
-### Remedy verdict
+**A mention is indistinguishable from a declaration unless the form is constrained** — `M41` wrote that
+after finding it twice. `M42` found it twice more, inside its own gate, on its own tree:
 
-**The row's prescribed remedy is SOUND and is exactly what ships** — *"derive it from the
-`## RELEASED — M<n>` headings or from `gh pr list --state merged`"*. Both are implemented, and they
-cross-check each other rather than one being trusted.
+1. **Gating a claim file's `## Status:` block went red on the claim that introduced it.** That block is
+   structurally bounded, which looked constrained enough. It is not: this increment's claim *quotes*
+   lane-b's stale declaration in order to file it, and the gate read the quotation as a declaration.
+2. **Gating the hand-off line as prose went red on every increment it narrates** — 69 failures, each one
+   a correct historical mention of a past number.
+3. **The form that works is POSITIONAL, not natural language:** an anchored `[state next=… adr=…
+   migration=…]` block immediately after the hand-off arrow, rendered end to end by `next.php`.
+   **Proven both ways** — corrupting any of the three values reddens it, and *quoting the entire block
+   verbatim later in the same line does not*.
 
-⛔ **BUT THE PLAN'S PRESCRIBED FIRST ACT FOR THIS INCREMENT IS WRONG, AND FOLLOWING IT WOULD FALSIFY THE
-LOG.** It asks for *"deleting the six stale 'next free ADR is 0021' claims and the wrong `000109`."*
-Measured against the tree: **`M38` already deleted both live ones** and recorded at `lane-a.md:777-780`
-that it deliberately left five historical `RELEASED` bullets alone, because *"a dated record is not a
-stale forward claim, and editing one would falsify the log."* Every remaining `0021` site
-(`PROGRESS.md:174, 235, 238, 239, 243, 255`) and every `000109` site (`:126, :130, :139, :146, :153,
-:158, :163`) sits inside a dated `RELEASED` / `CLAIMED` / `CLOSED` bullet.
+⛔ **THE TRANSFERABLE RULE IS STRONGER THAN "CONSTRAIN THE FORM": NATURAL LANGUAGE CANNOT CARRY A
+MACHINE TOKEN AT ALL.** Every failure in this family — `preflight`'s literal scrape, `R7`'s marker
+matched anywhere in a commit range, and both attempts above — is an attempt to make prose
+machine-readable. The fix is never a better pattern; it is a token that prose cannot accidentally
+produce.
 
-**Exactly two live forward declarations remain in the tracker:** `PROGRESS.md:123` (the ADR number,
-*currently correct* at `0022`, and whose own text already argues for its deletion) and `PROGRESS.md:232`
-(the `docs/exceptions-log.md` namespace). **So the act is restated: replace those two with derive-it
-pointers, leave every dated record byte-identical, and say so** — the same discipline `M41` applied to
-its unreachable 40 KB target.
+### ⛔ The plan's prescribed first act would have falsified the log
 
-⛔ **AND THE MEASUREMENT FOUND WHY THE CONSTITUTION CANNOT BE LOADED IN ONE CALL, WHICH IS NOT WHAT THE
-PLAN ASSUMED.** Rule 7 is **196,596 bytes — 94.8% of the whole `## Standing Rules` section — and
-163,680 of those (lines 123–259) are a claim ledger with zero imperatives**, duplicating what
-`docs/claims/lane-*.md` now holds. Filed as its own row and taken as its own PR, decided with the user:
-mixing a 163 KB docs surgery into a scripts increment makes the diff unreviewable.
+It asked for *"deleting the six stale 'next free ADR is 0021' claims and the wrong `000109`."* Measured:
+**`M38` had already deleted both live ones** and recorded at `:777-780` that it deliberately left five
+historical `RELEASED` bullets alone — *"a dated record is not a stale forward claim, and editing one
+would falsify the log."* Every remaining site sits inside a dated ledger bullet.
+
+**Exactly two live declarations remained** — `PROGRESS.md:123`, the ADR number, and `:232`, the
+exceptions-log entry — and those are what became pointers. Every dated record is byte-identical: the
+tracker diff is four hunks, one of which is the new status bullet.
+
+⚠️ **`:232` also cited the exceptions log at a path it does not live at** (`exceptions-log.md:339`
+rather than `docs/ux/exceptions-log.md`) — a line number in a file that has since moved, which is the
+citation class `M37` measured at roughly thirty occurrences.
+
+### ⛔ And the reason the constitution cannot be read in one call is not the imperatives
+
+`## Standing Rules` is 207,468 bytes. **Rule 7 alone is 196,596 of them — 94.8% — and 163,680 is a claim
+ledger with zero imperatives**, duplicating `docs/claims/lane-*.md`, which has been the home of claims
+since the 2026-08-25 amendment. The plan's premise was that separating imperative from rationale would
+fix the size. It would not have moved the number materially. Filed as a `major` row with its own
+increment and its own surgery proof — decided with the user, 2026-08-29.
+
+### ➕ `\R` MATCHES A BYTE INSIDE A UTF-8 CHARACTER, AND IT COST THIS SCRIPT ITS LINE NUMBERS
+
+`preg_split` on the regex newline class without the `u` modifier matches the single byte `0x85` as a
+Unicode NEL — and that byte is a *continuation* byte in ordinary characters, not only exotic ones.
+**Measured:** the first draft split this file into **2,297 lines where it has 2,273**, because the
+corpus is full of check marks (`E2 9C 85`), and every line number it reported after the first one was
+wrong by a growing offset. That is how a false positive was traced to line 55 when the real line was 54.
+
+⚠️ **One live occurrence exists and is filed rather than fixed**, because `tests/` was outside this
+claim: `tests/Feature/Audit/ImpersonationAttributionTest.php:204` splits a streamed audit CSV that way,
+and **`Å` is `C3 85`** — the name `Åsa Lindqvist` splits that CSV into 4 rows where it has 3, shifting
+every positional index the test asserts. **That is the `M9` shape**: a random faker name reddening a
+test on a dice roll, where re-running would hide it forever.
+
+### The row, and a remedy that was sound for once
+
+Closes `docs/feature-backlog.md`'s *"`scripts/preflight.php` derives the next increment number from
+prose, so a FORECAST reads as a SPEND."* **Its prescribed remedy was SOUND and is exactly what shipped**
+— the first row in six whose fix did not have to be corrected. ⚠️ **But it understated itself:** it
+names one consumer and there are two, because the same wrong number was rendered into every hand-off,
+which is the artefact a fresh session actually reads. The fix is only complete because `next.php`
+generates that line from the same figures.
+
+✅ **MEASURED ON THE TREE THAT REPRODUCES IT.** Before the change, on this branch, `preflight` answered
+*"highest M seen: `M42` → next free is `M43`"* — raised by this increment's own claim naming its own
+number, which is precisely the compounding the row predicted. After: *"highest released `M41` → next
+free is `M42`"*, with merged pull-request titles agreeing independently.
+
+### Controls — ten of them, every mutation moving the sha256, every restore byte-exact
+
+| Control | Verdict |
+|---|---|
+| A prose `M99` in a claim file | stays `M42` — the defect is not reproduced |
+| The same text as a real `## RELEASED — M99` heading | moves to `M100` — the guard is not refusing everything |
+| A numbered `RELEASED` heading *below* `## Template` | **exit 2, CANNOT MEASURE** — not a silently lower maximum |
+| R8 vs a migration prefix · an increment number · a sub-decision id · "next free" | red ×4 |
+| `CLAUDE.md` truncated to 20 lines · deleted outright | red ×2 — absence is not a free pass |
+| `[state …]` values corrupted ×3 | red ×3 |
+| The whole `[state …]` block quoted later in the same line | **green** — position, not substring |
+| A second Lane A marker, then `next.php --write` | refuses, rather than taking the first |
+
+⚠️ **`scripts/mutate.php` COULD NOT DRIVE ANY OF THEM, AND THAT IS ITS OWN ROW.** Its `--tests` argument
+is Pest paths and it execs them through `docker exec`, so a gate implemented as a standalone script has
+no harness at all — and Docker was down on this host, so there was no container either. The controls
+therefore reimplement its discipline at the call site: a green baseline first, tokens read from files so
+no shell can eat them, abort unless the sha256 moves, and restore by byte comparison rather than
+`git checkout --`.
+
+### How the prediction fared — and the one number it got wrong proves the row it filed
+
+Everything structural held. **`Static analysis` stayed at 20 steps**, because R8 landed inside the
+already-registered `tracker-lint` step rather than as a new one. Pest, Vitest, Storybook axe and E2E
+were unmoved, as predicted from a diff touching no `app/`, `database/`, `routes/`, `tests/`,
+`resources/` or `packages/`. PHPStan was unmoved and structurally unable to move.
+
+⚠️ **THE ONE MISS WAS PINT'S FILE COUNT, AND IT MISSED FOR THE REASON THIS INCREMENT FILED A ROW
+ABOUT.** The claim predicted **1419**, reasoning from `docs/gate-baselines.md`'s committed **1417**
+plus the two new scripts. CI reported **1420**. The baseline is eleven commits and two increments
+stale — it predates `M40`'s `scripts/tracker-lint.php` — so the trunk was already at 1418 and the
+arithmetic was right on a wrong input.
+
+⛔ **A STALE BASELINE DOES NOT ANNOUNCE ITSELF; IT PRODUCES A CONFIDENT WRONG PREDICTION.** The figure
+looked measured because it *was* measured — just not recently, and nothing in the file or in
+`preflight` said how long ago. That is the whole argument for the staleness row, made by the increment
+that filed it, against itself.
+
+### Six rows filed, not fixed, each at the moment it was decided
+
+The ledger surgery (`major`) · the `\R` defect in `tests/` · `gate-baselines.md` having no staleness
+signal while being eleven commits stale · a claim file having no constrained forward-declaration form,
+so lane-b's stale number cannot be gated · R8 being unable to reach `PROGRESS.md` until the ledger moves
+· `mutate.php` being unable to control a gate that is not Pest.
+
+**Net: one closed, six filed.** That is the treadmill `D5` describes, and every one of the six was
+measured rather than suspected.
 
 ### Files
 
-`CLAUDE.md` (new) · `scripts/state.php` (new) · `scripts/next.php` (new) · `scripts/preflight.php` ·
-`scripts/tracker-lint.php` · `composer.json` · `PROGRESS.md` (Lane A's own block and hand-off line, plus
-the two live namespace declarations) · `docs/feature-backlog.md` · `docs/claims/lane-a.md`.
-
-Shared artefacts taken: `docs/**`, `PROGRESS.md` (own block only). Paired files taken: none.
-**Namespaces spent: NOTHING** — eighteenth consecutive. No ADR, no migration prefix, no `§D`.
-
-### Prediction
-
-`Static analysis` stays at **20 steps** — the new rule group lands inside the already-registered
-`tracker-lint` step, and `state.php` / `next.php` are instruments, which `preflight.php:13-18` forbids
-registering as CI steps. Pest, Vitest (134 files), Storybook axe and E2E are all unmoved: nothing under
-`app/`, `database/`, `routes/`, `tests/`, `resources/` or `packages/` is touched. PHPStan is unmoved and
-**structurally unable to move** — it scans `app`, `database` and `routes` only. `tracker-lint` goes from
-7 rule groups to 8, and `PROGRESS.md` drops from 519,566 bytes to roughly 503,000.
-
-⚠️ **Pint's file count moves, 1417 → 1419**, because two new files land under `scripts/` and CI runs a
-**bare** `pint --test` over the whole project. Named here rather than discovered in the diff — and the
-verification uses the bare invocation, never `pint --test app tests database`, which misses `scripts/`
-entirely.
-
-⚠️⚠️ **THE ONE I MOST EXPECT TO BE WRONG: the `## RELEASED` parse, because its failure mode is
-silent.** Three independent reasons it is fragile — lane-b's headings are bare `M35,` while lane-a's
-newest are backticked; two lane-a headings carry **no `M` at all**; and **both files contain a verbatim
-`## RELEASED — <row name>` template example**, which is precisely the shape that deleted 1,086 lines on
-2026-08-16. An off-by-one truncation yields a *lower maximum*, not an error, and a lower maximum is a
-number collision. **That is why the assertion pins the COUNT at 25 rather than trusting the max**, and
-why the number is cross-checked against a second, independent source.
+`CLAUDE.md` · `scripts/state.php` · `scripts/next.php` · `scripts/preflight.php` ·
+`scripts/tracker-lint.php` · `composer.json` · `PROGRESS.md` · `docs/feature-backlog.md` ·
+`docs/claims/lane-a.md`. **Namespaces spent: NOTHING.**
 
 ---
 

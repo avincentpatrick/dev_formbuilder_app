@@ -16,7 +16,94 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M38`, three decisions filed in `decisions.md` (`m38-decisions-d5-d6-d7`)
+## Status: NO ACTIVE CLAIM — `M38` is merged and the lane holds nothing forward
+
+**`M38` is merged (PR #228, `44e79a9`, 6/6 green with real step counts: Static analysis **19** · E2E
+**20** · Contract **16** · Frontend **12** · axe **11** · Pest **11**, not one `steps: []`).** Lane A
+holds no active row and pre-claims no forward number. The next row is taken under Rule 7(f), and the
+claim is written here and **pushed** before the first file is opened.
+
+⛔⛔ **DO NOT TAKE THE NEXT INCREMENT NUMBER FROM `preflight` — IT IS WRONG RIGHT NOW, AND THIS FILE IS
+WHY.** It takes `preg_match_all('/\bM(\d{1,3})\b/')` over the **whole of both claim files** and returns
+the maximum, so **every mention of a number is read as a spend** — a forecast, a released record, or a
+sentence about the bug itself. **`M38`'s claim discusses `M39` three times while filing the row about
+this exact defect, so the tool now answers *"next free is `M40`"*.** ⚠️ **The increment that documented
+the defect made the tool's answer worse by documenting it**, which is a sharper statement of the row
+than the row was originally filed with. **Derive the number from the `## RELEASED — M<n>` headings
+across both lane files, or from `gh pr list --state merged` — never from `preflight` and never from
+prose.** Filed as a `minor` in `docs/feature-backlog.md` under *Test suite & CI gates*; `scripts/` is
+Lane B's column, so `M38` did not fix it.
+
+⛔ **AND READ `docs/backlog-triage.md` BEFORE TAKING ANY BACKLOG ROW.** All 68 open rows were
+re-validated on 2026-08-28; **eight prescribed remedies do not work.**
+
+---
+
+## RELEASED — `M38`, three decisions filed and a constitution corrected (merged as PR #228, `44e79a9`, 6/6 green)
+
+**Every claimed file was edited, and the claim was extended once — as its own pushed commit, before
+either newly-claimed line was opened.** `D5` moved to ANSWERED; `D6` and `D7` were filed OPEN; the
+disclosure row was **moved** out of `docs/feature-backlog.md` rather than copied; two rows were filed
+and not fixed. **Namespaces spent: NOTHING** — fourteenth consecutive Lane A increment.
+
+### How the prediction fared — the gates held, and the claim's own figures did not
+
+The claim predicted no gate could move, and none did: six jobs green with real step counts, and the
+one it flagged as *"most likely to be wrong — that this PR's green tick means anything"* was correct
+to flag. **Nothing in CI reads `decisions.md`.** The proof was the read-back, and it is recorded above.
+
+⛔ **THE CLAIM'S OWN FIRST DRAFT WAS WRONG, AND IT WAS CORRECTED IN THE CLAIM RATHER THAN QUIETLY.** It
+asserted that *"Lane A's hand-off figure `000109` is spent twice over"*. **It was not.**
+`PROGRESS.md:1891` already read `next free ADR 0022` and `migration 2026_08_17_000111` — **both
+correct.** That figure was inherited from a planning document describing a state `M37`'s close-out had
+already fixed, and it reached a claim without being checked against the file. ⚠️ **A stale figure taken
+from a document rather than from the tree is the exact defect this increment is about, and it got into
+the claim that says so.**
+
+### ⛔ The finding inverts the premise, and it is the transferable part
+
+**The artefact rewritten from scratch every increment — the hand-off — was CORRECT. The artefact meant
+to be stable — the constitution — was STALE.**
+
+`PROGRESS.md:123` is **Standing Rule 7(g) itself**, the clause written to stop exactly this, and it
+read *"NEXT FREE ADR NUMBER: `0021`"* from **`M15`** — the increment that shipped
+`0021-respondent-scoped-device-outbox.md` — all the way to `M38`. It sat **directly above its own
+sentence boasting that it had said `0020` for three increments after K1a spent it.** A rule that
+records its own past failure in the same breath as repeating it is the strongest available argument
+for deriving the number from `ls docs/adr/`.
+
+⚠️ **Five historical `RELEASED` bullets naming `0021`/`000109` were deliberately LEFT ALONE.** Each
+records what was true at its own increment; a dated record is not a stale forward claim, and editing
+one would falsify the log. **Only the two live forward claims were changed** (`:123`, `:1889`).
+
+### What the measurements found that the sources did not
+
+| Figure | Source said | Measured |
+|---|---|---|
+| `D6` disclosure sites | row **6** · M37's census **"11+"** | **17 across 9 files** |
+| `D7` required CI contexts | the proposing plan: **5** | **6** |
+| Open `major` rows naming their filer | — | **1 of 12** |
+
+⚠️ **M37's census reproduced the very under-counting it was built to detect** — that is worth more than
+the corrected number.
+
+### ⚠️ Three splice assertions fired on prose quoting the anchor it searched for
+
+The tracker contains **verbatim examples of its own headings**: Standing Rule 7(e) at `:88` quotes the
+hand-off marker, and a first-draft status bullet quoted the status heading. Substring counts went to 2
+and 3 and the writes were refused. **Every assertion is now line-anchored — which is exactly why
+`preflight.php` anchors its own, and why M41's surgery must split by pre-measured line index rather
+than search.** M31's 1,086-line deletion in miniature, caught by an assertion rather than by a reader.
+
+### ⛔ Baselines deliberately NOT regenerated, and the reason is `M39`'s row
+
+`docs/gate-baselines.md` still carries run `33132909007` — **verified `event=pull_request` on branch
+`m36-loop-verification-harness`**, i.e. the file written to end stale numbers is itself stamped from a
+PR-branch run. It is **not** regenerated here because the only fresh post-merge candidate is this
+increment's own merge run, and **that run is being cancelled** by this close-out push. That is the
+defect `M39` fixes, and `M38` is its last measured instance: on this increment alone, run
+`33170390017` (the claim push) was already cancelled by the claim-extension push.
+
 
 **Taken 2026-08-28.** Branch `m38-decisions-d5-d6-d7`, cut from `origin/main` at `4a1ebc8`, PR into
 `main`. **Docs-only.** First increment of the operating-loop realignment; `M39` (CI truth) follows it.

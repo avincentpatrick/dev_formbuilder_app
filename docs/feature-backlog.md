@@ -2211,7 +2211,14 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   mentions a number.** This is the same defect the `D5`/`D6`/`D7` increment is about, one level down: a
   figure derived from prose rather than from state. Filed by `M38 (2026-08-28)`, and deliberately **not**
   fixed there — `scripts/` is Lane B's column under Standing Rule 7(b) and that increment is docs-only.
-  **Live.**
+  ⛔⛔ **AND THE ROW IS BROADER THAN ITS OWN HEADLINE — MEASURED ON THE INCREMENT THAT FILED IT.**
+  The scan is `preg_match_all('/\bM(\d{1,3})\b/')` over the **whole of both claim files**, taking the
+  maximum — so it is not merely a *forecast* that reads as a spend, it is **every mention of a number**:
+  a released record, a quoted hand-off fragment, or a sentence about this very bug. `M38`'s claim
+  discusses `M39` three times *while filing this row*, and the tool consequently answers **"next free
+  is `M40`"**. ⚠️ **The increment that documented the defect made the tool's answer worse by
+  documenting it.** That is why the fix cannot be "stop writing forecasts": it must derive the number
+  from the `## RELEASED — M<n>` headings or from `gh pr list --state merged`. **Live.**
 - **`minor` · `baselineOf()` turns "no checksum" into `''`, and only middleware turns it back.**
   `tests/Feature/Submissions/SubmissionEditRoutesTest.php:62` returns `(string) $value`, so a null
   `answers_content_checksum` reaches the request body as an **empty string**, and it is

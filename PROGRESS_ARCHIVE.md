@@ -5150,3 +5150,41 @@ audit of its weaknesses across 11+ sites, and the row's own "decide at the merge
 **Six verdicts were re-checked by hand and all six held** — that, not the agents' confidence ratings, is
 why the aggregate is actionable. The brief forbade the **database**, not merely the files (M34).
 Namespaces: **nothing spent** — thirteenth consecutive Lane A increment.
+
+### 2026-08-28 — M38 (Lane A): three decisions filed, and the constitution's ADR number was stale since M15 — PR #228, `44e79a9`, 6/6 green
+
+**`D5` → ANSWERED**: the M-series ends at **zero open `major` rows plus three consecutive increments
+filing none** (the user's call — and *not* the category bar `D5` itself recommended, which the entry
+states rather than retro-fitting). **`D6`** (the named-client disclosure on a public repository) and
+**`D7`** (branch protection with owner bypass) filed **OPEN** with recommendations. The disclosure row
+was **moved** out of `docs/feature-backlog.md`, not copied — `D1`'s convention, and Rule 7(b)'s
+one-authority rule.
+
+⛔ **THE BAR IS NOT MEASURABLE TODAY AND THE ENTRY SAYS SO WITH THE MEASUREMENT.** Only **1 of the 12**
+`major`-marked rows names the increment that filed it; provenance appears in at least 15 free-text
+shapes. Even the first clause is not cleanly countable: a moved row keeps its bullet, so `grep -c`
+returns 12 the instant one stops being a defect. The honest number is **11**.
+
+⛔⛔ **THE FINDING INVERTED THE INCREMENT'S OWN PREMISE.** The artefact rewritten from scratch every
+increment — the hand-off — was **correct**. The artefact meant to be stable — the constitution — was
+**stale**. `PROGRESS.md:123` is **Standing Rule 7(g) itself** and read *"NEXT FREE ADR NUMBER `0021`"*
+from **M15**, the increment that shipped `0021-respondent-scoped-device-outbox.md`, all the way to M38
+— directly above its own sentence boasting it had done exactly that once before with `0020`. Two live
+forward claims corrected; **five historical `RELEASED` bullets deliberately left alone**, because a
+dated record is not a stale claim.
+
+⚠️ **THE CLAIM'S OWN FIRST DRAFT WAS WRONG AND WAS CORRECTED INSIDE THE CLAIM.** It asserted Lane A's
+hand-off carried a spent migration prefix `000109`; `:1891` already read `000111` and ADR `0022`, both
+correct. The figure came from a planning document describing a state M37 had already fixed — a stale
+figure taken from a document rather than the tree, inside the claim that names that defect.
+
+**Measured against what the sources claimed:** `D6`'s disclosure sites are **17 across 9 files** (the
+row said 6, M37's census said "11+", so **the census reproduced the under-counting it was built to
+detect**); `D7` needs **six** required contexts, not the five the proposing plan named.
+
+⚠️ **THREE SPLICE ASSERTIONS FIRED ON PROSE QUOTING THE ANCHOR THEY SEARCHED FOR** — Rule 7(e) at `:88`
+quotes the hand-off marker verbatim. Every assertion is now line-anchored, which is why `preflight`
+anchors its own, and why the coming tracker surgery must split by pre-measured line index, never by
+search. **Two rows filed, not fixed:** `preflight` reads any `M<n>` literal in either claim file as a
+spend — and M38's own claim, discussing M39 while filing that row, moved the tool's answer to
+*"next free is M40"*. **Namespaces spent: nothing — fourteenth consecutive.**

@@ -2210,43 +2210,25 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   changed.** Filed by `M39 (2026-08-28)`; not fixed there because `deploy.yml` was outside that claim and
   the remedy is a comment plus a decision about whether `paths-ignore` should also guard deploys. **Live.**
 
-- **`minor` · `scripts/preflight.php` derives the next increment number from prose, so a FORECAST reads
-  as a SPEND.** Its *"highest M seen in either claim file"* check scrapes the highest `M<n>` **literal**
-  out of `docs/claims/lane-a.md` and `docs/claims/lane-b.md`. But `lane-a.md` announces the next free
-  number inside its own `## Status` block — *"`M38` is the next free number"* — so on a tree whose highest
-  **merged** increment is `M37`, the tool reports **"highest M seen: `M38` → next free is `M39`"**. One
-  too high, and it will be one too high on every future increment, because every close-out writes that
-  sentence again. **Measured during `M38`, whose number the tool would have skipped**; the claim was
-  numbered from the merged PR titles and the `## RELEASED` headings instead. ⚠️ **The authority is what
-  is MERGED — `## RELEASED — M<n>` headings, or `gh pr list --state merged` — never a line that merely
-  mentions a number.** This is the same defect the `D5`/`D6`/`D7` increment is about, one level down: a
-  figure derived from prose rather than from state. Filed by `M38 (2026-08-28)`, and deliberately **not**
-  fixed there — `scripts/` is Lane B's column under Standing Rule 7(b) and that increment is docs-only.
-  ⛔⛔ **AND THE ROW IS BROADER THAN ITS OWN HEADLINE — MEASURED ON THE INCREMENT THAT FILED IT.**
-  The scan is `preg_match_all('/\bM(\d{1,3})\b/')` over the **whole of both claim files**, taking the
-  maximum — so it is not merely a *forecast* that reads as a spend, it is **every mention of a number**:
-  a released record, a quoted hand-off fragment, or a sentence about this very bug. `M38`'s claim
-  discusses `M39` three times *while filing this row*, and the tool consequently answers **"next free
-  is `M40`"**. ⚠️ **The increment that documented the defect made the tool's answer worse by
-  documenting it.** That is why the fix cannot be "stop writing forecasts": it must derive the number
-  from the `## RELEASED — M<n>` headings or from `gh pr list --state merged`.
-  ⛔⛔ **AND IT COMPOUNDS — MEASURED ACROSS `M38` AND `M39`, WHICH IS THE PART THAT MAKES IT WORTH
-  FIXING RATHER THAN WORKING AROUND.** Every increment that *documents* the defect adds another number
-  literal, and the tool's answer climbs monotonically. `M38`'s claim discussed the next increment and
-  moved it to **+1**. `M38`'s close-out, writing up that very finding, quoted the wrong answer and made
-  it **+2**. `M39`'s own claim quoted it again — and its release referred to the **planned tracker-surgery
-  increment**, an increment that does not exist yet — taking it to **+3**: `preflight` answered *"next
-  free is `M42`"* when the truth was `M40`. ⚠️ **A reference to a FUTURE, UNSPENT increment is
-  indistinguishable from a spend to this scan**, so the better a lane documents its roadmap, the more
-  wrong the number gets.
-  ⚠️ **MITIGATION APPLIED IN `M39`, AND IT IS NOT A FIX: `docs/claims/lane-a.md` now contains NO
-  forward number literal at all**, which makes the tool accidentally correct. **The cost is real** — that
-  file can no longer name a planned increment in prose, so `M39`'s release says *"the coming tracker
-  surgery"* where it wants to say a number. A mitigation that degrades the writing is a reason to fix the
-  scan, not a solution.
-  ⚠️ **AND THE ERROR IS INVISIBLE LOCALLY:** `preflight` reads the claim files via `show_from_main()`,
-  i.e. as they stand on `origin/main`, so a correction cannot be observed until it is pushed — which also
-  means the wrong number is what every session sees at open. **Live.**
+- ✅ **CLOSED BY `M42` (2026-08-29) — `minor` · ~~`scripts/preflight.php` derives the next increment
+  number from prose, so a FORECAST reads as a SPEND.~~** The number now comes from
+  `php scripts/state.php`, which takes it from the `## RELEASED — M<n>` headings of both claim files —
+  each truncated at its own `## Template` heading — and cross-checks the maximum against
+  `gh pr list --state merged`. `preflight.php` calls that script instead of parsing anything itself:
+  one authority, referenced rather than copied, exactly as Rule 7(b) requires of the lane boundary.
+  ✅ **THE ROW'S PRESCRIBED REMEDY WAS SOUND AND IS WHAT SHIPPED**, which is the first time in six rows.
+  ⚠️ **AND THE ROW UNDERSTATED ITSELF: it names one consumer and there are two.** The same wrong
+  number was rendered into every hand-off line, which is the artefact a fresh session actually reads —
+  so the fix is only complete because `scripts/next.php` generates that line from the same figures.
+  ✅ **MEASURED ON THE TREE THAT REPRODUCES IT.** Before the change, on this branch, `preflight`
+  answered *"highest M seen: `M42` → next free is `M43`"* — raised by this increment's own claim naming
+  its own number, the compounding the row predicted. After it: *"highest released `M41` → next free is
+  `M42`"*, with the merged-PR titles agreeing independently.
+  ✅ **Positive controls, both directions.** A prose `M99` appended to `lane-a.md` leaves the answer at
+  `M42`; the same text as a real `## RELEASED — M99` heading moves it to `M100`; and a numbered
+  RELEASED heading placed *below* the Template heading makes the script exit 2, CANNOT MEASURE, rather
+  than silently returning a lower maximum. Every mutation moved the sha256 and every restore was
+  byte-exact.
 - **`minor` · `baselineOf()` turns "no checksum" into `''`, and only middleware turns it back.**
   `tests/Feature/Submissions/SubmissionEditRoutesTest.php:62` returns `(string) $value`, so a null
   `answers_content_checksum` reaches the request body as an **empty string**, and it is
@@ -2880,6 +2862,68 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   has decided the increment number three times running. `git worktree remove` is the whole fix.
   **Live**, and deliberately not taken by M36, which had no reason to touch another lane's checkout.
 
+- **`minor` · A line-splitting regex matches a byte INSIDE a UTF-8 character, and one faker name is
+  enough to trigger it.** `tests/Feature/Audit/ImpersonationAttributionTest.php:204` splits the streamed
+  audit CSV with `preg_split('/\R/', ...)`. Without the `u` modifier PCRE's `\R` matches the single byte
+  `0x85` as a Unicode NEL — and `0x85` is a *continuation* byte in common characters, not only exotic
+  ones. **Measured:** the name `Åsa Lindqvist` (`Å` is `C3 85`) splits that CSV into 4 rows where it has
+  3, so `str_getcsv` receives a fragment and every subsequent positional index shifts. The test asserts
+  `$rows[0][5]` and `$rows[1][4]` by position — deliberately, and correctly — so a shifted array either
+  reddens the suite on a dice roll or lands a different value in the asserted slot. ⚠️ **This is the
+  `M9` shape exactly**: a fixture that is a random faker name turned one test red once already, and
+  re-running would have hidden it forever. **The fix is `explode` on a newline** — the repository is pure
+  LF and `tracker-lint` R5 asserts it on the tracker files — or `/\R/u` if a regex is wanted.
+  **Found by M42** while writing `scripts/state.php`, whose first draft had the identical defect: it
+  split `docs/claims/lane-a.md` into 2,297 lines where the file has 2,273, because that corpus is full of
+  check marks (`E2 9C 85`), and every line number it reported after the first one was wrong by a growing
+  offset. **Not fixed here — `tests/` is outside this increment's claim.** **Latent.**
+
+- **`minor` · `docs/gate-baselines.md` has no staleness signal, and it is stale right now.** Its
+  provenance names run `33175202807` (sha `454d9ba`, `M39`'s merge) while `M40` and `M41` have both
+  merged since — the file written to end stale numbers is itself eleven commits behind the trunk, and
+  every close-out in between was supposed to regenerate it. Nothing measures or reports that: `preflight`
+  prints the provenance line verbatim, which looks measured precisely because it is a real run id.
+  `scripts/state.php` now reports the distance (`commits_behind_main`), but reporting is not gating.
+  **The remedy is one of two, and they are not equivalent:** have `gate-baselines.php` refuse to leave a
+  file whose sha is not `origin/main`'s head, or stamp the distance into the document so a reader sees it
+  without running anything. **Found by M42 (2026-08-29)**, not fixed because the generator was outside
+  this increment's claim and the choice between the two is a real one. **Live.**
+
+- **`minor` · A claim file has no constrained form for a forward declaration, so the one stale
+  declaration on the tree cannot be gated.** `docs/claims/lane-b.md:29` states *"`M36` IS THE NEXT FREE
+  NUMBER"*, six increments stale. It is inert only because `state.php` no longer reads it — but nothing
+  stops the next writer reading it, and **Lane A may not correct it**: one writer per claim file is what
+  makes a claim conflict structurally impossible, and reaching across to fix a number would break the
+  rule that surfaced it. ⛔ **A gate is not available either, and the reason is the transferable part:
+  inside a claim file a DECLARATION and a QUOTATION OF ONE ARE THE SAME BYTES.** `M42` proved that by
+  building the gate and watching it go red on its own claim, which quotes lane-b's stale sentence in
+  order to file it. **The fix is to give claim files a machine-readable namespace footer** — the shape
+  `M42` used for the hand-off, where the token is positional rather than prose — which belongs with the
+  Rule 7 rewrite rather than bolted on. **Found by M42 (2026-08-29).** **Live.**
+
+- **`minor` · `tracker-lint` R8 guards `CLAUDE.md` and cannot reach `PROGRESS.md`, which is the half that
+  actually rotted.** Standing Rule 7(g) held a stale ADR number for twenty-three increments; R8 would not
+  have caught it. It scans `CLAUDE.md` only, because that file's whole contract is that it points rather
+  than states, so *any* namespace literal in it is wrong and no judgement is needed. The tracker has no
+  such constraint: a live forward claim and a dated `RELEASED` bullet quoting a past one are textually
+  identical, so a rule over it is either **red on arrival** — which `M40` established can never merge —
+  or vacuous. **Blocked on separating the ledger from the constitution** (see the `major` row under
+  Documentation & specs); once the dated records live in the archive, what remains in Standing Rules is
+  by definition current and can be gated. **Filed by M42 (2026-08-29)** at the moment it decided not to
+  fake it. **Live.**
+
+- **`minor` · `scripts/mutate.php` cannot drive a positive control for anything that is not Pest in a
+  container.** Its `--tests` argument is Pest paths and it execs them via `docker exec`, so a gate
+  implemented as a standalone script — `tracker-lint`, `state.php`, the five lint gates — has no harness,
+  and the standing instruction to use it *for every positive control* is unfollowable for exactly the
+  class of gate this project keeps adding. **Measured by M42**, which proved six R8 cases and four
+  `state.php` cases by hand instead: baseline first, tokens read from files, abort unless the sha256
+  moves, restore by byte comparison. That is `mutate.php`'s own discipline reimplemented at the call
+  site, which is the argument for a `--command=` mode rather than for doing it again. ⚠️ **Docker being
+  down on the host made this unavoidable rather than merely inconvenient** — with no container there is
+  no harness at all. **Live.**
+
+
 ### Documentation & specs
 
 - ~~**`major` · `npm run build` cannot bootstrap a fresh clone or worktree, and the README is the only
@@ -3061,3 +3105,23 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   forms and five forms, against four and six as seeded); `README.md:85-86` (contract and e2e are real
   merge-blocking gates, not stubs; there is no `deploy` stage in `ci.yml` at all); and this file's own
   `:105` and `:459`. **Live**, all documentary.
+
+
+- **`major` · Standing Rule 7(g) contains a 163,680-byte claim ledger that duplicates
+  `docs/claims/lane-*.md`, and it is why the constitution cannot be read in one call.** Measured:
+  `## Standing Rules` is 207,468 bytes; **Rule 7 alone is 196,596 of them — 94.8%** — and lines 123–259
+  are per-increment `RELEASED` / `CLAIMED` bullets carrying **zero imperatives**. Claims have lived in
+  `docs/claims/` since the 2026-08-25 amendment, so this is the second copy of a record that already has
+  a home, which is the defect Rule 7(b) records about the lane boundary and `docs/gate-baselines.md` ends
+  for gate numbers. ⚠️ **`M41` named this and deliberately did not take it**, restating its own ~40 KB
+  target as unreachable *"while Standing Rules and Next Session live in this file"* and calling the move
+  *"a decision about what the constitution keeps, not a splice."* **That decision was taken with the user
+  on 2026-08-29: move it, as its own increment.** ⛔ **It is a tracker surgery and must be run as one** —
+  the marker at the start of a line in the commit message *and* surviving the squash onto the trunk,
+  split by pre-measured line index and never by search, proved by a counted multiset of line hashes plus
+  exact byte conservation with no tolerance. **It also unblocks the `minor` row about R8 not reaching
+  `PROGRESS.md`**: once the dated records are in the archive, what is left in Standing Rules is current
+  by definition and can be gated. Estimated effect: roughly 504 KB down to roughly 340 KB.
+  **Filed by M42 (2026-08-29)**, deliberately not taken there because mixing a 163 KB documentation
+  surgery into a scripts increment makes the diff unreviewable and muddies which change moved which gate.
+  **Live.**

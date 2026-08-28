@@ -219,6 +219,75 @@ if ($drop > DROP_LIMIT && ! $declared) {
 
 $notes[] = sprintf('%s had %d lines at HEAD~1 and has %d now (%+d)', TRACKER, $before, $after, -$drop);
 
+// ── R8. CLAUDE.md carries no namespace literal, because every one of them is derived (M42). ───────
+//
+//    WHY THIS IS A MERGE GATE AND NOT ADVICE. Standing Rule 7(g) declared a next-free ADR number from
+//    M15 — the increment that spent it — until M38, twenty-three increments later, sitting directly
+//    above its own sentence boasting it had done exactly this once before. Nothing caught it because
+//    nothing in CI has ever read a documentation diff. CLAUDE.md is auto-loaded into every session, so
+//    it is the artefact most likely to rot the same way and the one whose rot would be read first.
+//
+//    ⛔ WHY IT SCANS CLAUDE.md AND NOT PROGRESS.md, WHICH IS THE HARDER AND MORE IMPORTANT HALF. Inside
+//    the tracker a live declaration and a dated quotation of a past one are THE SAME BYTES: the
+//    constitution's forward claim and a RELEASED bullet recording what was true two months ago differ
+//    only in which is still true. A rule over the tracker is therefore either RED ON ARRIVAL — which
+//    M40 established can never merge — or vacuous. CLAUDE.md has the constraint by construction: its
+//    whole contract is that it points rather than states, so ANY namespace literal in it is wrong, and
+//    the rule needs no judgement about which. The tracker half stays unguarded and is filed as a row
+//    rather than faked here.
+//
+//    The floor matters as much as the patterns: a deleted or emptied CLAUDE.md must FAIL, not pass for
+//    free. Four lint gates gained a floor in M36 after controller-gate printed `passed` while blind.
+const IMPERATIVES = 'CLAUDE.md';
+const MIN_IMPERATIVE_LINES = 50;
+
+if (! is_file(IMPERATIVES)) {
+    fail('R8 imperatives', IMPERATIVES.' does not exist. It is auto-loaded into every session and is '.
+        'the file this project reads first; a missing one is not a passing one.');
+} else {
+    $imperatives = read_or_die(IMPERATIVES);
+    $imperativeLines = substr_count($imperatives, "\n");
+
+    if ($imperativeLines < MIN_IMPERATIVE_LINES) {
+        fail('R8 imperatives', sprintf(
+            '%s has %d lines, below the floor of %d. A gate nobody can tell is blind is a gate nobody is running.',
+            IMPERATIVES, $imperativeLines, MIN_IMPERATIVE_LINES));
+    } else {
+        pass('R8 imperatives', sprintf('%s has %d lines, over the floor of %d', IMPERATIVES, $imperativeLines, MIN_IMPERATIVE_LINES));
+    }
+
+    $literals = [
+        'a migration prefix' => '/\d{4}_\d{2}_\d{2}_\d{6}/',
+        'an increment number' => '/\bM\d{1,3}\b/',
+        'an ADR sub-decision id' => '/§D\d+/u',
+        'a "next free" declaration' => '/next free/i',
+    ];
+
+    foreach ($literals as $what => $pattern) {
+        $hits = preg_match_all($pattern, $imperatives);
+
+        if ($hits > 0) {
+            fail('R8 imperatives', sprintf(
+                '%s contains %d occurrence(s) of %s. That file states no numbers — it points at '.
+                '`php scripts/state.php`, which derives them from the tree. A number written there is a '.
+                'copy, and a copy is what went stale for twenty-three increments inside Standing Rule 7(g).',
+                IMPERATIVES, $hits, $what));
+        } else {
+            pass('R8 imperatives', sprintf('%s contains no %s', IMPERATIVES, $what));
+        }
+    }
+
+    if (substr_count($imperatives, "\r") !== 0) {
+        fail('R8 imperatives', IMPERATIVES.' contains carriage returns; both tracker files are pure LF and so is this.');
+    } elseif (! str_ends_with($imperatives, "\n")) {
+        fail('R8 imperatives', IMPERATIVES.' does not end with a newline — a splice will fuse two lines.');
+    } else {
+        pass('R8 imperatives', IMPERATIVES.' is pure LF and ends with a newline');
+    }
+
+    $notes[] = sprintf('%s is %d bytes, %d lines, carrying no namespace literal', IMPERATIVES, strlen($imperatives), $imperativeLines);
+}
+
 // ── Report. ──────────────────────────────────────────────────────────────────────────────────────
 foreach ($notes as $note) {
     fwrite(STDOUT, "tracker-lint: {$note}\n");
@@ -230,7 +299,7 @@ if ($failures !== []) {
     exit(1);
 }
 
-fwrite(STDOUT, "tracker-lint: passed (7 rule groups, both tracker files scanned).\n");
+fwrite(STDOUT, "tracker-lint: passed (8 rule groups, both tracker files and CLAUDE.md scanned).\n");
 exit(0);
 
 function fail(string $rule, string $message): void

@@ -204,7 +204,11 @@ if ($drop > DROP_LIMIT && ! $declared) {
     fail('R7 delta', sprintf(
         '%s lost %d lines (%d down to %d), over the limit of %d, and no commit in HEAD~1..HEAD carries "%s". '.
         'This is the exact shape of the 1,086-line deletion of 2026-08-16 (f565ac9), which merged green. '.
-        'If the removal is deliberate, put the marker at the START of a line in the commit message (a passing mention mid-sentence deliberately does NOT count).',
+        'If the removal is deliberate, put the marker at the START of a line in the commit message (a passing mention mid-sentence deliberately does NOT count). '.
+        'IF THIS IS A POST-MERGE RUN ON main AND THE PR DID CARRY THE MARKER, THE SQUASH DISCARDED IT: '.
+        'gh pr merge --squash --body "" empties the body, and the default body is exactly what would have '.
+        'carried the marker through. M41 did that and reddened main for one commit. Pass a body containing '.
+        'the marker, or put it in the PR title.',
         TRACKER, $drop, $before, $after, DROP_LIMIT, SURGERY_MARKER));
 } elseif ($drop > DROP_LIMIT) {
     pass('R7 delta', sprintf('%s lost %d lines, declared with "%s"', TRACKER, $drop, SURGERY_MARKER));

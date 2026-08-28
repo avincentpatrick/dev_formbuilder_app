@@ -16,7 +16,86 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M41`, the tracker surgery (`m41-tracker-surgery`)
+## Status: NO ACTIVE CLAIM — `M41` is merged and the lane holds nothing forward
+
+**`M41` is merged (PR #231, 6/6 green).** Lane A holds no active row and pre-claims no forward number.
+The next row is taken under Rule 7(f), and the claim is written here and **pushed** before the first
+file is opened.
+
+⛔⛔ **THE NEXT INCREMENT NUMBER IS ONE PAST THE HIGHEST `## RELEASED — M<n>` HEADING ACROSS BOTH LANE
+FILES, AND IS DELIBERATELY NOT WRITTEN AS A LITERAL ANYWHERE IN THIS FILE.** `preflight` takes the
+maximum `M<n>` literal over both claim files, so any mention — a forecast, or a sentence about the bug
+— raises its answer. Carrying no forward literal keeps the tool accidentally correct. That is a
+mitigation, not a fix.
+
+✅ **THE TRACKER IS NOW 514 KB, DOWN FROM 1.42 MB — READABLE IN ~5 `Read` CALLS INSTEAD OF ~58.** Keep
+it that way: **status bullets are pointers now, not narratives.** The full record of an increment
+belongs in this file and in `PROGRESS_ARCHIVE.md`, not in `PROGRESS.md`.
+
+⛔ **A REMOVAL OF MORE THAN 200 LINES FROM `PROGRESS.md` NEEDS `[tracker-surgery]` AT THE START OF A
+LINE IN THE COMMIT MESSAGE.** Mentioning it mid-sentence deliberately does not count.
+
+---
+
+## RELEASED — `M41`, the tracker surgery (merged as PR #231, 6/6 green)
+
+**`PROGRESS.md` 1,451,863 → 513,856 bytes (−64.6%), 2,152 → 579 lines.** 1,576 lines and 135 older
+status bullets moved verbatim into `PROGRESS_ARCHIVE.md`. **Namespaces spent: NOTHING** — seventeenth
+consecutive.
+
+### Proved four ways, three of them independent of each other
+
+1. **Multiset of 1,576 moved line-hashes** preserved with exact multiplicity — a *counted set
+   equality*, which is exactly what the 2026-08-16 incident lacked.
+2. **Byte conservation, exact:** `2,597,391 == 2,597,391`.
+3. **Standing Rules byte-identical**, `sha256 764cb1b0…` — the constitution came through untouched.
+4. **Independent git-level proof**, outside the script's own arithmetic: the moved slice read from the
+   *pre-surgery commit* and the tail of the *new archive* both hash to `85c52749…`.
+
+⚠️ **PROOF 4 FAILED ON ITS FIRST RUN AND THE CHECK WAS WRONG, NOT THE SURGERY** — it used `310,1886`,
+including the blank line the script had deliberately popped. **A failing independent check is not
+automatically a defect; verify the check before believing it.**
+
+### How the prediction fared — it named the failure and the failure was one byte
+
+The claim flagged byte conservation as most likely to break *"because this is not a pure permutation"*.
+It broke: **2,597,391 vs 2,597,392**. The first formula omitted the **join seam** between the old
+archive tail and the first inserted line; the truth is `sum(P)+sum(H)+|P|+|H|+1`. ⛔ **A conservation
+check with a tolerance would have absorbed that silently. An exact one named it**, and the fix is
+derived arithmetic, not a fudge factor.
+
+### ⛔ `R7` reported the deletion as DECLARED before the surgery was committed
+
+The marker was matched **anywhere** in the commit range, so the **claim commit** — whose message merely
+explains that surgery commits must carry the marker — armed it. **A mention is indistinguishable from
+a declaration unless the form is constrained**, which is the same defect as `preflight` reading a
+number in prose as a spend: **found twice in one session, and this time inside a gate written one
+increment earlier.**
+
+The marker must now **start a line**. Proven by construction: same tree, same commit range, verdict
+flipped from a wrong `declared` to a correct **FAIL**.
+
+### `## Current Status` deliberately survives, because the previous gate said so
+
+`M40`'s `R2` asserts exactly one such heading in the tracker, so deleting it would have turned the
+previous increment's merge-blocking gate **red**. That gate working on its first real test is why the
+shape is *heading + newest 10 bullets + pointer*. The moved block sits under its own archive heading —
+**not** a `Current Status` one, which `R4` forbids there and which would be wrong regardless.
+
+**Gate constants lowered in the same commit, or `main` merges red:**
+`EXPECTED_CROSS_FILE_NEXT_SESSION` 2 → 1 (the archive's duplicate heading renamed) and
+`TRACKER_BYTE_CEILING` 1,500,000 → 600,000, keeping deliberate headroom rather than hugging the new
+size.
+
+### ⚠️ The plan's acceptance test was unreachable and is restated, not quietly missed
+
+It asked for **~40 KB**. Removing *all* of Current Status leaves 462,966 bytes, because **Standing
+Rules (207,468) + Next Session (226,452) + tail = 462,646 on their own.** No arrangement of this
+increment reaches it, and neither does the `CLAUDE.md` split that follows — that moves the imperatives
+out and leaves the rationale the plan says this file keeps. **One-call loading needs the Next Session
+history and the Standing Rules incident record to move as well: a decision about what the constitution
+keeps, not a splice.**
+
 
 **Taken 2026-08-28.** Branch `m41-tracker-surgery`, cut from `origin/main` at `79d1589`, PR into `main`.
 Fourth increment of the operating-loop realignment, and **the one the previous increment exists to

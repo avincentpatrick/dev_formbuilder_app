@@ -6857,3 +6857,48 @@ Phases 0 + 1 + 2 shipped their increment maps (see the correction above for what
 - **G7a (as-built)** — `XlsformTypeMap` (bidirectional type table), `GeoWireConverter` (single lat/lon-flip site, ADR-0006 §3.1), `XlsformWorkbookWriter`, `XlsformExporter` (reads the id-free `SchemaSnapshotSerializer` snapshot; **no DB in the stream closure**). Lossy §3 expansions + `#meridian` breadcrumb column; cascading→single `select_one` + `level`/`parent`.
 - Latest gate counts: **Pest 1001 (+13 G11)**; Vitest gains **4 new suites** (`useTheme`, `type-scale`, `theme-overrides`, `token-references`) via a widened `vitest.config.ts` glob — the 414 public-runtime tests are unchanged (G11 touches no public-runtime logic, only a fallback collapse in 4 components' CSS). Previously: **Pest 988 (+22 G10b2) + Vitest 414**; new `scopes-axe` spec (8 tests × 3 viewports = 24) + `/scopes` in `responsive-axe` (6); new `field-library-axe` Playwright spec (picker render + insert + save-to-library, light+dark, axe-clean). On the host: Pint / vue-tsc (app + SW) / phpstan-on-changed (level 8, `-d memory_limit=3G`) / controller-gate / migration-lint all green; `openapi.json` regenerated (+2 `/field-library` paths). **`npm run build` + Vitest can't run on this Windows host** — `node_modules/@rolldown` has only Linux bindings + npm bin-links were skipped (the documented CI-provisioned-toolchain gotcha); both pass on CI's Linux runner (vue-tsc already proved the TS/Vue compiles). CI (6 jobs) **green on #44** — the E2E job needed 3 test-only follow-ups (a `/Full name/` strict-mode locator that also matched the seeded form's canvas field → scope to `.library`; then the whole-page picker `assertClean` re-flagging the pre-existing `.builder__back` tablet target-size → **scope the picker scan to `.builder__pane--left`**, since builder-axe already gates the full builder page at all 3 viewports).
 - **Feature-gating follow-up:** `xlsform_export`/`xlsform_import` **and** form-templates / (G9b) field-library / offline_sync / api_access are Starter+ paid per the pricing matrix. **H5b gated QUOTAS (forms/storage/seats/submissions/exports/api metering), not FEATURE flags** — these features still ship **ungated** and are **retro-gated in H5c** behind the grandfather override (`EntitlementService::feature()` already resolves `legacyOverrides()` ahead of plan flags; the seam is empty until H5c backs it).
+
+### 2026-08-28 — M41 (Lane A): the tracker surgery — PR #231, 6/6 green
+
+**`PROGRESS.md` 1,451,863 → 513,856 bytes (−64.6%), 2,152 → 579 lines.** 1,576 lines and 135 older
+status bullets moved verbatim into this file, so the tracker is readable in **~5 `Read` calls instead
+of ~58**. Split by **pre-measured line index, never by search**: the 1,086-line deletion of 2026-08-16
+(`f565ac9`) happened because a script searched for an anchor in a file containing a verbatim example of
+that anchor. A better regex is not the fix; not searching is.
+
+**Proved four ways, three independent of each other.** A counted multiset of 1,576 moved line-hashes
+with exact multiplicity — which is precisely what the 2026-08-16 incident lacked. **Byte conservation
+exact: 2,597,391 == 2,597,391.** Standing Rules byte-identical (`sha256 764cb1b0…`), so the
+constitution came through untouched. And an **independent git-level proof** outside the script's own
+arithmetic: the moved slice read from the pre-surgery commit and the tail of the new archive both hash
+to `85c52749…`.
+
+⚠️ **The fourth proof failed on its first run and the CHECK was wrong, not the surgery** — it used a
+boundary that included the blank line the script had deliberately popped. **A failing independent check
+is not automatically a defect; verify the check before believing it.**
+
+⚠️ **The claim named byte conservation as the assertion most likely to fail, and it failed by EXACTLY
+ONE BYTE** — the join seam between the old archive tail and the first inserted line. The first formula
+was `len(join(P))+1+len(join(H))+1`; the truth is `sum(P)+sum(H)+|P|+|H|+1`. ⛔ **A conservation check
+with a tolerance would have absorbed that silently. An exact one named it.**
+
+⛔ **AND R7 REPORTED THE DELETION AS *DECLARED* BEFORE THE SURGERY WAS COMMITTED.** The marker was
+matched anywhere in the commit range, so the claim commit — whose message merely explains that surgery
+commits must carry it — armed the escape. **A mention is indistinguishable from a declaration unless
+the form is constrained**, which is the same defect as `preflight` reading a number in prose as a spend:
+**found twice in one session, and this time inside a gate written one increment earlier.** The marker
+must now start a line; proven by construction, with the verdict flipping from a wrong `declared` to a
+correct FAIL on an unchanged tree.
+
+**`## Current Status` deliberately survives** with its newest bullets and a pointer, because M40's `R2`
+asserts exactly one such heading in the tracker — deleting it would have turned the previous
+increment's merge-blocking gate red. The moved block sits under its own heading here, **not** a
+`Current Status` one, which `R4` forbids and which would be wrong regardless: an archive of past status
+is not a current status. Gate constants were lowered in the same commit — cross-file `Next Session`
+2 → 1, ceiling 1,500,000 → 600,000 — because a gate whose expectation an increment invalidates must be
+updated by that increment.
+
+⚠️ **The plan's ~40 KB acceptance test was arithmetically unreachable and is restated rather than
+quietly missed:** Standing Rules (207,468) + Next Session (226,452) + tail = 462,646 bytes on their
+own. One-call loading needs those to move too — a decision about what the constitution keeps, not a
+splice. Namespaces spent: nothing, seventeenth consecutive.

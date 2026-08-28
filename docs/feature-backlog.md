@@ -2887,7 +2887,18 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   **The remedy is one of two, and they are not equivalent:** have `gate-baselines.php` refuse to leave a
   file whose sha is not `origin/main`'s head, or stamp the distance into the document so a reader sees it
   without running anything. **Found by M42 (2026-08-29)**, not fixed because the generator was outside
-  this increment's claim and the choice between the two is a real one. **Live.**
+  this increment's claim and the choice between the two is a real one.
+  ⛔ **AND A THIRD OPTION IS BETTER THAN EITHER, MEASURED ON THIS ROW'S OWN CLOSE-OUT: A RAW COMMIT
+  DISTANCE OVER-REPORTS, BECAUSE MOST COMMITS CANNOT PRODUCE A RUN AT ALL.** Immediately after `M42`
+  regenerated the file from its own post-merge run, `scripts/state.php` reported it *"1 commits behind
+  origin/main — regenerate it"*. The single intervening commit was the close-out, touching
+  `PROGRESS.md`, `PROGRESS_ARCHIVE.md` and `docs/claims/**` — every one of them in `ci.yml`'s
+  `paths-ignore` set, so **no CI run for it exists or could exist**. The baseline was current and the
+  instrument said otherwise. **Count only commits that touch a non-ignored path**, or the signal cries
+  wolf on every close-out and gets ignored exactly like the number it replaced. ⚠️ **That is the
+  vacuous-success family inverted:** the catalogued members read an absence as a success, and this reads
+  a *deliberate* absence as drift. `state.php` already knows the ignore set is the question; it does not
+  yet ask it. **Live.**
 
 - **`minor` · A claim file has no constrained form for a forward declaration, so the one stale
   declaration on the tree cannot be gated.** `docs/claims/lane-b.md:29` states *"`M36` IS THE NEXT FREE

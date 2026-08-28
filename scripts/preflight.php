@@ -131,7 +131,7 @@ $atLineStart = preg_match_all('/^\*\*'.preg_quote($marker, '/').'/m', $progress)
 info('total lines', (string) substr_count($progress, "\n"));
 
 if ($atLineStart === 1) {
-    pass("hand-off marker for lane ".strtoupper($lane)." appears exactly once at line start");
+    pass('hand-off marker for lane '.strtoupper($lane).' appears exactly once at line start');
 } else {
     $failures[] = 'hand-off marker count';
     fail("hand-off marker appears {$atLineStart} time(s) at line start — expected exactly 1.");
@@ -226,7 +226,7 @@ if ($failures === []) {
     exit(0);
 }
 
-fwrite(STDERR, 'preflight: '.count($failures)." BLOCKING problem(s): ".implode(', ', $failures)."\n");
+fwrite(STDERR, 'preflight: '.count($failures).' BLOCKING problem(s): '.implode(', ', $failures)."\n");
 exit(1);
 
 // ── helpers ──────────────────────────────────────────────────────────────────────────────────────

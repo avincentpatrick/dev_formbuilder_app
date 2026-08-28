@@ -16,25 +16,108 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M40` is merged and the lane holds nothing forward
+## Status: ACTIVE CLAIM — `M41`, the tracker surgery (`m41-tracker-surgery`)
 
-**`M40` is merged (PR #230, `9c20924`, 6/6 green with real step counts).** Lane A holds no active row
-and pre-claims no forward number. The next row is taken under Rule 7(f), and the claim is written here
-and **pushed** before the first file is opened.
+**Taken 2026-08-28.** Branch `m41-tracker-surgery`, cut from `origin/main` at `79d1589`, PR into `main`.
+Fourth increment of the operating-loop realignment, and **the one the previous increment exists to
+guard**. Its commits carry `[tracker-surgery]`, or `R7` refuses them.
 
-⛔⛔ **THE NEXT INCREMENT NUMBER IS ONE PAST THE HIGHEST `## RELEASED — M<n>` HEADING ACROSS BOTH LANE
-FILES, AND IS DELIBERATELY NOT WRITTEN AS A LITERAL ANYWHERE IN THIS FILE.** `preflight` takes the
-maximum `M<n>` literal over the whole of both claim files, so **any** mention raises its answer —
-including a forecast, or a sentence about the bug itself. By carrying no forward literal, this file
-keeps the tool accidentally correct. That is a mitigation, not a fix; the fix is a `minor` in
-`docs/feature-backlog.md`.
+⚠️ Numbered from the `## RELEASED` headings; `preflight` agrees. Lane B reads **NO ACTIVE CLAIM**,
+highest released `M35`. Both files re-read in full at write time.
 
-⛔ **AND READ `docs/backlog-triage.md` BEFORE TAKING ANY BACKLOG ROW.** All 68 open rows were
-re-validated on 2026-08-28; **eight prescribed remedies do not work.**
+### Row
 
-✅ **THE TRACKER IS NOW GATED.** `composer run tracker-lint`, registered as its own CI step in the
-Static analysis job with `fetch-depth: 2`. **The surgery is therefore unblocked**, and it must carry
-`[tracker-surgery]` in its commit message or `R7` will refuse it.
+From the approved realignment plan. Not a `docs/feature-backlog.md` row.
+
+### Evidence verified — the anatomy, measured before a byte is moved
+
+`PROGRESS.md` is **1,451,863 bytes / 2,152 lines**, pure LF, no BOM, trailing newline present.
+**The five segments sum to exactly the file size, and that identity is the first assertion:**
+
+| Section | lines | bytes |
+|---|---|---|
+| header | 1–6 | 320 |
+| `## Standing Rules` | 7–287 | 207,468 |
+| **`## Current Status`** | **288–1886** | **988,897** |
+| `## Next Session` | 1887–2077 | 226,452 |
+| tail | 2078–2152 | 28,726 |
+| **sum** | | **1,451,863** ✅ |
+
+`## Current Status` holds **145 top-level bullets**. The archive is 1,145,528 bytes and carries the
+second, stale constitution: `## Standing Rules for This Project` (line 5) and a `## Next Session —
+Resume Here` (line 16) that is **byte-identical to the tracker's heading**.
+
+### Remedy verdict
+
+⛔ **THE PLAN'S ACCEPTANCE TEST IS UNREACHABLE BY THE OPERATION IT PRESCRIBES, AND THE ARITHMETIC SAYS
+SO BEFORE ANY WORK STARTS.** It asks for *"`PROGRESS.md` at or under ~40 KB, so the constitution can be
+loaded, not merely opened."* Removing **all** of `## Current Status` leaves **462,966 bytes** — Standing
+Rules (207,468) plus Next Session (226,452) plus the tail are **462,646 bytes on their own.** No
+arrangement of this increment reaches 40 KB, and **neither does the `CLAUDE.md` split that follows it**:
+moving the imperative half of Standing Rules out still leaves the rationale and the incident record that the plan
+explicitly says `PROGRESS.md` keeps.
+
+**So the target is restated honestly rather than quietly missed:** this increment takes the tracker from
+**1,451,863 to roughly 513,000 bytes — a 65% reduction, and from ~58 `Read` calls to ~5.** One-call
+loading needs the Next Session history and the Standing Rules incident record to move as well, which is
+a separate decision about what the constitution keeps, not a splice.
+
+⛔ **AND `## Current Status` MUST NOT SIMPLY DISAPPEAR — `M40`'s OWN GATE FORBIDS IT.** `R2` asserts
+exactly one `^## Current Status$` in the tracker, so deleting the heading would turn the previous
+increment's merge-blocking gate red. That is the gate working as designed on its first real test. The
+heading stays, holding **the newest 10 bullets (50,477 bytes, `M40` back to `M29`) plus a pointer**;
+the older **135 bullets (~938,400 bytes)** move to the archive under a heading of their own.
+
+⚠️ **The moved block must NOT carry a `## Current Status` heading into the archive** — `R4` forbids one
+there, and that is also the right shape: an archive of past status is not a current status.
+
+### The method, and why it is not a search
+
+⛔ **SPLIT BY PRE-MEASURED LINE INDEX, THEN PROVE THE RESULT IS A PERMUTATION OF THE INPUT BYTES.** The
+1,086-line deletion of 2026-08-16 (`f565ac9`) happened because a script searched for an anchor in a file
+containing a **verbatim example of that anchor**. A better regex is not the fix; not searching is.
+`M40` hit the same shape three times in one increment, and `M38`'s own status bullet quoted the heading
+it was being inserted under.
+
+**Two commits on one branch — archive first, then tracker — so git itself can prove the move:** the
+moved slice taken from the tracker at the commit *before* the surgery must hash identically to the same
+slice read out of the new archive.
+
+**Assertions, all of which must pass or the branch is abandoned:**
+
+1. **Multiset of line hashes** — every moved line appears in the archive with *exactly* the same
+   multiplicity. A counted set equality, not "the archive got bigger". This is what the 2026-08-16
+   incident lacked.
+2. **Byte conservation** as an exact integer: `tracker_before + archive_before == tracker_after +
+   archive_after + (bytes of headings added)`, with the added bytes stated, not inferred.
+3. **Surviving-section identity** — `sha256` of Standing Rules (lines 7–287) byte-identical before and
+   after. The constitution must come through untouched.
+4. **Heading uniqueness** — one `^## Standing Rules$`, one `^## Current Status$`, one `^## Next
+   Session` in the tracker; **and exactly one `^## Next Session` across BOTH files**, down from two.
+5. **`tracker-lint` constants lowered in the same commit** — `EXPECTED_CROSS_FILE_NEXT_SESSION` 2 → 1,
+   and the byte ceiling from 1,500,000 to the new real headroom. A gate whose expectation the surgery
+   invalidates must be updated by the surgery, or `main` merges red.
+6. **Encoding** — zero CR, no BOM, trailing newline, both files.
+7. **`git diff --name-only`** returns exactly the four expected paths.
+8. **The acceptance test, restated** — tracker at or under **520,000 bytes** and readable in ~5 calls,
+   with the remaining blockers named by size rather than hand-waved.
+
+### Files
+
+`PROGRESS.md` · `PROGRESS_ARCHIVE.md` · `scripts/tracker-lint.php` (two constants) ·
+`docs/claims/lane-a.md`. **Namespaces spent: NOTHING** — seventeenth consecutive.
+
+### Prediction
+
+No code, no test, no `.vue`: every gate unmoved except `tracker-lint`, whose own constants change.
+`scripts/` is on Pint's path, so bare `pint --test` must stay green. Static analysis stays at **20**
+steps.
+
+⚠️ **THE ONE I MOST EXPECT TO BE WRONG: the byte-conservation assertion, because it is not a pure
+permutation.** Moving a block also *adds* heading and pointer text, so a naive equality will fail and
+the honest form must account for exactly the bytes added — stated as an integer computed from the
+strings inserted, never as a tolerance. **A conservation check with a fudge factor is not a
+conservation check.**
 
 ---
 

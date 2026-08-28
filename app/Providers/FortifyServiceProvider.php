@@ -163,5 +163,75 @@ class FortifyServiceProvider extends ServiceProvider
         });
 
         RateLimiter::for('two-factor', fn (Request $request) => Limit::perMinute(5)->by((string) $request->session()->get('login.id')));
+
+        // ── M43: the Fortify routes Fortify itself leaves unmetered ────────────────────────────────────
+        //
+        // Bound by App\Http\Middleware\ThrottleFortifyEndpoints, not by a `throttle:` alias, because
+        // Fortify has no per-route middleware hook — that class carries the route-name => limiter map and
+        // the reasoning. Every name below must appear in it; FortifyRateLimitTest asserts both directions.
+        //
+        // ⚠️ THE NUMBERS ARE SIZED AGAINST A PROPERTY OF ThrottleRequests, NOT AGAINST INTUITION. It
+        // counts SUCCESSES as well as failures and never clears the bucket — the same behaviour
+        // docs/security-threat-model.md §8 records for `login`, where six successful sign-ins in a minute
+        // lock the account out for the rest of it. So a door a legitimate session opens repeatedly gets
+        // headroom, and a door that exists only to test a secret does not.
+        //
+        // ⚠️ AND A PER-MINUTE ARM ALONE IS NOT A BOUND ON A MAIL CANNON: 5/min is 300/hour. The two
+        // guest-reachable mail paths therefore carry an HOURLY arm as well, keyed on the address rather
+        // than the identity, because that is the arm an enumerating script actually runs into. Both arms
+        // are checked before either is incremented (ThrottleRequests::handleRequest), so tripping the
+        // hourly arm does not also burn the minute.
+        //
+        // The `by()` prefixes match the sixteen limiters already registered across this provider and
+        // AppServiceProvider. They are for readability only: the framework namespaces every bucket as
+        // md5($limiterName.$limit->key), so two limiters cannot collide even with identical keys.
+
+        RateLimiter::for('password-reset-request', fn (Request $request): array => [
+            Limit::perMinute(5)->by('pwreq:'.Str::transliterate(Str::lower((string) $request->input(Fortify::email())).'|'.$request->ip())),
+            Limit::perHour(30)->by('pwreq-ip:'.$request->ip()),
+        ]);
+
+        RateLimiter::for('password-reset', fn (Request $request): array => [
+            Limit::perMinute(5)->by('pwreset:'.Str::transliterate(Str::lower((string) $request->input(Fortify::email())).'|'.$request->ip())),
+            Limit::perHour(30)->by('pwreset-ip:'.$request->ip()),
+        ]);
+
+        // No identity exists yet, so the address is the only arm available — and the HOST is part of the
+        // key for the reason the saml-* limiters give: RegistrationGate resolves per host, so a tenant's
+        // open workspace is a different door from the central one, and one corporate NAT must not be able
+        // to exhaust another workspace's budget. The address stays in the key because the host is
+        // attacker-chosen.
+        RateLimiter::for('registration', fn (Request $request): array => [
+            Limit::perMinute(5)->by('reg:'.$request->ip().':'.$request->getHost()),
+            Limit::perHour(20)->by('reg-hr:'.$request->ip().':'.$request->getHost()),
+        ]);
+
+        // Authenticated from here down. `?? ip` is a floor that should never fire — measured on the live
+        // route table, `Authenticate` runs at index 5 and this middleware at 6 — and it is written as a
+        // fallback rather than an assertion because a limiter closure is the wrong place to fatal. Without
+        // it, `->by('')` would be one deployment-wide bucket, which is the M30 defect exactly.
+        RateLimiter::for('password-update', fn (Request $request): Limit => Limit::perMinute(6)
+            ->by('pwupd:'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
+
+        // ⚠️ TEN RATHER THAN SIX, AND THE REASON IS MEASURED, NOT CAUTIOUS. This is the redemption door
+        // for RequireRecentPassword, whose SAML twin has been bounded at 20/min since P1c — so ten is
+        // already tighter than the path it is symmetric with. tests/e2e/support/console.ts posts this form
+        // on every console visit whose 900s window has expired, across three viewport projects, and
+        // ThrottleRequests counts those successes. Six would put a red E2E run inside the margin for a
+        // security difference between six guesses a minute and ten.
+        RateLimiter::for('password-confirm', fn (Request $request): Limit => Limit::perMinute(10)
+            ->by('pwconf:'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
+
+        // The tightest of the seven, and the one with the smallest secret behind it: a SIX-DIGIT TOTP with
+        // no other bound anywhere — the vendor controller counts nothing and no Lockout listener exists.
+        // Five deliberately matches `two-factor` above: same secret, same guess space, same answer.
+        RateLimiter::for('two-factor-confirm', fn (Request $request): Limit => Limit::perMinute(5)
+            ->by('2fac:'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
+
+        // Enrolment lifecycle rather than secret-testing, and one shared bucket because no single flow
+        // spends one hit of enable AND disable AND regenerate. Enrol-then-confirm IS one such flow, which
+        // is why two-factor.confirm is split out above rather than folded in here.
+        RateLimiter::for('two-factor-manage', fn (Request $request): Limit => Limit::perMinute(10)
+            ->by('2fam:'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
     }
 }

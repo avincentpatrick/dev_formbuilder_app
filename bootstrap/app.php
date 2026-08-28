@@ -34,6 +34,7 @@ use App\Http\Middleware\InitializeTenancyByPublicHost;
 use App\Http\Middleware\RequireFeature;
 use App\Http\Middleware\RequireModule;
 use App\Http\Middleware\RequireRecentPassword;
+use App\Http\Middleware\ThrottleFortifyEndpoints;
 use App\Support\Api\ApiErrorResponse;
 use App\Support\Auth\InvalidGoogleAuthStateException;
 use Illuminate\Auth\AuthenticationException;
@@ -206,6 +207,15 @@ return Application::configure(basePath: dirname(__DIR__))
             StartSession::class,
             ShareErrorsFromSession::class,
             AuthenticatesRequests::class,
+            // M43. ⚠️ NOT here to make `$request->user()` resolve — that was assumed and MEASURED FALSE.
+            // SortedMiddleware hoists the LISTED classes past the unlisted ones, so with this line
+            // deleted the class still lands last, at index 13, and still after Authenticate at 5.
+            // What the entry buys is WHERE the refusal happens: index 6 rather than 13, ahead of
+            // EstablishTenantDatabaseContext's database round trip, SubstituteBindings and Inertia. On
+            // POST /forgot-password, which anyone can reach, bounding the WORK is the point of the
+            // limiter — refusing after paying for tenancy resolution would bound the mail and not the
+            // load. Deleting this line is a performance regression under flood, not a correctness one.
+            ThrottleFortifyEndpoints::class,
             ThrottleRequests::class,
             ThrottleRequestsWithRedis::class,
             AuthenticatesSessions::class,

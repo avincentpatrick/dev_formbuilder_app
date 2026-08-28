@@ -16,84 +16,11 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — every credential-verifying Fortify route gets a bound (`m43-fortify-rate-limits`)
+## Status: NO ACTIVE CLAIM — `M43` is merged and the lane holds nothing forward
 
-Taken 2026-08-29. Branch `m43-fortify-rate-limits`, cut from `origin/main` at `0c8d855`, PR into `main`.
-
-**Row:** `docs/feature-backlog.md`, under `### Test suite & CI gates` — *"**`major` · `POST
-/user/confirm-password` carries no rate limit at all.**"*, the item ranked **#1** in
-`docs/backlog-triage.md`. ⚠️ **Cited by heading and opening sentence rather than by line number,
-deliberately: this increment edits that file, and `M40` had its own citations go stale inside the commit
-that wrote them.**
-
-### Evidence verified
-
-Every citation opened against the merged tree, and the row's own claim re-measured rather than taken on
-report:
-
-- *"its middleware is `[web, RequirePlatformHost, AppSecurityHeaders, GateRegistration, Authenticate:web,
-  EstablishTenantDatabaseContext]` — no `ThrottleRequests`"* — **HELD.** `config/fortify.php`'s
-  `middleware` array is exactly those five entries (`web` first), and `vendor/laravel/fortify/routes/routes.php`
-  adds only `auth:web` to `POST /user/confirm-password`.
-- *"`config/fortify.php:169-172` maps only `login` and `two-factor`"* — **HELD**, and it understates: there is
-  no `verification` key either, so the two email-verification routes carry Fortify's **vendor literal**
-  `throttle:6,1` rather than anything this app chose.
-- *"the SAML step-up path is bounded (`throttle:saml-step-up`, 20/min)"* — **HELD**,
-  `AppServiceProvider.php:466`.
-- *"`RequireRecentPassword` … `StepUpReauthenticationTest.php:135-147` pins `members.role`,
-  `members.remove`, `members.ownership`, `settings.sso.metadata`, `admin.tenants.assign-plan`,
-  `admin.tenants.index`, `admin.settings.update`"* — **HELD.**
-
-⛔ **THE ROW UNDERSTATES ITSELF, 1 → 8, AND THREE OF THE EIGHT NEED NO SESSION AT ALL.** Read from the
-vendor route file: `throttle:` occurs exactly four times, on `POST /login`, `POST /two-factor-challenge`
-and the two verification routes. Unbounded and credential-bearing: **`POST /forgot-password`** (unlimited
-reset-mail dispatch and account enumeration), **`POST /reset-password`** (unlimited reset-token guessing),
-**`POST /register`** (unlimited account creation) — all three reachable by anyone — plus `PUT
-/user/password`, the row's own `POST /user/confirm-password`, `POST
-/user/confirmed-two-factor-authentication` (**an exhaustible 6-digit TOTP**), and the `two-factor.enable` /
-`two-factor.disable` / recovery-code-regeneration verbs.
-
-### Remedy verdict
-
-⛔ **STRUCTURALLY IMPOSSIBLE — not merely wrong.** The row prescribes *"one `RateLimiter::for()` plus one
-`->middleware('throttle:…')`"*. The second half has nowhere to land: **Fortify has no per-route middleware
-hook**, and `config/fortify.php` records that in its own comments three times — at the `GateRegistration`
-note (*"`Features::registration()` registers both verbs with THIS list"*), at the
-`EstablishTenantDatabaseContext` note, and again where it explains why `bootstrap/app.php`'s `priority()`
-cannot substitute (*priority reorders middleware a route already carries and never adds one*). This is the
-fifth row in six whose evidence is sound and whose remedy is not.
-
-**What is being built instead** — the shape `docs/backlog-triage.md` names as the real option: a
-path-checking middleware in the `GateRegistration` mould, mounted on the same config array, matching on
-**route name** and delegating to the framework's `ThrottleRequests`, so `/login` is not double-throttled
-and the 429, `Retry-After` and `X-RateLimit-*` headers stay the framework's.
-
-Files: `app/Http/Middleware/ThrottleFortifyEndpoints.php` (new), `app/Providers/FortifyServiceProvider.php`,
-`config/fortify.php`, `bootstrap/app.php`, `tests/Feature/Auth/FortifyRateLimitTest.php` (new),
-`docs/security-threat-model.md`, `docs/feature-backlog.md`, `PROGRESS.md`, this file.
-Shared artefacts taken: `docs/security-threat-model.md`, `docs/feature-backlog.md`, `PROGRESS.md` (own
-block only). **`openapi.json` is NOT taken** — predicted byte-identical below.
-Paired files taken: none. No `KNOWN_*` allowlist, no parity list, no `tests/e2e/*.spec.ts`.
-Namespaces spent: **nothing from either namespace** — no ADR, no migration prefix, no `§D`. `0022` and
-`2026_08_17_000111` stay free; `0010` stays reserved for H1d; `#16` stays free. **Nineteenth consecutive.**
-
-Prediction, written before the first file was opened:
-
-- **Pest** gains the new cases and nothing else in it moves; the delta is reconciled case-by-case against a
-  pre-change baseline **of the same scope**, not against a hand-off figure.
-- **PHPStan CAN move**, and saying so beats the usual "a test-only diff cannot touch it": `phpstan.neon`
-  scans `app`, and this adds a class there. Measured by **FILE LIST** against the base tree, because local
-  reports ~18 phantom errors CI does not.
-- **Pint** touches 4–5 files, and its `PASS` is not believed until a deliberately misformatted probe has
-  made it fail — with the probe placed **outside** `app/`, so it cannot redden PHPStan too, which is the
-  clean-up trap `M35` recorded.
-- **Vitest and Storybook axe** cannot move — no front-end diff.
-- **`openapi.json` byte-identical**, confirmed by `cmp` against a fresh `scramble:export`: a 429 comes from
-  route middleware no controller mentions. `M30` predicted exactly this for the same reason and it held.
-- ⚠️ **THE ONE I MOST EXPECT TO BE WRONG IS E2E.** `tests/e2e/support/console.ts` posts the
-  confirm-password form on **every** console visit, and `docs/security-threat-model.md` §8 already records
-  that `ThrottleRequests` **counts successes as well as failures and never clears the bucket**. If 10/min
-  per user is too tight, the console specs go red for a reason that has nothing to do with what they test.
+**`M43` is merged (PR #233, `c09c7ef`, 6/6 green).** Lane A holds no active row and pre-claims no forward
+number. The next row is taken under Rule 7(f), and the claim is written here and **pushed** before the
+first file is opened.
 
 ⛔ **RUN `php scripts/state.php` FOR EVERY NUMBER.** Increment, ADR, migration prefix, exceptions-log
 entry, open rows, open decisions, and how far behind the trunk `docs/gate-baselines.md` has fallen.
@@ -104,6 +31,138 @@ numbers at all, and `tracker-lint` R8 keeps it that way.
 
 ⛔ **A REMOVAL OF MORE THAN 200 LINES FROM `PROGRESS.md` NEEDS `[tracker-surgery]` AT THE START OF A
 LINE IN THE COMMIT MESSAGE.** Mentioning it mid-sentence deliberately does not count.
+
+---
+
+## RELEASED — `M43`, every credential-verifying Fortify route gets a bound (merged as PR #233, `c09c7ef`, 6/6 green)
+
+**Every claimed file was edited, and one was added that the claim did not name.**
+`app/Http/Middleware/ThrottleFortifyEndpoints.php` (new) · `app/Providers/FortifyServiceProvider.php` ·
+`config/fortify.php` · `bootstrap/app.php` · `tests/Feature/Auth/FortifyRateLimitTest.php` (new) ·
+`docs/security-threat-model.md` · `docs/feature-backlog.md` · `PROGRESS.md` · this file.
+**Namespaces spent: NOTHING** — no ADR, no migration prefix, no `§D`. **Nineteenth consecutive.**
+
+### The row was a floor in both halves, which is now the expected shape rather than a surprise
+
+**Evidence held on every citation** — the middleware list, `config/fortify.php`'s two-entry `limiters`
+array, `saml-step-up` at 20/min, and the seven routes `StepUpReauthenticationTest` pins behind the
+step-up. ⛔ **And it understated itself 1 → 8.** Measured from the live route table rather than read:
+**26 Fortify routes, 14 of them writes**, with `throttle:` on **four** — and the two verification routes
+carry the vendor's literal `6,1` because `limiters` names no `verification` key, so that number was never
+a decision this project made. Unbounded and credential-bearing were `POST /forgot-password`,
+`POST /reset-password` and `POST /register` — **none of which needs a session** — plus `PUT /user/password`,
+the row's own `POST /user/confirm-password`, `POST /user/confirmed-two-factor-authentication` and the
+three 2FA lifecycle verbs.
+
+⛔ **THE PRESCRIBED REMEDY WAS STRUCTURALLY IMPOSSIBLE, AND THE REPOSITORY HAD ALREADY SAID SO THREE
+TIMES IN ONE FILE.** *"One `RateLimiter::for()` plus one `->middleware('throttle:…')`"* — **Fortify has no
+per-route middleware hook**, which `config/fortify.php` records at the `GateRegistration` note, at the
+`EstablishTenantDatabaseContext` note, and again where it explains that `priority()` cannot substitute
+because priority reorders middleware a route already carries and never adds one. **Sixth row in seven
+whose evidence is sound and whose remedy is not.**
+
+### ⛔ The plan's own ordering argument was wrong, and measuring it is the transferable half
+
+The plan asserted the class **must** be listed in `bootstrap/app.php`'s `priority()` or `$request->user()`
+would read null, silently degrading every authenticated limiter to its IP arm. It reasoned correctly about
+`SortedMiddleware` moving a listed class to the last-seen lower-priority index, and drew the wrong
+conclusion. **Measured on the live route table both ways, by deleting the entry and re-deriving:** listed,
+the class lands at index **6**; unlisted, it lands at **13 — last, and still after `Authenticate` at 5.**
+The user resolves either way.
+
+The entry is **kept**, for the reason that survived measurement rather than the one that motivated it:
+refusal at index 6 rather than 13 is refusal *ahead of* `EstablishTenantDatabaseContext`'s database round
+trip, `SubstituteBindings` and Inertia. On `POST /forgot-password`, which anyone can reach, bounding the
+**work** is the point; refusing after paying for tenancy resolution would bound the mail and not the load.
+✅ **All three comments that had stated the false reason were rewritten before the commit landed** — a
+false claim about a control is worse than a missing one, because it stops the next reader looking.
+
+### ⚠️ Three vendor facts read from the installed source rather than from memory
+
+**(a) `ThrottleRequests::handle()` gates its named-limiter branch on `func_num_args() === 3`.** A fourth
+argument — a decay, a prefix, a tidy-up — silently routes to the numeric path, where `resolveMaxAttempts()`
+finds a non-numeric value and throws `MissingRateLimiterException`: **a 500 on every guarded route**, not a
+degradation. Proven by `MC3`.
+**(b) Bucket keys are namespaced `md5($limiterName.$limit->key)`**, so two limiters cannot collide even
+with identical `by()` keys — the per-limiter prefixes are readability, not correctness.
+**(c) The write routes carry a `.store` suffix the view routes do not.** `register.store`,
+`password.confirm.store` and `two-factor.regenerate-recovery-codes` against `register`, `password.confirm`
+and `two-factor.recovery-codes`. ⛔ **The plan named all three wrongly.** A map keyed on the
+obvious-looking name throttles three GET pages the axe suite scans, leaves all three endpoints open, **and
+every behavioural case still passes** — because the pages are not what anything posts to. Caught by
+reading the vendor route file before a line was written, and now pinned by a dedicated case.
+
+### ✅ Controls, and the one whose asymmetry is the actual finding
+
+Docker Desktop was down for the first two-thirds of the build, so four mutants were run against the
+structural logic with `mutate.php`'s discipline reimplemented at the call site — M42's recorded rule for a
+gate that is not Pest-in-a-container. Once the daemon was up, **three real `mutate.php` runs**, each with a
+baseline first, sha256 asserted **moved**, and restore verified by byte comparison:
+
+| Control | Result |
+|---|---|
+| **MC1** delegation replaced by `return $next($request)` | **CAUGHT — 4 failed / 4 passed** |
+| **MC2** `password-confirm` key collapsed to `by('pwconf')` | **CAUGHT — exactly 1 red** |
+| **MC3** a fourth argument added to the delegation | **CAUGHT — 4 red** |
+
+⛔⛔ **MC1 IS THE RESULT WORTH CARRYING FORWARD: THE FOUR STRUCTURAL CASES STAYED GREEN WHILE EVERY
+BEHAVIOURAL ONE WENT RED.** A gate that only reads the map would have asserted that a lookup table has the
+right shape while every route it names went unthrottled — **decorative, and green.** The structural half is
+worth having (it is what makes a vendor-added route redden the file without the test knowing its name), but
+**it cannot stand alone, and only a mutation could show that.**
+⚠️ **MC2 is the M30 defect reproduced deliberately.** Without the cross-user request — same address, same
+minute, different account — one deployment-wide bucket for the redemption door of this app's own step-up
+gate survives with everything green.
+
+### ⛔ A mistake of my own that the suite caught, and it is M30's trap wearing different clothes
+
+`expect($live)->toHaveKey($name, $message)` — **`toHaveKey()`'s second argument is the expected VALUE, not
+a message**, so the explanatory sentence was being asserted as the value stored under that key. Same family
+as the `toContain` variadic-needles trap M30 recorded, **except that one stayed GREEN with the wrong value
+in the array and this one failed loudly. Only the luck differed.** The rule is not "beware `toContain`"; it
+is **a Pest expectation's second argument is not universally a message — read the signature.** Written into
+the case rather than into a commit nobody re-reads.
+
+### How the prediction fared
+
+- ✅ **Local scope `tests/Feature/{Auth,Settings,Notifications,Tenancy}` 561 / 1912 → 569 / 1962** —
+  **+8 tests and +50 assertions, exactly the eight cases and exactly their fifty**, reconciling in both
+  numbers. The baseline was taken **with the production change active and the test file held aside**, so it
+  also proves the middleware moved no existing count; restored byte-identically.
+- ⚠️ **WRONG, in the safe direction: PHPStan did not move.** The claim said it *could*, because
+  `phpstan.neon` scans `app` and this adds a class there — a deliberate correction to the usual "a
+  test-only diff cannot touch it". Measured: **18 errors across 10 files, the recorded baseline, and
+  neither new file is among them.** The class was clean at level 8 first time.
+- ⚠️ **WRONG, and this is the one the claim named as most likely to be wrong: E2E.** The worry was that
+  `tests/e2e/support/console.ts` posts the confirm-password form on every console visit and
+  `ThrottleRequests` counts successes. **E2E passed at 20 steps.** The ceiling is 10/min rather than 6
+  *because* of that measurement, so the prediction was wrong and the sizing it produced was right — those
+  are different things and only the second one shipped.
+- ✅ **Pint `passed`, proven live first** by a deliberately misformatted probe (exit 1, file and fixers
+  named), placed **outside `app/`** so it could not also redden PHPStan — M35's clean-up trap avoided by
+  construction rather than by remembering.
+- ✅ **`openapi.json` byte-identical**, verified by `sha256` across a fresh `scramble:export` rather than
+  asserted from the reasoning that a 429 comes from route middleware no controller mentions.
+
+### ➕ Filed rather than silently left
+
+`PUT /user/profile-information` is a fifteenth Fortify write route and a **genuine second mail cannon** —
+it nulls `email_verified_at` and sends a verification notification on every address change, so one
+authenticated session can mail arbitrary recipients without limit. It is out of scope **by decision**, is
+named in the gate's `FORTIFY_UNBOUND_BY_DECISION` list beside `logout` so the coverage equality passes
+*because a decision was recorded*, and is filed as its own `minor` row. Remove it from that list and the
+gate goes red naming it.
+
+### ⚠️ Two environment findings
+
+**Lane A's stack came back HALF-UP after Docker Desktop was started**, exactly as `M35` recorded: `docker
+ps` showed `worker` and `scheduler` running while `app`, `postgres`, `redis`, `node` and `mailpit` sat
+`Exited (255)`. **`docker ps` alone cannot tell a healthy lane from a half-dead one — list with `-a`.**
+`docker compose up -d` from the lane's own worktree fixed it and `preflight` then probed the container
+cleanly.
+
+**`mutate.php` refuses a dirty target, and that refusal was correct and useful** — it caught two
+uncommitted edits that would otherwise have been baked into the "restored" bytes.
 
 ---
 

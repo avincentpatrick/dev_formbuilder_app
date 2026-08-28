@@ -2349,7 +2349,76 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   credential stuffing, with nothing red. **Latent.** The project already guards exactly this elsewhere:
   `SsoLoginWebTest.php:285` asserts every SAML limiter it names actually exists, precisely because a
   `throttle:` alias naming an unregistered limiter "resolves to an UNLIMITED PASSTHROUGH".*
-- **`major` · `POST /user/confirm-password` carries no rate limit at all.**
+- ~~**`major` · `POST /user/confirm-password` carries no rate limit at all.**~~
+  ✅ **DONE — M43 (2026-08-29). THE HEADLINE HELD EXACTLY, THE ROW WAS A FLOOR ONE-EIGHTH THE SIZE OF THE
+  DEFECT, AND ITS PRESCRIBED REMEDY WAS STRUCTURALLY IMPOSSIBLE RATHER THAN MERELY WRONG.**
+  `app/Http/Middleware/ThrottleFortifyEndpoints.php` (new), seven limiters in `FortifyServiceProvider.php`,
+  one entry each in `config/fortify.php` and `bootstrap/app.php`, and
+  `tests/Feature/Auth/FortifyRateLimitTest.php` (new).
+  ⛔ **EIGHT ROUTES, NOT ONE — AND THREE OF THEM NEED NO SESSION AT ALL.** Measured from the live route
+  table rather than from the row: **26 Fortify routes, 14 of them writes**, and Fortify ships `throttle:`
+  on **four** (`POST /login`, `POST /two-factor-challenge`, and the two verification routes at the
+  vendor's literal `6,1` — `config/fortify.php` names no `verification` key, so that number was never a
+  decision this project made). Unbounded and credential-bearing: **`POST /forgot-password`** (unlimited
+  reset-mail dispatch and account enumeration), **`POST /reset-password`** (reset-token guessing) and
+  **`POST /register`** — none of which needs a session — plus `PUT /user/password`, the row's own
+  `POST /user/confirm-password`, `POST /user/confirmed-two-factor-authentication` (**an exhaustible
+  six-digit TOTP whose only other bound is nothing at all**) and the three 2FA lifecycle verbs.
+  ⛔ **THE PRESCRIBED FIX HAS NOWHERE TO LAND, AND THE REPOSITORY ALREADY SAID SO THREE TIMES.** *"One
+  `RateLimiter::for()` plus one `->middleware('throttle:…')`"* — **Fortify has no per-route middleware
+  hook**; `config/fortify.php` records that at the `GateRegistration` note, at the
+  `EstablishTenantDatabaseContext` note, and again where it explains that `bootstrap/app.php`'s
+  `priority()` cannot substitute because priority reorders middleware a route already carries and never
+  adds one. **Sixth row in seven whose evidence is sound and whose remedy is not.**
+  ⚠️ **THE MAP IS KEYED ON ROUTE NAME, AND THE `.store` SUFFIX IS THE TRAP THE PLAN WALKED INTO.** Three
+  Fortify GET/POST pairs share a path, so a path map needs a verb table beside it. The write routes are
+  `register.store`, `password.confirm.store` and `two-factor.regenerate-recovery-codes`; `register`,
+  `password.confirm` and `two-factor.recovery-codes` are the **GET view pages**. A map keyed on the
+  obvious-looking name throttles three pages the axe suite scans, leaves all three endpoints open, **and
+  every behavioural test still passes** — because the pages are not what anything posts to. The plan for
+  this increment named all three wrongly and was corrected against the vendor route file before a line was
+  written; a dedicated case now fails on exactly that mutation.
+  ⛔ **AND THE PLAN'S ORDERING ARGUMENT WAS WRONG IN THE DIRECTION THAT WOULD HAVE PUT A FALSE CLAIM IN A
+  DOCBLOCK.** It said the class must be listed in `bootstrap/app.php`'s `priority()` or `$request->user()`
+  would read null, silently degrading every authenticated limiter to its IP arm. **Measured on the live
+  route table both ways: with the entry deleted the class still lands last, at index 13, and still after
+  `Authenticate` at index 5.** The user resolves either way. The entry is kept for the reason that survived
+  measurement — refusal at index 6 rather than 13, i.e. ahead of `EstablishTenantDatabaseContext`'s
+  database round trip, which is what bounds the *work* a flood causes rather than only the mail — and all
+  three comments that had stated the false reason were rewritten. **A false claim about a control is worse
+  than a missing one, because it stops the next reader looking.**
+  ⚠️ **`ThrottleRequests::handle()` GATES ITS NAMED-LIMITER BRANCH ON `func_num_args() === 3`.** A fourth
+  argument — a decay, a prefix, a tidy-up — silently routes to the numeric path, where
+  `resolveMaxAttempts()` finds a non-numeric value and throws `MissingRateLimiterException`: a 500 on every
+  guarded route. Read from the installed source and written into the docblock.
+  ⚠️ **CEILINGS SIZED AGAINST A MEASURED PROPERTY, NOT INTUITION.** `ThrottleRequests` counts **successes
+  as well as failures and never clears the bucket** — the behaviour `docs/security-threat-model.md` §8
+  already records for `login`. So `password-confirm` is 10/min per user rather than 6, because
+  `tests/e2e/support/console.ts` posts that form on every console visit whose step-up window has expired,
+  across three viewport projects, and those successes count. And because 5/min is 300/hour, the two
+  guest-reachable reset paths carry an **hourly** arm keyed on the address (30/hour) — the arm an
+  enumerating script actually meets — while `registration` is 5/min + 20/hour keyed on address **and
+  host**, because `RegistrationGate` resolves per host and one corporate NAT must not be able to exhaust
+  another workspace's budget.
+  ✅ **THE GATE WALKS THE LIVE TABLE AND ASSERTS THE EQUALITY IN BOTH DIRECTIONS.** Fortify routes are
+  discovered by **controller namespace**, so a route added by a vendor upgrade reddens the file without it
+  knowing the name; the map is read **from the middleware class**, never mirrored, which is Standing Rule
+  7(b-bis) applied one file later. The second direction is what keeps `login.store` from having a second
+  bucket stacked on `throttle:login` — the `guest-challenge` defect this repository has already recorded
+  once.
+  ⛔ **DOCKER DESKTOP WAS DOWN FOR THE WHOLE BUILD, SO `scripts/mutate.php` COULD NOT DRIVE PEST — ITS
+  DISCIPLINE WAS REIMPLEMENTED AT THE CALL SITE INSTEAD**, which is M42's recorded lesson for a gate that
+  is not Pest-in-a-container. Four mutants, each with its sha256 asserted **moved**, each `php -l`'d, each
+  restored by byte comparison and verified identical, each reddening its expected case **and only it**:
+  dropping `password.confirm.store` from the map (coverage, naming the route); adding `login.store`
+  (the double-throttle direction); pointing the entry at the GET view route (coverage **and** the
+  `.store` case); mistyping a limiter name (the registration case). ⚠️ **That is a proof of the structural
+  logic, not of the Pest cases** — the behavioural 429s are proven by CI, and saying which is which is the
+  point.
+  ➕ **FILED RATHER THAN SILENTLY LEFT:** `PUT /user/profile-information` is a fifteenth Fortify write
+  route and a real exposure; it is out of this increment's scope by decision, named in the gate's
+  decided-unbound list so it cannot read as an oversight, and filed as its own row below.
+  Original filing follows.
   **MEASURED (M30) from the live route table:** its middleware is
   `[web, RequirePlatformHost, AppSecurityHeaders, GateRegistration, Authenticate:web, EstablishTenantDatabaseContext]`
   — no `ThrottleRequests`. Vendor `ConfirmablePasswordController::store()` counts nothing and `app/`
@@ -2365,6 +2434,22 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `RateLimiter::for()` plus one `->middleware('throttle:…')`, and it should carry a binding assertion in
   `RateLimiterBindingTest.php`, which already has the helper. **Deliberately left by M30** because it adds a
   limiter to a route that increment does not otherwise touch.
+- **`minor` · `PUT /user/profile-information` is a second mail cannon, and it is the one Fortify write route left deliberately unbound.**
+  `UpdateUserProfileInformation` nulls `email_verified_at` and calls
+  `sendEmailVerificationNotification()` on **every** address change, so one authenticated session can
+  dispatch unlimited verification mail to **arbitrary recipients** — the same shape as the
+  `POST /forgot-password` exposure M43 closed, one door over, and behind a login rather than in front of
+  one. **Live.** ⚠️ **Deliberately out of M43's scope, not missed:** that increment's scope was set at the
+  eight credential-bearing routes, and this one verifies no credential. It is named in
+  `FortifyRateLimitTest`'s `FORTIFY_UNBOUND_BY_DECISION` list beside `logout`, so the coverage equality
+  passes *because a decision was recorded*, not because the route was overlooked — remove it from that
+  list and the gate goes red naming it. **The remedy is one line in each of two files** and is already
+  built either side of it: a `RateLimiter::for()` closure in `FortifyServiceProvider` and a
+  `'user-profile-information.update' => …` entry in `ThrottleFortifyEndpoints::limiters()`. ⚠️ **Size it
+  against the same measured property as the rest:** `ThrottleRequests` counts successes and never clears,
+  and a legitimate profile save is a success, so a per-minute ceiling under about 10 will eventually
+  redden `FortifyRouteContextTest` or `EmailVerificationGateTest`. The address-change arm is the one worth
+  keying tightly; a name change sends no mail at all, and nothing currently distinguishes them.
 - **`minor` · `throttle:saml-acs`'s route BINDING is asserted by nothing, while its registration is.**
   `SsoLoginWebTest.php:285-291` loops six limiter names and asserts each resolves — which stays green when
   the binding at `routes/tenant.php:1172` is deleted, because the registration at `AppServiceProvider.php:421`

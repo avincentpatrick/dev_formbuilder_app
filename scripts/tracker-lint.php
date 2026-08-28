@@ -39,25 +39,35 @@ $verbose = isset($opts['verbose']);
 const TRACKER = 'PROGRESS.md';
 const ARCHIVE = 'PROGRESS_ARCHIVE.md';
 
-// The ceiling is a RATCHET, not the target. PROGRESS.md is ~1.44 MB and cannot be read in one call;
-// the surgery that fixes that is its own increment. A ceiling set to the TARGET would be red on
-// arrival and could never merge, so this ships just above current and the surgery lowers it. The
-// headroom is printed on every run so a stale ceiling is visible rather than inferred.
-const TRACKER_BYTE_CEILING = 1500000;
+// The ceiling is a RATCHET, and the surgery has now turned it down once: 1,500,000 -> 600,000, with
+// the tracker at ~514 KB. It is deliberately NOT set to the current size — a ceiling with no
+// headroom reddens on the next ordinary close-out — and deliberately not to the plan's ~40 KB
+// target, which is unreachable while Standing Rules (207 KB) and Next Session (226 KB) remain in
+// this file. The headroom is printed on every run so a stale ceiling is visible rather than
+// inferred, and the next increment to move either of those sections turns it down again.
+const TRACKER_BYTE_CEILING = 600000;
 
 // A drop larger than this needs an explicit marker in the commit message. The incident was 1,086.
 const DROP_LIMIT = 200;
+// ⛔ THE MARKER MUST START A LINE, AND THAT IS NOT COSMETIC. The first version matched it
+// ANYWHERE in the commit range, so a commit whose message merely DISCUSSED the marker armed it:
+// the surgery's own claim commit said its commits carry the marker or R7 refuses them, and R7
+// duly reported the deletion as DECLARED before the surgery had even been committed. A mention
+// is indistinguishable from a declaration unless the form is constrained — the same defect as a
+// number in prose being read as a spend, found twice in one session. Requiring line-start makes
+// declaring it deliberate and discussing it free.
 const SURGERY_MARKER = '[tracker-surgery]';
 
 // The archive carries a SECOND, STALE constitution: "## Standing Rules for This Project" plus a
 // "## Next Session — Resume Here" that is byte-identical to the tracker's.
 //
-// ⛔ THE PLAN FOR THIS GATE ASKED FOR EXACTLY ONE OF EACH ACROSS BOTH FILES. Measured, that is RED
-// ON ARRIVAL: the cross-file Next Session count is 2 today, so such a gate could never merge. The
-// real hazard is the one the plan itself named — "a naive append would make three" — so two is
-// pinned as the known state and three is the defect. The surgery lowers this to 1 in the same
-// commit that removes the archive's duplicate, which is a deliberate, visible edit here.
-const EXPECTED_CROSS_FILE_NEXT_SESSION = 2;
+// ⛔ THIS WAS 2 UNTIL THE SURGERY, AND THE SURGERY LOWERED IT IN ITS OWN COMMIT. The gate shipped
+// pinning the known-bad state of two, because asserting one would have been RED ON ARRIVAL and
+// could never have merged; the hazard it blocked meanwhile was the one the plan named, "a naive
+// append would make three". The archive's duplicate heading is now renamed, so exactly one
+// remains and this is 1. ⚠️ A gate whose expectation an increment invalidates must be updated BY
+// that increment, or main merges red.
+const EXPECTED_CROSS_FILE_NEXT_SESSION = 1;
 
 $failures = [];
 $notes = [];
@@ -188,13 +198,13 @@ $drop = $before - $after;
 
 $msgOut = [];
 exec('git log --format=%B HEAD~1..HEAD 2>&1', $msgOut);
-$declared = str_contains(implode("\n", $msgOut), SURGERY_MARKER);
+$declared = preg_match('/^'.preg_quote(SURGERY_MARKER, '/').'/m', implode(chr(10), $msgOut)) === 1;
 
 if ($drop > DROP_LIMIT && ! $declared) {
     fail('R7 delta', sprintf(
         '%s lost %d lines (%d down to %d), over the limit of %d, and no commit in HEAD~1..HEAD carries "%s". '.
         'This is the exact shape of the 1,086-line deletion of 2026-08-16 (f565ac9), which merged green. '.
-        'If the removal is deliberate, declare it in the commit message.',
+        'If the removal is deliberate, put the marker at the START of a line in the commit message (a passing mention mid-sentence deliberately does NOT count).',
         TRACKER, $drop, $before, $after, DROP_LIMIT, SURGERY_MARKER));
 } elseif ($drop > DROP_LIMIT) {
     pass('R7 delta', sprintf('%s lost %d lines, declared with "%s"', TRACKER, $drop, SURGERY_MARKER));

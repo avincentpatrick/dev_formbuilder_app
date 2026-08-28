@@ -108,6 +108,29 @@ proving the expression evaluates `true` for `pull_request` rather than having di
 everywhere; (3) after merge, the merge-commit run on `main` must reach **`success`**, and the close-out
 push must produce **no run at all** — read as *correctly skipped*, never as *pending*.
 
+### ✅ CONTROLS 1 AND 1b MEASURED — AND THE NEGATIVE CONTROL IS THE ONE THAT MATTERS
+
+| Control | Run | Result |
+|---|---|---|
+| the run that stamped the LIVE baseline file | `33132909007` (`pull_request` on `m36-loop-verification-harness`) | **REFUSED, exit 1**, naming the branch |
+| `M38`'s own PR run | `33171176804` (`pull_request` on `m38-decisions-d5-d6-d7`) | **REFUSED, exit 1** |
+| **negative — a real push on `main`** | `33135990415` (`push` on `main`) | **ACCEPTED, exit 0**, stamping `push` on `main` |
+
+⛔ **A GUARD THAT REFUSES EVERYTHING IS NOT A GUARD**, which is why the third row exists. Two
+refusals prove only that something is rejecting; the acceptance proves it is rejecting *the right
+thing*.
+
+⚠️ **THE SECOND REFUSAL WAS FIRST MEASURED THROUGH A PIPE AND READ `EXIT=0`** — `head`'s status,
+not the script's. **A pipe hides the exit status**, which this project has written down and which
+still cost a re-run. Re-measured unpiped: **exit 1.**
+
+✅ **PINT PROVEN NOT BLIND ON `scripts/`, WHICH IS THE ONLY GATE THIS DIFF CAN MOVE.** A bare
+`pint --test` returned `{"tool":"pint","result":"passed"}` with **no file count at all** — exactly the
+shape of *"`passed` is not evidence it scanned anything"*. A deliberately misformatted
+`scripts/PintProbeM39.php` turned it **red, exit 1**, naming the file with twelve fixers; the probe was
+then deleted and its absence verified. `scripts/` is deliberately not on PHPStan's path, so the probe
+could not redden a second gate the way an `app/` probe would.
+
 ---
 
 ## RELEASED — `M38`, three decisions filed and a constitution corrected (merged as PR #228, `44e79a9`, 6/6 green)

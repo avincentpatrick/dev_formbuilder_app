@@ -5228,3 +5228,48 @@ guard. Pint proven not blind on `scripts/` by probe, after a bare `passed` print
 the provenance line moved. ⛔ **The numbering defect compounds:** documenting it adds literals, and
 `preflight` reached **+3** because M39's release named a *planned, unspent* increment. `lane-a.md` now
 carries no forward literal — a mitigation with a real cost to the writing, not a fix.
+
+### 2026-08-28 — M40 (Lane A): the tracker is gated, and a vacuous success was found inside the gate — PR #230, `9c20924`, 6/6 green
+
+`scripts/tracker-lint.php` as its own CI step with `fetch-depth: 2`: seven rule groups over
+`PROGRESS.md` and `PROGRESS_ARCHIVE.md` — size ceiling, per-file heading uniqueness, cross-file
+constitution count, no `Current Status` in the archive, encoding, hand-off markers, and an
+undeclared-deletion guard. **Static analysis went 19 → 20 steps**, which is the evidence the gate is
+registered rather than merely written. It is a CI step and not a local check because the incident it
+exists for **merged green** — nothing in CI had ever read a documentation diff.
+
+⛔⛔ **`R7`, THE ONE RULE THAT WOULD HAVE CAUGHT THE 1,086-LINE DELETION, WAS PERMANENTLY BLIND ON THIS
+HOST AND REPORTED SUCCESS.** It used `HEAD` followed by a caret. PHP's `exec()` runs through cmd.exe on
+Windows, where **the caret is the escape character**, so git received plain `HEAD`: measured, `HEAD` and
+`HEAD`-caret both resolved to `216ea25` while `HEAD~1` gave `f537bea`. The rule compared the file
+**against itself** and printed `+0` forever, and `rev-parse --verify` still SUCCEEDED so the
+cannot-measure guard never fired. **It did not skip loudly; it passed quietly** — green on Linux CI and
+blind on every local run, which is the worse half.
+
+✅ **Found only because one control COMMITTED its mutation rather than leaving it in the working tree.**
+The first harness mutated in place and `R7` reported CAUGHT — correctly, but for the wrong reason:
+uncommitted, `HEAD` still held the unmutated file. ⚠️ **A control that does not reproduce CI's actual
+condition can confirm a broken check as confidently as a working one.**
+
+**Proven on both sides.** 8/8 host violations caught, both files restored byte-identically by sha256.
+The declared-surgery escape proven with the mutation **committed**, because the surgery cannot merge
+without it. And **the PR was deliberately red before green**: `R7`'s CI behaviour depends on
+`fetch-depth: 2` and cannot be tested on the host, so a 300-line violation was pushed on purpose,
+failed at step 12 naming the drop and `f565ac9`, and was reverted byte-identically in the same PR.
+
+⚠️ **Two prescribed remedies did not work.** Asserting one `Next Session` across both tracker files
+would have been RED ON ARRIVAL — the heading is byte-identical in both, so the count is 2; the gate
+pins 2 and the surgery lowers it to 1. And `mutate.php` cannot prove a standalone CLI gate: it runs
+Pest inside the app container.
+
+⛔ **Six misattributions corrected.** The deletion is **J4b1's, 2026-08-16, `f565ac9`** — settled from
+`git show --numstat`, not from prose. Four sites said `M31`, two said `M16`; every number was invented
+by a later retelling and **M38/M39 wrote three of them**. The only site that never named an increment
+is the only one that stayed true. Unlike M38's `0021` bullets, which recorded what was true when
+written, this was never true at any point.
+
+⚠️ **The absence-read-as-success family gained two members in one increment:** `HEAD`-caret comparing a
+file to itself, and a watcher script reading an **empty check rollup** as *"all checks complete"*
+because the previous run had just been cancelled. With `steps: []` and the path-filtered run, that is
+four shapes of one defect — **absence mistaken for a passing result** — two of them found while
+building the gate that exists for exactly that class. Namespaces spent: nothing, sixteenth consecutive.

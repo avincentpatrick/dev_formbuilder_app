@@ -16,7 +16,120 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M40`, a merge-blocking tracker gate that must precede the surgery (`m40-tracker-lint`)
+## Status: NO ACTIVE CLAIM — `M40` is merged and the lane holds nothing forward
+
+**`M40` is merged (PR #230, `9c20924`, 6/6 green with real step counts).** Lane A holds no active row
+and pre-claims no forward number. The next row is taken under Rule 7(f), and the claim is written here
+and **pushed** before the first file is opened.
+
+⛔⛔ **THE NEXT INCREMENT NUMBER IS ONE PAST THE HIGHEST `## RELEASED — M<n>` HEADING ACROSS BOTH LANE
+FILES, AND IS DELIBERATELY NOT WRITTEN AS A LITERAL ANYWHERE IN THIS FILE.** `preflight` takes the
+maximum `M<n>` literal over the whole of both claim files, so **any** mention raises its answer —
+including a forecast, or a sentence about the bug itself. By carrying no forward literal, this file
+keeps the tool accidentally correct. That is a mitigation, not a fix; the fix is a `minor` in
+`docs/feature-backlog.md`.
+
+⛔ **AND READ `docs/backlog-triage.md` BEFORE TAKING ANY BACKLOG ROW.** All 68 open rows were
+re-validated on 2026-08-28; **eight prescribed remedies do not work.**
+
+✅ **THE TRACKER IS NOW GATED.** `composer run tracker-lint`, registered as its own CI step in the
+Static analysis job with `fetch-depth: 2`. **The surgery is therefore unblocked**, and it must carry
+`[tracker-surgery]` in its commit message or `R7` will refuse it.
+
+---
+
+## RELEASED — `M40`, a merge-blocking tracker gate, and a vacuous success found inside it (merged as PR #230, `9c20924`, 6/6 green)
+
+**Every claimed file was edited.** `scripts/tracker-lint.php` (new), `composer.json`,
+`.github/workflows/ci.yml`, plus the six misattribution corrections. **Namespaces spent: NOTHING** —
+sixteenth consecutive Lane A increment.
+
+### How the prediction fared — it held, including the part flagged as most likely wrong
+
+**Static analysis went 19 → 20 steps**, measured on the green run (`33183400689`). ⚠️ **The red control
+run showed 19 and that number was NOT the delta**: a failure at step 12 skipped `Setup Node`, which
+takes its paired `Post Setup Node` step with it, so the count coincidentally matched the old one. **A
+step count read off a failed run is not comparable to one read off a green run** — that is a new
+instance of this project's *measure the right thing* rule, and it was nearly reported as a miss.
+
+The claim named the line-count-delta rule as most likely to be wrong, *"if the parent is not reachable
+the check must fail loudly rather than skip"*. **It was right to flag it, and the failure was worse
+than predicted** — see below.
+
+### ⛔ THE CONTROLS FOUND A VACUOUS SUCCESS INSIDE THE GATE WRITTEN TO END VACUOUS SUCCESSES
+
+**`R7` — the one rule that would have caught the 1,086-line deletion — was permanently blind on this
+host, and it reported success.** It used `HEAD` followed by a caret. PHP's `exec()` runs through
+**cmd.exe** on Windows, where **the caret is the escape character**, so git received plain `HEAD`.
+Measured: `HEAD` and `HEAD`-caret both resolved to `216ea25`, while `HEAD~1` gave `f537bea`.
+
+The rule compared `PROGRESS.md` **against itself** and printed `+0` forever. ⚠️ **The cannot-measure
+guard could not save it** — `rev-parse --verify --quiet` *succeeded*, because `HEAD` resolves perfectly
+well. It did not skip loudly; **it passed quietly.** ⛔ **Correct on Linux CI and blind on every local
+run**, so CI would have been green while every local proof of `R7`, including all future ones, was a
+lie.
+
+✅ **FOUND ONLY BECAUSE ONE CONTROL COMMITTED ITS MUTATION INSTEAD OF LEAVING IT IN THE WORKING TREE.**
+The first harness mutated in place and `R7` reported **CAUGHT** — correctly, but for the wrong reason:
+with the change uncommitted, `HEAD` still held the unmutated file. **A control that does not reproduce
+CI's actual condition can confirm a broken check as confidently as a working one.** Fixed to `HEAD~1`
+throughout, with the trap written into the script rather than into a hand-off.
+
+### The gate is proven on BOTH sides, which is the whole point of it being a CI step
+
+| Proof | Where | Result |
+|---|---|---|
+| Eight violations, one per rule group | host | **8/8 CAUGHT**, both files restored byte-identically by sha256 |
+| Declared-surgery escape, mutation **committed** | host | undeclared drop **fails** (naming `f565ac9`); with `[tracker-surgery]` it **passes** |
+| **`R7` under `fetch-depth: 2`** | **CI** | **step 12 failed**: *"lost 300 lines (2151 down to 1851) … no commit in HEAD~1..HEAD carries [tracker-surgery]"* |
+
+⛔ **THE PR WAS DELIBERATELY RED BEFORE IT WAS GREEN.** `R7`'s CI behaviour depends on `fetch-depth: 2`
+making the parent reachable, which cannot be tested on the host — so the violation was pushed on
+purpose and reverted in the same PR, restored byte-identically. **A gate proven only on the host is the
+defect being re-committed.**
+
+⚠️ **The escape hatch was proven separately because the surgery cannot merge without it.** A gate with
+an untested escape is a gate that blocks the next increment.
+
+⚠️ **And the first attempt at that control was invalid, recorded rather than quietly rerun:** it cut
+the last 301 lines, removing the `Next Session` heading and both hand-off markers, so three other rules
+fired and `R7`'s result was buried. Cutting from the **middle** isolates the rule under test.
+
+### Two prescribed remedies did not work
+
+1. **"Exactly one `^## Standing Rules` and one `^## Next Session` across both files" would have been RED
+   ON ARRIVAL.** `^## Standing Rules$` is unambiguous (tracker **1**, archive **0**), **but
+   `^## Next Session` is byte-identical in both files**, so the cross-file count is **2**. The gate
+   pins exactly 2 — blocking the hazard the plan itself named, *"a naive append would make three"* —
+   and the surgery lowers it to 1 in the same commit that removes the archive's duplicate.
+2. **`scripts/mutate.php` cannot prove this gate**: it runs Pest inside the app container, and this is
+   a standalone CLI script.
+
+### Six misattributions corrected, and the distinction matters
+
+The incident is **J4b1's**, 2026-08-16, `f565ac9` — settled from `git show --numstat`, never from
+prose. The corpus said `M31` (4 sites) or `M16` (2); **every `M` number was invented by a later
+retelling, and `M38` and `M39` wrote three of them.** The only site that never named an increment is
+the only one that stayed true.
+
+⛔ **This is NOT the case `M38` left alone.** Those `0021` bullets recorded what was *true when
+written* — a dated record is not a stale claim. **This was never true at any point**, so correcting it
+fixes an error rather than falsifying a log.
+
+⚠️ **AND THIS CLAIM'S OWN CITATIONS WENT STALE INSIDE THE COMMIT THAT WROTE THEM.** The attribution
+table cited line numbers, and splicing the claim into that same file moved every one — the *"~30
+citations false or moved"* class `M37` measured, reproduced live. It now cites counts and filenames
+only. **Counts and filenames are stable; line numbers in a file being edited are not.**
+
+### ➕ The absence-read-as-success family gained two members in one increment
+
+`steps: []` is a job that never acquired a runner. A path-filtered push is a run that does not exist.
+**`HEAD`-caret was a comparison against itself that reported success.** And the watcher script polling
+this PR read an **empty check rollup** as *"all checks complete"* — the old run had just been cancelled
+and the new one had not registered, so *"nothing is incomplete"* was satisfied by nothing at all.
+⚠️ **Four shapes, one defect: absence mistaken for a passing result** — two of them found while
+building the gate that exists for exactly that class.
+
 
 **Taken 2026-08-28.** Branch `m40-tracker-lint`, cut from `origin/main` at `f537bea`, PR into `main`.
 Third increment of the operating-loop realignment. **It must land before the tracker surgery**, because

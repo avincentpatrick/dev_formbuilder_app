@@ -4,6 +4,7 @@ use App\Http\Middleware\AppSecurityHeaders;
 use App\Http\Middleware\EstablishTenantDatabaseContext;
 use App\Http\Middleware\GateRegistration;
 use App\Http\Middleware\RequirePlatformHost;
+use App\Http\Middleware\ThrottleFortifyEndpoints;
 use Laravel\Fortify\Features;
 
 return [
@@ -147,11 +148,25 @@ return [
     // in the same request still has no user GUC — the trap SsoUserProvisioner.php:145 and
     // E2eSeeder both document. Nothing on `users` does that today (`last_login_at` belongs to
     // `sso_connections`), so this is a boundary to respect, not a gap to close.
+    //
+    // ⚠️ ThrottleFortifyEndpoints (M43) IS HERE FOR THE THIRD TIME FOR THE SAME REASON — no per-route hook.
+    // Fortify ships `throttle:` on four routes only (`POST /login`, `POST /two-factor-challenge` and the
+    // two verification routes, the last pair at the vendor's literal `6,1` because `limiters` below names
+    // no `verification` key). Everything else accepting a credential was unmetered, including three routes
+    // reachable with NO SESSION AT ALL: `POST /forgot-password`, `POST /reset-password` and `POST /register`.
+    // It matches on route NAME — three Fortify GET/POST pairs share a path — and falls through for anything
+    // not in its map, so nothing here is throttled twice.
+    //
+    // ⚠️ Its position in THIS array is not what decides when it runs — bootstrap/app.php's priority()
+    // does, and the reason it is listed there is measured rather than argued: see that call site. In
+    // short, an unlisted middleware still ends up after `auth`, so the entry is about refusing BEFORE
+    // EstablishTenantDatabaseContext's database round trip, not about resolving the user.
     'middleware' => [
         'web',
         RequirePlatformHost::class,
         AppSecurityHeaders::class,
         GateRegistration::class,
+        ThrottleFortifyEndpoints::class,
         EstablishTenantDatabaseContext::class,
     ],
 

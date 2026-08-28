@@ -31,6 +31,19 @@ $targets = [$root.'/app/Http/Controllers'];
 $parser = (new ParserFactory)->createForNewestSupportedVersion();
 $finder = new NodeFinder;
 
+/**
+ * A plausible floor for the discovery check below (M36).
+ *
+ * The tree held 97 controller file(s) when this floor was set; it sits well below that so ordinary deletion does
+ * not trip it, and well above zero so a broken or renamed scan root does.
+ *
+ * Measured rather than guessed: this gate run INSIDE the app container on this host reports
+ * 49, because RecursiveDirectoryIterator descends the Windows bind mount only partially while
+ * `find` on the same path sees every file. An under-scan here is a reproducible event today,
+ * not a hypothetical one — which is why the floor is a hard failure and not a warning.
+ */
+const MIN_EXPECTED_CONTROLLERS = 55;
+
 $violations = [];
 $scanned = 0;
 
@@ -88,6 +101,20 @@ foreach ($targets as $dir) {
             }
         }
     }
+}
+
+if ($scanned < MIN_EXPECTED_CONTROLLERS && $violations === []) {
+    // A gate nobody can tell is blind is a gate nobody is running. Mirrors R2 in
+    // scripts/component-import-lint.php, which was the only one of the five gates to have a floor.
+    fwrite(STDERR, sprintf(
+        "Controller gate FAILED: scanned only %d controller file(s), expected at least %d.\n".
+        "  This is a DISCOVERY regression, not a clean run — a scan root has moved, or the gate is\n".
+        "  running somewhere its iterator cannot see the whole tree. Run it on the HOST, not inside\n".
+        "  the app container — on this host the container reports 49 of 97.\n",
+        $scanned,
+        MIN_EXPECTED_CONTROLLERS
+    ));
+    exit(1);
 }
 
 if ($violations !== []) {

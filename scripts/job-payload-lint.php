@@ -120,6 +120,18 @@ $dir = $root.'/app';
 $parser = (new ParserFactory)->createForNewestSupportedVersion();
 $finder = new NodeFinder;
 
+/**
+ * A plausible floor for the discovery check below (M36).
+ *
+ * The tree held 31 job class(es) when this floor was set; it sits well below that so ordinary deletion does
+ * not trip it, and well above zero so a broken or renamed scan root does.
+ *
+ * This gate reports the same count on the host and inside the app container, so it has no known
+ * under-scan today. The floor is still warranted: a renamed or moved scan root is silent here
+ * exactly as it is in the three siblings that DO under-scan.
+ */
+const MIN_EXPECTED_JOBS = 18;
+
 $violations = [];
 $scanned = 0;
 
@@ -233,6 +245,19 @@ foreach (is_dir($root.'/app/Jobs') ? php_files($root.'/app/Jobs') : [] as $path)
             );
         }
     }
+}
+
+if ($scanned < MIN_EXPECTED_JOBS && $violations === []) {
+    // A gate nobody can tell is blind is a gate nobody is running. Mirrors R2 in
+    // scripts/component-import-lint.php, which was the only one of the five gates to have a floor.
+    fwrite(STDERR, sprintf(
+        "Job payload linter FAILED: scanned only %d job class(es), expected at least %d.\n".
+        "  This is a DISCOVERY regression, not a clean run — a scan root has moved, or the gate is\n".
+        "  running somewhere its iterator cannot see the whole tree.\n",
+        $scanned,
+        MIN_EXPECTED_JOBS
+    ));
+    exit(1);
 }
 
 if ($violations !== []) {

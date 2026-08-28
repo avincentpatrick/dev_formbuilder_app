@@ -74,6 +74,9 @@
         "job-payload-lint": "@php scripts/job-payload-lint.php",
         "constraint-boundary-lint": "@php scripts/constraint-boundary-lint.php",
         "component-import-lint": "@php scripts/component-import-lint.php",
+        "preflight": "@php scripts/preflight.php",
+        "gate-baselines": "@php scripts/gate-baselines.php",
+        "mutate": "@php scripts/mutate.php",
         "quality": [
             "@lint",
             "@analyse",

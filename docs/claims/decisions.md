@@ -171,6 +171,45 @@ contract: `openapi.json` is untouched by `M33`.
 
 ---
 
+### D5 — What bar ends the M-series?
+
+**Filed 2026-08-28 by Lane A, during `M36`.** Not a defect and not a blocker — an undecided question
+that nothing in the loop currently asks, filed here rather than put to the user as a blocking question
+because D1/D3/D4 set that precedent and because the series continues perfectly well without an answer.
+
+**Why the question exists.** The post-merge remediation series has run **M1 → M36** as one row per PR
+into `main`, taken from `docs/feature-backlog.md`. It has no exit criterion. Nothing anywhere says what
+"done" looks like, so the honest description of the current plan is *"until the backlog is empty"* —
+and the backlog does not drain monotonically. **M36 is the worked example**: it closed one row and
+filed three, two of which it found by measuring rather than by reading. That is the series working
+exactly as intended, and it is also why it does not obviously terminate.
+
+**The facts.** The file has grown across the series, not shrunk. Rows arrive from three sources: the
+original merge-gate review, defects found while building an unrelated row, and — increasingly — rows a
+row's own verification uncovers. The third source is the productive one and it scales with effort
+spent, so more thoroughness produces more backlog rather than less.
+
+**Three shapes an answer could take**, offered so the question is cheap to answer rather than to
+argue:
+
+1. **A severity bar.** The series ends when no `major` remains and every `minor` is either closed or
+   explicitly accepted as latent. Countable today, and it does not pretend the file will empty.
+2. **A category bar.** The series ends when nothing correctness- or security-shaped remains; style,
+   documentation and test-ergonomics rows move to a standing backlog worked opportunistically.
+3. **A budget.** A fixed number of further increments, after which whatever remains is re-triaged
+   against the held pipeline rather than continued by default.
+
+**Recommendation: (2), with (1) as the visible measure.** The held list — OCR, uploading/import,
+payments, Track B, GDPR — is product work that has been waiting since 2026-08-18, and the argument for
+continuing remediation indefinitely gets weaker the further it drifts from correctness and security
+into ergonomics. ⚠️ **This is genuinely the user's call and is not being proceeded on** — unlike D4,
+there is no revert-in-one-enum-arm here, because the decision is about what to spend the next several
+increments on rather than about a line of code.
+
+⚠️ **AND THE SERIES SHOULD NOT STALL WAITING FOR THIS.** Standing Rule 5 is unchanged: the next row is
+taken under Rule 7(f) and built. This question changes when to stop, not whether to continue.
+---
+
 ## ANSWERED
 
 ### D2 — May an axe violation be retryable at all? **No. A flaky e2e result now fails CI.**

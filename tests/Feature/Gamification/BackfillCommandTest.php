@@ -103,7 +103,7 @@ it('names each workspace on its own job, and starts every one at the beginning o
     expect(Artisan::call('gamification:backfill'))->toBe(0);
 
     // ⚠️ THE COUNT ASSERTION IN THE TEST ABOVE CANNOT SEE THE DEFECT THIS ONE EXISTS FOR, AND THAT WAS
-    // MEASURED RATHER THAN REASONED. Hoisting the loop variable in `fanOut()` so every child is dispatched
+    // MEASURED RATHER THAN REASONED. Hoisting the loop variable in `BackfillGamificationCommand::fanOut()` so every child is dispatched
     // with `$targets[0]`'s id leaves this whole file at 8 passed / 19 assertions, exit 0 — while every
     // workspace but the alphabetically-first is left permanently unbackfilled and the operator is told
     // "2 workspace(s) queued". The backfill is a one-shot operator action nobody re-runs, so there is no
@@ -111,7 +111,7 @@ it('names each workspace on its own job, and starts every one at the beginning o
     //
     // ⛔ AND `Queue::assertPushed($class, $closure)` IS NOT THE FIX, THOUGH IT READS LIKE ONE — it is what
     // the backlog row prescribed. `QueueFake::assertPushed()` asserts `pushed($job, $callback)->count() > 0`
-    // (Laravel 13.18.1, `QueueFake.php:130-134`): AT LEAST ONE MATCH. One closure asking "is this job's
+    // (Laravel 13.18.1, `QueueFake.php:131-134`): AT LEAST ONE MATCH. One closure asking "is this job's
     // tenantId one of the two?" is satisfied by the first of two identical jobs and stays green under
     // precisely the mutation it would have been added to catch. `Queue::pushed()` returns the job objects
     // themselves (`:364-375`, `->pluck('job')`), so the whole set is comparable at once — which pins the

@@ -16,19 +16,52 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M36` is merged and the lane holds nothing forward
+## Status: ACTIVE CLAIM — `M37`, a read-only re-validation of the open backlog
 
-**`M36` is merged (PR #226, `ca6f802`, CI 6/6 green with real step counts: E2E 20 · Static 19 ·
-Contract 16 · Frontend 12 · axe 11 · Pest 11 — not one `steps: []`).** Lane A holds no active row and
-pre-claims no forward number. The next row is taken under Rule 7(f), and the claim is written here and
-**pushed** before the first file is opened.
+**Taken 2026-08-28.** Branch `m37-backlog-triage`, cut from `origin/main` at `f2a663f`, PR into `main`.
+Row: **not a backlog row** — the second half of the same user-directed process work `M36` began. The
+backlog is the queue every later row is taken from, and nothing has ever checked whether its rows are
+still true.
 
-⛔⛔ **BEFORE YOU NUMBER ANYTHING, RUN `php scripts/preflight.php --lane=a`.** It prints both lanes'
-`## Status` lines, `git worktree list` and the highest M seen anywhere, in one command — which is the
-check that has decided the increment number three increments running, in both directions. **`M37` is
-the next free number.** The preflight's figure is a FLOOR, not an allocation: a forward queue is a
-claim and does not live under the `## Status` heading, so still read the whole of `lane-b.md`.
+### Evidence verified
 
+The premise, measured on `origin/main` rather than assumed: **81 open bullet rows, of which 68 carry a
+severity tag — 12 `major`, 56 `minor`** — across eight sections. The staleness premise has one hard
+data point rather than a rate: **M20 found three of its four filed cases already passing.** This row
+exists to replace that anecdote with a census, so the number it produces IS the finding.
+
+### Remedy verdict
+
+No remedy is prescribed and none is invented. **This row changes no application code and fixes no
+defect.** It produces a triaged queue; acting on it is the next row's business. That boundary is
+deliberate — a pass that both triages and fixes cannot report honestly on its own accuracy.
+
+**Files:** `docs/backlog-triage.md` (new) · `docs/claims/lane-a.md` · `PROGRESS.md` (own block only) ·
+`PROGRESS_ARCHIVE.md`.
+
+⛔ **`docs/feature-backlog.md` IS DELIBERATELY NOT EDITED BY THIS ROW.** It is a shared artefact both
+lanes claim, and a fan-out must not contend for it. The triage lands in its own file; folding verdicts
+back into the backlog is a later, serial decision.
+
+**Shared artefacts taken:** `docs/backlog-triage.md`, `PROGRESS.md` (own block only). **Not** the
+backlog, **not** `openapi.json`, **not** `phpunit.xml`.
+
+**Paired files taken:** none.
+
+**Namespaces spent:** NOTHING. ADR `0022` free and still Lane A's block-opener (thirteenth consecutive
+increment). Migration `2026_08_17_000111` free. No `§D<n>`.
+
+⛔ **THE SUB-AGENT BRIEF FORBIDS THE DATABASE, NOT MERELY THE FILES.** M34's "read-only" verification
+agent ran `php artisan test`, whose `migrate:fresh` dropped the schema under a live mutation run and
+produced three phantom failures that read as real ones — **Rule 7(c) reproduced inside one lane.** The
+tell was the assertion total moving, not the failure count. So: no `artisan`, no `pest`, no
+migrations, no writing `docker exec`, no file edits. Reading is the entire permitted surface.
+
+**Prediction:** a large minority of rows will be stale — either already fixed, or citations moved by an
+intervening increment. **The prediction most likely to be wrong is that the agents agree with each
+other about what "still live" means**; a row whose defect is real but whose consequence was overstated
+is the ambiguous case, and I expect the triage to need a verdict vocabulary the brief does not yet
+supply. I also expect at least one row to **understate itself**, since that is now five-for-five.
 ---
 
 ## RELEASED — M36, the loop's traps made executable (merged as PR #226, `ca6f802`, 6/6 green)

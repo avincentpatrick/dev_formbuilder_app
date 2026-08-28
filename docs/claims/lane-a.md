@@ -16,22 +16,84 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M39` is merged and the lane holds nothing forward
+## Status: ACTIVE CLAIM — `M40`, a merge-blocking tracker gate that must precede the surgery (`m40-tracker-lint`)
 
-**`M39` is merged (PR #229, `454d9ba`, 6/6 green with real step counts).** Lane A holds no active row
-and pre-claims no forward number. The next row is taken under Rule 7(f), and the claim is written here
-and **pushed** before the first file is opened.
+**Taken 2026-08-28.** Branch `m40-tracker-lint`, cut from `origin/main` at `f537bea`, PR into `main`.
+Third increment of the operating-loop realignment. **It must land before the tracker surgery**, because
+a local-only check would not have caught the incident it exists for: that deletion **merged green**.
 
-⛔⛔ **THE NEXT INCREMENT NUMBER IS ONE PAST THE HIGHEST `## RELEASED — M<n>` HEADING ACROSS BOTH LANE
-FILES — AND IT IS DELIBERATELY NOT WRITTEN AS A LITERAL ANYWHERE IN THIS FILE.** `preflight` takes the
-maximum `M<n>` literal over the whole of both claim files, so **any** mention of a number raises its
-answer, including a forecast or a sentence about the bug. `M38` proved it by discussing `M39` while
-filing that row, which moved the tool's answer one increment past the truth. **By
-not writing a forward literal here, the tool is now accidentally correct** — that is a mitigation, not
-a fix, and the fix is filed as a `minor` in `docs/feature-backlog.md`.
+⚠️ **Numbered from the `## RELEASED` headings, and `preflight` now agrees** (`M39` → next free). Lane B
+reads **NO ACTIVE CLAIM**, highest released `M35`. Both files re-read in full at write time.
 
-⛔ **AND READ `docs/backlog-triage.md` BEFORE TAKING ANY BACKLOG ROW.** All 68 open rows were
-re-validated on 2026-08-28; **eight prescribed remedies do not work.**
+### Row
+
+From the approved realignment plan. Not a `docs/feature-backlog.md` row.
+
+### Evidence verified
+
+⛔ **THE INCIDENT IS REAL, AND IT IS MISATTRIBUTED IN SIX PLACES — THREE OF WHICH THIS LANE WROTE
+YESTERDAY.** Settled from git rather than from prose: commit **`f565ac9`**, dated **2026-08-16**,
+subject *"docs(progress): LANE A — J4b1 merged as #158"*, numstat **`1 1086 PROGRESS.md`** — one line
+added, **1,086 deleted**, in the `j4b1-tracker` window (PR #160). **It is a J-series incident.**
+
+| Attribution in the corpus | Sites | Verdict |
+|---|---|---|
+| *"M31's 1,086-line deletion"* | 4 (`PROGRESS.md:292`, `lane-a.md:285/394/498`) | **WRONG** — `M38`/`M39` wrote three |
+| *"M16's 1,086-line deletion"* | 2 (`PROGRESS.md:351`, `lane-a.md:1073`) | **WRONG** |
+| The original record, `PROGRESS.md:90` | 1 | **RIGHT** — mechanism plus the date, claiming no `M` number |
+
+⚠️ **THE ONE SITE THAT NEVER NAMED AN INCREMENT IS THE ONLY ONE THAT STAYED TRUE.** Every later
+retelling added a number, and every added number was invented. That is this project's
+*documentation-asserting-what-the-code-does-not-do* class applied to its own incident log — and the lane
+that filed ten such backlog rows produced three more of them in two increments.
+
+⛔ **AND THIS IS NOT THE SAME CASE AS `M38`'s `0021` BULLETS, WHICH WERE DELIBERATELY LEFT ALONE.** Those
+recorded what was *true when written*; a dated record is not a stale claim. **This was never true at any
+point**, so correcting it fixes an error rather than falsifying a log. All six sites are corrected.
+
+### Remedy verdict
+
+**The plan prescribes two things that do not work on this tree, both verified.**
+
+1. ⛔ **"Exactly one `^## Standing Rules` and one `^## Next Session` ACROSS BOTH FILES" WOULD BE RED ON
+   ARRIVAL.** Measured: `^## Standing Rules$` is unambiguous (`PROGRESS.md` **1**, archive **0** — the
+   archive's reads *"…for This Project"*), **but `^## Next Session` is byte-identical in both files**, so
+   the cross-file count is **2** today. A gate asserting 1 could never merge. **What ships instead pins
+   the hazard the plan itself named** — *"a naive append would make three"* — asserting the cross-file
+   count is **exactly 2**, plus per-file uniqueness. The surgery lowers it to 1, deliberately and visibly.
+2. ⛔ **`scripts/mutate.php` CANNOT PROVE THIS GATE.** It runs **Pest inside the app container**
+   (`--tests=<pest paths>`), and Docker is down on this host besides. `tracker-lint.php` is a standalone
+   CLI gate, not a Pest test. **The control is one deliberate violation per rule**, each run against the
+   real script and restored by byte comparison — and, because a local-only gate is exactly what this
+   increment exists to reject, **one violation is pushed to the PR branch so CI itself goes red**, then
+   fixed in the same PR. A gate proven only on the host is the defect being re-committed.
+
+**And the byte ceiling cannot be the target value.** `PROGRESS.md` is **1,444,477 bytes** today. The
+ceiling ships just above current as a **ratchet**, printing its headroom so staleness is visible, and the
+surgery drops it to the real target. A ceiling red on arrival is a gate nobody can merge.
+
+### Files
+
+`scripts/tracker-lint.php` (**NEW** — Lane B's column) · `composer.json` (claim-first) ·
+`.github/workflows/ci.yml` (claim-first: one step plus `fetch-depth: 2`) · `PROGRESS.md` (two
+misattributions, plus Lane A's block and hand-off line) · `docs/claims/lane-a.md` (four
+misattributions).
+
+⛔ **CROSSES THE LANE BOUNDARY ON PURPOSE; LANE B HOLDS NOTHING, VERIFIED AT WRITE TIME. THIS CLAIM IS
+THE PERMISSION** — the `M28`/`M39` shape. **Namespaces spent: NOTHING.** Sixteenth consecutive.
+
+### Prediction
+
+No `app/`, `database/`, `routes/`, `.vue` or test file: Pest, Vitest, axe, E2E, PHPStan, `openapi.json`
+and the five host lint gates unmoved. `scripts/` **is** on Pint's path, so bare `pint --test` must stay
+green. **Static analysis goes 19 → 20 steps** — that delta, not the green tick, is the evidence the gate
+is registered rather than merely written.
+
+⚠️ **THE ONE I MOST EXPECT TO BE WRONG: the line-count-delta rule.** On a `pull_request` event
+`actions/checkout` gives a **merge commit**, so `HEAD^` is main's tip rather than the PR head, and
+`fetch-depth: 2` must actually make that parent reachable. If it does not, the check must **fail loudly
+rather than skip** — a delta silently not measured is precisely the vacuous-success family this
+increment is joining.
 
 ---
 

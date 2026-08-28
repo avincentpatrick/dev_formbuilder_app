@@ -2229,7 +2229,24 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   discusses `M39` three times *while filing this row*, and the tool consequently answers **"next free
   is `M40`"**. ⚠️ **The increment that documented the defect made the tool's answer worse by
   documenting it.** That is why the fix cannot be "stop writing forecasts": it must derive the number
-  from the `## RELEASED — M<n>` headings or from `gh pr list --state merged`. **Live.**
+  from the `## RELEASED — M<n>` headings or from `gh pr list --state merged`.
+  ⛔⛔ **AND IT COMPOUNDS — MEASURED ACROSS `M38` AND `M39`, WHICH IS THE PART THAT MAKES IT WORTH
+  FIXING RATHER THAN WORKING AROUND.** Every increment that *documents* the defect adds another number
+  literal, and the tool's answer climbs monotonically. `M38`'s claim discussed the next increment and
+  moved it to **+1**. `M38`'s close-out, writing up that very finding, quoted the wrong answer and made
+  it **+2**. `M39`'s own claim quoted it again — and its release referred to the **planned tracker-surgery
+  increment**, an increment that does not exist yet — taking it to **+3**: `preflight` answered *"next
+  free is `M42`"* when the truth was `M40`. ⚠️ **A reference to a FUTURE, UNSPENT increment is
+  indistinguishable from a spend to this scan**, so the better a lane documents its roadmap, the more
+  wrong the number gets.
+  ⚠️ **MITIGATION APPLIED IN `M39`, AND IT IS NOT A FIX: `docs/claims/lane-a.md` now contains NO
+  forward number literal at all**, which makes the tool accidentally correct. **The cost is real** — that
+  file can no longer name a planned increment in prose, so `M39`'s release says *"the coming tracker
+  surgery"* where it wants to say a number. A mitigation that degrades the writing is a reason to fix the
+  scan, not a solution.
+  ⚠️ **AND THE ERROR IS INVISIBLE LOCALLY:** `preflight` reads the claim files via `show_from_main()`,
+  i.e. as they stand on `origin/main`, so a correction cannot be observed until it is pushed — which also
+  means the wrong number is what every session sees at open. **Live.**
 - **`minor` · `baselineOf()` turns "no checksum" into `''`, and only middleware turns it back.**
   `tests/Feature/Submissions/SubmissionEditRoutesTest.php:62` returns `(string) $value`, so a null
   `answers_content_checksum` reaches the request body as an **empty string**, and it is

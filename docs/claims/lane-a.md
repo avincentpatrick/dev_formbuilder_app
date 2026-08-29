@@ -16,7 +16,163 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — the eight `major` documentation-truth rows, and a citation-liveness gate (`m46-citation-truth-and-liveness-gate`)
+## Status: NO ACTIVE CLAIM — `M46` is merged and the lane holds nothing forward
+
+**`M46` is merged.** Lane A holds no active row and pre-claims no forward number. The next row is taken
+under Rule 7(f), and the claim is written here and **pushed** before the first file is opened.
+
+⛔ **RUN `php scripts/state.php` FOR EVERY NUMBER.** Increment, ADR, migration prefix, exceptions-log
+entry, open rows, open decisions, and how far behind the trunk `docs/gate-baselines.md` has fallen.
+Nothing in this file or in `PROGRESS.md` is the authority for any of them any more.
+
+✅ **`CLAUDE.md` IS THE IMPERATIVE LAYER AND IS AUTO-LOADED.** Read it before this file. It carries no
+numbers at all, and `tracker-lint` R8 keeps it that way.
+
+⛔⛔ **THE `[tracker-surgery]` INSTRUCTION IS UNFOLLOWABLE THROUGH A DEFAULT SQUASH — SEE `M45`.**
+GitHub prefixes every commit subject with `* ` in the default body, which demotes the marker off line
+start. Pass an explicit `--body` whose FIRST content line is the marker. The PR title cannot carry it:
+`state.php` anchors merged titles on `^M(\d{1,3}):`.
+
+⛔ **AND `M46` ADDS ONE: A FIGURE THAT ARRIVED FROM A RECONNAISSANCE PASS IS NOT A MEASUREMENT.**
+Three of them entered this increment's own claim or plan and **all three were wrong** — see the release
+below. Re-measure a scout's number before it reaches a claim, a document or a commit message.
+
+---
+
+## RELEASED — `M46`, the corpus stops asserting what the code refutes, and a citation-liveness gate (merged as PR #236, `6dbe942`, 6/6 green)
+
+**Every claimed file was edited, and the claim's file list was extended once — by measurement rather than
+by discovery.** Eight `major` rows closed, six residuals filed, one new lint gate. **Namespaces spent:
+NOTHING** — twenty-second consecutive. `ADR-0022` stays free and stays this lane's block-opener; `0010`
+stays reserved for H1d; the migration prefix stays free.
+
+### ⛔ THE SHARPEST FINDING IS ABOUT THIS INCREMENT'S OWN METHOD, NOT ABOUT THE ROWS
+
+**Three numbers reached the claim, the plan or a draft from a reconnaissance pass, and every one of them
+was wrong when measured directly.**
+
+| Figure as reported | Measured | Where it would have landed |
+|---|---|---|
+| `Cache::` written at **six call sites in four files** | **three sites in three files** | It was already in the pushed claim's *Remedy verdict* |
+| The data dictionary names **3 of 45** migration constraints | **9 of 45** | It was going into a filed backlog row |
+| `impersonation_started` appears **in no document but the backlog** | already present in the data dictionary's `NotificationType` row | It was going into a closed row's evidence |
+
+⚠️ **The first is the one that matters, because a claim is a pushed commit and that number was published
+before it was checked.** The correction is recorded here rather than quietly fixed, and the finding it
+replaced is *better*: the third cache write reaches the cache through an **injected repository**, so the
+grep the false docblock prescribed could not have seen it at all — a sharper point than "six not three"
+would ever have been. **A wrong number can conceal a better finding, not merely overstate a lesser one.**
+
+### ⛔ FIVE OF THE EIGHT ROWS WERE WRONG ABOUT THEMSELVES, IN FOUR DIFFERENT WAYS
+
+Ninth row in ten whose evidence is sound and whose remedy is not — and the failure modes are no longer
+one kind:
+
+- **STALE.** The README row was fixed on 2026-08-18, ten days before the census that re-validated it as
+  live. All three of its citations are blank lines. ⚠️ **And a later increment had already noticed** —
+  `M27` rewrote the same block for a different row and recorded in its commit message that these line
+  numbers were rotten, without closing this row. **A stale row survives being read; it dies only when
+  someone opens its citations.**
+- **FALSE IN A CLAUSE.** ADR-0001's *"no lowercasing anywhere on the register/login path"* is false;
+  Fortify canonicalises on four paths behind a config flag. ⛔ **The mechanism lives in `vendor/`, so a
+  grep of first-party code returns nothing and CONFIRMS the false claim.**
+- **OVER-READ.** ADR-0017's sentence has three clauses, two false and one true. The obvious remedy —
+  delete it — would have fixed the false claims by destroying a real, named gap: the threat model
+  models no isolation **topology** at all, which is the one thing that ADR is about.
+- **UNDERSTATED.** Two rows named one document each and reached three and four. One of those extra
+  sites is a **production runbook step prescribing a command that does not exist**.
+
+### ✅ THE OPERATIONAL FINDING, WHICH IS NOT A DOCUMENTATION DEFECT
+
+`docs/deployment-infrastructure.md` told an operator to install `php artisan reverb:start` as an
+auto-restarting Windows service. Measured on this tree: `laravel/reverb` is absent from `composer.json`,
+`reverb` appears in no `artisan list`, and the command exits **1**. Following the runbook exactly would
+have produced a service failing on every start with the supervisor retrying it forever. ⚠️ **It was found
+by chance** — this shell ate the backticks around a command in a diagnostic and executed it, which is the
+recorded backtick trap producing, for once, the right answer. The measurement was then taken deliberately.
+
+### The gate, and the scope rule that was allowed to decide
+
+`scripts/citation-liveness-lint.php`, registered at **four** sites — `composer.json` (script and the
+`quality` aggregate), its own `ci.yml` step because no CI job runs `composer run quality`,
+`preflight.php`'s hardcoded gate array whose comment said *five*, and a `gate-baselines.php` metric whose
+pattern was **proven against the real success line rather than assumed**.
+
+⚠️ **The scope rule was fixed before the measurement so the run would decide it, and it then turned out to
+be ambiguous — which is recorded rather than quietly resolved.** The report-only run returned **13
+rotten occurrences across 10 distinct dead targets**; the rule said "≤12 → fix them all" without saying
+which count it meant. The work is per target, so branch B was taken and tier 1 now gates at **zero**.
+**All of `docs/**` measures 40 rotten** — the naive scope was never mergeable, which is the whole reason
+the rule existed.
+
+⛔ **AND THE COUNT MOVED TWICE, FOR TWO UNRELATED REASONS — THE PREDICTION NAMED THIS AS THE THING MOST
+LIKELY TO BE WRONG, AND IT WAS WRONG TWICE OVER.** The planning estimate was 11. It measured 10, because
+one of the eleven had already been repaired as part of an unrelated row in the same increment. Then
+**widening the extension class from six characters to seven surfaced three more** — `.env.example` was
+invisible to the extractor because `example` is seven letters, and with it went every dotfile citation in
+the corpus. A cap chosen to prevent one false-positive class was silently causing a false-negative class.
+
+### ⚠️ Five traps measured while building it, each of which produced a wrong answer first
+
+1. **PCRE's newline class matches byte `0x85`, which occurs INSIDE UTF-8 emoji** (`✅` is `E2 9C 85`).
+   Lines are split with `explode()`. This corpus is saturated with them.
+2. **The extension class must start with a letter**, or WCAG contrast ratios (`4.5:1`) parse as citations.
+3. **The pattern delimiter cannot be a tilde**, because the fence predicate must match a tilde fence.
+4. **A bare basename must prefer the repository root**, or `README.md` is ambiguous against the
+   design-system package's own and the three dead citations resolve to nothing — a clean run by accident.
+5. **The extension cap, above.** Traps 2 and 5 are the same knob in opposite directions.
+
+### The controls — and why `mutate.php` could not run them
+
+⛔ **It would have reported a false SURVIVED.** Its verdict comes solely from parsing Pest's `Tests:`
+summary line, which a standalone CLI gate never emits, so `$failed` stays 0 whatever the gate did. Its
+five disciplines were reimplemented at the call site.
+
+| Control | Verdict |
+|---|---|
+| **C1** re-introduce the dead Fortify citation this increment repaired | RED — named tier 1, the document, the citation and `BLANK` |
+| **C2a** raise the document floor | RED as a discovery regression, **and proven NOT to print the citation-remedy footer** |
+| **C2b** break the extraction pattern **silently, not fatally** | RED on the **citation floor** rather than reporting a clean scan |
+| **C3** ratchet the ceiling below the measured count | RED with the ledger message, not tier 1's |
+
+⚠️ **C2b was rewritten before it was run.** The first draft renamed the pattern constant, which would have
+fataled on an undefined constant — and `php -l` does not catch that. **A control that fatals proves the
+gate refused to run, not that it caught anything**, which is M32's recorded lesson arriving in a new place.
+C1's mutation and its byte-compared restoration are committed.
+
+### How the prediction fared
+
+| Predicted | Outcome |
+|---|---|
+| Pint moves by exactly **one** file | ✅ **1423 against a baseline of 1422.** Proven live first with a deliberate probe. |
+| PHPStan cannot move | ✅ Structural — it scans `app`, `database`, `routes`; the only `app/` change is a docblock. Stated rather than quoted. |
+| Pest unmoved, with the docs-reading contract test the one risk | ✅ 53 passed / 200 assertions locally; the queue-order literal was verified untouched before and after every splice. |
+| Vitest, axe, E2E, contract unmoved | ✅ No `.vue`, no `.ts`, no route, no schema. |
+| The new baseline row resolves rather than reading `NOT FOUND` | ✅ Pattern proven against the real success line before the run. |
+| ⚠️ **Most expected to be wrong: the tier-1 count** | ⛔ **Wrong, twice, for two unrelated reasons.** Named correctly in advance; the *reasons* were not foreseen. |
+
+**Six lint gate lines now print in `preflight --with-gates`**, and the five pre-existing ones are unmoved.
+
+**Six jobs, step counts parsed individually — Static analysis 21 · E2E 20 · Contract 16 · Frontend 12 · axe 11 · Pest 11. Not one `steps: []`.** ⚠️ **Static analysis is 21 where every prior release recorded 20, and that +1 is the point:** it is the new gate's own step, so the step count is itself the evidence that the registration took. A sixth gate registered in `composer.json` alone would have moved nothing, because no CI job runs the `quality` aggregate.
+
+### ➕ Filed rather than silently left — six
+
+1. **`major`** · The data dictionary states a `uuidv7()` **database-side default** on thirty table rows
+   and no migration sets one. The preamble conditions it on PostgreSQL 18+; the thirty column rows do not.
+   Same class as the `audits` CHECK row, one order of magnitude larger.
+2. **`major`** · The README prescribes the axe suite in the **musl** node service, which `CLAUDE.md`'s own
+   gate table records as impossible, and with no server for `test-storybook --url` to point at.
+3. **`minor`** · Share-slug **lookup** is case-sensitive while storage is lowercase-only, so a mixed-case
+   share URL 404s. A runtime defect, found from the opposite end of ADR-0001's `citext` retraction.
+4. **`minor`** · The audit spec credits `submission` with two events emitted nowhere. **Not fixed on
+   purpose:** narrowing a compliance spec's audited-event list has retention and SIEM consequences, and
+   the right answer may be "build them".
+5. **`minor`** · The dictionary names 9 of 45 declared constraints while enumerating them exhaustively in
+   places — a census, not a sweep.
+6. **`minor`** · The gate's own two limits: it cannot see a behaviour negative, and its ledger ceiling
+   counts deliberately-preserved dead citations inside closed rows, so it can never ratchet to zero.
+
+### ORIGINAL CLAIM (`M46`)
 
 Taken 2026-08-29. Branch `m46-citation-truth-and-liveness-gate`, cut from `origin/main` at `6c3e8e5`, PR into
 `main`. Row: the eight open `major` rows under `### Documentation & specs` in `docs/feature-backlog.md` —

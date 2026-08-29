@@ -2810,9 +2810,65 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   loop forever — `GamificationBackfill.php:245` returns a null cursor when `count($rows) < $limit` is false,
   which `0 < 0` makes it, so the chain terminates. Of the three payload fields, only `tenantId` and
   `afterAuditId` carry real uncovered risk.
-- **`major` · Four maintenance fan-outs are asserted by a fixture too small to see a wrong tenant id.**
-  `SweepWebhookRetriesJob.php:26` · `SweepScheduledFormsJob.php:30` · `RollUpUsageCountersJob.php:27` ·
-  `ReapExpiredDraftsJob.php:25`. **Filed by M32 (2026-08-28), which fixed the other two of the six and
+- ~~**`major` · Four maintenance fan-outs are asserted by a fixture too small to see a wrong tenant id.**~~
+  ✅ **DONE — M44 (2026-08-29).** Two new cases per file, **eight in total, and no existing case or
+  `beforeEach` was modified**: the second tenant lives inside each new case only. Widening the shared
+  fixture would have left every existing case draining just the first of two children and **still
+  passing** — because `lazyById()` enumerates by UUIDv7, i.e. creation order, so the child that gets
+  worked is always the first tenant's. That is the M31 hazard producing a green suite with its new
+  coverage silently deleted, and it is why the row's own warning was followed to the letter.
+  **PROVEN BY MUTATION IN BOTH DIRECTIONS, ON THE COMMIT THAT PRECEDED THE TESTS.** The hoist
+  (`$first ??= $tenant;` — silent, and the dispatch count unchanged) read **SURVIVED ×4** before and
+  **CAUGHT ×4** after, each time reddening exactly the two new cases and leaving all fourteen existing
+  ones green. ⚠️ The BEFORE result is a **proof rather than a measurement** and is reported as one: with
+  one active tenant the mutant is *semantically identical* to the original, so it cannot fail. Its value
+  is narrower — it proves the token matched, the sha256 moved, the mutant parsed and the harness ran.
+  ⛔ **`->first()` ON `activeTenants()` WOULD HAVE FATALLED** — it returns a `Generator` — and M32 already
+  paid for that: *a control that dies loudly proves nothing about a silent defect*. `iterator_to_array()`
+  is unsafe here too, since `yield from` over a chunked `LazyCollection` can repeat keys and collapse
+  entries.
+  ⛔ **THE TRIAGE'S REMEDY CLAIM WAS FALSE, AND CHECKING IT CHANGED THE BUILD.** `docs/backlog-triage.md`
+  said `M32` fixed the sibling *"in exactly the prescribed shape (a drain loop plus a second tenant)"*.
+  `M32` added a **`Bus::fake` set-equality case only**; the drain loop in that file is **`M6`'s**, predates
+  it, and dispatches the **child** directly so it never reaches the parent's loop at all. Two unrelated
+  mechanisms in one file were read as one.
+  ⛔ **AND THE ROW'S PRESCRIBED REMEDY IS BLIND ON ONE OF THE FOUR FILES.** `WebhookRetrySweeper` writes
+  **no rows**, so under the hoist acme is swept twice and re-dispatches its own due delivery both times:
+  the queue depth is **2**, numerically identical to two tenants swept once. A drain loop plus a count is
+  not enough there — `WebhookRetrySweepTest` asserts **per-delivery payload containment** instead, so
+  each due delivery must have been enqueued exactly once.
+  **The drain helpers are now bounded loops with the child count ASSERTED rather than inferred**
+  (`$activeTenants = 1` by default, so all fourteen existing call sites are unchanged). Proven
+  load-bearing rather than decorative: reverting one loop to the pre-M44 single-child drain reddens
+  **only** the two-tenant case.
+
+- **`minor` · Two `WebhookRetrySweepTest` cases were passing for a reason unrelated to their names.**
+  **Found and FIXED by M44 (2026-08-29) while taking the row above** — filed here because it is a
+  *separate* defect from the tenant-width one and would otherwise be invisible to any later search.
+  Measured, not reasoned about: replacing `SweepWebhookRetriesJob::sweep()`'s body with a comment — a
+  sweep that dispatches **nothing at all** — left **two of the file's three cases green**, because both
+  assert `webhookQueueDepth() === 0` and a dead sweep produces exactly that. They proved nothing about
+  the sweep. ⚠️ **`mutate.php` reported `CAUGHT` throughout, which is correct and is the trap**: one case
+  did redden, so the aggregate verdict is green-lit while the vacuity is visible *only* in the printed
+  RED list. **Read the red set, never just the verdict.** The asserted fan-out count fixes it as a side
+  effect — the same mutation now reddens **5 of 5**.
+
+- **`minor` · Every `MaintenanceJob` fan-out is proved one file at a time, so a future one inherits no
+  coverage.** **Deliberately not built by M44 (2026-08-29)** — filed the moment it was decided. After
+  M44 all five fan-outs carry an identically-named `Bus::fake` case, which is exactly the duplication a
+  structural gate should own: one test could iterate the `MaintenanceJob` subclasses and assert the
+  dispatched-`tenantId` multiset equals the active-tenant set. ⛔ **Two things block the naive form, both
+  verified rather than assumed:** a generic loop would invoke `VerifyCustomDomainsJob::handle()`, which
+  does real DNS work inline, and `PruneFailedJobsJob::handle()`, which works inline on `failed_jobs` —
+  neither fans out. Avoiding them needs a declared fan-out/inline split, and that registry drifts unless
+  it is itself set-equality-checked against the concrete subclasses. Left because the row M44 closed was
+  already four files wide and `tests/Feature/Queue/JobContractTest.php` is a shared artefact.
+
+  **THE ROW AS FILED FOLLOWS, KEPT VERBATIM RATHER THAN DELETED** — its reasoning is what made the build
+  correct, including the two places it was wrong, and a closed row that discards its own argument teaches
+  nothing to the next reader.
+  ~~`SweepWebhookRetriesJob.php:26` · `SweepScheduledFormsJob.php:30` · `RollUpUsageCountersJob.php:27` ·
+  `ReapExpiredDraftsJob.php:25`.~~ **Filed by M32 (2026-08-28), which fixed the other two of the six and
   deliberately did not fix these** — a different failure mode needing a different fix, and a user decision of
   record that it be its own row.
   ⛔ **THIS CORRECTS A HAND-OFF THAT SAID THESE WERE CHECKED AND CLEARED.** They were checked as *production

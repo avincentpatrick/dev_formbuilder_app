@@ -39,13 +39,14 @@ $verbose = isset($opts['verbose']);
 const TRACKER = 'PROGRESS.md';
 const ARCHIVE = 'PROGRESS_ARCHIVE.md';
 
-// The ceiling is a RATCHET, and the surgery has now turned it down once: 1,500,000 -> 600,000, with
-// the tracker at ~514 KB. It is deliberately NOT set to the current size — a ceiling with no
+// The ceiling is a RATCHET and it has now been turned down twice: 1,500,000 -> 600,000 by the
+// Current Status surgery, and 600,000 -> 400,000 by the claim-ledger surgery that took Standing
+// Rules from 208 KB to 46 KB. It is deliberately NOT set to the current size — a ceiling with no
 // headroom reddens on the next ordinary close-out — and deliberately not to the plan's ~40 KB
-// target, which is unreachable while Standing Rules (207 KB) and Next Session (226 KB) remain in
-// this file. The headroom is printed on every run so a stale ceiling is visible rather than
-// inferred, and the next increment to move either of those sections turns it down again.
-const TRACKER_BYTE_CEILING = 600000;
+// target, which is unreachable while Next Session (214 KB, and now 62% of this file) remains in it.
+// The headroom is printed on every run so a stale ceiling is visible rather than inferred, and the
+// increment that moves Next Session turns this down again.
+const TRACKER_BYTE_CEILING = 400000;
 
 // A drop larger than this needs an explicit marker in the commit message. The incident was 1,086.
 const DROP_LIMIT = 200;

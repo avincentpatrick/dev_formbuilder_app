@@ -16,84 +16,146 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — the `[tracker-surgery]` marker becomes armable, and R7 stops being blind to bytes (`m47-surgery-marker-armable`)
+## Status: NO ACTIVE CLAIM — `M47` is merged and the lane holds nothing forward
 
-Taken 2026-08-29. Branch `m47-surgery-marker-armable`, cut from `origin/main` at `dbeb6ff`, PR into `main`.
-Row: `docs/feature-backlog.md` § *The tracker and its gates* — **`major` · "The `[tracker-surgery]` marker
-cannot survive a squash merge in any form both gates accept, so `R7` is unarmable on the trunk"**, filed by
-`M45` and measured on its own merged commit.
+**`M47` is merged.** Lane A holds no active row and pre-claims no forward number. The next row is taken
+under Rule 7(f), and the claim is written here and **pushed** before the first file is opened.
 
-### Evidence verified
+⛔ **RUN `php scripts/state.php` FOR EVERY NUMBER.** Increment, ADR, migration prefix, exceptions-log
+entry, open rows, open decisions, and how far behind the trunk `docs/gate-baselines.md` has fallen.
+Nothing in this file or in `PROGRESS.md` is the authority for any of them any more.
 
-Four citations, opened individually against the merged tree rather than read as a set.
+✅ **`CLAUDE.md` IS THE IMPERATIVE LAYER AND IS AUTO-LOADED.** Read it before this file. It carries no
+numbers at all, and `tracker-lint` R8 keeps it that way.
 
-| Citation | Verdict |
+✅ **THE `[tracker-surgery]` INSTRUCTION IS NOW FOLLOWABLE — `M47` CLOSED IT.** R7 accepts the marker
+behind exactly one `* `, `- ` or `+ `, which is the shape a default squash produces, and an indented or
+mid-sentence mention still cannot arm it. **Still pass an explicit `--body` whose first content line is
+the marker** — belt and braces, and `CLAUDE.md` says so under *Merging*. ⛔ **Never the PR title:**
+`state.php`'s merged-title cross-check anchors on the increment-number prefix and would stop seeing that
+pull request entirely.
+
+⛔ **AND `M47` ADDS THE ONE THE NEXT SURGERY NEEDS: `R7` NOW FAILS ON BYTES AS WELL AS LINES.**
+`DROP_BYTE_LIMIT` is 50,000, sized from all 394 commits that have ever touched `PROGRESS.md`. The next
+filed surgery — `## Next Session`, re-measured at 242,873 bytes — is nearly five times over it and
+**owes the end-to-end proof `M47` could not give**: no real GitHub squash has yet been observed arming
+the relaxed marker. Read the post-merge run on `main`, not the PR run.
+
+⚠️ **AND ONE ABOUT METHOD, WHICH IS THE HALF WORTH KEEPING.** A gate you have just written is proved by
+a deliberate red and by nothing else — but so is a gate you have just *inherited*. `M47` found R7 had
+never fired by replaying it against a real past surgery rather than by reading it. **Replay an existing
+gate against the event it was built for before trusting it.**
+
+---
+
+## RELEASED — `M47`, the surgery marker becomes armable and R7 stops being blind to bytes (merged as PR #237, `8555ae1`, 6/6 green)
+
+⛔ **THE SHARPEST FINDING IS THAT THE GATE HAD NEVER FIRED ONCE, AND THE PROOF IS A RECORDING RATHER
+THAN AN ARGUMENT.** The shipped `tracker-lint` was run in a detached worktree at `1f966a4` — M45's own
+merge, the largest surgery since the incident this gate exists for — and printed
+`R7 delta — PROGRESS.md line delta is -133 (583 to 450)`. **The ordinary branch.** A 161,528-byte
+removal of the constitution, declared twice in the trunk message, classified as a routine edit. Every
+claimed file was edited; the claim was not extended. **Namespaces spent: NOTHING** — `ADR-0022` stays
+free, `0010` stays reserved, the migration prefix is untouched. ⚠️ **The consecutive-increment count
+every previous release quotes here is deliberately omitted**: it is a number read out of prose, which
+is the class `state.php` exists to end.
+
+### ⛔ THE ROW UNDERSTATED ITSELF, AND THE FOOTNOTE WAS THE LARGER DEFECT
+
+The row is about the marker. It mentions the line threshold once, in passing, to explain why R7 stayed
+green on M45 — *"its drop was 133 lines against `DROP_LIMIT`'s 200"* — and moves on. That sentence is a
+**second, independent way the gate cannot fire**, and it is the one that reaches the next surgery.
+
+Measured across **every** commit that has ever touched `PROGRESS.md` on `origin/main` — 394
+parent/child pairs, blob sizes from `git cat-file`, not from `numstat`:
+
+| | bytes dropped |
 |---|---|
-| `scripts/tracker-lint.php:201` — "R7 matches `/^\[tracker-surgery\]/m`" | **MOVED BY ONE.** `:201` is the `exec()` that reads the range; the predicate is `:202`. The claim is true of the file, false of the line. |
-| `scripts/state.php:249` — anchors merged PR titles on `^M(\d{1,3}):` | **HELD EXACTLY**, character for character. |
-| PR #235 / `1f966a4` — the default squash body renders `* [tracker-surgery] M45 phase 1: …` | **HELD**, read from the trunk commit itself. |
-| `DROP_LIMIT` is 200 and `M45`'s drop was 133 | **HELD.** `PROGRESS.md` 583 → 450 lines at `1f966a4`. |
+| surgeries | 938,007 · **670,409 (the incident)** · 307,867 · 272,006 · **161,528 (M45)** |
+| ordinary | **14,340** · 6,486 · 6,130 · 4,114 · … |
 
-⛔ **THE HEADLINE IS PROVEN, NOT INFERRED — BOTH PREDICATES RUN AGAINST THE REAL TRUNK BYTES OF
-`git log --format=%B 1f966a4~1..1f966a4`:** the shipped `/^\[tracker-surgery\]/m` returns **NO MATCH**;
-`/^(?:[*+-] )?\[tracker-surgery\]/m` returns **MATCH**. R7 was unarmed on a surgery whose commits each
-carried the marker at line start.
+**Bimodal, with an order of magnitude between the halves and nothing in it.** `DROP_BYTE_LIMIT` is
+50,000: 3.5× above the largest ordinary drop, 3.2× below the smallest surgery. ⚠️ **The threshold was
+sized from that distribution and not from intuition**, and the direction to watch is stated in the
+constant's comment — the ordinary half growing, because that 14,340 was **one generated hand-off line**.
 
-⚠️ **THE ROW UNDERSTATES ITSELF, AND THE SECOND DEFECT IS THE LARGER ONE.** It treats the byte-blindness
-as a footnote — *"`M45` was unaffected only because its drop was 133 against `DROP_LIMIT`'s 200"* — but that
-is a second, independent way R7 fails to fire, and it is the one that reaches the next surgery. Measured
-across **every** commit touching `PROGRESS.md` on `origin/main` (394 parent/child pairs, blob sizes from
-`git cat-file`), the distribution is bimodal with an order-of-magnitude gap:
+### ⚠️ AND THE CANONICAL "1,086" IS NOT THIS GATE'S ARITHMETIC
 
-| commit | bytes dropped | net lines | what |
-|---|---|---|---|
-| `9fa0719` | 938,007 | 1,573 | the Current Status surgery |
-| `f565ac9` | **670,409** | **1,085** | **the incident of 2026-08-16** |
-| `31a93fd` | 307,867 | — | Phase 0 restructure, 2026-07-04 |
-| `dd044a9` | 272,006 | — | docs restructure, 2026-07-13 |
-| `1f966a4` | 161,528 | **133** | **`M45` — under the line limit, invisible to R7** |
-| `58abcd4` | 14,340 | 3 | **an ordinary close-out** — one long hand-off line replaced |
-| everything else | ≤ 6,486 | — | ordinary |
+R7 computes a **net** drop. To R7 the incident is **1,085** and M45 is **133**; the extra line in each
+case is one the commit added. The constant's own comment had justified the limit with a number the gate
+does not compute. Both figures now sit beside it. Small, and the same shape as everything else here.
 
-⚠️ **AND THE CANONICAL "1,086" IS A `numstat` DELETION COUNT, NOT R7's ARITHMETIC.** R7 measures a *net*
-drop, so the incident is **1,085** to this gate and `M45` is **133** rather than 134. Both are recorded
-here because the constant's own comment says *"The incident was 1,086"*, and a gate whose threshold is
-justified by a number it does not itself compute is a small version of the defect this row is about.
+### ✅ TEN POSITIVE CONTROLS, AND THE PAIRING IS WHAT MAKES THEM WORTH ANYTHING
 
-### Remedy verdict
+M43's lesson applied deliberately: a structural gate can be fully green and entirely decorative, so each
+half was removed and the run watched.
 
-The row prescribes two things and offers a third. **The first is necessary and insufficient, the second is
-correct, and a fourth is missing.**
+| control | result |
+|---|---|
+| new gate replayed at `1f966a4` | **DECLARED SURGERY**, 161,528 bytes |
+| …marker predicate reverted to bare line start | **RED** |
+| …byte limit raised past the drop | falls **silently** to the ordinary branch |
+| synthetic overrun, marker mid-sentence | **FAIL** — the hole M40 closed stays shut |
+| …marker indented two spaces | **FAIL** — no `\s*` leaked in |
+| …marker at bare line start | **PASS** — no regression |
+| …marker behind `* ` and behind `- ` | **PASS** — the squash shape |
+| 50,001 bytes in 125 lines, undeclared | **FAIL** |
+| 49,994 bytes in 67 lines, undeclared | **PASS** |
 
-1. *"Pass an explicit `--body` whose first content line is the marker"* — **works, and does not close the
-   case.** A merge done through the web UI, or by anyone who does not read the instruction, still produces
-   the bullet form. The row itself calls the existing empty-`--body` rule *"necessary and not sufficient"*
-   and this has the same shape.
-2. *"Consider relaxing `R7` to accept the marker after a leading `* ` or `- `"* — **correct, and it is the
-   half that actually arms the gate.** Taken, constrained to exactly one bullet character and exactly one
-   space with **no leading whitespace**, so the mid-sentence-mention hole the original comment defends
-   stays shut.
-3. *"Or put it in the PR title"*, still in R7's own failure message — **actively wrong, and it breaks a
-   second gate.** `state.php:249` anchors on `^M(\d{1,3}):`, so a marker prefix silently drops that PR out
-   of the independent increment cross-check. Being deleted, with the reason named in both files.
-4. **NOT PRESCRIBED ANYWHERE: a byte threshold.** Without it R7 cannot see the next filed surgery either.
+The last two pin the threshold **at the boundary**, six bytes apart, so it is a threshold rather than a
+number that happens to be exceeded.
 
-Files: `scripts/tracker-lint.php`, `scripts/state.php` (comment only), `CLAUDE.md`, `PROGRESS.md`
-(Standing Rules + own status block + own hand-off line), `docs/feature-backlog.md`, `docs/claims/lane-a.md`,
-`docs/gate-baselines.md` (regenerated at close-out).
-Shared artefacts taken: `CLAUDE.md`, `PROGRESS.md`, `docs/feature-backlog.md`, `docs/gate-baselines.md`.
-Paired files taken: none.
-Namespaces spent: **nothing from either namespace** — no ADR, no migration prefix, no exceptions entry.
-`ADR-0022` stays free and `0010` stays reserved.
+### ⛔ `mutate.php` COULD NOT DRIVE THIS, AND NEITHER WOULD THE FIX FILED FOR IT
 
-Prediction: `tracker-lint` R7 is the only gate this diff can move, and it moves in the *message* rather
-than the verdict — a green run proves nothing, so six positive controls carry the proof, three of them
-replayed against the real bytes of `1f966a4` rather than a fixture. PHPStan cannot move: it scans `app`,
-`database` and `routes`, and this diff touches none of them. Pint runs bare on the host because the diff is
-`scripts/`. **The one I most expect to be wrong is the byte threshold, in the direction of being too low** —
-the 14,340-byte ordinary drop came from replacing a single very long generated hand-off line, and that line
-can grow. Second most likely: the historical replay at `1f966a4` fails for an unrelated rule and I read an
-aggregate exit code instead of R7's own line.
+The open `minor` row proposes a `--command=` mode. **It would not have reached R7 either**: R7's input
+is the **commit graph** — blob sizes at `HEAD~1` and a declaration read out of `git log --format=%B`.
+No amount of file mutation touches it. What it needs is a *history* fixture — a detached worktree at a
+chosen ref, a synthetic commit, the message amended per case. Built by hand, thrown away with the
+worktree, and filed as a refinement: that row is right in scope and one size too small in shape.
+
+### ⛔ THE GATE'S OWN ADVICE WAS BREAKING A SECOND GATE
+
+R7's failure message said *"or put it in the PR title"*. `remote_highest()` in `scripts/state.php`
+anchors merged titles on the increment-number prefix for the independent cross-check that prevents a
+numbering collision — so following R7's advice would have made that pull request invisible to it, and
+**the failure mode of an invisible spend is a lower maximum rather than an error.** Deleted, and the
+reason written into both files in both directions. The row's diagnosis — *"the two gates want
+incompatible first characters on the same string, and nothing in either file mentions the other"* —
+was exactly right.
+
+### ➕ THE M46 CITATION GATE FIRED ON THIS DIFF, ON THIS ROW'S OWN CITATION
+
+Adding the docblock to `state.php` pushed line 249 into a comment; the ledger tier went 19 → 20 and
+went red. **A gate built one increment ago catching the increment that edits the file it cites is the
+strongest evidence available that it works** — and it was caught locally, before the push. The citation
+now names `remote_highest()`, which is what `CLAUDE.md` already prescribes.
+
+### ⚠️ AND ONE FIGURE OF MY OWN WENT STALE INSIDE THE COMMIT THAT WROTE IT
+
+The `## Next Session` residual first stated the section size **and** the whole-file size. The Standing
+Rule 8 paragraph added in the same commit moved `PROGRESS.md` from 353,875 to 356,365, so the second
+figure was wrong before it was pushed. **M40 recorded this exact shape** — its attribution table cited
+line numbers and its own splice moved every one. Fixed by dropping the figure rather than correcting
+it: the section size is what the next taker plans against, and `tracker-lint` prints the whole-file
+size on every run.
+
+### ⛔ WHAT IS NOT PROVEN, STATED RATHER THAN DISCOVERED
+
+**No real GitHub squash was exercised.** M47's own drop is far under both limits, so a green R7 on this
+merge is the vacuous-success family — the very thing this increment exists to end. The end-to-end proof
+is **owed by the increment that moves `## Next Session`**, which is re-measured at 242,873 bytes and is
+now over the byte limit by nearly five times. That row says so, and says to read the post-merge run on
+`main` rather than the PR run.
+
+### How the prediction fared
+
+**The one named as most likely wrong — the 50,000 threshold being too low — was not exercised**, which
+is not the same as being right: nothing in this increment's diff came near it, and the boundary controls
+prove only that the constant does what it says. It stays the thing to watch. **The second prediction was
+wrong in a useful direction**: the replay at `1f966a4` did not fail for an unrelated rule, so reading
+R7's own line rather than the exit code turned out to be unnecessary caution — the whole run was green
+there, which is itself the finding. **Unpredicted:** the citation gate reddening on my own edit, and a
+residual figure invalidating itself inside its own commit.
 
 ---
 

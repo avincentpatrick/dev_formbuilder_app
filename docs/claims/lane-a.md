@@ -16,21 +16,98 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M44` is merged and the lane holds nothing forward
+## Status: ACTIVE CLAIM — `M45`, the claim ledger leaves the constitution (`m45-ledger-surgery`)
 
-**`M44` is merged (PR #234, `7837078`, 6/6 green).** Lane A holds no active row and pre-claims no forward
-number. The next row is taken under Rule 7(f), and the claim is written here and **pushed** before the
-first file is opened.
+**Taken 2026-08-29.** Branch `m45-ledger-surgery`, cut from `origin/main` at `e89c4c3`, PR into `main`.
+**Second tracker surgery**, and `M41` is the precedent it is built on rather than a thing it repeats.
 
-⛔ **RUN `php scripts/state.php` FOR EVERY NUMBER.** Increment, ADR, migration prefix, exceptions-log
-entry, open rows, open decisions, and how far behind the trunk `docs/gate-baselines.md` has fallen.
-Nothing in this file or in `PROGRESS.md` is the authority for any of them any more.
+**Row:** `docs/feature-backlog.md`'s last `major` — *"Standing Rule 7(g) contains a 163,680-byte claim
+ledger that duplicates `docs/claims/lane-*.md`, and it is why the constitution cannot be read in one
+call."* Filed by `M42`, which deliberately did not take it; the decision to take it as its own
+increment was the user's, 2026-08-29. Closing it advances `D5`, whose bar is zero open `major` rows.
 
-✅ **`CLAUDE.md` IS THE IMPERATIVE LAYER AND IS AUTO-LOADED.** Read it before this file. It carries no
-numbers at all, and `tracker-lint` R8 keeps it that way.
+⛔ **RUN `php scripts/state.php` FOR EVERY NUMBER.** Nothing in this file or in `PROGRESS.md` is the
+authority for any of them. ✅ **`CLAUDE.md` is the imperative layer and is auto-loaded** — read it
+before this file.
 
-⛔ **A REMOVAL OF MORE THAN 200 LINES FROM `PROGRESS.md` NEEDS `[tracker-surgery]` AT THE START OF A
-LINE IN THE COMMIT MESSAGE.** Mentioning it mid-sentence deliberately does not count.
+### Evidence verified
+
+Every citation opened against the merged tree at `e89c4c3`, and the row's own boundary re-measured
+rather than taken:
+
+| The row states | Measured | Verdict |
+|---|---|---|
+| the ledger is **163,680 bytes** at lines **123–259** | lines **126–259 = 162,601 bytes**; `:123`–`:125` are three **live imperatives** (the ADR-number-is-not-written-here fix, the `0010`-is-reserved trap, cite-by-filename) | **held in substance, boundary off by three lines and 1,650 bytes** — the file has grown since filing |
+| Rule 7 is **196,596** of Standing Rules' **207,468** | Rule 7 (`:34`–`:260`) = **197,167** of **208,039** | held |
+| the block carries **zero imperatives** | **FALSE in one respect.** `:161`, `:223`, `:244` and `:252` carry **`DO NOT RE-ASK` user decisions of record** — M9's three SSO-adoption decisions (2026-08-24), leaderboard visibility, the ⌘K stacking behaviour and checklist dismissibility (2026-08-17 ×3) | **the row understates what is in the block** |
+| it **"duplicates `docs/claims/lane-*.md`"** | **FALSE, and it inverts the remedy.** `docs/claims/` holds `## RELEASED` headings for **M15–M44 only**; the block covers **M1–M14** plus the J/K/P/I-series. The split is exact and the overlap is **zero** — and **0 of its 129 non-blank lines** appear verbatim in `PROGRESS_ARCHIVE.md` either | **the block is the ONLY copy** |
+
+### Remedy verdict
+
+⛔ **THE ROW'S PREMISE IS ITS REMEDY, AND THE PREMISE IS FALSE — SO THE OBVIOUS ACTION IS THE WRONG
+ONE.** *"The second copy of a record that already has a home"* invites a deletion. There is no second
+copy: deleting the block destroys the only record of every claim before `M15`.
+
+⛔ **AND IT CANNOT GO WHERE THE ROW POINTS.** The block carries **both** lanes' claims — 🅰️ and 🅱️
+bullets interleaved — and Lane A may never write `lane-b.md`. One writer per claim file is the rule
+that makes a claim conflict structurally impossible, so the destination the row names is closed by the
+rule the row is filed under. **`PROGRESS_ARCHIVE.md` is the only structurally legal home**, and it is
+`M41`'s precedent besides.
+
+**Eighth row in nine whose evidence is sound and whose prescribed remedy is not.**
+
+⚠️ **A COUNTED MULTISET IS LOAD-BEARING HERE AND A SET WOULD NOT BE:** the 134 moved lines yield
+**130 distinct sha256s** — five blank lines share one hash — so a set equality passes while silently
+dropping four lines.
+
+⚠️ **AND R7 CANNOT FIRE ON THIS SURGERY.** `DROP_LIMIT` is **200 lines** with a strict `>`; this drops
+**134**. The marker is carried because the row demands it, but the gate that exists to enforce it is
+silent at this size, and `CLAUDE.md`'s own two-hundred-line threshold does not reach this diff either.
+**A green R7 is not evidence that anything was declared** — it never looked. The controls therefore
+target the rules that *can* fire: R3, R1 and R5.
+
+⛔ **NO `M41` TOOLING SURVIVES.** Its surgery commit (`be875b1`, PR #231) touched three files and
+committed no harness; `git log --diff-filter=D -- scripts/` is empty. The specification is reusable,
+the script is not. **And `M41`'s third assertion is not reusable verbatim** — it asserted Standing
+Rules byte-identical, which this increment is deliberately mutating; the equivalent here is *Standing
+Rules minus the moved slice is byte-identical*.
+
+### The operation
+
+`PROGRESS.md` lines **126–259** inclusive — 134 lines, **162,601 bytes**, slice sha256 `c1a525e7…` —
+move verbatim to `PROGRESS_ARCHIVE.md` under a new final heading, and one pointer bullet takes their
+place. **Line 260 (blank) stays**: it is 7(g)'s separator from Rule 8, and `M41`'s fourth proof failed
+on exactly that class of off-by-one blank line. Two commits, **archive first then tracker**, so git can
+prove the move independently of the script's arithmetic.
+
+Files: `PROGRESS.md` · `PROGRESS_ARCHIVE.md` · `scripts/tracker-lint.php` (constants only) ·
+`docs/feature-backlog.md` · `docs/gate-baselines.md` · this file.
+Shared artefacts taken: `PROGRESS.md` (own status block and Rule 7(g) only), `PROGRESS_ARCHIVE.md`,
+`docs/feature-backlog.md`, `docs/gate-baselines.md`.
+Paired files taken: **none**.
+Namespaces spent: **nothing from either namespace** — no ADR, no migration prefix, no `§D`.
+Twenty-first consecutive.
+
+### Prediction
+
+No code, no test, no `.vue`, no `app/`, `database/`, `routes/`, `tests/`, `resources/` or `packages/`
+file. **Pest, Vitest, Storybook axe and E2E must all be unchanged**; **PHPStan cannot move** and saying
+so beats quoting an unchanged number. Pint's file count moves only if a file is added, and none is.
+`Static analysis` stays at its current step count — the constants change inside the already-registered
+`tracker-lint` step.
+
+Measured before the first byte moves, so a miss is visible: `PROGRESS.md` **508,441 → ~346,600**;
+`preflight`'s *total lines* **583 → 449**; `## Standing Rules` **208,039 → ~45,500**;
+`PROGRESS_ARCHIVE.md` **2,090,997 → ~2,253,700**. `state.php`'s advisory literal count for
+`PROGRESS.md` drops sharply — **16 of its 21 `next free` lines live inside the moved block** — which
+is a reported number, never a gated one, and is predicted here so the drop is not read as a defect.
+
+⚠️ **THE ONE I MOST EXPECT TO BE WRONG: byte conservation, again, and for a different seam than
+`M41`'s.** That increment appended to a file whose tail it was joining; this one **also cuts a hole in
+the middle of `PROGRESS.md` and stitches a pointer into it**, so there are *two* seams, not one, and
+the pointer's own byte count enters the identity. A tolerance would absorb either. The formula is
+stated as integers computed from the literal inserted strings, and if it disagrees the arithmetic is
+re-derived rather than fudged.
 
 ---
 

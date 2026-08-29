@@ -1408,6 +1408,30 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   that path), which is precisely the shape that stops being true after an unrelated change. Not a live
   defect; a live blind spot. M12's own seven refusal cases all assert the message.
 
+- **`minor` · Every object-valued answer that the piping layer excludes renders as `json_encode` machine
+  noise on the inbox, the export and the PDF — because those three surfaces have no exclusion and no
+  display arm.** ⛔ **FOUND BY `M48` INSIDE THE `## Next Session` BLOCK IT WAS ARCHIVING, RECORDED THERE
+  SINCE `G6` AND FILED NOWHERE ELSE** — the J4b1 shape, and it would have become invisible to a *file*
+  search the moment that block moved. `SchemaValueFormatter::displayValue()` has arms for `YesNo`, for geo
+  (`formatGeo()`) and for option-bearing choice types; everything else falls to `scalar()`, which is
+  `is_scalar($value) ? $value : (string) json_encode($value)`. `FieldType::isMedia()` exists and this class
+  never calls it.
+  ⚠️ **THE RECORD SAID "MEDIA"; THE MEASUREMENT SAYS SEVEN FIELD TYPES.** `App\Enums\PipingEligibility`
+  excludes exactly two object-valued families for exactly this reason, in its own words — matrix/likert
+  *"would reach displayValue()'s is_array branch and json_encode each row into the middle of a question"*,
+  and the attachment envelopes *"would fall through to its json_encode scalar fallback and render machine
+  noise into a question"*. So `FileUpload`, `ImageCapture`, `AudioCapture`, `VideoCapture`, `Signature`,
+  `Matrix` and `LikertMatrix` all reach the fallback. Geo does not — it has an arm.
+  ⛔ **THE PIPING LAYER IS THE ONLY CALLER THAT IS SAFE, AND IT IS SAFE BY EXCLUSION RATHER THAN BY
+  RENDERING.** Four call sites reach `displayValue()`: `TemplateRenderer` (guarded by `PipingEligibility`),
+  and `SubmissionInboxPresenter`, `SubmissionRowProjector` (the streamed CSV/XLSX) and
+  `SubmissionPdfPresenter` — **none of which consults `PipingEligibility` or any equivalent**. A tenant
+  reviewing a photo answer, exporting it, or printing it gets a JSON blob where a filename belongs.
+  **Pinned by no test.** ⚠️ **The remedy is a display arm, not an exclusion** — a submission export may not
+  simply omit an answered question the way a template may decline to pipe one — so it is a decision about
+  what a media cell *says* (filename? count? a signed link?), which is why this is filed rather than fixed.
+  Cited by symbol throughout, deliberately: the anchors here have moved once already. **Live.**
+
 ### Gamification
 
 - ✅ **CLOSED BY `M24` (2026-08-26, straight to `main` as `be55d16` + `d1d1d72`, no PR, CI 6/6) — `major` · ~~The backfill awards review points for two

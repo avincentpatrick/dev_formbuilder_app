@@ -22,11 +22,23 @@ use App\Support\Connectors\ListsChannels;
  * manual channel id). So a failure returns `error` beside an empty list rather than a 5xx, which would make the
  * sidecar's client discard the reason along with the response.
  *
- * NO CACHING, deliberately. `grep -rn "Cache::" app/` finds nothing — the repo has never written to a cache at
- * runtime, and making a picker the first consumer would buy a cache-key tenancy question and an unproven
- * dependency for a call that only fires when a human opens a modal. The client holds the list for the page's
- * lifetime and offers an explicit refresh, which is where the benefit actually was. (`conversations.list` is a
- * Tier-2 method at ~20 requests/minute; user-initiated opens are nowhere near it.)
+ * NO CACHING IN THIS CLASS, deliberately: making a picker the first tenant-scoped cache consumer would buy a
+ * cache-key tenancy question and an unproven dependency for a call that only fires when a human opens a
+ * modal. The client holds the list for the page's lifetime and offers an explicit refresh, which is where
+ * the benefit actually was. (`conversations.list` is a Tier-2 method at ~20 requests/minute; user-initiated
+ * opens are nowhere near it.)
+ *
+ * ⛔ THE JUSTIFICATION ABOVE USED TO REST ON A GLOBAL CLAIM, AND THE GLOBAL CLAIM WAS FALSE. It asserted that
+ * grepping the application tree for cache-facade calls finds nothing and that this repository had never
+ * written to a cache at runtime. Increment M46 (2026-08-29) measured three runtime cache writes:
+ * a connector-refresh lock in RefreshOneConnectionJob, an SSO replay guard in SsoLoginService, and the
+ * guest proof-of-work replay guard in GuestChallengeService. ⚠️ THE THIRD IS THE ONE THAT MATTERS TO ANYONE
+ * REPEATING THE CHECK: it reaches the cache through an INJECTED Cache\Repository, so the facade grep the old
+ * comment prescribed cannot see it at all — and that grep also matched the old comment itself, which is how a
+ * claim of absence stayed plausible while sitting three files from its own counter-examples.
+ * NAME THE THING, NEVER QUOTE IT: a comment that embeds the command it wants you to run booby-traps that
+ * command, and a grep over first-party code can only ever report absence from first-party code.
+ * The local decision is unaffected and is stated on its own terms above.
  */
 final class ConnectorChannelDirectory
 {

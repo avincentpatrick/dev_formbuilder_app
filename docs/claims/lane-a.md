@@ -16,69 +16,216 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M45`, the claim ledger leaves the constitution (`m45-ledger-surgery`)
+## Status: NO ACTIVE CLAIM — `M45` is merged and the lane holds nothing forward
+
+**`M45` is merged (PR #235, `1f966a4`, 6/6 green).** Lane A holds no active row and pre-claims no forward
+number. The next row is taken under Rule 7(f), and the claim is written here and **pushed** before the
+first file is opened.
+
+⛔ **RUN `php scripts/state.php` FOR EVERY NUMBER.** Increment, ADR, migration prefix, exceptions-log
+entry, open rows, open decisions, and how far behind the trunk `docs/gate-baselines.md` has fallen.
+Nothing in this file or in `PROGRESS.md` is the authority for any of them any more.
+
+✅ **`CLAUDE.md` IS THE IMPERATIVE LAYER AND IS AUTO-LOADED.** Read it before this file. It carries no
+numbers at all, and `tracker-lint` R8 keeps it that way.
+
+⛔⛔ **AND THE `[tracker-surgery]` INSTRUCTION IS NOW KNOWN TO BE UNFOLLOWABLE THROUGH A DEFAULT SQUASH
+— SEE `M45` BELOW.** GitHub prefixes every commit subject with `* ` in the default body, which demotes
+the marker off line start. Pass an explicit `--body` whose FIRST content line is the marker. The PR
+title cannot carry it: `state.php` anchors merged titles on `^M(\d{1,3}):`.
+
+---
+
+## RELEASED — `M45`, the claim ledger leaves the constitution (merged as PR #235, `1f966a4`, 6/6 green)
+
+**Every claimed file was edited and nothing was added that the claim did not name.** `PROGRESS.md` ·
+`PROGRESS_ARCHIVE.md` · `scripts/tracker-lint.php` (one constant and its comment) ·
+`docs/feature-backlog.md` · `docs/gate-baselines.md` · this file. **No production file, no test, no
+`.vue`.** **Namespaces spent: NOTHING** — twenty-first consecutive.
+
+**`PROGRESS.md` 508,441 → 346,913 bytes, 583 → 450 lines. `## Standing Rules` 208,039 → 46,511.**
+134 lines and 162,601 bytes moved verbatim into `PROGRESS_ARCHIVE.md` (2,090,997 → 2,254,778).
+
+### ⛔ The row's PREMISE was false, which is a different failure from a wrong mechanism
+
+The row reads *"a 163,680-byte claim ledger that **duplicates** `docs/claims/lane-*.md`"* and calls the
+block *"the second copy of a record that already has a home."* **Measured before a byte moved:
+`docs/claims/` holds `## RELEASED` headings for `M15`–`M44` and nothing earlier; the block holds
+`M1`–`M14` plus the J/K/P/I-series. The split is exact and the overlap is ZERO** — and 0 of its 129
+non-blank lines appear verbatim in `PROGRESS_ARCHIVE.md` either. **It is the only copy.**
+
+⛔ **The action the row invites is therefore destructive.** *"The second copy"* invites a deletion, and
+a deletion loses the record of every claim before `M15` — including the one the whole `docs/claims/`
+regime was created in response to. **Eighth row in nine whose evidence is sound and whose remedy is
+not, and the first where the remedy fails because the PREMISE is false rather than the mechanism.**
+Every previous member of that family prescribed a fix that did not work; this one prescribes a *frame*
+that makes the wrong fix look obvious, which is harder to catch because there is no mechanism to test.
+
+⛔ **AND IT COULD NOT GO WHERE THE ROW POINTS, FOR A REASON THE ROW IS ITSELF FILED UNDER.** The block
+interleaves 🅰️ and 🅱️ bullets — both lanes' claims in one list — and Lane A may never write
+`lane-b.md`. **One writer per claim file closes the only destination the row names.** That left
+`PROGRESS_ARCHIVE.md`, which is `M41`'s precedent anyway, and it was settled before the splice rather
+than discovered inside it.
+
+### ⚠️ Two more corrections to the row, both cheap and both load-bearing
+
+**(1) The boundary was off by three lines and 1,650 bytes.** The row cites `:123-259` / 163,680; the
+ledger is `:126-259` / **162,601**, because `:123`–`:125` are live imperatives — the
+ADR-number-is-not-written-here fix, the `0010`-is-reserved trap, and cite-by-filename. Splicing the
+row's range would have deleted three rules. **A row's line numbers are the first thing to re-measure.**
+
+**(2) *"Carrying zero imperatives"* is false.** Four of the moved bullets carry **`DO NOT RE-ASK` user
+decisions of record**: `M9`'s three SSO-adoption decisions (2026-08-24), and leaderboard visibility,
+the ⌘K palette's stacking behaviour and checklist dismissibility (2026-08-17). They moved with the
+block — hoisting them into `decisions.md` would have created the second copy this row exists to end
+*and* broken the conservation proof — and both the archive heading and the pointer name them
+explicitly, so a reader looking for a settled decision is sent to them rather than left to guess.
+
+### ⛔⛔ R7 CANNOT FIRE ON THIS SURGERY, AND IT WAS PROVEN RATHER THAN ASSUMED
+
+`DROP_LIMIT` is **200 lines** with a strict `>`. This drop is **133**. So the rule that exists to catch
+an undeclared tracker deletion is **silent on a tracker deletion of 162,601 bytes**, because it counts
+lines and this block is 134 very long ones.
+
+**Proven, not inferred:** the phase-2 commit was amended to remove `[tracker-surgery]` entirely,
+`tracker-lint` was re-run, and it **passed** — printing `-133` while asserting nothing about it. The
+message was then restored and verified byte-identical (1,016 bytes, `87315091…`). ⚠️ **`CLAUDE.md`'s
+own two-hundred-line threshold does not reach this diff either**, so the marker was carried because the
+row demands it and for no other reason. **A green R7 here is the vacuous-success family again: a rule
+that passed because it never looked.**
+
+### ⛔⛔ AND THE MARKER DOES NOT SURVIVE A DEFAULT SQUASH — A NEW MEMBER OF `M41`'s FAMILY
+
+`M41` recorded two rules: the marker must **start a line**, and an empty `--body` **discards** it.
+Neither covers what happened here. The merge passed **no** `--body`, so the default was used, and the
+marker *is* in the trunk message — **twice** — but GitHub's default squash body renders each commit
+subject as a bullet:
+
+```
+* [tracker-surgery] M45 phase 1: the claim ledger lands in the archive
+```
+
+**`R7` matches `/^\[tracker-surgery\]/m`, and `* ` in front of it means no match.** Verified on the
+merged commit: `grep '^\[tracker-surgery\]'` finds nothing, `grep 'tracker-surgery'` finds two.
+
+⛔ **HAD THIS BEEN A DROP OVER 200 LINES, `main` WOULD HAVE MERGED RED** — `M41`'s exact outcome,
+reached by the opposite route: it lost the marker by *emptying* the body, this lost it by *accepting
+the default*. **Preserving the text is not preserving the form.**
+
+⚠️ **AND THE OBVIOUS WORKAROUND IS CLOSED BY A SECOND MECHANISM.** `tracker-lint`'s own failure message
+suggests putting the marker in the PR title. **`state.php:249` anchors merged pull-request titles on
+`^M(\d{1,3}):`** for its independent increment cross-check, so a `[tracker-surgery]` prefix would break
+the one guard that catches a numbering collision. **The two gates want incompatible first characters**,
+and the only form satisfying both is an explicit `--body` whose first content line is the marker. Filed.
+
+### ✅ Proved by 21 assertions, every one exact and none with a tolerance
+
+| Proof | Result |
+|---|---|
+| Counted multiset of 134 moved line hashes, exact multiplicity | **130 distinct / 134 counted**, both sides |
+| Byte conservation | **2,601,691 == 2,601,691** |
+| Lines 1–125 byte-identical (7(g)'s imperatives survive) | `82773829…` |
+| Rule 8 downward byte-identical | `b593cfeb…` |
+| Independent git-level proof — pre-surgery slice vs new archive tail | both `868511fd…` |
+| Heading uniqueness, tracker and cross-file | 7 checks, all held |
+| Encoding, both files | LF only, trailing NL, no BOM |
+
+⚠️ **THE MULTISET WAS NOT CEREMONIAL HERE.** 134 lines yield **130 distinct hashes** — five blank lines
+share one — so a set equality would have passed while silently dropping four lines. `M41` argued for a
+counted multiset from the 2026-08-16 incident; this is the first increment where the count itself was
+load-bearing on its own data.
+
+⚠️ **AND THE CLAIM NAMED BYTE CONSERVATION AS THE MOST LIKELY MISS FOR THE SECOND TIME IN A ROW, AND
+THIS TIME IT HELD.** The reasoning was that this surgery has **two** seams where `M41` had one — it
+cuts a hole in the middle of the tracker as well as appending to the archive — so the pointer's own
+1,073 bytes enter the identity beside the heading's 1,180. Stating both as integers computed from the
+literal inserted strings, rather than inferring them, is what made it exact on the first run.
+
+### ⚠️ The paths-touched assertion failed twice, and the CHECK was wrong both times
+
+`M41` recorded this once — *"a failing independent check is not automatically a defect; verify the
+check before believing it"* — and it recurred **twice inside one increment, in the same assertion, for
+two unrelated reasons**: first it compared committed state while phase 2 still sat in the working tree,
+then its expected list omitted `scripts/tracker-lint.php`, which the plan had named in scope. Both
+times the surgery was correct and the instrument was not. **Twenty of twenty-one assertions passing
+with one failure is exactly the shape that tempts you to change the subject rather than the check.**
+
+### ✅ Controls — four, because `mutate.php` cannot drive a standalone script
+
+Its `--tests` argument is Pest paths execed through `docker exec` and there is no `--command=` mode, so
+its discipline was reimplemented at the call site: green baseline first, tokens read from files,
+sha256 asserted **moved**, `php -l` on any PHP mutant, restore by **byte comparison**.
+
+| Control | Verdict |
+|---|---|
+| a second `## Next Session` in the archive | **R3 red**, named, exit 1 |
+| a `## Current Status` in the archive | **R4 red**, named |
+| the ceiling set below the new size | **R1 red**, named |
+| one CR byte in the tracker | **R5 red**, named |
+
+Each reddened its own rule **and only it**; each restore was byte-exact; the gate was green again
+afterwards. ⚠️ **These are the rules this diff could actually have violated** — proving R7 instead
+would have proven nothing, since it cannot fire at 134 lines, and offering it would have been the
+decorative-gate mistake `M43` measured.
+
+### How the prediction fared
+
+**Everything structural held, and every gate number is byte-identical to the committed baseline** —
+Pest **4627 / 19,579**, Vitest **134 files**, Storybook axe **42 / 303**, E2E **551 passed + 10
+skipped, no flaky line**, PHPStan `[OK]`, Pint **PASS over 1422 files**. Zero delta on every one, which
+is what a documentation diff plus one `scripts/` constant must produce. Six jobs, step counts parsed
+individually — Contract **16** · Frontend **12** · Static analysis **20** · axe **11** · E2E **20** ·
+Pest **11**. **Not one `steps: []`.** Five host lint gates unmoved at 97 · 113 · 31 · 113/121/0 · 180;
+Pint proven live with a deliberate probe before its `PASS` was believed.
+
+**Byte predictions were exact where they were derived and wrong where they were counted in my head:**
+346,913 against a predicted ~346,600 (the formula was right; the round number was a guess), Standing
+Rules **46,511** against ~45,500, archive **2,254,778** against ~2,253,700.
+
+⚠️ **THE ONE CLEAN MISS: `preflight`'s line count. Predicted 449, actual 450.** I subtracted the 134
+moved lines and forgot to add back the one line the pointer occupies. **It is trivially small and it is
+the same arithmetic class as `M41`'s one-byte seam** — a move that also inserts is not a pure removal,
+and the inserted thing has to be counted on both axes, not just in bytes.
+
+**And `state.php`'s advisory literal count for `PROGRESS.md` fell 147 → 69**, predicted in the claim as
+"sharply lower" precisely so the drop would not be read as a defect. 16 of the 21 `next free` lines
+lived inside the moved block; they are dated records and are correct as history where they now sit.
+
+### ➕ Filed rather than silently left
+
+Three rows, each at the moment it was decided:
+
+1. **`major` — `## Next Session` is a second historical ledger and is now 62% of the tracker**
+   (214,073 of 346,913 bytes). ⛔ **`M41` named this section by size and nothing ever filed it** — it
+   lived only in that release's prose and in this increment's plan, so no backlog search would have
+   reached it. That is the `J4b1` shape exactly. ⚠️ **It is not a repeat of this increment and must not
+   be planned as one**: `M45` moved a block that was provably 100% dated record with a clean boundary,
+   and that one has live and dead material interleaved, so its boundary must be *decided* rather than
+   measured.
+2. **`major` → amended, not filed: the R8 row moves from *blocked* to *unblocked and still open*.** The
+   precondition is met and the gate is not built. Two things named for whoever takes it: the exemption
+   surface is no longer zero (this increment's own pointer cites `M1`, `M14`, `M15`; 7(g) still cites
+   `0010`), so a naive rule is red on arrival for a *new* reason; and it must not be aimed at
+   `## Next Session` until that section moves.
+3. **`major` — the marker/squash finding above.** ⚠️ **Filed one severity higher than it was first
+   drafted, and the reason is the argument for it:** the failure is silent, it lands on `main`, and it
+   defeats the only gate this repository has against the incident that cost it 1,086 lines. A row that
+   makes `R7` unarmable is not a tooling nicety.
+4. **`minor` — the four `DO NOT RE-ASK` decisions now living in the archive rather than in
+   `decisions.md`**, whose `ANSWERED` form is D-numbered questions and does not fit an increment
+   decision with no question attached.
+
+### ORIGINAL CLAIM (`M45`)
+
+Kept as written, including the prediction that was wrong.
 
 **Taken 2026-08-29.** Branch `m45-ledger-surgery`, cut from `origin/main` at `e89c4c3`, PR into `main`.
-**Second tracker surgery**, and `M41` is the precedent it is built on rather than a thing it repeats.
+**Second tracker surgery**; `M41` is the precedent it is built on rather than a thing it repeats.
 
 **Row:** `docs/feature-backlog.md`'s last `major` — *"Standing Rule 7(g) contains a 163,680-byte claim
 ledger that duplicates `docs/claims/lane-*.md`, and it is why the constitution cannot be read in one
 call."* Filed by `M42`, which deliberately did not take it; the decision to take it as its own
 increment was the user's, 2026-08-29. Closing it advances `D5`, whose bar is zero open `major` rows.
-
-⛔ **RUN `php scripts/state.php` FOR EVERY NUMBER.** Nothing in this file or in `PROGRESS.md` is the
-authority for any of them. ✅ **`CLAUDE.md` is the imperative layer and is auto-loaded** — read it
-before this file.
-
-### Evidence verified
-
-Every citation opened against the merged tree at `e89c4c3`, and the row's own boundary re-measured
-rather than taken:
-
-| The row states | Measured | Verdict |
-|---|---|---|
-| the ledger is **163,680 bytes** at lines **123–259** | lines **126–259 = 162,601 bytes**; `:123`–`:125` are three **live imperatives** (the ADR-number-is-not-written-here fix, the `0010`-is-reserved trap, cite-by-filename) | **held in substance, boundary off by three lines and 1,650 bytes** — the file has grown since filing |
-| Rule 7 is **196,596** of Standing Rules' **207,468** | Rule 7 (`:34`–`:260`) = **197,167** of **208,039** | held |
-| the block carries **zero imperatives** | **FALSE in one respect.** `:161`, `:223`, `:244` and `:252` carry **`DO NOT RE-ASK` user decisions of record** — M9's three SSO-adoption decisions (2026-08-24), leaderboard visibility, the ⌘K stacking behaviour and checklist dismissibility (2026-08-17 ×3) | **the row understates what is in the block** |
-| it **"duplicates `docs/claims/lane-*.md`"** | **FALSE, and it inverts the remedy.** `docs/claims/` holds `## RELEASED` headings for **M15–M44 only**; the block covers **M1–M14** plus the J/K/P/I-series. The split is exact and the overlap is **zero** — and **0 of its 129 non-blank lines** appear verbatim in `PROGRESS_ARCHIVE.md` either | **the block is the ONLY copy** |
-
-### Remedy verdict
-
-⛔ **THE ROW'S PREMISE IS ITS REMEDY, AND THE PREMISE IS FALSE — SO THE OBVIOUS ACTION IS THE WRONG
-ONE.** *"The second copy of a record that already has a home"* invites a deletion. There is no second
-copy: deleting the block destroys the only record of every claim before `M15`.
-
-⛔ **AND IT CANNOT GO WHERE THE ROW POINTS.** The block carries **both** lanes' claims — 🅰️ and 🅱️
-bullets interleaved — and Lane A may never write `lane-b.md`. One writer per claim file is the rule
-that makes a claim conflict structurally impossible, so the destination the row names is closed by the
-rule the row is filed under. **`PROGRESS_ARCHIVE.md` is the only structurally legal home**, and it is
-`M41`'s precedent besides.
-
-**Eighth row in nine whose evidence is sound and whose prescribed remedy is not.**
-
-⚠️ **A COUNTED MULTISET IS LOAD-BEARING HERE AND A SET WOULD NOT BE:** the 134 moved lines yield
-**130 distinct sha256s** — five blank lines share one hash — so a set equality passes while silently
-dropping four lines.
-
-⚠️ **AND R7 CANNOT FIRE ON THIS SURGERY.** `DROP_LIMIT` is **200 lines** with a strict `>`; this drops
-**134**. The marker is carried because the row demands it, but the gate that exists to enforce it is
-silent at this size, and `CLAUDE.md`'s own two-hundred-line threshold does not reach this diff either.
-**A green R7 is not evidence that anything was declared** — it never looked. The controls therefore
-target the rules that *can* fire: R3, R1 and R5.
-
-⛔ **NO `M41` TOOLING SURVIVES.** Its surgery commit (`be875b1`, PR #231) touched three files and
-committed no harness; `git log --diff-filter=D -- scripts/` is empty. The specification is reusable,
-the script is not. **And `M41`'s third assertion is not reusable verbatim** — it asserted Standing
-Rules byte-identical, which this increment is deliberately mutating; the equivalent here is *Standing
-Rules minus the moved slice is byte-identical*.
-
-### The operation
-
-`PROGRESS.md` lines **126–259** inclusive — 134 lines, **162,601 bytes**, slice sha256 `c1a525e7…` —
-move verbatim to `PROGRESS_ARCHIVE.md` under a new final heading, and one pointer bullet takes their
-place. **Line 260 (blank) stays**: it is 7(g)'s separator from Rule 8, and `M41`'s fourth proof failed
-on exactly that class of off-by-one blank line. Two commits, **archive first then tracker**, so git can
-prove the move independently of the script's arithmetic.
 
 Files: `PROGRESS.md` · `PROGRESS_ARCHIVE.md` · `scripts/tracker-lint.php` (constants only) ·
 `docs/feature-backlog.md` · `docs/gate-baselines.md` · this file.
@@ -86,28 +233,11 @@ Shared artefacts taken: `PROGRESS.md` (own status block and Rule 7(g) only), `PR
 `docs/feature-backlog.md`, `docs/gate-baselines.md`.
 Paired files taken: **none**.
 Namespaces spent: **nothing from either namespace** — no ADR, no migration prefix, no `§D`.
-Twenty-first consecutive.
 
-### Prediction
-
-No code, no test, no `.vue`, no `app/`, `database/`, `routes/`, `tests/`, `resources/` or `packages/`
-file. **Pest, Vitest, Storybook axe and E2E must all be unchanged**; **PHPStan cannot move** and saying
-so beats quoting an unchanged number. Pint's file count moves only if a file is added, and none is.
-`Static analysis` stays at its current step count — the constants change inside the already-registered
-`tracker-lint` step.
-
-Measured before the first byte moves, so a miss is visible: `PROGRESS.md` **508,441 → ~346,600**;
-`preflight`'s *total lines* **583 → 449**; `## Standing Rules` **208,039 → ~45,500**;
-`PROGRESS_ARCHIVE.md` **2,090,997 → ~2,253,700**. `state.php`'s advisory literal count for
-`PROGRESS.md` drops sharply — **16 of its 21 `next free` lines live inside the moved block** — which
-is a reported number, never a gated one, and is predicted here so the drop is not read as a defect.
-
-⚠️ **THE ONE I MOST EXPECT TO BE WRONG: byte conservation, again, and for a different seam than
-`M41`'s.** That increment appended to a file whose tail it was joining; this one **also cuts a hole in
-the middle of `PROGRESS.md` and stitches a pointer into it**, so there are *two* seams, not one, and
-the pointer's own byte count enters the identity. A tolerance would absorb either. The formula is
-stated as integers computed from the literal inserted strings, and if it disagrees the arithmetic is
-re-derived rather than fudged.
+⚠️ **THE ONE I MOST EXPECTED TO BE WRONG: byte conservation, for a different seam than `M41`'s** —
+this surgery cuts a hole *and* appends, so there are two seams and the pointer's own byte count enters
+the identity. **It held on the first run.** The miss was one line, not one byte, and it was in the
+line-count prediction rather than in the conservation check.
 
 ---
 

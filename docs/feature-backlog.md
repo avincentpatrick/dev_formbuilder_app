@@ -3071,6 +3071,35 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   its own `major` row and has to move first. **Filed by M42 (2026-08-29)** at the moment it decided
   not to fake it. **Live.**
 
+- **`major` · The `[tracker-surgery]` marker cannot survive a squash merge in any form both gates
+  accept, so `R7` is unarmable on the trunk.** ⛔ **MEASURED ON `M45`'s OWN MERGE (PR #235, `1f966a4`),
+  which passed no `--body` at all and therefore used GitHub's default.** The marker *is* in the trunk
+  message — twice — and `grep '^\[tracker-surgery\]'` still finds **nothing**, because the default
+  squash body renders every commit subject as a bullet: `* [tracker-surgery] M45 phase 1: …`.
+  `R7` matches `/^\[tracker-surgery\]/m` (`scripts/tracker-lint.php:201`), and `* ` in front of it is
+  not a line start. **Preserving the text is not preserving the form.**
+  ⛔ **`M41` REDDENED `main` BY EMPTYING THE BODY; THIS IS THE SAME OUTCOME REACHED BY ACCEPTING THE
+  DEFAULT**, so the rule written in response to that incident — *"never pass an empty `--body`"*, in
+  `CLAUDE.md` under Merging — is **necessary and not sufficient**, and following it exactly still
+  produces an unarmed marker. `M45` was unaffected only because its drop was 133 lines against
+  `DROP_LIMIT`'s 200 and `R7` could not fire either way; **a surgery over 200 lines that obeys every
+  written instruction merges RED.**
+  ⛔ **AND THE WORKAROUND THE GATE ITSELF SUGGESTS IS CLOSED BY A SECOND GATE.** `R7`'s failure message
+  says *"or put it in the PR title"*. **`scripts/state.php:249` anchors merged pull-request titles on
+  `^M(\d{1,3}):`** for the independent increment cross-check that exists to prevent a numbering
+  collision, so a `[tracker-surgery]` prefix in the title silently drops that PR out of the second
+  source. **The two gates want incompatible first characters on the same string**, and nothing in
+  either file mentions the other.
+  **The remedy is one line and it is a merge instruction, not a code change**: pass an explicit
+  `--body` whose **first content line** is the marker, and put it in `CLAUDE.md` under Merging beside
+  the empty-body rule. ⚠️ **Verify it the way `M40` verified `R7` in the first place — with a
+  deliberately red push** — because this is the third distinct way this marker has failed to arm and
+  the first two both looked correct at the moment of writing. Consider also relaxing `R7` to accept
+  the marker after a leading `* ` or `- `, which is the shape a squash actually produces; that is a
+  smaller change than it looks and closes the case where a future merge is done through the web UI.
+  ⚠️ **Sized as `major` because the failure is silent, lands on `main`, and defeats the only gate this
+  repository has against the incident that cost it 1,086 lines** (`f565ac9`, 2026-08-16).
+  **Filed by M45 (2026-08-29)**, measured on its own merged commit rather than predicted. **Live.**
 - **`minor` · `scripts/mutate.php` cannot drive a positive control for anything that is not Pest in a
   container.** Its `--tests` argument is Pest paths and it execs them via `docker exec`, so a gate
   implemented as a standalone script — `tracker-lint`, `state.php`, the five lint gates — has no harness,

@@ -73,10 +73,17 @@ The two copies share nothing at runtime — not a port, not a database, not a fi
 > — and then loops you straight back to the landing page:
 >
 > 1. `POST /login` authenticates fine.
-> 2. Fortify redirects to its configured home, `/dashboard` (`config/fortify.php:80`) — **still on the
+> 2. Fortify redirects to its configured home, `/dashboard` — the `home` key in `config/fortify.php` — **still on the
 >    central host**.
-> 3. `/dashboard` is a tenant route, so `PreventAccessFromCentralDomains` 302s it to `/`. That is the
->    loop, and there is no error message anywhere in it.
+> 3. `/dashboard` is a tenant route, and the tenant group's **first** middleware is
+>    `InitializeTenancyBySubdomain`. On the central host `localhost` there is no subdomain to resolve, so
+>    it throws `NotASubdomainException`, and `bootstrap/app.php`'s renderer for that exception returns
+>    `redirect(config('app.url'))` — a 302 back to `/`. That is the loop, and there is no error message
+>    anywhere in it. ⚠️ **Corrected by Increment M46 (2026-08-29): this step used to blame
+>    `PreventAccessFromCentralDomains`.** That middleware is registered one position later and never
+>    executes here — and it could not produce this symptom anyway, because its refusal is `abort(404)`,
+>    not a redirect. **The observable was right and the named cause was wrong**, which is the worse of the
+>    two failures: it sends the next reader to a middleware that is behaving correctly.
 > 4. **Walking to the subdomain afterwards does not rescue it.** `SESSION_DOMAIN=null` makes the session
 >    cookie **host-only for `localhost`**, so the browser never sends it to `demo.localhost`; that host
 >    302s to `/login` as an anonymous visitor.
@@ -447,9 +454,13 @@ docker exec dev_formbuilder_app-postgres-1 psql -U meridian -d meridian -c \
 curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8080/auth/google/redirect
 ```
 
-4. Sign in at <http://localhost:8080/login> as `viewer@demo.test`. The sidebar must show exactly
-   Submissions, Dashboard, **Achievements**, Analytics and Settings — no Forms, Members, Scopes, Audit log,
-   Feedback, Webhooks, Integrations or Domains (§5). ⚠️ **Achievements is on this list because it is the one
+4. Sign in at <http://demo.localhost:8080/login> as `viewer@demo.test`. ⚠️ **The workspace host, not the
+   platform host — corrected by Increment M46 (2026-08-29), which found this step sending the reader to
+   `localhost:8080/login`, the exact dead end the warning block at the top of this document measures.**
+   Step 5 below already used a workspace host, so the inconsistency read as intentional. The sidebar must
+   show exactly Submissions, Dashboard, **Achievements**, Analytics and Settings — no Forms, Members,
+   Scopes, Audit log, Feedback, Webhooks, Integrations or Domains (§5). ⚠️ **Achievements is on this list
+   because it is the one
    destination with no permission gate at all** — it is keyed on the `gamification` module switch only, by
    design (every member sees their own points and standing; only the NAMED ranked list is gated, on
    `dashboard.org.view`, and it is withheld inside the page rather than by hiding the page).

@@ -194,6 +194,11 @@ $metrics = [
         'pattern' => '/Component-import linter passed \((\d+) SFC/',
         'format' => static fn (array $m): string => "{$m[1]} SFCs",
     ],
+    'citation-liveness-lint' => [
+        'job' => 'Static analysis, style & security',
+        'pattern' => '/Citation liveness linter passed \((\d+) document\(s\) scanned, (\d+) citation\(s\) checked, (\d+) resolved, (\d+) unresolved; ledger tier (\d+) rotten, ceiling (\d+)/',
+        'format' => static fn (array $m): string => "{$m[1]} docs, {$m[2]} citations, {$m[3]} resolved, {$m[4]} unresolved, ledger {$m[5]}/{$m[6]}",
+    ],
 ];
 
 $rows = [];

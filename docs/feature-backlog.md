@@ -3184,43 +3184,165 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   document a backlog search would reach — the same shape as J4b1's four defects, which were recorded in
   the tracker and nowhere else. Its evidence was re-verified before this bullet was written: both
   citations hold.*
-- **`major` · ADR-0001 claims `citext` and `pgcrypto` are enabled by default, covering case-insensitive
+- ~~**`major` · ADR-0001 claims `citext` and `pgcrypto` are enabled by default, covering case-insensitive uniqueness for share slugs and user email.**~~
+  ✅ **DONE — M46 (2026-08-29). THE EXTENSIONS HALF HELD AT ALL THREE CITATIONS. THE SECOND CLAUSE IS
+  FALSE, AND HOW IT CAME TO BE FALSE IS THE MORE USEFUL HALF OF THIS ROW.**
+  `docs/adr/0001-postgresql-over-mysql.md`, three sites — the extensions bullet, the assumptions-section
+  `citext` and `pgcrypto` bullets, and the negative-consequences restatement **the row does not name**, which
+  was the third place the same promise was made. `CREATE EXTENSION` is issued exactly once in this
+  repository, for PostGIS; `pgcrypto` is additionally **unneeded**, since no migration declares a
+  database-side UUID default and every primary key is generated in PHP.
+  ⛔ **"NO LOWERCASING ANYWHERE ON THE REGISTER/LOGIN PATH" IS FALSE.** `config/fortify.php` enables
+  username lowercasing and Fortify canonicalises on **four** paths — registration, login, password-reset
+  request and profile update — while the SSO, Google sign-in and invitation paths lowercase independently.
+  ⚠️ **AND THE REASON IT READS AS TRUE IS A TRAP WORTH KEEPING: THE MECHANISM LIVES IN `vendor/`, GATED BY A
+  CONFIG FLAG.** A grep of first-party code returns nothing and **confirms the false claim**. This is the
+  second instance in this same increment — the row above has the other — and together they are the argument
+  for why the citation-liveness gate added here refuses to be sold as catching behaviour negatives: an
+  artifact negative is mechanisable, a behaviour negative is not.
+  ➕ **THE REAL RESIDUAL IS NARROWER THAN THE ROW, AND THERE IS A SECOND ONE THE ROW NEVER FOUND.** (1) The
+  guarantee is application-layer only: `users.email` carries a plain case-sensitive unique with no
+  `lower(email)` index, so a seeder, factory or raw insert can still create two casings. (2) **Share-slug
+  LOOKUP is case-sensitive** — storage is lowercase-only by a write regex, but both public resolvers query
+  the column unlowered, so a mixed-case share URL 404s instead of resolving. Filed as its own row below.
+  Original filing follows.
+  **`major` · ADR-0001 claims `citext` and `pgcrypto` are enabled by default, covering case-insensitive
   uniqueness for share slugs and user email.** `docs/adr/0001-postgresql-over-mysql.md:56` (restated `:83`,
   `:127`). Only PostGIS is enabled, and `0001_01_01_000000_create_users_table.php:26` is a plain
   case-sensitive unique with no lowercasing anywhere on the register/login path — so an engineer writing
   auth, invite-dedupe or account-merge builds on a guarantee the database does not give. **Live.** This
   branch corrected the adjacent `pg_trgm` bullet at `:128` and left `:56` asserting the opposite.
-- **`major` · Two of the ten rows in ADR-0002 §D3's isolation-control inventory describe unbuilt
+- ~~**`major` · Two of the ten rows in ADR-0002 §D3's isolation-control inventory describe unbuilt mechanisms.**~~
+  ✅ **DONE — M46 (2026-08-29). BOTH ROWS REWRITTEN TO AS-BUILT, AND THE ROW UNDERSTATED ITSELF BY TWO SITES,
+  ONE OF WHICH IS AN OPERATIONAL HAZARD RATHER THAN A DOCUMENTATION ONE.**
+  `docs/adr/0002-multi-tenancy-shared-db-rls.md` (the Realtime and Cache rows, in the as-built voice the Jobs
+  row already set — design intent kept as what the control must be when the stack lands, rather than deleted),
+  `docs/deployment-infrastructure.md` (four sites) and
+  `app/Services/Connectors/ConnectorChannelDirectory.php` (docblock only).
+  ⛔ **THE PRODUCTION RUNBOOK PRESCRIBED A COMMAND THAT DOES NOT EXIST.** Its provisioning step told an
+  operator to install `php artisan reverb:start` as an auto-restarting Windows service. Measured on this
+  tree: `laravel/reverb` is absent from `composer.json`, `reverb` appears in no `artisan list`, and the
+  command exits **1**. Following the runbook exactly would have produced a service that fails on every start,
+  retried forever by the supervisor. **A documentation defect in a runbook is an operational defect**, and it
+  is the reason this row's real severity was higher than its filing.
+  ⛔ **AND A CODE COMMENT ASSERTED THE SAME CLASS OF FALSE NEGATIVE, ONE LAYER DOWN.**
+  `ConnectorChannelDirectory` justified a local decision with a global claim — that grepping the application
+  tree for cache-facade calls finds nothing and that this repository had never written to a cache at runtime.
+  There are **three** runtime cache writes, and the third reaches the cache through an **injected repository**,
+  so the grep the comment prescribed could not have seen it; that grep also matched the comment itself.
+  **A grep over first-party code can only ever report absence from first-party code** — the same trap that
+  made ADR-0001's clause false in the row below. ⚠️ The row's own Cache citation was dead, pointing at an
+  unrelated amendment. Original filing follows.
+  **`major` · Two of the ten rows in ADR-0002 §D3's isolation-control inventory describe unbuilt
   mechanisms.** `docs/adr/0002-multi-tenancy-shared-db-rls.md:129` credits Reverb channel-authorization
   callbacks that *"re-verify the requesting user's tenant membership"* — there is no broadcasting config,
   no `routes/channels.php` and no dependency — and `:132` claims `tenant:{id}:…` Redis cache prefixing,
   where `CACHE_STORE=database`, no KPI caching exists and the only `tenant:{…}` key in the tree is a queue
   rate limiter. **Live.** Sharpened because the adjacent Jobs row *was* rewritten to as-built, training a
   reader to treat uncorrected rows as verified.
-- **`major` · The audit spec's exhaustive `users` scope row omits the impersonation boundary events.**
+- ~~**`major` · The audit spec's exhaustive `users` scope row omits the impersonation boundary events.**~~
+  ✅ **DONE — M46 (2026-08-29). THE HEADLINE HELD AND THE ROW UNDERSTATED ITSELF BY THREE FURTHER SITES, ALL
+  IN A SECOND DOCUMENT IT DOES NOT NAME.** `docs/audit-compliance-logging-spec.md`'s §1 `users` row now
+  carries `impersonation_started` and `impersonation_ended`, with the actor direction stated —
+  `auditable_id` is the **impersonated user** and `acting_as_user_id` the operator, so the row reads as *what
+  was done to this account, and by whom*. ⛔ **THE SAME UNDERCOUNT RECURS THREE TIMES IN
+  `docs/data-dictionary.md`**, which called the `AuditEvent` catalog **eight-valued** where the enum has ten,
+  said "see the 8-value catalog above" in the `audits.event` column row, and described the domain-specific
+  events by a count two short. All three corrected. **The dictionary was internally consistent and externally
+  wrong in three places at once, which is the failure mode a catalog exists to prevent** — and it is why
+  fixing only the document the row named would have left three quarters of the defect live. ⚠️ **The row's
+  own summary of the spec was imprecise in a way worth recording:** it said the `users` row named `updated`
+  and `permission_changed`. `permission_changed` against that alias is a **separate preceding row**, so the
+  alias's coverage was already two rows, and reading any one row as the whole scope is how the omission
+  survived. ➕ **Filed rather than fixed:** the same table **over-claims** in the other direction. Original
+  filing follows.
+  **`major` · The audit spec's exhaustive `users` scope row omits the impersonation boundary events.**
   `docs/audit-compliance-logging-spec.md` §1 (~`:28`) names `updated` and `permission_changed` only, while
   `app/Services/Admin/ImpersonationService.php:389-406` records `impersonation_started` /
   `impersonation_ended` against that same alias. A SIEM forwarder or retention rule built from the section
   that exists to be exhaustive drops the highest-privilege events in the ledger. **Live.**
-- **`major` · The threat model's `Open` row asserts `APP_PREVIOUS_KEYS` "appears in no `.env.example` and
+- ~~**`major` · The threat model's `Open` row asserts `APP_PREVIOUS_KEYS` "appears in no `.env.example` and in no document".**~~
+  ✅ **DONE — M46 (2026-08-29). NARROWED AT FOUR SITES AND DELIBERATELY NOT CLOSED, EXACTLY AS THE ROW'S OWN
+  HEDGE INSTRUCTED.** `docs/security-threat-model.md` (the §5 register row and the §9 residual) and
+  `docs/adr/0009-oauth-connector-token-custody.md` (§Context 8, §D9 and the See-also list). The variable is
+  declared in `.env.example` with an inline warning naming this exact failure and citing the sub-decision, so
+  the "appears nowhere" half is retracted; **the rotation PROCEDURE is genuinely still absent**, and the
+  document that owns it defers the connector lane in its own key-rotation section, so the item stays `Open`
+  and now says which half is missing. ⛔ **THE SHAPE OF THE ERROR IS THE FINDING, NOT ITS CONTENT: A REGISTER
+  WHOSE PURPOSE IS TO TELL AN OPERATOR WHERE TO LOOK TOLD THEM THERE WAS NOTHING TO FIND.** That is worse
+  than silence, because the natural response to *"undocumented"* is to conclude the capability is absent and
+  stop. ⚠️ **FOUR OF THIS ROW'S SIX CITATIONS WERE THEMSELVES DEAD**, including the `.env.example` range that
+  is the row's own refutation — and one of them had already been re-anchored once, by the increment whose
+  edit displaced it. ➕ **Beyond the row:** the seam's own citation, repeated in three places, pointed at
+  `config/app.php`'s **locale block** — roughly twenty lines above the real entry. All three now cite the
+  `previous_keys` key by name, because a line number in a config file is a pointer with a shelf life.
+  Original filing follows.
+  **`major` · The threat model's `Open` row asserts `APP_PREVIOUS_KEYS` "appears in no `.env.example` and
   in no document".** `docs/security-threat-model.md:100` (repeated `:218` — **was `:217` until M9's own §8 row shifted it, which is exactly the hazard the citation-cluster row below records**; duplicated into
   `docs/adr/0009:31,:83,:168,:290`). It is present on this branch at `.env.example:207-209` with an
   ADR-0009 §D9 warning attached, and discussed in two more documents — so the register is wrong at the
   moment it is ratified, and an operator planning an `APP_KEY` rotation is told not to look for the seam
   that exists. **Live.** ⚠️ **Narrow it, do not close it**: the documented rotation *procedure* genuinely
   is still absent.
-- **`major` · ACCESS-MATRIX's verification step 4 sends the reader to the platform host, which the same
+- ~~**`major` · ACCESS-MATRIX's verification step 4 sends the reader to the platform host, which the same document proves is a dead end.**~~
+  ✅ **DONE — M46 (2026-08-29). THE ROW'S HEADLINE HELD, ITS CITATION WAS FALSE, AND THE DOCUMENT IT
+  CORRECTS TURNED OUT TO BE WRONG ABOUT ITS OWN MECHANISM.** `docs/ACCESS-MATRIX.md`, two sites: step 4 now
+  signs in at the workspace host, matching step 5; and the warning block's explanation is rewritten.
+  ⛔ **THE WARNING BLOCK BLAMED THE WRONG MIDDLEWARE, AND THE ROW DID NOT NOTICE — SO THE OBVIOUS ONE-TOKEN
+  FIX WOULD HAVE LEFT A FALSE EXPLANATION STANDING.** Measured on the live group: the tenant routes list
+  `InitializeTenancyBySubdomain` **before** `PreventAccessFromCentralDomains`. On the platform host there is
+  no subdomain to resolve, so the initialiser throws `NotASubdomainException` and `bootstrap/app.php`'s
+  renderer for it returns `redirect(config('app.url'))` — that is the 302. The middleware the document
+  blamed never executes, and vendor source shows its refusal is `abort(404)`, which is not a redirect at all
+  and could not have produced the observed loop. Nothing in first-party code overrides that. **A document
+  that gets the observable right and the cause wrong is worse than one that says nothing: it sends the next
+  reader to a middleware that is behaving correctly.** ⚠️ The step-4 citation itself pointed at a shell
+  comment **inside a fenced block** — which is one of the two cases the citation-liveness gate added by this
+  increment detects mechanically. Original filing follows.
+  **`major` · ACCESS-MATRIX's verification step 4 sends the reader to the platform host, which the same
   document proves is a dead end.** `docs/ACCESS-MATRIX.md:446` says sign in at
   `http://localhost:8080/login` as `viewer@demo.test` and inspect the sidebar; `:70-92` records the
   measured finding that Fortify lands on `/dashboard` on the central host, `PreventAccessFromCentralDomains`
   302s it to `/`, and walking to the subdomain afterwards does not rescue it. Step 5 two lines below
   correctly uses a workspace host, so the inconsistency reads as intentional. **Live.**
-- **`major` · The README's frontend and design-system command blocks are host commands that cannot run on
+- ~~**`major` · The README's frontend and design-system command blocks are host commands that cannot run on the host.**~~
+  ✅ **CLOSED AS ALREADY FIXED — M46 (2026-08-29), AND NO EDIT WAS MADE TO `README.md` BECAUSE THE ROW'S
+  REMEDY IS A NO-OP THAT WOULD RE-AFFIRM THE ONE LINE STILL WRONG.** ⛔ **EVERY CITATION IN THIS ROW IS
+  FALSE, AND ALL THREE POINT AT BLANK LINES.** The block was corrected by `1261a73` — *M1 — the pre-merge
+  remediation the integration review produced*, 2026-08-18 — and today every frontend and design-system
+  command in `README.md` already reads `docker compose exec node …`, under an explicit warning that the
+  Windows host has no `rolldown` win32 binding. The `docs/TESTING-GUIDE.md` citation lands on a blank line
+  too; the sentence it means begins two lines later. ⚠️ **AND THE ROW'S CLAIM IS OVER-BROAD EVEN AS
+  HISTORY — MEASURED, NOT ASSUMED.** Of the five commands it names, **three can in fact run on this host**:
+  `type-check` is `vue-tsc` (pure JS), `ds:tokens` is style-dictionary (pure JS), and
+  `ds:storybook:build` resolves a rollup-based Vite in the design-system package rather than the root's
+  rolldown. Only `build` and `ds:test` genuinely cannot. The container-first instruction stays regardless —
+  it is right for parity reasons, not only for capability reasons. ⛔ **THE SHARPEST FINDING IS THAT THE ROW
+  WAS FILED AGAINST A TREE THAT NO LONGER EXISTED, AND A LATER INCREMENT HAD ALREADY NOTICED.** `M27`
+  rewrote the same block for a different row and recorded in its own commit message that these line numbers
+  were rotten — and did not close this row. **A stale row survives being read; it only dies when someone
+  opens its citations.** ➕ A live residual was found in the corrected block and is filed as its own row
+  below. Original filing follows.
+  **`major` · The README's frontend and design-system command blocks are host commands that cannot run on
   the host.** `README.md:51-59` — `npm run build`, `type-check`, `ds:tokens`, `ds:storybook:build`, `ds:test`.
   Only `npm run dev` carries the "(or use the `node` compose service)" parenthetical, and `:19` calls host
   Node optional, so the rest read as host commands; `docs/TESTING-GUIDE.md:22-23` states the opposite (no
   `pdo_pgsql`, no rolldown win32 binding). **Live**, on the platform the README explicitly documents.
-- **`major` · ADR-0017 says the threat model carries no SSO and no isolation-topology rows; it carries
+- ~~**`major` · ADR-0017 says the threat model carries no SSO and no isolation-topology rows; it carries both.**~~
+  ✅ **DONE — M46 (2026-08-29). THE ROW IS RIGHT ABOUT TWO THIRDS OF THE SENTENCE, AND ITS OWN REMEDY WOULD
+  HAVE DESTROYED THE THIRD.** `docs/adr/0017-tenant-isolation-tiering.md`, one bullet, rewritten as a **split
+  verdict** rather than deleted. ⛔ **THE TOPOLOGY CLAUSE IS STILL TRUE.** Searching
+  `docs/security-threat-model.md` for *topology*, *dedicated database*, *shared-schema* or *isolation tier*
+  returns **nothing**: the five rows the row points at are extraction and cross-tenant-foreign-key rows —
+  about getting data out of the shared database, not about the choice of database, which is the thing this
+  ADR is actually about. Deleting the sentence would have fixed a false claim by throwing away a true one,
+  and would have replaced a reviewer who blocks on shipped work with a reviewer who believes the topology has
+  been threat-modelled. ⚠️ **BOTH REFUTING CITATIONS WERE MIS-ANCHORED.** One range opens on three Google
+  sign-in rows and reaches only the first SAML row of fourteen; the other names four isolation rows where the
+  section carries five. **The row named the right defect through the wrong coordinates** — which is why the
+  rewrite cites the SAML table by its lead-in sentence and by its row count instead of by a line range.
+  Original filing follows.
+  **`major` · ADR-0017 says the threat model carries no SSO and no isolation-topology rows; it carries
   both.** `docs/adr/0017-tenant-isolation-tiering.md:73`, refuted by
   `docs/security-threat-model.md:171-179` (the SAML table) and `:49-52` (four isolation/extraction rows
   that cite this very ADR). A reviewer using the ADRs as the map of what has been threat-modelled blocks
@@ -3235,13 +3357,90 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   include `"`, and the value is `$tenant->name`. **Latent** — no user-facing write route for `tenants.name`
   was found — but the asserted invariant is false either way, and `BrandedMailRenderTest.php:122` only
   pins the unquoted case.
-- **`major` · The data dictionary states "No CHECK pairs the two" for `audits.user_id` /
+- ~~**`major` · The data dictionary states "No CHECK pairs the two" for `audits.user_id` / `acting_as_user_id`.**~~
+  ✅ **DONE — M46 (2026-08-29). THE ONLY ONE OF THE EIGHT DOCUMENTATION-TRUTH ROWS WHOSE EVERY LINE NUMBER
+  WAS STILL INTACT, AND THE ONLY ONE WHOSE PRESCRIBED REMEDY NEEDED NO CORRECTION.** `docs/data-dictionary.md`,
+  two sites. The §13 design note now names `audits_acting_as_not_self_check` and its predicate, and keeps the
+  `nullOnDelete` reasoning — which is sound, and simply belongs to the **other** constraint. ⚠️ **THE
+  DIAGNOSIS WAS EXACT AND IS WORTH RESTATING AS A CLASS:** the document transcribed the migration's argument
+  for the constraint that was **rejected** instead of the one that was **added**, and both live in the same
+  docblock under adjacent headings. A reader comparing doc to migration would have found matching prose and
+  concluded agreement. ➕ **Beyond the row:** §13 omitted `audits_event_check` entirely while the same section
+  enumerates CHECK constraints elsewhere, so its absence read as "there is no such constraint" — now named,
+  with the note that it is generated from the enum once, at the migration that creates it, so widening it
+  needs its own migration. Original filing follows.
+  **`major` · The data dictionary states "No CHECK pairs the two" for `audits.user_id` /
   `acting_as_user_id`.** `docs/data-dictionary.md:630`, refuted by
   `2026_08_09_000001_add_acting_as_user_id_to_audits.php:98-101`
   (`audits_acting_as_not_self_check`). The doc recorded the migration's reasoning for the **rejected**
   constraint (`:34`) rather than the one that shipped (`:40`), so a backfill or fixture setting
   `acting_as_user_id = user_id` gets a 23514 from a constraint the canonical schema reference denies.
   **Live**, and the section enumerates CHECKs exhaustively elsewhere, so the negative reads as complete.
+- **`major` · The data dictionary states a `uuidv7()` DATABASE-SIDE DEFAULT on thirty table rows, and no migration sets one.**
+  Filed by M46 (2026-08-29) while closing the `audits` CHECK row, because it is the same class one order of
+  magnitude larger: **the canonical schema reference asserting a schema property the database does not have.**
+  `docs/data-dictionary.md` carries `uuidv7()` in the `Default` column of thirty `id` rows. Measured against
+  `database/migrations/`: **no migration declares any database-side UUID default at all** — every primary key
+  is `$table->uuid('id')->primary()` with the value generated in PHP, which is also what the offline client
+  requires, since it mints the key before the server sees it. ⚠️ **The preamble is not wrong, and that is
+  what makes this survivable rather than trivial**: the Primary-key-strategy paragraph explicitly conditions
+  the native default on PostgreSQL 18+ and says to *"generate UUIDv7 client-side … and remove the DB-side
+  default"* otherwise. **The thirty column rows carry no such condition**, and a reader inventorying defaults
+  from the per-table rows — which is what those rows are for — gets it wrong thirty times. **The fix is
+  mechanical but not one-line**: either the column rows say "application-generated" or the preamble's
+  conditional is repeated per row; choosing which is a documentation decision, not a lookup. **Live.**
+- **`major` · The README prescribes a design-system command that cannot work in the service it names.**
+  Filed by M46 (2026-08-29), found inside the block a now-closed row wrongly claimed was still broken — see
+  the README row above, which was stale but whose neighbourhood was not. `README.md`'s design-system block
+  runs the axe suite as `docker compose exec node npm run ds:test`. It cannot work, for two independent
+  reasons. (1) The `node` service is `node:24-alpine` — **musl** — and `CLAUDE.md`'s own gate table records
+  that a glibc Chromium fails `ENOENT` there with the binary present and executable. (2) `ds:test` resolves
+  to `test-storybook` with **no `--url`**, so it requires a Storybook server already listening on `:6006`,
+  and nothing in the block starts one. `ci.yml`'s axe job does it correctly — glibc runner, static build
+  served, `wait-on`, then `test-storybook --url` — so the working shape exists and is two steps, not one.
+  ⚠️ **Sized `major` because it is the one line in that block a reader will actually run**, and its failure
+  is the confusing kind: a native-module error from inside a container, not a missing-server message. **Live.**
+- **`minor` · Share-slug LOOKUP is case-sensitive while share-slug STORAGE is lowercase-only, so a
+  mixed-case share URL 404s instead of resolving.** ⚠️ **A runtime defect, filed in this section because
+  M46 found it while retracting ADR-0001's `citext` claim** and the two are the same finding seen from
+  opposite ends. Writes are constrained by `UpdateFormShareRequest`'s lowercase-only slug regex, so no
+  uppercase slug can be stored — which is how case-insensitive *uniqueness* is achieved without `citext`.
+  But `GuestFormController` and `PwaManifestController` both resolve the column unlowered, so a respondent
+  who receives a link with any character re-cased — by a mail client, a QR transcription, a person retyping
+  it — gets a 404 that is indistinguishable from a withdrawn form. **The remedy is one call at each of the
+  two lookups, not a migration**, and it should be a behavioural test rather than a structural one. **Live.**
+- **`minor` · The audit spec credits the `submission` scope with two events that are emitted nowhere.**
+  Filed by M46 (2026-08-29) rather than fixed, because the correct direction is a decision this increment
+  should not take alone. `docs/audit-compliance-logging-spec.md` §1 lists `deleted` and `restored` for
+  `submission`. Measured: the only `('submission', …)` pairs written are `created`, `updated` and
+  `exported`; `AuditEvent::Restored` is emitted against `form`, never `submission`. **The `Submission` model
+  does use `SoftDeletes`**, so the events are plausible rather than nonsensical — which is exactly why the
+  fix is ambiguous. ⛔ **Narrowing a compliance spec's audited-event list has retention and SIEM
+  consequences, and the honest answer may be "these are owed, build them" rather than "delete them from the
+  document."** The section exists to be exhaustive, so an over-claim is the same defect as the omission
+  closed above, pointing the other way. **Live.**
+- **`minor` · The data dictionary names nine of the forty-five constraints the migrations declare, while
+  enumerating constraints exhaustively in places.** Filed by M46 (2026-08-29) on the measurement that closed
+  the `audits` row. `database/migrations/` declares **45** distinct named constraints; `docs/data-dictionary.md`
+  names **9**. That is not a defect on its own — a dictionary is not obliged to name every constraint — but
+  the section that carried the false `audits` negative *does* enumerate CHECKs elsewhere and *does* state
+  negatives deliberately, so a missing constraint there reads as an absent one. **The value is a census, not
+  a sweep**: list the 36 unnamed constraints once, and let each table's section decide whether it owes a
+  mention. **Not live** — this is a coverage question, not a false statement.
+- **`minor` · The citation-liveness gate cannot see a behaviour negative, and its ledger ceiling counts
+  deliberately-preserved historical filings.** Filed by M46 (2026-08-29) at the moment the gate shipped, so
+  its limits are a filed constraint rather than a comment nobody re-reads. Two of them. ⛔ **(1) It checks
+  that a cited line is ALIVE, never that it says what the citing sentence claims.** Of the eight rows it was
+  built alongside it fires on three; the other five cite live lines that say the wrong thing. Two measured
+  counter-examples sit in this increment's own diff — a docblock asserting that grepping `app/` for cache
+  writes finds nothing, and an ADR asserting nothing lowercases email, whose refutation lives in `vendor/`.
+  **A gate over first-party code that reports absence is an engine for that error**, and this one must never
+  be widened into that shape. ⚠️ **(2) `LEDGER_ROT_CEILING` counts every dead citation in
+  `docs/feature-backlog.md`, including those inside CLOSED rows whose preserved filings are dead BY DESIGN**
+  — three rows were closed here precisely because their citations were dead, and that evidence is kept. So
+  the ceiling can only ratchet down as far as the historical floor. A refinement would exempt struck-through
+  rows; it needs a parser that can tell a closed row from an open one, which is more than this gate should
+  grow on its first outing. **Not live** — both are stated limits, filed so they cannot be forgotten.
 - ➡️ **MOVED TO `docs/claims/decisions.md` AS `D6` (2026-08-28) — IT IS A DECISION, NOT A DEFECT, AND NO
   LANE SHOULD TAKE IT AS A ROW.** ⛔ **AND IT IS THE ONE ITEM AN AUTOMATED LOOP MAY NEVER TOUCH**, because
   every increment adds documents and history and therefore makes it strictly worse rather than better.

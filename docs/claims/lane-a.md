@@ -16,11 +16,83 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M43` is merged and the lane holds nothing forward
+## Status: ACTIVE CLAIM — `M44`, four maintenance fan-outs asserted by a fixture too small to see a wrong tenant id (`m44-fanout-fixture-width`)
 
-**`M43` is merged (PR #233, `c09c7ef`, 6/6 green).** Lane A holds no active row and pre-claims no forward
-number. The next row is taken under Rule 7(f), and the claim is written here and **pushed** before the
-first file is opened.
+Taken 2026-08-29. Branch `m44-fanout-fixture-width`, cut from `origin/main` at `bcd0701`, PR into `main`.
+Lane B holds nothing forward — `lane-b.md` read in full, not its `## Status` line, and `git worktree list`
+run. `M43` is merged (PR #233, `c09c7ef`, 6/6 green) and released below.
+
+**Row**, from `docs/feature-backlog.md` — identified by its title rather than by a line number, because
+this increment edits that file: ***"`major` · Four maintenance fan-outs are asserted by a fixture too
+small to see a wrong tenant id."*** Ranked **#2** in `docs/backlog-triage.md`; **#1 was `M43`**.
+
+### Evidence verified
+
+Every citation opened against the merged tree. **All five held.**
+
+- `SweepWebhookRetriesJob.php:26` · `SweepScheduledFormsJob.php:30` · `RollUpUsageCountersJob.php:27` ·
+  `ReapExpiredDraftsJob.php:25` — **held**, all four the bare
+  `<Child>::dispatch((string) $tenant->getKey())` inside `foreach ($this->activeTenants() as $tenant)`.
+- *"every fixture holds exactly one active tenant"* — **held** in all four files.
+- The helper comments *"acme is the only active tenant"* — **held** in `ScheduledFormSweepTest`,
+  `UsageRollupTest` and `DraftReaperTest`. **Partially false in the fourth**: `WebhookRetrySweepTest`
+  encodes the same assumption as `// parent → fans out the per-tenant child` (singular), not in those
+  words. The row cites only the three, so this is the row being precise rather than wrong.
+- *"drain is hard-coded to exactly two `workOneJob('scheduled-maintenance')` calls"* — **held**, all four.
+- `SweepTenantWebhookRetriesJob` appears nowhere under `tests/`; the other three children appear only
+  inside comments — **held**, by grep of the whole tree.
+
+⚠️ **AND THE ROW DOES NOT UNDERSTATE ITSELF, WHICH IS WORTH RECORDING BECAUSE IT IS THE EXCEPTION.**
+Checked rather than assumed: **seven** `MaintenanceJob` subclasses exist and `activeTenants()` is called
+by **five**. `VerifyCustomDomainsJob` and `PruneFailedJobsJob` never call it — they work **inline**, which
+the base docblock explicitly permits for a sweep whose subject lives entirely in RLS-exempt tables.
+`RefreshConnectorTokensJob` was fixed in `M32`. **Four remain, and four is what the row says** — against
+M37's finding that 14 open rows understate their scope.
+
+### Remedy verdict
+
+⛔ **THE TRIAGE'S CLAIM IS FALSE. `docs/backlog-triage.md` says the remedy is *"SOUND and already proven:
+`RefreshConnectorTokensJob` is fixed in exactly the prescribed shape (a drain loop plus a second
+tenant)"* — and that is not what `M32` did.** Read first-hand rather than taken on report:
+
+- `M32` added **one `Bus::fake` case** (`ConnectorTokenRefreshTest.php:188-225`): a second tenant,
+  `(new RefreshConnectorTokensJob)->handle()` called **directly**, set-equality on the sorted
+  `$job->tenantId` list. **No drain loop. No per-tenant effects.**
+- The drain loop in that same file (`runRefreshSweep()`, `:74-89`) is **`M6`'s**, predates `M32`,
+  dispatches the **child** directly and therefore never reaches the parent's loop at all.
+
+Two unrelated mechanisms in one file were read as one. What is **actually** proven against this exact
+mutation is the `Bus::fake` shape — `M32`'s own results table records *"the same hoist in
+`RefreshConnectorTokensJob::sweep()` — SURVIVED, 9 passed / 38, exit 0 → CAUGHT"*.
+
+⛔ **AND THERE IS A SECOND BLINDNESS THE ROW ITSELF DOES NOT NAME.** The row warns that a second tenant
+plus a two-call drain leaves the second child unworked. Found by reading `WebhookRetrySweeper::sweep()`:
+**it does not mutate the rows it dispatches for.** So under the hoist, tenant A is swept twice and
+enqueues two `DeliverWebhookJob`s — and `webhookQueueDepth()` reads **2**, identical to correct
+two-tenant behaviour. **A count-only assertion is blind on that file even with a working drain loop.**
+Only asserting identity catches it.
+
+**Verdict: sound in intent, incomplete in mechanism, and larger than necessary for three of the four
+files.** Build the proven identity assertion in all four; add the row's end-to-end shape where it pays.
+
+Files: `tests/Feature/Webhooks/WebhookRetrySweepTest.php` · `tests/Feature/Forms/ScheduledFormSweepTest.php` ·
+`tests/Feature/Entitlements/UsageRollupTest.php` · `tests/Feature/Submissions/DraftReaperTest.php` ·
+`docs/feature-backlog.md` · `PROGRESS.md` · `docs/gate-baselines.md` · this file.
+**No production file is edited** — the production code is correct at all four sites and this row is
+about coverage.
+Shared artefacts taken: `docs/**` and `PROGRESS.md` (own block only).
+Paired files taken: **none** — no Standing Rule 7(b-bis) entry is touched.
+Namespaces spent: **nothing from either namespace** — no ADR, no migration prefix, no `§D`.
+Prediction: Pest rises by roughly seven cases; Vitest, Storybook axe and E2E are untouched; **PHPStan
+cannot move at all** on a test-only diff, since it scans `app`, `database` and `routes`. All four BEFORE
+mutants read `SURVIVED` and all four AFTER mutants read `CAUGHT`. ⚠️ **The BEFORE result is a proof
+rather than a forecast and will be reported as one** — with exactly one active tenant the hoisted mutant
+is *semantically identical* to the original, so it cannot fail; its value is narrower but real, proving
+the token matched, the sha256 moved, the mutant parsed and the harness ran. **The one I most expect to be
+wrong is `DraftReaperTest`'s two-tenant case** — the only one whose second-tenant fixture must be built
+under a *second* RLS context, with `$this->drafts` resolved from the container under acme's.
+
+---
 
 ⛔ **RUN `php scripts/state.php` FOR EVERY NUMBER.** Increment, ADR, migration prefix, exceptions-log
 entry, open rows, open decisions, and how far behind the trunk `docs/gate-baselines.md` has fallen.

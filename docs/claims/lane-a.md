@@ -16,26 +16,84 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M46` is merged and the lane holds nothing forward
+## Status: ACTIVE CLAIM — the `[tracker-surgery]` marker becomes armable, and R7 stops being blind to bytes (`m47-surgery-marker-armable`)
 
-**`M46` is merged.** Lane A holds no active row and pre-claims no forward number. The next row is taken
-under Rule 7(f), and the claim is written here and **pushed** before the first file is opened.
+Taken 2026-08-29. Branch `m47-surgery-marker-armable`, cut from `origin/main` at `dbeb6ff`, PR into `main`.
+Row: `docs/feature-backlog.md` § *The tracker and its gates* — **`major` · "The `[tracker-surgery]` marker
+cannot survive a squash merge in any form both gates accept, so `R7` is unarmable on the trunk"**, filed by
+`M45` and measured on its own merged commit.
 
-⛔ **RUN `php scripts/state.php` FOR EVERY NUMBER.** Increment, ADR, migration prefix, exceptions-log
-entry, open rows, open decisions, and how far behind the trunk `docs/gate-baselines.md` has fallen.
-Nothing in this file or in `PROGRESS.md` is the authority for any of them any more.
+### Evidence verified
 
-✅ **`CLAUDE.md` IS THE IMPERATIVE LAYER AND IS AUTO-LOADED.** Read it before this file. It carries no
-numbers at all, and `tracker-lint` R8 keeps it that way.
+Four citations, opened individually against the merged tree rather than read as a set.
 
-⛔⛔ **THE `[tracker-surgery]` INSTRUCTION IS UNFOLLOWABLE THROUGH A DEFAULT SQUASH — SEE `M45`.**
-GitHub prefixes every commit subject with `* ` in the default body, which demotes the marker off line
-start. Pass an explicit `--body` whose FIRST content line is the marker. The PR title cannot carry it:
-`state.php` anchors merged titles on `^M(\d{1,3}):`.
+| Citation | Verdict |
+|---|---|
+| `scripts/tracker-lint.php:201` — "R7 matches `/^\[tracker-surgery\]/m`" | **MOVED BY ONE.** `:201` is the `exec()` that reads the range; the predicate is `:202`. The claim is true of the file, false of the line. |
+| `scripts/state.php:249` — anchors merged PR titles on `^M(\d{1,3}):` | **HELD EXACTLY**, character for character. |
+| PR #235 / `1f966a4` — the default squash body renders `* [tracker-surgery] M45 phase 1: …` | **HELD**, read from the trunk commit itself. |
+| `DROP_LIMIT` is 200 and `M45`'s drop was 133 | **HELD.** `PROGRESS.md` 583 → 450 lines at `1f966a4`. |
 
-⛔ **AND `M46` ADDS ONE: A FIGURE THAT ARRIVED FROM A RECONNAISSANCE PASS IS NOT A MEASUREMENT.**
-Three of them entered this increment's own claim or plan and **all three were wrong** — see the release
-below. Re-measure a scout's number before it reaches a claim, a document or a commit message.
+⛔ **THE HEADLINE IS PROVEN, NOT INFERRED — BOTH PREDICATES RUN AGAINST THE REAL TRUNK BYTES OF
+`git log --format=%B 1f966a4~1..1f966a4`:** the shipped `/^\[tracker-surgery\]/m` returns **NO MATCH**;
+`/^(?:[*+-] )?\[tracker-surgery\]/m` returns **MATCH**. R7 was unarmed on a surgery whose commits each
+carried the marker at line start.
+
+⚠️ **THE ROW UNDERSTATES ITSELF, AND THE SECOND DEFECT IS THE LARGER ONE.** It treats the byte-blindness
+as a footnote — *"`M45` was unaffected only because its drop was 133 against `DROP_LIMIT`'s 200"* — but that
+is a second, independent way R7 fails to fire, and it is the one that reaches the next surgery. Measured
+across **every** commit touching `PROGRESS.md` on `origin/main` (394 parent/child pairs, blob sizes from
+`git cat-file`), the distribution is bimodal with an order-of-magnitude gap:
+
+| commit | bytes dropped | net lines | what |
+|---|---|---|---|
+| `9fa0719` | 938,007 | 1,573 | the Current Status surgery |
+| `f565ac9` | **670,409** | **1,085** | **the incident of 2026-08-16** |
+| `31a93fd` | 307,867 | — | Phase 0 restructure, 2026-07-04 |
+| `dd044a9` | 272,006 | — | docs restructure, 2026-07-13 |
+| `1f966a4` | 161,528 | **133** | **`M45` — under the line limit, invisible to R7** |
+| `58abcd4` | 14,340 | 3 | **an ordinary close-out** — one long hand-off line replaced |
+| everything else | ≤ 6,486 | — | ordinary |
+
+⚠️ **AND THE CANONICAL "1,086" IS A `numstat` DELETION COUNT, NOT R7's ARITHMETIC.** R7 measures a *net*
+drop, so the incident is **1,085** to this gate and `M45` is **133** rather than 134. Both are recorded
+here because the constant's own comment says *"The incident was 1,086"*, and a gate whose threshold is
+justified by a number it does not itself compute is a small version of the defect this row is about.
+
+### Remedy verdict
+
+The row prescribes two things and offers a third. **The first is necessary and insufficient, the second is
+correct, and a fourth is missing.**
+
+1. *"Pass an explicit `--body` whose first content line is the marker"* — **works, and does not close the
+   case.** A merge done through the web UI, or by anyone who does not read the instruction, still produces
+   the bullet form. The row itself calls the existing empty-`--body` rule *"necessary and not sufficient"*
+   and this has the same shape.
+2. *"Consider relaxing `R7` to accept the marker after a leading `* ` or `- `"* — **correct, and it is the
+   half that actually arms the gate.** Taken, constrained to exactly one bullet character and exactly one
+   space with **no leading whitespace**, so the mid-sentence-mention hole the original comment defends
+   stays shut.
+3. *"Or put it in the PR title"*, still in R7's own failure message — **actively wrong, and it breaks a
+   second gate.** `state.php:249` anchors on `^M(\d{1,3}):`, so a marker prefix silently drops that PR out
+   of the independent increment cross-check. Being deleted, with the reason named in both files.
+4. **NOT PRESCRIBED ANYWHERE: a byte threshold.** Without it R7 cannot see the next filed surgery either.
+
+Files: `scripts/tracker-lint.php`, `scripts/state.php` (comment only), `CLAUDE.md`, `PROGRESS.md`
+(Standing Rules + own status block + own hand-off line), `docs/feature-backlog.md`, `docs/claims/lane-a.md`,
+`docs/gate-baselines.md` (regenerated at close-out).
+Shared artefacts taken: `CLAUDE.md`, `PROGRESS.md`, `docs/feature-backlog.md`, `docs/gate-baselines.md`.
+Paired files taken: none.
+Namespaces spent: **nothing from either namespace** — no ADR, no migration prefix, no exceptions entry.
+`ADR-0022` stays free and `0010` stays reserved.
+
+Prediction: `tracker-lint` R7 is the only gate this diff can move, and it moves in the *message* rather
+than the verdict — a green run proves nothing, so six positive controls carry the proof, three of them
+replayed against the real bytes of `1f966a4` rather than a fixture. PHPStan cannot move: it scans `app`,
+`database` and `routes`, and this diff touches none of them. Pint runs bare on the host because the diff is
+`scripts/`. **The one I most expect to be wrong is the byte threshold, in the direction of being too low** —
+the 14,340-byte ordinary drop came from replacing a single very long generated hand-off line, and that line
+can grow. Second most likely: the historical replay at `1f966a4` fails for an unrelated rule and I read an
+aggregate exit code instead of R7's own line.
 
 ---
 

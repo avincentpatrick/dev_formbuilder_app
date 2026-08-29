@@ -3059,10 +3059,17 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   than states, so *any* namespace literal in it is wrong and no judgement is needed. The tracker has no
   such constraint: a live forward claim and a dated `RELEASED` bullet quoting a past one are textually
   identical, so a rule over it is either **red on arrival** — which `M40` established can never merge —
-  or vacuous. **Blocked on separating the ledger from the constitution** (see the `major` row under
-  Documentation & specs); once the dated records live in the archive, what remains in Standing Rules is
-  by definition current and can be gated. **Filed by M42 (2026-08-29)** at the moment it decided not to
-  fake it. **Live.**
+  or vacuous. ✅ **UNBLOCKED BY `M45` (2026-08-29), AND STILL OPEN — THE PRECONDITION IS MET, THE GATE
+  IS NOT BUILT.** The dated records now live in `PROGRESS_ARCHIVE.md`; what remains in Standing Rules
+  is **46,511 bytes** of rules 1–8 and is current by definition, so a rule over it is no longer red on
+  arrival. ⚠️ **Two things the next taker should measure rather than assume.** (1) The exemption
+  surface is not zero: `M45`'s own pointer bullet in 7(g) names `M1`, `M14`, `M15` and two dates, and
+  Rule 7(g)'s surviving imperatives cite `0010` as a reserved ADR — so a naive "no namespace literal
+  in Standing Rules" rule is red on arrival for a *different* reason than before, and the constrained
+  form has to be positional, as `M42` established after two failed attempts at prose. (2) It must not
+  be pointed at `## Next Session`, which is still 214,073 bytes of dated hand-offs — that section has
+  its own `major` row and has to move first. **Filed by M42 (2026-08-29)** at the moment it decided
+  not to fake it. **Live.**
 
 - **`minor` · `scripts/mutate.php` cannot drive a positive control for anything that is not Pest in a
   container.** Its `--tests` argument is Pest paths and it execs them via `docker exec`, so a gate
@@ -3278,21 +3285,103 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `:105` and `:459`. **Live**, all documentary.
 
 
-- **`major` · Standing Rule 7(g) contains a 163,680-byte claim ledger that duplicates
-  `docs/claims/lane-*.md`, and it is why the constitution cannot be read in one call.** Measured:
-  `## Standing Rules` is 207,468 bytes; **Rule 7 alone is 196,596 of them — 94.8%** — and lines 123–259
-  are per-increment `RELEASED` / `CLAIMED` bullets carrying **zero imperatives**. Claims have lived in
-  `docs/claims/` since the 2026-08-25 amendment, so this is the second copy of a record that already has
-  a home, which is the defect Rule 7(b) records about the lane boundary and `docs/gate-baselines.md` ends
-  for gate numbers. ⚠️ **`M41` named this and deliberately did not take it**, restating its own ~40 KB
-  target as unreachable *"while Standing Rules and Next Session live in this file"* and calling the move
-  *"a decision about what the constitution keeps, not a splice."* **That decision was taken with the user
-  on 2026-08-29: move it, as its own increment.** ⛔ **It is a tracker surgery and must be run as one** —
-  the marker at the start of a line in the commit message *and* surviving the squash onto the trunk,
-  split by pre-measured line index and never by search, proved by a counted multiset of line hashes plus
-  exact byte conservation with no tolerance. **It also unblocks the `minor` row about R8 not reaching
-  `PROGRESS.md`**: once the dated records are in the archive, what is left in Standing Rules is current
-  by definition and can be gated. Estimated effect: roughly 504 KB down to roughly 340 KB.
-  **Filed by M42 (2026-08-29)**, deliberately not taken there because mixing a 163 KB documentation
-  surgery into a scripts increment makes the diff unreviewable and muddies which change moved which gate.
-  **Live.**
+- ~~**`major` · Standing Rule 7(g) contains a 163,680-byte claim ledger that duplicates
+  `docs/claims/lane-*.md`, and it is why the constitution cannot be read in one call.**~~
+  ✅ **DONE — M45 (2026-08-29). THE MEASUREMENT HELD AND THE PREMISE DID NOT, WHICH INVERTED THE
+  REMEDY: THE BLOCK IS NOT A SECOND COPY, IT IS THE ONLY ONE.** `PROGRESS.md` **508,441 → 346,913
+  bytes** (583 → 450 lines), `## Standing Rules` **208,039 → 46,511**, moved verbatim to
+  `PROGRESS_ARCHIVE.md` under `## Archived claim ledger`. `scripts/tracker-lint.php`'s
+  `TRACKER_BYTE_CEILING` ratcheted 600,000 → 400,000 in the same commit, which that constant's own
+  comment makes the obligation of whichever increment moves one of these sections.
+  ⛔ **`docs/claims/` HOLDS `M15`–`M44` AND NOTHING EARLIER; THE BLOCK HOLDS `M1`–`M14` PLUS THE
+  J/K/P/I-SERIES. THE SPLIT IS EXACT AND THE OVERLAP IS ZERO** — 0 of its 129 non-blank lines appear
+  verbatim in either claim file or in `PROGRESS_ARCHIVE.md`. Had *"the second copy of a record that
+  already has a home"* been taken on report, the obvious action — delete the duplicate — would have
+  destroyed the only record of every claim before `M15`. **Eighth row in nine whose evidence is sound
+  and whose prescribed remedy is not**, and the first where the remedy fails because the row's
+  *premise* is false rather than its mechanism.
+  ⛔ **AND IT COULD NOT GO WHERE THE ROW POINTS.** The block interleaves 🅰️ and 🅱️ bullets — both
+  lanes' claims — and Lane A may never write `lane-b.md`. The destination the row names is closed by
+  the one-writer rule the row is filed under, which leaves `PROGRESS_ARCHIVE.md` as the only
+  structurally legal home. That was settled before a byte moved, not discovered during the splice.
+  ⚠️ **THE ROW'S "ZERO IMPERATIVES" IS FALSE, AND IT IS THE PART WORTH READING.** Four of the moved
+  bullets carry **`DO NOT RE-ASK` user decisions of record** — M9's three SSO-adoption decisions
+  (2026-08-24), and leaderboard visibility, the ⌘K palette's stacking behaviour and checklist
+  dismissibility (2026-08-17). They moved with the block, because hoisting them into
+  `docs/claims/decisions.md` would have created the second copy this row exists to end and broken the
+  conservation proof besides; both the archive heading and the pointer name them explicitly so the
+  record stays discoverable. Filed as its own `minor` below.
+  ⚠️ **THE ROW'S BOUNDARY WAS OFF BY THREE LINES AND ITS SIZE BY 1,650 BYTES** — it cites `:123-259`
+  / 163,680 and the ledger is `:126-259` / **162,601**, because `:123`–`:125` are live imperatives
+  (the ADR-number-is-not-written-here fix, the `0010`-is-reserved trap, cite-by-filename) and the file
+  has grown since filing. **A row's line numbers are the first thing to re-measure, not the last.**
+  ⛔⛔ **R7 CANNOT FIRE ON THIS SURGERY, AND THAT WAS PROVEN RATHER THAN INFERRED.** `DROP_LIMIT` is
+  **200 lines** with a strict `>`; this drop is **133**. The commit was amended to remove
+  `[tracker-surgery]` entirely and `tracker-lint` **still passed**, then the message was restored
+  byte-exactly. So the marker is carried because the row demands it, **not because any gate enforced
+  it** — and `CLAUDE.md`'s own two-hundred-line threshold does not reach this diff either. A green R7
+  here is the vacuous-success family again: a rule that passed because it never looked.
+  ✅ **PROVED BY 21 ASSERTIONS, ALL EXACT AND NONE WITH A TOLERANCE**: a counted multiset of the 134
+  moved line hashes with exact multiplicity (**130 distinct** — five blank lines share one, so a set
+  equality would have passed while dropping four lines); **byte conservation exact,
+  2,601,691 == 2,601,691**, with the 1,180-byte heading and the 1,073-byte pointer stated as integers
+  computed from the literal strings; lines 1–125 and Rule 8 downward byte-identical
+  (`82773829…`, `b593cfeb…`); and an **independent git-level proof** — the slice read from the
+  pre-surgery commit and the tail of the new archive both hash `868511fd…`.
+  ⚠️ **THE PATHS-TOUCHED ASSERTION FAILED TWICE AND THE CHECK WAS WRONG BOTH TIMES, NOT THE SURGERY**
+  — first because it compared committed state while phase 2 sat in the working tree, then because its
+  expected list omitted the ceiling ratchet the plan had named in scope. `M41` recorded this once
+  (*"a failing independent check is not automatically a defect; verify the check before believing
+  it"*); it recurred twice inside one increment, in the same assertion, for two unrelated reasons.
+  ✅ **AND THE GATE WAS PROVEN ABLE TO FAIL ON THE RULES THAT ACTUALLY BEAR ON THIS DIFF**, since
+  `scripts/mutate.php` cannot drive a standalone script: four controls, each with a green baseline
+  first, each asserting the sha256 **moved**, each restored by **byte comparison** — a second
+  `## Next Session` in the archive reddens **R3**; a `## Current Status` there reddens **R4**; the
+  ceiling set below the new size reddens **R1**; one CR byte reddens **R5**. Each named its own rule
+  and only it, and the gate was green again afterwards.
+  ➕ **Filed rather than fixed:** the `## Next Session` row below, and the decisions-hoist row.
+  Original filing follows.
+  — *Measured: `## Standing Rules` is 207,468 bytes; **Rule 7 alone is 196,596 of them — 94.8%** —
+  and lines 123–259 are per-increment `RELEASED` / `CLAIMED` bullets carrying **zero imperatives**.
+  Claims have lived in `docs/claims/` since the 2026-08-25 amendment, so this is the second copy of a
+  record that already has a home, which is the defect Rule 7(b) records about the lane boundary and
+  `docs/gate-baselines.md` ends for gate numbers. `M41` named this and deliberately did not take it,
+  restating its own ~40 KB target as unreachable "while Standing Rules and Next Session live in this
+  file" and calling the move "a decision about what the constitution keeps, not a splice." That
+  decision was taken with the user on 2026-08-29: move it, as its own increment. It is a tracker
+  surgery and must be run as one. It also unblocks the `minor` row about R8 not reaching
+  `PROGRESS.md`. Estimated effect: roughly 504 KB down to roughly 340 KB. Filed by M42
+  (2026-08-29).*
+
+- **`major` · `## Next Session` is a second historical ledger inside the constitution, and it is now
+  62% of the file.** Measured after M45's surgery: `PROGRESS.md` is **346,913 bytes** and
+  `## Next Session — Resume Here` is **214,073 of them**, against `## Standing Rules`' 46,511 and
+  `## Current Status`' 57,283. Roughly **19 superseded-prompt blocks** (each 2.7–7.5 KB of a hand-off
+  that was superseded increments ago) plus a long run of *"(do not re-open)"* per-increment decision
+  records for `I1`–`I12`, `H1e`–`H24b1`, `J1`–`J5` and the five answered-2026-07-21 questions.
+  **Exactly the shape M45 just moved, one section down**, and the same argument applies: a superseded
+  hand-off is a dated record, not an instruction, and the archive is where dated records live. What
+  must stay is the two live `LANE * NEXT PROMPT` lines — `scripts/next.php --write` refuses unless
+  exactly one per lane exists at line start, and `scripts/state.php --check` gates the positional
+  `[state …]` block on Lane A's — plus the parallel-lanes protocol header and whichever "do not
+  re-open" entries are still load-bearing, which is a judgement per entry rather than a slice.
+  ⚠️ **That last part is why this is not a repeat of M45 and must not be planned as one:** M45 moved
+  a block that was provably 100% dated record with a clean boundary; this one has live and dead
+  material interleaved, so the boundary has to be decided rather than measured. ⛔ **M41 named this
+  section by size and NOTHING EVER FILED IT** — it lived only in that release's prose and in M45's
+  plan, so a backlog search would never have reached it. That is the J4b1 shape, and it is why this
+  bullet exists. **Filed by M45 (2026-08-29). Live.**
+
+- **`minor` · Four `DO NOT RE-ASK` user decisions of record now live in `PROGRESS_ARCHIVE.md` rather
+  than in `docs/claims/decisions.md`.** M45 moved them with the claim ledger they were embedded in:
+  M9's three SSO-adoption decisions (2026-08-24), and leaderboard visibility, the ⌘K palette's
+  stacking behaviour and checklist dismissibility (2026-08-17). **Deliberate, and the reasoning is
+  the row above's:** hoisting them into `decisions.md` would have created the second copy that row
+  exists to end, and would have broken the byte-conservation proof — the move stayed a pure
+  permutation precisely because nothing was lifted out of it. Both the archive heading and the
+  pointer left in Rule 7(g) name them explicitly, so they are discoverable rather than lost.
+  ⚠️ **The residual defect is a FORM mismatch, not a lost record:** `decisions.md`'s `ANSWERED`
+  section is D-numbered *questions* (`D2`, `D5`), and these are increment decisions with no question
+  attached, so adopting them needs a second form in that file rather than a copy-paste. **Not live**
+  — nothing is wrong today; this is a filing question. **Filed by M45 (2026-08-29)** at the moment it
+  decided not to do it.

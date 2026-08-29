@@ -73,7 +73,7 @@ The two copies share nothing at runtime — not a port, not a database, not a fi
 > — and then loops you straight back to the landing page:
 >
 > 1. `POST /login` authenticates fine.
-> 2. Fortify redirects to its configured home, `/dashboard` — the `home` key in `config/fortify.php` — **still on the
+> 2. Fortify redirects to its configured home, `/dashboard` — `config/fortify.php:80` — **still on the
 >    central host**.
 > 3. `/dashboard` is a tenant route, and the tenant group's **first** middleware is
 >    `InitializeTenancyBySubdomain`. On the central host `localhost` there is no subdomain to resolve, so

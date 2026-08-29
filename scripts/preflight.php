@@ -199,11 +199,11 @@ if (! is_file($baselinePath)) {
     }
 }
 
-// ── The five lint gates. Opt-in because they are slow, and reported HOST-first on purpose.
+// ── The six lint gates. Opt-in because they are slow, and reported HOST-first on purpose.
 if (isset($opts['with-gates'])) {
     section('Lint gates (host)');
 
-    foreach (['controller-gate', 'migration-lint', 'job-payload-lint', 'constraint-boundary-lint', 'component-import-lint'] as $gate) {
+    foreach (['controller-gate', 'migration-lint', 'job-payload-lint', 'constraint-boundary-lint', 'component-import-lint', 'citation-liveness-lint'] as $gate) {
         $status = 0;
         $out = sh('php '.escapeshellarg('scripts/'.$gate.'.php').' 2>&1', $status);
         $status === 0 ? pass(trim(last_line($out))) : fail(trim($out));

@@ -153,6 +153,18 @@ jobs:
       - name: Tracker lint (PROGRESS.md structure, encoding and deletion guard)
         run: composer run tracker-lint
 
+      # M46. A `path:N` citation whose target line is BLANK, a horizontal rule, a fence delimiter, a
+      # table separator or past end-of-file is a pointer into nothing, and nothing in CI has ever
+      # read one. Six of the eight documentation-truth rows M46 closed had citations in that state,
+      # and this gate mechanically catches three of them. Registered as its own step for the same
+      # reason every linter above is: no CI job runs `composer run quality`.
+      #
+      # ⛔ IT CHECKS THAT A CITED LINE IS ALIVE, NEVER THAT IT SAYS WHAT THE CITING SENTENCE CLAIMS.
+      # The class it deliberately cannot catch is named in the script header, with two measured
+      # counter-examples from the same increment. Do not sell it as more than it is.
+      - name: Citation liveness linter (no citation into a blank line, rule or fence)
+        run: composer run citation-liveness-lint
+
       - name: Composer audit (SCA)
         run: composer audit
 

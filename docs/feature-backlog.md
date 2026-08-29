@@ -3660,9 +3660,11 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   plan, so a backlog search would never have reached it. That is the J4b1 shape, and it is why this
   bullet exists. **Filed by M45 (2026-08-29). Live.**
   ➕ **RE-MEASURED BY M47 (2026-08-29), AND THE SECTION HAS GROWN SINCE FILING.** `## Next Session` to
-  end of file is **242,873 bytes** of `PROGRESS.md`'s 353,875 — not the 214,073 above, which was true
-  on 2026-08-29 at M45's close and is a dated figure like any other. **Plan against the measurement,
-  not against this row.**
+  end of file is **242,873 bytes** — not the 214,073 above, which was true on 2026-08-29 at M45's
+  close and is a dated figure like any other. **Plan against the measurement, not against this row.**
+  ⚠️ **The whole-file size is deliberately NOT stated here.** A first draft of this bullet gave it, and
+  M47's own paragraph in Standing Rule 8 — in the same commit — invalidated it before the commit was
+  written. `tracker-lint` prints it on every run; the section size is the figure that stays put.
   ✅ **AND THE GATE THAT WOULD HAVE MISSED THIS SURGERY IS NOW ARMED FOR IT.** `R7`'s new
   `DROP_BYTE_LIMIT` is 50,000, so a removal of that size **must** carry the marker or the trunk goes
   red — where the line threshold alone would have waved it through exactly as it waved M45 through.

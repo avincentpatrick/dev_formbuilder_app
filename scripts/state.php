@@ -226,6 +226,16 @@ function derive_increment(bool $offline): array
 /**
  * The second, independent maximum: merged pull-request titles.
  *
+ * ⛔ THE TITLE MUST BEGIN WITH THE INCREMENT FORM, AND ONE OTHER GATE USED TO ASK FOR THE OPPOSITE.
+ *    The anchor below is why: a title that does not START with `M<n>:` is silently invisible here,
+ *    and the failure mode of an invisible spend is a LOWER maximum rather than an error — i.e. a
+ *    number collision. Until M47, R7 in scripts/tracker-lint.php told anyone whose surgery marker
+ *    had been eaten by a squash to "put it in the PR title", which would have prefixed exactly this
+ *    string and dropped that pull request out of the cross-check. The two gates wanted incompatible
+ *    first characters and neither file mentioned the other. R7 now accepts the marker behind the
+ *    bullet a squash produces and no longer sends anyone here; if this anchor is ever loosened,
+ *    that advice becomes safe again and R7's message should be revisited in the same commit.
+ *
  * @return array{0: ?int, 1: ?string}
  */
 function remote_highest(): array

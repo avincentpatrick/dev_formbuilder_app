@@ -16,35 +16,89 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M47` is merged and the lane holds nothing forward
+## Status: ACTIVE CLAIM — `## Next Session` leaves the constitution (`m48-next-session-surgery`)
 
-**`M47` is merged.** Lane A holds no active row and pre-claims no forward number. The next row is taken
-under Rule 7(f), and the claim is written here and **pushed** before the first file is opened.
+Taken 2026-08-29. Branch `m48-next-session-surgery`, cut from `origin/main` at `a77938c`, PR into `main`.
+**It is a tracker surgery and is run as one**, under `CLAUDE.md`'s *The tracker* rules.
 
-⛔ **RUN `php scripts/state.php` FOR EVERY NUMBER.** Increment, ADR, migration prefix, exceptions-log
-entry, open rows, open decisions, and how far behind the trunk `docs/gate-baselines.md` has fallen.
-Nothing in this file or in `PROGRESS.md` is the authority for any of them any more.
+Row: the `major` in `docs/feature-backlog.md` — *"`## Next Session` is a second historical ledger inside
+the constitution, and it is now 62% of the file"* — filed by `M45`, re-measured by `M47`, and carrying
+`M47`'s explicit hand-over: **this increment owes the end-to-end proof that a real GitHub squash arms the
+relaxed `[tracker-surgery]` marker on the trunk.**
 
-✅ **`CLAUDE.md` IS THE IMPERATIVE LAYER AND IS AUTO-LOADED.** Read it before this file. It carries no
-numbers at all, and `tracker-lint` R8 keeps it that way.
+### Evidence verified
 
-✅ **THE `[tracker-surgery]` INSTRUCTION IS NOW FOLLOWABLE — `M47` CLOSED IT.** R7 accepts the marker
-behind exactly one `* `, `- ` or `+ `, which is the shape a default squash produces, and an indented or
-mid-sentence mention still cannot arm it. **Still pass an explicit `--body` whose first content line is
-the marker** — belt and braces, and `CLAUDE.md` says so under *Merging*. ⛔ **Never the PR title:**
-`state.php`'s merged-title cross-check anchors on the increment-number prefix and would stop seeing that
-pull request entirely.
+Every citation opened against the merged tree at `a77938c`. **The defect is real and larger than the row
+says; three of the row's four factual enumerations are wrong.**
 
-⛔ **AND `M47` ADDS THE ONE THE NEXT SURGERY NEEDS: `R7` NOW FAILS ON BYTES AS WELL AS LINES.**
-`DROP_BYTE_LIMIT` is 50,000, sized from all 394 commits that have ever touched `PROGRESS.md`. The next
-filed surgery — `## Next Session`, re-measured at 242,873 bytes — is nearly five times over it and
-**owes the end-to-end proof `M47` could not give**: no real GitHub squash has yet been observed arming
-the relaxed marker. Read the post-merge run on `main`, not the PR run.
+- **`## Next Session — Resume Here` is 214,178 bytes over lines 218–408 — 59.5% of a 360,207-byte file.**
+  MOVED. The row's `214,073` / `346,913` / `46,511` / `57,283` are `M45`-dated and every one has drifted;
+  `## Standing Rules` is now 49,001 and `## Current Status` **67,982**. The row's *ordering* claim holds.
+- **`M47`'s addendum of `242,873` bytes HOLDS to within 31 bytes (now 242,904) — but it is a DIFFERENT
+  BOUNDARY.** That figure is heading-to-EOF and sweeps in `## Roadmap Phases`, `## What's done`,
+  `## Verification loop` and `## Gotchas` (28,726 bytes across four sections this increment does not
+  touch). Planning against it would have overstated the surgery by 13%.
+- ⛔ **"Roughly 19 superseded-prompt blocks" is FALSE — there are 14.** Measured at line start:
+  13 `**SUPERSEDED PROMPT (…)` plus 1 `**PRIMARY NEXT PROMPT`.
+- ⛔ **"`I1`–`I12`, `H1e`–`H24b1`, `J1`–`J5`" is FALSE in two of three ranges.** 28 `(do not re-open)`
+  records exist at line start: `I1`–`I4`, `I6`, `I7a`, `I7b` — **no `I5`, no `I8`–`I12`** — and
+  `H5a`–`H24b1`. **There is no J-series record in the section at all**; those moved to
+  `PROGRESS_ARCHIVE.md` with `M45`'s claim ledger, so the row inherited a range that had already left.
+- **"What must stay is the two live `LANE * NEXT PROMPT` lines" HOLDS, and understates itself.**
+  `scripts/next.php`'s `write_line()` exits 1 unless exactly one matches at line start; `state.php`'s
+  `HANDOFF_STATE_MARKER` anchors the `[state …]` block immediately after the arrow. **The row omits the
+  merge gate**: `tracker-lint` R6 asserts the same thing and is the one that reddens `main`.
+- **`DROP_BYTE_LIMIT` is 50,000 and this drop is ~199,325 — HOLDS.**
 
-⚠️ **AND ONE ABOUT METHOD, WHICH IS THE HALF WORTH KEEPING.** A gate you have just written is proved by
-a deliberate red and by nothing else — but so is a gate you have just *inherited*. `M47` found R7 had
-never fired by replaying it against a real past surgery rather than by reading it. **Replay an existing
-gate against the event it was built for before trusting it.**
+### Remedy verdict
+
+**Sound in direction, and incomplete in three ways the tree enforces.** The row prescribes only *move it,
+with the boundary decided rather than measured*; that direction is right and the boundary judgement is
+recorded below. What it does not say:
+
+1. ⛔ **The archive heading may not be `## Next Session`.** `tracker-lint` R3 counts `/^## Next Session/m`
+   **across both files** and expects exactly 1 — so the obvious heading is **red on arrival**. `M45` hit
+   this and renamed the archive's stale copy to `## Historical next-session pointer`.
+2. ⛔ **`TRACKER_BYTE_CEILING` must be ratcheted in this diff, and its comment is falsified by it.** The
+   constant's own note says *"the increment that moves Next Session turns this down again"* and asserts the
+   ~40 KB target is *"unreachable while Next Session (214 KB, and now 62% of this file) remains in it"*.
+3. ⛔ **The post-merge run on `main` exists only because a non-ignored path is in the same commit.**
+   `ci.yml`'s `push` `paths-ignore` covers `PROGRESS.md`, `PROGRESS_ARCHIVE.md`, `docs/claims/**`,
+   `docs/gate-baselines.md` and `docs/backlog-triage.md`. **A tracker-only surgery produces no run at
+   all** — so the proof this increment owes would have been unobtainable. It is obtainable here only
+   because obligation 2 drags `scripts/` into the diff. Filed as its own row rather than left as luck.
+
+⛔ **AND THE MEASUREMENT INVERTS WHICH THRESHOLD IS DOING THE WORK.** The drop is **176 net lines** against
+`DROP_LIMIT`'s 200 — **under it** — and ~199,325 bytes against `DROP_BYTE_LIMIT`'s 50,000, **3.99× over**.
+So this surgery is armed by the byte half alone, and the line-only gate would have waved it through exactly
+as it waved `M45` through. That is a control this increment runs, not a claim it makes.
+
+Files: `PROGRESS.md`, `PROGRESS_ARCHIVE.md`, `scripts/tracker-lint.php` (`TRACKER_BYTE_CEILING` and its
+comment), `docs/feature-backlog.md`, `scripts/citation-liveness-lint.php` (`LEDGER_ROT_CEILING`, **only if
+the measured count actually drops**), `docs/claims/lane-a.md`.
+⚠️ **The list is stated here, before phase 1, and deliberately includes the ratchet** — `M45`'s
+paths-touched assertion failed twice, once with an expected list that omitted exactly that.
+Shared artefacts taken: `PROGRESS.md` (own block plus the `## Next Session` section), `PROGRESS_ARCHIVE.md`,
+`docs/feature-backlog.md`, `docs/claims/lane-a.md`, `scripts/tracker-lint.php`,
+`scripts/citation-liveness-lint.php`.
+Paired files taken: none — no 7(b-bis) entry is touched.
+Namespaces spent: **nothing from either namespace.** No migration, no ADR (`0022` stays free, `0010` stays
+reserved for H1d), no `§D`, no exceptions entry, no route.
+
+Prediction, written before the first byte moves:
+
+- `R7` reports `DECLARED SURGERY` on the PR run and again on the post-merge `push` run on `main`.
+  **This is the one I most expect to be wrong**, and the reason is that every previous attempt to carry
+  this marker through a merge looked correct at the moment of writing and was not — three distinct
+  failures so far. If it reddens `main`, that is the acceptance test paying out, and the remedy is a
+  follow-up commit rather than a force-push.
+- `R1` passes at the new ceiling with roughly 39 KB of headroom; `R2`/`R3`/`R4`/`R5`/`R6` do not move.
+- **PHPStan, Vitest, Storybook axe and e2e cannot move** — the diff touches no `app/`, `database/`,
+  `routes/` or front-end file. I expect to report that rather than quote an unchanged number.
+- Pint: `scripts/*.php` changes are constant-and-comment only; I expect no reformatting.
+- `citation-liveness` tier 2 is at **19 of 19 — zero headroom**, so any dead citation I add reddens it.
+  I expect to *reduce* it to 18 by repairing the one dead `PROGRESS.md` pointer the earlier surgeries
+  left in the ledger, and to ratchet the constant in the same commit.
 
 ---
 

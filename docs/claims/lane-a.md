@@ -16,7 +16,159 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M44`, four maintenance fan-outs asserted by a fixture too small to see a wrong tenant id (`m44-fanout-fixture-width`)
+## Status: NO ACTIVE CLAIM — `M44` is merged and the lane holds nothing forward
+
+**`M44` is merged (PR #234, `7837078`, 6/6 green).** Lane A holds no active row and pre-claims no forward
+number. The next row is taken under Rule 7(f), and the claim is written here and **pushed** before the
+first file is opened.
+
+⛔ **RUN `php scripts/state.php` FOR EVERY NUMBER.** Increment, ADR, migration prefix, exceptions-log
+entry, open rows, open decisions, and how far behind the trunk `docs/gate-baselines.md` has fallen.
+Nothing in this file or in `PROGRESS.md` is the authority for any of them any more.
+
+✅ **`CLAUDE.md` IS THE IMPERATIVE LAYER AND IS AUTO-LOADED.** Read it before this file. It carries no
+numbers at all, and `tracker-lint` R8 keeps it that way.
+
+⛔ **A REMOVAL OF MORE THAN 200 LINES FROM `PROGRESS.md` NEEDS `[tracker-surgery]` AT THE START OF A
+LINE IN THE COMMIT MESSAGE.** Mentioning it mid-sentence deliberately does not count.
+
+---
+
+## RELEASED — `M44`, four maintenance fan-outs asserted by a fixture too small to see a wrong tenant id (merged as PR #234, `7837078`, 6/6 green)
+
+**Every claimed file was edited and nothing was added that the claim did not name.**
+`tests/Feature/Webhooks/WebhookRetrySweepTest.php` · `tests/Feature/Forms/ScheduledFormSweepTest.php` ·
+`tests/Feature/Entitlements/UsageRollupTest.php` · `tests/Feature/Submissions/DraftReaperTest.php` ·
+`docs/feature-backlog.md` · `PROGRESS.md` · `docs/gate-baselines.md` · this file. **No production file was
+edited** — the production loop is correct at all four sites, and the whole row was about coverage.
+**Namespaces spent: NOTHING** — no ADR, no migration prefix, no `§D`. **Twentieth consecutive.**
+
+### ✅ The controls, and the one whose asymmetry is the finding
+
+Six `mutate.php` runs, each with a green baseline first, the sha256 asserted **moved**, the mutant `php -l`'d,
+and the restore verified by byte comparison. **The BEFORE runs were taken on the claim commit, before a
+single test line existed** — the half `M32` once got wrong by measuring against a `HEAD` that had already
+moved onto its own work.
+
+| Mutation | Before | After |
+|---|---|---|
+| hoist the loop variable — every child gets tenant #1 (four files) | **SURVIVED ×4** | **CAUGHT ×4**, exactly the two new cases red, all 14 existing green |
+| a `sweep()` that dispatches nothing (webhook) | CAUGHT — but **only 1 of 3 red** | CAUGHT — **5 of 5 red** |
+| the drain loop reverted to the pre-M44 single-child drain | — | **CAUGHT — only the two-tenant case red** |
+
+⚠️ **THE BEFORE RESULT IS A PROOF, NOT A MEASUREMENT, AND SAYING SO IS THE POINT.** With exactly one active
+tenant `$first` *is* `$tenant`, so the mutant is **semantically identical** to the original and cannot fail.
+Reporting four SURVIVEDs as though they were a discovery would overclaim. What they genuinely prove is
+narrower and still worth having: the token matched, the sha256 moved, the mutant parsed, and the harness
+ran — the four ways `M31` and `M9` record that a control silently proves nothing.
+
+⛔ **AND THE MUTATION HAD TO BE SILENT RATHER THAN FATAL.** `->first()` on `activeTenants()` would have
+fataled — it returns a `Generator` — which is `M32`'s recorded invalidated control, *a control that dies
+loudly proves nothing about a silent defect*. `iterator_to_array()` is unsafe here too: `yield from` over a
+chunked `LazyCollection` can repeat keys and collapse entries. The form used, `$first ??= $tenant;`, keeps
+the dispatch **count** correct and changes only identity — which is exactly why the old fixtures were blind.
+
+### ⛔⛔ A SEPARATE DEFECT, FOUND ONLY BECAUSE THE RED SET WAS READ RATHER THAN THE VERDICT
+
+Replacing `SweepWebhookRetriesJob::sweep()`'s body with a comment — a sweep dispatching **nothing at all** —
+left **two of that file's three cases GREEN**, because both assert `webhookQueueDepth() === 0` and a dead
+sweep produces exactly that. They were passing for a reason unrelated to their names.
+
+⚠️ **`mutate.php` reported `CAUGHT` for that run, and it was right to.** One case *did* redden, so the
+aggregate verdict is indistinguishable from a healthy one. **The vacuity is visible only in the printed RED
+list.** This is a new member of this repository's vacuous-success family and it fails in a new direction:
+not a gate that never ran, but a gate whose verdict is true and whose *coverage* is a third of what the file
+appears to assert. **Read the red set, never just the verdict.** Filed as its own row; the asserted fan-out
+count fixes it, taking the same mutation to 5 of 5.
+
+### ⛔ Two things checked rather than assumed, and both changed the build
+
+**(1) The triage's remedy claim was false.** `docs/backlog-triage.md` said `M32` fixed the sibling *"in
+exactly the prescribed shape (a drain loop plus a second tenant)"*. `M32` added a **`Bus::fake`
+set-equality case only**; the drain loop in that file is **`M6`'s**, predates it, and dispatches the
+**child** directly, so it never reaches the parent's loop at all. Two unrelated mechanisms in one file were
+read as one. Had it been taken on report, the increment would have built the drain loop and skipped the one
+shape actually proven against this mutation.
+
+**(2) The row's own prescribed remedy is blind on one of its four files.** `WebhookRetrySweeper` writes
+**no rows**, so under the hoist acme is swept twice and re-dispatches its own due delivery both times: the
+queue depth reads **2**, numerically identical to two tenants swept once. A drain loop plus a count cannot
+see it. That file asserts **per-delivery payload containment** instead — each due delivery enqueued exactly
+once. This is the row's own *"the obvious fix produces a new green test that still cannot see it"* trap, one
+level down, in a form the row does not name.
+
+**Seventh row in eight whose evidence is sound and whose remedy is not.** ⚠️ And the evidence half held
+completely this time — including the row's **scope**, which is exactly four. Seven `MaintenanceJob`
+subclasses exist, five call `activeTenants()`, `VerifyCustomDomainsJob` and `PruneFailedJobsJob` work
+inline, and `RefreshConnectorTokensJob` was `M32`'s. **A row that neither understates nor overstates itself
+is rare enough here to be worth recording.**
+
+### The shape of the fix
+
+Two cases per file, eight in total. **No existing case and no `beforeEach` was modified** — every second
+tenant lives inside its own new case. That is not fastidiousness: widening a shared fixture would leave each
+existing case draining only the first of two children and **still passing**, because `lazyById()` enumerates
+by UUIDv7, i.e. creation order, so the child that gets worked is always the first tenant's. Green, and its
+new coverage silently deleted. That is `M31`'s hazard, and the row warned about it in as many words.
+
+Case A names the child class and asserts the dispatched multiset; case B drives the real `database` queue and
+asserts the per-tenant effect. They cannot be one case — `Bus::fake` prevents the child from ever reaching
+the queue. Case A carries an identical name across all five fan-outs on purpose, so
+`grep "fans out one child per active tenant" tests/` now returns **5**, which answers the row's own note
+that four of the five child classes appeared under `tests/` only inside comments, and one not at all.
+
+The drain helpers became bounded loops with the child count **asserted rather than inferred**
+(`$activeTenants = 1` by default, so all fourteen existing call sites are unchanged in text and behaviour).
+`tests/Pest.php`'s `workOneJob()` was deliberately **not** touched: dropping `--once` for
+`--stop-when-empty` routes to `Worker::daemon()`, which additionally calls `resetScope` every iteration and
+installs pcntl handlers — read from the installed vendor source, and a change ~25 files would inherit.
+
+### ⚠️ Three vendor and model facts read from the installed source rather than from memory
+
+- **`EventFake::dispatched()` returns argument ARRAYS, not the events** — `fakeEvent()` stores
+  `func_get_args()` — unlike `BusFake::dispatched()`, which returns the commands. So the forms case maps
+  `fn (array $args) => $args[0]->tenantId`. Its *filter* callback **is** spread (`$callback(...$arguments)`),
+  which is precisely what makes the asymmetry easy to get backwards. This is the `toContain`/`toHaveKey`
+  family again: a second argument that is not what it looks like.
+- **`Worker::stop()` returns in 13.18.1 and does not `exit()`** — only `kill()` does. So a `--stop-when-empty`
+  drain would not have killed the Pest process; it was rejected for `resetScope`, not for that.
+- **The fairness limiter is per tenant, per queue, per minute** (60 for `scheduled-maintenance`), so a second
+  tenant's child gets a fresh bucket and `RateLimited` cannot defeat a two-tenant drain.
+
+### How the prediction fared
+
+- ✅ **All four BEFORE controls SURVIVED and all four AFTER controls CAUGHT**, with exactly the predicted red
+  set in every file: the two new cases red, every existing case green.
+- ✅ **PHPStan could not move and was not quoted** — a test-only diff, and it scans `app`, `database`, `routes`.
+  Vitest, Storybook axe and E2E were untouched. Pint passed at 1422 files and was **proved scanned** by
+  preflight's deliberate probe rather than trusted (`M9`).
+- ⚠️ **The named most-likely-wrong prediction was wrong, and in the safe direction.** `DraftReaperTest`'s
+  two-tenant case was called the riskiest, on the theory that `$this->drafts` — resolved from the container
+  under acme's context — might memoize a tenant. It did not: `SubmissionDraftService` holds only injected
+  readonly collaborators, and the case passed first time. It was also the **first** file built and the
+  pattern was proven on it before being replicated.
+- ⛔ **AND THE PLAN UNDER-SCOPED ITSELF, WHICH THE CLAIM SHOULD SAY PLAINLY.** It proposed the row's
+  end-to-end shape for three files and Layer 1 only for the webhook one, on the ground that a count there is
+  blind. Blind it is — but *payload containment* is not, and the repo already had the idiom. Four files got
+  both layers, not three. The plan's own reasoning was right and its conclusion was one step short.
+- ⚠️ A predicted "roughly seven cases" was **eight**. The four files went 14 passed / 29 assertions →
+  **22 passed / 93 assertions**; six containing directories read **1253 passed / 5029 assertions**, zero
+  failures. Absolute gate figures are **not** restated here — they live in `docs/gate-baselines.md`,
+  regenerated from this increment's own post-merge run.
+
+### ➕ Filed rather than silently left
+
+- The two vacuous `WebhookRetrySweepTest` cases (fixed here, filed as their own `minor` because the defect is
+  distinct from the tenant-width one and would be invisible to any later search).
+- The generic `MaintenanceJob` fan-out gate that was **not** built: a naive loop over the subclasses would
+  invoke `VerifyCustomDomainsJob::handle()`, which does real DNS work inline, and `PruneFailedJobsJob`, which
+  works inline on `failed_jobs`. Avoiding them needs a declared fan-out/inline registry that drifts unless it
+  is itself set-equality-checked. Left because this row was already four files wide.
+- **Not filed, because it is harness config rather than product:** `.claude/settings.local.json` carries two
+  Increment-A-era allowlist entries running Pest **host-side with no `docker exec`**, a form this host cannot
+  execute (`pdo_pgsql` is absent). Recorded here so the next reader does not copy them.
+
+### ORIGINAL CLAIM (`M44`)
 
 Taken 2026-08-29. Branch `m44-fanout-fixture-width`, cut from `origin/main` at `bcd0701`, PR into `main`.
 Lane B holds nothing forward — `lane-b.md` read in full, not its `## Status` line, and `git worktree list`
@@ -91,18 +243,6 @@ is *semantically identical* to the original, so it cannot fail; its value is nar
 the token matched, the sha256 moved, the mutant parsed and the harness ran. **The one I most expect to be
 wrong is `DraftReaperTest`'s two-tenant case** — the only one whose second-tenant fixture must be built
 under a *second* RLS context, with `$this->drafts` resolved from the container under acme's.
-
----
-
-⛔ **RUN `php scripts/state.php` FOR EVERY NUMBER.** Increment, ADR, migration prefix, exceptions-log
-entry, open rows, open decisions, and how far behind the trunk `docs/gate-baselines.md` has fallen.
-Nothing in this file or in `PROGRESS.md` is the authority for any of them any more.
-
-✅ **`CLAUDE.md` IS THE IMPERATIVE LAYER AND IS AUTO-LOADED.** Read it before this file. It carries no
-numbers at all, and `tracker-lint` R8 keeps it that way.
-
-⛔ **A REMOVAL OF MORE THAN 200 LINES FROM `PROGRESS.md` NEEDS `[tracker-surgery]` AT THE START OF A
-LINE IN THE COMMIT MESSAGE.** Mentioning it mid-sentence deliberately does not count.
 
 ---
 

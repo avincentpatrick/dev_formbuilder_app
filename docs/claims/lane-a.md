@@ -16,23 +16,122 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M45` is merged and the lane holds nothing forward
+## Status: ACTIVE CLAIM — the eight `major` documentation-truth rows, and a citation-liveness gate (`m46-citation-truth-and-liveness-gate`)
 
-**`M45` is merged (PR #235, `1f966a4`, 6/6 green).** Lane A holds no active row and pre-claims no forward
-number. The next row is taken under Rule 7(f), and the claim is written here and **pushed** before the
-first file is opened.
+Taken 2026-08-29. Branch `m46-citation-truth-and-liveness-gate`, cut from `origin/main` at `6c3e8e5`, PR into
+`main`. Row: the eight open `major` rows under `### Documentation & specs` in `docs/feature-backlog.md` —
+ADR-0001's `citext`/`pgcrypto` claim · ADR-0002 §D3's two unbuilt isolation controls · the audit spec's
+omission of the impersonation boundary events · the `APP_PREVIOUS_KEYS` register entry · ACCESS-MATRIX's
+verification step 4 · the README's host command blocks · ADR-0017's "no SSO rows" claim · the data
+dictionary's "No CHECK pairs the two". **Each is identified by its title, because this increment edits that
+file and a line number would not survive its own diff.**
 
-⛔ **RUN `php scripts/state.php` FOR EVERY NUMBER.** Increment, ADR, migration prefix, exceptions-log
-entry, open rows, open decisions, and how far behind the trunk `docs/gate-baselines.md` has fallen.
-Nothing in this file or in `PROGRESS.md` is the authority for any of them any more.
+⛔ **`docs/backlog-triage.md` IS NOT A QUEUE, AND WAS NOT USED AS ONE.** Its top-ranked row shipped as `M43`
+and the one below it as `M44`; it is 39 commits behind the trunk. The queue was re-derived from the tree,
+which gives **twelve** open `major` rows — one is `D6` and belongs to no lane, two are the tracker chain, and
+**eight** are this section. The triage's own entry for this section says *five*. **A dated census
+understates by construction, and it understated by three.**
 
-✅ **`CLAUDE.md` IS THE IMPERATIVE LAYER AND IS AUTO-LOADED.** Read it before this file. It carries no
-numbers at all, and `tracker-lint` R8 keeps it that way.
+### Evidence verified
 
-⛔⛔ **AND THE `[tracker-surgery]` INSTRUCTION IS NOW KNOWN TO BE UNFOLLOWABLE THROUGH A DEFAULT SQUASH
-— SEE `M45` BELOW.** GitHub prefixes every commit subject with `* ` in the default body, which demotes
-the marker off line start. Pass an explicit `--body` whose FIRST content line is the marker. The PR
-title cannot carry it: `state.php` anchors merged titles on `^M(\d{1,3}):`.
+Every citation opened against the merged tree. **Three of the eight are sound as filed; five are wrong about
+themselves**, which is the finding before any edit is made.
+
+- **ADR-0001** — all three citations HOLD. Only `postgis` is enabled
+  (`2026_07_12_000001_enable_postgis_extension.php`); `citext`, `pgcrypto` and `pg_trgm` appear nowhere
+  outside prose. The row's own aside about the adjacent bullet is **off by one**.
+- **ADR-0002 §D3** — the Realtime citation HOLDS; the Cache citation is **FALSE**, it points at the I7b
+  carve-out amendment and the Cache row has moved. Ten-row count confirmed.
+- **Audit spec** — the cited row has **MOVED by one**, and the row's summary of it is imprecise:
+  `permission_changed` against `users` is a *separate preceding row*, so that section's `users` coverage was
+  already two rows rather than the one the filing describes.
+- **`APP_PREVIOUS_KEYS`** — **four of six citations are FALSE or moved**, including the `.env.example` range
+  that is the row's own refutation.
+- **ACCESS-MATRIX** — the step-4 citation is **FALSE**: it lands on a shell comment *inside a fenced block*.
+  The warning-block citation HOLDS.
+- **README** — **every citation is FALSE; all three are blank lines.**
+- **ADR-0017** — the ADR citation HOLDS. Both refutations are **mis-anchored**: one range opens on Google
+  sign-in rows and covers only the first SAML row of fourteen; the other names four rows where there are five.
+- **Data dictionary** — **both citations HOLD exactly.** The only row of the eight whose line numbers are
+  intact, and the only one where nothing had to be re-anchored.
+
+### Remedy verdict
+
+**Two of the eight prescribed remedies are correct. One is a no-op that would make the file worse, one would
+destroy a true residual, and four are materially incomplete.**
+
+- **ADR-0001 — WRONG IN ITS SECOND CLAUSE.** The row asserts *"no lowercasing anywhere on the register/login
+  path"*. `config/fortify.php` enables username lowercasing, and Fortify canonicalises on four paths; the
+  SSO, Google and invite paths lowercase too. ⛔ **A gate scoped to first-party code would have CONFIRMED
+  the false clause** — the mechanism lives in `vendor/`. The real residual is narrower (the guarantee is
+  application-layer, so a seeder or raw insert can still collide) **plus one the row never names: share-slug
+  LOOKUP is case-sensitive, so a mixed-case share URL 404s.**
+- **ADR-0002 §D3 — UNDERSTATES BY TWO, AND ONE IS OPERATIONAL.** `docs/deployment-infrastructure.md`
+  prescribes an artisan Reverb command as a Windows service in a **production runbook step**, for a command
+  that does not exist in this tree. And `ConnectorChannelDirectory.php` carries a docblock asserting that
+  grepping `app/` for cache writes *finds nothing* — there are six call sites in four files. **A comment
+  that greps first-party code and reports absence is the same defect one layer down.**
+- **Audit spec — UNDERSTATES BY THREE.** The same undercount recurs in `docs/data-dictionary.md`, which calls
+  the event catalog eight-valued where the enum has ten, twice over, and describes the domain-specific events
+  by a count that is two short. The spec also **over-claims** in the other direction, crediting a
+  `submission` scope with two events emitted nowhere.
+- **`APP_PREVIOUS_KEYS` — CORRECT, AND ITS HEDGE IS THE VALUABLE HALF.** *Narrow it, do not close it* is
+  right: the seam is documented, the **rotation procedure genuinely is not**, and the document that owns the
+  procedure cites the gap as still open rather than closing it.
+- **ACCESS-MATRIX — THE DOCUMENT NAMES THE WRONG MIDDLEWARE.** The observable holds and the mechanism does
+  not: on the platform host the subdomain initialiser throws first and the exception renderer issues the
+  redirect. The middleware the document blames never executes, and it would answer 404 rather than 302 if it
+  did. **The row does not notice, so the obvious fix would leave a false explanation in place.**
+- **README — THE REMEDY IS A NO-OP THAT WOULD RE-AFFIRM THE ONE WRONG LINE.** The block was corrected on
+  2026-08-18; every frontend and design-system command already runs in the container under an explicit
+  host-incapability warning. ⚠️ **Measured, and the row's blanket claim is over-broad:** three of the five
+  named commands *can* run on this host. **Close as already fixed and re-file the residual** — the block
+  prescribes the axe suite in the musl node service, which `CLAUDE.md`'s own gate table records as
+  impossible, and with no server for it to point at.
+- **ADR-0017 — THE OBVIOUS REMEDY OVER-CORRECTS.** The SSO half is refuted and so is the isolation half, but
+  the **topology** half is still true: the threat model carries no tiering rows at all. Deleting the sentence
+  destroys a genuine, named gap. **Split the verdict instead.**
+- **Data dictionary — CORRECT AND CORRECTLY SCOPED.** The document transcribed the migration's reasoning for
+  the constraint that was **rejected** rather than the one that shipped. It misses one adjacent omission.
+
+Files: `docs/feature-backlog.md`, `docs/adr/0001-postgresql-over-mysql.md`,
+`docs/adr/0002-multi-tenancy-shared-db-rls.md`, `docs/adr/0009-oauth-connector-token-custody.md`,
+`docs/adr/0017-tenant-isolation-tiering.md`, `docs/audit-compliance-logging-spec.md`,
+`docs/data-dictionary.md`, `docs/security-threat-model.md`, `docs/ACCESS-MATRIX.md`,
+`docs/deployment-infrastructure.md`, `app/Services/Connectors/ConnectorChannelDirectory.php` (docblock only),
+`scripts/citation-liveness-lint.php` (new), `scripts/gate-baselines.php`, `scripts/preflight.php`,
+`composer.json`, `.github/workflows/ci.yml`, `docs/gate-baselines.md`, this file, `PROGRESS.md` (own block
+only). Plus whichever documents the gate's own report-only run names — **that list is a measurement, not a
+prediction, and it is recorded in the release rather than guessed here.**
+Shared artefacts taken: the `docs/**` files above, `PROGRESS.md` (own block only).
+Paired files taken: none.
+Namespaces spent: **NOTHING FROM EITHER NAMESPACE.** `ADR-0022` stays free and stays this lane's
+block-opener — every edit here corrects the record of a decision already taken, and this project has never
+minted an ADR for a lint gate. `0010` stays reserved for H1d. The migration prefix stays free; no migration
+is written. If the share-slug finding turns out to need a call it goes to `docs/claims/decisions.md` as the
+next free `D`, and the next row is taken in the same turn.
+
+Prediction, written before the first file was opened:
+
+- **Pint moves by exactly one file** — CI runs a bare whole-project `pint --test` and `scripts/` is in scope,
+  so the new gate script is a new scanned file. **Two baseline rows move, not one.**
+- **PHPStan cannot move.** It scans `app`, `database` and `routes`, and the only `app/` change is a docblock.
+  That is a structural claim, not a quoted number.
+- **Pest unmoved** — with one real exposure: a contract test reads `docs/deployment-infrastructure.md` and
+  asserts a queue-order literal. That literal is in a different bullet from the one being edited, verified
+  before this claim was written, but it is the single Pest-reddening path in the diff.
+- **Vitest, Storybook axe, E2E and the contract suite unmoved** — no `.vue`, no `.ts`, no route, no schema.
+- **The new gate's baseline row resolves rather than reading `NOT FOUND`** on the first regeneration.
+- ⚠️ **The one I most expect to be wrong: the tier-1 rotten-citation count, and therefore the gate's scope.**
+  The planning measurement puts the specification corpus at eleven and all of `docs/**` at forty — the latter
+  **red on arrival, which can never merge**. But ten of the eleven corrections point into files whose true
+  anchors have not been re-measured, and this increment's own edits shift line numbers in three documents
+  that other documents cite. **The scope rule is therefore fixed in advance so the run decides it and not
+  the author:** zero means gate at zero; twelve or fewer means fix them all; more than twelve means ship a
+  frozen, enumerated allow-list that can only shrink.
+- ⛔ **And the gate's honest reach is three of these eight rows, not six.** It checks that a cited line is
+  *alive*, never that it says what the citing sentence claims. Five of the eight cite **live lines that say
+  the wrong thing**, and no gate catches those. That limit ships in the script header and is filed as a row.
 
 ---
 

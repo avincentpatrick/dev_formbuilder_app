@@ -195,10 +195,21 @@ foreach (['A', 'B'] as $lane) {
 // ── R7. The rule that would have caught the incident. ────────────────────────────────────────────
 //    A large removal is legitimate only when the commit message says so.
 //
-//    ⚠️ ON A pull_request EVENT actions/checkout HANDS US A MERGE COMMIT, so HEAD~1 is main's tip
-//    and HEAD~1..HEAD is the PR's own commits — exactly the range whose messages must carry the
-//    marker. On a push to main, HEAD~1 is the previous commit and the range is what was pushed.
-//    Both are correct, and both need the parent REACHABLE, which is why ci.yml uses fetch-depth: 2.
+//    ⚠️ ON A pull_request EVENT actions/checkout HANDS US A SYNTHETIC MERGE COMMIT, so HEAD~1 is
+//    main's tip and HEAD~1..HEAD is the PR's own commits. On a push to main, HEAD~1 is the previous
+//    commit and the range is what was pushed. Both are correct, and both need the parent REACHABLE.
+//
+//    ⛔⛔ AND THE SENTENCE ABOVE USED TO END "…which is why ci.yml uses fetch-depth: 2", WHICH WAS
+//    FALSE — THE RANGE IS ONLY THE PR'S OWN COMMITS IF THEY ARE IN THE CLONE. At depth 2 the clone
+//    holds the merge commit and its two parents and nothing else, so HEAD~1..HEAD is the merge commit
+//    plus the PR's LAST commit; every earlier one is grafted away and a marker on it is invisible.
+//    M40 chose 2 for this rule and 2 is one short of what the rule needs. Nobody could have noticed
+//    for eight increments because THIS RULE HAD NEVER FIRED — M48's is the first surgery large enough
+//    to make it look, and it reddened with the delta measured perfectly and the marker "absent".
+//    Reproduced with `git fetch --depth=2 origin refs/pull/238/merge` rather than reasoned about.
+//    ci.yml's static-analysis checkout is now fetch-depth: 0; a bounded depth is what created this,
+//    and a bigger bounded number would fail the next longer PR silently, in the one direction that
+//    reads like a missing marker rather than like a broken gate.
 //
 //    ⛔⛔ IT IS HEAD~1 AND NEVER HEAD-CARET, AND THAT IS NOT A STYLE CHOICE. PHP's exec() runs through
 //    cmd.exe on Windows, where the caret IS THE ESCAPE CHARACTER, so a rev-parse of HEAD-caret

@@ -3804,3 +3804,24 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   surgery deliberately touch one non-ignored file. Both are decisions about `ci.yml`, which is a shared
   artefact. **Filed by M48 (2026-08-29)**, found while confirming the run this increment needs would
   exist. **Live.**
+
+- **`minor` · Nothing asserts that CI's checkout is deep enough for `R7` to see the commit that
+  declares a surgery, and the failure presents as a missing marker rather than as a broken gate.**
+  ⛔ **Found by `M48` the hard way: it reddened PR #238.** `ci.yml`'s `static-analysis` checkout used
+  `fetch-depth: 2`, chosen by `M40` for this very rule. On a `pull_request` that leaves the merge
+  commit and its two parents in the clone and nothing else, so `HEAD~1..HEAD` is **the merge commit
+  plus the PR's LAST commit** — every earlier one is grafted away. `M48` put `[tracker-surgery]` on its
+  phase-1 commit, which sat at depth 3, and `R7` reported the marker absent while measuring the delta
+  perfectly. **Fixed in `M48` (`fetch-depth: 0`), and `tracker-lint`'s docblock — which asserted the
+  opposite in writing — corrected with it.** ⚠️ **WHAT IS FILED IS THE ABSENCE OF A GUARD, NOT THE
+  DEFECT.** The value is one line of YAML with nothing pinning it; the next person tuning CI clone time
+  can restore a bounded depth and the only symptom will be a surgery that cannot declare itself. **And
+  the honest difficulty is that `R7` cannot tell the two apart from inside** — "no commit in this range
+  carries the marker" is the same observation whether the commit is missing or the marker is. A check
+  would have to assert the *shape of the clone* (that the merge commit's second parent's history is
+  present), which is a different kind of assertion from anything this gate makes today.
+  ⛔ **AND IT WENT UNSEEN FOR EIGHT INCREMENTS FOR THE REASON THIS WHOLE ARC KEEPS PRODUCING: THE RULE
+  HAD NEVER FIRED.** `M40` built it, `M47` proved its predicates against replayed bytes, and neither
+  could have reached this — the defect only exists on a real `pull_request` checkout with a real
+  multi-commit PR. **Filed by M48 (2026-08-29)** at the moment the fix was written. **Not live** — the
+  defect is closed; the missing guard is not.

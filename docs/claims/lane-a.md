@@ -100,6 +100,7 @@ Prediction, written before the first byte moves:
   I expect to *reduce* it to 18 by repairing the one dead `PROGRESS.md` pointer the earlier surgeries
   left in the ledger, and to ratchet the constant in the same commit.
 
+
 ---
 
 ## RELEASED — `M47`, the surgery marker becomes armable and R7 stops being blind to bytes (merged as PR #237, `8555ae1`, 6/6 green)

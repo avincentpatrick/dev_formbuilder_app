@@ -105,7 +105,13 @@ const TIER2_FILES = ['docs/feature-backlog.md'];
  * struck-through rows, which needs a parser that can tell a closed row from an open one — more than
  * this gate should grow on its first outing, and filed as its own row instead.
  */
-const LEDGER_ROT_CEILING = 19;
+// ⚠️ 19 -> 18 by M48 (2026-08-29), which repaired the one dead citation its own subject had created:
+// the ledger pointed at `PROGRESS.md:1436` in a file that has been spliced twice since and is now 306
+// lines. Re-pointed by SECTION NAME rather than re-measured to a new line, which is what this gate's
+// own failure message prescribes. ⛔ THE FIRST DRAFT OF THAT REPAIR NAMED THE WRONG SECTION — it
+// invented a G11 entry the archive does not have, and only opening the archive caught it. A citation
+// repaired by guess is the defect this gate exists to catch, committed by the increment holding it.
+const LEDGER_ROT_CEILING = 18;
 
 /** R3 floors. Three, because there are three independent ways for this gate to pass while blind. */
 const MIN_EXPECTED_DOCUMENTS = 40;

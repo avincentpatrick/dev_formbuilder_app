@@ -39,14 +39,23 @@ $verbose = isset($opts['verbose']);
 const TRACKER = 'PROGRESS.md';
 const ARCHIVE = 'PROGRESS_ARCHIVE.md';
 
-// The ceiling is a RATCHET and it has now been turned down twice: 1,500,000 -> 600,000 by the
-// Current Status surgery, and 600,000 -> 400,000 by the claim-ledger surgery that took Standing
-// Rules from 208 KB to 46 KB. It is deliberately NOT set to the current size — a ceiling with no
-// headroom reddens on the next ordinary close-out — and deliberately not to the plan's ~40 KB
-// target, which is unreachable while Next Session (214 KB, and now 62% of this file) remains in it.
-// The headroom is printed on every run so a stale ceiling is visible rather than inferred, and the
-// increment that moves Next Session turns this down again.
-const TRACKER_BYTE_CEILING = 400000;
+// The ceiling is a RATCHET and it has now been turned down THREE times: 1,500,000 -> 600,000 by the
+// Current Status surgery, 600,000 -> 400,000 by the claim-ledger surgery that took Standing Rules
+// from 208 KB to 46 KB, and 400,000 -> 200,000 by M48's Next Session surgery, which moved 200,625
+// bytes out of a 360,207-byte file and left it at 161,298. It is deliberately NOT set to the current
+// size — a ceiling with no headroom reddens on the next ordinary close-out — so this leaves ~38,700,
+// roughly a dozen ordinary close-outs at the rate `## Current Status` has actually been growing.
+//
+// ⛔ THE ~40 KB TARGET IS STILL UNREACHABLE, AND THE SECTION BLOCKING IT HAS CHANGED — WHICH IS WHY
+// THIS COMMENT NAMES THE MEASUREMENT AND NOT A SECTION IT INHERITED. The previous version said the
+// target was unreachable "while Next Session (214 KB, and now 62% of this file) remains in it"; that
+// section is now 15,269 bytes and 9.5%, and the sentence was falsified by the same commit that
+// ratcheted this constant. What blocks the target now is `## Current Status` at 67,982 bytes — 42%
+// of the file and its largest section — plus `## Standing Rules` at 49,001. The increment that turns
+// this constant down again is the one that moves Current Status, and that is a filed row rather than
+// a sentence here: a comment naming the next obligation is the thing that goes stale first.
+// The headroom prints on every run, so a ceiling that has drifted is visible rather than inferred.
+const TRACKER_BYTE_CEILING = 200000;
 
 // ⛔ TWO THRESHOLDS, BECAUSE THE LINE ONE IS BLIND TO THE ONLY SURGERY THIS GATE HAS EVER SEEN.
 // DROP_LIMIT is lines, and the incident is quoted everywhere as 1,086 — that is a numstat deletion

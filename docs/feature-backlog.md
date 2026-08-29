@@ -1970,7 +1970,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   deterministic failure into an intermittent one" is correct, and the decision it asked for is **D2 in
   `docs/claims/decisions.md`**: `failOnFlakyTests: !!process.env.CI` alongside the existing `retries: 1`,
   so a result that needed the retry is red while the retry still produces its trace. ⚠️ Note
-  `PROGRESS.md:1436` records a **second** flake in this same file — *"Builder — empty canvas (dark)"* — of
+  `PROGRESS_ARCHIVE.md` records a **second** flake in this same file, under `## Archived status bullets` — *"Builder — empty canvas (dark)"* — of
   the same shape; if it recurs it is now a hard failure rather than a line to skim past.
   ⚠️ **Line numbers moved:** the live-link case was `builder-axe.spec.ts:198` and is `:205` after this
   change. **Cite the test's NAME.** Historical records below preserve `:198` as the incident recorded it,
@@ -3665,7 +3665,59 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `PROGRESS.md`. Estimated effect: roughly 504 KB down to roughly 340 KB. Filed by M42
   (2026-08-29).*
 
-- **`major` · `## Next Session` is a second historical ledger inside the constitution, and it is now
+- ~~**`major` · `## Next Session` is a second historical ledger inside the constitution, and it is now
+  62% of the file.**~~
+  ✅ **DONE — M48 (2026-08-29). THE DEFECT WAS REAL AND LARGER THAN THE ROW; THREE OF ITS FOUR COUNTS
+  WERE WRONG; AND THE INCREMENT'S MOST VALUABLE OUTPUT IS A RECORDING, NOT A DIFF.** `PROGRESS.md`
+  **360,207 → 161,298 bytes** (483 → 306 lines), `## Next Session` **214,178 → 15,269** — from **59.5%
+  of the file to 9.5%**. 178 lines and 200,625 bytes moved verbatim to `PROGRESS_ARCHIVE.md` under
+  `## Archived session hand-offs and per-increment decisions`.
+  ⛔ **R7 HAS NOW FIRED, AND THIS IS THE FIRST TIME IN ITS EXISTENCE.** `M47` proved the byte threshold
+  against replayed trunk bytes and recorded plainly that no real merge had ever armed it. The gate's own
+  words on this diff: *"PROGRESS.md lost 177 line(s) (483 down to 306, limit 200) and 198,909 byte(s)
+  (360,207 down to 161,298, limit 50,000), declared with `[tracker-surgery]`"*.
+  ⛔ **AND THE ARITHMETIC INVERTS WHICH HALF OF THE GATE DID THE WORK — READ THE LINE FIGURE AGAIN.**
+  **177 net lines against `DROP_LIMIT`'s 200. UNDER IT.** A surgery that removed three-fifths of the
+  constitution is invisible to the line threshold, exactly as `M45`'s was. `DROP_BYTE_LIMIT` caught it
+  at 3.98× over. **The third consecutive surgery the line count could not see, and the first one
+  anything did.**
+  ⛔ **THE ROW'S COUNTS: three of four refuted, measured before a byte moved.** *"Roughly 19
+  superseded-prompt blocks"* is **14** (13 `SUPERSEDED PROMPT` plus one `PRIMARY NEXT PROMPT`, at line
+  start). *"`I1`–`I12`, `H1e`–`H24b1`, `J1`–`J5`"* is **28 records** over `I1`–`I4`, `I6`, `I7a`, `I7b`
+  and `H5a`–`H24b1` — **no `I5`, no `I8`–`I12`, and no J-series at all**, that last having left with
+  `M45`'s own claim ledger, so the row inherited a range that was already gone. `M47`'s **242,873** is
+  accurate to 31 bytes but is a **different boundary** — heading-to-EOF, sweeping in four sections this
+  increment does not touch; planning against it would have overstated the surgery by 13%. Only the
+  ordering claim held.
+  ⛔ **THE REMEDY WAS INCOMPLETE IN THREE WAYS THE TREE ENFORCES, AND THE FIRST IS RED ON ARRIVAL.**
+  (1) `tracker-lint` **R3 counts `^## Next Session` across BOTH files and expects exactly one**, so the
+  obvious archive heading fails the merge gate — the same trap `M45` hit and renamed around. (2)
+  `TRACKER_BYTE_CEILING` had to be ratcheted **400,000 → 200,000** in this diff, and **its own comment
+  asserted a fact this commit falsified** (*"unreachable while Next Session (214 KB, and now 62% of this
+  file) remains in it"*) — the third time a gate constant's comment has had to be corrected by the
+  increment that invalidated it. (3) ⛔ **`ci.yml`'s `push` `paths-ignore` means a tracker-only surgery
+  produces NO POST-MERGE RUN AT ALL**, so the end-to-end proof this row owed would have been
+  unobtainable; it is obtainable only because obligation (2) drags `scripts/` into the same commit.
+  Filed as its own row rather than left as luck.
+  ✅ **PROVED BEFORE A BYTE WAS WRITTEN, AND THE SET-VERSUS-MULTISET GAP IS AN ORDER OF MAGNITUDE WORSE
+  THAN `M45` MEASURED.** Pre-state pinned by sha256; nine anchors asserted at pre-measured indexes and
+  never searched for; a counted multiset of **178 line hashes with exact multiplicity — 95 distinct,
+  because 84 blank lines share one hash, so a set equality would have passed while dropping 83 lines**
+  (`M45`'s equivalent figure was four). Byte conservation exact in both directions and globally,
+  **2,618,558 == 2,618,558**, with no tolerance; the three kept regions hash unchanged
+  (`9d21756dd2933632`, `dcf5e07a14371f2d`, `5fca4324334d1453`). **The move is two slices, not one** —
+  the 2026-08-24 lane-column bulletin sat *above* the hand-off lines — and the proof does not assume
+  contiguity.
+  ⚠️ **AND THE BOUNDARY JUDGEMENT THE ROW SAID WOULD BE NEEDED WAS NEEDED, IN A DIRECTION IT DID NOT
+  NAME.** Sweeping the block's *"recorded, not fixed"* items against the **code** rather than against the
+  record found **three already closed** — the `domains.domain` URL pair (H22a), `MdsSwitch`, and
+  grant/revoke audit entries — and **one live, unfiled anywhere**, now a `minor` under *Submissions*. A
+  record asserting that something is unfixed is not evidence that it is; filing from the record would
+  have produced three phantom rows and still missed the real one.
+  ➕ **Filed rather than fixed:** the `## Current Status` row below (it is now 42% of the file and its
+  largest section), the `paths-ignore` row, and the display-fallthrough row under *Submissions*.
+  Original filing follows.
+  **`major` · `## Next Session` is a second historical ledger inside the constitution, and it is now
   62% of the file.** Measured after M45's surgery: `PROGRESS.md` is **346,913 bytes** and
   `## Next Session — Resume Here` is **214,073 of them**, against `## Standing Rules`' 46,511 and
   `## Current Status`' 57,283. Roughly **19 superseded-prompt blocks** (each 2.7–7.5 KB of a hand-off
@@ -3710,3 +3762,45 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   attached, so adopting them needs a second form in that file rather than a copy-paste. **Not live**
   — nothing is wrong today; this is a filing question. **Filed by M45 (2026-08-29)** at the moment it
   decided not to do it.
+  ➕ **EXTENDED BY `M48` (2026-08-29), WHICH ADDED TO THE SAME PILE FOR THE SAME REASON.** The
+  `## Next Session` surgery moved the **2026-08-06 `SEQUENCING LOCKED WITH THE USER` block** (OCR goes
+  last; payments cut to Phase 4 and Track B last; the Google credential and publishing-status facts; the
+  H16b redirect-URI trap) and the **five questions answered 2026-07-21** into `PROGRESS_ARCHIVE.md`
+  alongside M45's four. The reasoning is unchanged and was re-checked rather than inherited: lifting them
+  into `docs/claims/decisions.md` creates the second copy that row exists to end, **and it would have
+  broken the conservation proof by making the move something other than a pure permutation** — which is a
+  stronger argument here than it was for M45, because M48's proof is a counted multiset over two
+  non-contiguous slices. Both the tracker pointer and the archive heading name these decisions
+  explicitly. ⚠️ **The residual is unchanged and has simply grown**: `decisions.md` has no form for a
+  decision with no question attached, and there are now roughly a dozen of them in the archive rather
+  than four. **Still not live** — nothing is wrong today; it is still a filing question, and the second
+  form belongs with the Rule 7 rewrite.
+
+- **`major` · `## Current Status` is now 42% of the tracker and its largest section.** Measured
+  immediately after M48's surgery, on the file as it now stands: `PROGRESS.md` is **161,298 bytes** and
+  `## Current Status` is **67,982 of them — 42.1%**, against `## Standing Rules`' 49,001 (30.4%) and
+  `## Next Session`'s 15,269 (9.5%). **It is the same shape M45 and M48 have each moved once**, and it is
+  the last one: with it gone the constitution is roughly 93 KB and the ~40 KB target is arguable for the
+  first time. ⚠️ **IT MUST NOT BE PLANNED AS A REPEAT OF EITHER PREDECESSOR, FOR A REASON NEITHER OF THEM
+  HAD.** Rule 7(b) gives each lane **its own status block and only its own**, so the section has two
+  writers; a slice that moves both lanes' bullets is a Lane A edit to Lane B's block, which is the one
+  thing the boundary forbids. The boundary here is *per lane and then per bullet*, not per line range.
+  ⚠️ **And the ceiling ratchet is the taker's obligation**, as it was here — `TRACKER_BYTE_CEILING`'s
+  comment names this section by measurement rather than by inheriting a sentence. **Filed by M48
+  (2026-08-29) at the moment the scope was decided.** **Live.**
+
+- **`minor` · A tracker surgery whose diff touches only `paths-ignore`d files produces no post-merge run
+  at all, so `R7`'s trunk arm is unreachable for exactly the diff shape it guards.** `ci.yml`'s `push`
+  filter covers `PROGRESS.md`, `PROGRESS_ARCHIVE.md`, `docs/claims/**`, `docs/gate-baselines.md` and
+  `docs/backlog-triage.md`, and GitHub evaluates it over **every** file in the push — so a pure
+  permutation of the two tracker files, which is precisely what a well-executed surgery is, **cannot
+  trigger CI on `main`.** The PR run still gates the merge, so this is not a hole in the merge gate; what
+  it removes is the **post-merge observation on the trunk**, which is the only place the squash body's
+  form can be verified and the exact evidence `M47` recorded as owed. ⚠️ **M48 escaped it by accident of
+  scope**: the `TRACKER_BYTE_CEILING` ratchet put `scripts/` in the same commit. A surgery that needed no
+  ratchet would have merged with the marker unverifiable. ⛔ **The remedy is NOT to delete the filter** —
+  it exists because a close-out pushes documentation three times per increment and M39 measured six
+  cancelled runs from it. Candidates: exempt a commit whose message carries the marker, or have the
+  surgery deliberately touch one non-ignored file. Both are decisions about `ci.yml`, which is a shared
+  artefact. **Filed by M48 (2026-08-29)**, found while confirming the run this increment needs would
+  exist. **Live.**

@@ -100,6 +100,34 @@ Prediction, written before the first byte moves:
   I expect to *reduce* it to 18 by repairing the one dead `PROGRESS.md` pointer the earlier surgeries
   left in the ledger, and to ratchet the constant in the same commit.
 
+### Claim EXTENDED 2026-08-29 — `.github/workflows/ci.yml`
+
+⛔ **A FOURTH WAY THE `[tracker-surgery]` MARKER FAILS TO ARM, AND THE FIRST ON THE `pull_request` SIDE
+RATHER THAN THE SQUASH SIDE.** PR #238's static-analysis job went **red on R7** — the delta measured
+perfectly (177 lines / 198,909 bytes) and the marker was reported absent, while the phase-1 commit
+`f61ac11`'s subject *begins* with it.
+
+**Reproduced rather than reasoned about**, by doing exactly what `actions/checkout` does:
+`git fetch --depth=2 origin refs/pull/238/merge`. `HEAD~1..HEAD` then contains **two** commits — the
+synthetic merge commit and `add6f18`, the PR's **last** commit — and `f61ac11` sits at depth 3 and is
+**grafted away**. So at `fetch-depth: 2`, R7 can only ever see the PR's final commit message.
+
+⛔ **`scripts/tracker-lint.php`'s OWN DOCBLOCK ASSERTS THE OPPOSITE** — *"on a `pull_request` event
+actions/checkout hands us a merge commit, so `HEAD~1` is main's tip and `HEAD~1..HEAD` is the PR's own
+commits — exactly the range whose messages must carry the marker"* — and it is **false for any PR with
+more than one commit**. `ci.yml`'s `fetch-depth: 2` was chosen in M40 for this rule and is one short of
+what the rule needs. **Nobody could have seen it before now, because R7 had never fired.**
+
+**Extension taken, and pushed before the file was opened:** `.github/workflows/ci.yml`
+(`static-analysis`'s `fetch-depth`, `2` → `0`) and the docblock in `scripts/tracker-lint.php`, which is
+already claimed. `ci.yml` is a *NEITHER* column artefact under Rule 7(b) and is claimed here first.
+Cost measured, not assumed: full history is **20 MB over 866 commits**. A bounded depth is what created
+this defect, so the fix is unbounded.
+
+⚠️ **AND THE MARKER IS DELIBERATELY NOT ADDED TO THE LAST COMMIT, THOUGH THAT WOULD ALSO GO GREEN.**
+Doing both would make the next green run unattributable — the vacuous-success family, in the increment
+whose whole point is a recording. The marker stays on phase 1 alone, so a green R7 proves the depth fix
+and nothing else.
 
 ---
 

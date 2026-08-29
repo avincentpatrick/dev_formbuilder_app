@@ -48,8 +48,27 @@ const ARCHIVE = 'PROGRESS_ARCHIVE.md';
 // increment that moves Next Session turns this down again.
 const TRACKER_BYTE_CEILING = 400000;
 
-// A drop larger than this needs an explicit marker in the commit message. The incident was 1,086.
+// ⛔ TWO THRESHOLDS, BECAUSE THE LINE ONE IS BLIND TO THE ONLY SURGERY THIS GATE HAS EVER SEEN.
+// DROP_LIMIT is lines, and the incident is quoted everywhere as 1,086 — that is a numstat deletion
+// count, and this gate computes a NET drop, so to R7 the incident is 1,085. The two differ by the
+// single line f565ac9 added. But M45's claim-ledger surgery moved 161,528 bytes in 133 net lines
+// and sailed under the limit: this file's hand-off and status bullets are single lines thousands of
+// bytes long, so a line count is a poor proxy for how much of the constitution just left.
+//
+// ⛔ THE BYTE LIMIT IS SIZED FROM THE FULL HISTORY, NOT FROM INTUITION. Every commit touching this
+// file on origin/main — 394 parent/child pairs, blob sizes read with git cat-file — splits cleanly
+// in two, with an order of magnitude between the halves:
+//
+//   surgeries  938,007 (Current Status) · 670,409 (THE INCIDENT, f565ac9) · 307,867 · 272,006 ·
+//              161,528 (M45 — 133 lines, and therefore invisible to DROP_LIMIT)
+//   ordinary   14,340 (M42, one long generated hand-off line replaced) · 6,486 · 6,130 · 4,114 · ...
+//
+// 50,000 sits in that gap: 3.5x above the largest ordinary drop and 3.2x below the smallest surgery.
+// Both deltas print on every run so a threshold that has drifted out of the gap is visible rather
+// than inferred. ⚠️ The direction to watch is the ORDINARY half growing — that 14,340 was one
+// hand-off line, and scripts/next.php generates it.
 const DROP_LIMIT = 200;
+const DROP_BYTE_LIMIT = 50000;
 // ⛔ THE MARKER MUST START A LINE, AND THAT IS NOT COSMETIC. The first version matched it
 // ANYWHERE in the commit range, so a commit whose message merely DISCUSSED the marker armed it:
 // the surgery's own claim commit said its commits carry the marker or R7 refuses them, and R7
@@ -57,6 +76,15 @@ const DROP_LIMIT = 200;
 // is indistinguishable from a declaration unless the form is constrained — the same defect as a
 // number in prose being read as a spend, found twice in one session. Requiring line-start makes
 // declaring it deliberate and discussing it free.
+//
+// ⛔⛔ AND BARE LINE START WAS UNREACHABLE ON THE TRUNK, WHICH IS WHY EXACTLY ONE BULLET MAY NOW
+// PRECEDE IT. GitHub's default squash body renders every commit subject as "* <subject>", so M45's
+// surgery merged with the marker in the trunk message TWICE and R7 still matched nothing. Measured
+// on that commit rather than reasoned about: run against `git log --format=%B 1f966a4~1..1f966a4`,
+// the bare line-start pattern returns NO MATCH and the bullet-tolerant one matches. The relaxation
+// is exactly one of "* ", "- " or "+ " and NO LEADING WHITESPACE — an indented continuation line
+// still cannot arm it, which is precisely the property the paragraph above defends. It also closes
+// the case where a merge is done through the web UI, which produces the same shape.
 const SURGERY_MARKER = '[tracker-surgery]';
 
 // The archive carries a SECOND, STALE constitution: "## Standing Rules for This Project" plus a
@@ -197,28 +225,65 @@ $before = count($beforeOut);
 $after = substr_count($tracker, "\n");
 $drop = $before - $after;
 
-$msgOut = [];
-exec('git log --format=%B HEAD~1..HEAD 2>&1', $msgOut);
-$declared = preg_match('/^'.preg_quote(SURGERY_MARKER, '/').'/m', implode(chr(10), $msgOut)) === 1;
+// ⛔ THE BYTE SIZE IS READ FROM THE BLOB AND NOT RECONSTRUCTED FROM $beforeOut. exec() splits on
+//    newlines and drops the trailing one, so a length rebuilt from that array is wrong by an amount
+//    nobody can state in advance — and a threshold justified by a number the gate cannot compute is
+//    the small version of the defect this rule is about. `git cat-file -s` answers what was asked.
+$sizeOut = [];
+$sizeStatus = 0;
+exec('git cat-file -s HEAD~1:'.escapeshellarg(TRACKER).' 2>&1', $sizeOut, $sizeStatus);
 
-if ($drop > DROP_LIMIT && ! $declared) {
-    fail('R7 delta', sprintf(
-        '%s lost %d lines (%d down to %d), over the limit of %d, and no commit in HEAD~1..HEAD carries "%s". '.
-        'This is the exact shape of the 1,086-line deletion of 2026-08-16 (f565ac9), which merged green. '.
-        'If the removal is deliberate, put the marker at the START of a line in the commit message (a passing mention mid-sentence deliberately does NOT count). '.
-        'IF THIS IS A POST-MERGE RUN ON main AND THE PR DID CARRY THE MARKER, THE SQUASH DISCARDED IT: '.
-        'gh pr merge --squash --body "" empties the body, and the default body is exactly what would have '.
-        'carried the marker through. M41 did that and reddened main for one commit. Pass a body containing '.
-        'the marker, or put it in the PR title.',
-        TRACKER, $drop, $before, $after, DROP_LIMIT, SURGERY_MARKER));
-} elseif ($drop > DROP_LIMIT) {
-    pass('R7 delta', sprintf('%s lost %d lines, declared with "%s"', TRACKER, $drop, SURGERY_MARKER));
-    $notes[] = sprintf('DECLARED SURGERY: %d lines removed from %s', $drop, TRACKER);
-} else {
-    pass('R7 delta', sprintf('%s line delta is %+d (%d to %d)', TRACKER, -$drop, $before, $after));
+if ($sizeStatus !== 0 || $sizeOut === [] || preg_match('/^\d+$/', trim((string) $sizeOut[0])) !== 1) {
+    fwrite(STDERR, 'tracker-lint: CANNOT MEASURE R7 — the size of '.TRACKER." at HEAD~1 is unreadable.\n");
+    fwrite(STDERR, '              git cat-file -s said: '.trim(implode(' ', $sizeOut))."\n");
+    exit(2);
 }
 
-$notes[] = sprintf('%s had %d lines at HEAD~1 and has %d now (%+d)', TRACKER, $before, $after, -$drop);
+$beforeBytes = (int) trim((string) $sizeOut[0]);
+$afterBytes = strlen($tracker);
+$byteDrop = $beforeBytes - $afterBytes;
+
+$overLines = $drop > DROP_LIMIT;
+$overBytes = $byteDrop > DROP_BYTE_LIMIT;
+
+$msgOut = [];
+exec('git log --format=%B HEAD~1..HEAD 2>&1', $msgOut);
+$declared = preg_match('/^(?:[*+-] )?'.preg_quote(SURGERY_MARKER, '/').'/m', implode(chr(10), $msgOut)) === 1;
+
+$scale = sprintf('%d line(s) (%d down to %d, limit %d) and %s byte(s) (%s down to %s, limit %s)',
+    $drop, $before, $after, DROP_LIMIT,
+    number_format($byteDrop), number_format($beforeBytes), number_format($afterBytes),
+    number_format(DROP_BYTE_LIMIT));
+
+if (($overLines || $overBytes) && ! $declared) {
+    fail('R7 delta', sprintf(
+        '%s lost %s — over %s — and no commit in HEAD~1..HEAD declares it with "%s". '.
+        'This is the shape of the deletion of 2026-08-16 (f565ac9), which merged green: 1,085 lines by this '.
+        "gate's arithmetic (1,086 by numstat) and 670,409 bytes. ".
+        'If the removal is deliberate, put the marker at the START of a line in the commit message. One "* ", '.
+        '"- " or "+ " may precede it, because that is what a squash produces; a mention mid-sentence or on an '.
+        'indented line deliberately does NOT count. '.
+        'IF THIS IS A POST-MERGE RUN ON main, THE SQUASH IS THE LIKELY CAUSE, IN ONE OF TWO WAYS: '.
+        'gh pr merge --squash --body "" empties the body entirely (M41 did that and reddened main for one '.
+        "commit), and GitHub's DEFAULT body renders each subject as a bullet, which is how M45 merged with the ".
+        'marker present twice and this rule matching nothing. Pass an explicit --body whose FIRST CONTENT LINE '.
+        'is the marker. '.
+        '⛔ DO NOT PUT IT IN THE PR TITLE: scripts/state.php anchors merged pull-request titles on ^M(\d{1,3}): '.
+        'for the independent increment cross-check, so a marker prefix there silently drops this PR out of that '.
+        'second source and trades one gate for another.',
+        TRACKER, $scale, $overLines && $overBytes ? 'both limits' : ($overLines ? 'the line limit' : 'the byte limit'),
+        SURGERY_MARKER));
+} elseif ($overLines || $overBytes) {
+    pass('R7 delta', sprintf('%s lost %s, declared with "%s"', TRACKER, $scale, SURGERY_MARKER));
+    $notes[] = sprintf('DECLARED SURGERY: %d line(s) and %s byte(s) removed from %s',
+        $drop, number_format($byteDrop), TRACKER);
+} else {
+    pass('R7 delta', sprintf('%s delta is %+d line(s) and %+d byte(s), under both limits (%d lines, %s bytes)',
+        TRACKER, -$drop, -$byteDrop, DROP_LIMIT, number_format(DROP_BYTE_LIMIT)));
+}
+
+$notes[] = sprintf('%s had %d lines / %s bytes at HEAD~1 and has %d / %s now (%+d lines, %+d bytes)',
+    TRACKER, $before, number_format($beforeBytes), $after, number_format($afterBytes), -$drop, -$byteDrop);
 
 // ── R8. CLAUDE.md carries no namespace literal, because every one of them is derived (M42). ───────
 //

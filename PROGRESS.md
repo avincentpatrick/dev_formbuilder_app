@@ -152,6 +152,36 @@ lives in [PROGRESS_ARCHIVE.md](PROGRESS_ARCHIVE.md) and in git — do **not** re
    found two stale figures in one hand-off, and M36 found the Lane A line quoting Pest at 4595/19,433
    when the run reported **4611/19465**, one increment later.
 
+   ⛔ **AND THE TRACKER'S OWN MERGE GATE FAILED TWICE MORE — SILENTLY, AND BEFORE IT HAD EVER FIRED
+   ONCE (M47, 2026-08-29).** `scripts/tracker-lint.php` R7 is the only thing standing between this file
+   and a repeat of the 1,086-line deletion of 2026-08-16 (`f565ac9`), which merged green. It was
+   unarmable on the trunk for two unrelated reasons, and **neither was found by the gate** — both were
+   found by someone looking at a surgery afterwards:
+
+   - **The declaration could not reach line start.** GitHub's *default* squash body renders every commit
+     subject as `* <subject>`, so M45's surgery merged with `[tracker-surgery]` in the trunk message
+     **twice** while the rule matched nothing. M41 had already reddened `main` by *emptying* the body;
+     accepting the default reaches the same outcome by obeying the rule written in response to it.
+     **Preserving the text is not preserving the form** — the same lesson as M42's positional state
+     block, one file over. R7 now accepts exactly one `* `, `- ` or `+ ` before the marker and no
+     leading whitespace, so a mention on an indented line still cannot arm it.
+   - **The threshold counted lines, and what it guards is measured in bytes.** A hand-off or status
+     bullet here is a single line of thousands of bytes, so M45 removed **161,528 bytes in 133 net
+     lines** and sailed under a 200-line limit. Measured across all 394 commits that have ever touched
+     this file: surgeries start at 161,528 bytes and ordinary close-outs stop at 14,340 — an order of
+     magnitude apart with nothing in between. R7 now fails on **either** threshold and prints both
+     deltas on every run.
+
+   ⚠️ **AND THE WORKAROUND THE GATE ITSELF PRINTED WAS WRONG.** It told the reader to put the marker in
+   the PR title — where `state.php`'s merged-title cross-check would then have stopped seeing that pull
+   request at all, trading the surgery gate for a numbering collision. **Two gates wanting incompatible
+   first characters on the same string, and neither file mentioning the other.** Both now do.
+
+   ⛔ **THE LESSON IS ABOUT THE PATTERN AND NOT THIS BUG.** Three separate attempts to carry a machine
+   token through prose have now failed in this repository. The form that works is **positional**, and
+   the only evidence that it works is a deliberate red — a green run is what all three failures looked
+   like from the outside, for as long as nobody removed the mechanism and watched.
+
 ## Current Status
 
 - **🅰️ LANE A — `M46` IS MERGED (PR #236, `6dbe942`, CI 6/6 GREEN WITH REAL STEP COUNTS — Static analysis 21 · E2E 20 · Contract 16 · Frontend 12 · axe 11 · Pest 11): THE CORPUS STOPS ASSERTING WHAT THE CODE REFUTES.** Eight `major` documentation-truth rows closed, six residuals filed — open `major` rows **12 → 6**. New sixth lint gate `scripts/citation-liveness-lint.php`; **Static analysis is 21 where every prior release recorded 20, and that +1 is the gate's own step**, which is what proves the registration took. Full record in `docs/claims/lane-a.md`. ⛔ **THE SHARPEST FINDING IS ABOUT METHOD, NOT ABOUT THE ROWS: THREE FIGURES THAT ARRIVED FROM A RECONNAISSANCE PASS WERE ALL WRONG WHEN MEASURED DIRECTLY**, and one of them was already inside the *pushed* claim — cache writes reported as six sites in four files are three in three; constraints the data dictionary names, reported as 3 of 45, are 9 of 45; and an event string reported as appearing in no document was already in one. **A claim is a pushed commit, so a scout's number published inside one is a published error** — and the correction was *better* than the claim: the third cache write reaches the cache through an injected repository, invisible to the very grep the false docblock prescribed. ⛔ **FIVE OF THE EIGHT ROWS WERE WRONG ABOUT THEMSELVES IN FOUR DISTINCT WAYS** — one entirely STALE (fixed ten days before the census that re-validated it as live, and a later increment had already noticed the rot in its own commit message without closing the row); one FALSE IN A CLAUSE whose refutation lives in `vendor/`, so a first-party grep *confirms* the error; one OVER-READ, where the obvious remedy would have deleted a true residual (the threat model models no isolation **topology** at all); and two UNDERSTATED. ⛔ **THE UNDERSTATEMENT REACHED AN OPERATIONAL DEFECT: the production runbook prescribed `php artisan reverb:start` as an auto-restarting Windows service, and that command exits 1 and ships in no package** — an operator following it exactly would have created a service failing on every start, retried forever. ✅ **THE GATE'S SCOPE WAS DECIDED BY THE RUN, NOT THE AUTHOR** — the rule was fixed before the measurement, tier 1 now gates at **zero**, and all of `docs/**` measures 40 rotten, so the naive scope could never have merged. ⚠️ **Its stated limit is in its header and filed as a row: it checks a cited line is ALIVE, never that it says what the citing sentence claims.** Four positive controls, hand-run because `mutate.php` would report a false SURVIVED on a gate that is not Pest-in-a-container; each reddened its own rule and only its own, and the one that mattered proved a broken extraction pattern fails the FLOOR rather than reporting a clean scan.

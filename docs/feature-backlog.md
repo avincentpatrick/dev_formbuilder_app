@@ -3071,13 +3071,64 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   its own `major` row and has to move first. **Filed by M42 (2026-08-29)** at the moment it decided
   not to fake it. **Live.**
 
-- **`major` · The `[tracker-surgery]` marker cannot survive a squash merge in any form both gates
+- ~~**`major` · The `[tracker-surgery]` marker cannot survive a squash merge in any form both gates
+  accept, so `R7` is unarmable on the trunk.**~~
+  ✅ **DONE — M47 (2026-08-29). THE HEADLINE HELD AND WAS PROVEN AGAINST THE REAL TRUNK BYTES, AND THE
+  ROW UNDERSTATED ITSELF: THE MARKER WAS THE SMALLER OF TWO INDEPENDENT WAYS R7 COULD NOT FIRE.**
+  `scripts/tracker-lint.php` (R7), `scripts/state.php` (one docblock, no behaviour), `CLAUDE.md` (two
+  bullets under *Merging*, one rewritten under *The tracker*), `PROGRESS.md` (Standing Rule 7).
+  ⛔ **THE VACUOUS SUCCESS WAS CAPTURED LIVE RATHER THAN INFERRED.** The shipped gate was run in a
+  detached worktree at `1f966a4` — M45's own merge, the largest surgery since the incident — and
+  reported `R7 delta — PROGRESS.md line delta is -133 (583 to 450)`. **The ordinary branch.** A
+  161,528-byte removal of the constitution, declared twice in the trunk message, and the only gate this
+  repository has against the 2026-08-16 deletion classified it as a routine edit.
+  ⛔ **THE SECOND DEFECT IS THE LARGER ONE AND THE ROW TREATS IT AS A FOOTNOTE.** `DROP_LIMIT` is 200
+  **lines**, and this file's hand-off and status bullets are single lines thousands of bytes long.
+  Measured across **every** commit touching `PROGRESS.md` on `origin/main` — 394 parent/child pairs,
+  blob sizes from `git cat-file` — the distribution is bimodal with an order of magnitude between the
+  halves: surgeries at 938,007 · **670,409 (the incident)** · 307,867 · 272,006 · **161,528 (M45, at
+  133 net lines)**, and everything ordinary at **14,340 or less**. `DROP_BYTE_LIMIT` is 50,000, which
+  is 3.5× above the largest ordinary drop and 3.2× below the smallest surgery.
+  ⚠️ **AND THE CANONICAL "1,086" IS A `numstat` DELETION COUNT, NOT THIS GATE'S ARITHMETIC.** R7
+  computes a **net** drop, so to R7 the incident is **1,085** and M45 is **133**. Both figures are now
+  in the constant's comment, because a threshold justified by a number the gate does not itself compute
+  is a small instance of the defect the rule exists to catch.
+  ✅ **TEN POSITIVE CONTROLS, AND THE PAIRING IS THE POINT — NEITHER HALF IS DECORATION.** Three replay
+  the real trunk bytes of `1f966a4` rather than a fixture: with both changes it reports **DECLARED
+  SURGERY**; with the marker predicate reverted to bare line start it goes **RED**; with the byte limit
+  raised past the drop it falls silently back to the ordinary branch. Five more fix the marker form
+  against a synthetic overrun — mid-sentence **FAIL**, indented **FAIL**, bare line start **PASS**,
+  `* ` **PASS**, `- ` **PASS**. Two more pin the threshold **at the boundary**: a 50,001-byte removal in
+  125 lines fails, a 49,994-byte removal in 67 lines passes.
+  ⛔ **`scripts/mutate.php` COULD NOT DRIVE ANY OF THIS, AND THE OPEN ROW PROPOSING A `--command=` MODE
+  WOULD NOT HAVE EITHER — R7's INPUT IS THE COMMIT GRAPH, NOT A FILE.** Its discipline was reimplemented
+  at the call site instead: baseline first, abort unless the sha256 moved, restore by byte comparison.
+  See the refinement filed on that row below.
+  ⛔ **THE ROW'S THIRD PRESCRIPTION WAS ACTIVELY WRONG AND HAS BEEN DELETED FROM THE GATE.** R7's own
+  failure message said *"or put it in the PR title"*; `state.php`'s `remote_highest()` anchors merged
+  titles on the increment-number prefix, so following it would have dropped that pull request out of the
+  independent cross-check that exists to prevent a numbering collision. The reason is now written into
+  **both** files, in both directions — the condition the row identified was that neither mentioned the
+  other.
+  ⚠️ **WHAT IS NOT PROVEN, STATED RATHER THAN DISCOVERED:** no real GitHub squash was exercised. M47's
+  own drop is far under both limits, so a green R7 on its merge is the vacuous-success family again.
+  **The end-to-end proof is owed by the increment that moves `## Next Session`**, which is the next
+  surgery and is now gated by the byte limit.
+  ➕ **AND THE M46 CITATION GATE FIRED ON THIS DIFF, ON THIS ROW'S OWN CITATION.** Adding the docblock to
+  `state.php` pushed line 249 into a comment, so the ledger tier went 19 → 20 and went red. The citation
+  below is therefore rewritten to name `remote_highest()` instead of a line — which is what `CLAUDE.md`
+  already prescribes, and a gate built one increment ago catching the increment that edits the cited
+  file is the strongest evidence available that it works. Original filing follows, with both of its
+  coordinates corrected: the predicate is one line below where it says, and `state.php` is cited by
+  function.
+  **`major` · The `[tracker-surgery]` marker cannot survive a squash merge in any form both gates
   accept, so `R7` is unarmable on the trunk.** ⛔ **MEASURED ON `M45`'s OWN MERGE (PR #235, `1f966a4`),
   which passed no `--body` at all and therefore used GitHub's default.** The marker *is* in the trunk
   message — twice — and `grep '^\[tracker-surgery\]'` still finds **nothing**, because the default
   squash body renders every commit subject as a bullet: `* [tracker-surgery] M45 phase 1: …`.
-  `R7` matches `/^\[tracker-surgery\]/m` (`scripts/tracker-lint.php:201`), and `* ` in front of it is
-  not a line start. **Preserving the text is not preserving the form.**
+  `R7` matches `/^\[tracker-surgery\]/m` (in `scripts/tracker-lint.php`, at the `$declared` assignment —
+  the row's original line cite was one short), and `* ` in front of it is not a line start.
+  **Preserving the text is not preserving the form.**
   ⛔ **`M41` REDDENED `main` BY EMPTYING THE BODY; THIS IS THE SAME OUTCOME REACHED BY ACCEPTING THE
   DEFAULT**, so the rule written in response to that incident — *"never pass an empty `--body`"*, in
   `CLAUDE.md` under Merging — is **necessary and not sufficient**, and following it exactly still
@@ -3085,11 +3136,11 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `DROP_LIMIT`'s 200 and `R7` could not fire either way; **a surgery over 200 lines that obeys every
   written instruction merges RED.**
   ⛔ **AND THE WORKAROUND THE GATE ITSELF SUGGESTS IS CLOSED BY A SECOND GATE.** `R7`'s failure message
-  says *"or put it in the PR title"*. **`scripts/state.php:249` anchors merged pull-request titles on
-  `^M(\d{1,3}):`** for the independent increment cross-check that exists to prevent a numbering
-  collision, so a `[tracker-surgery]` prefix in the title silently drops that PR out of the second
-  source. **The two gates want incompatible first characters on the same string**, and nothing in
-  either file mentions the other.
+  says *"or put it in the PR title"*. **`remote_highest()` in `scripts/state.php` anchors merged
+  pull-request titles on the increment-number form** for the independent increment cross-check that
+  exists to prevent a numbering collision, so a `[tracker-surgery]` prefix in the title silently drops
+  that PR out of the second source. **The two gates want incompatible first characters on the same
+  string**, and nothing in either file mentions the other.
   **The remedy is one line and it is a merge instruction, not a code change**: pass an explicit
   `--body` whose **first content line** is the marker, and put it in `CLAUDE.md` under Merging beside
   the empty-body rule. ⚠️ **Verify it the way `M40` verified `R7` in the first place — with a
@@ -3099,7 +3150,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   smaller change than it looks and closes the case where a future merge is done through the web UI.
   ⚠️ **Sized as `major` because the failure is silent, lands on `main`, and defeats the only gate this
   repository has against the incident that cost it 1,086 lines** (`f565ac9`, 2026-08-16).
-  **Filed by M45 (2026-08-29)**, measured on its own merged commit rather than predicted. **Live.**
+  **Filed by M45 (2026-08-29)**, measured on its own merged commit rather than predicted.
 - **`minor` · `scripts/mutate.php` cannot drive a positive control for anything that is not Pest in a
   container.** Its `--tests` argument is Pest paths and it execs them via `docker exec`, so a gate
   implemented as a standalone script — `tracker-lint`, `state.php`, the five lint gates — has no harness,
@@ -3110,6 +3161,15 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   site, which is the argument for a `--command=` mode rather than for doing it again. ⚠️ **Docker being
   down on the host made this unavoidable rather than merely inconvenient** — with no container there is
   no harness at all. **Live.**
+  ➕ **REFINED BY M47 (2026-08-29), WHICH NEEDED EXACTLY THIS AND FOUND THE PROPOSED MODE WOULD NOT HAVE
+  SERVED IT.** A `--command=` mode mutates a **file** and runs something; `R7`'s input is the **commit
+  graph** — the thresholds read blob sizes at `HEAD~1` and the declaration is read out of
+  `git log --format=%B`. No amount of file mutation reaches it. What that gate actually needs is a
+  *history* fixture: a detached throwaway worktree at a chosen ref, a synthetic commit, and the message
+  amended per case. M47 built ten controls that way and threw the harness away with the worktree.
+  ⚠️ **So the row's scope is right and its shape is one size too small**: `--command=` covers the five
+  lint gates and `state.php`, and leaves `tracker-lint`'s only interesting rule uncovered. Worth
+  splitting into two rows before either is taken.
 
 - **`minor` · `scripts/next.php` takes each release's LEAD paragraph, and a lead paragraph is often a
   file manifest rather than the lesson.** The generator renders the newest four `## RELEASED` sections
@@ -3599,6 +3659,17 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   section by size and NOTHING EVER FILED IT** — it lived only in that release's prose and in M45's
   plan, so a backlog search would never have reached it. That is the J4b1 shape, and it is why this
   bullet exists. **Filed by M45 (2026-08-29). Live.**
+  ➕ **RE-MEASURED BY M47 (2026-08-29), AND THE SECTION HAS GROWN SINCE FILING.** `## Next Session` to
+  end of file is **242,873 bytes** of `PROGRESS.md`'s 353,875 — not the 214,073 above, which was true
+  on 2026-08-29 at M45's close and is a dated figure like any other. **Plan against the measurement,
+  not against this row.**
+  ✅ **AND THE GATE THAT WOULD HAVE MISSED THIS SURGERY IS NOW ARMED FOR IT.** `R7`'s new
+  `DROP_BYTE_LIMIT` is 50,000, so a removal of that size **must** carry the marker or the trunk goes
+  red — where the line threshold alone would have waved it through exactly as it waved M45 through.
+  ⚠️ **That also makes this increment the one that owes the end-to-end proof M47 could not give:** no
+  real GitHub squash has yet been observed arming the relaxed marker, because M47's own drop was far
+  too small to make R7 look. Merge this one with an explicit `--body` whose first content line is the
+  marker, and read the post-merge run on `main` rather than the PR run.
 
 - **`minor` · Four `DO NOT RE-ASK` user decisions of record now live in `PROGRESS_ARCHIVE.md` rather
   than in `docs/claims/decisions.md`.** M45 moved them with the claim ledger they were embedded in:

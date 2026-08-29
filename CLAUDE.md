@@ -122,8 +122,16 @@ the parent commit and accidentally gives the right answer.
   runner and proves nothing.
 - **A push filtered out by `paths-ignore` produces no run at all.** Read that as *correctly skipped* —
   never as *pending*. Require a positive count of six completed checks, never merely "none incomplete".
-- ⛔ **Never pass an empty `--body` to a squash merge.** The default body is what carries a commit
-  body onto the trunk, and a machine-read marker living there is discarded by an empty one.
+- ⛔ **A squash merge must land the surgery marker on a line of its own, and neither default does it.**
+  An empty `--body` discards the commit bodies outright; GitHub's *default* body renders each commit
+  subject as `* <subject>`, which demotes the marker off line start — the trunk then carries the text
+  and the gate matches nothing. **Pass an explicit `--body` whose first content line is the marker.**
+  The gate also accepts it behind a single `* `, `- ` or `+ `, so a web-UI merge arms it too; an
+  indented or mid-sentence mention still does not, deliberately.
+- ⛔ **Never put the marker in the PR title.** The merged-title cross-check in `scripts/state.php`
+  anchors on the increment-number prefix, so a marker in front of it silently drops that pull request
+  out of the second, independent source for the increment number — trading the surgery gate for a
+  numbering collision.
 
 ## The tracker
 
@@ -131,9 +139,12 @@ the parent commit and accidentally gives the right answer.
   `PROGRESS_ARCHIVE.md`.
 - Each lane edits **only its own status block and its own hand-off line**, and never reformats the
   other's.
-- ⛔ **Removing more than two hundred lines from `PROGRESS.md` requires the surgery marker at the start
-  of a line in the commit message, and it must survive onto the trunk.** Mentioning it mid-sentence
-  deliberately does not count.
+- ⛔ **A large removal from `PROGRESS.md` requires the surgery marker at the start of a line in the
+  commit message, and it must survive onto the trunk.** Mentioning it mid-sentence deliberately does
+  not count. **Large is measured in bytes as well as lines, and the byte half is the one that catches
+  this file** — its hand-off and status bullets are single lines thousands of bytes long, so a few
+  dozen of them outweigh hundreds of ordinary ones. `scripts/tracker-lint.php` holds both limits and
+  prints both deltas on every run; read them there rather than restating either here.
 - **Split by pre-measured line index, never by search.** These files contain verbatim examples of their
   own anchors; that is how a search once deleted a thousand lines and merged green. Prove a move by a
   counted multiset of line hashes plus exact byte conservation — never by "the archive got bigger", and

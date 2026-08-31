@@ -129,6 +129,31 @@ Doing both would make the next green run unattributable — the vacuous-success 
 whose whole point is a recording. The marker stays on phase 1 alone, so a green R7 proves the depth fix
 and nothing else.
 
+### Claim EXTENDED again 2026-08-31 — `.gitleaksignore`
+
+⛔ **`fetch-depth: 0` MADE A SECOND GATE START WORKING, AND IT HAD BEEN AS BLIND AS `R7`.** `ci.yml`'s
+secret scan runs `gitleaks detect --source .`, which scans **git history**, not the worktree. At
+`fetch-depth: 2` the clone held two commits, so **the secret scan on a PUBLIC repository has been
+checking two commits at a time for its whole life.** With depth 0 it scanned **818 commits on CI (843
+locally) and reported 3 leaks.**
+
+✅ **VERIFIED, AND THERE IS NO REAL SECRET.** All three findings are the **same string** — identical
+sha256 — an 8-to-12 character fixture in
+`packages/design-system/src/components/PasswordStrength/PasswordStrength.test.ts`, quoted twice into the
+tracker on the same day. **That line already carries `// gitleaks:allow`** and a comment explaining
+exactly this shape. The directive suppresses the match *in the commit where it exists*; the three hits
+are the historical commits that predate it. A password-**strength** checklist fixture has to look like a
+password to be worth asserting on.
+
+**Extension taken, pushed before the file was created:** `.gitleaksignore`, three exact fingerprints
+(`commit:file:rule:line`), which is gitleaks' designed mechanism and suppresses only these three. ⛔ **Not
+`--no-git`, and not a rule exclusion** — either would give back the history scanning this increment just
+switched on, which is a genuine security gain and the whole reason the finding exists.
+
+⚠️ **AND THIS EXTENSION IS PUBLISHED BY CHERRY-PICK ONTO `main`, NOT BY `git push origin HEAD:main`** —
+which is what put the surgery on the trunk earlier today. The rule as written is right for an empty
+branch and wrong for a mid-build extension.
+
 ---
 
 ## RELEASED — `M47`, the surgery marker becomes armable and R7 stops being blind to bytes (merged as PR #237, `8555ae1`, 6/6 green)

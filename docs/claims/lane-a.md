@@ -16,17 +16,82 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M52` is merged and the realignment is complete
+## Status: ACTIVE CLAIM — `M53`, the close-out exemption, in both places it is missing (`m53-closeout-exemption`)
 
-**`M52` is merged.** All three increments of the realignment have landed: the lanes are collapsed
-(`M50`), the trunk is protected and the corpus redacted (`M51`), and the two most-violated rules are
-now mechanical (`M52`).
+Taken 2026-09-01. Branch `m53-closeout-exemption`, cut from `origin/main` at `0bce9db`, PR into `main`.
+Row: the `major` filed by `M52`'s own close-out — *"The pre-push guard REFUSES A NORMAL CLOSE-OUT, and
+it refused the one that shipped it."* **Taken immediately and on the user's instruction**, because the
+first unattended run is gated on it: a loop that reaches its own close-out and is refused by its own
+guard would fail on its first outing, at the one step this realignment exists to automate.
 
-⛔ **THE FIRST UNATTENDED RUN HAS NOT HAPPENED AND NEEDS AN EXPLICIT GO.** The driver is built and
-proven; it has never been let loose. `D9` is open and is the one item that must never be started
-without an answer.
+### Evidence verified
 
-⛔ **RUN `php scripts/state.php` FOR EVERY NUMBER.**
+Every claim in the row re-checked against the merged tree rather than trusted from the row I wrote:
+
+- **`ci.yml`'s `paths-ignore` is exactly five entries** — `PROGRESS.md`, `PROGRESS_ARCHIVE.md`,
+  `docs/claims/**`, `docs/gate-baselines.md`, `docs/backlog-triage.md`. ✅ **held**, parsed from the
+  file this session.
+- **`docs/feature-backlog.md` is not among them.** ✅ **held** — and closing a row there is step 1 of
+  the close-out `CLAUDE.md` prescribes, so the divergence is **exactly one path** and it is the one
+  every close-out touches.
+- **The refusal is real and was observed**, not predicted: `M52`'s close-out was refused with *"This
+  push changes 4 path(s) that are not documentation"* and had to go with `--no-verify`. ✅ **held**
+- **`loop gates` is red on a close-out branch by construction** — it runs `preflight`, whose Rule 7(g)
+  check requires the claim on `origin/main` to name the current branch, and `m<n>-closeout` is a branch
+  the claim cannot name. ✅ **held**, observed on the same close-out.
+
+### Remedy verdict
+
+**The row's prescribed remedy is right, and its stated non-remedy is right too** — which is a first for
+this arc, and unsurprising given the row was written by the increment that caused the defect.
+
+⛔ **The row's warning is the load-bearing half: do NOT fix this by adding the backlog to
+`paths-ignore`.** That would stop CI running on backlog edits — a real reduction in gate coverage, in
+`ci.yml`, which is on the user's stop list. Verified rather than assumed: `paths-ignore` is under
+`push:`, so an entry there means *no run at all*, which `CLAUDE.md` already warns must be read as
+*correctly skipped* and never as *pending*.
+
+**So the guard gets its own set**, and the relationship to `paths-ignore` becomes **asserted instead of
+assumed**: the guard's list must be a **superset** of `paths-ignore`, checked at run time, failing
+closed if `ci.yml` ever grows an entry the guard does not know. That keeps the two visibly related
+without one pretending to derive from the other — which is the mistake `M52` made.
+
+⚠️ **The second half is NOT the same fix and must not be pattern-matched into one.** `loop gates` is
+not misclassifying paths; it is asking `preflight` a question that has no true answer on a close-out
+branch. The fix there is an explicit `--closeout` mode, propagated to `preflight`, that downgrades the
+claim assertion to a note **and says why**. ⛔ **Deliberately explicit rather than inferred from the
+branch name**: `m<n>-closeout` is a convention, and a guard that silently relaxes itself whenever a
+branch is named a certain way is a guard anyone can switch off by renaming a branch.
+
+### Files
+
+`scripts/pre-push-guard.php` · `scripts/preflight.php` · `scripts/loop.php` · `docs/feature-backlog.md`
+(close the row) · `docs/claims/lane-a.md` · `PROGRESS.md` (own block) · `docs/gate-baselines.md`
+(close-out).
+
+**Shared artefacts taken:** `PROGRESS.md`, `docs/**`.
+**Paired files taken:** none from 7(b-bis). ⚠️ **One coupling is taken and is the whole point of the
+increment:** the guard's documentation set and `ci.yml`'s `paths-ignore` must stay in a superset
+relation, and that relation is now enforced at run time rather than remembered.
+**Namespaces spent:** **nothing.** No ADR, no migration, no `§D`, no decision id. `0023` stays free.
+
+### Prediction
+
+**Pint is the only gate that can move** — three `scripts/` files change, and bare host Pint is the form
+that scans that directory. PHPStan cannot move (`app`, `database`, `routes`). Vitest 134, axe, e2e and
+`openapi.json` unmoved. No CI step added or removed, so `static-analysis` keeps its step count.
+
+⚠️ **The thing most likely to be wrong is the superset assertion firing on its own tree.**
+`docs/claims/**` is a glob and the guard's matcher handles `/**` by prefix; if the guard's own set is
+written with a trailing slash, or `ci.yml` is later written with a different glob shape, the superset
+check compares strings that mean the same thing and are not equal — and it **fails closed**, which
+turns a cosmetic mismatch into a refused push. That is the right direction to fail, and it is the
+first thing to check if a push is refused for a reason that looks absurd.
+
+⛔ **And the acceptance test is not a gate at all: this increment's own close-out must push WITHOUT
+`--no-verify`.** `M52`'s could not. If the close-out is refused again, the fix is wrong no matter what
+the controls said — so the proof is deferred to the close-out deliberately, and stated here before it
+can be claimed afterwards.
 
 ---
 

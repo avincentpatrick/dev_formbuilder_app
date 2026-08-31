@@ -47,6 +47,21 @@ successful sign-in, which looks like a broken build and is not.
 chapter per feature, with the URL, the account and the expected result for every step, plus a list of what is
 deliberately not built yet.
 
+### Enable the pre-push guard (one command, once per clone)
+
+```bash
+git config core.hooksPath .githooks     # or: composer run hooks:install
+```
+
+It refuses two pushes this project has already made by accident: work pushed before its claim is on
+the trunk, and a `HEAD:main` carrying more than one commit — `git push origin HEAD:main` pushes the
+**whole branch**, which is how a tracker surgery once reached the trunk with no squash merge.
+
+⚠️ **It cannot enable itself.** `core.hooksPath` is local git configuration and a repository may not
+turn on its own hooks, by design. `php scripts/preflight.php --lane=a` reports when it is missing, so
+an unguarded clone says so at session open. `--no-verify` bypasses it deliberately: this guards
+mistakes, not intent — the server-side control is the branch ruleset on `main`.
+
 ## Everyday commands
 
 ```bash

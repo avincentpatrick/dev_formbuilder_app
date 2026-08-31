@@ -3249,7 +3249,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `resources/public-runtime/public-runtime.css:4` imports the same artifact and `vite.config.ts:26` lists
   both as build inputs; the error names both directories. (That file is Lane B's column — it was evidence
   here, never a target.)
-  **(2) THREE README sites, not one.** The row cites `README.md:51-59`; the command is at `:63` (`:51` is
+  **(2) THREE README sites, not one.** The row cites `README.md:66-74`; the command is at `:78` (`:51` is
   the section heading), the block listed **`build` BEFORE `ds:tokens`** under a comment calling the latter
   a *"regenerate"* — reading as optional maintenance rather than a prerequisite — **`ds:install` appeared
   nowhere in the file at all**, and a third site at `:97` (the e2e bootstrap) ran `ds:tokens && build`
@@ -3273,7 +3273,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `.gitignore:21` is `/packages/*/dist`, and `git ls-files packages/design-system/dist` returns nothing,
   so a tree that has just been cloned does not contain it. The true sequence is `ds:install` →
   `ds:tokens` → `build`, which `ci.yml` performs and `docs/deployment-infrastructure.md:39` documents —
-  but `README.md:51-59` presents `npm run build` as a first-class command with no prerequisite. Live, and
+  but `README.md:66-74` presents `npm run build` as a first-class command with no prerequisite. Live, and
   it is the first thing a new contributor runs. PROVE IT IN A THROWAWAY `git worktree`, NOT BY MOVING
   `dist/` ASIDE — the local tree has a populated `dist/` from earlier increments, so any test that starts
   from it measures the wrong thing. FILED BY `M23` (2026-08-26) WITHOUT BEING BUILT, AND THE FILING IS THE
@@ -3421,7 +3421,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   opens its citations.** ➕ A live residual was found in the corrected block and is filed as its own row
   below. Original filing follows.
   **`major` · The README's frontend and design-system command blocks are host commands that cannot run on
-  the host.** `README.md:51-59` — `npm run build`, `type-check`, `ds:tokens`, `ds:storybook:build`, `ds:test`.
+  the host.** `README.md:66-74` — `npm run build`, `type-check`, `ds:tokens`, `ds:storybook:build`, `ds:test`.
   Only `npm run dev` carries the "(or use the `node` compose service)" parenthetical, and `:19` calls host
   Node optional, so the rest read as host commands; `docs/TESTING-GUIDE.md:22-23` states the opposite (no
   `pdo_pgsql`, no rolldown win32 binding). **Live**, on the platform the README explicitly documents.
@@ -3619,7 +3619,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   and renders outside it); `docs/ux/design-system-reference.md:812,:843`;
   `docs/pricing-feature-gating-matrix.md:56` (Business is seeded `unlimited`, not 25 endpoints);
   `docs/PRD.md:13` (the ADR index stops at 0014; 0015–0020 exist); `docs/TESTING-GUIDE.md:57,:639` (three
-  forms and five forms, against four and six as seeded); `README.md:85-86` (contract and e2e are real
+  forms and five forms, against four and six as seeded); `README.md:100-101` (contract and e2e are real
   merge-blocking gates, not stubs; there is no `deploy` stage in `ci.yml` at all); and this file's own
   `:105` and `:459`. **Live**, all documentary.
 

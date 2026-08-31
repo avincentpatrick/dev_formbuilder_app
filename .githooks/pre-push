@@ -1,0 +1,13 @@
+#!/bin/sh
+#
+# Pre-push guard (M52). The logic lives in scripts/pre-push-guard.php so that it can be driven
+# directly with synthetic input and proven by deliberate refusal — a hook that can only be exercised
+# by actually pushing is a hook nobody tests.
+#
+# Enable with:  git config core.hooksPath .githooks
+#
+# core.hooksPath is LOCAL configuration and cannot be committed: a repository may not enable its own
+# hooks, by design, because a clone would then execute code on checkout. `preflight` reports when this
+# is not installed, so an unguarded checkout says so at session open.
+
+exec php "$(dirname "$0")/../scripts/pre-push-guard.php" "$@"

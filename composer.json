@@ -3,7 +3,10 @@
     "name": "laravel/laravel",
     "type": "project",
     "description": "The skeleton application for the Laravel framework.",
-    "keywords": ["laravel", "framework"],
+    "keywords": [
+        "laravel",
+        "framework"
+    ],
     "license": "MIT",
     "require": {
         "php": "^8.4",
@@ -109,7 +112,9 @@
         ],
         "pre-package-uninstall": [
             "Illuminate\\Foundation\\ComposerScripts::prePackageUninstall"
-        ]
+        ],
+        "hooks:install": "@php -r \"passthru('git config core.hooksPath .githooks'); echo 'pre-push guard installed', PHP_EOL;\"",
+        "loop": "@php scripts/loop.php"
     },
     "extra": {
         "laravel": {

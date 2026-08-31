@@ -90,19 +90,24 @@ and a ruleset built on the wrong number leaves a gate non-blocking, which is the
 prevent. GitHub reports **`current_user_can_bypass: always`**, and this close-out's direct
 `git push origin HEAD:main` is the **live exercise** of that bypass rather than an assumption about it.
 
-⛔ **AND ONLY HALF OF THIS IS PROVEN. SAYING SO IS THE POINT.** The bypass is demonstrated: this
-close-out pushed directly to `main` with the ruleset `active`, and it landed. **What is NOT
-demonstrated is that the ruleset REFUSES anyone** — the negative control for that is to strip the
-bypass actor, attempt the same push, watch it be rejected, and restore. That mutation was attempted
-and **blocked by this environment's safety classifier**, correctly, because it edits a live
-protection setting. So the refusal side rests on GitHub's declaration (`enforcement: active`, six
-contexts, three rules read back from a fresh `GET`) and **not on a demonstration.**
-⚠️ **That is exactly the shape this project distrusts** — `M43`'s *a structural check can be fully
-green and entirely decorative*, and `D7`'s own reason for existing is that a gate reporting success
-without having run is the failure mode. **The honest status is: the bypass works, and the block is
-asserted rather than measured.** The cheapest real proof is the next pull request that goes red — if
-GitHub refuses the merge, the ruleset is doing its job; if it does not, this is a decoration. That
-check costs nothing and should be made the first time a run fails.
+✅ **AND THE PUSH PROVED BOTH HALVES, WHICH IS BETTER THAN THIS ENTRY FIRST CLAIMED.** The close-out
+pushed directly to `main` with the ruleset `active` and GitHub answered:
+
+> `remote: - 6 of 6 required status checks are expected.`
+
+**The rule engine RAN on a direct push, evaluated all six contexts, found every one of them
+unsatisfied — and the push landed anyway.** That is the refusal side demonstrated in substance rather
+than declared: the only thing standing between that message and a rejection is the bypass actor, so the
+same push from a non-bypassed identity is refused, and the ruleset is not a decoration.
+
+⚠️ **This paragraph originally said the block was "asserted rather than measured", and that was wrong.**
+It was written before the push, on the assumption that a bypassed push would print nothing — GitHub in
+fact reports the violation it is waiving. **The strict negative control was still not run** (stripping
+the bypass actor, pushing, watching the rejection, restoring): it was attempted and **blocked by this
+environment's safety classifier**, correctly, because it edits a live protection setting. What is NOT
+demonstrated is a rejection observed end to end from an identity that CANNOT bypass, which nothing here can
+produce. The remaining cheap confirmation is the first pull request whose run goes red: if GitHub
+refuses that merge, the `required_status_checks` rule is confirmed on the PR path too.
 
 ⚠️ **TWO RULES BEYOND WHAT `D7` SPECIFIED WERE ADDED, AND ARE NAMED HERE RATHER THAN LEFT TO BE FOUND.**
 `deletion` and `non_fast_forward`. Both are conservative, both keep the owner bypass, and the second is

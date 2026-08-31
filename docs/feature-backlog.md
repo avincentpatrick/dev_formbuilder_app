@@ -3825,6 +3825,18 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   could have reached this — the defect only exists on a real `pull_request` checkout with a real
   multi-commit PR. **Filed by M48 (2026-08-29)** at the moment the fix was written. **Not live** — the
   defect is closed; the missing guard is not.
+  ⛔ **RAISED IN SEVERITY BY WHAT THE FIX EXPOSED (M48, 2026-08-31): `fetch-depth` GOVERNS THE SECRET
+  SCAN TOO, AND THAT IS THE HIGHER-STAKES HALF.** `ci.yml` runs `gitleaks detect --source .`, which
+  scans **git history**, not the working tree. At `fetch-depth: 2` the clone held two commits, so **the
+  secret scan on a PUBLIC repository was checking two commits at a time for its entire life** — a
+  vacuous success of exactly the catalogued kind, in the gate whose failure costs the most. Raising the
+  depth to 0 for `R7` made it scan 818 commits on the first run. ✅ **It found three, all the same
+  string, all a password-strength test fixture; `.gitleaksignore` records why by fingerprint.** So the
+  outcome is reassuring and the *mechanism* is not: **one YAML integer silently governed whether two
+  independent gates could see anything**, and nothing anywhere said so. ⚠️ **A future edit that lowers
+  the depth to save clone time re-blinds BOTH, and neither reports being blind** — `R7` says the marker
+  is missing and the secret scan says no leaks found. That is the argument for the guard this row asks
+  for, and it is now a security argument rather than a bookkeeping one.
 
 - **`major` · `R7` measures the tip against its parent, so a large removal that is not in a push's LAST
   commit is invisible — and the constitution reached `main` through exactly that hole.** ⛔ **MEASURED

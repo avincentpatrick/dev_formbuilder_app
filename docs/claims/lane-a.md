@@ -16,11 +16,124 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M49` is merged and the lane holds nothing forward
+## Status: ACTIVE CLAIM — `M50`, the two-lane protocol is retired and the third worktree with it (`m50-lane-collapse`)
 
-**`M49` is merged.** Lane A holds no active row and pre-claims no forward number. The next row is taken
-under Rule 7(f), and the claim is written here and **pushed** before the first file is opened. The
-released record is below; the claim it replaced is preserved inside it.
+Taken 2026-08-31. Branch `m50-lane-collapse`, cut from `origin/main` at `bc7bc07`, PR into `main`.
+Row: the `minor` under *Tracker, CI and process* — *"`fb-lane-c` is an abandoned worktree that every
+numbering check must now read past"* (`docs/feature-backlog.md`, in the tracker/CI cluster). **The row
+is one part of this increment, not the whole of it**: the collapse itself is user-directed, and the row
+is the piece of it that was already filed.
+
+### ⛔ THIS CLAIM CROSSES THE LANE BOUNDARY ON PURPOSE, AND IT IS THE ONE INCREMENT ENTITLED TO
+
+`docs/claims/lane-b.md` is edited by Lane A here. That is forbidden by the rule this increment
+**abolishes**, which is the only reason it is safe — and it is stated rather than done quietly, on the
+`M28` precedent. Three independent facts make it safe rather than merely permitted, all verified this
+session against the merged tree:
+
+- `lane-b.md`'s `## Status` is `NO ACTIVE CLAIM` and has been since 2026-08-27.
+- **It carries no forward queue.** The file was mapped heading by heading; the only forward-looking
+  text under `## Status` is a warning *to* Lane B about reading `lane-a.md`, which is not a claim.
+- No Lane B session is running, and its worktree is clean at 68 commits behind.
+
+⚠️ **`state.php`'s `LANE_A_WRITABLE` reports this and does not gate it** — a disagreement inside
+`lane-b.md` is deliberately *reported* because Lane A could not fix it without breaking the rule that
+found it. So no gate will object, which is precisely why the crossing is declared here instead.
+
+### ⛔ AND THE SESSION THIS CLAIM OPENS IN HAD TWO WRITERS, WHICH IS THE ROW'S OWN THESIS ARRIVING EARLY
+
+This session began while **another Claude session (PID 24104) was live in this same worktree**,
+finishing `M49`'s close-out. It wrote `docs/claims/lane-a.md` at 19:59:35 and `PROGRESS.md` at 20:00:39
+— after this session had started and after its first read — and it moved `HEAD` from
+`m49-r7-event-base` to `m49-closeout` underneath. `git status` was clean at session start and was not
+clean minutes later. **Nothing was lost, because that session committed before switching**; the
+`M33` incident is what happens when it does not. This increment was held read-only until that session
+pushed `bc7bc07`, and the wait is the reason there is nothing to reconcile.
+
+### Evidence verified
+
+Every claim in the row opened against the merged tree:
+
+- **Three worktrees** — `git worktree list` returns `dev_formbuilder_app`, `fb-lane-b` on `main`
+  (clean), `fb-lane-c` on `lane-c-bootstrap` at `b44a36c`. ✅ **held**
+- **`lane-c-bootstrap` is M14-era** — `b44a36c` is *"Merge pull request #204 from …/m14-closeout"*.
+  ✅ **held**
+- **"104 commits behind `origin/main`"** — ⚠️ **moved to 177.** Correct when filed, stale now; the row
+  is a dated measurement and the drift is the reason it may not be quoted forward.
+- **"one dirty file"** — ✅ **held**, and identified: `packages/design-system/package-lock.json`,
+  `+1/−21`, every deletion a bare `"peer": true` key plus one comma reformat, mtime 2026-08-25 23:05.
+  **npm peer-resolution bookkeeping, not work.** Regenerable, and preserved anyway before removal.
+- **No `docs/claims/lane-c.md` anywhere** — ✅ **held**, and stronger than the row says:
+  **`lane-c-bootstrap` does not exist on the remote either**, verified against `git ls-remote --heads
+  origin`. Lane C was cut, never used, never published, and released nothing — no `M`-series entry is
+  attributable to it.
+
+### Remedy verdict
+
+**The row's prescribed fix — *"`git worktree remove` is the whole fix"* — is WRONG, and wrong in the
+direction this repository keeps cataloguing: it would have succeeded on the easy half and failed
+silently on the rest.**
+
+1. ⛔ **`git worktree remove` REFUSES on `fb-lane-c`**, because the worktree holds a modified tracked
+   file. The refusal is the guard working. The row treats removal as unconditional and does not
+   mention it.
+2. ⛔ **The row scopes the defect to `git worktree list` being noisy.** The actual coupling is in code:
+   `tracker-lint.php` R6 loops `['A', 'B']` and requires `/^\*\*LANE {$lane} NEXT PROMPT/m` **exactly
+   once at line start** in `PROGRESS.md`. Removing Lane B's hand-off without amending R6 **in the same
+   commit** reddens `main`. `preflight.php` and `next.php` each carry their own two-entry `LANES`
+   const. Removing a worktree fixes none of that.
+3. ⚠️ **The row is silent on the numbering input that must NOT be removed.** `state.php` derives the
+   increment from the `## RELEASED` headings of **both** claim files; `lane-b.md` holds ten releases
+   that exist nowhere else. Deleting it would drop one of the two independent sources and trade a tidy
+   listing for a numbering collision.
+
+**So the row is a floor in both halves**, which is now the expected shape rather than a surprise.
+
+### Files
+
+`docs/claims/lane-a.md` · `docs/claims/lane-b.md` *(boundary crossing, above)* ·
+`docs/claims/TEMPLATE.md` · `PROGRESS.md` · `scripts/tracker-lint.php` · `scripts/preflight.php` ·
+`scripts/next.php` · `docs/adr/0022-<slug>.md` *(new)* · `docs/feature-backlog.md` ·
+`docs/gate-baselines.md` *(regenerated at close-out, from this increment's own post-merge run)*.
+
+⚠️ **`docs/claims/TEMPLATE.md` is in the list for a reason that is easy to miss.** Its own warning says
+*"`lane-b.md` still carries its own copy … Lane B adopts this file **on its next increment** by
+deleting its copy and linking here."* **Lane B has no next increment after this one**, so that sentence
+becomes false at the moment of the collapse and has to be rewritten in the same PR — the same
+paired-fact shape as R6.
+
+**Shared artefacts taken:** `PROGRESS.md` (Standing Rule 7, the parallel-lanes section, and Lane B's
+hand-off line — i.e. **not** own-block-only, which Rule 7(d) normally requires and which this increment
+is entitled to for the same reason as the `lane-b.md` crossing), `docs/feature-backlog.md`,
+`docs/claims/*`, `docs/adr/`, `docs/gate-baselines.md`.
+
+**Paired files taken:** none from the 7(b-bis) table. **Two paired-shaped couplings are taken and are
+named here because they behave identically:** *(Lane B hand-off ⇄ `tracker-lint.php` R6)* and
+*(`lane-b.md`'s template copy ⇄ `TEMPLATE.md`'s note about it)*. Each must move in the same commit as
+its partner or the trunk goes red.
+
+**Namespaces spent:** **ADR `0022`** — derived from `state.php`, and the `0010` gap is **reserved for
+H1d, not free**. No migration prefix, no `§D`, no exceptions entry, no route, no ability key. No
+decision id: the collapse is a user instruction, not a question, and `D6`/`D7` belong to the next
+increment rather than this one.
+
+### Prediction
+
+**PHPStan cannot move and will not.** It scans `app`, `database`, `routes`; this diff is `scripts/`,
+`docs/` and `PROGRESS.md`. Saying so beats quoting an unchanged number.
+**Pint can move and is the only gate that can** — three `scripts/` files are edited, and bare host Pint
+is the form that sees `scripts/` at all. **Vitest stays at 134 files**, Storybook axe and E2E unmoved,
+`openapi.json` byte-identical: no `.ts`, no `.vue`, no route, no controller.
+**`static-analysis` keeps its step count** — no CI step is added or removed.
+
+⚠️ **The one most likely to be wrong is `tracker-lint` R3, not R6.** R6 is the trap the plan names and
+is therefore the one that will get attention; **R3 is the one nobody is looking at.** It counts
+`Next Session` across **both** tracker files and requires exactly `EXPECTED_CROSS_FILE_NEXT_SESSION`,
+which is **1** — and the parallel-lanes block being edited sits directly beneath the
+`## Next Session — Resume Here` heading that supplies that single occurrence. A collapse that tidies
+one line too far takes R3 red for a reason that has nothing to do with lanes. **Both R3 and R6 get a
+deliberate defect that turns them red, restored by byte comparison; the mechanism is mutated, not the
+declaration.**
 
 ⛔ **RUN `php scripts/state.php` FOR EVERY NUMBER.** Increment, ADR, migration prefix, exceptions-log
 entry, open rows, open decisions, and how far behind the trunk `docs/gate-baselines.md` has fallen.

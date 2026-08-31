@@ -158,6 +158,27 @@ if ($running === '0') {
     warn("could not probe {$container}: ".$running);
 }
 
+// ── M52. The pre-push guard is OPT-IN PER CLONE and cannot be otherwise: core.hooksPath is local
+//    git configuration, and a repository may not enable its own hooks by design. So the only honest
+//    mitigation is to make its ABSENCE loud at session open, rather than discovering it at the moment
+//    of the push it would have refused.
+section('Pre-push guard');
+$hooksPath = trim(sh('git config --get core.hooksPath'));
+
+if ($hooksPath === '') {
+    warn('core.hooksPath is unset — the pre-push guard is NOT installed.');
+    note('Install it with: git config core.hooksPath .githooks');
+    note('It refuses a push whose claim is not on the trunk, and a HEAD:main carrying more than one');
+    note('commit — the two rules M14 and M48 each broke with a real push. Not blocking: it guards');
+    note('mistakes, not intent, and --no-verify bypasses it on purpose.');
+} elseif ($hooksPath !== '.githooks') {
+    warn("core.hooksPath is '{$hooksPath}', not '.githooks' — the guard in this repository is not active.");
+} elseif (! is_file('.githooks/pre-push')) {
+    warn('core.hooksPath is .githooks but .githooks/pre-push is missing.');
+} else {
+    pass('pre-push guard installed (core.hooksPath = .githooks)');
+}
+
 // ── M31. A splice that fuses two lines because the inserted file had no trailing newline swallowed
 //    the other lane's bullet whole, and reported a delta of 0 where +1 was asserted.
 section('PROGRESS.md structural');

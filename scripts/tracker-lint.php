@@ -195,50 +195,77 @@ foreach (['A', 'B'] as $lane) {
 // ── R7. The rule that would have caught the incident. ────────────────────────────────────────────
 //    A large removal is legitimate only when the commit message says so.
 //
-//    ⚠️ ON A pull_request EVENT actions/checkout HANDS US A SYNTHETIC MERGE COMMIT, so HEAD~1 is
-//    main's tip and HEAD~1..HEAD is the PR's own commits. On a push to main, HEAD~1 is the previous
-//    commit and the range is what was pushed. Both are correct, and both need the parent REACHABLE.
+//    ⛔⛔ THE BASE COMES FROM THE EVENT, NOT FROM THE COMMIT GRAPH, AND THAT IS THE WHOLE OF M49.
+//    This rule spent its first eight increments assuming THE UNIT OF CHANGE IS ONE COMMIT. HEAD~1 is
+//    the right base only when a push or a pull request contains exactly one, and the 2026-08-16
+//    incident happened to be a single commit — which is the only reason the rule as first written
+//    would ever have caught it. THE GATE WAS SIZED AGAINST A SAMPLE OF ONE.
 //
-//    ⛔⛔ AND THE SENTENCE ABOVE USED TO END "…which is why ci.yml uses fetch-depth: 2", WHICH WAS
-//    FALSE — THE RANGE IS ONLY THE PR'S OWN COMMITS IF THEY ARE IN THE CLONE. At depth 2 the clone
-//    holds the merge commit and its two parents and nothing else, so HEAD~1..HEAD is the merge commit
-//    plus the PR's LAST commit; every earlier one is grafted away and a marker on it is invisible.
-//    M40 chose 2 for this rule and 2 is one short of what the rule needs. Nobody could have noticed
-//    for eight increments because THIS RULE HAD NEVER FIRED — M48's is the first surgery large enough
-//    to make it look, and it reddened with the delta measured perfectly and the marker "absent".
-//    Reproduced with `git fetch --depth=2 origin refs/pull/238/merge` rather than reasoned about.
-//    ci.yml's static-analysis checkout is now fetch-depth: 0; a bounded depth is what created this,
-//    and a bigger bounded number would fail the next longer PR silently, in the one direction that
-//    reads like a missing marker rather than like a broken gate.
+//    Measured on M48's own push rather than predicted: `e82e835..5d4bd79` carried four commits, one
+//    of which removed 198,909 bytes of this file. The run compared HEAD~1 — where the file is
+//    ALREADY 161,298 bytes — against HEAD and reported a delta of ZERO. The largest removal since
+//    the incident this rule exists for crossed the merge gate unmeasured, and green.
+//
+//    HOW THE BASE IS CHOSEN NOW. Keyed on GITHUB_EVENT_NAME, which GitHub always sets, so a ci.yml
+//    edit that drops the variables below EXITS 2 instead of going quiet:
+//
+//      push          github.event.before, passed in as TRACKER_LINT_BASE_SHA. Required. The range is
+//                    then every commit that was pushed, which is what the rule always meant.
+//      pull_request  HEAD~1 — see the next paragraph — with the CLONE SHAPE asserted against
+//                    github.event.pull_request.commits, passed in as TRACKER_LINT_PR_COMMITS.
+//      schedule,     HEAD~1. A nightly or hand-fired run measures the trunk tip against its parent;
+//      dispatch      whatever it carried was already measured by the push that created it.
+//      unset         HEAD~1, the local run. Printed as such, never silently assumed.
+//
+//    ⚠️ AND THE ROW THAT FILED THIS PRESCRIBED github.event.pull_request.base.sha FOR THE SECOND ARM,
+//    WHICH IS WRONG HERE — WRONG IN THE DIRECTION THAT PRINTS A NUMBER. base.sha is the base tip as
+//    of the EVENT; the checkout is refs/pull/N/merge as of the RUN. When main advances between them,
+//    which on a two-lane repository is routine and is already catalogued here as "a gate number
+//    moving on a diff that cannot move it is the OTHER LANE", `base.sha..HEAD` sweeps in the other
+//    lane's commits and reports their PROGRESS.md delta as this pull request's. The merge commit's
+//    FIRST PARENT is the tip actually being merged into, and is exact. So the payload is spent on the
+//    job base.sha cannot do: catching a clone too shallow to hold the commits being measured.
+//
+//    ⛔⛔ WHY A CLONE-SHAPE ASSERTION AT ALL. M48's other half: ci.yml used fetch-depth: 2, chosen by
+//    M40 FOR THIS RULE, which leaves the merge commit and the PR's LAST commit and grafts every
+//    earlier one away — so a marker on any but the final commit was invisible. R7 reported it absent
+//    while measuring the delta perfectly, and CANNOT TELL THE TWO APART FROM INSIDE: "no commit in
+//    this range carries the marker" is the same observation whether the commit is missing or the
+//    marker is. Comparing the range's commit count against the payload's is what distinguishes them,
+//    and it turns a silent re-blinding into a loud broken gate. The depth is 0 today; the value is one
+//    line of YAML and the next person tuning clone time can lower it.
 //
 //    ⛔⛔ IT IS HEAD~1 AND NEVER HEAD-CARET, AND THAT IS NOT A STYLE CHOICE. PHP's exec() runs through
 //    cmd.exe on Windows, where the caret IS THE ESCAPE CHARACTER, so a rev-parse of HEAD-caret
 //    returns HEAD itself. Measured on this host: HEAD and HEAD-caret both resolved to 216ea25 while
 //    HEAD~1 gave f537bea. The check therefore compared the file against ITSELF, reported +0 forever,
-//    and rev-parse --verify still SUCCEEDED so the cannot-measure guard below never fired. Green on
-//    Linux CI and silently blind on every local run — a vacuous success inside the gate written to
-//    end vacuous successes. Found only because a control COMMITTED its mutation rather than leaving
-//    it in the working tree, which is what CI actually does.
+//    and rev-parse --verify still SUCCEEDED so the cannot-measure guard never fired. Green on Linux
+//    CI and silently blind on every local run — a vacuous success inside the gate written to end
+//    vacuous successes. For the same reason the commit-ness check below is `git cat-file -t` and not
+//    a rev-parse with a brace suffix: NO CARET MAY APPEAR IN ANY COMMAND IN THIS FILE.
 //
-//    ⛔ IF THE PARENT IS NOT REACHABLE THIS EXITS 2 RATHER THAN SKIPPING. A delta silently not
-//    measured is a vacuous success, and this project already catalogues three separate kinds.
+//    ⛔ EVERY PATH EITHER RESOLVES OR EXITS 2. None falls back silently, and a base that cannot be
+//    established is never treated as a base of HEAD~1 — a delta measured against the wrong base is
+//    worse than one not measured at all, because it prints a number.
+$base = resolve_r7_base();
+
 $parentOut = [];
 $parentStatus = 0;
-exec('git rev-parse --verify --quiet HEAD~1 2>&1', $parentOut, $parentStatus);
+exec('git rev-parse --verify --quiet '.$base['ref'].' 2>&1', $parentOut, $parentStatus);
 
 if ($parentStatus !== 0 || $parentOut === []) {
-    fwrite(STDERR, "tracker-lint: CANNOT MEASURE R7 — HEAD~1 is not reachable (shallow clone?).\n");
-    fwrite(STDERR, "              ci.yml must check out with fetch-depth: 2. Refusing to skip the check.\n");
-    exit(2);
+    cannot_measure_r7(
+        $base['ref'].' is not reachable (shallow clone?).',
+        'The base was chosen as '.$base['source'].'. ci.yml checks out with fetch-depth: 0 for this '.
+        'rule. Refusing to skip the check.');
 }
 
 $beforeOut = [];
 $showStatus = 0;
-exec('git show HEAD~1:'.escapeshellarg(TRACKER).' 2>&1', $beforeOut, $showStatus);
+exec('git show '.$base['ref'].':'.escapeshellarg(TRACKER).' 2>&1', $beforeOut, $showStatus);
 
 if ($showStatus !== 0) {
-    fwrite(STDERR, 'tracker-lint: CANNOT MEASURE R7 — '.TRACKER." does not exist at HEAD~1.\n");
-    exit(2);
+    cannot_measure_r7(TRACKER.' does not exist at '.$base['ref'].'.', 'Base chosen as '.$base['source'].'.');
 }
 
 $before = count($beforeOut);
@@ -251,12 +278,12 @@ $drop = $before - $after;
 //    the small version of the defect this rule is about. `git cat-file -s` answers what was asked.
 $sizeOut = [];
 $sizeStatus = 0;
-exec('git cat-file -s HEAD~1:'.escapeshellarg(TRACKER).' 2>&1', $sizeOut, $sizeStatus);
+exec('git cat-file -s '.$base['ref'].':'.escapeshellarg(TRACKER).' 2>&1', $sizeOut, $sizeStatus);
 
 if ($sizeStatus !== 0 || $sizeOut === [] || preg_match('/^\d+$/', trim((string) $sizeOut[0])) !== 1) {
-    fwrite(STDERR, 'tracker-lint: CANNOT MEASURE R7 — the size of '.TRACKER." at HEAD~1 is unreadable.\n");
-    fwrite(STDERR, '              git cat-file -s said: '.trim(implode(' ', $sizeOut))."\n");
-    exit(2);
+    cannot_measure_r7(
+        'the size of '.TRACKER.' at '.$base['ref'].' is unreadable.',
+        'git cat-file -s said: '.trim(implode(' ', $sizeOut)));
 }
 
 $beforeBytes = (int) trim((string) $sizeOut[0]);
@@ -267,7 +294,7 @@ $overLines = $drop > DROP_LIMIT;
 $overBytes = $byteDrop > DROP_BYTE_LIMIT;
 
 $msgOut = [];
-exec('git log --format=%B HEAD~1..HEAD 2>&1', $msgOut);
+exec('git log --format=%B '.$base['ref'].'..HEAD 2>&1', $msgOut);
 $declared = preg_match('/^(?:[*+-] )?'.preg_quote(SURGERY_MARKER, '/').'/m', implode(chr(10), $msgOut)) === 1;
 
 $scale = sprintf('%d line(s) (%d down to %d, limit %d) and %s byte(s) (%s down to %s, limit %s)',
@@ -277,7 +304,7 @@ $scale = sprintf('%d line(s) (%d down to %d, limit %d) and %s byte(s) (%s down t
 
 if (($overLines || $overBytes) && ! $declared) {
     fail('R7 delta', sprintf(
-        '%s lost %s — over %s — and no commit in HEAD~1..HEAD declares it with "%s". '.
+        '%s lost %s — over %s — and no commit in %s..HEAD declares it with "%s". '.
         'This is the shape of the deletion of 2026-08-16 (f565ac9), which merged green: 1,085 lines by this '.
         "gate's arithmetic (1,086 by numstat) and 670,409 bytes. ".
         'If the removal is deliberate, put the marker at the START of a line in the commit message. One "* ", '.
@@ -292,7 +319,7 @@ if (($overLines || $overBytes) && ! $declared) {
         'for the independent increment cross-check, so a marker prefix there silently drops this PR out of that '.
         'second source and trades one gate for another.',
         TRACKER, $scale, $overLines && $overBytes ? 'both limits' : ($overLines ? 'the line limit' : 'the byte limit'),
-        SURGERY_MARKER));
+        $base['ref'], SURGERY_MARKER));
 } elseif ($overLines || $overBytes) {
     pass('R7 delta', sprintf('%s lost %s, declared with "%s"', TRACKER, $scale, SURGERY_MARKER));
     $notes[] = sprintf('DECLARED SURGERY: %d line(s) and %s byte(s) removed from %s',
@@ -302,8 +329,13 @@ if (($overLines || $overBytes) && ! $declared) {
         TRACKER, -$drop, -$byteDrop, DROP_LIMIT, number_format(DROP_BYTE_LIMIT)));
 }
 
-$notes[] = sprintf('%s had %d lines / %s bytes at HEAD~1 and has %d / %s now (%+d lines, %+d bytes)',
-    TRACKER, $before, number_format($beforeBytes), $after, number_format($afterBytes), -$drop, -$byteDrop);
+// ⛔ THE BASE AND ITS PROVENANCE PRINT ON EVERY RUN, AND THAT LINE IS THE ARTEFACT. A future edit
+//    that re-blinds this rule — a bounded fetch-depth, a dropped env var in ci.yml — is visible in
+//    the run log as a base that is not the one the event named, instead of as a marker that is
+//    mysteriously absent. M48 lost eight increments to exactly that ambiguity.
+$notes[] = sprintf('R7 base is %s (%s)', $base['ref'], $base['source']);
+$notes[] = sprintf('%s had %d lines / %s bytes at %s and has %d / %s now (%+d lines, %+d bytes)',
+    TRACKER, $before, number_format($beforeBytes), $base['ref'], $after, number_format($afterBytes), -$drop, -$byteDrop);
 
 // ── R8. CLAUDE.md carries no namespace literal, because every one of them is derived (M42). ───────
 //
@@ -425,4 +457,108 @@ function read_or_die(string $path): string
 function anchored_count(string $haystack, string $pattern): int
 {
     return (int) preg_match_all($pattern, $haystack);
+}
+
+/**
+ * R7's base, and where it came from. See the block comment above R7 for why each arm is what it is.
+ *
+ * @return array{ref: string, source: string}
+ */
+function resolve_r7_base(): array
+{
+    $event = trim((string) getenv('GITHUB_EVENT_NAME'));
+
+    if ($event === 'push') {
+        $sha = trim((string) getenv('TRACKER_LINT_BASE_SHA'));
+
+        if ($sha === '') {
+            cannot_measure_r7(
+                'GITHUB_EVENT_NAME is "push" but TRACKER_LINT_BASE_SHA is empty or unset.',
+                'ci.yml must pass github.event.before into this step. REFUSING TO FALL BACK TO HEAD~1: '.
+                'on a push of more than one commit HEAD~1 measures only the last of them, which is how '.
+                'a 198,909-byte removal of '.TRACKER.' reached the trunk with a delta of zero.');
+        }
+
+        if (preg_match('/^0{40}$/', $sha) === 1) {
+            cannot_measure_r7(
+                'the push event carries the all-zero before-sha, which means the branch was created '.
+                'by this push and has no previous tip.',
+                'There is no base to measure against, so there is nothing to compare and no honest '.
+                'delta to print. This should not occur on '.TRACKER."'s branch, which already exists.");
+        }
+
+        // `git cat-file -t` and NOT a rev-parse with a brace suffix: no caret may appear in any
+        // command in this file. See the R7 block comment.
+        $typeOut = [];
+        $typeStatus = 0;
+        exec('git cat-file -t '.escapeshellarg($sha).' 2>&1', $typeOut, $typeStatus);
+
+        if ($typeStatus !== 0 || trim((string) ($typeOut[0] ?? '')) !== 'commit') {
+            cannot_measure_r7(
+                'TRACKER_LINT_BASE_SHA ('.$sha.') is not a commit in this clone.',
+                'A shallow checkout grafts it away, and a force-push can orphan it. git cat-file said: '.
+                trim(implode(' ', $typeOut)));
+        }
+
+        return ['ref' => $sha, 'source' => 'github.event.before, via TRACKER_LINT_BASE_SHA'];
+    }
+
+    if ($event === 'pull_request') {
+        $declared = trim((string) getenv('TRACKER_LINT_PR_COMMITS'));
+
+        if (preg_match('/^\d+$/', $declared) !== 1) {
+            cannot_measure_r7(
+                'GITHUB_EVENT_NAME is "pull_request" but TRACKER_LINT_PR_COMMITS is empty, unset or '.
+                'not a number.',
+                'ci.yml must pass github.event.pull_request.commits into this step. Without it nothing '.
+                'can tell a clone too shallow to hold the marker from a commit that never carried one, '.
+                'and those two look identical from inside this rule.');
+        }
+
+        $countOut = [];
+        $countStatus = 0;
+        exec('git rev-list --count HEAD~1..HEAD 2>&1', $countOut, $countStatus);
+
+        if ($countStatus !== 0 || preg_match('/^\d+$/', trim((string) ($countOut[0] ?? ''))) !== 1) {
+            cannot_measure_r7(
+                'the commit count of HEAD~1..HEAD is unreadable on a pull_request event.',
+                'git rev-list said: '.trim(implode(' ', $countOut)));
+        }
+
+        $inRange = (int) trim((string) $countOut[0]);
+        // The PR's own commits plus the synthetic merge commit actions/checkout puts at HEAD.
+        $expected = (int) $declared + 1;
+
+        // >= and not ==, deliberately. The failure being guarded is the range holding FEWER commits
+        // than the pull request has, which is what a bounded fetch-depth produces. A strict equality
+        // would redden on branch topologies that are legal and uninteresting here — and a false red
+        // in the one rule that must never cry wolf costs more than the extra commits it would catch.
+        if ($inRange < $expected) {
+            cannot_measure_r7(
+                sprintf('HEAD~1..HEAD holds %d commit(s), but this pull request has %d, so %d of them '.
+                    'are not in the clone.', $inRange, (int) $declared, $expected - $inRange),
+                'THE CLONE IS TOO SHALLOW FOR THIS RULE. ci.yml must check out with fetch-depth: 0. '.
+                'This is the M48 defect, and it is reported here rather than as an absent marker '.
+                'because those two are indistinguishable from inside and one of them is a broken gate.');
+        }
+
+        return [
+            'ref' => 'HEAD~1',
+            'source' => sprintf("the merge commit's first parent; %d commit(s) in range against %d in "
+                .'the pull request', $inRange, (int) $declared),
+        ];
+    }
+
+    if ($event !== '') {
+        return ['ref' => 'HEAD~1', 'source' => 'the trunk tip against its parent, on a '.$event.' event'];
+    }
+
+    return ['ref' => 'HEAD~1', 'source' => 'local run — GITHUB_EVENT_NAME is unset'];
+}
+
+function cannot_measure_r7(string $what, string $why): never
+{
+    fwrite(STDERR, "tracker-lint: CANNOT MEASURE R7 — {$what}\n");
+    fwrite(STDERR, "              {$why}\n");
+    exit(2);
 }

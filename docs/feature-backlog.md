@@ -3804,8 +3804,32 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   surgery deliberately touch one non-ignored file. Both are decisions about `ci.yml`, which is a shared
   artefact. **Filed by M48 (2026-08-29)**, found while confirming the run this increment needs would
   exist. **Live.**
+  ⛔ **REMEDY CORRECTED BY M49 (2026-08-31), WITHOUT TAKING THE ROW: THE FIRST OF THE TWO CANDIDATES
+  CANNOT BE WRITTEN.** A workflow's `paths-ignore` is evaluated by GitHub *before* a run exists, over
+  the files in the push and nothing else; it has no access to a commit message, so *"exempt a commit
+  whose message carries the marker"* has nowhere to be expressed. That leaves the second candidate — a
+  process rule, not a code change — plus two the row did not name: **(a)** drop `PROGRESS.md` and
+  `PROGRESS_ARCHIVE.md` from the filter, which restores an ~18-minute pipeline on every close-out and
+  is exactly the cost `M39` measured and removed; **(b)** a second, tiny workflow running only
+  `tracker-lint` on `push` to `main` with no filter, ~1 minute. **Promoted to `docs/claims/decisions.md`
+  as a run-cost decision, with (b) recommended.** The row stays open until that decision is answered.
 
-- **`minor` · Nothing asserts that CI's checkout is deep enough for `R7` to see the commit that
+- ~~**`minor` · Nothing asserts that CI's checkout is deep enough for `R7` to see the commit that
+  declares a surgery, and the failure presents as a missing marker rather than as a broken gate.**~~
+  ✅ **DONE — M49 (2026-08-31), as a consequence of the base-resolution row below rather than as a
+  second effort.** The row asked for an assertion about *the shape of the clone*, and named the honest
+  difficulty exactly: **`R7` cannot tell the two apart from inside**, because *"no commit in this range
+  carries the marker"* is the same observation whether the commit is missing or the marker is. The
+  assertion it now makes is that comparison: on a `pull_request`, `github.event.pull_request.commits`
+  is passed in and compared against the commits actually present in `HEAD~1..HEAD`. Fewer in range
+  than the pull request has means the clone is grafted, and that **exits 2 with a message naming the
+  depth** rather than reporting an absent marker. ⚠️ **`>=` and not `==`, deliberately** — the failure
+  guarded is a range holding *fewer* commits, and a strict equality would redden on legal branch
+  topologies, which is a false red in the one rule that must never cry wolf. ⚠️ **The `gitleaks` half
+  of this row is NOT closed and is not closable here:** nothing pins `fetch-depth` *for the secret
+  scan*, whose blindness is silent in the same way and whose stakes are higher. It is re-filed as its
+  own `minor` below. Original filing follows.
+  **`minor` · Nothing asserts that CI's checkout is deep enough for `R7` to see the commit that
   declares a surgery, and the failure presents as a missing marker rather than as a broken gate.**
   ⛔ **Found by `M48` the hard way: it reddened PR #238.** `ci.yml`'s `static-analysis` checkout used
   `fetch-depth: 2`, chosen by `M40` for this very rule. On a `pull_request` that leaves the merge
@@ -3838,7 +3862,31 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   is missing and the secret scan says no leaks found. That is the argument for the guard this row asks
   for, and it is now a security argument rather than a bookkeeping one.
 
-- **`major` · `R7` measures the tip against its parent, so a large removal that is not in a push's LAST
+- ~~**`major` · `R7` measures the tip against its parent, so a large removal that is not in a push's
+  LAST commit is invisible — and the constitution reached `main` through exactly that hole.**~~
+  ✅ **DONE — M49 (2026-08-31). THE ROW'S EVIDENCE HELD IN FULL AND ITS PRESCRIBED REMEDY WAS HALF
+  WRONG, IN THE DIRECTION THAT PRINTS A NUMBER.** `R7` now takes its base from `github.event.before`
+  on a `push`, keyed on `GITHUB_EVENT_NAME` so a `ci.yml` edit that drops the variable **exits 2**
+  rather than falling back quietly. ⛔ **BUT `github.event.pull_request.base.sha`, which the row
+  prescribes for the second arm, IS WRONG HERE.** `base.sha` is the base tip as of the *event*; the
+  checkout is `refs/pull/N/merge` as of the *run*. When `main` advances between them — routine with
+  two lanes, and already catalogued as *"a gate number moving on a diff that cannot move it is the
+  OTHER LANE"* — `base.sha..HEAD` sweeps in the other lane's commits and reports **their**
+  `PROGRESS.md` delta as this pull request's. The merge commit's first parent is exact, so the PR arm
+  keeps `HEAD~1` for the measurement and spends the payload on the job `base.sha` cannot do: comparing
+  `github.event.pull_request.commits` against the commits actually in range, which is the only thing
+  that distinguishes a clone too shallow to hold the marker from a commit that never carried one.
+  **That closes the `fetch-depth` guard row above as a consequence rather than as a second effort.**
+  ➕ **The larger half of the increment is `scripts/tracker-lint-controls.php`**: eleven synthetic git
+  histories, the shipped bytes of the gate copied into each, committed **red** against the unfixed
+  gate first — seven cases landing elsewhere, and `C2`/`C4` reproducing this row's own defect on the
+  same bytes — then green. Registered as its own CI step, because `R7`'s `push` arm cannot execute
+  during a PR run and nothing else will ever exercise it. ⚠️ **AND A MUTATION FOUND A CONTROL PASSING
+  FOR THE WRONG REASON, INSIDE THE INCREMENT THAT WROTE IT:** disabling the empty-base refusal left
+  `C5` green, because an empty sha fell through to the commit-ness check and exited 2 from a different
+  branch. All five cannot-measure cases now assert their **own** message, not the shared prefix.
+  Original filing follows.
+  **`major` · `R7` measures the tip against its parent, so a large removal that is not in a push's LAST
   commit is invisible — and the constitution reached `main` through exactly that hole.** ⛔ **MEASURED
   ON `M48`'s OWN PUSH, NOT PREDICTED.** The push `e82e835..5d4bd79` carried four commits, one of which
   removed **198,909 bytes** of `PROGRESS.md`. The run it produced compared `HEAD~1` (`add6f18`, where
@@ -3862,3 +3910,31 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `pull_request` fixtures, which is the shape `M47` built for the marker and `scripts/mutate.php`
   cannot drive. **Filed by M48 (2026-08-31)**, which found it by making the mistake the gate exists to
   catch. **Live.**
+
+- **`minor` · Nothing pins `fetch-depth` for the SECRET SCAN, whose blindness is silent and whose
+  stakes are the highest of the three gates that integer governs.** Split out by `M49` (2026-08-31)
+  from the `R7` checkout-depth row it closed, because that row's remedy — comparing the range's
+  commit count against the payload's — is available to `R7` and **is not available here.** `ci.yml`
+  runs `gitleaks detect --source .`, which scans git **history**: at `fetch-depth: 2` it was checking
+  two commits at a time for the repository's whole life on a public repo, and `M48`'s raise to `0`
+  made it scan 818. ⛔ **`gitleaks` has no payload number to check itself against.** It cannot know
+  how many commits it *should* have seen, so a future reduction of the depth re-blinds it and it
+  reports `no leaks found` — the same shape as `R7`'s absent marker, in the gate whose failure costs
+  most. Candidates, none costed yet: assert in a CI step that `git rev-list --count HEAD` exceeds a
+  floor before the scan runs; or pin the depth with a comment the linter reads; or scan with an
+  explicit `--log-opts` range derived from the event payload, as `R7` now does. ⚠️ **The honest note
+  is that a floor is a ratchet and will need maintaining**, which is why this is filed rather than
+  guessed at. **Live.**
+
+- **`minor` · `scripts/tracker-lint-controls.php` proves R7 against synthetic histories, and nothing
+  proves it against a REAL GitHub `push` or squash.** Filed by `M49` (2026-08-31) at the moment the
+  harness shipped, so its limit is a filed constraint rather than a comment nobody re-reads. The
+  eleven cases construct their own commit graphs, which is the only way to exercise the `push` arm at
+  all — but a real `push` run differs in one way the fixture cannot reproduce: the payload is written
+  by GitHub, not by the harness, and `github.event.before` has never been read by this repository.
+  ⚠️ **`M49`'s own merge cannot close this**: a squash merge is ONE commit, so `before..HEAD` and
+  `HEAD~1..HEAD` are the same range on it, and the close-out push is `paths-ignore`d and produces no
+  run. **The first real exercise is the `## Current Status` surgery**, which is a multi-commit push
+  and is the open `major` directly above. Read its **post-merge** run on `main`, not its PR run, and
+  check the `R7 base is …` line names `github.event.before` rather than `HEAD~1`. **Not live** — a
+  stated limit, filed so it cannot be forgotten.

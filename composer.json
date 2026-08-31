@@ -75,6 +75,7 @@
         "constraint-boundary-lint": "@php scripts/constraint-boundary-lint.php",
         "component-import-lint": "@php scripts/component-import-lint.php",
         "tracker-lint": "@php scripts/tracker-lint.php",
+        "tracker-lint-controls": "@php scripts/tracker-lint-controls.php",
         "citation-liveness-lint": "@php scripts/citation-liveness-lint.php",
         "preflight": "@php scripts/preflight.php",
         "gate-baselines": "@php scripts/gate-baselines.php",
@@ -90,6 +91,7 @@
             "@constraint-boundary-lint",
             "@component-import-lint",
             "@tracker-lint",
+            "@tracker-lint-controls",
             "@citation-liveness-lint"
         ],
         "post-autoload-dump": [

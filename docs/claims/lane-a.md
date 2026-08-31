@@ -16,7 +16,89 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M55`, `assess` offered two rows that were never defects (`m55-assess-liveness`)
+## Status: NO ACTIVE CLAIM — the first unattended run is complete and the queue is empty of mechanical rows
+
+**`M55` is merged, and with it the first unattended loop run.** Of the three rows it was authorised to
+take, **one was a real defect** (`M54`) and **two were never defects at all** — `assess` now says so.
+
+⛔ **`php scripts/loop.php assess` exits 3: there is nothing left an unattended run may take.** That is
+the honest state of the queue, not a failure. The next row is a human's. ⛔ **`D9` must never be started
+without an explicit answer.**
+
+⛔ **RUN `php scripts/state.php` FOR EVERY NUMBER.**
+
+---
+
+## RELEASED — `M55`, `assess` stops on a row that says it is not a defect (merged as PR #246, `2f7fae4`, 6/6 green)
+
+**Every claimed file was edited and the claim was not extended.** Not a backlog row: **a defect in
+`M52`'s driver, found by the first unattended run that driver was built for.**
+
+### ⛔ TWO OF THE THREE ROWS THE CLASSIFIER OFFERED WERE NEVER DEFECTS, AND BOTH SAID SO THEMSELVES
+
+- *"The citation-liveness gate cannot see a behaviour negative…"* — **`Not live` — both are stated
+  limits, filed so they cannot be forgotten.** ⛔ **Its own text says the gate "must never be widened
+  into that shape".** An unattended run that took this row would have built the thing the row forbids,
+  and every gate in this repository would have gone green on it.
+- *"Nothing checks that a `§D<n>` citation names a section…"* — **`Not live` — this is a missing gate,
+  not a defect.**
+
+**Only `/gamification/me` was live**, and it merged as `M54`. **A one-in-three hit rate is the finding**,
+and it is worth more than the row this increment fixed.
+
+### ✅ MEASURED, AND THE VOCABULARY ALREADY EXISTED
+
+`docs/feature-backlog.md` carries **11** `**Not live**` markers and **13** `**Live**` ones. The corpus
+has marked liveness on both sides for a long time; `M52`'s `assess` read severity, held topics,
+forbidden paths, stop phrases and open decision ids — **and nothing that answers *"is this a defect?"***.
+The fix is not a new idea, it is reading a field that was already there.
+
+### ⚠️ TWO CONSTRAINTS SHAPED IT, AND EACH IS A WAY THE OBVIOUS VERSION WOULD BE WRONG
+
+⛔ **Anchored on the bolded literal, never a substring.** This corpus quotes its own vocabulary — rows
+discuss liveness in prose, and one uses the word about a gate's *subject* rather than about itself. A
+bare `contains('Not live')` stops rows that merely mention it, and **a control proves the anchor**: a
+row saying *"the gate is not live yet"* in plain prose is still `AUTO`.
+
+⚠️ **Silence deliberately does not stop.** Only **24 of 78** rows carry a marker at all. Treating an
+absent one as dead would stop nearly everything and make the driver useless rather than careful — the
+failure mode of over-correcting after a miss.
+
+It is a **stop** rule, so it scans the body: `M52`'s asymmetry holds — stops maximally sensitive, the
+go-signal maximally specific — and the marker is always the row's closing sentence.
+
+### ✅ THE PREDICTION HELD EXACTLY
+
+**Eligible 2 → 0**, and `assess` exits **3**. The claim named that number before the change. Three
+controls: live → `AUTO`, marked → `STOP` naming liveness, prose mention → `AUTO`. Backlog restored
+**byte-exact**. Pint was the only gate that could move and did not need to; PHPStan cannot.
+
+### ⛔ WHAT THIS DID NOT FIX, AND THE HONEST FRAMING OF WHAT IT DID
+
+**`assess` can only see what a row says about ITSELF.** Two blind spots are now measured and filed:
+
+1. **A row's remedy cost is invisible.** `M54` was classified mechanical and its *evidence* was — four
+   checks — while its remedy took reading three vendor classes and ended in a new class plus a
+   registration. **"Mechanical" means the row's claim is checkable without judgement; it does not mean
+   the fix is small**, and nothing in the classifier distinguishes the two.
+2. **A row dead for a reason nobody wrote down still passes.** The marker covers eleven rows. It cannot
+   cover the rest.
+
+⚠️ **So this raised a floor rather than closing a hole, and the eligible count is a shortlist for a
+human — never a work queue.** Saying that plainly is the point: a green `assess` that implies otherwise
+is the same species as a green gate that is blind, which is the failure this whole series exists to end.
+
+### ➕ WHAT THE FIRST UNATTENDED RUN ACTUALLY PROVED
+
+**The choreography works and the judgement is still the expensive part.** Claim, gates, pull request,
+six completed checks read individually, merge with an explicit body, close-out — all of it ran without
+the user being the trigger, four increments in a row. What the run did *not* demonstrate is that the
+queue can be trusted unsupervised: **it offered three rows and two of them should never have been
+offered.** The driver caught none of that. **A human reading two closing sentences did.**
+
+**Namespaces: nothing spent.**
+
+### The claim, preserved
 
 Taken 2026-09-01. Branch `m55-assess-liveness`, cut from `origin/main` at `fefb1d5`, PR into `main`.
 **Not a backlog row — a defect in `M52`'s driver, found by the first unattended run it was built for.**

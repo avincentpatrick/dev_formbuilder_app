@@ -65,6 +65,21 @@ const MECHANICAL_MARKERS = [
     'is wrong about itself', 'asserts what the code refutes', 'no longer true',
 ];
 
+// ⛔ A ROW THAT SAYS IT IS NOT A DEFECT. This corpus marks liveness explicitly -- 11 rows carry
+//    `**Not live**` and 13 carry `**Live**` -- and M52's assess had no notion of it. The first
+//    unattended run offered three rows and TWO of them were `**Not live**`: one a pair of stated
+//    limits filed so they could not be forgotten, whose own text says the gate "must never be widened
+//    into that shape", and one a missing gate rather than a defect. Taking the first would have built
+//    the thing the row forbids.
+//
+// ⚠️ ANCHORED ON THE BOLDED LITERAL, NEVER A SUBSTRING. This file quotes its own vocabulary: rows
+//    discuss liveness in prose, and one uses the word about a gate's SUBJECT rather than about itself.
+//    A bare contains('Not live') would stop rows that merely mention it.
+//
+// ⚠️ AND SILENCE IS NOT A STOP. Only 24 of 78 rows carry a marker at all, so treating an absent one as
+//    "not live" would stop nearly everything and make the driver useless rather than careful.
+const NOT_LIVE_MARKER = '**Not live**';
+
 // Phrases that mark work an unattended run may not start on its own judgement.
 const STOP_PHRASES = [
     'tracker surgery', 'tracker-surgery', 'surgery marker',
@@ -331,6 +346,13 @@ function stop_reasons(array $row): array
 
             break;
         }
+    }
+
+    // ⛔ THE ROW SAYS IT IS NOT A DEFECT. Checked against the BODY, because that is where the marker
+    //    lives -- it is always the row's closing sentence -- and because a stop rule should be as
+    //    sensitive as possible. See NOT_LIVE_MARKER.
+    if (str_contains($row['body'], NOT_LIVE_MARKER)) {
+        $reasons[] = 'the row marks itself `Not live` -- it is a stated limit or a missing gate, not a defect';
     }
 
     // ⛔ THE POSITIVE HALF MATCHES THE TITLE ONLY, AND THE ASYMMETRY IS DELIBERATE.

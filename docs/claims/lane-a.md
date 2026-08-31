@@ -16,7 +16,87 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M54`, a module-gated route documents the 403 it can actually answer (`m54-module-403-contract`)
+## Status: NO ACTIVE CLAIM — `M54` is merged; the unattended run has one of three rows done
+
+**`M54` is merged.** First increment of the first unattended loop run. Two rows remain in the
+authorised scope, both from `php scripts/loop.php assess`.
+
+⛔ **RUN `php scripts/state.php` FOR EVERY NUMBER.**
+
+---
+
+## RELEASED — `M54`, a module-gated route documents the 403 it can actually answer (merged as PR #245, `c824732`, 6/6 green)
+
+**Every claimed file was edited and the claim was not extended.** `/gamification/me` now documents the
+403 it can answer, through a general mechanism rather than a per-route patch.
+
+### ✅ THE ROW'S MECHANISM WAS EXACT, AND IT WAS CHECKED IN THE VENDOR SOURCE RATHER THAN TRUSTED
+
+`ErrorResponsesExtension:60` in the **installed** v0.13.30 adds a 403 **only** when the gathered
+middleware starts with `can:` or `Authorize::class.':'`. `module:` is invisible to it. That is why the
+sibling route documented both statuses and this one did not — it carries `can:` as well, and this one
+is deliberately ungated per ADR-0020 §D7.
+
+⚠️ **The citation had drifted**: the row cites `routes/api.php:440`, which is the comment block; the
+route is at `:456-457`. Recorded rather than quietly corrected, because a drifting line number is how a
+row stops being checkable.
+
+### ⛔ BOTH OBVIOUS REMEDIES WERE WRONG, AND REJECTED ON EVIDENCE
+
+1. **`openapi.json` may not be hand-edited.** CI exports a fresh document and diffs it, so a hand-added
+   403 is reverted by the next export and reddens the gate in between.
+2. **`@throws` cannot work either.** The exception is thrown by `RequireModule`; the controller never
+   mentions it, so there is nothing in the action for Scramble to read. **The gate lives on the route,
+   so the documentation has to be derived from the route.**
+
+The fix is an operation transformer — **general**, so the next `module:`-gated API route documents its
+403 without anyone remembering to, which is the defect class the row was one instance of.
+
+### ✅ WHAT WAS MEASURED
+
+**Exactly one operation changed.** `/gamification/leaderboard` was untouched — ⚠️ **the risk the claim
+named as most likely to matter.** It carries `can:` *and* `module:`, so Scramble had already given it a
+403; a transformer that appended unconditionally would have emitted the status twice and changed a
+route this row is not about. The guard is explicit and the diff proves it held. `components.responses`
+unchanged; **a second export is byte-identical**, which is what the contract gate actually requires.
+
+**PHPStan: 18 errors across the same 10 files as the baseline, and neither of this diff's files
+appears — zero delta BY FILE LIST.** ⚠️ The claim flagged that PHPStan **could** move here, unlike the
+previous four increments, because this adds a class under `app/`. It did not — but *"it cannot move"*
+had stopped being the reason, and saying so was the point. `tests/Feature/Api` 128 passed.
+
+⚠️ **The local run needed `--memory-limit=1G`**: at the default 128M PHPStan crashed inside its own
+result cache, which reads as a failure and is an environment fact rather than a finding.
+
+### ⛔⛔ THE ROW SAT ON A MUCH LARGER DEFECT, FILED RATHER THAN FOLDED IN
+
+**Every error component in `openapi.json` documents a body this surface does not return.** All four —
+`AuthorizationException`, `AuthenticationException`, `ValidationException`, `ModelNotFoundException` —
+describe Laravel's default `{ message }`. Every `/api/v1` error is rendered through `ApiErrorResponse`
+as `{ error: { code, message, details? } }`, which `docs/api-specification.md` §2.3 calls the contract.
+Measured directly: an API 403 answers `{"error":{"code":"forbidden",…}}` while the published document
+promises a top-level `message`. **Every 401, 403, 404 and 422 in the contract is wrong the same way.**
+
+Filed as its own `major`: the fix replaces Scramble's four default exception extensions and changes the
+published contract for the whole surface, which wants its own increment and its own review. **This row
+was one route's MISSING 403; that one is every route's MISDESCRIBED one.**
+
+⚠️ **So this increment's new 403 is deliberately the only accurate one in the document, and the
+inconsistency is stated rather than hidden.** Matching the neighbours would have meant documenting a
+shape the code does not return — in the increment closing a documentation-truth row.
+
+### ➕ ONE OBSERVATION ABOUT THE LOOP ITSELF, SINCE THIS WAS ITS FIRST INCREMENT
+
+**The classifier called this row mechanical and it was — but only in its evidence, not in its remedy.**
+Verifying the row took four checks; finding a remedy that CI would accept took reading three vendor
+classes, and the honest fix turned out to be a new class plus a registration. ⚠️ **"Mechanical" as the
+driver uses it means *the row's claim is checkable without judgement*, and that is not the same as *the
+fix is small*.** The stop-list was never in danger here — nothing tripped — but a row's remedy cost is
+invisible to `assess`, and the release says so rather than letting the eligible count imply otherwise.
+
+**Namespaces: nothing spent.**
+
+### The claim, preserved
 
 Taken 2026-09-01. Branch `m54-module-403-contract`, cut from `origin/main` at `87e8291`, PR into `main`.
 Row: the `minor` — *"`/gamification/me` documents only `200`"*. **This is the first increment of the

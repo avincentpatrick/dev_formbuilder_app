@@ -16,12 +16,73 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M54` is merged; the unattended run has one of three rows done
+## Status: ACTIVE CLAIM — `M55`, `assess` offered two rows that were never defects (`m55-assess-liveness`)
 
-**`M54` is merged.** First increment of the first unattended loop run. Two rows remain in the
-authorised scope, both from `php scripts/loop.php assess`.
+Taken 2026-09-01. Branch `m55-assess-liveness`, cut from `origin/main` at `fefb1d5`, PR into `main`.
+**Not a backlog row — a defect in `M52`'s driver, found by the first unattended run it was built for.**
 
-⛔ **RUN `php scripts/state.php` FOR EVERY NUMBER.**
+### Evidence verified — measured, not inferred
+
+The authorised run was scoped to the three rows `php scripts/loop.php assess` classified as mechanical.
+**Two of the three were not defects at all**, and both say so in their own last sentence:
+
+- *"The citation-liveness gate cannot see a behaviour negative…"* — **`Not live` — both are stated
+  limits, filed so they cannot be forgotten.** It also says of its first limit that the gate *"must
+  never be widened into that shape"*. **Taking it would have built the thing the row forbids.**
+- *"Nothing checks that a `§D<n>` citation names a section…"* — **`Not live` — this is a missing gate,
+  not a defect.**
+
+Only `/gamification/me` was live, and it is merged as `M54`.
+
+**The corpus census:** `docs/feature-backlog.md` carries **11** `**Not live**` markers and **13**
+`**Live**` ones. So a liveness marker exists, is used on both sides, and **`assess` has no notion of
+it** — it reads severity, held topics, forbidden paths, stop phrases and open decision ids, and nothing
+that answers *"is this a defect?"*.
+
+⚠️ **AND THE 24 MARKED ROWS ARE A MINORITY OF 78, WHICH SHAPES THE FIX.** Most rows carry no marker at
+all, so absence cannot mean "not live" without stopping nearly everything. The rule has to be: an
+explicit `Not live` stops; silence does not.
+
+### Remedy verdict
+
+**No row prescribed this, so there is nothing to disprove** — but the shape of the fix is constrained
+by two things worth stating before writing it.
+
+⛔ **The marker must be matched anchored, not as a substring.** `docs/feature-backlog.md` is a corpus
+that quotes its own vocabulary — several rows discuss liveness in prose, and `M46`'s row uses the word
+about the gate's *subject* rather than about itself. A bare `str_contains($body, 'Not live')` would stop
+rows that merely mention it. The marker in practice is the bolded literal `**Not live**`, and that is
+what is matched.
+
+⚠️ **And this is a stop rule, not a go rule, which decides where it belongs.** `M52` established the
+asymmetry deliberately: stop rules scan title **and** body because a stop should be maximally
+sensitive; the go-signal scans the title alone because the body quotes everything. Liveness is a stop,
+so it scans the body — where the marker actually lives, since it is always the row's closing sentence.
+
+### Files
+
+`scripts/loop.php` · `docs/feature-backlog.md` (file what this leaves) · `docs/claims/lane-a.md` ·
+`PROGRESS.md` (own block) · `docs/gate-baselines.md` (close-out).
+
+**Shared artefacts taken:** `PROGRESS.md`, `docs/**`.
+**Paired files taken:** none. **Namespaces spent: nothing.**
+
+### Prediction
+
+**Pint is the only gate that can move** — one `scripts/` file. PHPStan cannot: it scans `app`,
+`database`, `routes`. Vitest 134, axe, e2e and `openapi.json` unmoved. No CI step added.
+
+**The measurable outcome is the eligible count: 2 → 0.** Both remaining rows must stop, each naming
+liveness as the reason, and `assess` must then exit 3 — *"nothing here is mechanical enough to start
+unattended"*, which is a **normal outcome and not an error**, and is exactly the state the queue is
+really in.
+
+⚠️ **The one most likely to be wrong is the ceiling, not the floor.** Anchoring on `**Not live**` will
+catch the eleven marked rows; what it cannot catch is a row that is dead for a reason nobody wrote
+down. `M54`'s release already recorded that **a row's remedy cost is invisible to `assess`**, and this
+adds a second blind spot of the same family: **the classifier can only see what a row says about
+itself.** That is a floor being raised, not a hole being closed, and the release will say so rather
+than implying the queue is now safe to trust unattended.
 
 ---
 

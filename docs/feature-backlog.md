@@ -3019,13 +3019,26 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   prescribed command. **Live** — the fix is one word in two hand-off lines, but it is filed here because
   the hand-offs are rewritten every increment and a fix that is not written down does not survive one.
 
-- **`minor` · `fb-lane-c` is an abandoned worktree that every numbering check must now read past.**
-  `git worktree list` reports three worktrees; `c:\laragon\www\fb-lane-c` sits on `lane-c-bootstrap`, an
-  M14-era merge commit **104 commits behind `origin/main`**, with one dirty file and no
-  `docs/claims/lane-c.md` anywhere. Standing Rule 7 describes exactly two lanes, so a third entry is
-  noise in the one command the protocol tells every session to run before numbering — and that command
-  has decided the increment number three times running. `git worktree remove` is the whole fix.
-  **Live**, and deliberately not taken by M36, which had no reason to touch another lane's checkout.
+- ~~**`minor` · `fb-lane-c` is an abandoned worktree that every numbering check must now read past.**~~
+  ✅ **DONE — M50 (2026-08-31), and the row's prescribed remedy was wrong in two ways.** Closed as part
+  of the collapse to a single lane (`docs/adr/0022-single-lane-development.md`), which removed
+  `fb-lane-b` too. **The evidence held except for one figure:** the worktree was **177** commits behind
+  when it was taken, not the 104 recorded here — a dated measurement, and the drift is exactly why a
+  row's number may not be quoted forward. Two things the row did not have: `lane-c-bootstrap` **never
+  existed on the remote either**, so Lane C was cut, never used, never published and released nothing;
+  and the dirty file was the design-system `package-lock.json`, `+1/−21`, every deletion a bare
+  `"peer": true` key — **npm bookkeeping, not work.**
+  ⛔ **`git worktree remove` is NOT "the whole fix".** (1) It **refuses** on a worktree holding a
+  modified tracked file — measured, exit 128 — and the refusal is the guard working, not an obstacle.
+  It was cleared by saving the bytes outside the repository, **proving the saved copy reconstructed
+  them byte-for-byte**, and only then restoring the file. `--force` was never used. (2) The real
+  coupling is **in code, not in the worktree listing**: `tracker-lint.php` R6 required the Lane B
+  hand-off marker exactly once, so retiring the lane without amending R6 in the same commit reddens
+  `main` — proven by deliberate defect before the change, failing R6 alone.
+  ⚠️ **And one thing following the row literally would have destroyed:** `docs/claims/lane-b.md` is
+  KEPT. `state.php` derives the increment from the `## RELEASED` headings of both claim files, and that
+  file holds ten releases recorded nowhere else — losing them lowers the maximum **silently**, which is
+  a number collision rather than an error.
 
 - **`minor` · A line-splitting regex matches a byte INSIDE a UTF-8 character, and one faker name is
   enough to trigger it.** `tests/Feature/Audit/ImpersonationAttributionTest.php:204` splits the streamed
@@ -3066,7 +3079,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   yet ask it. **Live.**
 
 - **`minor` · A claim file has no constrained form for a forward declaration, so the one stale
-  declaration on the tree cannot be gated.** `docs/claims/lane-b.md:29` states *"`M36` IS THE NEXT FREE
+  declaration on the tree cannot be gated.** `docs/claims/lane-b.md:39` states *"`M36` IS THE NEXT FREE
   NUMBER"*, six increments stale. It is inert only because `state.php` no longer reads it — but nothing
   stops the next writer reading it, and **Lane A may not correct it**: one writer per claim file is what
   makes a claim conflict structurally impossible, and reaching across to fix a number would break the

@@ -15,7 +15,7 @@ copy that will be wrong within days. `scripts/tracker-lint.php` R8 enforces it a
 ## Start every session
 
 ```
-php scripts/preflight.php --lane=a          # or --lane=b
+php scripts/preflight.php --lane=a
 php scripts/state.php
 ```
 

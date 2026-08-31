@@ -33,20 +33,26 @@ database; whichever was written later is not automatically right.
 
 ## 1. Stacks and URLs
 
-> **There is ONE application.** What follows is two *running copies* of this same repository, not two
-> products. `C:/laragon/www/fb-lane-b` is a `git worktree` — a second checkout sharing the same `.git`,
-> parked on a different branch while two agents work in parallel. It carries an untracked
-> `docker-compose.override.yml` (`name: fb-lane-b`) purely so it gets its own containers and database:
-> Pest runs `migrate:fresh`, which **drops the schema**, so two lanes sharing one database would wipe
-> each other mid-run (Standing Rule 7c). Both branches merge into `phase1-completion`, and the second
-> stack disappears with `git worktree remove`.
+> ⛔ **STACK B IS GONE AS OF `M50` (2026-08-31). THERE IS ONE APPLICATION AND NOW ONE STACK — USE
+> STACK A ON PORT 8080.** The `fb-lane-b` worktree and its containers were removed when the project
+> collapsed to a single lane; see `docs/adr/0022-single-lane-development.md`. **The Stack B column
+> below is kept as a decommissioning reference, not as somewhere you can log in.** Nothing answers on
+> 8081, 5433, 6380 or 8026 any more.
 >
-> **If you are testing the product, use Stack A on port 8080.** Stack B is build scaffolding, and its
-> `acme` workspace is the Playwright fixture — not a third tenant of your product.
+> ⚠️ **ONE LEFTOVER SURVIVES ON PURPOSE: the Docker volume `fb-lane-b_pgdata`.** The stack was brought
+> down with `docker compose down` and **without `-v`**, so its database volume was deliberately not
+> destroyed — a removal that is easy to do and impossible to undo was left for a human. Remove it with
+> `docker volume rm fb-lane-b_pgdata` if you want the disk back; nothing in this repository needs it.
+> The `.env` files from both retired worktrees were copied to `C:/tmp/m50-lane-c-rescue/` before the
+> directories were deleted, because they are gitignored and were the only copies.
+>
+> **Why it existed at all**, since the reasoning still matters if parallel work ever resumes: Pest
+> runs `migrate:fresh`, which **drops the schema**, so two lanes sharing one database would wipe each
+> other mid-run (Standing Rule 7c). Isolation was the whole point of the second stack.
 
 The two copies share nothing at runtime — not a port, not a database, not a fixture:
 
-| | **Stack A — main** | **Stack B — lane B** |
+| | **Stack A — the only stack** | **Stack B — REMOVED by `M50`** |
 |---|---|---|
 | Compose project | `dev_formbuilder_app-*` | `fb-lane-b-*` |
 | Worktree | `C:/laragon/www/dev_formbuilder_app` | `C:/laragon/www/fb-lane-b` |

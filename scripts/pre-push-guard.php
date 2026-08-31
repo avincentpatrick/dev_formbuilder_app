@@ -47,6 +47,31 @@ const ZERO = '0000000000000000000000000000000000000000';
 //    commit is the claim — only how many are being added to the trunk.
 const MAX_DIRECT_TRUNK_COMMITS = 1;
 
+// ⛔ THE GUARD OWNS THIS LIST, AND M52 GOT THAT WRONG. Its first version DERIVED the set from
+//    ci.yml's paths-ignore, on the principle "one authority, referenced rather than copied" — which
+//    is right, and was applied to the WRONG authority. paths-ignore answers "can this change affect
+//    the product's CI?"; this guard needs "is this part of the claim and close-out protocol?". The
+//    two sets overlap almost entirely and differ on ONE path — docs/feature-backlog.md — which is the
+//    file EVERY close-out edits, because closing a row is step 1 of the close-out CLAUDE.md
+//    prescribes. So M52's guard refused M52's own close-out and it went with --no-verify.
+//
+// ⚠️ Deriving from an authority is only safer than copying when its semantics answer YOUR question.
+//    Otherwise it is a copy wearing borrowed confidence.
+//
+// ⛔ AND THE BACKLOG MUST NOT BE ADDED TO paths-ignore TO "FIX" THIS. That block sits under `push:`,
+//    so an entry there means NO RUN AT ALL on a backlog edit — a real reduction in gate coverage, in
+//    a file that is on the stop list. The relation between the two lists is instead ASSERTED below:
+//    this set must be a SUPERSET of paths-ignore, checked on every run, failing closed if ci.yml ever
+//    grows an entry this guard does not know about.
+const PROTOCOL_PATHS = [
+    'PROGRESS.md',
+    'PROGRESS_ARCHIVE.md',
+    'docs/claims/**',
+    'docs/gate-baselines.md',
+    'docs/backlog-triage.md',
+    'docs/feature-backlog.md',
+];
+
 $root = dirname(__DIR__);
 chdir($root);
 
@@ -147,7 +172,7 @@ foreach ($lines as $line) {
     //    M50, M51 and M51's correction were all pushed that way. A hook that refuses those gets
     //    --no-verify'd on its first outing, and a bypassed guard is furniture.
     if ($docOnly) {
-        $notes[] = 'rule A skipped — documentation-only push ('.count($paths).' path(s)), per '.WORKFLOW."'s paths-ignore";
+        $notes[] = 'rule A skipped — every changed path is claim/close-out protocol ('.count($paths).' path(s)); see PROTOCOL_PATHS';
     } else {
         $claim = sh('git show '.escapeshellarg('origin/'.TRUNK.':'.CLAIM_FILE).' 2>&1', $status);
 
@@ -160,7 +185,7 @@ foreach ($lines as $line) {
                 "REFUSED — %s on origin/%s does not name '%s'.\n".
                 "    An unpushed claim does not exist (M14 wrote a perfect one nobody could see).\n".
                 "    Write the claim, then: git push origin HEAD:%s — BEFORE the first file.\n".
-                '    This push changes %d path(s) that are not documentation, so it is work.',
+                '    This push changes %d path(s) outside the claim/close-out protocol, so it is work.',
                 CLAIM_FILE, TRUNK, $branch, TRUNK, count($paths));
         } else {
             $notes[] = 'rule A ok — '.CLAIM_FILE.' on origin/'.TRUNK." names '{$branch}'";
@@ -188,27 +213,29 @@ fwrite(STDERR, "pre-push: ok\n");
 exit(0);
 
 /**
- * ⛔ ONE AUTHORITY, REFERENCED RATHER THAN COPIED. `ci.yml`'s paths-ignore is already this
- * repository's definition of "a change that cannot affect the product", and it is the list a
- * close-out is built to stay inside. A second hand-maintained copy here would drift, which is the
- * defect Rule 7(b), docs/gate-baselines.md and docs/claims/TEMPLATE.md each record separately.
+ * The protocol path set, plus the assertion that keeps it honest against ci.yml.
+ *
+ * The set itself is PROTOCOL_PATHS above. What is derived here is not the answer but the CHECK: every
+ * paths-ignore entry must also be exempt here. If ci.yml grows one this guard does not know, that is a
+ * divergence someone must look at, and it fails closed rather than quietly disagreeing.
  *
  * @return list<string>
  */
 function documentation_patterns(): array
 {
     if (! is_file(WORKFLOW)) {
-        cannot_measure(WORKFLOW.' is missing, so the documentation-only exemption cannot be derived.');
+        cannot_measure(WORKFLOW.' is missing, so the paths-ignore cross-check cannot run.');
     }
 
     $body = (string) file_get_contents(WORKFLOW);
-    $patterns = [];
+    $ignored = [];
     $inBlock = false;
 
-    // Deliberately a line scan and not a YAML parse: this needs no dependency, and the shape it reads
-    // is asserted below rather than assumed. explode() rather than a newline regex — PCRE's \R without
+    // Deliberately a line scan and not a YAML parse: no dependency, and the shape it reads is
+    // asserted below rather than assumed. explode() rather than a newline regex — PCRE's \R without
     // /u matches a byte INSIDE a UTF-8 character and silently shifts every line after the first.
-    foreach (explode("\n", $body) as $line) {
+    foreach (explode('
+', $body) as $line) {
         $trimmed = trim($line);
 
         if ($trimmed === 'paths-ignore:') {
@@ -219,32 +246,50 @@ function documentation_patterns(): array
 
         if ($inBlock) {
             if (preg_match("/^-\s*'([^']+)'\s*$/", $trimmed, $m) === 1) {
-                $patterns[] = $m[1];
+                $ignored[] = $m[1];
 
                 continue;
             }
 
             if (preg_match('/^-\s*"([^"]+)"\s*$/', $trimmed, $m) === 1) {
-                $patterns[] = $m[1];
+                $ignored[] = $m[1];
 
                 continue;
             }
 
-            // Anything else ends the block — including a blank line or the next key.
             $inBlock = false;
         }
     }
 
-    // ⚠️ A FLOOR, BECAUSE AN EMPTY LIST WOULD SILENTLY EXEMPT NOTHING AND MAKE RULE A FIRE ON EVERY
-    //    CLAIM PUSH. That is the "operation that succeeds on empty input" family this project has now
-    //    hit in three separate scripts, so it fails closed instead.
-    if (count($patterns) < 3) {
-        cannot_measure(sprintf(
-            'parsed only %d paths-ignore entr(ies) from %s; expected at least 3. '.
-            'Refusing rather than exempting nothing.', count($patterns), WORKFLOW));
+    // ⚠️ A FLOOR, because an operation that succeeds on EMPTY INPUT is this project's signature
+    //    defect — three separate scripts have now hit it. An empty parse must not read as "nothing
+    //    to cross-check".
+    if (count($ignored) < 3) {
+        cannot_measure(sprintf('parsed only %d paths-ignore entr(ies) from %s; expected at least 3.',
+            count($ignored), WORKFLOW));
     }
 
-    return $patterns;
+    // The superset assertion. Compared on a NORMALISED form so that a glob and its prefix are not
+    // treated as different paths — 'docs/claims/**' and 'docs/claims/' mean the same thing here.
+    $normalise = static fn (string $p): string => rtrim(str_ends_with($p, '/**') ? substr($p, 0, -2) : $p, '/');
+    $mine = array_map($normalise, PROTOCOL_PATHS);
+    $missing = [];
+
+    foreach ($ignored as $pattern) {
+        if (! in_array($normalise($pattern), $mine, true)) {
+            $missing[] = $pattern;
+        }
+    }
+
+    if ($missing !== []) {
+        cannot_measure(sprintf(
+            '%s exempts %s, which this guard does not: PROTOCOL_PATHS is no longer a superset of '.
+            'paths-ignore. Reconcile them — and read the comment on PROTOCOL_PATHS first, because the '.
+            'answer is usually to add it HERE and not to the workflow.',
+            WORKFLOW, implode(', ', $missing)));
+    }
+
+    return PROTOCOL_PATHS;
 }
 
 /**

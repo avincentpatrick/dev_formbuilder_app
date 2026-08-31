@@ -3571,28 +3571,26 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   row is deliberately NOT reproduced**, since quoting it verbatim would republish the identification the
   row exists to remove — which is the same reason `D6`'s answered entry describes the search terms
   instead of printing them.
-- **`major` · The pre-push guard REFUSES A NORMAL CLOSE-OUT, and it refused the one that shipped it.**
-  `scripts/pre-push-guard.php` exempts a push whose changed paths are entirely documentation, and it
-  derives that set from `.github/workflows/ci.yml`'s `paths-ignore`. **`docs/feature-backlog.md` is not
-  in that list** — but closing a row there is step 1 of the close-out `CLAUDE.md` prescribes. So every
-  close-out that closes a row is classified as *work*, and rule A refuses it because a `m<n>-closeout`
-  branch is not the branch the claim names. **Measured on `M52`'s own close-out**, which was refused
-  and had to be pushed with `--no-verify`.
-  ⛔ **THE ERROR IS CONCEPTUAL, NOT A MISSING ENTRY, AND THAT IS THE TRANSFERABLE PART.** *"One
-  authority, referenced rather than copied"* was applied correctly and to the **wrong authority**:
-  `paths-ignore` answers *"can this change affect the product's CI?"*, and the guard needed
-  *"is this documentation?"*. The two sets overlap heavily and are not the same, and the difference is
-  exactly the file every close-out edits. **A referenced authority must answer YOUR question, not an
-  adjacent one** — deriving from it is only safer than copying when the semantics match.
-  ⚠️ **Do NOT fix this by adding the backlog to `paths-ignore`.** That would stop CI running on backlog
-  edits, which is a real change to gate coverage and lives behind `ci.yml`, on the user's stop list.
-  The fix belongs in the guard: its own documentation set, stated where it is used, with the
-  divergence from `paths-ignore` written down.
-  ⚠️ **And `scripts/loop.php`'s `gates` command has the same blind spot from the other side:** it runs
-  `preflight`, whose claim check is red on any close-out branch by construction, so the driver reports
-  `⛔ STOP — preflight is RED` on the part of the loop it most exists to automate. **One increment put
-  the close-out exemption in the hook and in neither the hook's path list nor the driver.** **Live**,
-  and filed at the moment it was decided rather than carried in a hand-off.
+- ~~**`major` · The pre-push guard REFUSES A NORMAL CLOSE-OUT, and it refused the one that shipped it.**~~
+  ✅ **DONE — `M53` (2026-09-01), fixed in BOTH places, and the row's own non-remedy was the load-bearing
+  half.** The guard no longer derives its exempt set from `ci.yml`'s `paths-ignore`; it owns
+  `PROTOCOL_PATHS` — the files the claim and close-out choreography touches — and the relationship to
+  `paths-ignore` is now **asserted rather than assumed**: `PROTOCOL_PATHS` must be a **superset**, checked
+  on every run, **failing closed (exit 2)** if `ci.yml` ever grows an entry the guard does not know.
+  ⛔ **The row was right that adding the backlog to `paths-ignore` would have been the wrong fix**, and
+  it was verified rather than accepted: that block sits under `push:`, so an entry means **no run at
+  all** on a backlog edit — a real reduction in gate coverage, in a file on the stop list.
+  ⚠️ **The second half needed a different fix and was deliberately not pattern-matched into the first.**
+  `loop gates` was not misclassifying paths; it was asking `preflight` a question with no true answer on
+  a close-out branch. It gets an explicit `--closeout` mode, propagated to `preflight`, which downgrades
+  the claim assertion to a **stated waiver** — ⛔ **explicit and never inferred from the branch name**,
+  because a check that relaxes itself whenever a branch is named a certain way is one anyone can switch
+  off by renaming a branch.
+  **Proven:** the exact commit range `M52`'s close-out was refused for now passes; the superset
+  assertion exits 2 when an entry is removed; `preflight` on an unclaimed branch fails without
+  `--closeout` and passes with it; and the five original guard controls still hold. **And the acceptance
+  test was not a control but this increment's own close-out, which pushed with no `--no-verify`** —
+  `M52`'s could not.
 - **`minor` · `/gamification/me` documents only `200`.** `openapi.json` — the route carries
   `module:gamification` (`routes/api.php:440`), whose `ModuleDisabledException` answers **403** on a
   supported user action (an owner switching the module off), and nothing inferred it because the endpoint

@@ -23,7 +23,7 @@ declare(strict_types=1);
  *
  * Usage:
  *   php scripts/loop.php assess              # classify the next candidate rows; exit 3 if a human is needed
- *   php scripts/loop.php gates               # the pre-push gate sequence; ANY exit 2 or red stops the loop
+ *   php scripts/loop.php gates [--closeout]  # the gate sequence; ANY exit 2 or red stops the loop
  *   php scripts/loop.php status              # where the series stands against D5's bar
  *
  * Exit 0 = clear to proceed. Exit 1 = a gate failed. Exit 2 = could not measure. Exit 3 = STOP, a human
@@ -158,8 +158,21 @@ function cmd_gates(): never
     // Deliberately the HOST gates only. PHPStan is container-only and Vitest cannot run on the host at
     // all, so a driver that pretended to run them here would report a green it never measured — which
     // is the exact defect this project keeps finding.
+    // ⛔ --closeout IS PASSED THROUGH, NOT GUESSED. preflight's Rule 7(g) check has no true answer on
+    //    a close-out branch — the claim could not have named a branch that did not exist when it was
+    //    written — so `gates` was RED BY CONSTRUCTION on the one step this driver most exists to
+    //    automate. M52 shipped that defect and its own close-out found it. Inferring it from the
+    //    branch name was rejected: a check anyone can switch off by renaming a branch is not a check.
+    $closeout = in_array('--closeout', array_slice($GLOBALS['argv'], 2), true);
+    $preflight = 'php scripts/preflight.php --lane=a --with-gates --with-pint'.($closeout ? ' --closeout' : '');
+
+    if ($closeout) {
+        line('Running in --closeout mode: the claim check is expected not to name this branch.');
+        line('');
+    }
+
     $gates = [
-        'preflight' => 'php scripts/preflight.php --lane=a --with-gates --with-pint',
+        'preflight' => $preflight,
         'tracker-lint' => 'php scripts/tracker-lint.php',
         'tracker-lint-controls' => 'php scripts/tracker-lint-controls.php',
         'citation-liveness' => 'php scripts/citation-liveness-lint.php',

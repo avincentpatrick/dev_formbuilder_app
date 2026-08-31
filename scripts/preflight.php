@@ -24,7 +24,7 @@ declare(strict_types=1);
  * this increment's own claim names its own number.
  *
  * Usage:
- *   php scripts/preflight.php [--lane=a] [--with-pint] [--with-gates]
+ *   php scripts/preflight.php [--lane=a] [--with-pint] [--with-gates] [--closeout]
  *
  * Runs on the HOST — which is itself one of the findings it reports. `--with-pint` and `--with-gates`
  * are opt-in because they are slow; everything else is nearly instant.
@@ -46,7 +46,8 @@ const LANES = [
 $root = dirname(__DIR__);
 chdir($root);
 
-$opts = getopt('', ['lane::', 'with-pint', 'with-gates']);
+$opts = getopt('', ['lane::', 'with-pint', 'with-gates', 'closeout']);
+$closeout = isset($opts['closeout']);
 $lane = strtolower((string) ($opts['lane'] ?? 'a'));
 
 if (! isset(LANES[$lane])) {
@@ -136,10 +137,24 @@ if ($branch === 'main') {
     warn('skipped — not on a branch');
 } elseif (str_contains(show_from_main($claimFile), $branch)) {
     pass("{$claimFile} on origin/main names this branch");
+} elseif ($closeout) {
+    // ⛔ --closeout IS EXPLICIT AND IS NEVER INFERRED FROM THE BRANCH NAME. `m<n>-closeout` is a
+    //    convention, and a check that relaxes itself whenever a branch is named a certain way is one
+    //    anyone can switch off by renaming a branch. The operator asserts the state; this records it.
+    //
+    //    On a close-out the claim has ALREADY merged, so Rule 7(g) has no true answer here: the branch
+    //    a close-out runs on is one the claim could not have named, because it did not exist when the
+    //    claim was written. M52 found this by having `loop gates` go red on its own close-out.
+    warn("--closeout: {$claimFile} on origin/main does not name '{$branch}', which is EXPECTED.");
+    note('A close-out runs on a branch the claim could not have named. The claim it releases has');
+    note('already merged, so Rule 7(g) is satisfied by history rather than by this branch.');
+    note('⚠️ If you did NOT mean this to be a close-out, you have just waived the claim check —');
+    note('re-run without --closeout and write the claim first.');
 } else {
     $failures[] = 'claim not published';
     fail("{$claimFile} on origin/main does NOT name '{$branch}'. An unpushed claim does not exist (M14).");
     note('Write the claim, then: git pull --rebase && git push origin HEAD:main — BEFORE the first file.');
+    note('If this is a close-out, say so explicitly: --closeout.');
 }
 
 // ── Rule 7(c) / M34. A concurrent migrate:fresh drops the schema mid-run and the failures read as

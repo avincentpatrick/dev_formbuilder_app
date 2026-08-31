@@ -16,14 +16,129 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M50` is merged and the lane holds nothing forward
+## Status: ACTIVE CLAIM — `M51`, branch protection and the redaction (`m51-protection-and-redaction`)
 
-**`M50` is merged.** There is now one lane, and this is the only claim file that is written. The next
-row is claimed here and **pushed** before the first file is opened; that rule survives the parallelism
-that created it, because the collision it now prevents is two sessions in ONE lane.
+Taken 2026-08-31. Branch `m51-protection-and-redaction`, cut from `origin/main` at `6d4c3a0`, PR into
+`main`. Rows: **`D6`** and **`D7`** in `docs/claims/decisions.md`, both **answered by the user**, plus
+`D6`'s surviving `major` in `docs/feature-backlog.md`. Neither is a defect row; both are decisions, and
+the user has supplied the answer to each.
 
-⛔ **RUN `php scripts/state.php` FOR EVERY NUMBER.** Increment, ADR, migration prefix, exceptions
-entry, open rows, open decisions, and how stale `docs/gate-baselines.md` is.
+### Evidence verified
+
+**`D7` — every fact re-checked against the live repository, not read from the entry:**
+
+- `gh api …/branches/main/protection` → **`404 Branch not protected`**. ✅ **held**
+- `gh api …/rulesets` → **`[]`**. ✅ **held** — net-new control, nothing to amend.
+- **The six required contexts, read from a real run** (`33398663198`, this project's own post-merge run
+  on `main`) rather than from `D7`'s list: `Static analysis, style & security` · `Tests (Pest on
+  PostgreSQL)` · `Frontend build & type-check` · `Design system a11y (axe)` · `Contract tests (OpenAPI)`
+  · `E2E (Playwright + axe)`. ✅ **six, and they match `D7`'s six exactly.** `D7` already records that
+  an earlier plan said **five**, so the entry is corroboration and the run is the source.
+- Rule 7(g) still requires a direct `git push origin HEAD:main` for the claim commit — this very claim
+  is one — so blanket protection would break the mechanism that makes a claim a lock. ✅ **held**
+
+**`D6` — the count re-derived from the tree, and it disagrees with all three prior figures:**
+
+| Source | Figure |
+|---|---|
+| The original backlog row | 6 sites |
+| `docs/backlog-triage.md`'s census | "11+" |
+| `D6`'s own table, taken when it moved | 17 occurrences across 9 files |
+| **Measured now** | **26 occurrences across 11 files** (20 lines carry at least one) |
+
+⚠️ **AND THE UNIT IS THE FINDING, NOT THE NUMBER.** *Occurrences* and *lines carrying an occurrence*
+are different measurements and the earlier figures do not say which they are: `grep -c` counts **lines**
+and `grep -o | wc -l` counts **occurrences**, and on this corpus they differ by six. Both are stated
+above so the next reader does not have to guess. The growth from 17 is partly real drift and partly
+**this project writing about its own redaction** — `docs/claims/decisions.md`, `docs/claims/lane-a.md`
+and `docs/feature-backlog.md` now hold 8 of the 26 between them, and every one of those is
+meta-discussion rather than corpus.
+
+Per-file, current tree: `PROGRESS_ARCHIVE.md` 3 · `docs/PRD.md` 3 · `docs/adr/0001` 3 ·
+`docs/adr/0002` 2 · `docs/adr/0003` 2 · `docs/domain-glossary.md` 2 ·
+`docs/competitive-feature-parity-matrix.md` 2 · `docs/architecture/technical-architecture.md` 1 ·
+`docs/feature-backlog.md` 4 · `docs/claims/decisions.md` 2 · `docs/claims/lane-a.md` 2.
+
+### Remedy verdict
+
+**`D7`'s prescribed remedy transfers intact** — a ruleset requiring all six contexts with the repository
+owner as bypass actor. This is the first row in this arc whose remedy needed no correction. ⚠️ **Its one
+trap is a number, and the entry names it itself**: a ruleset built on five contexts leaves one gate
+non-blocking, which is the exact failure it exists to prevent. The six are therefore taken from the run.
+
+⛔ **`D6`'s recommended option is NARROWER THAN THE USER'S INSTRUCTION, and the difference is the whole
+scope of the work.** Option 1 says *"replace the client name and project name … and keep **every
+technical lesson intact**"*, arguing that `"an id === 1 super-admin convention duplicated across four
+code layers"` is exactly as strong an argument without a name attached. The user's answer goes further:
+*"it is the naming **plus the vulnerability detail** that goes."*
+
+**Reading taken, stated here so the diff can be judged against it rather than reverse-engineered:**
+
+1. **Identification goes everywhere** — the project name, the client name, and the sentences that
+   identify the client by description (a named national health department, "a single government
+   department", "government-reporting tool"). Replaced with a non-identifying description.
+2. **The architectural lesson stays, expressed as a fact about THIS project's choice** — MySQL-shaped
+   gaps → PostgreSQL; no tenant concept → RLS; a fragile id-based super-admin convention → an explicit
+   `is_super_admin` boolean. `ADR-0002`'s D3 keeps a rationale, because a decision whose provenance is
+   deleted is a decision nobody can check.
+3. **The enumerated audit of a third party's posture goes** — the exploitation mechanic (*"silently
+   transferable if user #1 were ever deleted and the ID reused"*), and `ADR-0003`'s repository-state
+   inventory (Sail present but unused, CI limited to PHPUnit, no deploy stage), which reads as a
+   security and operations report on somebody else rather than as a reason for a choice here.
+
+⚠️ **THE BOUNDARY BETWEEN (2) AND (3) IS A JUDGEMENT CALL AND IS FLAGGED AS ONE.** A stricter reading
+would also strike the `id === 1` fact, which would leave `ADR-0002` §D3 asserting a decision with no
+recorded reason. The call is recoverable in the *removed-too-much* direction and not in the other, and
+**git history is not being rewritten**, so nothing is destroyed either way — that asymmetry is why the
+call is taken rather than escalated.
+
+### Files
+
+`docs/claims/decisions.md` (`D6` → ANSWERED, `D7` → ANSWERED, **new `D9`**) · `docs/feature-backlog.md`
+(close `D6`'s row to what was *done*) · `docs/PRD.md` · `docs/domain-glossary.md` ·
+`docs/competitive-feature-parity-matrix.md` · `docs/adr/0001-postgresql-over-mysql.md` ·
+`docs/adr/0002-multi-tenancy-shared-db-rls.md` · `docs/adr/0003-hosting-laravel-cloud.md` ·
+`docs/architecture/technical-architecture.md` · `PROGRESS_ARCHIVE.md` · `docs/claims/lane-a.md` ·
+`PROGRESS.md` (own block) · `docs/gate-baselines.md` (close-out).
+
+⚠️ **`PROGRESS_ARCHIVE.md` IS A DATED HISTORY FILE AND IS STILL REDACTED**, which is a deliberate
+exception to *never rewrite a dated record*: what is removed is an **identifier**, not a claim, so no
+statement in the log changes truth value. Named here because the general rule is a good one and this
+increment is stepping around it on purpose.
+
+⚠️ **AND THE META FILES ARE REDACTED TOO, OR THE REDACTION IS THEATRE.** A decision entry that records
+*"we removed the name"* while printing the name is self-defeating. `decisions.md`, `feature-backlog.md`
+and `lane-a.md` therefore describe the search terms without reproducing them.
+
+**Shared artefacts taken:** `docs/**`, `PROGRESS.md`, `PROGRESS_ARCHIVE.md`.
+**Paired files taken:** none from 7(b-bis). ⚠️ **One paired-shaped coupling is taken:** the
+citation-liveness ledger — this diff edits nine documents that other documents cite by `file:line`, so
+`scripts/citation-liveness-lint.php` is the partner and any citation this diff shifts must move with it.
+**Namespaces spent:** decision id **`D9`** (the history-rewrite question, filed unconditionally and
+recommended against). **No ADR** — `D6` and `D7` are decisions of record in `decisions.md`, and the
+collapse ADR is `M50`'s. No migration, no `§D`, no exceptions entry. `0010` stays reserved for H1d.
+
+### Prediction
+
+**No gate can move on content.** PHPStan scans `app`, `database`, `routes`; this diff is documentation
+only — no `.php`, no `.ts`, no `.vue`, no route, so Pint, PHPStan, Vitest, axe, e2e and `openapi.json`
+are all structurally unable to react. **Pest cannot move either**, which is worth saying because a
+documentation diff that reddens a test would mean a test is asserting on prose.
+
+⚠️ **The one most likely to be wrong is `citation-liveness`, and this time it is named for a measured
+reason rather than a hunch: it is exactly what caught `M50`.** Nine documents change length, and
+`docs/feature-backlog.md` alone carries citations into `PRD.md`, `technical-architecture.md` and the
+ADRs. `M50` shifted one file by ten lines and broke a citation into it. This diff shifts nine. **The
+ledger is at 18 against a ceiling of 18, so there is no headroom at all** — one shifted citation is red.
+
+⚠️ **Second most likely: `tracker-lint` R1/R7 on `PROGRESS_ARCHIVE.md`.** The archive is 2.4 MB and the
+redaction touches it, but the edit is a substitution rather than a deletion, so the byte delta should be
+near zero and certainly nowhere near `DROP_BYTE_LIMIT`. **If that prediction is wrong it will be wrong
+loudly**, which is the useful direction.
+
+**Branch protection is applied AFTER the merge and BEFORE the close-out push, deliberately**, so that
+this increment's own close-out — a direct `git push origin HEAD:main` — is the live test of the owner
+bypass rather than an assumption about it.
 
 ---
 

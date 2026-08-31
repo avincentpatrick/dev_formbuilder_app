@@ -16,10 +16,79 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M48` is merged and the lane holds nothing forward
+## Status: ACTIVE CLAIM — `M49`, R7 takes its base from the event rather than from the commit graph (`m49-r7-event-base`)
 
-**`M48` is merged.** Lane A holds no active row and pre-claims no forward number. The next row is taken
-under Rule 7(f), and the claim is written here and **pushed** before the first file is opened.
+Taken 2026-08-31. Branch `m49-r7-event-base`, cut from `origin/main` at `102a9a6`, PR into `main`.
+
+**Row** (`docs/feature-backlog.md`, the last `major` in the tracker/CI cluster): *"`R7` measures the
+tip against its parent, so a large removal that is not in a push's LAST commit is invisible — and the
+constitution reached `main` through exactly that hole."* Filed by `M48` on its own push rather than
+predicted.
+
+**Also taken, because this work closes it rather than because it is a second effort** (`minor`, two
+rows above): *"Nothing asserts that CI's checkout is deep enough for `R7` to see the commit that
+declares a surgery, and the failure presents as a missing marker rather than as a broken gate."* Its
+own text names the difficulty — **`R7` cannot tell the two apart from inside** — and a payload-supplied
+base plus a clone-shape assertion is exactly the assertion it asks for.
+
+**Not taken, recorded** (`minor`, one row above): the `paths-ignore` row. One of the two remedies it
+names is structurally impossible and that correction goes into the row; the rest is a run-cost decision
+and goes to `decisions.md`.
+
+### Evidence verified
+
+Every citation opened against the merged tree at `102a9a6`, not taken from the row.
+
+- **`R7` uses `HEAD~1` for all three reads — HELD.** `scripts/tracker-lint.php`, the R7 block: four
+  `exec()` calls, `rev-parse --verify HEAD~1`, `git show HEAD~1:`, `git cat-file -s HEAD~1:` and
+  `git log --format=%B HEAD~1..HEAD`. No other base is consulted anywhere.
+- **`ci.yml` is `fetch-depth: 0` — HELD.** The `static-analysis` checkout, with `M48`'s reasoning
+  written above it.
+- **`HEAD~1` on a `pull_request` is the base tip — HELD.** `refs/pull/N/merge`'s first parent is the
+  base branch tip, so the PR arm has been correct since `M48` raised the depth. **The `push` arm is
+  the broken one, and the row is right to name it alone.**
+- **Nothing else in the tree reads the commit graph this way — HELD.** `HEAD~1` occurs only in
+  `scripts/tracker-lint.php` and in `ci.yml`'s comment *about* that script.
+- ➕ **BEYOND THE ROW: nothing anywhere covers `tracker-lint.php`.** Zero references under `tests/`;
+  `M47`'s controls were built in a detached worktree and thrown away, which is the reason the
+  `fetch-depth` defect survived eight increments. **That is the larger half of this increment.**
+
+### Remedy verdict
+
+The row prescribes *"`github.event.before` on `push`, `github.event.pull_request.base.sha` on
+`pull_request`, passed in as an environment variable, with `HEAD~1` kept only as a local-run
+fallback."*
+
+⛔ **RIGHT ON `push`. WRONG ON `pull_request`, AND WRONG IN THE DIRECTION THAT PRINTS A NUMBER.**
+`pull_request.base.sha` is the base tip *as of the event*; the checkout is `refs/pull/N/merge` *as of
+the run*. When `main` advances between them — routine here, and already catalogued as *"a gate number
+moving on a diff that cannot move it is the OTHER LANE (PR CI tests a merge with current main)"* —
+`base.sha..HEAD` sweeps in the other lane's commits and reports their `PROGRESS.md` delta as this
+PR's. `HEAD~1` on the synthetic merge commit is the tip actually being merged into, and is exact.
+
+**So the PR arm keeps `HEAD~1` for the measurement and spends the payload on a different job**: a
+clone-shape assertion from `github.event.pull_request.commits`, which is what the guard row wants and
+what `base.sha` cannot give. Resolution is keyed on `GITHUB_EVENT_NAME`, which GitHub always sets, so
+a `ci.yml` edit that drops the new variables **exits 2** rather than going quiet.
+
+Files: `scripts/tracker-lint.php`, `scripts/tracker-lint-controls.php` (new),
+`.github/workflows/ci.yml`, `composer.json`, `docs/feature-backlog.md`, `docs/claims/decisions.md`,
+`docs/claims/lane-a.md`, `PROGRESS.md`, `docs/gate-baselines.md`.
+Shared artefacts taken: `.github/workflows/ci.yml`, `composer.json`, `docs/feature-backlog.md`,
+`docs/claims/decisions.md`, `docs/gate-baselines.md`, `PROGRESS.md` (own block only). Lane B's file was
+read in full and holds nothing.
+Paired files taken: none.
+Namespaces spent: **nothing from either** — no migration, no ADR (`0022` free, `0010` reserved), no
+`§D`, no route, no exceptions entry. One `D<n>` in `decisions.md`, a separate namespace, derived at
+write time.
+Prediction: PHPStan **cannot** move — it scans `app`, `database` and `routes` and this diff is
+`scripts/`, `.github/`, `composer.json` and docs; Vitest, axe and e2e likewise. Pint is the only gate
+that can, and only on the two `scripts/` files. `static-analysis` gains one step, so its baseline step
+count changes and must be re-read rather than compared. **Most likely to be wrong: the PR commit-count
+assertion.** `github.event.pull_request.commits` is taken on trust from the payload and has never been
+read in this repository; if it counts something other than what `git rev-list --count HEAD~1..HEAD`
+sees, the control is right in shape and wrong in arithmetic. `>=` is the hedge; if that still fails the
+honest fix is to drop the count and keep the reachability check alone.
 
 ⛔ **RUN `php scripts/state.php` FOR EVERY NUMBER.** Increment, ADR, migration prefix, exceptions-log
 entry, open rows, open decisions, and how far behind the trunk `docs/gate-baselines.md` has fallen.

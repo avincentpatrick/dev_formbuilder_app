@@ -297,6 +297,50 @@ explicit yes.
 
 ---
 
+### D8 — A tracker surgery triggers no post-merge run at all. Which way should `ci.yml` regain the trunk observation?
+
+**Filed 2026-08-31 by Lane A, during `M49`.** Filed rather than decided because every option trades
+**CI minutes against gate coverage**, and `M39` removed those minutes deliberately after measuring
+the cost. The row it comes from stays open in `docs/feature-backlog.md` until this is answered.
+
+**The defect, stated once.** `ci.yml`'s `push` filter ignores `PROGRESS.md`, `PROGRESS_ARCHIVE.md`,
+`docs/claims/**`, `docs/gate-baselines.md` and `docs/backlog-triage.md`, and GitHub evaluates it over
+**every** file in the push. A pure permutation of the two tracker files — which is precisely what a
+well-executed surgery is — therefore **cannot trigger CI on `main` at all.** The PR run still gates
+the merge, so this is not a hole in the merge gate; what it removes is the **post-merge observation on
+the trunk**, which is the only place a squash body's form can be verified. `M48` escaped it by
+accident of scope, because a `scripts/` ratchet landed in the same commit.
+
+⛔ **ONE OF THE TWO CANDIDATES THE ROW NAMED CANNOT BE WRITTEN, AND THAT IS MEASURED RATHER THAN
+ARGUED.** *"Exempt a commit whose message carries the marker"* has nowhere to be expressed: a
+workflow's `paths-ignore` is evaluated by GitHub **before a run exists**, over the pushed file paths
+and nothing else. It has no access to a commit message. So the real field is three, not two.
+
+**Option 1 — a second, tiny workflow: `tracker-lint` only, on `push` to `main`, no path filter.
+(RECOMMENDED.)** Roughly one minute against the full pipeline's ~18, so `M39`'s measured cost is not
+re-incurred; the trunk arm becomes reachable for exactly the diff shape it guards; and it is additive,
+so nothing about the existing pipeline changes. Cost: a second workflow file to keep in step with the
+first, and one more run appearing in `gh run list` — which anything counting *"six completed checks"*
+must not mistake for a seventh required context.
+
+**Option 2 — drop `PROGRESS.md` and `PROGRESS_ARCHIVE.md` from the filter.** One line, no new file,
+and the post-merge run is the real pipeline rather than a slice of it. Cost: **every close-out queues
+the full ~18-minute pipeline again**, which is what `M39` removed after measuring six cancelled runs;
+a close-out pushes documentation two or three times per increment, so this is the expensive option and
+it re-opens the `deploy.yml` trigger question `M39` closed.
+
+**Option 3 — a process rule: a surgery must deliberately touch one non-`paths-ignore`d file.** Costs
+nothing and changes no configuration. It is also **a reminder rather than a mechanism**, which is the
+class this project has repeatedly found insufficient — Rule 7(g)'s stale ADR number survived
+twenty-three increments as prose. It would work, right up until the increment that forgets.
+
+**Recommendation: option 1.** It buys the observation for about a minute a push and does not disturb
+a filter that was added for a measured reason. ⚠️ **Not proceeded on**: it adds a workflow to a public
+repository and changes what runs on the trunk, and `D7`'s branch-protection question may make the
+required-contexts count matter — so the two are better answered together than separately.
+
+---
+
 ## ANSWERED
 
 ### D5 — What bar ends the M-series? **Zero open `major` rows, plus three consecutive increments filing no new `major`.**

@@ -164,8 +164,42 @@ jobs:
       # which is why commit f565ac9 (2026-08-16) deleted 1,086 lines from PROGRESS.md and MERGED
       # GREEN. A local-only check would not have caught it, so this is registered here as its own
       # step for the same reason every linter above is: no CI job runs `composer run quality`.
+      # ⛔⛔ M49 — R7's BASE COMES FROM THE EVENT PAYLOAD, NOT FROM THE COMMIT GRAPH, AND THESE TWO
+      # VARIABLES ARE THAT WIRING. Dropping either does NOT make the rule fall back quietly: it
+      # keys on GITHUB_EVENT_NAME, which GitHub always sets, and exits 2.
+      #
+      # `push` — github.event.before is the tip `main` had BEFORE the push, so the range is every
+      # commit that was pushed. HEAD~1 is the right base only when a push holds exactly ONE commit,
+      # and M48's own four-commit push carried a 198,909-byte removal of PROGRESS.md that the run
+      # measured as a delta of ZERO. That is the defect this closes.
+      #
+      # ⚠️ `pull_request` DELIBERATELY DOES NOT USE github.event.pull_request.base.sha, THOUGH THE
+      # ROW THAT FILED THIS PRESCRIBED IT. base.sha is the base tip as of the EVENT; this checkout
+      # is refs/pull/N/merge as of the RUN. When `main` advances between them — routine here, with
+      # two lanes — base.sha..HEAD sweeps in the other lane's commits and reports their PROGRESS.md
+      # delta as this PR's. The merge commit's FIRST PARENT is exact, so the rule keeps HEAD~1 for
+      # the measurement and spends the payload on the job base.sha cannot do: `commits` is compared
+      # against the number of commits actually in the range, which is the only thing that can tell
+      # a clone too shallow to hold the marker from a commit that never carried one. Those two are
+      # indistinguishable from inside the rule, and mistaking them is what cost M48 eight
+      # increments. It is also what makes a future `fetch-depth` reduction fail LOUDLY.
       - name: Tracker lint (PROGRESS.md structure, encoding and deletion guard)
+        env:
+          TRACKER_LINT_BASE_SHA: ${{ github.event_name == 'push' && github.event.before || '' }}
+          TRACKER_LINT_PR_COMMITS: ${{ github.event_name == 'pull_request' && github.event.pull_request.commits || '' }}
         run: composer run tracker-lint
+
+      # M49. R7 has been wrong twice and both times invisibly, because a rule that never fires is a
+      # rule that was never tested: M47 proved its predicates against replayed bytes in a detached
+      # worktree and THREW THE FIXTURES AWAY, and the fetch-depth defect then survived eight
+      # increments. This is the same idea made repeatable — eleven synthetic git histories, the
+      # shipped bytes of the gate copied into each, both event arms and every cannot-measure path.
+      #
+      # ⛔ IT IS A CI STEP BECAUSE R7'S `push` ARM CANNOT EXECUTE DURING A PR RUN. Nothing else here
+      # will ever exercise it, and the composer-only registration would gate nothing — the same
+      # reason every linter above is its own step.
+      - name: Tracker lint controls (R7's base resolution, both event arms)
+        run: composer run tracker-lint-controls
 
       # M46. A `path:N` citation whose target line is BLANK, a horizontal rule, a fence delimiter, a
       # table separator or past end-of-file is a pointer into nothing, and nothing in CI has ever

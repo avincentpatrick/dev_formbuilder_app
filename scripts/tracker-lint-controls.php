@@ -82,14 +82,14 @@ const ZERO_SHA = '0000000000000000000000000000000000000000';
 $scratch = $opts['dir'] ?? (sys_get_temp_dir().DIRECTORY_SEPARATOR.'tracker-lint-controls-'.getmypid());
 
 if (! is_file(GATE)) {
-    fwrite(STDERR, "tracker-lint-controls: CANNOT RUN — ".GATE." is missing.\n");
+    fwrite(STDERR, 'tracker-lint-controls: CANNOT RUN — '.GATE." is missing.\n");
     exit(2);
 }
 
 $gateBytes = file_get_contents(GATE);
 
 if ($gateBytes === false || strlen($gateBytes) < 1000) {
-    fwrite(STDERR, "tracker-lint-controls: CANNOT RUN — ".GATE." is unreadable or implausibly short.\n");
+    fwrite(STDERR, 'tracker-lint-controls: CANNOT RUN — '.GATE." is unreadable or implausibly short.\n");
     exit(2);
 }
 
@@ -251,7 +251,7 @@ if ($failed !== []) {
     exit(1);
 }
 
-fwrite(STDOUT, sprintf("tracker-lint-controls: passed (%d cases; the push arm, the pull_request arm, "
+fwrite(STDOUT, sprintf('tracker-lint-controls: passed (%d cases; the push arm, the pull_request arm, '
     ."three cannot-measure paths and two demonstrations of the pre-M49 defect).\n", count($cases)));
 exit(0);
 
@@ -380,7 +380,7 @@ function git_init(string $dir): void
     // The SHIPPED bytes, copied per run. Testing a copy of the current working tree is the point:
     // the harness must measure the gate as it stands, not a transcription of it.
     if (! copy(GATE, $dir.'/scripts/tracker-lint.php')) {
-        fwrite(STDERR, "tracker-lint-controls: CANNOT RUN — could not copy ".GATE." into {$dir}.\n");
+        fwrite(STDERR, 'tracker-lint-controls: CANNOT RUN — could not copy '.GATE." into {$dir}.\n");
         exit(2);
     }
 }

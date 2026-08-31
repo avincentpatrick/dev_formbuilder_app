@@ -118,6 +118,44 @@ citation-liveness ledger — this diff edits nine documents that other documents
 recommended against). **No ADR** — `D6` and `D7` are decisions of record in `decisions.md`, and the
 collapse ADR is `M50`'s. No migration, no `§D`, no exceptions entry. `0010` stays reserved for H1d.
 
+### CLAIM EXTENDED — `docs/backlog-triage.md`, and this one is published BEFORE the file is opened
+
+✅ **`M50` recorded getting this exact order wrong one increment ago; this is the corrected form.** The
+extension is its own commit, pushed to `main` before the file is edited, and the branch carries nothing
+but this commit — so `git push origin HEAD:main` publishes exactly it, which is the distinction `M48`
+paid for.
+
+**Why it was missed:** the claim's file list was built from a search for the two **names**, and
+`docs/backlog-triage.md` contains neither. It identifies the client **by description instead** — *"a
+Philippine Department of Health project, by name"* — inside its own summary of this very decision.
+
+⛔ **THAT IS THE FINDING, AND IT GENERALISES BEYOND THIS ROW: A REDACTION SCOPED TO THE LITERAL STRINGS
+IS THE WRONG SCOPE.** Searching for the two names returns 26 occurrences in 11 files. Searching for the
+identifying *description* returns sites the name-search cannot see, in files the name-search says are
+clean. The corpus identifies its subject in at least four separate ways — the system name, the project
+name, the client's name, and a national-geography standard — and only the first two are greppable as a
+unit. **Three sites were found this way after the claim was written**, and each is in a file whose hit
+count for the names is zero or already accounted for:
+
+- `docs/backlog-triage.md` — the client named by description, in the triage's own summary of `D6`.
+- `docs/domain-glossary.md` — *"Philippine public-health/DOH-specific terminology"* and *"this
+  product's DOH-adjacent lineage"*, in a row whose **term** is worth keeping.
+- `docs/PRD.md` — a national geography standard named by its acronym, in a scoping bullet that is
+  otherwise a real statement about this product.
+
+### ⚠️ CHECKED AND DELIBERATELY NOT REDACTED, so the next reader does not re-litigate them
+
+Two sites match the identifying words and are **product content, not provenance**, and redacting them
+would damage the documentation to no benefit:
+
+- `app/Models/ScopeNode.php` and its migration — *"a tenant needing Philippine geography, a clinical
+  trial site tree, or a sales territory"* is an illustration of the **scope-tree feature**, listing
+  three unrelated examples. It describes a customer's data, not the legacy client.
+- `docs/multi-tenancy-rbac-design.md` — the same illustration, same reason.
+
+**`docs/adr/0002`'s two hits are also left**: *"tenants collecting health/personal data"* and
+*"plausibly government or enterprise"* are generic risk language that names nobody.
+
 ### Prediction
 
 **No gate can move on content.** PHPStan scans `app`, `database`, `routes`; this diff is documentation

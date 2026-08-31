@@ -1,0 +1,37 @@
+# gitleaks — fingerprints deliberately ignored, one per line as `commit:file:rule:line`.
+#
+# WHY THIS FILE EXISTS AT ALL (M48, 2026-08-31). `ci.yml`'s secret scan runs
+# `gitleaks detect --source .`, which scans git HISTORY rather than the working tree. The
+# `static-analysis` checkout used `fetch-depth: 2` — chosen in M40 for tracker-lint's R7 — so the clone
+# held two commits and THE SECRET SCAN ON A PUBLIC REPOSITORY WAS CHECKING TWO COMMITS AT A TIME FOR
+# ITS WHOLE LIFE. Raising the depth to 0 for R7 made it scan 818 commits, and it immediately reported
+# three findings that had been unreachable. That is the same vacuous-success shape this project
+# catalogues elsewhere: a gate reporting `passed` while it could not see.
+#
+# ⛔ ALL THREE ARE ONE STRING, AND IT IS NOT A SECRET. Verified before this file was written, by
+# comparing the sha256 of each finding's value: identical. It is the password fixture in
+# PasswordStrength.test.ts — a password-STRENGTH checklist has to be asserted against something that
+# looks like a password — quoted twice into the tracker on the day that component shipped.
+#
+# ⛔ THE TEST LINE ALREADY CARRIES `// gitleaks:allow`, AND THAT IS NOT ENOUGH, WHICH IS THE PART WORTH
+# UNDERSTANDING. An inline directive suppresses the match in the commit where the directive EXISTS.
+# History still contains the commits that predate it, and those commits can never be edited without
+# rewriting the repository. An inline allow is a working-tree instrument; a fingerprint is the
+# historical one. Both are needed, and neither substitutes for the other.
+#
+# ⛔ WHAT WAS DELIBERATELY NOT DONE: `--no-git` (scans the worktree and gives back the history coverage
+# this increment just switched on) and disabling the `generic-api-key` rule (blinds the scan to a whole
+# class). A fingerprint is `commit:file:rule:line` and matches nothing else, so it is the narrowest
+# instrument available — and a NEW leak in these same files still fails, because the line and commit
+# would differ.
+#
+# Adding a line here is a security decision. State which string, and why it is not a secret.
+
+# The PasswordStrength fixture, in the commit that introduced it before the inline allow existed.
+1685115c72d8c395bed08f232b8ddfd3a4c6281a:packages/design-system/src/components/PasswordStrength/PasswordStrength.test.ts:generic-api-key:54
+
+# The same fixture, quoted into the tracker's hand-off on the day the component shipped.
+ace89cb4d6a4686b59f216019b133236f41ab395:PROGRESS.md:generic-api-key:82
+
+# The same fixture again, in the archived copy of that hand-off.
+c94ba813e9516237da451a91036f7b8624a75439:PROGRESS_ARCHIVE.md:generic-api-key:2468

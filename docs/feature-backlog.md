@@ -3804,3 +3804,61 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   surgery deliberately touch one non-ignored file. Both are decisions about `ci.yml`, which is a shared
   artefact. **Filed by M48 (2026-08-29)**, found while confirming the run this increment needs would
   exist. **Live.**
+
+- **`minor` · Nothing asserts that CI's checkout is deep enough for `R7` to see the commit that
+  declares a surgery, and the failure presents as a missing marker rather than as a broken gate.**
+  ⛔ **Found by `M48` the hard way: it reddened PR #238.** `ci.yml`'s `static-analysis` checkout used
+  `fetch-depth: 2`, chosen by `M40` for this very rule. On a `pull_request` that leaves the merge
+  commit and its two parents in the clone and nothing else, so `HEAD~1..HEAD` is **the merge commit
+  plus the PR's LAST commit** — every earlier one is grafted away. `M48` put `[tracker-surgery]` on its
+  phase-1 commit, which sat at depth 3, and `R7` reported the marker absent while measuring the delta
+  perfectly. **Fixed in `M48` (`fetch-depth: 0`), and `tracker-lint`'s docblock — which asserted the
+  opposite in writing — corrected with it.** ⚠️ **WHAT IS FILED IS THE ABSENCE OF A GUARD, NOT THE
+  DEFECT.** The value is one line of YAML with nothing pinning it; the next person tuning CI clone time
+  can restore a bounded depth and the only symptom will be a surgery that cannot declare itself. **And
+  the honest difficulty is that `R7` cannot tell the two apart from inside** — "no commit in this range
+  carries the marker" is the same observation whether the commit is missing or the marker is. A check
+  would have to assert the *shape of the clone* (that the merge commit's second parent's history is
+  present), which is a different kind of assertion from anything this gate makes today.
+  ⛔ **AND IT WENT UNSEEN FOR EIGHT INCREMENTS FOR THE REASON THIS WHOLE ARC KEEPS PRODUCING: THE RULE
+  HAD NEVER FIRED.** `M40` built it, `M47` proved its predicates against replayed bytes, and neither
+  could have reached this — the defect only exists on a real `pull_request` checkout with a real
+  multi-commit PR. **Filed by M48 (2026-08-29)** at the moment the fix was written. **Not live** — the
+  defect is closed; the missing guard is not.
+  ⛔ **RAISED IN SEVERITY BY WHAT THE FIX EXPOSED (M48, 2026-08-31): `fetch-depth` GOVERNS THE SECRET
+  SCAN TOO, AND THAT IS THE HIGHER-STAKES HALF.** `ci.yml` runs `gitleaks detect --source .`, which
+  scans **git history**, not the working tree. At `fetch-depth: 2` the clone held two commits, so **the
+  secret scan on a PUBLIC repository was checking two commits at a time for its entire life** — a
+  vacuous success of exactly the catalogued kind, in the gate whose failure costs the most. Raising the
+  depth to 0 for `R7` made it scan 818 commits on the first run. ✅ **It found three, all the same
+  string, all a password-strength test fixture; `.gitleaksignore` records why by fingerprint.** So the
+  outcome is reassuring and the *mechanism* is not: **one YAML integer silently governed whether two
+  independent gates could see anything**, and nothing anywhere said so. ⚠️ **A future edit that lowers
+  the depth to save clone time re-blinds BOTH, and neither reports being blind** — `R7` says the marker
+  is missing and the secret scan says no leaks found. That is the argument for the guard this row asks
+  for, and it is now a security argument rather than a bookkeeping one.
+
+- **`major` · `R7` measures the tip against its parent, so a large removal that is not in a push's LAST
+  commit is invisible — and the constitution reached `main` through exactly that hole.** ⛔ **MEASURED
+  ON `M48`'s OWN PUSH, NOT PREDICTED.** The push `e82e835..5d4bd79` carried four commits, one of which
+  removed **198,909 bytes** of `PROGRESS.md`. The run it produced compared `HEAD~1` (`add6f18`, where
+  the file is already 161,298 bytes) against `HEAD` and reported a delta of **zero**. The largest
+  removal this repository has seen since 2026-08-16 crossed the merge gate **unmeasured, and green**.
+  ⛔ **THIS IS THE SAME ROOT CAUSE AS THE `fetch-depth` DEFECT `M48` FIXED, SEEN FROM THE OTHER SIDE:
+  `R7` assumes the unit of change is one commit.** `HEAD~1` is the right base only when a push or a PR
+  contains exactly one. The 2026-08-16 incident (`f565ac9`) was a single commit, which is the only
+  reason `R7` as written would ever have caught it — **the gate has been sized against a sample of
+  one.** ⚠️ **And the two holes compose**: on a `pull_request` the marker must be on the last commit,
+  and on a `push` the deletion must be in the last commit, so a surgery split into phases — which is
+  what `CLAUDE.md` prescribes and what `M45` and `M48` both did — is the *worst* case for both.
+  **The remedy is to take the base from the event payload rather than from the commit graph**:
+  `github.event.before` on `push`, `github.event.pull_request.base.sha` on `pull_request`, passed in as
+  an environment variable, with `HEAD~1` kept only as a local-run fallback. ⛔ **And when neither is
+  reachable it must exit 2, never fall back silently** — a delta measured against the wrong base is
+  worse than one not measured at all, because it prints a number. ⚠️ **Sized `major`** because it
+  defeats the only gate this repository has against the incident that cost it 1,086 lines, it does so
+  silently, and it has now been demonstrated on the trunk rather than argued. ⚠️ **The positive controls
+  are the hard part and must not be skipped**: they need synthetic multi-commit `push` and
+  `pull_request` fixtures, which is the shape `M47` built for the marker and `scripts/mutate.php`
+  cannot drive. **Filed by M48 (2026-08-31)**, which found it by making the mistake the gate exists to
+  catch. **Live.**

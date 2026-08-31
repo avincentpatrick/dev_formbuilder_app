@@ -99,7 +99,21 @@ jobs:
           #
           # ⛔ IT DOES NOT SKIP IN THAT CASE, IT EXITS 2. A delta silently not measured is a vacuous
           # success, and R7 exists precisely because a 1,086-line deletion once merged green.
-          fetch-depth: 2
+          #
+          # ⛔⛔ M48 — THIS WAS `2` AND `2` IS ONE SHORT OF WHAT R7 NEEDS, WHICH REDDENED THE FIRST PR
+          # THE RULE HAS EVER FIRED ON. On a pull_request, actions/checkout hands us a synthetic MERGE
+          # commit whose first parent is main's tip, so HEAD~1 measures correctly — but at depth 2 the
+          # only other commit in the clone is the PR's LAST one. Every earlier commit is grafted away,
+          # so a marker on any commit but the final one is invisible. Reproduced exactly rather than
+          # inferred, with `git fetch --depth=2 origin refs/pull/238/merge`: HEAD~1..HEAD held the
+          # merge commit and the PR's phase-2 commit, while the phase-1 commit that carried the marker
+          # sat at depth 3.
+          #
+          # ⚠️ A BOUNDED DEPTH IS WHAT CREATED THIS, so the fix is unbounded rather than a bigger
+          # number — `3` would fail the next three-commit PR and fail it SILENTLY, as a red gate that
+          # reads like a missing marker. Cost measured before choosing: full history is 20 MB over 866
+          # commits. Only this job needs it; nothing else here reads the commit graph.
+          fetch-depth: 0
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2

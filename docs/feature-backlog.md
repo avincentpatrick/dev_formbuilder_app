@@ -3621,6 +3621,18 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   ⚠️ **`M54`'s own new 403 is deliberately the ONLY accurate one**, which is an inconsistency stated
   rather than hidden: matching the neighbours would have meant documenting a shape the code does not
   return, in the increment closing a documentation-truth row. **Live.**
+- **`minor` · `loop assess` can only see what a row says about ITSELF, and two blind spots are now measured.**
+  Filed by `M55` at the moment both were confirmed, so they are a stated limit rather than a comment
+  nobody re-reads. **(1) A row's REMEDY COST is invisible.** `M54` was classified mechanical and its
+  evidence was — four checks — but finding a remedy CI would accept took reading three vendor classes and
+  ended in a new class plus a registration. *"Mechanical"* means **the row's claim is checkable without
+  judgement**, which is not the same as **the fix is small**, and the eligible count should never be read
+  as implying the second. **(2) A row that is dead for a reason nobody wrote down still passes.** `M55`
+  added a stop on the explicit `**Not live**` marker, which covers the 11 rows that carry it — but only
+  24 of 78 rows carry a liveness marker at all, and silence deliberately does not stop, because treating
+  an absent marker as dead would stop nearly everything and make the driver useless rather than careful.
+  ⚠️ **So this raised a floor rather than closing a hole**, and the eligible count is a shortlist for a
+  human, never a work queue. **Not live** — both are stated limits of a tool, not defects in it.
 - **`minor` · §20's `settings.key` catalog omits `security.require_two_factor`.**
   `docs/data-dictionary.md:838`, rewritten in this branch — the key is live
   (`app/Enums/SettingKey.php:42`, tenant-scoped at `:85`, written by `UpdateAccessSettingsRequest.php:60`,

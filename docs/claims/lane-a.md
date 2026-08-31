@@ -16,16 +16,81 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — the first unattended run is complete and the queue is empty of mechanical rows
+## Status: ACTIVE CLAIM — every error component in `openapi.json` documents a body the `/api/v1` surface does not return (`m56-api-error-envelope`)
 
-**`M55` is merged, and with it the first unattended loop run.** Of the three rows it was authorised to
-take, **one was a real defect** (`M54`) and **two were never defects at all** — `assess` now says so.
+Taken 2026-09-01. Branch `m56-api-error-envelope`, cut from `origin/main` at
+`da8bacf3c8be28300a3ccee6fcb74af2e215c2b9`, PR into `main`.
+Row: the open **`major`** in `docs/feature-backlog.md` — *"Every error component in `openapi.json`
+documents a body the `/api/v1` surface does not return."* Filed by `M54`.
 
-⛔ **`php scripts/loop.php assess` exits 3: there is nothing left an unattended run may take.** That is
-the honest state of the queue, not a failure. The next row is a human's. ⛔ **`D9` must never be started
-without an explicit answer.**
+### Evidence verified
 
-⛔ **RUN `php scripts/state.php` FOR EVERY NUMBER.**
+Every citation opened against the merged tree. **All four held; none had drifted.**
+
+- **`components.responses` holds exactly four entries** — `AuthenticationException`,
+  `ValidationException`, `AuthorizationException`, `ModelNotFoundException` — **held**, and each
+  describes a top-level `{ message }` (`ValidationException` adds a top-level `errors` map).
+- **`bootstrap/app.php:245-270` renders `/api/v1` through `ApiErrorResponse`** — **held**, and the row
+  UNDERSTATES it: past the closures the row names, a **final `Throwable` catch-all** guarantees nothing
+  on `api/v1/*` escapes the envelope, including a bare `abort()`.
+- **`docs/api-specification.md` §2.3 documents `{ error: { code, message, details? } }`** — **held**.
+- **An `AccessDeniedHttpException` answers `{"error":{"code":"forbidden",…}}`** — **held**, read at the
+  render closure rather than re-measured.
+
+⚠️ **And the scale the row asserts without a number: 113 `$ref`s across 68 operations** — 51 → 403,
+34 → 404, 25 → 422, 3 → 401. Counted from the committed document, not estimated.
+
+### ⚠️ TWO CORRECTIONS THE ROW DOES NOT CARRY, BOTH FROM READING WHAT SITS NEXT TO THE CITATIONS
+
+1. **THE ROW IS A FLOOR, NOT A CENSUS.** It names only `components.responses`. **Three further bodies
+   are wrong in exactly the same way and are inline** — `422 POST /domains/{domain}/primary`,
+   `422 DELETE /domains/{domain}`, `409 POST /webhooks/{webhookEndpoint}/deliveries/{webhookDelivery}/redeliver`
+   — emitted by **`HttpExceptionToResponseExtension`, a FIFTH Scramble default the row never names**,
+   from `abort(422)` / `abort(409)`. The row's own sentence ("every 401, 403, 404 and 422 in the
+   published contract is wrong in the same way") covers them, so they are **in scope**.
+2. **ONE APPARENT CASE IS NOT A DEFECT.** `403 POST /public/f/{shareToken}/draft` carries no top-level
+   `properties` because it is an `anyOf` of two branches — and **both branches already document the
+   correct envelope**. Left alone. A naive *"top-level properties must be `[error]`"* gate would have
+   called it a defect, which is why the gate below descends `anyOf`/`allOf`/`oneOf`.
+
+### Remedy verdict
+
+The row prescribes *"a set of custom `ExceptionToResponseExtension`s replacing Scramble's four
+defaults"*. **WORKS — and only because of a mechanism the row does not state**, read in the installed
+v0.13.30 rather than assumed. `TypeTransformer::handleResponseUsingExtensions()` picks the matching
+extension with `->reverse()->first()`, under its own comment *"We want latter registered extensions to
+have a higher priority to allow custom extensions to override default ones."* Custom extensions are
+`array_merge`d **after** the defaults, and that binding reads `Scramble::$extensions` at **resolve**
+time, so registering from `AppServiceProvider::boot()` is safe whatever the provider order.
+
+⛔ **Two consequences the remedy sentence hides, both load-bearing.** (a) **Registration ORDER is
+precedence read backwards** — the vendor order Validation → Authorization → Authentication → Http →
+NotFound must be matched exactly, or the generic `Http` arm captures the 34 documented 404s.
+(b) **`reference()` must be inherited, not rewritten** — it is what keeps the four component KEYS
+identical, so all 113 `$ref` strings stay byte-identical and the diff is exactly the defect. Each new
+class therefore **extends its vendor counterpart and overrides `toResponse()` alone**.
+
+Files: `app/Support/OpenApi/ApiValidationErrorResponse.php`,
+`app/Support/OpenApi/ApiAuthorizationErrorResponse.php`,
+`app/Support/OpenApi/ApiAuthenticationErrorResponse.php`,
+`app/Support/OpenApi/ApiNotFoundErrorResponse.php`, `app/Support/OpenApi/ApiHttpErrorResponse.php`,
+`app/Providers/AppServiceProvider.php`, `openapi.json`,
+`tests/Feature/Api/OpenApiContractTest.php`, `tests/Feature/Api/ApiV1Test.php`,
+`docs/feature-backlog.md`, `docs/claims/lane-a.md`, `PROGRESS.md` (own block only).
+Shared artefacts taken: `openapi.json`, `docs/feature-backlog.md`, `docs/claims/lane-a.md`,
+`PROGRESS.md` (own status block and hand-off line only). **No `tests/e2e/*.spec.ts`, no `phpunit.xml`.**
+Paired files taken: **none.**
+Namespaces spent: **nothing from either namespace** — no ADR, no migration, no `§D<n>`, no route.
+Prediction: `openapi.json` moves on **exactly seven bodies** (four component, three inline) with the
+`$ref` strings and the path set byte-identical; **PHPStan CAN move** because five classes land in
+`app/`, so its number is read rather than quoted; Pint, Vitest, Storybook axe and e2e do not move at
+all. ⚠️ **The one I most expect to be wrong: `ApiHttpErrorResponse`'s round-trip through
+`parent::toResponse()`** — whether the parent's status, description and message example survive being
+re-hung under `error.message`. Second most likely: whether those `abort()` bodies really carry
+`request_failed`, which is why the behavioural case measures one before the document claims it.
+
+⛔ **RUN `php scripts/state.php` FOR EVERY NUMBER.** ⛔ **`D9` must never be started without an
+explicit answer.**
 
 ---
 

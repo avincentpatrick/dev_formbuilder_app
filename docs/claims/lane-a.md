@@ -16,12 +16,97 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M51` is merged and the lane holds nothing forward
+## Status: ACTIVE CLAIM — `M52`, the pre-push hooks and the loop driver (`m52-hooks-and-driver`)
 
-**`M51` is merged.** The trunk is now protected and the redaction has landed. `D9` is open and is the
-one item that must not be started without an explicit answer.
+Taken 2026-08-31. Branch `m52-hooks-and-driver`, cut from `origin/main` at `02eba8d`, PR into `main`.
+**Not a backlog row.** This is the third and last increment of the user-directed realignment: make the
+protocol's two most-violated rules mechanical, and remove the user from being the trigger for the next
+session.
 
-⛔ **RUN `php scripts/state.php` FOR EVERY NUMBER.**
+### Evidence verified
+
+Both rules this increment mechanises have been broken **by real pushes**, and both incidents are in the
+ledger rather than hypothesised:
+
+- **`M14` wrote a perfect claim nobody could see** — it was never pushed. That is the whole reason
+  Rule 7(g) says *a claim is a pushed commit*, and `preflight` already checks it. ✅ **held** — but
+  `preflight` is advisory and not a merge gate, so it asserts the rule at session open and cannot
+  stop the push that breaks it.
+- **`M48` put a tracker surgery on the trunk with no squash merge**, because `git push origin HEAD:main`
+  — the command Rule 7(g) itself prescribes — **pushes the whole branch**, and by then the branch
+  carried the work. ✅ **held**, and `M50`'s release records it as still unguarded.
+- **This very session had two agents in one worktree**, which the claim lock is now the only thing
+  standing against. ✅ **held**
+
+**Ground state verified before designing:** `core.hooksPath` is **unset**, there is no `.githooks`
+directory, and `.git/hooks` contains nothing but samples. This is net-new, with nothing to amend.
+
+### Remedy verdict
+
+⛔ **THE PRESCRIBED HOOK (a), TAKEN LITERALLY, BLOCKS EVERY CLOSE-OUT — AND I KNOW BECAUSE I JUST MADE
+THREE.** *"Refuse a push when `docs/claims/lane-a.md` on `origin/main` does not name the current
+branch"* is correct for work and wrong for the close-out: a close-out runs on `m<n>-closeout`, which the
+claim **cannot** name because it did not exist when the claim was written. `M50`, `M51` and `M51`'s
+correction were all pushed from such a branch. A hook written to the letter would have refused all
+three, and the first thing anyone would do is `--no-verify` — which is how a guard becomes furniture.
+
+**The fix keeps the rule and narrows its scope to what the rule is FOR.** A claim exists so that *work*
+cannot begin unannounced. A close-out is not work; it is the release of a claim that has already
+merged. So the hook exempts a push whose changed paths are **entirely documentation** — and it reads
+that set from **`.github/workflows/ci.yml`'s `paths-ignore`**, which is already this repository's
+definition of *"a change that cannot affect the product"*. One authority, referenced rather than
+copied, exactly as `TEMPLATE.md` and `docs/gate-baselines.md` require of their own facts. ⚠️ **A second
+hand-maintained copy of that list is the defect this project has now recorded four separate times.**
+
+**Hook (b) transfers intact and needs no interpretation.** *Refuse `HEAD:main` when the branch carries
+more than the claim commit* — i.e. more than **one** commit beyond `origin/main`. That permits a claim
+push, a claim extension and a close-out, all of which are single commits, and refuses exactly `M48`'s
+shape.
+
+### Files
+
+`.githooks/pre-push` *(new)* · `scripts/loop.php` *(new, the driver)* · `scripts/preflight.php` (assert
+the hooks are installed, since a hook nobody enabled is not a guard) · `README.md` (the one-line
+enable step) · `composer.json` (register the driver and a `hooks:install` script) · `PROGRESS.md`
+(own block) · `docs/claims/lane-a.md` · `docs/feature-backlog.md` (file what this deliberately leaves)
+· `docs/gate-baselines.md` (close-out).
+
+**Shared artefacts taken:** `PROGRESS.md`, `docs/**`, `composer.json`, `README.md`.
+**Paired files taken:** none from 7(b-bis). ⚠️ **One coupling is taken and is named:** the hook's
+documentation-exempt list is *derived from* `ci.yml`, so a future edit to `paths-ignore` changes hook
+behaviour. That is the intended direction, and the hook fails **closed** if it cannot parse the file.
+**Namespaces spent:** **nothing** — no ADR, no migration, no `§D`, no decision id, no exceptions entry.
+`0022` is spent by `M50`; `0010` stays reserved for H1d.
+
+### ⛔ THE LIMIT THAT MUST BE STATED BEFORE IT IS DISCOVERED
+
+**`core.hooksPath` is LOCAL git configuration and cannot be committed.** A hook in `.githooks/` does
+nothing at all until someone runs one command, and **git offers no way for a repository to enable its
+own hooks** — that is a deliberate security property of git, not an oversight to engineer around. So
+this increment ships a guard that is **opt-in per clone**, and the honest mitigation is to make its
+*absence* visible: `preflight` reports whether `core.hooksPath` points at `.githooks`, so an unguarded
+checkout says so at session open rather than silently at the moment of the push it would have stopped.
+⚠️ **`--no-verify` also bypasses any pre-push hook by design.** This is a guard against mistakes, not
+against intent, and it is not a substitute for the server-side ruleset `M51` applied.
+
+### Prediction
+
+**Pint is the only gate that can move**, and it will see two new PHP files under `scripts/` — bare host
+Pint is the form that scans that directory at all. **PHPStan cannot move**: it scans `app`, `database`,
+`routes`. Vitest 134, axe, e2e and `openapi.json` unmoved — no `.ts`, no `.vue`, no route.
+**`static-analysis` keeps its step count**, because no CI step is added: these hooks are deliberately
+*not* a CI step, for the same reason `preflight` is not one — there are no worktrees, no local branch
+and no unpushed claim inside a CI runner, so registering them there would gate nothing.
+
+⚠️ **The one most likely to be wrong is the hook's own control, not a gate — and the reason is the last
+two increments.** `M50` and `M51` each named a gate as the likeliest risk and each was wrong, and both
+misses shared a shape: **the prediction was about volume when the mechanism was about position.** So
+the risk here is stated mechanically instead: **a pre-push hook is invisible to every gate in this
+repository.** Nothing in CI runs it, `composer quality` cannot exercise it, and its own success message
+is indistinguishable from it never having been invoked. **It will therefore be proven the only way a
+hook can be — by making a push that must be refused, and watching it be refused** — with the exempt
+path, the claim path and the multi-commit path each driven separately, against a real remote-tracking
+state rather than a simulated one.
 
 ---
 

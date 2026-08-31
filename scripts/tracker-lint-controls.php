@@ -161,7 +161,7 @@ $cases = [
         'repo' => $pushDeclared,
         'env' => ['GITHUB_EVENT_NAME' => 'push', 'TRACKER_LINT_BASE_SHA' => null],
         'expect_exit' => 2,
-        'expect_out' => 'CANNOT MEASURE R7',
+        'expect_out' => 'CANNOT MEASURE R7 — GITHUB_EVENT_NAME is "push" but TRACKER_LINT_BASE_SHA is empty or unset',
     ],
     [
         'id' => 'C6',
@@ -169,7 +169,7 @@ $cases = [
         'repo' => $pushDeclared,
         'env' => ['GITHUB_EVENT_NAME' => 'push', 'TRACKER_LINT_BASE_SHA' => ZERO_SHA],
         'expect_exit' => 2,
-        'expect_out' => 'CANNOT MEASURE R7',
+        'expect_out' => 'CANNOT MEASURE R7 — the push event carries the all-zero before-sha',
     ],
     [
         'id' => 'C7',
@@ -177,7 +177,7 @@ $cases = [
         'repo' => $pushDeclared,
         'env' => ['GITHUB_EVENT_NAME' => 'push', 'TRACKER_LINT_BASE_SHA' => ABSENT_SHA],
         'expect_exit' => 2,
-        'expect_out' => 'CANNOT MEASURE R7',
+        'expect_out' => 'is not a commit in this clone',
     ],
     [
         'id' => 'C8',
@@ -193,7 +193,7 @@ $cases = [
         'repo' => $pr,
         'env' => ['GITHUB_EVENT_NAME' => 'pull_request', 'TRACKER_LINT_PR_COMMITS' => '9'],
         'expect_exit' => 2,
-        'expect_out' => 'CANNOT MEASURE R7',
+        'expect_out' => 'THE CLONE IS TOO SHALLOW FOR THIS RULE',
     ],
     [
         'id' => 'C10',
@@ -201,7 +201,7 @@ $cases = [
         'repo' => $pr,
         'env' => ['GITHUB_EVENT_NAME' => 'pull_request', 'TRACKER_LINT_PR_COMMITS' => null],
         'expect_exit' => 2,
-        'expect_out' => 'CANNOT MEASURE R7',
+        'expect_out' => 'CANNOT MEASURE R7 — GITHUB_EVENT_NAME is "pull_request" but TRACKER_LINT_PR_COMMITS is empty',
     ],
     [
         'id' => 'C11',

@@ -471,7 +471,7 @@ function resolve_r7_base(): array
     if ($event === 'push') {
         $sha = trim((string) getenv('TRACKER_LINT_BASE_SHA'));
 
-        if (false) { // MUTATION M-a
+        if ($sha === '') {
             cannot_measure_r7(
                 'GITHUB_EVENT_NAME is "push" but TRACKER_LINT_BASE_SHA is empty or unset.',
                 'ci.yml must pass github.event.before into this step. REFUSING TO FALL BACK TO HEAD~1: '.
@@ -533,7 +533,7 @@ function resolve_r7_base(): array
         // than the pull request has, which is what a bounded fetch-depth produces. A strict equality
         // would redden on branch topologies that are legal and uninteresting here — and a false red
         // in the one rule that must never cry wolf costs more than the extra commits it would catch.
-        if ($inRange < $expected) {
+        if ($inRange < 0) { // MUTATION M-b
             cannot_measure_r7(
                 sprintf('HEAD~1..HEAD holds %d commit(s), but this pull request has %d, so %d of them '.
                     'are not in the clone.', $inRange, (int) $declared, $expected - $inRange),

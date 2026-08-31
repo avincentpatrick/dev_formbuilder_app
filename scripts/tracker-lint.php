@@ -107,6 +107,19 @@ const SURGERY_MARKER = '[tracker-surgery]';
 // that increment, or main merges red.
 const EXPECTED_CROSS_FILE_NEXT_SESSION = 1;
 
+// ⛔ THE LANES THAT OWE A HAND-OFF. This was ['A', 'B'] until M50 collapsed the project to a single
+// lane, and — exactly like the constant above — the collapse had to lower it IN ITS OWN COMMIT.
+// Removing Lane B's hand-off line without editing this list takes R6 red on the trunk; that was
+// measured before the change rather than reasoned about, by deleting the line against the unedited
+// gate and watching R6 fail alone (1 check, 1 rule group, R3 untouched).
+//
+// ⚠️ AND THE EXISTENCE CHECK ALONE IS NOT ENOUGH, WHICH IS WHY R6 ALSO COMPARES THE WHOLE SET. A
+// per-lane "appears exactly once" loop is blind to a marker for a lane that no longer exists: a
+// resurrected `**LANE B NEXT PROMPT` would satisfy every iteration of the loop and be reported by
+// nothing. Counting every `**LANE <X> NEXT PROMPT` and requiring the total to equal this list is
+// what makes the retirement enforceable instead of merely conventional.
+const HANDOFF_LANES = ['A'];
+
 $failures = [];
 $notes = [];
 
@@ -182,7 +195,7 @@ foreach ([TRACKER => $tracker, ARCHIVE => $archive] as $path => $body) {
 
 // ── R6. One hand-off marker per lane, at line start. preflight asserts this locally; it is repeated
 //    here because preflight is not a merge gate and this is. ───────────────────────────────────────
-foreach (['A', 'B'] as $lane) {
+foreach (HANDOFF_LANES as $lane) {
     $n = anchored_count($tracker, '/^\*\*LANE '.$lane.' NEXT PROMPT/m');
 
     if ($n !== 1) {
@@ -190,6 +203,21 @@ foreach (['A', 'B'] as $lane) {
     } else {
         pass('R6 handoff', "The LANE {$lane} hand-off marker appears exactly once at line start");
     }
+}
+
+// The set, not just the members — see HANDOFF_LANES. A marker for a retired lane passes every
+// iteration above and is caught only here.
+$allHandoffs = anchored_count($tracker, '/^\*\*LANE [A-Z] NEXT PROMPT/m');
+
+if ($allHandoffs !== count(HANDOFF_LANES)) {
+    fail('R6 handoff', sprintf(
+        '%s carries %d hand-off marker(s) at line start, expected exactly %d (%s). '.
+        'A marker for a lane that no longer exists is the failure this counts: the per-lane loop '.
+        'above cannot see one, because it only ever looks for the lanes it already knows about.',
+        TRACKER, $allHandoffs, count(HANDOFF_LANES), implode(', ', HANDOFF_LANES)));
+} else {
+    pass('R6 handoff', sprintf('%s carries exactly %d hand-off marker(s), one per live lane (%s)',
+        TRACKER, $allHandoffs, implode(', ', HANDOFF_LANES)));
 }
 
 // ── R7. The rule that would have caught the incident. ────────────────────────────────────────────

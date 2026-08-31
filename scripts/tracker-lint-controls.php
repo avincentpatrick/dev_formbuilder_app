@@ -343,8 +343,10 @@ function write_fixture_files(string $dir, int $fillerLines): void
         ."## Standing Rules\n\n"
         ."One rule, so the heading exists exactly once.\n\n"
         ."## Current Status\n\n"
+        // One marker, because M50 retired Lane B and R6 now counts the SET of hand-off
+        // markers rather than only the lanes it knows about. A second marker here would
+        // fail every case in this harness, which is the new check doing its job.
         ."**LANE A NEXT PROMPT** — fixture, so R6 finds one at line start.\n\n"
-        ."**LANE B NEXT PROMPT** — fixture, so R6 finds one at line start.\n\n"
         ."## Next Session\n\n"
         .$filler;
 

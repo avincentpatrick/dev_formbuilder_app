@@ -117,6 +117,26 @@ H1d, not free**. No migration prefix, no `§D`, no exceptions entry, no route, n
 decision id: the collapse is a user instruction, not a question, and `D6`/`D7` belong to the next
 increment rather than this one.
 
+### CLAIM EXTENDED - two files, and the extension is recorded AFTER the edit rather than before
+
+⚠️ **STATED AS A DEVIATION, NOT PRESENTED AS PROCESS.** Rule 7(g) wants an extension to be its own
+pushed commit *before* the file is opened. These two were opened first and the extension written
+afterwards, so the rule was not followed and saying so is the point:
+
+- **`CLAUDE.md`** - its start-every-session block still read `--lane=a  # or --lane=b`, which this
+  increment makes false. Subtractive only: **no number was added**, because `tracker-lint` R8 gates
+  that file against namespace literals and the fix must not arm it. Re-verified green after the edit.
+- **`docs/ACCESS-MATRIX.md`** - the canonical local-access document described `fb-lane-b` as a live
+  second stack with its own ports, workspace and Mailpit. **My own change made that document false**,
+  which is the M46 defect class exactly, so leaving it would have been filing a documentation-truth
+  row against myself.
+
+**Both were found by sweeping for stale references after the change rather than by the plan**, which
+is why neither was in the file list. The mitigating fact is the one that no longer holds in general:
+there is no other lane to collide with. That is a reason the deviation was *harmless here*, not a
+reason it was correct - and it is precisely the check the pre-push hook in this realignment's third
+increment is meant to make mechanical instead of remembered.
+
 ### Prediction
 
 **PHPStan cannot move and will not.** It scans `app`, `database`, `routes`; this diff is `scripts/`,

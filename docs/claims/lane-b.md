@@ -1,7 +1,17 @@
-# Lane B — active claim
+# Lane B — RETIRED, kept as a read-only archive
 
-**One writer: Lane B.** Lane A never edits this file, and Lane B never edits `lane-a.md`. That is
-what makes a claim conflict structurally impossible rather than merely unlikely.
+⛔ **LANE B WAS CLOSED ON 2026-08-31 BY `M50`. THIS FILE IS READ AND NEVER WRITTEN.** The decision
+of record is `docs/adr/0022-single-lane-development.md`. There is one lane, one worktree and one
+writer; the `fb-lane-b` worktree and its Docker stack are gone.
+
+⚠️ **IT IS KEPT BECAUSE DELETING IT WOULD BE A NUMBERING DEFECT, NOT OUT OF SENTIMENT.**
+`scripts/state.php` derives the increment number from the `## RELEASED` headings of **both** claim
+files. The ten releases below — `M15`, `M18`, `M21`, `M22`, `M24`, `M26`, `M29`, `M33`, `M34`, `M35`
+— are recorded in no other machine-readable place, and a scan that loses them fails **silently, by
+returning a LOWER maximum**, which is a number collision rather than an error.
+
+The one-writer rule below is history now. It is left in place because it explains why the claim
+protocol survived the parallelism that created it.
 
 **The protocol is Standing Rule 7(g)**, not this header. In one line: **a claim is a *pushed*
 commit** — write it here, `git push origin HEAD:main`, and only then open the first file. An
@@ -18,9 +28,9 @@ exact-equality `KNOWN_UNGUARDED` assertion, so the list shrinks in the *same* PR
 
 ---
 
-## Status: NO ACTIVE CLAIM
+## Status: RETIRED — no active claim, and no further claim will be written here
 
-**Lane B holds nothing as of 2026-08-27.** `M29` (PR #219, `7892f7f`), `M33` (PR #221, `f329e1b`), `M34`
+**Lane B held nothing from 2026-08-27 and was retired on 2026-08-31 by `M50`.** `M29` (PR #219, `7892f7f`), `M33` (PR #221, `f329e1b`), `M34`
 (PR #222, `b6adb2e`) and `M35` (PR #224) are merged and released. Their entries follow.
 
 ⛔⛔ **BEFORE YOU NUMBER ANYTHING: READ THE WHOLE OF `lane-a.md`, NOT ITS `## Status` LINE.** A lane's
@@ -2022,17 +2032,10 @@ the pre-M15 device-wide numbers, so every existing case kept meaning what it mea
 
 ## Template
 
-```
-## CLAIMED — <row name> (<branch>)
-Opened: <date>. Row: <the backlog row, quoted enough to identify it>.
-Files: <every file to be edited, repo-relative>.
-Shared artefacts taken: <docs/…, openapi.json, … — or "none">.
-Paired files taken: <7(b-bis) entries, and the other half of each — or "none">.
-Namespaces spent: <migration prefix / ADR number — or "nothing from either namespace">.
-Prediction: <what you expect the gates to do, written BEFORE the run so it can be measured
-             against rather than explained afterwards>.
+**Moved to `docs/claims/TEMPLATE.md`** by `M50` -- one authority, referenced rather than copied.
+Lane A's duplicate went there in `M36`; this was the last one, and two copies of a fact drift apart.
 
-## RELEASED — <row name> (merged as PR #<n>, <sha>, 6/6)
-<what was actually taken; whether every claimed file was edited; anything the claim was
- extended to mid-build, each of which was its own pushed commit before the file was opened>
-```
+The heading itself is kept ON PURPOSE. `scripts/state.php` truncates this file at `## Template` when
+it derives the increment number, so leaving the anchor in place makes this edit provably neutral to
+the numbering: what was removed is only the fenced example below it, which contained a verbatim
+`## RELEASED` line that the truncation existed to keep out of the scan in the first place.

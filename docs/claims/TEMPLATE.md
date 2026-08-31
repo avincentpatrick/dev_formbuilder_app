@@ -6,10 +6,16 @@ which is the exact defect Standing Rule 7(b) records about the lane boundary its
 defect `docs/gate-baselines.md` exists to end for gate numbers. A lane file that restates this
 template is the defect, not a convenience: point at this file instead.
 
-⚠️ **`lane-b.md` still carries its own copy at the time of writing, and that is deliberate.** Lane A
-may not edit Lane B's claim file — one writer each is what makes a claim conflict structurally
-impossible rather than merely unlikely. Lane B adopts this file on its next increment by deleting its
-copy and linking here.
+✅ **`lane-b.md`'s duplicate is gone as of `M50`, and the way it went is the point.** This file used
+to say Lane B would adopt it *"on its next increment"*. **Lane B had no next increment** — it was
+retired before one arrived, so a sentence that read as a plan was in fact a deferral with no owner
+and no deadline, which is the `D6` shape exactly. `M50` deleted the copy itself, crossing the
+one-writer boundary deliberately and saying so, because the rule that forbade it is the rule that
+increment abolished. See `docs/adr/0022-single-lane-development.md`.
+
+⚠️ **`lane-b.md` keeps its `## Template` HEADING even though the template is gone.**
+`scripts/state.php` truncates that file at the heading when deriving the increment number, so the
+anchor stays and the edit is provably neutral to the numbering — measured before and after.
 
 ---
 
@@ -79,6 +85,6 @@ exist; M14 proved that by writing a perfect one nobody could see.
 Before opening any shared or paired artefact, `git fetch` and read **both** lane files in full — not
 their `## Status` lines, because a forward queue is a claim and does not live under that heading.
 
-`php scripts/preflight.php --lane=a|b` asserts most of the above mechanically, including the parts
+`php scripts/preflight.php --lane=a` asserts most of the above mechanically, including the parts
 that have been got wrong repeatedly: the branch base, whether the claim is actually published, whether
 another suite is running, and whether `PROGRESS.md` is safe to splice.

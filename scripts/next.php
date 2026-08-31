@@ -37,24 +37,22 @@ declare(strict_types=1);
  * from the FIRST match deleted 1,086 lines on 2026-08-16 and merged green.
  *
  * Usage:
- *   php scripts/next.php [--lane=a|b]            # render to STDOUT, exactly as the tracker holds it
- *   php scripts/next.php [--lane=a|b] --write    # replace that lane's line in PROGRESS.md, in place
+ *   php scripts/next.php [--lane=a]              # render to STDOUT, exactly as the tracker holds it
+ *   php scripts/next.php [--lane=a] --write      # replace that lane's line in PROGRESS.md, in place
  *
  * Exit 0 = rendered. Exit 1 = a --write assertion failed. Exit 2 = could not measure.
  */
 
 const TRACKER = 'PROGRESS.md';
 
+// ONE LANE SINCE M50 -- docs/adr/0022-single-lane-development.md. Lane B's entry is gone, so its
+// hand-off line can no longer be regenerated and `--lane=b` is refused. docs/claims/lane-b.md is
+// still READ by scripts/state.php for the increment number; it is an archive, not a lane.
 const LANES = [
     'a' => [
         'claim' => 'docs/claims/lane-a.md',
         'worktree' => 'c:\\laragon\\www\\dev_formbuilder_app',
         'stack' => 'dev_formbuilder_app-* on 8080/5432/6379/5173',
-    ],
-    'b' => [
-        'claim' => 'docs/claims/lane-b.md',
-        'worktree' => 'c:\\laragon\\www\\fb-lane-b',
-        'stack' => 'fb-lane-b-* on 8081',
     ],
 ];
 
@@ -75,7 +73,7 @@ $lane = strtolower((string) ($opts['lane'] ?? 'a'));
 $write = isset($opts['write']);
 
 if (! isset(LANES[$lane])) {
-    fwrite(STDERR, "next: unknown lane '{$lane}'. Use --lane=a or --lane=b.\n");
+    fwrite(STDERR, "next: unknown lane '{$lane}'. There is one lane since M50 - use --lane=a.\n");
     exit(1);
 }
 

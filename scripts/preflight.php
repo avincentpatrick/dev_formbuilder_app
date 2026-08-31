@@ -24,15 +24,23 @@ declare(strict_types=1);
  * this increment's own claim names its own number.
  *
  * Usage:
- *   php scripts/preflight.php [--lane=a|b] [--with-pint] [--with-gates]
+ *   php scripts/preflight.php [--lane=a] [--with-pint] [--with-gates]
  *
  * Runs on the HOST — which is itself one of the findings it reports. `--with-pint` and `--with-gates`
  * are opt-in because they are slow; everything else is nearly instant.
  */
 
+// ⛔ ONE LANE SINCE M50 — docs/adr/0022-single-lane-development.md. Lane B's entry is gone and
+//    `--lane=b` is now REFUSED rather than silently accepted, which is the point: a stale hand-off
+//    or an old habit that still passes `--lane=b` gets an error instead of a plausible-looking run
+//    against a worktree that no longer exists.
+//
+// ⚠️ docs/claims/lane-b.md STILL EXISTS AND IS STILL READ — by scripts/state.php, which derives the
+//    increment number from the `## RELEASED` headings of BOTH claim files. It holds ten releases
+//    recorded nowhere else. It is an ARCHIVE, not a lane; absence from this map is what makes that
+//    distinction executable.
 const LANES = [
     'a' => ['claim' => 'docs/claims/lane-a.md', 'container' => 'dev_formbuilder_app-app-1'],
-    'b' => ['claim' => 'docs/claims/lane-b.md', 'container' => 'fb-lane-b-app-1'],
 ];
 
 $root = dirname(__DIR__);
@@ -42,7 +50,7 @@ $opts = getopt('', ['lane::', 'with-pint', 'with-gates']);
 $lane = strtolower((string) ($opts['lane'] ?? 'a'));
 
 if (! isset(LANES[$lane])) {
-    fwrite(STDERR, "preflight: unknown lane '{$lane}'. Use --lane=a or --lane=b.\n");
+    fwrite(STDERR, "preflight: unknown lane '{$lane}'. There is one lane since M50 - use --lane=a.\n");
     exit(1);
 }
 

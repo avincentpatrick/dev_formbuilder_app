@@ -16,143 +16,137 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `## Next Session` leaves the constitution (`m48-next-session-surgery`)
+## Status: NO ACTIVE CLAIM — `M48` is merged and the lane holds nothing forward
 
-Taken 2026-08-29. Branch `m48-next-session-surgery`, cut from `origin/main` at `a77938c`, PR into `main`.
-**It is a tracker surgery and is run as one**, under `CLAUDE.md`'s *The tracker* rules.
+**`M48` is merged.** Lane A holds no active row and pre-claims no forward number. The next row is taken
+under Rule 7(f), and the claim is written here and **pushed** before the first file is opened.
 
-Row: the `major` in `docs/feature-backlog.md` — *"`## Next Session` is a second historical ledger inside
-the constitution, and it is now 62% of the file"* — filed by `M45`, re-measured by `M47`, and carrying
-`M47`'s explicit hand-over: **this increment owes the end-to-end proof that a real GitHub squash arms the
-relaxed `[tracker-surgery]` marker on the trunk.**
+⛔ **RUN `php scripts/state.php` FOR EVERY NUMBER.** Increment, ADR, migration prefix, exceptions-log
+entry, open rows, open decisions, and how far behind the trunk `docs/gate-baselines.md` has fallen.
+Nothing in this file or in `PROGRESS.md` is the authority for any of them any more.
 
-### Evidence verified
+✅ **`CLAUDE.md` IS THE IMPERATIVE LAYER AND IS AUTO-LOADED.** Read it before this file. It carries no
+numbers at all, and `tracker-lint` R8 keeps it that way.
 
-Every citation opened against the merged tree at `a77938c`. **The defect is real and larger than the row
-says; three of the row's four factual enumerations are wrong.**
+⛔⛔ **`git push origin HEAD:main` PUSHES THE WHOLE BRANCH, NOT THE COMMIT YOU JUST WROTE — AND THAT IS
+HOW `M48`'s SURGERY REACHED THE TRUNK WITHOUT A SQUASH MERGE.** Rule 7(g) prescribes exactly that
+command for publishing a claim, and it is correct on an empty branch. It is **wrong the moment you use
+it for a mid-build claim EXTENSION**, because by then the branch carries the work. **Publish an
+extension with a PR, or push only that commit** (`git push origin <sha>:main`). The PR was then
+auto-marked merged, its remaining commits stranded, and the end-to-end proof lost. **Nothing was
+damaged and nothing was force-pushed** — but the increment's headline deliverable was.
 
-- **`## Next Session — Resume Here` is 214,178 bytes over lines 218–408 — 59.5% of a 360,207-byte file.**
-  MOVED. The row's `214,073` / `346,913` / `46,511` / `57,283` are `M45`-dated and every one has drifted;
-  `## Standing Rules` is now 49,001 and `## Current Status` **67,982**. The row's *ordering* claim holds.
-- **`M47`'s addendum of `242,873` bytes HOLDS to within 31 bytes (now 242,904) — but it is a DIFFERENT
-  BOUNDARY.** That figure is heading-to-EOF and sweeps in `## Roadmap Phases`, `## What's done`,
-  `## Verification loop` and `## Gotchas` (28,726 bytes across four sections this increment does not
-  touch). Planning against it would have overstated the surgery by 13%.
-- ⛔ **"Roughly 19 superseded-prompt blocks" is FALSE — there are 14.** Measured at line start:
-  13 `**SUPERSEDED PROMPT (…)` plus 1 `**PRIMARY NEXT PROMPT`.
-- ⛔ **"`I1`–`I12`, `H1e`–`H24b1`, `J1`–`J5`" is FALSE in two of three ranges.** 28 `(do not re-open)`
-  records exist at line start: `I1`–`I4`, `I6`, `I7a`, `I7b` — **no `I5`, no `I8`–`I12`** — and
-  `H5a`–`H24b1`. **There is no J-series record in the section at all**; those moved to
-  `PROGRESS_ARCHIVE.md` with `M45`'s claim ledger, so the row inherited a range that had already left.
-- **"What must stay is the two live `LANE * NEXT PROMPT` lines" HOLDS, and understates itself.**
-  `scripts/next.php`'s `write_line()` exits 1 unless exactly one matches at line start; `state.php`'s
-  `HANDOFF_STATE_MARKER` anchors the `[state …]` block immediately after the arrow. **The row omits the
-  merge gate**: `tracker-lint` R6 asserts the same thing and is the one that reddens `main`.
-- **`DROP_BYTE_LIMIT` is 50,000 and this drop is ~199,325 — HOLDS.**
+⛔ **`R7` IS BLIND ON A `push` AS WELL, AND IT IS FILED AS A `major`.** It compares `HEAD~1` against
+`HEAD`, so a removal that is not in the push's **last** commit is invisible: `M48`'s own four-commit
+push carried a 198,909-byte deletion of the constitution and the run measured **zero**. Until that row
+is taken, **do not read a green `R7` on a multi-commit push as evidence of anything.**
 
-### Remedy verdict
+✅ **`R7` HAS NOW FIRED, AND `M48` IS THE FIRST INCREMENT IT EVER LOOKED AT.** What that cost to learn:
+`ci.yml`'s `fetch-depth: 2` — chosen in `M40` *for this rule* — leaves only the PR's **last** commit in
+the clone, so a marker on any earlier one is invisible. Fixed to `0`. **A gate that has never fired has
+never been tested**, and this arc has now produced that lesson three times over.
 
-**Sound in direction, and incomplete in three ways the tree enforces.** The row prescribes only *move it,
-with the boundary decided rather than measured*; that direction is right and the boundary judgement is
-recorded below. What it does not say:
+⚠️ **THE END-TO-END SQUASH PROOF IS STILL OWED**, and is handed to the `## Current Status` surgery,
+which is the next `major` and is filed with its measurement. Merge it with an explicit `--body` whose
+first content line is the marker, and read the post-merge run on `main` rather than the PR run.
 
-1. ⛔ **The archive heading may not be `## Next Session`.** `tracker-lint` R3 counts `/^## Next Session/m`
-   **across both files** and expects exactly 1 — so the obvious heading is **red on arrival**. `M45` hit
-   this and renamed the archive's stale copy to `## Historical next-session pointer`.
-2. ⛔ **`TRACKER_BYTE_CEILING` must be ratcheted in this diff, and its comment is falsified by it.** The
-   constant's own note says *"the increment that moves Next Session turns this down again"* and asserts the
-   ~40 KB target is *"unreachable while Next Session (214 KB, and now 62% of this file) remains in it"*.
-3. ⛔ **The post-merge run on `main` exists only because a non-ignored path is in the same commit.**
-   `ci.yml`'s `push` `paths-ignore` covers `PROGRESS.md`, `PROGRESS_ARCHIVE.md`, `docs/claims/**`,
-   `docs/gate-baselines.md` and `docs/backlog-triage.md`. **A tracker-only surgery produces no run at
-   all** — so the proof this increment owes would have been unobtainable. It is obtainable here only
-   because obligation 2 drags `scripts/` into the diff. Filed as its own row rather than left as luck.
+---
 
-⛔ **AND THE MEASUREMENT INVERTS WHICH THRESHOLD IS DOING THE WORK.** The drop is **176 net lines** against
-`DROP_LIMIT`'s 200 — **under it** — and ~199,325 bytes against `DROP_BYTE_LIMIT`'s 50,000, **3.99× over**.
-So this surgery is armed by the byte half alone, and the line-only gate would have waved it through exactly
-as it waved `M45` through. That is a control this increment runs, not a claim it makes.
+## RELEASED — `M48`, `## Next Session` leaves the constitution, and the checkout depth that had blinded two gates (merged as PR #239, `f000a89`, 6/6 green; the surgery itself reached `main` directly — see below)
 
-Files: `PROGRESS.md`, `PROGRESS_ARCHIVE.md`, `scripts/tracker-lint.php` (`TRACKER_BYTE_CEILING` and its
-comment), `docs/feature-backlog.md`, `scripts/citation-liveness-lint.php` (`LEDGER_ROT_CEILING`, **only if
-the measured count actually drops**), `docs/claims/lane-a.md`.
-⚠️ **The list is stated here, before phase 1, and deliberately includes the ratchet** — `M45`'s
-paths-touched assertion failed twice, once with an expected list that omitted exactly that.
-Shared artefacts taken: `PROGRESS.md` (own block plus the `## Next Session` section), `PROGRESS_ARCHIVE.md`,
-`docs/feature-backlog.md`, `docs/claims/lane-a.md`, `scripts/tracker-lint.php`,
-`scripts/citation-liveness-lint.php`.
-Paired files taken: none — no 7(b-bis) entry is touched.
-Namespaces spent: **nothing from either namespace.** No migration, no ADR (`0022` stays free, `0010` stays
-reserved for H1d), no `§D`, no exceptions entry, no route.
+**The row is closed and the constitution is a third of the size it was.** `PROGRESS.md` **360,207 →
+161,298 bytes**, 483 → 306 lines; `## Next Session` **214,178 → 15,269**, from 59.5% of the file to
+9.5%. 178 lines / 200,625 bytes moved verbatim to `PROGRESS_ARCHIVE.md`, proved by a counted multiset
+with exact multiplicity and byte conservation with no tolerance, **2,618,558 == 2,618,558**.
 
-Prediction, written before the first byte moves:
+⛔ **THE INCREMENT'S REAL OUTPUT IS NOT THE DIFF. IT IS THAT ONE YAML INTEGER WAS SILENTLY BLINDING TWO
+INDEPENDENT GATES, AND ONE OF THEM WAS THE SECRET SCAN ON A PUBLIC REPOSITORY.** `ci.yml` used
+`fetch-depth: 2`, chosen in `M40` for `tracker-lint`'s `R7`. Consequences, both measured on this
+increment rather than reasoned about:
 
-- `R7` reports `DECLARED SURGERY` on the PR run and again on the post-merge `push` run on `main`.
-  **This is the one I most expect to be wrong**, and the reason is that every previous attempt to carry
-  this marker through a merge looked correct at the moment of writing and was not — three distinct
-  failures so far. If it reddens `main`, that is the acceptance test paying out, and the remedy is a
-  follow-up commit rather than a force-push.
-- `R1` passes at the new ceiling with roughly 39 KB of headroom; `R2`/`R3`/`R4`/`R5`/`R6` do not move.
-- **PHPStan, Vitest, Storybook axe and e2e cannot move** — the diff touches no `app/`, `database/`,
-  `routes/` or front-end file. I expect to report that rather than quote an unchanged number.
-- Pint: `scripts/*.php` changes are constant-and-comment only; I expect no reformatting.
-- `citation-liveness` tier 2 is at **19 of 19 — zero headroom**, so any dead citation I add reddens it.
-  I expect to *reduce* it to 18 by repairing the one dead `PROGRESS.md` pointer the earlier surgeries
-  left in the ledger, and to ratchet the constant in the same commit.
+- **`R7` cannot see a multi-commit PR.** At depth 2 the clone holds the merge commit and the PR's
+  **last** commit; every earlier one is grafted away. `M48` put `[tracker-surgery]` on its phase-1
+  commit and `R7` reported the marker absent **while measuring the delta perfectly**. Reproduced with
+  `git fetch --depth=2 origin refs/pull/238/merge`, not inferred. Fixed to `fetch-depth: 0`; a bounded
+  depth is what created this, and `3` would fail the next three-commit PR silently.
+- ⛔ **`gitleaks detect --source .` SCANS GIT HISTORY, so the secret scan was checking two commits at a
+  time for the repository's whole life.** At depth 0 it scanned **818 commits on the first run** and
+  reported three findings that had never been reachable. ✅ **There is no real secret**: all three are
+  the *same string* by sha256 — the password fixture in `PasswordStrength.test.ts`, quoted twice into
+  the tracker the day that component shipped. That line already carried `// gitleaks:allow`, which
+  suppresses the match **in the commit where the directive exists** and cannot reach the commits that
+  predate it. `.gitleaksignore` records the three fingerprints and why. **A reassuring outcome from an
+  alarming mechanism**, and the mechanism is what the filed row now carries.
+- **`R7` is blind on a `push` as well, and it is filed as a `major`** rather than fixed, on the user's
+  call. It compares `HEAD~1` against `HEAD`, so a removal not in the push's last commit is invisible.
+  `M48`'s own four-commit push carried the 198,909-byte deletion and the run measured **zero**.
 
-### Claim EXTENDED 2026-08-29 — `.github/workflows/ci.yml`
+✅ **AND `R7` FIRED, WHICH IT NEVER HAD BEFORE.** `DECLARED SURGERY: 177 line(s) and 198,909 byte(s)
+removed from PROGRESS.md`. ⛔ **Read the line figure twice: 177 against a limit of 200 — UNDER IT.** The
+surgery that removed three-fifths of the constitution is invisible to the line threshold; the byte half
+caught it at 3.98× over. Eight controls in a detached history fixture, each with a green baseline and a
+byte-compared restore: marker stripped → **red on the byte limit**; restored → green with the message
+md5 back to baseline exactly; `* ` and `- ` → pass; mid-sentence and indented → fail; ceiling one byte
+under the file → **R1 red**. **And C3, the one worth keeping:** marker stripped *and* `DROP_BYTE_LIMIT`
+raised past the drop → **exit 0**, the pre-`M47` gate classifying a 198,909-byte undeclared removal of
+the constitution as an ordinary edit.
 
-⛔ **A FOURTH WAY THE `[tracker-surgery]` MARKER FAILS TO ARM, AND THE FIRST ON THE `pull_request` SIDE
-RATHER THAN THE SQUASH SIDE.** PR #238's static-analysis job went **red on R7** — the delta measured
-perfectly (177 lines / 198,909 bytes) and the marker was reported absent, while the phase-1 commit
-`f61ac11`'s subject *begins* with it.
+⛔ **THE DEVIATION, STATED PLAINLY AND FIRST-PERSON: `git push origin HEAD:main` PUSHES THE WHOLE
+BRANCH.** Rule 7(g) prescribes exactly that command for publishing a claim, and it is right on an empty
+branch. Used for a mid-build **extension**, by which time the branch carried the surgery, it put the
+whole thing on the trunk without a squash merge, and PR #238 was auto-marked merged when its commits
+became ancestors of `main`. Nothing was damaged, nothing was force-pushed, `main` stayed green — **but
+the end-to-end proof `M47` handed to this increment was forfeited, and that was this increment's
+headline deliverable.** The second and third extensions were published by cherry-pick onto `main`
+instead, which is the correction. **The squash proof is handed forward to the `## Current Status`
+surgery**, filed as the next `major`.
 
-**Reproduced rather than reasoned about**, by doing exactly what `actions/checkout` does:
-`git fetch --depth=2 origin refs/pull/238/merge`. `HEAD~1..HEAD` then contains **two** commits — the
-synthetic merge commit and `add6f18`, the PR's **last** commit — and `f61ac11` sits at depth 3 and is
-**grafted away**. So at `fetch-depth: 2`, R7 can only ever see the PR's final commit message.
+**Every claimed file was edited**, and the claim was extended twice, each time in its own pushed commit
+before the file was opened: `.github/workflows/ci.yml`, then `.gitleaksignore`. Namespaces spent:
+**nothing from either** — no migration, no ADR (`0022` stays free, `0010` stays reserved), no `§D`, no
+exceptions entry, no route.
 
-⛔ **`scripts/tracker-lint.php`'s OWN DOCBLOCK ASSERTS THE OPPOSITE** — *"on a `pull_request` event
-actions/checkout hands us a merge commit, so `HEAD~1` is main's tip and `HEAD~1..HEAD` is the PR's own
-commits — exactly the range whose messages must carry the marker"* — and it is **false for any PR with
-more than one commit**. `ci.yml`'s `fetch-depth: 2` was chosen in M40 for this rule and is one short of
-what the rule needs. **Nobody could have seen it before now, because R7 had never fired.**
+**How the prediction fared.** The one named as most likely to be wrong — *"`R7` reports DECLARED SURGERY
+on the PR run and again post-merge"* — **was wrong, and wrong about the mechanism rather than the
+outcome.** It feared the squash body, the failure `M45` and `M47` had both paid for; the actual cause
+was a checkout depth nobody had connected to it. **That is the third time in this arc a prediction has
+named the right gate and the wrong mechanism**, which is the argument for writing predictions down: not
+that they come true, but that the measurement has something specific to disagree with. Right: `R1`'s
+headroom (predicted ~39 KB, measured **38,702**); no movement in PHPStan, Vitest, axe or e2e (e2e passed
+with 20 real steps on an unrelated diff); no Pint reformatting; the ledger tier reduced 19 → 18 and the
+constant ratcheted with it.
 
-**Extension taken, and pushed before the file was opened:** `.github/workflows/ci.yml`
-(`static-analysis`'s `fetch-depth`, `2` → `0`) and the docblock in `scripts/tracker-lint.php`, which is
-already claimed. `ci.yml` is a *NEITHER* column artefact under Rule 7(b) and is claimed here first.
-Cost measured, not assumed: full history is **20 MB over 866 commits**. A bounded depth is what created
-this defect, so the fix is unbounded.
+⚠️ **FIVE METHOD FAILURES, ALL MINE, ALL CAUGHT, AND THEY REPEAT ONE SHAPE — AN OPERATION THAT SUCCEEDS
+ON EMPTY INPUT.**
 
-⚠️ **AND THE MARKER IS DELIBERATELY NOT ADDED TO THE LAST COMMIT, THOUGH THAT WOULD ALSO GO GREEN.**
-Doing both would make the next green run unattributable — the vacuous-success family, in the increment
-whose whole point is a recording. The marker stays on phase 1 alone, so a green R7 proves the depth fix
-and nothing else.
+1. **A splice whose input file was empty wrote one blank line and reported success — twice**, both
+   times because `getenv()` in a `php -r` read an environment variable the shell had not exported. The
+   first shipped a claim extension consisting of nothing; the commit message described a change the
+   file did not contain. **Fixed with a length floor** — refuse unless the inserted text is at least
+   *n* lines — which is `M36`'s "a gate with no floor reports passed while blind", one layer down, in a
+   splice rather than a gate.
+2. **A guard asserted the wrong constant count** (3 references where the file has 5) and refused to
+   write. **The guard was right and I was wrong**, which is the inverse of `M41`'s lesson and deserves
+   saying: verify the check, and then believe it.
+3. ⛔ **A substring guard could not tell a quotation from a declaration.** The docblock correction
+   *quotes* the false sentence it retracts, so `str_contains` matched the retraction. Constrained to a
+   whole-line match. **This repository's most-repeated lesson, hit by the commit writing about it.**
+4. **A positive control returned green and the fixture was wrong, not the gate.** The first
+   `.gitleaksignore` probe used AWS's *documented example* keys, which gitleaks allowlists. `M19`'s
+   lesson — a probe measuring zero proves nothing unless it touched the thing — recurring in a new tool.
+5. **`Pint --test` prints `passed` with no file count, even under `-v`.** Proven non-vacuous by a
+   deliberate misformat of the exact file being edited: exit 1, naming the file and five fixers,
+   restored by byte comparison.
 
-### Claim EXTENDED again 2026-08-31 — `.gitleaksignore`
+⚠️ **AND ONE ABOUT ROWS, WHICH IS THE HALF THE CLAIM TEMPLATE EXISTS FOR.** Three of the row's four
+factual counts were wrong — 14 hand-off blocks not 19, and a `(do not re-open)` range that named
+`I5`, `I8`–`I12` and the whole J-series, none of which are in the section. Sweeping the block's
+*"recorded, not fixed"* items **against the code rather than against the record** found **three already
+closed** and **one live and filed nowhere**. Filing from the record would have produced three phantom
+rows and still missed the real one.
 
-⛔ **`fetch-depth: 0` MADE A SECOND GATE START WORKING, AND IT HAD BEEN AS BLIND AS `R7`.** `ci.yml`'s
-secret scan runs `gitleaks detect --source .`, which scans **git history**, not the worktree. At
-`fetch-depth: 2` the clone held two commits, so **the secret scan on a PUBLIC repository has been
-checking two commits at a time for its whole life.** With depth 0 it scanned **818 commits on CI (843
-locally) and reported 3 leaks.**
+---
 
-✅ **VERIFIED, AND THERE IS NO REAL SECRET.** All three findings are the **same string** — identical
-sha256 — an 8-to-12 character fixture in
-`packages/design-system/src/components/PasswordStrength/PasswordStrength.test.ts`, quoted twice into the
-tracker on the same day. **That line already carries `// gitleaks:allow`** and a comment explaining
-exactly this shape. The directive suppresses the match *in the commit where it exists*; the three hits
-are the historical commits that predate it. A password-**strength** checklist fixture has to look like a
-password to be worth asserting on.
-
-**Extension taken, pushed before the file was created:** `.gitleaksignore`, three exact fingerprints
-(`commit:file:rule:line`), which is gitleaks' designed mechanism and suppresses only these three. ⛔ **Not
-`--no-git`, and not a rule exclusion** — either would give back the history scanning this increment just
-switched on, which is a genuine security gain and the whole reason the finding exists.
-
-⚠️ **AND THIS EXTENSION IS PUBLISHED BY CHERRY-PICK ONTO `main`, NOT BY `git push origin HEAD:main`** —
-which is what put the surgery on the trunk earlier today. The rule as written is right for an empty
-branch and wrong for a mid-build extension.
 
 ---
 

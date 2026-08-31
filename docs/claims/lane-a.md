@@ -16,7 +16,112 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M53`, the close-out exemption, in both places it is missing (`m53-closeout-exemption`)
+## Status: NO ACTIVE CLAIM — `M53` is merged and the loop is ready for its first unattended run
+
+**`M53` is merged.** The realignment is complete and the defect that would have stopped the loop on its
+own close-out is closed. ⛔ **The first unattended run still needs an explicit go**, and `D9` remains
+the one item that must never be started without an answer.
+
+⛔ **RUN `php scripts/state.php` FOR EVERY NUMBER.**
+
+---
+
+## RELEASED — `M53`, the close-out exemption in both places it was missing (merged as PR #244, `dcd3309`, 6/6 green)
+
+**Every claimed file was edited and the claim was not extended.** Taken immediately on the user's
+instruction, ahead of the first unattended run, because a loop that reaches its close-out and is
+refused by its own guard fails on its first outing at the one step this realignment exists to automate.
+
+### ⛔ THE ERROR WAS CONCEPTUAL, AND IT IS THE MOST TRANSFERABLE THING IN THE WHOLE REALIGNMENT
+
+`M52`'s guard derived its exempt set from `ci.yml`'s `paths-ignore` on the principle **"one authority,
+referenced rather than copied"** — the principle this repository applies to gate numbers, to the lane
+boundary and to the claim template. The principle is right. **It was applied to the wrong authority.**
+
+| | answers |
+|---|---|
+| `paths-ignore` | *"can this change affect the product's CI?"* |
+| the guard needed | *"is this the claim and close-out protocol?"* |
+
+The two sets overlap almost entirely and differ on **exactly one path — `docs/feature-backlog.md`** —
+which is the file *every* close-out edits, because closing a row is step 1 of the close-out `CLAUDE.md`
+prescribes. So `M52`'s guard refused `M52`'s own close-out, and it went out under `--no-verify`.
+
+⚠️ **Deriving from an authority is only safer than copying when its semantics answer YOUR question.
+Otherwise it is a copy wearing borrowed confidence** — and it is worse than a copy, because the
+borrowed confidence stops you checking.
+
+### ✅ THE RELATIONSHIP IS NOW ASSERTED INSTEAD OF ASSUMED
+
+The guard owns `PROTOCOL_PATHS`. What is derived from `ci.yml` is no longer the **answer** but the
+**check**: `PROTOCOL_PATHS` must be a **superset** of `paths-ignore`, asserted on every run and
+**failing closed with exit 2** if the workflow grows an entry the guard does not know. The two lists
+stay visibly related without either pretending to be the other.
+
+⛔ **THE ROW'S NON-REMEDY WAS THE LOAD-BEARING HALF AND WAS VERIFIED RATHER THAN ACCEPTED.** *Do not
+add the backlog to `paths-ignore`.* That block sits under `push:`, so an entry means **no run at all**
+on a backlog edit — a real reduction in gate coverage, in a file on the user's stop list. Checked in
+the workflow rather than taken from the row I had written.
+
+### ⚠️ THE SECOND HALF NEEDED A DIFFERENT FIX AND WAS DELIBERATELY NOT PATTERN-MATCHED INTO THE FIRST
+
+`loop gates` was **not** misclassifying paths. It was asking `preflight` a question with **no true
+answer** on a close-out branch: Rule 7(g) wants the claim to name the current branch, and a close-out
+runs on a branch the claim *could not* have named because it did not exist when the claim was written.
+
+Both get an explicit `--closeout` mode that downgrades the claim assertion to a **stated waiver**, and
+prints that it *is* a waiver so a mistaken use is loud.
+
+⛔ **Explicit, never inferred from the branch name.** `m<n>-closeout` is a convention, and **a check
+that relaxes itself whenever a branch is named a certain way is one anyone can switch off by renaming a
+branch.** Two fixes for one row, and the temptation to make them the same fix was the thing to resist.
+
+### ✅ EIGHT CONTROLS, AND ONE THAT ONLY EXISTS BECAUSE PINT TOUCHED THE FILE
+
+| Control | Result |
+|---|---|
+| the exact commit range `M52`'s close-out was refused for | **allow** (was refuse) |
+| three commits straight to the trunk | **refuse** |
+| work on an unclaimed branch | **refuse** |
+| the same work on the claimed branch | **allow** |
+| branch deletion | **allow** |
+| an entry dropped from `PROTOCOL_PATHS` | **exit 2**, naming the divergent path |
+| `preflight` on an unclaimed branch, no `--closeout` | **exit 1** |
+| the same branch **with** `--closeout` | **exit 0**, waiver stated |
+
+The mutation was restored **byte-exact**. ⚠️ **The five original guard controls were re-run AFTER Pint
+reformatted `pre-push-guard.php`** — a reformat is a change, and controls that passed before one prove
+nothing about after it. That re-run cost one command and is the kind of check that is skipped precisely
+because it feels redundant.
+
+### ✅ THE ACCEPTANCE TEST WAS NOT A CONTROL, AND IT WAS NAMED BEFORE THE FIX WAS WRITTEN
+
+The claim said: *"this increment's own close-out must push WITHOUT `--no-verify`. `M52`'s could not. If
+the close-out is refused again, the fix is wrong no matter what the controls said."* **It pushed
+clean**, and `loop gates --closeout` came back green on a branch the claim does not name — the second
+half of the fix exercised in its real setting rather than a simulated one.
+
+⚠️⚠️ **BUT THIS ACCEPTANCE TEST IS WEAKER THAN THE CLAIM PROMISED, AND THE HONEST THING IS TO SAY SO
+RATHER THAN BANK IT.** `M53`'s close-out touches only `PROGRESS.md`, `docs/claims/lane-a.md` and
+`docs/gate-baselines.md` — **all three were already in `paths-ignore`, so this close-out would have
+passed under `M52`'s broken guard too.** The reason is incidental: the row was closed inside the pull
+request rather than in the close-out, so the one path that exposes the defect,
+`docs/feature-backlog.md`, is not in this push.
+
+**The real proof is control C7**, which replays the exact commit range `M52`'s close-out was refused
+for — four paths including the backlog — and now returns allow where it previously returned refuse.
+⛔ **A close-out that happens not to touch the defective path is not evidence about the defect**, and
+recording this as *"the acceptance test passed"* would be precisely the vacuous success this project
+keeps cataloguing. The next close-out that closes a row is the unforced end-to-end case.
+
+⚠️ **The claim's named risk did not fire, and saying so matters.** It predicted the superset assertion
+would fail closed on a cosmetic glob mismatch — `docs/claims/**` against `docs/claims/`. It does not:
+the comparison normalises the `/**` suffix before comparing. The risk was real and the mitigation was
+already in the code, which is a better outcome than being lucky.
+
+**Namespaces: nothing spent.** No ADR, no migration, no `§D`, no decision id.
+
+### The claim, preserved
 
 Taken 2026-09-01. Branch `m53-closeout-exemption`, cut from `origin/main` at `0bce9db`, PR into `main`.
 Row: the `major` filed by `M52`'s own close-out — *"The pre-push guard REFUSES A NORMAL CLOSE-OUT, and

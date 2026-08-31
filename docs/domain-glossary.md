@@ -2,7 +2,7 @@
 
 **Project:** Form-Builder SaaS (`dev_formbuilder_app`)
 **Status:** Draft v1.0
-**Purpose:** Reconciles three vocabularies this product draws on — KoboToolbox/ODK/XLSForm (research/M&E tradition), Fillout.com (modern business-forms tradition), and the legacy system `dev_pk_new` (this team's own prior implementation) — into one consistent term set, per `docs/PRD.md`'s own note: *"This document (and the product) standardizes on form → section → field → submission... A dedicated Domain Glossary (doc #2) will formalize this further; until then, this PRD is the reference for correct terminology."* This document is now that formalization — every other doc, and the eventual codebase, should use the **Standard Term** column below, not any of the source traditions' own words, except where a term is an external proper noun (§3).
+**Purpose:** Reconciles three vocabularies this product draws on — KoboToolbox/ODK/XLSForm (research/M&E tradition), Fillout.com (modern business-forms tradition), and the legacy system (this team's own prior implementation) — into one consistent term set, per `docs/PRD.md`'s own note: *"This document (and the product) standardizes on form → section → field → submission... A dedicated Domain Glossary (doc #2) will formalize this further; until then, this PRD is the reference for correct terminology."* This document is now that formalization — every other doc, and the eventual codebase, should use the **Standard Term** column below, not any of the source traditions' own words, except where a term is an external proper noun (§3).
 
 ---
 
@@ -16,7 +16,7 @@ Every other rename below follows the same principle: prefer whichever source tra
 
 ## 2. Core Structural Terms
 
-| Standard Term | Kobo / ODK / XLSForm | Fillout | Legacy (`dev_pk_new`) | Definition |
+| Standard Term | Kobo / ODK / XLSForm | Fillout | Legacy | Definition |
 |---|---|---|---|---|
 | **Form** | Form / Survey | Form | Form | The durable, logical container a tenant builds and publishes. See `docs/data-dictionary.md` §2. |
 | **Form version** | Form version (ODK Central: draft vs. deployed version) | *(no direct equivalent — Fillout forms are always live-editable)* | *(no equivalent — legacy's core gap, see ADR-driving discussion in `docs/adr/0002-multi-tenancy-shared-db-rls.md`'s sibling architecture plan §2.3)* | An immutable snapshot of a form at one publish. `docs/data-dictionary.md` §3. |
@@ -32,7 +32,7 @@ Every other rename below follows the same principle: prefer whichever source tra
 | **Repeat group** | `begin repeat`/`end repeat` (XLSForm); "repeat group" | Not a native concept (closest: "matrix"/"repeating section" workarounds) | `indicator_repeat_responses` (separate table) | A section instantiable multiple times per submission — see `docs/data-dictionary.md` §4's `is_repeatable`. |
 | **Submission** | Submission (Kobo); **Instance** (raw ODK/XForms term) | Response | `form_submissions` | One respondent's completed (or in-progress) answer set against one specific form version. Renamed from legacy's `form_submissions` — see `docs/data-dictionary.md` §7. |
 | **Respondent** | Respondent | Respondent / "submitter" | Implicit (no first-class concept — see `submissions.respondent_user_id`, nullable for guests) | The person who filled out a submission — may be an authenticated user or a guest. |
-| **Manual encoding** | *(no equivalent term — Kobo/ODK simply call this "filling the form")* | *(no equivalent term)* | **Encoding** — Philippine public-health/DOH-specific terminology for staff directly keying in data on behalf of a program, as opposed to a respondent self-reporting. | Direct digital data entry against a form's current published version by an authenticated staff user — `docs/PRD.md` Feature #7. Retained as-is because it names a real, distinct operational pattern this product's DOH-adjacent lineage requires, not a generic synonym for "submission." |
+| **Manual encoding** | *(no equivalent term — Kobo/ODK simply call this "filling the form")* | *(no equivalent term)* | **Encoding** — public-health sector terminology for staff directly keying in data on behalf of a program, as opposed to a respondent self-reporting. | Direct digital data entry against a form's current published version by an authenticated staff user — `docs/PRD.md` Feature #7. Retained as-is because it names a real, distinct operational pattern this product's public-health lineage requires, not a generic synonym for "submission." |
 | **Guest submission** | Public form link (no account required) | Public form / share link / embed | `/f/{slug}` public route pattern | A submission from an unauthenticated respondent via a signed, form-version-scoped share link — `docs/PRD.md` Feature #3. |
 | **Linelist** | *(not a Kobo/ODK/Fillout term)* — a public-health/M&E field term for a tabular line-listing sheet | *(no equivalent)* | Used in legacy's own planning docs (`docs/ocr_submission_feature.md`-equivalent notes) | A single scanned sheet whose rows each represent one respondent's submission, split into multiple individual submissions on ingest — `docs/PRD.md` Feature #2. |
 | **Field library** | Library (Kobo's own "Question Library" feature) | *(closest: reusable "form templates," not question-level)* | `field_library` | Reusable single-question blueprints — `docs/data-dictionary.md` §11. |

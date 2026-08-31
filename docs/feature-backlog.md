@@ -3538,25 +3538,39 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the ceiling can only ratchet down as far as the historical floor. A refinement would exempt struck-through
   rows; it needs a parser that can tell a closed row from an open one, which is more than this gate should
   grow on its first outing. **Not live** — both are stated limits, filed so they cannot be forgotten.
-- ➡️ **MOVED TO `docs/claims/decisions.md` AS `D6` (2026-08-28) — IT IS A DECISION, NOT A DEFECT, AND NO
-  LANE SHOULD TAKE IT AS A ROW.** ⛔ **AND IT IS THE ONE ITEM AN AUTOMATED LOOP MAY NEVER TOUCH**, because
-  every increment adds documents and history and therefore makes it strictly worse rather than better.
-  ⚠️ **THE ROW BELOW UNDERSTATES ITSELF BY NEARLY THREE TIMES, AND SO DID THE CENSUS THAT RE-VALIDATED
-  IT** — the row cites **6** sites and `docs/backlog-triage.md` said **"11+"**; the measurement taken when
-  it was moved is **17 occurrences of `dev_pk_new` / "Purok Kalusugan" across 9 tracked files**, adding
-  `docs/adr/0003`, `docs/domain-glossary.md` and `docs/competitive-feature-parity-matrix.md` to the list
-  below. That M37's census reproduced the very under-counting it was built to detect is the sharper half
-  of the finding. ⛔ **AND THE ROW'S OWN DEFERRAL IS SPENT:** it filed itself against *"the merge as the
-  natural last moment to make redaction a conscious decision rather than a default"*, and that merge
-  (PR #179) landed **2026-08-18** — the deadline passed unnoticed and nothing acted on it, so the default
-  won by silence. Original filing follows, kept because its reasoning is intact.
-- **`major` · The corpus names a real third-party client and publishes an audit of its weaknesses.**
-  `docs/PRD.md:35`, `:39`; `docs/architecture/technical-architecture.md:376`; two hits each in
-  `docs/adr/0001` and `0002`; three in `PROGRESS_ARCHIVE.md` — naming `dev_pk_new` / "Purok Kalusugan",
-  built for the Philippine Department of Health, and describing its missing form versioning and its
-  `users.id === 1` god-mode. **Live** on a public repo. ⚠️ **Pre-existing on `main` and not introduced by
-  this diff — this merge does not change its exposure, which is why it is not a blocker.** Filed because
-  the merge is the natural last moment to make redaction a conscious decision rather than a default.
+- ~~➡️ **MOVED TO `docs/claims/decisions.md` AS `D6` (2026-08-28) — IT IS A DECISION, NOT A DEFECT.**~~
+  ✅ **ANSWERED AND DONE — `M51` (2026-08-31). `D6` is in the `ANSWERED` section of
+  `docs/claims/decisions.md`; read the outcome there, not here.** The identification and the published
+  audit of the legacy system's weaknesses are out of the tracked files and **every architectural lesson
+  is kept**. ⛔ **THE EXPOSURE IS REDUCED, NOT CLOSED — history was NOT rewritten and that is a
+  deliberate limit.** The repository is public and its history is readable, so the strings remain in the
+  commits that carried them; **whether to rewrite history is filed as its own decision, `D9`, recommended
+  against.** Saying the material is gone would repeat this row's original defect in the other direction.
+  ⚠️ **WHAT THE ROW AND THE CENSUS BOTH GOT WRONG, AND THE UNIT IS THE FINDING:** the row cited **6**
+  sites and `docs/backlog-triage.md` said **"11+"**; `D6`'s own table said **17 across 9 files**;
+  `M51` measured **26 occurrences across 11 files — or 20 lines carrying at least one.** `grep -c` counts
+  LINES and `grep -o` counts OCCURRENCES, they differ by six here, and none of the earlier figures says
+  which it is — so *"the count grew"* was partly drift and partly a change of unit. ⛔ **AND A SEARCH
+  SCOPED TO THE TWO NAMES IS THE WRONG SCOPE:** three sites carried no name at all and identified the
+  client *by description*, including `docs/backlog-triage.md`, inside its own summary of this decision —
+  a name-search reports that file as clean. ⚠️ **One false-positive class would have made a blind
+  substitution destructive:** `PROGRESS_ARCHIVE.md` matched an acronym search **55 times** and not one
+  was the client — every hit is the developer's own Windows username in a plan-file path.
+  ⛔ **AND IT REMAINS AN ITEM AN AUTOMATED LOOP MAY NEVER TOUCH**, for `D9` and for anything like it.
+  The original filing follows, kept because its reasoning is intact and because a closed row that
+  deletes its own evidence cannot be audited.
+- ~~**`major` · The corpus names a real third-party client and publishes an audit of its weaknesses.**~~
+  ✅ **CLOSED BY `M51`.** `docs/PRD.md`, `docs/architecture/technical-architecture.md`,
+  `docs/adr/0001`, `0002` and `0003`, `docs/domain-glossary.md`,
+  `docs/competitive-feature-parity-matrix.md`, `docs/backlog-triage.md` and `PROGRESS_ARCHIVE.md` — the
+  system name, the project name, the client's name and a national geography standard, plus the
+  exploitation detail beside the `id`-based super-admin convention and the itemised inventory of the
+  legacy system's repository and CI posture. **The decisions' rationales are kept in full**, including
+  the convention itself, because a decision whose provenance is deleted is a decision nobody can check.
+  **Was live** on a public repo; the working tree no longer carries it. ⚠️ **The original text of this
+  row is deliberately NOT reproduced**, since quoting it verbatim would republish the identification the
+  row exists to remove — which is the same reason `D6`'s answered entry describes the search terms
+  instead of printing them.
 - **`minor` · `/gamification/me` documents only `200`.** `openapi.json` — the route carries
   `module:gamification` (`routes/api.php:440`), whose `ModuleDisabledException` answers **403** on a
   supported user action (an owner switching the module off), and nothing inferred it because the endpoint

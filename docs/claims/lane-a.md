@@ -126,8 +126,7 @@ but this commit — so `git push origin HEAD:main` publishes exactly it, which i
 paid for.
 
 **Why it was missed:** the claim's file list was built from a search for the two **names**, and
-`docs/backlog-triage.md` contains neither. It identifies the client **by description instead** — *"a
-Philippine Department of Health project, by name"* — inside its own summary of this very decision.
+`docs/backlog-triage.md` contains neither. It identifies the client **by description instead**, in its own summary of this very decision.
 
 ⛔ **THAT IS THE FINDING, AND IT GENERALISES BEYOND THIS ROW: A REDACTION SCOPED TO THE LITERAL STRINGS
 IS THE WRONG SCOPE.** Searching for the two names returns 26 occurrences in 11 files. Searching for the
@@ -138,8 +137,8 @@ unit. **Three sites were found this way after the claim was written**, and each 
 count for the names is zero or already accounted for:
 
 - `docs/backlog-triage.md` — the client named by description, in the triage's own summary of `D6`.
-- `docs/domain-glossary.md` — *"Philippine public-health/DOH-specific terminology"* and *"this
-  product's DOH-adjacent lineage"*, in a row whose **term** is worth keeping.
+- `docs/domain-glossary.md` — two phrases tying a glossary term to the client's own sector and
+  agency, in a row whose **term** is worth keeping.
 - `docs/PRD.md` — a national geography standard named by its acronym, in a scoping bullet that is
   otherwise a real statement about this product.
 
@@ -148,9 +147,8 @@ count for the names is zero or already accounted for:
 Two sites match the identifying words and are **product content, not provenance**, and redacting them
 would damage the documentation to no benefit:
 
-- `app/Models/ScopeNode.php` and its migration — *"a tenant needing Philippine geography, a clinical
-  trial site tree, or a sales territory"* is an illustration of the **scope-tree feature**, listing
-  three unrelated examples. It describes a customer's data, not the legacy client.
+- `app/Models/ScopeNode.php` and its migration — a comment illustrating the **scope-tree feature** with
+  three unrelated examples, one of which happens to be a national geography. It describes a customer's data, not the legacy client.
 - `docs/multi-tenancy-rbac-design.md` — the same illustration, same reason.
 
 **`docs/adr/0002`'s two hits are also left**: *"tenants collecting health/personal data"* and
@@ -2508,7 +2506,7 @@ specs*) and is being **moved** to `decisions.md`, not copied.
 Every figure measured first-hand against the merged tree, not carried from the plan:
 
 - **`D6` — the corpus names a real third-party client.** The row cites **6** sites; M37's census said
-  **"11+"**. **Measured: 17 occurrences of `dev_pk_new` / "Purok Kalusugan" across 9 tracked files** —
+  **"11+"**. **Measured: 17 occurrences of the two identifying names across 9 tracked files** —
   `docs/PRD.md`, `docs/architecture/technical-architecture.md`, `docs/adr/0001`, `0002`, `0003`,
   `docs/domain-glossary.md`, `docs/competitive-feature-parity-matrix.md`, `docs/feature-backlog.md`,
   `PROGRESS_ARCHIVE.md`. **The row understates itself by nearly three times — and so did the census

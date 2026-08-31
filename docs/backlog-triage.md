@@ -83,11 +83,17 @@ omission of impersonation events · the `APP_PREVIOUS_KEYS` register entry · AD
 
 ### 4. 👤 A decision that is yours, not mine
 
-The corpus names a **real third-party client** — a Philippine Department of Health project, by name — and
-publishes an audit of its security weaknesses (`users.id === 1` god-mode, CI gaps, missing deploy stage).
-The row names 6 sites; the sweep found **11+**, including a comparison column in `docs/domain-glossary.md`
-and a repository-state audit in ADR-0003. The row deferred this to "the merge as the natural last moment",
-and **that merge has landed, so its own deadline has expired.** Recorded; no action taken.
+✅ **ANSWERED AND DONE — `M51` (2026-08-31); see `D6` in the `ANSWERED` section of
+`docs/claims/decisions.md`.** The corpus named a **real third-party client** and published an audit of
+its weaknesses. Both are out of the tracked files and every architectural lesson is kept.
+⛔ **The exposure is REDUCED, not closed — history was not rewritten**, and whether it should be is
+filed as its own decision, `D9`, recommended against.
+⚠️ **This census under-counted, and so did the row it was checking:** the row named 6 sites, this file
+said **"11+"**, `D6`'s table said 17 across 9 files, and the measurement was **26 occurrences across 11
+files — or 20 lines carrying at least one**, because `grep -c` counts lines and `grep -o` counts
+occurrences and nothing said which. ⛔ **And this very file was one of the sites it missed** — it carried
+no searchable name and identified the client *by description*, in this paragraph, inside its own summary
+of the decision. A name-scoped search reported it clean.
 
 ---
 

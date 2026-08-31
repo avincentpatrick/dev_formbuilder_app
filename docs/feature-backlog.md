@@ -3591,10 +3591,36 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `--closeout` and passes with it; and the five original guard controls still hold. **And the acceptance
   test was not a control but this increment's own close-out, which pushed with no `--no-verify`** —
   `M52`'s could not.
-- **`minor` · `/gamification/me` documents only `200`.** `openapi.json` — the route carries
-  `module:gamification` (`routes/api.php:440`), whose `ModuleDisabledException` answers **403** on a
-  supported user action (an owner switching the module off), and nothing inferred it because the endpoint
-  deliberately has no `can:` gate. Its sibling `/gamification/leaderboard` documents both. **Live.**
+- ~~**`minor` · `/gamification/me` documents only `200`.**~~ ✅ **DONE — `M54` (2026-09-01).** The route
+  now documents the 403 it can answer. ⚠️ **The citation had drifted**: the row cites
+  `routes/api.php:440`, which is the comment block; the route is at `:456-457`. The mechanism was exact
+  and was verified in the vendor source for the version INSTALLED — Scramble v0.13.30's
+  `ErrorResponsesExtension:60` adds a 403 **only** for middleware starting `can:` or `Authorize::`, so
+  `module:` is invisible to it. ⛔ **Two obvious remedies are wrong and both were rejected on evidence:**
+  `openapi.json` may not be hand-edited (CI exports fresh and fails on drift), and an `@throws` cannot
+  work either, because the exception is thrown by `RequireModule`, which the controller never mentions —
+  the gate is on the ROUTE, so the documentation has to be derived from the route. Fixed with a general
+  operation transformer (`app/Support/OpenApi/ModuleDisabledResponseExtension.php`), so the next
+  `module:`-gated API route documents its 403 without anyone remembering to. **Exactly one operation
+  changed**, `/gamification/leaderboard` was untouched — it carries `can:` *and* `module:` and already
+  had a 403, which the transformer explicitly refuses to overwrite — and a second export is
+  byte-identical, which is what the contract gate requires.
+- **`major` · Every error component in `openapi.json` documents a body the `/api/v1` surface does not return.**
+  `components.responses` holds four entries — `AuthorizationException`, `AuthenticationException`,
+  `ValidationException`, `ModelNotFoundException` — and each describes Laravel's default `{ message }`
+  shape. **The API returns none of them.** `bootstrap/app.php:245-270` renders every `/api/v1` error
+  through `ApiErrorResponse`, whose envelope is `{ error: { code, message, details? } }` and is
+  documented as the contract in `docs/api-specification.md` §2.3. Measured directly: an
+  `AccessDeniedHttpException` on the API answers `{"error":{"code":"forbidden","message":…}}`, while
+  `openapi.json` promises a top-level `message`. **Every 401, 403, 404 and 422 in the published contract
+  is wrong in the same way**, and a client generated from it would look for a field that never arrives.
+  ⚠️ **Found by `M54` while closing the `/gamification/me` row**, which is one route's *missing* 403 —
+  this is every route's *misdescribed* one, so it is filed rather than folded in: the fix is a set of
+  custom `ExceptionToResponseExtension`s replacing Scramble's four defaults, and it changes the
+  published contract for the whole surface, which wants its own increment and its own review.
+  ⚠️ **`M54`'s own new 403 is deliberately the ONLY accurate one**, which is an inconsistency stated
+  rather than hidden: matching the neighbours would have meant documenting a shape the code does not
+  return, in the increment closing a documentation-truth row. **Live.**
 - **`minor` · §20's `settings.key` catalog omits `security.require_two_factor`.**
   `docs/data-dictionary.md:838`, rewritten in this branch — the key is live
   (`app/Enums/SettingKey.php:42`, tenant-scoped at `:85`, written by `UpdateAccessSettingsRequest.php:60`,

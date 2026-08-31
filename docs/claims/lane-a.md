@@ -16,7 +16,131 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M50`, the two-lane protocol is retired and the third worktree with it (`m50-lane-collapse`)
+## Status: NO ACTIVE CLAIM — `M50` is merged and the lane holds nothing forward
+
+**`M50` is merged.** There is now one lane, and this is the only claim file that is written. The next
+row is claimed here and **pushed** before the first file is opened; that rule survives the parallelism
+that created it, because the collision it now prevents is two sessions in ONE lane.
+
+⛔ **RUN `php scripts/state.php` FOR EVERY NUMBER.** Increment, ADR, migration prefix, exceptions
+entry, open rows, open decisions, and how stale `docs/gate-baselines.md` is.
+
+---
+
+## RELEASED — `M50`, one lane, one worktree, and a retired lane that a gate can now see (merged as PR #241, `56fbb49`, 6/6 green)
+
+**Every claimed file was edited, and the claim was extended to two more that it should have named.**
+`fb-lane-b` and `fb-lane-c` are gone, `main` is checked out nowhere but here, and the decision of
+record is `docs/adr/0022-single-lane-development.md`. Standing Rule 7 is superseded **in place**.
+
+✅ **THE FIX PROVED ITSELF AT THE MOMENT OF MERGE.** `gh pr merge 241` returned cleanly with no local
+error — the first time in this arc. Every previous merge errored *after the merge had already landed*,
+because `main` was checked out in `fb-lane-b` and git refuses one branch in two worktrees. The
+increment's own close-out is the end-to-end proof of its own headline.
+
+### ⛔ THE PREDICTION NAMED THE WRONG GATE, AND TWO I DID NOT NAME WENT RED
+
+**This is the part worth keeping.** The claim named `tracker-lint` R3 as *"the one most likely to be
+wrong … R6 is the trap the plan names and is therefore the one that will get attention; R3 is the one
+nobody is looking at."* **R3 never moved.** It anchors on the `## Next Session` *heading*, which this
+diff keeps — so the reasoning that made it a risk was sound and the conclusion was wrong.
+
+**The two that actually went red were neither of them, and both were mine:**
+
+1. **`tracker-lint-controls` — 5 of 11 cases failed.** Its fixtures build a synthetic `PROGRESS.md`
+   carrying **both** lane markers, so the new set-check failed inside every case. **A control harness
+   is a consumer of the gate it controls**, and changing a gate's expectation breaks its own fixtures
+   exactly as it breaks the tracker. `M49` built that harness one increment ago; the first change to
+   R6 since found it. The fixture models the tracker, so it now models one lane — 11/11.
+2. **`citation-liveness` — the ledger went 18 → 19 against a ceiling of 18.** This diff's own
+   `lane-b.md` header pushed the cited text from `:29` to `:39`, and a backlog citation landed on a
+   horizontal rule. That is `M34`'s *"a citation into a file your own diff edits must be re-read after
+   the edit"* — **hit by an increment that had the lesson in front of it.** Re-pointed; back to 18/18.
+   ⚠️ `ACCESS-MATRIX.md:446` was checked rather than assumed: dead at `HEAD` too, so not this diff's.
+
+**The generalisation: I predicted the gate whose EXPECTATION I was changing, and missed the two gates
+that CONSUME the thing I was changing.** A control fixture and a citation are both consumers, and
+neither is visible from the file being edited.
+
+⚠️ **The dull half of the prediction held.** PHPStan could not move and did not — it scans `app`,
+`database`, `routes`. Pint was named as the only gate that could move; it stayed green over **1424**
+files, and preflight proved the scan live with its own probe before the `PASS` was believed. Vitest
+134, axe, e2e and `openapi.json` unmoved.
+
+### ✅ THE ROW'S REMEDY WAS WRONG IN BOTH WAYS THE CLAIM PREDICTED, AND BOTH WERE MEASURED
+
+*"`git worktree remove` is the whole fix"* — measured, `exit 128`, refused on the modified tracked
+file. Cleared by saving the bytes outside the repository, **proving the saved copy reconstructed them
+byte-for-byte before the original was touched**, then restoring the file. `--force` was never used,
+and the guard was treated as working rather than as an obstacle.
+
+⚠️ **And the removal only half-succeeded, which is this project's signature shape.**
+`git worktree remove` reported `failed to delete … Function not implemented` on **both** worktrees —
+yet `git worktree list` came back clean and the `.git` pointer files were gone. **The registration was
+removed and the directories were not**, so a command that reported failure had done most of its job.
+The husks were deleted separately, and the leftovers that survive on purpose are recorded rather than
+discovered: the Docker volume `fb-lane-b_pgdata` (both stacks went down **without `-v`**, because a
+removal that is easy to do and impossible to undo belongs to a human) and both worktrees' gitignored
+`.env` files, copied to `C:/tmp/m50-lane-c-rescue/` because they were the only copies.
+
+### ✅ FIVE CONTROLS, AND THE ONE THAT MATTERS IS THE MUTATION
+
+| Control | Result |
+|---|---|
+| Remove Lane B's marker, **gate unedited** | **RED** — R6 alone, 1 check in 1 group, R3 untouched |
+| Resurrect `**LANE B NEXT PROMPT`, gate current | **RED** — set-check alone; the per-lane loop **passes** |
+| **M-a: set-check disabled**, marker still resurrected | **GREEN** — so the set-check is the only thing catching it |
+| Remove Lane A's marker | **RED** — both halves, 2 checks in 1 group |
+| Remove `## Next Session` | **RED** — R2 and R3, 2 checks in 2 groups |
+
+⛔ **`M-a` IS THE ONE THAT MAKES THE OTHERS WORTH ANYTHING.** A resurrected retired lane passes the
+per-lane loop, because that loop only ever looks for the lanes it already knows about. Without the
+set-check the whole run is **green** with a dead lane's hand-off sitting in the tracker — which is
+`M43`'s lesson exactly: a structural check can be fully green and entirely decorative, and only
+mutating the **mechanism** tells you which. Every mutation moved the sha256; every restore was
+byte-exact; the tree was clean afterwards.
+
+### ⛔ THE CLAIM'S FILE LIST WAS SHORT BY TWO, AND THE EXTENSION WAS WRITTEN AFTER THE EDIT
+
+`CLAUDE.md` and `docs/ACCESS-MATRIX.md`. Rule 7(g) wants an extension to be its own pushed commit
+*before* the file is opened; these were opened first. **Recorded as a deviation rather than dressed up
+as process.** Both were found by sweeping for stale references *after* the change — `CLAUDE.md` still
+read `--lane=a  # or --lane=b`, and ACCESS-MATRIX described `fb-lane-b` as a live stack with its own
+ports and workspace, which **my own change had made false**: the `M46` defect class, filed against
+myself. `CLAUDE.md`'s edit is **subtractive only**, because R8 gates that file against namespace
+literals and the fix must not arm it.
+
+⚠️ **The mitigating fact is the one that no longer generalises: there is no other lane to collide
+with.** That is why the deviation was harmless *here*, not why it was correct — and it is precisely
+the check this realignment's pre-push hook is meant to make mechanical instead of remembered.
+
+### ⛔ THE INCREMENT'S OWN SESSION REPRODUCED THE DEFECT IT WAS FIXING
+
+This session opened while **another session (PID 24104) was live in this worktree** finishing `M49`'s
+close-out. It wrote `docs/claims/lane-a.md` and `PROGRESS.md` minutes after this session's first read,
+and moved `HEAD` from `m49-r7-event-base` to `m49-closeout` underneath. `git status` was clean at
+session start and was not clean shortly after. **Nothing was lost only because that session committed
+before it switched** — the coin-flip `M33` described. The work was held **read-only** until that
+session pushed, which is why there was nothing to reconcile. **Three incidents of this shape in four
+days, and zero concurrent increments**, is the whole argument the ADR makes.
+
+### ⚠️ WHAT WAS NOT DONE, STATED RATHER THAN LEFT TO BE DISCOVERED
+
+**`docs/claims/lane-b.md` is KEPT, and deleting it would have been a numbering defect** — `state.php`
+derives the increment from the `## RELEASED` headings of both claim files and it holds ten releases
+recorded nowhere else. Its `## Template` **heading** is kept as the truncation anchor, so removing the
+template body is provably neutral: **M49 / M50 and 33 numbered headings, before and after.** Only the
+fenced example went, and it contained a verbatim `## RELEASED` line the truncation existed to exclude.
+
+**Standing Rule 7 was not deleted**, so the tracker delta is `+5 lines, −8,028 bytes` — under both
+limits, and **no surgery marker was owed.** A large deletion was available and was not taken:
+`CLAUDE.md` holds the instruction and `PROGRESS.md` holds the reasoning, and the reasoning is what
+makes the next person hesitate before reintroducing two lanes.
+
+**Namespaces: ADR `0022` and nothing else.** No migration, no `§D`, no exceptions entry, no decision
+id — the collapse was an instruction, not a question. `0010` stays reserved for H1d.
+
+### The claim, preserved
 
 Taken 2026-08-31. Branch `m50-lane-collapse`, cut from `origin/main` at `bc7bc07`, PR into `main`.
 Row: the `minor` under *Tracker, CI and process* — *"`fb-lane-c` is an abandoned worktree that every

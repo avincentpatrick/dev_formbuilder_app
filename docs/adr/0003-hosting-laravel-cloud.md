@@ -16,7 +16,7 @@ The new form-builder SaaS platform needs a production hosting target decided *be
 
 ### Why the legacy deployment model cannot be reused
 
-The legacy system (`dev_pk_new`) was never deployed as a real production SaaS service — it ran on a **Laragon-style local/shared-hosting development setup**, with no committed Docker configuration (despite Laravel Sail being present as a Composer dependency, it was never actually used to produce a runnable, committed container definition) and a CI pipeline that ran PHPUnit only, with no build/deploy stage at all (plan, tech-stack table: "Legacy shipped no committed Docker (despite Sail as a dependency) and CI that ran PHPUnit only — both named, explicit fixes"; plan §5: "CI enforces static analysis + code style + a real deploy pipeline + committed Docker parity"). Concretely, this means the legacy deployment model has **no**:
+The legacy system was never deployed as a real production SaaS service — it ran on a **Laragon-style local/shared-hosting development setup**, with no committed Docker configuration (despite Laravel Sail being present as a Composer dependency, it was never actually used to produce a runnable, committed container definition) and a CI pipeline that ran PHPUnit only, with no build/deploy stage at all (plan, tech-stack table: "Legacy shipped no committed Docker (despite Sail as a dependency) and CI that ran PHPUnit only — both named, explicit fixes"; plan §5: "CI enforces static analysis + code style + a real deploy pipeline + committed Docker parity"). Concretely, this means the legacy deployment model has **no**:
 
 - reproducible environment definition (no Docker Compose committed to the repo);
 - automated build/deploy pipeline (CI ran tests only; deploys, if they happened, were manual/ad hoc);
@@ -126,4 +126,4 @@ Absent one of these triggers, Laravel Cloud remains the default production targe
 ## References
 
 - Source plan: `hi-lets-create-a-federated-meteor.md` — §1 "Hosting recommendation" (primary source for this decision), tech-stack table (Docker/CI gaps), §2.1 (Row-Level Security requirement), §3 Phase roadmap, §4 item 22 (Deployment & Infrastructure Doc), §5 best practices (CI/deploy-pipeline requirements).
-- Legacy schema/deployment context: verified against `dev_pk_new`'s actual repository state (Sail present as a dependency but no committed Docker Compose; CI limited to PHPUnit; no deploy stage) — cited in the plan's tech-stack table and §5 best practices.
+- Legacy schema/deployment context: verified against the legacy system's actual repository state — cited in the plan's tech-stack table and §5 best practices. ⚠️ **The itemised inventory of that system's repository and CI posture was removed by `M51` (`D6`);** the requirement it produced is stated above and is what this decision rests on.

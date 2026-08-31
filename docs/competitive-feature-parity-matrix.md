@@ -2,7 +2,7 @@
 
 **Project:** Form-Builder SaaS (`dev_formbuilder_app`)
 **Status:** Draft v1.0 — a **living checklist**, expected to be revisited every time a phase ships or a competitor materially changes its offering, not a one-time snapshot.
-**Purpose:** Maps KoboToolbox/ODK, Fillout.com, and the legacy system `dev_pk_new`'s capabilities against this product's Main Features list and phase roadmap (both in the approved architecture plan and `docs/PRD.md`), so "are we at parity yet" has one authoritative answer instead of being re-litigated in every planning conversation.
+**Purpose:** Maps KoboToolbox/ODK, Fillout.com, and the legacy system's capabilities against this product's Main Features list and phase roadmap (both in the approved architecture plan and `docs/PRD.md`), so "are we at parity yet" has one authoritative answer instead of being re-litigated in every planning conversation.
 
 **Methodology & confidence note** — this document inherits the same epistemic posture the founding architecture plan stated explicitly: *"exact Fillout.com pricing/limits...should be treated as indicative, not pinned...re-check current figures before quoting them in customer-facing material."* The same applies here to every ✓/partial/✗ judgment about a competitor's current feature set — competitor products change their offerings frequently; treat this matrix as **directionally accurate as of this document's writing (2026-07-03)**, not a verified, current-as-of-today audit. Legend: **✓** = fully supported today, **◐** = partial/limited support, **✗** = not supported, **N/A** = not applicable to that product's positioning.
 
@@ -10,7 +10,7 @@
 
 ## 1. Core Form Building
 
-| Capability | Kobo/ODK | Fillout | Legacy (`dev_pk_new`) | This Product | Phase | Main Feature / Doc # |
+| Capability | Kobo/ODK | Fillout | Legacy | This Product | Phase | Main Feature / Doc # |
 |---|:---:|:---:|:---:|:---:|:---:|:---:|
 | Structured field/section editor (not raw JSON) | ✓ | ✓ | ✓ | ✓ | 1 | #8 |
 | Live preview while building | ◐ (Enketo preview, separate step) | ✓ | ✓ | ✓ | 1 | #8 |

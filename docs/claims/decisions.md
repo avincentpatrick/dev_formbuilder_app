@@ -172,131 +172,6 @@ contract: `openapi.json` is untouched by `M33`.
 
 ---
 
-### D6 — The corpus names a real third-party client and publishes an audit of its weaknesses, on a public repository. Redact?
-
-**Filed 2026-08-28 by Lane A, during `M38`.** **Moved** here out of `docs/feature-backlog.md`
-§ *Documentation & specs*, where it sat as a `major` row — moved rather than copied, because two
-copies of one question drift apart. That is the defect Standing Rule 7(b) records about the lane
-boundary and `docs/gate-baselines.md` records about gate numbers, and this file's own header names
-the class.
-
-⛔ **THIS IS THE ONE ITEM AN AUTOMATED LOOP MAY NEVER TOUCH.** Every increment adds documents and
-history, so a faster loop makes this **strictly worse** — more sites, more commits carrying them.
-It is sequenced first in the realignment for exactly that reason, and no unattended run may take it.
-
-**The facts, measured on the merged tree rather than read off the row.** The row cites **6** sites;
-M37's census, which re-validated all 68 open rows, said **"11+"**. The actual figure is **17
-occurrences of `dev_pk_new` / "Purok Kalusugan" across 9 tracked files**:
-
-| File | Hits |
-|---|---|
-| `PROGRESS_ARCHIVE.md` | 3 |
-| `docs/PRD.md` | 2 |
-| `docs/domain-glossary.md` | 2 |
-| `docs/competitive-feature-parity-matrix.md` | 2 |
-| `docs/adr/0001-postgresql-over-mysql.md` | 2 |
-| `docs/adr/0002-multi-tenancy-shared-db-rls.md` | 2 |
-| `docs/adr/0003-hosting-laravel-cloud.md` | 2 |
-| `docs/architecture/technical-architecture.md` | 1 |
-| `docs/feature-backlog.md` | 1 |
-
-⚠️ **THE ROW UNDERSTATES ITSELF BY NEARLY THREE TIMES — AND SO DID THE CENSUS THAT RE-VALIDATED IT.**
-That is worth more than the count: M37's whole finding was that rows understate their *scope*, and
-this row is a case of the census reproducing the very failure it was measuring.
-
-What is published, on a repository confirmed `"visibility": "PUBLIC"`: the client is named as a
-**Philippine Department of Health** project, and the corpus describes its `users.id === 1` god-mode
-convention (*"duplicated across four code layers, silently transferable if user #1 were ever deleted
-and the ID reused"* — `docs/adr/0002:373`), its missing form versioning, its CI gaps, and a
-repository-state audit in ADR-0003.
-
-⛔ **THE ROW'S OWN DEFERRAL IS SPENT, WHICH IS WHY THIS IS NOT SIMPLY LEFT WHERE IT WAS.** It filed
-itself against *"the merge as the natural last moment to make redaction a conscious decision rather
-than a default"*. That merge — PR #179 — landed **2026-08-18**. The deadline passed ten days ago and
-nothing acted on it, so the default won by silence. **A deferral whose deadline expires unnoticed is
-not a deferral; it is a decision taken by not deciding.**
-
-**Option 1 — redact to a non-identifying description. (RECOMMENDED.)** Replace the client name and
-project name with something like *"a prior government health-sector project"* across the 9 files,
-and keep **every technical lesson intact**. The lessons are what ADR-0001 and ADR-0002 cite as their
-rationale, and not one of them needs the client's identity to work: *"an `id === 1` super-admin
-convention duplicated across four code layers"* is exactly as strong an argument for
-`is_super_admin` without a name attached. Cost: one increment, ~17 replacements, and
-`PROGRESS_ARCHIVE.md` is history so its three hits are a judgement call of their own.
-
-**Option 2 — ratify: leave it as it is.** Defensible on the grounds that the legacy audit *is* the
-provenance for this project's architecture decisions, and that anonymising a citation weakens the
-chain a reader follows to check the reasoning. It is also the status quo, so it costs nothing. What
-it accepts is that a named third party's security weaknesses stay published, indefinitely and
-indexed, on a repository nobody outside this project has asked to be a party to that.
-
-**Option 3 — make the repository private.** Closes the exposure completely and immediately, and
-costs no editing. Rejected as an answer *to this question*: it is a much larger decision about the
-project, it would silently disarm the free-Actions-minutes premise several CI decisions rest on, and
-it treats a documentation problem with an infrastructure lever.
-
-**Recommendation: option 1.** The identification buys the corpus nothing — every argument survives
-the redaction word-for-word — and it is the only option that separates *keeping the engineering
-lesson* from *publishing a named organisation's weaknesses*. Option 2 is coherent but it is the one
-that has effectively been in force by default since the deferral expired, and it should be chosen on
-purpose if it is chosen at all.
-
-⚠️ **GENUINELY THE USER'S CALL AND NOT BEING PROCEEDED ON.** Unlike D3 and D4, there is no
-revert-in-one-line here: a redaction rewrites the provenance of two ADRs, and a wrong guess in
-either direction is expensive to undo. Standing Rule 5 still applies to everything *else* — the
-series does not stall waiting for this.
-
----
-
-### D7 — Should `main` get branch protection, with the repository owner as a bypass actor?
-
-**Filed 2026-08-28 by Lane A, during `M38`.** Filed rather than decided because it **changes settings
-on a public repository**, which is the class of change the J2d precedent and D4's narrowing note both
-put with the user. It gates the realignment's later increments — the merge-verdict script and the
-Rule 7 rewrite both assume an answer.
-
-**Why it comes up now.** Every merge in this series is a self-merge on a green run, and the check
-that the run was really green is **the model parsing `gh` output**. That has already failed once, in
-a way nobody caught at the time: I5 merged during a GitHub Actions major outage with four of six jobs
-never having acquired a runner, reporting `steps: []` — a **vacuous success**. Every hand-off since
-has carried *"parse each job's step count individually"* as prose, and prose has to be remembered.
-
-**The facts, verified rather than assumed.** `gh api repos/:owner/:repo/branches/main/protection`
-returns **`404 Branch not protected`** and `.../rulesets` returns **`[]`**. There is nothing to amend;
-this would be a net-new control. `main` currently accepts a direct push from anyone with write access,
-which is also **exactly how the claim protocol works** — Rule 7(g) requires `git push origin HEAD:main`
-for the claim commit *before* any file is opened, so blanket protection would break the one mechanism
-that makes concurrent work safe.
-
-⚠️ **THE CONTEXT COUNT IS SIX, NOT FIVE — CORRECTED HERE BECAUSE THE PLAN THAT PROPOSED THIS SAID
-FIVE.** Read from a real run: `Static analysis, style & security` · `Tests (Pest on PostgreSQL)` ·
-`Frontend build & type-check` · `Design system a11y (axe)` · `Contract tests (OpenAPI)` ·
-`E2E (Playwright + axe)`. A ruleset written to the wrong number leaves one gate non-blocking, which is
-the failure it was built to prevent.
-
-**Option 1 — a ruleset requiring all six contexts, with bypass actor = repository owner.
-(RECOMMENDED.)** GitHub refuses the merge until every required context reports `success`, so the
-`steps: []` trap **disappears mechanically**: a required check that never acquired a runner is
-*pending*, not *passed*, and nothing merges. The owner bypass keeps Rule 7(g)'s direct claim push
-working. Cost: the bypass is a real hole — it is exactly as strong as the owner's discipline about
-using it, and it must be used for claim commits only.
-
-**Option 2 — no protection; keep today's convention-only discipline.** Costs nothing and changes
-nothing. It leaves the merge verdict with the model, which is where it was during I5, and the
-mitigation stays "the hand-off reminds you to parse step counts."
-
-**Option 3 — full protection with no bypass.** Strongest, and it breaks the claim protocol: claims
-would need a PR each, which turns a one-commit lock into a multi-minute round trip and removes the
-property that makes it a lock at all. Rejected unless the claim protocol changes first.
-
-**Recommendation: option 1.** It retires a known, measured failure mode with a mechanism instead of a
-reminder — the same move Rule 8 made for the local checks — and it is the only option that does so
-without breaking Rule 7(g). ⚠️ **It is not being proceeded on**: it alters repository settings that
-are visible publicly and that this project cannot un-ring by editing a file, so it waits for an
-explicit yes.
-
----
-
 ### D8 — A tracker surgery triggers no post-merge run at all. Which way should `ci.yml` regain the trunk observation?
 
 **Filed 2026-08-31 by Lane A, during `M49`.** Filed rather than decided because every option trades
@@ -341,7 +216,160 @@ required-contexts count matter — so the two are better answered together than 
 
 ---
 
+### D9 — Should the legacy client's identity be rewritten out of git history as well? **RECOMMENDED AGAINST.**
+
+**Filed 2026-08-31 by Lane A during `M51`, unconditionally and without being asked**, because `D6`'s
+answer redacts the **working tree** and the repository is public. A redaction that reduces an exposure
+without closing it must say so and must name the remaining question, or the next reader will assume the
+material is gone. `D6`'s original defect was a deadline that expired unnoticed and let the default win
+by silence; **closing it with wording that implied the material had been erased would be that same
+defect pointing the other way.**
+
+**The facts.** `M48`'s secret scan read the repository's whole history — hundreds of commits — which is
+how it produced 818 findings on its first real run. That is direct evidence the history is readable, and
+it is the reason this entry exists rather than an inference about GitHub. The redacted strings remain in
+every commit that ever carried them, reachable by anyone who clones.
+
+**Option 1 — leave history alone. (RECOMMENDED.)** The working-tree redaction is what a reader, a search
+engine and a casual clone see; the history requires deliberate archaeology. Three costs make the
+alternative a bad trade:
+
+1. ⛔ **A force-push across the whole repository is the largest possible instance of the
+   mechanical-operation class this project already gates.** `R7` exists because one splice deleted 1,086
+   lines and merged green; `mutate.php` exists because a restore that looked right was not. A history
+   rewrite is that class at maximum blast radius — **and no gate here would catch it going wrong**,
+   because every gate compares against a history the operation has just replaced.
+2. ⛔ **It changes every sha, and three separate mechanisms are keyed to shas.** `state.php`'s
+   merged-pull-request-title cross-check — the *second, independent* source for the increment number —
+   is resolved against commits; `R7`'s evidence is blob sizes and commit messages at specific shas; and
+   `.gitleaksignore`'s fingerprints are **commit-scoped**, so every one of them silently stops matching
+   and the secret scan starts reporting findings that were already adjudicated. Two of those three are
+   the machinery this series spent `M48`, `M49` and `M50` building.
+3. **The exposure is not live-exploitable.** The material is architectural criticism of a legacy project
+   **the owner owns** — a schema audit and a deployment-posture inventory — not credentials, tokens or
+   personal data. Nothing in it can be used against a running system, and the secret scan found no real
+   secret.
+
+**Option 2 — rewrite history (`git filter-repo`), then force-push.** Closes the exposure completely.
+Costs all three of the above, plus: every existing clone and fork diverges permanently, open pull
+requests are invalidated, and the operation is **irreversible in practice** once collaborators fetch.
+
+**Option 3 — make the repository private.** Closes the exposure without touching history. Rejected here
+for the same reason `D6` rejected it: it is a much larger decision about the project, and it would
+silently remove the free-Actions-minutes premise several CI decisions rest on.
+
+**Recommendation: option 1**, and it is **not being proceeded on in either direction** — nothing is
+rewritten and nothing further is redacted until this is answered. ⚠️ **The honest framing is that this
+is a cost/benefit call, not a security emergency.** If the answer is option 2, it should be taken as a
+deliberate, scheduled operation with the three keyed mechanisms re-derived afterwards — not folded into
+an increment.
+
+---
+
 ## ANSWERED
+
+### D7 — Should `main` get branch protection, with the repository owner as a bypass actor? **Yes.**
+
+**Filed 2026-08-28 by Lane A during `M38`; answered 2026-08-31 (user decision); applied by Lane A during
+`M51`.** It was filed rather than decided because it changes settings on a public repository, which is
+the class of change that stays with the user.
+
+**As decided — option 1, exactly as recommended.** A ruleset on `main` requiring **all six** status
+checks, with the **repository owner as the sole bypass actor**.
+
+**What it retires, and it is a measured failure rather than a hypothetical.** Every merge in this series
+is a self-merge on a green run, and the check that the run was really green was *the model parsing `gh`
+output*. That failed once already: `I5` merged during a GitHub Actions outage with four of six jobs
+never having acquired a runner, reporting `steps: []` — a **vacuous success**. Every hand-off since has
+carried *"parse each job's step count individually"* as prose, and prose has to be remembered. Under the
+ruleset a required check that never acquired a runner is **pending, not passed**, and nothing merges.
+The trap disappears mechanically.
+
+**Why the owner bypass is not a loophole grudgingly accepted but a requirement.** Rule 7(g) makes a
+claim a **pushed commit** — `git push origin HEAD:main` *before* the first file is opened. Blanket
+protection would turn that one-commit lock into a pull request round trip and destroy the property that
+makes it a lock. The bypass is exactly as strong as the discipline about using it, and it is for claim
+commits and close-outs only.
+
+⛔ **THE SIX CONTEXTS WERE READ FROM A REAL RUN, NOT FROM THIS ENTRY.** `D7` itself records that the plan
+proposing it said **five**, and a ruleset built on the wrong number leaves a gate non-blocking — which is
+the precise failure it exists to prevent. Taken from run `33398663198`, the post-merge run on `main` for
+`M50`: `Static analysis, style & security` · `Tests (Pest on PostgreSQL)` · `Frontend build & type-check`
+· `Design system a11y (axe)` · `Contract tests (OpenAPI)` · `E2E (Playwright + axe)`.
+
+⚠️ **AND THE APPLICATION WAS SEQUENCED SO THAT IT TESTS ITSELF.** The ruleset was created **after**
+`M51`'s pull request merged and **before** its close-out, so this increment's own close-out — a direct
+`git push origin HEAD:main` — is the live exercise of the owner bypass rather than an assumption about
+it. A protection rule whose bypass has never been used is a protection rule that has never been tested.
+
+---
+
+### D6 — The corpus names a real third-party client and publishes an audit of its weaknesses, on a public repository. Redact? **Yes — the working tree. History is NOT rewritten.**
+
+**Filed 2026-08-28 by Lane A during `M38`; answered 2026-08-31 (user decision); applied by Lane A during
+`M51`.**
+
+**As decided:** the client identification and the published audit of that legacy system's weaknesses are
+removed from the tracked files. **Every architectural lesson is kept** — it is the naming plus the
+vulnerability detail that goes.
+
+⛔⛔ **THE EXPOSURE IS REDUCED, NOT CLOSED, AND THIS ENTRY SAYS SO IN TERMS.** **History is not
+rewritten, and that is a deliberate limit rather than an oversight.** The repository is public and its
+full history is readable — `M48`'s secret scan proved exactly that by reading hundreds of commits to
+produce 818 findings. Every redacted string therefore remains in the commits that carried it and is
+reachable by anyone who clones. What changed is what a reader, a search engine and a casual clone see.
+**Whether to rewrite history is filed as its own decision, `D9`, unconditionally and recommended
+against.** This row's original defect was a deadline that passed and let the default win by silence;
+recording it as *"the material is gone"* would be that same defect pointing the other way.
+
+**The count was re-derived and disagreed with all three prior figures — and the unit turned out to be
+the finding.**
+
+| Source | Figure |
+|---|---|
+| The original backlog row | 6 sites |
+| `docs/backlog-triage.md`'s census | "11+" |
+| This entry's own table, when the row moved here | 17 occurrences across 9 files |
+| **Measured during `M51`** | **26 occurrences across 11 files — or 20 lines carrying at least one** |
+
+⚠️ **`grep -c` counts LINES and `grep -o | wc -l` counts OCCURRENCES, and on this corpus they differ by
+six.** None of the three earlier figures says which it is, so *"the count grew"* was partly drift and
+partly a change of unit. Some of the growth is also this project writing about its own redaction: three
+of the eleven files were the decision record, the backlog row and the claim ledger.
+
+⛔ **AND A REDACTION SCOPED TO THE LITERAL STRINGS IS THE WRONG SCOPE — THREE SITES WERE INVISIBLE TO
+IT.** The corpus identified its subject in at least four ways: the system name, the project name, the
+client's name, and a national geography standard named by acronym. Only the first two are greppable as a
+unit. `docs/backlog-triage.md` contained **neither name** and identified the client by description,
+inside its own summary of this very decision; `docs/domain-glossary.md` and `docs/PRD.md` each carried
+one more. **A name-scoped search reports those files as clean.**
+
+⚠️ **AND ONE FALSE-POSITIVE CLASS WOULD HAVE MADE A BLIND SUBSTITUTION DESTRUCTIVE.** `PROGRESS_ARCHIVE.md`
+matched an acronym search **55 times** and **not one was the client** — every occurrence is the
+developer's own Windows username inside a plan-file path. A substitution run on the obvious pattern
+would have corrupted 55 paths and redacted nothing. The occurrences were read before they were replaced.
+
+**Where the line was drawn between "lesson" and "audit", stated so the diff can be judged against it:**
+
+- **Kept, in full:** every decision's rationale. `ADR-0001`'s MySQL-shaped gaps, `ADR-0002`'s absent
+  tenant concept, and the **`id`-based super-admin convention repeated across several code layers** that
+  `ADR-0002` §D3 exists to avoid. A decision whose provenance is deleted is a decision nobody can check,
+  and this entry's own option 1 argued that the lesson is exactly as strong without a name attached.
+- **Removed:** the exploitation mechanic spelled out beside that convention, and `ADR-0003`'s itemised
+  inventory of the legacy system's repository and CI posture. Both read as a security and operations
+  report on somebody else rather than as a reason for a choice here.
+- **Checked and deliberately kept:** `app/Models/ScopeNode.php`, its migration and
+  `docs/multi-tenancy-rbac-design.md` illustrate the **scope-tree feature** with three unrelated
+  examples. They describe a customer's data, not the legacy client.
+
+⚠️ **THE ANSWER IS BROADER THAN THIS ENTRY'S OWN RECOMMENDATION, AND THE ENTRY SAYS SO RATHER THAN
+RETRO-FITTING ONE.** Option 1 as filed kept *"every technical lesson intact"* and stripped only naming.
+The decision also removed the vulnerability detail. The boundary between the two is a judgement call; it
+was taken toward keeping each decision's rationale, and it is recoverable in the removed-too-much
+direction precisely because history was left alone.
+
+---
+
 
 ### D5 — What bar ends the M-series? **Zero open `major` rows, plus three consecutive increments filing no new `major`.**
 

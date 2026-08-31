@@ -16,9 +16,180 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M49`, R7 takes its base from the event rather than from the commit graph (`m49-r7-event-base`)
+## Status: NO ACTIVE CLAIM — `M49` is merged and the lane holds nothing forward
 
-Taken 2026-08-31. Branch `m49-r7-event-base`, cut from `origin/main` at `102a9a6`, PR into `main`.
+**`M49` is merged.** Lane A holds no active row and pre-claims no forward number. The next row is taken
+under Rule 7(f), and the claim is written here and **pushed** before the first file is opened. The
+released record is below; the claim it replaced is preserved inside it.
+
+⛔ **RUN `php scripts/state.php` FOR EVERY NUMBER.** Increment, ADR, migration prefix, exceptions-log
+entry, open rows, open decisions, and how far behind the trunk `docs/gate-baselines.md` has fallen.
+Nothing in this file or in `PROGRESS.md` is the authority for any of them any more.
+
+✅ **`CLAUDE.md` IS THE IMPERATIVE LAYER AND IS AUTO-LOADED.** Read it before this file. It carries no
+numbers at all, and `tracker-lint` R8 keeps it that way.
+
+⛔⛔ **`git push origin HEAD:main` PUSHES THE WHOLE BRANCH, NOT THE COMMIT YOU JUST WROTE — AND THAT IS
+HOW `M48`'s SURGERY REACHED THE TRUNK WITHOUT A SQUASH MERGE.** Rule 7(g) prescribes exactly that
+command for publishing a claim, and it is correct on an empty branch. It is **wrong the moment you use
+it for a mid-build claim EXTENSION**, because by then the branch carries the work. **Publish an
+extension with a PR, or push only that commit** (`git push origin <sha>:main`). The PR was then
+auto-marked merged, its remaining commits stranded, and the end-to-end proof lost. **Nothing was
+damaged and nothing was force-pushed** — but the increment's headline deliverable was.
+
+✅ **`R7` IS NO LONGER BLIND ON A `push` — `M49` CLOSED IT.** The base now comes from
+`github.event.before`, and every path either resolves or **exits 2**; the run prints which base it used
+and where it came from, so a re-blinding is visible in the log instead of presenting as an absent
+marker. ⚠️ **What is still unexercised is a multi-commit `push` on real GitHub**: a squash merge is one
+commit, so `before..HEAD` and `HEAD~1..HEAD` coincide on it. **The `## Current Status` surgery is the
+first real test**, and it is the open `major`.
+
+✅ **`R7` HAS NOW FIRED, AND `M48` IS THE FIRST INCREMENT IT EVER LOOKED AT.** What that cost to learn:
+`ci.yml`'s `fetch-depth: 2` — chosen in `M40` *for this rule* — leaves only the PR's **last** commit in
+the clone, so a marker on any earlier one is invisible. Fixed to `0`. **A gate that has never fired has
+never been tested**, and this arc has now produced that lesson three times over.
+
+⚠️ **THE END-TO-END SQUASH PROOF IS STILL OWED**, and is handed to the `## Current Status` surgery,
+which is the next `major` and is filed with its measurement. Merge it with an explicit `--body` whose
+first content line is the marker, and read the post-merge run on `main` rather than the PR run.
+
+---
+
+## RELEASED — `M49`, R7 takes its base from the event payload and the clone can no longer lie about its shape (merged as PR #240, `12b0ef5`, 6/6 green)
+
+**The `major` is closed and the rule no longer assumes the unit of change is one commit.** On a `push`
+the base is `github.event.before`; on a `pull_request` it stays the merge commit's first parent, with
+the clone's shape asserted against the payload. Every path either resolves or **exits 2**, and every
+run now prints `R7 base is … (…)` — the provenance line is the artefact, because a re-blinding then
+appears in the log as the wrong base instead of as a mysteriously absent marker.
+
+**Every claimed file was edited and the claim was not extended.** Namespaces spent: **nothing from
+either** — no migration, no ADR (`0022` free, `0010` reserved), no `§D`, no route, no exceptions entry.
+One decision id, `D8`, from `decisions.md`'s separate namespace.
+
+### ⛔ THE ROW'S EVIDENCE HELD IN FULL AND ITS PRESCRIBED REMEDY WAS HALF WRONG
+
+Every citation opened and every one held — the first time in this arc that has happened. The remedy is
+the half that broke, and it broke in the direction this repository keeps cataloguing: **it would have
+printed a number.**
+
+The row asked for `github.event.pull_request.base.sha` on the `pull_request` arm. `base.sha` is the
+base tip as of the **event**; the checkout is `refs/pull/N/merge` as of the **run**. When `main`
+advances between them — routine with two lanes, and already recorded here as *"a gate number moving on
+a diff that cannot move it is the OTHER LANE"* — `base.sha..HEAD` sweeps in the other lane's commits
+and reports **their** `PROGRESS.md` delta as this pull request's. The merge commit's first parent is
+exact, so the arm keeps `HEAD~1` and the payload is spent on the one job `base.sha` cannot do.
+
+**That reallocation is what closes the `fetch-depth` guard `minor` as well.** That row named its own
+difficulty precisely — *"`R7` cannot tell the two apart from inside"*, because *"no commit in this
+range carries the marker"* is the same observation whether the commit is missing or the marker is.
+Comparing the range's commit count against `github.event.pull_request.commits` is the distinction, and
+it converts a silent re-blinding into a loud broken gate.
+
+### ✅ THE PREDICTION NAMED AS MOST LIKELY WRONG WAS RIGHT, AND THE REAL PAYLOAD SETTLED IT EXACTLY
+
+The claim said the commit-count assertion was the thing to doubt: `github.event.pull_request.commits`
+had never been read in this repository, and if it counted something other than what
+`git rev-list --count HEAD~1..HEAD` sees, the control would be right in shape and wrong in arithmetic.
+`>=` was the hedge.
+
+**Measured on PR #240's own run:** `R7 base is HEAD~1 (the merge commit's first parent; 6 commit(s) in
+range against 5 in the pull request)`. Six against five — the PR's commits plus the synthetic merge
+commit, **exactly**. The hedge was never needed, and `>=` stays because the failure it guards is a
+range holding *fewer* commits; a strict equality would redden on legal topologies, and a false red in
+the one rule that must never cry wolf costs more than the extra commits it would catch.
+
+⚠️ **The rest of the prediction was dull and correct, which is the point of writing it down.** PHPStan
+could not move and did not — it scans `app`, `database` and `routes`, and this diff is `scripts/`,
+`.github/`, `composer.json` and documentation. Vitest, axe and e2e likewise. **Pint was named as the
+only gate that could move, and it moved**: it failed on `scripts/tracker-lint-controls.php` with three
+fixers, which is also the proof it scanned `scripts/` at all. `static-analysis` gained one step, 21 to
+22, exactly as predicted, so its baseline changes rather than fails.
+
+### ⛔ THE LARGER HALF IS THE HARNESS, AND IT WAS COMMITTED RED
+
+`scripts/tracker-lint-controls.php` — eleven synthetic git histories, the shipped bytes of the gate
+copied into each. Committed **red first** (`dac636e`), against the unfixed gate:
+
+| | against the unfixed gate | after the fix |
+|---|---|---|
+| `C1`, `C3` — the push arm sees the deletion | **FAIL** | pass |
+| `C2`, `C4` — **the defect**, on the same fixture, against `HEAD~1` | pass | pass |
+| `C5`–`C7` — absent, zeroed and unreachable base sha | **FAIL** | pass |
+| `C8` — the `pull_request` arm | pass | pass |
+| `C9`, `C10` — clone-shape assertion | **FAIL** | pass |
+| `C11` — an ordinary edit stays under both limits | pass | pass |
+
+⛔ **`C2` AND `C4` ARE THE ONES THAT MATTER AND THEY ARE KEPT PERMANENTLY.** They run the same bytes
+with the pre-`M49` base and assert the gate sees `+0 lines and +0 bytes` — `M48`'s incident in
+miniature. `M19`'s lesson is that a probe measuring zero proves nothing unless it touched the defect,
+and a harness that only shows the new code passing has shown nothing at all.
+
+✅ **`C8` PASSING BEFORE THE FIX IS AN HONEST CONTROL, NOT A GAP.** The `pull_request` arm was already
+correct once `M48` raised the depth to `0`. The row was right to name the `push` arm alone.
+
+⛔ **AND IT IS A CI STEP, BECAUSE `R7`'s `push` ARM CANNOT EXECUTE DURING A PR RUN.** `M47` built
+controls for this gate in a detached worktree and threw them away, and the `fetch-depth` defect then
+survived eight increments. A control that is not committed is a control that ran once.
+
+### ⚠️ A MUTATION FOUND A CONTROL PASSING FOR THE WRONG REASON, INSIDE THE INCREMENT THAT WROTE IT
+
+Two mechanism mutations, each committed and each restored by byte comparison against a copy taken
+before the first write — never with `git checkout --`, which reverts to `HEAD` and eats uncommitted
+work.
+
+- **M-a — disabling the push arm's empty-base refusal left `C5` GREEN.** An empty sha fell through to
+  the commit-ness check and exited 2 from a *different* branch, so the case could not tell which
+  mechanism had fired. This is `M43`'s lesson exactly — a structural check can be fully green and
+  entirely decorative. **All five cannot-measure cases now assert their own message rather than the
+  shared `CANNOT MEASURE R7` prefix**, and `C5` then failed alone under the same mutation.
+- **M-b — disabling the clone-shape assertion failed `C9` alone**, with `C8` and `C10` still green. The
+  two halves are load-bearing separately, not one branch that happens to cover both.
+
+### ⚠️ FOUR METHOD FAILURES, ALL MINE, ALL CAUGHT
+
+1. ⛔ **A mutation reported success while never applying — the sha256 guard caught it.** `perl -0pi -e`
+   in **double quotes** let the shell eat `$sha`, so the pattern matched nothing. That is `M31`'s
+   defect verbatim, hit by the increment writing about it, and the only reason it was not a phantom
+   green is that the sha was compared before and after.
+2. **The single-quoted retry also did nothing**, for a second and unrelated reason: Perl's `-i` without
+   a backup suffix is a no-op on this host. **Two shell layers, two silent no-ops**; switched to an
+   exact-string edit with no shell in the path, which is `mutate.php`'s own doctrine one level down.
+3. ⛔ **The fixture inherited the host's `core.autocrlf` and measured the host.** The only case that
+   checks a branch out and merges came back with CR bytes in every line, so `R5` went red and `R2`'s
+   line-anchored headings went red behind it — three failures in two rule groups, **none of them R7**,
+   in the cases built to exercise R7. The fixture now pins `core.autocrlf` and `core.eol`.
+4. **`git add -A` committed the commit-message file** the harness wrote for `-F`. Moved outside the
+   repository.
+
+### ⚠️ WHAT IS NOT PROVEN, STATED RATHER THAN DISCOVERED
+
+**A multi-commit `push` on real GitHub.** A squash merge is one commit, so `before..HEAD` and
+`HEAD~1..HEAD` coincide on it, and the close-out push is `paths-ignore`d and produces no run at all.
+✅ **The post-merge run does prove the WIRING, and it is quoted here rather than asserted** — run
+[33389037597](https://github.com/avincentpatrick/dev_formbuilder_app/actions/runs/33389037597),
+`push` on `main`: `R7 base is 017108c39957c53064adbd7b4719fa3fb0b34905 (github.event.before, via
+TRACKER_LINT_BASE_SHA)`. That sha is the claim commit — the tip `main` carried before the merge —
+so the payload reached the rule and the rule used it. **What it does not prove is the multi-commit
+case**, because on this push the two bases coincide. **The first real exercise is the `## Current Status` surgery**, which is the open
+`major`; read its post-merge run on `main`, not its PR run. Filed as its own `minor` so it cannot be
+forgotten.
+
+**And the `gitleaks` half of the guard row does not close.** `gitleaks` has no payload number to check
+itself against, so it cannot know how many commits it *should* have seen: a future depth reduction
+re-blinds it and it reports `no leaks found`. Re-filed as its own `minor`, with three uncosted
+candidates and the honest note that a commit-count floor is a ratchet somebody has to maintain.
+
+### ➕ BEYOND THE ROW
+
+- **The `paths-ignore` row's first candidate cannot be written.** *"Exempt a commit whose message
+  carries the marker"* has nowhere to be expressed: a `paths-ignore` filter is evaluated by GitHub
+  **before a run exists**, over the pushed file paths and nothing else. Corrected in the row, and the
+  remaining run-cost question promoted to **`D8`** with a recommendation rather than decided here.
+- **Nothing anywhere covered `tracker-lint.php` before this** — zero references under `tests/`. That
+  was not in the row and is the reason the two defects in this arc were both invisible.
+
+### The claim, preserved
 
 **Row** (`docs/feature-backlog.md`, the last `major` in the tracker/CI cluster): *"`R7` measures the
 tip against its parent, so a large removal that is not in a push's LAST commit is invisible — and the
@@ -89,35 +260,6 @@ assertion.** `github.event.pull_request.commits` is taken on trust from the payl
 read in this repository; if it counts something other than what `git rev-list --count HEAD~1..HEAD`
 sees, the control is right in shape and wrong in arithmetic. `>=` is the hedge; if that still fails the
 honest fix is to drop the count and keep the reachability check alone.
-
-⛔ **RUN `php scripts/state.php` FOR EVERY NUMBER.** Increment, ADR, migration prefix, exceptions-log
-entry, open rows, open decisions, and how far behind the trunk `docs/gate-baselines.md` has fallen.
-Nothing in this file or in `PROGRESS.md` is the authority for any of them any more.
-
-✅ **`CLAUDE.md` IS THE IMPERATIVE LAYER AND IS AUTO-LOADED.** Read it before this file. It carries no
-numbers at all, and `tracker-lint` R8 keeps it that way.
-
-⛔⛔ **`git push origin HEAD:main` PUSHES THE WHOLE BRANCH, NOT THE COMMIT YOU JUST WROTE — AND THAT IS
-HOW `M48`'s SURGERY REACHED THE TRUNK WITHOUT A SQUASH MERGE.** Rule 7(g) prescribes exactly that
-command for publishing a claim, and it is correct on an empty branch. It is **wrong the moment you use
-it for a mid-build claim EXTENSION**, because by then the branch carries the work. **Publish an
-extension with a PR, or push only that commit** (`git push origin <sha>:main`). The PR was then
-auto-marked merged, its remaining commits stranded, and the end-to-end proof lost. **Nothing was
-damaged and nothing was force-pushed** — but the increment's headline deliverable was.
-
-⛔ **`R7` IS BLIND ON A `push` AS WELL, AND IT IS FILED AS A `major`.** It compares `HEAD~1` against
-`HEAD`, so a removal that is not in the push's **last** commit is invisible: `M48`'s own four-commit
-push carried a 198,909-byte deletion of the constitution and the run measured **zero**. Until that row
-is taken, **do not read a green `R7` on a multi-commit push as evidence of anything.**
-
-✅ **`R7` HAS NOW FIRED, AND `M48` IS THE FIRST INCREMENT IT EVER LOOKED AT.** What that cost to learn:
-`ci.yml`'s `fetch-depth: 2` — chosen in `M40` *for this rule* — leaves only the PR's **last** commit in
-the clone, so a marker on any earlier one is invisible. Fixed to `0`. **A gate that has never fired has
-never been tested**, and this arc has now produced that lesson three times over.
-
-⚠️ **THE END-TO-END SQUASH PROOF IS STILL OWED**, and is handed to the `## Current Status` surgery,
-which is the next `major` and is filed with its measurement. Merge it with an explicit `--body` whose
-first content line is the marker, and read the post-merge run on `main` rather than the PR run.
 
 ---
 

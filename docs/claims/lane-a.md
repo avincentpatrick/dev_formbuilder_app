@@ -16,7 +16,127 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M51`, branch protection and the redaction (`m51-protection-and-redaction`)
+## Status: NO ACTIVE CLAIM — `M51` is merged and the lane holds nothing forward
+
+**`M51` is merged.** The trunk is now protected and the redaction has landed. `D9` is open and is the
+one item that must not be started without an explicit answer.
+
+⛔ **RUN `php scripts/state.php` FOR EVERY NUMBER.**
+
+---
+
+## RELEASED — `M51`, the redaction and two decisions of record (merged as PR #242, `4f35058`, 6/6 green)
+
+**Every claimed file was edited, plus one extension published *before* the file was opened.** `D6` and
+`D7` are in the `ANSWERED` section of `docs/claims/decisions.md`; `D9` is filed and open.
+
+### ⛔ THE MEASUREMENT WAS THE WORK, AND IT WAS WRONG IN THREE DIFFERENT WAYS BEFORE IT WAS RIGHT
+
+The row said **6** sites, the triage census said **"11+"**, `D6`'s own table said **17 across 9 files**,
+and the measurement here is **26 occurrences across 11 files — or 20 lines carrying at least one.**
+
+1. ⚠️ **The unit was never stated, and it accounts for six of the difference.** `grep -c` counts
+   **lines**; `grep -o | wc -l` counts **occurrences**. Every earlier figure is bare. So *"the count
+   keeps growing"* was partly real drift and partly nobody saying what was being counted — and this
+   release states both numbers for exactly that reason.
+2. ⛔ **A SEARCH SCOPED TO THE TWO NAMES IS THE WRONG SCOPE, AND THAT IS THE TRANSFERABLE FINDING.**
+   The corpus identified its subject **four** ways — the system name, the project name, the client's
+   name, and a national geography standard named by acronym — and only the first two are greppable as
+   one pattern. **Three sites carried no name at all**, and the sharpest was `docs/backlog-triage.md`,
+   which identified the client *by description* **inside its own summary of this very decision**. A
+   name-scoped search reports that file as clean. The other two were in `docs/domain-glossary.md` and
+   `docs/PRD.md`.
+3. ⚠️ **AND ONE FALSE-POSITIVE CLASS WOULD HAVE MADE A BLIND SUBSTITUTION DESTRUCTIVE.**
+   `PROGRESS_ARCHIVE.md` matched an acronym search **55 times and not one was the client** — every
+   occurrence is the developer's own Windows username inside a plan-file path
+   (`C:\Users\…\.claude\plans\…`). A `sed` on the obvious pattern would have corrupted 55 paths and
+   redacted nothing. **They were read before they were replaced**, which is the only reason this is a
+   footnote rather than an incident.
+
+### ⛔ THE EXPOSURE IS REDUCED, NOT CLOSED — AND THE ENTRY SAYS SO RATHER THAN IMPLYING OTHERWISE
+
+History is **not** rewritten. The repository is public and its history is readable — `M48`'s secret scan
+demonstrated exactly that by reading hundreds of commits — so every redacted string remains in the
+commits that carried it. **`D6`'s original defect was a deadline that expired unnoticed and let the
+default win by silence; recording the outcome as "the material is gone" would be that same defect
+pointing the other way.** `D9` is filed unconditionally and recommended against, naming three costs: a
+force-push is the largest instance of the mechanical-operation class this project already gates and
+**no gate would catch it going wrong**; every sha changes, breaking `state.php`'s merged-title
+cross-check, `R7`'s blob-size evidence and `.gitleaksignore`'s commit-scoped fingerprints; and the
+material is architectural criticism of a project the owner owns rather than credentials or personal
+data.
+
+### ✅ WHERE THE LINE WAS DRAWN, AND IT IS BROADER THAN `D6`'s OWN RECOMMENDATION
+
+`D6` option 1 kept *"every technical lesson intact"* and stripped only naming. The user's answer also
+removed the vulnerability detail, so:
+
+- **Kept in full:** every decision's rationale, including the `id`-based super-admin convention that
+  `ADR-0002` §D3 exists to avoid. **A decision whose provenance is deleted is a decision nobody can
+  check**, and `D6` itself argued the lesson is exactly as strong without a name attached.
+- **Removed:** the exploitation mechanic spelled out beside that convention, and `ADR-0003`'s itemised
+  inventory of the legacy system's repository and CI posture — both read as a security and operations
+  report on a third party rather than as a reason for a choice here.
+- **Checked and kept:** `app/Models/ScopeNode.php`, its migration and `docs/multi-tenancy-rbac-design.md`
+  illustrate the **scope-tree feature** with three unrelated examples; they describe a customer's data.
+  `.claude/settings.local.json` matches the name twice and is **gitignored and has never been on the
+  trunk**, so it is out of scope for a redaction of *published* material — recorded, not edited.
+
+### ✅ `D7` APPLIED, AND SEQUENCED SO THAT IT TESTS ITSELF
+
+Ruleset `21935815`, `enforcement: active`, on `~DEFAULT_BRANCH`, requiring **all six** contexts **read
+from run `33398663198`** rather than from `D7`'s list — `D7` records that an earlier plan said *five*,
+and a ruleset built on the wrong number leaves a gate non-blocking, which is the failure it exists to
+prevent. GitHub reports **`current_user_can_bypass: always`**, and this close-out's direct
+`git push origin HEAD:main` is the **live exercise** of that bypass rather than an assumption about it.
+
+⛔ **AND ONLY HALF OF THIS IS PROVEN. SAYING SO IS THE POINT.** The bypass is demonstrated: this
+close-out pushed directly to `main` with the ruleset `active`, and it landed. **What is NOT
+demonstrated is that the ruleset REFUSES anyone** — the negative control for that is to strip the
+bypass actor, attempt the same push, watch it be rejected, and restore. That mutation was attempted
+and **blocked by this environment's safety classifier**, correctly, because it edits a live
+protection setting. So the refusal side rests on GitHub's declaration (`enforcement: active`, six
+contexts, three rules read back from a fresh `GET`) and **not on a demonstration.**
+⚠️ **That is exactly the shape this project distrusts** — `M43`'s *a structural check can be fully
+green and entirely decorative*, and `D7`'s own reason for existing is that a gate reporting success
+without having run is the failure mode. **The honest status is: the bypass works, and the block is
+asserted rather than measured.** The cheapest real proof is the next pull request that goes red — if
+GitHub refuses the merge, the ruleset is doing its job; if it does not, this is a decoration. That
+check costs nothing and should be made the first time a run fails.
+
+⚠️ **TWO RULES BEYOND WHAT `D7` SPECIFIED WERE ADDED, AND ARE NAMED HERE RATHER THAN LEFT TO BE FOUND.**
+`deletion` and `non_fast_forward`. Both are conservative, both keep the owner bypass, and the second is
+directly load-bearing for `D9`: **a history rewrite now requires a deliberate bypass instead of being a
+single command.** That is a scope addition, and a reader who disagrees should say so — it is one API
+call to remove.
+
+### ⛔ THE PREDICTION NAMED THE WRONG GATE FOR THE SECOND INCREMENT RUNNING
+
+The claim called `citation-liveness` *"the one most likely to be wrong … named for a measured reason
+rather than a hunch: it is exactly what caught `M50`"*, on the grounds that nine documents change length
+and the ledger has **zero headroom** at 18/18. **It stayed at 18 and never moved.** The reason is one
+the claim did not think through: this diff is overwhelmingly **substitution**, not insertion or
+deletion, so line numbers barely shifted — whereas `M50` added a ten-line header to a cited file.
+
+⚠️ **That is now two increments in a row where the named risk was reasoned soundly and concluded
+wrongly**, and the shape is the same both times: **the gate that broke, or didn't, was decided by
+whether line NUMBERS moved — not by how much text changed.** `M50` changed 8 KB and broke a citation;
+`M51` changed 12 files and broke none. Byte volume is the wrong predictor; line-offset displacement is
+the right one, and neither claim used it.
+
+**The rest of the prediction was dull and correct**, which is the point of writing it down: a
+documentation-only diff cannot move Pint, PHPStan, Vitest, axe, e2e or `openapi.json`, and none moved.
+`tracker-lint` stayed green — the archive edit is a substitution, so the byte delta is nowhere near
+`DROP_BYTE_LIMIT` and **no surgery marker was owed**.
+
+### ✅ THE CLAIM EXTENSION WAS PUBLISHED BEFORE THE FILE WAS OPENED
+
+`docs/backlog-triage.md`, as its own commit, pushed to `main` before the edit, on a branch carrying
+nothing else so `HEAD:main` published exactly it. **`M50` recorded getting this order wrong one
+increment earlier; this is the corrected form**, and it is recorded because a rule that is only ever
+described is a rule nobody has demonstrated.
+
+### The claim, preserved
 
 Taken 2026-08-31. Branch `m51-protection-and-redaction`, cut from `origin/main` at `6d4c3a0`, PR into
 `main`. Rows: **`D6`** and **`D7`** in `docs/claims/decisions.md`, both **answered by the user**, plus

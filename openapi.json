@@ -2984,6 +2984,38 @@
                                 }
                             }
                         }
+                    },
+                    "403": {
+                        "description": "The workspace has switched this module off. Not a plan limit: nothing needs buying, and an administrator inside the workspace can re-enable it.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "error": {
+                                            "type": "object",
+                                            "properties": {
+                                                "code": {
+                                                    "type": "string",
+                                                    "description": "Stable machine-readable code: `module_disabled`."
+                                                },
+                                                "message": {
+                                                    "type": "string",
+                                                    "description": "Error overview."
+                                                }
+                                            },
+                                            "required": [
+                                                "code",
+                                                "message"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "error"
+                                    ]
+                                }
+                            }
+                        }
                     }
                 }
             }

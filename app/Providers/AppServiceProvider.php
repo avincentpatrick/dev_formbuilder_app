@@ -50,6 +50,7 @@ use App\Support\Auth\SocialiteGoogleIdentityProvider;
 use App\Support\Connectors\ConnectorOAuthStateService;
 use App\Support\Guest\GuestChallengeService;
 use App\Support\Guest\GuestShareTokenService;
+use App\Support\OpenApi\ModuleDisabledResponseExtension;
 use App\Support\Submissions\RandomSubmissionReferenceIssuer;
 use App\Support\Submissions\SubmissionReferenceIssuer;
 use App\Support\Tenancy\DnsTxtResolver;
@@ -508,6 +509,12 @@ class AppServiceProvider extends ServiceProvider
         // (`--no-dev`) install never touches its classes. The bearer scheme documents the Sanctum
         // personal-access-token auth used by the /api/v1 surface (api-specification.md §2.6 / §3).
         if (class_exists(Scramble::class)) {
+            // M54. `module:`-gated routes answer 403 and Scramble cannot see it: its 403 inference keys
+            // on `can:` / `Authorize::` middleware alone (ErrorResponsesExtension:60, v0.13.30). General
+            // rather than a per-route patch — see ModuleDisabledResponseExtension for why the annotation
+            // route cannot work when the gate lives on the route and not in the action.
+            Scramble::configure()->withOperationTransformers(ModuleDisabledResponseExtension::class);
+
             Scramble::extendOpenApi(function (OpenApi $openApi): void {
                 $openApi->secure(SecurityScheme::http('bearer')->as('sanctumToken'));
 

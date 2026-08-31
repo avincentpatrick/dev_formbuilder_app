@@ -3571,6 +3571,28 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   row is deliberately NOT reproduced**, since quoting it verbatim would republish the identification the
   row exists to remove — which is the same reason `D6`'s answered entry describes the search terms
   instead of printing them.
+- **`major` · The pre-push guard REFUSES A NORMAL CLOSE-OUT, and it refused the one that shipped it.**
+  `scripts/pre-push-guard.php` exempts a push whose changed paths are entirely documentation, and it
+  derives that set from `.github/workflows/ci.yml`'s `paths-ignore`. **`docs/feature-backlog.md` is not
+  in that list** — but closing a row there is step 1 of the close-out `CLAUDE.md` prescribes. So every
+  close-out that closes a row is classified as *work*, and rule A refuses it because a `m<n>-closeout`
+  branch is not the branch the claim names. **Measured on `M52`'s own close-out**, which was refused
+  and had to be pushed with `--no-verify`.
+  ⛔ **THE ERROR IS CONCEPTUAL, NOT A MISSING ENTRY, AND THAT IS THE TRANSFERABLE PART.** *"One
+  authority, referenced rather than copied"* was applied correctly and to the **wrong authority**:
+  `paths-ignore` answers *"can this change affect the product's CI?"*, and the guard needed
+  *"is this documentation?"*. The two sets overlap heavily and are not the same, and the difference is
+  exactly the file every close-out edits. **A referenced authority must answer YOUR question, not an
+  adjacent one** — deriving from it is only safer than copying when the semantics match.
+  ⚠️ **Do NOT fix this by adding the backlog to `paths-ignore`.** That would stop CI running on backlog
+  edits, which is a real change to gate coverage and lives behind `ci.yml`, on the user's stop list.
+  The fix belongs in the guard: its own documentation set, stated where it is used, with the
+  divergence from `paths-ignore` written down.
+  ⚠️ **And `scripts/loop.php`'s `gates` command has the same blind spot from the other side:** it runs
+  `preflight`, whose claim check is red on any close-out branch by construction, so the driver reports
+  `⛔ STOP — preflight is RED` on the part of the loop it most exists to automate. **One increment put
+  the close-out exemption in the hook and in neither the hook's path list nor the driver.** **Live**,
+  and filed at the moment it was decided rather than carried in a hand-off.
 - **`minor` · `/gamification/me` documents only `200`.** `openapi.json` — the route carries
   `module:gamification` (`routes/api.php:440`), whose `ModuleDisabledException` answers **403** on a
   supported user action (an owner switching the module off), and nothing inferred it because the endpoint

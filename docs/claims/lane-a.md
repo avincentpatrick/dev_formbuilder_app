@@ -16,7 +16,165 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M52`, the pre-push hooks and the loop driver (`m52-hooks-and-driver`)
+## Status: NO ACTIVE CLAIM — `M52` is merged and the realignment is complete
+
+**`M52` is merged.** All three increments of the realignment have landed: the lanes are collapsed
+(`M50`), the trunk is protected and the corpus redacted (`M51`), and the two most-violated rules are
+now mechanical (`M52`).
+
+⛔ **THE FIRST UNATTENDED RUN HAS NOT HAPPENED AND NEEDS AN EXPLICIT GO.** The driver is built and
+proven; it has never been let loose. `D9` is open and is the one item that must never be started
+without an answer.
+
+⛔ **RUN `php scripts/state.php` FOR EVERY NUMBER.**
+
+---
+
+## RELEASED — `M52`, the pre-push guard and the loop driver (merged as PR #243, `37ec14f`, 6/6 green)
+
+**Every claimed file was edited and the claim was not extended.** Two rules that had each been broken
+by a real push are now refused by a hook, and the scripted half of a session no longer needs a human
+to type it.
+
+### ⛔ THE PRESCRIBED HOOK, TAKEN LITERALLY, WOULD HAVE BLOCKED EVERY CLOSE-OUT
+
+*"Refuse a push when `docs/claims/lane-a.md` on `origin/main` does not name the current branch"* is
+correct for work and wrong for the close-out, which runs on an `m<n>-closeout` branch the claim
+**cannot** name — that branch did not exist when the claim was written. `M50`, `M51` and `M51`'s
+correction were all pushed that way, so this was measured against three real pushes rather than
+imagined. **A hook that refuses those gets `--no-verify`'d on its first outing, and a bypassed guard
+is furniture.**
+
+The rule keeps its purpose and narrows its scope: a push whose changed paths are **entirely
+documentation** is exempt, and that set is **read from `ci.yml`'s `paths-ignore`** — already this
+repository's definition of *"a change that cannot affect the product"*. ⚠️ **The parse has a floor of
+three and fails CLOSED**, because a list that silently came back empty would exempt nothing and fire
+rule A on every claim push. That is the *succeeds-on-empty-input* family, now hit in a third script.
+
+⚠️ **And the exemption is what makes rule A possible at all**, not a convenience: at the moment of the
+claim push the claim is *in the commit being pushed* and is not yet on `origin/main`, so the rule
+cannot be satisfied by the very commit that establishes it.
+
+### ✅ PROVEN SIX WAYS, THEN END TO END ON A REAL PUSH
+
+| Control | Result |
+|---|---|
+| documentation-only push to the trunk (a claim push) | **allow** |
+| three commits pushed straight to the trunk (`M48`'s shape) | **refuse — rule B** |
+| work pushed to a branch the claim does not name | **refuse — rule A** |
+| the **same commit** pushed to the branch the claim does name | **allow** |
+| a branch deletion | **allow** |
+| `ci.yml`'s `paths-ignore` mutated below the floor | **exit 2, refuses** |
+
+Then for real: `git push origin hook-proof` was **refused, exit 1**, and `git ls-remote` confirmed the
+branch was **never created**. The identical commit pushed to the claimed branch was allowed. The
+`ci.yml` mutation was restored **byte-exact**. ⚠️ **The synthetic controls alone would not have been
+enough** — they prove the logic, not that git invokes it, and those are different claims.
+
+### ⛔ THE DRIVER'S FIRST VERSION WAS PERMISSIVE BY DEFAULT WHILE ITS OWN DOCBLOCK CLAIMED THE OPPOSITE
+
+It said *"auto-eligible only if positively recognised as mechanical"*, and the code admitted **every**
+`minor` row that tripped no stop rule — **68 of 78 rows in scope.** That is `M43`'s lesson occurring
+inside this increment's own logic: **a check can read as strict and behave as decorative**, and the
+only thing that separated them here was running it and looking at the output.
+
+Two fixes, both measured rather than reasoned:
+
+1. **A positive marker is required**, not merely an absent stop. The stop list is a floor, not a census.
+2. ⛔ **The go-signal matches the row TITLE only, while stop rules still scan title AND body.** The
+   asymmetry is the finding: a stop should be as sensitive as possible, a go-signal as specific as
+   possible. Matching the body admitted a CSS overflow row, a missing-middleware security row, and a
+   row that **is an open decision** — each on a keyword buried in its own commentary. **The title is
+   the row's claim; the body is its argument, and the argument quotes everything.**
+
+**78 rows → 3 eligible**, all genuinely citation or documentation-truth rows, which is the scope that
+was actually asked for.
+
+➕ **And it stops on any row naming an OPEN decision, which nothing in the brief asked for.** Taking
+such a row unattended would answer the decision by building one of its options — the `D6` failure in
+miniature, a deadline passing and the default winning by silence.
+
+**The stop rules were proven by injection**: one synthetic row flipped through each trigger — `major`,
+a held topic, `ci.yml`, an open decision — each stopping with the correct reason named, and the
+backlog restored byte-exact afterwards.
+
+### ⛔ TWO FINDINGS AGAINST MY OWN WORK, BOTH CAUGHT BY THINGS THIS SERIES BUILT
+
+1. **The driver's first draft hand-rolled a backlog parser** — while `state.php` already returns every
+   row with its severity, line and provenance, and is the authority this project tells every session
+   to trust for counting the tree. **A second parser would have drifted from the first**, which is the
+   defect Rule 7(b), `docs/gate-baselines.md`, `TEMPLATE.md` and this increment's own guard each record
+   separately. It was written *one function away from a comment warning about it.* Rewired.
+2. **`loop gates` caught this increment's own red.** Adding the enable step to `README.md` shifted
+   every line below it by **15**, and a backlog citation into `README.md:85-86` landed inside the
+   fenced block I had just added — `M34`'s *a citation into a file your own diff edits must be re-read
+   after the edit*, for the **third increment running**. ⚠️ **All five** displaced README citations
+   were re-pointed by the verified shift, not only the one the gate flagged: the other four were
+   already dead against a blank line so the count was unaffected, **but my diff moved what they
+   meant**, and leaving them would have made them doubly wrong for whoever takes that row.
+
+### ✅ THE PREDICTION WAS RIGHT, AND IT WAS STATED MECHANICALLY BECAUSE THE LAST TWO WERE NOT
+
+`M50` named R3 and `M51` named citation-liveness; both were reasoned soundly and both were wrong, and
+both misses were about *volume* when the mechanism was about *position*. So this claim refused to name
+a gate and named a property instead: **"a pre-push hook is invisible to every gate in this repository
+— nothing in CI runs it, `composer quality` cannot exercise it, and its own success message is
+indistinguishable from it never having been invoked. It will be proven the only way a hook can be, by
+making a push that must be refused and watching it be refused."** That is exactly what happened.
+
+**Pint was named as the only gate that could move, and it moved** — it failed on both new `scripts/`
+files with three fixers each, which is simultaneously the proof that bare host Pint scans `scripts/`
+at all. PHPStan could not move and did not.
+
+### ⛔⛔ THE GUARD REFUSED THIS INCREMENT'S OWN CLOSE-OUT, AND IT WAS RIGHT TO — THE DEFECT IS MINE
+
+**Filed as a `major` and pushed with `--no-verify`, disclosed here because the guard's own refusal
+message says to.** The close-out edits `docs/feature-backlog.md` to close a row — step 1 of the
+close-out `CLAUDE.md` prescribes — and **that file is not in `ci.yml`'s `paths-ignore`**. So the push
+was classified as *work*, and rule A refused it because `m52-closeout` is not the branch the claim
+names.
+
+⛔ **THE ERROR IS CONCEPTUAL AND IT IS THE MOST TRANSFERABLE THING IN THIS INCREMENT.** *"One
+authority, referenced rather than copied"* — the principle this repository applies to gate numbers, to
+the lane boundary and to the claim template — was applied **correctly, to the wrong authority**.
+`paths-ignore` answers *"can this change affect the product's CI?"*. The guard needed *"is this
+documentation?"*. The two sets overlap almost entirely, **and the file they differ on is the one every
+close-out edits.** Deriving from an authority is only safer than copying when its semantics answer
+**your** question; otherwise it is a copy with extra confidence.
+
+⚠️ **It cannot be fixed by adding the backlog to `paths-ignore`** — that would stop CI running on
+backlog edits, a real change to gate coverage, behind `ci.yml`, on the user's stop list. The fix
+belongs in the guard, with its divergence from `paths-ignore` written down at the point of use.
+
+⚠️ **And the same blind spot exists from the other side in `scripts/loop.php`**: `gates` runs
+`preflight`, whose claim check is red on any close-out branch by construction, so the driver halts on
+the part of the loop it most exists to automate. **One increment put the close-out exemption in the
+hook, and in neither the hook's path list nor the driver.**
+
+✅ **The honest reading is that the guard worked.** It caught a real inconsistency in its own author's
+model on its first real close-out, the escape hatch was used exactly as designed — once, deliberately,
+and disclosed — and the finding is filed rather than smoothed over. A guard that had let this through
+would have taught nothing.
+
+### ⚠️ THE LIMITS, STATED RATHER THAN LEFT TO BE DISCOVERED
+
+**The guard is opt-in per clone and cannot be otherwise.** `core.hooksPath` is local git configuration
+and a repository may not enable its own hooks — a deliberate git security property, not a gap to
+engineer around. `preflight` now reports its absence, so an unguarded checkout says so at session open
+rather than at the push it would have caught. **`--no-verify` bypasses it by design: this guards
+mistakes, not intent.** The server-side half is `M51`'s ruleset.
+
+**The driver does not write the increment**, and was never meant to. The user asked for the *trigger*
+to go, not the judgement. Reading citations, verifying a remedy, designing a fix and writing controls
+remain the work; what is automated is preflight, the numbers, the row classification, the gate
+sequence and the close-out choreography.
+
+⛔ **AND THE FIRST UNATTENDED RUN HAS NOT HAPPENED.** It needs an explicit go, and asking for it is the
+last act of this increment rather than something to be assumed from the tooling existing.
+
+**Namespaces: nothing spent.** No ADR, no migration, no `§D`, no decision id, no exceptions entry.
+
+### The claim, preserved
 
 Taken 2026-08-31. Branch `m52-hooks-and-driver`, cut from `origin/main` at `02eba8d`, PR into `main`.
 **Not a backlog row.** This is the third and last increment of the user-directed realignment: make the

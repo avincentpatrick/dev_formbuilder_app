@@ -247,7 +247,7 @@ if (! is_file($baselinePath)) {
 if (isset($opts['with-gates'])) {
     section('Lint gates (host)');
 
-    foreach (['controller-gate', 'migration-lint', 'job-payload-lint', 'constraint-boundary-lint', 'component-import-lint', 'citation-liveness-lint'] as $gate) {
+    foreach (['controller-gate', 'migration-lint', 'job-payload-lint', 'constraint-boundary-lint', 'component-import-lint', 'mail-attribute-lint', 'citation-liveness-lint'] as $gate) {
         $status = 0;
         $out = sh('php '.escapeshellarg('scripts/'.$gate.'.php').' 2>&1', $status);
         $status === 0 ? pass(trim(last_line($out))) : fail(trim($out));

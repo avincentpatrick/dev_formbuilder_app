@@ -160,6 +160,21 @@ jobs:
       - name: Component import linter (no template tag without an import)
         run: composer run component-import-lint
 
+      # M57. `Markdown::withSecuredEncoding()` (AppServiceProvider) swaps the echo encoder for the
+      # whole markdown-mail render with a three-character map — [ < > — so on that surface a Blade
+      # echo does NOT escape quotes, and `{{ }}` and `{!! !!}` are equally unsafe inside an
+      # attribute. The published mail header shipped a tenant name into an `alt` that way, and a
+      # name carrying a quote appended a live event handler to the <img> — which SURVIVES the
+      # CssToInlineStyles DOM round-trip, because the break-out happens before any parser sees the
+      # markup. Registered as its own step for the same reason every linter above is: no CI job runs
+      # `composer run quality`.
+      #
+      # ⛔ IT IS NOT A `{!!` COUNTER, DELIBERATELY. The raw-output directive is not what separates
+      # safe from unsafe here; the CONTEXT is. The script header records the four controls that
+      # proved it red, including the one written as `{{ }}`.
+      - name: Mail attribute linter (no unescaped Blade echo in a mail-view attribute)
+        run: composer run mail-attribute-lint
+
       # M40. The tracker is documentation, and NOTHING in CI has ever read a documentation diff —
       # which is why commit f565ac9 (2026-08-16) deleted 1,086 lines from PROGRESS.md and MERGED
       # GREEN. A local-only check would not have caught it, so this is registered here as its own

@@ -3445,7 +3445,32 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   that cite this very ADR). A reviewer using the ADRs as the map of what has been threat-modelled blocks
   the merge on, or duplicates, work that already shipped. **Live** — the file was edited after P2b, so this
   bullet was left behind rather than never revisited.
-- **`major` · A second raw-HTML sink shipped in this branch, and the escaping contract says there is
+- ~~**`major` · A second raw-HTML sink shipped in this branch, and the escaping contract says there is
+  none.**~~ ✅ **DONE — M57 (2026-09-01). THE ROW'S EVIDENCE WAS EXACT AND ITS FRAMING WAS WRONG IN BOTH
+  DIRECTIONS, WHICH IS WHY IT IS WORTH RESTATING AS A CLASS.** Every citation held, including the one that
+  mattered most: the header's own comment claimed the slot *"arrived already escaped with ENT_QUOTES"*, and
+  it does not — **because of a control this application deliberately turned on**. `Markdown::render()`
+  *replaces* `EncodedHtmlString`'s encoder for the whole render with a three-character map (`[`, `<`, `>`),
+  so `withSecuredEncoding()` — the H23a4 mitigation that closed the markdown-injection row — is what removed
+  quote escaping from every echo in a mail view. ⛔ **THE ROW UNDERSTATES ITSELF: `{!!` IS NOT THE HAZARD.**
+  `{{ }}` runs the same map, so it is equally unsafe in an attribute; the header held two more (`href`,
+  `src`) and the unpublished vendor components hold others. A gate counting `{!!` would have been green
+  against this defect, and `scripts/mail-attribute-lint.php` therefore keys on *a Blade echo inside a quoted
+  attribute*, with one of its four controls written as `{{ }}` for exactly that reason. ⚠️ **And it
+  OVERSTATES itself: the two sinks are not two defects.** The bare `{!! $slot !!}` is text context, where
+  the map has already escaped `<` and `>` and re-escaping would double-encode — it is correct and must stay.
+  ➕ **Measured, not deduced, and it inverted the expectation recorded in the claim:** the injected attribute
+  **survives** `CssToInlineStyles`, which normalises the break-out *into* a live second attribute rather than
+  repairing it. ➕ **A consequence for the test, worth more than the fix:** a text assertion cannot
+  distinguish fixed from broken here — ` onerror=` appears inside the `alt` value either way, and the
+  inliner re-quotes with `'` rather than emitting `&quot;` — so the test asserts the rendered `<img>`'s
+  **attribute set** by equality. The first draft asserted the `&quot;` form the PDF surface produces and was
+  red against a correct fix. Shipped: `app/Support/Mail/MailAttribute.php`, the header, the linter and its
+  `composer.json`/`ci.yml` wiring, `BrandedMailRenderTest` + `tests/Unit/Mail/MailAttributeTest.php`, and
+  four documents — Doc #26 §5.2 (new), the threat model's §7 table and §9 item 9, `docs/testing-strategy.md`
+  and the `AppServiceProvider` call site that causes it. **Latent when found and recorded as such**: nothing
+  in `app/` creates or updates a `Tenant` row's name. Original filing follows.
+  **`major` · A second raw-HTML sink shipped in this branch, and the escaping contract says there is
   none.** `docs/piping-output-encoding-design.md:151` asserts *"zero `{!!` exists in application code
   today"*, status "(holds)", and `:180` makes any second sink a contract change. The new
   `resources/views/vendor/mail/html/header.blade.php:31,33` carries two — `:31` interpolating blind into an
@@ -3454,6 +3479,21 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   include `"`, and the value is `$tenant->name`. **Latent** — no user-facing write route for `tenants.name`
   was found — but the asserted invariant is false either way, and `BrandedMailRenderTest.php:122` only
   pins the unquoted case.
+- **`minor` · The framework's own mail components interpolate into attributes the same way, and the M57
+  gate cannot reach them.** Filed by M57 (2026-09-01) at the moment the scope was decided, not afterwards.
+  We publish exactly **one** override under `resources/views/vendor/mail/`; every other component renders
+  from `vendor/laravel/framework`, and `mail/html/button.blade.php` puts `$url` into an `href` with a plain
+  Blade echo — which, under `withSecuredEncoding()`, escapes no quote. `scripts/mail-attribute-lint.php`
+  scans `resources/views/` only, so it is structurally blind to them. ⚠️ **Not reachable today, and the
+  measurement is the reason rather than the assumption**: all six `->action()` call sites in
+  `app/Notifications/` pass an application-built URL (`TenantUrl::to()`, signed routes) and none interpolates
+  free text; `layout.blade.php`'s only attribute echo is the app locale. **The obvious remedy is worse than
+  the defect:** publishing the components to bring them in scope costs a vendor file to keep in sync on
+  every Laravel upgrade, which `resources/views/mail/notification.blade.php`'s docblock already argues
+  against for exactly this reason — it is why only one file is published. Candidates if it ever becomes
+  reachable: publish only the component that takes a free-text URL, or assert the attribute set of the
+  rendered button the way `BrandedMailRenderTest` now asserts the header's. **Live, and deliberately not
+  fixed.**
 - ~~**`major` · The data dictionary states "No CHECK pairs the two" for `audits.user_id` / `acting_as_user_id`.**~~
   ✅ **DONE — M46 (2026-08-29). THE ONLY ONE OF THE EIGHT DOCUMENTATION-TRUTH ROWS WHOSE EVERY LINE NUMBER
   WAS STILL INTACT, AND THE ONLY ONE WHOSE PRESCRIBED REMEDY NEEDED NO CORRECTION.** `docs/data-dictionary.md`,
@@ -3689,7 +3729,9 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   now lands on the **Google sign-in** block this branch added — the exact conflation the sentence forbids);
   `docs/adr/0016:133,:135,:147` (ADR-0019 §D6b, not §D7); `docs/adr/0020:43`; `docs/adr/0011:8,:111`
   (`MdsTabs` exists as of J4c1); `docs/audit-compliance-logging-spec.md:54`;
-  `docs/piping-output-encoding-design.md:180`; `docs/offline-first-sync-design.md:128`;
+  `docs/piping-output-encoding-design.md:181` (was `:180`; **M57 moved it by one line and the citation
+  linter caught it in the same run** — the ledger tier went 18 → 19 and named this pointer, which is the
+  clearest evidence yet for the rule this very row is about); `docs/offline-first-sync-design.md:128`;
   `docs/data-dictionary.md:62` (§28, not §31 — the pointer currently lands on a note arguing the opposite
   case); `docs/api-specification.md:179` (`read:audit_log` is orphaned four blockquotes below its table
   and renders outside it); `docs/ux/design-system-reference.md:812,:843`;

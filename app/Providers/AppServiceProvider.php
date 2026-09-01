@@ -263,6 +263,21 @@ class AppServiceProvider extends ServiceProvider
         // RESIDUAL, stated rather than implied: `*`, `_` and backticks stay live, so an adversarial name
         // can still render italic or as a code span. That is typography, not a security control — both
         // vectors the threat model names need `[`, and both are closed.
+        //
+        // ⛔ THE RESIDUAL THAT MATTERED WAS NOT LISTED HERE, AND IT COST M57 A DEFECT. This call does not
+        // ADD escaping — it REPLACES it. `Markdown::render()` swaps `EncodedHtmlString`'s encoder for the
+        // whole render with the three-character map above, so for the duration of a markdown-mail render
+        // `{{ }}` no longer escapes `"`, `'` or `&`, and `{{ }}` and `{!! !!}` become identical. In TEXT
+        // context that is the intended, safe trade. In an HTML ATTRIBUTE it is a break-out: the published
+        // mail header interpolated a tenant name into an `alt` and a name carrying a quote appended a live
+        // event handler to the <img>, surviving the CssToInlineStyles DOM round-trip because the break-out
+        // happens before any parser sees the markup.
+        //
+        // So: any Blade echo inside a quoted attribute in a mail view must go through
+        // `App\Support\Mail\MailAttribute::escape()`, which is this map's missing half.
+        // `scripts/mail-attribute-lint.php` enforces it as a merge-blocking CI step; Doc #26 §5.2 carries
+        // the reasoning. ⚠️ Nothing outside the markdown-mail render is affected — every other Blade view
+        // still gets the framework default, and using that escaper there would be a second escape.
         Markdown::withSecuredEncoding();
 
         // Per-form `.any`/`.own` authorization (Increment D2). Registered explicitly rather than relying

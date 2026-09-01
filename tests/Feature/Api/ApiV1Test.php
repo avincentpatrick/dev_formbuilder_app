@@ -411,3 +411,52 @@ it('returns a tenant-not-identified envelope on the central host', function (): 
         ->assertNotFound()
         ->assertJsonPath('error.code', 'tenant_not_identified');
 });
+
+// ── M56: the envelope the CONTRACT documents is the envelope the surface returns ───────────────────
+
+it('answers 401, 403, 404 and 422 with the envelope and nothing beside it', function (): void {
+    // ⚠️ WRITTEN BECAUSE EVERY EXISTING ASSERTION ON THIS SURFACE WOULD PASS WITH THE DEFECT PRESENT.
+    // There are ~25 `assertJsonPath('error.code', …)` calls across the API suite and several
+    // `assertJsonStructure(['error' => [...]])` ones — and BOTH are subset checks. A response carrying
+    // `error` AND a top-level `message` satisfies every one of them. That is exactly the shape
+    // `openapi.json` published for the whole life of the surface, and no test could have contradicted
+    // it, because no test asserted what is ABSENT. This one asserts the exact top-level key set.
+    //
+    // ⛔ THIS IS THE BEHAVIOURAL HALF OF A PAIR. Its partner in OpenApiContractTest asserts the same
+    // shape in the published document. Neither is sufficient alone: the structural one can be green
+    // against a document describing a body nobody returns (that WAS the defect), and this one can be
+    // green against a document nobody regenerated.
+    $tenant = apiTenant();
+    enterTenant($tenant->id);
+    $admin = apiMember('admin');
+    $form = app(FormService::class)->create($tenant, $admin, 'Survey');
+    $readToken = $admin->createToken('ci', [ApiAbilities::READ_FORMS])->plainTextToken;
+
+    $base = 'http://acme.meridian.test/api/v1';
+
+    // [label, response, expected code, whether the documented body carries `details`]
+    $cases = [
+        ['401 unauthenticated', $this->getJson("{$base}/forms"), 'unauthenticated', false],
+        ['403 insufficient_ability', $this->withToken($readToken)
+            ->postJson("{$base}/forms/{$form->id}/versions/{$form->draft_version_id}/publish"), 'insufficient_ability', true],
+        ['404 not_found', $this->withToken($readToken)
+            ->getJson("{$base}/forms/".Str::uuid()->toString()), 'not_found', false],
+        ['422 validation_failed', $this->actingAs($admin)
+            ->postJson("{$base}/auth/tokens", ['name' => 'Bad key', 'abilities' => ['bogus:ability']]), 'validation_failed', true],
+    ];
+
+    foreach ($cases as [$label, $response, $expectedCode, $hasDetails]) {
+        $body = $response->json();
+
+        // The whole point: `error` is the ONLY top-level key. Laravel's default `{ message }` — which the
+        // contract used to promise — would surface here and nowhere else in the suite.
+        expect(array_keys($body))->toBe(['error'], $label);
+
+        $errorKeys = array_keys($body['error']);
+        sort($errorKeys);
+
+        expect($errorKeys)->toBe($hasDetails ? ['code', 'details', 'message'] : ['code', 'message'], $label)
+            ->and($body['error']['code'])->toBe($expectedCode, $label)
+            ->and($body['error']['message'])->toBeString()->not->toBeEmpty();
+    }
+});

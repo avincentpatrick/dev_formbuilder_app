@@ -2250,14 +2250,26 @@
                                 "schema": {
                                     "type": "object",
                                     "properties": {
-                                        "message": {
-                                            "type": "string",
-                                            "description": "Error overview.",
-                                            "example": ""
+                                        "error": {
+                                            "type": "object",
+                                            "properties": {
+                                                "code": {
+                                                    "type": "string",
+                                                    "description": "Stable machine-readable code for this refusal. The `/api/v1` surface answers every error with this envelope \u2014 see `docs/api-specification.md` \u00a72.3."
+                                                },
+                                                "message": {
+                                                    "type": "string",
+                                                    "description": "Human-readable English overview, for developer and support consumption. Never shown to a respondent \u2014 the public runtime renders its own localized copy keyed by `code`."
+                                                }
+                                            },
+                                            "required": [
+                                                "code",
+                                                "message"
+                                            ]
                                         }
                                     },
                                     "required": [
-                                        "message"
+                                        "error"
                                     ]
                                 }
                             }
@@ -2300,14 +2312,26 @@
                                 "schema": {
                                     "type": "object",
                                     "properties": {
-                                        "message": {
-                                            "type": "string",
-                                            "description": "Error overview.",
-                                            "example": ""
+                                        "error": {
+                                            "type": "object",
+                                            "properties": {
+                                                "code": {
+                                                    "type": "string",
+                                                    "description": "Stable machine-readable code for this refusal. The `/api/v1` surface answers every error with this envelope \u2014 see `docs/api-specification.md` \u00a72.3."
+                                                },
+                                                "message": {
+                                                    "type": "string",
+                                                    "description": "Human-readable English overview, for developer and support consumption. Never shown to a respondent \u2014 the public runtime renders its own localized copy keyed by `code`."
+                                                }
+                                            },
+                                            "required": [
+                                                "code",
+                                                "message"
+                                            ]
                                         }
                                     },
                                     "required": [
-                                        "message"
+                                        "error"
                                     ]
                                 }
                             }
@@ -4905,14 +4929,27 @@
                                 "schema": {
                                     "type": "object",
                                     "properties": {
-                                        "message": {
-                                            "type": "string",
-                                            "description": "Error overview.",
-                                            "example": "Re-enable the endpoint before redelivering."
+                                        "error": {
+                                            "type": "object",
+                                            "properties": {
+                                                "code": {
+                                                    "type": "string",
+                                                    "description": "Stable machine-readable code for this refusal. The `/api/v1` surface answers every error with this envelope \u2014 see `docs/api-specification.md` \u00a72.3."
+                                                },
+                                                "message": {
+                                                    "type": "string",
+                                                    "description": "Human-readable English overview, for developer and support consumption. Never shown to a respondent \u2014 the public runtime renders its own localized copy keyed by `code`.",
+                                                    "example": "Re-enable the endpoint before redelivering."
+                                                }
+                                            },
+                                            "required": [
+                                                "code",
+                                                "message"
+                                            ]
                                         }
                                     },
                                     "required": [
-                                        "message"
+                                        "error"
                                     ]
                                 }
                             }
@@ -7522,13 +7559,27 @@
                         "schema": {
                             "type": "object",
                             "properties": {
-                                "message": {
-                                    "type": "string",
-                                    "description": "Error overview."
+                                "error": {
+                                    "type": "object",
+                                    "properties": {
+                                        "code": {
+                                            "type": "string",
+                                            "description": "Stable machine-readable code: `unauthenticated`."
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Human-readable English overview, for developer and support consumption. Never shown to a respondent \u2014 the public runtime renders its own localized copy keyed by `code`.",
+                                            "example": "Authentication is required."
+                                        }
+                                    },
+                                    "required": [
+                                        "code",
+                                        "message"
+                                    ]
                                 }
                             },
                             "required": [
-                                "message"
+                                "error"
                             ]
                         }
                     }
@@ -7541,24 +7592,46 @@
                         "schema": {
                             "type": "object",
                             "properties": {
-                                "message": {
-                                    "type": "string",
-                                    "description": "Errors overview."
-                                },
-                                "errors": {
+                                "error": {
                                     "type": "object",
-                                    "description": "A detailed description of each field that failed validation.",
-                                    "additionalProperties": {
-                                        "type": "array",
-                                        "items": {
-                                            "type": "string"
+                                    "properties": {
+                                        "code": {
+                                            "type": "string",
+                                            "description": "Stable machine-readable code: `validation_failed`."
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Human-readable English overview, for developer and support consumption. Never shown to a respondent \u2014 the public runtime renders its own localized copy keyed by `code`.",
+                                            "example": "The given data was invalid."
+                                        },
+                                        "details": {
+                                            "type": "object",
+                                            "properties": {
+                                                "fields": {
+                                                    "type": "object",
+                                                    "description": "A detailed description of each field that failed validation, keyed by field name.",
+                                                    "additionalProperties": {
+                                                        "type": "array",
+                                                        "items": {
+                                                            "type": "string"
+                                                        }
+                                                    }
+                                                }
+                                            },
+                                            "required": [
+                                                "fields"
+                                            ]
                                         }
-                                    }
+                                    },
+                                    "required": [
+                                        "code",
+                                        "message",
+                                        "details"
+                                    ]
                                 }
                             },
                             "required": [
-                                "message",
-                                "errors"
+                                "error"
                             ]
                         }
                     }
@@ -7571,13 +7644,39 @@
                         "schema": {
                             "type": "object",
                             "properties": {
-                                "message": {
-                                    "type": "string",
-                                    "description": "Error overview."
+                                "error": {
+                                    "type": "object",
+                                    "properties": {
+                                        "code": {
+                                            "type": "string",
+                                            "description": "Stable machine-readable code: `forbidden` for a policy refusal, or `insufficient_ability` when the API token lacks a required ability."
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Human-readable English overview, for developer and support consumption. Never shown to a respondent \u2014 the public runtime renders its own localized copy keyed by `code`.",
+                                            "example": "You are not authorized to perform this action."
+                                        },
+                                        "details": {
+                                            "type": "object",
+                                            "properties": {
+                                                "missing": {
+                                                    "type": "array",
+                                                    "description": "Sent with `insufficient_ability`: the token abilities the route required and this token does not hold.",
+                                                    "items": {
+                                                        "type": "string"
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "code",
+                                        "message"
+                                    ]
                                 }
                             },
                             "required": [
-                                "message"
+                                "error"
                             ]
                         }
                     }
@@ -7590,13 +7689,27 @@
                         "schema": {
                             "type": "object",
                             "properties": {
-                                "message": {
-                                    "type": "string",
-                                    "description": "Error overview."
+                                "error": {
+                                    "type": "object",
+                                    "properties": {
+                                        "code": {
+                                            "type": "string",
+                                            "description": "Stable machine-readable code: `not_found`."
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Human-readable English overview, for developer and support consumption. Never shown to a respondent \u2014 the public runtime renders its own localized copy keyed by `code`.",
+                                            "example": "The requested resource was not found."
+                                        }
+                                    },
+                                    "required": [
+                                        "code",
+                                        "message"
+                                    ]
                                 }
                             },
                             "required": [
-                                "message"
+                                "error"
                             ]
                         }
                     }

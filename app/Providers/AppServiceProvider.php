@@ -50,6 +50,11 @@ use App\Support\Auth\SocialiteGoogleIdentityProvider;
 use App\Support\Connectors\ConnectorOAuthStateService;
 use App\Support\Guest\GuestChallengeService;
 use App\Support\Guest\GuestShareTokenService;
+use App\Support\OpenApi\ApiAuthenticationErrorResponse;
+use App\Support\OpenApi\ApiAuthorizationErrorResponse;
+use App\Support\OpenApi\ApiHttpErrorResponse;
+use App\Support\OpenApi\ApiNotFoundErrorResponse;
+use App\Support\OpenApi\ApiValidationErrorResponse;
 use App\Support\OpenApi\ModuleDisabledResponseExtension;
 use App\Support\Submissions\RandomSubmissionReferenceIssuer;
 use App\Support\Submissions\SubmissionReferenceIssuer;
@@ -514,6 +519,28 @@ class AppServiceProvider extends ServiceProvider
             // rather than a per-route patch — see ModuleDisabledResponseExtension for why the annotation
             // route cannot work when the gate lives on the route and not in the action.
             Scramble::configure()->withOperationTransformers(ModuleDisabledResponseExtension::class);
+
+            // M56. The four error COMPONENTS and every inline `abort()` body documented Laravel's
+            // default `{ message }`, which this surface has never returned: `bootstrap/app.php` renders
+            // /api/v1 through ApiErrorResponse's `{ error: { code, message, details? } }` envelope, and
+            // a final Throwable arm means nothing escapes it. Each class below extends its Scramble
+            // counterpart and overrides `toResponse()` alone, so `shouldHandle()` and `reference()` stay
+            // the vendor's — which is what holds all 113 `$ref` strings byte-identical.
+            //
+            // ⛔ THE ORDER IS LOAD-BEARING AND IS THE VENDOR'S OWN. TypeTransformer picks the matching
+            //    extension with `->reverse()->first()` (its comment: "latter registered extensions
+            //    have a higher priority"), so precedence is this list read BACKWARDS. Registered in
+            //    ScrambleServiceProvider's order — Validation, Authorization, Authentication, Http,
+            //    NotFound — the generic Http arm sits before NotFound and therefore loses to it, exactly
+            //    as it does among the defaults. Sort this list alphabetically and the 34 documented 404s
+            //    silently re-route through the generic arm.
+            Scramble::registerExtensions([
+                ApiValidationErrorResponse::class,
+                ApiAuthorizationErrorResponse::class,
+                ApiAuthenticationErrorResponse::class,
+                ApiHttpErrorResponse::class,
+                ApiNotFoundErrorResponse::class,
+            ]);
 
             Scramble::extendOpenApi(function (OpenApi $openApi): void {
                 $openApi->secure(SecurityScheme::http('bearer')->as('sanctumToken'));

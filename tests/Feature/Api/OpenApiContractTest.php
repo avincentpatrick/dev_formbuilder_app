@@ -160,3 +160,97 @@ it('keeps the published event_types enum in step with DomainEventType', function
         expect($actual)->toBe($expected);
     }
 });
+
+it('documents the /api/v1 error envelope on every error response it publishes', function (): void {
+    // ⛔ M56. THE DOCUMENT USED TO PROMISE A BODY THE SURFACE HAS NEVER RETURNED. Scramble's five default
+    // exception extensions all describe Laravel's `{ message }`; `bootstrap/app.php` renders every
+    // /api/v1 error through ApiErrorResponse's `{ error: { code, message, details? } }` (§2.3), with a
+    // final Throwable arm so nothing escapes it. Four shared components (113 $refs across 68 operations)
+    // and three inline `abort()` bodies were wrong in exactly the same way. A client generated from the
+    // contract looked for a top-level field that never arrives.
+    //
+    // ⚠️ THIS IS A CENSUS, NOT A CHECK ON THE SEVEN KNOWN CASES — deliberately. The backlog row named
+    // only `components.responses`, and scoping a gate to what the row named would have left the three
+    // inline bodies wrong and unwatched, since no component references them. Anything published as an
+    // error, by any mechanism, is asserted here.
+    //
+    // ⚠️ AND IT DESCENDS anyOf/oneOf/allOf. `403 POST /public/f/{shareToken}/draft` is a two-branch
+    // union with no top-level `properties` at all; both branches are correct envelopes. A naive
+    // "top-level properties must be exactly [error]" rule calls that a defect, which is how a gate
+    // starts costing more than it catches.
+    /** @var array<string, mixed> $spec */
+    $spec = json_decode((string) file_get_contents(base_path('openapi.json')), true, flags: JSON_THROW_ON_ERROR);
+
+    $describesEnvelope = function (array $schema) use (&$describesEnvelope): bool {
+        foreach (['anyOf', 'oneOf', 'allOf'] as $combinator) {
+            if (isset($schema[$combinator]) && is_array($schema[$combinator])) {
+                foreach ($schema[$combinator] as $branch) {
+                    if (! is_array($branch) || ! $describesEnvelope($branch)) {
+                        return false;
+                    }
+                }
+
+                return $schema[$combinator] !== [];
+            }
+        }
+
+        if (array_keys($schema['properties'] ?? []) !== ['error']) {
+            return false;
+        }
+
+        $error = $schema['properties']['error'];
+        $properties = array_keys($error['properties'] ?? []);
+        $required = $error['required'] ?? [];
+
+        // ⚠️ `code` and `message` are always present and always required; `details` is optional on most
+        // statuses and REQUIRED on the 422, whose every cause sends a field map. So this asks that the
+        // two guaranteed keys are required — not that the required set is exactly those two, which is
+        // what the first draft of this gate asked, and what it went red on. The gate was wrong, not the
+        // document, and it is recorded here because a gate corrected by loosening is the one worth
+        // explaining.
+        return in_array('code', $properties, true)
+            && in_array('message', $properties, true)
+            && in_array('code', $required, true)
+            && in_array('message', $required, true);
+    };
+
+    // Every shared error component, plus every INLINE >= 400 body. A `$ref` is skipped because the
+    // component it points at is checked on its own — checking it again per referrer would report the
+    // same defect 113 times.
+    $published = [];
+
+    foreach ($spec['components']['responses'] ?? [] as $name => $response) {
+        $published["components.responses.{$name}"] = $response;
+    }
+
+    foreach ($spec['paths'] as $path => $methods) {
+        foreach ($methods as $method => $operation) {
+            if (! is_array($operation) || ! isset($operation['responses'])) {
+                continue;
+            }
+
+            foreach ($operation['responses'] as $status => $response) {
+                if (isset($response['$ref']) || (int) $status < 400) {
+                    continue;
+                }
+
+                $published[strtoupper((string) $method)." {$path} → {$status}"] = $response;
+            }
+        }
+    }
+
+    // ⛔ A FLOOR, BECAUSE A WALK THAT MATCHES NOTHING PASSES. If a future refactor moves error responses
+    // somewhere this traversal does not reach, the loop below runs zero times and reports success — the
+    // failure mode CLAUDE.md records for every gate that scans a tree. 16 is what exists today (4
+    // components + 12 inline); the assertion is `>=` so adding a route cannot turn it red.
+    expect(count($published))->toBeGreaterThanOrEqual(16);
+
+    foreach ($published as $where => $response) {
+        $schema = $response['content']['application/json']['schema'] ?? null;
+
+        expect($schema)->toBeArray("{$where}: publishes no application/json schema");
+        expect($describesEnvelope($schema))->toBeTrue(
+            "{$where}: does not document { error: { code, message } } — see api-specification.md §2.3"
+        );
+    }
+});

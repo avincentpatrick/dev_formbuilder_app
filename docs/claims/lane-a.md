@@ -16,76 +16,135 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — the canonical schema reference documents database-side defaults the database has never had (`m58-documented-default-drift`)
+## Status: NO ACTIVE CLAIM — `M58` is merged; two `major` rows remain, one documentation and one tracker surgery
 
-Taken 2026-09-01. Branch `m58-documented-default-drift`, cut from `origin/main` at `2b9c40c`, PR into `main`.
-Row: `docs/feature-backlog.md`, `R-50703a07` — **"The data dictionary states a `uuidv7()` DATABASE-SIDE
-DEFAULT on thirty table rows, and no migration sets one"**, filed by `M46` (2026-08-29). It is the largest
-of the three remaining `major` rows and the one `docs/backlog-triage.md`'s third-ranked class covers; the
-other two — the README's unrunnable design-system command and the `## Current Status` surgery — stay open.
+**`M58` closed the largest of the three remaining `major` rows, and the row was a floor in a direction it
+never names.** Its evidence held exactly — every one of its four assertions measured true — while its
+scope was **three times** what it claimed and its offered remedy fork was **dissolved by the one lookup it
+declined to do**. **2 `major` rows remain**: the README's unrunnable design-system command, and the
+`## Current Status` tracker surgery. Neither is a code defect.
 
-### Evidence verified
+⚠️ **For whoever takes the tracker surgery: that row's central warning may be spent.** It says the section
+*"has two writers"* and that a slice moving both lanes' bullets is the one thing Rule 7(b) forbids.
+`docs/claims/lane-b.md` has read `## Status: RETIRED` since `M50`. **Verify it before planning around it**
+— it was not verified here, only noticed.
 
-The row carries no `file:line` citations, so each of its four assertions was measured instead — against
-`database/migrations/` and against `information_schema.columns` on the running stack.
+⛔ **`D9` must never be started without an explicit answer.** Open decisions: `D1`, `D3`, `D4`, `D8`, `D9`, `D10`.
 
-| The row asserts | Verdict |
-|---|---|
-| `docs/data-dictionary.md` carries `uuidv7()` in the `Default` column of thirty `id` rows | **HELD, and low.** 31 such cells in that file, 4 more in a file the row does not name. |
-| No migration declares any database-side UUID default | **HELD.** 0 of 37 `uuid` `id` columns carry a `column_default`. |
-| The preamble conditions the native default on PostgreSQL 18+ | **HELD** as a quotation, **and the framing around it does not.** See the remedy verdict. |
-| Live | **HELD.** |
+⛔ **RUN `php scripts/state.php` FOR EVERY NUMBER.**
 
-⛔ **THE ROW UNDERSTATES ITSELF BY ROUGHLY THREE TIMES, AND THE MISSING HALF IS THE LARGER ONE.** The
-defect is not `uuidv7()`; it is *any* function named in the `Default` column. Measured across the two
-documents that carry column tables:
+---
 
-| | Cells |
-|---|---|
-| `uuidv7()`, false | 31 |
-| `now()`, false — **a value the row never mentions** | 61 |
-| Function-shaped `Default` cells that are **TRUE** | **2** |
+## RELEASED — `M58`, the canonical schema reference documents database-side defaults the database has never had (merged as PR #249, `220f827`, 6/6 green with real step counts — Static analysis 23 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 
-⚠️ **The second document is `docs/multi-tenancy-rbac-design.md`** (§6, §7, §8.1, §8.2 — 8 cells). It is the
-same false claim in a document the row does not name, which is the failure `docs/backlog-triage.md`
-predicted for 14 of the 68 rows it triaged.
+**Shipped 2026-09-01.** Branch `m58-documented-default-drift`. Every claimed file was edited, plus one that
+was not claimed: `docs/adr/0008-entitlement-and-metering.md` — see *the citation I moved*, below. The claim
+was not extended otherwise.
 
-⛔ **AND THE TWO SURVIVORS ARE WHY THIS IS NOT A FIND-AND-REPLACE.** `audits.created_at` and
-`feedback_reports.submitted_at` really do carry `CURRENT_TIMESTAMP`, put there by `->useCurrent()` in
-`create_audits_table` and `create_feedback_reports_table`. A sweep over `now()` would falsify two correct
-rows while repairing sixty-one.
+### ⛔ THE ROW'S EVIDENCE WAS EXACT AND ITS SCOPE WAS A THIRD OF THE TRUTH
 
-### Remedy verdict
+Four assertions, four measured, four held — including the one that decides everything: **0 of 37 `uuid`
+`id` columns carry a `column_default`.** And this server is **PostgreSQL 17.5**, so `uuidv7()` is not
+merely undeclared here, *it does not exist*.
 
-The row offers a fork — *"either the column rows say 'application-generated' or the preamble's conditional
-is repeated per row; choosing which is a documentation decision, not a lookup"* — and **the fork is false,
-because the lookup it declines to do is what settles it.** This server is **PostgreSQL 17.5**, so
-`uuidv7()` is not merely undeclared, it does not exist; the preamble's own conditional therefore resolves
-to its second branch (*"generate UUIDv7 client-side … and remove the DB-side default"*), which is what
-`App\Models\Concerns\HasUuidv7` has been doing across 45 models all along. **Repeating the conditional per
-row would repeat an unresolved choice on a system that resolved it.** The rows state what is true; the
-preamble becomes a statement and keeps its rationale and its PG-18 forward option.
+But the defect is not `uuidv7()`. It is **any function named in the `Default` column**, and the half the
+row never mentions is the larger one:
 
-⚠️ **One thing the row gets generous rather than wrong:** *"the preamble is not wrong"*. It is not false,
-but it is a live conditional over a settled question, which is why it is in scope rather than left alone.
+| | Cells | Columns |
+|---|---|---|
+| `uuidv7()` on an `id` row | 32 | 32 |
+| **`now()` on a timestamp row — absent from the row entirely** | **61** | **74** |
+| **True, and therefore untouched** | **2** | **2** |
 
-Files: `docs/data-dictionary.md`, `docs/multi-tenancy-rbac-design.md`,
-`tests/Feature/Migrations/DocumentedDefaultDriftTest.php` (new), `docs/feature-backlog.md`,
-`docs/claims/lane-a.md`, `PROGRESS.md`.
-Shared artefacts taken: `docs/data-dictionary.md`, `docs/multi-tenancy-rbac-design.md`,
-`docs/feature-backlog.md`, `PROGRESS.md` (Lane A block only). Not taken: `openapi.json`, `phpunit.xml`.
-Paired files taken: none.
-Namespaces spent: **nothing from either namespace** — no migration, no ADR, no `§D`. The gate is a Pest
-file under `tests/Feature`, which `php artisan test` already discovers, so no `composer.json` or `ci.yml`
-registration either.
-Prediction: the docs-and-test diff cannot move PHPStan (it scans `app`, `database`, `routes`) and cannot
-move Vitest, axe or E2E; Pint runs on the host over a diff with no PHP style surface but the new test file;
-the Pest job's **step** count stays put while its test and assertion counts rise. **The one I most expect
-to be wrong is the cell count**: 92 was measured against this host's known-hybrid database, which is
-missing `sso_verified_domains` despite its migration being in the tree, so a freshly-migrated schema
-should push the count **up**, not down. Second most likely wrong: that the combined
-`` `created_at` / `updated_at` `` cell form — one cell covering two columns, 13 of them — is handled
-correctly by the parser's first draft.
+The second document is `docs/multi-tenancy-rbac-design.md`, which the row does not name — the same failure
+`docs/backlog-triage.md` predicted for 14 of the 68 rows it triaged, landing on a row filed *after* that
+census.
+
+### ⛔ THE FINDING THAT DECIDED THE SHAPE OF THE FIX
+
+**Exactly two function-shaped `Default` cells in the entire corpus are true** — `audits.created_at` and
+`feedback_reports.submitted_at`, both from a real `->useCurrent()`. **A sweep over `now()` would have
+falsified two correct rows while repairing sixty-one.** That is the whole argument for closing this with a
+gate rather than a replace, and it is why the third control below is the one that matters: it sweeps the
+*true* cell as well, and must redden the discriminator while leaving the phantom sweep green.
+
+### Remedy verdict: the offered fork is FALSE, and the lookup it declines is what dissolves it
+
+The row says *"either the column rows say 'application-generated' or the preamble's conditional is repeated
+per row; choosing which is a documentation decision, not a lookup."* Repeating the conditional would repeat
+an **unresolved choice on a system that resolved it**: `App\Models\Concerns\HasUuidv7` mints the key in PHP
+across 45 models, and the preamble's own reason (b) — the offline client needs the key *before* the row
+reaches the server — makes client-side generation correct **independently of the server version**. A
+DB-side default would never have filled that column even on PG 18.
+
+⚠️ **And the row is too generous to the preamble.** *"The preamble is not wrong"* is true as far as it
+goes; it is a **live conditional over a settled question**, which is a different defect from a false
+sentence and is why it was in scope rather than left alone. ➕ **In the same paragraph, unprompted:**
+*"Two tables deliberately deviate … `bigint identity`"* was itself stale. There are **five**.
+
+### The gate, and why it is not a lint script
+
+`tests/Feature/Migrations/DocumentedDefaultDriftTest.php` — `RefreshDatabase`, raw `DB::select` against
+`information_schema`. ⛔ **Deliberately a test and not a `scripts/*-lint.php` sibling.** That pattern
+exists because a drift failure names a constraint and not the file that wrote it; here the defect **is** a
+document, so the failure already names file, table and column, and a static twin would have to infer
+defaults from `->default()` / `->useCurrent()` / `->nullable()` / raw `DB::statement` against a question
+the catalog answers exactly. It checks **presence, not equality** — `now()` is documented where Postgres
+reports `CURRENT_TIMESTAMP`, and demanding string equality would fail on a synonym.
+
+Proved red four ways through `scripts/mutate.php`, sha256 asserted to move and to return:
+
+| Control | Result | What went red |
+|---|---|---|
+| An `id` row re-asserts `uuidv7()` | CAUGHT | the sweep |
+| A timestamp row re-asserts `now()` | CAUGHT | the sweep |
+| **The TRUE `audits.created_at` cell is swept too** | **CAUGHT** | **the discriminator only — the sweep stayed green, at 15 assertions not 18** |
+| The table-header shape changes | CAUGHT | both, at **4** assertions not 18 — the floor fired instead of reporting green over nothing |
+
+### How the prediction fared — one right, one right for a better reason than I gave, one wrong
+
+- ✅ **"The one I most expect to be wrong is the cell count."** It was, in the predicted direction and for
+  the predicted reason: 92 measured locally, **93 cells / 106 columns** on a fresh schema. This host's
+  database is missing `sso_verified_domains` despite its migration being in the tree. ⚠️ **The lesson is
+  the one that generalises: a local measurement against this hybrid database is a FLOOR, and the number
+  that goes in a document must come from `RefreshDatabase`.**
+- ✅ **Correct, and the gate itself is the reason:** the Pest job's step count stayed at 11 and Static
+  analysis stayed at 23, because the gate needed no `composer.json` or `ci.yml` entry — `php artisan test`
+  already discovers `tests/Feature`.
+- ⛔ **WRONG, AND IT IS THE SAME DEFECT `M57` RECORDED ONE INCREMENT AGO.** *"The docs-and-test diff cannot
+  move anything else."* The preamble rewrite added **two lines** to `docs/data-dictionary.md`, which shifts
+  every line-number citation into that file past it. **`citation-liveness-lint` passed at ledger tier 18,
+  unchanged, and could not have caught it** — it checks a cited line is ALIVE, never that it still says
+  what the citing sentence claims, which is the limit `M46` filed at the moment it shipped the gate.
+  Found by hand, checking all eleven citations: ten were **already rotten before this branch existed**
+  (pointing at blank lines, table separators and unrelated rows), and exactly one was correct and moved —
+  `docs/adr/0008-entitlement-and-metering.md`'s `data-dictionary.md:22`, now `:24`. Its sibling `:622` in
+  the same parenthesis was already dead and was repaired to `:760` while in the sentence.
+  ⚠️ **`PROGRESS_ARCHIVE.md`'s citation was left alone deliberately** — a dated record is history, and
+  rewriting one falsifies the log.
+
+### ⚠️ Two things about the local suite that are worth more than the green
+
+- **The full local `php artisan test` run was INCONCLUSIVE and reported exit code 0.** It fataled on the
+  container's 128 MB limit: `artisan test` spawns subprocess workers that **do not inherit** the CLI
+  `-d memory_limit` flag, and **the pipe hid the exit status** — the documented trap, met in the wild.
+  What was run instead, and is the honest evidence: `vendor/bin/pest tests/Feature/Migrations` **in
+  process** with the raised limit, which also proves the one local risk this file carries — Pest loads a
+  directory into a single process, so a file-scope helper colliding with `SubmissionReferenceBackfillTest`
+  would be a fatal redeclaration. 9 passed, 45 assertions. CI's Pest job is the authority and is green.
+- **Pint's own probe is why its result is trustworthy**: `preflight --with-pint` proves the scan is real by
+  failing on a deliberate probe first. It then found one genuine style issue in the new test file
+  (`single_quote`), which a bare green would not have distinguished from a blind pass.
+
+### Filed rather than fixed, each at the moment it was decided
+
+- **The gate reads function-shaped cells only.** A documented *literal* that disagrees with the database is
+  invisible to it — and that is most of the column. Scoped out because the literal comparison needs a
+  normalizer per type (`'local'::character varying` against `'local'`), so a first draft would fire on
+  formatting rather than drift. **Honestly a second gate, not a widened predicate.**
+- **`submission_geo_index` is a real table the data dictionary does not mention at all** — found while
+  reconciling the `bigint identity` deviation list. Documenting a table means recovering its semantics,
+  PII classification and RLS shape; that is its own row.
 
 ---
 

@@ -278,3 +278,28 @@ it('exposes no activate endpoint', function (): void {
 
     expect(Domain::unscopedQuery()->where('domain', 'forms.acme-example.com')->sole()->activated_at)->toBeNull();
 });
+
+it('wraps the bare abort() refusal in the same envelope the contract now documents', function (): void {
+    // ⚠️ MEASURED RATHER THAN REASONED, AND THAT IS THE POINT OF THE CASE. M56 documented the inline
+    // bodies a bare `abort($code)` produces — this route's 422 is one of three on the surface — and the
+    // claim that an `abort()` is enveloped at all rested entirely on READING the final Throwable arm in
+    // bootstrap/app.php. Every test of these three routes, including the one directly above, asserts
+    // `assertStatus(...)` and never opens the body, so nothing measured it until now.
+    //
+    // ⛔ AND IT IS WHY THE GENERIC ARM DOCUMENTS `code` AS A DESCRIBED STRING RATHER THAN A PER-STATUS
+    // MATCH. The code here is `request_failed`, assigned by the catch-all's DEFAULT branch and not by
+    // any rule keyed on 422 — so naming a code per status in the document would have put a second copy
+    // of that closure chain in the documentation layer, to drift the next time a closure is added.
+    $token = domainApiToken();
+    $tenant = Tenant::query()->where('slug', 'acme')->sole();
+    customDomain($tenant, 'forms.acme-example.com', verified: true, activated: false);
+
+    $body = $this->withToken($token)
+        ->postJson('http://acme.meridian.test/api/v1/domains/forms.acme-example.com/primary')
+        ->assertStatus(422)
+        ->json();
+
+    expect(array_keys($body))->toBe(['error'])
+        ->and(array_keys($body['error']))->toBe(['code', 'message'])
+        ->and($body['error']['code'])->toBe('request_failed');
+});

@@ -278,7 +278,7 @@ it('does not document a database-side default the database does not have', funct
 
     expect($phantom)->toBe(
         [],
-        "The Default column claims a database-side default the database does not have — the value is ".
+        'The Default column claims a database-side default the database does not have — the value is '.
         "supplied by the application, so the document must say so:\n".implode("\n", $phantom)
     );
 });

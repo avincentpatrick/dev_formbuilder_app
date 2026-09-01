@@ -77,6 +77,7 @@
         "job-payload-lint": "@php scripts/job-payload-lint.php",
         "constraint-boundary-lint": "@php scripts/constraint-boundary-lint.php",
         "component-import-lint": "@php scripts/component-import-lint.php",
+        "mail-attribute-lint": "@php scripts/mail-attribute-lint.php",
         "tracker-lint": "@php scripts/tracker-lint.php",
         "tracker-lint-controls": "@php scripts/tracker-lint-controls.php",
         "citation-liveness-lint": "@php scripts/citation-liveness-lint.php",
@@ -93,6 +94,7 @@
             "@job-payload-lint",
             "@constraint-boundary-lint",
             "@component-import-lint",
+            "@mail-attribute-lint",
             "@tracker-lint",
             "@tracker-lint-controls",
             "@citation-liveness-lint"

@@ -16,16 +16,76 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M57` is merged; three `major` rows remain, all of them documentation or tracker work
+## Status: ACTIVE CLAIM — the canonical schema reference documents database-side defaults the database has never had (`m58-documented-default-drift`)
 
-**`M57` closed the newest `major` and, like `M56`, the row was a floor rather than a census** — but it was
-wrong in *both* directions this time, not merely short. **3 `major` rows remain**: the data dictionary's
-thirty phantom `uuidv7()` defaults, the README's unrunnable design-system command, and the `## Current
-Status` tracker surgery. None is a code defect.
+Taken 2026-09-01. Branch `m58-documented-default-drift`, cut from `origin/main` at `2b9c40c`, PR into `main`.
+Row: `docs/feature-backlog.md`, `R-50703a07` — **"The data dictionary states a `uuidv7()` DATABASE-SIDE
+DEFAULT on thirty table rows, and no migration sets one"**, filed by `M46` (2026-08-29). It is the largest
+of the three remaining `major` rows and the one `docs/backlog-triage.md`'s third-ranked class covers; the
+other two — the README's unrunnable design-system command and the `## Current Status` surgery — stay open.
 
-⛔ **`D9` must never be started without an explicit answer.** Open decisions: `D1`, `D3`, `D4`, `D8`, `D9`.
+### Evidence verified
 
-⛔ **RUN `php scripts/state.php` FOR EVERY NUMBER.**
+The row carries no `file:line` citations, so each of its four assertions was measured instead — against
+`database/migrations/` and against `information_schema.columns` on the running stack.
+
+| The row asserts | Verdict |
+|---|---|
+| `docs/data-dictionary.md` carries `uuidv7()` in the `Default` column of thirty `id` rows | **HELD, and low.** 31 such cells in that file, 4 more in a file the row does not name. |
+| No migration declares any database-side UUID default | **HELD.** 0 of 37 `uuid` `id` columns carry a `column_default`. |
+| The preamble conditions the native default on PostgreSQL 18+ | **HELD** as a quotation, **and the framing around it does not.** See the remedy verdict. |
+| Live | **HELD.** |
+
+⛔ **THE ROW UNDERSTATES ITSELF BY ROUGHLY THREE TIMES, AND THE MISSING HALF IS THE LARGER ONE.** The
+defect is not `uuidv7()`; it is *any* function named in the `Default` column. Measured across the two
+documents that carry column tables:
+
+| | Cells |
+|---|---|
+| `uuidv7()`, false | 31 |
+| `now()`, false — **a value the row never mentions** | 61 |
+| Function-shaped `Default` cells that are **TRUE** | **2** |
+
+⚠️ **The second document is `docs/multi-tenancy-rbac-design.md`** (§6, §7, §8.1, §8.2 — 8 cells). It is the
+same false claim in a document the row does not name, which is the failure `docs/backlog-triage.md`
+predicted for 14 of the 68 rows it triaged.
+
+⛔ **AND THE TWO SURVIVORS ARE WHY THIS IS NOT A FIND-AND-REPLACE.** `audits.created_at` and
+`feedback_reports.submitted_at` really do carry `CURRENT_TIMESTAMP`, put there by `->useCurrent()` in
+`create_audits_table` and `create_feedback_reports_table`. A sweep over `now()` would falsify two correct
+rows while repairing sixty-one.
+
+### Remedy verdict
+
+The row offers a fork — *"either the column rows say 'application-generated' or the preamble's conditional
+is repeated per row; choosing which is a documentation decision, not a lookup"* — and **the fork is false,
+because the lookup it declines to do is what settles it.** This server is **PostgreSQL 17.5**, so
+`uuidv7()` is not merely undeclared, it does not exist; the preamble's own conditional therefore resolves
+to its second branch (*"generate UUIDv7 client-side … and remove the DB-side default"*), which is what
+`App\Models\Concerns\HasUuidv7` has been doing across 45 models all along. **Repeating the conditional per
+row would repeat an unresolved choice on a system that resolved it.** The rows state what is true; the
+preamble becomes a statement and keeps its rationale and its PG-18 forward option.
+
+⚠️ **One thing the row gets generous rather than wrong:** *"the preamble is not wrong"*. It is not false,
+but it is a live conditional over a settled question, which is why it is in scope rather than left alone.
+
+Files: `docs/data-dictionary.md`, `docs/multi-tenancy-rbac-design.md`,
+`tests/Feature/Migrations/DocumentedDefaultDriftTest.php` (new), `docs/feature-backlog.md`,
+`docs/claims/lane-a.md`, `PROGRESS.md`.
+Shared artefacts taken: `docs/data-dictionary.md`, `docs/multi-tenancy-rbac-design.md`,
+`docs/feature-backlog.md`, `PROGRESS.md` (Lane A block only). Not taken: `openapi.json`, `phpunit.xml`.
+Paired files taken: none.
+Namespaces spent: **nothing from either namespace** — no migration, no ADR, no `§D`. The gate is a Pest
+file under `tests/Feature`, which `php artisan test` already discovers, so no `composer.json` or `ci.yml`
+registration either.
+Prediction: the docs-and-test diff cannot move PHPStan (it scans `app`, `database`, `routes`) and cannot
+move Vitest, axe or E2E; Pint runs on the host over a diff with no PHP style surface but the new test file;
+the Pest job's **step** count stays put while its test and assertion counts rise. **The one I most expect
+to be wrong is the cell count**: 92 was measured against this host's known-hybrid database, which is
+missing `sso_verified_domains` despite its migration being in the tree, so a freshly-migrated schema
+should push the count **up**, not down. Second most likely wrong: that the combined
+`` `created_at` / `updated_at` `` cell form — one cell covering two columns, 13 of them — is handled
+correctly by the parser's first draft.
 
 ---
 

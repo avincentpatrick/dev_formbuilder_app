@@ -166,6 +166,65 @@ it('renders markdown link syntax in an interpolated name as inert text', functio
         ->and($html)->toContain('Reset your password');
 });
 
+it('cannot break out of the header alt attribute with a quote-bearing tenant name', function (): void {
+    // M57. The defect this closes, and the reason the sibling case above did not catch it: secured
+    // encoding escapes `[`, `<` and `>` and NOT `"`, so the markdown-injection test passes while an
+    // attribute break-out sails through. Measured on the tree BEFORE the fix, the rendered header was:
+    //
+    //     <img src="…" class="logo" alt="Acme" onerror="alert(1)" style="…">
+    //
+    // — a live event handler as a SEPARATE attribute, normalised into one by CssToInlineStyles' own DOM
+    // round-trip rather than repaired by it, because the break-out happens at string concatenation
+    // before any parser sees the markup.
+    //
+    // ⛔ THIS ASSERTS THE ATTRIBUTE SET, AND A TEXT ASSERTION HERE WOULD BE VACUOUS — measured, not
+    // feared. After the fix the inliner re-emits the attribute SINGLE-quoted rather than encoding the
+    // quote: `alt='Acme" onerror="alert(1)'`. So the substring ` onerror=` is present in BOTH the
+    // broken and the fixed output, and every text-level needle that distinguishes them is really an
+    // assertion about which quote character symfony/css-selector happened to choose. The invariant is
+    // that the payload lands entirely inside the alt VALUE and creates no attribute; that is what is
+    // asserted. (The first draft of this test asserted `&quot; onerror=&quot;` — the form the PDF
+    // surface produces — and was red against a correct fix.)
+    $brand = stubBrandPalette();
+    $brand['name'] = 'Acme" onerror="alert(1)';
+
+    $html = renderStubMail($brand);
+
+    preg_match('/<img[^>]*>/', $html, $matches);
+    expect($matches)->not->toBeEmpty();
+
+    $img = new DOMDocument;
+    $img->loadHTML($matches[0], LIBXML_NOERROR);
+    $node = $img->getElementsByTagName('img')->item(0);
+
+    $attributes = [];
+    foreach ($node->attributes as $attribute) {
+        $attributes[$attribute->name] = $attribute->value;
+    }
+
+    // Equality, not "does not have onerror" — an allow-list is what catches the NEXT event handler.
+    expect(array_keys($attributes))->toBe(['src', 'class', 'alt', 'style']);
+    expect($attributes['alt'])->toBe('Acme" onerror="alert(1)');
+});
+
+it('does not double-encode a name the secured encoder has already escaped', function (): void {
+    // M57. This pins the remedy that was REJECTED, which is the only reason it earns a place: escaping
+    // with htmlspecialchars at its default `double_encode: true` would turn the secured map's own
+    // `&lt;` into `&amp;lt;` and ship it to the images-off audience the alt text exists for.
+    //
+    // ⚠️ Stated rather than implied: this case does NOT discriminate the fix from the unfixed tree —
+    // DOMDocument emits a bare `&` in an attribute as `&amp;` either way. It discriminates the fix from
+    // the WRONG fix. The quote case above is the one that moves when the escaper is removed.
+    $brand = stubBrandPalette();
+    $brand['name'] = 'Acme & <Co>';
+
+    $html = renderStubMail($brand);
+
+    expect($html)->toContain('alt="Acme &amp; &lt;Co&gt;"');
+    expect($html)->not->toContain('&amp;amp;');
+    expect($html)->not->toContain('&amp;lt;');
+});
+
 it('resolves the meridian theme and not the framework default', function (): void {
     $html = renderStubMail(stubBrandPalette());
 

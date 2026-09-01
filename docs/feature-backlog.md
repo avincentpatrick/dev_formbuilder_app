@@ -3513,7 +3513,34 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   constraint (`:34`) rather than the one that shipped (`:40`), so a backfill or fixture setting
   `acting_as_user_id = user_id` gets a 23514 from a constraint the canonical schema reference denies.
   **Live**, and the section enumerates CHECKs exhaustively elsewhere, so the negative reads as complete.
-- **`major` · The data dictionary states a `uuidv7()` DATABASE-SIDE DEFAULT on thirty table rows, and no migration sets one.**
+- ~~**`major` · The data dictionary states a `uuidv7()` DATABASE-SIDE DEFAULT on thirty table rows, and no migration sets one.**~~
+  ✅ **CLOSED — `M58` (2026-09-01). THE EVIDENCE HELD EXACTLY AND THE SCOPE WAS UNDERSTATED BY THREE TIMES,
+  IN A DIRECTION THE ROW DOES NOT MENTION.** The row's four assertions were each measured and each held:
+  this server is **PostgreSQL 17.5**, and **0 of 37** `uuid` `id` columns carried a `column_default`. But
+  the defect is not `uuidv7()` — it is **any function named in the `Default` column**, and the larger half
+  is `now()`. Measured against a freshly migrated schema: **93 cells covering 106 columns** — 32 `id` cells
+  claiming `uuidv7()`, 74 timestamp cells claiming `now()` — across **two** documents, the second being
+  `docs/multi-tenancy-rbac-design.md`, which the row does not name. ⛔ **AND EXACTLY TWO FUNCTION-SHAPED
+  CELLS IN THE WHOLE CORPUS ARE TRUE:** `audits.created_at` and `feedback_reports.submitted_at`, both from
+  `->useCurrent()`. **A sweep over `now()` would have falsified two correct rows while repairing
+  sixty-one** — which is the whole argument for closing this with a gate rather than a replace.
+  ⚠️ **THE ROW'S OFFERED FORK IS FALSE, AND THE LOOKUP IT DECLINES TO DO IS WHAT DISSOLVES IT.** *"Either
+  the column rows say 'application-generated' or the preamble's conditional is repeated per row; choosing
+  which is a documentation decision, not a lookup."* Repeating the conditional would repeat an **unresolved
+  choice on a system that resolved it years of increments ago**: `App\Models\Concerns\HasUuidv7` mints the
+  key in PHP across 45 models, and reason (b) in the preamble's own rationale — the offline client needs the
+  key before the row reaches the server — makes client-side generation correct **independently of the server
+  version**, so a DB-side default would never have been the thing that filled the column even on PG 18.
+  ➕ **BEYOND THE ROW, IN THE SAME PARAGRAPH:** the preamble's *"Two tables deliberately deviate … and use
+  `bigint identity`"* was itself stale — there are **five** (`submission_answer_index`, `usage_counters`,
+  `legacy_overrides`, `point_awards`, `badge_awards`). Corrected with it.
+  **The gate is `tests/Feature/Migrations/DocumentedDefaultDriftTest.php`**, which reads
+  `information_schema` on a `RefreshDatabase` schema — deliberately a test and not a lint script, because
+  the defect *is* a document and a static twin would have to infer defaults from `->default()` /
+  `->useCurrent()` / raw `DB::statement` against a question the catalog answers exactly. Proved red four
+  ways, and **the one that matters is the third**: sweeping the *true* `audits.created_at` cell as well
+  turns the discriminator red while the phantom sweep stays green, so the gate is not merely banning the
+  word `now()`. Original filing follows.
   Filed by M46 (2026-08-29) while closing the `audits` CHECK row, because it is the same class one order of
   magnitude larger: **the canonical schema reference asserting a schema property the database does not have.**
   `docs/data-dictionary.md` carries `uuidv7()` in the `Default` column of thirty `id` rows. Measured against
@@ -3526,6 +3553,28 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   from the per-table rows — which is what those rows are for — gets it wrong thirty times. **The fix is
   mechanical but not one-line**: either the column rows say "application-generated" or the preamble's
   conditional is repeated per row; choosing which is a documentation decision, not a lookup. **Live.**
+- **`minor` · The documented-default gate reads FUNCTION-shaped cells only, so a documented LITERAL that
+  disagrees with the database is invisible to it.** Filed by `M58` (2026-09-01) at the moment the scope was
+  decided, rather than left as a comment inside the test nobody re-reads.
+  `tests/Feature/Migrations/DocumentedDefaultDriftTest.php` compares a `Default` cell to the live schema
+  only when the cell names a function — `now()`, `uuidv7()`. A cell reading `'{}'::jsonb`, `false`, `0` or
+  `'trial'` is skipped. ⚠️ **That is not a small remainder**: it is most of the column, and the corpus
+  carries hundreds of them. It was scoped out because the literal comparison is the noisy half — Postgres
+  reports `'local'::character varying` where a document reasonably writes `'local'`, `false` where a
+  document writes `No`, so the check needs a normalizer per type rather than a presence test, and a first
+  draft would fire on formatting instead of on drift. **The honest sizing is "a second gate", not "widen
+  the predicate".** ⛔ **And the class is proven live, not hypothetical** — the 106 columns this increment
+  repaired were exactly this defect wearing its function-shaped half. **Live.**
+- **`minor` · `submission_geo_index` is a real table and the data dictionary does not mention it at all.**
+  Found by `M58` (2026-09-01) while reconciling the primary-key-strategy preamble's `bigint identity`
+  deviation list against the schema. The table exists in the migrated database with a `bigint` `id`, and
+  `docs/data-dictionary.md` — whose own header calls itself *"the source of truth for column-level
+  shape"* — carries no section for it, so it is absent from the deviation list, from the table of contents
+  and from every enumeration in the document. ⚠️ **Filed rather than fixed deliberately**: documenting a
+  table means recovering its real semantics, its PII classification and its RLS shape, which is its own
+  row's worth of work and not a line in a preamble. ⚠️ **And the count it distorts is one this increment
+  just corrected**, so the deviation sentence is right about the tables it names and still not a census —
+  the same failure, one level up, as the row `M58` closed. **Live.**
 - **`major` · The README prescribes a design-system command that cannot work in the service it names.**
   Filed by M46 (2026-08-29), found inside the block a now-closed row wrongly claimed was still broken — see
   the README row above, which was stale but whose neighbourhood was not. `README.md`'s design-system block

@@ -282,7 +282,7 @@ Column-level spec, following `docs/data-dictionary.md`'s exact conventions (UUID
 
 | Column | Type | Nullable | Default | PII? | Description |
 |---|---|---|---|---|---|
-| `id` | `uuid` | No | `uuidv7()` | No | Primary key. |
+| `id` | `uuid` | No | application-generated (`HasUuidv7`) | No | Primary key. |
 | `name` | `varchar(150)` | No | — | No | Display name. |
 | `email` | `varchar(255)` | No | — | **Yes** | Globally unique. One identity across every tenant membership — never duplicated per tenant. |
 | `email_verified_at` | `timestamptz` | Yes | `NULL` | No | Standard Laravel/Fortify verification timestamp. |
@@ -295,8 +295,8 @@ Column-level spec, following `docs/data-dictionary.md`'s exact conventions (UUID
 | `last_active_tenant_id` | `uuid` | Yes | `NULL` | No | FK `tenants.id`. The tenant to default into on next login / the central app's post-login redirect target, for a user belonging to more than one tenant (§2). Not authoritative for any authorization decision — purely a UX convenience. |
 | `tos_accepted_at` | `timestamptz` | Yes | `NULL` | No | Set when this user accepts the platform's own Terms of Service — added per `docs/data-privacy-gdpr-compliance.md` §6's platform-user-consent recommendation. `NULL` for a user mid-invite who hasn't completed signup yet. |
 | `privacy_policy_accepted_at` | `timestamptz` | Yes | `NULL` | No | Set when this user accepts the platform's own Privacy Policy — same rationale as `tos_accepted_at`; tracked as a separate timestamp since the two documents can be revised and re-accepted independently. |
-| `created_at` | `timestamptz` | No | `now()` | No | — |
-| `updated_at` | `timestamptz` | No | `now()` | No | — |
+| `created_at` | `timestamptz` | No | set by Eloquent | No | — |
+| `updated_at` | `timestamptz` | No | set by Eloquent | No | — |
 | `deleted_at` | `timestamptz` | Yes | `NULL` | No | Soft-delete; consistent with the rest of the schema's trash-grace-period convention. |
 
 > **Design Note — a genuinely new, fourth RLS shape**
@@ -324,7 +324,7 @@ Column-level spec, following `docs/data-dictionary.md`'s exact conventions (UUID
 
 | Column | Type | Nullable | Default | PII? | Description |
 |---|---|---|---|---|---|
-| `id` | `uuid` | No | `uuidv7()` | No | Primary key. |
+| `id` | `uuid` | No | application-generated (`HasUuidv7`) | No | Primary key. |
 | `tenant_id` | `uuid` | No | — | No | FK `tenants.id`. |
 | `user_id` | `uuid` | No | — | No | FK `users.id`. |
 | `status` | `varchar(15)` — PHP enum: `TenantUserStatus` | No | `'invited'` | No | `invited`, `active`, `suspended`, `declined`, `removed`. |
@@ -336,8 +336,8 @@ Column-level spec, following `docs/data-dictionary.md`'s exact conventions (UUID
 | `joined_at` | `timestamptz` | Yes | `NULL` | No | Set on transition `invited` → `active`. |
 | `removed_at` | `timestamptz` | Yes | `NULL` | No | — |
 | `removed_by` | `uuid` | Yes | `NULL` | No | FK `users.id`. |
-| `created_at` | `timestamptz` | No | `now()` | No | — |
-| `updated_at` | `timestamptz` | No | `now()` | No | — |
+| `created_at` | `timestamptz` | No | set by Eloquent | No | — |
+| `updated_at` | `timestamptz` | No | set by Eloquent | No | — |
 
 Unique constraint: `(tenant_id, user_id)` — a person has at most one membership record per tenant, ever (a removed-then-re-invited member reuses/reactivates the same row rather than creating a duplicate).
 
@@ -438,7 +438,7 @@ These tables are what make the **Form Editor** and **Reviewer** roles real for a
 
 | Column | Type | Nullable | Default | PII? | Description |
 |---|---|---|---|---|---|
-| `id` | `uuid` | No | `uuidv7()` | No | Primary key. |
+| `id` | `uuid` | No | application-generated (`HasUuidv7`) | No | Primary key. |
 | `tenant_id` | `uuid` | No | — | No | FK `tenants.id`; denormalized for RLS. |
 | `scopeable_type` | `varchar(30)` — PHP enum: `ResourceScopeable` | No | — | No | Morph-map alias: `form` or `scope_node`. Pinned by a DB CHECK generated from the enum, so the RLS guard's per-alias branch set is provably exhaustive. |
 | `scopeable_id` | `uuid` | No | — | No | Polymorphic target — **no DB foreign key** (the target table varies by type). Unlike `attachments`, this is an authorization input, so the missing FK is closed at the database by a dedicated policy shape — see the RLS note below. |
@@ -446,7 +446,7 @@ These tables are what make the **Form Editor** and **Reviewer** roles real for a
 | `capacity` | `varchar(20)` — PHP enum: `ResourceCapacity` | No | — | No | `editor` or `reviewer` — which per-resource permission (`forms.edit.own` / `submissions.review.own`) this row grants. |
 | `includes_descendants` | `boolean` | No | `false` | No | Meaningful only for a `scope_node` target (a CHECK forbids `true` on a form). When set, the grant reaches every form under that node's subtree. Default-off keeps each grant's blast radius legible from the row itself rather than inferred from tree position. |
 | `granted_by` | `uuid` | Yes | `NULL` | No | FK `users.id`. The Owner/Admin who granted this access (per §5's restriction that only they can). Was `added_by`. |
-| `created_at` / `updated_at` | `timestamptz` | No | `now()` | No | — |
+| `created_at` / `updated_at` | `timestamptz` | No | set by Eloquent | No | — |
 
 Unique constraint: `(tenant_id, scopeable_type, scopeable_id, user_id)` — a person holds exactly one capacity on a given target at a time (editor *or* reviewer, never both). `capacity` is deliberately **not** in the key, so granting the other capacity UPDATES the existing row; were it in the key, a demotion from editor to reviewer would insert a second row and silently leave edit rights standing.
 
@@ -471,7 +471,7 @@ geography, clinical-trial sites, or sales territories models all three identical
 
 | Column | Type | Nullable | Default | PII? | Description |
 |---|---|---|---|---|---|
-| `id` | `uuid` | No | `uuidv7()` | No | Primary key. |
+| `id` | `uuid` | No | application-generated (`HasUuidv7`) | No | Primary key. |
 | `tenant_id` | `uuid` | No | — | No | FK `tenants.id`. |
 | `parent_id` | `uuid` | Yes | `NULL` | No | Self-reference. **Composite** FK `(tenant_id, parent_id)` → `(tenant_id, id)`, `ON DELETE CASCADE` — ADR-0002 §D5. A single-column FK would be unsafe: PostgreSQL runs referential actions *bypassing RLS*, so one tenant's delete could cascade into another tenant's rows. |
 | `name` | `varchar(150)` | No | — | No | Display label. |
@@ -482,7 +482,7 @@ geography, clinical-trial sites, or sales territories models all three identical
 | `position` | `integer` | No | `0` | No | Sibling ordering. |
 | `is_active` | `boolean` | No | `true` | No | Deactivation, used **instead of** a soft delete: a `deleted_at` the authorization resolver must remember to filter is a landmine. The resolver filters `is_active` in both of its query shapes, with tests on each. |
 | `created_by` | `uuid` | Yes | `NULL` | No | FK `users.id`. |
-| `created_at` / `updated_at` | `timestamptz` | No | `now()` | No | — |
+| `created_at` / `updated_at` | `timestamptz` | No | set by Eloquent | No | — |
 
 `forms` gains a nullable `scope_node_id` with the same composite-FK shape, plus a PostgreSQL 15+
 column-list `ON DELETE SET NULL (scope_node_id)` — a plain composite `SET NULL` would try to null

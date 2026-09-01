@@ -16,81 +16,104 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — every error component in `openapi.json` documents a body the `/api/v1` surface does not return (`m56-api-error-envelope`)
+## Status: NO ACTIVE CLAIM — `M56` is merged; the queue's remaining `major` rows are all human-judgement rows
 
-Taken 2026-09-01. Branch `m56-api-error-envelope`, cut from `origin/main` at
-`da8bacf3c8be28300a3ccee6fcb74af2e215c2b9`, PR into `main`.
-Row: the open **`major`** in `docs/feature-backlog.md` — *"Every error component in `openapi.json`
-documents a body the `/api/v1` surface does not return."* Filed by `M54`.
+**`M56` closed the newest `major`, and it was a floor rather than a census** — seven published error
+bodies were wrong, not the four the row named. **4 `major` rows remain**, none of them mechanical.
 
-### Evidence verified
+⛔ **`D9` must never be started without an explicit answer.** Open decisions: `D1`, `D3`, `D4`, `D8`, `D9`.
 
-Every citation opened against the merged tree. **All four held; none had drifted.**
+⛔ **RUN `php scripts/state.php` FOR EVERY NUMBER.**
 
-- **`components.responses` holds exactly four entries** — `AuthenticationException`,
-  `ValidationException`, `AuthorizationException`, `ModelNotFoundException` — **held**, and each
-  describes a top-level `{ message }` (`ValidationException` adds a top-level `errors` map).
-- **`bootstrap/app.php:245-270` renders `/api/v1` through `ApiErrorResponse`** — **held**, and the row
-  UNDERSTATES it: past the closures the row names, a **final `Throwable` catch-all** guarantees nothing
-  on `api/v1/*` escapes the envelope, including a bare `abort()`.
-- **`docs/api-specification.md` §2.3 documents `{ error: { code, message, details? } }`** — **held**.
-- **An `AccessDeniedHttpException` answers `{"error":{"code":"forbidden",…}}`** — **held**, read at the
-  render closure rather than re-measured.
+---
 
-⚠️ **And the scale the row asserts without a number: 113 `$ref`s across 68 operations** — 51 → 403,
-34 → 404, 25 → 422, 3 → 401. Counted from the committed document, not estimated.
+## RELEASED — `M56`, the published error contract describes a body the API has never returned (merged as PR #247, `26505fb`, 6/6 green with real step counts — Static analysis 22 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 
-### ⚠️ TWO CORRECTIONS THE ROW DOES NOT CARRY, BOTH FROM READING WHAT SITS NEXT TO THE CITATIONS
+**Every claimed file was edited, plus one that was not claimed and should have been:**
+`tests/Feature/Api/CustomDomainApiTest.php`, where the `abort()` envelope case belongs because the
+domain fixtures already live there. **The claim was not otherwise extended**, and no ADR, migration,
+route or `§D<n>` was spent.
 
-1. **THE ROW IS A FLOOR, NOT A CENSUS.** It names only `components.responses`. **Three further bodies
-   are wrong in exactly the same way and are inline** — `422 POST /domains/{domain}/primary`,
-   `422 DELETE /domains/{domain}`, `409 POST /webhooks/{webhookEndpoint}/deliveries/{webhookDelivery}/redeliver`
-   — emitted by **`HttpExceptionToResponseExtension`, a FIFTH Scramble default the row never names**,
-   from `abort(422)` / `abort(409)`. The row's own sentence ("every 401, 403, 404 and 422 in the
-   published contract is wrong in the same way") covers them, so they are **in scope**.
-2. **ONE APPARENT CASE IS NOT A DEFECT.** `403 POST /public/f/{shareToken}/draft` carries no top-level
-   `properties` because it is an `anyOf` of two branches — and **both branches already document the
-   correct envelope**. Left alone. A naive *"top-level properties must be `[error]`"* gate would have
-   called it a defect, which is why the gate below descends `anyOf`/`allOf`/`oneOf`.
+### ⛔ THE ROW NAMED FOUR OF FIVE DEFAULTS, AND THE FIFTH HAD NO COMPONENT TO NOTICE
 
-### Remedy verdict
+`components.responses` was the whole of the row's scope. **`HttpExceptionToResponseExtension` emits its
+body INLINE**, so three further responses were wrong in exactly the same way and were structurally
+invisible to any fix scoped to components: `422 POST /domains/{domain}/primary`,
+`422 DELETE /domains/{domain}` and `409 POST /webhooks/{endpoint}/deliveries/{delivery}/redeliver`, all
+from bare `abort()` calls. **Seven bodies, not four.** Fixed here rather than filed, because the row's
+own sentence — *"every 401, 403, 404 and 422 in the published contract is wrong in the same way"* —
+already covered them, and shipping the increment that fixes the rest while leaving three known-wrong
+bodies behind is the failure the *floor, not a census* rule exists to prevent.
 
-The row prescribes *"a set of custom `ExceptionToResponseExtension`s replacing Scramble's four
-defaults"*. **WORKS — and only because of a mechanism the row does not state**, read in the installed
-v0.13.30 rather than assumed. `TypeTransformer::handleResponseUsingExtensions()` picks the matching
-extension with `->reverse()->first()`, under its own comment *"We want latter registered extensions to
-have a higher priority to allow custom extensions to override default ones."* Custom extensions are
-`array_merge`d **after** the defaults, and that binding reads `Scramble::$extensions` at **resolve**
-time, so registering from `AppServiceProvider::boot()` is safe whatever the provider order.
+### ✅ AND ONE APPARENT EIGHTH CASE WAS NEVER A DEFECT
 
-⛔ **Two consequences the remedy sentence hides, both load-bearing.** (a) **Registration ORDER is
-precedence read backwards** — the vendor order Validation → Authorization → Authentication → Http →
-NotFound must be matched exactly, or the generic `Http` arm captures the 34 documented 404s.
-(b) **`reference()` must be inherited, not rewritten** — it is what keeps the four component KEYS
-identical, so all 113 `$ref` strings stay byte-identical and the diff is exactly the defect. Each new
-class therefore **extends its vendor counterpart and overrides `toResponse()` alone**.
+`403 POST /public/f/{shareToken}/draft` carries no top-level `properties`, which is the exact signature
+of the defect — and it is an `anyOf` whose **two branches both already documented the envelope**. The
+first draft of the census gate would have called it broken. It descends `anyOf`/`oneOf`/`allOf` instead,
+which is why a naive rule was not shipped as a merge gate.
 
-Files: `app/Support/OpenApi/ApiValidationErrorResponse.php`,
-`app/Support/OpenApi/ApiAuthorizationErrorResponse.php`,
-`app/Support/OpenApi/ApiAuthenticationErrorResponse.php`,
-`app/Support/OpenApi/ApiNotFoundErrorResponse.php`, `app/Support/OpenApi/ApiHttpErrorResponse.php`,
-`app/Providers/AppServiceProvider.php`, `openapi.json`,
-`tests/Feature/Api/OpenApiContractTest.php`, `tests/Feature/Api/ApiV1Test.php`,
-`docs/feature-backlog.md`, `docs/claims/lane-a.md`, `PROGRESS.md` (own block only).
-Shared artefacts taken: `openapi.json`, `docs/feature-backlog.md`, `docs/claims/lane-a.md`,
-`PROGRESS.md` (own status block and hand-off line only). **No `tests/e2e/*.spec.ts`, no `phpunit.xml`.**
-Paired files taken: **none.**
-Namespaces spent: **nothing from either namespace** — no ADR, no migration, no `§D<n>`, no route.
-Prediction: `openapi.json` moves on **exactly seven bodies** (four component, three inline) with the
-`$ref` strings and the path set byte-identical; **PHPStan CAN move** because five classes land in
-`app/`, so its number is read rather than quoted; Pint, Vitest, Storybook axe and e2e do not move at
-all. ⚠️ **The one I most expect to be wrong: `ApiHttpErrorResponse`'s round-trip through
-`parent::toResponse()`** — whether the parent's status, description and message example survive being
-re-hung under `error.message`. Second most likely: whether those `abort()` bodies really carry
-`request_failed`, which is why the behavioural case measures one before the document claims it.
+### THE MECHANISM THE ROW'S REMEDY SENTENCE HIDES
 
-⛔ **RUN `php scripts/state.php` FOR EVERY NUMBER.** ⛔ **`D9` must never be started without an
-explicit answer.**
+*"A set of custom `ExceptionToResponseExtension`s replacing Scramble's four defaults"* is correct and
+underdetermined. Read in the installed v0.13.30 rather than assumed:
+`TypeTransformer::handleResponseUsingExtensions()` selects with `->reverse()->first()`, so **registration
+order is precedence read backwards**. Registered alphabetically — the obvious thing to do — the generic
+HTTP arm would have captured all **34 documented 404s**. The vendor's own order is matched instead, and
+the comment beside it says what happens if someone tidies it.
+
+Second: **`reference()` had to be INHERITED, not written.** It is what keeps the four component keys, and
+therefore all **113 `$ref` strings**, byte-identical. Each class therefore extends its vendor counterpart
+and overrides **`toResponse()` alone** — `shouldHandle()` comes free and cannot drift from the package's.
+
+### HOW THE PREDICTION FARED — INCLUDING THE PARTS THAT WERE WRONG
+
+- ✅ **"Exactly seven bodies."** Held. Seven diff hunks; `$ref` count 113, paths 51, operations 68, all
+  unchanged, and no `$ref` or path key appears in the diff at all.
+- ⚠️ **"The one I most expect to be wrong: `ApiHttpErrorResponse`'s round-trip through
+  `parent::toResponse()`."** **WRONG — it worked first time.** Status, description and the `abort()`
+  message example all survived being re-hung under `error.message`. The named risk was not the real one.
+- ❌ **THE REAL FAILURE WAS THE GATE, AND IT WAS NOT PREDICTED AT ALL.** The census gate's first draft
+  asserted the required set was *exactly* `['code','message']` and went **red on the 422**, whose
+  `details` is legitimately required. **The gate was wrong and the document was right** — loosened to
+  "code and message are among the required", with the reason recorded beside it. That is the increment's
+  own instance of *verify the remedy separately*: a gate written from four examples and applied to a
+  fifth.
+- ✅ **"`abort()` bodies carry `request_failed`."** Held, and **measured rather than reasoned** — the
+  three routes' existing tests assert `assertStatus()` only and never open a body, so nothing had ever
+  confirmed the catch-all envelopes them.
+- ⚠️ **"Pint does not move."** Its RESULT did not, but it was not free: `fully_qualified_strict_types`
+  fired on a docblock `@see`, so bare `pint --test` went red once before passing.
+- ✅ **PHPStan**: no error in any M56 file (local reports 18, all the known model-property blindness; CI's
+  baseline is no errors). **Vitest, Storybook axe and e2e**: not run and not moved — zero `.vue`, `.ts`
+  or selector movement, stated rather than skipped silently.
+
+### TWO CONTROLS, BECAUSE ONE MUTATION CANNOT COVER BOTH HALVES
+
+The census gate reads the **committed** `openapi.json`, so removing the registration does not redden it —
+the two halves needed separate proofs, and conflating them would have proved neither.
+
+1. **Mechanism** — registration removed, re-exported: all four components revert to `{ message }` and
+   exactly three inline bodies revert. Restored to an exact sha256 from a byte copy taken first.
+2. **Gate** — `mutate.php` on the committed contract: **CAUGHT**, `1 failed, 2 passed` against a
+   `3 passed` baseline, restored to an exact sha256.
+
+⚠️ **`mutate.php` refused the first attempt because the target was dirty** — which is the rule working:
+the restore compares bytes against the file as it stands, so a dirty target bakes the edits in.
+
+### ⚠️ THE HAND-WRITTEN SPEC HAD BEEN RIGHT SINCE PHASE 0
+
+`docs/api-specification.md` §3 sketches a `ValidationError` component with `error.code`, `error.message`
+and `error.details.fields` — **the exact shape now generated**, including the field map's position. So the
+design document and the generated contract had contradicted each other for the life of the surface, and
+nothing compared them. **Its component is named `ValidationError` and the generated one is
+`ValidationException`** — a consequence of the deliberate decision to keep the generated keys so the 113
+`$ref`s stayed put. Recorded here rather than filed: it is a naming difference between an illustrative
+sketch and a generated artefact, and the decision that produced it is on this page.
+
+⚠️ **The three "undocumented STATUS" rows are a different defect and stay open** — the sync 403s,
+`promote`'s three 409 causes and `SyncSubmissionResultResource`'s bare strings are *missing* responses,
+not misdescribed ones. Nothing here documents a status Scramble still cannot infer, and folding them in
+would have been the widening this row was filed to avoid.
 
 ---
 

@@ -23,6 +23,56 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
+### D10 — `§9` item 9's escalation has fired. Adopt the value-object forcing device, or keep answering per surface?
+
+**Filed 2026-09-01 by Lane A, during `M57`, at the moment the scope was decided.** Filed rather than
+decided because the escalation is a **repo-wide refactor of every render path**, and it was measured
+against exactly one instance. Nothing is broken today; this is about what the *next* surface costs.
+
+**The trigger, and that it really did fire.** `docs/security-threat-model.md` §9 item 9 has said since
+H6a that output encoding is *"convention plus one test per surface, not a mechanism that fails the
+build"*, and it named its own escalation: **if a second surface is found unescaped after that contract
+lands, adopt the forcing device** — a renderer returning a value object with no `__toString()` and one
+method per output context, so a forgotten escape becomes a PHPStan-level-8 error the way
+`OcrFieldEligibility`'s `default`-less match makes an unclassified field type one. `M57` found that
+second surface: the published mail header interpolated a tenant name into an HTML `alt` where nothing
+escaped the quote.
+
+⛔ **AND THE FAILURE MODE IS WORSE THAN ITEM 9 DESCRIBED, WHICH IS THE REAL ARGUMENT FOR ACTING.** Item 9
+predicted *"a surface added later escapes correctly only if its author reads the table"*. That is not what
+happened. The mail surface **had** its per-surface test, the test was **green throughout**, and it could
+not have been otherwise — it asserts markdown syntax, and `withSecuredEncoding()`'s three-character map is
+simultaneously what neutralises `[` and what stops escaping `"`. **A per-surface test aimed at the wrong
+context is not weak coverage; it is coverage that cannot fail.** Reading the table would not have helped:
+the table had a row for this surface and it was ticked.
+
+**The options.**
+
+- **(a) Adopt the forcing device across every surface**, as item 9 prescribes. It is the only option that
+  makes a *missing* escape a type error rather than a review question, and it is the only one that would
+  have caught `M57` without anybody thinking of attribute context first. ⚠️ **The cost is not the class —
+  it is every call site**: the HTML/Blade shells, the PDF templates, the Slack `mrkdwn` formatter, the
+  markdown-mail views, the CSV/XLSX export path, and whatever the guest runtime hands to Vue. Several are
+  Blade, where a value object with no `__toString()` is precisely what an echo cannot render, so the views
+  change too.
+- **(b) Keep answering per surface, and make each answer mechanical** — which is what `M57` shipped:
+  a named escaper plus `scripts/mail-attribute-lint.php` as a merge-blocking step, so on that one surface
+  a forgotten attribute escape now fails the build. Cheap, proven, and **it does not generalise**: the next
+  surface owes its own gate, and nothing prompts its author to write one.
+- **(c) Split the difference — adopt the forcing device only where the escaper is context-dependent.** The
+  surfaces that have burned us (`mrkdwn`, markdown-mail attributes) are the ones where the *correct*
+  escaper is not the framework default. Surfaces whose default is already right (ordinary Blade, Vue text)
+  keep the convention.
+
+**Recommendation: (b) now, and treat a *third* unescaped surface as automatic (a).** The per-surface
+answer has now been tried twice and each time it closed the surface it was aimed at. One more failure
+makes the pattern rather than the instance the defect, and at that point (a)'s cost is justified by
+evidence instead of by a rule written in advance. ⚠️ **What (b) leaves genuinely open is the discovery
+problem, not the fixing problem** — `M57` was found because a backlog row pointed at it, and no sweep of
+"which surfaces render an untrusted value into a context whose default escaper is wrong" has ever been
+run. **That sweep is worth doing under any of the three options** and is the cheapest next step whichever
+way this is answered.
+
 ### D1 — Should the sixteen synchronous dispatch listeners become `ShouldQueue`?
 
 **Filed 2026-08-25.** Moved here out of `docs/feature-backlog.md` § *Connectors & webhooks*, where

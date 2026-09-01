@@ -16,7 +16,108 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M57`, the secured mail encoder stopped escaping quotes and the header says it didn't (`m57-mail-attribute-escaping`)
+## Status: NO ACTIVE CLAIM — `M57` is merged; three `major` rows remain, all of them documentation or tracker work
+
+**`M57` closed the newest `major` and, like `M56`, the row was a floor rather than a census** — but it was
+wrong in *both* directions this time, not merely short. **3 `major` rows remain**: the data dictionary's
+thirty phantom `uuidv7()` defaults, the README's unrunnable design-system command, and the `## Current
+Status` tracker surgery. None is a code defect.
+
+⛔ **`D9` must never be started without an explicit answer.** Open decisions: `D1`, `D3`, `D4`, `D8`, `D9`.
+
+⛔ **RUN `php scripts/state.php` FOR EVERY NUMBER.**
+
+---
+
+## RELEASED — `M57`, the secured mail encoder stopped escaping quotes and the header says it didn't (merged as PR #248, `757fbd9`, 6/6 green with real step counts — Static analysis 23 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
+
+**Shipped 2026-09-01.** Branch `m57-mail-attribute-escaping`. Every claimed file was edited, plus one that
+was not claimed: `scripts/preflight.php`, because a gate registered in `composer.json` and `ci.yml` alone
+would only ever have failed in CI. The claim was not extended otherwise.
+
+### ⛔ THE CONTROL THAT CLOSED ONE ROW IS THE CONTROL THAT OPENED THIS ONE
+
+`Markdown::withSecuredEncoding()` — H23a4's mitigation, which closed the markdown-injection row — does not
+*add* escaping. It **replaces** it: `Markdown::render()` swaps `EncodedHtmlString`'s encoder for the whole
+render with a three-character map (`[`, `<`, `>`). No `"`, no `'`, no `&`. The published mail header then
+interpolated `$tenant->name` into an `alt`, and a name of `Acme" onerror="alert(1)` appended a live event
+handler to the `<img>`.
+
+⚠️ **The sharpest part is that the surface's own per-surface encoding test was green throughout and could
+not have been otherwise.** It asserts markdown syntax — `[Reset your password](https://evil.example)` — and
+the map that neutralises `[` is the same map that stops escaping `"`. **A per-surface test aimed at the
+wrong context is not weak coverage; it is coverage that cannot fail.** That is a harder failure than the
+one `docs/security-threat-model.md` §9 item 9 had recorded, which was *"a later author does not read the
+table"*, and item 9 now says so.
+
+### The row was wrong in both directions, and the useful half is the direction nobody checks
+
+| | |
+|---|---|
+| Understates | **`{!!` is not the hazard.** `{{ }}` runs the same map, so it is equally unsafe in an attribute. The header held two more (`href`, `src`); a gate counting the directive would have been **fully green** against this defect. |
+| Overstates | **The two sinks are not two defects.** The bare `{!! $slot !!}` is text context, where `<`/`>` are already escaped and re-escaping would double-encode. It is correct and it stays. |
+
+**Remedy verdict: none offered**, so nothing was disproved — but the two obvious candidates were both
+measured and both wrong. `{{ }}` is the same map. `htmlspecialchars` at its default `double_encode: true`
+turns the map's own `&lt;` into `&amp;lt;`, shipped to exactly the images-off audience an `alt` exists for.
+
+### How the prediction fared — one right for the wrong reason, one wrong, one wrong mid-build
+
+- ✅ **"The one I most expect to be wrong is the positive control."** It was the one I was most confident
+  about being uncertain, and it held: the injected attribute **survives** `CssToInlineStyles`. The
+  inliner does not repair the break-out, it **normalises it into** a proper second attribute, because the
+  concatenation happens before any parser runs. `&` is the only character the round-trip fixes by itself.
+- ⛔ **WRONG, AND IT COST A RED TEST: THE ASSERTION FORM.** The first draft asserted
+  `&quot; onerror=&quot;` — the form `SubmissionPdfRendererTest` produces, and the obvious precedent — and
+  it was **red against a correct fix**. The inliner re-quotes the attribute with `'` instead of encoding
+  the `"`. ⚠️ **The consequence is worth more than the fix**: a text assertion here *cannot* discriminate,
+  because ` onerror=` sits inside the `alt` value in both the broken and the fixed output. The test now
+  asserts the rendered `<img>`'s **attribute set by equality** — the same discipline `M56` reached for
+  response bodies, arriving from a different direction.
+- ⛔ **WRONG: "no other baseline moves."** True of the gates, false of the ledger. Inserting §5.2 into
+  Doc #26 shifted a paragraph down one line and killed a live citation pointing at it — `citation-liveness-lint`
+  caught it in the same run, ledger tier 18 → 19, and the pointer it named was **inside the row that is
+  itself about citations rotting**. Repaired in the same commit. The gate `M46` built found a defect
+  `M57` created, within minutes of creating it.
+- ✅ **Correct:** three violations today, all in one file, zero after the fix; Static analysis 22 → 23
+  steps and every other job unchanged.
+
+### The gate, and why it is not a `{!!` counter
+
+`scripts/mail-attribute-lint.php` keys on **a Blade echo inside a quoted attribute**, never on the
+directive, because on this surface the directive distinguishes nothing. Proved red four ways before it was
+trusted — `scripts/mutate.php` cannot drive a gate that is not Pest-in-a-container (`M42`), so its
+discipline was reimplemented at the call site: sha256 asserted to **move** before each run, the **specific**
+failure message asserted rather than the shared prefix (`M49`), restore by byte comparison.
+
+**C1** the unescaped `alt` put back · **C1b** the same defect written as `{{ }}` · **C2** both scan roots
+moved · **C3** the attribute regex made to match nothing. **C3 is the one to remember**: files still found,
+rules still run, nothing matched — the failure with no symptom, which a file count alone cannot see. The
+Pest half was mutation-proved separately and CAUGHT.
+
+### Filed rather than silently left
+
+The framework's own unpublished mail components interpolate into attributes identically and are outside the
+gate's reach. All six `->action()` call sites pass an application-built URL, so it is unreachable today —
+filed as a `minor` **in the same commit that decided not to fix it**, with the measurement and with why
+publishing them is worse than the defect.
+
+⚠️ **`§9` item 9's named escalation has fired and was deliberately not taken.** Its trigger was *"a second
+surface found unescaped after that contract lands"*. The value-object forcing device across every render
+path was priced against one instance and refused; the per-surface answer shipped instead. **It stays named
+and owed** — if a third surface is found unescaped, the per-surface answer has been tried twice.
+
+### Also corrected, because a negative claim is only as wide as the search that produced it
+
+Doc #26's *"the one permitted raw-HTML sink in the entire codebase"* scoped its own evidence to
+`v-html`/`innerHTML` in `resources/`, then generalised the conclusion to everywhere — while the mail header
+carried two `{!!` the whole time. The claim silently widened between its clause and its conclusion. Item 9
+also still said `withSecuredEncoding()` was *"still off"*, eleven increments after H23a4 turned it on.
+
+### The claim as filed, kept verbatim so the section above can be measured against it
+
+⚠️ **This is history and not a live claim.** It is preserved rather than summarised because a release that
+rewrites its own prediction is a release that cannot be wrong — and two of these predictions were.
 
 Taken 2026-09-01. Branch `m57-mail-attribute-escaping`, cut from origin/main at `e0509eb`, PR into main.
 Row: the `major` in `docs/feature-backlog.md`'s *Documentation & specs* section — *"A second raw-HTML sink

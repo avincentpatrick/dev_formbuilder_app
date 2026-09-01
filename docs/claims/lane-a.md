@@ -16,10 +16,55 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M56` is merged; the queue's remaining `major` rows are all human-judgement rows
+## Status: ACTIVE CLAIM — `M57`, the secured mail encoder stopped escaping quotes and the header says it didn't (`m57-mail-attribute-escaping`)
 
-**`M56` closed the newest `major`, and it was a floor rather than a census** — seven published error
-bodies were wrong, not the four the row named. **4 `major` rows remain**, none of them mechanical.
+Taken 2026-09-01. Branch `m57-mail-attribute-escaping`, cut from origin/main at `e0509eb`, PR into main.
+Row: the `major` in `docs/feature-backlog.md`'s *Documentation & specs* section — *"A second raw-HTML sink
+shipped in this branch, and the escaping contract says there is none."* Chosen by the user from the four
+open `major` rows; the other three stay open.
+
+### Evidence verified
+
+- `docs/piping-output-encoding-design.md` §5, Blade-shells row — *"Zero `{!!` exists in application code today"*, status *(holds)*: **HELD as a citation, FALSE as a claim.** The cell says what the row says it says, and the tree refutes it.
+- Same file, the *"one permitted raw-HTML sink in the entire codebase"* paragraph: **HELD, and false.** It also scopes itself to `v-html`/`innerHTML` in `resources/js`, so its own sentence and its own contract clause disagree about what a *sink* is.
+- `resources/views/vendor/mail/html/header.blade.php` — two `{!!`: **HELD.** `alt="{!! trim($slot) !!}"` in an attribute, and a bare `{!! $slot !!}` in the no-logo branch.
+- The premise the file's own comment rests on — *"the slot arrived from `mail.notification` already escaped with ENT_QUOTES"*: **FALSE, and falsified by this application's own hardening.** `app/Providers/AppServiceProvider.php` calls `Markdown::withSecuredEncoding()`; `Illuminate\Mail\Markdown::render()` then replaces `EncodedHtmlString`'s encoder with a three-character map — `[`, `<`, `>`. No `"`, no `'`, no `&`. The comment describes the framework default, which this app is deliberately not on.
+- The value reaching the slot: **HELD.** `resources/views/mail/notification.blade.php` writes `{{ $brand['name'] }}` into the header slot and `App\Support\Branding\BrandPalette::branded()` sets that to `(string) $tenant->name`.
+- *"No user-facing write route for `tenants.name` was found"*: **HELD, independently.** No `Tenant::create(` and no `->fill(['name'` outside docblocks anywhere in `app/`. Latent is the right severity.
+- `tests/Feature/Mail/BrandedMailRenderTest.php` *"only pins the unquoted case"*: **HELD.** Its header case asserts `alt="Acme Health"`; nothing in the file carries a quote.
+
+⚠️ **THE ROW UNDERSTATES ITSELF IN ONE DIRECTION AND OVERSTATES ITSELF IN THE OTHER.** `{!!` is not the
+hazard — **attribute context under secured encoding** is, and `{{ }}` runs the same three-character map,
+so it is equally quote-unsafe in an attribute. Our own header holds two more (`href=`, `src=`) and the
+vendor components we render through hold others. A gate that counts `{!!` measures the wrong thing and
+passes. In the other direction the row counts two sinks: the bare `{!! $slot !!}` is HTML **text**
+context, where the secured map has already escaped `<` and `>`, and re-escaping it would double-encode —
+so one of the two is a defect and one is correct.
+
+### Remedy verdict
+
+**NONE OFFERED** — the row asserts the invariant is false and stops. So nothing is disproved, and the
+shape is mine to choose. Two candidates were measured and rejected before the escaper was written:
+`{{ }}` is **wrong**, because under secured encoding it is the same three-character map; and
+`e()`/`htmlspecialchars` at its default `double_encode: true` is **wrong**, because the value has already
+been through that map and would ship `&amp;lt;` to exactly the images-off audience the `alt` exists for.
+`double_encode: false` is the load-bearing argument.
+
+Files: `app/Support/Mail/MailAttribute.php` (new), `resources/views/vendor/mail/html/header.blade.php`,
+`scripts/mail-attribute-lint.php` (new), `composer.json`, `.github/workflows/ci.yml`,
+`app/Providers/AppServiceProvider.php`, `tests/Feature/Mail/BrandedMailRenderTest.php`,
+`tests/Unit/Support/Mail/MailAttributeTest.php` (new).
+Shared artefacts taken: `docs/piping-output-encoding-design.md`, `docs/testing-strategy.md`,
+`docs/security-threat-model.md` (read; amended only if it restates the old claim),
+`docs/feature-backlog.md`, `composer.json`, `.github/workflows/ci.yml`, `PROGRESS.md` (own block only).
+Paired files taken: none.
+Namespaces spent: nothing from either namespace — no migration, no ADR. `0023` stays free.
+Prediction: the positive control shows a live injected attribute surviving the `CssToInlineStyles` DOM
+round-trip; the new linter finds exactly three violations today, all in one file, and zero after the fix;
+job 1's step count rises by one and no other baseline moves. **The one I most expect to be wrong is the
+positive control** — the inliner re-parses and re-serialises the whole document, and if `DOMDocument`
+drops or folds the injected attribute the severity is lower than the row implies and I will say so rather
+than keep the framing.
 
 ⛔ **`D9` must never be started without an explicit answer.** Open decisions: `D1`, `D3`, `D4`, `D8`, `D9`.
 

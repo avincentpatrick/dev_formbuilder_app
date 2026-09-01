@@ -3605,22 +3605,40 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   changed**, `/gamification/leaderboard` was untouched — it carries `can:` *and* `module:` and already
   had a 403, which the transformer explicitly refuses to overwrite — and a second export is
   byte-identical, which is what the contract gate requires.
-- **`major` · Every error component in `openapi.json` documents a body the `/api/v1` surface does not return.**
-  `components.responses` holds four entries — `AuthorizationException`, `AuthenticationException`,
-  `ValidationException`, `ModelNotFoundException` — and each describes Laravel's default `{ message }`
-  shape. **The API returns none of them.** `bootstrap/app.php:245-270` renders every `/api/v1` error
-  through `ApiErrorResponse`, whose envelope is `{ error: { code, message, details? } }` and is
-  documented as the contract in `docs/api-specification.md` §2.3. Measured directly: an
-  `AccessDeniedHttpException` on the API answers `{"error":{"code":"forbidden","message":…}}`, while
-  `openapi.json` promises a top-level `message`. **Every 401, 403, 404 and 422 in the published contract
-  is wrong in the same way**, and a client generated from it would look for a field that never arrives.
-  ⚠️ **Found by `M54` while closing the `/gamification/me` row**, which is one route's *missing* 403 —
-  this is every route's *misdescribed* one, so it is filed rather than folded in: the fix is a set of
-  custom `ExceptionToResponseExtension`s replacing Scramble's four defaults, and it changes the
-  published contract for the whole surface, which wants its own increment and its own review.
-  ⚠️ **`M54`'s own new 403 is deliberately the ONLY accurate one**, which is an inconsistency stated
-  rather than hidden: matching the neighbours would have meant documenting a shape the code does not
-  return, in the increment closing a documentation-truth row. **Live.**
+- ~~**`major` · Every error component in `openapi.json` documents a body the `/api/v1` surface does not return.**~~
+  ✅ **DONE — `M56` (2026-09-01), and the row was a FLOOR: seven bodies were wrong, not four.** Every
+  citation held — the four components, the render closures, §2.3 and the measured `forbidden` body — and
+  the scale the row asserted without a number is **113 `$ref`s across 68 operations** (51 → 403, 34 → 404,
+  25 → 422, 3 → 401). The remedy it prescribed works, **for a mechanism the row does not state**, read in
+  the installed v0.13.30: `TypeTransformer::handleResponseUsingExtensions()` selects with
+  `->reverse()->first()`, so **registration order IS precedence read backwards** — the vendor's own order
+  had to be matched or the generic HTTP arm would have captured all 34 documented 404s.
+  ⛔ **AND THE ROW NAMED FOUR OF FIVE DEFAULTS.** `HttpExceptionToResponseExtension` emits its body
+  **inline, with no component to notice**, so three further responses were wrong in exactly the same way
+  and were invisible to any fix scoped to `components.responses`: `422 POST /domains/{domain}/primary`,
+  `422 DELETE /domains/{domain}` and `409 POST /webhooks/{endpoint}/deliveries/{delivery}/redeliver`, all
+  from bare `abort()` calls. Fixed in the same increment.
+  ✅ **One apparent eighth case was NOT a defect, and checking it was the point.** `403 POST
+  /public/f/{shareToken}/draft` carries no top-level `properties` because it is an `anyOf`; **both
+  branches already documented the envelope**. A gate keyed on *"top-level properties must be `[error]`"*
+  would have called it broken, so the gate descends `anyOf`/`oneOf`/`allOf` instead.
+  **Five classes**, each extending its Scramble counterpart and **overriding `toResponse()` alone** so
+  `shouldHandle()` and `reference()` stay the vendor's — which is what held the four component **keys**
+  and all 113 `$ref` strings byte-identical. `ApiErrorEnvelope` builds the shape once, because two
+  descriptions of one envelope drifting apart is the defect being closed.
+  ⚠️ **`code` is a described string, never a `const`, and the generic arm names no code at all** — a
+  per-status match there would have been a second copy of `bootstrap/app.php`'s closure chain living in
+  the documentation layer.
+  **Proven two ways, because one mutation cannot cover both halves**: removing the registration and
+  re-exporting reverts all seven bodies (the mechanism), and mutating the committed `openapi.json` turns
+  the new census gate red and restores to an exact sha256 (the gate). ⚠️ **The gate's first draft was
+  WRONG and went red on the 422**, whose `details` is legitimately required — loosened, and the reason is
+  recorded beside it. A fresh export is byte-identical to the commit, so CI's drift diff passes.
+  ⚠️ **`M54`'s `/gamification/me` 403 is no longer the only accurate response on the surface** — the
+  inconsistency that row stated rather than hid is now closed from the other side.
+  ⚠️ **The three "undocumented STATUS" rows below are a different defect and stay open** — the sync 403s,
+  `promote`'s three 409 causes and `SyncSubmissionResultResource`'s bare strings are *missing* responses,
+  not misdescribed ones, and nothing here documents a status Scramble still cannot infer.
 - **`minor` · `loop assess` can only see what a row says about ITSELF, and two blind spots are now measured.**
   Filed by `M55` at the moment both were confirmed, so they are a stated limit rather than a comment
   nobody re-reads. **(1) A row's REMEDY COST is invisible.** `M54` was classified mechanical and its

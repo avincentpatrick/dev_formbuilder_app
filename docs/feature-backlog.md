@@ -3728,6 +3728,26 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `start_url`. ⚠️ **Pest cannot reach it** — Cache Storage is a browser API — and
   `tests/e2e/public-runtime-offline.spec.ts` already carries the offline harness, so the row names the
   assertion rather than the approach. **Live.**
+- **`minor` · `docker compose run --rm e2e` does not work on this host as three documents prescribe it,
+  and the most likely wrong form EXITS 0.** Filed by M61 (2026-09-02), measured while running the two
+  specs its diff reached. `CLAUDE.md`'s gate table, `docs/ux/design-system-reference.md` and
+  `docs/ux/exceptions-log.md` all give the bare command. Three prerequisites, none of them stated
+  anywhere, and they fail in descending order of honesty:
+  ⛔ **(1) The service `entrypoint` is already the Playwright CLI, so the natural
+  `docker compose run --rm e2e npx playwright test …` passes `npx` as playwright's SUBCOMMAND. It prints
+  `error: unknown command 'npx'` and RETURNS EXIT CODE 0** — the succeeds-on-empty-input class this
+  project has now measured four times, and the one that would silently launder a skipped e2e run into a
+  claim. The working form is `docker compose run --rm e2e test <spec> …`.
+  ⚠️ **(2) Node cannot resolve `acme.localhost` inside the e2e image, and `curl` can** — so a hand check
+  says the stack is reachable while Playwright's `webServer` probe decides it is not, tries to boot
+  `php artisan serve`, and dies on `php: not found`. The failure names PHP and the cause is DNS.
+  ⚠️ **(3) `public/hot` must be removed and `npm run build` run first.** With the Vite dev server up,
+  Laravel emits `@vite` pointing at `localhost:5173`, which lives in the `node` container — unreachable
+  from the e2e container's `network_mode: service:app` namespace. The symptom is `global-setup` timing
+  out on `getByLabel('Email')`, which reads as a broken login page.
+  **The remedy is a `docker/e2e` entrypoint wrapper or a documented recipe, plus a non-zero exit on an
+  unknown subcommand.** ⚠️ **Sized `minor` only because CI is the authority for e2e** — but (1) is the
+  kind of green that gets quoted in a claim. **Live.**
 - **`minor` · The audit spec credits the `submission` scope with two events that are emitted nowhere.**
   Filed by M46 (2026-08-29) rather than fixed, because the correct direction is a decision this increment
   should not take alone. `docs/audit-compliance-logging-spec.md` §1 lists `deleted` and `restored` for

@@ -351,8 +351,15 @@ export function createServerAutosave(options: ServerAutosaveOptions): ServerAuto
     function postKeepalive(): void {
         try {
             // Routes through the injected `post` when there is one, so a test can observe the last-chance
-            // write instead of it escaping to the real network — and so the single-flight bookkeeping is not
-            // bypassed in the one place that would be hardest to notice.
+            // write instead of it escaping to the real network.
+            //
+            // ⛔ THIS COMMENT USED TO CLAIM THE INJECTION ALSO KEPT "the single-flight bookkeeping … not
+            // bypassed in the one place that would be hardest to notice." THAT WAS FALSE AND IT IS WHY THE
+            // RACE BELOW SURVIVED REVIEW. Neither branch of this function touches `inFlight` or
+            // `pendingWhileInFlight` — it is a deliberate bypass of the coalescer, which is exactly why
+            // `dispose()` has to consult `inFlight` itself before calling it. A comment asserting the
+            // property whose absence is the bug is worse than no comment, so it is corrected in place rather
+            // than deleted.
             if (options.post !== undefined) {
                 void Promise.resolve(options.post(body())).catch(() => {
                     // the page is going away

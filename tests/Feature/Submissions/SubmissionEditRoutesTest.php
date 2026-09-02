@@ -389,11 +389,16 @@ it('carries an errors bag on a refused correction, so the page does not remount 
 
     editReenter();
 
+    // `from()` because the assertion below is about WHERE `back()` lands. The refusal must return to the page
+    // whose state has to survive; a refusal that bounced to the detail view would discard the corrections
+    // however well `preserveState` were armed, and without a referer `back()` would fall through to `/`.
     $this->actingAs($this->owner)
+        ->from("http://acme.meridian.test/submissions/{$submission->id}/edit")
         ->patch("http://acme.meridian.test/submissions/{$submission->id}/answers", [
             'answers' => ['full_name' => 'Ada', 'color' => 'b'], 'baseline' => $stale,
         ])
-        ->assertSessionHasErrors()
+        ->assertRedirect("http://acme.meridian.test/submissions/{$submission->id}/edit")
+        ->assertSessionHasErrors('baseline')
         ->assertSessionHas('toast');
 });
 
@@ -420,7 +425,7 @@ it('carries the errors bag on a non-editable refusal too, a different cause reac
         ->patch("http://acme.meridian.test/submissions/{$submission->id}/answers", [
             'answers' => ['full_name' => 'X'], 'baseline' => baselineOf($submission),
         ])
-        ->assertSessionHasErrors()
+        ->assertSessionHasErrors('baseline')
         ->assertSessionHas('toast');
 });
 

@@ -16,27 +16,82 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M59` is merged; **ONE `major` row remains**, and it is the tracker surgery
+## Status: ACTIVE CLAIM — the `## Current Status` tracker surgery, the last `major` row (`m60-current-status-surgery`)
 
-**`M59` closed the README's unrunnable axe command.** `state.php` now counts **1 `major`** where it
-counted two, and `M59` filed **no new `major`** — which matters, because `D5` ends the M-series at zero
-open `major` plus three consecutive increments filing none, and this is one of those three.
+Taken 2026-09-02. Branch `m60-current-status-surgery`, cut from `origin/main` at `4b12f3b`, PR into `main`.
+Row: **`major` · `## Current Status` is now 42% of the tracker and its largest section** —
+`docs/feature-backlog.md:4044`, filed by `M48` (2026-08-29). It is the last open `major`.
 
-⚠️ **For whoever takes the tracker surgery — the last `major`.** That row's central warning, that
-`## Current Status` *"has two writers"*, **may be spent**: `docs/claims/lane-b.md` has read
-`## Status: RETIRED` since `M50`. It has now been noticed three times and measured never; measure it.
-Its post-merge trunk observation also depends on `D8`, which is open and explicitly *not proceeded on*
-pending `D7`, so plan for the marker being unverifiable on the trunk unless the surgery deliberately
-touches one non-`paths-ignore`d file.
+### Evidence verified
 
-⛔ **AND THE LESSON THIS INCREMENT WOULD MOST LIKE TO HAND ON: A GATE CAN GO RED FOR REASONS YOUR DIFF
-CANNOT REACH.** `composer audit` reddened `PR #250` on three `league/commonmark` advisories published the
-night before, against a transitive dependency. A prediction that enumerates *which gates my diff can
-move* is answering a different question from *which gates will be green*.
+⛔ **EVERY FIGURE THE ROW STATES IS STALE, ALL FOUR IN THE SAME DIRECTION.** The section has grown, so
+the row understates its own case. Measured on `origin/main` at `4b12f3b`, by byte offset between `^## `
+headings rather than by reading a sentence:
 
-⛔ **`D9` must never be started without an explicit answer.** Open decisions: `D1`, `D3`, `D4`, `D8`, `D9`, `D10`.
+| The row's citation | Verdict |
+|---|---|
+| `PROGRESS.md` is **161,298 bytes** | **MOVED — 196,030 bytes, 323 lines.** True at `M48`'s close; +21.6% since |
+| `## Current Status` is **67,982 bytes — 42.1%** | **MOVED — 110,268 bytes, 56.3%.** +62% in four days |
+| `## Standing Rules` **49,001 (30.4%)** | **MOVED — 51,072 (26.1%)** |
+| `## Next Session` **15,269 (9.5%)** | **MOVED — 5,644 (2.9%)** |
+| Rule 7(b): each lane owns its own status block | **HELD AS TEXT, SPENT AS A CONSTRAINT** — below |
+| `TRACKER_BYTE_CEILING`'s comment names this section by measurement | **HELD** — `scripts/tracker-lint.php:42-57`, and it names this increment as the one that ratchets it |
 
-⛔ **RUN `php scripts/state.php` FOR EVERY NUMBER.**
+⛔ **AND THE ROW IS URGENT FOR A REASON IT DOES NOT STATE.** `R1`'s ceiling is 200,000 bytes and the
+tracker is **196,030 — 3,970 bytes of headroom, roughly one ordinary close-out.** A row that reads as
+tidiness is one close-out from reddening the trunk.
+
+### The row's central hazard is SPENT, and `M59` handed it to me to measure rather than to repeat
+
+The row's headline warning is that the section *"has two writers"*, so a slice crossing the lane tags
+would be a Lane A edit to Lane B's block. **The row is dated 2026-08-29; `M50` retired Lane B on
+2026-08-31** — two days later. `docs/claims/lane-b.md:3` reads *"LANE B WAS CLOSED ON 2026-08-31 BY
+`M50`. THIS FILE IS READ AND NEVER WRITTEN"*; its `## Status` is `RETIRED`; it holds **no forward
+queue** (every remaining heading is a `## RELEASED` record); and Rule 7 itself carries a
+`SUPERSEDED 2026-08-31 BY M50` banner at the head of the rule.
+
+**So the section has one writer and the slice may cross the lane tags.** This is `M45`'s own lesson —
+*verify the row's PREMISE, not only its evidence and its remedy* — landing on `M45`'s successor.
+
+### Remedy verdict
+
+The row prescribes a shape rather than a mechanism: *"the same shape `M45` and `M48` have each moved
+once"*, plus two obligations. Measured separately:
+
+- **The shape WORKS and has a fourth precedent the row does not name: `M41` moved 135 bullets out of
+  this same section.** Its constraint is still live — `R2` asserts exactly one `^## Current Status$`
+  in the tracker, so the heading survives with the newest bullets and a pointer.
+- **"The boundary is per lane and then per bullet" is UNNECESSARY**, per the premise finding above.
+- **"The ceiling ratchet is the taker's obligation" HOLDS**, and it does a second job the row does not
+  claim: `scripts/tracker-lint.php` is not in `ci.yml`'s `paths-ignore`, so the ratchet is what makes
+  the post-merge run on `main` exist at all. That is `D8`'s option 3 and `M48`'s accident made
+  deliberate — **and it is the only way this increment can pay the end-to-end squash proof that `M47`
+  and `M48` have each handed forward.**
+- ⛔ **What the row does NOT say, and what will decide the diff:** the bullets are **two-level**. Lines
+  193–221 are heads at column 0; 222–231 are ten continuation lines belonging to `M29`'s 189-byte head.
+  A slicer cutting on the bullet marker would orphan them.
+
+Scope, decided with the user: keep the newest **three** bullets (`M41` kept ten), moving lines 196–231
+— 36 lines, 102,152 bytes, `M56` → `M29` — into the head of `PROGRESS_ARCHIVE.md`'s existing
+`## Archived status bullets` section, so it stays newest-first. Verification is a throwaway harness, as
+in all three predecessors.
+
+Files: `PROGRESS.md`, `PROGRESS_ARCHIVE.md`, `scripts/tracker-lint.php`, `docs/claims/lane-a.md`,
+`docs/feature-backlog.md`, `docs/claims/decisions.md`, `docs/gate-baselines.md`.
+Shared artefacts taken: `PROGRESS.md` (the whole `## Current Status` section, deliberately, on the
+premise finding above), `PROGRESS_ARCHIVE.md`, `docs/feature-backlog.md`, `docs/claims/decisions.md`.
+Paired files taken: none.
+Namespaces spent: nothing from either namespace — no ADR, no migration prefix.
+
+Prediction: `R7` fires on the **byte arm alone** — ~102,152 bytes against a 50,000 limit, ~35 lines
+against a 200 limit — which no real surgery has yet done; `R1`, `R2`, `R4`, `R5`, `R6` stay green;
+PHPStan cannot move (no file under `app`, `database` or `routes`); Pest, Vitest, axe, contract and E2E
+counts unchanged. **The one I most expect to be wrong is exact byte conservation at the join seam** —
+`M41` predicted the same and it failed by exactly one byte, because the insertion adds a newline the
+naive formula omits; I am using its corrected form rather than re-deriving it. ⚠️ **And per `M59`: a
+gate can go red for reasons my diff cannot reach** — `composer audit` reddened PR #250 on advisories
+published overnight, so this prediction answers *which gates my diff can move*, not *which will be
+green*.
 
 ---
 

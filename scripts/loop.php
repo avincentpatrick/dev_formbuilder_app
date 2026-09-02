@@ -80,6 +80,16 @@ const MECHANICAL_MARKERS = [
 //    "not live" would stop nearly everything and make the driver useless rather than careful.
 const NOT_LIVE_MARKER = '**Not live**';
 
+/**
+ * Inline code spans removed, so a row that NAMES the vocabulary is not read as using it.
+ *
+ * ⚠️ Detection only. Nothing else reads the stripped copy, and no row is rewritten.
+ */
+function loopStripCodeSpans(string $body): string
+{
+    return preg_replace('/`[^`]*`/u', '', $body) ?? $body;
+}
+
 // Phrases that mark work an unattended run may not start on its own judgement.
 const STOP_PHRASES = [
     'tracker surgery', 'tracker-surgery', 'surgery marker',
@@ -359,7 +369,14 @@ function stop_reasons(array $row): array
     // ⛔ THE ROW SAYS IT IS NOT A DEFECT. Checked against the BODY, because that is where the marker
     //    lives -- it is always the row's closing sentence -- and because a stop rule should be as
     //    sensitive as possible. See NOT_LIVE_MARKER.
-    if (str_contains($row['body'], NOT_LIVE_MARKER)) {
+    //
+    // ⛔ WITH INLINE CODE SPANS STRIPPED FIRST, BECAUSE NOT_LIVE_MARKER's OWN COMMENT WAS WRONG (M64).
+    //    It claims the check is "anchored on the bolded literal, never a substring" -- but a bolded
+    //    literal INSIDE BACKTICKS is still a substring, and that comment names the exact failure it
+    //    does not prevent: a row that merely QUOTES the vocabulary. M64 filed a row about liveness
+    //    coverage whose text necessarily reads `**Not live**` while the row itself says **Live.**, and
+    //    it was mis-stopped on the first run. That row is the standing control for this line.
+    if (str_contains(loopStripCodeSpans($row['body']), NOT_LIVE_MARKER)) {
         $reasons[] = 'the row marks itself `Not live` -- it is a stated limit or a missing gate, not a defect';
     }
 

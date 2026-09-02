@@ -2881,7 +2881,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   M63 measured those shape counts and reviewed none of them. **Whoever takes it should split it: land the
   derived checks first and decide each finding on its own, then take the manifest as its own increment.** Filed by `M63`.
 
-- **`minor` · `D5`'s exit bar reads MET but is still not OPERABLE on its own terms, and the gap is provenance.** Filed by **M63 (2026-09-02)**, measured rather than asserted, and **carrying a user decision of
+- ✅ **CLOSED BY `M64` (2026-09-02) — `minor` · ~~`D5`'s exit bar reads MET but is still not OPERABLE on its own terms, and the gap is provenance.~~** Filed by **M63 (2026-09-02)**, measured rather than asserted, and **carrying a user decision of
   record taken the same day: keep going and make the bar real first.** `state.php` counts **zero open
   `major`**, and no `major` bullet in this file is attributable to `M59`, `M60`, `M61` or `M62` — the
   highest filer that records itself is `M49` — so both of `D5`'s clauses read satisfied, four consecutive
@@ -2898,6 +2898,62 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   without one; and `state.php` reporting the two clauses directly so the exit is read off the tree rather
   than argued. ➕ **Do the same for liveness while the file is open** — only 24 of the rows carry a
   liveness marker, which is the sibling blind spot `M55` filed. Filed by `M63`.
+  ✅ **DONE — `M64` (2026-09-02).** One canonical form, `` Filed by `<increment>` ``, on **all 161**
+  severity bullets; `state.php` derives both of `D5`'s clauses and prints them; `loop.php status` reads
+  them instead of recomputing; and `tests/Feature/Docs/BacklogProvenanceTest.php` holds the form.
+  ⛔ **THE ROW'S SCOPE WAS WRONG AND THE CORRECTION IS THE FINDING.** It is written as though the work
+  were about *rows*. `D5`'s second clause asks which increment **filed** each `major`, and **45 of the
+  55 `major` bullets are closed** — a `major` filed and closed inside one increment was still filed by
+  it. `state.php`'s parser could not see a closed bullet at all, which is why `total_bullets` read 185
+  while `open` read 84: **77 bullets existed nowhere.** The scope is 161 bullets, not 84 rows.
+  ⚠️ **Its counts were wrong in both directions** — it says 47 of 58 `major` and 45 open rows; the tree
+  said **45 of 55** and 41–42 of 84. And only **5** of the 161 carried the strict form against **54**
+  carrying some free-text filer, which is the fifteen-shapes problem measured rather than asserted.
+  ⛔ **The loose parser was actively mis-attributing, which is why one form matters more than the row
+  argues.** The maintenance-fan-out row quotes the row it superseded under a *"THE ROW AS FILED
+  FOLLOWS"* heading, so `state.php` read `M32` out of a **quotation** while the row's own first
+  paragraph says `M44` filed it. Backticks are what separate a record from prose about a filing.
+  ⛔ **NO LINE WAS ADDED, and that was not caution.** 21 line-number citations point into this file
+  from 8 others — 9 in `PROGRESS_ARCHIVE.md`, which is never rewritten, and 4 in `lane-b.md`, which is
+  never edited — the highest at line 2297. **74 of the 156 lines the backfill changed sit above it**,
+  so an insert would have rotted every one, invisibly: `citation-liveness-lint` checks a line is alive,
+  not that it still says what the citing sentence claims. Conservation was proved three ways.
+  ⚠️ **The `lint gate` half was deliberately changed to a Pest test, with the user's confirmation** —
+  `scripts/mutate.php` drives Pest and nothing else, so a lint sibling would hand-roll its discipline
+  and add a CI step. The phrase *"lint gate"* is Lane A's own from `M36`, not the user's answer to `D5`.
+  ➕ **The liveness half is filed rather than done, and the reason is in the row below.**
+
+- **`minor` · 31 of the 84 open rows say nothing about whether they are still live, and the marker is
+  reported rather than gated.** `M64` normalised provenance and could not normalise this in the same
+  pass, so it is filed the moment that was decided rather than left in a commit message. `state.php`
+  now counts the marker — **live 39 · latent 4 · not-live 10 · UNMARKED 31** — and
+  `tests/Feature/Docs/BacklogProvenanceTest.php` deliberately does **not** require it.
+  ⛔ **THE REASON IS THAT LIVENESS IS NOT A TEXT EDIT AND PROVENANCE WAS.** A filer is a fact recorded
+  in git: `M64` resolved all 161 against 135 historical versions of this file mechanically. *Is this
+  defect still live* is a judgement against the code, one row at a time — it is the `M37` triage job,
+  six read-only passes, and `M37`'s own finding was that **65 of 68** rows were still live, so the
+  answer is not cheap and is not guessable. Gating a marker nobody has decided would make it a
+  formality, which is the decorative-gate mistake `M43` measured.
+  ⚠️ **`M55` filed the sibling of this and its wording under-counts today**: it says *"only 24 of 78
+  rows carry a liveness marker"*, measured against `**Not live**` and `**Live**` alone. Counting
+  `**Latent.**` and the trailing-period forms puts it at **53 of 84**. Re-derive before working it.
+  ⚠️ **And `loop assess` is the thing that pays for this**, since silence deliberately does not stop
+  it — that is `M55`'s stated limit, and it is a floor rather than a hole precisely because 31 rows
+  are silent. **Live.** Filed by `M64`.
+
+- **`minor` · `docs/backlog-triage.md` ranks the queue by a census that is now 107 commits stale, and
+  its top three items are all closed.** Read at source rather than taken on report: its *"Priority
+  queue — what to take next"* opens with three `major` items — the unthrottled Fortify endpoints, the
+  four maintenance fan-outs, and five documentation-truth rows — and `state.php` counts **zero open
+  `major`**. Anyone following `CLAUDE.md`'s instruction to *"read `docs/backlog-triage.md` first for
+  the ranked order"* is handed a ranking whose first three entries no longer exist.
+  ⚠️ **The file says of itself that its counts are a dated census and not the tree, and `state.php`
+  prints how stale it is on every run**, so this is a stale ranking rather than a false claim — which
+  is why it is `minor`. But the staleness signal names commits, not usefulness: nothing says *the
+  ranking is spent*, and the number a reader needs is how many of its ranked items are still open.
+  ⛔ **DELIBERATELY NOT FIXED IN `M64` AND FILED THE MOMENT THAT WAS DECIDED.** Re-ranking 84 rows is
+  a triage pass, not an edit, and it is the same judgement the liveness row above needs — the two
+  should be taken together, by whoever takes either. **Live.** Filed by `M64`.
 
 - **`minor` · `routes/api.php:114-116` describes a middleware ordering the priority sorter does not produce.**
   Re-read at source rather than taken from the report: the comment states that `feature:api_access` runs *"before throttle so a no-feature tenant is refused before

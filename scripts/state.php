@@ -572,10 +572,18 @@ function finish_row(array $row): array
     // Liveness is REPORTED and deliberately not gated (M64). Deciding live/not-live for a row that
     // carries no marker is a judgement against the code — the M37 triage job — not a text edit, and
     // it is filed as its own row rather than smuggled into a mechanical pass.
+    //
+    // ⛔ INLINE CODE SPANS ARE STRIPPED FIRST, AND THAT IS NOT PRECAUTIONARY. scripts/loop.php's
+    //    NOT_LIVE_MARKER carries a comment claiming it is "anchored on the bolded literal, never a
+    //    substring" — but a bolded literal INSIDE BACKTICKS is still a substring, and a row that
+    //    merely names the vocabulary is indistinguishable from one that uses it. M64 filed a row
+    //    whose text reads `**Not live**` while the row itself says **Live.**, and it was classified
+    //    not-live on the first run. The stripped copy is used for detection ONLY; nothing else reads it.
+    $prose = preg_replace('/`[^`]*`/u', '', $row['body']) ?? $row['body'];
     $liveness = null;
 
     foreach (['**Not live**' => 'not-live', '**Live.**' => 'live', '**Live**' => 'live', '**Latent.**' => 'latent', '**Latent**' => 'latent'] as $marker => $value) {
-        if (str_contains($row['body'], $marker)) {
+        if (str_contains($prose, $marker)) {
             $liveness = $value;
 
             break;

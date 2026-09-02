@@ -4290,3 +4290,29 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   missing file, wrote a blank line and reported success). **Filed by M60 (2026-09-02)** at the moment
   the decision to keep this increment's harness throwaway was taken with the user, rather than
   discovered later. **Live.**
+
+- **`minor` · The claim template has a field for a row's evidence and a field for its remedy, and the
+  thing that actually went wrong in `M60` was neither.** `docs/claims/TEMPLATE.md` requires
+  `### Evidence verified` and `### Remedy verdict`, added by `M36` on the strength of four consecutive
+  rows with sound evidence and a broken remedy. **`M60`'s row had sound evidence in kind, an
+  implementable remedy, and a PREMISE that had expired** — its central instruction (*"the section has
+  two writers, so a slice that moves both lanes' bullets is the one thing the boundary forbids"*) was
+  filed 2026-08-29 and falsified on 2026-08-31 when `M50` retired Lane B. **Both existing fields would
+  have been answered "held" without the discrepancy ever surfacing**, because neither asks *why does
+  this row believe its scope is what it says*.
+  ⚠️ **AND IT IS NOT A ONE-OFF — THE SAME SHAPE IS ALREADY IN THE LEDGER TWICE.** `M45` recorded
+  *"verify the row's PREMISE, not only its evidence and its remedy"* after a row framed a file as *"the
+  second copy of a record that already has a home"* when the overlap was **zero**, so the deletion its
+  framing invited would have destroyed the only copy. `M60` is the second. In both cases the premise
+  was a sentence about **the world around the defect** — who owns a file, whether a copy exists —
+  rather than about the defect, and it is exactly the class that rots while the code does not.
+  ⚠️ **The cheap remedy is one more template field and one more claim heading**, which is what `M36`
+  did; the honest objection is that a third mandatory field is a third thing to answer "held" to, and a
+  field nobody thinks about is the decorative-gate mistake `M43` measured. A better shape may be to fold
+  it into `Evidence verified` as *"including any claim the row makes about the world rather than about
+  the code"*, which costs no new heading. **That choice is why this is filed rather than taken** — it
+  changes a shared artefact every future claim is written against.
+  ⛔ **Filed by M60 (2026-09-02), and filed HERE rather than only in the release that found it.** A
+  finding recorded only in claim prose is invisible to a backlog search — `J4b1` traced four live
+  defects, wrote them in the tracker and nowhere else, and they stayed unfindable until someone
+  re-read the increment. **Live.**

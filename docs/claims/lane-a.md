@@ -166,7 +166,7 @@ being fixed. Worth knowing before reading that number as progress.
 lines since). `citation-liveness-lint` cannot see this class — it checks a line is *alive*, not that
 it still says what the citing sentence claims — so it was done by hand and cross-checked twice.
 
-**One row closed, one filed, one corrected. Namespaces spent: nothing from either namespace —
+**One row closed, TWO filed, one corrected. Namespaces spent: nothing from either namespace —
 twentieth consecutive.**
 
 ---

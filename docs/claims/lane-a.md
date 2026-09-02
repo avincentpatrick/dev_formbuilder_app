@@ -16,92 +16,169 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M64`, D5's exit bar is not operable and the gap is provenance (`m64-backlog-provenance`)
+## Status: NO ACTIVE CLAIM — `M64` is merged; `D5`'s exit bar is arithmetic now, and it reads MET
 
-Taken 2026-09-02. Branch `m64-backlog-provenance`, cut from `origin/main` at `7c1c8ce`, PR into `main`.
-Row: `docs/feature-backlog.md` — **"`D5`'s exit bar reads MET but is still not OPERABLE on its own
-terms, and the gap is provenance."** Filed by `M63` (2026-09-02), carrying the user decision of record
-taken the same day: **keep going and make the bar real first.**
+`M64` closed **one** row, filed **two** and opened one decision, so the open count moved 84 → 85 and
+stayed at **zero `major`**. `state.php` counts the tree; do not take that sentence's arithmetic on trust.
 
-### Evidence verified
+👤 **THE ONE THING THAT NEEDS THE USER, AND IT IS NOT URGENT: `D12`.** `D5`'s bar is no longer a floor.
+Every `major` bullet records its filer, **none is `(unattributed)`**, and the last increment that ever
+filed one is **`M54`** — so the window is **nine consecutive** against a bar of three. `M63` measured
+four off a floor and the user answered *keep going and make the bar real first*; that condition is now
+spent, so the question returns **once**, in `D12`, with three options and a recommendation to **keep
+going**. ⛔ **`state.php` prints the two clauses and deliberately does not decide them.**
 
-Every count in the row was re-measured against the merged tree rather than taken on report, and the
-row is **right about the defect and wrong about its census in both directions**:
-
-| | Row says | Tree says |
-|---|---|---|
-| `major` bullets with no parseable filer | 47 of 58 | **45 of 55** |
-| Open rows with no parseable filer | 45 | **41–42 of 84** |
-| Severity bullets in the file | not stated | **161**, in exactly **three** shapes — 84 open, 32 `CLOSED BY`, 45 struck `~~` |
-| Bullets carrying a filer at all | not stated | **56** (open 43 · `CLOSED BY` 3 · struck 10) |
-| Bodies carrying **two** different filer ids | not stated | **0** |
-
-⚠️ **The 41-vs-42 is not a typo and it is the finding underneath the row.** Two near-identical loose
-free-text parsers — `state.php`'s and the ad-hoc one written to check it — disagree by one row on the
-same file. That is what "fifteen free-text shapes" costs, and it is why the remedy is to normalise the
-file rather than to improve the regex.
-
-### Remedy verdict
-
-**Sound in intent; one half deliberately changed and one clause of the premise is false.**
-
-⛔ **The premise clause that is false:** the row is written as though the scope were *rows*. `D5`'s
-second clause asks which increment **filed** each `major`, and **45 of the 55 `major` bullets are
-closed** — a `major` filed and closed inside one increment was still filed by it. So the scope is all
-**161** severity bullets, not the 84 open ones. **`state.php`'s parser cannot see a closed bullet at
-all**: its severity regex matches only the open shape, which is why `total_bullets` reads 185 while
-`open` reads 84. Verifying the row's premise rather than only its evidence and its remedy is `M45`'s
-and `M60`'s lesson, and this is the third increment running in which it was where the value was.
-
-⛔ **The changed half: a Pest test, not a lint script.** `D5`'s precondition says *"with a lint gate
-holding it there"* — that phrase is Lane A's own wording from `M36`, not the user's answer. The gate
-lands as `tests/Feature/Docs/BacklogProvenanceTest.php` beside `DocumentedCommandDriftTest.php`, whose
-header already argues this exact case and whose reason (3) decided it: **`scripts/mutate.php` drives
-Pest in a container and nothing else**, so a lint script would hand-roll its discipline at the call
-site — `M42`'s measured weaker form — and would add a CI step. **User confirmed the choice before the
-first file was opened.**
-
-### Two measured constraints that shaped the design, neither in the row
-
-⛔ **The backfill may not add a line.** **20 line-number citations point into
-`docs/feature-backlog.md`** from 8 files — 9 in `PROGRESS_ARCHIVE.md` (never rewritten), 4 in
-`lane-b.md` (**never edited**), 5 in code and ADRs. `M58` measured that an edit changing a document's
-line count rots every citation into it and that `citation-liveness-lint` structurally cannot see it.
-So the provenance clause is **appended to the end of a bullet's existing last line**, and conservation
-is asserted as `count(before) === count(after)` plus a per-index `str_starts_with` check — never as
-"the file got bigger".
-
-⛔ **`git log -S` glued to its argument returns zero hits and exit 0.** Measured both ways on this
-host: `-S$needle` finds nothing, `-S $needle` finds the introducing commit. That is the repo's
-recurring species — an operation that succeeds on empty input (`M48`'s three splices, `M49`'s eaten
-`$`) — and uncontrolled it would mark all 161 bullets `(unattributed)` and read as an honest answer.
-The archaeology pass therefore carries a discriminator control: a present needle must return ≥ 1 and an
-absent needle exactly 0, asserted before the sweep and again after.
-
-Files: `docs/feature-backlog.md`, `scripts/state.php`, `scripts/loop.php`,
-`tests/Feature/Docs/BacklogProvenanceTest.php`, `docs/claims/lane-a.md`, `docs/gate-baselines.md`,
-`PROGRESS.md` (Lane A's own status block only).
-Shared artefacts taken: `docs/feature-backlog.md`, `docs/claims/decisions.md` (a `D5` annotation only,
-if the bar comes out measurable), `PROGRESS.md` (own block only).
-Paired files taken: none.
-Namespaces spent: nothing from either namespace — no migration, no ADR, no `§D<n>`.
-
-Prediction, written before the run so it can be measured against rather than explained afterwards:
-PHPStan **cannot** move — no file under `app`, `database` or `routes` is touched, and saying that is
-the point rather than quoting an unchanged number. The Static-analysis step count must stay **where it
-is**; a moved count means the Pest-not-lint choice was not honoured. Pint sees `tests/` and `scripts/`
-and will be proved to by a deliberately misformatted probe, restored byte-exact. Four controls are
-planned — a deleted clause, a reverted legacy shape, an unparseable id, and a deleted section against
-the floor. ⚠️ **The one I most expect to be wrong is `MU4`, the floor.** A floor tuned to today's 161
-is a fixture that may be too small to reach the defect it exists for, which is `M20`'s lesson; if
-deleting a whole section leaves the per-bullet arm red anyway, the floor is decorative and I will say
-so rather than count `MU4` as caught.
+⚠️ **For whoever takes the next row: the three lessons `M64` would most like to hand on.**
+**(1) A CHECK THAT MEASURES ZERO MAY BE TOO WEAK TO SEE THE THING IT IS CHECKING FOR.** The claim
+justified the canonical form by measuring the ambiguity at **zero** — counting bullets whose body
+carried *two different* filer ids. That check cannot see a bullet carrying **exactly one id in the
+wrong place**, which is what the maintenance fan-out row is: `state.php` read `M32` out of a quoted
+historical row while the row's own first paragraph says `M44` filed it. **Ask what shape of instance
+your zero could not have contained.**
+**(2) THE FLOOR IS THE ARM THAT CATCHES A BLIND PARSER, AND ONLY A MUTATION AIMED AT THE PARSER SHOWS
+IT.** `MU4` blinded the bullet parser; the arm that checks *every* bullet stayed **green**, passing
+vacuously over an empty set, and only the floor went red. The claim had named the floor as the most
+likely to be decorative. It is the opposite, and no green run could have said so.
+**(3) VERIFY THE ROW'S PREMISE — the third increment running in which that was where the value was.**
+The row is written about *rows*; `D5`'s clause is about **`major` bullets**, 45 of whose 55 are closed,
+and `state.php` could not see a closed bullet at all. Working the row as written would have normalised
+84 bullets and left the clause exactly as unevaluable as it was.
 
 ⛔ **`D9` must never be started without an explicit answer.** Open decisions: `D1`, `D3`, `D4`, `D8`,
-`D9`, `D10`, `D11`. This increment answers none and asks none — the one question it had was put and
-answered before the branch was cut.
+`D9`, `D10`, `D11`, and **`D12`**, opened here.
 
 ⛔ **RUN `php scripts/state.php` FOR EVERY NUMBER.**
+---
+
+## RELEASED — `M64`, `D5`'s exit bar is not operable and the gap is provenance (merged as PR #255, `b35e0d7`, 6/6 green with real step counts — Static analysis 23 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
+
+**Shipped 2026-09-02.** Branch `m64-backlog-provenance`. Every claimed file was edited except
+`docs/gate-baselines.md`, which was regenerated rather than edited. The claim was **extended to
+`docs/claims/decisions.md`** — `D12`, filed because the bar became answerable inside this increment —
+and that landed as its own pushed commit. **No production file changed**, so PHPStan could not move;
+saying that is the point rather than quoting an unchanged number.
+
+### What the defect actually was
+
+`D5` ends the M-series on **zero open `major` plus N consecutive increments filing none**, and its
+second clause was unevaluable: provenance appeared in at least fifteen free-text shapes and most
+bullets carried none. `D5` wrote down the cost in advance — *"a bar that cannot be measured is a bar
+that will be declared met by whoever wants to stop"* — and `M63` then reported it as *reading* met off
+a floor of 11 attributable bullets. The user's answer was **keep going and make the bar real first**.
+
+### ⛔ THE ROW'S SCOPE WAS WRONG, AND THE CORRECTION IS WHERE THE WORK WAS
+
+The row is written about **rows**. `D5`'s second clause asks which increment **filed** each `major`,
+and **45 of the 55 `major` bullets are closed** — a `major` filed and closed inside one increment was
+still filed by it. **`state.php`'s parser could not see a closed bullet at all**: its severity regex
+matched `- **`major` ·` and nothing else, which is why `total_bullets` read 185 while `open` read 84.
+**77 bullets existed nowhere.** Scope is 161 bullets, not 84 rows — and that is the third increment
+running in which verifying the row's **premise**, not merely its evidence and its remedy, was the value.
+
+⚠️ **Its counts were wrong in both directions**: it says *47 of 58* `major` and *45* open rows; the tree
+said **45 of 55** and **41–42 of 84**. Only **5** of the 161 carried the strict form against **54**
+carrying some free-text filer.
+
+### ⛔ THE LOOSE PARSER WAS ACTIVELY MIS-ATTRIBUTING, WHICH THE ROW DOES NOT SAY
+
+The maintenance fan-out row quotes the row it superseded under a *"THE ROW AS FILED FOLLOWS"* heading,
+so `state.php` read **`M32` out of a quotation** while the row's own first paragraph says `M44` filed
+it. The claim asserted this risk *measured zero*, on a check that counted bullets carrying two
+different ids. **That check was too weak** — it could not see a bullet with exactly one id in the wrong
+place. Backticks are what separate a record somebody wrote as a record from prose about a filing.
+
+### The archaeology went through three forms, and the first two were wrong
+
+| Form | Method | Why it failed |
+|---|---|---|
+| 1 | walk ADDED LINES | mis-attributes every bullet whose first line was **re-wrapped at close** |
+| 2 | walk VERSIONS, 70-char key | the window **spills past a short title** into the body, so an editor who touched the next sentence re-attributes the row — it put `M48`'s row on `M60` |
+| 3 | walk VERSIONS, key bounded by the title's own bold-close | shipped |
+
+Three answers were established **by hand and each by a different route** — `M5` from a bare `docs:`
+commit that names its increment only in the body, `M44` from the row's own text, `M48` from the
+pickaxe — and asserted as **known-answer controls that abort the sweep**. That is not decoration: a
+sweep whose only output is `(unattributed)` reads exactly like an honest one.
+
+### ⛔ NO LINE WAS ADDED, AND THAT WAS NOT CAUTION
+
+**21 line-number citations point into the backlog from 8 files** — 9 in `PROGRESS_ARCHIVE.md` (never
+rewritten), 4 in `lane-b.md` (never edited), the highest at **line 2297**. **74 of the 156 lines the
+backfill changed sit above it.** An insert would have rotted every one, invisibly: `citation-liveness`
+checks a line is *alive*, not that it still says what the citing sentence claims. Conservation was
+proved three independent ways — `wc -l` identical, `git diff --numstat` 156/156 with no net add or
+remove, and a per-index check that every changed line is old-text plus suffix — and the gate's own
+ledger stayed at **18 rotten against a ceiling of 18**, which is the external confirmation.
+
+### MEASURED — 5 mutations, every red set read individually
+
+Scope `tests/Feature/Docs`, baseline **7 passed / 51 assertions**.
+
+| | Mutation | Red set | Reading |
+|---|---|---|---|
+| `MU1` | a bullet's clause deleted | the per-bullet arm | — |
+| `MU2` | reverted to `Found by` | the per-bullet arm | — |
+| `MU3` | a malformed id | the per-bullet arm | — |
+| `MU4` | **the parser blinded** | **the FLOOR ALONE** | ⛔ the per-bullet arm stayed **green**, passing vacuously over zero bullets |
+| `MU5` | a second clause on one bullet | the per-bullet arm | the quotation case |
+
+⛔ **`MU4` IS THE ONE THAT MATTERS AND THE PREDICTION WAS WRONG ABOUT IT.** The claim named the floor
+as most likely to be decorative. It is load-bearing: with the parser blinded, the arm that checks every
+bullet passes over an empty set and only the floor goes red. Assertions dropped 51 → 47, which is
+`M34`'s tell. Wrong in the direction of pessimism, and worth saying rather than presenting 5/5 as clean.
+
+### How the prediction fared, including the parts that were wrong
+
+✅ Predicted and held: PHPStan cannot move; the Static-analysis step count does not move (no new lint
+step, which is what the Pest-not-lint choice bought); Pint sees `tests/` and was **proved to** by a
+deliberately misformatted probe naming the new file by path, restored byte-exact by sha256.
+⛔ **Wrong: the claim said the ambiguity a canonical form defends against "measures zero today."** It
+measured zero on a check too weak to see it, and the `M32`/`M44` mis-attribution was live the whole time.
+⛔ **Wrong: `MU4` was predicted as the likely survivor and it is the sharpest control in the set.**
+
+### ➕ Two controls caught the AUTHOR rather than the code
+
+- The gate's discrimination arm was written expecting **`M999x9` to be refused**. The id grammar
+  accepts it — it is the shape of the real ids `J4b1` and `P3a`, and the vocabulary is deliberately not
+  M-only. The assertion is **kept, inverted, with the reason beside it**, because a control that only
+  ever confirms the author is not a control.
+- **`git log -S$needle` — glued to its flag — returns zero hits at exit 0 on this host**, where
+  `-S $needle` returns one. Uncontrolled it would have marked all 161 bullets `(unattributed)`. The same
+  species bit twice more in one session: `grep -c "$(cat token)"` reported **0** for a token a
+  `grep -F -f` pattern file found exactly once.
+
+### ➕ A check this increment proved wrong by triggering it
+
+`scripts/loop.php`'s `NOT_LIVE_MARKER` carries a comment claiming it is *"anchored on the bolded
+literal, never a substring"* — and **a bolded literal inside backticks is still a substring**. The
+comment names the exact failure it does not prevent. Filing a row **about** liveness coverage, whose
+text necessarily quotes `**Not live**`, classified it not-live on the first run while the row says
+`**Live.**`. Both readers now strip inline code spans before detection; measured **live 40 → 41,
+not-live 11 → 10**, and `loop assess` **still stops** on a genuine `**Not live**` row — which is the
+control that separates a fix from a disabled check.
+
+### 👤 WHERE THE BAR NOW STANDS, AND WHY IT IS A QUESTION AND NOT AN ANNOUNCEMENT
+
+Clause 1 **MET**. Clause 2 **MET** — the last increment that ever filed a `major` is **`M54`**, so
+`M55`–`M63` is **nine consecutive** against a bar of three, with **every `major` attributed and none
+`(unattributed)`**. `M63`'s floor said four; the measurement says nine.
+
+Filed as **`D12`** with three real options and a recommendation to **keep going**. ⛔ **`state.php`
+reports it and deliberately does not decide it**, and `loop.php status` says so in terms — because
+`D5`'s failure mode has a twin: *"declared met by whoever wants to stop"* and *"never triggered by
+whoever wants to continue"*. Two things the bar still cannot see are written into `D12` rather than
+left to be discovered after stopping: it checks a filer is **recorded**, never that it is **correct**;
+and severity is **self-assigned**, so "no `major` since `M54`" is equally consistent with the defects
+getting smaller and with the bar quietly changing what gets called `major`.
+
+### Deliberately not done, filed the moment it was decided
+
+- **The liveness backfill** — 30 open rows say nothing. Provenance was a fact recoverable from git;
+  liveness is a judgement against the code, one row at a time, which is the `M37` triage job whose own
+  finding was that 65 of 68 rows were still live. Gating a marker nobody has decided would make it a
+  formality — `M43`'s decorative-gate mistake.
+- **`docs/backlog-triage.md`'s ranking** — its top three items are all `major` and all closed, while
+  `CLAUDE.md` still sends every session to read it first for the ranked order.
 
 ---
 

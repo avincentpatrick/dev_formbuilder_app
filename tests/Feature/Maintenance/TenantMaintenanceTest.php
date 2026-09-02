@@ -59,13 +59,15 @@ function maintenanceFixture(string $slug, bool $paused, ?string $message = null)
 it('serves the guest form normally when the tenant is not paused', function (): void {
     [$tenant, $owner, $form] = maintenanceFixture('acme', paused: false);
 
-    // ⚠️ `withoutVite()` is REQUIRED on the two not-paused cases specifically, and its absence is why they
-    // were the only two red jobs in this file. They are the only tests here that render the real guest
-    // runtime shell — `public-runtime.blade.php`, which carries `@vite`. The paused cases render the
-    // maintenance blade instead, which is why they were green without it. The Pest CI job never runs
-    // `npm run build`, so `@vite` throws `Vite manifest not found` and the 200 arrives as a 500; locally it
-    // passes whenever `public/build` happens to exist, which is exactly the silent local/CI divergence
-    // PROGRESS.md records under "Any Pest test that renders a blade view needs withoutVite()".
+    // ⚠️ `withoutVite()` IS REQUIRED ON EVERY CASE IN THIS FILE, PAUSED OR NOT. This comment used to say it
+    // was needed "on the two not-paused cases specifically" because only those render
+    // `public-runtime.blade.php` — **that was false, and M61 paid a CI cycle to find out**: the maintenance
+    // blade carries `@vite(['resources/css/app.css'])` too, so the paused arm throws
+    // `ViteManifestNotFoundException` from `MaintenanceResponse::make()` and the 503 arrives as a 500. The
+    // paused cases below were never green *without* it — they have always called it, and the comment
+    // explained a habit it did not describe. The Pest CI job never runs `npm run build`; locally it passes
+    // whenever `public/build` happens to exist, which is exactly the silent local/CI divergence PROGRESS.md
+    // records under "Any Pest test that renders a blade view needs withoutVite()".
     $this->withoutVite();
 
     $this->get('http://acme.meridian.test/f/acme-feedback')->assertOk();
@@ -140,11 +142,16 @@ it('does not pause another tenant\'s forms', function (): void {
 it('503s a mixed-case guest URL too, rather than canonicalizing past the pause', function (): void {
     [$tenant, $owner, $form] = maintenanceFixture('acme', paused: true, message: 'Back on Monday.');
 
+    // ⛔ withoutVite() — and this case is why the comment at the top of this file now says EVERY case needs
+    // it. Written without, on the strength of that comment's claim that the paused arm renders no @vite,
+    // it passed locally (this host has a public/build) and was the single red test in CI: 500, not 503,
+    // from ViteManifestNotFoundException inside MaintenanceResponse::make().
+    $this->withoutVite();
+
     // EnforceTenantMaintenance short-circuits BEFORE $next(), so the controller — and with it M61's
     // canonical 301 — never runs. That is the correct precedence twice over: a paused tenant must not
     // answer differently for a mis-cased URL than for a canonical one, or the redirect leaks the slug's
     // existence past the pause. It is an ORDERING property, so it is pinned rather than reasoned about.
-    // No withoutVite() needed: the paused arm renders the maintenance blade, not the guest shell.
     $this->get('http://acme.meridian.test/f/AcMe-FeEdBaCk')
         ->assertStatus(503)
         ->assertSee('Back on Monday.')

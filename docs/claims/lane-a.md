@@ -16,7 +16,159 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — the README prescribes a design-system command that cannot work in the service it names (`m59-readme-axe-command`)
+## Status: NO ACTIVE CLAIM — `M59` is merged; **ONE `major` row remains**, and it is the tracker surgery
+
+**`M59` closed the README's unrunnable axe command.** `state.php` now counts **1 `major`** where it
+counted two, and `M59` filed **no new `major`** — which matters, because `D5` ends the M-series at zero
+open `major` plus three consecutive increments filing none, and this is one of those three.
+
+⚠️ **For whoever takes the tracker surgery — the last `major`.** That row's central warning, that
+`## Current Status` *"has two writers"*, **may be spent**: `docs/claims/lane-b.md` has read
+`## Status: RETIRED` since `M50`. It has now been noticed three times and measured never; measure it.
+Its post-merge trunk observation also depends on `D8`, which is open and explicitly *not proceeded on*
+pending `D7`, so plan for the marker being unverifiable on the trunk unless the surgery deliberately
+touches one non-`paths-ignore`d file.
+
+⛔ **AND THE LESSON THIS INCREMENT WOULD MOST LIKE TO HAND ON: A GATE CAN GO RED FOR REASONS YOUR DIFF
+CANNOT REACH.** `composer audit` reddened `PR #250` on three `league/commonmark` advisories published the
+night before, against a transitive dependency. A prediction that enumerates *which gates my diff can
+move* is answering a different question from *which gates will be green*.
+
+⛔ **`D9` must never be started without an explicit answer.** Open decisions: `D1`, `D3`, `D4`, `D8`, `D9`, `D10`.
+
+⛔ **RUN `php scripts/state.php` FOR EVERY NUMBER.**
+
+---
+
+## RELEASED — `M59`, the README prescribes a design-system command that cannot work in the service it names (merged as PR #250, `34514c9`, 6/6 green with real step counts — Static analysis 23 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
+
+**Shipped 2026-09-02.** Branch `m59-readme-axe-command`. Every claimed file was edited, plus one that was
+not: `composer.lock` — extended mid-build, as its own pushed commit, for the advisory below.
+
+### The row's evidence held at all five citations and its SEVERITY ARGUMENT WAS FALSE
+
+The row sizes itself on the claim that the failure *"is the confusing kind: a native-module error from
+inside a container, not a missing-server message."* **Measured, it is exactly a missing-server message** —
+`test-storybook` names the `--url` flag and links its own documentation. Reason (2) fires first and
+reason (1) is never reached on that path.
+
+**The row is still `major`, for a reason it does not give:** it is the only line in that block that cannot
+be made to work by fixing the reader's own tree.
+
+### ⛔ THE PROOF THAT MATTERED, BECAUSE THE OBVIOUS TEST GIVES THE WRONG ANSWER
+
+Run bare in the `node` service, the scan fails on an **absent** browser — which implies *"install it"* as
+the remedy, and that remedy is wrong. So it was installed. `playwright install` there warns it is
+*"downloading fallback build for ubuntu24.04-x64"*, and the scan then reports `spawn ... ENOENT` **with a
+189 MB binary present and executable**, at 0 of 42 suites.
+
+| Where | Result |
+|---|---|
+| `node`, as the README prescribed it | the missing-server message, exit 1 |
+| `node`, server up, **no browser installed** | `ENOENT` — reads as "install the browser" |
+| `node`, server up, **browser installed** | **`ENOENT` again, binary present and executable** — 0 of 42 |
+| `e2e` image, `ci.yml`'s shape | **42 suites / 303 tests, exit 0** |
+
+**That third row is the whole argument for changing images rather than adding an install step**, and only
+the second and third together make it.
+
+### Remedy verdict: the row's one prescription is wrong in the direction that matters
+
+*"The working shape … is two steps, not one."* `ci.yml` is **five**, three of them one-time installs, and
+its fifth is a two-process orchestration. It is also not transplantable: every native binding on disk is
+linux-only, so the host recipe needs a host `ds:install` first, which J4c measured as breaking the node
+container's Vite. **The user chose the `e2e`-image form on those alternatives** rather than the host form.
+
+### Three findings that came only from running the block, not reading it
+
+- **`--maxWorkers` is local-only and NOT optional.** Without it, 34 of 42 suites die `ENOMEM` — at *load*,
+  so every test that runs still passes and the tail looks survivable. CI never showed this because a
+  runner has the memory.
+- ⛔ **`ds:storybook:build` FAILS AND EXITS `0`** against an incomplete package tree: Storybook's
+  crash-report prompt runs after the error and swallows the status. **This is the `M27` class pointing the
+  other way** — that row's lesson was *"the failure prints a success after it, trust the exit code"*, and
+  here the exit code is the liar. Both now sit together in the README. Filed as its own row.
+- **`ds:test` could never have been made to work as a one-liner.** The dev server that would serve `:6006`
+  exists in the package and has **no root alias**, so the missing half was not merely unstarted — it was
+  inexpressible in the block's own vocabulary. Filed.
+
+### The gate, and why it is a test rather than a lint script
+
+`tests/Feature/Docs/DocumentedCommandDriftTest.php`. Three reasons, and the third decided it: the defect
+IS the document so the failure already names file, line and command; `php artisan test` discovers
+`tests/Feature` so no `composer.json`, `quality` or `ci.yml` entry is needed; and ⛔ **`scripts/mutate.php`
+drives Pest-in-a-container and nothing else**, so a lint sibling would have had to reimplement its
+discipline by hand — which `M42` recorded as the weaker form.
+
+Every arm is an **artifact** claim derived from `package.json` and `docker-compose.yml`; nothing asserts a
+command *works*. Comment lines are skipped deliberately, or the README's own explanation of this defect —
+which must name the broken command and the missing flag — would make the fix unwritable.
+
+Proved red four ways through `scripts/mutate.php`, sha256 asserted to move and to return:
+
+| Control | Result | What went red |
+|---|---|---|
+| The axe script restored to the musl `node` service | CAUGHT | the musl arm only |
+| `--url` stripped from the scan | CAUGHT | the url arm only |
+| A README script name that does not exist | CAUGHT | the existence arm only |
+| **The fence marker changed so the block stops parsing** | **CAUGHT** | **two floors, at 4 arms / 25 assertions not 27** — the floor fired instead of reporting green over nothing |
+
+### How the prediction fared — three right, one right for the wrong reason, one not predicted at all
+
+- ✅ **"Static analysis and Pest both stay at their current step counts."** They did — 23 and 11 — and the
+  stated reason is the right one: the gate needed no registration.
+- ✅ **PHPStan, Vitest, axe and E2E cannot move.** None did.
+- ⛔ **"The one I most expect to be wrong is the citation sweep."** It was wrong, and **the direction is
+  the finding.** I predicted `citation-liveness-lint` could not see this class, because it checks a cited
+  line is ALIVE and never that it says what the citing sentence claims. Both halves are true and **the
+  conclusion did not follow**: the README grew 22 lines, a cited line was pushed *inside a fenced block*,
+  and *inside a fence* is an **aliveness** rule. The gate caught it, at 19 over its ceiling of 18. It
+  would still have missed a line that merely moved and stayed prose.
+  ⚠️ **The repair was scoped to what this branch moved.** Three other README citations were already
+  pointing at a blank line before this branch existed, and the row that carries them says its list must be
+  re-derived before it is worked — so they were left. `README.md`'s first 88 lines were proved
+  byte-identical to `origin/main` to establish that nothing else had shifted.
+- ⛔ **NOT PREDICTED AT ALL, AND IT IS THE MORE USEFUL MISS.** The prediction enumerated *which gates my
+  diff could move*, which is a different question from *which gates will be green*. `composer audit` went
+  red on three `high` `league/commonmark` advisories published **2026-09-01 20:17–20:21 UTC** — after
+  `M58` merged and after this branch was cut.
+
+### ➕ The extension: `league/commonmark` 2.9.0 → 2.10.0
+
+Taken rather than reported, because `composer audit` is a merge gate and until it landed **no pull request
+in this repository could reach 6/6**. Transitive via `laravel/framework ^2.8.1`, so `composer.json` never
+moved and the lock delta is one package and its version fields.
+
+⚠️ **Regression evidence, because this is the library `Markdown::render()` runs on** — the exact surface
+`M57` worked and `scripts/mail-attribute-lint.php` guards: `tests/Feature/Mail` + `tests/Unit/Mail` +
+`tests/Feature/Notifications`, **161 passed, 580 assertions**.
+
+⛔ **The extension was published by CHERRY-PICK, not `git push origin HEAD:main`** — that form pushes the
+whole branch, which is how `M48` put a surgery on the trunk with no squash merge.
+
+### ⚠️ Two mechanics that cost time and will recur
+
+- **`git add -A` swept the `ds:install` lockfile churn into the first commit.** `packages/design-system/package-lock.json`
+  loses `"peer": true` markers on four packages whenever that install runs, and `docs/claims/lane-a.md`
+  has warned since `M20` to revert it rather than commit it. Caught by reading `git show --stat`, not by
+  any gate. **Stage by path on any branch where a design-system install has run.**
+- **The shell ate a backtick inside a `grep` argument** and the command died on an unmatched quote — the
+  documented trap, met in the wild. The prose files in this increment were written through the Write and
+  Edit tools for exactly that reason.
+
+### Filed rather than fixed, each at the moment it was decided — four
+
+1. **`minor`** · A failing `ds:storybook:build` exits `0`. The real remedy disables Storybook telemetry in
+   the package script, which is untested against `ci.yml`'s axe job — CI is on a clean tree and has never
+   hit this, so the change is unproven exactly where it matters most.
+2. **`minor`** · The design-system dev server has no root alias.
+3. **`minor`** · Three gate invocations fetch `http-server` from the network and nothing declares it — so
+   the merge-blocking accessibility gate has an undeclared, unpinned dependency.
+4. **`minor`** · The new gate reads `README.md` only; three other documents carry runnable command blocks,
+   and widening the `docker compose exec <musl service>` arm to a deployment runbook would produce false
+   positives on every line. **The corpus needs choosing before the constant is widened.**
+
+### ORIGINAL CLAIM (`M59`)
 
 Taken 2026-09-02. Branch `m59-readme-axe-command`, cut from `origin/main` at `03b0738`, PR into `main`.
 Row: `docs/feature-backlog.md` — **`major` · The README prescribes a design-system command that cannot
@@ -112,16 +264,6 @@ audit` is a merge gate, so until this lands no pull request in this repository c
 ⚠️ **AND THE ONE THING THAT MAKES IT MORE THAN A LOCK BUMP HERE:** `league/commonmark` is what
 `Markdown::render()` runs on, which is the exact surface `M57` worked and `scripts/mail-attribute-lint.php`
 guards. The mail suites are the regression evidence, and they are named in the release.
-
-⛔ **`D9` must never be started without an explicit answer.** Open decisions: `D1`, `D3`, `D4`, `D8`, `D9`, `D10`.
-
-⛔ **RUN `php scripts/state.php` FOR EVERY NUMBER.**
-
-⚠️ **Still open after this row, for whoever takes it: the `## Current Status` tracker surgery.** That
-row's central warning — that the section *"has two writers"* — **may be spent**: `docs/claims/lane-b.md`
-has read `## Status: RETIRED` since `M50`. Verify it before planning around it; it has been noticed twice
-now and measured never. Its post-merge trunk observation also depends on `D8`, which is open and
-explicitly *not proceeded on* pending `D7`.
 
 ---
 

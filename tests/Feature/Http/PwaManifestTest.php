@@ -127,3 +127,60 @@ it('404s a form that has a slug but no published version', function (): void {
 
     $this->get('http://acme.meridian.test/f/draftme/manifest.webmanifest')->assertNotFound();
 });
+
+// ── M61: the lookup is case-insensitive, and this route deliberately does NOT redirect ────────
+//
+// ⚠️ THE ASYMMETRY WITH THE MINT ROUTE IS A DECISION, AND THE 200 BELOW IS WHAT MAKES IT PAY. The mint
+// route canonicalizes a mis-cased URL with a 301 because the document URL is a storage key in four client
+// systems. This one has an explicit `id`, so a mis-cased manifest URL cannot fork an installed app — the
+// same argument the shell's blade already makes for its `?b=` fingerprint. Serving 200 here also makes the
+// canonical `$scope` a BEHAVIOURAL property: emit the request path instead and this case goes red, whereas
+// under a redirect that defect would be invisible.
+
+it('serves the manifest for a mixed-case slug, with canonical id/start_url/scope', function (): void {
+    $tenant = pwaTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    pwaGuestForm($tenant, $owner);
+
+    $this->get('http://acme.meridian.test/f/InTaKe/manifest.webmanifest')
+        ->assertOk()
+        ->assertHeaderMissing('Location')
+        ->assertJsonPath('id', '/f/intake')
+        ->assertJsonPath('start_url', '/f/intake')
+        ->assertJsonPath('scope', '/f/intake');
+});
+
+// The three oracle guards. The fourth gate on this route — `offline_sync` — is entitlement-shaped and its
+// guard lives in OfflineSyncGateTest, where the plan-catalog fixture is, rather than duplicated here.
+
+it('404s a mixed-case unknown slug', function (): void {
+    pwaTenant();
+
+    $this->get('http://acme.meridian.test/f/NoPe/manifest.webmanifest')
+        ->assertNotFound()
+        ->assertHeaderMissing('Location');
+});
+
+it('404s a mixed-case URL for a published form with guest access disabled', function (): void {
+    $tenant = pwaTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    pwaGuestForm($tenant, $owner, 'intake', guest: false);
+
+    $this->get('http://acme.meridian.test/f/InTaKe/manifest.webmanifest')
+        ->assertNotFound()
+        ->assertHeaderMissing('Location');
+});
+
+it('404s a mixed-case URL for a form with a slug but no published version', function (): void {
+    $tenant = pwaTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    $form = app(FormService::class)->create($tenant, $owner, 'Draft only');
+    $form->update(['public_slug' => 'draftme', 'allow_guest_submissions' => true]);
+
+    $this->get('http://acme.meridian.test/f/DrAfTmE/manifest.webmanifest')
+        ->assertNotFound()
+        ->assertHeaderMissing('Location');
+});

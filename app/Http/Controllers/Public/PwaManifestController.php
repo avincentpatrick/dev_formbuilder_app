@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Form;
 use App\Services\Branding\GuestBrandingPresenter;
 use App\Services\Entitlements\EntitlementService;
+use App\Support\Forms\FormSlug;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Str;
 
@@ -35,6 +36,23 @@ use Illuminate\Support\Str;
  * the shell's `<meta name="theme-color">` and this value must never disagree, and the shell's manifest link
  * carries this presenter's fingerprint as `?b=` so a brand change moves this URL. `background_color` stays
  * fixed: it is a NEUTRAL, and ADR-0014 §D7 keeps the tenant layer off neutrals.
+ *
+ * M61 — RESOLUTION AND THE FOUR GATES STILL MIRROR {@see GuestFormController::mint}, INCLUDING ITS NEW
+ * CASE-INSENSITIVE LOOKUP. **The canonical 301 deliberately does NOT mirror**, and that asymmetry is a
+ * decision rather than an omission:
+ *
+ * 1. **`id` is explicit here**, so a mis-cased manifest URL cannot fork an installed app — exactly the
+ *    argument `public-runtime.blade.php` already makes for why the `?b=` fingerprint is safe on this URL.
+ *    Emitting a canonical `$scope` is therefore sufficient; the redirect would buy nothing.
+ * 2. **The product never emits a mis-cased manifest URL.** The shell interpolates the canonical slug into
+ *    the `<link rel="manifest">` href, and the shell is only ever served at the canonical URL. Reaching
+ *    this route mis-cased takes a hand-typed URL.
+ * 3. **No service-worker route caches it** — the shell-HTML route requires `request.mode === 'navigate'`
+ *    and the schema route matches `/api/v1/public/f/`. The worst case is a duplicate browser HTTP-cache
+ *    entry holding byte-identical JSON.
+ * 4. **A 3xx here would be untestable.** This URL is fetched by the browser's own installability
+ *    machinery, not by any of our code, so a redirect on it is unobservable from Pest — whereas serving
+ *    200 makes the canonical `$scope` below a behavioural property a test can actually pin.
  */
 final class PwaManifestController extends Controller
 {
@@ -42,14 +60,16 @@ final class PwaManifestController extends Controller
 
     public function __invoke(EntitlementService $entitlements, GuestBrandingPresenter $branding, string $slug): JsonResponse
     {
-        $form = Form::query()->where('public_slug', $slug)->first();
+        $form = Form::query()->where('public_slug', FormSlug::forLookup($slug))->first();
 
         abort_if($form === null, 404);
         abort_unless($form->allow_guest_submissions, 404);
         abort_if($form->current_published_version_id === null, 404);
         abort_if($entitlements->currentPlan() !== null && ! $entitlements->feature('offline_sync'), 404);
 
-        $scope = '/f/'.$slug;
+        // The CANONICAL value, never the request path: this string is the installed app's identity, and a
+        // mis-cased request must not mint a second one. See (1) and (4) in the class docblock.
+        $scope = '/f/'.$form->public_slug;
 
         return response()->json([
             'id' => $scope,

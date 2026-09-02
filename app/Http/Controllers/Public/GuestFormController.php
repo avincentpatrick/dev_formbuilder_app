@@ -9,9 +9,11 @@ use App\Exceptions\Guest\InvalidShareTokenException;
 use App\Http\Controllers\Controller;
 use App\Models\Form;
 use App\Services\Branding\GuestBrandingPresenter;
+use App\Support\Forms\FormSlug;
 use App\Support\Guest\GuestShareTokenService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
 /**
@@ -31,16 +33,54 @@ use Illuminate\Http\Request;
  * {@see self::mint()} deliberately does NOT: it is the SPA's re-mint fetch, which renders no document.
  * Both read it from {@see GuestBrandingPresenter} rather than composing it locally — two call sites
  * deriving one answer independently is how a resume link ends up branded differently from a share link.
+ *
+ * M61 — THE SLUG IS RESOLVED CASE-INSENSITIVELY AND THE URL IS THEN CANONICALIZED WITH A 301. Five things
+ * about that are load-bearing and each is a defect if it is undone:
+ *
+ * 1. ⛔ **THE REDIRECT SITS AFTER THE THREE 404 GATES, NOT BEFORE THEM.** Hoisted above them — into a
+ *    middleware, say, where it would cost no extra throttle hit — a `301` followed by a `404` becomes an
+ *    existence oracle, and distinguishing "no such form" from "guest access disabled" is precisely what the
+ *    paragraph above says these gates exist to prevent. It also sits before {@see GuestShareTokenService::mint},
+ *    because minting an HMAC that is about to be discarded is pointless.
+ * 2. **THE URL IS CANONICALIZED, NOT MERELY TOLERATED, BECAUSE IT IS A STORAGE KEY IN FOUR SYSTEMS** — the
+ *    service worker's `guest-shell-html` Cache Storage entry (Workbox keys by full request URL), the Dexie
+ *    `draft_answers` compound primary key `[form_version_id, local_draft_id]`, the outbox row's `slug`
+ *    column, and the manifest's `id`/`start_url`/`scope`. Resolving a mis-cased URL to a 200 *without*
+ *    redirecting would fork all four: install from `/f/Clinic-Intake` and the shell caches under that URL
+ *    while `start_url` points at `/f/clinic-intake`, so the installed app is a cache miss offline.
+ * 3. **THE QUERY STRING IS PRESERVED**, because H7 URL prefill rides it. A query-dropping redirect would
+ *    silently deliver an un-prefilled form — worse than the 404 it replaces, because it produces wrong data
+ *    rather than a visible error. Built from `route()` + `getQueryString()` and never by rewriting
+ *    `fullUrl()`, which would also rewrite a slug-shaped substring elsewhere in the URL.
+ * 4. **BOTH ARMS REDIRECT — no branching on `Accept`.** A legacy outbox row carrying a mis-cased slug
+ *    reaches the server only through the JSON arm, and `fetch()` follows a 301 on a GET with its headers
+ *    intact. Two arms deriving one answer independently is the defect the H23b paragraph above records.
+ * 5. **`301` RATHER THAN `302`.** Storage is lowercase — `FormService::setShareSettings()` lowers what it
+ *    is handed and the share request's regex refuses uppercase before that — so the target is
+ *    `lower(path)`, a pure function of the URL, independent of database state, and a cached redirect can
+ *    therefore never become wrong. A `302` would re-cost a `throttle:guest-mint` hit on every mis-cased
+ *    entry instead of once per device. ⚠️ The redirect and the request that follows it do share that
+ *    per-IP bucket, which is the shape the `guest-challenge` limiter exists to avoid — two of
+ *    thirty, once per device, and hoisting it out to save them is the oracle in (1).
  */
 final class GuestFormController extends Controller
 {
-    public function mint(Request $request, string $slug, GuestShareTokenService $tokens, GuestBrandingPresenter $branding): JsonResponse|View
+    public function mint(Request $request, string $slug, GuestShareTokenService $tokens, GuestBrandingPresenter $branding): JsonResponse|RedirectResponse|View
     {
-        $form = Form::query()->where('public_slug', $slug)->first();
+        $form = Form::query()->where('public_slug', FormSlug::forLookup($slug))->first();
 
         abort_if($form === null, 404);
         abort_unless($form->allow_guest_submissions, 404);
         abort_if($form->current_published_version_id === null, 404);
+
+        if ($slug !== $form->public_slug) {
+            $query = $request->getQueryString();
+
+            return redirect()->to(
+                route('guest.form.mint', ['slug' => $form->public_slug]).($query === null ? '' : '?'.$query),
+                301,
+            );
+        }
 
         $minted = $tokens->mint($form->tenant_id, $form->id, $form->current_published_version_id);
         $expiresAt = gmdate('c', $minted->expiresAt);
@@ -63,7 +103,10 @@ final class GuestFormController extends Controller
                 'id' => $form->id,
                 'title' => $form->title,
             ],
-            'slug' => $slug,
+            // The CANONICAL value, not the request path — matching self::resume() below. Everything the shell
+            // derives from this is a storage key; see (2) in the class docblock. After the redirect above the
+            // two are always equal, so this is defence-in-depth rather than the fix.
+            'slug' => $form->public_slug,
             'locale' => $form->default_locale,
             'brand' => $branding->forGuest(),
         ]);

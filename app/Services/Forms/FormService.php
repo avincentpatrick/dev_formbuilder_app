@@ -25,6 +25,7 @@ use App\Support\Forms\FormSchedule;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 /**
  * Form creation (form-versioning-schema-migration.md §3.1). Creates the durable form, its initial draft
@@ -289,6 +290,28 @@ final class FormService
         ?int $guestRateLimitPerMinute,
         ?User $actor = null,
     ): Form {
+        // M61 — THE PRECONDITION THAT MAKES THE RUNTIME LOOKUP DETERMINISTIC, NOT A TIDY-UP.
+        // `forms_tenant_id_public_slug_unique` is case-SENSITIVE, so `Intake` and `intake` are two legal
+        // rows; {@see \App\Support\Forms\FormSlug::forLookup} resolves both, and `->first()` would then pick
+        // between two forms arbitrarily. Lowering here is what stops that pair from existing.
+        //
+        // ⛔ IT MUST STAY ABOVE THE $old/$new ARRAYS BELOW. Lowered at `forceFill()` time instead, the audit
+        // row records a value the database does not hold — in the one method whose docblock argues the audit
+        // row is the whole reason it grew this large.
+        //
+        // A no-op through the HTTP surface, where UpdateFormShareRequest's regex refuses uppercase before it
+        // ever gets here, and deliberately kept anyway: this service is callable without a request, and the
+        // XLSForm importer's own path normalizes for exactly the same reason.
+        //
+        // ⛔ NOT prepareForValidation() and NOT a model mutator, and both alternatives are worse in a way
+        // that is easy to miss. Lowering in the FormRequest would make `Clinic-Intake` VALID and redden the
+        // rejection case in FormShareTest, which is correct as it stands — silently accepting mixed case
+        // lets two authors believe they hold distinct names while the case-sensitive Rule::unique passes
+        // both. A setPublicSlugAttribute() mutator would rewrite every seeder and test that writes through
+        // $form->update(), making a mixed-case row impossible to CONSTRUCT in a test and permanently hiding
+        // the legacy-row defect class this increment had to check for by hand.
+        $slug = $slug === null ? null : Str::lower($slug);
+
         return DB::transaction(function () use ($form, $slug, $allowGuests, $botChallenge, $guestRateLimitPerMinute, $actor): Form {
             $old = [
                 'public_slug' => $form->public_slug,

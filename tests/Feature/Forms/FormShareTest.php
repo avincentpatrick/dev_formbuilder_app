@@ -29,19 +29,23 @@ uses(RefreshDatabase::class);
 | XLSForm importer and the e2e seeder ever set them, so a real tenant could build and publish a form and
 | still had no way to hand it to a respondent. These tests pin the write path that closes that.
 |
-| Four properties carry more weight than the rest, and each exists because the obvious implementation gets
+| Five properties carry more weight than the rest, and each exists because the obvious implementation gets
 | it wrong:
 |   1. Uniqueness is PER TENANT and counts SOFT-DELETED forms. The index is (tenant_id, public_slug) with no
 |      deleted_at predicate, so a model-scoped check reports a trashed row's slug free and the write then
 |      dies on a 23505 nobody catches.
 |   2. Guest-on with a null slug is REFUSED. It is not half-configured, it is unreachable: the runtime
-|      resolves `where('public_slug', $slug)` and every visitor gets the same 404 as an unknown form.
+|      resolves the form BY that column and every visitor gets the same 404 as an unknown form.
 |   3. The write is AUDITED — the first `auditable_type = 'form'` row in the system. Turning guest access on
 |      is the difference between a private draft and an open collection endpoint.
 |   4. A slug change invalidates NOTHING except the old URL. Share tokens are HMACs over
 |      (tenant, form, version) and resume links carry a token, not a slug — so a guest mid-form and a saved
 |      draft both survive a rename. That is asserted here rather than assumed, because the whole shape of
 |      the modal's rename warning depends on it being true.
+|   5. The stored value is LOWERCASE, and M61 made that a load-bearing guarantee rather than a convention.
+|      The runtime lookup is case-insensitive now, and `forms_tenant_id_public_slug_unique` is not — so a
+|      mixed-case row would be a pair the lookup resolves to both. The regex refuses uppercase on the way in
+|      and FormService lowers whatever it is handed; both halves are pinned below.
 */
 
 beforeEach(function (): void {
@@ -134,6 +138,11 @@ it('clears the link entirely when the slug is nulled', function (): void {
 
 // ── Validation ───────────────────────────────────────────────────────────────────────────────
 
+// ⚠️ M61 MADE THE RUNTIME LOOKUP CASE-INSENSITIVE AND THIS CASE IS STILL CORRECT — do not delete the
+// `uppercase` entry as obsolete. The reason it is refused changed rather than expired: the unique index is
+// case-SENSITIVE, so accepting `Clinic-Intake` beside `clinic-intake` would let two authors believe they
+// hold distinct link names while Rule::unique passes both, and the now-forgiving lookup would resolve the
+// pair to both rows. Refusing on the way in is what keeps one canonical spelling per form.
 it('rejects slugs that are not lowercase hyphenated', function (string $slug): void {
     $form = shareableForm($this->admin);
 
@@ -473,4 +482,39 @@ it('never lets the two new columns be mass-assigned', function (): void {
 
     expect($fresh->bot_challenge)->toBe(FormBotChallenge::Off)
         ->and($fresh->guest_rate_limit_per_minute)->toBeNull();
+});
+
+// ── M61: the storage invariant the runtime lookup now depends on ──────────────────────────────
+
+it('stores a slug lowercased even when the service is called directly, and audits the stored value', function (): void {
+    $form = shareableForm($this->admin);
+
+    // Unreachable through HTTP by design — the FormRequest's regex refuses uppercase before it gets here,
+    // and the dataset case above pins that. This asserts the SERVICE's own guarantee, which matters
+    // because the service is callable without a request (the XLSForm importer normalizes for the same
+    // reason) and because FormSlug::forLookup() is only deterministic while it holds:
+    // forms_tenant_id_public_slug_unique is case-SENSITIVE, so `Intake` beside `intake` would be a pair
+    // the case-insensitive lookup resolves to both, with ->first() choosing arbitrarily.
+    app(FormService::class)->setShareSettings($form, 'Clinic-Intake', true, FormBotChallenge::Off, null, $this->admin);
+
+    enterTenant($this->tenant->id, $this->admin->id);
+    $fresh = Form::query()->whereKey($form->id)->firstOrFail();
+
+    expect($fresh->public_slug)->toBe('clinic-intake');
+
+    // ⛔ THE AUDIT HALF IS WHY THIS TEST IS WORTH WRITING. Lower the value at forceFill() time instead of
+    // above the $old/$new arrays and the column assertion above still passes — while the ledger records a
+    // value the database does not hold, in the one method whose docblock argues the audit row is the whole
+    // reason it grew. The column assertion cannot see that; this one can.
+    $audit = Audit::query()
+        ->where('auditable_type', 'form')
+        ->where('auditable_id', $form->id)
+        ->latest('id')
+        ->firstOrFail();
+
+    expect($audit->new_values['public_slug'])->toBe('clinic-intake');
+
+    // And the point of the increment: the link resolves at both casings, from the canonical one directly.
+    $this->getJson('http://acme.meridian.test/f/clinic-intake')->assertOk();
+    $this->getJson('http://acme.meridian.test/f/Clinic-Intake')->assertStatus(301);
 });

@@ -73,6 +73,140 @@ it('404s an unknown slug', function (): void {
     $this->getJson('http://acme.meridian.test/f/nope')->assertNotFound();
 });
 
+// ── M61: mixed-case share URLs are canonicalized, not merely resolved ─────────────────────────
+//
+// The row this closes prescribed lowercasing the lookup and nothing else. That would turn the 404 into a
+// 200 and leave the mis-cased URL in place — and that URL is a storage key in the service worker's
+// `guest-shell-html` cache, the Dexie `draft_answers` primary key, the outbox row and the installed PWA's
+// `start_url`. These cases pin the CANONICALIZATION, which is why they assert a 301 and then follow it.
+
+it('301s a mixed-case share URL to the canonical one, and the canonical URL then serves the form', function (): void {
+    $tenant = guestTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    guestForm($tenant, $owner);                       // stored slug: `intake`
+
+    // assertStatus(301) and not a bare assertRedirect(): the latter accepts ANY 3xx, so a 302 would pass
+    // it — and a 302 is re-fetched on every mis-cased entry instead of being cached once per device.
+    $this->getJson('http://acme.meridian.test/f/InTaKe')
+        ->assertStatus(301)
+        ->assertRedirect('http://acme.meridian.test/f/intake');
+
+    // Following it is the half that proves the redirect terminates. The target satisfies the negation of
+    // the condition that emitted it, so a loop is structurally impossible — asserted rather than argued.
+    $this->getJson('http://acme.meridian.test/f/intake')
+        ->assertOk()
+        ->assertJsonPath('form.title', 'Intake');
+});
+
+it('serves the canonical share URL directly, with no redirect', function (): void {
+    $tenant = guestTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    guestForm($tenant, $owner);
+
+    // The guard against an UNCONDITIONAL redirect. Without it, a mutant that drops the `!==` comparison
+    // still passes every case above.
+    $this->getJson('http://acme.meridian.test/f/intake')
+        ->assertOk()
+        ->assertHeaderMissing('Location');
+});
+
+it('preserves the query string when canonicalizing a mixed-case share URL', function (): void {
+    $tenant = guestTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    guestForm($tenant, $owner);
+
+    // H7 URL prefill rides `location.search`. A query-dropping redirect would silently deliver an
+    // UN-PREFILLED form — worse than the 404 it replaces, because it produces wrong data rather than a
+    // visible error. One parameter only: Symfony's getQueryString() ksorts, so a multi-param assertion
+    // would be pinning the sort rather than the preservation.
+    $this->getJson('http://acme.meridian.test/f/InTaKe?role=staff')
+        ->assertStatus(301)
+        ->assertRedirect('http://acme.meridian.test/f/intake?role=staff');
+});
+
+// ── M61: the redirect must never become a slug-existence oracle ───────────────────────────────
+//
+// ⛔ THESE THREE ARE THE REASON THE REDIRECT SITS AFTER THE 404 GATES RATHER THAN BEFORE THEM. Hoisted
+// above them — into middleware, say, where it would cost no second throttle hit — a `301` followed by a
+// `404` tells a prober that the slug EXISTS, which is exactly the distinction GuestFormController's
+// docblock says these gates return 404-never-403 to prevent. `assertHeaderMissing('Location')` is what
+// makes that intent legible: without it a 302-then-404 variant reads as a pass.
+
+it('404s — never 301s — a mixed-case URL for a form with guest access disabled', function (): void {
+    $tenant = guestTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    $form = publishedGuestForm($tenant, $owner);
+    $form->update(['public_slug' => 'secret', 'allow_guest_submissions' => false]);
+
+    $this->getJson('http://acme.meridian.test/f/SeCrEt')
+        ->assertNotFound()
+        ->assertHeaderMissing('Location');
+});
+
+it('404s — never 301s — a mixed-case URL for a guest-enabled form with no published version', function (): void {
+    $tenant = guestTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    $form = makeForm($owner, 'Draft only');
+    makeDraftVersion($form);
+    $form->update(['public_slug' => 'draft', 'allow_guest_submissions' => true]);
+
+    $this->getJson('http://acme.meridian.test/f/DrAfT')
+        ->assertNotFound()
+        ->assertHeaderMissing('Location');
+});
+
+it('404s an unknown slug at any casing', function (): void {
+    guestTenant();
+
+    // The pre-existing sibling covers the lowercase spelling only, so on its own it stays green under a
+    // lookup that lowercases nothing.
+    $this->getJson('http://acme.meridian.test/f/NoPe')
+        ->assertNotFound()
+        ->assertHeaderMissing('Location');
+});
+
+it('boots the shell with the canonical slug in its dataset when entered at a mixed-case URL', function (): void {
+    $tenant = guestTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    guestForm($tenant, $owner);
+
+    // withoutVite() for the reason recorded on the personalization case below: the Pest CI job builds no
+    // assets, so a shell-rendering test without the stub passes locally and dies on "Vite manifest not
+    // found" in CI.
+    $html = $this->withoutVite()
+        ->followingRedirects()
+        ->get('http://acme.meridian.test/f/InTaKe')
+        ->assertOk()
+        ->getContent();
+
+    expect($html)->toContain('data-form-slug="intake"')
+        ->and($html)->toContain('href="/f/intake/manifest.webmanifest?b=')
+        // Nothing anywhere in the document may carry the request's casing: every one of the four client
+        // storage keys is derived from what the shell is handed.
+        ->and($html)->not->toContain('InTaKe');
+});
+
+it('counts the canonicalizing redirect against the per-IP mint limit', function (): void {
+    config(['guest.rate_limit.mint_per_ip' => 1]);
+    $tenant = guestTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    guestForm($tenant, $owner);
+
+    // Pinned as a STATED property rather than left to be discovered: a mis-cased first visit costs two
+    // requests from one per-IP bucket, once per device, because the 301 is cached thereafter. It is also
+    // the second tripwire against hoisting the redirect into middleware to save that hit — done there it
+    // would be free AND above the 404 gates, which is the oracle the three cases above forbid.
+    $this->getJson('http://acme.meridian.test/f/InTaKe')->assertStatus(301);
+    $this->getJson('http://acme.meridian.test/f/intake')->assertStatus(429);
+});
+
 /** The `<html …>` opening tag — the element the personalization invariant is actually about. */
 function guestRootTag(string $html): string
 {

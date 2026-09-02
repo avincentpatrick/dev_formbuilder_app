@@ -2659,7 +2659,12 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `GroupBPolicyGateTest.php:97` is `explode(':', $middleware, 2)[0]` — everything after the first colon is
   discarded, so a gate naming a permission nobody holds and one naming the wrong subject are
   byte-indistinguishable from a correct one. Its own header at `:33` says it "cannot judge whether an
-  allowlisted reason is TRUE". Two corrections to the row: it walks **Group B only** (`:114-115` filter out
+  allowlisted reason is TRUE".
+  ✅ **NO LONGER TRUE AS OF `M63` (2026-09-02), and the citation is annotated rather than rewritten because
+  the sentence was correct when written and is the reason the later row existed.** The parse moved to
+  `tests/Pest.php` as `policyGates()`, which keeps the payload; `:97` in that file is now something else
+  entirely, so read the claim as history and the code at its current home. A gate naming the wrong subject
+  is caught by `GroupBGateSubjectTest`; one naming a permission nobody holds, by `DC5`. Two corrections to the row: it walks **Group B only** (`:114-115` filter out
   `api.v1.public.*` and `api.v1.tokens.*`), and it resolves the router alias map rather than matching the
   string `can:` — deliberately, per `:81-86`.
   ⚠️ **THE ROW SAYS "THREE" AND THE RESOURCE CENSUS SAYS SIXTEEN.** Re-running M29's census with the
@@ -2765,7 +2770,19 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   requests and no denials of their own — `admin.tenants.reactivate`, `admin.tenants.assign-plan` and
   `admin.feedback.update`. One increment, one file of behavioural arms, with M35's fixture already in place.
 
-- **`minor` · The `can:` arm on `GET /api/v1/analytics/report` — the non-export twin — is asserted by nothing.**
+- ✅ **CLOSED BY `M63` (2026-09-02) — `minor` · ~~The `can:` arm on `GET /api/v1/analytics/report` — the non-export twin — is asserted by nothing.~~**
+  Three cases added to `AnalyticsApiTest`, which until now had **no policy-refusal case at all** — its only
+  two `error.code` assertions were `insufficient_ability` and `feature_not_available`. The first is M34's
+  export fixture aimed at this route (403 + `forbidden`, the code being what proves the ability gate PASSED
+  and the policy refused). ➕ **The other two are a different species and are the reason this row closed
+  alongside the wrong-subject one:** a principal holding exactly `submissions.view` must be **refused**, and
+  one holding only `dashboard.form.view` must be **served** — 200 under the wrong subject, 403 under the
+  right one. The second is also the positive control that the refusals are the gate rather than a broken
+  fixture, and the only assertion anywhere pinning `viewAny()`'s **second disjunct**: every other analytics
+  case uses a Viewer or an Owner, who both hold `dashboard.org.view` as well.
+  ⚠️ **Three separate `it()`s, not one**, per this file's own recorded trap: the auth guard caches its
+  resolved user for the app instance, so a second `withToken()` in one test keeps acting as the first.
+  **THE ROW AS FILED FOLLOWS, KEPT VERBATIM.**
   The mirror image of the row M34 closed, and found while closing it. `AnalyticsApiTest.php:87` pins the twin's
   **ability** arm and `:99` pins a Viewer's intended 200, but nothing anywhere drives that route with a caller
   who carries `read:analytics` and fails `can:viewAny,SavedReportView`. Delete the `can:` middleware from
@@ -2775,7 +2792,23 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   M20 rule read forwards**: it is a different route, and this row's whole thesis is that a test aimed at the
   twin is not coverage of its sibling. Fixing the sibling by aiming at the twin would repeat the defect.
 
-- **`minor` · Three saved-view verbs are gated by an entitlement assertion that no permission test backs.**
+- ✅ **CLOSED BY `M63` (2026-09-02) — `minor` · ~~Three saved-view verbs are gated by an entitlement assertion that no permission test backs.~~**
+  Three permission arms added at the foot of `AnalyticsPageGateTest`, and the M34 comment that said these
+  were unpinned is corrected in the same diff rather than left to rot.
+  ⛔ **EVERY NEW CASE RUNS ON BUSINESS, AND THAT IS THE WHOLE DESIGN.** On Professional the `feature:` gate
+  redirects first, so a permission failure could never be observed — the refusal would arrive from the wrong
+  middleware and the test would pass for the wrong reason. Business is what makes a 403 mean *"the policy
+  refused"*, and it is the difference between this row and the case it was filed against.
+  ➕ **The PATCH/DELETE case builds the view FOR the caller on purpose.** `update()`/`delete()` are
+  `owns($view) && viewAny()`; a view belonging to somebody else would 403 on the **ownership** half and
+  prove nothing about the permission half — which `SavedReportViewWebTest` already pins from that side.
+  Owned by the caller, ownership passes and the permission is the only thing left to refuse. The read-back
+  afterwards is not ceremony: a 403 that had nonetheless mutated the row would be the worse defect.
+  ⚠️ **The row said three verbs; the case it cites drives FOUR routes** — `GET /analytics/export` as well —
+  and carries a `:137` assertion that neither verb reached the service. The export's own permission arm was
+  already pinned elsewhere, so three is the right count for this row and four is the right count for that
+  case.
+  **THE ROW AS FILED FOLLOWS, KEPT VERBATIM.**
   `AnalyticsPageGateTest.php:106` drives `POST /analytics/views`, `PATCH /analytics/views/{view}` and
   `DELETE /analytics/views/{view}` as an **Owner** on a Professional plan and asserts a redirect from each —
   the `feature:` refusal, exactly the shape that filed the export row. M34 added a comment there saying so in
@@ -2783,7 +2816,41 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   bytes, so they fall outside a stored-bytes census and belong with whoever takes the analytics write surface.
   **Latent.**
 
-- **`minor` · A `can:` gate that names the WRONG SUBJECT is invisible to every test in the repository, including the one written to catch it.**
+- ✅ **CLOSED BY `M63` (2026-09-02) — `minor` · ~~A `can:` gate that names the WRONG SUBJECT is invisible to every test in the repository, including the one written to catch it.~~**
+  Closed with a **new species of assertion for this repo**, designed once across the surface exactly as the
+  row asked rather than bolted onto the route under repair. `tests/Pest.php` gains `policyGates()`, which
+  keeps the payload the old helper discarded and returns a **list** (two `routes/tenant.php` routes carry
+  two `can:` middlewares at once, and a helper answering with one of them would silently pick a winner);
+  `GroupBPolicyGateTest` gains six derived coherence checks; and a new `GroupBGateSubjectTest` declares the
+  **audience** of each eligible gate and computes the actual one from the live policy.
+  ⛔ **THE ROW'S EVIDENCE HELD AT EVERY CITATION AND ITS LITERAL MUTATION WOULD HAVE PROVED THE WRONG
+  THING.** `Submission` is **not** in `routes/api.php`'s `use App\Models\…` block, so `Submission::class`
+  written there resolves to the global `\Submission`, which does not exist — `Gate::getPolicyFor()` returns
+  null and the route 403s **everyone**, a different defect that the existing 200s already catch. The
+  mutation has to spell the FQCN literally. Same family as M49's shell-eaten `$`, arriving through a
+  namespace instead.
+  ⛔ **AND THE OBVIOUS STRUCTURAL REMEDY WAS REJECTED AS THE WEAK ARTEFACT.** A route-name →
+  middleware-string manifest mirrors the routes file: edit both identically and it asserts nothing. What
+  ships declares the **permission keys that open the route** and computes the real set by granting one key
+  at a time, so the swap makes the declaration false **in words** — it cannot be kept true by a matching
+  edit. It is also a whole-catalog statement, which no behavioural arm is without 29 requests per route.
+  ⚠️ **THE ROW'S RECIPE WAS RIGHT AND INCOMPLETE, AND THE MISSING HALF IS WHY THE DEFECT SURVIVED.**
+  *"Grant exactly `submissions.view` and neither dashboard key"* cannot be done with a seeded role:
+  **measured against `RolePermissionSeeder::MATRIX`, all five roles holding `submissions.view` — owner,
+  admin, form_editor, reviewer, viewer — also hold at least `dashboard.form.view`.** It needs a direct
+  permission grant (`memberHoldingOnly()`), whose no-synthetic-role discipline is inherited from
+  `FormVisibilityScopeTest`'s committed-role leak.
+  ➕ **THE SHARPEST CHECK IS ONE THE ROW DOES NOT MENTION, AND IT CAME FROM READING THE INSTALLED VENDOR
+  CODE.** `Authorize::isClassName()` is `str_contains($value, '\\')` and `getModel()` returns
+  `$request->route($model, null) ?? null`, so **a subject that is not a declared route parameter authorizes
+  against `[null]` and silently refuses every principal, forever.** DC3 is that check. All six derived
+  checks pass on today's table, so this closes with **no production finding** — which is itself worth
+  recording, because it was the outcome the plan said to stop on.
+  ⚠️ **STATED LIMIT, in the M20 discipline:** none of DC1–DC6 can see this row's own defect. A
+  well-formed gate aimed at the wrong audience passes every one of them identically, which is precisely why
+  the declared-audience half exists beside them and why neither is sufficient alone.
+  ⚠️ **Scoped to Group B's 51 gates. `routes/tenant.php`'s ~95 are filed below rather than swept in.**
+  **THE ROW AS FILED FOLLOWS, KEPT VERBATIM** — its recipe is what made the fixture correct.
   Found by M34's adversarial pass over its own committed diff — the mutation nobody thinks to try, because it
   changes no behaviour for any principal a test happens to use. Swap `can:viewAny,SavedReportView::class` for
   `can:viewAny,Submission::class` at `routes/api.php:369` (**the alternative `routes/api.php:359-362` says in
@@ -2799,6 +2866,39 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `GroupBPolicyGateTest` from "a gate is present" to "the gate names the subject its route intends" — rather
   than being bolted onto the one route that happened to be under repair. **Latent.**
 
+- **`minor` · `routes/tenant.php`'s ~95 `can:` gates get none of M63's checks, and the derived half is expected to FIND something.** Filed by **M63 (2026-09-02)** at the moment the scope was set, because a
+  deliberately-unfixed finding that lives only in a commit message is invisible to any later backlog search.
+  M63 built `policyGates()` and DC1–DC6 over Group B's 51 gates; the web session surface has roughly twice
+  as many and **nothing has ever parsed one of them**. ⛔ **This is not a tidiness row.** A DC3 failure is a
+  subject that is not a declared route parameter, which `Authorize::getModel()` resolves to `null` — the
+  route then refuses **every** principal, silently and permanently; a DC5 failure is the same outcome by a
+  typo'd permission key. Group B came back clean, and that is evidence about Group B only.
+  **The derived half is a pure extension** — pass a second enumerator to the same `policyGates()` — and is
+  the cheap, valuable part. ⚠️ **The declared-audience half is the expensive one and should not be
+  rubber-stamped:** ~66 intent decisions (~19 class-subject, ~26 bare) against M63's 21, and it is the
+  first place the two payload shapes Group B does not contain become live — the three-part
+  `'can:create,'.Submission::class.',form'` (5 routes) and two `can:` middlewares on one route (2 routes).
+  M63 measured those shape counts and reviewed none of them. **Whoever takes it should split it: land the
+  derived checks first and decide each finding on its own, then take the manifest as its own increment.**
+
+- **`minor` · `D5`'s exit bar reads MET but is still not OPERABLE on its own terms, and the gap is provenance.** Filed by **M63 (2026-09-02)**, measured rather than asserted, and **carrying a user decision of
+  record taken the same day: keep going and make the bar real first.** `state.php` counts **zero open
+  `major`**, and no `major` bullet in this file is attributable to `M59`, `M60`, `M61` or `M62` — the
+  highest filer that records itself is `M49` — so both of `D5`'s clauses read satisfied, four consecutive
+  increments against a bar of three. ⛔ **`D5` set its own precondition and it is half-built:** *"provenance
+  normalised to one parseable form across `docs/feature-backlog.md`, with a lint gate holding it there."*
+  `state.php` now derives provenance, which is the reading half — but **47 of the 58 bullets carrying the
+  `major` marker record no filer in any form the parser recognises**, and 45 of the open rows record none
+  either. There is **no gate**, so nothing stops the next row from being filed without one.
+  ⚠️ **This is `D5`'s own warning about itself coming true**: *"a bar that cannot be measured is a bar that
+  will be declared met by whoever wants to stop."* The measurement above is a floor built on the 11
+  attributable bullets plus the absence of a contrary one — good enough to report, **not** good enough to
+  end a series on. What lands here: one parseable provenance form, backfilled across every bullet that has
+  a knowable filer, `(unattributed)` written explicitly where it does not; a lint gate refusing a new row
+  without one; and `state.php` reporting the two clauses directly so the exit is read off the tree rather
+  than argued. ➕ **Do the same for liveness while the file is open** — only 24 of the rows carry a
+  liveness marker, which is the sibling blind spot `M55` filed.
+
 - **`minor` · `routes/api.php:114-116` describes a middleware ordering the priority sorter does not produce.**
   Re-read at source rather than taken from the report: the comment states that `feature:api_access` runs *"before throttle so a no-feature tenant is refused before
   consuming a burst slot"*. **Measured with `route:list`, which prints the SORTED list: `ThrottleRequests:api`
@@ -2809,7 +2909,18 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   data), so **documentation defect, not a behaviour one** — but the fix is a decision rather than an edit:
   either strike the claim, or hoist `api_access` into the priority list so the comment becomes true.
 
-- **`minor` · Two byte-serving routes gate on a subject their own comments question.**
+- ➡️ **MOVED TO `docs/claims/decisions.md` AS `D11` (2026-09-02, by `M63`) — IT IS A DECISION, NOT A DEFECT, AND NO LANE SHOULD TAKE IT AS A ROW.** Both candidate fixes change **who can do something**, which is a product call; and `M63`'s claim was that it added the first executable assertion about which permission a gate names, so changing a gate inside that diff would have made its own mutation matrix ambiguous about which half caught what. The recommendation on file is **A — leave both and pin the intent** in the `routes/tenant.php` grant manifest when that row is taken.
+  ⛔ **THE ROW'S OWN CITATION IS WRONG AND IT CHANGES THE ARGUMENT:** the PDF route is **`POST`**, not
+  `GET` — deliberately, because it has side effects (an audit row, a metered export, a queued job). A gate
+  on a side-effecting write is a different question from a gate on a read, and the row reasoned about the
+  second. This is the third increment running in which verifying a row's **premise** — not merely its
+  evidence and its remedy — was where the value was.
+  ⚠️ **THIS CONVERSION DELIBERATELY DOES NOT FOLLOW `D1`'s PRECEDENT, AND THE DEPARTURE IS THE POINT.**
+  `D1` kept the original bullet in its `- **`minor` · …**` form beneath the moved-to line, so `state.php`
+  still counts it as an open row — the exact miscount `D5` records as making its first clause
+  *"not cleanly countable"*. Here the severity token is spent on the moved-to line instead and the original
+  reasoning is kept below it verbatim, which loses nothing a reader wanted and stops inflating the census.
+  **THE ROW AS FILED FOLLOWS, KEPT VERBATIM** — its reasoning is intact and its caution was correct.
   Surfaced by M34's resource census and **not verified beyond the route declaration** — treat each as a lead,
   not a finding, and re-read the file before acting. `GET /submissions/{submission}/pdf` gates `can:view`
   where its sibling export route uses `can:export`, and the route's own comment flags the asymmetry.

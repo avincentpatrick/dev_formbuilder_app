@@ -232,3 +232,68 @@ it('lists reportable questions and aggregates one', function (): void {
         ->assertJsonPath('data.reason', 'not_indexed')
         ->assertJsonStructure(['data' => ['coverage' => ['indexed', 'countable']]]);
 });
+
+/*
+|--------------------------------------------------------------------------
+| The POLICY layer — which permission the `can:` gate actually names (Increment M63)
+|--------------------------------------------------------------------------
+| Until M63 this file had no policy-refusal case at all: its only two `error.code` assertions were
+| `insufficient_ability` and `feature_not_available`, so the `can:viewAny,SavedReportView` arm on
+| `GET /api/v1/analytics/report` was asserted by NOTHING. The export twin's arm was pinned by M34 and
+| this one was filed rather than fixed, because a test aimed at the twin is not coverage of its sibling.
+|
+| ⛔ AND THE SECOND AND THIRD CASES ARE A DIFFERENT SPECIES FROM THE FIRST. `routes/api.php` rejects
+| `can:viewAny,Submission::class` for these routes in a prose comment, duplicated in
+| `SavedReportViewPolicy`'s docblock, and defended by nothing executable — swap the subject and every test
+| in the repository stayed green, because no principal any test used could tell the two gates apart.
+| `SavedReportViewPolicy::viewAny()` reads the two dashboard keys; `SubmissionPolicy::viewAny()` reads
+| `submissions.view`. So the ONLY fixture that discriminates is one holding exactly one side and not the
+| other — 403 under the right subject and 200 under the wrong one, and the reverse for the third case.
+|
+| ⚠️ NO SEEDED ROLE CAN PRODUCE EITHER PRINCIPAL, which is why `memberHoldingOnly()` exists and why the
+| defect survived: all five roles holding `submissions.view` also hold at least `dashboard.form.view`.
+|
+| ⚠️ ONE TOKEN AND ONE REQUEST PER TEST, for the reason recorded further up this file: the auth guard
+| CACHES its resolved user for the app instance, so a second `withToken()` inside one test keeps acting as
+| the first. Three cases, not one.
+*/
+
+it('refuses the REPORT to a correctly-scoped token whose owner holds neither dashboard permission', function (): void {
+    // The `can:` arm the ability case above cannot reach: this token carries read:analytics, so Sanctum
+    // passes it through and only Authorize:viewAny,SavedReportView is left to refuse.
+    $nobody = memberHoldingOnly();
+    $token = $nobody->createToken('ci', [ApiAbilities::READ_ANALYTICS])->plainTextToken;
+
+    // `forbidden` rather than `insufficient_ability` is what proves the ability gate PASSED and the policy
+    // is what refused. Asserting only the status would pass under either.
+    $this->withToken($token)
+        ->getJson(analyticsUrl().'?'.http_build_query(reportParams()))
+        ->assertForbidden()
+        ->assertJsonPath('error.code', 'forbidden');
+});
+
+it('refuses the REPORT to a principal holding exactly submissions.view — the key the REJECTED subject names', function (): void {
+    // 200 UNDER THE WRONG SUBJECT. `SubmissionPolicy::viewAny()` reads exactly this key, so if the gate
+    // were `can:viewAny,Submission::class` this principal would be served — which is the widening
+    // `routes/api.php` rejects in prose. This case is that sentence, made executable.
+    $principal = memberHoldingOnly('submissions.view');
+    $token = $principal->createToken('ci', [ApiAbilities::READ_ANALYTICS])->plainTextToken;
+
+    $this->withToken($token)
+        ->getJson(analyticsUrl().'?'.http_build_query(reportParams()))
+        ->assertForbidden()
+        ->assertJsonPath('error.code', 'forbidden');
+});
+
+it('serves the REPORT to a principal holding ONLY dashboard.form.view', function (): void {
+    // 403 UNDER THE WRONG SUBJECT, and the positive control that the two refusals above are the gate
+    // rather than a broken fixture: the same helper, one permission different, and the route opens.
+    // It is also the only thing on the API surface pinning viewAny()'s SECOND disjunct — every other
+    // analytics case here is a Viewer or an Owner, both of whom hold dashboard.org.view as well.
+    $principal = memberHoldingOnly('dashboard.form.view');
+    $token = $principal->createToken('ci', [ApiAbilities::READ_ANALYTICS])->plainTextToken;
+
+    $this->withToken($token)
+        ->getJson(analyticsUrl().'?'.http_build_query(reportParams()))
+        ->assertOk();
+});

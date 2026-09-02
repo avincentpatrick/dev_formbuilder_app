@@ -48,6 +48,7 @@ use App\Support\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
 use Database\Factories\SsoConnectionFactory;
 use Database\Seeders\PlanSeeder;
+use Illuminate\Auth\Middleware\Authorize;
 use Illuminate\Http\Client\Request as HttpClientRequest;
 use Illuminate\Routing\Route as RoutingRoute;
 use Illuminate\Support\Carbon;
@@ -831,6 +832,144 @@ function adminConsoleRoutes(): array
         static fn (RoutingRoute $route): bool => $route->uri() === 'admin'
             || str_starts_with($route->uri(), 'admin/'),
     ));
+}
+
+/*
+|--------------------------------------------------------------------------
+| Policy gates, PARSED rather than merely counted (Increment M63)
+|--------------------------------------------------------------------------
+| `GroupBPolicyGateTest` has asked "does this route carry a `can:` gate?"
+| since M13, and answered it by resolving the middleware alias and throwing
+| the rest away: `explode(':', $middleware, 2)[0]`. Element [1] — the whole
+| `<ability>,<Subject>` payload — was computed and discarded, so a gate
+| naming the WRONG subject satisfied every assertion in the repository.
+|
+| ⛔ THE PAYLOAD IS WHERE THE AUTHORIZATION DECISION ACTUALLY LIVES.
+| `routes/api.php` gates six analytics routes on `viewAny,SavedReportView`,
+| whose policy reads the two dashboard keys. Swap the subject for
+| `App\Models\Submission`, whose `viewAny` reads `submissions.view`, and the
+| route answers to a different audience entirely — with no test in the
+| repository able to tell, because no principal any test used could
+| distinguish two gates that both refused it.
+|
+| These live here rather than in either consumer because Pest loads every
+| test file into ONE process, so a helper declared in a test file resolves
+| only when THAT file has been loaded — the failure this file's header
+| already records paying for twice. `groupBRoutes()` MOVED here from
+| `GroupBPolicyGateTest.php` for exactly that reason: M63 gave it a second
+| caller.
+|
+| ⚠️ THE ALIAS INDIRECTION IS NOT DEFENSIVE, AND REMOVING IT IS THE FIRST
+| THING THAT WENT WRONG WRITING THE ORIGINAL. `route:list` PRINTS the
+| resolved class (`Illuminate\Auth\Middleware\Authorize:view,form`) while
+| `gatherMiddleware()` RETURNS the declared alias (`can:view,form`) — a
+| check written against what the command printed found ZERO gated routes and
+| reported all fifty as ungated.
+|
+| Returns a LIST, not a single gate: two routes in `routes/tenant.php` carry
+| two `can:` middlewares at once, and a helper that answered with one of them
+| would silently pick a winner.
+*/
+
+/**
+ * Every policy gate declared on a route, parsed into its ability and its subjects.
+ *
+ * Handles all five shapes that occur in this repository:
+ *   `can:viewAny,App\Models\Form`        class subject, no bound instance
+ *   `can:view,form`                      a bound route parameter
+ *   `can:tenant.settings.manage`         a bare Gate/Spatie ability, NO subject at all
+ *   `can:create,App\Models\Submission,form`   class subject plus a second bound argument
+ *   two `can:` entries on one route      two list elements
+ *
+ * @return list<array{ability: string, subjects: list<string>, declared: string}>
+ */
+function policyGates(RoutingRoute $route): array
+{
+    $aliases = app('router')->getMiddleware();
+    $gates = [];
+
+    foreach ($route->gatherMiddleware() as $middleware) {
+        if (! is_string($middleware)) {
+            continue; // a closure or an instance — never a `can:` gate
+        }
+
+        [$name, $payload] = array_pad(explode(':', $middleware, 2), 2, null);
+
+        if (($aliases[$name] ?? $name) !== Authorize::class) {
+            continue;
+        }
+
+        // A gate with no payload at all is malformed rather than absent, and is reported as such:
+        // `$ability` comes back empty and the structural case names the route.
+        $parts = array_map(trim(...), explode(',', (string) $payload));
+        $ability = (string) array_shift($parts);
+
+        $gates[] = ['ability' => $ability, 'subjects' => array_values($parts), 'declared' => $middleware];
+    }
+
+    return $gates;
+}
+
+/**
+ * Group B — the token-consumed resource surface.
+ *
+ * Keyed on the route-NAME prefix, which is what delimits the group: Group A is `api.v1.tokens.*`
+ * (session-authenticated, mints rather than reads) and Group C is `api.v1.public.*` (the unauthenticated
+ * guest runtime, whose authorization is a signed share token and which has no `User` to ask a policy
+ * about). Every caller asserts a floor on the count, because a filter that silently stopped matching
+ * would leave every assertion over it passing on an empty set.
+ *
+ * @return list<RoutingRoute>
+ */
+function groupBRoutes(): array
+{
+    return array_values(array_filter(
+        Route::getRoutes()->getRoutes(),
+        static function (RoutingRoute $route): bool {
+            $name = (string) $route->getName();
+
+            return str_starts_with($name, 'api.v1.')
+                && ! str_starts_with($name, 'api.v1.public.')
+                && ! str_starts_with($name, 'api.v1.tokens.');
+        },
+    ));
+}
+
+/**
+ * An active member holding EXACTLY the named permissions and nothing else.
+ *
+ * ⛔ THE SEEDED FIVE-ROLE MATRIX CANNOT PRODUCE THIS, AND THAT IS THE WHOLE REASON THE HELPER EXISTS.
+ * Measured against `RolePermissionSeeder::MATRIX`: all five roles that hold `submissions.view` — owner,
+ * admin, form_editor, reviewer, viewer — also hold at least `dashboard.form.view`. So no seeded principal
+ * can distinguish a gate reading `submissions.view` from one reading the dashboard pair, which is exactly
+ * the discrimination M63 needed and exactly why the defect survived.
+ *
+ * ⚠️ A DIRECT PERMISSION, NEVER A SYNTHETIC ROLE, AND THE REASON IS A BUG THIS SUITE ALREADY PAID FOR.
+ * `FormVisibilityScopeTest`'s first draft minted a global role on `pgsql_privileged` — OUTSIDE
+ * `RefreshDatabase`'s transaction — so the row COMMITTED and leaked into every later test in the process;
+ * `RbacRlsTest` counts the global catalog and went red with "6 is not 5" a hundred files later with
+ * nothing pointing back. `makeFormsCreatorOnly()` there is this helper's direct precedent.
+ *
+ * Order is load-bearing at every step: `apiMember()` sets the RLS GUC and Spatie's team id and creates the
+ * `tenant_users` row the tenant middleware requires (without it the refusal arrives from the wrong layer);
+ * `syncRoles([])` runs BEFORE the grant, because `viewer` carries both dashboard keys and would destroy
+ * the discrimination; the cache flush runs AFTER the grant and before any `can()`.
+ *
+ * ⚠️ Leaves the new user as the acting principal, exactly as `apiMember()` does. A caller that writes
+ * further fixtures must re-enter as its own actor first.
+ */
+function memberHoldingOnly(string ...$permissions): User
+{
+    $user = apiMember('viewer');
+    $user->syncRoles([]);
+
+    if ($permissions !== []) {
+        $user->givePermissionTo(...$permissions);
+    }
+
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    return $user;
 }
 
 /*

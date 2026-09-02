@@ -134,6 +134,16 @@ Every rate-limited response includes standard `X-RateLimit-Limit`/`X-RateLimit-R
 > GroupBPolicyGateTest.php` walks the live route table and fails on a route carrying neither a `can:`
 > middleware nor a written reason it needs none — because this is a property of a **route table**, and a
 > guard that lives in one controller's test cannot see the next route somebody adds.
+>
+> **And since M63 the guard asks what the gate NAMES, not only that one is present.** It used to discard
+> everything after the first colon, so `can:viewAny,SavedReportView` and `can:viewAny,Submission` were
+> indistinguishable to it. Two halves now cover that: six derived checks in the same file (a class subject
+> must resolve to a registered policy implementing the ability; a **non-class subject must be a declared
+> route parameter**, because `Authorize::getModel()` otherwise hands the gate `null` and it refuses every
+> caller; a bare ability must be a real permission key), and `GroupBGateSubjectTest`, which declares the
+> **set of permission keys that opens each route** and computes the actual set from the live policy. The
+> declaration is an audience rather than an echo of the middleware string, so a re-pointed gate makes it
+> false in words instead of being kept true by a matching edit.
 
 > **H15a note.** `manage:integrations` scopes the native-connector surface (`/connections` and the delivery
 > rules nested under it). New rather than a reuse of `manage:webhooks` for the reason above, one step

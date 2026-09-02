@@ -88,8 +88,24 @@ docker compose exec node npm run type-check     # vue-tsc
 
 # Design system — the two above are the bootstrap; these are the rest.
 docker compose exec node npm run ds:tokens              # re-run after editing tokens/*.json
-docker compose exec node npm run ds:storybook:build     # build the component library docs
-docker compose exec node npm run ds:test                # axe every story (WCAG 2.2 AA)
+docker compose exec node npm run ds:storybook:build     # -> packages/design-system/storybook-static
+
+# axe every story (WCAG 2.2 AA) — the merge-blocking gate, run the way ci.yml runs it.
+#
+# ⛔ NOT THE `ds:test` SCRIPT, AND NOT IN THE `node` SERVICE. Two independent reasons, both measured:
+#    (1) `node` is node:24-alpine — musl — while Playwright ships a glibc Chromium, so the launch
+#        fails `spawn ... ENOENT` WITH THE BINARY PRESENT AND EXECUTABLE, which reads as a missing
+#        browser and is not one. Installing it there does NOT help: `playwright install` warns it is
+#        downloading the ubuntu fallback build, and the scan still reports 0 of 42 suites.
+#    (2) `ds:test` is a bare `test-storybook` with no `--url`, so it needs a server already
+#        listening on :6006 and nothing here starts one.
+#    So the scan is two images and not one line. Build above in `node`; scan below in `e2e`.
+#
+# ⚠️ `--maxWorkers` is local-only and not optional: jest defaults to one worker per core and the
+#    container runs out of memory, which surfaces as `ENOMEM` in 34 of 42 suites — a load failure,
+#    so the tests that DO run all pass and the tail looks survivable. CI needs no cap.
+# ⚠️ The `e2e` service shares the app container's network namespace, so `app` must be running.
+docker compose run --rm --entrypoint sh e2e -c 'cd packages/design-system && npx concurrently -k -s first "npx --yes http-server storybook-static -p 6006 --silent" "npx --yes wait-on tcp:127.0.0.1:6006 && npx test-storybook --url http://127.0.0.1:6006 --maxWorkers=2"'
 ```
 
 > **If you skip either step the failure does not look like a missing step.** Skipping `ds:install`
@@ -99,6 +115,12 @@ docker compose exec node npm run ds:test                # axe every story (WCAG 
 > `✓ built in 329ms` and a file size. **Trust the exit code (`1`), not the tail of the output.**
 > (`@meridian/design-system` also exports `./tokens` → `dist/tokens.ts` from the same generated
 > directory. Nothing imports it today, but it is the same artifact behind a second export path.)
+
+> ⛔ **AND ON `ds:storybook:build` THE EXIT CODE IS THE LIAR — the exact opposite of the line above,
+> so do not carry one habit into the other.** Against an incomplete `packages/design-system` tree it
+> dies with `Cannot find module '@storybook/vue3-vite/preset'` and then **exits `0`**: Storybook's
+> anonymous crash-report prompt runs after the error and swallows the status. `ds:install` is the
+> fix. The tell is the stack trace and the absent `Output directory:` line, never `$?`.
 
 ## Windows / Laragon gotchas
 

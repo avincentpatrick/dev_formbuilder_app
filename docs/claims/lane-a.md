@@ -16,31 +16,90 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M63` is merged; the `can:` gate surface now asserts what it NAMES
+## Status: ACTIVE CLAIM — `M64`, D5's exit bar is not operable and the gap is provenance (`m64-backlog-provenance`)
 
-`M63` closed **three** rows, converted one to a decision and filed **two**, so the open count moved
-86 → 84 and stayed at **zero `major`**. `state.php` counts the tree; do not take that sentence's
-arithmetic on trust.
+Taken 2026-09-02. Branch `m64-backlog-provenance`, cut from `origin/main` at `7c1c8ce`, PR into `main`.
+Row: `docs/feature-backlog.md` — **"`D5`'s exit bar reads MET but is still not OPERABLE on its own
+terms, and the gap is provenance."** Filed by `M63` (2026-09-02), carrying the user decision of record
+taken the same day: **keep going and make the bar real first.**
 
-⚠️ **For whoever takes the next row: the three lessons `M63` would most like to hand on.**
-**(1) A STRUCTURAL GATE CAN DISCARD THE ONLY PART THAT CARRIES THE DECISION, AND STAY GREEN FOREVER.**
-`carriesPolicyGate()` computed `explode(':', $middleware, 2)` and read `[0]`. Element `[1]` — the entire
-`<ability>,<Subject>` payload — was thrown away, so for 51 routes the repository asserted that *a* gate was
-present and nothing about what it authorized. **Look for the value a check computes and does not use.**
-**(2) A DECLARATION THAT MIRRORS THE IMPLEMENTATION ASSERTS NOTHING; ONE THAT RESTATES IT IN OTHER TERMS
-ASSERTS A LOT.** The obvious remedy — route name → middleware string — is edited in the same breath as the
-routes file and stays true. Declaring the **audience** (which permission keys open the route) and computing
-it from the live policy cannot be kept true by a matching edit: the swap makes the declaration false *in
-words*, and an author has to rewrite a sentence a reviewer reads.
-**(3) THE MUTATION THAT FOUND A DEFECT IN THE GATE ITSELF WAS THE ONE AIMED SOMEWHERE ELSE.** `MU8`
-narrowed `can:create` to `can:view` on a route with no bound instance; `DC6` caught it as designed, and the
-**audience oracle raised `ArgumentCountError` and died with a FATAL rather than a report** — so a single
-arity slip would have hidden every other route's audience. The plan had specified that guard and the first
-implementation did not carry it. A green run could never have shown this.
+### Evidence verified
 
-⛔ **`D9` must never be started without an explicit answer.** Open decisions: `D1`, `D3`, `D4`, `D8`, `D9`,
-`D10`, and **`D11`**, opened here — do the two byte-serving routes name the right permission. `M63` answered
-none and asked the user exactly one question, on `D5` (below).
+Every count in the row was re-measured against the merged tree rather than taken on report, and the
+row is **right about the defect and wrong about its census in both directions**:
+
+| | Row says | Tree says |
+|---|---|---|
+| `major` bullets with no parseable filer | 47 of 58 | **45 of 55** |
+| Open rows with no parseable filer | 45 | **41–42 of 84** |
+| Severity bullets in the file | not stated | **161**, in exactly **three** shapes — 84 open, 32 `CLOSED BY`, 45 struck `~~` |
+| Bullets carrying a filer at all | not stated | **56** (open 43 · `CLOSED BY` 3 · struck 10) |
+| Bodies carrying **two** different filer ids | not stated | **0** |
+
+⚠️ **The 41-vs-42 is not a typo and it is the finding underneath the row.** Two near-identical loose
+free-text parsers — `state.php`'s and the ad-hoc one written to check it — disagree by one row on the
+same file. That is what "fifteen free-text shapes" costs, and it is why the remedy is to normalise the
+file rather than to improve the regex.
+
+### Remedy verdict
+
+**Sound in intent; one half deliberately changed and one clause of the premise is false.**
+
+⛔ **The premise clause that is false:** the row is written as though the scope were *rows*. `D5`'s
+second clause asks which increment **filed** each `major`, and **45 of the 55 `major` bullets are
+closed** — a `major` filed and closed inside one increment was still filed by it. So the scope is all
+**161** severity bullets, not the 84 open ones. **`state.php`'s parser cannot see a closed bullet at
+all**: its severity regex matches only the open shape, which is why `total_bullets` reads 185 while
+`open` reads 84. Verifying the row's premise rather than only its evidence and its remedy is `M45`'s
+and `M60`'s lesson, and this is the third increment running in which it was where the value was.
+
+⛔ **The changed half: a Pest test, not a lint script.** `D5`'s precondition says *"with a lint gate
+holding it there"* — that phrase is Lane A's own wording from `M36`, not the user's answer. The gate
+lands as `tests/Feature/Docs/BacklogProvenanceTest.php` beside `DocumentedCommandDriftTest.php`, whose
+header already argues this exact case and whose reason (3) decided it: **`scripts/mutate.php` drives
+Pest in a container and nothing else**, so a lint script would hand-roll its discipline at the call
+site — `M42`'s measured weaker form — and would add a CI step. **User confirmed the choice before the
+first file was opened.**
+
+### Two measured constraints that shaped the design, neither in the row
+
+⛔ **The backfill may not add a line.** **20 line-number citations point into
+`docs/feature-backlog.md`** from 8 files — 9 in `PROGRESS_ARCHIVE.md` (never rewritten), 4 in
+`lane-b.md` (**never edited**), 5 in code and ADRs. `M58` measured that an edit changing a document's
+line count rots every citation into it and that `citation-liveness-lint` structurally cannot see it.
+So the provenance clause is **appended to the end of a bullet's existing last line**, and conservation
+is asserted as `count(before) === count(after)` plus a per-index `str_starts_with` check — never as
+"the file got bigger".
+
+⛔ **`git log -S` glued to its argument returns zero hits and exit 0.** Measured both ways on this
+host: `-S$needle` finds nothing, `-S $needle` finds the introducing commit. That is the repo's
+recurring species — an operation that succeeds on empty input (`M48`'s three splices, `M49`'s eaten
+`$`) — and uncontrolled it would mark all 161 bullets `(unattributed)` and read as an honest answer.
+The archaeology pass therefore carries a discriminator control: a present needle must return ≥ 1 and an
+absent needle exactly 0, asserted before the sweep and again after.
+
+Files: `docs/feature-backlog.md`, `scripts/state.php`, `scripts/loop.php`,
+`tests/Feature/Docs/BacklogProvenanceTest.php`, `docs/claims/lane-a.md`, `docs/gate-baselines.md`,
+`PROGRESS.md` (Lane A's own status block only).
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/claims/decisions.md` (a `D5` annotation only,
+if the bar comes out measurable), `PROGRESS.md` (own block only).
+Paired files taken: none.
+Namespaces spent: nothing from either namespace — no migration, no ADR, no `§D<n>`.
+
+Prediction, written before the run so it can be measured against rather than explained afterwards:
+PHPStan **cannot** move — no file under `app`, `database` or `routes` is touched, and saying that is
+the point rather than quoting an unchanged number. The Static-analysis step count must stay **where it
+is**; a moved count means the Pest-not-lint choice was not honoured. Pint sees `tests/` and `scripts/`
+and will be proved to by a deliberately misformatted probe, restored byte-exact. Four controls are
+planned — a deleted clause, a reverted legacy shape, an unparseable id, and a deleted section against
+the floor. ⚠️ **The one I most expect to be wrong is `MU4`, the floor.** A floor tuned to today's 161
+is a fixture that may be too small to reach the defect it exists for, which is `M20`'s lesson; if
+deleting a whole section leaves the per-bullet arm red anyway, the floor is decorative and I will say
+so rather than count `MU4` as caught.
+
+⛔ **`D9` must never be started without an explicit answer.** Open decisions: `D1`, `D3`, `D4`, `D8`,
+`D9`, `D10`, `D11`. This increment answers none and asks none — the one question it had was put and
+answered before the branch was cut.
 
 ⛔ **RUN `php scripts/state.php` FOR EVERY NUMBER.**
 

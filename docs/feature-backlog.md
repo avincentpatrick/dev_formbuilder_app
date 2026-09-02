@@ -4041,7 +4041,49 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   than four. **Still not live** — nothing is wrong today; it is still a filing question, and the second
   form belongs with the Rule 7 rewrite.
 
-- **`major` · `## Current Status` is now 42% of the tracker and its largest section.** Measured
+- ~~**`major` · `## Current Status` is now 42% of the tracker and its largest section.**~~
+  ✅ **DONE — `M60` (2026-09-02), merged as PR #251 (`55c6409`, 6/6 green with real step counts —
+  Static analysis 23 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11).** 36 lines and
+  **102,115 bytes** — `M56` down to `M29` — moved verbatim into the head of `PROGRESS_ARCHIVE.md`'s
+  existing `## Archived status bullets` section, head-inserted so the section stays newest-first.
+  `PROGRESS.md` **196,030 → 94,757 bytes (−51.7%), 323 → 287 lines**; `## Current Status` from
+  110,268 bytes to ~8,100. The heading, the newest three bullets and a rewritten pointer survive,
+  because `R2` forbids deleting the heading — the choice `M41` made and recorded. Ceiling ratcheted
+  **200,000 → 130,000**, its comment re-measured, and the headroom sized from the real growth rate
+  (mean 3,460 bytes per close-out across `M46`–`M59`, max 4,892) rather than from the phrase *"roughly
+  a dozen"* that had survived four ratchets unexamined.
+  ⛔ **EVERY FIGURE THIS ROW STATED WAS STALE, ALL FOUR IN THE SAME DIRECTION, AND THAT INVERTED ITS
+  PRIORITY.** It reads as a tidiness row. Measured at the moment it was taken, `## Current Status` was
+  **110,268 bytes and 56.3%**, not 67,982 and 42.1%, and the file was 196,030 against `R1`'s 200,000
+  ceiling — **3,970 bytes of headroom, about ONE ordinary close-out from a red trunk.** A row whose own
+  numbers understate it by 62% cannot be triaged from its text.
+  ⛔ **AND ITS CENTRAL PROHIBITION WAS SPENT — THE PREMISE, NOT THE EVIDENCE OR THE REMEDY.** The row
+  forbids a slice crossing the lane tags, because Rule 7(b) gives each lane its own status block. The
+  row is dated **2026-08-29**; `M50` retired Lane B on **2026-08-31**, two days later
+  (`docs/adr/0022-single-lane-development.md`). `lane-b.md` reads *"READ AND NEVER WRITTEN"*, its
+  status is `RETIRED`, it holds no forward queue, and Rule 7 itself carries a superseded banner. So the
+  slice carries the 🅱️ bullets for `M35`, `M34`, `M33` and `M29` deliberately. `M59` flagged this as
+  *"noticed three times and measured never"* and handed it over to be measured; **this is `M45`'s own
+  lesson — verify the row's PREMISE — landing on `M45`'s successor.**
+  ✅ **AND IT DISCHARGED THE END-TO-END SQUASH PROOF `M47` AND `M48` EACH HANDED FORWARD.** The
+  post-merge run on `main` (`33586412469`) reports `DECLARED SURGERY: 36 line(s) and 101,273 byte(s)`
+  with `R7 base is 54bb8bd… (github.event.before, via TRACKER_LINT_BASE_SHA)` — a real GitHub squash
+  arming the relaxed marker on a real trunk push, which no surgery had yet produced: `M41` reddened
+  `main` with an emptied `--body`, `M45` lost the marker to the default `* ` prefix, `M48` pushed the
+  branch and forfeited the squash. **The byte arm fired alone** — 36 lines against a 200 limit, 101,273
+  bytes against 50,000 — which is exactly the blindness the byte threshold was added for.
+  ⚠️ **Proved four ways, 17 checks, 0 failed**, with the slice re-read from git at phase 1's parent
+  rather than from anything the splice wrote: a counted multiset of 36 line hashes with exact
+  multiplicity, present in the archive **and** decremented in the tracker; exact byte conservation with
+  the added bytes stated rather than inferred (`2,653,273 + 2,013 == 2,655,286`); `## Standing Rules`
+  byte-identical; and an independent git-level hash. **`M41` predicted byte conservation was the check
+  most likely to fail and it failed by exactly one byte at the join seam; this used its corrected
+  formula and held on the first run.** Five positive controls — `R7`, `R1`, `R4`, `R5`, `R2` — each red
+  when mutated and byte-identical when restored, against a green baseline taken first.
+  ➕ **One side effect worth recording:** `state.php`'s count of prose literals in `PROGRESS.md`
+  disagreeing with the tree fell from **30 to 6**, because 24 of them lived inside the moved bullets.
+  **Original filing follows.**
+  **`major` · `## Current Status` is now 42% of the tracker and its largest section.** Measured
   immediately after M48's surgery, on the file as it now stands: `PROGRESS.md` is **161,298 bytes** and
   `## Current Status` is **67,982 of them — 42.1%**, against `## Standing Rules`' 49,001 (30.4%) and
   `## Next Session`'s 15,269 (9.5%). **It is the same shape M45 and M48 have each moved once**, and it is
@@ -4203,3 +4245,48 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   and is the open `major` directly above. Read its **post-merge** run on `main`, not its PR run, and
   check the `R7 base is …` line names `github.event.before` rather than `HEAD~1`. **Not live** — a
   stated limit, filed so it cannot be forgotten.
+  ⛔ **THE HAND-FORWARD IN THIS ROW IS UNSATISFIABLE AS WRITTEN, AND `M60` FOUND IT BY BEING THE
+  INCREMENT IT NAMES (2026-09-02).** The row says the first real exercise *"is the `## Current Status`
+  surgery, **which is a multi-commit push**"*. It is not, and no correctly merged increment ever can
+  be. A squash merge puts **exactly one** commit on `main`, so `github.event.before..HEAD` holds one
+  commit and is identical to `HEAD~1..HEAD` — precisely the collapse this row already identifies for
+  `M49`'s own merge, applied one paragraph later to a case it assumed was different. The only way to
+  push several commits to the trunk at once is `git push origin HEAD:main` on a loaded branch, which
+  is what `M48` did and what `scripts/pre-push-guard.php` now refuses at
+  `MAX_DIRECT_TRUNK_COMMITS = 1`. ⚠️ **So `R7`'s multi-commit `push` range is structurally unreachable
+  on `main` by any protocol-compliant push**, and the assertion that range supports — that the marker
+  may sit on any commit in the push, not only the last — can only ever be exercised by
+  `tracker-lint-controls.php`'s synthetic histories or by a `pull_request` run. ✅ **What `M60` DID
+  discharge is the half that was actually owed**: a real GitHub squash of a real surgery, arming `R7`
+  on a real `push` run on `main`, with the base taken from `github.event.before`. That is `M47`'s and
+  `M48`'s hand-forward and it is now spent. **What remains is narrower than this row states** and
+  should be re-read as: nothing proves `R7` against a multi-commit trunk push, and nothing ever will
+  without deliberately breaking the merge protocol.
+
+- **`minor` · Four tracker surgeries have now hand-rolled the same verification harness and none of
+  them kept it.** `M41`, `M45`, `M48` and `M60` each wrote a throwaway splice-and-verify script in the
+  session scratchpad and discarded it. `git log --all --diff-filter=A` finds no file ever added under
+  `scripts/` whose name contains *surgery*, *splice* or *verify*, and `M45` recorded the same finding
+  about `M41` in almost these words — *"the specification is reusable, the script is not."*
+  ⚠️ **THE COST IS MEASURED, NOT HYPOTHETICAL, AND IT IS ALWAYS THE CHECK RATHER THAN THE SURGERY.**
+  `M41`'s byte-conservation assertion was **wrong on its first run** — it omitted the join seam's
+  newline and failed by exactly one byte, against a correct tree. `M45`'s paths-touched assertion
+  failed **twice**, with the check at fault both times. `M60` re-derived `M41`'s corrected formula out
+  of release *prose*, because there was no code to inherit it from. Three surgeries, three defective
+  first-run checks, and the defect in a verification harness presents as a failing surgery.
+  ⛔ **AND `scripts/tracker-lint-controls.php`'s OWN DOCBLOCK ARGUES THE OPPOSITE CASE IN ITS OWN
+  WORDS:** *"a control that is not committed is a control that ran once."* It was written about `M47`
+  building controls for `R7` in a detached worktree and throwing them away — which is the stated reason
+  the `fetch-depth` defect survived eight increments. The tracker gate has a committed control harness;
+  the tracker *surgery* does not, and the surgery is the operation with the blast radius.
+  ⚠️ **What makes this live rather than tidy:** with `## Current Status` gone, `## Standing Rules` is
+  **51,072 bytes and 53.9% of the tracker** — the largest section by a wide margin — so a fifth
+  surgery is plausible rather than theoretical. It is also a **different kind of move**: live
+  imperatives, not dated records, so its boundary must be *decided* rather than measured, which is
+  exactly the case where a proved conservation harness is worth most.
+  ⛔ **A kept script needs its own positive controls or it is worse than none** — in the
+  `tracker-lint-controls.php` mould, and the three that matter are a dropped line, a changed byte and
+  **empty input**, that last being the `M48` failure this class keeps producing (three splices read a
+  missing file, wrote a blank line and reported success). **Filed by M60 (2026-09-02)** at the moment
+  the decision to keep this increment's harness throwaway was taken with the user, rather than
+  discovered later. **Live.**

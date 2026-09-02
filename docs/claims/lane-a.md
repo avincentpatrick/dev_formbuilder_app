@@ -16,82 +16,158 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — the `## Current Status` tracker surgery, the last `major` row (`m60-current-status-surgery`)
+## Status: NO ACTIVE CLAIM — `M60` is merged, and **there are ZERO open `major` rows for the first time in the M-series**
 
-Taken 2026-09-02. Branch `m60-current-status-surgery`, cut from `origin/main` at `4b12f3b`, PR into `main`.
-Row: **`major` · `## Current Status` is now 42% of the tracker and its largest section** —
-`docs/feature-backlog.md:4044`, filed by `M48` (2026-08-29). It is the last open `major`.
+**`M60` closed the last one — the tracker surgery.** `state.php` counts **0 `major`, 82 `minor`**, and
+`M60` filed no new `major`. `D5` ends the M-series at zero open `major` **plus three consecutive
+increments filing none**; `M59` was the first of those three and `M60` is the second. **One more
+increment filing no `major` meets the stated bar.**
 
-### Evidence verified
+⚠️ **For whoever takes the next row: the two lessons `M60` would most like to hand on.**
+**(1) A row's PREMISE is a third thing, separate from its evidence and its remedy, and it is the one
+with no field in the claim template.** This row's evidence was stale in every figure and its
+prohibition had expired two days after it was written — and the template's `Evidence verified` and
+`Remedy verdict` would both have been answered "held" without noticing either. **(2) A dated row
+cannot be triaged from its text.** This one read as tidiness and was one ordinary close-out from
+reddening the trunk.
 
-⛔ **EVERY FIGURE THE ROW STATES IS STALE, ALL FOUR IN THE SAME DIRECTION.** The section has grown, so
-the row understates its own case. Measured on `origin/main` at `4b12f3b`, by byte offset between `^## `
-headings rather than by reading a sentence:
+⛔ **`D9` must never be started without an explicit answer.** Open decisions: `D1`, `D3`, `D4`, `D8`,
+`D9`, `D10`. `D8` gained a note from `M60` — its stated blocker is half-gone now `D7` is answered —
+but it is **not** answered and was not proceeded on.
 
-| The row's citation | Verdict |
-|---|---|
-| `PROGRESS.md` is **161,298 bytes** | **MOVED — 196,030 bytes, 323 lines.** True at `M48`'s close; +21.6% since |
-| `## Current Status` is **67,982 bytes — 42.1%** | **MOVED — 110,268 bytes, 56.3%.** +62% in four days |
-| `## Standing Rules` **49,001 (30.4%)** | **MOVED — 51,072 (26.1%)** |
-| `## Next Session` **15,269 (9.5%)** | **MOVED — 5,644 (2.9%)** |
-| Rule 7(b): each lane owns its own status block | **HELD AS TEXT, SPENT AS A CONSTRAINT** — below |
-| `TRACKER_BYTE_CEILING`'s comment names this section by measurement | **HELD** — `scripts/tracker-lint.php:42-57`, and it names this increment as the one that ratchets it |
+⛔ **RUN `php scripts/state.php` FOR EVERY NUMBER.**
 
-⛔ **AND THE ROW IS URGENT FOR A REASON IT DOES NOT STATE.** `R1`'s ceiling is 200,000 bytes and the
-tracker is **196,030 — 3,970 bytes of headroom, roughly one ordinary close-out.** A row that reads as
-tidiness is one close-out from reddening the trunk.
+---
 
-### The row's central hazard is SPENT, and `M59` handed it to me to measure rather than to repeat
+## RELEASED — `M60`, the `## Current Status` tracker surgery, the last `major` row (merged as PR #251, `55c6409`, 6/6 green with real step counts — Static analysis 23 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 
-The row's headline warning is that the section *"has two writers"*, so a slice crossing the lane tags
-would be a Lane A edit to Lane B's block. **The row is dated 2026-08-29; `M50` retired Lane B on
-2026-08-31** — two days later. `docs/claims/lane-b.md:3` reads *"LANE B WAS CLOSED ON 2026-08-31 BY
-`M50`. THIS FILE IS READ AND NEVER WRITTEN"*; its `## Status` is `RETIRED`; it holds **no forward
-queue** (every remaining heading is a `## RELEASED` record); and Rule 7 itself carries a
-`SUPERSEDED 2026-08-31 BY M50` banner at the head of the rule.
+**Shipped 2026-09-02.** Branch `m60-current-status-surgery`, three phases. Every claimed file was
+edited except `docs/gate-baselines.md`, which was regenerated rather than edited, and the claim was
+extended to nothing — no mid-build extension was needed, the first increment in a while where that is
+true.
 
-**So the section has one writer and the slice may cross the lane tags.** This is `M45`'s own lesson —
-*verify the row's PREMISE, not only its evidence and its remedy* — landing on `M45`'s successor.
+**What moved.** `PROGRESS.md` lines 196–231 — **36 lines, 102,115 bytes, `M56` down to `M29`** — into
+the **head** of `PROGRESS_ARCHIVE.md`'s existing `## Archived status bullets` section. Head and not
+tail, because that section's first bullet is `M26` and appending would have inverted the newest-first
+order it has always had. `PROGRESS.md` **196,030 → 94,757 bytes (−51.7%), 323 → 287 lines**;
+`## Current Status` from **110,268 bytes (56.3%, its largest section) to ~8,100 (~8.6%)**. The
+heading, the newest three bullets and a rewritten pointer survive — `R2` forbids deleting the heading,
+which is the choice `M41` made and recorded. `TRACKER_BYTE_CEILING` ratcheted **200,000 → 130,000**.
 
-### Remedy verdict
+### ⛔⛔ THE ROW'S PREMISE WAS THE WRONG THING, AND NEITHER CLAIM FIELD WOULD HAVE CAUGHT IT
 
-The row prescribes a shape rather than a mechanism: *"the same shape `M45` and `M48` have each moved
-once"*, plus two obligations. Measured separately:
+`M36` added `Evidence verified` and `Remedy verdict` because four consecutive rows had sound evidence
+and a broken remedy. **This row had a third failure mode neither field asks about.** Its central
+instruction — *"IT MUST NOT BE PLANNED AS A REPEAT OF EITHER PREDECESSOR… Rule 7(b) gives each lane
+its own status block, so the section has two writers; a slice that moves both lanes' bullets is the
+one thing the boundary forbids"* — is not evidence and not a remedy. It is the **premise the row's
+scope was derived from**, and it expired **two days after the row was filed**: the row is dated
+2026-08-29, `M50` retired Lane B on 2026-08-31. `lane-b.md` reads *"READ AND NEVER WRITTEN"*, its
+status is `RETIRED`, it holds no forward queue, and Rule 7 itself carries a superseded banner.
 
-- **The shape WORKS and has a fourth precedent the row does not name: `M41` moved 135 bullets out of
-  this same section.** Its constraint is still live — `R2` asserts exactly one `^## Current Status$`
-  in the tracker, so the heading survives with the newest bullets and a pointer.
-- **"The boundary is per lane and then per bullet" is UNNECESSARY**, per the premise finding above.
-- **"The ceiling ratchet is the taker's obligation" HOLDS**, and it does a second job the row does not
-  claim: `scripts/tracker-lint.php` is not in `ci.yml`'s `paths-ignore`, so the ratchet is what makes
-  the post-merge run on `main` exist at all. That is `D8`'s option 3 and `M48`'s accident made
-  deliberate — **and it is the only way this increment can pay the end-to-end squash proof that `M47`
-  and `M48` have each handed forward.**
-- ⛔ **What the row does NOT say, and what will decide the diff:** the bullets are **two-level**. Lines
-  193–221 are heads at column 0; 222–231 are ten continuation lines belonging to `M29`'s 189-byte head.
-  A slicer cutting on the bullet marker would orphan them.
+⚠️ **`M59` had already noticed and deliberately did not conclude:** *"It has now been noticed three
+times and measured never; measure it."* That is the right instinct written down — a suspicion handed
+forward as an obligation rather than as a fact — and it is why this cost ten minutes instead of an
+increment.
 
-Scope, decided with the user: keep the newest **three** bullets (`M41` kept ten), moving lines 196–231
-— 36 lines, 102,152 bytes, `M56` → `M29` — into the head of `PROGRESS_ARCHIVE.md`'s existing
-`## Archived status bullets` section, so it stays newest-first. Verification is a throwaway harness, as
-in all three predecessors.
+### ⛔⛔ EVERY FIGURE THE ROW STATED WAS STALE, ALL FOUR IN THE SAME DIRECTION, AND IT INVERTED THE PRIORITY
 
-Files: `PROGRESS.md`, `PROGRESS_ARCHIVE.md`, `scripts/tracker-lint.php`, `docs/claims/lane-a.md`,
-`docs/feature-backlog.md`, `docs/claims/decisions.md`, `docs/gate-baselines.md`.
-Shared artefacts taken: `PROGRESS.md` (the whole `## Current Status` section, deliberately, on the
-premise finding above), `PROGRESS_ARCHIVE.md`, `docs/feature-backlog.md`, `docs/claims/decisions.md`.
-Paired files taken: none.
-Namespaces spent: nothing from either namespace — no ADR, no migration prefix.
+The row says 67,982 bytes and 42.1% of a 161,298-byte file. Measured when it was taken:
+**110,268 bytes and 56.3% of 196,030** — the section had grown **62%** in four days. The consequence
+is not cosmetic: `R1`'s ceiling is 200,000, so the headroom was **3,970 bytes — about ONE ordinary
+close-out from a red trunk.** **A row that reads as tidiness was one increment from blocking every
+merge**, and nothing in its text said so. `state.php` counts the tree for rows and decisions but not
+for the *contents* of a row, and this is the gap that leaves.
 
-Prediction: `R7` fires on the **byte arm alone** — ~102,152 bytes against a 50,000 limit, ~35 lines
-against a 200 limit — which no real surgery has yet done; `R1`, `R2`, `R4`, `R5`, `R6` stay green;
-PHPStan cannot move (no file under `app`, `database` or `routes`); Pest, Vitest, axe, contract and E2E
-counts unchanged. **The one I most expect to be wrong is exact byte conservation at the join seam** —
-`M41` predicted the same and it failed by exactly one byte, because the insertion adds a newline the
-naive formula omits; I am using its corrected form rather than re-deriving it. ⚠️ **And per `M59`: a
-gate can go red for reasons my diff cannot reach** — `composer audit` reddened PR #250 on advisories
-published overnight, so this prediction answers *which gates my diff can move*, not *which will be
-green*.
+### ✅ THE END-TO-END SQUASH PROOF, OWED SINCE `M47` AND FORFEITED BY `M48`, IS DISCHARGED
+
+Post-merge run on `main` (`33586412469`), the line itself:
+
+```
+tracker-lint: DECLARED SURGERY: 36 line(s) and 101,273 byte(s) removed from PROGRESS.md
+tracker-lint: R7 base is 54bb8bd… (github.event.before, via TRACKER_LINT_BASE_SHA)
+```
+
+**No surgery had ever produced this.** `M41` reddened `main` by emptying the `--body`; `M45` merged
+with the marker present twice and the gate matching nothing, because GitHub's default body renders
+each subject as `* <subject>`; `M48` pushed the branch to `main` and forfeited the squash entirely.
+The form that worked is an explicit `--body` whose **first content line** is the marker, verified
+against **the gate's own regex before merging rather than after**.
+
+⚠️ **And the byte arm fired ALONE** — 36 lines against a 200 limit, 101,273 bytes against 50,000. The
+line threshold is blind to a surgery that removes half the file, which is exactly why `M48` added the
+byte half.
+
+### ⛔ A HAND-FORWARD IN THE ROW ABOVE IT IS UNSATISFIABLE, AND ONLY THE INCREMENT IT NAMED COULD FIND IT
+
+`M49`'s row says the first real exercise *"is the `## Current Status` surgery, **which is a
+multi-commit push**"*. It is not. **A squash merge puts exactly one commit on `main`**, so
+`github.event.before..HEAD` holds one commit and is identical to `HEAD~1..HEAD` — the same collapse
+that row identifies for `M49`'s own merge, one paragraph earlier, then assumes away for this one. The
+only way to push several commits to the trunk is `git push origin HEAD:main` on a loaded branch, which
+is what `M48` did and what `pre-push-guard` now refuses at `MAX_DIRECT_TRUNK_COMMITS = 1`. **So `R7`'s
+multi-commit `push` range is structurally unreachable on `main` by any compliant push**, and the row
+is corrected in place rather than closed.
+
+### How the prediction fared
+
+**Right:** `R7` fired on the byte arm alone, at 2.0× the limit; `R1`, `R2`, `R4`, `R5`, `R6` stayed
+green; PHPStan could not move; every other gate count was unchanged. **Right for the reason given:**
+byte conservation was named as most likely to fail — `M41` predicted the same and **failed by exactly
+one byte at the join seam** — and it held on the first run **because `M41`'s corrected formula was
+used rather than re-derived**. That is the value of a release recording its own arithmetic error.
+
+**Wrong, and cheaply:** the claim said the slice was 102,152 bytes. It is **102,115 of content plus 36
+newlines**; the earlier figure had silently folded the newlines in. The conservation identity is
+insensitive to which convention is used **only if the same one is used on both sides**, which is the
+whole reason the formula states the added bytes rather than inferring them.
+
+**Wrong in a way worth keeping:** the plan asserted the moved slice was 102,152 bytes *and* that the
+file would land at "~93,900". It landed at **94,757**, because the rewritten pointer is 878 bytes
+larger than the one it replaced — an addition the estimate treated as zero. **A conservation check
+catches this and an estimate does not**, which is the argument for having both.
+
+### Proof and controls
+
+**17 checks, 0 failed**, with the moved slice re-read **from git at phase 1's parent** rather than
+from anything the splice wrote:
+
+1. a counted multiset of 36 line hashes with exact multiplicity — present in the archive **and**
+   decremented in the tracker. All 36 were distinct here, unlike `M48`'s 178 lines of which only 95
+   were, where a set equality would have dropped 83 silently;
+2. **exact byte conservation, no tolerance, added bytes stated** — `2,653,273 + 2,013 == 2,655,286`;
+3. `## Standing Rules` byte-identical at `3eb6baf2be0186f1`;
+4. the git-level hash `1b61ff0a` on both sides.
+
+Phases 1 and 2 are split **to buy proof 4, not for tidiness**: nothing is removed until the archive
+already holds it. `M48` collapsed both files into one commit and forfeited exactly that.
+
+**Five positive controls**, each red when mutated and byte-identical when restored, against a green
+baseline taken first: `R7` with the declaration amended out of phase 2 — it names the **byte** limit —
+`R1` with the ceiling below the new size, `R4` with a `## Current Status` heading in the archive, `R5`
+with one CR byte, and `R2` with the heading renamed, the heading this surgery deliberately did not
+delete. `scripts/mutate.php` could drive none of them: its `--tests` argument is Pest paths through
+`docker exec` with no `--command` mode, so its discipline was reimplemented at the call site.
+
+### Two smaller things, recorded rather than filed
+
+➕ **The ceiling comment's adjective outlived four ratchets.** Every version said *"roughly a dozen
+ordinary close-outs"* and none named the rate. Measured across `M46`–`M59`: **mean 3,460 bytes per
+close-out, max 4,892**, so 35,243 bytes of headroom is about **ten** at the mean and seven at the
+worst. Say the number, not the adjective.
+
+➕ **`state.php`'s prose-literal disagreement count for `PROGRESS.md` fell from 30 to 6**, because 24
+of them lived inside the moved bullets — a scan of a shrinking file gets quieter without anything
+being fixed. Worth knowing before reading that number as progress.
+
+⚠️ **The surgery rotted no live citation, and that was checked rather than assumed.** Eleven
+`PROGRESS.md:<line>` citations exist outside the archive; all are either below the cut point or were
+**already** rotten inside dated `RELEASED` records (one names `:465` in a file that has never had 465
+lines since). `citation-liveness-lint` cannot see this class — it checks a line is *alive*, not that
+it still says what the citing sentence claims — so it was done by hand and cross-checked twice.
+
+**One row closed, one filed, one corrected. Namespaces spent: nothing from either namespace —
+twentieth consecutive.**
 
 ---
 

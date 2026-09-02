@@ -264,6 +264,24 @@ a filter that was added for a measured reason. ⚠️ **Not proceeded on**: it a
 repository and changes what runs on the trunk, and `D7`'s branch-protection question may make the
 required-contexts count matter — so the two are better answered together than separately.
 
+➕ **THE STATED BLOCKER IS NOW HALF-GONE, AND `M60` NOTED IT WITHOUT TAKING THE DECISION
+(2026-09-02).** This entry defers partly on the grounds that *"`D7`'s branch-protection question may
+make the required-contexts count matter — so the two are better answered together than separately."*
+**`D7` is answered and applied**: the ruleset names six required status checks. So option 1's stated
+cost — *"one more run appearing in `gh run list`, which anything counting six completed checks must
+not mistake for a seventh required context"* — is now concrete rather than speculative, and it
+resolves in option 1's favour: a second workflow is **not** a required context unless the ruleset is
+edited to name it, and nothing about the six changes. The remaining objection is the one that was
+always the user's: it adds a workflow to a public repository.
+
+⚠️ **AND `M60` IS EVIDENCE BOTH FOR AND AGAINST OPTION 3, WHICH IS WHY IT IS RECORDED HERE RATHER
+THAN USED AS AN ARGUMENT.** `M60` needed the trunk observation — it owed the end-to-end squash proof
+`M47` and `M48` had each handed forward — and got it, because its `TRACKER_BYTE_CEILING` ratchet put
+`scripts/` in the same push. That is option 3 working. But it worked *because this surgery happened
+to owe a ratchet*, exactly as `M48` escaped the same hole *by accident of scope*. **Two for two on
+coincidence is not a mechanism**, and a surgery that needs no ratchet still merges with its marker
+unverifiable. The recommendation stands at option 1, and the decision is still not proceeded on.
+
 ---
 
 ### D9 — Should the legacy client's identity be rewritten out of git history as well? **RECOMMENDED AGAINST.**

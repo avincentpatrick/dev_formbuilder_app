@@ -16,26 +16,89 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M60` is merged, and **there are ZERO open `major` rows for the first time in the M-series**
+## Status: ACTIVE CLAIM — share-slug lookup is case-sensitive (`m61-share-slug-canonicalization`)
 
-**`M60` closed the last one — the tracker surgery.** `state.php` counts **0 `major`, 82 `minor`**, and
-`M60` filed no new `major`. `D5` ends the M-series at zero open `major` **plus three consecutive
-increments filing none**; `M59` was the first of those three and `M60` is the second. **One more
-increment filing no `major` meets the stated bar.**
+Taken 2026-09-02. Branch `m61-share-slug-canonicalization`, cut from `origin/main` at `23db2fa`, PR into `main`.
+Row: *"Share-slug LOOKUP is case-sensitive while share-slug STORAGE is lowercase-only, so a mixed-case share
+URL 404s instead of resolving"* — `docs/feature-backlog.md`, in the `### Documentation & specs` section,
+filed by `M46` (2026-08-29). ⚠️ **`state.php` counts 83 open rows, not the 82 the block below records** —
+`M60` filed one after writing its own status. **This is the only open row that is a runtime,
+respondent-facing defect rather than a docs/gate finding.**
 
-⚠️ **For whoever takes the next row: the two lessons `M60` would most like to hand on.**
-**(1) A row's PREMISE is a third thing, separate from its evidence and its remedy, and it is the one
-with no field in the claim template.** This row's evidence was stale in every figure and its
-prohibition had expired two days after it was written — and the template's `Evidence verified` and
-`Remedy verdict` would both have been answered "held" without noticing either. **(2) A dated row
-cannot be triaged from its text.** This one read as tidiness and was one ordinary close-out from
-reddening the trunk.
+### Evidence verified
 
-⛔ **`D9` must never be started without an explicit answer.** Open decisions: `D1`, `D3`, `D4`, `D8`,
-`D9`, `D10`. `D8` gained a note from `M60` — its stated blocker is half-gone now `D7` is answered —
-but it is **not** answered and was not proceeded on.
+Every citation opened against the merged tree. **The row is a floor and it understates itself in one
+direction while its own vocabulary is wrong.**
 
-⛔ **RUN `php scripts/state.php` FOR EVERY NUMBER.**
+- ⛔ **`share_slug` DOES NOT EXIST.** The column is `forms.public_slug`. `share_slug` appears in prose only —
+  this file, `PROGRESS_ARCHIVE.md` and the backlog row itself. Nothing in executable source carries the name
+  the row uses throughout. **HELD in substance, FALSE in identifier.**
+- `GuestFormController` resolves the column unlowered — **HELD.** `Form::query()->where('public_slug', $slug)`,
+  `$slug` the raw route segment.
+- `PwaManifestController` resolves the column unlowered — **HELD**, identical shape.
+- *"Writes are constrained by `UpdateFormShareRequest`'s lowercase-only slug regex, so no uppercase slug can
+  be stored"* — **HELD FOR THE HTTP SURFACE ONLY, and the row states it as if it were an invariant of the
+  column.** `FormService::setShareSettings()` writes the value verbatim, and seeders and `tests/Pest.php`'s
+  `guestForm()` helper write through `$form->update()`, bypassing validation entirely. The column has **no**
+  case guarantee; the request does.
+- *"which is how case-insensitive uniqueness is achieved without `citext`"* — **HELD.** No `citext`, no
+  `->collation()`, no functional `lower()` index; the unique is a plain `['tenant_id', 'public_slug']`.
+- **A THIRD RESOLVER THE ROW DOES NOT NAME:** `FormSlug::isTaken()` is a case-sensitive `where` on the same
+  column. Not live (its only caller feeds it normalized values) and deliberately not fixed here — filed.
+- **ROUTING DOES NOT REJECT IT FIRST.** No `where()` on `{slug}` in any route and no `Route::pattern` in the
+  repo, so `/f/Clinic-Intake` routes successfully and fails at the query. Had a constraint existed the row
+  would have been unreachable; it was worth checking rather than assuming.
+
+### Remedy verdict
+
+⛔ **WRONG — and applying it as written would ship a worse defect than the one it closes.** Measured before
+a line was written.
+
+The row prescribes *"one call at each of the two lookups, not a migration."* That turns the 404 into a 200
+**and leaves the mis-cased URL in place** — and the URL is a *storage key* in four independent systems:
+Cache Storage's `guest-shell-html` (Workbox keys by full request URL), the Dexie `draft_answers` compound
+primary key `[form_version_id, slug]`, the outbox row's `slug` column, and the installed PWA's
+`id`/`start_url`/`scope`. The raw casing reaches all four because `mint()`'s view arm emits the **request
+path** as `slug` while `resume()` emits the canonical `$form->public_slug` — **the two arms disagree by
+construction**, which is the finding the row is one end of.
+
+⛔ **The concrete outcome of the prescribed fix:** install from `/f/Clinic-Intake`, the shell caches under
+that URL, `start_url` resolves to `/f/clinic-intake` — **launch offline and the installed app is a cache
+miss.** `brand-cache.ts` argues in its own header that losing offline access to a primed form is the trade
+never to make.
+
+**The remedy is canonicalization, not tolerance:** lowercase for lookup, then a `301` to the canonical URL —
+placed **after** the existing 404 gates, because a `301`-then-`404` chain is a slug-existence oracle and
+both controller docblocks state probe-indistinguishability as the reason those gates return 404 and never
+403. Normalization is `Str::lower` **only**, deliberately not `FormSlug::normalize()`: that is `Str::slug()`,
+which transliterates and re-hyphenates, so it would mint aliases the write side never reserved and
+`isTaken()` never de-duplicated — leaving `->first()` to choose arbitrarily between two forms.
+
+⚠️ **The row is also right about one thing I nearly over-scoped:** it says *not a migration*, and it is
+correct. But this fix **creates the argument for one** — the DB's uniqueness domain stays case-sensitive
+while the runtime's resolution domain becomes case-insensitive. Filed rather than built.
+
+Files: `app/Support/Forms/FormSlug.php`, `app/Http/Controllers/Public/GuestFormController.php`,
+`app/Http/Controllers/Public/PwaManifestController.php`, `app/Services/Forms/FormService.php`,
+`app/Http/Requests/Forms/UpdateFormShareRequest.php`, `tests/Feature/Guest/GuestRuntimeTest.php`,
+`tests/Feature/Http/PwaManifestTest.php`, `tests/Feature/Forms/FormShareTest.php`,
+`tests/Feature/Entitlements/OfflineSyncGateTest.php`, `tests/Feature/Maintenance/TenantMaintenanceTest.php`,
+`docs/feature-backlog.md`, `docs/claims/lane-a.md`, `docs/gate-baselines.md`, `PROGRESS.md` (own block only).
+
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/gate-baselines.md`, `PROGRESS.md` (own block only).
+No `openapi.json` — none of these routes is in the documented API surface. No top-level `tests/e2e/*.spec.ts`.
+Paired files taken: none.
+Namespaces spent: nothing from either namespace — no migration, no ADR, no `§D<n>`.
+
+Prediction, written before the run: PHPStan **will** move (four `app/` files, a widened union return type);
+Pint, the lint gates, Vitest and axe will not. Ten to twelve new Pest cases. Eight mutations expected CAUGHT
+and **one — restoring `'slug' => $slug` in the view arm — predicted SURVIVED before it is run**, because
+once the redirect exists that arm is reachable only when the two expressions are equal; it is kept as
+defence-in-depth and no contrived test will be written to force it red.
+⚠️ **The one I most expect to be wrong: the claim that no existing test breaks.** Every existing request in
+the five touched suites is canonical, so the redirect branch should be unreachable for all of them — but
+that is a reading of ten files, and `GuestRuntimeTest`'s shell assertions are the kind that pass locally and
+fail in CI when `withoutVite()` is forgotten.
 
 ---
 

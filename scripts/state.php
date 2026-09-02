@@ -108,6 +108,8 @@ $state = [
     'worktrees' => derive_worktrees(),
 ];
 
+$state['d5'] = derive_d5($state['backlog'], (int) $state['increment']['highest_released']);
+
 $state['declarations'] = scan_declarations($state);
 $state['check'] = run_check($state);
 
@@ -480,18 +482,32 @@ function derive_backlog(bool $withRows): array
         $rows[] = finish_row($current);
     }
 
-    $open = array_values(array_filter($rows, static fn (array $r): bool => $r['severity'] !== null));
+    $severity = array_values(array_filter($rows, static fn (array $r): bool => $r['severity'] !== null));
+    $open = array_values(array_filter($severity, static fn (array $r): bool => $r['state'] === 'open'));
     $counts = ['major' => 0, 'minor' => 0, 'nit' => 0];
+    $everCounts = ['major' => 0, 'minor' => 0, 'nit' => 0];
 
     foreach ($open as $row) {
         $counts[(string) $row['severity']]++;
     }
 
+    foreach ($severity as $row) {
+        $everCounts[(string) $row['severity']]++;
+    }
+
     return [
         'open' => count($open),
         'by_severity' => $counts,
+        // ⛔ EVERY severity bullet, open AND closed. D5's second clause asks which increment FILED each
+        //    `major`, and a `major` filed and closed inside one increment was still filed by it — so a
+        //    parser that can only see the open shape cannot evaluate the bar at all. Until M64 this
+        //    one could not: its severity regex matched `- **`major` ·` and nothing else, which is why
+        //    `total_bullets` read 185 while `open` read 84 and the 77 closed bullets existed nowhere.
+        'severity_bullets' => count($severity),
+        'ever_by_severity' => $everCounts,
         'total_bullets' => count($rows),
         'rows' => $withRows ? $open : null,
+        'severity_rows' => $severity,
         'rows_reason' => $withRows ? null : 'omitted by --no-rows',
         'source' => BACKLOG,
     ];
@@ -505,21 +521,65 @@ function finish_row(array $row): array
 {
     // ⛔ THE SEPARATOR IS U+00B7 MIDDLE DOT, NOT AN EM DASH. The same rows use an em dash elsewhere, so
     //    splitting on the dash a reader notices first mis-fires on nearly every row.
+    //
+    // A severity bullet exists in exactly three shapes, measured across the whole file (M64):
+    //     open       - **`minor` · Title**
+    //     struck     - ~~**`major` · Title**~~
+    //     closed-by  - ✅ **CLOSED BY `M17` (2026-08-26) — `major` · ~~Title~~**
+    // All three carry the severity token followed by the middle dot ON THE FIRST LINE, which is the
+    // only anchor common to them. Requiring it on the first line is not fastidiousness: a bullet that
+    // was MOVED OUT to decisions.md keeps the original row verbatim inside its body, so a parser that
+    // reads the whole body counts a 162nd row that is deliberately no longer one.
     $severity = null;
     $title = $row['first'];
+    $state = 'open';
+    $closer = null;
 
-    if (preg_match('/^- \*\*`(major|minor|nit)` \x{00B7} (.*)$/u', $row['first'], $m) === 1) {
+    if (preg_match('/^- (?:~~)?\*\*`(major|minor|nit)` \x{00B7} (.*)$/u', $row['first'], $m) === 1) {
         $severity = $m[1];
         $title = $m[2];
+        $state = str_starts_with($row['first'], '- ~~') ? 'closed' : 'open';
+    } elseif (preg_match('/^- .*CLOSED BY `([A-Z]\d{1,3}[a-z]?\d?)`.*`(major|minor|nit)` \x{00B7} (.*)$/u', $row['first'], $m) === 1) {
+        $closer = $m[1];
+        $severity = $m[2];
+        $title = $m[3];
+        $state = 'closed';
     }
 
     // The id hashes the title WITHOUT its severity token. A minor-to-major promotion is a decision
     // somebody just took deliberately, and re-identifying the row there would fire the "this row
     // changed, re-triage it" signal on the one change that needs no re-triage.
+    //
+    // ⛔ THE PROVENANCE FORM IS EXACT, AND THE LOOSE ONE IT REPLACED WAS MEASURABLY WRONG. Until M64
+    //    this matched `Filed|Found by|in <id>` anywhere in the body in any of fifteen free-text
+    //    shapes, and took the FIRST hit. The maintenance-fan-out row quotes the row it superseded
+    //    under a "THE ROW AS FILED FOLLOWS" heading, so the loose form read `M32` out of a QUOTATION
+    //    while the row's own first paragraph says M44 filed it. One form, in backticks, is what makes
+    //    a quotation distinguishable from a record.
+    //
+    // ⚠️ `(unattributed)` IS NOT THE SAME AS SILENCE, and the two must not collapse into one null.
+    //    An explicit `(unattributed)` is a filer somebody looked for and could not find; a missing
+    //    clause is a filer nobody looked for. D5's second clause is a hole in the first case and
+    //    simply unevaluated in the second, so `recorded` is carried beside `provenance`.
     $provenance = null;
+    $recorded = false;
 
-    if (preg_match('/\b[Ff](?:iled|ound) (?:by|in)\s+\**`?([A-Z]\d{1,3}[a-z]?\d?)`?/u', $row['body'], $m) === 1) {
-        $provenance = $m[1];
+    if (preg_match('/Filed by `([A-Z]\d{1,3}[a-z]?\d?|\(unattributed\))`/u', $row['body'], $m) === 1) {
+        $recorded = true;
+        $provenance = $m[1] === '(unattributed)' ? null : $m[1];
+    }
+
+    // Liveness is REPORTED and deliberately not gated (M64). Deciding live/not-live for a row that
+    // carries no marker is a judgement against the code — the M37 triage job — not a text edit, and
+    // it is filed as its own row rather than smuggled into a mechanical pass.
+    $liveness = null;
+
+    foreach (['**Not live**' => 'not-live', '**Live.**' => 'live', '**Live**' => 'live', '**Latent.**' => 'latent', '**Latent**' => 'latent'] as $marker => $value) {
+        if (str_contains($row['body'], $marker)) {
+            $liveness = $value;
+
+            break;
+        }
     }
 
     return [
@@ -528,6 +588,114 @@ function finish_row(array $row): array
         'title' => rtrim($title),
         'line' => $row['line'],
         'provenance' => $provenance,
+        'provenance_recorded' => $recorded,
+        'state' => $state,
+        'closed_by' => $closer,
+        'liveness' => $liveness,
+    ];
+}
+
+/**
+ * How many consecutive increments D5's second clause asks for — READ OUT OF THE DECISION, never typed.
+ *
+ * ⛔ A CONSTANT HERE WOULD BE THE DEFECT THIS WHOLE SCRIPT EXISTS TO END. The bar is a user decision
+ * recorded in one place; a `const D5_WINDOW = 3` beside it is a second copy that stays 3 after somebody
+ * changes the decision to four, and the bar would then be declared met on the old terms. So it is
+ * parsed, and an unparseable heading is a CANNOT MEASURE rather than a default.
+ */
+function d5_window_size(): int
+{
+    $body = read_tracked_file(DECISIONS);
+
+    if (preg_match('/^### D5 — .*$/m', $body, $m) !== 1) {
+        cannot_measure(DECISIONS.' has no `### D5` heading; the exit bar cannot be read.');
+    }
+
+    $words = ['one' => 1, 'two' => 2, 'three' => 3, 'four' => 4, 'five' => 5, 'six' => 6, 'seven' => 7, 'eight' => 8, 'nine' => 9, 'ten' => 10];
+
+    if (preg_match('/\b(\d+|'.implode('|', array_keys($words)).')\s+consecutive\b/i', $m[0], $w) !== 1) {
+        cannot_measure(DECISIONS.'\'s D5 heading states no "<n> consecutive" clause: '.trim($m[0]));
+    }
+
+    $token = strtolower($w[1]);
+
+    return $words[$token] ?? (int) $token;
+}
+
+/**
+ * D5's exit bar for the M-series, computed rather than argued.
+ *
+ * ⛔ THE BAR IS READ FROM decisions.md AND NEVER RESTATED HERE. As answered: zero open `major` rows,
+ * PLUS three consecutive increments filing no new `major`. D5 recorded that its second clause could
+ * not be evaluated at all, because eleven of the twelve `major` bullets did not record which increment
+ * filed them and provenance appeared in at least fifteen free-text shapes. M64 normalised the file to
+ * one form and backfilled it from history, so the clause is now arithmetic on the tree.
+ *
+ * ⚠️ WHAT THIS STILL CANNOT DO, said here rather than discovered later. It reports whether a filer is
+ * RECORDED, never whether it is CORRECT — a wrong id passes, the same way citation-liveness-lint
+ * checks a line is alive and not that it says what the citation claims. And a `major` filed by the
+ * CURRENT increment is unknowable until that increment releases, so the window below deliberately ends
+ * at the highest RELEASED increment rather than at the one in progress.
+ *
+ * @param  array<string, mixed>  $backlog
+ * @return array<string, mixed>
+ */
+function derive_d5(array $backlog, int $highestReleased): array
+{
+    $size = d5_window_size();
+    $rows = is_array($backlog['severity_rows'] ?? null) ? $backlog['severity_rows'] : [];
+    $majors = array_values(array_filter($rows, static fn (array $r): bool => $r['severity'] === 'major'));
+
+    $window = [];
+
+    for ($n = max(1, $highestReleased - $size + 1); $n <= $highestReleased; $n++) {
+        $window['M'.$n] = 0;
+    }
+
+    $unattributed = [];
+
+    foreach ($majors as $row) {
+        if ($row['provenance'] === null) {
+            $unattributed[] = ['line' => $row['line'], 'recorded' => $row['provenance_recorded'], 'title' => $row['title']];
+
+            continue;
+        }
+
+        if (array_key_exists($row['provenance'], $window)) {
+            $window[$row['provenance']]++;
+        }
+    }
+
+    $missing = array_values(array_filter($rows, static fn (array $r): bool => $r['provenance_recorded'] === false));
+    $openMajor = (int) ($backlog['by_severity']['major'] ?? -1);
+    $clause1 = $openMajor === 0;
+    $clause2 = $unattributed === [] && array_sum($window) === 0;
+
+    $liveness = ['live' => 0, 'not-live' => 0, 'latent' => 0, 'unmarked' => 0];
+
+    foreach ($rows as $row) {
+        if ($row['state'] !== 'open') {
+            continue;
+        }
+
+        $liveness[$row['liveness'] ?? 'unmarked']++;
+    }
+
+    return [
+        'clause_1_met' => $clause1,
+        'clause_1' => 'zero open `major` rows',
+        'open_major' => $openMajor,
+        'clause_2_met' => $clause2,
+        'clause_2' => $size.' consecutive released increments filing no new `major`',
+        'window_size' => $size,
+        'window' => $window,
+        'majors_total' => count($majors),
+        'majors_unattributed' => count($unattributed),
+        'unattributed' => $unattributed,
+        'bullets_without_a_clause' => count($missing),
+        'liveness' => $liveness,
+        'met' => $clause1 && $clause2,
+        'source' => 'computed from '.BACKLOG.'; the BAR itself is stated in '.DECISIONS.' and is never restated here',
     ];
 }
 
@@ -850,10 +1018,15 @@ function render(array $state): void
     info('open decisions', $state['decisions']['open'] === [] ? '(none)' : implode(', ', $state['decisions']['open']));
     info('answered decisions', implode(', ', $state['decisions']['answered']));
 
+    info('severity bullets, ever', $state['backlog']['severity_bullets'].'  ('.$state['backlog']['ever_by_severity']['major'].' major, '.
+                                   $state['backlog']['ever_by_severity']['minor'].' minor, '.$state['backlog']['ever_by_severity']['nit'].' nit) — open and closed');
+
     if ($state['triage']['commits_behind_main'] !== null) {
         info('triage census', $state['triage']['sha'].', '.$state['triage']['commits_behind_main'].' commits behind main');
         note((string) $state['triage']['note']);
     }
+
+    render_d5($state['d5']);
 
     section('Gate baselines');
 
@@ -905,6 +1078,57 @@ function render(array $state): void
 function section(string $title): void
 {
     fwrite(STDOUT, "\n== {$title} ".str_repeat('=', max(0, 74 - strlen($title)))."\n");
+}
+
+/**
+ * ⛔ THIS PRINTS THE ARITHMETIC AND NOT A VERDICT ON WHETHER TO STOP. D5's own warning is that a bar
+ * which cannot be measured gets declared met by whoever wants to stop; a bar that CAN be measured is
+ * still a decision to take with the user, not a thing a script announces. So the two clauses are
+ * reported, the window is printed increment by increment so the reader can see what it is made of, and
+ * any `major` with no filer is named as a HOLE rather than counted as a pass.
+ *
+ * @param  array<string, mixed>  $d5
+ */
+function render_d5(array $d5): void
+{
+    section('Series exit — D5');
+
+    info('clause 1', ($d5['clause_1_met'] ? 'MET' : 'not met').' — '.$d5['clause_1'].
+        ' ('.$d5['open_major'].' open)');
+    info('clause 2', ($d5['clause_2_met'] ? 'MET' : 'not met').' — '.$d5['clause_2']);
+
+    $window = [];
+
+    foreach ($d5['window'] as $increment => $filed) {
+        $window[] = $increment.'='.$filed;
+    }
+
+    info('majors filed, per increment', implode('  ', $window).'   (of '.$d5['majors_total'].' `major` bullets ever)');
+
+    if ($d5['majors_unattributed'] > 0) {
+        warn($d5['majors_unattributed'].' `major` bullet(s) record no filer, so clause 2 has a HOLE — '.
+             'an unknown filer cannot be shown NOT to be one of the increments in the window');
+
+        foreach ($d5['unattributed'] as $row) {
+            note('line '.$row['line'].($row['recorded'] ? ' — explicitly `(unattributed)`' : ' — NO clause at all').': '.
+                 mb_substr((string) $row['title'], 0, 70));
+        }
+    }
+
+    if ($d5['bullets_without_a_clause'] > 0) {
+        warn($d5['bullets_without_a_clause'].' severity bullet(s) carry no provenance clause at all');
+    }
+
+    $liveness = $d5['liveness'];
+    info('liveness on open rows', 'live='.$liveness['live'].'  latent='.$liveness['latent'].
+        '  not-live='.$liveness['not-live'].'  UNMARKED='.$liveness['unmarked']);
+    note('Liveness is reported and deliberately NOT gated. An absent marker is a judgement nobody has');
+    note('made yet, not a defect in the row — deciding it is a pass against the code, and it is filed.');
+
+    if ($d5['met']) {
+        note('BOTH CLAUSES READ MET. That is an input to a conversation with the user, never a verdict');
+        note('this script is entitled to reach on its own — see D5 in '.DECISIONS.'.');
+    }
 }
 
 function pass(string $message): void

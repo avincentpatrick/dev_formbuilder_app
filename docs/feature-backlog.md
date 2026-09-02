@@ -3299,9 +3299,14 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   artifact negative is mechanisable, a behaviour negative is not.
   ➕ **THE REAL RESIDUAL IS NARROWER THAN THE ROW, AND THERE IS A SECOND ONE THE ROW NEVER FOUND.** (1) The
   guarantee is application-layer only: `users.email` carries a plain case-sensitive unique with no
-  `lower(email)` index, so a seeder, factory or raw insert can still create two casings. (2) **Share-slug
-  LOOKUP is case-sensitive** — storage is lowercase-only by a write regex, but both public resolvers query
-  the column unlowered, so a mixed-case share URL 404s instead of resolving. Filed as its own row below.
+  `lower(email)` index, so a seeder, factory or raw insert can still create two casings. (2) ~~**Share-slug
+  LOOKUP is case-sensitive**~~ — ✅ **CLOSED BY M61 (2026-09-02)**, and this cross-reference is corrected
+  rather than deleted because it was half wrong in a way worth keeping: *"storage is lowercase-only by a
+  write regex"* was true of the HTTP surface and asserted as an invariant of the COLUMN, which the service
+  layer did not hold up. Both public resolvers now lower the incoming segment and canonicalize the URL with
+  a 301; the service lowers on write, so the storage half is an invariant now rather than a convention.
+  ⚠️ **The `users.email` half in (1) above is UNCHANGED and still live** — M61 fixed the slug and touched
+  nothing about email, and the two are the same shape only by analogy.
   Original filing follows.
   **`major` · ADR-0001 claims `citext` and `pgcrypto` are enabled by default, covering case-insensitive
   uniqueness for share slugs and user email.** `docs/adr/0001-postgresql-over-mysql.md:56` (restated `:83`,
@@ -3657,15 +3662,72 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   document prescribes *this* stack, and a deployment runbook naming a production host would produce false
   positives on every line. **The corpus needs choosing before the constant is widened. Not live** — a
   stated limit, filed so it cannot be forgotten.
-- **`minor` · Share-slug LOOKUP is case-sensitive while share-slug STORAGE is lowercase-only, so a
-  mixed-case share URL 404s instead of resolving.** ⚠️ **A runtime defect, filed in this section because
-  M46 found it while retracting ADR-0001's `citext` claim** and the two are the same finding seen from
-  opposite ends. Writes are constrained by `UpdateFormShareRequest`'s lowercase-only slug regex, so no
-  uppercase slug can be stored — which is how case-insensitive *uniqueness* is achieved without `citext`.
-  But `GuestFormController` and `PwaManifestController` both resolve the column unlowered, so a respondent
-  who receives a link with any character re-cased — by a mail client, a QR transcription, a person retyping
-  it — gets a 404 that is indistinguishable from a withdrawn form. **The remedy is one call at each of the
-  two lookups, not a migration**, and it should be a behavioural test rather than a structural one. **Live.**
+- ~~**`minor` · Share-slug LOOKUP is case-sensitive while share-slug STORAGE is lowercase-only, so a
+  mixed-case share URL 404s instead of resolving.**~~
+  ✅ **DONE — M61 (2026-09-02), AND THE ROW'S REMEDY WAS WRONG IN A WAY THAT WOULD HAVE SHIPPED A WORSE
+  DEFECT THAN THE ONE IT CLOSED.** Evidence held in substance and was wrong in its vocabulary: **there is
+  no `share_slug` anywhere in executable source** — the column is `forms.public_slug`, and `share_slug`
+  appears only in this file, `PROGRESS_ARCHIVE.md` and `lane-a.md`. Both named resolvers were unlowered as
+  described. ⚠️ *"Writes are constrained by the regex, so no uppercase slug can be stored"* is true of the
+  HTTP surface and **stated as if it were an invariant of the column** — `FormService::setShareSettings()`
+  wrote the value verbatim, and seeders plus `tests/Pest.php`'s `guestForm()` write through
+  `$form->update()`, bypassing validation entirely. A **third** unlowered resolver the row does not name
+  (`FormSlug::isTaken()`) is filed below.
+  ⛔ **THE PRESCRIBED REMEDY — *"one call at each of the two lookups"* — TURNS THE 404 INTO A 200 AND
+  LEAVES THE MIS-CASED URL IN PLACE, AND THAT URL IS A STORAGE KEY IN FOUR CLIENT SYSTEMS:** the service
+  worker's `guest-shell-html` Cache Storage entry (Workbox keys by full request URL), the Dexie
+  `draft_answers` compound primary key, the outbox row's `slug` column, and the installed PWA's
+  `id`/`start_url`/`scope`. The raw casing reached all four because the mint action emitted the **request
+  path** as `slug` while the resume action beside it emitted the canonical value — the two arms disagreed
+  by construction. Concretely: install from `/f/Clinic-Intake`, the shell caches under that URL,
+  `start_url` resolves to `/f/clinic-intake`, and **the installed app is a cache miss offline** — the one
+  trade `brand-cache.ts` argues in its own header must never be made.
+  **Shipped instead:** a lookup lowered through a new `FormSlug::forLookup()` (lowercase ONLY — deliberately
+  not `normalize()`, which is `Str::slug()` and would transliterate `/f/clinic_intake` and `/f/Clinic Intake`
+  into aliases the write side never reserved and `isTaken()` never de-duplicated, leaving `->first()` to
+  choose between two forms), then a **301 to the canonical URL placed AFTER the existing 404 gates** —
+  hoisted above them the redirect becomes a slug-existence oracle, which is exactly what both controller
+  docblocks say those gates return 404-never-403 to prevent. The query string is preserved because H7 URL
+  prefill rides it, so a query-dropping redirect would silently deliver an un-prefilled form: wrong data
+  rather than a visible error. `setShareSettings()` now lowers what it is handed, above the audit arrays,
+  which is the precondition that makes the lookup deterministic against a case-sensitive unique index.
+  ⚠️ **The manifest route deliberately does NOT redirect** — its `id` is explicit so a mis-cased URL cannot
+  fork an installed app, and serving 200 is what makes the canonical `scope` a property a test can pin.
+  ✅ **The row was right that no migration is needed, and this fix creates the argument for one** — filed.
+  **16 behavioural cases across five suites, including one oracle guard per 404 gate; 9 mutations, 8 CAUGHT
+  and 1 SURVIVED as predicted in writing beforehand.**
+- **`minor` · The database's uniqueness domain and the runtime's resolution domain now disagree about
+  case, and `FormSlug::isTaken()` is the third resolver.** Filed by M61 (2026-09-02) at the moment the
+  disagreement was created, not found later. `forms_tenant_id_public_slug_unique`, the `Rule::unique` in
+  `UpdateFormShareRequest`, and `FormSlug::isTaken()`'s `where` are all case-SENSITIVE; the runtime lookup
+  is not. **Nothing can create the ambiguous pair today** — the share request's regex refuses uppercase and
+  `setShareSettings()` lowers what it is handed — so this is `minor` and `isTaken()` is latent rather than
+  live. ⚠️ **But the structural fix is a functional unique index on `lower(public_slug)`, which is exactly
+  the migration the closed row above said this remedy did not need.** Both statements are true and worth
+  keeping side by side: the fix did not need it, and the fix is what makes the case for it. Fold
+  `Rule::unique` and `isTaken()` together — they are one finding seen twice. **Live as a divergence, not as
+  a reachable defect.**
+- **`minor` · A pre-existing mixed-case `public_slug` row would have been taken dark by M61, and nothing in
+  the repository can tell whether one exists.** Filed by M61 (2026-09-02). Before the change such a row was
+  reachable at its own casing; after it, `forLookup()` lowers every request and the row matches **nothing**.
+  Unlikely — the regex has refused uppercase since I1 and the XLSForm importer normalizes — but the failure
+  is silent, and "unlikely" is not "checked". M61 ran the go/no-go
+  (`select … from forms where public_slug <> lower(public_slug)`) against this host and it was empty; **this
+  host's database is behind the migrations and is not any deployed one**, so the check is owed again per
+  environment. The remedy is a lowering data migration guarded by a collision check
+  (`group by lower(public_slug) having count(*) > 1`). ⛔ **Reject the code-level alternative** — an
+  exact-match-then-lowered two-step lookup costs a second query on every 404 probe, forks the resolution
+  rule permanently, and still leaves the legacy row unreachable at its lowercase spelling. **Not live here;
+  a deployment obligation.**
+- **`minor` · Nothing proves the offline path M61's redirect exists to protect.** Filed by M61
+  (2026-09-02) at the moment the gate shipped, so the limit is a filed constraint rather than a comment
+  nobody re-reads. No suite asserts that after a mis-cased entry `caches.open('guest-shell-html').keys()`
+  holds the **canonical** URL and not the mis-cased one, nor that an installed PWA launched at its
+  `start_url` finds the shell offline. That is the failure the whole canonicalization exists to prevent,
+  and after M61 it is established only by reasoning from `sw.ts`'s navigate-mode route and the manifest's
+  `start_url`. ⚠️ **Pest cannot reach it** — Cache Storage is a browser API — and
+  `tests/e2e/public-runtime-offline.spec.ts` already carries the offline harness, so the row names the
+  assertion rather than the approach. **Live.**
 - **`minor` · The audit spec credits the `submission` scope with two events that are emitted nowhere.**
   Filed by M46 (2026-08-29) rather than fixed, because the correct direction is a decision this increment
   should not take alone. `docs/audit-compliance-logging-spec.md` §1 lists `deleted` and `restored` for

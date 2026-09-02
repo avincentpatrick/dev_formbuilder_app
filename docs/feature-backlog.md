@@ -1265,15 +1265,85 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   only because `reconcile.ts`'s checksum guard rejects the hit, which means **the checksum guard is the only
   thing standing between the resume path and a pile of pre-republish drafts.** Filed so that whoever tidies
   the mismatch knows what it is load-bearing for. **Live.**
-- **`minor` · `useServerAutosave.dispose()` fires without consulting `inFlight`.**
-  `resources/js/composables/useServerAutosave.ts:425-431` sends a `keepalive` POST carrying a **stale**
-  `base_content_checksum` on an Inertia navigation during a save, so the server refuses it as
-  `draft_conflict` and the edits made during that request are silently dropped. **Live.**
-- **`minor` · The encode page's conflict refusal remounts and discards the editor's corrections.**
-  `resources/js/Pages/submissions/Encode.vue:709` returns the optimistic-concurrency refusal as a flash
-  toast rather than a validation error, so `preserveState` evaluates false and the page reloads from the
-  stored document. The docblock reasons only about the 422 path and gets the conflict path — the one the
-  machinery exists for — backwards. **Live.**
+- ~~**`minor` · `useServerAutosave.dispose()` fires without consulting `inFlight`.**~~
+  ✅ **DONE — M62 (2026-09-02). EVIDENCE EXACT; REMEDY SOUND IN INTENT AND UNDER-SPECIFIED WHERE IT MATTERS.**
+  Citation rewritten from a by-line range to `dispose()` in `resources/js/composables/useServerAutosave.ts`,
+  because M62 moved those lines — a row must not cite line numbers into a file its own remedy edits.
+  The mechanism held exactly, and the two facts that make it a data loss rather than a wasted request are
+  one screen apart and in neither the row nor the code's own comments: `send()` clears `dirty` at its top,
+  and `baseline` advances **only** on a 200.
+  ⚠️ ***"Consult `inFlight`"* IS RIGHT AND INCOMPLETE — consulting it and then declining to send drops the
+  same edits.** What works is to **chain** on the existing `inFlight` handle, which is possible *only*
+  because an Inertia visit unmounts the component but keeps the JS context alive. Shipped with a
+  `state !== 'stopped'` re-check inside the continuation, because the save being waited on may itself have
+  ended the loop.
+  ➕ **THE ROW UNDERSTATED ITSELF: `onBeforeUnload` HAS THE SAME STALE-BASE SHAPE AND IS DELIBERATELY NOT
+  CHANGED.** There the browser context is dying, so a continuation would never run and chaining would trade
+  a request that fails for a request never made; `event.preventDefault()` — the native leave prompt — is the
+  control, on the same argument the 64 KiB `keepalive` cap already makes. Recorded in its docblock as a
+  stated limit rather than left to read as an oversight.
+  ⛔ **AND THE COMMENT INSIDE `postKeepalive()` ASSERTED THE PROPERTY WHOSE ABSENCE IS THE BUG** — *"the
+  single-flight bookkeeping is not bypassed in the one place that would be hardest to notice."* Neither
+  branch touches `inFlight` or `pendingWhileInFlight`. That sentence is the most likely reason the race
+  survived review, and it is corrected in place rather than deleted.
+  ➕ **A SURVIVOR IN THE SAME FUNCTION, FOUND BY MUTATION AND CLOSED HERE.** `dispose()`'s outer gate
+  `dirty || debounceTimer !== null` narrowed to `&&` left **all 22 cases green** — every dispose case in the
+  file happened to have both true at once. The separating state is a 5xx, which sets `dirty` and
+  deliberately does not re-schedule: unsaved work, no armed timer, dropped in silence under `&&`. Pinned
+  now; the mutation reddens exactly that case. **Pre-existing, and not something to leave behind in the
+  function this row rewrites.**
+- ~~**`minor` · The encode page's conflict refusal remounts and discards the editor's corrections.**~~
+  ✅ **DONE — M62 (2026-09-02), AND THE ROW'S IMPLIED REMEDY WOULD HAVE SHIPPED A SILENT LOST UPDATE.**
+  Citation rewritten from a by-line reference to `submitEdit()` in
+  `resources/js/Pages/submissions/Encode.vue`, for the same reason as the row above. Evidence held: the
+  refusal arrived as a toast with no errors bag, the predicate answered `false`, and Inertia re-keyed the
+  component. *"Remounts"* is literally right — `swapComponent` in the installed `@inertiajs/vue3` re-keys
+  with `Date.now()` when `preserveState` is false.
+  ⛔ **BUT *"return it as a validation error so `preserveState` holds"* PRESERVES THE TYPED WORK AND SILENTLY
+  RE-ARMS THE CONCURRENCY GUARD.** `preserveState` gates the re-key, **never the props** — `swapComponent`
+  assigns the new page object unconditionally — and `EncodeFormPresenter::present()` reads the baseline off
+  the stored row on every render. So `back()` re-renders carrying the *other* editor's checksum, the
+  preserved page adopts it, and the next Save matches and blindly overwrites the change just refused. **A
+  visible refusal becomes a silent lost update, which is worse than the defect being closed.**
+  **Shipped instead:** the errors bag (which arms the predicate) **plus** a component-local snapshot of the
+  render-time baseline, deliberately never re-synced. The second Save is refused too — that is the point:
+  the editor keeps every character they typed and the client can never write over a document it has not
+  seen. Adopting the newer answers stays a deliberate page reload.
+  ⚠️ **The row cites the `preserveState` line; the line that mattered was the one sending
+  `props.editing?.baseline`.** Fixing only the cited line ships the lost update. A third cause,
+  `illegalState()`, reaches the same catch arm and gets the same treatment deliberately.
+  👤 **A "discard my changes and reload" affordance was put to the user and declined for this increment** —
+  filed below rather than built.
+  **8 mutations: 7 CAUGHT first time; 1 SURVIVED and is closed above. The predicted survivor was WRONG** —
+  inverting the `preserveState` predicate was predicted to survive on the strength of the existing 422
+  cases, and it was CAUGHT by exactly one test, which is how it was discovered that **no existing case ever
+  read that predicate at all.**
+- **`minor` · Submit races its own last-chance draft write, and the refusal lands on the Submit.** Filed by
+  M62 (2026-09-02), found by opening the row above's citation and reading what sat next to it — **not by
+  running it.** `submit()` in `resources/js/Pages/submissions/Encode.vue` calls `autosave.dispose()` and then
+  immediately `router.post(…)` carrying `base_content_checksum: autosave.baseline.value`. When the page is
+  dirty both requests go out with the **same** base: the keepalive through the draft channel, and the
+  Submit's own `saveDraft()` on `SubmissionController::store()`'s promote branch, which passes
+  `checkBaseline: $request->claimsBaseline()`. They serialize on `updateDraft()`'s `lockForUpdate`; the
+  winner advances the checksum and **the loser is refused `draftConcurrentlyModified()`** — there is no
+  idempotency escape for identical content, the guard compares checksums only. If the keepalive wins, and it
+  is dispatched first, **the Submit is the one refused**, telling a keyer their draft *"was changed somewhere
+  else"* on a page with no somewhere else. ⚠️ **What is NOT settled: which request actually wins.** That is
+  timing, and this row was read rather than executed — so treat the direction as the likely case, not a
+  measurement. ⚠️ **M62 neither fixes nor worsens it** — the common path (`inFlight === null`) still fires
+  the keepalive immediately — **but in the narrow in-flight window M62 now delays the keepalive, which can
+  change which of the two is refused.** The remedy worth costing first is the cheapest one: `submit()` may
+  not need the last-chance write at all, since the POST carries the full answer map anyway and the promote
+  branch re-saves it — the comment defending the write says as much. **Live.**
+- **`minor` · Nothing offers a way out of a refused correction except a browser reload.** Filed by M62
+  (2026-09-02), the moment the scope was decided rather than after. M62 keeps the editor's typed corrections
+  on the page and keeps the guard armed, so a second Save is refused too and the only route forward is the
+  browser's own refresh. 👤 **The user was asked and chose the snapshot-only fix**, so this is a deferral of
+  record, not an oversight. What is missing is a durable conflict notice (the toast fades, leaving a page
+  that looks normal and can never be saved) and an explicit *"discard my changes and reload"* action.
+  ⛔ **Whatever is built must not become a one-click adopt-the-new-baseline**, which is the silent lost
+  update the closed row above exists to prevent. **Live.**
+
 - ✅ **CLOSED BY `M13` (2026-08-25) — `major` · ~~`/api/v1/sync/submissions` creates submissions against ANY
   form in the tenant, with no per-form authorization at all.~~** Filed 2026-08-24 by M11's adversarial pass;
   every file:line claim in it verified verbatim against the code before it was planned against. The route

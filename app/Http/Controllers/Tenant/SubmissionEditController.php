@@ -105,6 +105,18 @@ final class SubmissionEditController extends Controller
      * `bootstrap/app.php` render closure turns it into `back()->withErrors()` for a web request, which is
      * exactly what the page wants — per-field messages against the fields that failed. Catching it here would
      * flatten Stage 3's field errors into one toast. Same posture as {@see SubmissionController::store()}.
+     *
+     * ⚠️ THE REFUSAL CARRIES AN ERRORS BAG AS WELL AS A TOAST, AND THE BAG IS NOT DECORATION — IT IS THE
+     * ONLY THING KEEPING THE EDITOR'S TYPED CORRECTIONS ON THE PAGE. `Encode.vue`'s `submitEdit()` asks
+     * `preserveState` whether the errors bag is non-empty; a toast-only refusal answered "no", Inertia re-keyed
+     * the component, and a page of corrections was replaced by the stored document with no warning. The toast
+     * stays because it is what the editor actually reads — the bag is keyed `baseline`, which is not a rendered
+     * field, so it would say nothing on its own.
+     *
+     * `illegalState()` reaches this same arm and gets the same treatment deliberately. It is a different cause
+     * — the row may not be corrected at all, rather than not corrected from THIS page — but discarding a page
+     * of typed work is not a better answer for it either, and a remount shows the editor nothing the toast has
+     * not already told them.
      */
     public function update(
         EditSubmissionAnswersRequest $request,
@@ -121,7 +133,9 @@ final class SubmissionEditController extends Controller
         try {
             $service->edit($submission, $version, $request->answers(), $editor, true, $request->baseline());
         } catch (SubmissionEditException $e) {
-            return back()->with('toast', ['type' => 'error', 'message' => $e->getMessage()]);
+            return back()
+                ->withErrors(['baseline' => $e->getMessage()])
+                ->with('toast', ['type' => 'error', 'message' => $e->getMessage()]);
         }
 
         // ⚠️ THE OUTCOME IS NAMED IN THE TOAST, not only pre-warned on the page. The banner's

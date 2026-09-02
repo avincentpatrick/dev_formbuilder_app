@@ -294,6 +294,35 @@ describe('useServerAutosave — lifecycle', () => {
 
         expect(post).not.toHaveBeenCalled();
     });
+
+    it('still writes on dispose() when the work is dirty but NO timer is armed', async () => {
+        // ⚠️ FOUND BY MUTATION, NOT BY READING (M62). `dispose()`'s gate is `dirty || debounceTimer !== null`,
+        // and narrowing that `||` to `&&` left the whole of this file green — every other dispose case here
+        // happens to have both true at once, so the `||` arm was load-bearing and pinned by nothing.
+        //
+        // This is the state that separates them: a 5xx sets `dirty = true` and deliberately does NOT
+        // re-schedule (the next keystroke is what retries), so a keyer who hits a server error and then
+        // clicks away has unsaved work and no armed timer. Under `&&` that work is dropped in silence —
+        // the same class of loss as the race above, reached from the other side.
+        const post = vi
+            .fn()
+            .mockResolvedValueOnce(jsonResponse(500))
+            .mockResolvedValue(jsonResponse(200, { content_checksum: 'sum-2' }));
+        const { autosave, answers } = harness({ post });
+
+        answers.a = '1';
+        await nextTick();
+        await vi.advanceTimersByTimeAsync(150);
+
+        // Non-vacuity: the case is only about the dirty-without-timer state, so prove we are in it.
+        expect(post).toHaveBeenCalledTimes(1);
+        expect(autosave.state.value).toBe('error');
+
+        autosave.dispose();
+
+        expect(post).toHaveBeenCalledTimes(2);
+        expect((post.mock.calls[1][0] as { answers: Record<string, unknown> }).answers).toEqual({ a: '1' });
+    });
 });
 
 /**
@@ -393,5 +422,79 @@ describe('useServerAutosave — P3a lost-update baseline', () => {
         // turn a typed refusal into an unhandled rejection either.
         expect(autosave.state.value).toBe('stopped');
         expect(autosave.message.value).toContain('already been submitted');
+    });
+
+    /*
+     * Increment M62 — dispose() must not RACE the save it is disposing.
+     *
+     * `send()` clears `dirty` at its top and advances `baseline` only on a 200. So everything typed WHILE a
+     * save is open leaves the composable dirty against the PRE-save checksum, and the last-chance keepalive
+     * dispose() fires on an Inertia navigation used to carry that stale base. The server serializes the two
+     * on `lockForUpdate`, the open save moves the checksum, and the keepalive is refused `draft_conflict` —
+     * swallowed by the fire-and-forget catch, so the keyer loses those edits with no error and no trace.
+     *
+     * These two cases need a post that STAYS OPEN, which no other case in this file has: every helper above
+     * resolves immediately, so `inFlight` is always null by the time the assertion runs and the race is
+     * unreachable by construction.
+     */
+
+    /** A post whose promise is held open, so the composable really is mid-flight when dispose() lands. */
+    function deferredPost() {
+        const releases: Array<(r: Response) => void> = [];
+        const post = vi.fn(() => new Promise<Response>((resolve) => { releases.push(resolve); }));
+
+        return { post, release: (r: Response) => releases.shift()?.(r) };
+    }
+
+    it('does not race an in-flight save on dispose(), and follows it with the ADVANCED baseline', async () => {
+        const { post, release } = deferredPost();
+        const { autosave, answers } = harness({ post, baseContentChecksum: 'sum-1' });
+
+        answers.a = '1';
+        await nextTick();
+        await vi.advanceTimersByTimeAsync(150);
+
+        expect(post).toHaveBeenCalledTimes(1);
+        expect((post.mock.calls[0][0] as Record<string, unknown>).base_content_checksum).toBe('sum-1');
+
+        // The keyer types on while that request is still open, then clicks an Inertia <Link>.
+        answers.a = '12';
+        await nextTick();
+        autosave.dispose();
+
+        // ⛔ THE DEFECT, PINNED: a keepalive fired HERE would carry `sum-1`, which the open save is about to
+        // supersede, and be refused. Nothing may go out until that save has landed.
+        expect(post).toHaveBeenCalledTimes(1);
+
+        release(jsonResponse(200, { last_saved_at: 't1', content_checksum: 'sum-2' }));
+        await vi.advanceTimersByTimeAsync(0);
+
+        // ...and now it goes, carrying what the server just wrote and the text typed during the request.
+        expect(post).toHaveBeenCalledTimes(2);
+        const body = post.mock.calls[1][0] as { answers: Record<string, unknown>; base_content_checksum: unknown };
+        expect(body.base_content_checksum).toBe('sum-2');
+        expect(body.answers).toEqual({ a: '12' });
+    });
+
+    it('sends nothing after dispose() when the in-flight save has ENDED the loop', async () => {
+        // The continuation resolves after `stop()` has run, which is exactly the window `stop()` exists to
+        // close. Without the re-check inside it, dispose() would post into a session the server has already
+        // refused — the "we'll keep trying" behaviour the terminal cases above deliberately forbid.
+        const { post, release } = deferredPost();
+        const { autosave, answers } = harness({ post, baseContentChecksum: 'sum-1' });
+
+        answers.a = '1';
+        await nextTick();
+        await vi.advanceTimersByTimeAsync(150);
+
+        answers.a = '12';
+        await nextTick();
+        autosave.dispose();
+
+        release(conflict('draft_conflict'));
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(autosave.state.value).toBe('stopped');
+        expect(post).toHaveBeenCalledTimes(1);
     });
 });

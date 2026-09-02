@@ -351,8 +351,15 @@ export function createServerAutosave(options: ServerAutosaveOptions): ServerAuto
     function postKeepalive(): void {
         try {
             // Routes through the injected `post` when there is one, so a test can observe the last-chance
-            // write instead of it escaping to the real network — and so the single-flight bookkeeping is not
-            // bypassed in the one place that would be hardest to notice.
+            // write instead of it escaping to the real network.
+            //
+            // ⛔ THIS COMMENT USED TO CLAIM THE INJECTION ALSO KEPT "the single-flight bookkeeping … not
+            // bypassed in the one place that would be hardest to notice." THAT WAS FALSE AND IT IS WHY THE
+            // RACE BELOW SURVIVED REVIEW. Neither branch of this function touches `inFlight` or
+            // `pendingWhileInFlight` — it is a deliberate bypass of the coalescer, which is exactly why
+            // `dispose()` has to consult `inFlight` itself before calling it. A comment asserting the
+            // property whose absence is the bug is worse than no comment, so it is corrected in place rather
+            // than deleted.
             if (options.post !== undefined) {
                 void Promise.resolve(options.post(body())).catch(() => {
                     // the page is going away
@@ -386,6 +393,15 @@ export function createServerAutosave(options: ServerAutosaveOptions): ServerAuto
      * `fetch` with `keepalive`, NOT `navigator.sendBeacon`: sendBeacon cannot set the CSRF header and forces
      * a content type the endpoint does not accept. Being honest about the limit — `keepalive` bodies are
      * capped at 64 KiB — is exactly why the confirm prompt is raised as well rather than relied on instead.
+     *
+     * ⚠️ A SECOND HONEST LIMIT, AND THE ASYMMETRY WITH `dispose()` IS DELIBERATE RATHER THAN AN OVERSIGHT.
+     * When a save is in flight this fires the same stale-base keepalive `dispose()` now refuses to fire, and
+     * the server will refuse it as `draft_conflict`. It is NOT chained the way `dispose()` chains, because a
+     * real browser navigation is tearing the JS context down — a continuation on `inFlight` would never run,
+     * so chaining here would trade a request that fails for a request that is never made. The protection on
+     * this path is `event.preventDefault()`, the native leave prompt, on exactly the argument the 64 KiB cap
+     * makes above: the last-chance POST is the courtesy, and the prompt is the guarantee. The refused POST
+     * destroys nothing — the server rejects it and keeps the newer document.
      */
     function onBeforeUnload(event: BeforeUnloadEvent): void {
         // ⚠️ THE `stopped` STATE MUST STILL PROMPT, and an earlier draft of this got it exactly backwards.
@@ -424,7 +440,27 @@ export function createServerAutosave(options: ServerAutosaveOptions): ServerAuto
      */
     function dispose(): void {
         if (state.value !== 'stopped' && (dirty || debounceTimer !== null)) {
-            void postKeepalive();
+            if (inFlight === null) {
+                void postKeepalive();
+            } else {
+                // ⚠️ CHAINED, NOT FIRED. `send()` clears `dirty` at its top and advances `baseline` only on a
+                // 200, so anything typed DURING a save leaves this composable dirty while `baseline` still
+                // holds the PRE-save checksum. Firing now would present that stale base, the server would
+                // serialize the two on `lockForUpdate`, and the keepalive would arrive after the in-flight
+                // save had moved the checksum — refused `draft_conflict`, swallowed by the fire-and-forget
+                // `catch`, and the edits made during that request lost with no error, no prompt and no trace.
+                //
+                // Chaining is possible HERE and nowhere else: an Inertia visit unmounts the component but
+                // keeps the JS context alive, so this continuation still runs. `onBeforeUnload` cannot do
+                // this and does not try — see its own note.
+                void inFlight.then(() => {
+                    // The in-flight save may itself have ended the loop (409/419/permanent). Posting after
+                    // that is exactly what `stop()` exists to prevent, and `stop()` runs before this resolves.
+                    if (state.value !== 'stopped') {
+                        postKeepalive();
+                    }
+                });
+            }
         }
         clearTimers();
         if (typeof window !== 'undefined') {

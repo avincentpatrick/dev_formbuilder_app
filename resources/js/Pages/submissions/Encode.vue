@@ -666,6 +666,23 @@ function submit(): void {
 }
 
 /**
+ * The concurrency token this page was RENDERED from, snapshotted once and never re-synced.
+ *
+ * ⛔ NOT `props.editing.baseline` READ AT SUBMIT TIME, AND THE DIFFERENCE IS A SILENT LOST UPDATE.
+ * A refused correction returns through `back()`, so Inertia re-issues the GET and `EncodeFormPresenter`
+ * recomputes this value from the CURRENT stored row — the other editor's checksum. In the installed
+ * `@inertiajs/vue3`, `preserveState` gates only the component re-key: `page.props` is replaced either way.
+ * So reading the prop here would let a preserved page adopt the very checksum it had just been refused
+ * against, and the next Save would match and blindly overwrite the change the guard exists to protect.
+ *
+ * Holding the original means the second Save is refused too. That is the point, not a shortcoming: the
+ * editor keeps every character they typed and can copy it out, and the client can never write over a
+ * document it has not seen. Adopting the newer answers is a deliberate act — a page reload — and it is
+ * deliberately not one click away, because one click is how the newer answers get discarded by accident.
+ */
+const editBaseline = ref<string | null>(props.editing?.baseline ?? null);
+
+/**
  * Increment I9c — apply a correction to an already-finalized submission.
  *
  * A PATCH to the submission's own route, never the encode POST: that endpoint's whole job is to CREATE a
@@ -680,6 +697,13 @@ function submit(): void {
  * page so the next entry starts clean. Here, a success REDIRECTS to the detail view, so nothing is preserved
  * either way — and a 422 must keep every edit the user made, which is what the errors-length check does.
  * Getting this backwards would silently discard a page of corrections on one failed constraint.
+ *
+ * ⛔ THE PREDICATE IS UNCHANGED AND ITS REASONING USED TO BE HALF THE STORY, WHICH IS WORSE THAN WRONG.
+ * It argued only about the 422 path. The CONCURRENCY refusal — the one the baseline machinery exists for —
+ * used to arrive as a toast with no errors bag, so this predicate answered `false`, Inertia re-keyed the
+ * component and a page of corrections was replaced by the stored document. The server now sends an errors
+ * bag on that path too ({@see \App\Http\Controllers\Tenant\SubmissionEditController::update()}), which is
+ * what arms this predicate; the predicate itself was never the defect.
  */
 function submitEdit(): void {
     runtime.markSubmitAttempted();
@@ -696,8 +720,9 @@ function submitEdit(): void {
         props.update_url as string,
         // `baseline` is the whole of this channel's concurrency story — see the prop's docblock. It is sent
         // even when null so the server's `required` rule rejects a page too old to have one, rather than
-        // letting a blind whole-document write through.
-        { answers, baseline: props.editing?.baseline },
+        // letting a blind whole-document write through. The SNAPSHOT, never the live prop: see
+        // `editBaseline` above for why reading `props.editing.baseline` here would re-arm the guard.
+        { answers, baseline: editBaseline.value },
         {
             preserveScroll: true,
             onStart: () => {

@@ -91,6 +91,28 @@ Prediction, written before the run so it can be measured against:
   shipped one increment apart. I expect most hits to be **already rotten before this branch existed**, and
   I expect to be wrong about how many.
 
+### ➕ CLAIM EXTENDED MID-BUILD — `composer.lock`, for a blocking advisory that is not this row's
+
+**Extended 2026-09-02, as its own pushed commit before the file was opened**, and by cherry-pick rather
+than `git push origin HEAD:main` — that form pushes the WHOLE branch, which is how `M48` put a surgery on
+the trunk with no squash merge.
+
+`PR #250`'s **Static analysis** job failed on `Composer audit (SCA)` while every other gate passed, and
+the failure is **not this branch's**: three `high` advisories against `league/commonmark`, all published
+**2026-09-01 20:17–20:21 UTC** — after `M58` merged and after this branch was cut. Two denial-of-service
+and one XSS (`on*` handler filter bypassed with a U+000C form feed). Affected `<2.9.1`; this tree carries
+**2.9.0**, released 4 weeks ago.
+
+⚠️ **It is transitive, not direct** — `laravel/framework v13.18.1` requires `^2.8.1`, so `2.9.1` satisfies
+the existing constraint and no framework move is needed. `composer.json` does not change; only the lock.
+
+⛔ **TAKEN RATHER THAN REPORTED, BECAUSE IT BLOCKS EVERY INCREMENT AND NOT JUST THIS ONE.** `composer
+audit` is a merge gate, so until this lands no pull request in this repository can reach 6/6.
+
+⚠️ **AND THE ONE THING THAT MAKES IT MORE THAN A LOCK BUMP HERE:** `league/commonmark` is what
+`Markdown::render()` runs on, which is the exact surface `M57` worked and `scripts/mail-attribute-lint.php`
+guards. The mail suites are the regression evidence, and they are named in the release.
+
 ⛔ **`D9` must never be started without an explicit answer.** Open decisions: `D1`, `D3`, `D4`, `D8`, `D9`, `D10`.
 
 ⛔ **RUN `php scripts/state.php` FOR EVERY NUMBER.**

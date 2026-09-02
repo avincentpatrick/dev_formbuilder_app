@@ -16,32 +16,114 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M62` is merged; **four consecutive increments have now filed no `major` row**
+## Status: ACTIVE CLAIM — the `can:` gate that names the wrong subject (`m63-can-gate-subject`)
 
-`M59`, `M60`, `M61` and `M62` each filed zero `major`, which is the bar `D5` names — zero open `major`
-plus three consecutive increments filing none. `state.php` counts the tree; do not take that sentence's
-arithmetic on trust. `M62` closed **two** rows and filed **two**, so the open count is unchanged.
+Taken 2026-09-02. Branch `m63-can-gate-subject`, cut from `origin/main` at `9ec5ed8`, PR into `main`.
+Row: **"A `can:` gate that names the WRONG SUBJECT is invisible to every test in the repository,
+including the one written to catch it"** — `docs/feature-backlog.md`, the `Test suite & CI gates`
+section, filed by `M34`. Cited by title rather than by line index because this increment edits that file.
 
-⚠️ **For whoever takes the next row: the three lessons `M62` would most like to hand on.**
-**(1) A ROW'S REMEDY CAN BE WORSE THAN ITS DEFECT, AND THIS IS THE SECOND INCREMENT RUNNING WHERE IT WAS.**
-`M61`'s remedy would have created a silent offline failure; `M62`'s would have turned a visible refusal
-into a silent lost update. In both cases the row was right that a defect existed and wrong about what to do,
-and in both cases the deciding evidence was **four lines of installed vendor code** — not the framework's
-documentation, and not reasoning from an API's name. **Read the build that is on disk.**
-**(2) A PREDICTION THAT ASSUMES COVERAGE CAN DISCOVER ITS ABSENCE BY BEING WRONG.** The claim predicted a
-mutation would survive because *"the existing cases exercise that predicate anyway."* It was caught by
-exactly one test — the new one — because **no existing case had ever read that predicate.** The failed
-prediction was worth more than a correct one would have been.
-**(3) A MUTATION HARNESS THAT CAN ABORT BETWEEN WRITE AND RESTORE SILENTLY CORRUPTS THE TREE.** `M62`'s
-first Vitest harness died on a console-encoding error after applying and before restoring, and left two
-mutants stacked in one file. Only the printed sha256 chain revealed it. Put the restore in a `finally`.
+Two sibling rows close with it, both in the same section: **"The `can:` arm on
+`GET /api/v1/analytics/report` — the non-export twin — is asserted by nothing"** and **"Three saved-view
+verbs are gated by an entitlement assertion that no permission test backs."** A third — **"Two
+byte-serving routes gate on a subject their own comments question"** — is converted to a decision rather
+than taken; see `D11`.
+
+### Evidence verified
+
+Every citation in all four rows was opened against the merged tree. **All hold; none has rotted.**
+
+- `routes/api.php:366` / `:369` — **held.** Byte-identical middleware triplets, each carrying
+  `'can:viewAny,'.SavedReportView::class`, on the report and its export twin.
+- `routes/api.php:359-362` — **held.** The prose rejection of `can:viewAny,Submission::class`, duplicated
+  a second time in `SavedReportViewPolicy`'s class docblock. Nothing executable defends either copy.
+- `routes/api.php:114-116` — **held** (the ordering comment; that row is not taken here).
+- `tests/Feature/Api/AnalyticsApiTest.php:87` / `:99` — **held.** The file carries no policy-refusal case
+  at all: its only two `error.code` assertions are `insufficient_ability` and `feature_not_available`.
+- `tests/Feature/Analytics/AnalyticsExportTest.php:203-221` — **held**, and it is the fixture to copy.
+- `tests/Feature/Analytics/AnalyticsPageGateTest.php:106-137` — **held**, and the row **understates
+  itself**: it drives **four** routes, not three (`GET /analytics/export` plus the three saved-view verbs),
+  and carries a `:137` assertion that neither verb reached the service.
+- `tests/Feature/Api/GroupBPolicyGateTest.php` — **held, and it is `:97-99` rather than `:97` alone.**
+  `:97` computes `explode(':', $middleware, 2)[0]` and `:99` compares it to `Authorize::class`. Element
+  `[1]` — the whole `<ability>,<Subject>` payload — is computed and discarded.
+
+⚠️ **THE ROW UNDERSTATES ITSELF IN THE DIRECTION THAT MATTERS.** It reads as one route's problem. The
+payload is discarded for **all 51 gated Group-B routes**, and the identical idiom appears a second time at
+`tests/Feature/Admin/AdminConsoleGateTest.php:78-93` and a third at
+`tests/Feature/Auth/RateLimiterBindingTest.php:43-60`. `routes/tenant.php` carries ~95 further `can:`
+middlewares that nothing has ever parsed.
+
+⛔ **AND THE ROW'S OWN MUTATION WOULD PROVE THE WRONG THING.** `Submission` is **not** in
+`routes/api.php`'s `use App\Models\…` block — verified: Audit, Connection, Form, PointAward, ResourceGrant,
+SavedReportView, ScopeNode, WebhookEndpoint, and no other. So `Submission::class` written there resolves to
+the global `\Submission`, which does not exist, `Gate::getPolicyFor()` returns null, and the route 403s
+**every** principal — a different defect, and one the existing 200s already catch. The mutation must use
+the literal FQCN. This is the M49 class of trap arriving through a namespace rather than a shell.
+
+### Remedy verdict
+
+**Sound as far as it goes, and insufficient as stated — it closes one route and the row's own thesis is a
+surface.**
+
+The prescribed fixture — *"grant a constructed principal exactly `submissions.view` and neither dashboard
+key"* — is correct and is the only thing that can tell two gates apart. ✅ **Measured, not assumed: no
+seeded role can produce it.** All five roles in `RolePermissionSeeder::MATRIX` that hold `submissions.view`
+(owner, admin, form_editor, reviewer, viewer) also hold at least `dashboard.form.view`. It therefore needs
+a **direct permission grant**, which the row does not say.
+
+⚠️ **The remedy the row implies for the structural half — a route-name → middleware-string manifest — is
+the weak artefact**, and it is rejected here. Edit the routes file and the manifest identically and it
+asserts nothing. What ships instead declares the **permission set the gate is intended to admit** and
+computes the actual one from the live policy, so the swap makes the manifest a lie *in words* rather than
+in punctuation.
+
+⛔ **Read the build that is on disk** (`M61`/`M62`'s lesson, third increment running):
+`Illuminate\Auth\Middleware\Authorize::isClassName()` is `str_contains($value, '\\')`, and `getModel()`
+returns `$request->route($model, null) ?? null` for a non-class subject. **A subject that is not a declared
+route parameter therefore authorizes against `[null]` and silently refuses every principal.** That is the
+sharpest teeth a derived check has, and it is not in the row.
+
+Files: `tests/Pest.php`, `tests/Feature/Api/GroupBPolicyGateTest.php`,
+`tests/Feature/Api/GroupBGateSubjectTest.php` (new), `tests/Feature/Api/AnalyticsApiTest.php`,
+`tests/Feature/Analytics/AnalyticsExportTest.php`, `tests/Feature/Analytics/AnalyticsPageGateTest.php`,
+`docs/feature-backlog.md`, `docs/claims/decisions.md`, `docs/claims/lane-a.md`, `PROGRESS.md`,
+`docs/gate-baselines.md`.
+Shared artefacts taken: `tests/Pest.php`, `docs/feature-backlog.md`, `docs/claims/decisions.md`,
+`PROGRESS.md` (own block only), `docs/gate-baselines.md`. Lane B is `RETIRED` and holds nothing; both claim
+files were read in full, not their `## Status` lines.
+Paired files taken: none.
+Namespaces spent: `D11` from the decisions namespace. **Nothing from the ADR or migration namespaces** —
+no production file is touched.
+
+Prediction: written before the run so it can be measured against rather than explained afterwards.
+
+- **PHPStan cannot move.** It scans `app`, `database` and `routes`, and this diff touches none of them
+  except transiently under a committed mutation. Vitest, Storybook axe and E2E are unreachable by a
+  PHP-test-only diff. Pint *does* see `tests/`, so it is the one host gate that can go red.
+- **Pest gains cases and its assertion total moves; the file count does not.** Exactly one new test file.
+- Of the eight mutations, **seven are predicted CAUGHT and one — MU6 — is predicted to SURVIVE** if DC4
+  skips the route rather than failing it, which is the honest-scope sentence DC4 needs either way.
+- ⚠️ **The one I most expect to be wrong is MU5's "sole detector" claim.** It asserts that only DC3
+  reddens when a bound subject is misspelled, on the reasoning that the existing case asserts a 403 and the
+  mutant 403s everyone. `OpenApiContractTest` walks the route table, and if it drives documented endpoints
+  the mutation is caught by two and the claim is false. **Measured rather than assumed**, and the scope of
+  every red set is named in the release, because a red set is scope-bound.
+- Second most likely wrong: that the 21 computed permission sets all match their route's intent. If any
+  does not, that is a **production finding**, not a manifest to adjust — it gets decided, not absorbed.
 
 ⛔ **`D9` must never be started without an explicit answer.** Open decisions: `D1`, `D3`, `D4`, `D8`, `D9`,
-`D10`. `M62` opened none and answered none, and asked the user exactly one scope question, which is
-recorded on the row it belongs to rather than promoted to a decision.
+`D10`, and `D11` opened here.
+
+✅ **`D5`'s exit bar was measured this session and reads MET** — `state.php` counts zero open `major`, and
+no `major` bullet in the backlog is attributable to `M59`, `M60`, `M61` or `M62` (the highest filer that
+records itself is `M49`). ⛔ **It was NOT declared met, on the user's instruction and on `D5`'s own
+terms**: `D5` set a precondition — provenance normalised across the backlog with a lint gate holding it
+there — and that is half-built, with 47 of the 58 `major` bullets carrying no parseable provenance at all.
+The user's decision of record, taken 2026-09-02, is **keep going and make the bar real first**, so the
+`D5`-operability increment is filed as a row by this one.
 
 ⛔ **RUN `php scripts/state.php` FOR EVERY NUMBER.**
-
 ---
 
 ## RELEASED — `M62`, the encode page silently discards typed work, in two independent ways (merged as PR #253, `df48e1b`, 6/6 green with real step counts — Static analysis 23 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)

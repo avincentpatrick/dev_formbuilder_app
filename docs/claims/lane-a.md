@@ -16,27 +16,100 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M61` is merged; **three consecutive increments have now filed no `major` row**
+## Status: ACTIVE CLAIM — the encode page silently discards typed work, in two independent ways (`m62-encode-typed-work-loss`)
 
-**`M59`, `M60` and `M61` each filed zero `major`, which is the bar `D5` names** — zero open `major` plus
-three consecutive increments filing none. `state.php` counts the tree; do not take that sentence's
-arithmetic on trust, and note `M61` filed **four** `minor` rows, so the open count went **up**.
+Taken 2026-09-02. Branch `m62-encode-typed-work-loss`, cut from `origin/main` at `4c9f2daa03836361dfd80f6ebd37ecae779d85a4`, PR into `main`.
 
-⚠️ **For whoever takes the next row: the two lessons `M61` would most like to hand on.**
-**(1) A stale COMMENT defeated a correct prediction.** This claim predicted, in writing, that the most
-likely failure was "a shell assertion that passes locally and fails in CI when `withoutVite()` is
-forgotten" — and then wrote exactly that test without it, because
-`tests/Feature/Maintenance/TenantMaintenanceTest.php`'s own header comment said the paused arm renders no
-`@vite`. It does. **Predicting a trap does not protect you from a document that tells you the trap is not
-there**; read the code the comment describes. **(2) A control can be a false green even when you are
-being careful.** The first attempt to prove that fix used a double-quoted `php -r`, the shell ate `$this`,
-the mutation never applied, and the run reported PASS against the *fixed* file. `scripts/mutate.php` takes
-tokens from files precisely so no shell is in the path — use it rather than hand-rolling.
+**Two rows, one increment, and they are one per MODE of the same page rather than two views of one bug.**
+`docs/feature-backlog.md`, the *Submissions, drafts & the guest runtime* section, adjacent bullets:
+(1) *"`minor` · `useServerAutosave.dispose()` fires without consulting `inFlight`"* — the create/draft-keying
+channel; (2) *"`minor` · The encode page's conflict refusal remounts and discards the editor's corrections"* —
+the edit channel. Autosave is disabled in edit mode by `enabled: … && !isEditing.value`, so neither row can
+reach the other's mode. Both are silent losses of work a member of staff typed.
 
-⛔ **`D9` must never be started without an explicit answer.** Open decisions: `D1`, `D3`, `D4`, `D8`, `D9`,
-`D10`. `M61` opened none and answered none.
+### Evidence verified
 
-⛔ **RUN `php scripts/state.php` FOR EVERY NUMBER.**
+Every citation opened against the merged tree at `4c9f2da`, and the mechanism traced end to end rather than
+read off the row.
+
+- **`resources/js/composables/useServerAutosave.ts` — HELD, and the row's mechanism is exact.** `dispose()`
+  guards on `state.value !== 'stopped' && (dirty || debounceTimer !== null)` and never consults `inFlight`.
+  The two facts that make it a data loss rather than a wasted request are one screen apart and neither is in
+  the row: `send()` sets `dirty = false` at its top, and `baseline.value` advances **only** on a 200. So
+  typing during an in-flight save re-dirties the composable while the baseline still holds the pre-save
+  checksum, and `postKeepalive()` builds its body from that stale `base_content_checksum`. Fire-and-forget
+  with a swallowed rejection, so the `draft_conflict` refusal is never seen by anyone.
+- ➕ **THE ROW UNDERSTATES ITSELF: `onBeforeUnload` HAS THE SAME SHAPE AND THE ROW DOES NOT NAME IT.**
+  It returns early only on `!dirty && inFlight === null`, then calls `preventDefault()` and the same
+  keepalive — so it too presents a stale base when a save is in flight. It is a different situation, not the
+  same defect (see the remedy verdict), but a reader of the row would not know the sibling existed.
+- **`app/Http/Controllers/Tenant/SubmissionEditController.php` — HELD.** The `catch (SubmissionEditException)`
+  arm returns `back()->with('toast', …)` and no errors bag.
+- **`resources/js/Pages/submissions/Encode.vue` — HELD.** `submitEdit()` passes a `preserveState` predicate
+  that is true only when the errors bag is non-empty, and its docblock reasons only about the 422 path. The
+  row's word *"remounts"* is literally right, which I confirmed in the **installed** vendor build rather than
+  from the documentation: `node_modules/@inertiajs/vue3/dist/index.js`'s `swapComponent` re-keys the
+  component with `Date.now()` when `preserveState` is false, and the changed key is what forces the remount.
+- **Two throw sites, not one.** `SubmissionAnswerEditService::edit()` raises
+  `SubmissionEditException::concurrentlyModified()` both before the lock and again under it, and
+  `illegalState()` is a third, different cause reaching the same catch arm. The row implies one path.
+- **The existing coverage cannot see any of it.** `tests/Feature/Submissions/SubmissionEditRoutesTest.php`
+  already proves the refusal, but asserts `assertSessionHas('toast')` — and so does its success case, so the
+  assertion **does not discriminate a refusal from an acceptance**. `Encode.vue` has a Vitest file with an
+  edit-mode block, and no case in it touches `preserveState`.
+
+### Remedy verdict
+
+**Row 1's remedy is sound in intent and under-specified in the one place that matters.** *"Consult
+`inFlight`"* is right; consulting it and then declining to send would drop the same edits. The workable
+shape is to **chain** onto the existing `inFlight` handle, which is possible **only** because an Inertia
+visit keeps the JS context alive — and that is exactly why `onBeforeUnload` must NOT get the same treatment:
+there the context is dying, chaining cannot resolve, and the native leave prompt is already the stated
+protection, on the same argument the docblock makes for the 64 KiB keepalive cap. So the sibling is a
+**stated limit**, not a second fix.
+
+⛔ **ROW 2'S IMPLIED REMEDY SHIPS A WORSE DEFECT THAN THE ONE IT CLOSES, AND I MEASURED THE CHAIN BEFORE
+WRITING A TEST.** *"Return it as a validation error so `preserveState` holds"* preserves the typed work **and
+silently re-arms the concurrency guard.** In the installed `@inertiajs/vue3`, `swapComponent` assigns the new
+page object to `page.value` **unconditionally** — `preserveState` gates the remount, never the props — and
+`EncodeFormPresenter::present()` reads `editing.baseline` off the stored row's answer relation on every
+render. So `back()` re-renders the edit page carrying the *other* editor's checksum, the preserved page
+adopts it, and the next Save matches and **blindly overwrites the change the guard had just refused**. A
+visible refusal becomes a silent lost update. **Shipping instead:** the errors bag *plus* a component-local
+snapshot of the render-time baseline, deliberately never re-synced, so the second Save is refused again and
+the editor keeps their work but can never overwrite what they have not seen.
+
+Files: `app/Http/Controllers/Tenant/SubmissionEditController.php`,
+`resources/js/Pages/submissions/Encode.vue`, `resources/js/composables/useServerAutosave.ts`,
+`resources/js/Pages/submissions/encode.test.ts`,
+`resources/js/composables/__tests__/useServerAutosave.test.ts`,
+`tests/Feature/Submissions/SubmissionEditRoutesTest.php`, `docs/feature-backlog.md`, `PROGRESS.md`
+(Lane A's block only), `docs/claims/lane-a.md`, `docs/gate-baselines.md` (regenerated, never edited).
+
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/claims/lane-a.md`, `docs/gate-baselines.md`,
+`PROGRESS.md` (own status block and own hand-off line only). No `openapi.json`, no `phpunit.xml`, no
+top-level `tests/e2e/*.spec.ts`.
+
+Paired files taken: none. Nothing here touches `SyncStatus.vue`, `KNOWN_UNGUARDED`, `KNOWN_OVERFLOWING` or
+any other exact-equality list.
+
+Namespaces spent: **nothing from either namespace.** No migration, no ADR, no sub-decision id, no exceptions
+entry. The reserved ADR gap stays reserved for H1d.
+
+Prediction, written before the first gate runs.
+**PHPStan will not move at all** — the only `app/` change is one return statement in a controller arm with no
+new types, and the gate scans `app`, `database` and `routes`. I will say that rather than quote a number.
+**Pest will move by the assertions I add and by nothing else**; the risk is that adding an errors bag to the
+refusal arm reddens an existing case that asserted a *clean* session somewhere I have not looked — that is
+the one I most expect to be wrong, and it is a real possibility precisely because the suite's own success and
+refusal assertions do not currently discriminate. **Vitest is where the real work is** and where I expect the
+first red: the chained keepalive resolves a promise after `clearTimers()` has already run, so a test that
+does not await a microtask tick will observe no request and read as a pass — the M49 class in Vitest
+clothing, a control that never applied looking exactly like a control that survived. ⚠️ **The mutation I
+predict will SURVIVE is the one that inverts the `preserveState` predicate**: the existing 422 cases exercise
+that same predicate, so it is a weak discriminator for the conflict path, and removing the errors bag from
+the catch arm is the mutation that actually pins Row 2. Recorded now so the pairing is measured rather than
+assumed.
 
 ---
 

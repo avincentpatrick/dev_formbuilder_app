@@ -23,6 +23,48 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
+### D11 — Two byte-serving routes gate on a subject their own comments question. Leave them, or move one?
+
+**Filed 2026-09-02 by Lane A, during `M63`, at the moment the scope was decided.** Promoted out of
+`docs/feature-backlog.md` rather than taken as a row, because both candidate fixes change **who can do
+something**, and that is a product call rather than a cleanup. The row that raised it called itself *"a
+lead, not a finding"* and said to re-read the file before acting — which is what produced the correction
+below.
+
+⛔ **THE ROW'S OWN CITATION IS WRONG, AND THE ERROR MATTERS TO THE ANSWER.** It describes
+`GET /submissions/{submission}/pdf`. The route is **`POST`** (`routes/tenant.php`, `submissions.pdf`), and
+it is POST deliberately — the route's own comment records that it has side effects: an audit row, a
+metered export, and a queued job. A gate on a side-effecting write is a different argument from a gate on
+a read, and the row was reasoning about the second.
+
+**The two gates, and what each already says for itself.** `submissions.pdf` gates `can:view` where its
+streamed-export sibling gates `can:export`, and the route comment flags the asymmetry itself.
+`forms.share.qr` gates `can:update,form` — an **edit** permission to read a QR code of a URL that is
+public once guest access is on. Neither is a coverage hole: both carry deny tests already.
+
+- **A — leave both, and pin the intent instead.** No route changes. Both enter the `routes/tenant.php`
+  grant manifest when that row is taken, so the asymmetry becomes something *asserted* rather than
+  defended in a comment — which is the row's actual complaint. Costs one line each, changes nobody's
+  access, and removes the "nobody chose this deliberately" objection permanently.
+- **B — align the PDF with its export sibling** (`can:export`). ⚠️ **The reason not to, and it is
+  concrete:** a Viewer holds `submissions.view` and **not** `submissions.export`, so *"print the response
+  you are already reading"* would stop being available to the role whose entire surface is reading
+  responses. `routes/tenant.php` states exactly this at the route and decided against it once already.
+  Against that: the PDF **is** a metered export that writes an audit row, so charging it to the export
+  permission is defensible on cost grounds rather than on read-scope grounds.
+- **C — loosen the QR** to `can:view,form` or `can:viewOverview,form`. Today a Reviewer running a field
+  day cannot print the poster for a form they are collecting on, which is a real workflow. Against it: the
+  QR encodes the share slug, and **before guest access is switched on that slug is not yet public** — so
+  an edit-level gate is defensible as *"only the author hands out the address."*
+
+**Recommendation: A.** `M63`'s whole claim is that it added the first executable assertion about which
+permission a gate names; changing a gate inside that same diff would make its mutation matrix ambiguous
+about which half caught what. B and C are each worth taking as their own row **with an answer already in
+hand** — and under A they become one-line manifest edits whose effect a reviewer can see, rather than
+middleware changes nobody can measure. ⚠️ If B is ever taken, it needs the Viewer question answered
+first: either Viewers lose the PDF, or `submissions.export` stops meaning "may move bytes off the
+platform", and those are different products.
+
 ### D10 — `§9` item 9's escalation has fired. Adopt the value-object forcing device, or keep answering per surface?
 
 **Filed 2026-09-01 by Lane A, during `M57`, at the moment the scope was decided.** Filed rather than

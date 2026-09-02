@@ -134,3 +134,19 @@ it('does not pause another tenant\'s forms', function (): void {
 
     $this->get('http://acme.meridian.test/f/acme-feedback')->assertOk();
 });
+
+// ── M61: availability outranks canonicalization ───────────────────────────────────────────────
+
+it('503s a mixed-case guest URL too, rather than canonicalizing past the pause', function (): void {
+    [$tenant, $owner, $form] = maintenanceFixture('acme', paused: true, message: 'Back on Monday.');
+
+    // EnforceTenantMaintenance short-circuits BEFORE $next(), so the controller — and with it M61's
+    // canonical 301 — never runs. That is the correct precedence twice over: a paused tenant must not
+    // answer differently for a mis-cased URL than for a canonical one, or the redirect leaks the slug's
+    // existence past the pause. It is an ORDERING property, so it is pinned rather than reasoned about.
+    // No withoutVite() needed: the paused arm renders the maintenance blade, not the guest shell.
+    $this->get('http://acme.meridian.test/f/AcMe-FeEdBaCk')
+        ->assertStatus(503)
+        ->assertSee('Back on Monday.')
+        ->assertHeaderMissing('Location');
+});

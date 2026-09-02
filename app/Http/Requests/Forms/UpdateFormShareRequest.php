@@ -63,7 +63,17 @@ final class UpdateFormShareRequest extends FormRequest
                 'min:'.FormSlug::MIN_LENGTH,
                 'max:'.FormSlug::MAX_LENGTH,
                 // Lowercase alphanumerics in hyphen-separated groups: no leading/trailing/doubled hyphen, no
-                // uppercase (the runtime lookup is a case-sensitive equality), no path or query characters.
+                // uppercase, no path or query characters.
+                //
+                // ⚠️ M61 CHANGED THE REASON UPPERCASE IS REFUSED, AND THE RULE IS UNCHANGED. It used to be
+                // that the runtime lookup was a case-sensitive equality, so an uppercase slug would have been
+                // unreachable. The lookup is case-INSENSITIVE now (FormSlug::forLookup), and uppercase is
+                // still refused for a different and stronger reason: `forms_tenant_id_public_slug_unique` is
+                // case-SENSITIVE, so accepting `Intake` beside `intake` would create a pair the now-forgiving
+                // lookup resolves to both, with `->first()` choosing arbitrarily. One canonical spelling also
+                // keeps the URL usable as a client-side storage key — see GuestFormController's docblock.
+                // ⛔ Refuse rather than normalize: silently lowercasing here would let two authors believe
+                // they hold distinct link names while this Rule::unique passes both.
                 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/',
                 Rule::notIn(FormSlug::RESERVED),
                 Rule::unique('forms', 'public_slug')->ignore($form->id),
@@ -89,9 +99,9 @@ final class UpdateFormShareRequest extends FormRequest
     {
         $validator->after(function (Validator $validator): void {
             // Guest access with no slug is not a half-configured form, it is an unreachable one: the runtime
-            // resolves `where('public_slug', $slug)`, so the flag would be on and every visitor would still
-            // get the 404 that GuestFormController gives an unknown slug. Refuse the combination outright
-            // rather than persisting a state whose only symptom is a link that does not exist.
+            // resolves the form BY that column, so the flag would be on and every visitor would still get the
+            // 404 that GuestFormController gives an unknown slug. Refuse the combination outright rather than
+            // persisting a state whose only symptom is a link that does not exist.
             if ($this->boolean('allow_guest_submissions') && $this->input('public_slug') === null) {
                 $validator->errors()->add(
                     'public_slug',

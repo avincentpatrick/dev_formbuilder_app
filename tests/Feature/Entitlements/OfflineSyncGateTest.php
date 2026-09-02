@@ -115,3 +115,31 @@ it('does not offline_sync-gate the sync/submissions replay (never-block)', funct
     // Whatever the controller makes of an empty batch, it must not be a 402 offline_sync refusal.
     expect($response->status())->not->toBe(402);
 });
+
+// ── M61: the entitlement gate is the fourth 404 on this route, so it needs the same oracle guard ──
+//
+// The other three gates are guarded in PwaManifestTest. This one lives here because this file owns the
+// plan-catalog fixture, and duplicating that fixture is exactly how two files come to disagree about what
+// a Free tenant is entitled to.
+
+it('404s — never 301s — a mixed-case manifest URL for a plan without offline_sync', function (): void {
+    [$tenant, $owner] = offlineGateTenant();
+    offlineGatePublishedForm($tenant, $owner);
+    assignPlanTier(PlanTier::Free); // offline_sync = false
+
+    $this->get('http://acme.meridian.test/f/InTaKe/manifest.webmanifest')
+        ->assertNotFound()
+        ->assertHeaderMissing('Location');
+});
+
+it('serves a mixed-case manifest URL for a Starter tenant, entitlement satisfied', function (): void {
+    [$tenant, $owner] = offlineGateTenant();
+    offlineGatePublishedForm($tenant, $owner);
+    assignPlanTier(PlanTier::Starter);
+
+    // The positive half. Without it the case above passes just as well under a lookup that resolves
+    // nothing at all, because "mis-cased and unentitled" and "mis-cased and unfindable" are both 404.
+    $this->get('http://acme.meridian.test/f/InTaKe/manifest.webmanifest')
+        ->assertOk()
+        ->assertJsonPath('scope', '/f/intake');
+});

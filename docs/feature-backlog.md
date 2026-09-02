@@ -3575,7 +3575,46 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   row's worth of work and not a line in a preamble. ⚠️ **And the count it distorts is one this increment
   just corrected**, so the deviation sentence is right about the tables it names and still not a census —
   the same failure, one level up, as the row `M58` closed. **Live.**
-- **`major` · The README prescribes a design-system command that cannot work in the service it names.**
+- ~~**`major` · The README prescribes a design-system command that cannot work in the service it names.**~~
+  ✅ **DONE — M59 (2026-09-02). THE ROW'S EVIDENCE HELD AT ALL FIVE CITATIONS AND ITS SEVERITY ARGUMENT
+  WAS FALSE.** The block now builds in `node` and scans in the `e2e` glibc image, in `ci.yml`'s shape —
+  measured end to end at **42 suites / 303 tests**, which is the `docs/gate-baselines.md` figure exactly.
+  ⛔ **THE ROW IS WRONG ABOUT WHAT A READER SEES, AND THAT WAS ITS WHOLE SIZING ARGUMENT.** It predicts
+  *"a native-module error from inside a container, not a missing-server message."* Measured: it is
+  **exactly a missing-server message**, and a helpful one — `test-storybook` names the `--url` flag and
+  links its own docs. Reason (2) fires first and reason (1) is never reached on that path. The row is
+  still `major`, for a reason it does not give: the command is the **only** line in the block that cannot
+  be made to work by fixing the reader's tree.
+  ⚠️ **REASON (1) IS REAL AND HAD TO BE PROVED SEPARATELY, BECAUSE THE OBVIOUS TEST GIVES THE WRONG
+  ANSWER.** Run bare, the scan fails on an **absent** browser — which would imply "install it" as the
+  fix. So it was installed: `playwright install` inside that container warns it is *"downloading fallback
+  build for ubuntu24.04-x64"*, and the scan then reports `spawn ... ENOENT` **with a 189 MB binary present
+  and executable**, 0 of 42 suites. **Installing the browser there is not the fix; changing images is.**
+  ⛔ **AND THE REMEDY IT GESTURES AT IS WRONG.** *"The working shape … is two steps, not one"* — `ci.yml`
+  is **five**, three of them one-time installs, and its fifth is a two-process orchestration. It is also
+  not transplantable: every native binding on disk is linux-only, so the host recipe needs a host
+  `ds:install` first, which J4c measured as **breaking the node container's Vite**.
+  ➕ **THREE THINGS THE ROW DOES NOT MENTION, EACH FOUND BY RUNNING THE BLOCK RATHER THAN READING IT.**
+  **(1)** `--maxWorkers` is **local-only and not optional**: jest defaults to one worker per core and the
+  container dies `ENOMEM` in **34 of 42 suites** — at *load*, so every test that runs still passes and the
+  tail looks survivable. CI needs no cap and therefore never showed this.
+  **(2) `ds:storybook:build` FAILS AND EXITS `0`** against an incomplete package tree — Storybook's
+  anonymous crash-report prompt runs after the error and swallows the status. Filed as its own row below.
+  **(3)** `ds:test` could never have been made to work as a one-liner: the dev-server script that would
+  serve `:6006` exists in the package and has **no root alias**. Filed below.
+  ⚠️ **The duplicate command block in this file is now a pointer to `README.md`** — that duplication is
+  what let the README rot while the working recipe sat here, in a file no reader of the README opens.
+  Gated by `tests/Feature/Docs/DocumentedCommandDriftTest.php`, proved red four ways through
+  `scripts/mutate.php`; the fence-marker control fired a **floor** at 25 assertions rather than 27.
+  ⚠️ **AND THIS BRANCH ROTTED A CITATION AND THE GATE CAUGHT IT** — the README grew 22 lines below the
+  block, which pushed a cited line into a fenced block and took the ledger to 19 over its ceiling of 18.
+  ⛔ **THAT IS THE OPPOSITE OF WHAT WAS PREDICTED**, and worth keeping: the prediction said
+  `citation-liveness-lint` could not see this class, because it checks a cited line is ALIVE and never
+  that it still says what the citing sentence claims. Both halves are true and the conclusion did not
+  follow — *inside a fence* is an **aliveness** rule, so the gate caught this instance of an accuracy
+  defect. It would have missed a line that merely moved and stayed prose. Repaired; only the citation
+  this branch moved was touched. Original filing follows.
+  **`major` · The README prescribes a design-system command that cannot work in the service it names.**
   Filed by M46 (2026-08-29), found inside the block a now-closed row wrongly claimed was still broken — see
   the README row above, which was stale but whose neighbourhood was not. `README.md`'s design-system block
   runs the axe suite as `docker compose exec node npm run ds:test`. It cannot work, for two independent
@@ -3585,7 +3624,39 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   and nothing in the block starts one. `ci.yml`'s axe job does it correctly — glibc runner, static build
   served, `wait-on`, then `test-storybook --url` — so the working shape exists and is two steps, not one.
   ⚠️ **Sized `major` because it is the one line in that block a reader will actually run**, and its failure
-  is the confusing kind: a native-module error from inside a container, not a missing-server message. **Live.**
+  is the confusing kind: a native-module error from inside a container, not a missing-server message.
+- **`minor` · A failing `ds:storybook:build` exits `0`, so every check of its status is vacuous.** Filed
+  by M59 (2026-09-02) at the moment it was measured, not fixed here because the fix is upstream-shaped.
+  Against an incomplete `packages/design-system` tree the build dies with
+  `Cannot find module '@storybook/vue3-vite/preset'` and **returns exit code 0**: Storybook's anonymous
+  crash-report prompt runs after the error and swallows the status. ⚠️ **This is the M27 class pointing
+  the other way** — that row's finding was *"the failure prints a success after it, trust the exit code"*,
+  and here the exit code is the liar. Both warnings now sit together in `README.md`, which is a mitigation
+  and not a fix. **The real remedy is `STORYBOOK_DISABLE_TELEMETRY=1` or `--disable-telemetry` in the
+  package script**, which needs checking against `ci.yml`'s axe job before it is set globally — CI is on a
+  clean tree and has never hit this, so the change is untested where it matters most. **Live.**
+- **`minor` · The design-system dev server has no root alias, so the one script that would make the axe
+  one-liner work is unreachable from the vocabulary every document uses.** Filed by M59 (2026-09-02).
+  `packages/design-system/package.json` carries `storybook dev -p 6006 --no-open`; the root `package.json`
+  aliases `ds:install`, `ds:tokens`, `ds:storybook:build` and `ds:test` and **not that one**. ⚠️ **This is
+  why the closed row above could never have been fixed by "start a server first"** — there was no
+  documented way to say it. A `ds:storybook` alias would also give the component library a local preview,
+  which nothing currently documents. **Not urgent** — the merge gate scans a static build and should keep
+  doing so. **Live.**
+- **`minor` · Three gate invocations fetch `http-server` from the network at run time, and nothing
+  declares it.** Filed by M59 (2026-09-02). `ci.yml`'s axe job and both halves of the README recipe reach
+  it through `npx`, and it appears in no `package.json` — so the merge-blocking accessibility gate has an
+  undeclared, unpinned, network-fetched dependency. `concurrently` and `wait-on` are at least present in
+  the root tree. **The remedy is one devDependency line**, but it belongs with a decision about which
+  package owns it, and the axe job is the wrong place to be experimenting. **Live.**
+- **`minor` · The command gate reads `README.md` only, and three other documents carry runnable command
+  blocks.** Filed by M59 (2026-09-02) at the moment the gate shipped, so its scope limit is a filed
+  constraint rather than a comment nobody re-reads. `docs/TESTING-GUIDE.md`, `docs/ACCESS-MATRIX.md` and
+  `docs/deployment-infrastructure.md` all prescribe shell commands and none is scanned. ⚠️ **Widening it is
+  a bigger change than it looks**: the `docker compose exec <musl service>` arm is meaningful only where a
+  document prescribes *this* stack, and a deployment runbook naming a production host would produce false
+  positives on every line. **The corpus needs choosing before the constant is widened. Not live** — a
+  stated limit, filed so it cannot be forgotten.
 - **`minor` · Share-slug LOOKUP is case-sensitive while share-slug STORAGE is lowercase-only, so a
   mixed-case share URL 404s instead of resolving.** ⚠️ **A runtime defect, filed in this section because
   M46 found it while retracting ADR-0001's `citext` claim** and the two are the same finding seen from

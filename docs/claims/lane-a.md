@@ -16,22 +16,90 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M58` is merged; two `major` rows remain, one documentation and one tracker surgery
+## Status: ACTIVE CLAIM — the README prescribes a design-system command that cannot work in the service it names (`m59-readme-axe-command`)
 
-**`M58` closed the largest of the three remaining `major` rows, and the row was a floor in a direction it
-never names.** Its evidence held exactly — every one of its four assertions measured true — while its
-scope was **three times** what it claimed and its offered remedy fork was **dissolved by the one lookup it
-declined to do**. **2 `major` rows remain**: the README's unrunnable design-system command, and the
-`## Current Status` tracker surgery. Neither is a code defect.
+Taken 2026-09-02. Branch `m59-readme-axe-command`, cut from `origin/main` at `03b0738`, PR into `main`.
+Row: `docs/feature-backlog.md` — **`major` · The README prescribes a design-system command that cannot
+work in the service it names**, filed by `M46`. **Named by title and never by line number**, because this
+increment edits that file and a line number would not survive its own diff.
 
-⚠️ **For whoever takes the tracker surgery: that row's central warning may be spent.** It says the section
-*"has two writers"* and that a slice moving both lanes' bullets is the one thing Rule 7(b) forbids.
-`docs/claims/lane-b.md` has read `## Status: RETIRED` since `M50`. **Verify it before planning around it**
-— it was not verified here, only noticed.
+### Evidence verified
+
+Five citations, five opened, five held.
+
+- **`README.md`'s design-system block runs the axe suite as `docker compose exec node npm run ds:test`** —
+  **HELD**, verbatim, and it is the last line of that block.
+- **The `node` service is `node:24-alpine`** — **HELD** in `docker-compose.yml`. The service is a stock
+  image with no build stage, so nothing in it installs a browser or a glibc shim.
+- **`CLAUDE.md`'s gate table records the glibc-Chromium `ENOENT`** — **HELD, and the table is more precise
+  than the row is.** It says *cannot run in the musl node container*, which is exactly the scope J4b's
+  retraction left standing: J4b retracted *"impossible on this host"*, never *"impossible in that
+  container"*. No `CLAUDE.md` edit is owed.
+- **`ds:test` resolves to `test-storybook` with no `--url`** — **HELD** through one indirection:
+  the root script is `npm --prefix packages/design-system run test-storybook`, and the package script is
+  the bare string `test-storybook`. No flags at all.
+- **`ci.yml`'s axe job does it correctly** — **HELD**: glibc runner, its own `playwright install chromium`,
+  a static build, `http-server` + `wait-on` under `concurrently`, then `test-storybook --url`.
+
+⚠️ **AND THE ROW UNDERSTATES ITSELF THREE TIMES.**
+**(1) `ds:test` has no reachable server even in principle, from the vocabulary the README uses.**
+`packages/design-system/package.json` *does* carry a `storybook dev -p 6006 --no-open` script — the one
+thing that would make the line true — and the root `package.json` exposes **no `ds:*` alias for it**. The
+missing half is not merely unstarted; it is inexpressible in the block's own idiom.
+**(2) The line above it is half of the same defect.** `ds:storybook:build` writes `storybook-static` and
+the block never says where that lands or that it must be served. The two lines are a broken *pair*.
+**(3) The block's own prose miscounts itself** — *"the two above are the bootstrap"* sits over four
+commands.
+
+### Remedy verdict
+
+**The row offers one prescription — *"the working shape exists and is two steps, not one"* — and it is
+WRONG IN THE DIRECTION THAT MATTERS.** `ci.yml`'s axe job is **five** steps, three of them one-time
+installs, and its fifth is itself a two-process orchestration. More to the point it is **not
+transplantable into the `node` service under any arrangement**, because the blocker is the image.
+
+Measured on this host rather than argued, before a line was written:
+
+- Every native binding on disk — `@esbuild`, `@swc/core`, `@rollup`, `@rolldown`, in both `node_modules/`
+  and `packages/design-system/node_modules/` — is **linux-only**. That is the `node` container's own
+  `npm install` writing through the bind mount.
+- So J4b's host recipe would need a host `ds:install` **first**, which J4c measured as breaking the node
+  container's Vite until `packages/design-system/node_modules` is removed and the container restarted.
+  **Destructive to a running dev stack, and therefore rejected as the headline command** — the user's
+  call, taken on the alternatives rather than assumed.
+- `http-server` is installed in neither tree. CI reaches it through `npx`, and so must anything local.
+
+**Chosen shape: build in `node`, scan in the `e2e` image.** That service is already a glibc Playwright
+runner with the repo bind-mounted, so the linux `node_modules` on disk are the *correct* ones there.
+Nothing is installed on the host and the dev stack is untouched.
+
+Files: `README.md`, `docs/feature-backlog.md`, `tests/Feature/Docs/DocumentedCommandDriftTest.php` (new),
+`docs/claims/lane-a.md`, `PROGRESS.md` (Lane A's own status block only).
+Shared artefacts taken: `README.md`, `docs/feature-backlog.md`, `docs/claims/lane-a.md`, `PROGRESS.md`.
+Paired files taken: none.
+Namespaces spent: nothing from either namespace — no ADR, no migration prefix, no sub-decision id.
+
+Prediction, written before the run so it can be measured against:
+
+- The Pest job's step count and the Static-analysis job's step count both stay where they are, because a
+  `tests/Feature` gate is discovered by `php artisan test` and needs no `composer.json` or `ci.yml` entry.
+- PHPStan cannot move — it scans `app`, `database` and `routes`, and this is a docs-and-test diff.
+- Vitest, the axe suite and E2E cannot move; no SFC, story or spec is touched.
+- ⚠️ **The one I most expect to be wrong is the citation sweep.** This diff changes the line count of both
+  `README.md` and `docs/feature-backlog.md`, and `citation-liveness-lint` checks that a cited line is
+  ALIVE, never that it still says what the citing sentence claims — the defect `M57` and `M58` each
+  shipped one increment apart. I expect most hits to be **already rotten before this branch existed**, and
+  I expect to be wrong about how many.
 
 ⛔ **`D9` must never be started without an explicit answer.** Open decisions: `D1`, `D3`, `D4`, `D8`, `D9`, `D10`.
 
 ⛔ **RUN `php scripts/state.php` FOR EVERY NUMBER.**
+
+⚠️ **Still open after this row, for whoever takes it: the `## Current Status` tracker surgery.** That
+row's central warning — that the section *"has two writers"* — **may be spent**: `docs/claims/lane-b.md`
+has read `## Status: RETIRED` since `M50`. Verify it before planning around it; it has been noticed twice
+now and measured never. Its post-merge trunk observation also depends on `D8`, which is open and
+explicitly *not proceeded on* pending `D7`.
 
 ---
 

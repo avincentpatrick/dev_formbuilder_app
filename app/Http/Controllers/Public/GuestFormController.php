@@ -55,11 +55,12 @@ use Illuminate\Http\Request;
  * 4. **BOTH ARMS REDIRECT — no branching on `Accept`.** A legacy outbox row carrying a mis-cased slug
  *    reaches the server only through the JSON arm, and `fetch()` follows a 301 on a GET with its headers
  *    intact. Two arms deriving one answer independently is the defect the H23b paragraph above records.
- * 5. **`301` RATHER THAN `302`.** Storage is lowercase (see {@see \App\Services\Forms\FormService::setShareSettings}),
- *    so the target is `lower(path)` — a pure function of the URL, independent of database state — and a
- *    cached redirect can therefore never become wrong. A `302` would re-cost a `throttle:guest-mint` hit on
- *    every mis-cased entry instead of once per device. ⚠️ The redirect and the request that follows it do
- *    share that per-IP bucket, which is the shape the `guest-challenge` limiter exists to avoid — two of
+ * 5. **`301` RATHER THAN `302`.** Storage is lowercase — `FormService::setShareSettings()` lowers what it
+ *    is handed and the share request's regex refuses uppercase before that — so the target is
+ *    `lower(path)`, a pure function of the URL, independent of database state, and a cached redirect can
+ *    therefore never become wrong. A `302` would re-cost a `throttle:guest-mint` hit on every mis-cased
+ *    entry instead of once per device. ⚠️ The redirect and the request that follows it do share that
+ *    per-IP bucket, which is the shape the `guest-challenge` limiter exists to avoid — two of
  *    thirty, once per device, and hoisting it out to save them is the oracle in (1).
  */
 final class GuestFormController extends Controller

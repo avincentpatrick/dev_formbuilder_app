@@ -294,6 +294,35 @@ describe('useServerAutosave — lifecycle', () => {
 
         expect(post).not.toHaveBeenCalled();
     });
+
+    it('still writes on dispose() when the work is dirty but NO timer is armed', async () => {
+        // ⚠️ FOUND BY MUTATION, NOT BY READING (M62). `dispose()`'s gate is `dirty || debounceTimer !== null`,
+        // and narrowing that `||` to `&&` left the whole of this file green — every other dispose case here
+        // happens to have both true at once, so the `||` arm was load-bearing and pinned by nothing.
+        //
+        // This is the state that separates them: a 5xx sets `dirty = true` and deliberately does NOT
+        // re-schedule (the next keystroke is what retries), so a keyer who hits a server error and then
+        // clicks away has unsaved work and no armed timer. Under `&&` that work is dropped in silence —
+        // the same class of loss as the race above, reached from the other side.
+        const post = vi
+            .fn()
+            .mockResolvedValueOnce(jsonResponse(500))
+            .mockResolvedValue(jsonResponse(200, { content_checksum: 'sum-2' }));
+        const { autosave, answers } = harness({ post });
+
+        answers.a = '1';
+        await nextTick();
+        await vi.advanceTimersByTimeAsync(150);
+
+        // Non-vacuity: the case is only about the dirty-without-timer state, so prove we are in it.
+        expect(post).toHaveBeenCalledTimes(1);
+        expect(autosave.state.value).toBe('error');
+
+        autosave.dispose();
+
+        expect(post).toHaveBeenCalledTimes(2);
+        expect((post.mock.calls[1][0] as { answers: Record<string, unknown> }).answers).toEqual({ a: '1' });
+    });
 });
 
 /**

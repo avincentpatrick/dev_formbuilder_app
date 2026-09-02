@@ -23,6 +23,68 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
+### D12 — `D5`'s bar is now measurable, and it reads MET by nine increments rather than three. End the M-series, or keep going?
+
+**Filed 2026-09-02 by Lane A, during `M64`, at the moment the bar became computable.** This is not a
+re-ask of `D5` and it is not a re-ask of the answer given on 2026-09-02. `M63` reported the bar as
+*reading* met and the user answered **"keep going and make the bar real first"** — an answer conditional
+on the bar not yet being real. `M64` made it real. The condition is spent, so the question returns once,
+with numbers instead of a floor.
+
+⛔ **WHAT CHANGED IS THE EVIDENCE, NOT THE ARITHMETIC.** `M63`'s claim was a floor: 11 attributable
+`major` bullets plus the absence of a contrary one, with **47 of 58 recording no filer**. Every severity
+bullet now records one, resolved from the file's own history against all 135 of its versions, so the
+clause is arithmetic:
+
+| | |
+|---|---|
+| Open `major` rows | **0** — clause 1 |
+| `major` bullets ever, all shapes | **55**, every one attributed, **none `(unattributed)`** |
+| Highest increment that ever filed a `major` | **`M54`** |
+| Consecutive released increments filing none | **`M55`–`M63`, nine** — against a bar of three |
+
+⚠️ **AND THE MARGIN IS THE PART WORTH READING.** The answer to `D5` set the second clause at three
+*because* the first clause alone is satisfiable at any instant by an increment nobody has verified yet.
+Nine is not three: this is not a bar cleared on the last day, and eight of the nine increments in that
+window each closed a row and filed new ones without any of them being `major`.
+
+⛔ **WHAT THE BAR STILL DOES NOT MEASURE, SAID HERE RATHER THAN DISCOVERED AFTER STOPPING.** The gate
+checks a filer is **recorded**, never that it is **correct** — a wrong id passes. Severity is
+**self-assigned** by the increment that files the row, and no increment has assigned `major` since
+`M54`, which is consistent with the defects getting smaller *and* with the bar quietly changing what
+gets called `major`. Nothing here can tell those apart. **84 rows remain open**, and 30 of them say
+nothing about whether they are still live.
+
+- **A — keep going, and treat `D5` as satisfied-but-not-triggered.** The bar was written to stop a series
+  that had no exit criterion at all, not to force a stop the moment it clears. 84 open rows remain and the
+  recent ones are real: `M61` found a case-sensitivity defect that 404'd live share URLs, `M62` found an
+  encode page discarding typed work, `M63` found a `can:` gate naming the wrong subject. **None of those
+  was `major` and all three were user-visible.** Against it: a bar nobody acts on is `D5`'s own failure
+  mode wearing the other face — *"declared met by whoever wants to stop"* has a twin in *"never triggered
+  by whoever wants to continue."*
+- **B — end the M-series here and re-plan.** `D5` was answered to make this a decision rather than a
+  drift, and it has cleared by a factor of three. The remaining 84 rows do not disappear: they become a
+  standing backlog worked under whatever succeeds the series, and the held list re-enters as the
+  go-forward pipeline. Against it: the exit says nothing about the *shape* of what follows, and stopping
+  without that is how a queue becomes a graveyard.
+- **C — keep going, but re-cut the bar now that it can be measured.** `D5` recorded that the answer given
+  was *not* the recommendation filed — the recommendation was a **category** bar (end on correctness and
+  security, move style/docs/ergonomics to a standing backlog) and the answer was a severity bar. A
+  category bar is measurable today and was not in `M36`: `state.php` sees every bullet, its filer and its
+  liveness. Against it: re-cutting a bar at the moment it clears is exactly what it exists to prevent, and
+  it needs the liveness backfill first — 30 open rows are unjudged.
+
+**Recommendation: A, with the numbers on the record and this entry as the thing that makes B available at
+any time.** The bar's purpose was to make stopping a decision rather than a drift, and that purpose is now
+served whichever way it goes — it is measured, it is printed by `state.php` and `loop.php status` on every
+run, and it cannot be quietly declared or quietly ignored again. What argues against acting on it *today*
+is that the three most recent increments each found a live, user-visible defect while filing no `major`,
+which is evidence the queue is still productive rather than evidence it is done. ⚠️ **C should not be
+taken before the liveness backfill**, or the re-cut bar inherits 30 rows nobody has judged. ⛔ **And if B
+is taken, it needs an answer to "what replaces the series" in the same breath**, because the held list —
+OCR, uploading/import, payments, Track B, GDPR — is scheduled to re-enter at exactly that moment and that
+is a bigger conversation than an exit condition.
+
 ### D11 — Two byte-serving routes gate on a subject their own comments question. Leave them, or move one?
 
 **Filed 2026-09-02 by Lane A, during `M63`, at the moment the scope was decided.** Promoted out of

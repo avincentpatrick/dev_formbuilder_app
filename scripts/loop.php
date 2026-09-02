@@ -80,6 +80,16 @@ const MECHANICAL_MARKERS = [
 //    "not live" would stop nearly everything and make the driver useless rather than careful.
 const NOT_LIVE_MARKER = '**Not live**';
 
+/**
+ * Inline code spans removed, so a row that NAMES the vocabulary is not read as using it.
+ *
+ * ⚠️ Detection only. Nothing else reads the stripped copy, and no row is rewritten.
+ */
+function loopStripCodeSpans(string $body): string
+{
+    return preg_replace('/`[^`]*`/u', '', $body) ?? $body;
+}
+
 // Phrases that mark work an unattended run may not start on its own judgement.
 const STOP_PHRASES = [
     'tracker surgery', 'tracker-surgery', 'surgery marker',
@@ -107,58 +117,66 @@ function usage(): never
 
 /**
  * ⛔ THE TERMINAL CONDITION IS D5's BAR AND IT IS READ FROM decisions.md, NEVER RESTATED HERE.
- * D5 as answered: zero open `major` rows, PLUS three consecutive increments filing no new `major`.
- * D5's own entry records that the SECOND clause cannot be evaluated today, because eleven of the
- * twelve majors do not record which increment filed them and provenance appears in at least fifteen
- * free-text shapes. So this reports the first clause and says the second is unmeasurable — rather
- * than declaring the bar met, which is exactly what D5 warns will happen if nobody says so.
+ *
+ * ⛔ AND IT IS NOT RECOMPUTED HERE EITHER, WHICH IS THE POINT OF THIS REWRITE (M64). This function
+ * used to count provenance itself and then print a hard-coded "Clause 2 UNMEASURABLE". Both were
+ * defects waiting to happen: a second parser drifts from the first — the note at this file's parser
+ * boundary says so in terms — and a hard-coded verdict survives the day the underlying fact changes.
+ * M64 normalised provenance to one form across all 161 severity bullets and backfilled it from
+ * history, so state.php now DERIVES both clauses and this reads them.
+ *
+ * ⚠️ IT STILL DOES NOT DECIDE ANYTHING. Both clauses reading met is an input to a conversation with
+ * the user, not a stop signal a driver may act on: D5's own warning is that a measurable bar is one
+ * somebody will declare met, and the exit status below deliberately does not encode "stop".
  */
 function cmd_status(): never
 {
     $state = state();
     $backlog = is_array($state['backlog'] ?? null) ? $state['backlog'] : [];
+    $d5 = is_array($state['d5'] ?? null) ? $state['d5'] : [];
     $majors = (int) ($backlog['by_severity']['major'] ?? -1);
-    $rows = is_array($backlog['rows'] ?? null) ? $backlog['rows'] : [];
 
-    if ($majors < 0) {
-        cannot_measure('state.php returned no backlog severity counts.');
+    if ($majors < 0 || $d5 === []) {
+        cannot_measure('state.php returned no backlog severity counts or no D5 block.');
     }
 
-    // D5's SECOND clause needs each row to record the increment that filed it. state.php already
-    // exposes that field, so the blocker is countable rather than merely asserted.
-    $withProvenance = 0;
+    if (! is_file(DECISIONS)) {
+        cannot_measure(DECISIONS.' is missing; the terminal condition cannot be read.');
+    }
 
-    foreach ($rows as $row) {
-        if (($row['provenance'] ?? null) !== null && $row['provenance'] !== '') {
-            $withProvenance++;
-        }
+    if (! str_contains((string) file_get_contents(DECISIONS), '### D5')) {
+        cannot_measure(DECISIONS.' has no D5 entry; the bar this reports against does not exist.');
     }
 
     line('Series status against D5, the terminal condition');
     line('');
     line(sprintf('  open `major` rows                 %d', $majors));
     line(sprintf('  open rows total                   %d', (int) ($backlog['open'] ?? -1)));
+    line(sprintf('  severity bullets, open + closed   %d', (int) ($backlog['severity_bullets'] ?? -1)));
     line(sprintf('  highest released                  M%d', (int) $state['increment']['highest_released']));
-    line(sprintf('  rows recording their provenance   %d of %d', $withProvenance, count($rows)));
-
-    if (! is_file(DECISIONS)) {
-        cannot_measure(DECISIONS.' is missing; the terminal condition cannot be read.');
-    }
-
-    $answered = str_contains((string) file_get_contents(DECISIONS), '### D5');
-    line(sprintf('  D5 present in %-20s %s', DECISIONS, $answered ? 'yes' : 'NO — read it before trusting this'));
+    line(sprintf('  bullets with no provenance clause %d', (int) ($d5['bullets_without_a_clause'] ?? -1)));
     line('');
 
-    if ($majors === 0) {
-        line('  Clause 1 MET — no open `major`.');
-    } else {
-        line(sprintf('  Clause 1 NOT met — %d `major` row(s) still open.', $majors));
+    line(sprintf('  Clause 1 %s — %s (%d open).', $d5['clause_1_met'] ? 'MET' : 'NOT met', $d5['clause_1'], $majors));
+    line(sprintf('  Clause 2 %s — %s.', $d5['clause_2_met'] ? 'MET' : 'NOT met', $d5['clause_2']));
+
+    $window = [];
+
+    foreach ((array) ($d5['window'] ?? []) as $increment => $filed) {
+        $window[] = $increment.'='.$filed;
     }
 
-    line(sprintf('  Clause 2 UNMEASURABLE — it needs each row to record the increment that filed it, and'));
-    line(sprintf('  %d of %d do. D5 predicted exactly this and it is now COUNTED rather than asserted:', $withProvenance, count($rows)));
-    line('  until provenance is normalised to one parseable form, the clause cannot be evaluated.');
-    line('  ⛔ A bar that cannot be measured is a bar that gets declared met by whoever wants to stop.');
+    line('    majors filed in the window: '.implode('  ', $window));
+
+    if ((int) ($d5['majors_unattributed'] ?? 0) > 0) {
+        line(sprintf('  ⛔ %d `major` bullet(s) record no filer, so clause 2 has a HOLE: an unknown filer', (int) $d5['majors_unattributed']));
+        line('     cannot be shown NOT to be one of the increments in the window.');
+    }
+
+    line('');
+    line('  ⛔ A bar that CAN be measured is still not a decision this driver may take. Both clauses');
+    line('     reading met goes to the user with the numbers, and Standing Rule 5 is unchanged until');
+    line('     they answer: the next row is taken and built.');
 
     exit($majors === 0 ? 0 : 3);
 }
@@ -351,7 +369,14 @@ function stop_reasons(array $row): array
     // ⛔ THE ROW SAYS IT IS NOT A DEFECT. Checked against the BODY, because that is where the marker
     //    lives -- it is always the row's closing sentence -- and because a stop rule should be as
     //    sensitive as possible. See NOT_LIVE_MARKER.
-    if (str_contains($row['body'], NOT_LIVE_MARKER)) {
+    //
+    // ⛔ WITH INLINE CODE SPANS STRIPPED FIRST, BECAUSE NOT_LIVE_MARKER's OWN COMMENT WAS WRONG (M64).
+    //    It claims the check is "anchored on the bolded literal, never a substring" -- but a bolded
+    //    literal INSIDE BACKTICKS is still a substring, and that comment names the exact failure it
+    //    does not prevent: a row that merely QUOTES the vocabulary. M64 filed a row about liveness
+    //    coverage whose text necessarily reads `**Not live**` while the row itself says **Live.**, and
+    //    it was mis-stopped on the first run. That row is the standing control for this line.
+    if (str_contains(loopStripCodeSpans($row['body']), NOT_LIVE_MARKER)) {
         $reasons[] = 'the row marks itself `Not live` -- it is a stated limit or a missing gate, not a defect';
     }
 

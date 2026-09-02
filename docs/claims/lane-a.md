@@ -16,91 +16,173 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — share-slug lookup is case-sensitive (`m61-share-slug-canonicalization`)
+## Status: NO ACTIVE CLAIM — `M61` is merged; **three consecutive increments have now filed no `major` row**
 
-Taken 2026-09-02. Branch `m61-share-slug-canonicalization`, cut from `origin/main` at `23db2fa`, PR into `main`.
-Row: *"Share-slug LOOKUP is case-sensitive while share-slug STORAGE is lowercase-only, so a mixed-case share
-URL 404s instead of resolving"* — `docs/feature-backlog.md`, in the `### Documentation & specs` section,
-filed by `M46` (2026-08-29). ⚠️ **`state.php` counts 83 open rows, not the 82 the block below records** —
-`M60` filed one after writing its own status. **This is the only open row that is a runtime,
-respondent-facing defect rather than a docs/gate finding.**
+**`M59`, `M60` and `M61` each filed zero `major`, which is the bar `D5` names** — zero open `major` plus
+three consecutive increments filing none. `state.php` counts the tree; do not take that sentence's
+arithmetic on trust, and note `M61` filed **four** `minor` rows, so the open count went **up**.
 
-### Evidence verified
+⚠️ **For whoever takes the next row: the two lessons `M61` would most like to hand on.**
+**(1) A stale COMMENT defeated a correct prediction.** This claim predicted, in writing, that the most
+likely failure was "a shell assertion that passes locally and fails in CI when `withoutVite()` is
+forgotten" — and then wrote exactly that test without it, because
+`tests/Feature/Maintenance/TenantMaintenanceTest.php`'s own header comment said the paused arm renders no
+`@vite`. It does. **Predicting a trap does not protect you from a document that tells you the trap is not
+there**; read the code the comment describes. **(2) A control can be a false green even when you are
+being careful.** The first attempt to prove that fix used a double-quoted `php -r`, the shell ate `$this`,
+the mutation never applied, and the run reported PASS against the *fixed* file. `scripts/mutate.php` takes
+tokens from files precisely so no shell is in the path — use it rather than hand-rolling.
 
-Every citation opened against the merged tree. **The row is a floor and it understates itself in one
-direction while its own vocabulary is wrong.**
+⛔ **`D9` must never be started without an explicit answer.** Open decisions: `D1`, `D3`, `D4`, `D8`, `D9`,
+`D10`. `M61` opened none and answered none.
 
-- ⛔ **`share_slug` DOES NOT EXIST.** The column is `forms.public_slug`. `share_slug` appears in prose only —
-  this file, `PROGRESS_ARCHIVE.md` and the backlog row itself. Nothing in executable source carries the name
-  the row uses throughout. **HELD in substance, FALSE in identifier.**
-- `GuestFormController` resolves the column unlowered — **HELD.** `Form::query()->where('public_slug', $slug)`,
-  `$slug` the raw route segment.
-- `PwaManifestController` resolves the column unlowered — **HELD**, identical shape.
-- *"Writes are constrained by `UpdateFormShareRequest`'s lowercase-only slug regex, so no uppercase slug can
-  be stored"* — **HELD FOR THE HTTP SURFACE ONLY, and the row states it as if it were an invariant of the
-  column.** `FormService::setShareSettings()` writes the value verbatim, and seeders and `tests/Pest.php`'s
-  `guestForm()` helper write through `$form->update()`, bypassing validation entirely. The column has **no**
-  case guarantee; the request does.
-- *"which is how case-insensitive uniqueness is achieved without `citext`"* — **HELD.** No `citext`, no
-  `->collation()`, no functional `lower()` index; the unique is a plain `['tenant_id', 'public_slug']`.
-- **A THIRD RESOLVER THE ROW DOES NOT NAME:** `FormSlug::isTaken()` is a case-sensitive `where` on the same
-  column. Not live (its only caller feeds it normalized values) and deliberately not fixed here — filed.
-- **ROUTING DOES NOT REJECT IT FIRST.** No `where()` on `{slug}` in any route and no `Route::pattern` in the
-  repo, so `/f/Clinic-Intake` routes successfully and fails at the query. Had a constraint existed the row
-  would have been unreachable; it was worth checking rather than assuming.
-
-### Remedy verdict
-
-⛔ **WRONG — and applying it as written would ship a worse defect than the one it closes.** Measured before
-a line was written.
-
-The row prescribes *"one call at each of the two lookups, not a migration."* That turns the 404 into a 200
-**and leaves the mis-cased URL in place** — and the URL is a *storage key* in four independent systems:
-Cache Storage's `guest-shell-html` (Workbox keys by full request URL), the Dexie `draft_answers` compound
-primary key `[form_version_id, slug]`, the outbox row's `slug` column, and the installed PWA's
-`id`/`start_url`/`scope`. The raw casing reaches all four because `mint()`'s view arm emits the **request
-path** as `slug` while `resume()` emits the canonical `$form->public_slug` — **the two arms disagree by
-construction**, which is the finding the row is one end of.
-
-⛔ **The concrete outcome of the prescribed fix:** install from `/f/Clinic-Intake`, the shell caches under
-that URL, `start_url` resolves to `/f/clinic-intake` — **launch offline and the installed app is a cache
-miss.** `brand-cache.ts` argues in its own header that losing offline access to a primed form is the trade
-never to make.
-
-**The remedy is canonicalization, not tolerance:** lowercase for lookup, then a `301` to the canonical URL —
-placed **after** the existing 404 gates, because a `301`-then-`404` chain is a slug-existence oracle and
-both controller docblocks state probe-indistinguishability as the reason those gates return 404 and never
-403. Normalization is `Str::lower` **only**, deliberately not `FormSlug::normalize()`: that is `Str::slug()`,
-which transliterates and re-hyphenates, so it would mint aliases the write side never reserved and
-`isTaken()` never de-duplicated — leaving `->first()` to choose arbitrarily between two forms.
-
-⚠️ **The row is also right about one thing I nearly over-scoped:** it says *not a migration*, and it is
-correct. But this fix **creates the argument for one** — the DB's uniqueness domain stays case-sensitive
-while the runtime's resolution domain becomes case-insensitive. Filed rather than built.
-
-Files: `app/Support/Forms/FormSlug.php`, `app/Http/Controllers/Public/GuestFormController.php`,
-`app/Http/Controllers/Public/PwaManifestController.php`, `app/Services/Forms/FormService.php`,
-`app/Http/Requests/Forms/UpdateFormShareRequest.php`, `tests/Feature/Guest/GuestRuntimeTest.php`,
-`tests/Feature/Http/PwaManifestTest.php`, `tests/Feature/Forms/FormShareTest.php`,
-`tests/Feature/Entitlements/OfflineSyncGateTest.php`, `tests/Feature/Maintenance/TenantMaintenanceTest.php`,
-`docs/feature-backlog.md`, `docs/claims/lane-a.md`, `docs/gate-baselines.md`, `PROGRESS.md` (own block only).
-
-Shared artefacts taken: `docs/feature-backlog.md`, `docs/gate-baselines.md`, `PROGRESS.md` (own block only).
-No `openapi.json` — none of these routes is in the documented API surface. No top-level `tests/e2e/*.spec.ts`.
-Paired files taken: none.
-Namespaces spent: nothing from either namespace — no migration, no ADR, no `§D<n>`.
-
-Prediction, written before the run: PHPStan **will** move (four `app/` files, a widened union return type);
-Pint, the lint gates, Vitest and axe will not. Ten to twelve new Pest cases. Eight mutations expected CAUGHT
-and **one — restoring `'slug' => $slug` in the view arm — predicted SURVIVED before it is run**, because
-once the redirect exists that arm is reachable only when the two expressions are equal; it is kept as
-defence-in-depth and no contrived test will be written to force it red.
-⚠️ **The one I most expect to be wrong: the claim that no existing test breaks.** Every existing request in
-the five touched suites is canonical, so the redirect branch should be unreachable for all of them — but
-that is a reading of ten files, and `GuestRuntimeTest`'s shell assertions are the kind that pass locally and
-fail in CI when `withoutVite()` is forgotten.
+⛔ **RUN `php scripts/state.php` FOR EVERY NUMBER.**
 
 ---
+
+## RELEASED — `M61`, share-slug lookup is case-sensitive, so a mixed-case share URL 404s (merged as PR #252, `6292827`, 6/6 green with real step counts — Static analysis 23 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
+
+**Shipped 2026-09-02.** Branch `m61-share-slug-canonicalization`. Every claimed file was edited except
+`docs/gate-baselines.md`, which was regenerated rather than edited. The claim was extended to nothing, and
+`docs/feature-backlog.md` gained a **fourth** filed row the claim did not anticipate — for a harness defect
+found while running the gates rather than while doing the work. See *the gate that exits 0*, below.
+
+### ⛔ THE ROW'S REMEDY WOULD HAVE SHIPPED A WORSE DEFECT THAN THE ONE IT CLOSED
+
+The row prescribed *"one call at each of the two lookups, not a migration."* Applied as written that turns
+the 404 into a 200 **and leaves the mis-cased URL in place** — and that URL is a storage key in four
+independent client systems: the service worker's `guest-shell-html` Cache Storage entry (Workbox keys by
+full request URL), the Dexie `draft_answers` compound primary key, the outbox row's `slug` column, and the
+installed PWA's `id`/`start_url`/`scope`. The raw casing reached all four because `mint()`'s view arm
+emitted the **request path** while `resume()` directly beside it emitted the canonical value — **the two
+arms disagreed by construction**, which is this row seen from its other end.
+
+Concretely: install from `/f/Clinic-Intake`, the shell caches under that URL, `start_url` resolves to
+`/f/clinic-intake`, and **the installed app is a cache miss offline** — the one trade `brand-cache.ts`
+argues in its own header must never be made. A remedy that fixes a 404 by creating a silent offline
+failure is worse than the defect it closes, and nothing in the row hints at it.
+
+⚠️ **The evidence half held in substance and was wrong in its vocabulary.** `share_slug` — the identifier
+the row uses throughout — **does not exist in executable source**; the column is `forms.public_slug`. Two
+more: *"writes are constrained by the regex, so no uppercase slug can be stored"* is true of the HTTP
+surface and **stated as an invariant of the column**, which `FormService::setShareSettings()` did not hold
+up; and a **third** unlowered resolver sat beside the two named (`FormSlug::isTaken()`). The row is a floor.
+
+### ⛔⛔ CI CAUGHT A DEFECT THE LOCAL SUITE STRUCTURALLY COULD NOT, AND THIS CLAIM HAD PREDICTED IT
+
+The Pest job was red on **exactly one test of 4,657** — the new maintenance case, `500` not `503`, from
+`ViteManifestNotFoundException` raised inside `MaintenanceResponse::make()`. The maintenance blade carries
+`@vite(['resources/css/app.css'])`.
+
+**This claim's stated most-likely failure was that exact mechanism**, and it still happened, because
+`TenantMaintenanceTest`'s own header comment said *"the paused cases render the maintenance blade instead,
+which is why they were green without it."* **That sentence is false** — and the code directly beneath it
+calls `$this->withoutVite()` on every paused case anyway, so the comment described a habit rather than the
+reason for it. ⛔ **Predicting a trap does not protect you from a document that tells you the trap is not
+there.** The comment is corrected rather than deleted, with the measurement in it.
+
+⚠️ **It cannot fail locally.** This host has a `public/build`, and `public/hot` besides — Laravel's Vite
+helper checks `hot` first and never reads the manifest, so the local suite passes for two independent
+reasons. Reproducing CI meant removing **both**.
+
+### ⛔ AND THE FIRST CONTROL FOR THAT FIX WAS A FALSE GREEN
+
+Proving the `withoutVite()` fix meant removing it again and watching the test go red. The first attempt
+used `php -r` in a **double-quoted** shell string; the shell ate `$this`, `php` fataled on *"Using $this
+when not in object context"* — printed above the test output and easy to skim past — the mutation never
+applied, and the run reported **1 passed** against the *fixed* file. **A control that never applied looks
+exactly like a control that survived.** This is the M49 class, third occurrence, and the fix is the one
+`scripts/mutate.php` already implements: tokens from files, no shell in the path. Redone through it under
+the reproduced CI asset state: baseline 8 passed, mutant reddens exactly that one test.
+
+### ✅ THE ONE DESIGN DECISION THAT PAID FOR ITSELF IN A MUTATION
+
+The manifest route deliberately does **not** redirect — it lowers its lookup and emits a canonical `scope`.
+Four reasons were written down first, and the fourth turned out to be the measurable one: serving a
+mis-cased manifest URL **200** makes `$scope = '/f/'.$form->public_slug` a behavioural property, and its
+mutant goes red. Under a redirect that mutant would have SURVIVED and the defect would have been invisible.
+**Choosing the smaller change made the gate stronger**, which is the opposite of the usual trade.
+
+### ⛔ THE REDIRECT'S POSITION IS THE WHOLE SECURITY ARGUMENT, AND IT IS PINNED THREE WAYS
+
+Placed before the 404 gates the redirect is an **existence oracle**: `301`-then-`404` tells a prober the
+slug exists, which is exactly the distinction both controller docblocks say those gates return
+404-never-403 to prevent. Guarded by one test per gate, each asserting `assertHeaderMissing('Location')`
+rather than only the status — a `302`-then-`404` variant reads as a pass otherwise — and proven by a
+mutation that hoists the block above the guest and published gates and reddens exactly those two cases.
+⚠️ **Hoisting it into middleware would make the extra `throttle:guest-mint` hit free**, which is the
+tempting version and the one that trades the oracle away. Named in the docblock so the trade stays visible,
+and a throttle test pins the double-count as a stated property rather than leaving it to be discovered.
+
+### ✅ TEN MUTATIONS: NINE CAUGHT, ONE SURVIVED AS PREDICTED IN WRITING BEFOREHAND
+
+`M-9` — restoring `'slug' => $slug` in the view arm — was **declared a predicted survivor in the plan and
+in the claim before it was run**, and survived. Once the redirect exists that arm is reachable only when the
+two expressions are equal, so the change is defence-in-depth whose value is that the redirect's absence is
+not catastrophic. **No contrived test was written to force it red.** `mutate.php`'s own header says a
+survivor is a finding to file rather than explain away, and filing it *as predicted, with its reasoning* is
+the difference between a hole in the suite and a deliberate belt-and-braces.
+
+⚠️ **`M-8` is the one worth copying.** It moves the service's lowering **below** the audit arrays: the
+database still ends up lowercase, so the column assertion stays green, and only the audit assertion catches
+it. The tell was the assertion COUNT — baseline 100, `M-7` 97, `M-8` 98. One assertion further in, i.e. a
+*different* assertion failing. **A control that reddens the same test for a different reason is not the
+same control**, and the count is the only thing that says which.
+
+### ⛔ THE GATE THAT EXITS 0 — FOUND WHILE RUNNING THE GATES, NOT WHILE DOING THE WORK
+
+`CLAUDE.md`'s gate table and two design documents all prescribe `docker compose run --rm e2e`. On this host
+that needs **three** undocumented prerequisites, and the most natural wrong form is silent: appending
+`npx playwright test ...` passes `npx` as the CLI's subcommand, because the compose service's `entrypoint`
+is already the Playwright CLI. It prints `error: unknown command 'npx'` and **returns exit code 0.** That is
+the succeeds-on-empty-input class this project has now measured four times, and it is the one that would
+launder a skipped e2e run into a claim. The other two: Node cannot resolve `acme.localhost` inside the
+image while `curl` can, so the probe fails, Playwright tries to boot `php artisan serve` and dies on
+`php: not found` — **the message names PHP and the cause is DNS**; and `public/hot` must be removed and the
+assets built, or the shell points `@vite` at a dev server in a container this one cannot reach and
+`global-setup` times out on the login field, which reads as a broken login page. **Filed.**
+
+### ✅ A LOCAL E2E RED THAT THE CONTROL SETTLED IN THE OPPOSITE DIRECTION
+
+The two `public-runtime-offline.spec.ts` cases failed locally on some viewports and passed on others —
+45 passed, 3 failed. The control (same spec, this increment's five `app/` files reverted to `origin/main`)
+returned **6 failed, 0 passed**: strictly worse, and it failed the *tablet* cases that had passed with the
+change applied. ⛔ **Reverting a change cannot cause failures that change fixes**, so the only consistent
+explanation is run-order-dependent state in this host's long-lived dev database, degrading across
+consecutive runs. CI's E2E job then passed. **Two runs of the same spec on this host are not two
+measurements of the same thing** — which is the sharper form of the lesson `M19` recorded.
+
+### ⚠️ A GO/NO-GO WHOSE FIRST ANSWER WAS MEANINGLESS
+
+The pre-deploy check for pre-existing mixed-case rows returned **empty under `meridian_app` — and that role
+sees zero rows at all**, because RLS scopes it to a null tenant. An empty result from a role that can see
+nothing is not evidence of absence; it is the same shape as the three splices that read a missing file and
+reported success. Re-run under the bypassing role, with a discriminator control proving the predicate fires
+on a deliberately mixed-case value: **20 forms, 10 slugs, all lowercase.** ⛔ **This host's database is not
+any deployed one**, so the check is filed as a per-environment obligation rather than discharged.
+
+### THE PREDICTION, INCLUDING WHERE IT WAS WRONG
+
+- ⛔ **WRONG: "PHPStan *will* move — four `app/` files and a widened union return type."** It did not.
+  Measured rather than counted: the five files swapped to their `origin/main` versions and re-analysed in
+  the same container, the error sets are **byte-identical, delta zero**. The local errors are the known
+  model-property phantoms and none is in a touched file. **Predicting a gate will move is as much a claim as
+  predicting it will not**, and this one was made from the size of the diff rather than from what the gate
+  reads.
+- ⛔ **WRONG, and it was the flagged risk, in the exact predicted MECHANISM and the wrong FILE.** The claim
+  said the likeliest miss was a shell assertion missing `withoutVite()` — it named `GuestRuntimeTest`, which
+  got the guard, and the one that needed it was `TenantMaintenanceTest`. See the CI section above.
+- ⛔ **WRONG in one branch: `M-2`'s predicted survivors.** Case 5 (shell boot) stayed green as predicted;
+  case 6 (the throttle case) went red, because it asserts `301` on its first request and a lookup-only fix
+  returns `200`. Half right, and the half that was wrong was the half I reasoned about least.
+- ✅ **RIGHT: no PRE-EXISTING test broke.** Every request in the five touched suites is canonical, so the
+  redirect branch is unreachable for all of them. The one red was a test this increment wrote.
+- ✅ **RIGHT: Pint, the lint gates, Vitest and axe unmoved.** No front-end file is in the diff, so two of
+  them cannot move by construction — said, rather than quoted as an unchanged number.
+- ✅ **RIGHT, exceeded: 16 new cases** against a predicted ten to twelve, and **10 mutations** against a
+  predicted nine. The oracle guards multiplied once *one per gate* became the rule rather than *one per
+  route*.
+
 
 ## RELEASED — `M60`, the `## Current Status` tracker surgery, the last `major` row (merged as PR #251, `55c6409`, 6/6 green with real step counts — Static analysis 23 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

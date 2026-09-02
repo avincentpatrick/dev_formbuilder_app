@@ -166,6 +166,7 @@ function eligibleGroupBGates(): array
 it('pins the exact permission set that opens every eligible Group-B gate', function (): void {
     $eligible = eligibleGroupBGates();
     $computed = [];
+    $uncallable = [];
 
     // One key at a time, REPLACING rather than accumulating — an additive loop would compute the union of
     // everything granted so far and every route would come back holding the whole catalog.
@@ -174,9 +175,22 @@ it('pins the exact permission set that opens every eligible Group-B gate', funct
         app(PermissionRegistrar::class)->forgetCachedPermissions();
 
         foreach ($eligible as $name => $gate) {
-            $allowed = $gate['subject'] === null
-                ? Gate::forUser($this->probe)->allows($gate['ability'])
-                : Gate::forUser($this->probe)->allows($gate['ability'], $gate['subject']);
+            // ⚠️ THE GUARD IS NOT DEFENSIVE, IT WAS MEASURED. Under M63's own MU8 — `can:create` narrowed to
+            // `can:view` on a route with no bound instance — this loop raised ArgumentCountError and the
+            // whole file died with a FATAL rather than a report. DC6 names that defect precisely and is
+            // where it belongs; catching it here turns "the oracle exploded" into a line that says so and
+            // points at the check that explains it, so one arity slip cannot hide every other route's
+            // audience.
+            try {
+                $allowed = $gate['subject'] === null
+                    ? Gate::forUser($this->probe)->allows($gate['ability'])
+                    : Gate::forUser($this->probe)->allows($gate['ability'], $gate['subject']);
+            } catch (Throwable $e) {
+                $uncallable[$name] = $name.' — the gate could not be evaluated at all ('.$e::class
+                    .'); DC6 in GroupBPolicyGateTest names this';
+
+                continue;
+            }
 
             if ($allowed) {
                 $computed[$name][] = $key;
@@ -184,9 +198,13 @@ it('pins the exact permission set that opens every eligible Group-B gate', funct
         }
     }
 
-    $mismatches = [];
+    $mismatches = array_values($uncallable);
 
     foreach ($eligible as $name => $gate) {
+        if (isset($uncallable[$name])) {
+            continue; // already reported, and its computed set is meaningless
+        }
+
         $actual = $computed[$name] ?? [];
         sort($actual);
         $declared = GROUP_B_GATE_GRANTS[$name] ?? null;

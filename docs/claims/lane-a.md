@@ -16,38 +16,129 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M64` is merged; `D5`'s exit bar is arithmetic now, and it reads MET
+## Status: ACTIVE CLAIM — `M65`, the schedulability sweep: liveness backfilled and gated, the triage derived (`m65-schedulability`)
 
-`M64` closed **one** row, filed **two** and opened one decision, so the open count moved 84 → 85 and
-stayed at **zero `major`**. `state.php` counts the tree; do not take that sentence's arithmetic on trust.
+Taken 2026-09-03. Branch `m65-schedulability`, cut from `origin/main` at `444d96d`, PR into `main`.
 
-👤 **THE ONE THING THAT NEEDS THE USER, AND IT IS NOT URGENT: `D12`.** `D5`'s bar is no longer a floor.
-Every `major` bullet records its filer, **none is `(unattributed)`**, and the last increment that ever
-filed one is **`M54`** — so the window is **nine consecutive** against a bar of three. `M63` measured
-four off a floor and the user answered *keep going and make the bar real first*; that condition is now
-spent, so the question returns **once**, in `D12`, with three options and a recommendation to **keep
-going**. ⛔ **`state.php` prints the two clauses and deliberately does not decide them.**
+**Two rows, taken together because `M64` filed them saying so** — *"the two should be taken together, by
+whoever takes either."* This is also the first increment run under the batching protocol, recorded here
+as `D13`, so the claim carries **`Evidence verified` and `Remedy verdict` once per row and never merged**.
+Collapsing them into one narrative would destroy the exact property batching has to preserve: a row's
+evidence and its remedy are separately trustworthy, and the remedy is the half nobody checks.
 
-⚠️ **For whoever takes the next row: the three lessons `M64` would most like to hand on.**
-**(1) A CHECK THAT MEASURES ZERO MAY BE TOO WEAK TO SEE THE THING IT IS CHECKING FOR.** The claim
-justified the canonical form by measuring the ambiguity at **zero** — counting bullets whose body
-carried *two different* filer ids. That check cannot see a bullet carrying **exactly one id in the
-wrong place**, which is what the maintenance fan-out row is: `state.php` read `M32` out of a quoted
-historical row while the row's own first paragraph says `M44` filed it. **Ask what shape of instance
-your zero could not have contained.**
-**(2) THE FLOOR IS THE ARM THAT CATCHES A BLIND PARSER, AND ONLY A MUTATION AIMED AT THE PARSER SHOWS
-IT.** `MU4` blinded the bullet parser; the arm that checks *every* bullet stayed **green**, passing
-vacuously over an empty set, and only the floor went red. The claim had named the floor as the most
-likely to be decorative. It is the opposite, and no green run could have said so.
-**(3) VERIFY THE ROW'S PREMISE — the third increment running in which that was where the value was.**
-The row is written about *rows*; `D5`'s clause is about **`major` bullets**, 45 of whose 55 are closed,
-and `state.php` could not see a closed bullet at all. Working the row as written would have normalised
-84 bullets and left the clause exactly as unevaluable as it was.
+- **Row A** — `docs/feature-backlog.md:2926`: *"31 of the 84 open rows say nothing about whether they are
+  still live, and the marker is reported rather than gated."* Filed by `M64`.
+- **Row B** — `docs/feature-backlog.md:2944`: *"`docs/backlog-triage.md` ranks the queue by a census that
+  is now 107 commits stale, and its top three items are all closed."* Filed by `M64`.
 
-⛔ **`D9` must never be started without an explicit answer.** Open decisions: `D1`, `D3`, `D4`, `D8`,
-`D9`, `D10`, `D11`, and **`D12`**, opened here.
+### Evidence verified — Row A
 
-⛔ **RUN `php scripts/state.php` FOR EVERY NUMBER.**
+| | Row says | Tree says |
+|---|---|---|
+| Unmarked open rows | 31 of 84 | **30 of 85** |
+| The marker census | live 39 · latent 4 · not-live 10 | **live 41 · latent 4 · not-live 10** |
+| `state.php` counts the marker | yes | ✅ **held** — it strips inline code spans first, then matches five literals in order with `**Not live**` tried first |
+| `BacklogProvenanceTest.php` does not require it | yes | ✅ **held** — three arms, and the docblock says so in terms |
+| `loop assess` pays for the silence | yes | ✅ **held** — the bolded literal is its only liveness stop, and its own comment records that silence deliberately does not stop |
+| `M55`'s sibling row says *"24 of 78"* | yes | ✅ **held**, and that row is itself **open** and marked `**Not live**` |
+
+The row instructs *"Re-derive before working it"* and it is right to: both of its counts have moved. That
+is the row working, not the row failing.
+
+⛔ **AND THE ROW OVERSTATES ITS OWN SILENCE, WHICH IS THE UNUSUAL DIRECTION.** **9 of the 30** unmarked
+rows already state a verdict in a **bolded but non-canonical** form — `**Latent, not live**`,
+`**Not live — a maintenance trap.**`, `**Live, and deliberately not fixed.**`, `**Not a defect and not
+live**`, `**Live as a divergence, not as a reachable defect.**`, `**Not live here; a deployment
+obligation.**`, `**Latent, and strictly narrower than what M5 closed**`, and one whose only defect is a
+**lowercase n**. So the judgement is **21 fresh verdicts plus 9 confirmations**, not 30 of each.
+⛔ **The matcher is NOT widened to admit them.** Widening moves the census without adding one byte of
+judgement, and a naive prefix widening would silently classify the lowercase one and the em-dash one as
+`not-live` on nobody's authority. Each of the 9 is checked against the code like the other 21, then
+rewritten to carry the canonical literal.
+
+### Remedy verdict — Row A
+
+**The row prescribes no fix. It argues against one**, and the argument is sound but **spent by its own
+precondition**: *"gating a marker nobody has decided would make it a formality"* holds only while the
+markers are undecided. Three things the row does not say, each found by checking it rather than reading it:
+
+1. **The cost it prices is 30 judgements; the tree's cost is 21.** See above.
+2. **`M43` reads one notch softer than `M64` cites it.** `M43`'s own conclusion is *"the structural half
+   is worth having (it is what makes a vendor-added route redden the file without the test knowing its
+   name), but it cannot stand alone."* `M43` argued for **keeping** a structural gate **and adding**
+   behavioural controls — not for withholding the structural gate. Both readings go on the record; the
+   reversal is argued at the site rather than slipped in.
+3. **Closing the silence changes a second file's behaviour and falsifies a comment in it.**
+   `scripts/loop.php`'s *"silence is not a stop"* note becomes false, and `loop assess` will then refuse
+   every `not-live` row. That is the gate working. ⛔ Its **logic is not touched** — the comment is.
+
+### Evidence verified — Row B
+
+| | Row says | Tree says |
+|---|---|---|
+| Census staleness | 107 commits | **110** |
+| Top three ranked items | all closed | ✅ **held** — #1 shipped as `M43`, #2 as `M44`, #3's five documentation rows are all struck; #4 was answered as `D6` and is annotated in-file |
+| Open `major` rows | zero | ✅ **held** |
+| `CLAUDE.md` sends every session there first | yes | ✅ **held** |
+
+✅ **Nothing in the tree cites `docs/backlog-triage.md` by line number** — every reference is by filename.
+Replacing it rots no citation. That is emphatically **not** true of `docs/feature-backlog.md`, which
+carries 21 incoming line-number citations, 9 of them in `PROGRESS_ARCHIVE.md`, which is never rewritten.
+
+⛔ **THE ROW'S PREMISE IS RIGHT AND THE FIX IT INVITES IS DESTRUCTIVE, WHICH IS WHY THE PREMISE WAS
+CHECKED AND NOT ONLY THE EVIDENCE.** The row criticises the **ranking** — the `## Priority queue`
+section. The file's lower half is `## What the sweep found about its own accuracy` and `## Method, and
+what it cannot see`, and the second of those carries the brief *"the brief forbade the DATABASE, not
+merely the files — no `artisan`, no `pest`, no migrations, no writing `docker exec`"*, with the reason:
+`M34`'s read-only agent ran `artisan test` and its `migrate:fresh` dropped the schema under a live run.
+**That text exists nowhere else in the tree** — `PROGRESS_ARCHIVE.md` carries a five-line summary of the
+increment and not the brief. The obvious reading of *"re-rank the queue"* is a wholesale rewrite, and it
+would delete the only copy of the instruction that stops a repeat of `M34`. It is preserved byte-for-byte
+instead, in `docs/backlog-triage-m37.md`.
+
+### Remedy verdict — Row B
+
+**Prescribed:** *"Re-ranking 84 rows is a triage pass, not an edit."* **Incomplete in the way that
+matters, in two respects:**
+
+1. **It says re-rank; it never says derive.** A hand-written census rots — this one rotted in 110 commits
+   — so re-ranking by hand reproduces the defect the row names. Deriving it is the move `next.php` already
+   made for the hand-off and `gate-baselines.php` made for gate numbers, and it is the only form that
+   cannot rot silently.
+2. **Severity carries no ranking signal at all.** 0 open `major`, 85 `minor`, 0 `nit`. Liveness is the
+   only axis the tree offers — which is precisely why **Row A has to land first**, and is the mechanical
+   reason the two rows are one increment rather than two.
+
+Files: `docs/claims/lane-a.md` · `docs/claims/decisions.md` · `docs/feature-backlog.md` ·
+`tests/Feature/Docs/BacklogProvenanceTest.php` · `scripts/state.php` · `scripts/loop.php` (comment only) ·
+`scripts/citation-liveness-lint.php` · `scripts/backlog-triage.php` (new) · `docs/backlog-triage.md`
+(generated) · `docs/backlog-triage-m37.md` (new, frozen) · `docs/gate-baselines.md` (regenerated, not
+edited) · `PROGRESS.md` (own status block and the generated hand-off line only).
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/backlog-triage.md`, `docs/claims/decisions.md`,
+`PROGRESS.md` (own block only).
+Paired files taken: none.
+Namespaces spent: **`D13`**, the next free decision id. Nothing from the ADR or migration namespaces.
+⛔ **`CLAUDE.md` is not edited** — `tracker-lint` R8 forbids every number this increment handles.
+
+Prediction, written before the run so it can be measured against rather than explained afterwards:
+
+- **PHPStan cannot move.** No file under `app`, `database` or `routes` is touched. Saying that is the
+  point; quoting an unchanged number is not.
+- **Pest scoped to `tests/Feature/Docs` goes 7 → 8 passed**, and the assertion total rises. A local
+  full-suite number is not CI's and is not reported.
+- **`citation-liveness-lint`'s ledger stays at exactly 18 of 18.** That is the external confirmation that
+  a zero-net-line backfill shifted nothing; a move in either direction means a line was inserted.
+- **`MU4` — the parser blinded — reddens the FLOOR alone**, and the per-row arm stays green passing
+  vacuously over an empty set. `M64` predicted its floor was the likeliest decoration and measured the
+  opposite; this predicts the opposite deliberately.
+- **Pint flags the new script at least once.** Bare `vendor/bin/pint --test` covers `scripts/`; the
+  scoped form every hand-off used to prescribe does not.
+- ⚠️ **THE ONE I MOST EXPECT TO BE WRONG: the liveness verdicts themselves.** `M37` expected a large
+  minority of rows to be stale and found **65 of 68 still live**. I predict the *opposite skew* here, and
+  for a stated reason: these 30 are unmarked precisely because they are the rows nobody could easily
+  call, so I expect materially more `latent` and `not-live` among them than the marked population's
+  41 · 4 · 10. ⛔ **If the split comes back resembling the marked population, read that as evidence the
+  agents defaulted to `live` rather than judged** — and hand-check more than six before writing a marker.
 ---
 
 ## RELEASED — `M64`, `D5`'s exit bar is not operable and the gap is provenance (merged as PR #255, `b35e0d7`, 6/6 green with real step counts — Static analysis 23 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)

@@ -363,6 +363,69 @@ it('refuses a PATCH whose real baseline is stale, with both editors holding a re
 
 /*
 |--------------------------------------------------------------------------
+| The SHAPE of a refusal (Increment M62)
+|--------------------------------------------------------------------------
+| Every case above proves the refusal HAPPENS. None of them could see WHAT IT LOOKS LIKE, and the page
+| depends on the difference: `Encode.vue`'s `submitEdit()` asks `preserveState` whether the errors bag is
+| non-empty, so a toast-only refusal made Inertia re-key the component and replace a page of typed
+| corrections with the stored document — silently, with the toast the only trace.
+|
+| ⛔ AND THE ASSERTION THOSE CASES USE CANNOT TELL THE TWO OUTCOMES APART. `assertSessionHas('toast')` is
+| true of an accepted correction as well as a refused one — the success arm flashes a toast too — so it
+| passes whichever way the controller goes. The pair below is the discriminator: errors on the refusal,
+| NO errors on the acceptance. Asserting only the first half would leave a controller that bags errors on
+| every response, including the ones the editor should be redirected away from, looking correct.
+*/
+
+it('carries an errors bag on a refused correction, so the page does not remount over the corrections', function (): void {
+    $submission = seedEditableWithRealChecksum(['full_name' => 'Ada', 'color' => 'r']);
+    $stale = baselineOf($submission);
+    expect($stale)->not->toBe('');
+
+    $this->actingAs($this->owner)
+        ->patch("http://acme.meridian.test/submissions/{$submission->id}/answers", [
+            'answers' => ['full_name' => 'Ada Lovelace', 'color' => 'r'], 'baseline' => $stale,
+        ])->assertRedirect("/submissions/{$submission->id}");
+
+    editReenter();
+
+    $this->actingAs($this->owner)
+        ->patch("http://acme.meridian.test/submissions/{$submission->id}/answers", [
+            'answers' => ['full_name' => 'Ada', 'color' => 'b'], 'baseline' => $stale,
+        ])
+        ->assertSessionHasErrors()
+        ->assertSessionHas('toast');
+});
+
+it('leaves the session clean on an ACCEPTED correction, which is what makes the bag a discriminator', function (): void {
+    $submission = seedEditableWithRealChecksum(['full_name' => 'Ada', 'color' => 'r']);
+    $baseline = baselineOf($submission);
+    expect($baseline)->not->toBe('');
+
+    $this->actingAs($this->owner)
+        ->patch("http://acme.meridian.test/submissions/{$submission->id}/answers", [
+            'answers' => ['full_name' => 'Ada Lovelace', 'color' => 'r'], 'baseline' => $baseline,
+        ])
+        ->assertRedirect("/submissions/{$submission->id}")
+        ->assertSessionHasNoErrors();
+});
+
+it('carries the errors bag on a non-editable refusal too, a different cause reaching the same arm', function (): void {
+    // `illegalState()`, not `concurrentlyModified()`. The row may not be corrected AT ALL rather than not
+    // from this page, and it takes the same catch arm deliberately: discarding a page of typed work is not a
+    // better answer for it either, and a remount shows the editor nothing the toast has not already said.
+    $submission = seedEditable(SubmissionStatus::Archived);
+
+    $this->actingAs($this->owner)
+        ->patch("http://acme.meridian.test/submissions/{$submission->id}/answers", [
+            'answers' => ['full_name' => 'X'], 'baseline' => baselineOf($submission),
+        ])
+        ->assertSessionHasErrors()
+        ->assertSessionHas('toast');
+});
+
+/*
+|--------------------------------------------------------------------------
 | Authorization
 |--------------------------------------------------------------------------
 */

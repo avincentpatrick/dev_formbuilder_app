@@ -766,4 +766,53 @@ describe('Encode.vue — edit mode (I9c)', () => {
         expect(readOnly.text()).toContain('scan.png');
         expect(wrapper.find('input[type="file"]').exists()).toBe(false);
     });
+
+    /*
+     * Increment M62 — a refused correction must keep the corrections, WITHOUT re-arming the guard.
+     *
+     * Two halves that only work together, and shipping either alone is worse than shipping neither.
+     */
+
+    it('keeps the page mounted when the refusal carries an errors bag, and re-keys it when it does not', async () => {
+        // The predicate is unchanged; what changed is that the CONCURRENCY refusal now arrives with an errors
+        // bag, where it used to arrive as a toast alone. With an empty bag Inertia re-keys the component and
+        // the editor's typed corrections are replaced by the stored document — silently.
+        const wrapper = mountEncode(editPayload());
+        await wrapper.find('form').trigger('submit');
+
+        const options = mocks.patch.mock.calls[0][2] as { preserveState: (page: unknown) => boolean };
+
+        expect(options.preserveState({ props: { errors: { baseline: 'Changed somewhere else.' } } })).toBe(true);
+        // The control. A success carries no errors and redirects away, so nothing needs preserving there —
+        // without this the assertion above would pass against a predicate that simply returned true.
+        expect(options.preserveState({ props: { errors: {} } })).toBe(false);
+    });
+
+    it('holds the RENDER-TIME baseline across a refusal, so a preserved page cannot overwrite the other editor', async () => {
+        const wrapper = mountEncode(editPayload());
+        await wrapper.find('form').trigger('submit');
+
+        expect((mocks.patch.mock.calls[0][1] as Record<string, unknown>).baseline).toBe('checksum-baseline-1');
+
+        // ⛔ THE REFUSAL, AS INERTIA REALLY DELIVERS IT. `back()` re-issues the GET, and `preserveState` gates
+        // only the component re-key — `page.props` is replaced either way. `EncodeFormPresenter` recomputes
+        // `editing.baseline` from the CURRENT stored row, so the preserved page is handed the checksum of the
+        // very change it was just refused against.
+        await wrapper.setProps({
+            editing: {
+                id: 'sub-1',
+                answers: { comments: 'Original' },
+                status: 'submitted',
+                baseline: 'checksum-baseline-2',
+                demotes_on_save: false,
+            },
+        });
+
+        await wrapper.find('form').trigger('submit');
+
+        // Reading the prop here would send `checksum-baseline-2`, the server would accept it, and the other
+        // editor's correction would be destroyed with no error anywhere — a visible refusal turned into a
+        // silent lost update. The snapshot means the second Save is refused too, which is the point.
+        expect((mocks.patch.mock.calls[1][1] as Record<string, unknown>).baseline).toBe('checksum-baseline-1');
+    });
 });

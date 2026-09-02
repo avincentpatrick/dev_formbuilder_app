@@ -39,23 +39,35 @@ $verbose = isset($opts['verbose']);
 const TRACKER = 'PROGRESS.md';
 const ARCHIVE = 'PROGRESS_ARCHIVE.md';
 
-// The ceiling is a RATCHET and it has now been turned down THREE times: 1,500,000 -> 600,000 by the
-// Current Status surgery, 600,000 -> 400,000 by the claim-ledger surgery that took Standing Rules
-// from 208 KB to 46 KB, and 400,000 -> 200,000 by M48's Next Session surgery, which moved 200,625
-// bytes out of a 360,207-byte file and left it at 161,298. It is deliberately NOT set to the current
-// size — a ceiling with no headroom reddens on the next ordinary close-out — so this leaves ~38,700,
-// roughly a dozen ordinary close-outs at the rate `## Current Status` has actually been growing.
+// The ceiling is a RATCHET and it has now been turned down FOUR times: 1,500,000 -> 600,000 by M41's
+// Current Status surgery, 600,000 -> 400,000 by M45's claim-ledger surgery that took Standing Rules
+// from 208 KB to 46 KB, 400,000 -> 200,000 by M48's Next Session surgery, which moved 200,625 bytes
+// out of a 360,207-byte file and left it at 161,298, and 200,000 -> 130,000 by M60, which moved the
+// rest of Current Status — 102,115 bytes in 36 lines — and left the file at 94,757. It is
+// deliberately NOT set to the current size, because a ceiling with no headroom reddens on the next
+// ordinary close-out.
 //
-// ⛔ THE ~40 KB TARGET IS STILL UNREACHABLE, AND THE SECTION BLOCKING IT HAS CHANGED — WHICH IS WHY
-// THIS COMMENT NAMES THE MEASUREMENT AND NOT A SECTION IT INHERITED. The previous version said the
-// target was unreachable "while Next Session (214 KB, and now 62% of this file) remains in it"; that
-// section is now 15,269 bytes and 9.5%, and the sentence was falsified by the same commit that
-// ratcheted this constant. What blocks the target now is `## Current Status` at 67,982 bytes — 42%
-// of the file and its largest section — plus `## Standing Rules` at 49,001. The increment that turns
-// this constant down again is the one that moves Current Status, and that is a filed row rather than
-// a sentence here: a comment naming the next obligation is the thing that goes stale first.
+// ⛔ AND THE HEADROOM IS NOW SIZED FROM A MEASUREMENT RATHER THAN FROM THE PHRASE IT INHERITED.
+// Every previous version of this comment said "roughly a dozen ordinary close-outs" without ever
+// naming the rate. Measured across the fifteen close-outs from M46 to M59, PROGRESS.md grew by a
+// mean of 3,460 bytes and a maximum of 4,892. So this leaves 35,243 bytes: about ten close-outs at
+// the mean and seven at the worst observed — which is the honest figure, and slightly fewer than a
+// dozen. Say the number rather than the adjective; the adjective is what survived four ratchets
+// unexamined.
+//
+// ⛔ THE ~40 KB TARGET IS NOW ARGUABLE FOR THE FIRST TIME, AND THE SECTION BLOCKING IT HAS CHANGED
+// AGAIN — WHICH IS WHY THIS COMMENT NAMES THE MEASUREMENT AND NOT A SECTION IT INHERITED. The
+// previous version said the blocker was `## Current Status` at 67,982 bytes and 42%; by the time
+// this increment opened the file that section was 110,268 bytes and 56.3%, so the figure was stale
+// in the direction that mattered and the headroom was down to 3,970 — about one close-out from a
+// red trunk. What blocks the target now is `## Standing Rules` at 51,072 bytes, which is 53.9% of
+// the file and its largest section by a wide margin; `## Current Status` is ~8,100 and `## Next
+// Session` 5,644. Whether that section should move is a question about a CONSTITUTION rather than a
+// ledger — it holds live imperatives, not dated records, so it is not the same kind of move as the
+// four above — and it is deliberately NOT filed here: a comment naming the next obligation is the
+// thing that goes stale first, and this one has now been proved to do exactly that twice.
 // The headroom prints on every run, so a ceiling that has drifted is visible rather than inferred.
-const TRACKER_BYTE_CEILING = 200000;
+const TRACKER_BYTE_CEILING = 130000;
 
 // ⛔ TWO THRESHOLDS, BECAUSE THE LINE ONE IS BLIND TO THE ONLY SURGERY THIS GATE HAS EVER SEEN.
 // DROP_LIMIT is lines, and the incident is quoted everywhere as 1,086 — that is a numstat deletion

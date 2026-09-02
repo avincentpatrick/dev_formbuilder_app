@@ -2659,7 +2659,12 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `GroupBPolicyGateTest.php:97` is `explode(':', $middleware, 2)[0]` — everything after the first colon is
   discarded, so a gate naming a permission nobody holds and one naming the wrong subject are
   byte-indistinguishable from a correct one. Its own header at `:33` says it "cannot judge whether an
-  allowlisted reason is TRUE". Two corrections to the row: it walks **Group B only** (`:114-115` filter out
+  allowlisted reason is TRUE".
+  ✅ **NO LONGER TRUE AS OF `M63` (2026-09-02), and the citation is annotated rather than rewritten because
+  the sentence was correct when written and is the reason the later row existed.** The parse moved to
+  `tests/Pest.php` as `policyGates()`, which keeps the payload; `:97` in that file is now something else
+  entirely, so read the claim as history and the code at its current home. A gate naming the wrong subject
+  is caught by `GroupBGateSubjectTest`; one naming a permission nobody holds, by `DC5`. Two corrections to the row: it walks **Group B only** (`:114-115` filter out
   `api.v1.public.*` and `api.v1.tokens.*`), and it resolves the router alias map rather than matching the
   string `can:` — deliberately, per `:81-86`.
   ⚠️ **THE ROW SAYS "THREE" AND THE RESOURCE CENSUS SAYS SIXTEEN.** Re-running M29's census with the

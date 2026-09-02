@@ -372,14 +372,14 @@ No AI appears anywhere in the committed docs; the versioned draft/publish model 
 ### Design system — the Storybook axe gate runs locally *(corrected in J4b)*
 
 **It was recorded for several increments as impossible to run on this host. It is not.** The job needs the
-package's own dependency tree, which nothing in the root install provides, plus its own browser:
+package's own dependency tree, which nothing in the root install provides, plus its own browser.
 
-```
-npm --prefix packages/design-system install
-npx --prefix packages/design-system playwright install chromium
-npm run ds:storybook:build      # 268 modules, preview built in ~7s
-npx test-storybook --url ...    # 39 suites / 278 tests
-```
+➡️ **THE COMMAND SEQUENCE LIVES IN `README.md` UNDER "Everyday commands", AND IS MAINTAINED THERE.**
+This section deliberately no longer prints a second copy — that duplication is what let the README rot
+while the working recipe sat in a backlog file no reader opens. `M59` measured the whole field and the
+README prescribes the `e2e`-image form, because the host form printed here pays the bind-mount cost
+recorded immediately below. `tests/Feature/Docs/DocumentedCommandDriftTest.php` gates the README half.
+What stays here is what a command block cannot carry: that cost, the resolution trap, and the catch.
 
 ⚠️ **It must be invoked through the root script or from inside the package.** Run from the repo root,
 `@storybook/vue3-vite` fails to resolve and the build dies loading a preset — which is the symptom that got

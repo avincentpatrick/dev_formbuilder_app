@@ -2,9 +2,11 @@
 
 declare(strict_types=1);
 
-use Illuminate\Auth\Middleware\Authorize;
+use Database\Seeders\RolePermissionSeeder;
+use Illuminate\Contracts\Routing\UrlRoutable;
 use Illuminate\Routing\Route as RoutingRoute;
-use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Reflector;
 
 /*
 |--------------------------------------------------------------------------
@@ -75,46 +77,18 @@ const GROUP_B_ROUTES_WITHOUT_A_POLICY_GATE = [
 ];
 
 /**
- * Does this route carry a policy gate — resolved through the router's own alias map rather than matched on
- * the string `can:`?
+ * Does this route carry a policy gate at all?
  *
- * ⚠️ THIS INDIRECTION IS NOT DEFENSIVE, IT IS THE FIRST THING THAT WENT WRONG WRITING THIS FILE.
- * `route:list` PRINTS the resolved class (`Illuminate\Auth\Middleware\Authorize:view,form`), while
- * `gatherMiddleware()` RETURNS the declared alias (`can:view,form`) — and a check written against what the
- * command printed found ZERO gated routes and reported all fifty as ungated. Asking the router to resolve
- * the alias is what makes the check agree with whichever spelling a route actually used, and keeps it
- * correct if a route ever declares the FQCN directly.
+ * ⚠️ THE PARSE MOVED TO `tests/Pest.php` IN M63, AND THE REASON IS THE DEFECT THIS FILE USED TO CARRY.
+ * The body here was `explode(':', $middleware, 2)[0]` — element [1], the entire `<ability>,<Subject>`
+ * payload, was computed and thrown away. That made every assertion below a statement about the PRESENCE
+ * of a gate and none of them a statement about what it NAMES, so a gate pointed at the wrong model
+ * satisfied all four. `policyGates()` keeps the payload; this stays a bool because the four cases below
+ * genuinely only ask "is one there".
  */
 function carriesPolicyGate(RoutingRoute $route): bool
 {
-    $aliases = app('router')->getMiddleware();
-
-    return array_any($route->gatherMiddleware(), static function (mixed $middleware) use ($aliases): bool {
-        if (! is_string($middleware)) {
-            return false; // a closure or an instance — never a `can:` gate
-        }
-
-        $name = explode(':', $middleware, 2)[0];
-
-        return ($aliases[$name] ?? $name) === Authorize::class;
-    });
-}
-
-/**
- * @return list<RoutingRoute>
- */
-function groupBRoutes(): array
-{
-    return array_values(array_filter(
-        Route::getRoutes()->getRoutes(),
-        static function (RoutingRoute $route): bool {
-            $name = (string) $route->getName();
-
-            return str_starts_with($name, 'api.v1.')
-                && ! str_starts_with($name, 'api.v1.public.')
-                && ! str_starts_with($name, 'api.v1.tokens.');
-        },
-    ));
+    return policyGates($route) !== [];
 }
 
 it('gives every Group-B route a policy gate, or an allowlisted reason it needs none', function (): void {
@@ -155,4 +129,255 @@ it('gates the great majority of the surface with middleware rather than by excep
     $gated = array_filter(groupBRoutes(), carriesPolicyGate(...));
 
     expect(count($gated))->toBeGreaterThan(count(GROUP_B_ROUTES_WITHOUT_A_POLICY_GATE) * 4);
+});
+
+/*
+|--------------------------------------------------------------------------
+| M63 — the gate's PAYLOAD, not merely its presence
+|--------------------------------------------------------------------------
+| Everything above asks "is a gate there". Everything below asks "does the gate
+| it found say something coherent". The two are genuinely different questions,
+| and the gap between them is where a real defect lived: `can:viewAny,X` and
+| `can:viewAny,Y` are indistinguishable to the four cases above.
+|
+| ⚠️ THE HONEST SCOPE, AND IT IS THE WHOLE REASON `GroupBGateSubjectTest`
+| EXISTS ALONGSIDE THIS FILE. None of DC1–DC6 can see the defect M63 was
+| opened for. Swapping `viewAny,SavedReportView` for `viewAny,Submission`
+| passes every one of them IDENTICALLY — both classes exist, both policies are
+| registered, both implement `viewAny`, both are arity-1. These checks catch a
+| gate that is MALFORMED or IMPOSSIBLE. They cannot catch one that is
+| well-formed and aimed at the wrong audience; that needs the permission sets
+| in the sibling file, which is why neither is sufficient alone.
+|
+| All six are derived from the live router and the live container. There is no
+| declaration to keep in sync, and nothing here touches the database.
+*/
+
+/** @return list<array{route: string, gate: array{ability: string, subjects: list<string>, declared: string}}> */
+function groupBGatePairs(): array
+{
+    $pairs = [];
+
+    foreach (groupBRoutes() as $route) {
+        foreach (policyGates($route) as $gate) {
+            $pairs[] = ['route' => (string) $route->getName(), 'gate' => $gate, 'object' => $route];
+        }
+    }
+
+    return $pairs;
+}
+
+/** A subject is a class string exactly when `Authorize::isClassName()` says so — `str_contains($v, '\\')`. */
+function subjectIsClassName(string $subject): bool
+{
+    return str_contains($subject, '\\');
+}
+
+it('DC1 — parses every Group-B gate into a non-empty ability and no empty subject', function (): void {
+    $broken = [];
+
+    foreach (groupBGatePairs() as $pair) {
+        if ($pair['gate']['ability'] === '') {
+            $broken[] = $pair['route'].' — no ability in `'.$pair['gate']['declared'].'`';
+        }
+
+        foreach ($pair['gate']['subjects'] as $subject) {
+            if (trim($subject) === '') {
+                $broken[] = $pair['route'].' — empty subject in `'.$pair['gate']['declared'].'`';
+            }
+        }
+    }
+
+    expect($broken)->toBe([], "malformed `can:` payloads:\n".implode("\n", $broken));
+});
+
+it('DC2 — resolves every class-string subject to a registered policy that implements the ability', function (): void {
+    $broken = [];
+
+    foreach (groupBGatePairs() as $pair) {
+        foreach ($pair['gate']['subjects'] as $subject) {
+            if (! subjectIsClassName($subject)) {
+                continue;
+            }
+
+            if (! class_exists($subject)) {
+                // ⚠️ THE FAILURE MODE THIS CATCHES IS SILENT AND TOTAL: `Gate::getPolicyFor()` returns null
+                // for a class that does not exist, so the route 403s EVERY principal. An unimported
+                // `Foo::class` inside `routes/api.php` resolves to the GLOBAL `\Foo` and lands here.
+                $broken[] = $pair['route'].' — no such class `'.$subject.'`';
+
+                continue;
+            }
+
+            $policy = Gate::getPolicyFor($subject);
+
+            if ($policy === null) {
+                $broken[] = $pair['route'].' — no policy registered for `'.$subject.'`';
+
+                continue;
+            }
+
+            if (! is_callable([$policy, $pair['gate']['ability']])) {
+                $broken[] = $pair['route'].' — '.$policy::class.' has no `'.$pair['gate']['ability'].'()`';
+            }
+        }
+    }
+
+    expect($broken)->toBe([], "class-string subjects that cannot resolve:\n".implode("\n", $broken));
+});
+
+/*
+| DC3 is the sharpest tooth in this file, and it is a fact about the INSTALLED middleware rather than a
+| style rule. `Authorize::getModel()` returns `$request->route($model, null) ?? null` for any subject
+| without a backslash, so a subject that is not a declared route parameter authorizes against `[null]` —
+| `Gate::resolveAuthCallback()` finds no policy for null, falls through to an empty callback, and the route
+| refuses EVERY principal, forever, with no error anywhere. A renamed route parameter, or a `can:` line
+| copy-pasted onto a route that does not bind that model, produces exactly this.
+*/
+it('DC3 — binds every non-class subject to a route parameter the URI actually declares', function (): void {
+    $broken = [];
+
+    foreach (groupBGatePairs() as $pair) {
+        $declared = $pair['object']->parameterNames();
+
+        foreach ($pair['gate']['subjects'] as $subject) {
+            if (subjectIsClassName($subject) || in_array($subject, $declared, true)) {
+                continue;
+            }
+
+            $broken[] = $pair['route'].' — `'.$subject.'` is not a parameter of `'.$pair['object']->uri()
+                .'` (declares: '.($declared === [] ? 'none' : implode(', ', $declared)).')';
+        }
+    }
+
+    expect($broken)->toBe([], "subjects that resolve to null and would refuse everyone:\n".implode("\n", $broken));
+});
+
+/*
+| DC4 asks the same policy question as DC2 for BOUND subjects, resolving the model the way production does
+| — `signatureParameters(['subClass' => UrlRoutable::class])`, which is what `ImplicitRouteBinding` uses.
+|
+| ⚠️ IT SKIPS RATHER THAN FAILS when a controller action type-hints nothing for that parameter, and saying
+| so is the point: some routes bind by string and resolve inside the controller, and treating that as a
+| defect would make the check useless rather than careful. A gate on such a route is covered by DC3 only.
+*/
+it('DC4 — resolves every BOUND subject to a registered policy that implements the ability', function (): void {
+    $broken = [];
+
+    foreach (groupBGatePairs() as $pair) {
+        $hints = [];
+
+        foreach ($pair['object']->signatureParameters(['subClass' => UrlRoutable::class]) as $parameter) {
+            $class = Reflector::getParameterClassName($parameter);
+
+            if ($class !== null) {
+                $hints[$parameter->getName()] = $class;
+            }
+        }
+
+        foreach ($pair['gate']['subjects'] as $subject) {
+            if (subjectIsClassName($subject) || ! isset($hints[$subject])) {
+                continue; // a class subject is DC2's; an un-type-hinted parameter is deliberately skipped
+            }
+
+            $policy = Gate::getPolicyFor($hints[$subject]);
+
+            if ($policy === null) {
+                $broken[] = $pair['route'].' — no policy registered for bound `'.$hints[$subject].'`';
+
+                continue;
+            }
+
+            if (! is_callable([$policy, $pair['gate']['ability']])) {
+                $broken[] = $pair['route'].' — '.$policy::class.' has no `'.$pair['gate']['ability'].'()`'
+                    .' (bound subject `'.$subject.'`)';
+            }
+        }
+    }
+
+    expect($broken)->toBe([], "bound subjects whose policy cannot answer the ability:\n".implode("\n", $broken));
+});
+
+/*
+| DC5 covers the third payload shape: `can:<ability>` with NO subject at all, which the five `domains`
+| routes use. Spatie registers a `Gate::before` that resolves the string as a permission key; a typo makes
+| `PermissionDoesNotExist` bubble into a `false`, and the route refuses everyone — DC3's failure mode
+| reached by a different road.
+*/
+it('DC5 — resolves every bare ability to a real permission key or a defined Gate ability', function (): void {
+    $broken = [];
+
+    foreach (groupBGatePairs() as $pair) {
+        if ($pair['gate']['subjects'] !== []) {
+            continue;
+        }
+
+        $ability = $pair['gate']['ability'];
+
+        if (in_array($ability, RolePermissionSeeder::PERMISSIONS, true) || Gate::has($ability)) {
+            continue;
+        }
+
+        $broken[] = $pair['route'].' — `'.$ability.'` is neither a seeded permission nor a defined ability';
+    }
+
+    expect($broken)->toBe([], "bare abilities that nothing can grant:\n".implode("\n", $broken));
+});
+
+/*
+| DC6 pins arity, because getting it wrong is a 500 rather than a refusal. `Gate::callPolicyMethod()`
+| shifts a leading CLASS-STRING argument off before calling, so a class subject contributes no parameter
+| while a bound one does. Only the `<=` direction is checkable: PHP ignores surplus arguments silently.
+*/
+it('DC6 — passes every policy method at least the arguments it requires', function (): void {
+    $broken = [];
+
+    foreach (groupBGatePairs() as $pair) {
+        $subjects = $pair['gate']['subjects'];
+
+        if ($subjects === []) {
+            continue; // a bare ability is DC5's
+        }
+
+        $first = $subjects[0];
+        $class = subjectIsClassName($first) ? $first : null;
+
+        if ($class === null || ! class_exists($class)) {
+            continue; // bound subjects resolve at runtime; DC4 has already asked the policy question
+        }
+
+        $policy = Gate::getPolicyFor($class);
+
+        if ($policy === null || ! is_callable([$policy, $pair['gate']['ability']])) {
+            continue; // DC2 owns that failure and names it better
+        }
+
+        // The user is always argument one; a leading class string is shifted off and contributes nothing.
+        $supplied = 1 + (count($subjects) - 1);
+        $required = (new ReflectionMethod($policy, $pair['gate']['ability']))->getNumberOfRequiredParameters();
+
+        if ($required > $supplied) {
+            $broken[] = $pair['route'].' — '.$policy::class.'::'.$pair['gate']['ability']
+                .'() requires '.$required.' argument(s), the gate supplies '.$supplied;
+        }
+    }
+
+    expect($broken)->toBe([], "gates that would fatal on arity:\n".implode("\n", $broken));
+});
+
+/*
+| Non-vacuity for all six, in the ClientUuidScopeTest shape. Every case above passes trivially on an empty
+| set, and `groupBGatePairs()` is one filter away from returning one.
+*/
+it('walks a real set of parsed gates rather than an empty one', function (): void {
+    $pairs = groupBGatePairs();
+
+    expect(count($pairs))->toBeGreaterThan(40);
+
+    // And the parse actually produced payloads rather than a list of empty shells.
+    $withSubjects = array_filter($pairs, static fn (array $p): bool => $p['gate']['subjects'] !== []);
+    expect(count($withSubjects))->toBeGreaterThan(35);
+
+    $bare = array_filter($pairs, static fn (array $p): bool => $p['gate']['subjects'] === []);
+    expect(count($bare))->toBeGreaterThan(4); // the `domains` group, which is the only bare-ability shape
 });

@@ -107,8 +107,12 @@ it('gates the export and all three saved-view verbs on the same feature', functi
     // THIS IS AN ENTITLEMENT ASSERTION AND NOT AN AUTHORIZATION ONE, and saying so is the point of the
     // comment (M34). The caller is an Owner, who passes every `can:` gate below on the way to the
     // `feature:` refusal, so nothing here exercises the authorization middleware on any of these four
-    // routes. The permission gate on /analytics/export is pinned in AnalyticsWebExportTest.php; the
-    // three saved-view verbs are still unpinned and that is filed in docs/feature-backlog.md.
+    // routes. The permission gate on /analytics/export is pinned in AnalyticsWebExportTest.php.
+    //
+    // ✅ THE THREE SAVED-VIEW VERBS ARE NO LONGER UNPINNED — M63 added their permission arms at the foot of
+    // this file, on BUSINESS so the `feature:` gate cannot redirect first and answer for the policy. This
+    // case keeps its entitlement job; the pairing is deliberate, because each arm is blind to the other's
+    // middleware and a route needs both answered.
     $this->withoutVite();
     assignPlanTier(PlanTier::Professional);
 
@@ -177,4 +181,61 @@ it('exposes advanced_analytics on Business and withholds it on Professional', fu
     $this->actingAs($this->owner)
         ->get('http://acme.meridian.test/dashboard')
         ->assertInertia(fn ($page) => $page->where('entitlements.features.advanced_analytics', false));
+});
+
+/*
+|--------------------------------------------------------------------------
+| The saved-view WRITE verbs, gated on a PERMISSION rather than on the plan (Increment M63)
+|--------------------------------------------------------------------------
+| The entitlement case above drives these same routes as an Owner on Professional and asserts a redirect —
+| the `feature:` arm. It says in its own comment that nothing there exercises the authorization middleware,
+| and until M63 nothing anywhere did: delete `can:create,SavedReportView` from `routes/tenant.php` and the
+| whole repository stayed green.
+|
+| ⚠️ EVERY CASE BELOW RUNS ON BUSINESS, DELIBERATELY. On Professional the `feature:` gate redirects first
+| and a permission failure could never be observed — the refusal would arrive from the wrong middleware and
+| the test would pass for the wrong reason. Business is what makes a 403 mean "the policy refused".
+*/
+
+it('403s POST /analytics/views for a member holding neither dashboard permission', function (): void {
+    $this->withoutVite();
+    $principal = memberHoldingOnly();
+    assignPlanTier(PlanTier::Business);
+
+    $this->actingAs($principal)->post(gateUrl('analytics/views'), ['name' => 'X'])->assertForbidden();
+});
+
+it('403s POST /analytics/views for a principal holding exactly submissions.view', function (): void {
+    // The wrong-subject discriminator, on the write verb. `SavedReportViewPolicy::create()` delegates to
+    // `viewAny()` — the two dashboard keys — so a gate re-pointed at `Submission` would SERVE this caller.
+    $this->withoutVite();
+    $principal = memberHoldingOnly('submissions.view');
+    assignPlanTier(PlanTier::Business);
+
+    $this->actingAs($principal)->post(gateUrl('analytics/views'), ['name' => 'X'])->assertForbidden();
+});
+
+it('403s PATCH and DELETE on a members OWN view when they hold neither dashboard permission', function (): void {
+    // ⛔ THE VIEW IS BUILT FOR THE PRINCIPAL ON PURPOSE, and it is what makes this test mean anything.
+    // `SavedReportViewPolicy::update()`/`delete()` are `owns($view) && viewAny()`. A view belonging to
+    // somebody else would 403 on the OWNERSHIP half and prove nothing about the permission half — which
+    // `SavedReportViewWebTest` already pins from that side. Owned by the caller, ownership passes and the
+    // permission is the only thing left to refuse.
+    $this->withoutVite();
+    $principal = memberHoldingOnly();
+    assignPlanTier(PlanTier::Business);
+
+    $view = app(SavedReportViewService::class)->create(
+        $principal,
+        'Mine',
+        (new AnalyticsQuery(from: CarbonImmutable::now()->subDays(5), to: CarbonImmutable::now()))->toArray(),
+    );
+
+    $this->actingAs($principal)->patch(gateUrl("analytics/views/{$view->id}"), ['name' => 'Y'])->assertForbidden();
+    $this->actingAs($principal)->delete(gateUrl("analytics/views/{$view->id}"))->assertForbidden();
+
+    // The GUC is torn down by each request, so the read-back needs it re-established — and the read-back is
+    // the point: a 403 that had nonetheless mutated the row would be the worse defect.
+    enterTenant($this->tenant->id, $principal->id);
+    expect($view->refresh()->name)->toBe('Mine');
 });

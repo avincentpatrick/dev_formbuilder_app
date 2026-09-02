@@ -241,3 +241,47 @@ it('returns 402 on the EXPORT when the plan lacks advanced_analytics', function 
         ->assertJsonPath('error.code', 'feature_not_available')
         ->assertJsonPath('error.details.feature', 'advanced_analytics');
 });
+
+/*
+|--------------------------------------------------------------------------
+| WHICH permission the `can:` gate names (Increment M63)
+|--------------------------------------------------------------------------
+| The case above pins that the policy refuses a member holding NEITHER dashboard key. It cannot pin WHICH
+| policy: a role-less member is refused identically by `SavedReportViewPolicy::viewAny()` (the two
+| dashboard keys) and by `SubmissionPolicy::viewAny()` (`submissions.view`), so swapping this route's
+| subject for the `Submission` one `routes/api.php` rejects in prose left it green.
+|
+| This route is the one the backlog row names. The report twin carries the same pair in
+| `tests/Feature/Api/AnalyticsApiTest.php`, written separately on purpose: covering a sibling by aiming at
+| its twin is the exact defect M34 filed when it closed the export's arm and left the report's open.
+*/
+
+it('refuses the EXPORT to a principal holding exactly submissions.view — the key the REJECTED subject names', function (): void {
+    // 200 UNDER THE WRONG SUBJECT. No seeded role produces this principal: every role holding
+    // `submissions.view` also holds at least `dashboard.form.view`, which is why the swap was invisible.
+    $principal = memberHoldingOnly('submissions.view');
+    $token = $principal->createToken('ci', [ApiAbilities::READ_ANALYTICS])->plainTextToken;
+
+    $this->withToken($token)->get(exportUrl())
+        ->assertForbidden()
+        ->assertJsonPath('error.code', 'forbidden');
+});
+
+it('streams the EXPORT to a principal holding ONLY dashboard.form.view', function (): void {
+    // 403 UNDER THE WRONG SUBJECT, and the positive control that the refusal above is the gate rather than
+    // a broken fixture — same helper, one permission different, and the route opens.
+    //
+    // ⚠️ ROWS, NOT STATUS, per this file's opening doctrine: the tenant GUC is torn down before the export
+    // closure runs, and a missing re-assertion yields an EMPTY FILE WITH HTTP 200. A 200-only assertion
+    // here would pass on a body proving the principal was admitted to nothing.
+    $principal = memberHoldingOnly('dashboard.form.view');
+    $token = $principal->createToken('ci', [ApiAbilities::READ_ANALYTICS])->plainTextToken;
+
+    $response = $this->withToken($token)->get(exportUrl());
+    $response->assertOk();
+
+    $rows = exportRows($response->streamedContent());
+
+    expect($rows[0])->toBe(['Section', 'Key', 'Value'])
+        ->and(count($rows))->toBeGreaterThan(1);
+});

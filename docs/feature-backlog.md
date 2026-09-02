@@ -3786,7 +3786,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   and renders outside it); `docs/ux/design-system-reference.md:812,:843`;
   `docs/pricing-feature-gating-matrix.md:56` (Business is seeded `unlimited`, not 25 endpoints);
   `docs/PRD.md:13` (the ADR index stops at 0014; 0015–0020 exist); `docs/TESTING-GUIDE.md:57,:639` (three
-  forms and five forms, against four and six as seeded); `README.md:100-101` (contract and e2e are real
+  forms and five forms, against four and six as seeded); `README.md:169-172` (contract and e2e are real
   merge-blocking gates, not stubs; there is no `deploy` stage in `ci.yml` at all); and this file's own
   `:105` and `:459`. **Live**, all documentary.
 

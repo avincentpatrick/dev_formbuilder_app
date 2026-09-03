@@ -39,9 +39,14 @@ in `composer run quality` — do not "fix" that by registering them.
 - `git push origin HEAD:main` **before you open the first file**. An unpushed claim does not exist.
 - Before touching any shared or paired artefact, `git fetch` and read **both** claim files in full —
   not their `## Status` lines. A forward queue is a claim and does not live under that heading.
-- The template and its two required fields are in `docs/claims/TEMPLATE.md`. Point at it; never copy it.
-- **Verify the row's evidence and its remedy separately.** A row is a floor, not a census: open every
-  citation and look at what sits next to it.
+- The template and its required fields are in `docs/claims/TEMPLATE.md`. Point at it; never copy it.
+- **Verify the row's evidence, its remedy and its premise separately — three answers, not one.**
+  Evidence is whether the citations still resolve. Remedy is whether the prescribed fix works, measured
+  before you write the test. **Premise is what the row believes about the world *around* the defect** —
+  who owns a file, whether a second copy exists, whether a precondition still holds, which cases it
+  carved out — and it is the half that rots while the code stays exactly as described. `preflight`
+  refuses an active claim missing any of the three.
+- **A row is a floor, not a census:** open every citation and look at what sits next to it.
 
 ## Numbers
 

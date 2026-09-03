@@ -141,6 +141,16 @@ it('holds EXEMPT_JOBS and the list above to each other, in BOTH directions (M69)
     // ConnectorRulePausedNotification was from H16a until M66: registered with the linter, missing
     // from this list, and therefore never checked for CarriesTenantBrand by the one arm that checks
     // it. It shipped rendering the framework's default theme. This arm is the missing direction.
+    //
+    // ✅ PROVED BY THREE CONTROLS (M69), NOT BY BEING GREEN. Via scripts/mutate.php, sha256-restored:
+    //   MU1  drop EventNotification from the list above, leave it in EXEMPT_JOBS  → CAUGHT (1 red).
+    //   MU2  add a REAL non-notification job (SweepWebhookRetriesJob) to EXEMPT_JOBS → SURVIVED, and
+    //        SURVIVED is the PASS here: the subset filter is supposed to ignore it.
+    //   MU3  add a NON-EXISTENT class to the SAME slot                             → CAUGHT (1 red).
+    // ⛔ MU2 ALONE WOULD HAVE PROVED NOTHING, and that is the transferable half. Its green is also
+    // what a regex that never harvested the new entry would produce — a control passing through a
+    // different branch than the one it names (M49). MU3 is what separates them: same slot, red, so
+    // the slot IS read, and MU2's green is therefore the FILTER rather than blindness.
     $linter = file_get_contents(base_path('scripts/job-payload-lint.php'));
 
     // Parse rather than require: the linter is a standalone script with no framework boot, and

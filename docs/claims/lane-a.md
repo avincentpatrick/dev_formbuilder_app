@@ -23,9 +23,9 @@ Standing Rule 7(b-bis).
 
 ✅ **`D13`'S DEBT IS PAID, AND THE ANSWER IS NOT MARGINAL.** The batching protocol was answered on a
 predicted ~42% saving that `D13` insisted be **proven on the first batched increment or the batch size
-revisited**. Measured end to end — `M65`'s release commit to `M66`'s — the four rows cost **~105 minutes
-against a 628-minute baseline, an ~83% saving**, and the build phase alone was **34 minutes of authoring
-for four rows plus eight mutation controls**. ⚠️ **Do not read 83% as the new expected figure.** See the
+revisited**. Measured end to end — `M65`'s last close-out commit to `M66`'s — the four rows cost **~110
+minutes against a 628-minute baseline, an ~82% saving**, and the build phase alone was **34 minutes of
+authoring for four rows plus eight mutation controls**. ⚠️ **Do not read 82% as the new expected figure.** See the
 release below for the three reasons it flatters, the most important being that `D13`'s per-row baseline
 was drawn from increments whose build phase included a CI wait this one overlapped with useful work.
 
@@ -73,7 +73,14 @@ confess the opposite, and because the check costs one `git diff --stat`.
 | merge → release (close-out) | see the close-out commit; `D13` mean 22 |
 | **Baseline, 4 rows** | **628 min** (4 × 157) |
 | **`D13`'s own model** | 367 min — a 41.6% saving |
-| **Measured** | **~105 min end to end — an ~83% saving** |
+| **Measured** | **87 min to the release commit (86%); ~110 min to this close-out's last commit (~82%)** |
+
+⚠️ **TWO FIGURES BECAUSE THE WINDOW HAS TWO DEFENSIBLE ENDS, AND QUOTING ONLY THE FLATTERING ONE WOULD BE
+THE DEFECT THIS PROJECT KEEPS FILING.** `M65`'s cycle is bounded by its **last** close-out commit, so the
+comparable figure for `M66` is the one that includes regenerating these baselines from the post-merge run —
+a step that cannot start until CI finishes. The exact components, each read from `git log` rather than
+estimated: **gap 31 min · build 52 min · close-out the remainder.** Either end clears the 40% bar by more
+than double.
 
 ⛔ **THE BAR WAS 40% AND IT CLEARED BY MORE THAN DOUBLE, WHICH IS A REASON FOR SUSPICION AND NOT
 CELEBRATION.** Three things flatter this number and all three are named here rather than left for someone
@@ -88,7 +95,7 @@ to discover when the next batch comes in slower:
 3. **The fan-out was cheap here and will not always be.** Three read-only agents cleared four rows. A row
    whose evidence needs a database or a running suite cannot be verified that way at all.
 
-**The honest reading: batching is worth doing and `D13`'s ~42% is the number to plan against, not 83%.**
+**The honest reading: batching is worth doing and `D13`'s ~42% is the number to plan against, not 82%.**
 The clause `D13` was actually protecting against — *materially under 40%* — is not in play, so **the batch
 size stands and is not revisited.**
 

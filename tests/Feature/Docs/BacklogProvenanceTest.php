@@ -249,6 +249,32 @@ function backlogProvenanceLiveness(string $body): ?string
     return null;
 }
 
+/**
+ * How many verdicts the row records. EXACTLY ONE is the contract, matching the filer clause above.
+ *
+ * ⛔ THE ASYMMETRY THIS CLOSES WAS FOUND BY A MUTATION THAT WAS EXPECTED TO SURVIVE, AND IT DID.
+ * `MU5` appended a second, contradicting `**Not live**` to a row already marked `**Live**` and the
+ * first draft of this arm stayed GREEN, because it asked whether a verdict was present rather than
+ * whether exactly one was. That is not a cosmetic difference here: `scripts/state.php` resolves by
+ * FIRST MATCH with `**Not live**` tried first, so a stray second verdict does not read as ambiguity
+ * — it silently wins, and a row wrongly resolved not-live is one `scripts/loop.php` refuses forever.
+ *
+ * ⚠️ Tightening it was safe rather than lucky, and the difference was measured before the change:
+ * all 85 open rows carry exactly one marker, so the rule is not red on arrival — which `M40`
+ * established can never merge.
+ */
+function backlogProvenanceLivenessCount(string $body): int
+{
+    $prose = preg_replace('/`[^`]*`/u', '', $body) ?? $body;
+    $found = 0;
+
+    foreach (array_keys(BACKLOG_LIVENESS_MARKERS) as $marker) {
+        $found += substr_count($prose, $marker);
+    }
+
+    return $found;
+}
+
 it('discovers enough of the backlog to be able to fail', function (): void {
     $bullets = backlogProvenanceBullets();
 
@@ -322,17 +348,24 @@ it('records a liveness verdict on every open row', function (): void {
         }
 
         $checked++;
+        $found = backlogProvenanceLivenessCount($bullet['body']);
 
-        if (backlogProvenanceLiveness($bullet['body']) !== null) {
+        if ($found === 1) {
             continue;
         }
 
-        $violations[] = BACKLOG_PROVENANCE_DOCUMENT.':'.$bullet['line'].' (`'.$bullet['severity'].'`) '.
-            'records no liveness verdict. Append one of '.implode(' / ', array_keys(BACKLOG_LIVENESS_MARKERS)).
-            ' to the row — **Live** if the defect is reachable in the tree today, **Latent** if it is real '.
-            'but needs a stated precondition (say which), **Not live** if it is a stated limit, a '.
-            'deliberate decision or already fixed. Decide it against the CODE, not from the row\'s own '.
-            'wording; the marker inside backticks is a mention and deliberately does not count.';
+        $where = BACKLOG_PROVENANCE_DOCUMENT.':'.$bullet['line'].' (`'.$bullet['severity'].'`)';
+
+        $violations[] = $found === 0
+            ? $where.' records no liveness verdict. Append one of '.implode(' / ', array_keys(BACKLOG_LIVENESS_MARKERS)).
+              ' to the row — **Live** if the defect is reachable in the tree today, **Latent** if it is real '.
+              'but needs a stated precondition (say which), **Not live** if it is a stated limit, a '.
+              'deliberate decision or already fixed. Decide it against the CODE, not from the row\'s own '.
+              'wording; the marker inside backticks is a mention and deliberately does not count.'
+            : $where.' records '.$found.' liveness verdicts. Exactly one is the record. `scripts/state.php` '.
+              'resolves a row by FIRST MATCH with `**Not live**` tried first, so a second verdict does not '.
+              'read as ambiguity — it silently wins, and a row wrongly resolved not-live is one '.
+              '`scripts/loop.php` will refuse forever. Quote the other in backticks or delete it.';
     }
 
     // ⛔ THE FLOOR IS THIS ARM'S OWN AND IT IS ASSERTED FIRST. With zero open bullets discovered the
@@ -416,4 +449,21 @@ it('discriminates between a record, a quotation and a legacy shape', function ()
     // not-live whichever order the two appear in the prose.
     expect(backlogProvenanceLiveness('**Live.** … and later **Not live** too.'))->toBe('not-live');
     expect(backlogProvenanceLiveness('**Not live** … and later **Live.** too.'))->toBe('not-live');
+
+    // ⛔ WHICH IS EXACTLY WHY THE COUNT IS GATED AND NOT ONLY THE PRESENCE. The two lines above are
+    // the hazard stated as behaviour: a second verdict does not read as ambiguity anywhere in this
+    // repository, it silently wins. `MU5` proved the first draft of the arm blind to it.
+    expect(backlogProvenanceLivenessCount('**Live.** Filed by `M1`.'))->toBe(1);
+    expect(backlogProvenanceLivenessCount('**Live.** … and later **Not live** too.'))->toBe(2);
+    expect(backlogProvenanceLivenessCount('nothing here. Filed by `M1`.'))->toBe(0);
+
+    // A quoted verdict is not a second verdict — the strip applies to the count as well, or every
+    // row that discusses the vocabulary would fail the exactly-one rule.
+    expect(backlogProvenanceLivenessCount('**Live.** and the row quotes `**Not live**` as vocabulary.'))->toBe(1);
+
+    // `**Live.**` must not also register as `**Live**`, or every single row would count two and the
+    // rule would be red on arrival for the whole corpus.
+    expect(backlogProvenanceLivenessCount('**Live.**'))->toBe(1);
+    expect(backlogProvenanceLivenessCount('**Latent.**'))->toBe(1);
+    expect(backlogProvenanceLivenessCount('**Not live**'))->toBe(1);
 });

@@ -1409,7 +1409,6 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   ➕ **A residual found while scoping this, filed as its own row below**: `dispose()` removes the
   `beforeunload` listener and nothing re-adds it, so after a refused Submit the browser's leave prompt is
   gone for the rest of the page's life. Pre-existing, and untouched here.
-  Filed by `M62`.
   **`minor` · Submit races its own last-chance draft write, and the refusal lands on the Submit.** Filed by
   M62 (2026-09-02), found by opening the row above's citation and reading what sat next to it — **not by
   running it.** `submit()` in `resources/js/Pages/submissions/Encode.vue` calls `autosave.dispose()` and then
@@ -1428,7 +1427,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   not need the last-chance write at all, since the POST carries the full answer map anyway and the promote
   branch re-saves it — the comment defending the write says as much. **Live.** Filed by `M62`.
 - **`minor` · After a refused Submit the browser's leave prompt is gone for the rest of the page's life.**
-  Filed by `M68` (2026-09-03), found while scoping the Submit-race row above and deliberately not fixed
+  Filed 2026-09-03 by `M68`, found while scoping the Submit-race row above and deliberately not fixed
   there. `createServerAutosave()` registers `onBeforeUnload` exactly once at setup, and **both** teardown
   paths remove it — `dispose()` and, since `M68`, `standDown()`. Nothing ever re-adds it. The answer
   watcher *does* re-arm the save loop on the next keystroke (it only returns early on `state === 'stopped'`,
@@ -1545,7 +1544,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   shared floor would be satisfied by the other arm's exceptions.
   ➕ **A MEASURED LIMIT OF THAT SWEEP, filed as its own row below**: it cannot see the loss of ONE of two
   declared causes, because either tag alone keeps the route in scope and the status documented. Found when
-  a control removing a single `@throws` from the promote action SURVIVED. Filed by `M13`.
+  a control removing a single `@throws` from the promote action SURVIVED.
   **`minor` · Neither sync route documents the 403 its in-controller policy gate now returns.** Filed
   2026-08-25 by M13. `openapi.json` lists `200/404/422` for `GET /sync/manifest` and `200/422` for
   `POST /sync/submissions`, while the first can return a `403 forbidden` and the second a per-item
@@ -1577,10 +1576,10 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   documented two statuses by teaching the GENERATOR, and `SyncSubmissionResultResource` is a
   `JsonResource` whose `toArray()` Scramble already infers. The candidate is a typed shape on that method
   rather than an annotation, and it is untried. **Whoever takes it should re-read the 403 row's closure
-  above first**, because the two were filed as one defect and are not one. Filed by `M13`.
+  above first**, because the two were filed as one defect and are not one.
 
 - **`minor` · The `@throws` contract sweep cannot see the loss of ONE of two declared causes.**
-  Filed by `M68` (2026-09-03), and **measured rather than predicted: a control removing a single `@throws`
+  Filed 2026-09-03 by `M68`, and **measured rather than predicted: a control removing a single `@throws`
   tag from `SubmissionPromoteController::store()` SURVIVED with all seven contract cases green.** Both arms
   of the sweep in `tests/Feature/Api/OpenApiContractTest.php` ask *"does this operation document status
   N?"*, and the walk keeps a route in scope if it declares **any** of the exceptions in the arm's list — so
@@ -2234,7 +2233,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   alone.
   ⚠️ **IT DOES NOT CLOSE THE MAIL-CANNON ROW ON THE SAME ROUTE**, which the row itself warns about. That is a
   rate limit and its remedy is a `RateLimiter::for()` plus a `ThrottleFortifyEndpoints::limiters()` entry; it
-  stays open. Filed by `M66`.
+  stays open.
   **`minor` · The Fortify group serves tenant subdomains and carries no org-2FA gate, so the mint was not the
   only way past it.** Found while closing the row directly above, which named one route. `config/fortify.php`
   registers Fortify's routes in their own group — `web`, `RequirePlatformHost`, `AppSecurityHeaders`,
@@ -2249,7 +2248,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   neighbour row already covers `PUT /user/profile-information` from the mail-cannon angle; read both before
   taking either.** **Live.** Filed by `M66`.
 - **`minor` · Any tenant-scoped policy read mounted on the Fortify group is silently blind, and two increments have now walked into it.**
-  Filed by `M68` (2026-09-03) at the moment it walked into it, having cost a full build-and-fail cycle.
+  Filed 2026-09-03 by `M68` at the moment it walked into it, having cost a full build-and-fail cycle.
   `config/fortify.php`'s group carries no tenancy middleware at all, so `EstablishTenantDatabaseContext`
   resolves a **null** tenant there and `TenantSettingRegistry::all()` returns `[]`. Every key then reads as
   its sparse default — for `security.require_two_factor` that is `false`, so the gate `M68` mounted
@@ -2579,7 +2578,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 ### Test suite & CI gates
 
 - **`minor` · A SUCCESSFUL password confirmation is unreachable from the Pest harness, so nothing asserts one.**
-  Filed by `M68` (2026-09-03), found when a case asserting `assertSessionHasNoErrors()` on
+  Filed 2026-09-03 by `M68`, found when a case asserting `assertSessionHasNoErrors()` on
   `POST /user/confirm-password` failed with *"The provided password was incorrect"* against a user the
   factory had created with that exact password. **The cause is structural, not a fixture mistake:**
   `config/auth.php`'s provider is `rls_aware`, so `RlsAwareUserProvider` resolves the user on the SEPARATE
@@ -4534,7 +4533,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `toHaveKey`'s second argument is the expected VALUE, not a message, so the first draft asserted that the
   vocabulary mapped a key to a whole sentence and went red against a document that was CORRECT. Both sites
   now use `array_key_exists()` with `toBeTrue()`, and the reason is written beside them.
-  ⚠️ **`docs/data-dictionary.md`'s line count is unchanged**, so no citation into it rotted. Filed by `M1`.
+  ⚠️ **`docs/data-dictionary.md`'s line count is unchanged**, so no citation into it rotted.
   **`minor` · §20's `settings.key` catalog omits `security.require_two_factor`.**
   `docs/data-dictionary.md:838`, rewritten in this branch — the key is live
   (`app/Enums/SettingKey.php:42`, tenant-scoped at `:85`, written by `UpdateAccessSettingsRequest.php:60`,

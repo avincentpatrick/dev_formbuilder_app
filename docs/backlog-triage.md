@@ -40,50 +40,50 @@ from it and listed separately below.
 
 | Row | Filed | Line | Cites (non-hub) |
 |---|---|---|---|
-| `tracker-lint` R8 guards `CLAUDE.md` and cannot reach `PROGRESS.md`, which is the half that actually rotted. | `M42` | 3708 | *hub files only* |
-| `scripts/mutate.php` cannot drive a positive control for anything that is not Pest in a container. | `M42` | 3806 | *hub files only* |
-| Nothing pins `fetch-depth` for the SECRET SCAN, whose blindness is silent and whose stakes are the highest of the three gates that integer governs. | `M49` | 4945 | *hub files only* |
-| `submission_geo_index` is a real table and the data dictionary does not mention it at all. | `M58` | 4188 | *hub files only* |
-| A self-registered account that was never verified is indistinguishable from an invite placeholder, so a token holder can still overwrite its password. | `M8` | 2143 | `tests/e2e/auth-axe.spec.ts` |
-| `SyncSubmissionResultResource`'s generated contract types `submission` and `error` as bare strings. | `M13` | 1560 | `openapi.json` |
-| `deploy.yml`'s effective trigger CHANGED in `M39`, and nothing says so at the site. | `M39` | 2600 | `.github/workflows/deploy.yml` |
-| A claim file has no constrained form for a forward declaration, so the one stale declaration on the tree cannot be gated. | `M42` | 3696 | `docs/claims/lane-b.md` |
-| `scripts/next.php` takes each release's LEAD paragraph, and a lead paragraph is often a file manifest rather than the lesson. | `M42` | 3826 | `scripts/next.php` |
-| The audit spec credits the `submission` scope with two events that are emitted nowhere. | `M46` | 4366 | `docs/audit-compliance-logging-spec.md` |
-| The documented-default gate reads FUNCTION-shaped cells only, so a documented LITERAL that disagrees with the database is invisible to it. | `M58` | 4176 | `tests/Feature/Migrations/DocumentedDefaultDriftTest.php` |
-| Four tracker surgeries have now hand-rolled the same verification harness and none of them kept it. | `M60` | 4990 | `scripts/tracker-lint-controls.php` |
-| The claim template has a field for a row's evidence and a field for its remedy, and the thing that actually went wrong in `M60` was neither. | `M60` | 5018 | `docs/claims/TEMPLATE.md` |
-| The `@throws` contract sweep cannot see the loss of ONE of two declared causes. | `M68` | 1582 | `tests/Feature/Api/OpenApiContractTest.php` |
-| A SUCCESSFUL password confirmation is unreachable from the Pest harness, so nothing asserts one. | `M68` | 2581 | `config/auth.php` |
+| `tracker-lint` R8 guards `CLAUDE.md` and cannot reach `PROGRESS.md`, which is the half that actually rotted. | `M42` | 3707 | *hub files only* |
+| `scripts/mutate.php` cannot drive a positive control for anything that is not Pest in a container. | `M42` | 3805 | *hub files only* |
+| Nothing pins `fetch-depth` for the SECRET SCAN, whose blindness is silent and whose stakes are the highest of the three gates that integer governs. | `M49` | 4944 | *hub files only* |
+| `submission_geo_index` is a real table and the data dictionary does not mention it at all. | `M58` | 4187 | *hub files only* |
+| A self-registered account that was never verified is indistinguishable from an invite placeholder, so a token holder can still overwrite its password. | `M8` | 2142 | `tests/e2e/auth-axe.spec.ts` |
+| `SyncSubmissionResultResource`'s generated contract types `submission` and `error` as bare strings. | `M13` | 1559 | `openapi.json` |
+| `deploy.yml`'s effective trigger CHANGED in `M39`, and nothing says so at the site. | `M39` | 2599 | `.github/workflows/deploy.yml` |
+| A claim file has no constrained form for a forward declaration, so the one stale declaration on the tree cannot be gated. | `M42` | 3695 | `docs/claims/lane-b.md` |
+| `scripts/next.php` takes each release's LEAD paragraph, and a lead paragraph is often a file manifest rather than the lesson. | `M42` | 3825 | `scripts/next.php` |
+| The audit spec credits the `submission` scope with two events that are emitted nowhere. | `M46` | 4365 | `docs/audit-compliance-logging-spec.md` |
+| The documented-default gate reads FUNCTION-shaped cells only, so a documented LITERAL that disagrees with the database is invisible to it. | `M58` | 4175 | `tests/Feature/Migrations/DocumentedDefaultDriftTest.php` |
+| Four tracker surgeries have now hand-rolled the same verification harness and none of them kept it. | `M60` | 4989 | `scripts/tracker-lint-controls.php` |
+| The claim template has a field for a row's evidence and a field for its remedy, and the thing that actually went wrong in `M60` was neither. | `M60` | 5017 | `docs/claims/TEMPLATE.md` |
+| The `@throws` contract sweep cannot see the loss of ONE of two declared causes. | `M68` | 1581 | `tests/Feature/Api/OpenApiContractTest.php` |
+| A SUCCESSFUL password confirmation is unreachable from the Pest harness, so nothing asserts one. | `M68` | 2580 | `config/auth.php` |
 | The two `draft_answers` readers disagree about which `form_version_id` they mean. | `M21` | 1330 | `resources/public-runtime/App.vue` · `resources/public-runtime/lib/reconcile.ts` |
-| `docs/gate-baselines.md` has no staleness signal, and it is stale right now. | `M42` | 3674 | `docs/gate-baselines.md` · `scripts/gate-baselines.php` |
-| Nothing proves the offline path M61's redirect exists to protect. | `M61` | 4337 | `resources/public-runtime/sw.ts` · `tests/e2e/public-runtime-offline.spec.ts` |
-| `docker compose run --rm e2e` does not work on this host as three documents prescribe it, and the most likely wrong form EXITS 0. | `M61` | 4346 | `docs/ux/design-system-reference.md` · `docs/ux/exceptions-log.md` |
+| `docs/gate-baselines.md` has no staleness signal, and it is stale right now. | `M42` | 3673 | `docs/gate-baselines.md` · `scripts/gate-baselines.php` |
+| Nothing proves the offline path M61's redirect exists to protect. | `M61` | 4336 | `resources/public-runtime/sw.ts` · `tests/e2e/public-runtime-offline.spec.ts` |
+| `docker compose run --rm e2e` does not work on this host as three documents prescribe it, and the most likely wrong form EXITS 0. | `M61` | 4345 | `docs/ux/design-system-reference.md` · `docs/ux/exceptions-log.md` |
 | Two hand-maintained lists of queued mail notifications must agree, and nothing checks that they do. | `M66` | 906 | `tests/Feature/Mail/QueuedMailContractTest.php` · `scripts/job-payload-lint.php` |
 | Resume-link shells sit in Cache Storage, and the brand refresh re-fetches them. | `M21` | 1317 | `resources/public-runtime/sw.ts` · `resources/public-runtime/lib/brand-cache.ts` · `routes/api.php` |
-| A tracker surgery whose diff touches only `paths-ignore`d files produces no post-merge run at all, so `R7`'s trunk arm is unreachable for exactly the diff shap… | `M48` | 4823 | `docs/gate-baselines.md` · `docs/backlog-triage.md` · `docs/claims/decisions.md` |
-| A failing `ds:storybook:build` exits `0`, so every check of its status is vacuous. | `M59` | 4248 | *hub files only* |
-| Three gate invocations fetch `http-server` from the network at run time, and nothing declares it. | `M59` | 4266 | *hub files only* |
+| A tracker surgery whose diff touches only `paths-ignore`d files produces no post-merge run at all, so `R7`'s trunk arm is unreachable for exactly the diff shap… | `M48` | 4822 | `docs/gate-baselines.md` · `docs/backlog-triage.md` · `docs/claims/decisions.md` |
+| A failing `ds:storybook:build` exits `0`, so every check of its status is vacuous. | `M59` | 4247 | *hub files only* |
+| Three gate invocations fetch `http-server` from the network at run time, and nothing declares it. | `M59` | 4265 | *hub files only* |
 | A media pick made during a conflict review is protected only by the reaper's grace window. | `M22` | 1294 | `resources/public-runtime/App.vue` |
-| The design-system dev server has no root alias, so the one script that would make the axe one-liner work is unreachable from the vocabulary every document uses. | `M59` | 4258 | `packages/design-system/package.json` |
+| The design-system dev server has no root alias, so the one script that would make the axe one-liner work is unreachable from the vocabulary every document uses. | `M59` | 4257 | `packages/design-system/package.json` |
 | A failed conflict-review recovery can strand the respondent's only copy of their answers. | `M66` | 1129 | `resources/public-runtime/components/RuntimeSession.vue` |
-| `scripts/backlog-triage.php --check` is wired into nothing, so the generated triage can drift with no gate saying so. | `M65` | 3282 | `scripts/backlog-triage.php` · `composer.json` |
+| `scripts/backlog-triage.php --check` is wired into nothing, so the generated triage can drift with no gate saying so. | `M65` | 3281 | `scripts/backlog-triage.php` · `composer.json` |
 | `MdsSegmentedControl` spills 30px INSIDE the builder's config pane — a real horizontal scrollbar, and not the page-overflow defect it was filed as. | `M19` | 630 | `resources/js/components/builder/ConfigPanel.vue` · `packages/design-system/src/components/SegmentedControl/SegmentedControl.vue` · `docs/ux/exceptions-log.md` |
-| A cluster of by-line citations went stale, several of them inside this branch. | `M1` | 4565 | `app/Support/Tenancy/TenantIsolation.php` · `app/Models/Tenant.php` · `scripts/migration-lint.php` · `config/queue.php` +9 |
+| A cluster of by-line citations went stale, several of them inside this branch. | `M1` | 4564 | `app/Support/Tenancy/TenantIsolation.php` · `app/Models/Tenant.php` · `scripts/migration-lint.php` · `config/queue.php` +9 |
 | A tabular rule that maps no Submission ID column still duplicates on an unconfirmed retry, and the durable fix is in the rule EDITOR rather than the adapter. | `M5` | 795 | — *no file harvested* |
 | `SlackConnector::deliver()` has the same non-idempotent shape and is deliberately not covered. | `M5` | 830 | — *no file harvested* |
-| `promote()` re-asserts the version is published BEFORE the lock and never again under it. | `M12` | 1611 | — *no file harvested* |
-| The `reviewer` role's seeded description and `SubmissionPolicy::create()` contradict each other. | `M13` | 1513 | — *no file harvested* |
-| The tenant-facing SSO domains card on `/settings/sso` does not exist, so verification is operator-assisted. | `M18` | 2050 | — *no file harvested* |
-| `MemberController::invite()` validates `['required', 'email', 'max:255']` and a role, with no domain-ownership check. | `M18` | 2065 | — *no file harvested* |
-| Self-registration remains a way to occupy an address in a domain you do not control. | `M18` | 2076 | — *no file harvested* |
+| `promote()` re-asserts the version is published BEFORE the lock and never again under it. | `M12` | 1610 | — *no file harvested* |
+| The `reviewer` role's seeded description and `SubmissionPolicy::create()` contradict each other. | `M13` | 1512 | — *no file harvested* |
+| The tenant-facing SSO domains card on `/settings/sso` does not exist, so verification is operator-assisted. | `M18` | 2049 | — *no file harvested* |
+| `MemberController::invite()` validates `['required', 'email', 'max:255']` and a role, with no domain-ownership check. | `M18` | 2064 | — *no file harvested* |
+| Self-registration remains a way to occupy an address in a domain you do not control. | `M18` | 2075 | — *no file harvested* |
 | The storage-quota line counts strangers' submissions. | `M21` | 1310 | — *no file harvested* |
-| Every hand-off prescribes a Pint command that scans ~40 fewer files than CI does. | `M36` | 3627 | — *no file harvested* |
-| `PUT /user/profile-information` is a second mail cannon, and it is the one Fortify write route left deliberately unbound. | `M43` | 2835 | — *no file harvested* |
-| Every object-valued answer that the piping layer excludes renders as `json_encode` machine noise on the inbox, the export and the PDF — because those three sur… | `M48` | 1666 | — *no file harvested* |
-| Nothing offers a way out of a refused correction except a browser reload. | `M62` | 1445 | — *no file harvested* |
-| The promote route still documents neither of its two 403 causes nor its 422, and the generator cannot narrow a refusal family to one route. | `M67` | 1640 | — *no file harvested* |
-| After a refused Submit the browser's leave prompt is gone for the rest of the page's life. | `M68` | 1430 | — *no file harvested* |
+| Every hand-off prescribes a Pint command that scans ~40 fewer files than CI does. | `M36` | 3626 | — *no file harvested* |
+| `PUT /user/profile-information` is a second mail cannon, and it is the one Fortify write route left deliberately unbound. | `M43` | 2834 | — *no file harvested* |
+| Every object-valued answer that the piping layer excludes renders as `json_encode` machine noise on the inbox, the export and the PDF — because those three sur… | `M48` | 1665 | — *no file harvested* |
+| Nothing offers a way out of a refused correction except a browser reload. | `M62` | 1444 | — *no file harvested* |
+| The promote route still documents neither of its two 403 causes nor its 422, and the generator cannot narrow a refusal family to one route. | `M67` | 1639 | — *no file harvested* |
+| After a refused Submit the browser's leave prompt is gone for the rest of the page's life. | `M68` | 1429 | — *no file harvested* |
 
 ## Latent — real, but each needs a stated precondition first
 
@@ -92,19 +92,19 @@ Not queue work until the precondition holds. The row says what it is.
 | Row | Filed | Line | Cites (non-hub) |
 |---|---|---|---|
 | The setup-time directory has no pre-flight refresh | `M1` | 884 | `app/Services/Connectors/TabularDestinationDirectory.php` |
-| A verified SSO email domain is trusted indefinitely — there is no re-verification sweep. | `M18` | 2035 | `routes/console.php` |
-| `baselineOf()` turns "no checksum" into `''`, and only middleware turns it back. | `M31` | 2630 | `tests/Feature/Submissions/SubmissionEditRoutesTest.php` |
-| `gamification:backfill --sync` reports failure after it has already committed every award. | `M32` | 3534 | `app/Console/Commands/BackfillGamificationCommand.php` |
-| Route-model binding resolves BEFORE the three console gates, so a synthetic id 404s from the binding rather than from the middleware a test names. | `M67` | 3081 | `bootstrap/app.php` |
-| A line-splitting regex matches a byte INSIDE a UTF-8 character, and one faker name is enough to trigger it. | `M42` | 3658 | `tests/Feature/Audit/ImpersonationAttributionTest.php` · `docs/claims/lane-a.md` |
-| `throttle:saml-acs`'s route BINDING is asserted by nothing, while its registration is. | `M30` | 2851 | `tests/Feature/Sso/SsoLoginWebTest.php` · `routes/tenant.php` · `app/Providers/AppServiceProvider.php` · `tests/Feature/Sso/SsoAcsWebTest.php` +1 |
+| A verified SSO email domain is trusted indefinitely — there is no re-verification sweep. | `M18` | 2034 | `routes/console.php` |
+| `baselineOf()` turns "no checksum" into `''`, and only middleware turns it back. | `M31` | 2629 | `tests/Feature/Submissions/SubmissionEditRoutesTest.php` |
+| `gamification:backfill --sync` reports failure after it has already committed every award. | `M32` | 3533 | `app/Console/Commands/BackfillGamificationCommand.php` |
+| Route-model binding resolves BEFORE the three console gates, so a synthetic id 404s from the binding rather than from the middleware a test names. | `M67` | 3080 | `bootstrap/app.php` |
+| A line-splitting regex matches a byte INSIDE a UTF-8 character, and one faker name is enough to trigger it. | `M42` | 3657 | `tests/Feature/Audit/ImpersonationAttributionTest.php` · `docs/claims/lane-a.md` |
+| `throttle:saml-acs`'s route BINDING is asserted by nothing, while its registration is. | `M30` | 2850 | `tests/Feature/Sso/SsoLoginWebTest.php` · `routes/tenant.php` · `app/Providers/AppServiceProvider.php` · `tests/Feature/Sso/SsoAcsWebTest.php` +1 |
 | Twelve existing tenant-context call sites restore in a `finally` INSIDE their transaction, which is the shape `TenantContext::runFor()` was deliberately built … | `M3` | 708 | `app/Listeners/Auth/SendWelcomeEmail.php` · `app/Services/Admin/ImpersonationService.php` · `app/Services/Admin/SuperAdminService.php` · `app/Services/Auth/GoogleAuthRequestService.php` +3 |
-| The framework's own mail components interpolate into attributes the same way, and the M57 gate cannot reach them. | `M57` | 4102 | `scripts/mail-attribute-lint.php` · `resources/views/mail/notification.blade.php` |
+| The framework's own mail components interpolate into attributes the same way, and the M57 gate cannot reach them. | `M57` | 4101 | `scripts/mail-attribute-lint.php` · `resources/views/mail/notification.blade.php` |
 | M5's reconciliation asks "is this SUBMISSION in the destination", not "is THIS DELIVERY's row in the destination", so two rules writing one submission to one t… | `M5` | 810 | — *no file harvested* |
 | A 5xx that arrives AFTER the provider committed is still re-driven. | `M5` | 823 | — *no file harvested* |
 | A rotated token can still be lost in the one-UPDATE window M6 left. | `M6` | 875 | — *no file harvested* |
-| `users.last_active_tenant_id` has no writer anywhere in `app/`. | `M8` | 2165 | — *no file harvested* |
-| The database's uniqueness domain and the runtime's resolution domain now disagree about case, and `FormSlug::isTaken()` is the third resolver. | `M61` | 4314 | — *no file harvested* |
+| `users.last_active_tenant_id` has no writer anywhere in `app/`. | `M8` | 2164 | — *no file harvested* |
+| The database's uniqueness domain and the runtime's resolution domain now disagree about case, and `FormSlug::isTaken()` is the third resolver. | `M61` | 4313 | — *no file harvested* |
 
 ## Not live — listed, not hidden
 
@@ -114,31 +114,31 @@ listed here rather than dropped so that this file and that stop rule cannot disa
 
 | Row | Filed | Line | Cites (non-hub) |
 |---|---|---|---|
-| M8's GRANT removed an accidental backstop that a mutation argument was leaning on. | `M8` | 2156 | *hub files only* |
-| Two `WebhookRetrySweepTest` cases were passing for a reason unrelated to their names. | `M44` | 3484 | *hub files only* |
-| The data dictionary names nine of the forty-five constraints the migrations declare, while enumerating constraints exhaustively in places. | `M46` | 4376 | *hub files only* |
-| Four P3a refusal cases assert the exception CLASS and never the message. | `M12` | 1656 | `tests/Feature/Submissions/SubmissionDraftServiceTest.php` |
-| The delivery-rule modal's channel-refresh button is the same unguarded shape, GET-only. | `M23` | 2550 | `resources/js/components/integrations/RuleFormModal.vue` |
-| A semantic token is no guarantee of a visible element, and one more instance is probably out there. | `M23` | 2570 | `resources/js/components/builder/LogicRail.vue` |
-| Four `DO NOT RE-ASK` user decisions of record now live in `PROGRESS_ARCHIVE.md` rather than in `docs/claims/decisions.md`. | `M45` | 4741 | `docs/claims/decisions.md` |
-| The citation-liveness gate cannot see a behaviour negative, and its ledger ceiling counts deliberately-preserved historical filings. | `M46` | 4384 | `docs/feature-backlog.md` |
-| `routes/tenant.php`'s ~95 `can:` gates get none of M63's checks, and the derived half is expected to FIND something. | `M63` | 3193 | `routes/tenant.php` |
-| Any tenant-scoped policy read mounted on the Fortify group is silently blind, and two increments have now walked into it. | `M68` | 2251 | `config/fortify.php` |
-| `gamification:backfill --dry-run` cannot reveal a mis-scoring defect, by construction. | `M24` | 1732 | `app/Services/Gamification/BackfillTally.php` · `app/Console/Commands/BackfillGamificationCommand.php` |
-| Two SSO test files justify a real assertion with a rationale that is false on this framework version. | `M30` | 2861 | `tests/Feature/Sso/SsoLoginWebTest.php` · `tests/Feature/Sso/SsoLoginCompletionWebTest.php` |
-| `scripts/tracker-lint-controls.php` proves R7 against synthetic histories, and nothing proves it against a REAL GitHub `push` or squash. | `M49` | 4960 | `scripts/tracker-lint-controls.php` · `scripts/pre-push-guard.php` |
-| `docs/backlog-triage.md` keeps a tier-1 citation exemption whose stated reason stopped being true in the same increment. | `M65` | 3295 | `docs/backlog-triage.md` · `scripts/citation-liveness-lint.php` |
-| The liveness marker is gated for presence and nothing checks that a verdict is CORRECT — and the error rate of judging one is now measured rather than assumed. | `M65` | 3306 | `tests/Feature/Docs/BacklogProvenanceTest.php` · `scripts/loop.php` |
-| Thirteen Vitest stubs across four files are silently inert. | `M23` | 2557 | `resources/js/Pages/submissions/show.test.ts` · `resources/js/components/sso/cards.test.ts` · `resources/js/components/sso/SsoPolicyCard.test.ts` · `resources/js/Layouts/AppLayout.test.ts` +2 |
-| Every `MaintenanceJob` fan-out is proved one file at a time, so a future one inherits no coverage. | `M44` | 3495 | `tests/Feature/Queue/JobContractTest.php` · `app/Jobs/Maintenance/SweepWebhookRetriesJob.php` · `app/Jobs/Maintenance/SweepScheduledFormsJob.php` · `app/Jobs/Maintenance/RollUpUsageCountersJob.php` +5 |
+| M8's GRANT removed an accidental backstop that a mutation argument was leaning on. | `M8` | 2155 | *hub files only* |
+| Two `WebhookRetrySweepTest` cases were passing for a reason unrelated to their names. | `M44` | 3483 | *hub files only* |
+| The data dictionary names nine of the forty-five constraints the migrations declare, while enumerating constraints exhaustively in places. | `M46` | 4375 | *hub files only* |
+| Four P3a refusal cases assert the exception CLASS and never the message. | `M12` | 1655 | `tests/Feature/Submissions/SubmissionDraftServiceTest.php` |
+| The delivery-rule modal's channel-refresh button is the same unguarded shape, GET-only. | `M23` | 2549 | `resources/js/components/integrations/RuleFormModal.vue` |
+| A semantic token is no guarantee of a visible element, and one more instance is probably out there. | `M23` | 2569 | `resources/js/components/builder/LogicRail.vue` |
+| Four `DO NOT RE-ASK` user decisions of record now live in `PROGRESS_ARCHIVE.md` rather than in `docs/claims/decisions.md`. | `M45` | 4740 | `docs/claims/decisions.md` |
+| The citation-liveness gate cannot see a behaviour negative, and its ledger ceiling counts deliberately-preserved historical filings. | `M46` | 4383 | `docs/feature-backlog.md` |
+| `routes/tenant.php`'s ~95 `can:` gates get none of M63's checks, and the derived half is expected to FIND something. | `M63` | 3192 | `routes/tenant.php` |
+| Any tenant-scoped policy read mounted on the Fortify group is silently blind, and two increments have now walked into it. | `M68` | 2250 | `config/fortify.php` |
+| `gamification:backfill --dry-run` cannot reveal a mis-scoring defect, by construction. | `M24` | 1731 | `app/Services/Gamification/BackfillTally.php` · `app/Console/Commands/BackfillGamificationCommand.php` |
+| Two SSO test files justify a real assertion with a rationale that is false on this framework version. | `M30` | 2860 | `tests/Feature/Sso/SsoLoginWebTest.php` · `tests/Feature/Sso/SsoLoginCompletionWebTest.php` |
+| `scripts/tracker-lint-controls.php` proves R7 against synthetic histories, and nothing proves it against a REAL GitHub `push` or squash. | `M49` | 4959 | `scripts/tracker-lint-controls.php` · `scripts/pre-push-guard.php` |
+| `docs/backlog-triage.md` keeps a tier-1 citation exemption whose stated reason stopped being true in the same increment. | `M65` | 3294 | `docs/backlog-triage.md` · `scripts/citation-liveness-lint.php` |
+| The liveness marker is gated for presence and nothing checks that a verdict is CORRECT — and the error rate of judging one is now measured rather than assumed. | `M65` | 3305 | `tests/Feature/Docs/BacklogProvenanceTest.php` · `scripts/loop.php` |
+| Thirteen Vitest stubs across four files are silently inert. | `M23` | 2556 | `resources/js/Pages/submissions/show.test.ts` · `resources/js/components/sso/cards.test.ts` · `resources/js/components/sso/SsoPolicyCard.test.ts` · `resources/js/Layouts/AppLayout.test.ts` +2 |
+| Every `MaintenanceJob` fan-out is proved one file at a time, so a future one inherits no coverage. | `M44` | 3494 | `tests/Feature/Queue/JobContractTest.php` · `app/Jobs/Maintenance/SweepWebhookRetriesJob.php` · `app/Jobs/Maintenance/SweepScheduledFormsJob.php` · `app/Jobs/Maintenance/RollUpUsageCountersJob.php` +5 |
 | `replay.ts:223-228` hardcodes `conflict_code = 'form_updated'` on a client-side version guard. | `M14` | 1141 | `resources/public-runtime/lib/replay.ts` |
-| The command gate reads `README.md` only, and three other documents carry runnable command blocks. | `M59` | 4272 | `docs/TESTING-GUIDE.md` · `docs/ACCESS-MATRIX.md` · `docs/deployment-infrastructure.md` |
+| The command gate reads `README.md` only, and three other documents carry runnable command blocks. | `M59` | 4271 | `docs/TESTING-GUIDE.md` · `docs/ACCESS-MATRIX.md` · `docs/deployment-infrastructure.md` |
 | All sixteen synchronous dispatch listeners could now be `ShouldQueue`, and nothing has decided whether they should be. | `M3` | 695 | — *no file harvested* |
-| Nothing checks that a `§D<n>` citation names a section whose text supports it. | `M7` | 4550 | — *no file harvested* |
-| The sync surface's read and write are gated on different permission families, so no single non-admin role can complete the offline loop. | `M13` | 1600 | — *no file harvested* |
-| the dashboard card ranks the whole tenant to compute three numbers that need no ranking. | `M26` | 1757 | — *no file harvested* |
-| `loop assess` can only see what a row says about ITSELF, and two blind spots are now measured. | `M55` | 4499 | — *no file harvested* |
-| A pre-existing mixed-case `public_slug` row would have been taken dark by M61, and nothing in the repository can tell whether one exists. | `M61` | 4325 | — *no file harvested* |
+| Nothing checks that a `§D<n>` citation names a section whose text supports it. | `M7` | 4549 | — *no file harvested* |
+| The sync surface's read and write are gated on different permission families, so no single non-admin role can complete the offline loop. | `M13` | 1599 | — *no file harvested* |
+| the dashboard card ranks the whole tenant to compute three numbers that need no ranking. | `M26` | 1756 | — *no file harvested* |
+| `loop assess` can only see what a row says about ITSELF, and two blind spots are now measured. | `M55` | 4498 | — *no file harvested* |
+| A pre-existing mixed-case `public_slug` row would have been taken dark by M61, and nothing in the repository can tell whether one exists. | `M61` | 4324 | — *no file harvested* |
 
 ## Hub files — a batch may touch at most one
 
@@ -163,10 +163,10 @@ really coupled — and why excluding them is what makes the queue above separabl
 This is the greedy pick off the top of the queue above — a proposal to check, not a schedule.
 A row whose files were not harvested cannot be checked for collision and is not proposed.
 
-- **docs/feature-backlog.md:3708** — `M42` · *no non-hub file*
-- **docs/feature-backlog.md:1560** — `M13` · `openapi.json`
-- **docs/feature-backlog.md:2600** — `M39` · `.github/workflows/deploy.yml`
-- **docs/feature-backlog.md:4366** — `M46` · `docs/audit-compliance-logging-spec.md`
+- **docs/feature-backlog.md:3707** — `M42` · *no non-hub file*
+- **docs/feature-backlog.md:1559** — `M13` · `openapi.json`
+- **docs/feature-backlog.md:2599** — `M39` · `.github/workflows/deploy.yml`
+- **docs/feature-backlog.md:4365** — `M46` · `docs/audit-compliance-logging-spec.md`
 
 ## What this file cannot see
 
@@ -179,26 +179,26 @@ Rows with no harvested file:
 
 - `docs/feature-backlog.md:795` — A tabular rule that maps no Submission ID column still duplicates on an unconfirmed retry, and the durable fix is in the rule EDITOR rather than the adapter.
 - `docs/feature-backlog.md:830` — `SlackConnector::deliver()` has the same non-idempotent shape and is deliberately not covered.
-- `docs/feature-backlog.md:1611` — `promote()` re-asserts the version is published BEFORE the lock and never again under it.
-- `docs/feature-backlog.md:1513` — The `reviewer` role's seeded description and `SubmissionPolicy::create()` contradict each other.
-- `docs/feature-backlog.md:2050` — The tenant-facing SSO domains card on `/settings/sso` does not exist, so verification is operator-assisted.
-- `docs/feature-backlog.md:2065` — `MemberController::invite()` validates `['required', 'email', 'max:255']` and a role, with no domain-ownership check.
-- `docs/feature-backlog.md:2076` — Self-registration remains a way to occupy an address in a domain you do not control.
+- `docs/feature-backlog.md:1610` — `promote()` re-asserts the version is published BEFORE the lock and never again under it.
+- `docs/feature-backlog.md:1512` — The `reviewer` role's seeded description and `SubmissionPolicy::create()` contradict each other.
+- `docs/feature-backlog.md:2049` — The tenant-facing SSO domains card on `/settings/sso` does not exist, so verification is operator-assisted.
+- `docs/feature-backlog.md:2064` — `MemberController::invite()` validates `['required', 'email', 'max:255']` and a role, with no domain-ownership check.
+- `docs/feature-backlog.md:2075` — Self-registration remains a way to occupy an address in a domain you do not control.
 - `docs/feature-backlog.md:1310` — The storage-quota line counts strangers' submissions.
-- `docs/feature-backlog.md:3627` — Every hand-off prescribes a Pint command that scans ~40 fewer files than CI does.
-- `docs/feature-backlog.md:2835` — `PUT /user/profile-information` is a second mail cannon, and it is the one Fortify write route left deliberately unbound.
-- `docs/feature-backlog.md:1666` — Every object-valued answer that the piping layer excludes renders as `json_encode` machine noise on the inbox, the export and the PDF — because those three sur…
-- `docs/feature-backlog.md:1445` — Nothing offers a way out of a refused correction except a browser reload.
-- `docs/feature-backlog.md:1640` — The promote route still documents neither of its two 403 causes nor its 422, and the generator cannot narrow a refusal family to one route.
-- `docs/feature-backlog.md:1430` — After a refused Submit the browser's leave prompt is gone for the rest of the page's life.
+- `docs/feature-backlog.md:3626` — Every hand-off prescribes a Pint command that scans ~40 fewer files than CI does.
+- `docs/feature-backlog.md:2834` — `PUT /user/profile-information` is a second mail cannon, and it is the one Fortify write route left deliberately unbound.
+- `docs/feature-backlog.md:1665` — Every object-valued answer that the piping layer excludes renders as `json_encode` machine noise on the inbox, the export and the PDF — because those three sur…
+- `docs/feature-backlog.md:1444` — Nothing offers a way out of a refused correction except a browser reload.
+- `docs/feature-backlog.md:1639` — The promote route still documents neither of its two 403 causes nor its 422, and the generator cannot narrow a refusal family to one route.
+- `docs/feature-backlog.md:1429` — After a refused Submit the browser's leave prompt is gone for the rest of the page's life.
 - `docs/feature-backlog.md:810` — M5's reconciliation asks "is this SUBMISSION in the destination", not "is THIS DELIVERY's row in the destination", so two rules writing one submission to one t…
 - `docs/feature-backlog.md:823` — A 5xx that arrives AFTER the provider committed is still re-driven.
 - `docs/feature-backlog.md:875` — A rotated token can still be lost in the one-UPDATE window M6 left.
-- `docs/feature-backlog.md:2165` — `users.last_active_tenant_id` has no writer anywhere in `app/`.
-- `docs/feature-backlog.md:4314` — The database's uniqueness domain and the runtime's resolution domain now disagree about case, and `FormSlug::isTaken()` is the third resolver.
+- `docs/feature-backlog.md:2164` — `users.last_active_tenant_id` has no writer anywhere in `app/`.
+- `docs/feature-backlog.md:4313` — The database's uniqueness domain and the runtime's resolution domain now disagree about case, and `FormSlug::isTaken()` is the third resolver.
 - `docs/feature-backlog.md:695` — All sixteen synchronous dispatch listeners could now be `ShouldQueue`, and nothing has decided whether they should be.
-- `docs/feature-backlog.md:4550` — Nothing checks that a `§D<n>` citation names a section whose text supports it.
-- `docs/feature-backlog.md:1600` — The sync surface's read and write are gated on different permission families, so no single non-admin role can complete the offline loop.
-- `docs/feature-backlog.md:1757` — the dashboard card ranks the whole tenant to compute three numbers that need no ranking.
-- `docs/feature-backlog.md:4499` — `loop assess` can only see what a row says about ITSELF, and two blind spots are now measured.
-- `docs/feature-backlog.md:4325` — A pre-existing mixed-case `public_slug` row would have been taken dark by M61, and nothing in the repository can tell whether one exists.
+- `docs/feature-backlog.md:4549` — Nothing checks that a `§D<n>` citation names a section whose text supports it.
+- `docs/feature-backlog.md:1599` — The sync surface's read and write are gated on different permission families, so no single non-admin role can complete the offline loop.
+- `docs/feature-backlog.md:1756` — the dashboard card ranks the whole tenant to compute three numbers that need no ranking.
+- `docs/feature-backlog.md:4498` — `loop assess` can only see what a row says about ITSELF, and two blind spots are now measured.
+- `docs/feature-backlog.md:4324` — A pre-existing mixed-case `public_slug` row would have been taken dark by M61, and nothing in the repository can tell whether one exists.

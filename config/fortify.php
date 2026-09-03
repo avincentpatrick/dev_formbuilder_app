@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\AppSecurityHeaders;
+use App\Http\Middleware\EnforceTenantTwoFactorOnFortify;
 use App\Http\Middleware\EstablishTenantDatabaseContext;
 use App\Http\Middleware\GateRegistration;
 use App\Http\Middleware\RequirePlatformHost;
@@ -161,6 +162,25 @@ return [
     // does, and the reason it is listed there is measured rather than argued: see that call site. In
     // short, an unlisted middleware still ends up after `auth`, so the entry is about refusing BEFORE
     // EstablishTenantDatabaseContext's database round trip, not about resolving the user.
+    //
+    // ⚠️ EnforceTenantTwoFactorOnFortify (M68) IS HERE FOR THE FOURTH TIME FOR THE SAME REASON — no
+    // per-route hook. M66 mounted EnforceTenantTwoFactor on the /api/v1 token-mint group and filed the row
+    // saying the mint was never the only way past it: this group serves tenant subdomains, so an unenrolled
+    // member under `security.require_two_factor`, bounced from every page of the workspace, could still
+    // PUT /user/profile-information and PUT /user/password.
+    //
+    // ⛔ IT IS A PER-ROUTE MAP AND NOT THE GATE ITSELF, AND THAT IS NOT FASTIDIOUSNESS. Adding
+    // EnforceTenantTwoFactor to this array directly would gate all twenty-six Fortify routes and close the
+    // escape hatch its own docblock calls the whole design — the 2FA enrolment routes, `POST /logout`
+    // (which that docblock names in terms: "do not tidy it inside"), and the `password.confirm` trio that
+    // `twoFactorAuthentication(['confirmPassword' => true])` below routes enrolment through. See that class
+    // for the three carve-outs and for why the route NAMES are not the obvious ones.
+    //
+    // Its position in THIS array is not what decides when it runs, and unlike ThrottleFortifyEndpoints it
+    // is deliberately ABSENT from bootstrap/app.php's priority() list — which is what leaves it at the end
+    // of the sorted stack, after `auth` and after EstablishTenantDatabaseContext, where the user is
+    // resolved and the tenant-scoped settings read has its RLS GUC. Measured on the live route table both
+    // ways rather than assumed.
     'middleware' => [
         'web',
         RequirePlatformHost::class,
@@ -168,6 +188,7 @@ return [
         GateRegistration::class,
         ThrottleFortifyEndpoints::class,
         EstablishTenantDatabaseContext::class,
+        EnforceTenantTwoFactorOnFortify::class,
     ],
 
     /*

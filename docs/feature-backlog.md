@@ -3129,7 +3129,22 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   and settling it is the job of whichever increment takes it. **Not live** — a stated limit of the gate,
   filed so the next reader does not have to rediscover it. Filed by `M65`.
 
-- **`minor` · `routes/api.php:114-116` describes a middleware ordering the priority sorter does not produce.**
+- ✅ **CLOSED BY `M67` (2026-09-03) — `minor` · ~~`routes/api.php:114-116` describes a middleware ordering the priority sorter does not produce.~~**
+  The claim is struck and the real order is now asserted, by execution rather than by reading:
+  `TenancyMiddlewarePriorityTest` sorts the RESOLVED stack for `api.v1.submissions.promote` and requires
+  `ThrottleRequests` ahead of `RequireFeature`.
+  ⛔ **THE ROW POSED A DECISION AND IT HAS ONE DEFENSIBLE ANSWER, so `M67` took it rather than filing it.**
+  Making the comment true means hoisting the feature gate ABOVE the limiter, which puts a
+  tenancy-resolving, database-backed lookup in front of it — an unauthenticated flood would then pay for
+  that lookup before being limited. `bootstrap/app.php`'s own `ThrottleFortifyEndpoints` entry already
+  argues the principle (`M43`): what a limiter's slot buys is BOUNDING THE WORK. The claim was the defect.
+  ⚠️ **THE ROW'S CITATION HAD DRIFTED** — the comment had moved down the file — which is why it is not
+  re-cited by line here. ✅ **Checked for siblings and there are none**: the only other occurrences of the
+  phrase are quotations of it (this row, `lane-b.md`'s historical record, and the new test's rationale).
+  ⚠️ Proved by mutation: un-listing `ThrottleRequests` from the priority array reddens the new arm and
+  leaves the four pre-existing ones green.
+
+  ⓘ The original row, kept for its evidence and for the filer of record below:
   Re-read at source rather than taken from the report: the comment states that `feature:api_access` runs *"before throttle so a no-feature tenant is refused before
   consuming a burst slot"*. **Measured with `route:list`, which prints the SORTED list: `ThrottleRequests:api`
   is hoisted to FIRST**, ahead of tenancy, auth and the feature gate — so a no-feature tenant **does** consume

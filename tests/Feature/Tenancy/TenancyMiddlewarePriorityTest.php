@@ -6,9 +6,11 @@ use App\Http\Middleware\AuthenticateApiToken;
 use App\Http\Middleware\EnforceTenantMaintenance;
 use App\Http\Middleware\EstablishTenantDatabaseContext;
 use App\Http\Middleware\InitializeTenancyByPublicHost;
+use App\Http\Middleware\RequireFeature;
 use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
 use Illuminate\Foundation\Http\Kernel as HttpKernel;
 use Illuminate\Routing\Middleware\SubstituteBindings;
+use Illuminate\Routing\Middleware\ThrottleRequests;
 use Illuminate\Routing\Route;
 use Illuminate\Routing\Router;
 use Illuminate\Routing\SortedMiddleware;
@@ -110,4 +112,54 @@ it('leaves nothing the app actually routes on promoted ahead of the session', fu
     foreach ([InitializeTenancyByPublicHost::class, InitializeTenancyBySubdomain::class, PreventAccessFromCentralDomains::class] as $routed) {
         expect(array_search($routed, $priority, true))->toBeGreaterThan($session);
     }
+});
+
+it('resolves the api burst throttle AHEAD of the api_access feature gate, as routes/api.php now says', function (): void {
+    // ⛔ M67. `routes/api.php` used to promise the OPPOSITE — that `feature:api_access` ran *"before throttle
+    // so a no-feature tenant is refused before consuming a burst slot"*. It never did. `ThrottleRequests` is
+    // named in bootstrap/app.php's priority array and `RequireFeature` is not, and SortedMiddleware hoists
+    // the LISTED classes past the unlisted ones, so the limiter resolves FIRST — ahead of tenancy, auth and
+    // the feature gate alike. A no-feature tenant does consume a slot, and the protection did not exist.
+    //
+    // ⚠️ THE COMMENT WAS STRUCK RATHER THAN MADE TRUE, AND THE REASON IS IN THE ARRAY IT WOULD HAVE HAD TO
+    // MOVE. Making it true means hoisting `RequireFeature` ABOVE `ThrottleRequests`, which puts a
+    // tenancy-resolving, database-backed lookup in front of the rate limiter — so an unauthenticated flood
+    // would pay for that lookup before being limited. bootstrap/app.php's own ThrottleFortifyEndpoints entry
+    // already argues this: what a limiter's slot buys is BOUNDING THE WORK. The claim was the defect, not
+    // the ordering.
+    //
+    // ⚠️ MEASURED, NOT REASONED (M43). Reading the priority array gives the wrong answer often enough that
+    // this asserts the RESOLVED stack for a route the app actually serves.
+    $route = collect(app(Router::class)->getRoutes()->getRoutes())
+        ->first(fn (Route $r): bool => $r->getName() === 'api.v1.submissions.promote');
+
+    expect($route)->not->toBeNull('the api/v1 promote route is gone — re-point this assertion rather than deleting it');
+
+    // ⛔ `gatherRouteMiddleware()`, NOT `$route->gatherMiddleware()`, AND THE FIRST DRAFT OF THIS TEST WENT
+    // RED ON THE DIFFERENCE. The route's own method returns the raw ALIASES (`throttle:api`,
+    // `feature:api_access`); only the Router resolves them to class names, and the priority sort operates on
+    // the resolved list. Sorting the aliases finds neither class and reports the limiter missing entirely.
+    $stack = array_values((new SortedMiddleware(
+        app(HttpKernel::class)->getMiddlewarePriority(),
+        app(Router::class)->gatherRouteMiddleware($route),
+    ))->all());
+
+    $throttle = null;
+    $featureGate = null;
+
+    foreach ($stack as $index => $entry) {
+        // Both carry parameters (`throttle:api`, `feature:api_access`), so the stack holds
+        // `Class:args` strings and an exact-match search finds neither.
+        if ($throttle === null && str_starts_with($entry, ThrottleRequests::class)) {
+            $throttle = $index;
+        }
+
+        if ($featureGate === null && str_starts_with($entry, RequireFeature::class)) {
+            $featureGate = $index;
+        }
+    }
+
+    expect($throttle)->toBeInt('no ThrottleRequests on the api/v1 stack — the burst limiter is gone entirely');
+    expect($featureGate)->toBeInt('no RequireFeature on the api/v1 stack — the api_access gate is gone entirely');
+    expect($throttle)->toBeLessThan($featureGate);
 });

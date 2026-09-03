@@ -16,45 +16,128 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M68` is merged; a row's remedy can be IMPOSSIBLE rather than wrong, and it fails GREEN
+## Status: ACTIVE CLAIM — `M69`, the fourth batched increment: four rows, and the two that understate themselves (m69-batched-rows)
 
-`M68` closed **four** rows, filed **four** and refined a sibling, so the open count moved 83 → 79 → **83**
-and stayed at **zero `major`** with `UNMARKED=0`. `state.php` counts the tree; do not take that sentence's
-arithmetic on trust.
+Taken 2026-09-04. Branch `m69-batched-rows`, cut from `origin/main` at `08e2a31`, PR into `main`.
 
-⚠️ **THE ONE THING `M68` WOULD MOST LIKE TO HAND ON: BUILDING THE ROW'S REMEDY IS SOMETIMES THE ONLY WAY TO
-FIND OUT IT CANNOT WORK — AND THE WRONG VERSION IS GREEN.** `M66` handed on that the remedy is the half
-nobody checks; `M67` handed on that the **premise** is the level under that. `M68`'s `R2` failed at neither
-exactly: its premise held, its evidence held, and the fix it implies — mount the existing gate — produces a
-gate that **can never fire**. The Fortify group has no tenancy middleware, so the tenant-scoped settings
-read answers `false` for every workspace in the deployment. Correctly mounted, fully green, permanently
-blind.
+Four rows under `D13`, sharing no non-hub file, exactly one touching a hub file. Run `php scripts/state.php`
+for every number in this block; none of it is authoritative here.
 
-1. **The failure was silent by construction, not by oversight.** Under `settings`'s nullable_global SELECT
-   policy a tenant's own rows are *invisible* rather than absent without its context — no exception, no row
-   count, nothing to assert on. **Three behavioural cases failing with the write succeeding is the only
-   thing that said so.**
-2. ⛔ **The answer was already in the tree and had been written down twice.** `RegistrationGate` hit the
-   identical wall on `/register` in I5, and both it and `TenantSettingRegistry::forTenant()` say so in their
-   docblocks. `M68` walked into it anyway. **Prose at the site is not a mechanism** — it is filed as its own
-   row for exactly that reason.
-3. **A row's carve-outs are part of its premise.** `R2` names one route that must stay ungated; there are
-   three, and the second is named *in terms* in the very docblock the row is about.
+- **Row 1** — `docs/feature-backlog.md` · *`SyncSubmissionResultResource`'s generated contract types
+  `submission` and `error` as bare strings.* Filed by `M13`, widened by `M68`. Non-hub: `openapi.json`.
+- **Row 2** — `docs/feature-backlog.md` · *Two hand-maintained lists of queued mail notifications must
+  agree, and nothing checks that they do.* Filed by `M66`. Non-hub:
+  `tests/Feature/Mail/QueuedMailContractTest.php` · `scripts/job-payload-lint.php`.
+- **Row 3** — `docs/feature-backlog.md` · *`deploy.yml`'s effective trigger CHANGED in `M39`, and nothing
+  says so at the site.* Filed by `M39`. Non-hub: `.github/workflows/deploy.yml`.
+- **Row 4** — `docs/feature-backlog.md` · *The claim template has a field for a row's evidence and a field
+  for its remedy, and the thing that actually went wrong in `M60` was neither.* Filed by `M60`.
+  Non-hub: `docs/claims/TEMPLATE.md`. **HUB: `CLAUDE.md`** — the one hub-touching row.
 
-⚠️ **AND A TEST CAN BE GREEN WHILE BLIND TO THE MECHANISM IT NAMES.** `R3`'s follow-up case survived two
-mutations because its setup never armed the flag it was written to protect — typing arms a debounce timer,
-and the flag is set one layer down. Corrected, one mutation is now CAUGHT and the other still SURVIVES; the
-comment says which is proven and which is belief.
+⛔ **NOT TAKEN, AND WHY, SO NOBODY RE-DERIVES IT.** The triage's greedy top pick is `M42`'s *`tracker-lint`
+R8 guards `CLAUDE.md` and cannot reach `PROGRESS.md`*: it would be a **second** hub row, and its own text
+names a precondition (`## Next Session` must move first, under its own `major` row) that `state.php` now
+reports as zero open `major` — so that precondition is either met or the row is stale, and settling which is
+the first hour of whoever takes it. `M68`'s *`@throws` sweep* row collides with Row 1 on
+`tests/Feature/Api/OpenApiContractTest.php`.
 
-⛔ **A PROTOCOL MISS, RECORDED RATHER THAN LEFT FOR A DIFF READER: the claim was NOT extended and five files
-were opened outside it.** Nothing collided because there is one writer — which is why it went unnoticed and
-not why it was acceptable.
+### Evidence verified
 
-⛔ **`D9` must never be started without an explicit answer.** Open decisions: `D1`, `D3`, `D4`, `D8`, `D9`,
-`D10`, `D11`, `D12`. `D12` — whether to end the M-series — is still the one thing that needs the user, and
-`M68` deliberately did not touch it. **`D13` is answered, proven three times, and not to be re-asked.**
+- **Row 1 — HELD.** `openapi.json`'s `SyncSubmissionResultResource` schema publishes
+  `submission: {type: string}` and `error: {type: string}` and lists **both in `required`**, while
+  `SyncSubmissionController::failure()` returns `null` for each on every failure arm. Both citations open
+  and say what the row says.
+- **Row 2 — HELD.** `scripts/job-payload-lint.php`'s `EXEMPT_JOBS` and
+  `tests/Feature/Mail/QueuedMailContractTest.php`'s `$queuedMailNotifications` both exist, both are
+  hand-maintained, eleven entries each, currently in agreement.
+- **Row 3 — HELD.** `.github/workflows/deploy.yml`'s header comment says only that it runs after CI
+  succeeds on `main`; nothing at the site records that the trigger's meaning changed. `gh variable list`
+  returns empty (exit 0), so `DEPLOY_ENABLED` is still unset and the job is still dormant.
+- **Row 4 — HELD.** `docs/claims/TEMPLATE.md` requires exactly `### Evidence verified` and
+  `### Remedy verdict`; `CLAUDE.md`'s claim bullet reads *"Verify the row's evidence and its remedy
+  separately"*.
 
-⛔ **RUN `php scripts/state.php` FOR EVERY NUMBER.**
+⚠️ **TWO ROWS UNDERSTATE THEMSELVES, both found by opening the citation and looking at what sat next to it.**
+
+1. **Row 1, twice over.** (a) `status` is typed a bare string too, and it is the *first* thing an integrator
+   branches on — the controller emits a closed set of five (`created`, `duplicate`, `invalid`, `conflict`,
+   `error`), enumerated nowhere. (b) `M68`'s widening says *"the four codes an integrator must branch on"*;
+   the controller emits at least **nine** — `form_version_not_found`, `form_not_found`, `forbidden`,
+   `submission_invalid`, `submission_conflict`, `submission_version_superseded`, plus
+   `FormNotAcceptingSubmissionException`'s own `form_not_open` / `form_closed` / `max_responses_reached`.
+2. **Row 2.** The existing arm that reads the linter source already proves **one** direction — every
+   test-list entry is in `EXEMPT_JOBS`. The row is really about the **reverse** direction, which is the
+   direction `ConnectorRulePausedNotification` escaped through.
+
+### Premise verified
+
+⚠️ **THIS FIELD DOES NOT EXIST IN `docs/claims/TEMPLATE.md` YET — Row 4 is the row that adds it.** Written
+here first, deliberately: the increment that introduces a field should be the first to answer it, and a
+field whose author never had to fill one in is the decorative-gate shape `M43` measured.
+
+The question it asks is not *"do the citations resolve"* — that is `Evidence verified` — but *"is what this
+row believes about the world **around** the defect still true?"* That is the half that rotted in `M45`
+(a file framed as a second copy that had zero overlap), `M60` (a two-writer boundary that `M50` had
+abolished) and three of `M67`'s four rows.
+
+- **Row 1 — HOLDS, and its stated blocker has expired.** The row was parked because *"`openapi.json` is
+  generated and CI diffs it against a fresh export, so a hand edit fails the contract job."* Still true, and
+  no longer the end of the argument: `M67` and `M68` both documented statuses by teaching the **generator**.
+  The row says so itself and calls the candidate untried.
+- **Row 2 — HOLDS, with one nuance that changes how the assertion must be written.** The row warns that
+  `EXEMPT_JOBS` *"legitimately contains non-notification jobs, so it is the notification subset that must
+  match."* **Today it contains none** — all eleven entries are notifications. So whole-set equality would
+  pass today and be wrong in principle. The subset predicate gets written anyway, and it is proved against a
+  synthetic non-notification entry so the filter is not vacuous.
+- **Row 3 — HEADLINE HOLDS; HALF THE REMEDY IS ALREADY DISCHARGED AT A DIFFERENT SITE.** The row asks for
+  *"a comment plus a decision about whether `paths-ignore` should also guard deploys."* The tree already
+  answers the second half: `ci.yml`'s `push` filter ignores the five close-out doc paths, so a docs-only
+  push **produces no CI run at all**, hence no `workflow_run` event, hence `deploy.yml` cannot fire on one —
+  and `ci.yml`'s own comment says this in terms. What is left is only whether to duplicate that guard inside
+  `deploy.yml`, which would be a second description of one fact — the `M56` defect class. Recorded as `D14`
+  with the recommendation **document, do not duplicate**, and taken in the same turn.
+- **Row 4 — HOLDS.** Its one plausible objection is that a claim artefact has two writers; `lane-b.md` is
+  `RETIRED` and `ADR-0022` records the collapse to one lane, so the objection is moot.
+
+### Remedy verdict
+
+- **Row 1 — NONE PRESCRIBED BEYOND A DIRECTION, and the direction is measured before the test is written.**
+  The row names *"a typed shape on that method rather than an annotation"* and calls it untried. Three
+  candidates in preference order: a precise array-shape return annotation (the idiom already exists ~20
+  times in this tree); a locally-constructed array literal Scramble can trace statically (the documented
+  reason `LeaderboardEntryResource` exists at all); a type-to-schema extension appended to the six in
+  `AppServiceProvider` — appended, because precedence there is that list read **backwards**. Which one works
+  is recorded in the release, not guessed at here.
+- **Row 2 — PRESCRIBED, AND SOUND.** *"An arm in `QueuedMailContractTest` that parses `EXEMPT_JOBS` and
+  asserts the two sets are equal."* Implementable as written, subject to the subset nuance above.
+- **Row 3 — PRESCRIBED, AND HALF OF IT IS ALREADY DONE.** The comment is owed; the `paths-ignore` decision
+  is answered by the tree, so it becomes a recorded decision rather than a change.
+- **Row 4 — TWO SHAPES OFFERED, THE CHOICE PUT TO THE USER AND ANSWERED.** The row floats a third heading
+  versus folding the question into `Evidence verified`, and objects to both. **The user chose the third
+  heading, gated** — so it ships paired: `scripts/preflight.php` checks an **ACTIVE** claim block carries all
+  three headings (behavioural), a Pest doc arm checks `TEMPLATE.md` still declares them (structural). The
+  active block only — retro-fitting `## RELEASED` history would be red on arrival, which `M40` established
+  can never merge.
+
+Files: `app/Http/Resources/Api/V1/SyncSubmissionResultResource.php`, `openapi.json`,
+`tests/Feature/Api/SyncApiTest.php`, `tests/Feature/Mail/QueuedMailContractTest.php`,
+`scripts/job-payload-lint.php`, `.github/workflows/deploy.yml`, `docs/claims/decisions.md`,
+`docs/claims/TEMPLATE.md`, `CLAUDE.md`, `scripts/preflight.php`, a new file under `tests/Feature/Docs/`,
+`docs/feature-backlog.md`, `docs/claims/lane-a.md`, `PROGRESS.md` (own block only),
+`docs/gate-baselines.md`, `docs/backlog-triage.md`. `app/Support/OpenApi/ApiErrorEnvelope.php` **only if**
+Row 1 needs the second or third mechanism — its inner error object is the one description of that shape and
+a second one is the defect it exists to prevent.
+Shared artefacts taken: `openapi.json`, `CLAUDE.md`, `docs/claims/TEMPLATE.md`, `docs/claims/decisions.md`,
+`docs/feature-backlog.md`, `docs/gate-baselines.md`, `docs/backlog-triage.md`, `PROGRESS.md` (own block only).
+Paired files taken: `scripts/job-payload-lint.php` and `tests/Feature/Mail/QueuedMailContractTest.php` — Row
+2 is precisely the rule that they must be edited together, so this claim takes both halves.
+Namespaces spent: **nothing from either namespace** — no migration, no ADR. One decision id, `D14`.
+Prediction: **Contract (OpenAPI) moves, and it is the one I most expect to be wrong** — Row 1's mechanism is
+untried by the row's own admission, and if the annotation form is ignored by the installed Scramble the fix
+grows a class. Pest moves on three rows. PHPStan **may** move: Row 1 is the only diff inside `app/`, and
+Rows 2-4 are `scripts/`, `tests/`, `docs/` and `.github/`, which **cannot** move it — the delta gets
+measured against the base tree, never quoted from an unchanged number. Pint, Vitest, axe and E2E unchanged;
+**no e2e spec is reached by this diff** and that is the reason none is run, not an omission.
 
 ---
 

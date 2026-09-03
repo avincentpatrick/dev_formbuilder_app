@@ -69,6 +69,16 @@ export interface ServerAutosave {
     baseline: Ref<string | null>;
     /** Force an immediate save if dirty. Awaits the in-flight request. */
     flush: () => Promise<void>;
+    /**
+     * Increment M68 — settle any save ALREADY in flight without starting a new one, so `baseline` is
+     * current. For a caller that is about to write this document itself. {@see standDown} is its pair.
+     */
+    settle: () => Promise<void>;
+    /**
+     * Increment M68 — tear the loop down WITHOUT the last-chance write, for a caller that is about to
+     * write this document itself. {@see dispose} is the ordinary teardown and still writes.
+     */
+    standDown: () => void;
     dispose: () => void;
 }
 
@@ -476,6 +486,71 @@ export function createServerAutosave(options: ServerAutosaveOptions): ServerAuto
      * `keepalive` so the request survives the teardown, and deliberately fire-and-forget: there is no one
      * left to tell, and awaiting it would block the navigation the keyer asked for.
      */
+    /**
+     * The teardown both exits share: timers and the unload listener. Writes NOTHING, by construction —
+     * which is the whole reason it is extracted rather than inlined twice.
+     */
+    function teardown(): void {
+        clearTimers();
+        if (typeof window !== 'undefined') {
+            window.removeEventListener('beforeunload', onBeforeUnload);
+        }
+    }
+
+    /**
+     * Increment M68 — settle a save ALREADY in flight, and start no new one.
+     *
+     * ⛔ THE `while` IS NOT DEFENSIVE, AND `pendingWhileInFlight = false` IS NOT A TIDY-UP. `run()`'s own
+     * `finally` starts a FOLLOW-UP request when work arrived during the one it is completing, and that
+     * continuation runs BEFORE an `await inFlight` here resolves — so awaiting once returns with a brand
+     * new request in flight, which is the exact writer this function exists to be rid of. Clearing the
+     * flag first stops the chain being armed; the loop is what makes that true even if it was armed by a
+     * keystroke landing between the two statements.
+     *
+     * ⚠️ WORK TYPED DURING THAT LAST REQUEST IS DELIBERATELY NOT SAVED BY THIS CHANNEL. It is not lost:
+     * the only caller posts the FULL answer map immediately afterwards, and the endpoint it posts to
+     * saves before it promotes. Saving it here as well is precisely the second writer the M62 row is
+     * about.
+     */
+    async function settle(): Promise<void> {
+        while (inFlight !== null) {
+            pendingWhileInFlight = false;
+            // ⚠️ SWALLOWED, because this function's job is to WAIT and not to report. `send()` catches its
+            // own transport failures, but a rejection escaping it here would propagate out of an `async`
+            // click handler as an unhandled rejection AND leave the caller's `submitting` flag stuck true —
+            // a permanently disabled Submit button. The failure is already the loop's own to surface
+            // through `state` and `message`.
+            await inFlight.catch(() => undefined);
+        }
+    }
+
+    /**
+     * Increment M68 — stand the loop down without the last-chance write.
+     *
+     * ⛔ WHY THIS EXISTS RATHER THAN `dispose()` BEING CALLED FROM `submit()`. `dispose()` posts a
+     * keepalive carrying `baseline` — and the Submit that called it posts the SAME `baseline` a
+     * statement later. Both land on `updateDraft()`'s `lockForUpdate`, the winner advances the checksum,
+     * and **the loser is refused `draftConcurrentlyModified()`**: the keyer is told their draft "was
+     * changed somewhere else" on a page with no somewhere else. Which of the two is refused is timing,
+     * and it does not need settling, because removing one writer removes the race in every ordering.
+     *
+     * ⛔ AND IT MUST CLEAR `dirty`, WHICH IS NOT COSMETIC. `postKeepalive()` does not touch `dirty`, so
+     * before M68 a dirty Submit fired the keepalive TWICE — once from `submit()`'s `dispose()` and again
+     * from `onBeforeUnmount(dispose)` when the successful redirect remounted the page, since `dirty` was
+     * still true and that is the only condition `dispose()` tests. Clearing it here is what makes the
+     * later unmount a genuine no-op instead of a third writer.
+     *
+     * ⚠️ `state` is deliberately NOT set to `stopped`: that is the terminal state, it renders the red
+     * "your changes are no longer being saved" alert through `message`, and this is not a failure. It
+     * also means the answer watcher re-arms the loop on the next keystroke, which is what a keyer who
+     * gets a 422 back and keeps typing needs.
+     */
+    function standDown(): void {
+        dirty = false;
+        pendingWhileInFlight = false;
+        teardown();
+    }
+
     function dispose(): void {
         if (state.value !== 'stopped' && (dirty || debounceTimer !== null)) {
             if (inFlight === null) {
@@ -500,17 +575,17 @@ export function createServerAutosave(options: ServerAutosaveOptions): ServerAuto
                 });
             }
         }
-        clearTimers();
-        if (typeof window !== 'undefined') {
-            window.removeEventListener('beforeunload', onBeforeUnload);
-        }
+        teardown();
     }
 
     // Guarded, because this composable is also driven directly from Vitest with no component around it, and
     // an unguarded lifecycle hook warns there. Inside `Encode.vue` the instance exists and unmount cleans up.
+    //
+    // Wrapped rather than passed by reference: `dispose` now has siblings, and a hook invoked with an
+    // argument by some future Vue version must not silently become a call to a different overload.
     if (getCurrentInstance() !== null) {
-        onBeforeUnmount(dispose);
+        onBeforeUnmount(() => dispose());
     }
 
-    return { state, savedAt, completeness, expiresAt, message, baseline, flush, dispose };
+    return { state, savedAt, completeness, expiresAt, message, baseline, flush, settle, standDown, dispose };
 }

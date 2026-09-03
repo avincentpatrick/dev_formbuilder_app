@@ -2923,8 +2923,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   and add a CI step. The phrase *"lint gate"* is Lane A's own from `M36`, not the user's answer to `D5`.
   ➕ **The liveness half is filed rather than done, and the reason is in the row below.**
 
-- **`minor` · 31 of the 84 open rows say nothing about whether they are still live, and the marker is
-  reported rather than gated.** `M64` normalised provenance and could not normalise this in the same
+- ✅ **CLOSED BY `M65` (2026-09-03) — `minor` · ~~31 of the 84 open rows say nothing about whether they are still live, and the marker is
+  reported rather than gated.~~** `M64` normalised provenance and could not normalise this in the same
   pass, so it is filed the moment that was decided rather than left in a commit message. `state.php`
   now counts the marker — **live 39 · latent 4 · not-live 10 · UNMARKED 31** — and
   `tests/Feature/Docs/BacklogProvenanceTest.php` deliberately does **not** require it.
@@ -2941,8 +2941,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   it — that is `M55`'s stated limit, and it is a floor rather than a hole precisely because 31 rows
   are silent. **Live.** Filed by `M64`.
 
-- **`minor` · `docs/backlog-triage.md` ranks the queue by a census that is now 107 commits stale, and
-  its top three items are all closed.** Read at source rather than taken on report: its *"Priority
+- ✅ **CLOSED BY `M65` (2026-09-03) — `minor` · ~~`docs/backlog-triage.md` ranks the queue by a census that is now 107 commits stale, and
+  its top three items are all closed.~~** Read at source rather than taken on report: its *"Priority
   queue — what to take next"* opens with three `major` items — the unthrottled Fortify endpoints, the
   four maintenance fan-outs, and five documentation-truth rows — and `state.php` counts **zero open
   `major`**. Anyone following `CLAUDE.md`'s instruction to *"read `docs/backlog-triage.md` first for
@@ -2954,6 +2954,45 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   ⛔ **DELIBERATELY NOT FIXED IN `M64` AND FILED THE MOMENT THAT WAS DECIDED.** Re-ranking 84 rows is
   a triage pass, not an edit, and it is the same judgement the liveness row above needs — the two
   should be taken together, by whoever takes either. **Live.** Filed by `M64`.
+
+- **`minor` · `scripts/backlog-triage.php --check` is wired into nothing, so the generated triage can drift
+  with no gate saying so.** **`M65` decided against wiring it and recorded that the moment it was decided.**
+  The generator has a `--check` mode that regenerates into memory and compares the derived body against
+  disk, and it was proved both ways rather than asserted — clean on a fresh generation, exit 1 after one
+  hand edit to the census, clean again after a byte-comparison restore. ⛔ **What it lacks is a caller.** A
+  `scripts/*-lint.php` sibling needs a `composer.json` alias, an entry in the `quality` aggregate and its
+  own `ci.yml` step, because no CI job runs the `quality` aggregate — and `ci.yml` is the user's. A Pest arm
+  under `tests/Feature/` would need no CI step, but it would have to shell out to `git` from inside the app
+  container to resolve the trunk sha. ⚠️ **And wiring it changes what a close-out is OBLIGED to do**, since
+  the file goes stale by construction on every merge that touches a row: that is a decision about protocol
+  rather than a fix, which is why it is filed instead of taken. **Live** — the drift is reachable the moment
+  anyone edits the file by hand or closes a row without regenerating. Filed by `M65`.
+
+- **`minor` · `docs/backlog-triage.md` keeps a tier-1 citation exemption whose stated reason stopped being
+  true in the same increment.** **`M65` falsified the reason and did not act on it.**
+  `scripts/citation-liveness-lint.php` excludes the file as *"a point-in-time census whose whole value is
+  that it records what was true on the day it was measured"* — exactly right of a hand-written census, and
+  wrong of a generated one, whose citations are repaired by regenerating rather than destroyed by it. On the
+  merits it is now the ideal tier-1 candidate rather than an exemption. ⛔ **IT WAS NOT PROMOTED AND THE
+  REASON IS ARITHMETIC:** the ledger tier sits at 18 rotten against a ceiling of 18 with a strict `>`, so
+  harvesting a second file's citations with zero headroom risks reddening the gate on a change that fixes
+  nothing. Promoting it wants the ceiling brought down first, which is its own row's work. **Not live** — an
+  exemption kept for a superseded reason is a stale comment rather than a defect in the gate. Filed by `M65`.
+
+- **`minor` · The liveness marker is gated for presence and nothing checks that a verdict is CORRECT — and
+  the error rate of judging one is now measured rather than assumed.** **`M65` produced the backfill and
+  measured this while producing it.** `tests/Feature/Docs/BacklogProvenanceTest.php` requires exactly one
+  verdict on every open row and says at the site that it never checks the verdict is right; `scripts/state.php`
+  and `scripts/loop.php` both consume the marker and neither can either. ⛔ **THE NUMBER IS THE POINT: 5 of
+  the 30 verdicts the read-only fan-out returned were changed by hand before any of them was written.**
+  Three of the five moved because the judging and refuting passes had split *systematically* — agreeing on
+  every fact and disagreeing on whether a reachable mechanism somebody declined to fix is live — and two
+  more moved on the corpus's own established usage of the words. A sweep written straight from agent output
+  would have recorded five wrong markers, and a wrong `Not live` is the expensive direction, because
+  `loop assess` then refuses that row permanently and silently. ⚠️ **So the marker is a floor for scheduling
+  and must never be read as a verified fact about the code**; `scripts/mutate.php` is what settles a row,
+  and settling it is the job of whichever increment takes it. **Not live** — a stated limit of the gate,
+  filed so the next reader does not have to rediscover it. Filed by `M65`.
 
 - **`minor` · `routes/api.php:114-116` describes a middleware ordering the priority sorter does not produce.**
   Re-read at source rather than taken from the report: the comment states that `feature:api_access` runs *"before throttle so a no-feature tenant is refused before
@@ -4129,7 +4168,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   24 of 78 rows carry a liveness marker at all, and silence deliberately does not stop, because treating
   an absent marker as dead would stop nearly everything and make the driver useless rather than careful.
   ⚠️ **So this raised a floor rather than closing a hole**, and the eligible count is a shortlist for a
-  human, never a work queue. **Not live** — both are stated limits of a tool, not defects in it.
+  human, never a work queue. **Not live** — both are stated limits of a tool, not defects in it. ➕ **`M65` CLOSED THE SILENCE HALF OF (2).** Every open row now records a verdict and the marker is gated, so an unmarked row is a failing test rather than something this driver has to be careful around — and `assess` now refuses MORE rows than before, which is the stop rule finally having something to read on every row rather than the driver degrading. The remedy-cost blind spot in (1) is untouched and stands.
 - **`minor` · §20's `settings.key` catalog omits `security.require_two_factor`.**
   `docs/data-dictionary.md:838`, rewritten in this branch — the key is live
   (`app/Enums/SettingKey.php:42`, tenant-scoped at `:85`, written by `UpdateAccessSettingsRequest.php:60`,

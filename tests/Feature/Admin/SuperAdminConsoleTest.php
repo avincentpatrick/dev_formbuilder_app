@@ -148,13 +148,22 @@ it('lists all users for a confirmed super-admin', function () use ($adminUrl): v
 /** The four console routes with no behavioural denial of their own, as verb + path-builder. */
 dataset('undenied console routes', [
     'the cross-tenant user list' => ['get', fn (): string => '/users'],
-    'tenant reactivate' => ['post', fn (): string => '/tenants/'.consoleTenant()->id.'/reactivate'],
-    'tenant plan assignment' => ['post', fn (): string => '/tenants/'.consoleTenant()->id.'/plan'],
+    'tenant reactivate' => ['post', fn (): string => '/tenants/'.superAdminConsoleFixtureTenant()->id.'/reactivate'],
+    'tenant plan assignment' => ['post', fn (): string => '/tenants/'.superAdminConsoleFixtureTenant()->id.'/plan'],
     'feedback triage update' => ['patch', fn (): string => '/feedback/0f6f8b5e-1a2b-4c3d-8e9f-0a1b2c3d4e5f'],
 ]);
 
-/** A committed tenant for the two model-bound routes — see the block comment for why it cannot be a literal. */
-function consoleTenant(): Tenant
+/**
+ * A committed tenant for the two model-bound routes — see the block comment for why it cannot be a literal.
+ *
+ * ⛔ THE NAME IS LONG BECAUSE PEST TEST FILES SHARE ONE GLOBAL FUNCTION NAMESPACE, AND THE OBVIOUS NAME
+ * WAS ALREADY TAKEN. `consoleTenant()` exists in `tests/Feature/Feedback/FeedbackConsoleTest.php`, and
+ * declaring it twice is a FATAL that kills the whole run before a single test executes.
+ * ⚠️ AND NO LOCAL RUN IN THIS INCREMENT COULD HAVE CAUGHT IT: verification was per-directory
+ * (`pest tests/Feature/Admin`), so the two files were never loaded into one process. A helper added to
+ * a test file needs either a file-unique name or a whole-suite run — checking the directory is not enough.
+ */
+function superAdminConsoleFixtureTenant(): Tenant
 {
     return Tenant::firstOrCreate(['slug' => 'console-fixture'], ['name' => 'Console Fixture', 'status' => 'active']);
 }

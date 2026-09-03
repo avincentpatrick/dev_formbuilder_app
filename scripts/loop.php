@@ -76,8 +76,17 @@ const MECHANICAL_MARKERS = [
 //    discuss liveness in prose, and one uses the word about a gate's SUBJECT rather than about itself.
 //    A bare contains('Not live') would stop rows that merely mention it.
 //
-// ⚠️ AND SILENCE IS NOT A STOP. Only 24 of 78 rows carry a marker at all, so treating an absent one as
-//    "not live" would stop nearly everything and make the driver useless rather than careful.
+// ⚠️ SILENCE IS NOT A STOP — AND SINCE M65 THERE IS NO SILENCE LEFT. This note used to read "only 24
+//    of 78 rows carry a marker at all, so treating an absent one as 'not live' would stop nearly
+//    everything and make the driver useless rather than careful." That was the honest reading of a
+//    corpus where most rows said nothing. M65 backfilled every open row and
+//    tests/Feature/Docs/BacklogProvenanceTest.php now requires one, so an unmarked open row is a
+//    failing test rather than a row this file has to be careful around.
+//
+// ⛔ THE CONSEQUENCE IS THAT `assess` NOW REFUSES MORE ROWS, NOT FEWER, AND THAT IS THE GATE WORKING.
+//    Every row that resolves not-live is a stop that silence used to let through. Do not read a
+//    falling eligible count as this driver degrading — it is the stop rule finally having something
+//    to read on every row. The logic below is UNCHANGED by M65; only this comment is.
 const NOT_LIVE_MARKER = '**Not live**';
 
 /**

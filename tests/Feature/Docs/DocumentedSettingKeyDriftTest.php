@@ -290,7 +290,7 @@ function documentedSettingKeyDefaults(): array
     return $defaults;
 }
 
-it('documents exactly the settings keys the enum defines, in both directions', function (): void {
+it('lists exactly the settings keys the enum defines, in both directions', function (): void {
     $documented = array_keys(documentedSettingKeyCatalog());
     $defined = SettingKey::values();
 

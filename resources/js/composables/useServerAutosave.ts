@@ -72,6 +72,54 @@ export interface ServerAutosave {
     dispose: () => void;
 }
 
+/**
+ * The sentence a keyer reads when a `409` stops the autosave loop, keyed by the envelope's `error.code`
+ * (Increment M67).
+ *
+ * ⛔ THE OBLIGATION WAS ALREADY WRITTEN DOWN AND NOTHING GATED IT. `SubmissionDraftController::store()`
+ * carries the comment *"THREE CAUSES SINCE M11, AND THE COMPOSABLE MUST NOT TREAT THEM ALIKE"* and names
+ * all three. This file split the status two ways — `draft_conflict` versus everything else — so
+ * `submission_uuid_claimed` was told *"already been submitted"*, which is false and whose remedy is the
+ * opposite one. A deferral written into a comment outlives the premise that justified it, silently.
+ *
+ * ⚠️ THE ROW THAT FILED THIS NAMED THE WRONG CAUSE, and it changes what the fix is. It said the ENTITLEMENT
+ * and CONTENT causes both got the finalized sentence. `submission_conflict` (the content cause) cannot reach
+ * this endpoint at all — it is raised only by `SubmissionPipeline` and is deliberately suspended for drafts —
+ * so it is absent here rather than mapped to something plausible. Adding it would document a refusal this
+ * channel cannot produce.
+ *
+ * ⚠️ NOT REUSED FROM `public-runtime/lib/conflict-notice.ts`, THOUGH ITS DECISION IS. That module addresses
+ * a RESPONDENT re-mounting a fill session, and its remedy — review and submit again — is not available to a
+ * keyer whose background save has stopped: there is nothing to re-mount, and the answers are still on screen.
+ * What carries over is the rule that copy is keyed off `error.code` in exactly one place.
+ */
+const CONFLICT_COPY: Record<string, string> = {
+    // Another tab or device saved in between, so this tab's base is stale. Still terminal for the AUTOSAVE
+    // loop — retrying sends the same stale base forever, and silently re-sending would be the lost update
+    // the guard exists to stop — but the remedy is reloading, not submission.
+    draft_conflict:
+        'This draft was changed somewhere else, so saving has stopped to avoid overwriting it. Reload the page to pick up the newer answers.',
+    // The row really was promoted between two ticks. The pre-M67 sentence, which was correct for this cause
+    // and only this one.
+    draft_already_finalized: 'This response has already been submitted, so it is no longer being saved as a draft.',
+    // ENTITLEMENT, not timing: the identifier is spent on a row outside this caller's scope. Nothing the
+    // keyer typed is lost or wrong, and telling them it was submitted sends them looking for a submission
+    // that is not theirs — so the sentence names the identifier and the one act that helps.
+    submission_uuid_claimed:
+        'This response could not be matched to the draft it belongs to, so saving has stopped. Your answers are still on screen — reload the page to start a fresh draft, and copy them across before leaving.',
+};
+
+/**
+ * The fallback for an unrecognised or unreadable code.
+ *
+ * ⚠️ IT STAYS THE FINALIZED SENTENCE DELIBERATELY, AND `conflictCode()` RETURNING NULL IS A REAL INPUT
+ * (an unparseable body, or a cause added server-side before this build knew about it). Of the outcomes
+ * available it is the one that is safe when wrong: it tells the keyer the loop has stopped and that their
+ * work is no longer being saved, which is true of EVERY cause. The alternative — a reassuring sentence —
+ * is the failure mode the whole map exists to end.
+ */
+const FINALIZED_COPY = CONFLICT_COPY.draft_already_finalized;
+
 /** 1500ms, not the guest's 800: each tick is a network round trip plus a `lockForUpdate` transaction. */
 const DEFAULT_DEBOUNCE_MS = 1_500;
 /** The periodic backstop, per the UX spec's "every 30 seconds while the tab is active". Dirty-gated. */
@@ -193,21 +241,11 @@ export function createServerAutosave(options: ServerAutosaveOptions): ServerAuto
                 return;
             }
 
-            // ⚠️ 409 HAS TWO CAUSES SINCE P3a AND THEY NEED DIFFERENT ANSWERS — reading them alike told a
-            // keyer whose colleague had merely saved that their work was "already submitted", which is both
-            // false and unrecoverable-sounding.
+            // ⚠️ 409 HAS THREE CAUSES ON THIS CHANNEL AND THEY NEED DIFFERENT ANSWERS — reading them alike
+            // told a keyer whose colleague had merely saved that their work was "already submitted", which is
+            // both false and unrecoverable-sounding.
             if (response.status === 409) {
-                const code = await conflictCode(response);
-
-                // `draft_conflict` — another tab or device saved in between, so this tab's base is stale.
-                // Still terminal for the AUTOSAVE loop (retrying sends the same stale base forever, and
-                // silently re-sending would be the lost update this guard exists to stop), but the reason and
-                // the remedy are different, so the message names reloading rather than submission.
-                stop(
-                    code === 'draft_conflict'
-                        ? 'This draft was changed somewhere else, so saving has stopped to avoid overwriting it. Reload the page to pick up the newer answers.'
-                        : 'This response has already been submitted, so it is no longer being saved as a draft.',
-                );
+                stop(CONFLICT_COPY[(await conflictCode(response)) ?? ''] ?? FINALIZED_COPY);
 
                 return;
             }

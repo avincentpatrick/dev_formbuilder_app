@@ -1143,12 +1143,24 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `conflict_code` into **user-visible copy input** (`lib/conflict-notice.ts` keys the respondent's sentence
   off it), so this literal is no longer a debug tag. Nothing is wrong now; the hazard is that the next person
   to add a client-side park has to know that. **Not live — a maintenance trap.** Filed by `M14`. **Not live** — the hardcoded literal is reached only on an actual version change, which is the one case it names correctly, judged by `M65`.
-- **`minor` · The authenticated autosave's 409 branch tells a `submission_conflict` caller "already been
-  submitted".** `resources/js/composables/useServerAutosave.ts:196-213` splits two ways — `draft_conflict`
-  versus everything else — so the entitlement and content causes both get the finalized sentence, which is
-  the guest-side defect M14 closed, one channel over. It is a smaller harm (the encode surface is staffed,
-  not public) and **`resources/js/composables/` is in NEITHER lane's column under Standing Rule 7(b)**, so
-  M14 declined it rather than claiming a directory for a `minor`. **Live.** Filed by `M14`.
+- ✅ **CLOSED BY `M67` (2026-09-03) — `minor` · ~~The authenticated autosave's 409 branch tells a
+  `submission_conflict` caller "already been submitted".~~** The binary split is now a keyed map over the
+  three codes this channel can return, with the finalized sentence as an explicit default for a cause the
+  build has never heard of.
+  ⛔ **THE ROW'S PREMISE WAS FALSE ON THE HALF IT LED WITH, AND IT CHANGED THE FIX.** It named the
+  **entitlement and content** causes. `submission_conflict` — the content cause — **cannot reach this
+  endpoint at all**: it is raised only by `SubmissionPipeline` and is deliberately suspended for drafts. So
+  the map does NOT carry it; adding it would have documented a refusal this channel cannot produce, which is
+  the naive fix the row invites. The one real defect was `submission_uuid_claimed`, which the row does not
+  name — it was filed before `M14` split that code out, and nothing re-read it afterwards.
+  ⚠️ **THE OBLIGATION WAS ALREADY WRITTEN DOWN.** `SubmissionDraftController::store()` says *"THREE CAUSES
+  SINCE M11, AND THE COMPOSABLE MUST NOT TREAT THEM ALIKE"* and names all three. A comment is not a gate;
+  the arm was missing for two increments with a full sentence beside it saying so.
+  ✅ **The sibling channel was checked and is NOT affected**: Submit is a web `router.post`, and
+  `bootstrap/app.php`'s non-API arm toasts `$e->getMessage()`, which is per-cause already.
+  ⚠️ Proved by mutation, not by green: collapsing the new arm reddens exactly one case, and changing the
+  finalized sentence once reddens **four** — which is how the fallback is shown to read the map rather than
+  being a second copy of the string. Filed by `M14`.
 - ✅ **CLOSED BY `M15` (2026-08-26) — `major` · ~~The device-wide outbox is mounted above the phase machine
   on an unauthenticated page.~~** Filed 2026-08-25. **Every file:line in the row was verified before it was
   planned against, and four of six had drifted** — all of them caused by M14 growing `App.vue`:

@@ -682,3 +682,87 @@ it('404s the manifest of a soft-deleted form', function (): void {
         ->assertStatus(404)
         ->assertJsonPath('error.code', 'not_found');
 });
+
+it('returns exactly the four documented keys per item, and OMITS error.details when there are none (M69)', function (): void {
+    // ⛔ WHY array_keys EQUALITY AND NOT assertJsonStructure. Every Laravel JSON assertion on this
+    // surface is a SUBSET check — `assertJsonPath` and `assertJsonStructure` both pass on a body
+    // carrying an EXTRA top-level key. M56 found `/api/v1` asserted 25+ times that way while
+    // `openapi.json` published a shape the endpoint had never returned. The keys are therefore
+    // compared as whole ordered lists.
+    //
+    // ⚠️ AND THE `details` ARM IS THE ONE THAT MATTERS FOR M69's DIFF. The resource was rewritten so
+    // Scramble could infer the real shape, and the obvious way to write it (`$error['details'] ?? null`)
+    // would have started emitting `details: null` on every refusal that carries none — a silent wire
+    // change that no existing assertion here could have caught, because they all check subsets.
+    $tenant = syncTenant();
+    enterTenant($tenant->id);
+    $admin = syncMember('admin');
+    $form = syncPublishedForm($tenant, $admin);
+    $versionId = (string) $form->current_published_version_id;
+    $token = $admin->createToken('rw', [ApiAbilities::WRITE_SUBMISSIONS])->plainTextToken;
+
+    $answers = ['full_name' => 'Ada Lovelace', 'age' => '30'];
+
+    $response = $this->withToken($token)
+        ->postJson('http://acme.meridian.test/api/v1/sync/submissions', ['submissions' => [
+            ['form_version_id' => $versionId, 'client_submission_uuid' => Uuid::uuid7()->toString(), 'answers' => $answers],
+            ['form_version_id' => $versionId, 'client_submission_uuid' => Uuid::uuid7()->toString(), 'answers' => ['full_name' => '', 'age' => '30']],
+            ['form_version_id' => Uuid::uuid7()->toString(), 'client_submission_uuid' => Uuid::uuid7()->toString(), 'answers' => $answers],
+        ]])
+        ->assertOk();
+
+    $items = $response->json('data');
+
+    expect($items)->toHaveCount(3);
+
+    foreach ($items as $item) {
+        expect(array_keys($item))->toBe(['client_submission_uuid', 'status', 'submission', 'error']);
+    }
+
+    // created — `submission` is the object the contract now declares, `error` is null.
+    expect($items[0]['status'])->toBe('created')
+        ->and(array_keys($items[0]['submission']))->toBe(['id', 'reference', 'status'])
+        ->and($items[0]['error'])->toBeNull();
+
+    // invalid — carries details, so the key is PRESENT.
+    expect($items[1]['status'])->toBe('invalid')
+        ->and($items[1]['submission'])->toBeNull()
+        ->and(array_keys($items[1]['error']))->toBe(['code', 'message', 'details'])
+        ->and($items[1]['error']['code'])->toBe('submission_invalid')
+        ->and($items[1]['error']['details'])->toHaveKey('fields');
+
+    // ⛔ THE ONE THAT PINS THE OMISSION. A refusal with no details must not carry the key AT ALL —
+    // not as null. `array_key_exists` rather than isset(), which cannot tell absent from null and
+    // would pass against exactly the regression this arm exists to catch.
+    expect($items[2]['status'])->toBe('error')
+        ->and($items[2]['error']['code'])->toBe('form_version_not_found')
+        ->and(array_keys($items[2]['error']))->toBe(['code', 'message'])
+        ->and(array_key_exists('details', $items[2]['error']))->toBeFalse();
+});
+
+it('publishes that same shape in the exported contract, enum included (M69)', function (): void {
+    // The pair to the arm above: one asserts what the endpoint RETURNS, this asserts what the
+    // document PROMISES. M56's finding was that the two had disagreed for the whole life of the
+    // surface with 25+ green assertions in between, so neither is evidence without the other.
+    $schema = json_decode(file_get_contents(base_path('openapi.json')), true);
+    $result = $schema['components']['schemas']['SyncSubmissionResultResource'];
+
+    expect(array_keys($result['properties']))->toBe(['client_submission_uuid', 'status', 'submission', 'error']);
+
+    // status is a $ref to the enum, and the enum names every case the controller can emit.
+    expect($result['properties']['status'])->toBe(['$ref' => '#/components/schemas/SyncResultStatus'])
+        ->and($schema['components']['schemas']['SyncResultStatus']['enum'])
+        ->toBe(['created', 'duplicate', 'invalid', 'conflict', 'error']);
+
+    // submission and error are nullable OBJECTS — the defect this row was filed for was both of them
+    // being published as bare strings.
+    foreach (['submission', 'error'] as $property) {
+        expect($result['properties'][$property]['type'])->toBe(['object', 'null']);
+    }
+
+    expect(array_keys($result['properties']['submission']['properties']))->toBe(['id', 'reference', 'status'])
+        ->and(array_keys($result['properties']['error']['properties']))->toBe(['code', 'message', 'details'])
+        // …and `details` is declared but NOT required, which is what makes it the optional key the
+        // response actually omits rather than a promise the endpoint breaks.
+        ->and($result['properties']['error']['required'])->toBe(['code', 'message']);
+});

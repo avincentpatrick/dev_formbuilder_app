@@ -38,6 +38,7 @@ declare(strict_types=1);
  * Usage: php scripts/job-payload-lint.php
  */
 
+use App\Notifications\Concerns\CarriesTenantBrand;
 use PhpParser\Node;
 use PhpParser\Node\Stmt\Class_;
 use PhpParser\NodeFinder;
@@ -88,7 +89,7 @@ const SCALAR_PAYLOAD_TYPES = ['string', 'int', 'float', 'bool', 'array'];
  * tests/Feature/Mail/QueuedMailContractTest.php EXACTLY, as a set. Adding a queued mail notification
  * means adding it in BOTH places — that sentence has been in the test's docblock since H3, and for
  * most of that time nothing checked it: ConnectorRulePausedNotification sat here and not there from
- * H16a until M66, so the arm asserting {@see \App\Notifications\Concerns\CarriesTenantBrand} could
+ * H16a until M66, so the arm asserting {@see CarriesTenantBrand} could
  * not see the class, and it reached production rendering the framework's default mail theme.
  *
  * The test now parses this block and compares both directions, so a one-sided edit is a RED TEST

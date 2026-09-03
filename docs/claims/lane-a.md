@@ -16,38 +16,118 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M67` is merged; three of its four rows had a wrong PREMISE, not merely a wrong remedy
+## Status: ACTIVE CLAIM — `M68`, the third batched increment: four rows (`m68-batched-rows`)
 
-`M67` closed **four** rows and filed **two**, so the open count moved 85 → 83 and stayed at **zero
-`major`**. `state.php` counts the tree; do not take that sentence's arithmetic on trust.
+Taken 2026-09-03. Branch `m68-batched-rows`, cut from `origin/main` at `1de4b3a`, PR into `main`.
+Run at `D13`'s full width — four rows, no two citing the same non-hub file, exactly one hub row.
 
-⚠️ **THE ONE THING `M67` WOULD MOST LIKE TO HAND ON: CHECK THE PREMISE, NOT ONLY THE EVIDENCE AND THE
-REMEDY.** `M66` found two of four remedies wrong and said so. `M67` checked one level further back and
-**three of four rows failed at the premise** — the sentence the row reasons *from*, before it reaches
-evidence or remedy. Each failure changed what the fix is:
+Rows, with the non-hub file each would collide on:
 
-1. **A remedy can be absent rather than wrong.** `R1` prescribed *"a `@response` annotation per cause"*.
-   That is not a feature of the installed Scramble at all. Reading the vendor rather than the row produced
-   a different and general mechanism — `@throws` on the action plus an `ExceptionToResponseExtension` —
-   and *neither half alone does anything*, which was measured in both directions before it was kept.
-2. **A row can name a cause that cannot reach the thing it is about.** `R2` led with the *content* 409
-   cause; that cause is raised by one service and suspended for drafts, so it can never arrive on the
-   endpoint the row is filed against. Mapping it — the obvious fix — would have documented a refusal the
-   channel cannot produce.
-3. **A row can pose a decision that has only one defensible answer.** `R3` offered *strike the claim* or
-   *hoist the gate*; the tree already argued against hoisting, in a comment the row had not read. Filing
-   that as a decision would have parked a five-minute edit indefinitely.
+| | Row | Collides on |
+|---|---|---|
+| `R1` | `docs/feature-backlog.md:1488` (`M13`) — *"Neither sync route documents the 403 its in-controller policy gate now returns."* | `openapi.json` |
+| `R2` | `docs/feature-backlog.md:2108` (`M66`) — *"The Fortify group serves tenant subdomains and carries no org-2FA gate, so the mint was not the only way past it."* | `config/fortify.php` |
+| `R3` | `docs/feature-backlog.md:1390` (`M62`) — *"Submit races its own last-chance draft write, and the refusal lands on the Submit."* | `resources/js/Pages/submissions/Encode.vue` |
+| `R4` | `docs/feature-backlog.md:4342` (`M1`) — *"§20's `settings.key` catalog omits `security.require_two_factor`."* | `docs/data-dictionary.md` — **the hub row** |
 
-⚠️ **AND THE HARDEST-EARNED ONE, WHICH IS ABOUT VERIFYING RATHER THAN ABOUT ROWS: a per-directory Pest run
-is not a smaller version of the suite, it is a different question.** `M67`'s first CI run died before any
-test executed on a duplicate global function name one directory away. No amount of care inside
-`tests/Feature/Admin` could have seen it.
+⛔ **DELIBERATELY NOT BATCHED, AND THE REASON IS `D13` RATHER THAN A JUDGEMENT ABOUT THE ROW.**
+`docs/feature-backlog.md:1499` (`SyncSubmissionResultResource`'s bare-string `submission` and `error`)
+also cites `openapi.json` and would collide with `R1`. `R1`'s premise correction below hands it work
+rather than taking it.
 
-⛔ **`D9` must never be started without an explicit answer.** Open decisions: `D1`, `D3`, `D4`, `D8`,
-`D9`, `D10`, `D11`, `D12`. `D12` — whether to end the M-series — is still the one thing that needs the
-user, and `M67` deliberately did not touch it. **`D13` is answered, proven twice, and not to be re-asked.**
+### Evidence verified
 
-⛔ **RUN `php scripts/state.php` FOR EVERY NUMBER.**
+Per row, read out of the merged tree today rather than taken from the row.
+
+- **`R1` — HELD, both citations.** `openapi.json` documents `GET /sync/manifest` as `200/404/422` and
+  `POST /sync/submissions` as `200/422` — read by parsing the document, not by grepping it.
+  `SyncManifestController::show()` calls `Gate::forUser($request->user())->authorize('view', $form)`
+  after the version resolve, exactly as the row describes.
+- **`R2` — HELD.** `config/fortify.php`'s `middleware` array is exactly `web`, `RequirePlatformHost`,
+  `AppSecurityHeaders`, `GateRegistration`, `ThrottleFortifyEndpoints`,
+  `EstablishTenantDatabaseContext`. No `EnforceTenantTwoFactor`, and `RequirePlatformHost` admits
+  subdomains of the central domain.
+- **`R3` — HELD at both ends, which is what makes it a race rather than a suspicion.** `submit()`
+  calls `autosave.dispose()` and then posts `base_content_checksum: autosave.baseline.value`;
+  `dispose()`'s `postKeepalive()` sends `body()`, which carries **the same** base. Two writers, one
+  base.
+- **`R4` — HELD.** `security.require_two_factor` appears nowhere in `docs/data-dictionary.md`, while
+  `SettingKey::SecurityRequireTwoFactor` is live, tenant-scoped and defaulted `false`.
+
+### Remedy verdict
+
+Measured before a line was written, as `M36` requires.
+
+- **`R1` — the prescribed remedy is ABSENT rather than wrong, and it stopped being absent in `M67`.**
+  The row says the honest fix needs *"an annotation mechanism Scramble 0.13 does not offer for
+  arbitrary status codes"*. `M67` built exactly that seam. And half of it is already in the tree for
+  this status: `ApiAuthorizationErrorResponse` extends Scramble's own
+  `AuthorizationExceptionToResponseExtension` and is **already registered**, so it already claims
+  `AuthorizationException`. **One `@throws` tag, no new class, and the existing `$ref` is reused.**
+- **`R2` — no remedy offered, and the row is right that a group-level mount is wrong. It names one
+  carve-out; there are three.** Mirrors `ThrottleFortifyEndpoints`: a route-**name** map inside the
+  Fortify group, plus a coverage-equality gate in the shape of `FORTIFY_UNBOUND_BY_DECISION`.
+- **`R3` — the row's own cheapest option, and it survives inspection.** `submit()` needs `dispose()`'s
+  timer teardown and not its last-chance POST; the Submit carries the full answer map and the promote
+  branch re-saves it, which the defending comment says itself.
+- **`R4` — sound as far as it goes, and it goes one place short.** Correct both sentences, then make
+  the parity a Pest test rather than a sixth lint script (`M58`).
+
+### Premise verdict
+
+⚠️ **`M67` handed on that the premise is the level nobody checks. Two of these four fail there.**
+
+- ⛔ **`R1` — HALF FALSE, and it changes the scope.** The title says *neither* route documents "the
+  403". Only `GET /sync/manifest` can answer an HTTP 403. `SyncSubmissionController` returns a
+  per-item `error.code: "forbidden"` **inside a 200 body** — not a 403 at all. Documenting a 403 on
+  `POST /sync/submissions` would publish a status that route has never returned, which is the defect
+  the sibling row at `:1499` describes pointing the other way. **The `GET` half closes here; the
+  `POST` half is filed onto `:1499`, which owns the shape.**
+- ⚠️ **`R2` — HOLDS, and understates its own carve-out.** The row names the 2FA enrolment routes as
+  what must stay outside. `EnforceTenantTwoFactor`'s docblock names a second in terms — *"`POST
+  /logout` is a Fortify route in its own group … do not 'tidy' it inside"*, because "enrol or leave"
+  needs two doors — and `Features::twoFactorAuthentication(['confirmPassword' => true])` implies a
+  third: enrolment runs through `password.confirm.store`, so gating that locks the escape hatch it
+  exists to open. **A group-level mount is wrong in three ways, not one.**
+- ✅ **`R3` — HOLDS, including its own stated limit.** Which request wins is unmeasured, and the fix
+  does not need it settled: it removes the second writer.
+- ⚠️ **`R4` — UNDERSTATES ITSELF IN TWO DIRECTIONS.** §20 omits the key in **two** places, and the
+  second omits a **second** key: the `key` column's *"As built (I5)"* list is missing
+  `security.require_two_factor`, and Design Note 2's defaults list is missing **both**
+  `security.require_two_factor ⇒ false` **and** `maintenance.message ⇒ ''`. `SettingKey` has five
+  cases; §20 names three of the five defaults.
+
+Files: `app/Http/Controllers/Api/V1/SyncManifestController.php`, `openapi.json`,
+`tests/Feature/Api/SyncApiTest.php`, `app/Http/Middleware/` (one new middleware), `config/fortify.php`,
+`tests/Feature/Auth/TenantTwoFactorEnforcementTest.php`, `tests/Feature/Auth/FortifyRateLimitTest.php`,
+`resources/js/composables/useServerAutosave.ts`,
+`resources/js/composables/__tests__/useServerAutosave.test.ts`,
+`resources/js/Pages/submissions/Encode.vue`, `resources/js/Pages/submissions/encode.test.ts`,
+`docs/data-dictionary.md`, `tests/Feature/Docs/` (one new test), `docs/feature-backlog.md`,
+`docs/backlog-triage.md`, `docs/gate-baselines.md`, `PROGRESS.md` (own block only), this file.
+
+Shared artefacts taken: `openapi.json`, `docs/data-dictionary.md`, `docs/feature-backlog.md`,
+`docs/backlog-triage.md`, `docs/gate-baselines.md`, `PROGRESS.md` (own status block and own hand-off
+line only).
+Paired files taken: none — no 7(b-bis) pair is touched.
+Namespaces spent: **nothing from either namespace.** No migration, no ADR. `0023` stays free and the
+`0010` gap stays reserved for H1d.
+
+Prediction, written before the run so it can be measured rather than explained:
+
+- **Contract moves and nothing else does structurally.** `openapi.json` gains exactly **one** response
+  on **one** path and **zero** components — the 403 renders through the existing `$ref`.
+- **PHPStan can move and probably will not.** `R1` and `R2` both touch `app/`, so the "a `scripts/`-only
+  diff cannot move it" excuse does not apply; but a docblock tag and a name-keyed middleware are both
+  shapes it has nothing to say about. Measured against `origin/main`'s files, never quoted.
+- **Vitest stays at 134 files** and gains cases in two existing ones.
+- ⚠️ **The one I most expect to be wrong: `R2`'s middleware ordering.** `M43` measured that
+  `SortedMiddleware` hoists listed classes past unlisted ones and found the intuitive answer false, and
+  the Fortify array's own comments say its position there is *not* what decides when it runs. I expect
+  to have to boot the app and print `gatherRouteMiddleware()` both ways before the mount is right, and
+  I expect my first guess about whether it needs a `priority()` entry to be wrong.
+- Second most likely wrong: that `R3`'s new mode leaves `M62`'s two in-flight dispose cases untouched.
+  They are the cases most adjacent to the branch being changed.
 
 ---
 

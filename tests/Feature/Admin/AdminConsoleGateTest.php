@@ -193,6 +193,61 @@ it('keeps the exemption an exception rather than the policy', function (): void 
     expect(count($fullyGated))->toBeGreaterThan(count(ADMIN_CONSOLE_ROUTES_OUTSIDE_THE_INNER_GATES) * 4);
 });
 
+/*
+| Increment M66 — the same argument as the middleware arms above, one property over.
+|
+| `routes/admin.php` had carried, since I7b, a comment saying in terms that three POST routes bound
+| `{tenant}` with no `whereUuid` and that this was a latent 500: `tenants.id` is a native Postgres `uuid`,
+| so implicit binding emits `where "id" = 'not-a-uuid'` and Postgres raises SQLSTATE 22P02 BEFORE
+| `firstOrFail()` can turn a miss into a 404. The comment deferred the fix on a stated premise — "and have
+| simply never been reachable from a UI" — which stopped being true when `TenantDetail.vue` and
+| `Tenants.vue` shipped the buttons, and nothing anywhere re-read the premise.
+|
+| ⛔ THE HAND-LIST FAILURE MODE THIS FILE WAS BUILT FOR APPLIES VERBATIM. `TenantDetailConsoleTest` has a
+| malformed-id case, and it covers `admin.tenants.show` — the one route that already had the constraint.
+| A per-route test cannot fail for a route nobody wrote it for, which is exactly how three siblings sat
+| unpinned beside a pinned one with a full-sentence comment naming the defect. So this arm discovers the
+| parameterised routes from the table and asserts the property over whatever it finds.
+|
+| ⚠️ SCOPE, stated rather than implied: this watches the ROUTE TABLE, not the database. It cannot know that
+| a parameter is backed by a uuid column — it asserts that every console route taking a parameter constrains
+| it, which is the property that keeps a malformed id from ever reaching the driver. A console route that
+| legitimately takes a non-uuid parameter would redden this and should be discussed at that point, not
+| pre-allowlisted here for a case that does not exist yet.
+*/
+it('constrains every parameter the console binds, so a malformed id 404s instead of 500ing', function (): void {
+    $unconstrained = [];
+    $parameterised = 0;
+
+    foreach (adminConsoleRoutes() as $route) {
+        $parameters = $route->parameterNames();
+
+        if ($parameters === []) {
+            continue;
+        }
+
+        $parameterised++;
+
+        foreach ($parameters as $parameter) {
+            if (($route->wheres[$parameter] ?? null) === null) {
+                $unconstrained[] = sprintf('%s (%s) — {%s}', (string) $route->getName(), $route->uri(), $parameter);
+            }
+        }
+    }
+
+    expect($unconstrained)->toBe(
+        [],
+        "Console routes binding an unconstrained parameter — a malformed id reaches the driver and 500s:\n"
+            .implode("\n", $unconstrained)
+    );
+
+    // The floor this arm needs for itself. `parameterNames()` returning `[]` for everything — a refactor,
+    // a renamed accessor — would leave the forall above walking an empty set and passing forever. Seven
+    // parameterised console routes measured from the live table when this was written; asserted as a floor
+    // so a new one does not redden this for existing.
+    expect($parameterised)->toBeGreaterThan(5);
+});
+
 it('resolves each console alias to the middleware the console suites exercise', function (): void {
     // Split from the per-route cases deliberately, and it is the half that catches the OTHER cheap
     // mutation: re-pointing one of these names at a permissive class leaves every forall above green,

@@ -71,6 +71,24 @@ it('suspends and reactivates a tenant through the console', function () use ($ad
     expect($tenant->fresh()->status)->toBe('active');
 });
 
+it('404s a malformed workspace id on every tenant POST instead of 500ing on the uuid column', function () use ($adminUrl): void {
+    // Increment M66. `tenants.id` is a native Postgres `uuid`, so without `->whereUuid('tenant')` implicit
+    // binding emits `where "id" = 'not-a-uuid'` and Postgres raises SQLSTATE 22P02 — a QueryException, and
+    // therefore a 500, BEFORE `firstOrFail()` ever gets to turn a miss into a 404.
+    //
+    // ⛔ THE SIBLING GET ROUTE HAS HAD THIS CASE SINCE I7b AND IT PROVED NOTHING ABOUT THESE THREE.
+    // `TenantDetailConsoleTest` pins `admin.tenants.show`, which already carried the constraint; the three
+    // POSTs beside it did not, and a per-route test cannot fail for a route nobody wrote it for. All three
+    // are asserted here together, and `AdminConsoleGateTest` carries the arm that discovers a fourth.
+    $admin = User::factory()->superAdmin()->confirmedTwoFactor()->create();
+
+    foreach (['suspend', 'reactivate', 'plan'] as $action) {
+        $this->actingAs($admin)
+            ->post($adminUrl("/tenants/not-a-uuid/{$action}"))
+            ->assertNotFound();
+    }
+});
+
 it('surfaces a business-rule violation as a redirect-back error, not a 500', function () use ($adminUrl): void {
     $admin = User::factory()->superAdmin()->confirmedTwoFactor()->create();
     $tenant = Tenant::create(['name' => 'Acme', 'slug' => 'acme', 'status' => 'suspended']);

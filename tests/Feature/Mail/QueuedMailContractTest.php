@@ -9,6 +9,7 @@ use App\Notifications\Auth\QueuedVerifyEmail;
 use App\Notifications\Auth\WelcomeNotification;
 use App\Notifications\Concerns\CarriesTenantBrand;
 use App\Notifications\Connectors\ConnectionRevokedNotification;
+use App\Notifications\Connectors\ConnectorRulePausedNotification;
 use App\Notifications\Entitlements\QuotaOverageNotification;
 use App\Notifications\EventNotification;
 use App\Notifications\ResumeLinkNotification;
@@ -35,6 +36,15 @@ use Illuminate\Queue\Attributes\Queue as QueueAttribute;
  *
  * **The list is append-only in practice: adding a queued mail notification means adding it HERE and to
  * `scripts/job-payload-lint.php`'s EXEMPT_JOBS, or two separate gates fail.** I3 appended the ninth.
+ *
+ * ⛔ **M66 — THAT WARNING DESCRIBES A THING THAT HAD ALREADY HAPPENED, AND NOTHING WAS CHECKING IT.**
+ * `ConnectorRulePausedNotification` was registered in EXEMPT_JOBS at H16a and never added here, so the
+ * two hand-maintained lists disagreed by exactly one entry for its whole life. The consequence was not
+ * academic: the arm below asserting {@see CarriesTenantBrand} is the gate that would have caught the class
+ * shipping without the trait, which is precisely how it shipped — the only tenant-facing notification
+ * rendering the framework's default theme instead of the Meridian shell. **The lists are still maintained
+ * by hand and still nothing proves they agree**; that gap is filed as its own row rather than closed here,
+ * because closing it means deciding where such a gate lives.
  */
 $queuedMailNotifications = [
     TenantInvitationNotification::class,
@@ -49,6 +59,9 @@ $queuedMailNotifications = [
     // J3a — the tenth. See scripts/job-payload-lint.php's EXEMPT_JOBS for its twin registration; adding a
     // queued mail notification means adding it in BOTH places or two separate gates fail.
     WelcomeNotification::class,
+    // M66 — the eleventh, and the one that proves the sentence above. It has been in EXEMPT_JOBS since
+    // H16a and absent here ever since, which is why it reached production without CarriesTenantBrand.
+    ConnectorRulePausedNotification::class,
 ];
 
 it('implements ShouldQueue on every queued mail notification', function (string $class): void {

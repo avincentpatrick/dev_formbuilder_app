@@ -379,8 +379,14 @@ final class DeliverConnectorMessageJob extends TenantAwareJob
             return;
         }
 
+        // Inside handleForTenant(), where the GUC is live (H23a4) — see BrandPalette. M66: this send was the
+        // one tenant-facing connector mail without a brand, so a branded tenant got this and the revoked
+        // notice above from the SAME run, one branded and one product-default.
         Notification::route('mail', $email)
-            ->notify(new ConnectorRulePausedNotification((string) $subscription->name, $reason));
+            ->notify(
+                (new ConnectorRulePausedNotification((string) $subscription->name, $reason))
+                    ->withBrand(BrandPalette::forTenantId($this->tenantId))
+            );
     }
 
     /**

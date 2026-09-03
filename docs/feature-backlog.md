@@ -884,9 +884,38 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - **`minor` · The setup-time directory has no pre-flight refresh**, so an ordinary token expiry tells the
   tenant to reconnect a healthy account — `app/Services/Connectors/TabularDestinationDirectory.php:46,68`,
   the one place H16a's guard was not applied. **Latent** on a missed sweep (H16a's own premise). Filed by `M1`.
-- **`minor` · `ConnectorRulePausedNotification` is the only tenant-facing connector email with no brand.**
-  `app/Jobs/Connectors/DeliverConnectorMessageJob.php:330` sends it without `->withBrand(...)`, so a
-  branded tenant gets one branded and one product-default email from the same job. **Live**, one argument. Filed by `M1`.
+- ✅ **CLOSED BY `M66` (2026-09-03) — `minor` · ~~`ConnectorRulePausedNotification` is the only tenant-facing
+  connector email with no brand.~~** The send is at `app/Jobs/Connectors/DeliverConnectorMessageJob.php:382-383`
+  and now carries `->withBrand(BrandPalette::forTenantId($this->tenantId))`, matching its branded sibling 23
+  lines above. Filed by `M1`.
+  ⛔ **THE ROW'S "ONE ARGUMENT" REMEDY WAS FATAL, NOT MERELY INCOMPLETE.** The class did not use
+  `CarriesTenantBrand` at all, so the prescribed call was `Call to undefined method`. Four edits: the trait,
+  the `branded()` wrap in `toMail()`, the dispatch-site argument, and the fourth below. And the loss was
+  template-level rather than colour-level — `branded()` supplies `markdown('mail.notification')` **and**
+  `theme('meridian')`, and `config/mail.php` sets no global theme, so this class rendered the framework's
+  default shell.
+  ⛔ **THE ROOT CAUSE WAS A TWO-LIST DRIFT, AND IT IS THE HALF WORTH REMEMBERING.**
+  `scripts/job-payload-lint.php`'s EXEMPT_JOBS had carried this class since H16a; `QueuedMailContractTest`'s
+  list never did — and it is that test which asserts the trait is present, so the one gate that would have
+  caught this was the one gate blind to the class. Its own docblock already warned that adding a queued mail
+  notification means adding it in **both** places *"or two separate gates fail"*. Eleventh entry appended.
+  ⚠️ **The citation `:330` was never right in this row's life** — the site was `:325` when introduced
+  (`f5ec530`), `:343` after `M5`, `:383` since `M6`. `:330` is a blank line in a different method.
+  Proven by `MU3` (the argument removed → the new brand assertion red) and `MU4` (the trait removed →
+  `QueuedMailContractTest` red), each reddening only its own arm.
+- **`minor` · Two hand-maintained lists of queued mail notifications must agree, and nothing checks that they
+  do.** `tests/Feature/Mail/QueuedMailContractTest.php`'s `$queuedMailNotifications` and
+  `scripts/job-payload-lint.php`'s `EXEMPT_JOBS` are both edited by hand, and the contract test's docblock
+  says in terms that adding a class means adding it to **both** *"or two separate gates fail"*. ⛔ **That is
+  a description of what already happened rather than a warning about what might**: `ConnectorRulePausedNotification`
+  sat in EXEMPT_JOBS and not in the test list from H16a until `M66`, which is exactly why it reached
+  production without `CarriesTenantBrand` — the arm asserting the trait could not see the class. `M66`
+  appended the eleventh entry and **did not close the gap**: the lists are still hand-maintained and still
+  unproven against each other. The cheap form is an arm in `QueuedMailContractTest` that parses EXEMPT_JOBS
+  and asserts the two sets are equal, which turns a silent divergence into a red test naming the missing
+  class. ⚠️ **Check the direction of the assertion before writing it** — EXEMPT_JOBS legitimately contains
+  non-notification jobs, so it is the notification subset that must match, not the whole constant. **Live.**
+  Filed by `M66`.
 
 ### Submissions, drafts & the guest runtime
 
@@ -1075,12 +1104,40 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   reason and the mint is what exposed them** — `EncodeDraftTest.php:279` and `:307` asserted `error.code`
   alone on the claimed cause, exactly the code-only shape M11's docblock warns about; both now assert the
   code **and** the message. `openapi.json` stayed byte-identical, measured rather than predicted.
-- **`minor` · `RuntimeSession.handleDrift()`'s bare `catch {}` collapses every recovery failure into one
-  sentence.** `resources/public-runtime/components/RuntimeSession.vue:160-168` binds no error, so a dropped
-  connection during `remint()` or `fetchSchema()` reads as *"This form is no longer available."* — a terminal
-  claim about the form, made about the network. **Filed by M14 at the moment it decided not to fix it**: it
-  is a fourth fold site the two closed rows do not name, and widening past them was declined deliberately.
-  **Live.** Filed by `M14`.
+- ✅ **CLOSED BY `M66` (2026-09-03) — `minor` · ~~`RuntimeSession.handleDrift()`'s bare `catch {}` collapses
+  every recovery failure into one sentence.~~** The error is bound and split three ways, transcribed from
+  `App.vue`'s own handling of the same `remint()` → `fetchSchema()` pair. The terminal arm keeps the original
+  sentence **byte-identical**, which makes this a narrowing rather than a rewrite. Filed by `M14`.
+  ✅ **THE ROW WAS RIGHT AND THE CODEBASE ALREADY AGREED WITH IT.** *"…no longer available"* has three
+  first-party sites and the other two are bound to a real 404 — `GuestDraftResumeController.php:48` emits it
+  as `404 draft_not_found`, and `App.vue:236-242` emits its variant only behind `kind === 'terminal'`. This
+  was the sole site saying it without having established the cause, and the fix needed nothing new:
+  `error instanceof ApiError` is the discriminator this component already uses 76 lines below the defect.
+  ⚠️ **Its citation had rotted by 33 lines** — `handleDrift` is at `:193-201`; `:160-168` is the `onMounted`
+  restore block. The figure was copied from the **closed** row's pre-`M14` sweep list and never re-measured.
+  ⚠️ **And *"a fourth fold site"* mixes two taxonomies**: the closed row's fold sites fold *409 causes*; this
+  folds *transport vs HTTP*, where it is the **third** unbound `catch` of the `SaveForLater.vue` species.
+  ⛔ **THE ROW UNDERSTATED ITSELF, AND THE OBVIOUS COPY WOULD HAVE SHIPPED A SECOND FALSE SENTENCE.**
+  `handleSubmitError` discards the durable outbox row **before** calling `handleDrift`, and a resolving
+  session has autosave disabled by construction — the parked row *was* its durable copy. So in a conflict
+  review the reviewed answers exist in memory only, and *"your answers are saved on this device"* would be
+  the same error pointing the other way. The network arm branches on `props.resolving` for exactly that. The
+  lifecycle defect itself is filed below rather than fixed here.
+  Proven by a hand-rolled control (`scripts/mutate.php` is Pest-only): `MU7` reverting the fix reddens the
+  network **and** resolving cases while the terminal case stays green; `MU8` removing the terminal arm
+  reddens only the terminal case. Neither can pass for the other's reason.
+- **`minor` · A failed conflict-review recovery can strand the respondent's only copy of their answers.**
+  Found while closing the row directly above, and it is a data question the copy fix could only warn about.
+  `RuntimeSession.vue`'s `handleSubmitError` calls `discardRow(db, uuid)` for **every** `ApiError` — deleting
+  the parked outbox row — and only then dispatches `handleDrift()`. A conflict-review session
+  (`resolving: true`) has autosave disabled by construction, precisely because that parked row *was* its
+  durable copy. So if `remint()` or `fetchSchema()` then fails on a dropped connection, the reviewed answers
+  exist only in component memory and a reload loses them. ⛔ **`M66` fixed the sentence and deliberately not
+  the lifecycle**: the durable fix is to keep the row until recovery succeeds, which reaches the outbox
+  contract `lib/replay.ts` and the background sync driver share, needs its own Dexie-level coverage, and was
+  out of scope for a batched increment under `D13`. The interim mitigation is in the tree — the network arm
+  tells a resolving respondent to keep the page open rather than claiming their answers are saved. ⚠️ **The
+  ordinary (non-resolving) path is NOT affected**: autosave still holds those answers. **Live.** Filed by `M66`.
 - **`minor` · `replay.ts:223-228` hardcodes `conflict_code = 'form_updated'` on a client-side version
   guard.** Correct today — it really is a form-version drift, decided with no request made — but M14 turned
   `conflict_code` into **user-visible copy input** (`lib/conflict-notice.ts` keys the respondent's sentence
@@ -1985,10 +2042,27 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   authorization decision"* — which is a description of a feature that was never wired. **Either wire it
   (one write at session start, and the default-workspace convenience it promises becomes real) or drop the
   column**; leaving it is how a future increment reaches for it as a signal and gets NULL for everybody. Filed by `M8`. **Latent** — needs a future increment to reach for the column as a signal; today nothing writes it and nothing reads it meaningfully, judged by `M65`.
-- **`minor` · `EnforceTenantTwoFactor` is absent from the `/api/v1` token-mint group.**
-  `routes/api.php:73-89` — an unenrolled member under `security.require_two_factor`, bounced from every
-  page, can still `POST /api/v1/auth/tokens` from the same session and use the bearer against Group B,
-  which carries no 2FA gate either. **Live.** ⛔ **DOWNGRADED FROM `blocker` TO `minor` ON VERIFICATION,
+- ✅ **CLOSED BY `M66` (2026-09-03) — `minor` · ~~`EnforceTenantTwoFactor` is absent from the `/api/v1`
+  token-mint group.~~** Mounted on Group A after `verified`, so an unenrolled member under enforcement can no
+  longer mint a bearer from a session that is bounced off every page. Group B stays ungated for the reason
+  the row itself gives, now pinned with a floor rather than left in prose.
+  ⛔ **THE ROW'S REMEDY WAS WRONG AND MOUNTING IT AS WRITTEN WOULD HAVE SHIPPED A DEFECT.** *"The code edit
+  and the test edit are the same edit"* — but the middleware ended in a bare
+  `redirect()->route('two-factor.required')` with no `expectsJson()` branch, so it would have answered an
+  `Accept: application/json` group with a 302 into HTML, precisely what that group's own comment exists to
+  prevent. The JSON arm came first, mirroring `EnsureVerifiedEmail`, whose docblock already named this class
+  as the one that *"tolerates exactly that"*.
+  ⚠️ **AND IT CHANGED THE TENANT SIDECARS, WHICH IS RECORDED RATHER THAN LEFT TO BE FOUND.**
+  `GET /notifications` now answers 403 instead of 302; the same client swallows both, and `openapi.json`
+  moved by zero as `EnsureVerifiedEmail:45-50` predicts. No exemption was added, deliberately.
+  ⚠️ **Two of the row's own claims were false**: there is no alias (so the prescribed
+  `StepUpReauthenticationTest` manifest shape does not transfer — the FQCN shape does), and the phrase it
+  quotes as repository text, *"gate the mint, not the bearer"*, appears nowhere in the tree.
+  Proven by `MU1` (mount commented out → both arms red) and `MU2` (JSON arm removed → the behavioural case
+  red, the structural one still green), which is the `M43` pairing demonstrated rather than asserted.
+  ➕ **AND THE CENSUS IS LARGER THAN THE ROW'S ONE ROUTE — filed separately, immediately below.**
+  The row's original text follows, including the verification that downgraded it.
+  ⛔ **DOWNGRADED FROM `blocker` TO `minor` ON VERIFICATION,
   AND THE REASON IS THE ROW**: all six links hold, but the middleware is an **enrolment nudge by its own
   docblock** — *"re-challenging per request would be theatre on the doors that already challenge"*,
   and its one escape hatch is a route deliberately left outside its own group — Fortify's own 2FA-enrolment routes
@@ -1997,9 +2071,36 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   The code edit and the test edit are the same edit: mount it on Group A, and add a
   `StepUpReauthenticationTest:115`-shaped route manifest so it cannot silently come off again. Group B
   needs no gate — `routes/api.php:80-88`'s "gate the mint, not the bearer" argument applies verbatim. Filed by `M1`.
-- **`minor` · Three admin POSTs bind `{tenant}` with no `whereUuid`.** `routes/admin.php:56-63` —
-  `suspend`, `reactivate` and `assign-plan`, while the two routes added around them pin the pattern and the
-  docblock justifying the omission is now stale. A malformed uuid 500s instead of 404ing. **Live.** Filed by `M1`.
+- **`minor` · The Fortify group serves tenant subdomains and carries no org-2FA gate, so the mint was not the
+  only way past it.** Found while closing the row directly above, which named one route. `config/fortify.php`
+  registers Fortify's routes in their own group — `web`, `RequirePlatformHost`, `AppSecurityHeaders`,
+  `GateRegistration`, `ThrottleFortifyEndpoints`, `EstablishTenantDatabaseContext` — with no
+  `EnforceTenantTwoFactor`, and `RequirePlatformHost` admits subdomains of the central domain. So an
+  unenrolled member under `security.require_two_factor`, bounced from every page of the workspace, can still
+  `PUT /user/profile-information` and `PUT /user/password`. ⚠️ **Two of those routes are deliberately outside
+  the gate and must stay outside** — the 2FA enrolment endpoints themselves, which is the structural escape
+  hatch `EnforceTenantTwoFactor`'s docblock calls the whole design — so this is a per-route judgement and not
+  a group-level mount. It is the same defence-in-depth severity the row above was downgraded to, for the same
+  reasons: the writes are scoped to the actor's own account and the password route re-challenges. ⚠️ **A
+  neighbour row already covers `PUT /user/profile-information` from the mail-cannon angle; read both before
+  taking either.** **Live.** Filed by `M66`.
+- ✅ **CLOSED BY `M66` (2026-09-03) — `minor` · ~~Three admin POSTs bind `{tenant}` with no `whereUuid`.~~**
+  `suspend`, `reactivate` and `assign-plan` now carry `->whereUuid('tenant')` like the `show` and
+  `impersonate` routes around them, so a malformed id 404s instead of raising SQLSTATE 22P02. The row's
+  evidence held and its prescribed remedy **worked** — the only one of `M66`'s four that did. Filed by `M1`.
+  ⛔ **THE ROW MISCHARACTERISED THE COMMENT IT CITED, AND THE CORRECTION IS THE LESSON.** That comment does
+  not *justify* the omission — it **names** it, in a full sentence, as a latent defect the three share. What
+  was stale was only its stated reason, *"and have simply never been reachable from a UI"*: `TenantDetail.vue`
+  posts to all three and `Tenants.vue` posts two of them from the list page. **A defect deferred on a premise
+  nobody re-reads is a defect that ships**; the premise expired silently while the comment went on reassuring
+  every reader. Rewritten rather than deleted, because the diagnosis was right and only its expiry was wrong.
+  ✅ **The durable half is a sweep, not three more names.** `TenantDetailConsoleTest` has had a malformed-id
+  case since I7b — for `admin.tenants.show`, the one route that already carried the constraint. A per-route
+  test cannot fail for a route nobody wrote it for. `AdminConsoleGateTest` now discovers every parameterised
+  console route from the live table and asserts each constrains its parameter, with its own floor.
+  Proven by `MU5` (one constraint dropped → the structural **and** behavioural arms red) and `MU6`, the
+  discriminator: dropping the constraint on `admin.feedback.update` — a route this row never touched —
+  reddens the sweep too, which is what distinguishes a sweep from three hard-coded names.
 
 ### Design system
 

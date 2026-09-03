@@ -1171,6 +1171,91 @@ describe('RuntimeSession — the 409 a respondent is told the truth about (Incre
 
         wrapper.unmount();
     });
+
+    /*
+     * Increment M66 — the recovery path's own failure, which until now collapsed into one sentence.
+     *
+     * `handleDrift`'s `catch` took no argument, so a dropped connection during `remint()` read as "This form
+     * is no longer available." The comment two cases above names the swallow and works AROUND it — supplying
+     * a `fetchSchema` so the case under test does not fall into the catch block — which is as close as this
+     * suite ever came to asserting on it.
+     *
+     * ⛔ THE TWO CASES BELOW ARE MUTATION-DISTINCT ON PURPOSE, AND THE SECOND IS THE ONE THAT MATTERS MOST.
+     * Deleting the network arm reddens the first; deleting the terminal arm reddens the second. Without the
+     * second, "stop saying the form is gone" could be satisfied by never saying it — which would turn a
+     * genuinely dead form into a "check your connection" lie, the same defect pointing the other way.
+     */
+    it('calls a dropped connection a dropped connection, not a dead form', async () => {
+        const client = fakeClient({
+            submit: vi.fn(rejecting('form_updated', 'This form has been updated.')),
+            // A raw fetch rejection — what the browser throws when the connection drops. NOT an ApiError,
+            // which is the discriminator this component already uses in `handleSubmitError`'s tail.
+            remint: vi.fn(async () => {
+                throw new TypeError('Failed to fetch');
+            }),
+        });
+        const wrapper = mount(RuntimeSession, { props: { schema: conflictSchema(), bootstrap, client } });
+
+        await wrapper.find('input').setValue('Ada');
+        await wrapper.find('form').trigger('submit');
+        await settle();
+
+        const notice = wrapper.find('.session-notice').text();
+
+        expect(notice).not.toContain('no longer available');
+        expect(notice).toContain('check your connection');
+        expect(wrapper.emitted('reschema')).toBeUndefined();
+
+        wrapper.unmount();
+    });
+
+    it('still says the form is gone when the server says the form is gone', async () => {
+        const client = fakeClient({
+            submit: vi.fn(rejecting('form_updated', 'This form has been updated.')),
+            remint: vi.fn(() => {
+                throw new ApiError(normalizeError(404, { error: { code: 'form_not_found', message: 'Not found.' } }));
+            }),
+        });
+        const wrapper = mount(RuntimeSession, { props: { schema: conflictSchema(), bootstrap, client } });
+
+        await wrapper.find('input').setValue('Ada');
+        await wrapper.find('form').trigger('submit');
+        await settle();
+
+        // Verbatim, and asserted as the whole string: this is the one cause the original sentence was
+        // always right about, and keeping it byte-identical is what makes the change a narrowing rather
+        // than a rewrite.
+        expect(wrapper.find('.session-notice').text()).toBe('This form is no longer available.');
+
+        wrapper.unmount();
+    });
+
+    it('does not promise a resolving respondent that their answers are saved on this device', async () => {
+        // ⛔ THE BRANCH EXISTS BECAUSE THE REASSURING SENTENCE WOULD BE FALSE HERE. `handleSubmitError`
+        // discards the durable outbox row before calling `handleDrift`, and a resolving session has autosave
+        // disabled — the parked row WAS its durable copy. So in this branch the reviewed answers are in
+        // memory only, and "saved on this device" would be the same error this increment came to remove.
+        const client = fakeClient({
+            submit: vi.fn(rejecting('form_updated', 'This form has been updated.')),
+            remint: vi.fn(async () => {
+                throw new TypeError('Failed to fetch');
+            }),
+        });
+        const wrapper = mount(RuntimeSession, {
+            props: { schema: conflictSchema(), bootstrap, client, resolving: true },
+        });
+
+        await wrapper.find('input').setValue('Ada');
+        await wrapper.find('form').trigger('submit');
+        await settle();
+
+        const notice = wrapper.find('.session-notice').text();
+
+        expect(notice).not.toContain('saved on this device');
+        expect(notice).toContain('keep this page open');
+
+        wrapper.unmount();
+    });
 });
 
 describe('RuntimeSession — resume drift explains itself (H21b §5.3)', () => {

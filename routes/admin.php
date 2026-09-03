@@ -51,15 +51,25 @@ Route::domain((string) config('tenancy.central_domain'))
             Route::get('/tenants', [TenantAdminController::class, 'index'])->name('admin.tenants.index');
             // One workspace in depth (I7b): plan + usage + domains. ⚠️ `whereUuid` is not decoration —
             // `tenants.id` is a uuid column, so an unbound `/admin/tenants/not-a-uuid` reaches Postgres as
-            // `where id = 'not-a-uuid'` and raises SQLSTATE 22P02, i.e. a 500 rather than a 404. The three
-            // POST routes below share that latent defect and have simply never been reachable from a UI.
+            // `where id = 'not-a-uuid'` and raises SQLSTATE 22P02, i.e. a 500 rather than a 404.
+            //
+            // ✅ M66 — THE THREE POSTS BELOW CARRY IT NOW, AND THE CLAUSE THAT KEPT THEM LATENT IS THE PART
+            // WORTH READING. This comment used to end "…and have simply never been reachable from a UI",
+            // which was true when it was written and false by the time anyone re-read it: `TenantDetail.vue`
+            // posts to all three and `Tenants.vue` posts two of them from the list page. A defect deferred on
+            // a premise nobody re-checks is a defect that ships — the premise expired silently and the
+            // comment went on reassuring every reader. The durable half is in `AdminConsoleGateTest`, which
+            // now enumerates these routes rather than trusting a hand-written list to stay complete.
             Route::get('/tenants/{tenant}', [TenantAdminController::class, 'show'])
                 ->whereUuid('tenant')->name('admin.tenants.show');
-            Route::post('/tenants/{tenant}/suspend', [TenantAdminController::class, 'suspend'])->name('admin.tenants.suspend');
-            Route::post('/tenants/{tenant}/reactivate', [TenantAdminController::class, 'reactivate'])->name('admin.tenants.reactivate');
+            Route::post('/tenants/{tenant}/suspend', [TenantAdminController::class, 'suspend'])
+                ->whereUuid('tenant')->name('admin.tenants.suspend');
+            Route::post('/tenants/{tenant}/reactivate', [TenantAdminController::class, 'reactivate'])
+                ->whereUuid('tenant')->name('admin.tenants.reactivate');
             // Assign (or change) a tenant's plan — admin-assigned, no Cashier (H5a / ADR-0008). The service
             // adopts the affected tenant's context and audits it through the H4 AuditLogger.
-            Route::post('/tenants/{tenant}/plan', [TenantAdminController::class, 'assignPlan'])->name('admin.tenants.assign-plan');
+            Route::post('/tenants/{tenant}/plan', [TenantAdminController::class, 'assignPlan'])
+                ->whereUuid('tenant')->name('admin.tenants.assign-plan');
 
             // Start an impersonation (I11b, RBAC §9 resolved decision 1). ⚠️ The TARGET arrives as a raw
             // uuid in the BODY, never as a second route-model binding: binding resolves on the app

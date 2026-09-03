@@ -14,6 +14,7 @@ use App\Models\User;
 use App\Models\WebhookDelivery;
 use App\Notifications\Connectors\ConnectionRevokedNotification;
 use App\Notifications\Connectors\ConnectorRulePausedNotification;
+use App\Support\Branding\BrandPalette;
 use App\Support\Mapping\ColumnMapping;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
@@ -237,6 +238,36 @@ it('refuses to write, pauses ONLY that rule, and tells the owner once when the c
     // Nothing was written. Asserting the absence is the point — a drift that still appended would be the
     // silent misalignment the whole engine exists to prevent.
     expect(appendedRow())->toBeNull();
+});
+
+it('carries the tenant palette on the paused-rule mail, like every other tenant-facing send', function (): void {
+    // M66 — the assertion that was missing for this class's whole life. Its sibling ConnectionRevokedNotification
+    // is dispatched from the same job 23 lines away WITH a palette, so a branded tenant received one branded and
+    // one product-default email out of a single run.
+    //
+    // ⛔ THE DISCRIMINATOR IS `[]` versus a resolved palette, and that distinction is the whole test. The trait
+    // defaults `$brand` to `[]` and CarriesTenantBrand::branded() substitutes the product palette at RENDER time
+    // — deliberately, so a forgotten withBrand() sends a plausible email instead of throwing on a queue worker
+    // at 3am. That safety net is exactly what made this defect invisible: the mail went out looking fine. So
+    // asserting the rendered output would pass either way; only the payload can tell the two apart.
+    Notification::fake();
+    fakeSheets(['Full name', 'Reviewer notes', 'Colour', 'Submission ID']);
+
+    runSheetsDelivery();
+
+    $expected = BrandPalette::forTenantId($this->tenant->id);
+
+    Notification::assertSentOnDemand(
+        ConnectorRulePausedNotification::class,
+        function (ConnectorRulePausedNotification $notification) use ($expected): bool {
+            // Whole-array equality, not a key spot-check: a subset assertion passes on a palette that is
+            // missing exactly the field nobody thought to name (M56).
+            expect($notification->brand)->not->toBe([])
+                ->and($notification->brand)->toBe($expected);
+
+            return true;
+        }
+    );
 });
 
 it('does not re-notify the owner for every queued delivery against a drifted sheet', function (): void {

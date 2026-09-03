@@ -80,6 +80,15 @@ Files: `app/Support/OpenApi/SubmissionRefusalResponseExtension.php` (new) · `ap
 `resources/js/composables/useServerAutosave.ts` · `resources/js/composables/__tests__/useServerAutosave.test.ts` ·
 `routes/api.php` · `tests/Feature/Tenancy/TenancyMiddlewarePriorityTest.php` ·
 `tests/Feature/Admin/SuperAdminConsoleTest.php`.
+
+⚠️ **CLAIM EXTENDED 2026-09-03, BEFORE EITHER FILE WAS OPENED, AND THE REASON IS REUSE RATHER THAN
+SCOPE.** The claim named a NEW `tests/Feature/Api/SubmissionPromoteContractTest.php`. Two files that
+already exist are the right homes and a third file would have been a second description of a rule
+they own: **`tests/Feature/Api/OpenApiContractTest.php`** (which already walks every published error
+body — `M56`'s census — and therefore already asserts the new 409's envelope for free) and
+**`tests/Feature/Api/SubmissionPromoteApiTest.php`** (which holds this route's four behavioural cases
+and has no `409` among them). No new test file is created for `R1`.
+
 Shared artefacts taken: `openapi.json`, `docs/feature-backlog.md`, `docs/backlog-triage.md`, `docs/gate-baselines.md`, `PROGRESS.md` (own block only).
 Paired files taken: none.
 Namespaces spent: nothing from either namespace — no migration, no ADR, no `§D`.

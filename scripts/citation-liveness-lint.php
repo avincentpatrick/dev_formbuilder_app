@@ -79,11 +79,21 @@ const TIER1_EXTRA_FILES = ['README.md'];
  *
  * `docs/claims/**` are the lane ledgers. `docs/backlog-triage.md` is a point-in-time census whose
  * whole value is that it records what was true on the day it was measured — "correcting" its
- * citations would destroy the measurement rather than repair it. All three also sit in `ci.yml`'s
+ * citations would destroy the measurement rather than repair it. Both also sit in `ci.yml`'s
  * `paths-ignore`, which is the same judgement made one layer up.
+ *
+ * ➕ `docs/backlog-triage-m37.md` (`M65`) is the 2026-08-28 census, frozen byte-for-byte when
+ * `docs/backlog-triage.md` became generated. ⛔ IT IS ADDED HERE ON A FORWARD ARGUMENT AND NOT TO
+ * HIDE A FAILURE, and the distinction is worth the line: measured at the moment it was frozen, it
+ * PASSED tier 1 unexcluded — 57 documents, 456 citations, 424 resolved, ledger unmoved at 18. The
+ * reason to exclude it is that it can never be repaired. It is a dated record nobody may edit, so a
+ * citation of its that rots later is a red gate with no legal fix, which is the same argument the
+ * two above carry, reached before the rot rather than after it. ⚠️ It is NOT in `ci.yml`'s
+ * `paths-ignore` — that file is the user's — so unlike the others a push touching it does run CI.
+ * It is frozen, so it will not be touched again.
  */
 const TIER1_EXCLUDE_PREFIXES = ['docs/claims/'];
-const TIER1_EXCLUDE_FILES = ['docs/feature-backlog.md', 'docs/backlog-triage.md'];
+const TIER1_EXCLUDE_FILES = ['docs/feature-backlog.md', 'docs/backlog-triage.md', 'docs/backlog-triage-m37.md'];
 
 /** Tier 2 — the ledger. Ratcheted, never zero. */
 const TIER2_FILES = ['docs/feature-backlog.md'];

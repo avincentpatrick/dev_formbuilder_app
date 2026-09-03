@@ -440,6 +440,71 @@ an increment.
 
 ## ANSWERED
 
+### D13 — How should the remaining open backlog rows be worked, now that none of them is `major`? **In batches of 3–4 rows per increment, selected by file overlap, verified by a read-only fan-out, written by one hand.**
+
+**Filed and answered 2026-09-02 (user decision), from a plan the user approved after an earlier version
+of it was withdrawn; recorded by Lane A during `M65`, at the first increment run under it.** It is
+recorded here rather than left in the plan file because a protocol nobody wrote down is a protocol the
+next session re-asks — and this one was already asked, answered, and nearly re-litigated once.
+
+⚠️ **Not to be confused with `§D13` in an ADR.** Three ADRs carry a sub-decision numbered `§D13` and
+they are unrelated to this queue. Cite an ADR by **filename**, never by bare number; this entry is
+`D13` in `docs/claims/decisions.md` and nothing else.
+
+**What was measured before deciding** (2026-09-02, against this tree):
+
+| | |
+|---|---|
+| Build phase, claim to work commit | ~70 min mean, `M56`–`M63` |
+| Close-out, work to release commit | **~22 min and near-constant** |
+| Session-start gap, release to next claim | ~65 min mean |
+| **Overhead that is not the row's own work** | **~55% of wall-clock** |
+| Open rows as a conflict graph, edge = a shared cited file | 50 components, largest 26, **43 singletons** |
+| …with the hub files set aside | **65 components, largest 5** |
+
+**The rows are not coupled.** The 26-row component is glued only by hub files — `ci.yml`, `PROGRESS.md`,
+`CLAUDE.md`, this file, `scripts/state.php`, `PROGRESS_ARCHIVE.md`, `README.md` — which are meta-files,
+not product code. Four rows in one increment cost `4×70 + 22 + 65` minutes against `4×157`, a **~42%
+saving**, and the saving comes entirely out of overhead rather than out of verification.
+
+**As decided:**
+
+1. **Batch 3–4 rows per increment.** Selection is a file-overlap check, not a scheduling problem: **no
+   two rows in a batch may cite the same non-hub file, and at most one row may touch a hub file.**
+2. **Verification fans out; it does not compress.** Read-only subagents over disjoint rows, and the
+   claim carries **`Evidence verified` and `Remedy verdict` once per row, never merged into one
+   paragraph.** ⛔ That is the whole point: a row's evidence and its remedy are separately trustworthy —
+   `M30`, `M31`, `M32` and `M34` each found their real defect in the remedy — and collapsing four rows
+   into one narrative destroys exactly the property batching has to preserve.
+3. **One writer.** Agents report; the session opens the citations and makes every edit. **`ADR-0022` is
+   not reversed** — no second worktree, no second lane, no second claim file.
+4. ⛔ **Gates remain the only validators. There is no approver agent and no validator agent.** An
+   agent's approval cannot be turned red by `scripts/mutate.php`, which makes it a gate that cannot be
+   proved — the decorative gate `M43` measured. The two roles that produce falsifiable output are the
+   **researcher** (read-only verification against the code) and the **reviewer** (a finding *generator*,
+   whose findings are then verified like any other). Those are the only two used.
+5. **Bisection rule, agreed up front:** if a batch goes red and the cause is not obvious within one gate
+   run, drop to the single row that reddened and re-run. **Never debug four rows at once.**
+
+**What was considered and rejected, so it is not re-proposed:**
+
+- **A scheduler script.** An earlier draft proposed one. The graph analysis was worth running once, and
+  its finding is what makes the tool unnecessary: the rows are so weakly coupled that batch selection is
+  a file-overlap check a reader can do from a table.
+- **Widening `scripts/loop.php`'s mechanical recogniser.** Its `assess` clears few rows, and that is the
+  gate working rather than a defect: matching row **bodies** instead of titles was measured to admit a
+  CSS overflow row, a missing-middleware security row and an open decision — 68 of 78 wrongly in scope.
+  The loop governs **unattended** runs only and is not in the path of an attended session, so widening it
+  could not move the per-row cost this decision targets. ⚠️ **And completing the liveness backfill makes
+  `assess` refuse MORE rows, not fewer. Do not read its eligible count as loop health.**
+
+⛔ **THE SAVING IS TO BE PROVEN ON THE FIRST BATCHED INCREMENT, NOT ASSUMED.** Record `M66`'s claim,
+work and release timestamps against the ~157 min/row baseline above. **If the measured saving is
+materially under 40%, the batch size is wrong** — revisit it before running twenty more increments on
+an unverified premise. Anyone promising more than ~42% is proposing to skip verification, which is the
+half that works.
+---
+
 ### D7 — Should `main` get branch protection, with the repository owner as a bypass actor? **Yes.**
 
 **Filed 2026-08-28 by Lane A during `M38`; answered 2026-08-31 (user decision); applied by Lane A during

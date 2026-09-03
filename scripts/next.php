@@ -142,8 +142,9 @@ function render_line(string $lane, array $state): string
             .' job\'s step count read individually. Your claim goes in %s and is PUSHED before you open the'
             .' first file.', $config['claim']),
         'Take the next row from docs/feature-backlog.md — '.$state['backlog']['open'].' open ('
-            .$state['backlog']['by_severity']['major'].' major), ranked in docs/backlog-triage.md, whose census'
-            .' is dated and is not the tree. Verify the row\'s evidence and its remedy separately.',
+            .$state['backlog']['by_severity']['major'].' major), ranked in docs/backlog-triage.md, which is'
+            .' GENERATED from the tree — regenerate it rather than reading a stale one, and treat its order as'
+            .' operability and not priority. Verify the row\'s evidence and its remedy separately.',
         $decisions === []
             ? 'No open decisions.'
             : 'Open decisions: '.implode(', ', $decisions).' — do not re-ask them and do not stall; record a'

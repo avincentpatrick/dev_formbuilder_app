@@ -45,7 +45,11 @@ evidence and its remedy are separately trustworthy, and the remedy is the half n
 The row instructs *"Re-derive before working it"* and it is right to: both of its counts have moved. That
 is the row working, not the row failing.
 
-⛔ **AND THE ROW OVERSTATES ITS OWN SILENCE, WHICH IS THE UNUSUAL DIRECTION.** **9 of the 30** unmarked
+⛔ **AND THE ROW OVERSTATES ITS OWN SILENCE, WHICH IS THE UNUSUAL DIRECTION.** ➕ **CORRECTED MID-BUILD:
+this said 9 and the number is 8** — the detector that produced it matched the substring *live* inside the
+word *delivery*, which is the same class of defect as the code-span strip this increment gates, found in my
+own instrument rather than in the corpus. The eight are enumerated below and the count was re-derived
+mechanically before any marker was written. **8 of the 30** unmarked
 rows already state a verdict in a **bolded but non-canonical** form — `**Latent, not live**`,
 `**Not live — a maintenance trap.**`, `**Live, and deliberately not fixed.**`, `**Not a defect and not
 live**`, `**Live as a divergence, not as a reachable defect.**`, `**Not live here; a deployment

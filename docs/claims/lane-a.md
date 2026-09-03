@@ -16,29 +16,175 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M66`, the first batched increment: four rows, two of whose remedies were wrong (`m66-batched-rows`)
+## Status: NO ACTIVE CLAIM — `M66` is merged; the batching saving is measured, not assumed, and it cleared the bar by a wide margin
 
-Taken 2026-09-03. Branch `m66-batched-rows`, cut from `origin/main` at `4a75231`, PR into `main`.
+`M66` closed **four** rows and filed **three**, so the open count moved 86 → 85 and stayed at **zero
+`major`**. `state.php` counts the tree; do not take that sentence's arithmetic on trust.
 
-**Four rows, and the batch itself is the experiment.** `D13` is answered and this is the first increment
-run under it at full width. The rows were picked off the **generated** `docs/backlog-triage.md` — its
-greedy proposal, then checked rather than taken on trust — and they satisfy `D13`'s selection rule: **no
-two cite the same non-hub file, and exactly one (`R1`) touches a hub file.**
+✅ **`D13`'S DEBT IS PAID, AND THE ANSWER IS NOT MARGINAL.** The batching protocol was answered on a
+predicted ~42% saving that `D13` insisted be **proven on the first batched increment or the batch size
+revisited**. Measured end to end — `M65`'s release commit to `M66`'s — the four rows cost **~105 minutes
+against a 628-minute baseline, an ~83% saving**, and the build phase alone was **34 minutes of authoring
+for four rows plus eight mutation controls**. ⚠️ **Do not read 83% as the new expected figure.** See the
+release below for the three reasons it flatters, the most important being that `D13`'s per-row baseline
+was drawn from increments whose build phase included a CI wait this one overlapped with useful work.
 
-- **`R1`** — `docs/feature-backlog.md:1988`: *"`EnforceTenantTwoFactor` is absent from the `/api/v1`
-  token-mint group."* Filed by `M1`. Hub: `routes/api.php`.
-- **`R2`** — `docs/feature-backlog.md:887`: *"`ConnectorRulePausedNotification` is the only tenant-facing
-  connector email with no brand."* Filed by `M1`.
-- **`R3`** — `docs/feature-backlog.md:2000`: *"Three admin POSTs bind `{tenant}` with no `whereUuid`."*
-  Filed by `M1`.
-- **`R4`** — `docs/feature-backlog.md:1078`: *"`RuntimeSession.handleDrift()`'s bare `catch {}` collapses
-  every recovery failure into one sentence."* Filed by `M14`.
+⚠️ **For whoever takes the next batch: the three lessons `M66` would most like to hand on.**
+**(1) THE REMEDY IS STILL THE HALF THAT IS WRONG, AND BATCHING MADE THAT MORE VISIBLE RATHER THAN LESS.**
+Four rows, four sound bodies of evidence, **two broken remedies** — one of which (`R2`) could not have
+executed at all, because the row prescribed calling a method on a trait the class had never used. Reading
+the four together is what showed the pattern was not bad luck: the evidence is written by someone looking
+at the defect, the remedy by someone predicting a fix, and only one of those gets re-checked.
+**(2) A DEFECT DEFERRED ON A STATED PREMISE OUTLIVES ITS PREMISE, SILENTLY.** `R3`'s route comment named
+its own defect in a full sentence and deferred it because *"the POST routes have never been reachable from
+a UI"*. That was true when written. Three call sites falsified it later, and nothing anywhere re-read the
+sentence — the comment went on reassuring every reader for two increments. **When you defer on a premise,
+the premise is the thing that needs a gate**, which is why the fix here is an enumerating sweep rather
+than three more constraints.
+**(3) A ROW CAN UNDERSTATE ITSELF INTO A WORSE FIX.** `R4` read as a copy defect. The obvious kind
+sentence — *"your answers are saved on this device"* — is **false in a conflict review**, because the
+durable outbox row is discarded before the recovery runs and autosave is off in that mode. The row that
+looked cosmetic was sitting on a data-loss path, and the naive fix would have replaced one false
+reassurance with another.
 
-⛔ **EVERY ROW'S EVIDENCE HELD AND TWO OF THE FOUR REMEDIES ARE WRONG.** That is the fifth and sixth
-consecutive occurrence of the pattern `docs/claims/TEMPLATE.md` tabulates, and it is the entire argument
-for why these two fields stay separate **per row** and are never merged into one paragraph.
+⛔ **`D9` must never be started without an explicit answer.** Open decisions: `D1`, `D3`, `D4`, `D8`,
+`D9`, `D10`, `D11`, `D12`. `D12` — whether to end the M-series — is still the one thing that needs the
+user, and `M66` deliberately did not touch it. **`D13` is answered, proven, and not to be re-asked.**
+
+⛔ **RUN `php scripts/state.php` FOR EVERY NUMBER.**
 
 ---
+
+## RELEASED — `M66`, the first batched increment: four rows, two of whose remedies were wrong (merged as PR #257, `730a2d9`, 6/6 green with real step counts — Static analysis 23 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
+
+**Shipped 2026-09-03.** Branch `m66-batched-rows`. The first increment run at `D13`'s full width, and the
+one that owed `D13` its measurement.
+
+✅ **EVERY CLAIMED FILE WAS EDITED AND NO FILE WAS EDITED THAT THE CLAIM DID NOT NAME.** Twelve code and
+test files plus the two shared documents the claim declared. Recorded because `M65`'s release had to
+confess the opposite, and because the check costs one `git diff --stat`.
+
+### The measurement `D13` owed
+
+| | |
+|---|---|
+| `M65` release → `M66` claim (session-start gap) | **31 min** (`D13` mean: 65) |
+| claim → merge (build, including one CI round trip) | **52 min** (`D13` mean: 70 **per row**) |
+| merge → release (close-out) | see the close-out commit; `D13` mean 22 |
+| **Baseline, 4 rows** | **628 min** (4 × 157) |
+| **`D13`'s own model** | 367 min — a 41.6% saving |
+| **Measured** | **~105 min end to end — an ~83% saving** |
+
+⛔ **THE BAR WAS 40% AND IT CLEARED BY MORE THAN DOUBLE, WHICH IS A REASON FOR SUSPICION AND NOT
+CELEBRATION.** Three things flatter this number and all three are named here rather than left for someone
+to discover when the next batch comes in slower:
+
+1. **The baseline's build phase is not measured the same way.** `D13`'s ~70 min/row came from increments
+   whose claim→merge window *contains* the CI wait — `M65`'s was **402 minutes**, almost all of it
+   waiting. This increment overlapped its CI wait with useful work, so part of the "saving" is a
+   measurement artefact rather than batching.
+2. **These four rows were small.** They were selected for **separability**, which correlates with size.
+   A batch containing one genuinely large row will not look like this.
+3. **The fan-out was cheap here and will not always be.** Three read-only agents cleared four rows. A row
+   whose evidence needs a database or a running suite cannot be verified that way at all.
+
+**The honest reading: batching is worth doing and `D13`'s ~42% is the number to plan against, not 83%.**
+The clause `D13` was actually protecting against — *materially under 40%* — is not in play, so **the batch
+size stands and is not revisited.**
+
+### How the prediction fared
+
+| Predicted | Outcome |
+|---|---|
+| PHPStan **can** move; expect no errors, said rather than quoted | ✅ **held, and measured properly.** Swapped all five changed `app/`/`routes/` files to their `origin/main` versions, re-analysed, restored: **18 before, 18 after — delta exactly zero**, all pre-existing local phantoms |
+| Contract gate unchanged — `openapi.json` moves by zero | ✅ **held.** Untouched in the diff, and Contract green at 16 steps |
+| Vitest file count unchanged | ✅ **held** — cases added to an existing file; 40 → 43 tests in it |
+| Pest up across four directories | ✅ **held** |
+| **Pint flags the reformatted `routes/admin.php` one-liners** | ❌ **WRONG.** Passed first time. ⚠️ And `passed` was **not** believed on its own — a deliberately misformatted probe in `app/` came back with six fixers first, per the standing rule |
+| ⚠️ **The one named as most likely wrong: the contract gate** | ✅ **HELD** — so the flagged prediction was right and an unflagged one was wrong, which is the reverse of `M65` |
+| `MU6` reddens nothing | ❌ **WRONG, AND WRONG IN THE INSTRUCTIVE DIRECTION** — see below |
+
+⛔ **`MU6` WAS PREDICTED BACKWARDS BECAUSE I APPLIED A DOCUMENT-SWEEP RULE TO A ROUTE-TABLE SWEEP.** The
+claim said a discriminator mutation on an already-correct route should redden **nothing**, reasoning from
+`M58`, where mutating a correct row checks a document sweep for false positives. That is the wrong analogy.
+`AdminConsoleGateTest`'s new arm asserts a property over **every** parameterised console route, so
+un-pinning `admin.feedback.update` — a route `R3` never touched — **must** redden it, and it did. **That
+reddening is the evidence the arm is a sweep rather than three hard-coded names**, which is precisely what
+the discriminator was for. The prediction was wrong; the control did its job and told me so.
+
+### Two remedies were wrong, and one of them could not have run
+
+- **`R2` — fatal.** The row prescribed `->withBrand(...)`. `ConnectorRulePausedNotification` used
+  `Queueable` alone, so that call is `Call to undefined method`. Four edits, not one. **And the loss was
+  bigger than the row's framing**: `branded()` supplies the Meridian *template* as well as the palette, so
+  the class had been rendering the framework's default shell — a brand gap, not a colour gap.
+- **`R1` — would have shipped a defect.** *"The code edit and the test edit are the same edit"* — but the
+  middleware ended in a bare `redirect()`, so mounting it on a group whose clients send
+  `Accept: application/json` would have answered with markup. The JSON arm had to come first.
+
+⛔ **AND `R2`'S ROOT CAUSE WAS A GATE THAT COULD NOT SEE THE CLASS.** `scripts/job-payload-lint.php`'s
+EXEMPT_JOBS had carried it since H16a; `QueuedMailContractTest`'s list never did — and it is that test which
+asserts the trait is present. The two lists are hand-maintained, the test's own docblock warns that adding
+a class means adding it to both *"or two separate gates fail"*, and that is a description of what had
+already happened. The eleventh entry is appended; **the gap is filed rather than closed**, because proving
+two lists agree is a decision about where such a gate lives.
+
+### Proven by mutation — eight, each reddening only what it should
+
+| | Mutation | Red |
+|---|---|---|
+| `MU1` | mint mount commented out | structural **and** behavioural arms |
+| `MU2` | JSON arm removed | behavioural only — **structural stayed green** |
+| `MU3` | `withBrand()` removed | the new brand assertion |
+| `MU4` | trait removed | `QueuedMailContractTest`'s trait arm |
+| `MU5` | one `whereUuid` dropped | structural **and** behavioural |
+| `MU6` | a route `R3` never touched, un-pinned | the sweep — see above |
+| `MU7` | `R4`'s fix reverted | the network **and** resolving cases; **terminal case green** |
+| `MU8` | `R4`'s terminal arm removed | the terminal case **only** |
+
+✅ **`MU2` AND `MU7`/`MU8` ARE THE PAIRS WORTH KEEPING.** `MU2` reddened the behavioural case while leaving
+the structural one green, which is `M43`'s pairing demonstrated rather than asserted — the mount was still
+there, only its behaviour changed. `MU7`/`MU8` are mutation-distinct in opposite directions, and `MU8` is
+the one that matters: without it, *"stop saying the form is gone"* could be satisfied by never saying it,
+turning a genuinely dead form into a check-your-connection lie.
+
+⛔ **`R4`'S CONTROL IS HAND-ROLLED AND THAT IS AN OPEN ROW, NOT A CHOICE.** `scripts/mutate.php` is
+Pest-in-a-container only. `M62`'s discipline was reimplemented at the call site — baseline first, restore in
+a `finally`, sha256 must move and must return to its exact original value, decode with errors replaced.
+⚠️ **My first control script printed CAUGHT for both mutants and named no tests**, because its
+failure-name parser never matched Vitest's output format. The verdict was sound (exit codes) but the
+evidence for **mutation-distinctness** — the thing the test comments assert — was missing. Re-run with a
+working parser rather than left as a claim.
+
+### Three rows filed, each the moment it was decided
+
+- **The Fortify group carries no org-2FA gate.** `R1` named one route; the whole Fortify group serves
+  tenant subdomains with no `EnforceTenantTwoFactor`. **Deliberately not a group-level mount** — the 2FA
+  enrolment endpoints must stay outside, which is the structural escape hatch the middleware's docblock
+  calls the whole design. **Live.**
+- **A failed conflict-review recovery can strand the only copy of the answers.** The lifecycle defect
+  behind `R4`'s copy. **Live.**
+- **Nothing proves the two queued-mail lists agree.** `R2`'s root cause. **Live.**
+
+### Corrections on the record
+
+- Two of `R1`'s own claims were false and are recorded at the row: the middleware has **no alias** (so the
+  `StepUpReauthenticationTest` manifest shape it prescribes does not transfer), and the phrase it quotes as
+  repository text — *"gate the mint, not the bearer"* — **appears nowhere in the tree**. It is the row's
+  own coinage, and it read like a citation.
+- `R2`'s citation was **never** correct in the row's life; `R4`'s had rotted by 33 lines, inherited
+  un-remeasured from the **closed** row's pre-`M14` sweep list. Both repaired; the ledger held at exactly
+  18 of 18 against its ceiling.
+- A first draft of the `R1` row closure left **two** `Filed by` clauses in one bullet, which
+  `BacklogProvenanceTest`'s filer arm requires to be exactly one. Caught by running the gate rather than by
+  reading the edit.
+
+### The four rows as claimed — evidence and remedy, per row
+
+Retained verbatim from the claim rather than folded into the narrative above. `D13` records that
+collapsing four rows into one account destroys the property batching has to preserve: **a row's
+evidence and its remedy are separately trustworthy, and the remedy is the half nobody checks.** Two of
+the four below prove it again.
 
 ### `R1` — Evidence verified
 
@@ -187,44 +333,6 @@ highest. **The lifecycle defect is filed, not fixed** — keeping the row until 
 sync contract `replay.ts` and the background driver share, and `D13` forbids widening mid-batch.
 
 ---
-
-**Files:** `app/Http/Middleware/EnforceTenantTwoFactor.php` · `routes/api.php` ·
-`tests/Feature/Auth/TenantTwoFactorEnforcementTest.php` ·
-`app/Notifications/Connectors/ConnectorRulePausedNotification.php` ·
-`app/Jobs/Connectors/DeliverConnectorMessageJob.php` · `tests/Feature/Mail/QueuedMailContractTest.php` ·
-`tests/Feature/Connectors/GoogleSheetsDeliveryTest.php` · `routes/admin.php` ·
-`tests/Feature/Admin/AdminConsoleGateTest.php` · `tests/Feature/Admin/SuperAdminConsoleTest.php` ·
-`resources/public-runtime/components/RuntimeSession.vue` ·
-`resources/public-runtime/__tests__/components.test.ts`.
-
-**Shared artefacts taken:** `docs/feature-backlog.md`, `docs/backlog-triage.md` (regenerated, never
-hand-edited), `docs/gate-baselines.md` (regenerated at close-out), `PROGRESS.md` (own block only),
-`PROGRESS_ARCHIVE.md` (one appended line). **`openapi.json` is NOT taken** — see the prediction.
-
-**Paired files taken:** none.
-
-**Namespaces spent:** nothing from either namespace — no migration, no ADR, no `§D`.
-
-**Prediction**, written before the run:
-
-| | |
-|---|---|
-| PHPStan | **can** move — `app/` and `routes/` are both touched, so the usual *"a `scripts/`-only diff cannot move it"* line does not apply. Expect no errors, said rather than quoted |
-| Contract (OpenAPI) | **unchanged.** `EnsureVerifiedEmail.php:48` records that this exact shape moves it by zero |
-| Vitest | still the baseline **file count** — `R4` adds cases to an existing file |
-| Pest | up by the new cases, across four separate directories |
-| Pint | at least one flag on the reformatted `routes/admin.php` one-liners |
-| `MU6` | reddens nothing — it is a discriminator, and if the manifest arm reddens on an **already-correct** route the arm is measuring the wrong thing |
-
-⚠️ **The one most expected to be wrong: the contract gate.** If the mint route's 403 is documented
-per-cause rather than per-status, `openapi.json` moves and the claim is short one shared artefact.
-
-⛔ **AND THE MEASUREMENT THIS INCREMENT OWES IS NOT A GATE.** `D13` records ~42% as a claim to be proven.
-Baseline **4 × 157 = 628 min**; `D13`'s model is **367 min**; **≥40% saving means ≤ ~377 min** from `M65`'s
-release commit `4a75231` to this increment's release commit. ⚠️ **`M65`'s own claim→merge was 402 minutes,
-essentially all CI wait, against the ~70 min mean `D13` quotes** — so a miss must be reported with what the
-build time actually contained, or the revisit `D13` mandates will re-tune batch size for something that was
-never about batch size.
 
 ---
 

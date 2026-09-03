@@ -694,6 +694,14 @@ it('returns exactly the four documented keys per item, and OMITS error.details w
     // Scramble could infer the real shape, and the obvious way to write it (`$error['details'] ?? null`)
     // would have started emitting `details: null` on every refusal that carries none — a silent wire
     // change that no existing assertion here could have caught, because they all check subsets.
+    //
+    // ✅ PROVED, NOT ASSUMED (M69, via scripts/mutate.php, sha256-restored):
+    //   MU5  replace the `when()` with `$error['details'] ?? null`   → CAUGHT, this arm red.
+    //   MU6  revert the published `status` to a bare string in openapi.json → CAUGHT, the arm below red.
+    // ⚠️ MU5's FIRST FORM SURVIVED AND THE GATE WAS NOT AT FAULT. It was written as
+    // `($error['details'] ?? null) ?: $this->when(…)`, and for a refusal with no details that is
+    // `null ?: when(…)` — the same branch, so the mutant was semantically identical to the original
+    // while its sha256 moved. A mutation that APPLIES is not yet a mutation that CHANGES ANYTHING.
     $tenant = syncTenant();
     enterTenant($tenant->id);
     $admin = syncMember('admin');

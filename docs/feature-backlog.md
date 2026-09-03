@@ -903,8 +903,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   (`f5ec530`), `:343` after `M5`, `:383` since `M6`. `:330` is a blank line in a different method.
   Proven by `MU3` (the argument removed → the new brand assertion red) and `MU4` (the trait removed →
   `QueuedMailContractTest` red), each reddening only its own arm.
-- **`minor` · Two hand-maintained lists of queued mail notifications must agree, and nothing checks that they
-  do.** `tests/Feature/Mail/QueuedMailContractTest.php`'s `$queuedMailNotifications` and
+- ~~**`minor` · Two hand-maintained lists of queued mail notifications must agree, and nothing checks that they
+  do.**~~ `tests/Feature/Mail/QueuedMailContractTest.php`'s `$queuedMailNotifications` and
   `scripts/job-payload-lint.php`'s `EXEMPT_JOBS` are both edited by hand, and the contract test's docblock
   says in terms that adding a class means adding it to **both** *"or two separate gates fail"*. ⛔ **That is
   a description of what already happened rather than a warning about what might**: `ConnectorRulePausedNotification`
@@ -914,8 +914,24 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   unproven against each other. The cheap form is an arm in `QueuedMailContractTest` that parses EXEMPT_JOBS
   and asserts the two sets are equal, which turns a silent divergence into a red test naming the missing
   class. ⚠️ **Check the direction of the assertion before writing it** — EXEMPT_JOBS legitimately contains
-  non-notification jobs, so it is the notification subset that must match, not the whole constant. **Live.**
+  non-notification jobs, so it is the notification subset that must match, not the whole constant.
   Filed by `M66`.
+  ✅ **DONE — M69 (2026-09-04). THE ROW'S REMEDY WAS SOUND AND SHIPPED AS WRITTEN, AND ITS ONE WARNING
+  WAS THE THING WORTH HAVING.** `tests/Feature/Mail/QueuedMailContractTest.php` gains the reverse
+  direction: it parses `EXEMPT_JOBS`, filters to the notification subset and compares both sets.
+  ⚠️ **The warning about the filter was right for a reason the row did not give.** It says EXEMPT_JOBS
+  *"legitimately contains non-notification jobs"* — **today it contains none**, all eleven entries are
+  notifications. So whole-set equality would have passed and been wrong in principle, and a filter
+  written on that basis alone would have been untestable. It is filtered on the framework's
+  `Notification` base class and proved against a REAL job (`SweepWebhookRetriesJob`).
+  ⛔ **AND THE DISCRIMINATOR IS THE TRANSFERABLE HALF.** The control that adds a real job and expects
+  GREEN proves nothing on its own — a regex that never harvested the new entry produces the same green.
+  A second control puts a NON-EXISTENT class in the same slot and expects RED; the pair is what
+  separates "the filter excluded it" from "the parser never saw it" (the `M49` shape).
+  ⚠️ **Two defects in the arm's own first run, both kept as comments at the site**: the const block is
+  more comment than code and one comment quotes `Notification::route('mail', …)`, so harvesting every
+  quoted string picked up `'mail'`; and `class_exists` asserted per entry reports *"failed asserting
+  that false is true"* and names nothing.
 
 ### Submissions, drafts & the guest runtime
 
@@ -1556,8 +1572,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   it against a fresh export, so a hand edit fails the contract job — the honest fix is an annotation
   mechanism Scramble 0.13 does not offer for arbitrary status codes, or moving these gates somewhere the
   generator can see them. **Live**, pre-existing in kind. Filed by `M13`.
-- **`minor` · `SyncSubmissionResultResource`'s generated contract types `submission` and `error` as bare
-  strings.** Filed 2026-08-25 by M13. Both are object-or-null in every response the controller builds —
+- ~~**`minor` · `SyncSubmissionResultResource`'s generated contract types `submission` and `error` as bare
+  strings.**~~ Filed 2026-08-25 by M13. Both are object-or-null in every response the controller builds —
   `submission` is `{id, reference, status}`, `error` is `{code, message, details?}` — but Scramble infers a
   `string` for each, so `openapi.json` describes a shape no response has ever had. An integrator generating
   a client from the contract gets types that fail to deserialise on the first item. **Live**, pre-existing
@@ -1577,6 +1593,46 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `JsonResource` whose `toArray()` Scramble already infers. The candidate is a typed shape on that method
   rather than an annotation, and it is untried. **Whoever takes it should re-read the 403 row's closure
   above first**, because the two were filed as one defect and are not one.
+  ✅ **DONE — M69 (2026-09-04). THE EVIDENCE HELD, THE ROW UNDERSTATED ITSELF TWICE, AND THE DIRECTION IT
+  PRESCRIBES IS THE ONE THING THAT DOES NOT WORK.** `openapi.json` now publishes `submission` and `error`
+  as nullable OBJECTS with their real properties, and `status` as a `$ref` to a new
+  `App\Enums\SyncResultStatus` enumerating all five outcomes.
+  ⛔ **THE PRESCRIBED REMEDY — *"a typed shape on that method rather than an annotation"* — WAS TRIED
+  FIRST AND MOVED THE DOCUMENT BY EXACTLY NOTHING.** A full `@return array{…}` shape on `toArray()` left
+  all four properties `type: string`. `dedoc/scramble` infers `toArray()` from the STATEMENTS it can
+  trace, and **a docblock is not a statement**. What works is a literal it can trace. Two corollaries,
+  both measured: `BackedEnum::from()` returns `static`, which the inference does NOT resolve, so an
+  explicit `self` return (`SyncResultStatus::fromWire()`) is what turns the property into a `$ref`; and
+  **every comment inside the returned literal is PUBLISHED as that property's `description`** — a draft
+  shipped an eight-line note about `when()` into the exported contract.
+  ⚠️ **THE ROW UNDERSTATES ITSELF TWICE.** (1) `status` was a bare string too, and it is the FIRST thing
+  an integrator branches on. (2) `M68`'s widening says *"the four codes an integrator must branch on"*;
+  the controller emits at least **nine**.
+  ⚠️ **AND THE OBVIOUS WAY TO WRITE THE FIX CHANGES THE WIRE FORMAT.** `$error['details'] ?? null` would
+  have started emitting `details: null` on every refusal that carries none — `ApiErrorEnvelope`'s docblock
+  says in terms that `details` is omitted and never nulled. `$this->when()` preserves the omission AND
+  marks the property optional in the schema; `filter()` recurses into nested arrays, read in the installed
+  framework rather than assumed. **No existing assertion on this surface could have caught that**, because
+  Laravel's JSON assertions are all subset checks (`M56`) — which is why the new pins compare `array_keys`.
+  ⛔ **ENUMERATING `error.code` IS NOT TAKEN AND IS FILED SEPARATELY** — see the row below.
+- **`minor` · The per-item `error.code` is the integrator's real branching key on `/sync/submissions`, and
+  the contract still publishes it as an unconstrained string.** Recorded 2026-09-04 **at the moment it was
+  decided not to take**, rather than left in the release that found it. `M69` closed the row above by
+  teaching the generator a traceable literal, which fixed the SHAPE — `submission`, `error` and `status` —
+  and cannot reach this. **Measured: `SyncSubmissionController` emits at least nine codes** —
+  `form_version_not_found`, `form_not_found`, `forbidden`, `submission_invalid`, `submission_conflict`,
+  `submission_version_superseded`, and `FormNotAcceptingSubmissionException`'s `form_not_open`,
+  `form_closed` and `max_responses_reached`. `M68`'s widening of that row says *"the four codes"*, so the
+  count in the ledger is itself low.
+  ⛔ **WHY IT IS ITS OWN ROW AND NOT A LINE OF THE ONE ABOVE.** The two live fixes are different mechanisms.
+  A traced literal can carry a TYPE and cannot carry a DESCRIPTION, and this repository's established
+  answer for exactly this field is a description: `ApiErrorEnvelope::schema()` takes a `$codeDescription`
+  precisely because *"the codes are the integration-consumer's branching key, so they are named rather than
+  left as a string"*. Reaching that from a `JsonResource` needs either a `TypeToSchemaExtension` or a
+  second enum, and **which is right is a design decision rather than a fix** — an enum would put the nine
+  codes in one place but three of them are owned by an exception that computes its own `code()`.
+  ⚠️ **The honest sizing is that this is worth less than it looks** — an integrator can already branch on
+  `status`, which IS now enumerated, and `error.code` only narrows the `error` case. **Live.** Filed by `M69`.
 
 - **`minor` · The `@throws` contract sweep cannot see the loss of ONE of two declared causes.**
   Filed 2026-09-03 by `M68`, and **measured rather than predicted: a control removing a single `@throws`
@@ -2596,7 +2652,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   hole rather than a product defect: the step-up path is exercised in production and by the E2E suite, and
   it is the unit-level positive control that cannot exist. Filed by `M68`.
 
-- **`minor` · `deploy.yml`'s effective trigger CHANGED in `M39`, and nothing says so at the site.**
+- ~~**`minor` · `deploy.yml`'s effective trigger CHANGED in `M39`, and nothing says so at the site.**~~
   It fires on `workflow_run` of CI `completed` on `main` gated on `conclusion == 'success'`. Before `M39`
   every merge run on `main` was cancelled, so **the only runs that could ever have reached it were
   docs-only close-out runs** — a deploy path that could only ever have shipped a documentation commit.
@@ -2605,7 +2661,19 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   live:** `DEPLOY_ENABLED` is unset (`gh variable list` is empty), so the job is skipped. ⚠️ **The row
   exists because the day that variable is set is the wrong day to discover that the trigger's meaning
   changed.** Filed by `M39 (2026-08-28)`; not fixed there because `deploy.yml` was outside that claim and
-  the remedy is a comment plus a decision about whether `paths-ignore` should also guard deploys. **Live.** Filed by `M39`.
+  the remedy is a comment plus a decision about whether `paths-ignore` should also guard deploys. Filed by `M39`.
+  ✅ **DONE — M69 (2026-09-04). THE HEADLINE HELD; HALF THE REMEDY WAS ALREADY DISCHARGED SOMEWHERE
+  ELSE, AND THE ROW COULD NOT HAVE KNOWN.** `.github/workflows/deploy.yml` now records at the site what
+  its `workflow_run` trigger selected before `M39` and what it selects now. Re-verified before writing:
+  `gh variable list` is still empty, so `DEPLOY_ENABLED` is unset and the job is still dormant.
+  ⛔ **THE `paths-ignore` DECISION THE ROW ASKS FOR IS ALREADY MADE BY THE TREE.** `workflow_run` offers
+  no path filter, and it does not need one: `ci.yml`'s `push` filter skips the close-out documentation
+  paths, and **a push GitHub filters out produces no run at all** — so there is no `workflow_run` event
+  for `deploy.yml` to receive, and `ci.yml`'s own comment says exactly that. No decision was filed in
+  `docs/claims/decisions.md`, deliberately: that file's header says a resolved judgement does not belong
+  there, and duplicating the filter into `deploy.yml` would be a second description of one fact — the
+  `M56` class. What `deploy.yml` carries instead is a pointer plus the warning that the dependency runs
+  the opposite way from how it reads: **shortening `ci.yml`'s list re-opens the deploy path.**
 
 - ✅ **CLOSED BY `M42` (2026-08-29) — `minor` · ~~`scripts/preflight.php` derives the next increment
   number from prose, so a FORECAST reads as a SPEND.~~** The number now comes from
@@ -3592,7 +3660,11 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - ~~**`minor` · Neither structural lint gate fails on an empty scan.**~~
   ✅ **DONE — M36 (2026-08-28), AND THE ROW UNDERSTATED ITSELF: FOUR GATES, NOT TWO.** The row names
   `constraint-boundary-lint.php` and `migration-lint.php`. `scripts/controller-gate.php:101-102` and
-  `scripts/job-payload-lint.php:246-247` carry the identical shape and it names neither;
+  `scripts/job-payload-lint.php:269-270` carry the identical shape and it names neither;
+  *(the second line number was `:246-247` until `M69`, which added a docblock above `EXEMPT_JOBS` and
+  shifted everything below it. Re-pointed at the `MIN_EXPECTED_JOBS` floor this row is about — it had
+  ALREADY drifted onto two closing braces before that edit, and only stayed green because a brace is
+  not a blank line. Repaired because M69 moved it, not as a sweep.)*
   `component-import-lint.php` was the only one of the five with a floor, and it is the gate whose author
   filed the row. All four now carry a named `MIN_EXPECTED_*` constant asserted before the success path,
   in `component-import-lint.php`'s own R2 shape. **Its two citations held** — `:297-304` rather than
@@ -5014,8 +5086,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the decision to keep this increment's harness throwaway was taken with the user, rather than
   discovered later. **Live.** Filed by `M60`.
 
-- **`minor` · The claim template has a field for a row's evidence and a field for its remedy, and the
-  thing that actually went wrong in `M60` was neither.** `docs/claims/TEMPLATE.md` requires
+- ~~**`minor` · The claim template has a field for a row's evidence and a field for its remedy, and the
+  thing that actually went wrong in `M60` was neither.**~~ `docs/claims/TEMPLATE.md` requires
   `### Evidence verified` and `### Remedy verdict`, added by `M36` on the strength of four consecutive
   rows with sound evidence and a broken remedy. **`M60`'s row had sound evidence in kind, an
   implementable remedy, and a PREMISE that had expired** — its central instruction (*"the section has
@@ -5038,4 +5110,24 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   ⛔ **Filed by M60 (2026-09-02), and filed HERE rather than only in the release that found it.** A
   finding recorded only in claim prose is invisible to a backlog search — `J4b1` traced four live
   defects, wrote them in the tracker and nowhere else, and they stayed unfindable until someone
-  re-read the increment. **Live.** Filed by `M60`.
+  re-read the increment. Filed by `M60`.
+  ✅ **DONE — M69 (2026-09-04). THE ROW OFFERED TWO SHAPES AND OBJECTED TO BOTH; THE USER CHOSE THE
+  THIRD HEADING, AND IT SHIPS GATED SO IT CANNOT BECOME THE THING IT WARNS ABOUT.**
+  `docs/claims/TEMPLATE.md` declares `### Premise verified`; `CLAUDE.md`'s claim bullet is now three
+  answers rather than one; `scripts/preflight.php` refuses an ACTIVE claim missing any declared field;
+  `tests/Feature/Docs/ClaimTemplateFieldsTest.php` pins which fields the template declares.
+  ⛔ **THE FIELD LIST IS DERIVED FROM THE TEMPLATE, NOT RESTATED IN THE CHECK** — add a field and
+  preflight demands it on the next run with no edit. That is also why the Pest arm is not redundant: a
+  derived check inherits its source's failures, so deleting a heading would make preflight quietly stop
+  requiring it **while still printing `[ok]`**, which is worse than no gate.
+  ⚠️ **The two halves read the artefact from different places, deliberately.** The TEMPLATE comes from
+  the working tree — it is the protocol you are building under, and the increment adding a field should
+  be the first held to it. The CLAIM comes from `origin/main`, because an unpushed claim does not exist.
+  `M69` wrote its own claim with the field before the field existed, for that reason.
+  ⚠️ **The parser's first draft returned an EMPTY LIST and every check passed vacuously** — it tested
+  for a `## ` heading before the fence, and the template's example opens with `## Status: ACTIVE CLAIM`.
+  Caught only by the empty-result floor at the call site (the `M48` class: an operation that succeeds on
+  empty input). Both halves now carry that floor.
+  ⚠️ **What is gated is that the question is ASKED and ANSWERED, never that the answer is RIGHT** — the
+  same limit `BacklogProvenanceTest` carries for the liveness marker. A claim answering "held" under
+  every heading passes everything. Recorded rather than papered over.

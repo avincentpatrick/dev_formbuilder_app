@@ -5028,6 +5028,27 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   is that a floor is a ratchet and will need maintaining**, which is why this is filed rather than
   guessed at. **Live.** Filed by `M49`.
 
+- **`minor` · `npm audit` cannot distinguish "the registry is unreachable" from "your dependencies are
+  vulnerable", and both hard-block a merge.** Measured on `M69`'s own PR run (33818367732), which went
+  5/6 with the sixth job dying at step 19 of 23: `npm warn audit network timeout at:
+  https://registry.npmjs.org/-/npm/v1/security/advisories/bulk` followed by `npm error audit endpoint
+  returned an error` and exit 1. **No advisory was involved** — the same command against the same
+  lockfile reports `found 0 vulnerabilities` locally, and the diff touched no JS manifest at all.
+  ⛔ **THIS IS THE FALSE-RED TWIN OF A CLASS THIS REPOSITORY HAS ONLY EVER MET AS FALSE GREEN.** `I5`'s
+  `steps: []`, Pint before its probe, `M61`'s `e2e` wrong form and `M69`'s own PHPStan-crash-exits-0 are
+  all gates that report success without measuring. This one reports FAILURE without measuring, and it is
+  worse in one specific way: a false green is discovered eventually, while a false red is re-run until it
+  passes and **teaches the operator to re-run a red gate**, which is the habit every one of those other
+  rows exists to prevent.
+  ⚠️ **The remedy is not "add a retry" and that is the whole difficulty.** A retry loop around a network
+  call would fix the flake and preserve the conflation, so a genuine registry outage would still read as
+  a clean audit once it stopped erroring. The honest shape separates **fetching** the advisories from
+  **judging** them: fail the step only on a parsed high/critical finding, and fail it DIFFERENTLY —
+  distinctly, and ideally not as a merge block — when the endpoint could not be reached.
+  ⛔ **`ci.yml` IS THE USER'S FILE AND THIS IS ALSO A HUB ROW** (seven open rows cite it). `M69` re-ran
+  the job rather than editing the gate, and filed this the moment that was decided rather than leaving it
+  in a release nobody greps. **Live.** Filed by `M69`.
+
 - **`minor` · `scripts/tracker-lint-controls.php` proves R7 against synthetic histories, and nothing
   proves it against a REAL GitHub `push` or squash.** Filed by `M49` (2026-08-31) at the moment the
   harness shipped, so its limit is a filed constraint rather than a comment nobody re-reads. The

@@ -16,118 +16,171 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M68`, the third batched increment: four rows (`m68-batched-rows`)
+## Status: NO ACTIVE CLAIM — `M68` is merged; a row's remedy can be IMPOSSIBLE rather than wrong, and it fails GREEN
 
-Taken 2026-09-03. Branch `m68-batched-rows`, cut from `origin/main` at `1de4b3a`, PR into `main`.
-Run at `D13`'s full width — four rows, no two citing the same non-hub file, exactly one hub row.
+`M68` closed **four** rows, filed **four** and refined a sibling, so the open count moved 83 → 79 → **83**
+and stayed at **zero `major`** with `UNMARKED=0`. `state.php` counts the tree; do not take that sentence's
+arithmetic on trust.
 
-Rows, with the non-hub file each would collide on:
+⚠️ **THE ONE THING `M68` WOULD MOST LIKE TO HAND ON: BUILDING THE ROW'S REMEDY IS SOMETIMES THE ONLY WAY TO
+FIND OUT IT CANNOT WORK — AND THE WRONG VERSION IS GREEN.** `M66` handed on that the remedy is the half
+nobody checks; `M67` handed on that the **premise** is the level under that. `M68`'s `R2` failed at neither
+exactly: its premise held, its evidence held, and the fix it implies — mount the existing gate — produces a
+gate that **can never fire**. The Fortify group has no tenancy middleware, so the tenant-scoped settings
+read answers `false` for every workspace in the deployment. Correctly mounted, fully green, permanently
+blind.
 
-| | Row | Collides on |
-|---|---|---|
-| `R1` | `docs/feature-backlog.md:1488` (`M13`) — *"Neither sync route documents the 403 its in-controller policy gate now returns."* | `openapi.json` |
-| `R2` | `docs/feature-backlog.md:2108` (`M66`) — *"The Fortify group serves tenant subdomains and carries no org-2FA gate, so the mint was not the only way past it."* | `config/fortify.php` |
-| `R3` | `docs/feature-backlog.md:1390` (`M62`) — *"Submit races its own last-chance draft write, and the refusal lands on the Submit."* | `resources/js/Pages/submissions/Encode.vue` |
-| `R4` | `docs/feature-backlog.md:4342` (`M1`) — *"§20's `settings.key` catalog omits `security.require_two_factor`."* | `docs/data-dictionary.md` — **the hub row** |
+1. **The failure was silent by construction, not by oversight.** Under `settings`'s nullable_global SELECT
+   policy a tenant's own rows are *invisible* rather than absent without its context — no exception, no row
+   count, nothing to assert on. **Three behavioural cases failing with the write succeeding is the only
+   thing that said so.**
+2. ⛔ **The answer was already in the tree and had been written down twice.** `RegistrationGate` hit the
+   identical wall on `/register` in I5, and both it and `TenantSettingRegistry::forTenant()` say so in their
+   docblocks. `M68` walked into it anyway. **Prose at the site is not a mechanism** — it is filed as its own
+   row for exactly that reason.
+3. **A row's carve-outs are part of its premise.** `R2` names one route that must stay ungated; there are
+   three, and the second is named *in terms* in the very docblock the row is about.
 
-⛔ **DELIBERATELY NOT BATCHED, AND THE REASON IS `D13` RATHER THAN A JUDGEMENT ABOUT THE ROW.**
-`docs/feature-backlog.md:1499` (`SyncSubmissionResultResource`'s bare-string `submission` and `error`)
-also cites `openapi.json` and would collide with `R1`. `R1`'s premise correction below hands it work
-rather than taking it.
+⚠️ **AND A TEST CAN BE GREEN WHILE BLIND TO THE MECHANISM IT NAMES.** `R3`'s follow-up case survived two
+mutations because its setup never armed the flag it was written to protect — typing arms a debounce timer,
+and the flag is set one layer down. Corrected, one mutation is now CAUGHT and the other still SURVIVES; the
+comment says which is proven and which is belief.
 
-### Evidence verified
+⛔ **A PROTOCOL MISS, RECORDED RATHER THAN LEFT FOR A DIFF READER: the claim was NOT extended and five files
+were opened outside it.** Nothing collided because there is one writer — which is why it went unnoticed and
+not why it was acceptable.
 
-Per row, read out of the merged tree today rather than taken from the row.
+⛔ **`D9` must never be started without an explicit answer.** Open decisions: `D1`, `D3`, `D4`, `D8`, `D9`,
+`D10`, `D11`, `D12`. `D12` — whether to end the M-series — is still the one thing that needs the user, and
+`M68` deliberately did not touch it. **`D13` is answered, proven three times, and not to be re-asked.**
 
-- **`R1` — HELD, both citations.** `openapi.json` documents `GET /sync/manifest` as `200/404/422` and
-  `POST /sync/submissions` as `200/422` — read by parsing the document, not by grepping it.
-  `SyncManifestController::show()` calls `Gate::forUser($request->user())->authorize('view', $form)`
-  after the version resolve, exactly as the row describes.
-- **`R2` — HELD.** `config/fortify.php`'s `middleware` array is exactly `web`, `RequirePlatformHost`,
-  `AppSecurityHeaders`, `GateRegistration`, `ThrottleFortifyEndpoints`,
-  `EstablishTenantDatabaseContext`. No `EnforceTenantTwoFactor`, and `RequirePlatformHost` admits
-  subdomains of the central domain.
-- **`R3` — HELD at both ends, which is what makes it a race rather than a suspicion.** `submit()`
-  calls `autosave.dispose()` and then posts `base_content_checksum: autosave.baseline.value`;
-  `dispose()`'s `postKeepalive()` sends `body()`, which carries **the same** base. Two writers, one
-  base.
-- **`R4` — HELD.** `security.require_two_factor` appears nowhere in `docs/data-dictionary.md`, while
-  `SettingKey::SecurityRequireTwoFactor` is live, tenant-scoped and defaulted `false`.
+⛔ **RUN `php scripts/state.php` FOR EVERY NUMBER.**
 
-### Remedy verdict
+---
 
-Measured before a line was written, as `M36` requires.
+## RELEASED — `M68`, the third batched increment: four rows, and the two that failed at the PREMISE each failed in a NEW way (merged as PR #259, `cd2397d`, 6/6 green with real step counts — Static analysis 23 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 
-- **`R1` — the prescribed remedy is ABSENT rather than wrong, and it stopped being absent in `M67`.**
-  The row says the honest fix needs *"an annotation mechanism Scramble 0.13 does not offer for
-  arbitrary status codes"*. `M67` built exactly that seam. And half of it is already in the tree for
-  this status: `ApiAuthorizationErrorResponse` extends Scramble's own
-  `AuthorizationExceptionToResponseExtension` and is **already registered**, so it already claims
-  `AuthorizationException`. **One `@throws` tag, no new class, and the existing `$ref` is reused.**
-- **`R2` — no remedy offered, and the row is right that a group-level mount is wrong. It names one
-  carve-out; there are three.** Mirrors `ThrottleFortifyEndpoints`: a route-**name** map inside the
-  Fortify group, plus a coverage-equality gate in the shape of `FORTIFY_UNBOUND_BY_DECISION`.
-- **`R3` — the row's own cheapest option, and it survives inspection.** `submit()` needs `dispose()`'s
-  timer teardown and not its last-chance POST; the Submit carries the full answer map and the promote
-  branch re-saves it, which the defending comment says itself.
-- **`R4` — sound as far as it goes, and it goes one place short.** Correct both sentences, then make
-  the parity a Pest test rather than a sixth lint script (`M58`).
+**Shipped 2026-09-04.** Branch `m68-batched-rows`. The third increment run at `D13`'s full width.
 
-### Premise verdict
+⛔ **THE CLAIM WAS NOT EXTENDED AND SHOULD HAVE BEEN. FIVE FILES WERE OPENED OUTSIDE IT.** Rule 7 makes a
+claim extension a **pushed commit before the file is opened**, and `M67` did exactly that for one file pair.
+`M68` did not, for `app/Http/Middleware/EnforceTenantTwoFactor.php` (the claim said *"one **new**
+middleware"*, and this is an existing one, refactored), `app/Services/Settings/TwoFactorEnforcementGate.php`,
+`tests/Feature/Api/OpenApiContractTest.php`, `tests/Feature/Auth/FortifyTwoFactorCoverageTest.php` and
+`tests/Pest.php`. **Nothing collided, because Lane B is retired and there is one writer — which is the
+reason it went unnoticed and not a reason it was acceptable.** Recorded here rather than left for a diff
+reader to find. Every other claimed file was edited.
 
-⚠️ **`M67` handed on that the premise is the level nobody checks. Two of these four fail there.**
+### The lesson `M67` handed on, and what a third increment adds to it
 
-- ⛔ **`R1` — HALF FALSE, and it changes the scope.** The title says *neither* route documents "the
-  403". Only `GET /sync/manifest` can answer an HTTP 403. `SyncSubmissionController` returns a
-  per-item `error.code: "forbidden"` **inside a 200 body** — not a 403 at all. Documenting a 403 on
-  `POST /sync/submissions` would publish a status that route has never returned, which is the defect
-  the sibling row at `:1499` describes pointing the other way. **The `GET` half closes here; the
-  `POST` half is filed onto `:1499`, which owns the shape.**
-- ⚠️ **`R2` — HOLDS, and understates its own carve-out.** The row names the 2FA enrolment routes as
-  what must stay outside. `EnforceTenantTwoFactor`'s docblock names a second in terms — *"`POST
-  /logout` is a Fortify route in its own group … do not 'tidy' it inside"*, because "enrol or leave"
-  needs two doors — and `Features::twoFactorAuthentication(['confirmPassword' => true])` implies a
-  third: enrolment runs through `password.confirm.store`, so gating that locks the escape hatch it
-  exists to open. **A group-level mount is wrong in three ways, not one.**
-- ✅ **`R3` — HOLDS, including its own stated limit.** Which request wins is unmeasured, and the fix
-  does not need it settled: it removes the second writer.
-- ⚠️ **`R4` — UNDERSTATES ITSELF IN TWO DIRECTIONS.** §20 omits the key in **two** places, and the
-  second omits a **second** key: the `key` column's *"As built (I5)"* list is missing
-  `security.require_two_factor`, and Design Note 2's defaults list is missing **both**
-  `security.require_two_factor ⇒ false` **and** `maintenance.message ⇒ ''`. `SettingKey` has five
-  cases; §20 names three of the five defaults.
+`M66` closed on *"the remedy is still the half that is wrong."* `M67` went a level back and found the
+**premise** was the level nobody checks. `M68` checked all three per row, and the useful finding is not
+that premises fail again — it is **how**:
 
-Files: `app/Http/Controllers/Api/V1/SyncManifestController.php`, `openapi.json`,
-`tests/Feature/Api/SyncApiTest.php`, `app/Http/Middleware/` (one new middleware), `config/fortify.php`,
-`tests/Feature/Auth/TenantTwoFactorEnforcementTest.php`, `tests/Feature/Auth/FortifyRateLimitTest.php`,
-`resources/js/composables/useServerAutosave.ts`,
-`resources/js/composables/__tests__/useServerAutosave.test.ts`,
-`resources/js/Pages/submissions/Encode.vue`, `resources/js/Pages/submissions/encode.test.ts`,
-`docs/data-dictionary.md`, `tests/Feature/Docs/` (one new test), `docs/feature-backlog.md`,
-`docs/backlog-triage.md`, `docs/gate-baselines.md`, `PROGRESS.md` (own block only), this file.
+| Row | Evidence | Remedy | Premise |
+|---|---|---|---|
+| `R1` `M13` | ✅ held | ⚠️ **stated blocker was true when written and expired in `M67`** | ❌ **half false — one of the two routes cannot answer the status at all** |
+| `R2` `M66` | ✅ held | ⛔ **the implied remedy is IMPOSSIBLE, and building it produced a green blind gate** | ⚠️ holds, and names one carve-out where there are three |
+| `R3` `M62` | ✅ held at both ends | ✅ its own cheapest option, and it survived | ⚠️ holds, and **understates itself: three writers, not two** |
+| `R4` `M1` | ✅ held | ✅ sound, one place short | ⚠️ **understates itself in two directions** |
 
-Shared artefacts taken: `openapi.json`, `docs/data-dictionary.md`, `docs/feature-backlog.md`,
-`docs/backlog-triage.md`, `docs/gate-baselines.md`, `PROGRESS.md` (own status block and own hand-off
-line only).
-Paired files taken: none — no 7(b-bis) pair is touched.
-Namespaces spent: **nothing from either namespace.** No migration, no ADR. `0023` stays free and the
-`0010` gap stays reserved for H1d.
+### ⛔ The finding worth carrying forward: a remedy can be IMPOSSIBLE, not merely wrong — and it fails GREEN
 
-Prediction, written before the run so it can be measured rather than explained:
+`R2`'s row reads as though the fix were a mount. **It was built exactly that way first, and the gate could
+not ever fire.** `config/fortify.php`'s group carries no tenancy middleware, so
+`EstablishTenantDatabaseContext` resolves a **null** tenant there and `TenantSettingRegistry::all()` returns
+`[]`; `security.require_two_factor` then reads as its sparse default — `false` — for every workspace in the
+deployment. Correctly mounted, fully green, permanently blind. **Three behavioural cases failing with the
+write succeeding is what said so**; no gate, no linter and no reading of the row would have.
 
-- **Contract moves and nothing else does structurally.** `openapi.json` gains exactly **one** response
-  on **one** path and **zero** components — the 403 renders through the existing `$ref`.
-- **PHPStan can move and probably will not.** `R1` and `R2` both touch `app/`, so the "a `scripts/`-only
-  diff cannot move it" excuse does not apply; but a docblock tag and a name-keyed middleware are both
-  shapes it has nothing to say about. Measured against `origin/main`'s files, never quoted.
-- **Vitest stays at 134 files** and gains cases in two existing ones.
-- ⚠️ **The one I most expect to be wrong: `R2`'s middleware ordering.** `M43` measured that
-  `SortedMiddleware` hoists listed classes past unlisted ones and found the intuitive answer false, and
-  the Fortify array's own comments say its position there is *not* what decides when it runs. I expect
-  to have to boot the app and print `gatherRouteMiddleware()` both ways before the mount is right, and
-  I expect my first guess about whether it needs a `priority()` entry to be wrong.
-- Second most likely wrong: that `R3`'s new mode leaves `M62`'s two in-flight dispose cases untouched.
-  They are the cases most adjacent to the branch being changed.
+⚠️ **AND THE FAILURE IS SILENT BY CONSTRUCTION RATHER THAN BY OVERSIGHT.** Under `settings`'s
+nullable_global SELECT policy a tenant's own rows are **invisible** rather than absent without its context,
+so there is no error to catch and no row count to check. ⛔ **`RegistrationGate` hit this identical wall on
+`/register` in I5 and wrote it down twice** — in its own docblock and in
+`TenantSettingRegistry::forTenant()`'s — **and `M68` walked into it anyway.** That is what makes it a class
+rather than an incident, and it is filed as its own row: two correct examples and no mechanism.
+
+The fix follows the precedent that was already there, one entry away in the same config array: resolve the
+workspace from the **host** (`PlatformHost::tenantFor()`) and read through `getFor()`. The policy is
+extracted to `TwoFactorEnforcementGate` so the two surfaces cannot answer differently.
+
+### ⛔ A row's carve-outs are part of its premise, and this one named a third of them
+
+`R2` names the 2FA enrolment routes as what must stay ungated. `EnforceTenantTwoFactor`'s own docblock names
+a second **in terms** — *"`POST /logout` … do not 'tidy' it inside"*, because "enrol or leave" needs two
+doors — and `twoFactorAuthentication(['confirmPassword' => true])` implies a third: enrolment runs through
+`password.confirm.store`, confirmed on the live route table where `two-factor.enable` carries
+`RequirePassword`. **A group-level mount passes both refusal cases and breaks all three.**
+
+### ✅ What `M67` built paid for itself one increment later
+
+`R1` is one `@throws` tag and **no new class**. `M67`'s seam plus `ApiAuthorizationErrorResponse` — which
+has extended Scramble's own `AuthorizationExceptionToResponseExtension` since `M56` — already covered this
+status; the route walk was **extracted** rather than copied, and each arm keeps its own floor because a
+shared one would be satisfied by the other arm's exceptions. `openapi.json` moved by exactly one operation
+and zero components, every component group byte-identical.
+
+⛔ **AND `R1`'s PREMISE CORRECTION CHANGED THE SCOPE RATHER THAN THE SIZE.** Only `GET /sync/manifest` can
+answer an HTTP 403; `POST /sync/submissions` returns a per-item `forbidden` **inside a 200 body**.
+Documenting a 403 there would have published a status that route has never returned — the same defect the
+sibling row describes pointing the other way — so that half was **refined onto the sibling** instead.
+
+### ⚠️ Three tests found their own defects, and the third is the one worth repeating
+
+1. **`toHaveKey`'s second argument is the expected VALUE, not a message** (`M43`'s family). `R4`'s first
+   draft asserted the vocabulary mapped a key to a whole sentence, and went red against a document that was
+   **correct**.
+2. **`SettingScope` is a pure enum**, so `->value` in a failure message threw on every iteration — PHP builds
+   the argument eagerly, pass or fail, so it was loud only by luck.
+3. ⛔ **`R3`'s follow-up case could not see the mechanism it named, and only mutation said so.** Two
+   mutations SURVIVED against it: typing arms a debounce **timer**, while `pendingWhileInFlight` is set
+   inside `run()` — so the debounce has to actually fire. With that fixed, dropping the clear is CAUGHT and
+   **narrowing `settle()`'s `while` to an `if` still survives**, which the comment now states plainly rather
+   than implying both halves are proven.
+
+### The predictions, and the two that were wrong
+
+- ✅ **Contract moves by one path and zero components** — exact.
+- ✅ **PHPStan can move and probably will not** — delta **exactly zero**, measured by swapping in
+  `origin/main`'s versions of the changed `app/` files rather than by quoting the count (18 local errors
+  both sides, none in a file this increment touched).
+- ✅ **Vitest stays at 134 files** — 134 / 2311.
+- ⚠️ **"The one I most expect to be wrong: `R2`'s middleware ordering."** Half right for the wrong reason.
+  Printing `gatherRouteMiddleware()` both ways **was** necessary; but the specific guess — that a
+  `priority()` entry would be needed — was **wrong in the safe direction**: unlisted puts it at position 14,
+  after `Authenticate:web` (5) and `EstablishTenantDatabaseContext` (7). ⛔ **And the thing that actually was
+  most wrong about `R2` is something the prediction never contemplated at all**: not where the gate stood in
+  the stack, but that it had nothing to read.
+- ❌ **"Second most likely wrong: `R3` disturbs `M62`'s two in-flight dispose cases."** Wrong — they were
+  untouched throughout. What broke was a **new** case of my own, which is the more useful failure mode to
+  have predicted and did not occur to me.
+
+### Controls
+
+**Seventeen deliberate defects; every one CAUGHT or honestly reported as SURVIVED, each restored
+byte-exact.** `R4` five, `R1` four, `R3` four, `R2` four. The pairings are the point rather than the count:
+`R1`'s inline-body mutant leaves the status arm green and reddens the `$ref` arm; `R2`'s
+`blocksAmbient()` swap reddens the three refusals alone — **that is the blind-gate defect, caught**; `R4`'s
+discriminator moves a **correct** key to the wrong side and reddens the side arm alone; `R3`'s dispose
+mutant reddens one page case while the "page merely LEFT" discriminator still writes.
+
+Two harness facts were paid for and are filed rather than remembered: `scripts/mutate.php` refuses an empty
+`--new` (correctly) and refuses a dirty target (correctly, which is why the row commits precede its
+controls); and **a successful `POST /user/confirm-password` is unreachable from the Pest harness**, because
+`RlsAwareUserProvider` resolves on the separate `pgsql_auth` connection which cannot see `RefreshDatabase`'s
+open transaction — so nothing in the repository asserts that a correct password confirms, and the existing
+`assertStatus(302)` passes on failure too.
+
+### E2E
+
+Not run locally, and stated rather than glossed: the diff reaches `auth-axe.spec.ts` and
+`responsive-axe.spec.ts`, both axe scans over surfaces whose behaviour is unchanged for a member not under
+enforcement. A local run needs `public/hot` removed — which breaks the dev server this session is sharing —
+and `M61` measured that two runs on this host are not two measurements of the same thing. CI is the
+authority and ran the full suite.
+
+Four rows closed, four filed, one sibling refined: open count 83 → 79 → **83**, still zero `major`, and
+`UNMARKED=0`.
 
 ---
 

@@ -590,6 +590,15 @@ it('reports a full form per item, with its cap figures, and still processes its 
 });
 
 // ── GET /api/v1/sync/manifest — the read twin ─────────────────────────────────────────────────
+//
+// ⚠️ M68 — THE BEHAVIOUR BELOW WAS COVERED FROM M13 AND THE CONTRACT DID NOT PUBLISH IT UNTIL M68.
+// That gap is the whole of the backlog row, and it is worth reading as a shape rather than an
+// incident: these cases prove the route ANSWERS 403, and no amount of them can prove `openapi.json`
+// SAYS SO — Scramble infers a 403 from `can:` middleware and this route's gate is in the action body,
+// because nothing here is resource-bound. The document half now lives in
+// `tests/Feature/Api/OpenApiContractTest.php` ("documents a 403 on every /api/v1 action that declares
+// it can throw an authorization refusal"), keyed off the action's `@throws` tag. Deleting either half
+// leaves a green suite over a half-true contract, so do not "consolidate" them.
 
 it('403s a Form Editor fetching the manifest of a form they hold no grant on', function (): void {
     $tenant = syncTenant();

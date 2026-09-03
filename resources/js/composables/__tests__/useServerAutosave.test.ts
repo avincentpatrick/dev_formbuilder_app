@@ -537,3 +537,149 @@ describe('useServerAutosave — P3a lost-update baseline', () => {
         expect(post).toHaveBeenCalledTimes(1);
     });
 });
+
+/*
+ * Increment M68 — Submit must not RACE the draft channel, and `dispose()` made it do exactly that.
+ *
+ * `Encode.vue`'s `submit()` called `autosave.dispose()` and then immediately posted the promote carrying
+ * `autosave.baseline.value`. `dispose()` fires a last-chance keepalive carrying the SAME base, so on a dirty
+ * page TWO writers went out against one checksum. They serialize on `updateDraft()`'s `lockForUpdate`, the
+ * winner advances it, and the loser is refused `draftConcurrentlyModified()` — which, when the loser is the
+ * Submit, tells a keyer their draft "was changed somewhere else" on a page with no somewhere else.
+ *
+ * ⛔ WHICH ONE WINS IS TIMING AND IS DELIBERATELY NOT TESTED HERE. It does not need settling: `standDown()`
+ * removes one writer, so the race is gone in every ordering. A test that pinned an ordering would be pinning
+ * the scheduler.
+ *
+ * ⚠️ AND THE ROW UNDERSTATED IT — THERE WERE THREE WRITERS ON A SUCCESSFUL SUBMIT, NOT TWO. `postKeepalive()`
+ * never touches `dirty`, and `dispose()`'s only condition is `dirty || debounceTimer !== null`, so the
+ * remount that follows a successful promote ran `onBeforeUnmount(dispose)` and fired the keepalive a SECOND
+ * time. The third case below is the one that pins that, and it is why `standDown()` clears `dirty`.
+ */
+describe('useServerAutosave — standing down for a caller that will write the document itself (M68)', () => {
+    /** A post whose promise is held open, so the composable really is mid-flight when the call lands. */
+    function deferredPost() {
+        const releases: Array<(r: Response) => void> = [];
+        const post = vi.fn(() => new Promise<Response>((resolve) => { releases.push(resolve); }));
+
+        return { post, release: (r: Response) => releases.shift()?.(r) };
+    }
+
+    it('writes NOTHING on standDown(), where dispose() would have written', async () => {
+        const { autosave, post, answers } = harness({ baseContentChecksum: 'sum-1' });
+
+        answers.a = '1';
+        await nextTick();
+
+        // Inside the debounce window: dirty, with a timer armed. This is the state a keyer is in when they
+        // finish the last field and click Submit, and it is the state `dispose()` writes in.
+        expect(post).not.toHaveBeenCalled();
+
+        autosave.standDown();
+        await vi.advanceTimersByTimeAsync(500);
+
+        expect(post).not.toHaveBeenCalled();
+    });
+
+    it('DOES write on dispose() in that same state — the discriminator', async () => {
+        // ⛔ THE CONTROL FOR THE CASE ABOVE. Without it, "no request went out" is equally consistent with
+        // standDown() working and with the harness never having been dirty in the first place — the vacuous
+        // success this project keeps cataloguing. Same setup, one call changed, opposite outcome.
+        const { autosave, post, answers } = harness({ baseContentChecksum: 'sum-1' });
+
+        answers.a = '1';
+        await nextTick();
+
+        expect(post).not.toHaveBeenCalled();
+
+        autosave.dispose();
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(post).toHaveBeenCalledTimes(1);
+        expect((post.mock.calls[0][0] as Record<string, unknown>).base_content_checksum).toBe('sum-1');
+    });
+
+    it('leaves a later dispose() a genuine no-op, so the remount after a successful Submit writes nothing', async () => {
+        // ⛔ THE THIRD WRITER, PINNED. `Encode.vue` sets `preserveState` false on success, so the component
+        // remounts and `onBeforeUnmount(dispose)` runs. Before M68 `dirty` was still true at that point —
+        // the keepalive does not clear it — so this fired a second stale-base write at the exact moment the
+        // promote had finalized the row, whose refusal would be `draft_already_finalized`.
+        const { autosave, post, answers } = harness({ baseContentChecksum: 'sum-1' });
+
+        answers.a = '1';
+        await nextTick();
+
+        autosave.standDown();
+        autosave.dispose(); // what the unmount does a moment later
+
+        await vi.advanceTimersByTimeAsync(500);
+
+        expect(post).not.toHaveBeenCalled();
+    });
+
+    it('settles an in-flight save so the caller reads the ADVANCED baseline, not the pre-save one', async () => {
+        const { post, release } = deferredPost();
+        const { autosave, answers } = harness({ post, baseContentChecksum: 'sum-1' });
+
+        answers.a = '1';
+        await nextTick();
+        await vi.advanceTimersByTimeAsync(150);
+
+        expect(post).toHaveBeenCalledTimes(1);
+        expect(autosave.baseline.value).toBe('sum-1'); // not advanced yet — the request is still open
+
+        const settled = autosave.settle();
+        release(jsonResponse(200, { last_saved_at: 't1', content_checksum: 'sum-2' }));
+        await settled;
+
+        // ⛔ THIS IS WHAT THE SUBMIT POSTS. Without the settle it would post `sum-1` while the save that
+        // just landed had already moved the document to `sum-2` — refused, on the Submit, for a conflict
+        // the page itself created.
+        expect(autosave.baseline.value).toBe('sum-2');
+    });
+
+    it('does not let the coalescer start a FOLLOW-UP save while settling', async () => {
+        // ⛔ THE REASON `settle()` CLEARS `pendingWhileInFlight` AND LOOPS. `run()`'s own `finally` starts a
+        // follow-up request when work arrived during the one it is completing, and that continuation runs
+        // BEFORE an `await inFlight` resolves — so a naive single await returns with a NEW writer in flight,
+        // which is the very thing being stood down. Typing during the open save is what arms it.
+        const { post, release } = deferredPost();
+        const { autosave, answers } = harness({ post, baseContentChecksum: 'sum-1' });
+
+        answers.a = '1';
+        await nextTick();
+        await vi.advanceTimersByTimeAsync(150);
+        expect(post).toHaveBeenCalledTimes(1);
+
+        // ⛔ TYPING ALONE DOES NOT ARM `pendingWhileInFlight`, AND THE FIRST DRAFT OF THIS CASE ASSUMED IT
+        // DID — so the case passed while being blind to the mechanism it names, and only the mutation
+        // showed it (dropping `pendingWhileInFlight = false` from `settle()` SURVIVED). The answer watcher
+        // calls `schedule()`, which only arms a timer; the flag is set inside `run()`, so the debounce has
+        // to actually FIRE while the first request is still open. That is the second advance below.
+        answers.a = '12';
+        await nextTick();
+        await vi.advanceTimersByTimeAsync(150);
+        expect(post).toHaveBeenCalledTimes(1); // coalesced, not sent — and now pendingWhileInFlight is true
+
+        const settled = autosave.settle();
+        release(jsonResponse(200, { last_saved_at: 't1', content_checksum: 'sum-2' }));
+        await settled;
+        autosave.standDown();
+        await vi.advanceTimersByTimeAsync(500);
+
+        expect(post).toHaveBeenCalledTimes(1);
+    });
+
+    it('settles to nothing when no save is open, without starting one', async () => {
+        // The common path: `inFlight === null`, so `settle()` must be a no-op rather than a flush. A version
+        // that called `run()` here would reintroduce the writer this pair exists to remove.
+        const { autosave, post, answers } = harness();
+
+        answers.a = '1';
+        await nextTick();
+
+        await autosave.settle();
+
+        expect(post).not.toHaveBeenCalled();
+    });
+});

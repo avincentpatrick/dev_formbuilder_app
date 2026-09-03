@@ -609,7 +609,7 @@ const canSubmit = computed(
         isEditing.value || isOpen.value || (props.draft !== null && props.form.schedule.acceptance === 'closed'),
 );
 
-function submit(): void {
+async function submit(): Promise<void> {
     // Increment H12b — never POST a submission the schedule guard will 403 (the button is disabled too).
     if (!canSubmit.value) {
         return;
@@ -621,13 +621,34 @@ function submit(): void {
         return;
     }
 
+    // Increment M68 — this function AWAITS before it posts, so re-entry is now possible where it was not.
+    // The button's `:loading` covers the ordinary case; this covers a keyboard `Enter` repeat landing
+    // inside the settle window, which would otherwise produce two promotes of one draft.
+    if (submitting.value) {
+        return;
+    }
+
+    submitting.value = true;
+
     // ⚠️ STOP AUTOSAVING BEFORE THE SUBMIT GOES OUT. A debounce timer armed within the last 1500 ms would
     // otherwise fire while the promote is in flight: the draft POST blocks on the promoted row's
     // `lockForUpdate`, comes back 409 `draft_already_finalized`, and the composable — correctly, by its own
     // rules — renders the red "Your changes are no longer being saved" alert over a submission that in fact
-    // succeeded. Disposing here is not merely cosmetic: `dispose()` flushes any pending edit first, so the
-    // last keystroke before Submit is still captured, and Submit itself posts the full answer map anyway.
-    autosave.dispose();
+    // succeeded.
+    //
+    // ⛔ M68 — IT IS `settle()` + `standDown()` AND DELIBERATELY NOT `dispose()`, WHICH RACED THIS POST.
+    // `dispose()` fires a last-chance keepalive carrying `autosave.baseline.value`, and the `router.post`
+    // below carries the SAME value. Both land on `updateDraft()`'s `lockForUpdate`; the winner advances
+    // the checksum and the loser is refused `draftConcurrentlyModified()` — so a keyer could be told their
+    // draft "was changed somewhere else" by their own Submit. `settle()` waits out a save already in
+    // flight, so `baseline` below is the CURRENT one rather than the pre-save value; `standDown()` then
+    // tears the loop down writing nothing.
+    //
+    // Nothing is lost by not writing here: the POST carries the FULL answer map (see below) and
+    // `SubmissionController::store()`'s promote branch saves it before finalizing — which is what the
+    // comment this one replaces was already relying on.
+    await autosave.settle();
+    autosave.standDown();
     runtime.markSubmitAttempted();
     // The FULL answer map, not `effectiveAnswers`. The guest posts the pruned set; this channel deliberately
     // posts everything so the server's own prune stays observable — that is what keeps `prunedAnswers` above

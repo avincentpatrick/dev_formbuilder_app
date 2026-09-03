@@ -59,6 +59,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
+use Laravel\Fortify\Http\Controllers\ConfirmablePasswordController;
 use Ramsey\Uuid\Uuid;
 use Spatie\Permission\PermissionRegistrar;
 use Symfony\Component\Console\Output\NullOutput;
@@ -1385,4 +1386,44 @@ function interleaveDuringPromote(Closure $write, int $skip = 0, string $needle =
     });
 
     return fn (): bool => $state->fired;
+}
+
+/**
+ * Every live Fortify route, discovered by the NAMESPACE of its controller.
+ *
+ * Discovery rather than a list: a route added by a vendor upgrade appears here without the calling file
+ * knowing its name, which is the property `AdminConsoleGateTest` was built around. The prefix is derived
+ * from a ::class constant rather than written as a string literal, so it cannot be misspelt and cannot
+ * drift.
+ *
+ * ⛔ MOVED HERE IN M68, FROM `FortifyRateLimitTest`, BECAUSE IT ACQUIRED A SECOND CONSUMER.
+ * `FortifyTwoFactorCoverageTest` needs the identical discovery, and Pest loads a whole DIRECTORY into one
+ * process — so calling a sibling file's file-scope helper works right up until somebody runs the one file
+ * alone. Two copies would have been two chances to disagree about which routes are Fortify's, which is
+ * the argument that put the coverage lists in their own classes in the first place.
+ *
+ * @return list<RoutingRoute>
+ */
+function fortifyRoutes(): array
+{
+    $prefix = substr(ConfirmablePasswordController::class, 0, -strlen('ConfirmablePasswordController'));
+
+    return array_values(array_filter(
+        Route::getRoutes()->getRoutes(),
+        static function (RoutingRoute $route) use ($prefix): bool {
+            $uses = $route->getAction('uses');
+
+            return is_string($uses) && str_starts_with($uses, $prefix);
+        },
+    ));
+}
+
+/**
+ * The verbs on a route that can change state. HEAD is an artefact of registering GET.
+ *
+ * @return list<string>
+ */
+function fortifyWriteVerbs(RoutingRoute $route): array
+{
+    return array_values(array_intersect($route->methods(), ['POST', 'PUT', 'PATCH', 'DELETE']));
 }

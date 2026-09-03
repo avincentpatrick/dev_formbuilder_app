@@ -311,3 +311,145 @@ it('gates an UNENROLLED Owner out of settings the moment they switch it on', fun
         ->get('http://acme.meridian.test/settings')
         ->assertRedirect('http://acme.meridian.test/two-factor/required');
 });
+
+/*
+| Increment M68 — the Fortify group, which stood outside this gate from I8a until now.
+|
+| M66 closed the token mint and filed the row that produced these cases: the mint was never the only way
+| past this gate. The Fortify group serves tenant subdomains — `RequirePlatformHost` admits subdomains of
+| the central domain — so an unenrolled member bounced from every page of their workspace could still
+| change their own email and password.
+|
+| ⛔ THE ESCAPE-HATCH CASES ARE NOT PADDING; THEY ARE THE HALF THAT DECIDES THE DESIGN. The row named ONE
+| carve-out (the 2FA enrolment routes) and there are THREE — `POST /logout`, which
+| `EnforceTenantTwoFactor`'s docblock names in terms because "enrol or leave" needs two doors, and the
+| `password.confirm` trio, because `twoFactorAuthentication(['confirmPassword' => true])` routes enrolment
+| through the step-up. A group-level mount passes the two refusal cases below and breaks all three of
+| these, which is exactly the shape a "the tests are green" reading would have shipped.
+|
+| ⚠️ `TenantContext::applyLocal(null, null)` IS INLINED RATHER THAN BORROWED. `FortifyRouteContextTest`
+| has a `withoutUserContext()` helper for the same two-line primitive, and Pest loads a whole directory
+| into one process — so calling it from here works, right up until somebody runs THIS file alone. The
+| write cases need it because `RefreshDatabase` holds one open transaction and `enterTenant()`'s
+| `SET LOCAL` would otherwise supply the GUC that a real Fortify request does not have.
+*/
+
+it('refuses an unenrolled member the Fortify profile write once the workspace requires two-factor', function (): void {
+    requireTwoFactor();
+
+    $this->actingAs($this->unenrolled)
+        ->put('http://acme.meridian.test/user/profile-information', [
+            'name' => 'Renamed Person',
+            'email' => $this->unenrolled->email,
+        ])
+        ->assertRedirect('http://acme.meridian.test/two-factor/required');
+});
+
+it('refuses an unenrolled member the Fortify password write once the workspace requires two-factor', function (): void {
+    requireTwoFactor();
+
+    $this->actingAs($this->unenrolled)
+        ->put('http://acme.meridian.test/user/password', [
+            'current_password' => 'password',
+            'password' => 'a-Much-Longer-Passphrase-1',
+            'password_confirmation' => 'a-Much-Longer-Passphrase-1',
+        ])
+        ->assertRedirect('http://acme.meridian.test/two-factor/required');
+});
+
+it('answers a JSON caller in kind on the Fortify group', function (): void {
+    // The arm M66 added to the gate, reaching a second group. Fortify's own screens post with
+    // `Accept: application/json`, so a 302 into HTML is a response those clients cannot follow.
+    requireTwoFactor();
+
+    $this->actingAs($this->unenrolled)
+        ->putJson('http://acme.meridian.test/user/profile-information', [
+            'name' => 'Renamed Person',
+            'email' => $this->unenrolled->email,
+        ])
+        ->assertStatus(403);
+});
+
+it('leaves the Fortify profile write alone for an ENROLLED member — the discriminator', function (): void {
+    // ⛔ WITHOUT THIS, THE TWO REFUSALS ABOVE ARE EQUALLY CONSISTENT WITH A MIDDLEWARE THAT REFUSES
+    // EVERYONE. Same route, same enforcement, the one difference being the second factor.
+    requireTwoFactor();
+    $enrolled = $this->enrolled;
+    TenantContext::applyLocal(null, null);
+
+    $this->actingAs($enrolled)
+        ->put('http://acme.meridian.test/user/profile-information', [
+            'name' => 'Renamed Person',
+            'email' => $enrolled->email,
+        ])
+        ->assertSessionHasNoErrors();
+
+    TenantContext::applyLocal($this->tenant->id, $enrolled->id);
+    expect($enrolled->fresh()->name)->toBe('Renamed Person');
+});
+
+it('leaves the Fortify profile write alone when the workspace has NOT switched enforcement on', function (): void {
+    // The deploy-day case, on this group. No settings row exists, and the row's absence must not gate.
+    $unenrolled = $this->unenrolled;
+    TenantContext::applyLocal(null, null);
+
+    $this->actingAs($unenrolled)
+        ->put('http://acme.meridian.test/user/profile-information', [
+            'name' => 'Renamed Person',
+            'email' => $unenrolled->email,
+        ])
+        ->assertSessionHasNoErrors();
+
+    TenantContext::applyLocal($this->tenant->id, $unenrolled->id);
+    expect($unenrolled->fresh()->name)->toBe('Renamed Person');
+});
+
+it('keeps the 2FA enrolment route reachable for exactly the member it is bouncing', function (): void {
+    // CARVE-OUT 1, the one the row names. A gate that blocks the only way to satisfy it is a lockout.
+    requireTwoFactor();
+    $unenrolled = $this->unenrolled;
+    TenantContext::applyLocal(null, null);
+
+    $this->actingAs($unenrolled)
+        ->withSession(['auth.password_confirmed_at' => time()])
+        ->post('http://acme.meridian.test/user/two-factor-authentication')
+        ->assertSessionHasNoErrors();
+
+    TenantContext::applyLocal($this->tenant->id, $unenrolled->id);
+    expect($unenrolled->fresh()->two_factor_secret)->not->toBeNull();
+});
+
+it('keeps POST /logout reachable, because "enrol or leave" needs two doors', function (): void {
+    // CARVE-OUT 2 — named in EnforceTenantTwoFactor's own docblock, and NOT named by the backlog row.
+    requireTwoFactor();
+
+    $this->actingAs($this->unenrolled)
+        ->post('http://acme.meridian.test/logout')
+        ->assertRedirect();
+
+    $this->assertGuest();
+});
+
+it('keeps the password-confirmation step-up reachable, because enrolment runs through it', function (): void {
+    // CARVE-OUT 3 — implied by `twoFactorAuthentication(['confirmPassword' => true])` rather than stated
+    // anywhere, and measured on the live route table: `two-factor.enable` carries `RequirePassword`. Gate
+    // this and carve-out 1 is unreachable, one step further back.
+    //
+    // ⛔ THE ASSERTION IS ABOUT THE GATE AND DELIBERATELY NOT ABOUT THE CREDENTIAL, BECAUSE A SUCCESSFUL
+    // CONFIRM-PASSWORD IS UNREACHABLE FROM THIS HARNESS. `config/auth.php`'s provider is `rls_aware`, so
+    // `RlsAwareUserProvider` resolves the user on the SEPARATE `pgsql_auth` connection — which cannot see
+    // `RefreshDatabase`'s open transaction, so `$guard->validate()` finds no row and Fortify answers "the
+    // provided password was incorrect" no matter what is posted. The first draft of this case asserted
+    // `assertSessionHasNoErrors()` and failed for exactly that reason, which is the same separate-session
+    // trap `FortifyRouteContextTest::rereadUser()`'s docblock records from the other direction.
+    //
+    // So what is pinned is the only thing this file is entitled to claim: the request reached Fortify's
+    // own credential check instead of being bounced to enrolment. A gated route never gets that far.
+    requireTwoFactor();
+
+    $response = $this->actingAs($this->unenrolled)
+        ->post('http://acme.meridian.test/user/confirm-password', ['password' => 'password']);
+
+    expect($response->headers->get('Location'))
+        ->not->toBe('http://acme.meridian.test/two-factor/required');
+});

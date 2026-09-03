@@ -12,7 +12,6 @@ use Illuminate\Routing\Route as RoutingRoute;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
-use Laravel\Fortify\Http\Controllers\ConfirmablePasswordController;
 use Spatie\Permission\PermissionRegistrar;
 
 uses(RefreshDatabase::class);
@@ -54,39 +53,6 @@ uses(RefreshDatabase::class);
  * as its own backlog row rather than left here as a silent gap.
  */
 const FORTIFY_UNBOUND_BY_DECISION = ['logout', 'user-profile-information.update'];
-
-/**
- * Every live Fortify route, discovered by the NAMESPACE of its controller.
- *
- * Discovery rather than a list: a route added by a vendor upgrade appears here without this file knowing
- * its name, which is the property `AdminConsoleGateTest` was built around. The prefix is derived from a
- * ::class constant rather than written as a string literal, so it cannot be misspelt and cannot drift.
- *
- * @return list<RoutingRoute>
- */
-function fortifyRoutes(): array
-{
-    $prefix = substr(ConfirmablePasswordController::class, 0, -strlen('ConfirmablePasswordController'));
-
-    return array_values(array_filter(
-        Route::getRoutes()->getRoutes(),
-        static function (RoutingRoute $route) use ($prefix): bool {
-            $uses = $route->getAction('uses');
-
-            return is_string($uses) && str_starts_with($uses, $prefix);
-        },
-    ));
-}
-
-/**
- * The verbs on a route that can change state. HEAD is an artefact of registering GET.
- *
- * @return list<string>
- */
-function fortifyWriteVerbs(RoutingRoute $route): array
-{
-    return array_values(array_intersect($route->methods(), ['POST', 'PUT', 'PATCH', 'DELETE']));
-}
 
 /**
  * The `throttle:` parameters already declared on a route, resolved through the router's own alias map.

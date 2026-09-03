@@ -4,13 +4,10 @@ declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
-use App\Enums\SettingKey;
-use App\Services\Settings\TenantSettingRegistry;
-use App\Support\Audit\ImpersonationContext;
+use App\Services\Settings\TwoFactorEnforcementGate;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
 /**
  * Org-level 2FA enforcement — Increment I8a, PRD Feature #14's second acceptance criterion:
@@ -81,50 +78,25 @@ use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
  */
 final class EnforceTenantTwoFactor
 {
-    public function __construct(private readonly TenantSettingRegistry $settings) {}
+    public function __construct(private readonly TwoFactorEnforcementGate $gate) {}
 
+    /**
+     * ⛔ M68 — THE DECISION MOVED OUT AND THE REASON IS NOT TIDINESS. A second surface needed the same
+     * policy asked about a DIFFERENT tenant: the Fortify group carries no tenancy middleware, so the
+     * ambient read below answers `false` for every workspace there. {@see TwoFactorEnforcementGate} owns
+     * the policy and both middlewares consume it, so the two cannot drift — the shape `RegistrationGate`
+     * established for the same pair of surfaces. This class still owns WHERE the gate stands; the docblock
+     * above is that, and it is the part that must not move.
+     *
+     * `blocksAmbient()`, deliberately: everything this class guards HAS tenant context, and
+     * {@see EnforceTenantTwoFactorOnFortify} is the one that must not use it.
+     */
     public function handle(Request $request, Closure $next): Response
     {
-        $user = $request->user();
-
-        if ($user === null || $user->two_factor_confirmed_at !== null) {
-            return $next($request);
+        if ($this->gate->blocksAmbient($request)) {
+            return $this->gate->refuse($request);
         }
 
-        // ⚠️ AN IMPERSONATED SESSION IS EXEMPT, AND THIS ONE EXEMPTION IS NOT STRUCTURAL BECAUSE IT CANNOT
-        // BE (I11b). Every other carve-out in this file is a route outside the group; this one depends on
-        // SESSION STATE, not on which URL was asked for, so a route list could not express it.
-        //
-        // Without it the feature is unusable in exactly the workspaces most likely to need support: the
-        // operator lands on /dashboard, this redirects them to the enrollment interstitial, and the only
-        // action available there is to ENROL A SECOND FACTOR ON SOMEBODY ELSE'S ACCOUNT — a credential the
-        // operator would hold and the member would not know existed. Bouncing them is not the safe failure
-        // it looks like.
-        //
-        // The authority being trusted is not the impersonated member's. It is the console stack the grant
-        // came through: `superadmin` + `superadmin.mfa` (the operator's OWN confirmed 2FA, unconditional
-        // rather than per-tenant) + `step-up` (a password confirmation in the last 15 minutes). The policy
-        // this gate enforces — "this workspace requires its MEMBERS to enrol" — has no opinion about
-        // platform staff, who are not members. `ImpersonationContext` is the reader rather than a bare
-        // session key so the guard cannot drift from the writer, and it is uuid-validated on the way in.
-        if (ImpersonationContext::operatorId() !== null) {
-            return $next($request);
-        }
-
-        // Read LAST, so the common cases (guest, enrolled) cost nothing. The registry memoizes per tenant
-        // per request, so the unenrolled path is one query at most regardless of how many times it is hit.
-        if ($this->settings->get(SettingKey::SecurityRequireTwoFactor) !== true) {
-            return $next($request);
-        }
-
-        // M66 — mirrors {@see EnsureVerifiedEmail}, which has carried this arm since J3a. A redirect is an
-        // instruction to go and do something; a JSON client cannot go anywhere, so it gets the refusal
-        // instead of markup it will try to parse. On `/api/v1/*` the renderer turns this into the
-        // documented `forbidden` envelope, and everywhere else into a plain 403.
-        if ($request->expectsJson()) {
-            throw new AccessDeniedHttpException('This workspace requires two-factor authentication, and this account has not enrolled.');
-        }
-
-        return redirect()->route('two-factor.required');
+        return $next($request);
     }
 }

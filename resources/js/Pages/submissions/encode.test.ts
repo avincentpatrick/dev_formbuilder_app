@@ -1,5 +1,5 @@
 import { mount, type VueWrapper } from '@vue/test-utils';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { nextTick, reactive } from 'vue';
 
 import { field, section } from '../../../public-runtime/__tests__/fixtures';
@@ -814,5 +814,66 @@ describe('Encode.vue — edit mode (I9c)', () => {
         // editor's correction would be destroyed with no error anywhere — a visible refusal turned into a
         // silent lost update. The snapshot means the second Save is refused too, which is the point.
         expect((mocks.patch.mock.calls[1][1] as Record<string, unknown>).baseline).toBe('checksum-baseline-1');
+    });
+});
+
+/*
+ * Increment M68 — Submit must not race the draft channel it is about to supersede.
+ *
+ * `submit()` called `autosave.dispose()`, which fires a last-chance keepalive carrying
+ * `autosave.baseline.value`, and then posted the promote carrying the SAME value. Two writers, one
+ * checksum: they serialize on `updateDraft()`'s `lockForUpdate`, the winner advances it, and the loser is
+ * refused `draftConcurrentlyModified()`. When the loser is the Submit, the keyer is told their draft "was
+ * changed somewhere else" on a page with no somewhere else.
+ *
+ * ⚠️ THESE TWO CASES ARE A PAIR AND NEITHER IS EVIDENCE ALONE. "No draft write happened" is equally
+ * consistent with the fix working and with this page never having armed its autosave — so the second case
+ * leaves the page in the identical state and unmounts instead, where the write is still owed and must
+ * still happen. The composable-level proof lives in `useServerAutosave.test.ts`; this pins that
+ * `Encode.vue` is actually wired to it.
+ */
+describe('encode page — Submit does not race its own draft channel (M68)', () => {
+    /** The keepalive goes out through global `fetch`, not through Inertia — so that is what to watch. */
+    function watchKeepalive() {
+        const fetchSpy = vi.fn(async () => new Response('{"data":{}}', { status: 200 }));
+        vi.stubGlobal('fetch', fetchSpy);
+
+        return {
+            fetchSpy,
+            draftWrites: () =>
+                fetchSpy.mock.calls.filter(([url]) => String(url).includes('/submissions/draft')),
+        };
+    }
+
+    afterEach(() => {
+        vi.unstubAllGlobals();
+    });
+
+    it('sends the promote and NO draft write', async () => {
+        const { draftWrites } = watchKeepalive();
+        const wrapper = mountEncode(routerPayload({ singlePage: true }));
+
+        await typeInto(wrapper, 'Role', 'staff');
+        await wrapper.find('form').trigger('submit');
+
+        expect(mocks.post).toHaveBeenCalledTimes(1);
+
+        // ⛔ THE DEFECT, PINNED AT THE PAGE. Before M68 this was 1 — the keepalive — carrying the same
+        // `base_content_checksum` as the promote beside it.
+        expect(draftWrites()).toHaveLength(0);
+    });
+
+    it('still writes the draft when the page is merely LEFT — the discriminator', async () => {
+        // Identical setup, and the write is still owed here: an Inertia navigation away from a dirty page
+        // has nobody else to persist what was typed, which is the whole reason `dispose()` writes at all.
+        // If this went to zero as well, the case above would be passing because nothing was ever armed.
+        const { draftWrites } = watchKeepalive();
+        const wrapper = mountEncode(routerPayload({ singlePage: true }));
+
+        await typeInto(wrapper, 'Role', 'staff');
+        wrapper.unmount();
+        await nextTick();
+
+        expect(draftWrites()).toHaveLength(1);
     });
 });

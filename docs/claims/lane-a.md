@@ -16,40 +16,91 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M66` is merged; the batching saving is measured, not assumed, and it cleared the bar by a wide margin
+## Status: ACTIVE CLAIM — `M67`, the second batched increment: four rows, three of whose PREMISES were wrong (`m67-batched-rows`)
 
-`M66` closed **four** rows and filed **three**, so the open count moved 86 → 85 and stayed at **zero
-`major`**. `state.php` counts the tree; do not take that sentence's arithmetic on trust.
+Taken 2026-09-03. Branch `m67-batched-rows`, cut from `origin/main` at `3550d8c`, PR into `main`.
+Numbers derived by `php scripts/state.php`, never read from prose. `docs/backlog-triage.md` was
+regenerated before picking; the batch is its greedy suggestion **checked**, and the regeneration moved
+exactly one line (the provenance sha), so the ranking was already current.
 
-✅ **`D13`'S DEBT IS PAID, AND THE ANSWER IS NOT MARGINAL.** The batching protocol was answered on a
-predicted ~42% saving that `D13` insisted be **proven on the first batched increment or the batch size
-revisited**. Measured end to end — `M65`'s last close-out commit to `M66`'s — the four rows cost **~110
-minutes against a 628-minute baseline, an ~82% saving**, and the build phase alone was **34 minutes of
-authoring for four rows plus eight mutation controls**. ⚠️ **Do not read 82% as the new expected figure.** See the
-release below for the three reasons it flatters, the most important being that `D13`'s per-row baseline
-was drawn from increments whose build phase included a CI wait this one overlapped with useful work.
+**Rows** — `D13` width, no two sharing a non-hub file, exactly one touching a hub file:
 
-⚠️ **For whoever takes the next batch: the three lessons `M66` would most like to hand on.**
-**(1) THE REMEDY IS STILL THE HALF THAT IS WRONG, AND BATCHING MADE THAT MORE VISIBLE RATHER THAN LESS.**
-Four rows, four sound bodies of evidence, **two broken remedies** — one of which (`R2`) could not have
-executed at all, because the row prescribed calling a method on a trait the class had never used. Reading
-the four together is what showed the pattern was not bad luck: the evidence is written by someone looking
-at the defect, the remedy by someone predicting a fix, and only one of those gets re-checked.
-**(2) A DEFECT DEFERRED ON A STATED PREMISE OUTLIVES ITS PREMISE, SILENTLY.** `R3`'s route comment named
-its own defect in a full sentence and deferred it because *"the POST routes have never been reachable from
-a UI"*. That was true when written. Three call sites falsified it later, and nothing anywhere re-read the
-sentence — the comment went on reassuring every reader for two increments. **When you defer on a premise,
-the premise is the thing that needs a gate**, which is why the fix here is an enumerating sweep rather
-than three more constraints.
-**(3) A ROW CAN UNDERSTATE ITSELF INTO A WORSE FIX.** `R4` read as a copy defect. The obvious kind
-sentence — *"your answers are saved on this device"* — is **false in a conflict review**, because the
-durable outbox row is discarded before the recovery runs and autosave is off in that mode. The row that
-looked cosmetic was sitting on a data-loss path, and the naive fix would have replaced one false
-reassurance with another.
+| | Row | Filed | Non-hub files |
+|---|---|---|---|
+| `R1` | `/api/v1/submissions/{submission}/promote` documents no 409 at all, and three causes reach it | `M12` | *hub: `openapi.json`* |
+| `R2` | The authenticated autosave's 409 branch tells a `submission_conflict` caller "already been submitted" | `M14` | `resources/js/composables/useServerAutosave.ts` |
+| `R3` | `routes/api.php` describes a middleware ordering the priority sorter does not produce | `M34` | `routes/api.php` |
+| `R4` | `GET /admin/users` — the cross-tenant user list — has exactly one test, and it is a 200 | `M35` | `tests/Feature/Admin/SuperAdminConsoleTest.php` |
 
-⛔ **`D9` must never be started without an explicit answer.** Open decisions: `D1`, `D3`, `D4`, `D8`,
-`D9`, `D10`, `D11`, `D12`. `D12` — whether to end the M-series — is still the one thing that needs the
-user, and `M66` deliberately did not touch it. **`D13` is answered, proven, and not to be re-asked.**
+### Evidence verified
+
+- **`R1` — HELD, and the row UNDERSTATES ITSELF.** `openapi.json` lists exactly `200 / 403 / 404` for
+  that operation; confirmed by parsing the committed document rather than reading it. ⚠️ **The row
+  names three causes and there are five**, found by opening the citation and reading what sits beside
+  it: `409 submission_version_superseded` · `409 draft_conflict` · **`403 form_closed`** ·
+  **`403 max_responses_reached`** · **`422 submission_invalid`**. Two of those the row does not
+  mention at all.
+- **`R2` — EVIDENCE HELD, PREMISE FALSE ON THE HALF IT LEADS WITH.** The 409 branch really does split
+  two ways. But the row says *"the entitlement and content causes both get the finalized sentence"*,
+  and the **content** cause cannot reach this endpoint: `contentConflict()` is raised only by
+  `SubmissionPipeline` and is deliberately suspended for drafts. The row was filed before `M14` gave
+  the entitlement cause its own code, and nothing re-read it afterwards.
+- **`R3` — HELD by reading, to be re-confirmed by execution. Citation DRIFTED**: the row cites
+  `routes/api.php:114-116` and the comment now sits further down. Not re-cited by line.
+- **`R4` — HELD, TWICE OVER. Citation DRIFTED**: the row cites `SuperAdminConsoleTest.php:100`, which
+  `M66` turned into an unrelated assertion. The one `assertOk()` is real, and a repo-wide grep for the
+  URI returns **zero** hits — the request is built through a closure, so a naive search cannot see it,
+  which is itself why the gap survived.
+
+### Remedy verdict
+
+- **`R1` — WRONG, and structurally so.** The row prescribes *"a `@response` annotation per cause"*.
+  Scramble v0.13.30 has no such annotation. Read from the installed vendor: `PhpDocHandler::leave()`
+  appends every `@throws` tag on a class method to `$methodType->exceptions`, and
+  `Extensions/ExceptionToResponseExtension` turns that type into a documented response — so the
+  mechanism is **`@throws` in the action plus an exception-to-response extension**, the same shape
+  `ModuleDisabledResponseExtension` already takes. ⛔ **And a hand edit to `openapi.json` cannot work
+  at all**: the Contract job exports fresh and `diff -u`s it against the committed file.
+- **`R2` — NONE OFFERED**, so nothing to disprove. The obligation was already written down — the draft
+  controller's own comment says *"THREE CAUSES SINCE M11, AND THE COMPOSABLE MUST NOT TREAT THEM
+  ALIKE"* and names all three. Nothing gated the sentence, so the third arm was never grown. `M66`
+  lesson (2) with a different premise.
+- **`R3` — POSED AS A DECISION THAT HAS ONE DEFENSIBLE ANSWER, so I take it rather than file it.**
+  The row offers *strike the claim* or *hoist `api_access` into the priority list*. Hoisting is
+  strictly worse **and the tree already argues why**: `bootstrap/app.php`'s `ThrottleFortifyEndpoints`
+  entry records that a limiter's slot exists to **bound the work**, so putting a tenancy-resolving,
+  database-backed feature gate ahead of the limiter makes an unauthenticated flood pay for that lookup
+  before being limited. → strike the claim, and gate the order that actually resolves.
+- **`R4` — WORKS.** "One increment, one file of behavioural arms, with `M35`'s fixture already in
+  place" is accurate, and the pairing is `M43`'s: `AdminConsoleGateTest` is entirely structural, and a
+  structural gate cannot see a middleware that stops refusing.
+
+Files: `app/Support/OpenApi/SubmissionRefusalResponseExtension.php` (new) · `app/Providers/AppServiceProvider.php` ·
+`app/Http/Controllers/Api/V1/SubmissionPromoteController.php` · `tests/Feature/Api/SubmissionPromoteContractTest.php` (new) ·
+`resources/js/composables/useServerAutosave.ts` · `resources/js/composables/__tests__/useServerAutosave.test.ts` ·
+`routes/api.php` · `tests/Feature/Tenancy/TenancyMiddlewarePriorityTest.php` ·
+`tests/Feature/Admin/SuperAdminConsoleTest.php`.
+Shared artefacts taken: `openapi.json`, `docs/feature-backlog.md`, `docs/backlog-triage.md`, `docs/gate-baselines.md`, `PROGRESS.md` (own block only).
+Paired files taken: none.
+Namespaces spent: nothing from either namespace — no migration, no ADR, no `§D`.
+
+Prediction, written before the run:
+
+| Gate | Predicted |
+|---|---|
+| Contract | **moves** — one operation gains a 409. The only row in the batch that can move it. |
+| PHPStan | **can** move (`app/` and `routes/` both change). To be measured by swapping each changed file to its `origin/main` version and re-analysing — never quoted as a count. |
+| Pint | passes; `passed` to be disbelieved until a deliberately misformatted probe comes back with fixers. |
+| Vitest | file count unchanged — cases go into an existing file. |
+| Pest | up in three directories. |
+| E2E | unreachable by this diff; nothing run, and said so. |
+
+⚠️ **The one I most expect to be wrong: Contract.** The extension is registered globally, so if any
+other action's inference already reaches those exception classes the export moves more than one path.
+The check that catches it is inspecting the regenerated diff before committing it.
+
+⛔ Open decisions: `D1`, `D3`, `D4`, `D8`, `D9`, `D10`, `D11`, `D12`. None re-asked here. `D9` is not
+started. `D13` is answered and proven — the batch size is not revisited.
 
 ⛔ **RUN `php scripts/state.php` FOR EVERY NUMBER.**
 

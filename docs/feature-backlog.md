@@ -1515,16 +1515,38 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   alongside M12's; the reason to weigh it rather than do it is that neither `form_versions` nor `forms` is
   locked there, so a re-read is a narrowing rather than a closure — unlike M12's, whose authority comes from
   the `submissions` row lock every writer of that document holds. Filed by `M12`.
-- **`minor` · `/api/v1/submissions/{submission}/promote` documents no 409 at all, and three causes reach it.**
-  Filed 2026-08-25 by M12. `openapi.json` lists `200/404/403` for that route, while
-  `SubmissionDraftService::promote()` can raise `submission_version_superseded` (H9b),
-  `max_responses_reached` (H12a, a 403 with a body the document does not describe either) and — since M12 —
-  `draft_conflict`. Scramble infers from the CONTROLLER's own returns, which is why a service-thrown
-  exception has never appeared there and why M12 could add a cause with the document staying byte-identical.
-  So an integrator building against the contract has no reason to handle a refusal that is a normal outcome.
-  **Live**, pre-existing, and deliberately not fixed in M12: `openapi.json` is a Standing-Rule-7(b) NEITHER
-  artefact, so moving it needs its own claim, and the honest fix is a `@response` annotation per cause rather
-  than a hand edit. Filed by `M12`.
+- ✅ **CLOSED BY `M67` (2026-09-03) — `minor` · ~~`/api/v1/submissions/{submission}/promote` documents no 409 at all, and three causes reach it.~~**
+  The operation now documents a `409` naming `draft_conflict` and `submission_version_superseded`, and the
+  route has its first behavioural `409` case beside the document assertion.
+  ⛔ **THE PRESCRIBED REMEDY DID NOT EXIST.** *"A `@response` annotation per cause"* is not a feature of the
+  installed Scramble (v0.13.30) — read from the vendor rather than assumed. The real seam has two halves and
+  needs both: `Infer\Handler\PhpDocHandler::leave()` collects `@throws` tags on the ACTION into the method
+  type's exception list, and an `ExceptionToResponseExtension` renders them. Neither half alone does
+  anything, which was **measured in the correct direction before the fix was kept**: with the extension
+  registered and no `@throws`, the fresh export is byte-identical to the commit.
+  ⚠️ **AND THE ROW UNDERSTATED ITSELF — it names three causes and there are five**, one of them attributed
+  to the wrong guard (`assertCanPromote()` raises `closed()`, not `max_responses_reached`, which arrives a
+  layer further down through `SubmissionFinalizer`). The two undocumented statuses that remain are filed as
+  their own row below rather than widened into this change. `openapi.json` moved by exactly one path and
+  zero components; a hand edit was never possible, because the Contract job exports fresh and diffs.
+  Filed by `M12`.
+
+- **`minor` · The promote route still documents neither of its two 403 causes nor its 422, and the
+  generator cannot narrow a refusal family to one route.**
+  Filed 2026-09-03 by `M67`, which documented the 409 beside these and deliberately stopped there.
+  `POST /api/v1/submissions/{submission}/promote` can also answer **`403 form_closed`** (via
+  `FormAcceptanceGuard::assertCanPromote()`), **`403 max_responses_reached`** (via
+  `SubmissionFinalizer::finalize()` → `assertCapacity()`) and **`422 submission_invalid`**
+  (`SubmissionValidationException::semantic()`). The document lists a `403` — but it is Scramble's generic
+  `can:` inference, whose code description does not name either cause, and no `422` at all.
+  **Live.** Two reasons it was not folded into `M67`: the 403 arm would have to merge with an existing
+  documented response rather than add one, which is how a documentation fix becomes an unreviewed contract
+  change (the guard `ModuleDisabledResponseExtension` exists for); and the deeper limit is structural —
+  `SubmissionRefusalResponseExtension` is keyed on the exception CLASS and cannot know which of a family's
+  causes a given route raises, so `M67`'s 409 honestly says an operation raises a subset. Narrowing per
+  route needs a cause-level seam Scramble does not have; inventing one is a design decision, not a fix.
+  Filed by `M67`.
+
 - **`minor` · Four P3a refusal cases assert the exception CLASS and never the message.**
   `tests/Feature/Submissions/SubmissionDraftServiceTest.php` — the P3a section's `toThrow(
   SubmissionConflictException::class)` calls. Filed 2026-08-25 by M12, which is the second increment running

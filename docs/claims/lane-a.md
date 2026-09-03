@@ -132,6 +132,27 @@ Shared artefacts taken: `openapi.json`, `CLAUDE.md`, `docs/claims/TEMPLATE.md`, 
 Paired files taken: `scripts/job-payload-lint.php` and `tests/Feature/Mail/QueuedMailContractTest.php` — Row
 2 is precisely the rule that they must be edited together, so this claim takes both halves.
 Namespaces spent: **nothing from either namespace** — no migration, no ADR. One decision id, `D14`.
+
+### ⬆️ CLAIM EXTENSION 1 (2026-09-04) — `app/Enums/SyncResultStatus.php` (new) and `SyncSubmissionController`
+
+**Pushed before either file was opened.** `M68` recorded opening five files outside its claim and getting
+away with it only because there is one writer; that is not a precedent.
+
+**Why.** Row 1's own evidence check found the row understates itself: the per-item `status` is typed a bare
+`string` in the contract while being a **closed set of five** (`created`, `duplicate`, `invalid`,
+`conflict`, `error`), and it is the first thing an integrator branches on. Enumerating it needs a real
+backed enum — the generator infers from code, not from an annotation (measured, below) — so it reaches
+`SyncSubmissionController`, which the original claim did not name.
+
+⛔ **AND THE MEASUREMENT THAT FORCED THIS IS THE ROW'S REMEDY FAILING.** The row prescribes *"a typed shape
+on that method rather than an annotation"*. The annotation form was tried FIRST and **does not work**: a
+full `@return array{…}` shape on `toArray()` changed the exported document by **exactly nothing** — all four
+properties stayed `type: string`. `dedoc/scramble` infers `toArray()` from the STATEMENTS, and a docblock is
+not a statement. What works is a literal it can trace, which is why the fix is shaped the way it is.
+
+**Not taken, and filed instead:** enumerating `error.code`. The controller emits **at least nine** codes and
+the repository's established pattern for that field is a prose DESCRIPTION (`ApiErrorEnvelope`'s
+`$codeDescription`), which a traced literal cannot carry. Filed as its own row rather than half-built.
 Prediction: **Contract (OpenAPI) moves, and it is the one I most expect to be wrong** — Row 1's mechanism is
 untried by the row's own admission, and if the annotation form is ignored by the installed Scramble the fix
 grows a class. Pest moves on three rows. PHPStan **may** move: Row 1 is the only diff inside `app/`, and

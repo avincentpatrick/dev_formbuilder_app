@@ -16,42 +16,215 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M65` is merged; every open row now says whether it is still live, and the triage is generated
+## Status: ACTIVE CLAIM — `M66`, the first batched increment: four rows, two of whose remedies were wrong (`m66-batched-rows`)
 
-`M65` closed **two** rows and filed **three**, so the open count moved 85 → 86 and stayed at **zero
-`major`**. `state.php` counts the tree; do not take that sentence's arithmetic on trust.
+Taken 2026-09-03. Branch `m66-batched-rows`, cut from `origin/main` at `4a75231`, PR into `main`.
 
-⚠️ **For whoever takes the next row: the three lessons `M65` would most like to hand on.**
-**(1) WHEN TWO PASSES DISAGREE ON EVERY FACTUAL POINT AT ONCE, THE DISAGREEMENT IS A VOCABULARY GAP AND
-NOT A DISPUTE.** Nine rows came back contested, and in every one the judging and refuting passes agreed on
-each opened citation and split on whether *a reachable mechanism somebody declined to fix* is `Live` or
-`Not live`. Adjudicating nine rows one at a time would have produced nine defensible answers and no rule.
-Reading the corpus's ten existing `**Not live**` rows settled it in one pass — every one of them means
-**not a defect in the product**, and one row already read `**Live, and deliberately not fixed.**`, which
-proves declining to fix is orthogonal to liveness. **Derive the vocabulary from the corpus before
-arbitrating uses of it.**
-**(2) THE MUTATION WRITTEN EXPECTING TO SURVIVE IS THE ONE THAT PAID.** `MU5` appended a second,
-contradicting verdict to a row and the arm stayed green: it required *at least one* marker where the filer
-arm directly above it requires *exactly one*. That is not cosmetic here — `state.php` resolves by FIRST
-MATCH with `**Not live**` tried first, so a stray second verdict does not read as ambiguity, it silently
-wins, and a row wrongly resolved not-live is one `loop assess` refuses forever. **Write at least one
-mutation you expect to survive, and mean it.**
-**(3) A GENERATED FILE CAUGHT ITS OWN AUTHOR IN ORDINARY USE.** Closing two rows and filing three shifted
-every line the freshly generated `docs/backlog-triage.md` cites, and its `--check` reported DRIFTED before
-anybody noticed. That is the argument for deriving an artefact rather than re-writing it — and also the
-argument in the row filed here saying that `--check` has no caller.
+**Four rows, and the batch itself is the experiment.** `D13` is answered and this is the first increment
+run under it at full width. The rows were picked off the **generated** `docs/backlog-triage.md` — its
+greedy proposal, then checked rather than taken on trust — and they satisfy `D13`'s selection rule: **no
+two cite the same non-hub file, and exactly one (`R1`) touches a hub file.**
 
-⛔ **`D9` must never be started without an explicit answer.** Open decisions: `D1`, `D3`, `D4`, `D8`,
-`D9`, `D10`, `D11`, `D12`. `D12` — whether to end the M-series — is still the one thing that needs the
-user, and `M65` deliberately did not touch it. **`D13` is answered and recorded**, so the batching
-protocol is not to be re-asked.
+- **`R1`** — `docs/feature-backlog.md:1988`: *"`EnforceTenantTwoFactor` is absent from the `/api/v1`
+  token-mint group."* Filed by `M1`. Hub: `routes/api.php`.
+- **`R2`** — `docs/feature-backlog.md:887`: *"`ConnectorRulePausedNotification` is the only tenant-facing
+  connector email with no brand."* Filed by `M1`.
+- **`R3`** — `docs/feature-backlog.md:2000`: *"Three admin POSTs bind `{tenant}` with no `whereUuid`."*
+  Filed by `M1`.
+- **`R4`** — `docs/feature-backlog.md:1078`: *"`RuntimeSession.handleDrift()`'s bare `catch {}` collapses
+  every recovery failure into one sentence."* Filed by `M14`.
 
-⚠️ **`M66` OWES ONE MEASUREMENT.** `D13` records the ~42% saving as a claim to be **proven**, not a
-result: record `M66`'s claim → work → release timestamps against the ~157 min/row baseline in that entry.
-If the saving is materially under 40% the batch size is wrong, and that is to be revisited before running
-twenty more increments on it.
+⛔ **EVERY ROW'S EVIDENCE HELD AND TWO OF THE FOUR REMEDIES ARE WRONG.** That is the fifth and sixth
+consecutive occurrence of the pattern `docs/claims/TEMPLATE.md` tabulates, and it is the entire argument
+for why these two fields stay separate **per row** and are never merged into one paragraph.
 
-⛔ **RUN `php scripts/state.php` FOR EVERY NUMBER.**
+---
+
+### `R1` — Evidence verified
+
+| | Row says | Tree says |
+|---|---|---|
+| `routes/api.php:73-89` is the mint group's middleware array | yes | ✅ **held**, exact |
+| `EnforceTenantTwoFactor` absent from it | yes | ✅ **held** — and not imported in the file at all |
+| Group B carries no 2FA gate either | yes | ✅ **held** (`:109-128`) |
+| The middleware is an enrolment nudge by its own docblock | yes | ✅ **held**, verbatim at `EnforceTenantTwoFactor.php:19-22` |
+| Its escape hatch is a route outside its own group | yes | ✅ **held** (`:34-40`, `routes/tenant.php:970-994`) |
+| Token abilities capped at the issuer's RBAC | yes | ✅ **held** (`routes/api.php:92-96`, `ApiV1Test.php:255-267`) |
+| Nothing would catch it silently coming off | yes | ✅ **held, and this is the row's real motivation** — `tests/Pest.php:931-932` and `GroupBPolicyGateTest.php:41` both **exclude** `api.v1.tokens.*` from the Group-B sweep |
+| `routes/api.php:80-88` carries the mint-vs-bearer argument | yes | ⚠️ **off by a paragraph** — it is `:79-83`; `:84-87` is a different paragraph about the JSON arm |
+| *"gate the mint, not the bearer"* | quoted as repo text | ⚠️ **the row's own coinage** — the phrase exists nowhere in the tree |
+| *"(or its alias)"* | implied | ⚠️ **false** — there is no alias; `bootstrap/app.php:158-176` registers nine and this is not one |
+
+### `R1` — Remedy verdict
+
+⛔ **WRONG AS PRESCRIBED, AND MOUNTING IT VERBATIM SHIPS A DEFECT.** *"The code edit and the test edit are
+the same edit: mount it on Group A"* is false. `handle()` has **no `expectsJson()` branch** — it ends
+`return redirect()->route('two-factor.required')` (`:105`). An unenrolled member under enforcement calling
+`POST /api/v1/auth/tokens` would receive a **302 into HTML**, which is precisely the failure
+`routes/api.php:85-87` says that group exists to prevent.
+
+✅ **The correct remedy is two code edits and the repository already contains its exact template.**
+`EnsureVerifiedEmail.php:109-111` is the sibling gate on the same group, and its docblock supplies both
+halves: `:40-43` names this gate as the one that *"tolerates exactly that"* while `EnsureVerifiedEmail`
+*"simply does not create it"*; `:45-50` records that on `/api/v1/*` **and only there** the exception
+becomes the documented `forbidden` envelope, and that **"neither moves `openapi.json`"**.
+
+**The one behaviour change, stated before the run:** `GET /notifications` currently 302s an unenrolled
+member and `EnforceTenantTwoFactor.php:54-60` deliberately tolerates it. It becomes a 403 the same client
+already swallows — and still serves no notification content to someone being told to enrol, which is the
+property `:59-60` insists on. That paragraph is rewritten in the same edit rather than left false.
+
+**The prescribed test shape only half-transfers.** `StepUpReauthenticationTest:115` anchors on
+`getMiddlewareAliases()`, which has no analogue for an alias-less middleware.
+`TenantTwoFactorEnforcementTest.php:145-160` is the right template — FQCN via `gatherMiddleware()`, with a
+non-vacuous enumeration floor already at `:172-184`.
+
+⛔ **AND A BEHAVIOURAL TEST HERE PASSES VACUOUSLY.** `SettingKey.php:73` defaults
+`security.require_two_factor` to `false`, nothing in any factory or seeder writes it, and every Group-A
+fixture user is unenrolled — so a new case that forgets `requireTwoFactor()`
+(`TenantTwoFactorEnforcementTest.php:69-78`) passes against an **unmounted** middleware. The manifest arm
+is the one that can actually fail.
+
+---
+
+### `R2` — Evidence verified
+
+| | Row says | Tree says |
+|---|---|---|
+| The send is unbranded | yes | ✅ **held** |
+| At `DeliverConnectorMessageJob.php:330` | yes | ⚠️ **rotted, and was NEVER right** — the site is `:382-383`; `:330` is a blank line inside `finishCredentialRejected()`. It was `:325` when introduced (`f5ec530`), `:343` after `M5`, `:383` since `M6` |
+| It is the **only** unbranded tenant-facing connector email | yes | ✅ **held, and stronger than the row states** — eight sends are branded; three more are unbranded **by design**, with the intent stated in-line at `app/Models/User.php:152`, and all three still render the Meridian shell. This is the sole omission |
+| A branded tenant gets one branded and one product-default email from the same job | yes | ✅ **held** — the branded sibling is 23 lines above at `:356-360` |
+
+### `R2` — Remedy verdict
+
+⛔ **WRONG, AND FATAL — *"one argument"* is not what this is.** `ConnectorRulePausedNotification` does not
+use `CarriesTenantBrand` **at all**: it declares `use Queueable;` alone (`:39`) and its `toMail()`
+(`:54-62`) returns a bare `MailMessage`. **`->withBrand(...)` on it today is `Call to undefined method`.**
+It is the only one of ten notification classes missing both the trait and the `branded()` call.
+
+The loss is also **template-level, not colour-level**: `CarriesTenantBrand::branded()` (`:80-87`) supplies
+`markdown('mail.notification')` **and** `theme('meridian')`, and `config/mail.php:142-146` sets no global
+theme — so without it the tenant loses the whole brand shell, not a palette.
+
+✅ **Four edits, and the fourth is the root cause rather than a side-effect.** `scripts/job-payload-lint.php`
+EXEMPT_JOBS carries **eleven** notification entries including this class (`:102`); `QueuedMailContractTest`'s
+list carries **ten** and omits it. That test's own docblock (`:37`) says adding a queued mail notification
+means adding it in **both** places *"or two separate gates fail"* — a discipline broken exactly once, for
+exactly this class, and its case at `:100-101` is the assertion that would have caught the missing trait.
+
+**No hazards, checked rather than assumed.** `$this->tenantId` is a non-nullable promoted `string`;
+`BrandPalette::forTenantId()` (`:133-142`) returns `product()` for null or empty and `forTenant()` fails
+closed when the key disagrees with `TenantContext::currentTenantId()`; `notifyBlocked()` is reached only
+through `handleForTenant()`, where the GUC is live. **Nothing asserts the unbranded shape**, so nothing
+goes red on the fix — `GoogleSheetsDeliveryTest.php:234, 265` assert the class name only.
+
+---
+
+### `R3` — Evidence verified
+
+| | Row says | Tree says |
+|---|---|---|
+| `suspend`, `reactivate`, `assign-plan` bind `{tenant}` unpinned | yes | ✅ **held** — `:58`, `:59`, `:62`; a `whereUuid` sweep of `routes/` returns five hits and none is these |
+| The two routes around them pin the pattern | yes | ✅ **held** — `show` at `:56-57`, `impersonate` at `:71-72` |
+| A malformed uuid 500s instead of 404ing | yes | ✅ **held** — binding is implicit, the model overrides no route key, the controller type-hints `Tenant $tenant` (`TenantAdminController.php:64, 75, 91`), and `tenants.id` is a native Postgres `uuid` (`2026_07_05_000001_create_tenants_table.php:21-22`) under `DB_CONNECTION=pgsql` (`phpunit.xml:80`). SQLSTATE 22P02 is raised before `firstOrFail()` can 404 |
+| `routes/admin.php:56-63` | yes | ⚠️ **approximate** — the three routes span `:58-62`; `56-63` is the enclosing block. Nobody is misdirected |
+| The docblock **justifies** the omission | yes | ⛔ **MISCHARACTERISED — it NAMES it.** `:52-55` reads *"The three POST routes below share that latent defect"*. What is stale is only its reason — *"and have simply never been reachable from a UI"* |
+
+⛔ **THAT REASON IS FALSE TODAY, WHICH IS WHY THE ROW EXISTS.** `TenantDetail.vue:83` posts to the plan
+route, `:95` to the suspend/reactivate pair, and `Tenants.vue:47` posts the same pair from the list page.
+The comment is rewritten, not deleted — it is the correct diagnosis with a spent premise.
+
+### `R3` — Remedy verdict
+
+✅ **WORKS**, and it is the only one of the four that does. `->whereUuid('tenant')` copied verbatim from
+the neighbours. UUIDv7 ids match the framework pattern; **no route anywhere takes a slug as `{tenant}`**
+(the slug is the subdomain host, never a parameter); the group sets no name prefix and no `Route::pattern`,
+so route names are untouched and `AdminConsoleGateTest` / `StepUpReauthenticationTest`'s enumerations are
+unaffected.
+
+**And the row stops one step short of the durable half.** `AdminConsoleGateTest` enumerates
+`adminConsoleRoutes()` (`tests/Pest.php:828-835`) for **middleware only**, never for parameter constraints,
+so a fourth unpinned route would land exactly as these three did. An enumerated arm goes in, in the shape
+`StepUpReauthenticationTest.php:157-171` adopted after `M35` measured that a hand-written name list cannot
+fail for a route it does not name — **with a floor**, or it passes by matching nothing.
+
+---
+
+### `R4` — Evidence verified
+
+| | Row says | Tree says |
+|---|---|---|
+| The bare `catch` binds no error | yes | ✅ **held**, `RuntimeSession.vue:198` |
+| A dropped connection reads as *"This form is no longer available."* | yes | ✅ **held**, `:199`, an inline literal shared with nothing |
+| A terminal claim about the form, made about the network | yes | ✅ **held, and precisely stated** |
+| `resources/public-runtime/components/RuntimeSession.vue:160-168` | yes | ⚠️ **ROTTED** — `handleDrift` is at `:193-201`; `:160-168` is now the `onMounted` autosave-restore block. The figure was copied from the **closed** row's pre-`M14` sweep list (`docs/feature-backlog.md:1037`) and never re-measured |
+| *"a fourth fold site"* | yes | ⚠️ **mixes two taxonomies** — the closed row's fold sites fold *409 causes*; this folds *transport vs HTTP*. On that axis it is the **third** unbound `catch` of the `SaveForLater.vue` species (`:53`, `:78` fixed; `:198` not) |
+| *"widening past them was declined deliberately"* | yes | ✅ **corroborated by the suite itself** — `__tests__/components.test.ts:1134-1136` names the swallow in a comment and supplies a working `fetchSchema` **specifically to steer around the catch block** |
+
+### `R4` — Remedy verdict
+
+✅ **WORKS, and nothing is missing to build it.** `error instanceof ApiError` already separates transport
+from HTTP, and this component uses that exact split 76 lines below the defect (`:275`);
+`error.normalized.kind === 'terminal'` separates a gone form from a 429 or a 500.
+
+⛔ **THE STRONGEST EVIDENCE THE ROW IS RIGHT IS THAT THE SAME TWO CALLS ARE ALREADY WRAPPED CORRECTLY
+THREE TIMES.** `remint()` then `fetchSchema()` appears at four recovery sites; `App.vue:411-431` and
+`lib/replay.ts:238-246` / `:275-281` all bind the error and choose copy from it. `handleDrift` is the only
+one that does not. And the sentence itself is a convention this one site breaks: *"…no longer available"*
+has three first-party sites and the other two are bound to a real 404 —
+`GuestDraftResumeController.php:48` emits it as `404 draft_not_found`, and `App.vue:236-242` emits its
+variant only behind `kind === 'terminal'`. **The fix is a transcription of `App.vue:236-242`, not a design.**
+
+⛔ **AND THE ROW UNDERSTATES ITSELF IN A WAY THAT WOULD MAKE THE OBVIOUS COPY A SECOND FALSE SENTENCE.**
+`handleSubmitError` discards the durable outbox row at `:233` **before** reaching `handleDrift` at `:242`
+and `:259`. On the ordinary path the Dexie autosave draft still holds the answers — but in **resolve mode**
+autosave is disabled by construction (`:137`, `enabled: !props.resolving`, because the durable copy *was*
+the parked row `:233` just deleted). A network drop during a conflict review therefore leaves the reviewed
+answers **in memory only**, and the current sentence tells that respondent to stop trying. Reassuring them
+that *"your answers are saved on this device"* would be false in exactly the branch where the stakes are
+highest. **The lifecycle defect is filed, not fixed** — keeping the row until recovery succeeds reaches the
+sync contract `replay.ts` and the background driver share, and `D13` forbids widening mid-batch.
+
+---
+
+**Files:** `app/Http/Middleware/EnforceTenantTwoFactor.php` · `routes/api.php` ·
+`tests/Feature/Auth/TenantTwoFactorEnforcementTest.php` ·
+`app/Notifications/Connectors/ConnectorRulePausedNotification.php` ·
+`app/Jobs/Connectors/DeliverConnectorMessageJob.php` · `tests/Feature/Mail/QueuedMailContractTest.php` ·
+`tests/Feature/Connectors/GoogleSheetsDeliveryTest.php` · `routes/admin.php` ·
+`tests/Feature/Admin/AdminConsoleGateTest.php` · `tests/Feature/Admin/SuperAdminConsoleTest.php` ·
+`resources/public-runtime/components/RuntimeSession.vue` ·
+`resources/public-runtime/__tests__/components.test.ts`.
+
+**Shared artefacts taken:** `docs/feature-backlog.md`, `docs/backlog-triage.md` (regenerated, never
+hand-edited), `docs/gate-baselines.md` (regenerated at close-out), `PROGRESS.md` (own block only),
+`PROGRESS_ARCHIVE.md` (one appended line). **`openapi.json` is NOT taken** — see the prediction.
+
+**Paired files taken:** none.
+
+**Namespaces spent:** nothing from either namespace — no migration, no ADR, no `§D`.
+
+**Prediction**, written before the run:
+
+| | |
+|---|---|
+| PHPStan | **can** move — `app/` and `routes/` are both touched, so the usual *"a `scripts/`-only diff cannot move it"* line does not apply. Expect no errors, said rather than quoted |
+| Contract (OpenAPI) | **unchanged.** `EnsureVerifiedEmail.php:48` records that this exact shape moves it by zero |
+| Vitest | still the baseline **file count** — `R4` adds cases to an existing file |
+| Pest | up by the new cases, across four separate directories |
+| Pint | at least one flag on the reformatted `routes/admin.php` one-liners |
+| `MU6` | reddens nothing — it is a discriminator, and if the manifest arm reddens on an **already-correct** route the arm is measuring the wrong thing |
+
+⚠️ **The one most expected to be wrong: the contract gate.** If the mint route's 403 is documented
+per-cause rather than per-status, `openapi.json` moves and the claim is short one shared artefact.
+
+⛔ **AND THE MEASUREMENT THIS INCREMENT OWES IS NOT A GATE.** `D13` records ~42% as a claim to be proven.
+Baseline **4 × 157 = 628 min**; `D13`'s model is **367 min**; **≥40% saving means ≤ ~377 min** from `M65`'s
+release commit `4a75231` to this increment's release commit. ⚠️ **`M65`'s own claim→merge was 402 minutes,
+essentially all CI wait, against the ~70 min mean `D13` quotes** — so a miss must be reported with what the
+build time actually contained, or the revisit `D13` mandates will re-tune batch size for something that was
+never about batch size.
 
 ---
 

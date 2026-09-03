@@ -651,8 +651,15 @@ describe('useServerAutosave — standing down for a caller that will write the d
         await vi.advanceTimersByTimeAsync(150);
         expect(post).toHaveBeenCalledTimes(1);
 
-        answers.a = '12'; // arms pendingWhileInFlight
+        // ⛔ TYPING ALONE DOES NOT ARM `pendingWhileInFlight`, AND THE FIRST DRAFT OF THIS CASE ASSUMED IT
+        // DID — so the case passed while being blind to the mechanism it names, and only the mutation
+        // showed it (dropping `pendingWhileInFlight = false` from `settle()` SURVIVED). The answer watcher
+        // calls `schedule()`, which only arms a timer; the flag is set inside `run()`, so the debounce has
+        // to actually FIRE while the first request is still open. That is the second advance below.
+        answers.a = '12';
         await nextTick();
+        await vi.advanceTimersByTimeAsync(150);
+        expect(post).toHaveBeenCalledTimes(1); // coalesced, not sent — and now pendingWhileInFlight is true
 
         const settled = autosave.settle();
         release(jsonResponse(200, { last_saved_at: 't1', content_checksum: 'sum-2' }));

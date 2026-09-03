@@ -500,12 +500,17 @@ export function createServerAutosave(options: ServerAutosaveOptions): ServerAuto
     /**
      * Increment M68 — settle a save ALREADY in flight, and start no new one.
      *
-     * ⛔ THE `while` IS NOT DEFENSIVE, AND `pendingWhileInFlight = false` IS NOT A TIDY-UP. `run()`'s own
-     * `finally` starts a FOLLOW-UP request when work arrived during the one it is completing, and that
-     * continuation runs BEFORE an `await inFlight` here resolves — so awaiting once returns with a brand
-     * new request in flight, which is the exact writer this function exists to be rid of. Clearing the
-     * flag first stops the chain being armed; the loop is what makes that true even if it was armed by a
-     * keystroke landing between the two statements.
+     * ⛔ `pendingWhileInFlight = false` IS LOAD-BEARING AND MEASURED. `run()`'s own `finally` starts a
+     * FOLLOW-UP request when work arrived during the one it is completing, and that continuation runs
+     * BEFORE an `await inFlight` here resolves — so without this line, awaiting once returns with a brand
+     * new request in flight, which is the exact writer this function exists to be rid of. Removing it
+     * reddens `useServerAutosave.test.ts`'s follow-up case (control R3-C3).
+     *
+     * ⚠️ THE `while` IS *NOT* LOAD-BEARING, AND SAYING SO IS THE POINT. Narrowing it to an `if` SURVIVED
+     * the same mutation pass (R3-C4): with the flag cleared before the await, no follow-up is ever armed,
+     * so there is nothing for a second iteration to catch. It is kept because it costs nothing and closes
+     * the case of a keystroke landing between the two statements — a window no test can reach, so the loop
+     * is a belief rather than a proven necessity. Do not cite it as covered.
      *
      * ⚠️ WORK TYPED DURING THAT LAST REQUEST IS DELIBERATELY NOT SAVED BY THIS CHANNEL. It is not lost:
      * the only caller posts the FULL answer map immediately afterwards, and the endpoint it posts to

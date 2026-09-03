@@ -10,6 +10,7 @@ use App\Support\Audit\ImpersonationContext;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
 /**
  * Org-level 2FA enforcement — Increment I8a, PRD Feature #14's second acceptance criterion:
@@ -51,13 +52,27 @@ use Symfony\Component\HttpFoundation\Response;
  *  · the invitation-acceptance group — someone who has not joined yet cannot be bound by the policy of a
  *    workspace they are still deciding whether to enter.
  *
- * ── THE JSON SIDECARS ARE FINE, AND THAT WAS CHECKED RATHER THAN ASSUMED ──────────────────────────────
- * I4's `GET /notifications` poll sits inside the guarded group, so a stale tab belonging to a member who
- * has just been placed under enforcement receives this 302 and follows it to HTML. `notificationsClient`
- * already swallows every error for exactly this shape of failure — its own comment names "a tenant that
- * cannot be identified produces a 302 that builderClient then throws a SyntaxError on" — so the bell holds
- * its last known feed instead of raising an unhandled rejection every sixty seconds. No exemption needed,
- * and none should be added: an exemption would serve notification content to someone being told to enroll.
+ * ── A JSON CALLER IS ANSWERED IN KIND (M66) ───────────────────────────────────────────────────────────
+ * ⚠️ **THIS PARAGRAPH USED TO SAY THE SIDECARS WERE FINE, AND THAT WAS TRUE ONLY WHILE THIS GATE STOOD ON
+ * HTML DOORS ALONE.** I4's `GET /notifications` poll sits inside the guarded group, so a stale tab
+ * belonging to a member just placed under enforcement used to receive a 302 and follow it to HTML;
+ * `notificationsClient` swallows exactly that shape, so the bell held its last known feed instead of
+ * raising an unhandled rejection every sixty seconds. Tolerable — but tolerated, not chosen, and
+ * {@see EnsureVerifiedEmail} said so in terms: it *"simply does not create it"*.
+ *
+ * M66 mounted this gate on the `/api/v1` token-mint group, where that tolerance stops being tolerable: the
+ * group is `web`-session-authenticated but its clients send `Accept: application/json`, and
+ * `routes/api.php` states at the group that a 302 to an HTML notice is a response an API client cannot
+ * follow. So the JSON arm below is not a refinement of the sidecar behaviour, it is a precondition of
+ * mounting this anywhere an API client can reach.
+ *
+ * ⛔ **AND IT CHANGES THE SIDECARS TOO, WHICH IS THE HONEST WAY ROUND.** `/notifications` now answers 403
+ * rather than 302, and `bootstrap/app.php`'s renderers are gated on `$request->is('api/v1/*')` — so a
+ * tenant sidecar gets the framework's default 403 body while the mint gets the documented `forbidden`
+ * envelope. Both are correct, `openapi.json` moves by neither, and the same client swallows a 403 as
+ * readily as it swallowed the redirect. The property that must not change did not: **no exemption exists
+ * and none should be added**, because an exemption would serve notification content to someone being told
+ * to enroll.
  *
  * ── ORDER ─────────────────────────────────────────────────────────────────────────────────────────────
  * After `auth` and after {@see EstablishTenantDatabaseContext} (the settings read is tenant-scoped and
@@ -100,6 +115,14 @@ final class EnforceTenantTwoFactor
         // per request, so the unenrolled path is one query at most regardless of how many times it is hit.
         if ($this->settings->get(SettingKey::SecurityRequireTwoFactor) !== true) {
             return $next($request);
+        }
+
+        // M66 — mirrors {@see EnsureVerifiedEmail}, which has carried this arm since J3a. A redirect is an
+        // instruction to go and do something; a JSON client cannot go anywhere, so it gets the refusal
+        // instead of markup it will try to parse. On `/api/v1/*` the renderer turns this into the
+        // documented `forbidden` envelope, and everywhere else into a plain 403.
+        if ($request->expectsJson()) {
+            throw new AccessDeniedHttpException('This workspace requires two-factor authentication, and this account has not enrolled.');
         }
 
         return redirect()->route('two-factor.required');

@@ -34,6 +34,7 @@ use App\Http\Middleware\AuthenticateApiToken;
 use App\Http\Middleware\EnforceApiRequestQuota;
 use App\Http\Middleware\EnforceGuestFormRateLimit;
 use App\Http\Middleware\EnforceTenantMaintenance;
+use App\Http\Middleware\EnforceTenantTwoFactor;
 use App\Http\Middleware\EstablishGuestDraftContext;
 use App\Http\Middleware\EstablishGuestTenantContext;
 use App\Http\Middleware\EstablishTenantDatabaseContext;
@@ -86,6 +87,22 @@ Route::prefix('api/v1')
         // clients send `Accept: application/json`, so EnsureVerifiedEmail answers with the documented
         // `forbidden` envelope rather than a 302 to an HTML notice page an API client cannot follow.
         'verified',
+        // EnforceTenantTwoFactor (M66) — the same argument as `verified` directly above, one policy over,
+        // and it is placed after it deliberately: an unverified member under org-2FA enforcement proves the
+        // mailbox before being asked to enrol a second factor against an address nobody has confirmed they
+        // own. Both are absent from bootstrap/app.php's priority list, so written order is real order here.
+        //
+        // WHAT THIS CLOSES: a member bounced from every page of the workspace for not enrolling could still
+        // POST here from the same session and walk away with a bearer token — and Group B carries no 2FA
+        // gate either, for the reason stated above. It is defence in depth rather than a hole (the token
+        // trims to the issuer's own RBAC, and Fortify's enrolment routes sit outside this gate by design),
+        // which is why the row that filed it was downgraded from `blocker` to `minor` on verification.
+        //
+        // ⛔ MOUNTING IT REQUIRED GIVING THE MIDDLEWARE A JSON ARM FIRST. It ended in a bare
+        // `redirect()->route('two-factor.required')`, so mounted as-is it would have answered this group
+        // with precisely the HTML 302 the comment above says the group exists to avoid. The class mirrors
+        // EnsureVerifiedEmail now; see its docblock for what that changed on the tenant sidecars.
+        EnforceTenantTwoFactor::class,
     ])
     ->group(function (): void {
         // A key is minted scoped to the issuer's own RBAC (requested abilities are intersected against

@@ -6,6 +6,7 @@ use App\Enums\SettingKey;
 use App\Http\Middleware\EnforceTenantTwoFactor;
 use App\Models\User;
 use App\Services\Settings\TenantSettingRegistry;
+use App\Support\Api\ApiAbilities;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -157,6 +158,70 @@ it('keeps the interstitial structurally outside the gate', function (): void {
         ?->gatherMiddleware() ?? [];
 
     expect($dashboard)->toContain(EnforceTenantTwoFactor::class);
+});
+
+/*
+| Increment M66 — the API token mint, which stood outside this gate from I8a until now.
+|
+| A member bounced from every page of the workspace for not enrolling could still POST to the mint from the
+| same session and leave with a bearer token, and Group B carries no 2FA gate either — deliberately, for the
+| reason `routes/api.php` states: Group B authenticates by TOKEN, so there is no session, no browser and
+| nowhere to send anyone, and a gate there could only 403 a key that already works. Gating the MINT is the
+| durable form of the same rule, exactly as `verified` does one line above it.
+|
+| ⛔ THE STRUCTURAL ARM IS THE ONE THAT CAN FAIL, AND THAT IS NOT A FIGURE OF SPEECH. `SettingKey::default()`
+| returns FALSE for this key, the `settings` table is sparse, and no factory or seeder writes it — so a
+| behavioural case that forgets `requireTwoFactor()` passes against a middleware that is not mounted at all.
+| Both shapes are here for that reason, which is the M43 pairing: the structural arm catches the mount coming
+| off, the behavioural arm catches the mount being present and doing nothing.
+*/
+it('gates the API token mint on enrolment, structurally', function (): void {
+    // The alias shape `StepUpReauthenticationTest` uses does not transfer: this middleware has no alias and
+    // is mounted by FQCN, so the class is what gets asserted.
+    $mint = Route::getRoutes()->getByName('api.v1.tokens.store')?->gatherMiddleware() ?? [];
+
+    expect($mint)->toContain(EnforceTenantTwoFactor::class);
+
+    // Group B is NOT gated, and that is a decision rather than an omission — pinned here so that "add it
+    // everywhere for consistency" meets the argument before it meets the route file.
+    $groupB = collect(Route::getRoutes()->getRoutes())
+        ->filter(function ($route): bool {
+            $name = (string) $route->getName();
+
+            return str_starts_with($name, 'api.v1.')
+                && ! str_starts_with($name, 'api.v1.public.')
+                && ! str_starts_with($name, 'api.v1.tokens.');
+        });
+
+    expect($groupB->flatMap(fn ($route): array => $route->gatherMiddleware())->unique())
+        ->not->toContain(EnforceTenantTwoFactor::class);
+    expect($groupB->count())->toBeGreaterThan(20); // the filter matched a real surface, not an empty set
+});
+
+it('refuses the mint for an unenrolled member in JSON, never as a redirect into HTML', function (): void {
+    // ⛔ THE ASSERTION THAT MATTERS IS "NOT A 302". Before M66 this middleware ended in a bare
+    // `redirect()->route(...)`, so mounting it here without giving it a JSON arm would have answered an
+    // `Accept: application/json` client with markup it would try to parse — the exact failure the group's
+    // own comment in `routes/api.php` exists to prevent. A 403 is the fix; a 302 is the defect wearing it.
+    requireTwoFactor();
+
+    $this->actingAs($this->unenrolled)
+        ->postJson('http://acme.meridian.test/api/v1/auth/tokens', ['name' => 'ci'])
+        ->assertForbidden()
+        ->assertJsonPath('error.code', 'forbidden');
+});
+
+it('still mints for an enrolled member under the same enforcement', function (): void {
+    // The control. Without it the case above passes just as well against a gate that refuses everybody,
+    // which would close the row by breaking the feature.
+    requireTwoFactor();
+
+    $this->actingAs($this->enrolled)
+        ->postJson('http://acme.meridian.test/api/v1/auth/tokens', [
+            'name' => 'ci',
+            'abilities' => [ApiAbilities::READ_FORMS],
+        ])
+        ->assertCreated();
 });
 
 it('sends an enrolled user away from the interstitial rather than stranding them', function (): void {

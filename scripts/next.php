@@ -141,10 +141,26 @@ function render_line(string $lane, array $state): string
         sprintf('main IS THE TRUNK: branch from origin/main, PR into main, self-merge on 6/6 green with each'
             .' job\'s step count read individually. Your claim goes in %s and is PUSHED before you open the'
             .' first file.', $config['claim']),
-        'Take the next row from docs/feature-backlog.md — '.$state['backlog']['open'].' open ('
-            .$state['backlog']['by_severity']['major'].' major), ranked in docs/backlog-triage.md, which is'
-            .' GENERATED from the tree — regenerate it rather than reading a stale one, and treat its order as'
-            .' operability and not priority. Verify the row\'s evidence and its remedy separately.',
+        // ⛔ M67 — THE UNIT OF WORK IS DERIVED FROM `D13`, NOT HARD-CODED, BECAUSE THE HAND-EDIT THAT
+        //    CARRIED IT BEFORE WAS INVISIBLE HERE AND THIS GENERATOR SILENTLY DROPPED IT.
+        //    `D13` answered the question "how should the remaining rows be worked" with *in batches of 3–4*,
+        //    and `M66` put that into its hand-off BY HAND — the one thing the line above forbids. So the
+        //    instruction lived only in a string this script had never heard of, and the first faithful
+        //    regeneration (M67's) reverted the queue to single rows with nothing reporting the loss.
+        //    `git log -S BATCHED -- scripts/next.php` returns nothing, which is how that was established.
+        //    ⚠️ AN ANSWERED DECISION THAT ONLY A HAND-EDIT CARRIES IS ONE REGENERATION FROM GONE.
+        in_array('D13', $state['decisions']['answered'] ?? [], true)
+            ? 'Take the next BATCHED increment under D13 — 3-4 live rows sharing no non-hub file, at most one'
+                .' hub-touching row — from docs/feature-backlog.md ('.$state['backlog']['open'].' open, '
+                .$state['backlog']['by_severity']['major'].' major), ranked in docs/backlog-triage.md, which is'
+                .' GENERATED from the tree — regenerate it rather than reading a stale one, and treat its order'
+                .' as operability and not priority. D13\'s saving is proven and the batch size is not to be'
+                .' revisited; plan against its own ~42% model rather than any single increment\'s figure.'
+                .' Verify each row\'s evidence, its remedy AND its premise separately, and record them per row.'
+            : 'Take the next row from docs/feature-backlog.md — '.$state['backlog']['open'].' open ('
+                .$state['backlog']['by_severity']['major'].' major), ranked in docs/backlog-triage.md, which is'
+                .' GENERATED from the tree — regenerate it rather than reading a stale one, and treat its order'
+                .' as operability and not priority. Verify the row\'s evidence and its remedy separately.',
         $decisions === []
             ? 'No open decisions.'
             : 'Open decisions: '.implode(', ', $decisions).' — do not re-ask them and do not stall; record a'

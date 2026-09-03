@@ -56,6 +56,7 @@ use App\Support\OpenApi\ApiHttpErrorResponse;
 use App\Support\OpenApi\ApiNotFoundErrorResponse;
 use App\Support\OpenApi\ApiValidationErrorResponse;
 use App\Support\OpenApi\ModuleDisabledResponseExtension;
+use App\Support\OpenApi\SubmissionRefusalResponseExtension;
 use App\Support\Submissions\RandomSubmissionReferenceIssuer;
 use App\Support\Submissions\SubmissionReferenceIssuer;
 use App\Support\Tenancy\DnsTxtResolver;
@@ -555,6 +556,12 @@ class AppServiceProvider extends ServiceProvider
                 ApiAuthenticationErrorResponse::class,
                 ApiHttpErrorResponse::class,
                 ApiNotFoundErrorResponse::class,
+                // M67. Neither submission refusal is an HttpException, an AuthorizationException or any
+                // other class the five above claim, so appending cannot steal a response from them —
+                // `shouldHandle()` is exclusive by construction. Appended rather than inserted for the
+                // reason the comment above gives: precedence is this list read backwards, and a class
+                // with no competitor does not care where it sits.
+                SubmissionRefusalResponseExtension::class,
             ]);
 
             Scramble::extendOpenApi(function (OpenApi $openApi): void {

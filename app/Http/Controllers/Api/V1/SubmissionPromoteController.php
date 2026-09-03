@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Exceptions\Submissions\SubmissionConflictException;
+use App\Exceptions\Submissions\SubmissionException;
 use App\Http\Controllers\Controller;
 use App\Models\Submission;
 use App\Services\Submissions\SubmissionDraftService;
@@ -22,6 +24,22 @@ final class SubmissionPromoteController extends Controller
 {
     /**
      * Promote a draft to a submitted response.
+     *
+     * ⛔ THE TWO @throws TAGS BELOW ARE THE DOCUMENTED CONTRACT, NOT COMMENTARY (M67). Scramble infers a
+     * route's responses from the CONTROLLER, and this action throws nothing itself — every refusal comes
+     * out of `SubmissionDraftService::promote()` one frame down. So the 409 was absent from `openapi.json`
+     * for the whole life of the route while three of its causes were normal outcomes, and M12 could add a
+     * fourth with the document staying byte-identical.
+     *
+     * `Infer\Handler\PhpDocHandler::leave()` is what reads these tags into the method's exception list;
+     * {@see \App\Support\OpenApi\SubmissionRefusalResponseExtension} is what renders them. ⚠️ DELETING
+     * EITHER HALF SILENTLY UN-DOCUMENTS THE STATUS — proven by mutation rather than assumed, because a
+     * missing response reads exactly like a route that cannot refuse.
+     *
+     * @throws SubmissionConflictException `draft_conflict` — a draft save landed between promotion's read
+     *                                     of the answer document and the lock it finalizes under.
+     * @throws SubmissionException         `submission_version_superseded` — the pinned version is no
+     *                                     longer published.
      */
     public function store(Request $request, Submission $submission, SubmissionDraftService $drafts): JsonResponse
     {

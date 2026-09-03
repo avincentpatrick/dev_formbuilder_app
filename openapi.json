@@ -4619,6 +4619,7 @@
         "/submissions/{submission}/promote": {
             "post": {
                 "operationId": "v1.submissions.promote",
+                "description": "\u26d4 THE TWO @throws TAGS BELOW ARE THE DOCUMENTED CONTRACT, NOT COMMENTARY (M67). Scramble infers a\nroute's responses from the CONTROLLER, and this action throws nothing itself \u2014 every refusal comes\nout of `SubmissionDraftService::promote()` one frame down. So the 409 was absent from `openapi.json`\nfor the whole life of the route while three of its causes were normal outcomes, and M12 could add a\nfourth with the document staying byte-identical.\n\n`Infer\\Handler\\PhpDocHandler::leave()` is what reads these tags into the method's exception list;\n{@see \\App\\Support\\OpenApi\\SubmissionRefusalResponseExtension} is what renders them. \u26a0\ufe0f DELETING\nEITHER HALF SILENTLY UN-DOCUMENTS THE STATUS \u2014 proven by mutation rather than assumed, because a\nmissing response reads exactly like a route that cannot refuse.",
                 "summary": "Promote a draft to a submitted response",
                 "tags": [
                     "SubmissionPromote"
@@ -4660,6 +4661,67 @@
                                     },
                                     "required": [
                                         "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The request conflicts with the stored state of this submission. The causes are separate refusals with separate remedies: branch on `error.code`, never on the message.\n\nThe form version this submission is pinned to is no longer published.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "anyOf": [
+                                        {
+                                            "type": "object",
+                                            "properties": {
+                                                "error": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "code": {
+                                                            "type": "string",
+                                                            "description": "One of this refusal family: `draft_conflict` (another device wrote this draft between the read and this call \u2014 re-read the draft and keep the same `client_submission_uuid`), `draft_already_finalized` (the row is no longer a draft and can never be saved as one again), `submission_uuid_claimed` (the identifier is already spent in this workspace on a row outside your scope \u2014 mint a fresh one), or `submission_conflict` (a copy with materially different answers is already stored under this identifier). \u26a0\ufe0f A given operation raises a SUBSET of these \u2014 the set is a property of the refusal family, not of any one route \u2014 so treat an unrecognised code as a refusal that must not be retried."
+                                                        },
+                                                        "message": {
+                                                            "type": "string",
+                                                            "description": "Human-readable English overview, for developer and support consumption. Never shown to a respondent \u2014 the public runtime renders its own localized copy keyed by `code`."
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "code",
+                                                        "message"
+                                                    ]
+                                                }
+                                            },
+                                            "required": [
+                                                "error"
+                                            ]
+                                        },
+                                        {
+                                            "type": "object",
+                                            "properties": {
+                                                "error": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "code": {
+                                                            "type": "string",
+                                                            "description": "Always `submission_version_superseded` \u2014 the form version this submission is pinned to is no longer published, so finalizing it would commit against a schema the form has moved past."
+                                                        },
+                                                        "message": {
+                                                            "type": "string",
+                                                            "description": "Human-readable English overview, for developer and support consumption. Never shown to a respondent \u2014 the public runtime renders its own localized copy keyed by `code`."
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "code",
+                                                        "message"
+                                                    ]
+                                                }
+                                            },
+                                            "required": [
+                                                "error"
+                                            ]
+                                        }
                                     ]
                                 }
                             }

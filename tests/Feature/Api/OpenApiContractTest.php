@@ -254,3 +254,113 @@ it('documents the /api/v1 error envelope on every error response it publishes', 
         );
     }
 });
+
+it('documents the 409 the promote route can actually answer, and names its causes', function (): void {
+    // ⛔ M67. `openapi.json` published `200 / 403 / 404` for this operation while THREE of its refusals
+    // were normal outcomes, because Scramble infers from the CONTROLLER and every one of them is thrown
+    // by `SubmissionDraftService::promote()` a frame down. M12 could add a fourth cause with the document
+    // staying byte-identical — which is the property that made this invisible rather than merely wrong.
+    //
+    // ⚠️ THE STATUS AND THE CODES ARE ASSERTED SEPARATELY AND ON PURPOSE. A 409 documented as "a string"
+    // tells an integrator the status exists and nothing they can branch on, and `error.code` is the only
+    // thing on this surface that separates a re-readable draft conflict from a superseded version. Both
+    // arms are mutated independently — see the release for which mutation caught which.
+    /** @var array<string, mixed> $spec */
+    $spec = json_decode((string) file_get_contents(base_path('openapi.json')), true, flags: JSON_THROW_ON_ERROR);
+
+    $operation = $spec['paths']['/submissions/{submission}/promote']['post'] ?? null;
+
+    expect($operation)->toBeArray('the promote operation is missing from the contract entirely');
+
+    // ⚠️ `array_map('strval', …)` IS LOAD-BEARING, NOT TIDINESS. `json_decode` turns a numeric object key
+    // into an INT, so `["200","403","409"]` arrives as `[200, 403, 409]` and a strict `toContain('409')`
+    // fails against a document that is perfectly correct. This gate went red that way before it went red
+    // for the right reason.
+    expect(array_map('strval', array_keys($operation['responses'] ?? [])))->toContain('409');
+
+    // The whole 409 sub-document, flattened: the two exception families merge into one response with an
+    // `anyOf`, so a search over `properties` alone reads only the first branch and would pass with the
+    // second silently gone.
+    $documented = json_encode($operation['responses']['409'], JSON_THROW_ON_ERROR);
+
+    foreach (['draft_conflict', 'submission_version_superseded'] as $code) {
+        expect($documented)->toContain($code);
+    }
+});
+
+it('documents a 409 on every /api/v1 action that declares it can throw one', function (): void {
+    // ⚠️ THE SWEEP RATHER THAN THE ONE ROUTE, because the row was an instance and not the class: the
+    // annotation is the ONLY signal Scramble has for a service-thrown refusal, so the next action to
+    // declare one documents its 409 without anyone remembering to — or fails here.
+    //
+    // ⛔ AND THE FLOOR IS THE ARM THAT MATTERS. Deleting the `@throws` tags empties this walk, and a loop
+    // over nothing reports success — the exact shape CLAUDE.md records for every gate that scans a tree.
+    // The floor is what turns that deletion red, and it is the mutation that proved this test is not
+    // decorative. `>=` so adding a route cannot redden it.
+    /** @var array<string, mixed> $spec */
+    $spec = json_decode((string) file_get_contents(base_path('openapi.json')), true, flags: JSON_THROW_ON_ERROR);
+
+    // Both are rendered as a 409 by bootstrap/app.php's /api/v1 arm; neither is an HttpException, so
+    // nothing else in the Scramble pipeline claims them.
+    $conflictExceptions = [
+        App\Exceptions\Submissions\SubmissionConflictException::class,
+        App\Exceptions\Submissions\SubmissionException::class,
+    ];
+
+    $declaring = [];
+
+    foreach (Illuminate\Support\Facades\Route::getRoutes() as $route) {
+        $name = $route->getName();
+
+        if (! is_string($name) || ! str_starts_with($name, 'api.v1.')) {
+            continue;
+        }
+
+        $action = $route->getActionName();
+
+        if (! str_contains($action, '@')) {
+            continue;
+        }
+
+        [$class, $method] = explode('@', $action, 2);
+
+        if (! class_exists($class) || ! method_exists($class, $method)) {
+            continue;
+        }
+
+        $doc = (string) (new ReflectionMethod($class, $method))->getDocComment();
+
+        // Matched on the SHORT name, which is what both spellings end in: an imported `@throws Foo` and a
+        // fully-qualified `@throws \App\Exceptions\Submissions\Foo` both contain it, so one arm covers
+        // both and no backslash needs writing here.
+        $throwsConflict = array_filter(
+            $conflictExceptions,
+            fn (string $exception): bool => str_contains($doc, '@throws '.class_basename($exception))
+        );
+
+        if ($throwsConflict === []) {
+            continue;
+        }
+
+        // `api/v1/submissions/{submission}/promote` → `/submissions/{submission}/promote`: the document's
+        // paths are relative to the server URL, which already carries the prefix.
+        $declaring['/'.ltrim(Illuminate\Support\Str::after($route->uri(), 'api/v1'), '/')]
+            = strtolower((string) collect($route->methods())->first(fn (string $verb): bool => $verb !== 'HEAD'));
+    }
+
+    expect(count($declaring))->toBeGreaterThanOrEqual(
+        1,
+        'no /api/v1 action declares @throws for a submission refusal — the walk matched nothing, so every assertion below is vacuous'
+    );
+
+    foreach ($declaring as $path => $verb) {
+        $statuses = array_map('strval', array_keys($spec['paths'][$path][$verb]['responses'] ?? []));
+
+        // ⛔ NOT `toContain('409', $why)`. That expectation takes VARIADIC NEEDLES, so the explanation
+        // would become a second thing the array must contain — the M30 trap, which kept a case green with
+        // the wrong value in it. The message belongs on an expectation whose second argument IS a message.
+        expect(in_array('409', $statuses, true))->toBeTrue(
+            strtoupper($verb)." {$path} declares it can throw a submission refusal but documents no 409 — add the exception to the @throws block, then re-export openapi.json"
+        );
+    }
+});

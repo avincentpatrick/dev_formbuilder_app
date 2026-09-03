@@ -16,104 +16,188 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M67`, the second batched increment: four rows, three of whose PREMISES were wrong (`m67-batched-rows`)
+## Status: NO ACTIVE CLAIM — `M67` is merged; three of its four rows had a wrong PREMISE, not merely a wrong remedy
 
-Taken 2026-09-03. Branch `m67-batched-rows`, cut from `origin/main` at `3550d8c`, PR into `main`.
-Numbers derived by `php scripts/state.php`, never read from prose. `docs/backlog-triage.md` was
-regenerated before picking; the batch is its greedy suggestion **checked**, and the regeneration moved
-exactly one line (the provenance sha), so the ranking was already current.
+`M67` closed **four** rows and filed **two**, so the open count moved 85 → 83 and stayed at **zero
+`major`**. `state.php` counts the tree; do not take that sentence's arithmetic on trust.
 
-**Rows** — `D13` width, no two sharing a non-hub file, exactly one touching a hub file:
+⚠️ **THE ONE THING `M67` WOULD MOST LIKE TO HAND ON: CHECK THE PREMISE, NOT ONLY THE EVIDENCE AND THE
+REMEDY.** `M66` found two of four remedies wrong and said so. `M67` checked one level further back and
+**three of four rows failed at the premise** — the sentence the row reasons *from*, before it reaches
+evidence or remedy. Each failure changed what the fix is:
 
-| | Row | Filed | Non-hub files |
-|---|---|---|---|
-| `R1` | `/api/v1/submissions/{submission}/promote` documents no 409 at all, and three causes reach it | `M12` | *hub: `openapi.json`* |
-| `R2` | The authenticated autosave's 409 branch tells a `submission_conflict` caller "already been submitted" | `M14` | `resources/js/composables/useServerAutosave.ts` |
-| `R3` | `routes/api.php` describes a middleware ordering the priority sorter does not produce | `M34` | `routes/api.php` |
-| `R4` | `GET /admin/users` — the cross-tenant user list — has exactly one test, and it is a 200 | `M35` | `tests/Feature/Admin/SuperAdminConsoleTest.php` |
+1. **A remedy can be absent rather than wrong.** `R1` prescribed *"a `@response` annotation per cause"*.
+   That is not a feature of the installed Scramble at all. Reading the vendor rather than the row produced
+   a different and general mechanism — `@throws` on the action plus an `ExceptionToResponseExtension` —
+   and *neither half alone does anything*, which was measured in both directions before it was kept.
+2. **A row can name a cause that cannot reach the thing it is about.** `R2` led with the *content* 409
+   cause; that cause is raised by one service and suspended for drafts, so it can never arrive on the
+   endpoint the row is filed against. Mapping it — the obvious fix — would have documented a refusal the
+   channel cannot produce.
+3. **A row can pose a decision that has only one defensible answer.** `R3` offered *strike the claim* or
+   *hoist the gate*; the tree already argued against hoisting, in a comment the row had not read. Filing
+   that as a decision would have parked a five-minute edit indefinitely.
 
-### Evidence verified
+⚠️ **AND THE HARDEST-EARNED ONE, WHICH IS ABOUT VERIFYING RATHER THAN ABOUT ROWS: a per-directory Pest run
+is not a smaller version of the suite, it is a different question.** `M67`'s first CI run died before any
+test executed on a duplicate global function name one directory away. No amount of care inside
+`tests/Feature/Admin` could have seen it.
 
-- **`R1` — HELD, and the row UNDERSTATES ITSELF.** `openapi.json` lists exactly `200 / 403 / 404` for
-  that operation; confirmed by parsing the committed document rather than reading it. ⚠️ **The row
-  names three causes and there are five**, found by opening the citation and reading what sits beside
-  it: `409 submission_version_superseded` · `409 draft_conflict` · **`403 form_closed`** ·
-  **`403 max_responses_reached`** · **`422 submission_invalid`**. Two of those the row does not
-  mention at all.
-- **`R2` — EVIDENCE HELD, PREMISE FALSE ON THE HALF IT LEADS WITH.** The 409 branch really does split
-  two ways. But the row says *"the entitlement and content causes both get the finalized sentence"*,
-  and the **content** cause cannot reach this endpoint: `contentConflict()` is raised only by
-  `SubmissionPipeline` and is deliberately suspended for drafts. The row was filed before `M14` gave
-  the entitlement cause its own code, and nothing re-read it afterwards.
-- **`R3` — HELD by reading, to be re-confirmed by execution. Citation DRIFTED**: the row cites
-  `routes/api.php:114-116` and the comment now sits further down. Not re-cited by line.
-- **`R4` — HELD, TWICE OVER. Citation DRIFTED**: the row cites `SuperAdminConsoleTest.php:100`, which
-  `M66` turned into an unrelated assertion. The one `assertOk()` is real, and a repo-wide grep for the
-  URI returns **zero** hits — the request is built through a closure, so a naive search cannot see it,
-  which is itself why the gap survived.
-
-### Remedy verdict
-
-- **`R1` — WRONG, and structurally so.** The row prescribes *"a `@response` annotation per cause"*.
-  Scramble v0.13.30 has no such annotation. Read from the installed vendor: `PhpDocHandler::leave()`
-  appends every `@throws` tag on a class method to `$methodType->exceptions`, and
-  `Extensions/ExceptionToResponseExtension` turns that type into a documented response — so the
-  mechanism is **`@throws` in the action plus an exception-to-response extension**, the same shape
-  `ModuleDisabledResponseExtension` already takes. ⛔ **And a hand edit to `openapi.json` cannot work
-  at all**: the Contract job exports fresh and `diff -u`s it against the committed file.
-- **`R2` — NONE OFFERED**, so nothing to disprove. The obligation was already written down — the draft
-  controller's own comment says *"THREE CAUSES SINCE M11, AND THE COMPOSABLE MUST NOT TREAT THEM
-  ALIKE"* and names all three. Nothing gated the sentence, so the third arm was never grown. `M66`
-  lesson (2) with a different premise.
-- **`R3` — POSED AS A DECISION THAT HAS ONE DEFENSIBLE ANSWER, so I take it rather than file it.**
-  The row offers *strike the claim* or *hoist `api_access` into the priority list*. Hoisting is
-  strictly worse **and the tree already argues why**: `bootstrap/app.php`'s `ThrottleFortifyEndpoints`
-  entry records that a limiter's slot exists to **bound the work**, so putting a tenancy-resolving,
-  database-backed feature gate ahead of the limiter makes an unauthenticated flood pay for that lookup
-  before being limited. → strike the claim, and gate the order that actually resolves.
-- **`R4` — WORKS.** "One increment, one file of behavioural arms, with `M35`'s fixture already in
-  place" is accurate, and the pairing is `M43`'s: `AdminConsoleGateTest` is entirely structural, and a
-  structural gate cannot see a middleware that stops refusing.
-
-Files: `app/Support/OpenApi/SubmissionRefusalResponseExtension.php` (new) · `app/Providers/AppServiceProvider.php` ·
-`app/Http/Controllers/Api/V1/SubmissionPromoteController.php` · `tests/Feature/Api/SubmissionPromoteContractTest.php` (new) ·
-`resources/js/composables/useServerAutosave.ts` · `resources/js/composables/__tests__/useServerAutosave.test.ts` ·
-`routes/api.php` · `tests/Feature/Tenancy/TenancyMiddlewarePriorityTest.php` ·
-`tests/Feature/Admin/SuperAdminConsoleTest.php`.
-
-⚠️ **CLAIM EXTENDED 2026-09-03, BEFORE EITHER FILE WAS OPENED, AND THE REASON IS REUSE RATHER THAN
-SCOPE.** The claim named a NEW `tests/Feature/Api/SubmissionPromoteContractTest.php`. Two files that
-already exist are the right homes and a third file would have been a second description of a rule
-they own: **`tests/Feature/Api/OpenApiContractTest.php`** (which already walks every published error
-body — `M56`'s census — and therefore already asserts the new 409's envelope for free) and
-**`tests/Feature/Api/SubmissionPromoteApiTest.php`** (which holds this route's four behavioural cases
-and has no `409` among them). No new test file is created for `R1`.
-
-Shared artefacts taken: `openapi.json`, `docs/feature-backlog.md`, `docs/backlog-triage.md`, `docs/gate-baselines.md`, `PROGRESS.md` (own block only).
-Paired files taken: none.
-Namespaces spent: nothing from either namespace — no migration, no ADR, no `§D`.
-
-Prediction, written before the run:
-
-| Gate | Predicted |
-|---|---|
-| Contract | **moves** — one operation gains a 409. The only row in the batch that can move it. |
-| PHPStan | **can** move (`app/` and `routes/` both change). To be measured by swapping each changed file to its `origin/main` version and re-analysing — never quoted as a count. |
-| Pint | passes; `passed` to be disbelieved until a deliberately misformatted probe comes back with fixers. |
-| Vitest | file count unchanged — cases go into an existing file. |
-| Pest | up in three directories. |
-| E2E | unreachable by this diff; nothing run, and said so. |
-
-⚠️ **The one I most expect to be wrong: Contract.** The extension is registered globally, so if any
-other action's inference already reaches those exception classes the export moves more than one path.
-The check that catches it is inspecting the regenerated diff before committing it.
-
-⛔ Open decisions: `D1`, `D3`, `D4`, `D8`, `D9`, `D10`, `D11`, `D12`. None re-asked here. `D9` is not
-started. `D13` is answered and proven — the batch size is not revisited.
+⛔ **`D9` must never be started without an explicit answer.** Open decisions: `D1`, `D3`, `D4`, `D8`,
+`D9`, `D10`, `D11`, `D12`. `D12` — whether to end the M-series — is still the one thing that needs the
+user, and `M67` deliberately did not touch it. **`D13` is answered, proven twice, and not to be re-asked.**
 
 ⛔ **RUN `php scripts/state.php` FOR EVERY NUMBER.**
 
 ---
+
+## RELEASED — `M67`, the second batched increment: four rows, three of whose PREMISES were wrong (merged as PR #258, `760efa5`, 6/6 green with real step counts — Static analysis 23 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
+
+**Shipped 2026-09-03.** Branch `m67-batched-rows`. The second increment run at `D13`'s full width.
+
+✅ **EVERY CLAIMED FILE WAS EDITED, AND ONE FILE PAIR WAS ADDED BY A PUSHED CLAIM EXTENSION BEFORE EITHER
+WAS OPENED.** The claim named a new `SubmissionPromoteContractTest.php`; two existing files were the right
+homes, and that was recorded on the trunk rather than confessed here.
+
+### The lesson `M66` handed on, applied one level deeper
+
+`M66` closed on *"the remedy is still the half that is wrong"*. `M67` checked the **premise** as well, and
+**three of four rows fail there rather than at the evidence** — each in a way that changes what the fix is,
+not merely how big it is.
+
+| Row | Evidence | Remedy | Premise |
+|---|---|---|---|
+| `R1` `M12` | ✅ held | ❌ **prescribes a Scramble feature that does not exist** | ⚠️ **understates itself — five causes, not three; one attributed to the wrong guard** |
+| `R2` `M14` | ✅ held | — none offered | ❌ **false on the half it leads with — the named cause cannot reach the endpoint** |
+| `R3` `M34` | ✅ held | ⚠️ **a decision with one defensible answer** | ✅ held (citation drifted) |
+| `R4` `M35` | ✅ held | ✅ works | ✅ held (citation drifted) |
+
+⛔ **`R1`'S REMEDY WAS NOT WRONG, IT WAS ABSENT.** *"A `@response` annotation per cause"* is not a feature
+of the installed Scramble v0.13.30 — read from the vendor rather than assumed. The working seam has two
+halves and needs both: `Infer\Handler\PhpDocHandler::leave()` collects `@throws` tags on the ACTION into the
+method type's exception list, and an `ExceptionToResponseExtension` renders them. **Measured in the correct
+direction before the fix was kept**: with the extension registered and no `@throws`, the fresh export is
+byte-identical to the commit. And a hand edit was never available at all — the Contract job exports fresh
+and `diff -u`s against the commit, so the fix had to be generator-side or nothing.
+
+⛔ **`R2`'S PREMISE IS THE ONE WORTH CARRYING FORWARD.** The row said the *entitlement and content* causes
+both got the finalized sentence. `submission_conflict` is raised only by `SubmissionPipeline` and is
+deliberately suspended for drafts, so it **cannot reach that endpoint** — mapping it, which is what the
+row's framing invites, would have documented a refusal the channel cannot produce. The real defect was
+`submission_uuid_claimed`, which the row never names, and which the draft controller's own comment had
+been naming in a full sentence for two increments: *"THREE CAUSES SINCE M11, AND THE COMPOSABLE MUST NOT
+TREAT THEM ALIKE."* **A comment is not a gate** — that is `M66`'s lesson (2) with a fresh instance.
+
+### The result that matters most
+
+⛔ **EMPTYING `EnsureSuperAdmin`'S `abort_unless` REDDENS SIX CASES IN `SuperAdminConsoleTest` AND ZERO IN
+`AdminConsoleGateTest`.** The structural gate stays **fully green** with the production gate gone. That is
+`M43`'s *"a structural gate can be fully green and entirely decorative"* measured on this exact pair, and
+it is the whole argument for the row `M35` filed and deliberately left.
+
+### Controls — seven, all CAUGHT
+
+Five driven by `scripts/mutate.php`; two reimplement its discipline at the call site (bytes end to end,
+sha256 chain printed, restore in a `finally`, byte comparison) because it cannot drive Vitest — a filed row.
+
+| | Mutation | Result |
+|---|---|---|
+| `MU-A` | the promote `409` removed from `openapi.json` | 3 red |
+| `MU-B` | one documented code string changed | **exactly 1 red** — the status arm stayed green, so the two arms are independent |
+| `MU-C` | both `@throws` deleted | 1 red **on the floor**, which is the anti-decorative arm |
+| `MU-D` | the new autosave arm collapsed into the default | 1 red |
+| `MU-E` | the finalized sentence changed once | **4 red** — proving the fallback reads the map rather than being a second copy |
+| `MU-F` | `ThrottleRequests` un-listed from the priority array | 1 red, the four pre-existing arms green |
+| `MU-G` | `EnsureSuperAdmin` stops refusing | **6 red behavioural / 0 structural** |
+
+### Two things this increment got wrong and caught
+
+⛔ **TWO `R4` CASES PASSED FOR THE WRONG REASON IN THEIR FIRST DRAFT.** With a literal uuid the model-bound
+console routes 404 from `SubstituteBindings` — which is NAMED in the priority array while `superadmin` is
+not — so the refusal came from binding rather than from the gate under test, and the two 404s are
+indistinguishable. Caught by **printing the status and `Location` per route**, not by reading the array.
+Fixture is a real committed tenant now; the general hazard is filed as its own latent row.
+
+⛔ **AND A DEFECT THIS INCREMENT INTRODUCED INTO THE PUBLISHED CONTRACT.** Scramble publishes an action's
+docblock **description** as the operation's `description`, so `R1`'s first draft shipped several paragraphs
+about Scramble's inference machinery into `openapi.json` — and then drifted the Contract gate the moment
+Pint realigned the docblock. **The drift check is what caught it**, which is the argument for running the
+export-and-diff locally rather than trusting the row's own scope. The prose moved into the method body; the
+operation now publishes no description at all, matching its siblings.
+
+### How the prediction fared
+
+| Predicted | Outcome |
+|---|---|
+| Contract moves — one path | ✅ **held.** One path, **zero** components; no `$ref` disturbed, because the extension deliberately defines no `reference()` |
+| PHPStan **can** move; measure, never quote | ✅ **held and measured properly** — changed `app/`/`routes/` files swapped to their `origin/main` versions and re-analysed: **18 before, 18 after, delta exactly zero** |
+| **Pint passes** | ❌ **WRONG.** It flagged two of my files (`fully_qualified_strict_types`, `ordered_imports`, `phpdoc_align`, three more). ⚠️ And `passed` was not believed on its own — a deliberately misformatted probe came back with **nine** fixers first |
+| Vitest file count unchanged | ✅ **held** — 134 files, 2303 tests |
+| Pest up in three directories | ✅ **held** — `Api`, `Tenancy`, `Admin` |
+| E2E unreachable by this diff | ✅ **held** — nothing run, and said so |
+| ⚠️ **Named in advance as most likely wrong: Contract** | ✅ **HELD** — so the flagged prediction was right and an unflagged one was wrong, **the same shape as `M66`** |
+
+### The `D13` measurement, second data point
+
+| | |
+|---|---|
+| `M66` release → `M67` claim (session-start gap) | **45 min** (`M66`: 31 · `D13` mean 65) |
+| claim → last build commit | **39 min** (`M66`: 52) |
+| **Baseline, 4 rows** | **628 min** (4 × 157) |
+| **`D13`'s own model** | 367 min — a 41.6% saving |
+
+⚠️ **`M66` warned that ~82% flatters and that `D13`'s ~42% is the number to plan against. This increment
+was planned against ~42% and came in well under it again** — which is a second data point, not a
+confirmation: these four rows were again selected for **separability**, which still correlates with size.
+The honest reading is unchanged and `D13` is not reopened.
+
+### Rows
+
+Closed `R1`–`R4`. **Filed two**, both the moment they were decided rather than at the end: the promote
+route's remaining `403`/`403`/`422` gaps (with the structural reason the extension cannot narrow a refusal
+family per route), and the binding-before-gate ordering hazard. Open rows **85 → 83**, still **zero
+`major`**. `state.php` counts the tree.
+
+### ⛔ CI CAUGHT A DEFECT THIS INCREMENT'S LOCAL VERIFICATION WAS STRUCTURALLY INCAPABLE OF SEEING
+
+The first CI run's Pest job died **before a single test executed**: `consoleTenant()` was already declared
+in `tests/Feature/Feedback/FeedbackConsoleTest.php`, and **Pest test files share one global function
+namespace**, so redeclaring it is a fatal that takes the whole suite with it.
+
+⚠️ **THE REUSABLE PART IS NOT THE COLLISION, IT IS WHY NO LOCAL RUN COULD HAVE FOUND IT.** Verification
+here was **per-directory** — `pest tests/Feature/Admin`, `.../Api`, `.../Tenancy` — chosen deliberately to
+keep the loop fast. Those two files were therefore never loaded into one process. **Checking the directory
+a file lives in cannot see a collision one directory over**, however carefully it is done. A helper added
+to a Pest test file needs a file-unique name *or* a whole-suite run; a directory run is not a smaller
+version of the suite, it is a different question. A sweep for duplicate global function and dataset names
+across `tests/` now reports none, and is the cheap form of the check.
+
+### ⚠️ TWO MEASUREMENT TRAPS WALKED INTO DURING CLOSE-OUT, BOTH ALREADY ON FILE HERE
+
+1. **A full local Pest run reported `17 failed` and EXITED 0.** The `M58` shape exactly — the exit status
+   of a piped run is not evidence. It was read as a pass for one message before the summary line was
+   actually looked at. ⚠️ **A second run of the same tree came back `4377 passed, 0 failed`, and the pass
+   count rose by exactly 17** — the same tests, passing. They are not nameable after the fact, because the
+   first run's output was captured tail-only. Consistent with `M61`: two consecutive runs on this host are
+   not two measurements of the same thing. **CI's Pest job, on a database built from migrations, is the
+   authority and is green at 11 steps.**
+2. **`grep -c` reported the good news as a failure.** The capture run exited 1 because `grep -c` found
+   **zero** failures, and `grep -c` exits non-zero on no matches — the trap `CLAUDE.md` names in one line
+   (*"`wc -l`, never `grep -c`"*). The background task was reported as *failed* while the suite was clean.
+
+### A fresh instance of an OPEN row, recorded rather than re-filed
+
+Run bare during close-out, `scripts/gate-baselines.php` selected a **`schedule`** run sitting on the
+**previous trunk sha** and wrote it as provenance. Every guard it has passed — the run is successful, on
+`main`, and not a `pull_request` — because none of them compares the run's sha to `origin/main`'s head.
+Only `state.php`'s separate reporter caught it, as a warning rather than a gate.
+
+⚠️ **This is NOT a new row.** `M42`'s open *"`docs/gate-baselines.md` has no staleness signal"* row already
+names this exact remedy as its first option — *"have `gate-baselines.php` refuse to leave a file whose sha
+is not `origin/main`'s head"* — and its own close-out already argued why a raw commit distance
+over-reports. Recorded here as fresh evidence for a row that keeps being right, not filed again.
+The baselines here were regenerated with an explicit `--run=` on `M67`'s own post-merge run.
+
 
 ## RELEASED — `M66`, the first batched increment: four rows, two of whose remedies were wrong (merged as PR #257, `730a2d9`, 6/6 green with real step counts — Static analysis 23 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

@@ -195,9 +195,45 @@ async function handleDrift(conflictCode: string | null = null): Promise<void> {
         await props.client.remint();
         const next = await props.client.fetchSchema();
         emit('reschema', { schema: next, answers: { ...runtime.answers }, conflictCode });
-    } catch {
-        notice.value = { type: 'error', message: 'This form is no longer available.' };
+    } catch (error) {
+        // ⚠️ INCREMENT M66 — THE ERROR IS BOUND NOW, AND THE SENTENCE BELOW USED TO BE THE ONLY ONE. This
+        // `catch` took no argument, so a dropped connection during `remint()` or `fetchSchema()` read as
+        // "This form is no longer available." — a terminal claim about the FORM, made about the NETWORK.
+        //
+        // The split is the one this file already makes 76 lines down (`handleSubmitError`'s tail) and the
+        // one `App.vue:236-242` and `lib/replay.ts` make around this very call pair. `ApiError` means the
+        // server answered; anything else is a raw fetch rejection. Keeping the original sentence on the
+        // `terminal` arm is deliberate — that is the one case it was always true for, and the phrase is
+        // bound to a real 404 everywhere else in the codebase (`GuestDraftResumeController`, `App.vue`).
+        notice.value = {
+            type: 'error',
+            message:
+                error instanceof ApiError && error.normalized.kind === 'terminal'
+                    ? 'This form is no longer available.'
+                    : error instanceof ApiError
+                      ? error.normalized.message
+                      : unreachableRecoveryMessage(),
+        };
     }
+}
+
+/**
+ * The network arm's copy — and the reason it branches is a data question, not a wording one.
+ *
+ * ⛔ "YOUR ANSWERS ARE SAVED ON THIS DEVICE" IS FALSE IN A CONFLICT REVIEW, WHICH IS THE ONE PLACE IT WOULD
+ * MATTER MOST. `handleSubmitError` discards the durable outbox row BEFORE it calls `handleDrift`, and a
+ * resolving session has autosave disabled by construction (`enabled: !props.resolving` above) because the
+ * parked row WAS its durable copy. So when this arm is reached while resolving, the reviewed answers exist
+ * only in memory: reassuring the respondent would be the same class of error as the sentence this
+ * increment removed, pointing the other way.
+ *
+ * The underlying lifecycle defect — that a failed recovery can strand the only copy — is filed rather than
+ * fixed here; it reaches the outbox contract `lib/replay.ts` and the background driver share.
+ */
+function unreachableRecoveryMessage(): string {
+    return props.resolving
+        ? 'We could not reach the server to reload this form. Please keep this page open and try again once you are back online.'
+        : 'We could not reach the server to reload this form. Your answers are saved on this device — please check your connection and try again.';
 }
 
 /**

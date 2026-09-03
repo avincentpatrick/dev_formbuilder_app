@@ -4619,7 +4619,6 @@
         "/submissions/{submission}/promote": {
             "post": {
                 "operationId": "v1.submissions.promote",
-                "description": "\u26d4 THE TWO @throws TAGS BELOW ARE THE DOCUMENTED CONTRACT, NOT COMMENTARY (M67). Scramble infers a\nroute's responses from the CONTROLLER, and this action throws nothing itself \u2014 every refusal comes\nout of `SubmissionDraftService::promote()` one frame down. So the 409 was absent from `openapi.json`\nfor the whole life of the route while three of its causes were normal outcomes, and M12 could add a\nfourth with the document staying byte-identical.\n\n`Infer\\Handler\\PhpDocHandler::leave()` is what reads these tags into the method's exception list;\n{@see \\App\\Support\\OpenApi\\SubmissionRefusalResponseExtension} is what renders them. \u26a0\ufe0f DELETING\nEITHER HALF SILENTLY UN-DOCUMENTS THE STATUS \u2014 proven by mutation rather than assumed, because a\nmissing response reads exactly like a route that cannot refuse.",
                 "summary": "Promote a draft to a submitted response",
                 "tags": [
                     "SubmissionPromote"

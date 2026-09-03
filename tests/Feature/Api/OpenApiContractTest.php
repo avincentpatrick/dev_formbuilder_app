@@ -3,6 +3,10 @@
 declare(strict_types=1);
 
 use App\Enums\DomainEventType;
+use App\Exceptions\Submissions\SubmissionConflictException;
+use App\Exceptions\Submissions\SubmissionException;
+use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Str;
 
 /*
  | Increment E — a cheap in-suite guard on the committed OpenAPI contract (openapi.json). The CI
@@ -303,13 +307,13 @@ it('documents a 409 on every /api/v1 action that declares it can throw one', fun
     // Both are rendered as a 409 by bootstrap/app.php's /api/v1 arm; neither is an HttpException, so
     // nothing else in the Scramble pipeline claims them.
     $conflictExceptions = [
-        App\Exceptions\Submissions\SubmissionConflictException::class,
-        App\Exceptions\Submissions\SubmissionException::class,
+        SubmissionConflictException::class,
+        SubmissionException::class,
     ];
 
     $declaring = [];
 
-    foreach (Illuminate\Support\Facades\Route::getRoutes() as $route) {
+    foreach (Route::getRoutes() as $route) {
         $name = $route->getName();
 
         if (! is_string($name) || ! str_starts_with($name, 'api.v1.')) {
@@ -344,7 +348,7 @@ it('documents a 409 on every /api/v1 action that declares it can throw one', fun
 
         // `api/v1/submissions/{submission}/promote` → `/submissions/{submission}/promote`: the document's
         // paths are relative to the server URL, which already carries the prefix.
-        $declaring['/'.ltrim(Illuminate\Support\Str::after($route->uri(), 'api/v1'), '/')]
+        $declaring['/'.ltrim(Str::after($route->uri(), 'api/v1'), '/')]
             = strtolower((string) collect($route->methods())->first(fn (string $verb): bool => $verb !== 'HEAD'));
     }
 

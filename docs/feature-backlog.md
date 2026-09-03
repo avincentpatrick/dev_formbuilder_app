@@ -1387,7 +1387,30 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   inverting the `preserveState` predicate was predicted to survive on the strength of the existing 422
   cases, and it was CAUGHT by exactly one test, which is how it was discovered that **no existing case ever
   read that predicate at all.** Filed by `M1`.
-- **`minor` · Submit races its own last-chance draft write, and the refusal lands on the Submit.** Filed by
+- ✅ **CLOSED BY `M68` (2026-09-03) — `minor` · ~~Submit races its own last-chance draft write, and the refusal lands on the Submit.~~**
+  `submit()` no longer calls `autosave.dispose()`. The composable gained a pair — `settle()`, which awaits a
+  save already in flight without starting one so `baseline` is the ADVANCED value, and `standDown()`, which
+  tears the loop down writing nothing — and `Encode.vue` uses both. The row's own cheapest option, and it
+  survived inspection.
+  ⛔ **THE ROW UNDERSTATED ITSELF: THERE WERE THREE WRITERS ON A SUCCESSFUL SUBMIT, NOT TWO.**
+  `postKeepalive()` never touches `dirty`, and `dispose()`'s only condition is `dirty || debounceTimer !== null`
+  — so the remount that follows a successful promote ran `onBeforeUnmount(dispose)` and fired the keepalive a
+  SECOND time, against a row the promote had just finalized. Clearing `dirty` in `standDown()` is what makes
+  that unmount a genuine no-op, and it has its own case.
+  ⚠️ **The row's open question is not answered and did not need to be.** Which of the two writers wins is
+  timing; removing one removes the race in every ordering, so pinning an order would have been pinning the
+  scheduler.
+  ⛔ **AND ONE OF THE NEW CASES COULD NOT SEE THE MECHANISM IT NAMED — CAUGHT BY MUTATION, NOT BY READING.**
+  The follow-up-save case typed during an open request and asserted no second write, but typing arms only a
+  debounce TIMER while `pendingWhileInFlight` is set inside `run()`; the debounce has to actually FIRE. Two
+  mutations SURVIVED against it. With the second advance added, dropping `pendingWhileInFlight = false` is
+  CAUGHT — and narrowing `settle()`'s `while` to an `if` still survives, which the comment there now states
+  rather than implying both halves are proven.
+  ➕ **A residual found while scoping this, filed as its own row below**: `dispose()` removes the
+  `beforeunload` listener and nothing re-adds it, so after a refused Submit the browser's leave prompt is
+  gone for the rest of the page's life. Pre-existing, and untouched here.
+  Filed by `M62`.
+  **`minor` · Submit races its own last-chance draft write, and the refusal lands on the Submit.** Filed by
   M62 (2026-09-02), found by opening the row above's citation and reading what sat next to it — **not by
   running it.** `submit()` in `resources/js/Pages/submissions/Encode.vue` calls `autosave.dispose()` and then
   immediately `router.post(…)` carrying `base_content_checksum: autosave.baseline.value`. When the page is
@@ -1404,6 +1427,21 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   change which of the two is refused.** The remedy worth costing first is the cheapest one: `submit()` may
   not need the last-chance write at all, since the POST carries the full answer map anyway and the promote
   branch re-saves it — the comment defending the write says as much. **Live.** Filed by `M62`.
+- **`minor` · After a refused Submit the browser's leave prompt is gone for the rest of the page's life.**
+  Filed by `M68` (2026-09-03), found while scoping the Submit-race row above and deliberately not fixed
+  there. `createServerAutosave()` registers `onBeforeUnload` exactly once at setup, and **both** teardown
+  paths remove it — `dispose()` and, since `M68`, `standDown()`. Nothing ever re-adds it. The answer
+  watcher *does* re-arm the save loop on the next keystroke (it only returns early on `state === 'stopped'`,
+  which neither teardown sets), so autosave itself recovers — but the `beforeunload` handler does not, and
+  that handler is the one carrying `event.preventDefault()`. ⚠️ **So a keyer whose Submit comes back 422
+  keeps typing into a page that still saves and no longer warns them on close**, and the composable's own
+  note calls that prompt *"the guarantee"* to the last-chance POST's *"courtesy"*. **Pre-existing since the
+  listener was added; `M68` did not introduce it and did not widen it** — `standDown()` inherits exactly
+  `dispose()`'s teardown. Not fixed here because the honest remedy is to re-arm on the next dirty edit,
+  which is a lifecycle change to a file whose two teardown paths were the subject of this increment's own
+  mutation pass, and because the neighbouring row about a refused correction's escape route is where the UX
+  half of this belongs. **Live.** Filed by `M68`.
+
 - **`minor` · Nothing offers a way out of a refused correction except a browser reload.** Filed by M62
   (2026-09-02), the moment the scope was decided rather than after. M62 keeps the editor's typed corrections
   on the page and keeps the guard armed, so a second Save is refused too and the only route forward is the
@@ -1485,7 +1523,30 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   correct the seeder's sentence and drop `submissions.create` from the role), so it belongs to the user
   rather than to a defect fix. `SubmissionPolicy::create()`'s own docblock argues the tightening at length
   and notes *"no existing test asserted the old behaviour"*, which is why it went unnoticed. Filed by `M13`. **Live** — the seeded role description and the policy still disagree in the tree, so a reader resolving one against the other gets the wrong answer, judged by `M65`.
-- **`minor` · Neither sync route documents the 403 its in-controller policy gate now returns.** Filed
+- ✅ **CLOSED BY `M68` (2026-09-03) — `minor` · ~~Neither sync route documents the 403 its in-controller policy gate now returns.~~**
+  `GET /sync/manifest` now documents its `403` through the shared `AuthorizationException` component.
+  ⛔ **THE ROW'S PREMISE IS HALF FALSE, AND THE CORRECTION IS WHAT SET THE SCOPE.** Only the `GET` can answer
+  an HTTP 403. `SyncSubmissionController` returns a per-item `error.code: "forbidden"` **inside a 200 body** —
+  it is not a 403 at all, and documenting one on `POST /sync/submissions` would have published a status that
+  route has never returned, which is the defect the `SyncSubmissionResultResource` row below describes
+  pointing the other way. **That half is refined onto that row rather than widened into this one.**
+  ✅ **THE ROW'S STATED BLOCKER WAS TRUE WHEN WRITTEN AND STOPPED BEING TRUE IN `M67`.** It says the honest
+  fix needs *"an annotation mechanism Scramble 0.13 does not offer for arbitrary status codes"*. `M67` built
+  that seam one route over, and half of it already existed for this status:
+  `ApiAuthorizationErrorResponse` extends Scramble's own `AuthorizationExceptionToResponseExtension` and has
+  been registered since `M56`. **So the whole change is one `@throws` tag and no new class**, and the
+  existing `$ref` is reused rather than a second 403 minted.
+  ✅ **MEASURED IN THE CORRECT DIRECTION.** With the tag removed the fresh export drops back to
+  `200/404/422`. `openapi.json` moved by exactly one operation and zero components, every component group
+  byte-identical.
+  ⚠️ **THE COVERAGE WAS NEVER THE GAP; THE DOCUMENT WAS.** A behavioural 403 case has existed in
+  `SyncApiTest` since `M13`. What was missing was a document assertion, so `M67`'s `@throws` route walk was
+  **extracted** rather than copied and now serves both statuses, with each arm keeping its own floor — a
+  shared floor would be satisfied by the other arm's exceptions.
+  ➕ **A MEASURED LIMIT OF THAT SWEEP, filed as its own row below**: it cannot see the loss of ONE of two
+  declared causes, because either tag alone keeps the route in scope and the status documented. Found when
+  a control removing a single `@throws` from the promote action SURVIVED. Filed by `M13`.
+  **`minor` · Neither sync route documents the 403 its in-controller policy gate now returns.** Filed
   2026-08-25 by M13. `openapi.json` lists `200/404/422` for `GET /sync/manifest` and `200/422` for
   `POST /sync/submissions`, while the first can return a `403 forbidden` and the second a per-item
   `error.code: "forbidden"`. Scramble infers a 403 from route **middleware** and does not trace a
@@ -1503,6 +1564,39 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   a client from the contract gets types that fail to deserialise on the first item. **Live**, pre-existing
   since G8b, and the reason M13's per-item error codes could be added without moving the document at all:
   they are not enumerated anywhere. Same `openapi.json`-is-generated constraint as the row above. Filed by `M13`.
+  ➕ **WIDENED BY `M68` (2026-09-03), WHICH TOOK THE 403 ROW ABOVE AND FOUND HALF OF IT BELONGED HERE.**
+  That row's title claims *neither* sync route documents "the 403". Only the `GET` can answer an HTTP 403:
+  `SyncSubmissionController` returns a per-item `error.code: "forbidden"` **inside a 200 body**, and
+  documenting a 403 on `POST /sync/submissions` would have published a status that route has never
+  returned. **So the POST half is not a missing status — it is this row**, one field deeper: `error` is
+  typed as a bare string, so the four codes an integrator must branch on (`forbidden`, `submission_invalid`,
+  `submission_conflict`, plus the unknown-version arm) are not enumerated anywhere in the contract.
+  ⚠️ **AND THE MECHANISM IS NO LONGER MISSING, WHICH CHANGES THIS ROW'S COST RATHER THAN ITS SHAPE.** The
+  reason both rows were parked was *"`openapi.json` is generated and CI diffs it against a fresh export, so
+  a hand edit fails the contract job"* — still true, and no longer the end of the argument: `M67` and `M68`
+  documented two statuses by teaching the GENERATOR, and `SyncSubmissionResultResource` is a
+  `JsonResource` whose `toArray()` Scramble already infers. The candidate is a typed shape on that method
+  rather than an annotation, and it is untried. **Whoever takes it should re-read the 403 row's closure
+  above first**, because the two were filed as one defect and are not one. Filed by `M13`.
+
+- **`minor` · The `@throws` contract sweep cannot see the loss of ONE of two declared causes.**
+  Filed by `M68` (2026-09-03), and **measured rather than predicted: a control removing a single `@throws`
+  tag from `SubmissionPromoteController::store()` SURVIVED with all seven contract cases green.** Both arms
+  of the sweep in `tests/Feature/Api/OpenApiContractTest.php` ask *"does this operation document status
+  N?"*, and the walk keeps a route in scope if it declares **any** of the exceptions in the arm's list — so
+  with `SubmissionConflictException` deleted and `SubmissionException` left in place, the route is still
+  enumerated and the 409 is still published by the surviving tag. Removing **both** is CAUGHT.
+  ⚠️ **What that leaves undetectable is a real regression shape**: an action that used to declare two causes
+  and now declares one still documents its status, so the description Scramble renders narrows silently
+  while the gate stays green. **It is not the same as the extension's own stated limit** — that one is about
+  a route raising a SUBSET of a family's codes, which is a property of the family; this is about the tag
+  list on a single action shrinking. ⛔ **The obvious fix is wrong and is recorded so it is not tried**:
+  asserting one status per declared exception would demand a 409 twice on the same operation and pass
+  vacuously. What would actually catch it is asserting the rendered `code` DESCRIPTION contains each
+  declared cause's code, which means the sweep has to know how `SubmissionRefusalResponseExtension` composes
+  that sentence — coupling a gate to a renderer, and a design decision rather than a fix. **Live.**
+  Filed by `M68`.
+
 - **`minor` · The sync surface's read and write are gated on different permission families, so no single
   non-admin role can complete the offline loop.** Filed 2026-08-25 by M13. `GET /sync/manifest` needs
   `read:forms`, which maps to `forms.create` / `forms.edit.any` / `forms.edit.own` — form **authoring**
@@ -2105,7 +2199,43 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   The code edit and the test edit are the same edit: mount it on Group A, and add a
   `StepUpReauthenticationTest:115`-shaped route manifest so it cannot silently come off again. Group B
   needs no gate — `routes/api.php:80-88`'s "gate the mint, not the bearer" argument applies verbatim. Filed by `M1`.
-- **`minor` · The Fortify group serves tenant subdomains and carries no org-2FA gate, so the mint was not the
+- ✅ **CLOSED BY `M68` (2026-09-03) — `minor` · ~~The Fortify group serves tenant subdomains and carries no org-2FA gate, so the mint was not the only way past it.~~**
+  `EnforceTenantTwoFactorOnFortify` is mounted on `config/fortify.php` and covers
+  `user-profile-information.update` and `user-password.update` — the two routes the row names — by ROUTE
+  NAME, falling through for the other twenty-four.
+  ⛔⛔ **THE REMEDY THE ROW IMPLIES IS IMPOSSIBLE, AND THAT IS MEASURED RATHER THAN ARGUED. IT WAS BUILT
+  FIRST AND THREE BEHAVIOURAL CASES FAILED WITH THE WRITE SUCCEEDING.** Mounting `EnforceTenantTwoFactor`
+  here — per route or group-wide — produces a gate that **cannot ever fire**. This group carries no tenancy
+  middleware at all, so `EstablishTenantDatabaseContext` resolves a **null** tenant and
+  `TenantSettingRegistry::all()` returns `[]` with no ambient tenant: `security.require_two_factor` reads as
+  its sparse default, `false`, for every workspace in the deployment. **Mounted, green, permanently blind.**
+  ⚠️ **AND FAILING THAT WAY IS NOT AN ACCIDENT OF THIS KEY.** Under `settings`'s nullable_global SELECT
+  policy a tenant's own rows are INVISIBLE rather than absent without its context, so the fallback is silent
+  by construction. **`RegistrationGate` hit the identical wall on `/register`** and
+  `TenantSettingRegistry::forTenant()` exists because of it — so the answer was already in the tree, one
+  entry away in the same config array: resolve the workspace from the HOST (`PlatformHost::tenantFor()`) and
+  read through `getFor()`. The policy is extracted to `TwoFactorEnforcementGate` so this surface and the
+  tenant group cannot answer differently; `EnforceTenantTwoFactor` keeps its docblock and its mount and
+  loses only the decision.
+  ⛔ **THE ROW NAMES ONE CARVE-OUT AND THERE ARE THREE.** The 2FA enrolment routes (the row's);
+  **`POST /logout`**, which `EnforceTenantTwoFactor`'s own docblock names in terms — *"do not 'tidy' it
+  inside"* — because "enrol or leave" needs two doors; and **`password.confirm.store`**, because
+  `twoFactorAuthentication(['confirmPassword' => true])` routes enrolment through the step-up, measured on
+  the live route table where `two-factor.enable` carries `RequirePassword`. A group-level mount passes both
+  refusal cases and breaks all three.
+  ✅ **ORDERING MEASURED, NOT REASONED (`M43`).** Printed from `Router::gatherRouteMiddleware()` with the
+  entry present and then removed: unlisted in `priority()` puts it at position 14, after `Authenticate:web`
+  (5) and `EstablishTenantDatabaseContext` (7). **No `priority()` entry is needed** — the prediction that one
+  would be was wrong in the other direction.
+  ✅ **Four controls, and the arms separate.** Unmounting reddens the three refusals plus the coverage file's
+  mount control and leaves the list arms green; swapping `blocksForHost()` for `blocksAmbient()` — the blind
+  gate above — reddens the three refusals alone; moving `logout` into the gated list reddens its carve-out
+  case and the both-lists arm; removing a live write route from the decision list reddens the accounting arm
+  alone.
+  ⚠️ **IT DOES NOT CLOSE THE MAIL-CANNON ROW ON THE SAME ROUTE**, which the row itself warns about. That is a
+  rate limit and its remedy is a `RateLimiter::for()` plus a `ThrottleFortifyEndpoints::limiters()` entry; it
+  stays open. Filed by `M66`.
+  **`minor` · The Fortify group serves tenant subdomains and carries no org-2FA gate, so the mint was not the
   only way past it.** Found while closing the row directly above, which named one route. `config/fortify.php`
   registers Fortify's routes in their own group — `web`, `RequirePlatformHost`, `AppSecurityHeaders`,
   `GateRegistration`, `ThrottleFortifyEndpoints`, `EstablishTenantDatabaseContext` — with no
@@ -2118,6 +2248,26 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   reasons: the writes are scoped to the actor's own account and the password route re-challenges. ⚠️ **A
   neighbour row already covers `PUT /user/profile-information` from the mail-cannon angle; read both before
   taking either.** **Live.** Filed by `M66`.
+- **`minor` · Any tenant-scoped policy read mounted on the Fortify group is silently blind, and two increments have now walked into it.**
+  Filed by `M68` (2026-09-03) at the moment it walked into it, having cost a full build-and-fail cycle.
+  `config/fortify.php`'s group carries no tenancy middleware at all, so `EstablishTenantDatabaseContext`
+  resolves a **null** tenant there and `TenantSettingRegistry::all()` returns `[]`. Every key then reads as
+  its sparse default — for `security.require_two_factor` that is `false`, so the gate `M68` mounted
+  answered "not required" for every workspace in the deployment while being correctly mounted and fully
+  green. ⛔ **The failure is silent BY CONSTRUCTION, not by oversight**: under `settings`'s nullable_global
+  SELECT policy a tenant's own rows are INVISIBLE rather than absent without its context, so there is no
+  error to see and no row count to check. **`RegistrationGate` hit the identical wall on `/register` in I5**
+  — its docblock and `TenantSettingRegistry::forTenant()` both record it — and `M68` hit it again anyway,
+  which is what makes this a class rather than an incident. ⚠️ **What exists now is two correct examples and
+  no mechanism**: `RegistrationGate` and `TwoFactorEnforcementGate` both resolve the workspace from the HOST
+  and read through `getFor()`, and each says so in prose that the next author has to happen to read.
+  **The candidate remedies, neither obviously right:** have `TenantSettingRegistry::get()`/`all()` refuse
+  rather than return `[]` when no tenant is bound — which is fail-loud but would break every legitimate
+  central-host caller — or add a `#[RequiresTenantContext]`-style assertion the Fortify-group middlewares
+  can carry. **Not live** — no defect is open in the tree today; both known readers are correct. Filed as a
+  trap because it has now produced a wrong implementation twice and the second one was green.
+  Filed by `M68`.
+
 - ✅ **CLOSED BY `M66` (2026-09-03) — `minor` · ~~Three admin POSTs bind `{tenant}` with no `whereUuid`.~~**
   `suspend`, `reactivate` and `assign-plan` now carry `->whereUuid('tenant')` like the `show` and
   `impersonate` routes around them, so a malformed id 404s instead of raising SQLSTATE 22P02. The row's
@@ -2427,6 +2577,25 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   that shipped covers the cheap half only and must not be read as closing the class. Filed by `M23`.
 
 ### Test suite & CI gates
+
+- **`minor` · A SUCCESSFUL password confirmation is unreachable from the Pest harness, so nothing asserts one.**
+  Filed by `M68` (2026-09-03), found when a case asserting `assertSessionHasNoErrors()` on
+  `POST /user/confirm-password` failed with *"The provided password was incorrect"* against a user the
+  factory had created with that exact password. **The cause is structural, not a fixture mistake:**
+  `config/auth.php`'s provider is `rls_aware`, so `RlsAwareUserProvider` resolves the user on the SEPARATE
+  `pgsql_auth` connection — and Fortify's default `ConfirmPassword` action calls `$guard->validate()`, which
+  goes through that provider. Under `RefreshDatabase` the whole test is one open transaction on the DEFAULT
+  connection, which a second session cannot see, so the lookup finds no row and the answer is always
+  "incorrect". It is the same separate-session trap `FortifyRouteContextTest::rereadUser()`'s docblock
+  records from the other direction. ⚠️ **AND THE EXISTING COVERAGE READS AS THOUGH IT PROVED OTHERWISE**:
+  `FortifyRateLimitTest` posts a correct password and asserts `assertStatus(302)`, which a *failed*
+  confirmation also returns — so that file is unaffected for its own purpose (302 vs 429) while looking like
+  a positive control for the credential path. **Nothing in the repository asserts that a correct password
+  confirms.** `M68` worked around it by asserting the gate rather than the credential, which is the right
+  scope for that file and leaves this open. **The remedy is a choice**: commit the fixture user outside the
+  transaction, or bind the auth provider to the default connection under test. **Live** — as a coverage
+  hole rather than a product defect: the step-up path is exercised in production and by the E2E suite, and
+  it is the unit-level positive control that cannot exist. Filed by `M68`.
 
 - **`minor` · `deploy.yml`'s effective trigger CHANGED in `M39`, and nothing says so at the site.**
   It fires on `workflow_run` of CI `completed` on `main` gated on `conclusion == 'success'`. Before `M39`
@@ -4339,7 +4508,34 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   an absent marker as dead would stop nearly everything and make the driver useless rather than careful.
   ⚠️ **So this raised a floor rather than closing a hole**, and the eligible count is a shortlist for a
   human, never a work queue. **Not live** — both are stated limits of a tool, not defects in it. ➕ **`M65` CLOSED THE SILENCE HALF OF (2).** Every open row now records a verdict and the marker is gated, so an unmarked row is a failing test rather than something this driver has to be careful around — and `assess` now refuses MORE rows than before, which is the stop rule finally having something to read on every row rather than the driver degrading. The remedy-cost blind spot in (1) is untouched and stands.
-- **`minor` · §20's `settings.key` catalog omits `security.require_two_factor`.**
+- ✅ **CLOSED BY `M68` (2026-09-03) — `minor` · ~~§20's `settings.key` catalog omits `security.require_two_factor`.~~**
+  Both §20 passages are corrected and held against the enum by
+  `tests/Feature/Docs/DocumentedSettingKeyDriftTest.php`.
+  ⛔ **THE ROW UNDERSTATES ITSELF IN TWO DIRECTIONS.** It names one omission in one place. §20 omits the key
+  in **two** places, and the second omits a **second** key: the `key` column's *"As built (I5)"* list was
+  missing `security.require_two_factor`, and Design Note 2's defaults list was missing **both**
+  `security.require_two_factor ⇒ false` **and** `maintenance.message ⇒ ''`. `SettingKey` has five cases and
+  §20 named three of the five defaults.
+  ⚠️ **AND THE "As built (I5)" LABEL WAS ITSELF PART OF THE DEFECT** — the missing key arrived in I8a, so
+  adding it under an I5 heading would have replaced one false statement with another. The label now names
+  both increments.
+  ✅ **A PEST TEST AND NOT A SIXTH LINT SCRIPT (`M58`).** `php artisan test` already discovers
+  `tests/Feature`, so it needs no `composer.json` alias, no `quality` entry and no `ci.yml` step — and
+  `scripts/mutate.php` drives Pest in a container and nothing else, so a script would have had to
+  reimplement that harness by hand. Three arms, each comparing two sets for EQUALITY in both directions
+  (`M56`: a containment check passes over a document naming a key the enum does not have): membership, the
+  tenant/platform side, and the resolved defaults.
+  ✅ **Five controls, and the arms separate.** Removing the key from the `key` row reddens membership AND
+  side; removing it from the defaults paragraph reddens defaults alone; flipping a documented default VALUE
+  reddens defaults alone; documenting a key the enum lacks reddens membership alone; and the DISCRIMINATOR —
+  moving a **correct** key to the wrong side — reddens the side arm alone, which is what proves that arm is
+  not decoration.
+  ⚠️ **The gate found its own defect first, which is the `M43` trap arriving through a parser.**
+  `toHaveKey`'s second argument is the expected VALUE, not a message, so the first draft asserted that the
+  vocabulary mapped a key to a whole sentence and went red against a document that was CORRECT. Both sites
+  now use `array_key_exists()` with `toBeTrue()`, and the reason is written beside them.
+  ⚠️ **`docs/data-dictionary.md`'s line count is unchanged**, so no citation into it rotted. Filed by `M1`.
+  **`minor` · §20's `settings.key` catalog omits `security.require_two_factor`.**
   `docs/data-dictionary.md:838`, rewritten in this branch — the key is live
   (`app/Enums/SettingKey.php:42`, tenant-scoped at `:85`, written by `UpdateAccessSettingsRequest.php:60`,
   enforced by `EnforceTenantTwoFactor`'s `settings->get(SettingKey::SecurityRequireTwoFactor)` read). Anyone inventorying tenant configuration from the

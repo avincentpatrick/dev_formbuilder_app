@@ -2889,21 +2889,41 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   **~60–100 s** — the new console case is 59.4 s and the *pre-existing* M34 tenant-side twin is 97.5 s — so
   the cost is the error-page render and not this increment. `withoutVite()` is **not** the cause; adding it
   made the case slower (82 s). The pattern should not be multiplied casually. Filed by `M34`.
-- **`minor` · `GET /admin/users` — the cross-tenant user list — has exactly one test, and it is a 200.**
-  Found by M35's census of what the console's fourteen routes are actually driven by.
-  `SuperAdminConsoleTest.php:100` requests it as an enrolled super-admin and asserts `assertOk()`; **no
-  request to that URI is ever refused, by any caller, in any suite** — no guest, no non-super-admin, no
-  un-enrolled operator, no stale confirmation. It reads every user in the deployment through the
-  `superadmin_bypass` RLS carve-out, which is a wider read than the feedback screenshot M35 closed.
-  ⚠️ **STATED WEAKNESS, in the M20 discipline and for the same reason the row above carried one:** since M35
-  the four gates on this route are pinned STRUCTURALLY by `AdminConsoleGateTest`, and six sibling pages carry
-  behavioural denials against the same group — so this is a missing behavioural arm on a route whose
-  middleware is now enumerated, not an open door. Filed `minor` for that reason and not lower, because a
-  structural gate cannot see a middleware that stops refusing.
-  **Left unfixed by M35 deliberately**: it is `tests/Feature/Admin/SuperAdminConsoleTest.php`, which that
-  increment's diff does not touch, and the same is true of the three other console routes that have positive
-  requests and no denials of their own — `admin.tenants.reactivate`, `admin.tenants.assign-plan` and
-  `admin.feedback.update`. One increment, one file of behavioural arms, with M35's fixture already in place. Filed by `M35`. **Live** — the cross-tenant user list still carries exactly one assertion, and it is a 200, judged by `M65`.
+- ✅ **CLOSED BY `M67` (2026-09-03) — `minor` · ~~`GET /admin/users` — the cross-tenant user list — has exactly one test, and it is a 200.~~**
+  Sixteen behavioural denials added, driven from a dataset over **all four** routes the row named — guest,
+  authenticated non-super-admin (404, non-disclosure), super-admin without confirmed 2FA, and a lapsed
+  password confirmation.
+  ⛔ **THE PAIRING WAS PROVED, NOT ASSERTED, AND THE RESULT IS THE ROW'S WHOLE ARGUMENT.** Emptying
+  `EnsureSuperAdmin`'s `abort_unless` reddens **six** cases in `SuperAdminConsoleTest` and **zero** in
+  `AdminConsoleGateTest`, which stays fully green with the production gate gone. That is `M43`'s lesson
+  measured on this pair: a structural gate cannot see a middleware that stops refusing.
+  ⚠️ **MEASURED COST, AGAINST `M34`'S WARNING ON THIS FILE:** sixteen cases add **~4 s** (15.7 s → 20.0 s),
+  not the 60–100 s an error-page render costs here. The expensive shape is the rendered error page; a
+  middleware refusal never reaches one.
+  ⛔ **AND TWO OF THESE CASES PASSED FOR THE WRONG REASON IN THEIR FIRST DRAFT.** With a literal uuid the
+  two model-bound tenant routes 404 from `SubstituteBindings` — which is NAMED in the priority array while
+  `superadmin` is not — so the refusal came from binding rather than from the gate under test, and the two
+  404s are indistinguishable. Caught by printing the status and `Location` per route. The fixture is a real
+  committed tenant now; the general hazard is filed as its own row below.
+  ⚠️ **The row's citation had drifted** (`M66` grew this file), and a repo-wide grep for the URI returns
+  zero hits because the request is built through a closure — which is how the gap survived a census.
+  Filed by `M35`.
+
+- **`minor` · Route-model binding resolves BEFORE the three console gates, so a synthetic id 404s from the
+  binding rather than from the middleware a test names.**
+  Filed 2026-09-03 by `M67`, which hit it while writing the row above. `SubstituteBindings` is named in
+  `bootstrap/app.php`'s `$middleware->priority([...])` array; `superadmin`, `superadmin.mfa` and `step-up`
+  are not, and `SortedMiddleware` hoists listed classes past unlisted ones — so on any console route with a
+  bound `{tenant}`, binding runs first. **Not a production defect**, and that was checked rather than
+  assumed: the binding 404 and the gate 404 are the same status and the same non-disclosure answer, and
+  `auth` sorts ahead of both, so a guest is still redirected. What it is, is a **test-construction hazard
+  that hides itself** — a denial case written with an arbitrary uuid is green whether the gate refuses or
+  not. **Latent**: no test in the tree is currently affected (`SuperAdminConsoleTest`'s malformed-id case
+  refuses at the route constraint, and its suspend case uses a real tenant), so the precondition is *the
+  next denial case written against a model-bound console route with a synthetic id*. The durable fix is
+  probably naming the three console aliases in the priority array so declared order is resolved order,
+  which is a change to the console's middleware pipeline and wants its own increment. Filed by `M67`.
+
 
 - ✅ **CLOSED BY `M63` (2026-09-02) — `minor` · ~~The `can:` arm on `GET /api/v1/analytics/report` — the non-export twin — is asserted by nothing.~~**
   Three cases added to `AnalyticsApiTest`, which until now had **no policy-refusal case at all** — its only

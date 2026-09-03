@@ -117,3 +117,74 @@ it('lists all users for a confirmed super-admin', function () use ($adminUrl): v
     // specific rows belongs in the DB-level SuperAdminBypassTest.
     $this->actingAs($admin)->get($adminUrl('/users'))->assertOk();
 });
+
+/*
+|--------------------------------------------------------------------------
+| Increment M67 — the behavioural denials the console's four gates were missing.
+|--------------------------------------------------------------------------
+| ⛔ WHY THIS IS NOT REDUNDANT WITH `AdminConsoleGateTest`, WHICH IS THE POINT (M43). That file is ENTIRELY
+| STRUCTURAL: every case sweeps the route table and asserts which middleware each console route is DECLARED
+| with. A structural gate cannot see a middleware that stops refusing — empty the body of `superadmin` and
+| all of it stays green, because the entry is still on the route. Until now `GET /admin/users` had no
+| behavioural half at all: exactly one test, and it was a 200, on the widest cross-tenant read in the
+| deployment.
+|
+| ⚠️ AND THE ROW WAS RIGHT THAT IT IS NOT ALONE — `admin.tenants.reactivate`, `admin.tenants.assign-plan`
+| and `admin.feedback.update` had positive requests and no denials of their own either. Driven from a
+| dataset over all four, so a sweep reddens for a member it never names.
+|
+| ⛔⛔ THE PARAMETERISED ROUTES NEED A REAL TENANT, AND AN ARBITRARY UUID MADE TWO OF THESE CASES PASS FOR
+| THE WRONG REASON. `SubstituteBindings` is NAMED in bootstrap/app.php's priority array; `superadmin`,
+| `superadmin.mfa` and `step-up` are not — and SortedMiddleware hoists the listed classes past the unlisted
+| ones. So route-model binding runs BEFORE all three console gates, and a non-existent `{tenant}` 404s from
+| the binding rather than from the gate under test. That 404 is indistinguishable from `superadmin`'s, so
+| the non-disclosure case would have been green on two routes without ever reaching the middleware it names
+| — measured, by printing the status and Location per route, not reasoned. The tenant is therefore real and
+| every refusal below is the gate's own.
+|
+| `admin.feedback.update` takes a RAW uuid by design (its route comment says why), so it needs no row.
+*/
+
+/** The four console routes with no behavioural denial of their own, as verb + path-builder. */
+dataset('undenied console routes', [
+    'the cross-tenant user list' => ['get', fn (): string => '/users'],
+    'tenant reactivate' => ['post', fn (): string => '/tenants/'.consoleTenant()->id.'/reactivate'],
+    'tenant plan assignment' => ['post', fn (): string => '/tenants/'.consoleTenant()->id.'/plan'],
+    'feedback triage update' => ['patch', fn (): string => '/feedback/0f6f8b5e-1a2b-4c3d-8e9f-0a1b2c3d4e5f'],
+]);
+
+/** A committed tenant for the two model-bound routes — see the block comment for why it cannot be a literal. */
+function consoleTenant(): Tenant
+{
+    return Tenant::firstOrCreate(['slug' => 'console-fixture'], ['name' => 'Console Fixture', 'status' => 'active']);
+}
+
+it('redirects a guest away from every console route', function (string $verb, Closure $path) use ($adminUrl): void {
+    $this->{$verb}($adminUrl($path()))->assertRedirect();
+})->with('undenied console routes');
+
+it('404s an authenticated non-super-admin on every console route (non-disclosure)', function (string $verb, Closure $path) use ($adminUrl): void {
+    // 404 and not 403, deliberately: a 403 would confirm the route exists.
+    $this->actingAs(User::factory()->create())
+        ->{$verb}($adminUrl($path()))
+        ->assertNotFound();
+})->with('undenied console routes');
+
+it('redirects a super-admin without confirmed 2FA to enrollment on every console route', function (string $verb, Closure $path) use ($adminUrl): void {
+    // `superadmin.mfa` runs ahead of `step-up`, so this is the redirect even though the beforeEach above
+    // has already confirmed a password — mandatory MFA (security §8) is the outer of the two.
+    $this->actingAs(User::factory()->superAdmin()->create())
+        ->{$verb}($adminUrl($path()))
+        ->assertRedirect(route('admin.mfa.setup'));
+})->with('undenied console routes');
+
+it('sends a super-admin whose password confirmation has lapsed to the step-up on every console route', function (string $verb, Closure $path) use ($adminUrl): void {
+    // ⚠️ THE ONE CASE THAT MUST UNDO THE `beforeEach`. Every other test here calls confirmPasswordNow();
+    // the whole point of this one is that the window has closed, so the confirmation is pushed back past
+    // it. Without this line the request sails through `step-up` and 200s.
+    confirmPasswordNow(secondsAgo: 4 * 3600);
+
+    $this->actingAs(User::factory()->superAdmin()->confirmedTwoFactor()->create())
+        ->{$verb}($adminUrl($path()))
+        ->assertRedirect(route('password.confirm'));
+})->with('undenied console routes');

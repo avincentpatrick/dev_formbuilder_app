@@ -425,6 +425,45 @@ describe('useServerAutosave — P3a lost-update baseline', () => {
     });
 
     /*
+     * Increment M67 — the THIRD cause, which this channel has been able to return since M11.
+     *
+     * ⛔ THE ASSERTIONS ARE ON THE MESSAGE, NOT THE STATE, AND THAT IS THE WHOLE POINT. All three causes end
+     * in `stopped`, so a case asserting the state passes identically whether the arm exists or not — which
+     * is how the missing arm survived two increments of green.
+     */
+    it('tells an unmatched identifier apart from an already-submitted draft', async () => {
+        const post = vi.fn(async () => conflict('submission_uuid_claimed'));
+        const { autosave, answers } = harness({ post });
+
+        answers.a = '1';
+        await nextTick();
+        await vi.advanceTimersByTimeAsync(150);
+
+        expect(autosave.state.value).toBe('stopped');
+        // ENTITLEMENT, not timing. Nothing was submitted, and saying so sends the keyer looking for a
+        // submission that is not theirs; the sentence must name the identifier and what still helps.
+        expect(autosave.message.value).toContain('could not be matched');
+        expect(autosave.message.value).not.toContain('already been submitted');
+        // ...and it must not borrow the OTHER cause's remedy either: reloading to pick up newer answers is
+        // the draft_conflict fix, and there are no newer answers here.
+        expect(autosave.message.value).not.toContain('pick up the newer answers');
+    });
+
+    it('falls back to the finalized sentence for a cause this build has never heard of', async () => {
+        // A server-side cause added ahead of the front end. Of the sentences available, the one that is safe
+        // when wrong is the one true of EVERY cause: the loop has stopped and this is no longer being saved.
+        const post = vi.fn(async () => conflict('some_future_cause'));
+        const { autosave, answers } = harness({ post });
+
+        answers.a = '1';
+        await nextTick();
+        await vi.advanceTimersByTimeAsync(150);
+
+        expect(autosave.state.value).toBe('stopped');
+        expect(autosave.message.value).toContain('already been submitted');
+    });
+
+    /*
      * Increment M62 — dispose() must not RACE the save it is disposing.
      *
      * `send()` clears `dirty` at its top and advances `baseline` only on a 200. So everything typed WHILE a

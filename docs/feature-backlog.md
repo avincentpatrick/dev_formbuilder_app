@@ -1143,12 +1143,24 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `conflict_code` into **user-visible copy input** (`lib/conflict-notice.ts` keys the respondent's sentence
   off it), so this literal is no longer a debug tag. Nothing is wrong now; the hazard is that the next person
   to add a client-side park has to know that. **Not live — a maintenance trap.** Filed by `M14`. **Not live** — the hardcoded literal is reached only on an actual version change, which is the one case it names correctly, judged by `M65`.
-- **`minor` · The authenticated autosave's 409 branch tells a `submission_conflict` caller "already been
-  submitted".** `resources/js/composables/useServerAutosave.ts:196-213` splits two ways — `draft_conflict`
-  versus everything else — so the entitlement and content causes both get the finalized sentence, which is
-  the guest-side defect M14 closed, one channel over. It is a smaller harm (the encode surface is staffed,
-  not public) and **`resources/js/composables/` is in NEITHER lane's column under Standing Rule 7(b)**, so
-  M14 declined it rather than claiming a directory for a `minor`. **Live.** Filed by `M14`.
+- ✅ **CLOSED BY `M67` (2026-09-03) — `minor` · ~~The authenticated autosave's 409 branch tells a
+  `submission_conflict` caller "already been submitted".~~** The binary split is now a keyed map over the
+  three codes this channel can return, with the finalized sentence as an explicit default for a cause the
+  build has never heard of.
+  ⛔ **THE ROW'S PREMISE WAS FALSE ON THE HALF IT LED WITH, AND IT CHANGED THE FIX.** It named the
+  **entitlement and content** causes. `submission_conflict` — the content cause — **cannot reach this
+  endpoint at all**: it is raised only by `SubmissionPipeline` and is deliberately suspended for drafts. So
+  the map does NOT carry it; adding it would have documented a refusal this channel cannot produce, which is
+  the naive fix the row invites. The one real defect was `submission_uuid_claimed`, which the row does not
+  name — it was filed before `M14` split that code out, and nothing re-read it afterwards.
+  ⚠️ **THE OBLIGATION WAS ALREADY WRITTEN DOWN.** `SubmissionDraftController::store()` says *"THREE CAUSES
+  SINCE M11, AND THE COMPOSABLE MUST NOT TREAT THEM ALIKE"* and names all three. A comment is not a gate;
+  the arm was missing for two increments with a full sentence beside it saying so.
+  ✅ **The sibling channel was checked and is NOT affected**: Submit is a web `router.post`, and
+  `bootstrap/app.php`'s non-API arm toasts `$e->getMessage()`, which is per-cause already.
+  ⚠️ Proved by mutation, not by green: collapsing the new arm reddens exactly one case, and changing the
+  finalized sentence once reddens **four** — which is how the fallback is shown to read the map rather than
+  being a second copy of the string. Filed by `M14`.
 - ✅ **CLOSED BY `M15` (2026-08-26) — `major` · ~~The device-wide outbox is mounted above the phase machine
   on an unauthenticated page.~~** Filed 2026-08-25. **Every file:line in the row was verified before it was
   planned against, and four of six had drifted** — all of them caused by M14 growing `App.vue`:
@@ -1515,16 +1527,38 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   alongside M12's; the reason to weigh it rather than do it is that neither `form_versions` nor `forms` is
   locked there, so a re-read is a narrowing rather than a closure — unlike M12's, whose authority comes from
   the `submissions` row lock every writer of that document holds. Filed by `M12`.
-- **`minor` · `/api/v1/submissions/{submission}/promote` documents no 409 at all, and three causes reach it.**
-  Filed 2026-08-25 by M12. `openapi.json` lists `200/404/403` for that route, while
-  `SubmissionDraftService::promote()` can raise `submission_version_superseded` (H9b),
-  `max_responses_reached` (H12a, a 403 with a body the document does not describe either) and — since M12 —
-  `draft_conflict`. Scramble infers from the CONTROLLER's own returns, which is why a service-thrown
-  exception has never appeared there and why M12 could add a cause with the document staying byte-identical.
-  So an integrator building against the contract has no reason to handle a refusal that is a normal outcome.
-  **Live**, pre-existing, and deliberately not fixed in M12: `openapi.json` is a Standing-Rule-7(b) NEITHER
-  artefact, so moving it needs its own claim, and the honest fix is a `@response` annotation per cause rather
-  than a hand edit. Filed by `M12`.
+- ✅ **CLOSED BY `M67` (2026-09-03) — `minor` · ~~`/api/v1/submissions/{submission}/promote` documents no 409 at all, and three causes reach it.~~**
+  The operation now documents a `409` naming `draft_conflict` and `submission_version_superseded`, and the
+  route has its first behavioural `409` case beside the document assertion.
+  ⛔ **THE PRESCRIBED REMEDY DID NOT EXIST.** *"A `@response` annotation per cause"* is not a feature of the
+  installed Scramble (v0.13.30) — read from the vendor rather than assumed. The real seam has two halves and
+  needs both: `Infer\Handler\PhpDocHandler::leave()` collects `@throws` tags on the ACTION into the method
+  type's exception list, and an `ExceptionToResponseExtension` renders them. Neither half alone does
+  anything, which was **measured in the correct direction before the fix was kept**: with the extension
+  registered and no `@throws`, the fresh export is byte-identical to the commit.
+  ⚠️ **AND THE ROW UNDERSTATED ITSELF — it names three causes and there are five**, one of them attributed
+  to the wrong guard (`assertCanPromote()` raises `closed()`, not `max_responses_reached`, which arrives a
+  layer further down through `SubmissionFinalizer`). The two undocumented statuses that remain are filed as
+  their own row below rather than widened into this change. `openapi.json` moved by exactly one path and
+  zero components; a hand edit was never possible, because the Contract job exports fresh and diffs.
+  Filed by `M12`.
+
+- **`minor` · The promote route still documents neither of its two 403 causes nor its 422, and the
+  generator cannot narrow a refusal family to one route.**
+  Filed 2026-09-03 by `M67`, which documented the 409 beside these and deliberately stopped there.
+  `POST /api/v1/submissions/{submission}/promote` can also answer **`403 form_closed`** (via
+  `FormAcceptanceGuard::assertCanPromote()`), **`403 max_responses_reached`** (via
+  `SubmissionFinalizer::finalize()` → `assertCapacity()`) and **`422 submission_invalid`**
+  (`SubmissionValidationException::semantic()`). The document lists a `403` — but it is Scramble's generic
+  `can:` inference, whose code description does not name either cause, and no `422` at all.
+  **Live.** Two reasons it was not folded into `M67`: the 403 arm would have to merge with an existing
+  documented response rather than add one, which is how a documentation fix becomes an unreviewed contract
+  change (the guard `ModuleDisabledResponseExtension` exists for); and the deeper limit is structural —
+  `SubmissionRefusalResponseExtension` is keyed on the exception CLASS and cannot know which of a family's
+  causes a given route raises, so `M67`'s 409 honestly says an operation raises a subset. Narrowing per
+  route needs a cause-level seam Scramble does not have; inventing one is a design decision, not a fix.
+  Filed by `M67`.
+
 - **`minor` · Four P3a refusal cases assert the exception CLASS and never the message.**
   `tests/Feature/Submissions/SubmissionDraftServiceTest.php` — the P3a section's `toThrow(
   SubmissionConflictException::class)` calls. Filed 2026-08-25 by M12, which is the second increment running
@@ -2855,21 +2889,41 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   **~60–100 s** — the new console case is 59.4 s and the *pre-existing* M34 tenant-side twin is 97.5 s — so
   the cost is the error-page render and not this increment. `withoutVite()` is **not** the cause; adding it
   made the case slower (82 s). The pattern should not be multiplied casually. Filed by `M34`.
-- **`minor` · `GET /admin/users` — the cross-tenant user list — has exactly one test, and it is a 200.**
-  Found by M35's census of what the console's fourteen routes are actually driven by.
-  `SuperAdminConsoleTest.php:100` requests it as an enrolled super-admin and asserts `assertOk()`; **no
-  request to that URI is ever refused, by any caller, in any suite** — no guest, no non-super-admin, no
-  un-enrolled operator, no stale confirmation. It reads every user in the deployment through the
-  `superadmin_bypass` RLS carve-out, which is a wider read than the feedback screenshot M35 closed.
-  ⚠️ **STATED WEAKNESS, in the M20 discipline and for the same reason the row above carried one:** since M35
-  the four gates on this route are pinned STRUCTURALLY by `AdminConsoleGateTest`, and six sibling pages carry
-  behavioural denials against the same group — so this is a missing behavioural arm on a route whose
-  middleware is now enumerated, not an open door. Filed `minor` for that reason and not lower, because a
-  structural gate cannot see a middleware that stops refusing.
-  **Left unfixed by M35 deliberately**: it is `tests/Feature/Admin/SuperAdminConsoleTest.php`, which that
-  increment's diff does not touch, and the same is true of the three other console routes that have positive
-  requests and no denials of their own — `admin.tenants.reactivate`, `admin.tenants.assign-plan` and
-  `admin.feedback.update`. One increment, one file of behavioural arms, with M35's fixture already in place. Filed by `M35`. **Live** — the cross-tenant user list still carries exactly one assertion, and it is a 200, judged by `M65`.
+- ✅ **CLOSED BY `M67` (2026-09-03) — `minor` · ~~`GET /admin/users` — the cross-tenant user list — has exactly one test, and it is a 200.~~**
+  Sixteen behavioural denials added, driven from a dataset over **all four** routes the row named — guest,
+  authenticated non-super-admin (404, non-disclosure), super-admin without confirmed 2FA, and a lapsed
+  password confirmation.
+  ⛔ **THE PAIRING WAS PROVED, NOT ASSERTED, AND THE RESULT IS THE ROW'S WHOLE ARGUMENT.** Emptying
+  `EnsureSuperAdmin`'s `abort_unless` reddens **six** cases in `SuperAdminConsoleTest` and **zero** in
+  `AdminConsoleGateTest`, which stays fully green with the production gate gone. That is `M43`'s lesson
+  measured on this pair: a structural gate cannot see a middleware that stops refusing.
+  ⚠️ **MEASURED COST, AGAINST `M34`'S WARNING ON THIS FILE:** sixteen cases add **~4 s** (15.7 s → 20.0 s),
+  not the 60–100 s an error-page render costs here. The expensive shape is the rendered error page; a
+  middleware refusal never reaches one.
+  ⛔ **AND TWO OF THESE CASES PASSED FOR THE WRONG REASON IN THEIR FIRST DRAFT.** With a literal uuid the
+  two model-bound tenant routes 404 from `SubstituteBindings` — which is NAMED in the priority array while
+  `superadmin` is not — so the refusal came from binding rather than from the gate under test, and the two
+  404s are indistinguishable. Caught by printing the status and `Location` per route. The fixture is a real
+  committed tenant now; the general hazard is filed as its own row below.
+  ⚠️ **The row's citation had drifted** (`M66` grew this file), and a repo-wide grep for the URI returns
+  zero hits because the request is built through a closure — which is how the gap survived a census.
+  Filed by `M35`.
+
+- **`minor` · Route-model binding resolves BEFORE the three console gates, so a synthetic id 404s from the
+  binding rather than from the middleware a test names.**
+  Filed 2026-09-03 by `M67`, which hit it while writing the row above. `SubstituteBindings` is named in
+  `bootstrap/app.php`'s `$middleware->priority([...])` array; `superadmin`, `superadmin.mfa` and `step-up`
+  are not, and `SortedMiddleware` hoists listed classes past unlisted ones — so on any console route with a
+  bound `{tenant}`, binding runs first. **Not a production defect**, and that was checked rather than
+  assumed: the binding 404 and the gate 404 are the same status and the same non-disclosure answer, and
+  `auth` sorts ahead of both, so a guest is still redirected. What it is, is a **test-construction hazard
+  that hides itself** — a denial case written with an arbitrary uuid is green whether the gate refuses or
+  not. **Latent**: no test in the tree is currently affected (`SuperAdminConsoleTest`'s malformed-id case
+  refuses at the route constraint, and its suspend case uses a real tenant), so the precondition is *the
+  next denial case written against a model-bound console route with a synthetic id*. The durable fix is
+  probably naming the three console aliases in the priority array so declared order is resolved order,
+  which is a change to the console's middleware pipeline and wants its own increment. Filed by `M67`.
+
 
 - ✅ **CLOSED BY `M63` (2026-09-02) — `minor` · ~~The `can:` arm on `GET /api/v1/analytics/report` — the non-export twin — is asserted by nothing.~~**
   Three cases added to `AnalyticsApiTest`, which until now had **no policy-refusal case at all** — its only
@@ -3095,7 +3149,22 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   and settling it is the job of whichever increment takes it. **Not live** — a stated limit of the gate,
   filed so the next reader does not have to rediscover it. Filed by `M65`.
 
-- **`minor` · `routes/api.php:114-116` describes a middleware ordering the priority sorter does not produce.**
+- ✅ **CLOSED BY `M67` (2026-09-03) — `minor` · ~~`routes/api.php:114-116` describes a middleware ordering the priority sorter does not produce.~~**
+  The claim is struck and the real order is now asserted, by execution rather than by reading:
+  `TenancyMiddlewarePriorityTest` sorts the RESOLVED stack for `api.v1.submissions.promote` and requires
+  `ThrottleRequests` ahead of `RequireFeature`.
+  ⛔ **THE ROW POSED A DECISION AND IT HAS ONE DEFENSIBLE ANSWER, so `M67` took it rather than filing it.**
+  Making the comment true means hoisting the feature gate ABOVE the limiter, which puts a
+  tenancy-resolving, database-backed lookup in front of it — an unauthenticated flood would then pay for
+  that lookup before being limited. `bootstrap/app.php`'s own `ThrottleFortifyEndpoints` entry already
+  argues the principle (`M43`): what a limiter's slot buys is BOUNDING THE WORK. The claim was the defect.
+  ⚠️ **THE ROW'S CITATION HAD DRIFTED** — the comment had moved down the file — which is why it is not
+  re-cited by line here. ✅ **Checked for siblings and there are none**: the only other occurrences of the
+  phrase are quotations of it (this row, `lane-b.md`'s historical record, and the new test's rationale).
+  ⚠️ Proved by mutation: un-listing `ThrottleRequests` from the priority array reddens the new arm and
+  leaves the four pre-existing ones green.
+
+  ⓘ The original row, kept for its evidence and for the filer of record below:
   Re-read at source rather than taken from the report: the comment states that `feature:api_access` runs *"before throttle so a no-feature tenant is refused before
   consuming a burst slot"*. **Measured with `route:list`, which prints the SORTED list: `ThrottleRequests:api`
   is hoisted to FIRST**, ahead of tenancy, auth and the feature gate — so a no-feature tenant **does** consume

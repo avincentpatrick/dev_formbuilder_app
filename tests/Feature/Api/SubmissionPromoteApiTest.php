@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\FieldType;
+use App\Enums\FormVersionStatus;
 use App\Enums\RequiredMode;
 use App\Enums\SubmissionSource;
 use App\Enums\SubmissionStatus;
@@ -149,4 +150,40 @@ it('403s a member without submission-authoring permission (can:promote)', functi
     $this->withToken($token)
         ->postJson("http://acme.meridian.test/api/v1/submissions/{$draft->id}/promote")
         ->assertForbidden();
+});
+
+it('409s a draft pinned to a version the form has republished past', function (): void {
+    // ⛔ M67. THE DOCUMENTED HALF WITHOUT THIS IS DECORATIVE, WHICH IS M43'S LESSON RATHER THAN A
+    // PRECAUTION. This increment gave the route its missing `409` in `openapi.json`; a contract that
+    // promises a refusal with nothing proving the route emits it is a promise the next refactor can
+    // break in silence. `OpenApiContractTest` asserts the document, this asserts the wire, and neither
+    // can pass for the other's reason.
+    //
+    // ⚠️ THE VERSION IS SUPERSEDED BY A REAL REPUBLISH, NOT BY WRITING THE COLUMN. `PublishService`
+    // flips the outgoing version to `superseded` as part of publishing the next draft, so staging it any
+    // other way would test a state the application never actually produces.
+    $tenant = promoteTenant();
+    enterTenant($tenant->id);
+    $admin = User::factory()->create();
+    enterTenant($tenant->id, $admin->id);
+    makeActiveMember($admin, 'admin');
+    $form = promoteForm($tenant, $admin);
+    $draft = stagedDraft($form);
+
+    $pinned = FormVersion::findOrFail($form->current_published_version_id);
+    addFormField($form->refresh()->draftVersion, $admin, 'phone', FieldType::ShortText, 1);
+    app(PublishService::class)->publish($form->refresh(), $admin);
+    expect(FormVersion::findOrFail($pinned->id)->status)->toBe(FormVersionStatus::Superseded);
+
+    $token = $admin->createToken('write', [ApiAbilities::WRITE_SUBMISSIONS])->plainTextToken;
+
+    $this->withToken($token)
+        ->postJson("http://acme.meridian.test/api/v1/submissions/{$draft->id}/promote")
+        ->assertStatus(409)
+        // The CODE, not the message: it is the only thing separating this refusal from the three the
+        // conflict family raises at the same status, and it is what the contract now publishes.
+        ->assertJsonPath('error.code', 'submission_version_superseded');
+
+    enterTenant($tenant->id);
+    expect(Submission::query()->findOrFail($draft->id)->status)->toBe(SubmissionStatus::Draft);
 });

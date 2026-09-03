@@ -128,9 +128,26 @@ Route::prefix('api/v1')
         PreventAccessFromCentralDomains::class,
         EstablishTenantDatabaseContext::class,
         AuthenticateApiToken::class,
-        // api_access feature-gate (H5c) — gates the WHOLE token-consumed REST API. Immediately after auth
-        // (tenant context is set; a 401 for no-token precedes a 402 for no-feature) and before throttle so a
-        // no-feature tenant is refused before consuming a burst slot. A grandfathered tenant's override passes.
+        // api_access feature-gate (H5c) — gates the WHOLE token-consumed REST API. Declared after auth, so
+        // a 401 for no-token precedes a 402 for no-feature and the tenant context is already set. A
+        // grandfathered tenant's override passes.
+        //
+        // ⛔ THIS COMMENT USED TO CLAIM THE GATE RAN *"BEFORE THROTTLE, SO A NO-FEATURE TENANT IS REFUSED
+        // BEFORE CONSUMING A BURST SLOT"*, AND THAT PROTECTION HAS NEVER EXISTED (M34 filed it, M67 struck
+        // it). `ThrottleRequests` is named in bootstrap/app.php's priority array and `RequireFeature` is
+        // not, and SortedMiddleware hoists the LISTED classes past the unlisted ones — so the limiter
+        // resolves FIRST, ahead of tenancy, auth and this gate alike. A no-feature tenant does consume a
+        // slot. Harmless (the slot is a rate-limit bucket, not data), which is exactly why nothing caught it.
+        //
+        // ⚠️ STRUCK RATHER THAN MADE TRUE, AND THE REASON IS IN THE ARRAY IT WOULD HAVE TO MOVE. Making the
+        // old claim true means hoisting this gate ABOVE the limiter, which puts a tenancy-resolving,
+        // database-backed lookup in front of it — so an unauthenticated flood pays for that lookup before
+        // being limited. bootstrap/app.php's ThrottleFortifyEndpoints entry already argues the principle:
+        // what a limiter's slot buys is BOUNDING THE WORK. The claim was the defect, not the ordering.
+        //
+        // The resolved order is asserted by TenancyMiddlewarePriorityTest, because a comment describing a
+        // control that is not there is worse than no comment — it is what the next reader checks instead of
+        // the middleware.
         'feature:api_access',
         'throttle:api',
         // Monthly api_requests quota (H5c) — 429 when the metered current-period usage has reached the plan

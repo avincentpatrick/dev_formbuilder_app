@@ -4665,6 +4665,67 @@
                             }
                         }
                     },
+                    "409": {
+                        "description": "The request conflicts with the stored state of this submission. The causes are separate refusals with separate remedies: branch on `error.code`, never on the message.\n\nThe form version this submission is pinned to is no longer published.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "anyOf": [
+                                        {
+                                            "type": "object",
+                                            "properties": {
+                                                "error": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "code": {
+                                                            "type": "string",
+                                                            "description": "One of this refusal family: `draft_conflict` (another device wrote this draft between the read and this call \u2014 re-read the draft and keep the same `client_submission_uuid`), `draft_already_finalized` (the row is no longer a draft and can never be saved as one again), `submission_uuid_claimed` (the identifier is already spent in this workspace on a row outside your scope \u2014 mint a fresh one), or `submission_conflict` (a copy with materially different answers is already stored under this identifier). \u26a0\ufe0f A given operation raises a SUBSET of these \u2014 the set is a property of the refusal family, not of any one route \u2014 so treat an unrecognised code as a refusal that must not be retried."
+                                                        },
+                                                        "message": {
+                                                            "type": "string",
+                                                            "description": "Human-readable English overview, for developer and support consumption. Never shown to a respondent \u2014 the public runtime renders its own localized copy keyed by `code`."
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "code",
+                                                        "message"
+                                                    ]
+                                                }
+                                            },
+                                            "required": [
+                                                "error"
+                                            ]
+                                        },
+                                        {
+                                            "type": "object",
+                                            "properties": {
+                                                "error": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "code": {
+                                                            "type": "string",
+                                                            "description": "Always `submission_version_superseded` \u2014 the form version this submission is pinned to is no longer published, so finalizing it would commit against a schema the form has moved past."
+                                                        },
+                                                        "message": {
+                                                            "type": "string",
+                                                            "description": "Human-readable English overview, for developer and support consumption. Never shown to a respondent \u2014 the public runtime renders its own localized copy keyed by `code`."
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "code",
+                                                        "message"
+                                                    ]
+                                                }
+                                            },
+                                            "required": [
+                                                "error"
+                                            ]
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    },
                     "404": {
                         "$ref": "#/components/responses/ModelNotFoundException"
                     },

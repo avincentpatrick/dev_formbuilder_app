@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Enums\DomainEventType;
 use App\Exceptions\Submissions\SubmissionConflictException;
 use App\Exceptions\Submissions\SubmissionException;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 
@@ -292,25 +293,29 @@ it('documents the 409 the promote route can actually answer, and names its cause
     }
 });
 
-it('documents a 409 on every /api/v1 action that declares it can throw one', function (): void {
-    // ⚠️ THE SWEEP RATHER THAN THE ONE ROUTE, because the row was an instance and not the class: the
-    // annotation is the ONLY signal Scramble has for a service-thrown refusal, so the next action to
-    // declare one documents its 409 without anyone remembering to — or fails here.
-    //
-    // ⛔ AND THE FLOOR IS THE ARM THAT MATTERS. Deleting the `@throws` tags empties this walk, and a loop
-    // over nothing reports success — the exact shape CLAUDE.md records for every gate that scans a tree.
-    // The floor is what turns that deletion red, and it is the mutation that proved this test is not
-    // decorative. `>=` so adding a route cannot redden it.
-    /** @var array<string, mixed> $spec */
-    $spec = json_decode((string) file_get_contents(base_path('openapi.json')), true, flags: JSON_THROW_ON_ERROR);
-
-    // Both are rendered as a 409 by bootstrap/app.php's /api/v1 arm; neither is an HttpException, so
-    // nothing else in the Scramble pipeline claims them.
-    $conflictExceptions = [
-        SubmissionConflictException::class,
-        SubmissionException::class,
-    ];
-
+/**
+ * Every `/api/v1` action whose docblock declares it can throw one of the given exceptions.
+ *
+ * ⚠️ THE SWEEP RATHER THAN THE ONE ROUTE, because each row that produced an arm below was an instance
+ * and not the class: a `@throws` annotation is the ONLY signal Scramble has for a refusal raised
+ * anywhere but the action's own frame, so the next action to declare one documents its status without
+ * anyone remembering to — or fails here.
+ *
+ * ⛔ EXTRACTED IN M68 RATHER THAN COPIED. M67 built this walk for the 409; `M68` needed exactly it for
+ * the 403, and two copies of a route walk is how the two arms come to disagree about which routes are
+ * in scope. The FLOOR deliberately did NOT move in here with it — each arm keeps its own, because a
+ * floor inside the helper would be satisfied by the *other* arm's exceptions and every assertion in
+ * the empty arm would go vacuous while the shared floor stayed green.
+ *
+ * Matched on the SHORT name, which is what both spellings end in: an imported `@throws Foo` and a
+ * fully-qualified `@throws \App\Exceptions\Submissions\Foo` both contain it, so one arm covers both and
+ * no backslash needs writing here.
+ *
+ * @param  list<class-string<Throwable>>  $exceptions
+ * @return array<string, string> document path => lowercase HTTP verb
+ */
+function contractActionsDeclaringThrows(array $exceptions): array
+{
     $declaring = [];
 
     foreach (Route::getRoutes() as $route) {
@@ -334,15 +339,12 @@ it('documents a 409 on every /api/v1 action that declares it can throw one', fun
 
         $doc = (string) (new ReflectionMethod($class, $method))->getDocComment();
 
-        // Matched on the SHORT name, which is what both spellings end in: an imported `@throws Foo` and a
-        // fully-qualified `@throws \App\Exceptions\Submissions\Foo` both contain it, so one arm covers
-        // both and no backslash needs writing here.
-        $throwsConflict = array_filter(
-            $conflictExceptions,
+        $declared = array_filter(
+            $exceptions,
             fn (string $exception): bool => str_contains($doc, '@throws '.class_basename($exception))
         );
 
-        if ($throwsConflict === []) {
+        if ($declared === []) {
             continue;
         }
 
@@ -352,19 +354,119 @@ it('documents a 409 on every /api/v1 action that declares it can throw one', fun
             = strtolower((string) collect($route->methods())->first(fn (string $verb): bool => $verb !== 'HEAD'));
     }
 
+    return $declaring;
+}
+
+/**
+ * The committed contract, decoded once per arm. No DB, no Vite — it reads one file.
+ *
+ * @return array<string, mixed>
+ */
+function contractSpec(): array
+{
+    /** @var array<string, mixed> $spec */
+    $spec = json_decode((string) file_get_contents(base_path('openapi.json')), true, flags: JSON_THROW_ON_ERROR);
+
+    return $spec;
+}
+
+/**
+ * The status codes the contract publishes for one operation, as strings.
+ *
+ * @return list<string>
+ */
+function contractStatusesFor(array $spec, string $path, string $verb): array
+{
+    return array_map('strval', array_keys($spec['paths'][$path][$verb]['responses'] ?? []));
+}
+
+it('documents a 409 on every /api/v1 action that declares it can throw one', function (): void {
+    // ⛔ THE FLOOR IS THE ARM THAT MATTERS. Deleting the `@throws` tags empties this walk, and a loop
+    // over nothing reports success — the exact shape CLAUDE.md records for every gate that scans a tree.
+    // The floor is what turns that deletion red, and it is the mutation that proved this test is not
+    // decorative. `>=` so adding a route cannot redden it.
+    $spec = contractSpec();
+
+    // Both are rendered as a 409 by bootstrap/app.php's /api/v1 arm; neither is an HttpException, so
+    // nothing else in the Scramble pipeline claims them.
+    $declaring = contractActionsDeclaringThrows([
+        SubmissionConflictException::class,
+        SubmissionException::class,
+    ]);
+
     expect(count($declaring))->toBeGreaterThanOrEqual(
         1,
         'no /api/v1 action declares @throws for a submission refusal — the walk matched nothing, so every assertion below is vacuous'
     );
 
     foreach ($declaring as $path => $verb) {
-        $statuses = array_map('strval', array_keys($spec['paths'][$path][$verb]['responses'] ?? []));
-
         // ⛔ NOT `toContain('409', $why)`. That expectation takes VARIADIC NEEDLES, so the explanation
         // would become a second thing the array must contain — the M30 trap, which kept a case green with
         // the wrong value in it. The message belongs on an expectation whose second argument IS a message.
-        expect(in_array('409', $statuses, true))->toBeTrue(
+        expect(in_array('409', contractStatusesFor($spec, $path, $verb), true))->toBeTrue(
             strtoupper($verb)." {$path} declares it can throw a submission refusal but documents no 409 — add the exception to the @throws block, then re-export openapi.json"
+        );
+    }
+});
+
+/*
+ | M68 — the 403 half, and the reason it needs an arm of its own rather than a wider exception list.
+ |
+ | Scramble infers a 403 from `can:` / `Authorize::` MIDDLEWARE (`ErrorResponsesExtension`, v0.13.30) and
+ | does not trace a `Gate::forUser()->authorize()` call in an action body. Two /api/v1 routes put the gate
+ | in the body deliberately, because neither is resource-bound — the subject arrives as a query parameter
+ | or in the request payload, so there is nothing for a `can:` middleware to bind to. `GET /sync/manifest`
+ | was one, and its 403 went undocumented from G8b until here while a behavioural test for it had existed
+ | since M13. THE COVERAGE WAS NEVER THE GAP; THE DOCUMENT WAS.
+ |
+ | ⚠️ AND THE SIBLING ROUTE THE ROW NAMED IS NOT IN SCOPE, WHICH IS A CORRECTION TO THE ROW AND NOT AN
+ | OMISSION HERE. `POST /sync/submissions` answers a per-item `error.code: "forbidden"` inside a **200**
+ | body — it is not a 403 at all — so this arm must not reach it, and the walk cannot: it keys on a
+ | `@throws` tag, and that route throws nothing.
+ */
+it('documents a 403 on every /api/v1 action that declares it can throw an authorization refusal', function (): void {
+    $spec = contractSpec();
+
+    $declaring = contractActionsDeclaringThrows([AuthorizationException::class]);
+
+    expect(count($declaring))->toBeGreaterThanOrEqual(
+        1,
+        'no /api/v1 action declares @throws AuthorizationException — the walk matched nothing, so every assertion below is vacuous'
+    );
+
+    foreach ($declaring as $path => $verb) {
+        expect(in_array('403', contractStatusesFor($spec, $path, $verb), true))->toBeTrue(
+            strtoupper($verb)." {$path} declares it can throw an authorization refusal but documents no 403 — add the exception to the @throws block, then re-export openapi.json"
+        );
+    }
+});
+
+/*
+ | ⛔ THE PAIRING, DEMONSTRATED RATHER THAN ASSERTED (M43). The arm above proves the STATUS is published;
+ | this one proves it is published through the SHARED component. They fail on different mutations: remove
+ | the `@throws` tag and the arm above goes red; register a bespoke 403 extension carrying its own inline
+ | body and the arm above stays green while this one goes red. A structural gate that cannot separate
+ | those two is the decorative kind.
+ |
+ | `ApiAuthorizationErrorResponse` (M56) exists so that all 113 `$ref` strings on this surface stay
+ | byte-identical, and it earns that only if new 403s keep arriving through it.
+ */
+it('publishes the in-body authorization 403 through the shared component, not an inline body', function (): void {
+    $spec = contractSpec();
+
+    $declaring = contractActionsDeclaringThrows([AuthorizationException::class]);
+
+    expect(count($declaring))->toBeGreaterThanOrEqual(
+        1,
+        'no /api/v1 action declares @throws AuthorizationException — this arm is vacuous'
+    );
+
+    foreach ($declaring as $path => $verb) {
+        $response = $spec['paths'][$path][$verb]['responses']['403'] ?? null;
+
+        expect($response)->toBe(
+            ['$ref' => '#/components/responses/AuthorizationException'],
+            strtoupper($verb)." {$path} publishes a 403 that is not a plain \$ref to the shared AuthorizationException component. An inline body here would fork the /api/v1 error envelope that ApiAuthorizationErrorResponse exists to keep single."
         );
     }
 });

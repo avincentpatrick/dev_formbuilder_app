@@ -580,5 +580,15 @@ Route::prefix('api/v1/public')
         'feature:save_and_resume',
     ])
     ->group(function (): void {
+        // ⛔ THE `drafts/` PREFIX IS LOAD-BEARING AND IS THE ONLY THING KEEPING THIS OUT OF CACHE STORAGE.
+        // This is a GET answering with the respondent's FULL answer map, and sw.ts NetworkFirst-caches
+        // GETs under `/api/v1/public/f/` — so moving this route under `f/`, or consolidating this group
+        // with the share-token group above, would put a complete answer document into `guest-shell-html`
+        // for seven days. Same hazard the POST-not-GET note on the challenge route records, reached from
+        // the other side: there the verb is what saves it, here it is the path.
+        // ⚠️ The resume PAGE (`/f/resume/{resumeToken}`, routes/tenant.php) is a different matter and IS
+        // cached — its HTML carries `data-resume-token`. lib/brand-cache.ts's `isResumeShell()` stops the
+        // brand sweep renewing that entry; nothing stops the initial cache write, deliberately, because
+        // purging it would cost offline access to a primed form.
         Route::get('drafts/{resumeToken}', [GuestDraftResumeController::class, 'show'])->name('drafts.resume');
     });

@@ -117,12 +117,20 @@ function render_line(string $lane, array $state): string
     $upper = strtoupper($lane);
     $decisions = $state['decisions']['open'];
 
+    // ⛔ THE EFFECTIVE COUNT, NOT THE RAW ONE (M70). A commit inside `ci.yml`'s `paths-ignore` produces
+    //    NO RUN AT ALL and therefore cannot have invalidated the baselines — and a close-out is four or
+    //    five such commits, so the raw number told every incoming session the file was stale on the one
+    //    occasion it provably was not. Both are named here, because a single number leaves a reader
+    //    unable to tell a quiet trunk from a parser that harvested nothing.
+    $effectiveBehind = $state['baselines']['commits_behind_effective'] ?? $state['baselines']['commits_behind_main'];
+
     $baselines = $state['baselines']['commits_behind_main'] === null
         ? 'docs/gate-baselines.md carries no measurable provenance — regenerate it'
         : sprintf(
-            'docs/gate-baselines.md is %d commit(s) behind the trunk%s',
+            'docs/gate-baselines.md is %d commit(s) behind the trunk that could produce a CI run, of %d raw%s',
+            $effectiveBehind,
             $state['baselines']['commits_behind_main'],
-            $state['baselines']['commits_behind_main'] > 0 ? ' and should be regenerated' : '',
+            $effectiveBehind > 0 ? ' — regenerate it' : '',
         );
 
     $parts = [

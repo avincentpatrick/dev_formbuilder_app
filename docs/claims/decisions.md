@@ -23,6 +23,53 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
+### D14 — The compliance spec promised audit events for deleting and restoring a submission, and there is no delete or restore surface at all. Build it, or record it as not built?
+
+**Filed 2026-09-04 by Lane A, during `M70`, at the moment the row's deciding premise was falsified.**
+Promoted out of `docs/feature-backlog.md` rather than taken as a row, because the row `M46` filed asks
+which of two directions is right and **both of them are product calls**, not cleanups.
+
+⛔ **THE ROW'S DECIDING PREMISE IS FALSE, AND THAT IS WHAT MAKES THIS A DECISION RATHER THAN A FIX.**
+`M46` filed it as *"the honest answer may be 'these are owed, build them' rather than 'delete them from
+the document'"*, which presumes the events are an omission at an existing call site. **There is no call
+site and no surface.** Verified twice, independently: `SubmissionPolicy` declares `create`, `viewAny`,
+`view`, `export`, `review`, `update`, `promote` — no `delete`, no `restore`, no `forceDelete`;
+`RolePermissionSeeder` mints no `submissions.delete`; **zero** routes in `routes/` match such a verb;
+there is no controller action and no UI affordance under `resources/js/Pages/submissions/`. `deleted_at`
+exists on the table and is dormant, and `ClientUuidResolver::isClaimed()` already says so in terms:
+*"Nothing soft-deletes a submission today"*.
+
+⚠️ **The one path that does remove a submission cannot write these rows and must not be made to.**
+`ReapTenantDraftsJob` **hard**-deletes abandoned drafts, deliberately — a soft-delete tombstone would
+keep `client_submission_uuid` reserved against the partial unique index, which its own docblock explains
+— and it runs as a queue job, where `AuditLogger` hard-codes `is_system_action = false` and would
+resolve a null actor off a worker. That is the same malformed shape the `domain` row's *"deliberate
+gaps"* note already refuses `activate`/`deactivate` for.
+
+- **A — record it as not built, and leave the surface unbuilt.** `M70` has already narrowed §1's
+  `submission` row this way, saying *why* in the cell rather than going quiet, because a downstream SIEM
+  forwarder or retention rule built from that section would otherwise read a bare removal as a decision
+  that destroying a response needs no trail. Costs nothing further. **Against it:** a compliance
+  document that describes a product with no way to delete a response is only honest for as long as that
+  stays true, and the first customer asking for erasure changes it.
+- **B — build the surface, and owe the two events.** Policy methods, a `submissions.delete` permission
+  across six roles, routes, a controller, a trash view, and the audit calls inside the same transaction
+  as the state change. ⚠️ **The unpriced part is not the CRUD**: soft-deleting a submission makes
+  `ReapTenantDraftsJob`'s stated reason for hard-deleting a live conflict — a tombstone keeps the
+  client uuid reserved, so a respondent's retry against a deleted submission meets a unique-index
+  violation rather than a clean claim. `ClientUuidResolver::withTrashed()` becomes reachable behaviour
+  rather than a guard. That is a correctness surface, not a screen.
+- **C — restore only, for the reaper.** Rejected before it is proposed, and recorded so it is not: the
+  reaper hard-deletes, so there is nothing to restore, and giving it a soft-delete to undo re-opens B's
+  uniqueness problem with none of B's user-facing value.
+
+**Recommendation: A**, and not merely as the cheap option. Erasure of a submitted response is a data
+subject's request in GDPR terms, not a tidy-up — it interacts with retention, with export, with the
+`audits` ledger's own append-only guarantee, and with whatever the platform promises a form's
+respondents. That belongs with the held GDPR/legal work and to a deliberate design, not to a batched
+row closing a documentation over-claim. ⚠️ **If B is ever taken, the uniqueness interaction is the part
+to settle first** — it is the half that is invisible in the ticket and expensive in the code.
+
 ### D12 — `D5`'s bar is now measurable, and it reads MET by nine increments rather than three. End the M-series, or keep going?
 
 **Filed 2026-09-02 by Lane A, during `M64`, at the moment the bar became computable.** This is not a

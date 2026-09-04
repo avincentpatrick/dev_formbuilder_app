@@ -7,10 +7,12 @@
  * `guest-shell-html` (sw.ts). So the page a respondent is looking at RIGHT NOW self-heals: any
  * successful online navigation replaces the cache entry with a freshly-branded copy.
  *
- * What does not self-heal is every OTHER `/f/…` shell this device cached earlier — a second form, a
- * resume link — which keeps rendering the superseded brand offline until its 7-day expiry. Those
- * entries are only rewritten when the respondent happens to navigate to them online, which on a
- * field device may be never.
+ * What does not self-heal is every OTHER `/f/…` shell this device cached earlier — a second form —
+ * which keeps rendering the superseded brand offline until its 7-day expiry. Those entries are only
+ * rewritten when the respondent happens to navigate to them online, which on a field device may be
+ * never.
+ *
+ * ⛔ ONE CLASS OF SHELL IS DELIBERATELY LEFT TO GO STALE: a resume link. See `isResumeShell()`.
  *
  * ── RE-PRIME, NEVER PURGE, AND THIS IS THE WHOLE DESIGN ───────────────────────────────────────────
  * `caches.delete('guest-shell-html')` is the obvious fix and it is the wrong one. A stale brand is
@@ -101,7 +103,39 @@ export async function syncBrandedShellCache(deps: BrandCacheDeps): Promise<Brand
 }
 
 /**
- * Re-fetch and re-`put` every cached guest shell except the current one.
+ * Is this cached shell a resume link, whose HTML carries a credential?
+ *
+ * ⛔ A resume shell's body carries `data-resume-token` (`public-runtime.blade.php`), and that token
+ * is the whole credential for `GET /api/v1/public/drafts/{resumeToken}`, which answers with the
+ * respondent's full answer map. The shell is cached like any other `/f/…` navigation — `sw.ts`
+ * NetworkFirst, `guest-shell-html`, seven days — and `refreshCachedShells()` would otherwise
+ * re-`put` it from every later boot, RENEWING a token-bearing document on disk indefinitely instead
+ * of letting it age out. That renewal is what this predicate stops.
+ *
+ * ⚠️ SKIPPED, NEVER PURGED, on the same reasoning as the rest of this module. Deleting the entry
+ * would cost a respondent offline access to a form they deliberately primed, which is the trade this
+ * file exists to refuse. Skipping it means the entry expires on `sw.ts`'s seven-day clock and is
+ * never renewed; the worst anyone sees in the meantime is last week's colours on a resume link.
+ *
+ * ⚠️ TWO PREFIXES CARRY THIS AND THEY ARE NOT THE SAME ONE. Matched here is the guest ROUTE,
+ * `/f/resume/{resumeToken}` (`routes/tenant.php`). The resume READ is a different path,
+ * `/api/v1/public/drafts/{resumeToken}` (`routes/api.php`), and it escapes service-worker caching
+ * only because its prefix is `drafts/` rather than `f/`. A rename there re-opens a defect this
+ * function cannot see and this test file cannot reach.
+ */
+export function isResumeShell(url: string): boolean {
+    try {
+        return new URL(url).pathname.startsWith('/f/resume/');
+    } catch {
+        // Unparseable, so nothing can be concluded. Report FALSE rather than true: a predicate that
+        // fails open swallows the whole sweep, which is a worse and much quieter defect than the one
+        // being guarded — and the sweep is the thing this module exists to do.
+        return false;
+    }
+}
+
+/**
+ * Re-fetch and re-`put` every cached guest shell except the current one and any resume link.
  *
  * Two rules that look like defensiveness and are not:
  *  - **Only a 200 is written.** A `cache.put` of a 404 (the form was unpublished) or a 500 would
@@ -121,6 +155,10 @@ async function refreshCachedShells(cacheStorage: CacheStorage, doFetch: typeof f
     for (const request of entries) {
         if (request.url === currentUrl) {
             continue; // this document just came off the network — re-fetching it is pure waste
+        }
+
+        if (isResumeShell(request.url)) {
+            continue; // token-bearing document; let it expire rather than renewing it — isResumeShell()
         }
 
         try {

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { BRAND_VERSION_KEY, SHELL_CACHE, syncBrandedShellCache } from '../lib/brand-cache';
+import { BRAND_VERSION_KEY, isResumeShell, SHELL_CACHE, syncBrandedShellCache } from '../lib/brand-cache';
 import { openDb, type MeridianDb } from '../lib/db';
 
 /*
@@ -37,6 +37,7 @@ const respond = (status: number) => ({ status }) as Response;
 
 const OTHER_SHELL = 'http://acme.test/f/other';
 const CURRENT_SHELL = 'http://acme.test/f/intake';
+const RESUME_SHELL = 'http://acme.test/f/resume/tok-abc123';
 
 describe('syncBrandedShellCache', () => {
     it('does nothing when the cached shells already match this ramp', async () => {
@@ -82,6 +83,36 @@ describe('syncBrandedShellCache', () => {
             key: BRAND_VERSION_KEY,
             value: 'new000000000',
         });
+        await db.delete();
+    });
+
+    it('leaves a resume link alone while still refreshing the ordinary shell beside it', async () => {
+        // ⛔ A resume shell's HTML carries `data-resume-token`, and that token is the whole credential
+        // for the resume read, which answers with the respondent's full answer map. Re-`put`ing it on
+        // every later boot RENEWS a credential-bearing document on disk indefinitely; skipping it lets
+        // sw.ts's seven-day expiry collect it. Skipped and not purged — deleting it would cost offline
+        // access to a form the respondent deliberately primed.
+        const db = freshDb();
+        await db.app_state.put({ key: BRAND_VERSION_KEY, value: 'old000000000' });
+        const { caches, put } = fakeCaches({ [SHELL_CACHE]: [RESUME_SHELL, OTHER_SHELL] });
+        const doFetch = vi.fn().mockResolvedValue(respond(200));
+
+        const outcome = await syncBrandedShellCache({
+            brandVersion: 'new000000000',
+            db,
+            currentUrl: CURRENT_SHELL,
+            caches,
+            fetch: doFetch as unknown as typeof fetch,
+            navigator: { onLine: true } as Navigator,
+        });
+
+        expect(outcome).toBe('refreshed');
+        // ⚠️ THE OTHER HALF IS THE POINT. Asserting only that the resume URL was not fetched is
+        // satisfied by a sweep that skips EVERYTHING, which is a mutation this file must be able to
+        // tell apart from the fix — so the ordinary shell beside it is asserted to still go through.
+        expect(doFetch).toHaveBeenCalledTimes(1);
+        expect(doFetch).toHaveBeenCalledWith(OTHER_SHELL, { credentials: 'omit' });
+        expect(put).toHaveBeenCalledTimes(1);
         await db.delete();
     });
 
@@ -195,5 +226,32 @@ describe('syncBrandedShellCache', () => {
         // Not advanced — a failed sweep must stay retryable.
         expect(await db.app_state.get(BRAND_VERSION_KEY)).toBeUndefined();
         await db.delete();
+    });
+});
+
+describe('isResumeShell', () => {
+    it('matches the guest resume ROUTE by path, and not by substring', () => {
+        expect(isResumeShell(RESUME_SHELL)).toBe(true);
+
+        // ⛔ THE CHEAP SPELLING OF THIS PREDICATE PASSES THE LINE ABOVE AND FAILS THE ONE BELOW.
+        // `url.includes('/f/resume/')` cannot tell a path from a query string, so it would stop
+        // refreshing an ordinary shell whose query happens to carry that text — silently shrinking
+        // the sweep rather than the exemption.
+        expect(isResumeShell('http://acme.test/f/intake?next=/f/resume/tok-abc123')).toBe(false);
+        expect(isResumeShell('http://acme.test/f/intake#/f/resume/tok-abc123')).toBe(false);
+
+        // A prefix match on the SEGMENT, so a form whose slug merely begins with the same letters is
+        // still refreshed. `/f/resume` with no token is not the route either.
+        expect(isResumeShell('http://acme.test/f/resumed/tok-abc123')).toBe(false);
+        expect(isResumeShell('http://acme.test/f/resume')).toBe(false);
+        expect(isResumeShell(OTHER_SHELL)).toBe(false);
+    });
+
+    it('reports false rather than throwing on a url it cannot parse', () => {
+        // ⚠️ Failing OPEN here would skip every entry and quietly disable the sweep this module exists
+        // to perform — a much quieter defect than the one the predicate guards against, and one no
+        // other case in this file would catch, because they all pass well-formed URLs.
+        expect(isResumeShell('not a url')).toBe(false);
+        expect(isResumeShell('')).toBe(false);
     });
 });

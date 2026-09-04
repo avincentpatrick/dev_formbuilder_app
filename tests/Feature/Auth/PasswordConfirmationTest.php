@@ -2,8 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Models\User;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
 use Laravel\Fortify\Fortify;
 
 uses(RefreshDatabase::class);
@@ -93,8 +95,8 @@ it('is the committed identity that makes the credential reachable, and an in-tra
     //
     // This pins the TRAP, not a product behaviour — if it ever goes green, the separate-session
     // constraint has changed and `committedTenantIdentity()`'s reason for existing should be re-read.
-    $inTransaction = App\Models\User::factory()->create([
-        'password' => Illuminate\Support\Facades\Hash::make($this->correct),
+    $inTransaction = User::factory()->create([
+        'password' => Hash::make($this->correct),
     ]);
 
     $response = $this->actingAs($inTransaction)

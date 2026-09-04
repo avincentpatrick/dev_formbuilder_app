@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api\V1;
 
 use App\Enums\SubmissionSource;
+use App\Enums\SyncResultStatus;
 use App\Exceptions\Submissions\FormNotAcceptingSubmissionException;
 use App\Exceptions\Submissions\SubmissionConflictException;
 use App\Exceptions\Submissions\SubmissionException;
@@ -95,7 +96,7 @@ final class SyncSubmissionController extends Controller
 
         $version = FormVersion::query()->whereKey($item['form_version_id'])->first();
         if ($version === null) {
-            return $this->failure($uuid, 'error', 'form_version_not_found', 'The form version does not exist.');
+            return $this->failure($uuid, SyncResultStatus::Error, 'form_version_not_found', 'The form version does not exist.');
         }
 
         // `form_versions` carries no soft delete while `forms` does, so a deleted form's versions stay
@@ -108,7 +109,7 @@ final class SyncSubmissionController extends Controller
         // be authorized against.
         $form = Form::query()->whereKey($version->form_id)->first();
         if ($form === null) {
-            return $this->failure($uuid, 'error', 'form_not_found', 'The form this version belongs to no longer exists.');
+            return $this->failure($uuid, SyncResultStatus::Error, 'form_not_found', 'The form this version belongs to no longer exists.');
         }
 
         // The per-form authorization the route cannot express (M13 — see the class docblock). `forbidden` is
@@ -129,7 +130,7 @@ final class SyncSubmissionController extends Controller
         // request's 100-item cap; the grant lookups behind the policy are memoised per user by
         // {@see \App\Services\Authorization\ResourceGrantResolver}.
         if (! Gate::forUser($user)->allows('create', [Submission::class, $form])) {
-            return $this->failure($uuid, 'error', 'forbidden', 'You are not authorized to create submissions on this form.');
+            return $this->failure($uuid, SyncResultStatus::Error, 'forbidden', 'You are not authorized to create submissions on this form.');
         }
 
         try {
@@ -146,7 +147,7 @@ final class SyncSubmissionController extends Controller
 
             return [
                 'client_submission_uuid' => $uuid,
-                'status' => $result->created ? 'created' : 'duplicate',
+                'status' => ($result->created ? SyncResultStatus::Created : SyncResultStatus::Duplicate)->value,
                 // Increment J2e — `reference` joins the pair, so an offline client can replace the provisional
                 // queue tag it has been showing with the real handle the moment a row settles. Without it the
                 // outbox would have to re-fetch, or keep quoting a code the tenant cannot find.
@@ -159,17 +160,17 @@ final class SyncSubmissionController extends Controller
                 'error' => null,
             ];
         } catch (SubmissionValidationException $e) {
-            return $this->failure($uuid, 'invalid', 'submission_invalid', $e->getMessage(), ['fields' => $e->fieldErrors()]);
+            return $this->failure($uuid, SyncResultStatus::Invalid, 'submission_invalid', $e->getMessage(), ['fields' => $e->fieldErrors()]);
         } catch (SubmissionConflictException $e) {
-            return $this->failure($uuid, 'conflict', 'submission_conflict', $e->getMessage());
+            return $this->failure($uuid, SyncResultStatus::Conflict, 'submission_conflict', $e->getMessage());
         } catch (SubmissionException $e) {
-            return $this->failure($uuid, 'conflict', 'submission_version_superseded', $e->getMessage());
+            return $this->failure($uuid, SyncResultStatus::Conflict, 'submission_version_superseded', $e->getMessage());
         } catch (FormNotAcceptingSubmissionException $e) {
             // Schedule (`form_not_open` / `form_closed`) and the transactional response cap
             // (`max_responses_reached`, raised from inside SubmissionFinalizer). LAST arm, so no existing
             // classification moves; the exception's own code and details ride through unchanged, which is the
             // same payload the guest SPA already renders for these three causes.
-            return $this->failure($uuid, 'error', $e->code(), $e->getMessage(), $e->details());
+            return $this->failure($uuid, SyncResultStatus::Error, $e->code(), $e->getMessage(), $e->details());
         }
     }
 
@@ -177,7 +178,7 @@ final class SyncSubmissionController extends Controller
      * @param  array<string, mixed>|null  $details
      * @return array<string, mixed>
      */
-    private function failure(string $uuid, string $status, string $code, string $message, ?array $details = null): array
+    private function failure(string $uuid, SyncResultStatus $status, string $code, string $message, ?array $details = null): array
     {
         $error = ['code' => $code, 'message' => $message];
         if ($details !== null) {
@@ -186,7 +187,7 @@ final class SyncSubmissionController extends Controller
 
         return [
             'client_submission_uuid' => $uuid,
-            'status' => $status,
+            'status' => $status->value,
             'submission' => null,
             'error' => $error,
         ];

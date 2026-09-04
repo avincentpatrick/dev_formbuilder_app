@@ -157,6 +157,69 @@ if ($branch === 'main') {
     note('If this is a close-out, say so explicitly: --closeout.');
 }
 
+// ── M69. An ACTIVE claim must ANSWER every field the template declares — not merely exist.
+//
+//    WHY THIS IS A CHECK AND NOT A SENTENCE IN THE TEMPLATE. `docs/claims/TEMPLATE.md` has asked for
+//    the row's evidence and its remedy since M36, and M69 added a third field for the row's PREMISE
+//    on four increments' worth of evidence that the premise is the half that rots (M45, M60, M67,
+//    M68). A field that is only ever described is a field that is answered "held" — which is the
+//    decorative-gate shape M43 measured, where four structural cases stayed green while the
+//    mechanism they named had been deleted. So the heading is enforced, not merely documented.
+//
+//  ⛔ THE FIELD LIST IS DERIVED FROM THE TEMPLATE, NEVER RESTATED HERE. Copying the three headings
+//    into this file would make it the second description of the protocol, which is the exact defect
+//    TEMPLATE.md was created to end (it existed as a duplicate in both lane files and they drifted).
+//    Add a field to the template and this check demands it on the next run, with no edit here.
+//
+//  ⚠️ TWO DIFFERENT SOURCES, DELIBERATELY. The TEMPLATE is read from the WORKING TREE — it is the
+//    protocol you are building under, and an increment that adds a field should be held to it
+//    immediately rather than one merge later. The CLAIM is read from origin/main, because an
+//    unpushed claim does not exist (M14) and a field answered only locally is not answered.
+//
+//  ⚠️ THE ACTIVE BLOCK ONLY. `## RELEASED` history is never retro-fitted: rewriting a dated record
+//    falsifies the log, and a rule that is red on arrival can never merge (M40).
+section('Claim fields');
+
+$templateBody = @file_get_contents(__DIR__.'/../docs/claims/TEMPLATE.md');
+$claimBody = show_from_main($claimFile);
+$claimStatus = first_line_matching($claimBody, '/^## Status:/');
+
+if ($templateBody === false || $templateBody === null) {
+    warn('could not read docs/claims/TEMPLATE.md — the required fields cannot be derived');
+} elseif ($claimStatus === null) {
+    warn("no `## Status:` heading in {$claimFile} on origin/main");
+} elseif (stripos($claimStatus, 'ACTIVE CLAIM') === false) {
+    pass('no active claim on origin/main — nothing to check');
+    note('The fields are required of an ACTIVE claim. A released or retired lane answers nothing.');
+} else {
+    $required = claim_template_fields($templateBody);
+
+    // A floor. A pattern that silently harvests nothing would otherwise report agreement with an
+    // empty set — the M48 class, where three splices read a missing file and reported success.
+    if ($required === []) {
+        $failures[] = 'template declares no fields';
+        fail('docs/claims/TEMPLATE.md declares no `###` fields under `## Opening a claim` — check it.');
+    } else {
+        $block = active_claim_block($claimBody);
+        $missing = array_values(array_filter(
+            $required,
+            static fn (string $heading): bool => ! str_contains($block, "\n".$heading."\n")
+        ));
+
+        info('fields the template requires', implode(' · ', $required));
+
+        if ($missing === []) {
+            pass('the active claim answers every field the template declares');
+        } else {
+            $failures[] = 'active claim is missing a template field';
+            fail('the active claim on origin/main is MISSING: '.implode(' · ', $missing));
+            note('Answer it in the claim and push. `Premise verified` is the one that is newest and');
+            note('the one most often skipped: it asks what the row believes about the WORLD around');
+            note('the defect — who owns a file, whether a copy exists, which cases it carved out.');
+        }
+    }
+}
+
 // ── Rule 7(c) / M34. A concurrent migrate:fresh drops the schema mid-run and the failures read as
 //    product bugs. The tell is the ASSERTION TOTAL moving, not the failure count.
 section('Concurrent suites');
@@ -350,6 +413,99 @@ function sh(string $command, ?int &$status = null): string
 function show_from_main(string $path): string
 {
     return sh('git show '.escapeshellarg('origin/main:'.$path).' 2>&1');
+}
+
+/**
+ * The `###` field headings the claim template declares, in order, read from its `## Opening a claim`
+ * fenced block.
+ *
+ * ⚠️ SCOPED TO THAT ONE BLOCK ON PURPOSE. The template also carries `###`-level prose headings that
+ * explain WHY the fields exist; harvesting the whole file would demand those as claim fields too.
+ *
+ * ⛔ `explode("\n")`, never `preg_split` on `\R`. Without the `/u` modifier `\R` matches the byte
+ * 0x85, which occurs INSIDE common UTF-8 characters — `✅` is E2 9C 85 — and silently shifts every
+ * line after the first one. Both this file and the template are full of them (M42).
+ *
+ * @return list<string>
+ */
+function claim_template_fields(string $template): array
+{
+    $inSection = false;
+    $inFence = false;
+    $fields = [];
+
+    foreach (explode("\n", $template) as $line) {
+        $line = rtrim($line, "\r");
+
+        // ⛔ THE FENCE IS TESTED BEFORE THE HEADING, AND THE FIRST DRAFT HAD IT THE OTHER WAY ROUND.
+        //    Inside the fence a `## ` line is EXAMPLE CONTENT, not a section boundary — and the very
+        //    first line of this template's example is `## Status: ACTIVE CLAIM …`, so the heading arm
+        //    fired immediately and the function returned an empty list. It was caught only by the
+        //    empty-result floor at the call site, which is the whole reason that floor is there.
+        if ($inFence) {
+            if (str_starts_with($line, '```')) {
+                break;
+            }
+
+            if (str_starts_with($line, '### ')) {
+                $fields[] = $line;
+            }
+
+            continue;
+        }
+
+        if (str_starts_with($line, '```')) {
+            $inFence = $inSection;
+
+            continue;
+        }
+
+        if (str_starts_with($line, '## ')) {
+            // Reached the next top-level section without opening a fence: the block is over.
+            if ($inSection) {
+                break;
+            }
+
+            $inSection = str_starts_with($line, '## Opening a claim');
+        }
+    }
+
+    return $fields;
+}
+
+/**
+ * The ACTIVE claim block — from the `## Status:` heading to the next `##` heading, exclusive.
+ *
+ * Everything below that is `## RELEASED` history, which is a dated record and is never held to a
+ * field the protocol did not have when it was written.
+ */
+function active_claim_block(string $claim): string
+{
+    $lines = explode("\n", $claim);
+    $block = [];
+    $started = false;
+
+    foreach ($lines as $line) {
+        $line = rtrim($line, "\r");
+
+        if (str_starts_with($line, '## Status:')) {
+            $started = true;
+
+            continue;
+        }
+
+        if ($started && str_starts_with($line, '## ')) {
+            break;
+        }
+
+        if ($started) {
+            $block[] = $line;
+        }
+    }
+
+    // Bracketed with newlines so the caller's "\n{$heading}\n" match cannot miss the first or last
+    // line of the block.
+    return "\n".implode("\n", $block)."\n";
 }
 
 function first_line_matching(string $haystack, string $pattern): ?string

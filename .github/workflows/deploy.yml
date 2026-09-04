@@ -2,6 +2,30 @@ name: Deploy (production, self-hosted)
 
 # Runs on the self-hosted Windows Server runner AFTER the CI workflow succeeds on `main`
 # (ADR-0005 / docs/deployment-infrastructure.md §3). Nothing deploys unless every gate is green.
+#
+# ── ⛔ THIS TRIGGER'S EFFECTIVE MEANING CHANGED IN M39. IT IS NOT WHAT IT WAS WHEN IT WAS WRITTEN ──
+# The `on:` block below has never been edited, and that is exactly why this comment exists: the
+# workflow it depends on moved underneath it, so the same six lines now select a different set of
+# runs than they used to.
+#
+#   BEFORE M39. Every merge run on `main` was cancelled by the concurrency group in `ci.yml`, so a
+#   cancelled run's conclusion was never 'success' and the `if:` below could never pass for one.
+#   The ONLY runs that could ever reach this workflow were docs-only close-out runs — a production
+#   deploy path that, had it been enabled, could only ever have shipped a documentation commit.
+#
+#   SINCE M39. The cancellation is fixed, so this fires on REAL MERGE RUNS. That is correct and is
+#   what a deploy trigger should have meant all along — but it is a material change to a latent
+#   production path, and the day `DEPLOY_ENABLED` is first set is the wrong day to discover it.
+#
+# ── ✅ AND THE DOCS-ONLY HALF IS NOW CLOSED AT THE OTHER END, WHICH IS WHY THERE IS NO FILTER HERE ──
+# `workflow_run` offers no `paths-ignore`, and this workflow deliberately does not grow a second one.
+# It does not need it: `ci.yml`'s `push` filter skips the close-out documentation paths, and a push
+# GitHub filters out produces NO RUN AT ALL — so there is no `workflow_run` event for this workflow
+# to receive. `ci.yml` says so in terms at the site ("and stops it being the run that triggers
+# `deploy.yml`"), and that list is deliberately maintained in ONE place: a copy here would be a
+# second description of one fact, which is the drift M56 spent an increment undoing elsewhere.
+# ⚠️ The dependency runs the other way from how it reads — READ `ci.yml`'s `paths-ignore` BEFORE
+# changing it, because shortening that list re-opens this path rather than merely re-running CI.
 on:
   workflow_run:
     workflows: ["CI"]

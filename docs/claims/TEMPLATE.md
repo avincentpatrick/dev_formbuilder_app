@@ -31,6 +31,11 @@ Row: <the backlog row, quoted enough to identify it, with its file:line>.
 <each file:line citation in the row, checked against the MERGED tree — held / moved to X / false.
  Say which, per citation. A row whose citations you have not opened is a row you have not read.>
 
+### Premise verified
+<what this row believes about the WORLD AROUND the defect — who owns a file, whether a second copy
+ exists, whether a precondition still holds, who may edit what — and whether that is still true.
+ NOT the citations; those are the field above. This is the sentence that rots while the code does not.>
+
 ### Remedy verdict
 <the row's PRESCRIBED fix, measured: works / wrong (and how) / structurally impossible / none offered.
  Measure it BEFORE writing the test, not after.>
@@ -54,6 +59,32 @@ Prediction: <what you expect the gates to do, written BEFORE the run so it can b
 ```
 
 ---
+
+## Why `Premise verified` is a THIRD field and not a sentence inside the first
+
+Added in **M69**, and — like the two below — the count is the argument, not the tidiness. **A row's
+premise is what it believes about the world *around* the defect**, and it is the half that rots while
+the code stays exactly as the row describes it:
+
+| Row | Evidence | Remedy | Premise |
+|---|---|---|---|
+| M45 | held | implementable | **false** — a file framed as *"the second copy of a record that already has a home"* had **zero** overlap with the file it named, so the deletion its framing invited would have destroyed the only copy |
+| M60 | held in kind | implementable | **expired** — *"the section has two writers"* was filed 2026-08-29 and falsified on 2026-08-31 when `M50` retired Lane B |
+| M67 | held | — | **three of four rows wrong** |
+| M68 | held | — | a row's **carve-outs** are part of its premise: it named one route that must stay ungated; there were three |
+
+⛔ **Both existing fields would have been answered "held" in every one of those cases**, because
+neither asks *why does this row believe its scope is what it says*. That is the whole reason this is a
+heading rather than a clause folded into `Evidence verified`: **a question nobody has to answer
+separately is a question nobody answers.** The alternative was costed and rejected — `M43` measured a
+structural gate that was fully green and entirely decorative, and a sub-clause of an existing field is
+that shape.
+
+⚠️ **IT IS GATED, WHICH IS WHAT KEEPS IT FROM BECOMING THE THING IT WARNS ABOUT.**
+`php scripts/preflight.php` refuses an **ACTIVE** claim that is missing any of the three headings, and
+a Pest arm asserts this file still declares all three. The gate reads the active block **only** —
+`## RELEASED` history is never retro-fitted, both because rewriting a dated record falsifies the log
+and because a rule that is red on arrival can never merge (`M40`).
 
 ## Why `Evidence verified` and `Remedy verdict` are separate fields
 

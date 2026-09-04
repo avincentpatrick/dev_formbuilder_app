@@ -7065,6 +7065,18 @@
                 ],
                 "title": "SyncManifestResource"
             },
+            "SyncResultStatus": {
+                "type": "string",
+                "description": "One item's outcome in a batch offline replay (Increment G8b; `POST /sync/submissions`). \u26d4 WHY THIS IS AN ENUM AND NOT FIVE STRING LITERALS IN A CONTROLLER (M69). The batch surface answers HTTP 200 for every item and carries the real outcome in this field, so it \u2014 not the status code \u2014 is what an integrator branches on. It was typed a bare `string` in `openapi.json` for the whole life of the endpoint, which tells a client generator nothing at all about what to switch over.  The fix has to be a real backed enum rather than an annotation, and that is measured rather than assumed: a full `@return array{status: 'created'|'duplicate'|\u2026}` shape on {@see SyncSubmissionResultResource::toArray()} moved the exported document by EXACTLY NOTHING. `dedoc/scramble` infers `toArray()` from the STATEMENTS it can trace, and a docblock is not a statement.  \u26a0\ufe0f THE CASES ARE THE CONTROLLER'S EXISTING WIRE VALUES, UNCHANGED. This enum was introduced to DESCRIBE the five strings `SyncSubmissionController` already returned, never to renegotiate them \u2014 so no consumer moves, and the backing values are the contract.  \u26a0\ufe0f `Error` IS NOT \"the server broke\". It is the catch-all for a per-item refusal that is neither a validation failure nor a version conflict \u2014 an unknown form version, a deleted form, an unauthorized form, a closed one. Every one of them still arrives inside a 200.\n| |\n|---|\n| `created` <br/> The item was persisted on this replay. |\n| `duplicate` <br/> Idempotent no-op: this `client_submission_uuid` had already been accepted. |\n| `invalid` <br/> Per-field validation failure; `error.details.fields` carries the field map. |\n| `conflict` <br/> The version this item was encoded against has been superseded. |\n| `error` <br/> Any other per-item refusal \u2014 see `error.code` for which. |",
+                "enum": [
+                    "created",
+                    "duplicate",
+                    "invalid",
+                    "conflict",
+                    "error"
+                ],
+                "title": "SyncResultStatus"
+            },
             "SyncSubmissionRequest": {
                 "type": "object",
                 "description": "The offline batch-replay request (Increment G8b, docs/offline-first-sync-design.md \u00a75). Authorization is\nthe route's `ability:write:submissions` middleware + RLS. Only the coarse shape is asserted here \u2014 each\nitem's per-field validation is the shared {@see SubmissionPipeline}, one item at\na time, so a partial failure never rolls back its siblings. `client_submission_uuid` is the idempotency key\n(a duplicate replay is a 200 no-op); `submitted_at` is accepted but informational \u2014 the server timestamp is\nauthoritative (architecture \u00a74.2). Bounded to 100 items per request.",
@@ -7138,13 +7150,53 @@
                         "type": "string"
                     },
                     "status": {
-                        "type": "string"
+                        "$ref": "#/components/schemas/SyncResultStatus"
                     },
                     "submission": {
-                        "type": "string"
+                        "type": [
+                            "object",
+                            "null"
+                        ],
+                        "properties": {
+                            "id": {
+                                "type": "string"
+                            },
+                            "reference": {
+                                "type": "string"
+                            },
+                            "status": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "id",
+                            "reference",
+                            "status"
+                        ]
                     },
                     "error": {
-                        "type": "string"
+                        "type": [
+                            "object",
+                            "null"
+                        ],
+                        "properties": {
+                            "code": {
+                                "type": "string"
+                            },
+                            "message": {
+                                "type": "string"
+                            },
+                            "details": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            }
+                        },
+                        "required": [
+                            "code",
+                            "message"
+                        ]
                     }
                 },
                 "required": [

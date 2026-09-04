@@ -17,6 +17,7 @@ use App\Notifications\Submissions\SubmissionPdfReadyNotification;
 use App\Notifications\TenantInvitationNotification;
 use App\Notifications\Webhooks\WebhookAutoDisabledNotification;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Notifications\Notification;
 use Illuminate\Queue\Attributes\Queue as QueueAttribute;
 
 /**
@@ -132,6 +133,79 @@ it('exempts every queued mail notification from the job-payload linter R1 rule',
 
     expect($linter)->toContain("'{$class}'");
 })->with($queuedMailNotifications);
+
+it('holds EXEMPT_JOBS and the list above to each other, in BOTH directions (M69)', function () use ($queuedMailNotifications): void {
+    // ⛔ THE ARM ABOVE PROVES ONLY ONE DIRECTION, AND THE DIVERGENCE THAT REACHED PRODUCTION WENT THE
+    // OTHER WAY. It walks $queuedMailNotifications and asserts each is in EXEMPT_JOBS — so a class
+    // present in EXEMPT_JOBS and ABSENT here is invisible to it. That is exactly what
+    // ConnectorRulePausedNotification was from H16a until M66: registered with the linter, missing
+    // from this list, and therefore never checked for CarriesTenantBrand by the one arm that checks
+    // it. It shipped rendering the framework's default theme. This arm is the missing direction.
+    //
+    // ✅ PROVED BY THREE CONTROLS (M69), NOT BY BEING GREEN. Via scripts/mutate.php, sha256-restored:
+    //   MU1  drop EventNotification from the list above, leave it in EXEMPT_JOBS  → CAUGHT (1 red).
+    //   MU2  add a REAL non-notification job (SweepWebhookRetriesJob) to EXEMPT_JOBS → SURVIVED, and
+    //        SURVIVED is the PASS here: the subset filter is supposed to ignore it.
+    //   MU3  add a NON-EXISTENT class to the SAME slot                             → CAUGHT (1 red).
+    // ⛔ MU2 ALONE WOULD HAVE PROVED NOTHING, and that is the transferable half. Its green is also
+    // what a regex that never harvested the new entry would produce — a control passing through a
+    // different branch than the one it names (M49). MU3 is what separates them: same slot, red, so
+    // the slot IS read, and MU2's green is therefore the FILTER rather than blindness.
+    $linter = file_get_contents(base_path('scripts/job-payload-lint.php'));
+
+    // Parse rather than require: the linter is a standalone script with no framework boot, and
+    // including it would run the whole gate. Narrow to the const block first so an FQCN in a
+    // docblock elsewhere in the file cannot be harvested as an entry.
+    expect($linter)->toMatch('/const EXEMPT_JOBS = \[.*?\n\];/s');
+    preg_match('/const EXEMPT_JOBS = \[(.*?)\n\];/s', $linter, $block);
+
+    // ⚠️ STRIP THE `//` COMMENTS FIRST, AND THIS IS A MEASURED STEP RATHER THAN A PRECAUTION. The
+    // block is more comment than code, and one of those comments quotes `Notification::route('mail',
+    // $email)` — so harvesting every quoted string picked up `'mail'` and the first run of this arm
+    // failed on it. Deleting the comments is the honest fix; narrowing the pattern to strings that
+    // merely LOOK like an FQCN would have hidden a genuinely malformed entry instead.
+    $entries = preg_replace('#//[^\n]*#', '', $block[1]);
+    preg_match_all("/'([A-Za-z0-9_\\\\]+)'/", $entries, $matches);
+
+    $exempt = $matches[1];
+
+    // A floor, so a regex that silently harvests nothing cannot report agreement with an empty set —
+    // the M48 class of defect (an operation that succeeds on empty input).
+    expect($exempt)->not->toBeEmpty()
+        ->and(count($exempt))->toBeGreaterThanOrEqual(count($queuedMailNotifications));
+
+    // ⚠️ EVERY ENTRY MUST NAME A REAL CLASS, AND THIS IS NOT TIDINESS. The subset filter below is
+    // `is_subclass_of`, which answers false for a class that does not exist — so a typo or a stale
+    // rename in EXEMPT_JOBS would be filtered out as "not a notification" and take this gate blind
+    // in precisely the direction it was written to cover.
+    // Collected rather than asserted one at a time, so a failure PRINTS the offending FQCN. A bare
+    // `expect(class_exists($class))->toBeTrue()` inside the loop reports only "failed asserting that
+    // false is true", which is what the first run of this arm did — true, and useless.
+    $missingClasses = array_values(array_filter($exempt, fn (string $class): bool => ! class_exists($class)));
+
+    expect($missingClasses)->toBe([]);
+
+    // ⚠️ THE NOTIFICATION SUBSET, NOT THE WHOLE CONSTANT — and the direction of that filter is the
+    // one thing the backlog row told its taker to check first. EXEMPT_JOBS is R1's exemption list and
+    // may legitimately hold non-notification jobs; TODAY IT HOLDS NONE, so whole-set equality would
+    // pass and be wrong in principle. Filtered on the framework base class rather than on an
+    // `App\Notifications\` prefix, because a namespace is a convention and this is the actual
+    // property the list above is a list of.
+    $exemptNotifications = array_values(array_filter(
+        $exempt,
+        fn (string $class): bool => is_subclass_of($class, Notification::class),
+    ));
+
+    sort($exemptNotifications);
+    $declared = $queuedMailNotifications;
+    sort($declared);
+
+    // Compared as whole sorted sets rather than with two array_diff assertions: a failure then prints
+    // both lists side by side and names the class on whichever side it is missing from. (Not
+    // `toContain`, whose needles are VARIADIC — M30 watched a case stay green with the bad value in
+    // the array because of exactly that signature.)
+    expect($exemptNotifications)->toBe($declared);
+});
 
 it('places the mail queue third in the worker priority order', function (): void {
     expect(QueueName::Mail->value)->toBe('mail')

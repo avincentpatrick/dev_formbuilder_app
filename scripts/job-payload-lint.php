@@ -38,6 +38,7 @@ declare(strict_types=1);
  * Usage: php scripts/job-payload-lint.php
  */
 
+use App\Notifications\Concerns\CarriesTenantBrand;
 use PhpParser\Node;
 use PhpParser\Node\Stmt\Class_;
 use PhpParser\NodeFinder;
@@ -80,6 +81,24 @@ const SCALAR_PAYLOAD_TYPES = ['string', 'int', 'float', 'bool', 'array'];
  * scripts/migration-lint.php's EXEMPT_TABLES. An allowlist entry is a diff against a shared CI gate,
  * which a reviewer sees; a per-class attribute would let an author silence the gate in their own file.
  * R2/R3/R4 still apply to an exempt class.
+ */
+/**
+ * ⛔ THIS CONSTANT HAS A TWIN, AND SINCE M69 THE TWO PROVE EACH OTHER.
+ *
+ * Its notification entries must match `$queuedMailNotifications` in
+ * tests/Feature/Mail/QueuedMailContractTest.php EXACTLY, as a set. Adding a queued mail notification
+ * means adding it in BOTH places — that sentence has been in the test's docblock since H3, and for
+ * most of that time nothing checked it: ConnectorRulePausedNotification sat here and not there from
+ * H16a until M66, so the arm asserting {@see CarriesTenantBrand} could
+ * not see the class, and it reached production rendering the framework's default mail theme.
+ *
+ * The test now parses this block and compares both directions, so a one-sided edit is a RED TEST
+ * NAMING THE CLASS rather than a silent divergence. Two consequences for anyone editing here:
+ *   - Every entry must name a class that EXISTS. The comparison filters on the framework's
+ *     Notification base class, and a typo would be filtered out as "not a notification" — taking
+ *     that gate blind rather than failing it.
+ *   - A NON-notification job may still be exempted here; it is simply ignored by that comparison.
+ *     Today there are none, which is exactly why the filter is written and not assumed.
  */
 const EXEMPT_JOBS = [
     // Queued transactional Notifications (H3). They run via Illuminate\Notifications\SendQueuedNotifications

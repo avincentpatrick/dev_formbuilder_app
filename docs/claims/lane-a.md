@@ -194,6 +194,27 @@ failing to do. It could not be published with `git push origin HEAD:main`: the p
 because that form pushes the **whole branch** and three commits already stood on it. Published by cherry-pick
 onto a branch cut from `origin/main`, which is the recorded correct form.
 
+### ⛔ A DEFECT M69 SHIPPED, FOUND BY M69'S OWN CLOSE-OUT — and why six controls missed it
+
+**Fixed on the trunk in `8352748`, one commit, both paths proved.** The claim-fields check asked
+`stripos($claimStatus, 'ACTIVE CLAIM') === false` to decide whether to skip. **`NO ACTIVE CLAIM` CONTAINS
+`ACTIVE CLAIM`** — so the moment this very claim was released, the check read a released claim as an open
+one and `preflight` returned *"1 BLOCKING problem(s): active claim is missing a template field"* against a
+clean trunk. **It would have blocked the next session's first command.** Anchored at the start now.
+
+⚠️ **THE TRANSFERABLE PART IS WHY THE CONTROLS MISSED IT, AND IT IS A NEW SHAPE.** All six controls
+mutated an **ACTIVE** claim and watched the red arm fire correctly. **The SKIP path was never made to run
+at all.** Every control was pointed at the same branch of the same function, so the coverage looked
+complete and was half. **An arm you never exercise is an arm you have not tested** — the same family as a
+green gate nobody has proved, one level in: not *"is this gate decorative"* but *"which of its branches did
+my controls actually reach"*.
+
+⛔ **It also lands beside this increment's own headline rather than contradicting it.** `M69` says a
+remedy can **apply and do nothing**; this says a **control can fire correctly and still cover half the
+function**. Both are failures of a check that reports success — which is the class this repository keeps
+meeting, and the reason the next taker should ask of any control: *what does the code do when this control
+is NOT triggered, and did I ever run that?*
+
 ### The claim this released, verbatim — including the fields it answered before they existed
 
 

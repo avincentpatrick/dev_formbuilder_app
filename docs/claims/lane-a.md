@@ -16,240 +16,132 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M70`, the fifth batched increment: four rows, and a read-only fan-out that falsified six premises before the branch was cut (`m70-batched-rows`)
+## Status: NO ACTIVE CLAIM — `M70` is merged; a row's premise fails in a way a batch cannot average out, and the queue's own batch proposal was unsafe
 
-Taken 2026-09-04. Branch `m70-batched-rows`, cut from origin/main at `5023067`, PR into main.
+`M70` closed **four** rows and filed **four**, so the open count stayed at **81** with **zero `major`**
+and `UNMARKED=0`, while severity bullets ever moved 177 → 181. `state.php` counts the tree; do not take
+that sentence's arithmetic on trust.
 
-⛔ **THIS INCREMENT DOES NOT TAKE THE QUEUE'S OWN PROPOSAL, AND THE REASON IS ITS FIRST FINDING.**
-`docs/backlog-triage.md`'s generated *"Suggested next batch"* pairs `M42`'s *"`tracker-lint` R8 guards
-`CLAUDE.md` and cannot reach `PROGRESS.md`"* with `M60`'s *"Four tracker surgeries have now hand-rolled
-the same verification harness"*. Those two **hard-collide on `scripts/tracker-lint-controls.php`**: the
-first needs new `$cases` entries and a parameterised `write_fixture_files()` — which hard-codes a
-`## Standing Rules` fixture body, so a new rule group would execute inside all eleven existing `R7`
-fixtures — and the second names that same file as its explicit mould. The generator scores the first
-row *"hub files only"* because **it harvests citations from row TEXT**, and that row never names the
-file its fix cannot avoid. **That is a false negative in the one check `D13` selection depends on**,
-and it is filed rather than fixed here.
+⚠️ **THE ONE THING `M70` WOULD MOST LIKE TO HAND ON: SIX OF ELEVEN VERIFIED ROWS HAD A FALSE PREMISE,
+AND THE FAILURES DO NOT RESEMBLE EACH OTHER.** `M66` handed on that the **remedy** is the half nobody
+checks; `M67` that the **premise** is the level under that; `M68` that a remedy can be structurally
+impossible and fail green; `M69` that a remedy can apply and do nothing. `M70` adds the scale: run the
+fan-out over eleven rows rather than four and **the premise failure rate is the majority**, in four
+distinct shapes — a headline whose defect is dead while its addendum fires; a deciding premise that
+presumes a surface which does not exist; a stated choice the repository already made years ago; and a
+carve-out that is false on the one branch that matters.
 
-The four rows are named by **title and filer, never by line number** — this increment edits
-`docs/feature-backlog.md` and every line number in it moves.
+1. ⛔ **THE QUEUE'S OWN SUGGESTED BATCH WAS UNSAFE, AND THAT IS A DEFECT IN THE SELECTION CHECK ITSELF.**
+   `docs/backlog-triage.md` proposed `M42`'s tracker-lint row beside `M60`'s surgery-harness row; both
+   fixes land in `scripts/tracker-lint-controls.php`. The generator harvests citations from row **text**,
+   so a row whose fix cannot avoid a file it never names is scored *"hub files only"*. **The failure
+   points the wrong way** — an unharvestable citation makes a row look MORE separable, so the
+   generator's confidence is highest exactly where it is least earned. Filed, not fixed.
+2. ⛔ **A MEASUREMENT KILLED A GATE BEFORE IT WAS WRITTEN, WHICH IS THE `Remedy verdict` FIELD EARNING
+   ITS PLACE.** Row 3's doc fix is unprovable by construction — nothing in `tests/Feature/Audit/` reads
+   the spec — so the plan was to build the missing gate. Measuring first showed it red on arrival on
+   **ten** aliases, and worse: **the comparison is not statically derivable at all.** A harvest keyed on
+   `record(AuditEvent::X, 'alias'` finds 34 sites and is a floor, because `CustomDomainService` passes
+   the event as a variable, `SsoConnectionService` passes **both** through a private helper, and
+   `ImpersonationService` is the same shape. Roughly half the apparent over-claims were the parser.
+3. ⚠️ **TWO HARNESS DEFECTS, BOTH RECORDED RATHER THAN QUIETLY FIXED.** The Vitest control's first draft
+   matched failing cases on `^\s*(?:×|FAIL)` and printed **nothing**, because vitest opens every such
+   line with a colour escape — it reported CAUGHT three times with no evidence of *which* assertion
+   caught it, which is the `M49` shape. And a `state.php` control predicted 1 → 3 and measured 1 → 4:
+   the code was right and the expectation was wrong, `M60`'s row in miniature.
+4. ✅ **THE E2E DISCRIMINATOR WORKED AND IS WORTH REUSING.** One viewport failed locally. A single
+   re-run is forbidden by `D2` and proves nothing anyway, so the control was the **reverted code under
+   identical conditions** — which failed too, on a *different* test and a *different* viewport. A
+   failure that moves while the code does not is the environment (`M61`). CI's E2E job then passed.
 
-1. **Resume-link shells sit in Cache Storage, and the brand refresh re-fetches them.** Filed by `M21`.
-2. **A SUCCESSFUL password confirmation is unreachable from the Pest harness, so nothing asserts one.** Filed by `M68`.
-3. **The audit spec credits the `submission` scope with two events that are emitted nowhere.** Filed by `M46`.
-4. **`docs/gate-baselines.md` has no staleness signal, and it is stale right now.** Filed by `M42`.
+⛔ **`D9` must never be started without an explicit answer.** Open decisions: `D1`, `D3`, `D4`, `D8`,
+`D9`, `D10`, `D11`, `D12`, `D14`. `D12` — whether to end the M-series — is still the one thing that
+needs the user, and `M70` deliberately did not touch it. **`D13` is answered, proven five times, and not
+to be re-asked.**
 
-Disjointness re-checked against the fan-out's measured remedy footprints rather than against the
-generated table: **no two rows share a non-hub file, and exactly one row (4) touches a hub file.**
-
----
-
-**ROW 1 — Resume-link shells sit in Cache Storage, and the brand refresh re-fetches them. Filed by `M21`.**
-
-### Evidence verified
-
-Every clause resolves. `sw.ts` registers a `NetworkFirst` route on `request.mode === 'navigate' &&
-sameOrigin && url.pathname.startsWith('/f/')` into cache `guest-shell-html` with
-`maxAgeSeconds: 7 * DAY` — **held**. `routes/tenant.php`'s `/f/resume/{resumeToken}` is such a
-navigation — **held**. `resources/views/public-runtime.blade.php` puts `data-resume-token` on the
-`#app` mount node, so the token is in the cached body — **held**. `lib/brand-cache.ts`'s
-`refreshCachedShells()` enumerates `cache.keys()` and, per entry, re-`fetch`es and re-`put`s,
-swallowing failures per entry — **held**. `routes/api.php` carries the explicit POST-not-GET warning
-on the challenge route — **held**. And the resume read really is a GET returning the full answer map:
-`api-client.ts`'s `resumeDraft()` GETs `/api/v1/public/drafts/{resumeToken}` and
-`GuestDraftResumeController` emits `answers` — **held**.
-
-### Premise verified
-
-**HOLDS IN FULL — the only row of the eleven verified where both evidence and premise did.** The row's
-load-bearing escape clause is that the resume API escapes service-worker caching *only* by its path
-prefix: `routes/api.php` still registers `Route::get('drafts/{resumeToken}', …)` under the
-`api/v1/public` prefix, so the full path is `/api/v1/public/drafts/…` and `sw.ts`'s schema predicate
-`startsWith('/api/v1/public/f/')` does not match it. **One route rename re-opens it**, exactly as the
-row says. The "device-local, needs devtools, token already in the address bar" sizing also holds; the
-marginal contribution really is surviving a history clear. ⚠️ **One thing the row understates:** the
-cached shell also carries `data-share-token`, though that one is short-lived and re-mintable.
-
-### Remedy verdict
-
-**The prescribed remedy is right in direction and is the arm that cannot be proved.** The row says
-*"the fix touches `sw.ts`, which is the second type-check program and a different blast radius"*.
-Measured: there is **no `sw.test.ts`** in the tree — `__tests__/register-sw.test.ts` asserts only that
-`/sw.js` is registered with `{ scope: '/f/' }` — so deleting a new predicate clause in `sw.ts` leaves
-the entire Vitest suite green. It also costs offline resume access, contradicting `brand-cache.ts`'s
-own stated axiom that a respondent *"never loses the form"*.
-
-**Taken instead: the brand-refresh arm**, which is what the row's own title complains about and which
-`__tests__/brand-cache.test.ts`'s existing fake `CacheStorage` (already keyed by URL) can prove and a
-mutation can redden. The `sw.ts` arm is filed as its own row with the above reasoning. **User decision
-this session**, after both arms were priced.
+⛔ **RUN `php scripts/state.php` FOR EVERY NUMBER.**
 
 ---
 
-**ROW 2 — A SUCCESSFUL password confirmation is unreachable from the Pest harness. Filed by `M68`.**
+## RELEASED — `M70`, the fifth batched increment: four rows, and six premises the fan-out falsified before the branch was cut (merged as PR #261, `c096b8b`, 6/6 green with real step counts — Static analysis 23 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 
-### Evidence verified
+**Shipped 2026-09-04.** Branch `m70-batched-rows`. The fifth increment run at `D13`'s full width, and the
+first whose headline finding is about the **rate** at which premises fail rather than about one row.
 
-Intact at every citation. `config/auth.php`'s `users` provider driver is `rls_aware` — **held**.
-`App\Auth\RlsAwareUserProvider` pins `private const AUTH_CONNECTION = 'pgsql_auth'` in `createModel()`
-and deliberately does **not** override `retrieveByCredentials()`, so the credential lookup runs on that
-connection — **held**. `config/database.php`'s `pgsql_auth` is a distinct connection on the same
-database under a different role, i.e. a **separate session** — **held**, and independently pinned by
-`ConnectionTopologyTest`. No `Fortify::$confirmPasswordsUsingCallback` is registered anywhere in
-`app/`, so Fortify's default `ConfirmPassword` action and its `$guard->validate()` are what run —
-**held**. `FortifyRouteContextTest::rereadUser()`'s docblock records the same trap from the other
-direction — **held**.
+⛔ **THE FINDING WORTH CARRYING FORWARD: WIDEN THE FAN-OUT AND THE PREMISE FAILURE RATE IS THE
+MAJORITY.** Eleven rows were verified read-only before a branch was cut — four taken, seven left. **Six
+had a premise that is now false or materially overstated**, and the four shapes are worth having
+separately, because none of them is caught by asking *"do the citations still resolve?"*:
 
-⚠️ **And the row's sharpest claim is confirmed:** `FailedPasswordConfirmationResponse::toResponse()`
-returns `back()->withErrors(...)` for a non-JSON request — **also a 302** — so `FortifyRateLimitTest`'s
-`assertStatus(302)` on a correct password is genuinely indistinguishable from a failure and reads as a
-positive control while proving nothing about the credential.
+| Shape | Row |
+|---|---|
+| The **headline is dead** and only the addendum still fires | `M42`'s gate-baselines staleness row — it cites `M39`'s run and *"nothing measures or reports that"*; both instruments exist now |
+| The **deciding premise presumes a surface that does not exist** | `M46`'s audit-spec row treats two missing events as an omission at a call site; there is no policy method, permission, route, controller or UI |
+| A **stated choice the repository already made** | `M68`'s *"the remedy is a choice"* — one arm is `docs/testing-strategy.md`'s written rule with six helpers, the other would make six suites vacuous |
+| A **carve-out false on the one branch that matters** | `M66`'s *"the ordinary path is NOT affected"* — false on the republish branch, which is the majority cause |
 
-### Premise verified
+**And exactly one row of the eleven had evidence *and* premise both hold in full.** That is `M21`'s
+resume-shell row, and it is the one this increment could take at face value.
 
-⛔ **STALE IN ITS DECIDING SENTENCE.** The row says *"the remedy is a choice"* between committing the
-fixture outside the transaction and binding the auth provider to the default connection under test.
-**The repo already took the first, and wrote it down as a rule rather than an option.**
-`docs/testing-strategy.md` requires auth fixtures to be seeded with a committed write on the privileged
-connection, and there are **six existing helpers** implementing it — including the promoted global
-`committedTenantIdentity()` in `tests/Pest.php`, whose own docblock records that it was promoted *on
-the fourth copy*, and which already ships a known plaintext password.
+### What shipped, per row
 
-The second arm is not merely unchosen but **hostile to existing coverage**: `rls_aware` is the explicit
-subject of at least six suites, two of which assert `getConnectionName()` and name deleting
-`retrieveById()`'s `setConnection()` as their own mutation check. Rebinding the provider under test
-would make those vacuous. **This is a fixture swap, not a fork** — and `RefreshDatabase` wrapping only
-the default connection is confirmed by the absence of any `connectionsToTransact` override in `tests/`.
+**Row 1 — resume shells (`M21`).** `isResumeShell()` stops `refreshCachedShells()` re-`put`ing
+`/f/resume/…` entries, so a shell whose HTML carries `data-resume-token` — the whole credential for the
+full answer map — ages out on `sw.ts`'s seven-day clock instead of being renewed from every later boot.
+**Skipped, never purged**, on the module's own axiom that a respondent never loses a primed form.
+⛔ **The row's PRESCRIBED remedy — *"the fix touches `sw.ts`"* — is the arm that cannot be proved.**
+There is no `sw.test.ts`, so deleting such a clause leaves the whole Vitest suite green; and it costs
+offline resume access outright. The user chose the brand-refresh arm after both were priced; the `sw.ts`
+arm is filed with its e2e prerequisite named.
 
-### Remedy verdict
+**Row 2 — password confirmation (`M68`).** The repository now asserts, **for the first time**, that a
+correct password confirms. No `app/` change: `committedTenantIdentity()` already existed and
+`docs/testing-strategy.md` already required it. ⛔ **The status code is useless in both directions** —
+`FailedPasswordConfirmationResponse` returns `back()->withErrors(...)`, a 302, and success returns
+`redirect()->intended(...)`, also 302 — so every case asserts the **session**, and `FortifyRateLimitTest`
+is left alone as the file whose 302 assertion *looks* like a positive control.
 
-**Works, and is smaller than the row prices it.** No `app/` change at all. The proof must be a **pair**
-— a correct password asserting `assertSessionHasNoErrors()` *and*
-`assertSessionHas('auth.password_confirmed_at')`, plus a wrong password asserting
-`assertSessionHasErrors('password')` and the **absence** of that key. ⛔ The status is useless in both
-directions, which is the row's own finding turned into a test-design constraint. Without the negative
-arm the positive one is vacuous — a permissive `Fortify::confirmPasswordsUsing(fn () => true)` would
-satisfy it.
+**Row 3 — the audit spec (`M46`).** §1 no longer credits `submission` with `deleted`/`restored`, and
+records them as **not built** rather than not audited, because a SIEM forwarder built from that section
+would read a bare removal as a decision that destroying a response needs no trail. **`D14` filed**,
+recommending the surface stay unbuilt — with the cost the ticket hides: a soft-delete tombstone keeps
+`client_submission_uuid` reserved against the partial unique index, which is `ReapTenantDraftsJob`'s
+stated reason for hard-deleting.
 
----
+**Row 4 — baselines staleness (`M42`).** The count is path-filtered and **both numbers are printed**;
+`derive_triage()` carried the identical defect twenty lines away and is fixed with it. ⛔ **The ignore
+set is parsed from `ci.yml`, never copied**, with a floor so an empty harvest reports *cannot measure*
+rather than *nothing is ignored*. **Neither prescribed remedy was taken and both are wrong:** refusing a
+non-head sha in `gate-baselines.php` can never be satisfied, because that file is itself inside
+`paths-ignore`; stamping the distance into the document relocates the rot.
 
-**ROW 3 — The audit spec credits the `submission` scope with two events emitted nowhere. Filed by `M46`.**
+### Nine controls, each firing through the branch it names
 
-### Evidence verified
+`mutate.php` drove the two Pest arms. The rest reimplemented its discipline at the call site — tokens
+from files, exactly-once occurrence, sha256 must move, restore in a `finally` from a byte copy (`M62`) —
+because it drives Pest-in-a-container and nothing else. **sha256 returned exactly on every run.**
 
-The measurement is exactly right. `docs/audit-compliance-logging-spec.md` §1's `submission` row lists
-`created`, `updated`, `deleted`, `restored`, `exported` — **held**. Every `('submission', …)` pair
-written through `App\Support\Audit\AuditLogger::record()`, which its own docblock establishes as the
-single writer, is `created` (`SubmissionFinalizer`), `updated` (`SubmissionReviewService` and
-`SubmissionAnswerEditService`) and `exported` (`SubmissionPdfRequestService`) — **four sites, no
-`deleted`, no `restored`** — **held**. `AuditEvent::Restored` has exactly one emitter in the tree and
-it is against `form`, with the alias choice argued in place — **held**. `Submission` really does use
-`SoftDeletes`, and `softDeletesTz()` is in its create migration — **held**.
+Two are worth naming. `isResumeShell → true` reddens **five** cases including the pre-existing sweep
+case: that is the discriminator between *"skips resume links"* and *"skips everything"*, and the reason
+the substring spelling `url.includes('/f/resume/')` also has its own control. A permissive
+`confirmPasswordsUsing()` reddens the refusal, the vacuity guard and the negative control while leaving
+the success case green — which is correct, and is why both arms are required.
 
-### Premise verified
+### How the prediction fared
 
-⛔ **THE DECIDING PREMISE IS FALSE.** The row frames the fix as ambiguous between narrowing the document
-and *"these are owed, build them"*, which presumes the events are an omission at an existing call site.
-**There is no call site and no surface at all**: `SubmissionPolicy` has no `delete`, `restore` or
-`forceDelete` method; `RolePermissionSeeder` mints no `submissions.delete` permission; no route in
-`routes/` matches a submission delete/destroy/restore verb; there is no controller action and no UI
-affordance in `resources/js/Pages/submissions/`. The **only** code that deletes a submission is
-`ReapTenantDraftsJob`, which deliberately **hard**-deletes (its docblock explains that a soft-delete
-tombstone would keep `client_submission_uuid` reserved against the partial unique index) and runs in a
-queue context where `AuditLogger` is structurally malformed — it hard-codes `is_system_action = false`
-and resolves a null actor off a worker.
+**Right on the numbers.** All six jobs green; Pest and its baseline row moved; Vitest's file count did
+not (134); PHPStan did not move — its 18 local errors sit in ten files, none in this diff.
 
-**So `deleted_at` on `submissions` is dormant infrastructure for a feature that was never built**, and
-`ClientUuidResolver::isClaimed()` already says so in terms: *"Nothing soft-deletes a submission today"*.
-⚠️ Checked and clear: `AuditReplayMapTest` already parameterises `Deleted`/`Restored` over
-`replayRow('submission', …)` expecting null, so neither direction reddens it.
+⚠️ **Wrong where it mattered, and in the interesting direction.** The claim named Row 3's new
+spec-versus-emitters gate as the thing most likely to be red on arrival *"on a scope other than
+`submission`"*. **That was true and far too kind**: it is red on arrival on ten aliases, and the
+prediction did not think to doubt whether the comparison could be built at all. It cannot — not
+statically. The gate was not shipped, and the measurement is filed as its own row.
 
-### Remedy verdict
-
-**Neither prescribed direction is takeable as written.** *"Build them"* is a feature increment — policy
-methods, a permission key, routes, a controller, a trash UI, and a real correctness surface where a
-soft-deleted row's reserved uuid meets `ReapTenantDraftsJob`'s stated reason for hard-deleting. Not a
-batched row. *"Delete them from the document"* is takeable but ⚠️ **unprovable and unmutatable by
-construction**: all twelve files in `tests/Feature/Audit/` pin call sites and **none reads the
-document**, so nothing anywhere compares §1's normative table to the emitters.
-
-**Taken: narrow the document, recorded as "not built" rather than "not audited"** — the distinction
-matters because a downstream forwarder built from §1 would read a bare removal as a decision that
-submission deletion needs no trail — **and build the missing gate**, a Pest arm walking §1's table
-against the `record()` call sites harvested from `app/`. That closes the class rather than the
-instance. ⛔ **To be measured before the assertion is written: whether that gate is red on arrival on a
-scope other than `submission`.** Nothing has ever compared this document to the code, and `submission`
-is simply the scope somebody happened to check. `D14` is filed for the build-or-not question.
-
----
-
-**ROW 4 — `docs/gate-baselines.md` has no staleness signal, and it is stale right now. Filed by `M42`.**
-
-### Evidence verified
-
-🚩 **THE ROW'S OWN CITATIONS ARE DEAD, AND THE HEADLINE WITH THEM.** It cites run `33175202807` at sha
-`454d9ba` — `M39`'s merge, *"eleven commits behind the trunk"*. The file today is stamped from run
-`33821610871` at `af6a20a`, **`M69`'s own post-merge run, dated today**, and `git log` shows it
-regenerated on twelve consecutive close-outs since. *"Nothing measures or reports that"* is false in
-two places: `scripts/state.php`'s `derive_baselines()` computes and prints the distance, and
-`scripts/next.php` renders it into the generated hand-off every session reads at start-up.
-
-**What still holds:** `preflight.php` prints the provenance line verbatim without the distance, and
-`state.php` reports rather than gates.
-
-### Premise verified
-
-✅ **THE ROW'S OWN ADDENDUM IS THE LIVE HALF, AND IT IS FIRING ON THIS TREE RIGHT NOW.** The addendum
-warns that a raw commit distance over-reports, because most commits cannot produce a run at all, and
-that *"the signal cries wolf on every close-out and gets ignored exactly like the number it replaced"*.
-Measured against the three commits `state.php` currently counts: `5023067` touches only
-`docs/claims/lane-a.md` — **fully `paths-ignore`d**; `b1f719c` touches `PROGRESS.md`,
-`docs/backlog-triage.md`, `docs/claims/lane-a.md` and `docs/gate-baselines.md` — **all four
-`paths-ignore`d**; only `8352748` (`scripts/preflight.php`) could produce a run. **Reported 3, real 1 —
-a 3× over-report.** And `derive_triage()` carries the identical bare-count defect twenty lines away.
-
-⚠️ **One level the addendum does not reach:** even the corrected count of 1 cannot move a number in the
-table, because `scripts/preflight.php` is not scanned by any gate whose figure the file records.
-
-### Remedy verdict
-
-⛔ **BOTH PRESCRIBED REMEDIES ARE WRONG, AND ONE IS UNSATISFIABLE.** *"Have `gate-baselines.php` refuse
-a sha that is not `origin/main`'s head"* — the file is itself inside `ci.yml`'s `paths-ignore`, so its
-own regeneration commit produces no run, and a strict head-sha guard can never be satisfied at
-close-out time. *"Stamp the distance into the document"* — the document is wrong the instant the next
-commit lands, which is the same rot relocated.
-
-**Taken: the addendum.** Path-filter the count and report **both** numbers so the difference is
-visible rather than one constant silently replacing another. ⛔ **The ignore set is parsed from
-`ci.yml`, never copied** — it already exists there and is described in `docs/gate-baselines.md`, and a
-third literal copy in `scripts/state.php` is the exact duplication this project has banned twice. The
-parser needs its own floor: a block it fails to harvest must be an error, not a silent zero.
-
----
-
-Files: `resources/public-runtime/lib/brand-cache.ts` · `resources/public-runtime/__tests__/brand-cache.test.ts` ·
-`routes/api.php` (comment) · `tests/Feature/Auth/PasswordConfirmationTest.php` (new) ·
-`tests/Feature/Auth/TenantTwoFactorEnforcementTest.php` (prose) · `docs/testing-strategy.md` ·
-`docs/audit-compliance-logging-spec.md` · `tests/Feature/Audit/` (new arm) · `scripts/state.php` ·
-`scripts/next.php` · `docs/feature-backlog.md` · `docs/claims/decisions.md` (`D14`) ·
-`docs/claims/lane-a.md` · `PROGRESS.md` (own status block and the generated hand-off line only) ·
-`docs/gate-baselines.md` and `docs/backlog-triage.md` (both regenerated, not hand-edited).
-
-Shared artefacts taken: `docs/testing-strategy.md`, `docs/audit-compliance-logging-spec.md`,
-`docs/feature-backlog.md`, `docs/claims/decisions.md`, `PROGRESS.md` (own block only). No
-`openapi.json`, no `phpunit.xml`, no top-level `tests/e2e/*.spec.ts`.
-
-Paired files taken: none.
-
-Namespaces spent: nothing from either namespace — no migration prefix, no ADR number, no `§D`. One
-decision id, `D14`, in `docs/claims/decisions.md`.
-
-Prediction: all six jobs green. Pest moves and the `docs/gate-baselines.md` Pest row with it; Vitest's
-**file count does not move** (Row 1 adds cases to an existing spec, so the count stays as the baselines
-file records it); PHPStan cannot move — it scans `app`, `database` and `routes`, and the only `routes/`
-change is a comment. ⚠️ **The one I most expect to be wrong: Row 3's new spec-versus-emitters gate is
-red on arrival on a scope other than `submission`.** The spec calls itself *"a definitive, checkable
-list"*, nothing has ever checked it, and `submission` is only the scope somebody happened to look at.
+⚠️ **And one thing the plan got right for a reason worth keeping.** Pint was run **bare**, and it caught
+a `fully_qualified_strict_types` violation in the new test that the scoped form every hand-off used to
+prescribe passes cleanly. That is the open `M36` row demonstrating itself inside the increment that ran
+the bare form on purpose.
 
 ---
 

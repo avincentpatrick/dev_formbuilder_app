@@ -5247,6 +5247,19 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   ⛔ **`ci.yml` IS THE USER'S FILE AND THIS IS ALSO A HUB ROW** (seven open rows cite it). `M69` re-ran
   the job rather than editing the gate, and filed this the moment that was decided rather than leaving it
   in a release nobody greps. **Live.** Filed by `M69`.
+  ⚠️ **SECOND MEASURED OCCURRENCE, `M70` (2026-09-04), AND IT IS THE RECURRENCE THAT MAKES THIS WORTH
+  TAKING RATHER THAN TOLERATING.** It fired on `M70`'s own **post-merge run on the trunk**
+  (`33852073344`, sha `c096b8b`), reddening `main` at step 19 of 23 while the other five jobs went green
+  — and the same step had passed on that increment's PR run **twenty minutes earlier**, on the same
+  lockfile, with no JS manifest in the diff. ⚠️ **The error text differs from `M69`'s and the conflation
+  is identical**, which is the point: `M69` saw `npm warn audit network timeout`, `M70` saw
+  `npm warn audit 503 Service Unavailable - POST …/security/advisories/bulk` followed by
+  `{ error: 'Service Unavailable' }` and the same `npm error audit endpoint returned an error`. **Two
+  different registry failures, one indistinguishable red.** ⛔ **And the cost landed exactly where the row
+  predicts:** the operator re-ran a red gate on the trunk for the second increment running — the habit
+  this row exists to stop — because the alternative is leaving `main` red on a signal that measured
+  nothing. **Twice on consecutive increments means it is not a freak**, and a taker now has two logs to
+  build the fetch/judge split against.
 
 - **`minor` · `scripts/tracker-lint-controls.php` proves R7 against synthetic histories, and nothing
   proves it against a REAL GitHub `push` or squash.** Filed by `M49` (2026-08-31) at the moment the

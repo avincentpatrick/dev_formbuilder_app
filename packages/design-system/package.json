@@ -18,7 +18,7 @@
     "scripts": {
         "build:tokens": "node build-tokens.mjs",
         "storybook": "storybook dev -p 6006 --no-open",
-        "build-storybook": "npm run build:tokens && storybook build",
+        "build-storybook": "npm run build:tokens && storybook build --disable-telemetry",
         "test-storybook": "test-storybook"
     },
     "peerDependencies": {

@@ -16,7 +16,186 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M69`, the fourth batched increment: four rows, and the two that understate themselves (m69-batched-rows)
+## Status: NO ACTIVE CLAIM — `M69` is merged; a row's prescribed remedy can be INERT — it applies, changes nothing, and every gate stays green
+
+`M69` closed **four** rows and filed **one**, so the open count moved 83 → **80** and stayed at **zero
+`major`** with `UNMARKED=0`. `state.php` counts the tree; do not take that sentence's arithmetic on trust.
+
+⚠️ **THE ONE THING `M69` WOULD MOST LIKE TO HAND ON: A DOCBLOCK IS NOT A STATEMENT.** `M66` handed on that
+the remedy is the half nobody checks; `M67` that the **premise** is the level under that; `M68` that a
+remedy can be **structurally impossible and fail green**. `M69` adds the quietest failure yet: Row 1's row
+prescribes *"a typed shape on that method rather than an annotation"*, and the annotation form **applies
+cleanly, breaks nothing, and moves the artefact by exactly zero**. A full `@return array{…}` shape on
+`SyncSubmissionResultResource::toArray()` left all four properties `type: string` in the exported document.
+
+1. **It is not "the remedy was wrong" and not "the remedy was impossible".** It ran, it was valid PHP, every
+   test stayed green, and the thing it was written to change did not move. **The only way to know was to
+   export the document and diff it** — which is why the `Remedy verdict` field says *measure it BEFORE
+   writing the test*.
+2. ⛔ **THREE COROLLARIES, EACH MEASURED RATHER THAN REASONED.** (a) `BackedEnum::from()` is declared
+   `static`, which the installed Scramble does **not** resolve — the status property stayed a bare string
+   until an explicit `self` return type replaced it. (b) **Every comment inside the returned literal is
+   PUBLISHED** as that property's `description`; a draft shipped an eight-line note into `openapi.json`.
+   (c) The obvious spelling of the fix, `$error['details'] ?? null`, would have begun emitting
+   `details: null` on every refusal that carries none — **a silent wire change no existing assertion on
+   that surface could catch**, because Laravel's JSON assertions are all subset checks (`M56`).
+
+⚠️ **AND A CONTROL CAN SURVIVE WITH THE GATE ENTIRELY BLAMELESS.** `MU5`'s first form was
+`($error['details'] ?? null) ?: $this->when(…)` — for a null that is the same branch, so the mutant was
+**semantically identical to the original while its sha256 moved**. The harness reported SURVIVED and was
+right; the mutation was the defect. **A mutation that APPLIES is not yet a mutation that CHANGES ANYTHING**,
+and the sha256 check cannot tell the difference.
+
+⚠️ **THE DISCRIMINATOR PAIR IS THE OTHER HALF OF THAT LESSON.** Row 2's `MU2` adds a real non-notification
+job to `EXEMPT_JOBS` and expects GREEN — and green alone proves nothing, because a regex that never
+harvested the entry produces exactly the same result. `MU3` puts a **non-existent** class in the same slot
+and expects RED. Only the pair separates *"the filter excluded it"* from *"the parser never saw it"*.
+
+✅ **TWO ROWS' PREMISES MOVED, AND ONE HALF-REMEDY WAS ALREADY DISCHARGED SOMEWHERE ELSE.** Row 3 asks for
+*"a comment plus a decision about whether `paths-ignore` should also guard deploys"* — the tree had already
+decided: `ci.yml`'s `push` filter means a docs-only push produces **no run at all**, so no `workflow_run`
+event reaches `deploy.yml`. **No `D14` was filed**, deliberately: `decisions.md`'s own header says a
+resolved judgement does not belong there, and a second filter would be a second description of one fact.
+
+⛔ **TWO GATES WENT RED DURING THE BUILD AND BOTH WERE RIGHT.** `citation-liveness-lint` caught a
+19-line docblock shifting a backlog citation onto a blank line — the line-count rot class, and it had
+**already** drifted onto a closing brace before this increment, staying green only because a brace is not
+blank. `BacklogProvenanceTest` caught the new row naming its filer twice.
+
+⚠️ **RECORDED BECAUSE IT WILL BE BELIEVED OTHERWISE: PHPStan CRASHED ON THE CONTAINER'S 128M CAP AND
+EXITED 0.** With `--memory-limit=1G` it reports 18 errors, all `Access to an undefined property` on Eloquent
+models across 10 files, **none in the three `app/` files this increment touched**.
+
+⛔ **`D9` must never be started without an explicit answer.** Open decisions: `D1`, `D3`, `D4`, `D8`, `D9`,
+`D10`, `D11`, `D12`. `D12` — whether to end the M-series — is still the one thing that needs the user, and
+`M69` deliberately did not touch it. **`D13` is answered, proven four times, and not to be re-asked.**
+
+⛔ **RUN `php scripts/state.php` FOR EVERY NUMBER.**
+
+---
+
+## RELEASED — `M69`, the fourth batched increment: four rows, and the one whose prescribed remedy is INERT (merged as PR #260, `af6a20a`, 6/6 green with real step counts — Static analysis 23 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
+
+**Shipped 2026-09-04.** Branch `m69-batched-rows`. The fourth increment run at `D13`'s full width, and the
+first whose headline finding is about a remedy that *runs*.
+
+⛔ **THE FINDING WORTH CARRYING FORWARD: A DOCBLOCK IS NOT A STATEMENT, AND AN INERT REMEDY IS GREEN
+EVERYWHERE.** Row 1's row prescribes *"a typed shape on that method rather than an annotation"*. The
+annotation form was written first, exactly as prescribed: a full `@return array{…}` shape on
+`SyncSubmissionResultResource::toArray()`. It is valid PHP, it broke nothing, every test stayed green — and
+it moved `openapi.json` by **exactly zero bytes**. All four properties stayed `type: string`. `dedoc/scramble`
+infers `toArray()` from the STATEMENTS it can trace, and a docblock is not one.
+
+**This is a fourth distinct failure mode for a backlog row's remedy, and the series is worth reading in
+order:** `M66` — the remedy is the half nobody checks. `M67` — the **premise** is the level under that.
+`M68` — a remedy can be **structurally impossible** and fail GREEN. `M69` — a remedy can **apply cleanly and
+do nothing**, which no gate anywhere can report, because nothing is broken. **The only detector is to diff
+the artefact the remedy exists to move**, which is why `Remedy verdict` says *measure it BEFORE writing the
+test*.
+
+⚠️ **THREE COROLLARIES, EACH MEASURED RATHER THAN REASONED.**
+
+1. **`BackedEnum::from()` is declared `static`, and the installed Scramble does not resolve it.** The status
+   property stayed a bare string through an enum, a cast and a `@var`. An explicit `self` return type does
+   resolve — hence `SyncResultStatus::fromWire()`, which exists for the exported contract and says so at the
+   site so nobody "simplifies" it back.
+2. ⛔ **EVERY COMMENT INSIDE THE RETURNED LITERAL IS PUBLISHED** as that property's `description`. A draft
+   shipped an eight-line note about `when()` — arrows and all — into `openapi.json`. Explanations now sit
+   above the literal; the array carries only what an integrator should read.
+3. ⚠️ **THE OBVIOUS SPELLING OF THE FIX CHANGES THE WIRE FORMAT.** `$error['details'] ?? null` would have
+   begun emitting `details: null` on every refusal that carries none — and `ApiErrorEnvelope`'s docblock says
+   in terms that `details` is **omitted, not nulled**. `$this->when()` preserves the omission *and* marks the
+   property optional in the schema. `filter()` recurses into nested arrays: read in the installed framework
+   rather than assumed. **No existing assertion on that surface could have caught it**, because Laravel's
+   JSON assertions are all subset checks (`M56`) — which is why the new pins compare `array_keys`.
+
+⛔ **A CONTROL CAN SURVIVE WITH THE GATE ENTIRELY BLAMELESS.** `MU5`'s first form was
+`($error['details'] ?? null) ?: $this->when(…)`. For a null that is the same branch, so the mutant was
+**semantically identical to the original while its sha256 moved**. `mutate.php` reported SURVIVED and was
+right; the mutation was the defect. **A mutation that APPLIES is not yet a mutation that CHANGES ANYTHING**,
+and the sha256 guard — which exists precisely to catch a mutation that never applied — cannot see this.
+
+⚠️ **AND ITS TWIN: A GREEN CONTROL PROVES NOTHING WITHOUT A DISCRIMINATOR.** Row 2's `MU2` adds a real
+non-notification job to `EXEMPT_JOBS` and expects GREEN, to show the subset filter ignores it. Green is also
+what a regex that never harvested the entry would produce. `MU3` puts a **non-existent** class in the same
+slot and expects RED. Only the pair separates *"the filter excluded it"* from *"the parser never saw it"* —
+the `M49` shape, met here from the other side.
+
+### The four rows, and where each actually failed
+
+| Row | Filed | Evidence | Premise | Remedy |
+|---|---|---|---|---|
+| Sync contract types `submission`/`error` as bare strings | `M13`/`M68` | held, **understates itself twice** | held; its stated blocker had expired | ⛔ **inert as prescribed** |
+| Two mail lists must agree, nothing checks | `M66` | held | held, one nuance that changed the assertion | sound, shipped as written |
+| `deploy.yml`'s trigger changed, nothing says so | `M39` | held | **half already discharged elsewhere** | half of it was not a decision at all |
+| The template asks evidence + remedy, `M60`'s failure was neither | `M60` | held | held | two shapes offered, the user chose |
+
+⚠️ **ROW 1 UNDERSTATES ITSELF TWICE, both found by opening the citation and looking at what sat beside it.**
+`status` was a bare string too — the FIRST thing an integrator branches on, a closed set of five, enumerated
+nowhere. And `M68`'s widening says *"the four codes an integrator must branch on"*; the controller emits at
+least **nine**.
+
+⛔ **ROW 3's SECOND HALF WAS ALREADY DONE, AT A DIFFERENT SITE, AND NO DECISION WAS FILED.** The row asks for
+*"a comment plus a decision about whether `paths-ignore` should also guard deploys."* The tree had already
+answered: `ci.yml`'s `push` filter means a docs-only push **produces no run at all**, so no `workflow_run`
+event can reach `deploy.yml`, and `ci.yml`'s own comment says exactly that. **`D14` was deliberately NOT
+filed** — `decisions.md`'s header says a resolved judgement does not belong there, and a second filter inside
+`deploy.yml` would be a second description of one fact, the `M56` class. `deploy.yml` carries the pointer and
+the warning that the dependency runs the opposite way from how it reads: **shortening `ci.yml`'s list
+re-opens the deploy path.**
+
+✅ **ROW 4 SHIPS PAIRED, AND THE PAIRING IS NOT DECORATION.** `preflight.php` refuses an ACTIVE claim missing
+any field the TEMPLATE **declares** — derived, never restated, so adding a field needs no edit to the check.
+A Pest arm pins *which* fields the template declares, because a derived check inherits its source's failures:
+delete a heading and preflight quietly stops requiring it **while still printing `[ok]`**, which is worse
+than no gate. The two halves read from different places on purpose — the template from the working tree (the
+protocol you are building under), the claim from `origin/main` (an unpushed claim does not exist).
+**`M69` wrote its own claim with the field before the field existed**, so the increment introducing it was
+the first held to it.
+
+⚠️ **THE TEMPLATE PARSER'S FIRST DRAFT RETURNED AN EMPTY LIST AND EVERY CHECK PASSED VACUOUSLY.** It tested
+for a `## ` heading before the fence, and the template's example opens with `## Status: ACTIVE CLAIM`. Caught
+only by the empty-result floor at the call site — the `M48` class, an operation that succeeds on empty input.
+
+### Two gates went red during the build and both were right
+
+- **`citation-liveness-lint`** — the 19-line docblock added to `job-payload-lint.php` shifted every line
+  below it and tipped a backlog citation onto a blank line. **It had ALREADY drifted onto a closing brace
+  before this increment**, staying green only because a brace is not blank. Repaired only what `M69` moved.
+- **`BacklogProvenanceTest`** — the newly filed row recorded its filer twice.
+
+### Recorded because it will otherwise be believed
+
+⛔ **PHPStan CRASHED ON THE CONTAINER'S 128M CAP AND EXITED 0.** `vendor/bin/phpstan analyse` printed
+*"process crashed because it reached configured PHP memory limit"* and the shell reported success — the
+`M58` shape (`php artisan test`'s workers) in a second tool. With `--memory-limit=1G` it reports 18 errors,
+all `Access to an undefined property` on Eloquent models across 10 files, **none in the three `app/` files
+this increment touched.**
+
+⛔ **`npm audit` CONFLATES "THE REGISTRY IS UNREACHABLE" WITH "YOU ARE VULNERABLE", AND THIS PR HIT IT
+TWICE.** Two runs died at step 19 of 23 on a five-minute `network timeout at
+…/security/advisories/bulk`, with the same command against the same lockfile reporting `found 0
+vulnerabilities` locally and no JS manifest in the diff at all. **Filed as a row**, because it is the
+FALSE-RED twin of a class this repository has only ever met as false green — and worse in one way: a false
+red gets re-run until it passes, which teaches the operator to re-run a red gate.
+
+### How the prediction fared
+
+**Wrong in the interesting direction.** The claim named **Contract (OpenAPI)** as the gate it most expected
+to be wrong. Contract **passed on the first run and every run after**; the thing that was actually wrong was
+the *mechanism* reaching it, which the prediction did not think to doubt. PHPStan was predicted as *"may
+move"* — it did not, and the honest reason is that all 18 local errors are model-property phantoms in files
+this diff never touched. Pest moved on three rows as predicted. Pint, Vitest, axe and E2E were predicted
+unchanged and were. **No e2e spec is reached by this diff**, which is why none was run locally.
+
+⚠️ **ONE PROTOCOL NOTE, KEPT RATHER THAN TIDIED.** The claim was **extended once, correctly** — a pushed
+commit before `app/Enums/SyncResultStatus.php` or the controller were opened, which is what `M68` recorded
+failing to do. It could not be published with `git push origin HEAD:main`: the pre-push guard refused,
+because that form pushes the **whole branch** and three commits already stood on it. Published by cherry-pick
+onto a branch cut from `origin/main`, which is the recorded correct form.
+
+### The claim this released, verbatim — including the fields it answered before they existed
+
 
 Taken 2026-09-04. Branch `m69-batched-rows`, cut from `origin/main` at `08e2a31`, PR into `main`.
 

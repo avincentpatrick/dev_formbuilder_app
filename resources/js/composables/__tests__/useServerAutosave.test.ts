@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { nextTick, ref, reactive } from 'vue';
 
 import { createServerAutosave, type ServerAutosaveOptions } from '../useServerAutosave';
@@ -19,6 +19,23 @@ function jsonResponse(status: number, data: Record<string, unknown> = {}): Respo
     } as unknown as Response;
 }
 
+/**
+ * Every composable this file constructs, so `afterEach` can take its `beforeunload` listener off the
+ * shared window.
+ *
+ * ⛔ ADDED IN M71 BECAUSE THE FIRST DISPATCH-BASED CASE WOULD OTHERWISE HAVE MEASURED ITS NEIGHBOURS.
+ * happy-dom gives ONE `window` per test FILE, and until now nothing here disposed anything — so by the
+ * time a late case runs, every earlier harness still has an armed `beforeunload` handler attached, and
+ * several of them were deliberately left dirty (the 5xx and network-throw retry cases). A case that
+ * asserts "the page does NOT warn on close" by dispatching a cancelable `beforeunload` and reading
+ * `defaultPrevented` would therefore have been red no matter what the code under test did — a false
+ * failure that looks exactly like a real one. This is the isolation those cases need, and it is written
+ * as a teardown of the harnesses rather than a `window` reset so that it cannot mask a leak instead.
+ *
+ * `standDown()` and not `dispose()`: both detach the listener, and only `dispose()` writes.
+ */
+const liveHarnesses: Array<{ standDown: () => void }> = [];
+
 function harness(overrides: Partial<ServerAutosaveOptions> = {}) {
     const post = vi.fn(async () => jsonResponse(200, { last_saved_at: '2026-08-08T00:00:00+00:00', completeness_percent: 50 }));
     const answers = reactive<Record<string, unknown>>({});
@@ -37,11 +54,26 @@ function harness(overrides: Partial<ServerAutosaveOptions> = {}) {
         ...overrides,
     });
 
+    liveHarnesses.push(autosave);
+
     return { autosave, post, answers, enabled, currentStepKey };
+}
+
+/** Dispatch a real, cancelable `beforeunload` and report whether anything asked to stop the navigation. */
+function unloadIsWarned(): boolean {
+    const event = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(event);
+
+    return event.defaultPrevented;
 }
 
 beforeEach(() => {
     vi.useFakeTimers();
+});
+
+afterEach(() => {
+    liveHarnesses.forEach((autosave) => autosave.standDown());
+    liveHarnesses.length = 0;
 });
 
 describe('useServerAutosave — batching', () => {
@@ -681,5 +713,96 @@ describe('useServerAutosave — standing down for a caller that will write the d
         await autosave.settle();
 
         expect(post).not.toHaveBeenCalled();
+    });
+
+    // ── M71 — what standDown() takes away, and what the next keystroke must give back. ──────────────
+    //
+    // The live branch is the 422. `Encode.vue` keeps this component mounted only when the refusal carries
+    // an errors bag, and of the refusals the encode Submit can meet only `SubmissionValidationException`
+    // does — the conflict refusals return `back()` with a toast and no errors, so Inertia takes a fresh
+    // key, the component remounts, and a brand-new composable arms its own guards. The row that found
+    // this said "after a refused Submit", which is broader than the defect.
+
+    it('WARNS on close while dirty — the control, without which every negative below is vacuous', async () => {
+        // ⛔ THE DISCRIMINATOR FOR THE WHOLE GROUP. Every case below reads `event.defaultPrevented` after
+        // dispatching a cancelable `beforeunload`. If dispatching did not reach the composable at all —
+        // wrong event name, no listener attached, happy-dom not honouring `cancelable` — then "not warned"
+        // would be true for reasons having nothing to do with the code under test, and the two negatives
+        // below would pass while proving nothing.
+        const { answers } = harness();
+
+        answers.a = '1';
+        await nextTick();
+
+        expect(unloadIsWarned()).toBe(true);
+    });
+
+    it('re-arms the leave prompt on the next keystroke after standDown()', async () => {
+        // ⛔ THE DEFECT. `onBeforeUnload` was registered exactly once at construction and BOTH teardown
+        // paths removed it, with nothing anywhere re-adding it — so a keyer whose Submit came back 422
+        // kept typing into a page that still autosaved and would never again warn them on close. The
+        // composable's own note calls that prompt "the guarantee" to the last-chance POST's "courtesy".
+        const { autosave, answers } = harness();
+
+        answers.a = '1';
+        await nextTick();
+
+        autosave.standDown();
+        expect(unloadIsWarned()).toBe(false); // stood down, nothing typed since — nothing to warn about
+
+        answers.a = '12'; // the 422 came back and the keyer kept going
+        await nextTick();
+
+        expect(unloadIsWarned()).toBe(true);
+    });
+
+    it('does NOT re-arm the leave prompt after dispose() — the discriminator', async () => {
+        // ⛔ THE OTHER HALF OF THE PAIR, AND WHY `disposed` IS A FLAG RATHER THAN AN ASSUMPTION.
+        // `standDown()` is recoverable and `dispose()` is terminal; a re-arm that could not tell them
+        // apart would resurrect a listener on a component being unmounted. In a browser the watcher dies
+        // with the component so this is unreachable — but Vitest drives the composable with no component
+        // around it, which is exactly the shape that would hide the difference.
+        const { autosave, answers } = harness();
+
+        answers.a = '1';
+        await nextTick();
+
+        autosave.dispose();
+
+        answers.a = '12';
+        await nextTick();
+
+        expect(unloadIsWarned()).toBe(false);
+    });
+
+    it('re-arms the BACKSTOP on the next keystroke after standDown(), not just the debounce', async () => {
+        // ⛔ THE HALF NOBODY NOTICED, AND IT IS INVISIBLE TO THE PROMPT CASES ABOVE. `clearTimers()` clears
+        // the backstop interval as well as the debounce timer, and `schedule()` re-creates only the
+        // debounce timer — the interval was a single `setInterval` at construction. So the save loop
+        // "recovered" on the next keystroke while the periodic retry that rescues a save stuck in `error`
+        // was gone for the rest of the page's life.
+        //
+        // A failing post is what makes it observable: it leaves the work dirty, which is the backstop's
+        // own gate, and it is the same setup the backstop's original pair uses.
+        const post = vi.fn(async () => jsonResponse(500));
+        const { autosave, answers } = harness({ post });
+
+        answers.a = '1';
+        await nextTick();
+        await vi.advanceTimersByTimeAsync(150);
+        expect(post).toHaveBeenCalledTimes(1); // the failed attempt
+
+        autosave.standDown();
+
+        answers.a = '12';
+        await nextTick();
+        await vi.advanceTimersByTimeAsync(150); // the debounce, which always recovered
+        const afterTyping = post.mock.calls.length;
+
+        // ⛔ AND NOW NOBODY TYPES. Anything further can only come from the interval, which is the point:
+        // a case that let the debounce fire again here would pass on the unfixed code too.
+        await vi.advanceTimersByTimeAsync(1_100);
+
+        expect(post.mock.calls.length).toBeGreaterThan(afterTyping);
     });
 });

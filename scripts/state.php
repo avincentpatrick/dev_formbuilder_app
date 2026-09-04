@@ -54,6 +54,7 @@ const BACKLOG = 'docs/feature-backlog.md';
 const TRIAGE = 'docs/backlog-triage.md';
 const DECISIONS = 'docs/claims/decisions.md';
 const BASELINES = 'docs/gate-baselines.md';
+const CI_WORKFLOW = '.github/workflows/ci.yml';
 const EXCEPTIONS_LOG = 'docs/ux/exceptions-log.md';
 
 // ⛔ `ls` CANNOT TELL A RESERVATION FROM A DELETION, so the one gap in docs/adr/ is named here rather
@@ -711,6 +712,144 @@ function derive_d5(array $backlog, int $highestReleased): array
 }
 
 /**
+ * The `paths-ignore` set, READ FROM `ci.yml` AND NEVER COPIED (M70).
+ *
+ * ⛔ WHY THIS IS A PARSER AND NOT A CONSTANT. The set already exists in exactly one place that can
+ * decide anything — `ci.yml`'s `push` filter — and it is *described* in `docs/gate-baselines.md`. A
+ * literal list here would be a third statement of one fact, in the file whose whole job is to derive
+ * rather than restate, and this repository has twice recorded what that costs. When the set changes,
+ * the number below has to change with it or it silently starts lying in the other direction.
+ *
+ * ⚠️ IT HAS A FLOOR, AND THE FLOOR IS THE POINT. A YAML parse that harvests nothing would otherwise
+ * make every commit "non-ignored" and read as a perfectly healthy, slightly pessimistic answer — the
+ * succeeds-on-empty-input class this project has now measured five times. An empty harvest is
+ * returned as `null` (cannot measure), never as `[]` (nothing is ignored).
+ *
+ * @return list<string>|null null when the block cannot be found or is empty
+ */
+function ci_paths_ignore(): ?array
+{
+    // ⚠️ NOT `read_tracked_file()`, DELIBERATELY. That helper calls `cannot_measure()` on a missing or
+    // empty file, which ABORTS the whole run — so routing this through it would make every number
+    // `state.php` derives newly conditional on `ci.yml` being present. A missing workflow makes exactly
+    // one measurement impossible, and that is what this returns.
+    if (! is_file(CI_WORKFLOW)) {
+        return null;
+    }
+
+    $body = (string) file_get_contents(CI_WORKFLOW);
+
+    if (trim($body) === '') {
+        return null;
+    }
+
+    $patterns = [];
+    $inBlock = false;
+
+    // explode, never the regex newline class — `\R` without `/u` matches a byte INSIDE common UTF-8
+    // characters, and this file is full of them (M42).
+    foreach (explode("\n", $body) as $line) {
+        $line = rtrim($line, "\r");
+
+        if (preg_match('/^\s*paths-ignore:\s*$/', $line) === 1) {
+            $inBlock = true;
+
+            continue;
+        }
+
+        if (! $inBlock) {
+            continue;
+        }
+
+        // A list item under the block. Anything else — a blank line, a comment, the next key — ends it.
+        if (preg_match("/^\s*-\s*'([^']+)'\s*$/", $line, $m) === 1 || preg_match('/^\s*-\s*"([^"]+)"\s*$/', $line, $m) === 1) {
+            $patterns[] = $m[1];
+
+            continue;
+        }
+
+        if (trim($line) === '' || str_starts_with(ltrim($line), '#')) {
+            continue;
+        }
+
+        break;
+    }
+
+    return $patterns === [] ? null : $patterns;
+}
+
+/**
+ * How far a sha is behind the trunk, counted TWICE — raw, and excluding paths that cannot produce a run.
+ *
+ * ⛔ THE RAW COUNT OVER-REPORTS, AND M42's ROW PREDICTED EXACTLY THIS BEFORE IT WAS MEASURED: *"count
+ * only commits that touch a non-ignored path, or the signal cries wolf on every close-out and gets
+ * ignored exactly like the number it replaced."* A close-out is four or five commits of tracker,
+ * claim, baselines and triage — every one of them inside `ci.yml`'s `paths-ignore`, so none of them
+ * can produce a CI run at all, so none of them can invalidate a measurement. Reporting them as
+ * "behind" trains the reader to skip the line.
+ *
+ * ⚠️ BOTH NUMBERS ARE RETURNED AND BOTH ARE PRINTED. Silently swapping one constant for another would
+ * leave a reader unable to tell a quiet trunk from a broken parser, and the difference between the two
+ * is the only evidence that this function did anything.
+ *
+ * ⚠️ WHAT IT STILL CANNOT SAY, stated so it is not oversold: a non-ignored commit is one that COULD
+ * produce a run, not one that could move a number in the table. A `scripts/`-only change produces a
+ * run and cannot shift Pint's file count, PHPStan's `app`/`database`/`routes` scan, Pest, Vitest, axe
+ * or E2E. Narrowing further would mean modelling each gate's scope here, which is a second copy of
+ * `ci.yml` by another route.
+ *
+ * @return array{raw: int|null, effective: int|null, reason: string|null, ignored: list<string>|null}
+ */
+function commits_behind_trunk(?string $sha): array
+{
+    if ($sha === null) {
+        return ['raw' => null, 'effective' => null, 'reason' => 'no sha to count from', 'ignored' => null];
+    }
+
+    $range = escapeshellarg($sha.'..origin/main');
+    $status = 0;
+    $raw = trim(sh('git rev-list --count '.$range.' 2>&1', $status));
+
+    if ($status !== 0 || ! ctype_digit($raw)) {
+        return [
+            'raw' => null,
+            'effective' => null,
+            'reason' => 'git could not count from that sha — '.first_line($raw),
+            'ignored' => null,
+        ];
+    }
+
+    $patterns = ci_paths_ignore();
+
+    if ($patterns === null) {
+        return [
+            'raw' => (int) $raw,
+            'effective' => null,
+            'reason' => 'could not read a non-empty `paths-ignore` block from '.CI_WORKFLOW,
+            'ignored' => null,
+        ];
+    }
+
+    // `docs/claims/**` is a YAML glob; git's default pathspec does not treat `*` as crossing `/`, so a
+    // trailing `/**` becomes a plain directory pathspec, which git already means recursively.
+    $excludes = '';
+
+    foreach ($patterns as $pattern) {
+        $excludes .= ' '.escapeshellarg(':(exclude)'.preg_replace('#/\*\*$#', '', $pattern));
+    }
+
+    $status = 0;
+    $effective = trim(sh('git rev-list --count '.$range.' -- . '.$excludes.' 2>&1', $status));
+
+    return [
+        'raw' => (int) $raw,
+        'effective' => $status === 0 && ctype_digit($effective) ? (int) $effective : null,
+        'reason' => $status === 0 && ctype_digit($effective) ? null : 'git refused the exclude pathspec — '.first_line($effective),
+        'ignored' => $patterns,
+    ];
+}
+
+/**
  * @return array<string, mixed>
  */
 function derive_baselines(): array
@@ -737,21 +876,16 @@ function derive_baselines(): array
         $branch = $m[2];
     }
 
-    $behind = null;
-    $behindReason = null;
+    $counted = commits_behind_trunk($sha);
+    $behind = $counted['raw'];
+    $effective = $counted['effective'];
+    $behindReason = $sha === null ? 'no sha in the provenance line' : $counted['reason'];
 
-    if ($sha === null) {
-        $behindReason = 'no sha in the provenance line';
-    } else {
-        $status = 0;
-        $count = trim(sh('git rev-list --count '.escapeshellarg($sha.'..origin/main').' 2>&1', $status));
-
-        if ($status === 0 && ctype_digit($count)) {
-            $behind = (int) $count;
-        } else {
-            $behindReason = 'git could not count from that sha — '.first_line($count);
-        }
-    }
+    // ⛔ STALENESS IS DECIDED ON THE EFFECTIVE COUNT, AND THAT IS THE WHOLE CHANGE (M70). A commit
+    //    inside `ci.yml`'s `paths-ignore` produces NO RUN AT ALL, so it cannot have invalidated a
+    //    measurement and must not be reported as having done so. The raw count falls back only when
+    //    the effective one could not be taken — a missing answer must not read as a clean one.
+    $decidingCount = $effective ?? $behind;
 
     return [
         'run_id' => $run,
@@ -760,8 +894,10 @@ function derive_baselines(): array
         'branch' => $branch,
         'is_push_on_main' => $event === null ? null : ($event !== 'pull_request' && $branch === 'main'),
         'commits_behind_main' => $behind,
+        'commits_behind_effective' => $effective,
         'commits_behind_reason' => $behindReason,
-        'stale' => $behind === null ? null : $behind > 0,
+        'paths_ignored' => $counted['ignored'],
+        'stale' => $decidingCount === null ? null : $decidingCount > 0,
         'source' => BASELINES.', generated by scripts/gate-baselines.php',
     ];
 }
@@ -773,20 +909,17 @@ function derive_triage(): array
 {
     $line = first_line_matching(read_tracked_file(TRIAGE), '/^\*\*Measured /');
     $sha = $line !== null && preg_match('/at `([0-9a-f]{7,40})`/', $line, $m) === 1 ? $m[1] : null;
-    $behind = null;
 
-    if ($sha !== null) {
-        $status = 0;
-        $count = trim(sh('git rev-list --count '.escapeshellarg($sha.'..origin/main').' 2>&1', $status));
-
-        if ($status === 0 && ctype_digit($count)) {
-            $behind = (int) $count;
-        }
-    }
+    // ⛔ THE IDENTICAL BARE-COUNT DEFECT LIVED HERE TOO, TWENTY LINES FROM THE OTHER ONE (M70). Fixing
+    //    only the baselines half would have left a knowingly-wrong twin in the same file — and this one
+    //    over-reports harder, because a close-out regenerates `docs/backlog-triage.md` itself and that
+    //    commit is inside `paths-ignore`, so the file was counted as stale by its own regeneration.
+    $counted = commits_behind_trunk($sha);
 
     return [
         'sha' => $sha,
-        'commits_behind_main' => $behind,
+        'commits_behind_main' => $counted['raw'],
+        'commits_behind_effective' => $counted['effective'],
         'note' => 'generated by scripts/backlog-triage.php from the tree at that sha — regenerate it rather than editing it',
         'source' => TRIAGE,
     ];
@@ -1033,7 +1166,11 @@ function render(array $state): void
                                    $state['backlog']['ever_by_severity']['minor'].' minor, '.$state['backlog']['ever_by_severity']['nit'].' nit) — open and closed');
 
     if ($state['triage']['commits_behind_main'] !== null) {
-        info('triage census', $state['triage']['sha'].', '.$state['triage']['commits_behind_main'].' commits behind main');
+        info('triage census', $state['triage']['sha'].', '.
+            ($state['triage']['commits_behind_effective'] === null
+                ? $state['triage']['commits_behind_main'].' commits behind main (raw — the exclude pathspec failed)'
+                : $state['triage']['commits_behind_effective'].' commits behind main that could produce a CI run, of '.
+                  $state['triage']['commits_behind_main'].' raw'));
         note((string) $state['triage']['note']);
     } else {
         // ⛔ THIS else IS THE POINT OF THE BLOCK, AND IT WAS MISSING (M65). The baselines report a
@@ -1049,13 +1186,33 @@ function render(array $state): void
 
     section('Gate baselines');
 
+    // Both counts, always, and never one in place of the other: the difference between them is the
+    // only evidence the exclude pathspec did anything, and a reader who sees a single number cannot
+    // tell a quiet trunk from a parser that harvested nothing (M70).
+    $rawBehind = $state['baselines']['commits_behind_main'];
+    $effectiveBehind = $state['baselines']['commits_behind_effective'];
+    $counts = $effectiveBehind === null
+        ? $rawBehind.' raw (could not exclude '.CI_WORKFLOW."'s paths-ignore)"
+        : $effectiveBehind.' that could produce a CI run, of '.$rawBehind.' raw';
+
     if ($state['baselines']['stale'] === true) {
-        warn('measured at '.$state['baselines']['sha'].', '.$state['baselines']['commits_behind_main'].
-             ' commits behind origin/main — regenerate it from a post-merge run');
+        warn('measured at '.$state['baselines']['sha'].', '.$counts.
+             ' — regenerate it from a post-merge run');
     } elseif ($state['baselines']['stale'] === false) {
-        pass('measured at the head of origin/main');
+        if ((int) $rawBehind > 0) {
+            pass('measured at '.$state['baselines']['sha'].' — '.$counts.', so nothing since it could have');
+            note('A commit inside '.CI_WORKFLOW."'s `paths-ignore` produces NO RUN AT ALL, so it cannot");
+            note('have invalidated this measurement. A close-out is four or five such commits, which is');
+            note('why the raw count cried wolf on every one of them and taught the reader to skip it.');
+        } else {
+            pass('measured at the head of origin/main');
+        }
     } else {
         warn('staleness not measurable: '.(string) $state['baselines']['commits_behind_reason']);
+    }
+
+    if ($state['baselines']['paths_ignored'] !== null) {
+        info('paths-ignore, read from '.CI_WORKFLOW, implode(' · ', $state['baselines']['paths_ignored']));
     }
 
     info('run', (string) ($state['baselines']['run_id'] ?? 'NOT FOUND'));

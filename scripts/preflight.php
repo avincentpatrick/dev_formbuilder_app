@@ -188,7 +188,14 @@ if ($templateBody === false || $templateBody === null) {
     warn('could not read docs/claims/TEMPLATE.md — the required fields cannot be derived');
 } elseif ($claimStatus === null) {
     warn("no `## Status:` heading in {$claimFile} on origin/main");
-} elseif (stripos($claimStatus, 'ACTIVE CLAIM') === false) {
+    // ⛔ ANCHORED AT THE START, NOT A SUBSTRING SEARCH — AND THE FIRST DRAFT GOT THIS WRONG ON THE
+    //    TRUNK, IN M69'S OWN CLOSE-OUT. It asked `stripos($claimStatus, 'ACTIVE CLAIM') === false`,
+    //    and **`NO ACTIVE CLAIM` CONTAINS `ACTIVE CLAIM`** — so the moment the claim was released the
+    //    check read the released status as an open claim and blocked the next session's preflight.
+    //    ⚠️ The controls did not catch it because every one of them mutated an ACTIVE claim and watched
+    //    the red arm fire. **The SKIP path was never controlled**, which is the same shape as a green
+    //    gate nobody has proved: an arm you never make fire is an arm you have not tested.
+} elseif (! str_starts_with(ltrim($claimStatus), '## Status: ACTIVE CLAIM')) {
     pass('no active claim on origin/main — nothing to check');
     note('The fields are required of an ACTIVE claim. A released or retired lane answers nothing.');
 } else {

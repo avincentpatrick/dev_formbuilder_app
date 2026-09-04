@@ -435,13 +435,20 @@ it('keeps the password-confirmation step-up reachable, because enrolment runs th
     // anywhere, and measured on the live route table: `two-factor.enable` carries `RequirePassword`. Gate
     // this and carve-out 1 is unreachable, one step further back.
     //
-    // ⛔ THE ASSERTION IS ABOUT THE GATE AND DELIBERATELY NOT ABOUT THE CREDENTIAL, BECAUSE A SUCCESSFUL
-    // CONFIRM-PASSWORD IS UNREACHABLE FROM THIS HARNESS. `config/auth.php`'s provider is `rls_aware`, so
-    // `RlsAwareUserProvider` resolves the user on the SEPARATE `pgsql_auth` connection — which cannot see
-    // `RefreshDatabase`'s open transaction, so `$guard->validate()` finds no row and Fortify answers "the
-    // provided password was incorrect" no matter what is posted. The first draft of this case asserted
-    // `assertSessionHasNoErrors()` and failed for exactly that reason, which is the same separate-session
-    // trap `FortifyRouteContextTest::rereadUser()`'s docblock records from the other direction.
+    // ⛔ THE ASSERTION IS ABOUT THE GATE AND DELIBERATELY NOT ABOUT THE CREDENTIAL, AND THE REASON WAS
+    // NARROWED BY M70 (2026-09-04). `config/auth.php`'s provider is `rls_aware`, so `RlsAwareUserProvider`
+    // resolves the user on the SEPARATE `pgsql_auth` connection — which cannot see `RefreshDatabase`'s open
+    // transaction, so `$guard->validate()` finds no row and Fortify answers "the provided password was
+    // incorrect" no matter what is posted. The first draft of this case asserted `assertSessionHasNoErrors()`
+    // and failed for exactly that reason, which is the same separate-session trap
+    // `FortifyRouteContextTest::rereadUser()`'s docblock records from the other direction.
+    //
+    // ⚠️ WHAT IS NO LONGER TRUE: this used to say a successful confirm-password is unreachable from the
+    // Pest harness FULL STOP. It is unreachable from THIS file's fixtures, which are `User::factory()`
+    // identities by design because every other case here is about tenant membership and enrolment. With a
+    // COMMITTED identity it is perfectly reachable, and `tests/Feature/Auth/PasswordConfirmationTest.php`
+    // now asserts it in both directions. Swapping this case's fixture would buy nothing and would drag a
+    // credential concern into a file about a middleware.
     //
     // So what is pinned is the only thing this file is entitled to claim: the request reached Fortify's
     // own credential check instead of being bounced to enrolment. A gated route never gets that far.

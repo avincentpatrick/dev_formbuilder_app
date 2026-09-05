@@ -147,7 +147,7 @@ it('CATCHES a dropped line — one that leaves the tracker and never reaches the
     [$status, $output] = trackerSurgeryRun($fixture['paths'], $fixture['addedBytes']);
 
     expect($status)->toBe(TRACKER_SURGERY_FAILED, $output);
-    expect($output)->toContain('A1 multiset');
+    expect($output)->toContain('left the tracker without arriving');
 });
 
 it('CATCHES a changed byte — a line that arrives in the archive almost identical', function (): void {
@@ -162,8 +162,8 @@ it('CATCHES a changed byte — a line that arrives in the archive almost identic
     [$status, $output] = trackerSurgeryRun($fixture['paths'], $fixture['addedBytes']);
 
     expect($status)->toBe(TRACKER_SURGERY_FAILED, $output);
-    expect($output)->toContain('A1 multiset');
-    expect($output)->toContain('A4 slice hash');
+    expect($output)->toContain('left the tracker without arriving');
+    expect($output)->toContain('do not appear in the archive as ONE contiguous');
 });
 
 it('CATCHES a multiplicity collision that a SET comparison would pass', function (): void {
@@ -181,7 +181,7 @@ it('CATCHES a multiplicity collision that a SET comparison would pass', function
     [$status, $output] = trackerSurgeryRun($fixture['paths'], $fixture['addedBytes']);
 
     expect($status)->toBe(TRACKER_SURGERY_FAILED, $output);
-    expect($output)->toContain('A1 multiset');
+    expect($output)->toContain('left the tracker without arriving');
 });
 
 it('CATCHES byte conservation off by the JOIN SEAM — M41 failed here by exactly one byte', function (): void {
@@ -194,7 +194,7 @@ it('CATCHES byte conservation off by the JOIN SEAM — M41 failed here by exactl
     [$status, $output] = trackerSurgeryRun($fixture['paths'], $fixture['addedBytes'] - 1);
 
     expect($status)->toBe(TRACKER_SURGERY_FAILED, $output);
-    expect($output)->toContain('A2 byte conservation');
+    expect($output)->toContain('before + declared_added != after');
     expect($output)->toContain('JOIN SEAM');
 });
 

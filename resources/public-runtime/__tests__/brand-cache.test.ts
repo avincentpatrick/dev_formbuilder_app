@@ -79,6 +79,12 @@ describe('syncBrandedShellCache', () => {
         expect(doFetch).toHaveBeenCalledTimes(1);
         expect(doFetch).toHaveBeenCalledWith(OTHER_SHELL, { credentials: 'omit' });
         expect(put).toHaveBeenCalledTimes(1);
+        // ⛔ M74 — THE COUNT ABOVE CANNOT SEE THIS FILE'S CENTRAL DEFECT, WHICH IS WHY THE KEY IS NOW
+        // ASSERTED. `refreshCachedShells()` re-`put`s under the request object it took from
+        // `cache.keys()`, and a mutant writing the right response to the WRONG key —
+        // `cache.put(entries[0], response)` — kept all ten cases in this file green. Here `entries[0]`
+        // is CURRENT_SHELL, the one entry the sweep is supposed to skip.
+        expect(put).toHaveBeenCalledWith({ url: OTHER_SHELL }, { status: 200 });
         expect(await db.app_state.get(BRAND_VERSION_KEY)).toEqual({
             key: BRAND_VERSION_KEY,
             value: 'new000000000',
@@ -113,6 +119,11 @@ describe('syncBrandedShellCache', () => {
         expect(doFetch).toHaveBeenCalledTimes(1);
         expect(doFetch).toHaveBeenCalledWith(OTHER_SHELL, { credentials: 'omit' });
         expect(put).toHaveBeenCalledTimes(1);
+        // ⛔ M74 — THE HIGHEST-CONSEQUENCE SPELLING OF THE SAME MUTANT, AND THE REASON THIS CASE GETS
+        // THE ASSERTION TOO. Here `entries[0]` is RESUME_SHELL, so `cache.put(entries[0], …)` writes
+        // the ordinary shell's body under the token-bearing key — renewing on disk exactly the
+        // credential-bearing document the skip above exists to let expire. The count is blind to it.
+        expect(put).toHaveBeenCalledWith({ url: OTHER_SHELL }, { status: 200 });
         await db.delete();
     });
 
@@ -182,6 +193,11 @@ describe('syncBrandedShellCache', () => {
 
         expect(doFetch).toHaveBeenCalledTimes(2);
         expect(put).toHaveBeenCalledTimes(1);
+        // ⛔ M74 — AND THIS ONE PINS A PROPERTY NOTHING IN THE FILE ASSERTED AT ALL: that the sweep
+        // cached the entry that SUCCEEDED rather than the one that failed. `entries[0]` is the dead
+        // URL, whose fetch rejected, so a count of 1 is satisfied by writing a response under the key
+        // that never produced one.
+        expect(put).toHaveBeenCalledWith({ url: OTHER_SHELL }, { status: 200 });
         await db.delete();
     });
 

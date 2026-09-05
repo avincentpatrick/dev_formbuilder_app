@@ -182,10 +182,16 @@ it('refuses a run reporting no usable head sha', function (): void {
     expect($status)->toBe(1, $output);
     expect($output)->toContain('no usable head sha');
 
-    // ⚠️ THE WEAKEST ARM, AND SAYING SO IS THE POINT. Deleting the sha-shape check does not make this
-    //    case pass — git would be handed an empty rev and the ancestry arm would refuse instead. It
-    //    is non-vacuous only at the level of the MESSAGE, which is why the assertion is on the
-    //    sentence. It is defence-in-depth for a diagnostic, not an independent control.
+    // ⚠️ THE FIRST DRAFT OF THIS COMMENT WAS WRONG AND THE MUTATION SAID SO, WHICH IS WHY IT IS
+    //    CORRECTED HERE RATHER THAN QUIETLY. It predicted that disarming the sha-shape check would
+    //    leave this case GREEN — git handed an empty rev, the ancestry arm refusing instead, the
+    //    control non-vacuous only at the level of the message. Measured: disarming it turns this case
+    //    RED on its own. The stub answers `--is-ancestor` from its fixture and does not model git's
+    //    rejection of an empty rev, so the run sails past both later arms and exits 0.
+    // ⚠️ SO THE ARM IS INDEPENDENTLY CONTROLLED HERE AND ONLY PARTLY LOAD-BEARING IN PRODUCTION,
+    //    where real git would refuse the empty rev a moment later with a different sentence. It earns
+    //    its place as a diagnostic — "no usable head sha" names the cause, "git could not decide"
+    //    does not — and the message assertion below is what pins that distinction.
     expect($output)->not->toContain('could not decide whether');
 });
 

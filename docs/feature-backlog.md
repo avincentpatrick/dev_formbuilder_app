@@ -5793,8 +5793,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   *"is STILL DIRTY after the restore. Do not trust this tree."* — it cannot fire if git is what broke,
   and git is **absent inside the app container**, so any in-container invocation has a permanently
   vacuous `R2`. ✅ The correct pattern is 60 lines away in the same file: the `php -l` probe captures
-  `$lintStatus` through `shell_out`'s existing by-ref third parameter and checks it. **Live.** Filed by
-  `M72`.
+  `$lintStatus` through `shell_out`'s existing by-ref third parameter and checks it.
+  **Live.** Filed by `M72`.
 
 - **`minor` · `lib/brand-cache.ts` is a SECOND writer to `guest-shell-html`, and it renews a mis-cased
   key with a response a navigation cannot use.** Found during `M72`'s fan-out; `M61`'s docblock
@@ -5810,8 +5810,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `copyRedirectedCacheableResponsesPlugin` for this class and nothing here uses it. ⚠️ **Latent — it
   needs a device primed before `M61`**, and this repository cannot tell whether one exists, which is the
   same shape as the mixed-case `public_slug` row. But it means canonicalizing the origin response does
-  not heal already-cached shells, and that is a premise `M61` recorded as settled. **Latent.** Filed by
-  `M72`.
+  not heal already-cached shells, and that is a premise `M61` recorded as settled.
+  **Latent.** Filed by `M72`.
 
 - **`minor` · A draft is pinned to TWO different form versions in two tables after a silent share-token
   re-mint.** Found during `M72`'s fan-out while verifying the `draft_answers` key row, and it is the
@@ -5879,7 +5879,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   **Live.** Filed by `M72`.
 
 - **`minor` · The `npm audit` judge makes a REQUIRED context green while nothing was measured, and that
-  is a deliberate trade rather than an oversight.** Filed by `M72` (2026-09-05) at the moment the
+  is a deliberate trade rather than an oversight.** Recorded by `M72` (2026-09-05) at the moment the
   decision was taken, rather than left as a comment in the workflow. When the advisory endpoint is
   unreachable the judge exits `2`, `ci.yml` renders a `::warning::` and a job summary, and the step exits
   `0` — so `Static analysis, style & security` is green having judged **no dependency at all**. ⛔ **That

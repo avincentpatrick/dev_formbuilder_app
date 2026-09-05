@@ -153,7 +153,7 @@ export async function solveChallenge(challenge: Challenge): Promise<ChallengeSol
 
         // Every ~5k candidates. Frequent enough that a slow fallback solve stays interruptible, rare
         // enough that the yields themselves do not dominate the runtime.
-        /* M75 POSITIVE CONTROL — yield deleted */
+        if (n % 5000 === 4999) await yieldToEventLoop();
     }
 
     throw new Error(`Challenge unsolvable within ${challenge.maxnumber}`);

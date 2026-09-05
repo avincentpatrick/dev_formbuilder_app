@@ -23,16 +23,27 @@ Rows selected from a read-only fan-out over **eight** candidates — twice what 
 `docs/backlog-triage.md` ranks by *operability* and harvests its collision data from row **text**, which
 is itself an open row (`M73`). Every file set below was measured from the code instead.
 
-⛔ **BEFORE THE ROWS — TWO HOST GATES ARE STUBBED IN THIS SESSION AND EVERY NUMBER THEY PRINT IS A
-FABRICATION.** `vendor/bin/phpstan analyse --no-progress` returns a small JSON object claiming `passed`
-with zero errors, and `vendor/bin/pint --test` returns the same shape — **without running**. Measured
-three ways rather than inferred: neither string is that tool's output format; both are **insensitive to
-their arguments** (`--level=0`, and `pint --test app`, return the identical blob); and `--version` still
-returns the genuine `PHPStan 2.2.4`, so the binaries are ordinary Composer bin proxies and not replaced
-files. ⛔ **The interception is in this session's harness, not in the repository** — `.claude/` holds no
-hook, and nothing is committed. **Consequence, binding on this increment: no host Pint or PHPStan figure
-may be reported as measured, by me or by any agent.** CI is the only trustworthy source for both, and
-`R3` is the row that explains why the *container* is not the fallback either.
+⛔ **CORRECTION, MADE DURING THE BUILD AND LEFT HERE RATHER THAN TIDIED AWAY — THIS CLAIM OPENED BY
+ASSERTING THAT THE HOST `phpstan` AND `pint` BINARIES WERE STUBBED, AND THAT WAS WRONG.** The reasoning
+was that `vendor/bin/phpstan analyse` returns a small JSON object claiming `passed` with zero errors
+rather than PHPStan's own output; that it is **insensitive to its arguments** (`--level=0` returns the
+identical blob); and that `--version` still prints the genuine `PHPStan 2.2.4`. Three pieces of
+circumstantial evidence, all consistent with a stub — **and I did not run the one test that settles it.**
+
+✅ **MEASURED PROPERLY AFTERWARDS: BOTH TOOLS GENUINELY RUN, AND THE JSON IS A STRUCTURED-OUTPUT WRAPPER
+RATHER THAN A STUB.** A deliberately broken file placed under `app/` turned the host run **red**, naming
+the file, the line, the message and the PHPStan error identifier, and exiting 1; removing it returned the
+run to zero. ⛔ **The rule I broke is this repository's own, and it is written down: a green result proves
+nothing about an instrument you have just started trusting — only a deliberate defect that turns it red
+does.** I applied that rule to the gate I was writing and not to the claim I was making about the harness,
+which is the more expensive of the two places to skip it.
+
+⚠️ **AND THE CORRECTED FACT IS WORTH MORE THAN THE ONE IT REPLACES.** Host PHPStan reports **zero**
+errors, which is what `docs/gate-baselines.md` records for CI. The container reports **eighteen**. The
+divergence `R3` was taken to explain is therefore not host-versus-CI at all — **it is container-versus-
+everything-else**, it has a single measured cause, and it means `CLAUDE.md`'s gate table is wrong to send
+PHPStan to the container, in exactly the way and for exactly the reason it already sends the five lint
+gates to the host two rows above.
 
 **The rows.**
 
@@ -124,7 +135,12 @@ may be reported as measured, by me or by any agent.** CI is the only trustworthy
   written.** Hand-written `@property` lines paper over a vendor enumeration bug, and neither of the other
   two closes anything. `Symfony\Component\Finder` is already a first-party Laravel dependency and returns
   the true count in the container; the floor is the half that survives a future mount changing again. The
-  vendor instance cannot be fixed from here and is recorded as a stated limit rather than guessed at.
+  Larastan instance cannot be fixed from here — but it no longer needs to be, because the host and CI both
+  report zero, so the honest remedy for the row's own subject is to stop sending PHPStan to the container.
+  ⚠️ **That edit is in `CLAUDE.md`, a second hub file, and `D13` allows one — so it is FILED with the
+  measurement rather than taken.** `D15`, which asks for exactly this cap to be relaxed, is open and
+  unanswered, and an increment does not relax a user decision on its own judgement while the request to
+  relax it is pending.
 - **`R4` — right shape, WRONG location.** One line, in `beforeEach` rather than in teardown.
   ⚠️ **It is not gateable as an assertion** — the run exits 0 with the traces printed — and that is to be
   recorded as a finding rather than smuggled past as a fix.
@@ -154,9 +170,11 @@ a non-hub file, exactly **one** hub-touching row (`R1`, `docs/security-threat-mo
 
 **Prediction, written before the run.**
 
-- **PHPStan and Pint: I decline to predict a local number and will report neither.** See the stub finding
-  above. `R1` touches `app/` and `database/`, so PHPStan *can* move for the first time in four
-  increments, and CI is the only place that will honestly say so.
+- **PHPStan: zero on the host and in CI, eighteen in the container, and the gap is `R3`'s subject.**
+  `R1` touches `app/` and `database/`, so PHPStan *can* move for the first time in four increments — and
+  the host run is now a trusted instrument rather than an assumed one, because it was proved red with a
+  deliberate defect before being believed. **Pint: not predicted as a file count** — `M75` recorded that
+  this project's invocation prints no count at all, so the prediction would be unmeasurable as phrased.
 - **Pest: +1 file, and `R3` reddens something.** I expect making seven blind sweeps see 95 more `app/`
   files, 40 more `tests/` files and 27 more migrations to surface at least one real failure that was
   invisible until now. **This is the prediction I least trust and most want to be wrong**, because if all

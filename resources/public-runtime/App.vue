@@ -533,6 +533,7 @@ function onRestart(): void {
             :initial-answers="retainedAnswers"
             :notice="driftNotice"
             :resolving="resolveMode"
+            :resolving-uuid="resolvingUuid"
             :resume="resumeSeed"
             :search="initialSearch"
             :now="sessionNow"

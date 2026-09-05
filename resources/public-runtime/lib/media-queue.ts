@@ -73,6 +73,34 @@ export async function attachToSubmission(db: MeridianDb, attachmentLocalIds: str
         .modify({ client_submission_uuid: uuid });
 }
 
+/**
+ * Move blobs from one outbox row to another — and ONLY those the source row already owns.
+ *
+ * ⛔ INCREMENT M72 — WHY THIS IS NOT `attachToSubmission` WITH A DIFFERENT FILTER. That function claims
+ * only rows whose `client_submission_uuid` is null, and M21 narrowed it to exactly that after an
+ * abandoned draft's `local:` refs were silently re-pointed and a stranger's photo was uploaded as
+ * somebody else's attachment. The conflict-review case needs the opposite direction — media picked
+ * DURING a review is already owned by the review's fresh uuid and must follow the reviewed answers back
+ * onto the parked row — so it is a second, narrower write rather than a loosened first one.
+ *
+ * `from` is required and filtered on for that reason: without it this is the M21 defect with a new name.
+ */
+export async function repointToSubmission(
+    db: MeridianDb,
+    attachmentLocalIds: string[],
+    from: string,
+    to: string,
+): Promise<void> {
+    if (attachmentLocalIds.length === 0 || from === to) {
+        return;
+    }
+    await db.media_queue
+        .where('attachment_local_id')
+        .anyOf(attachmentLocalIds)
+        .filter((row) => row.client_submission_uuid === from)
+        .modify({ client_submission_uuid: to });
+}
+
 export function listForSubmission(db: MeridianDb, uuid: string): Promise<MediaQueueRow[]> {
     return db.media_queue.where('client_submission_uuid').equals(uuid).toArray();
 }

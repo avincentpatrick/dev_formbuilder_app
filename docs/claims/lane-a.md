@@ -70,11 +70,25 @@ and not to be re-asked.**
 
 ## RELEASED — `M72`, the seventh batched increment: four rows closing six, and the first whose shape was decided by a constraint rather than by value (merged as PR #263, `05368b2`, 6/6 green with real step counts - Static analysis 24 * E2E 20 * Contract 16 * Frontend 12 * Pest 11 * axe 11)
 
-**Shipped 2026-09-05.** Branch `m72-batched-rows`. Every claimed file was edited, and four were opened
-that the claim did not name — `packages/design-system/package-lock.json` (reverted, see below),
-`tests/fixtures/npm-audit/*.json` (claimed by wildcard), and no others. The claim was **not** extended
-mid-build; nothing collided, because there is one writer, which is why it went unnoticed and not why it
-was acceptable.
+**Shipped 2026-09-05.** Branch `m72-batched-rows`. **A model good enough to write a test from is not a
+measurement** — three beliefs were falsified by probing this increment that reading could not have
+reached, one of them held by a subagent reasoning correctly from vendor source.
+
+⛔ **AND THE HAND-OFF THIS RELEASE GENERATED PROVED THE `M42` ROW I HAD JUST MARKED `latent`.** Its first
+draft opened *"Every claimed file was edited, and four were opened that the claim did not name…"* —
+`scripts/next.php` takes the lead paragraph, and the rendered hand-off spent its whole budget on a file
+list and clipped before reaching a single finding. I marked that row **latent** hours earlier on the
+grounds that the harm *"does not reproduce on today's four newest releases"*, and its premise said
+exactly why that was temporary: the lesson-first convention is nowhere written down and
+`docs/claims/TEMPLATE.md` still prescribes the manifest form, so it is *"one template-faithful author
+away from reverting"*. **I was that author, in the same increment.** The lead is now the lesson; the row
+is re-marked **live** with this as its measurement. ⚠️ A `latent` verdict is a claim about the world
+holding still, and this one did not survive its own close-out.
+
+**On the claim itself:** every claimed file was edited, and two paths were opened that it did not name —
+`packages/design-system/package-lock.json` (reverted; see below) and `tests/fixtures/npm-audit/*.json`
+(claimed by wildcard). The claim was **not** extended mid-build; nothing collided, because there is one
+writer, which is why it went unnoticed and not why it was acceptable.
 
 ### ⛔ The finding worth carrying forward: a proof can succeed and still refute the thing it was asked to confirm
 

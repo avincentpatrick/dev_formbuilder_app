@@ -4135,6 +4135,19 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   times by heuristics over prose, which is the same argument that produced the positional `[state …]`
   block in the same increment. **Filed by M42 (2026-08-29)**, not fixed because `scripts/` changes need
   a PR and pushing one straight to `main` would bypass the gate that makes the trunk trustworthy.
+  ➕ **RE-VERIFIED AND THEN DEMONSTRATED BY `M72` (2026-09-05), IN THAT ORDER, WHICH IS THE FINDING.**
+  A read-only pass marked it **`latent`**: the harm does not reproduce on the four releases in the window,
+  and remedy (b) is **falsified** — *"every release already writes [its first `###`] as a one-line summary
+  of its own finding"* is true of **zero of the newest nine**; six are administrative headings. ⛔ **Then
+  `M72`'s own release put a manifest straight back into the window.** Its first draft opened *"Every
+  claimed file was edited, and four were opened that the claim did not name…"*, and the rendered hand-off
+  spent its whole budget on a file list and clipped before a single finding — hours after the same
+  increment called the row latent. The row's premise had said exactly why that verdict was temporary: the
+  lesson-first convention is nowhere written down and `docs/claims/TEMPLATE.md` still **prescribes** the
+  manifest form, so it is *"one template-faithful author away from reverting"*. **Back to `live`**, with a
+  measurement rather than an argument, and with the lesson that **a `latent` verdict is a claim about the
+  world holding still**. ⚠️ **And the bigger waste is in a place the row never looks:** `next.php`
+  applies `clip()` to the summary alone and renders the HEADING unbounded — filed separately.
   **Live.** Filed by `M42`.
 
 

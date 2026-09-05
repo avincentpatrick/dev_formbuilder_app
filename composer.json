@@ -80,6 +80,7 @@
         "mail-attribute-lint": "@php scripts/mail-attribute-lint.php",
         "tracker-lint": "@php scripts/tracker-lint.php",
         "tracker-lint-controls": "@php scripts/tracker-lint-controls.php",
+        "tracker-surgery": "@php scripts/tracker-surgery.php",
         "citation-liveness-lint": "@php scripts/citation-liveness-lint.php",
         "preflight": "@php scripts/preflight.php",
         "gate-baselines": "@php scripts/gate-baselines.php",

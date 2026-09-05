@@ -1514,7 +1514,34 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   change which of the two is refused.** The remedy worth costing first is the cheapest one: `submit()` may
   not need the last-chance write at all, since the POST carries the full answer map anyway and the promote
   branch re-saves it — the comment defending the write says as much. **Live.** Filed by `M62`.
-- **`minor` · After a refused Submit the browser's leave prompt is gone for the rest of the page's life.**
+- ✅ **DONE — M71 (2026-09-05). THE DEFECT WAS REAL, THE TITLE WAS TOO BROAD, AND THERE WERE TWO OF IT.**
+  `createServerAutosave()` now arms the `beforeunload` guard **and** the dirty-gated backstop through one
+  idempotent `armGuards()`, called at construction and again on every dirty edit, and refusing after
+  `dispose()` so a terminal teardown is never resurrected. The composable's own note already claimed the
+  loop re-arms on the next keystroke; the **save** loop did, and neither of these did.
+  ⛔ **THE SECOND HALF WAS UNNAMED BY THE ROW AND IS THE ONE NOBODY NOTICED.** `clearTimers()` clears the
+  backstop interval as well as the debounce timer, and `schedule()` re-creates only the debounce timer —
+  the backstop was a single `setInterval` at construction with nothing anywhere able to make another. So
+  a keyer who kept typing after a refusal also lost the periodic retry that rescues a save stuck in
+  `error`. **Two things failed to recover, not one.**
+  ⛔ **AND THE LIVE BRANCH IS NARROWER THAN "after a refused Submit".** `Encode.vue` keeps the component
+  mounted only when the refusal carries an errors bag. Of the refusals this Submit can meet, only
+  `SubmissionValidationException` does — `SubmissionException`, `SubmissionConflictException` and
+  `FormNotAcceptingSubmissionException` all return `back()` with a toast and **no** errors, so Inertia
+  takes a fresh key, the component remounts, and a brand-new composable arms its own guards. The row
+  generalised past its own evidence; only the 422 was ever live.
+  ✅ **Four cases, and the group needs all four**: a positive control that a dirty page warns at all
+  (without it every negative below is vacuous), the re-arm after `standDown()`, the discriminating
+  negative after `dispose()`, and the backstop measured across a **quiet** interval so the debounce
+  cannot pass for it. Two controls: removing the re-arm reddens both re-arm cases and leaves the
+  discriminator green; removing the `disposed` guard reddens **only** the discriminator.
+  ⚠️ **The test file needed an `afterEach` before any of this could be trusted.** happy-dom gives one
+  `window` per FILE and nothing there disposed anything, so roughly thirty-five earlier composables still
+  had armed `beforeunload` handlers on it — several deliberately left dirty. A dispatch-based negative
+  would have been red for a reason unrelated to the code under test. ⛔ `scripts/mutate.php` could not
+  drive any of it (Pest-in-a-container only); its discipline was reimplemented at the call site.
+
+- ~~**`minor` · After a refused Submit the browser's leave prompt is gone for the rest of the page's life.**~~
   Filed 2026-09-03 by `M68`, found while scoping the Submit-race row above and deliberately not fixed
   there. `createServerAutosave()` registers `onBeforeUnload` exactly once at setup, and **both** teardown
   paths remove it — `dispose()` and, since `M68`, `standDown()`. Nothing ever re-adds it. The answer
@@ -4490,7 +4517,30 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   served, `wait-on`, then `test-storybook --url` — so the working shape exists and is two steps, not one.
   ⚠️ **Sized `major` because it is the one line in that block a reader will actually run**, and its failure
   is the confusing kind: a native-module error from inside a container, not a missing-server message. Filed by `M46`.
-- **`minor` · A failing `ds:storybook:build` exits `0`, so every check of its status is vacuous.** Filed
+- ✅ **DONE — M71 (2026-09-05). THE ROW'S EVIDENCE HELD AND ITS STATED CAUSE WAS FALSE, WHICH CHANGED
+  THE DOCUMENTATION BUT NOT THE FIX.** `packages/design-system/package.json`'s `build-storybook` now
+  carries `--disable-telemetry`, read out of the installed Storybook 8.6.18 bundle rather than assumed,
+  and `tests/Feature/Docs/DocumentedCommandDriftTest.php` gained a fifth arm asserting the flag wherever
+  `README.md` prescribes a build — with a discovery floor, because the arm could otherwise pass on an
+  empty set, and a discriminating pair in the graph-resolution arm so a README sweep cannot silently
+  empty it.
+  ⛔ **NOTHING SWALLOWS THE STATUS, AND THE README SAID IT DID.** The preset failure is thrown as
+  critical and `withTelemetry` rethrows it unconditionally, so the CLI's own `.catch(() => exit(1))`
+  would fire. What happens is **abandonment**: the bundled `prompts` base class binds only a `keypress`
+  listener and no readline `close`/EOF handler, so on a non-TTY stdin the crash-report confirm never
+  settles, the rethrow is never reached, and Node exits on a drained event loop. Answering the prompt is
+  not a fix and neither is a retry — removing it from the code path is, which is what the flag does.
+  ⚠️ **THE ROW'S CAUTION WAS BACKWARDS.** It asked for the flag to be checked against CI first; CI
+  **cannot** reach this defect at all, because `promptCrashReports` returns immediately on
+  `if (process.env.CI) return` and the axe job installs the dependencies before building. CI already
+  got exit 1. The flag's only effect there is three fewer outbound telemetry POSTs.
+  ✅ **Two controls, and neither can pass for the other's reason.** Removing the flag reddens the new
+  arm **alone**; breaking the build-invocation selector reddens the arm **and** the discriminator.
+  ⚠️ The README warning was rewritten **in place at the same line count** — `docs/feature-backlog.md`
+  cites `README.md:169-172` and `citation-liveness-lint` is at its ledger ceiling with zero headroom, so
+  an inserted line would have reddened the gate. Measured before the edit, not after.
+
+- ~~**`minor` · A failing `ds:storybook:build` exits `0`, so every check of its status is vacuous.**~~ Filed
   by M59 (2026-09-02) at the moment it was measured, not fixed here because the fix is upstream-shaped.
   Against an incomplete `packages/design-system` tree the build dies with
   `Cannot find module '@storybook/vue3-vite/preset'` and **returns exit code 0**: Storybook's anonymous
@@ -5291,8 +5341,38 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   should be re-read as: nothing proves `R7` against a multi-commit trunk push, and nothing ever will
   without deliberately breaking the merge protocol.
 
-- **`minor` · Four tracker surgeries have now hand-rolled the same verification harness and none of
-  them kept it.** `M41`, `M45`, `M48` and `M60` each wrote a throwaway splice-and-verify script in the
+- ✅ **DONE — M71 (2026-09-05). THE HARNESS IS COMMITTED AND IT WAS PROVEN ON A REAL FIFTH SURGERY,
+  WHICH THIS INCREMENT WAS FORCED INTO RATHER THAN CHOOSING.** `scripts/tracker-surgery.php` holds the
+  four proofs the previous four surgeries each re-derived and discarded — a **counted** multiset of line
+  hashes, exact byte conservation with the added bytes **stated rather than inferred**, the paths touched
+  read from the working tree, and an independent contiguous slice hash sharing no code with the multiset
+  — and it **refuses with a distinct exit status** rather than passing when it cannot measure.
+  `tests/Feature/Docs/TrackerSurgeryHarnessTest.php` carries eight controls: a dropped line, a changed
+  byte, a multiplicity collision, an off-by-the-seam byte count, empty input, a no-op, an unstated
+  added-byte count, and the positive baseline without which every one of those reds is ambiguous.
+  ⛔ **THE ROW'S PREMISE WAS FALSE IN TWO PLACES.** (1) It says *"with `## Current Status` gone"*. That
+  section was **42,737 bytes and 33.2% of the file**, fourteen dated bullets, regrown +3,919 bytes in a
+  single day — and it is the section that had to move. The row aimed its hardest-case argument at
+  `## Standing Rules`, which is byte-frozen and has not moved at all. (2) `M70`'s correction claimed this
+  row collides with `M42`'s R8 row in `scripts/tracker-lint-controls.php`; it does not — the row's word
+  is *"mould"*, a pattern to copy, and that file's fixture writer is private and the wrong shape. **The
+  two rows do collide, but on `PROGRESS.md`.**
+  ⛔ **THE HARNESS'S OWN FIRST DRAFT WAS WRONG AND THE POSITIVE CONTROL CAUGHT IT — the M41/M45 pattern,
+  landing on the increment that was building the cure.** Its slice recovery used running counts, which
+  marks the *last* occurrences of a duplicated line rather than the removed ones, so blank lines came
+  back scrambled and it failed against a **correct** fixture. Recovered by common prefix/suffix instead.
+  ⛔ **AND SO WERE THE CONTROLS, IN A WAY ONLY A MUTATION FOUND.** Weakening the counted multiset to a
+  set left every control green: they asserted `toContain('A1 multiset')`, a substring that appears in the
+  **pass** note as well as the failure, so they were riding on an exit code two other proofs also drive.
+  That is the third occurrence of the `M30` `toContain` family here. Now asserted on text unique to each
+  failure, after which the same mutation reddens the multiplicity case **alone**.
+  ✅ **The surgery itself:** `M66` down to `M57`, 10 lines and 29,867 bytes, `PROGRESS.md` 128,645 →
+  98,778 against a 130,000 ceiling — headroom from **1,355 bytes**, under a single measured close-out, to
+  roughly 31,200. Two commits, archive first, so nothing left the tracker before the archive held it.
+  All four proofs passed on the first run.
+
+- ~~**`minor` · Four tracker surgeries have now hand-rolled the same verification harness and none of
+  them kept it.**~~ `M41`, `M45`, `M48` and `M60` each wrote a throwaway splice-and-verify script in the
   session scratchpad and discarded it. `git log --all --diff-filter=A` finds no file ever added under
   `scripts/` whose name contains *surgery*, *splice* or *verify*, and `M45` recorded the same finding
   about `M41` in almost these words — *"the specification is reusable, the script is not."*
@@ -5450,3 +5530,112 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   labelled *"a proposal to check, not a schedule"*; what is missing is that a row with **partial** harvest
   is indistinguishable from a fully-harvested one. The cheap improvement is to mark rows whose harvest is
   incomplete rather than to guess their footprints. Filed by `M70`.
+
+- **`minor` · `R7`'s byte threshold was calibrated on surgeries that were all left too late, so acting
+  EARLY lands in its dead zone.** Measured on `M71`'s own surgery, which is the first evidence of this
+  and is why it is filed rather than argued: the move dropped **29,867 bytes** in 10 lines — deliberate,
+  declared, and **under both** `DROP_BYTE_LIMIT` and `DROP_LIMIT` — so `R7` classified it as an ordinary
+  edit and printed *"under both limits"*. ⛔ **The calibration is sound and its input was biased.** The
+  constant's own comment derives 50,000 from a bimodal history: ordinary drops at 14,340 or less,
+  surgeries at 161,528 and up. But every surgery in that history was performed at the last moment, when
+  the ceiling forced it — `M60` acted at 3,970 bytes of headroom and `M45` at less. **The size of a
+  surgery in that sample is a function of how long it was deferred, not of what a surgery is.** `M71`
+  acted at 1,355 bytes of headroom by choice, and the reward for the better practice is a gate that
+  cannot see the operation. ⚠️ **The remedy is not obviously "lower the limit"**: 29,867 and the largest
+  ordinary drop of 14,340 are only a factor of two apart, so a threshold between them has far less room
+  than the current one, and `R7`'s whole value is that it does not cry wolf on close-outs. Candidates,
+  none costed: key the arm on the marker's PRESENCE rather than on a size (a declared surgery is checked
+  whatever its size, and an undeclared large drop still fails); or gate on the fraction of the file
+  removed rather than an absolute count; or accept that `R7` guards only catastrophes and let
+  `scripts/tracker-surgery.php` be the instrument for a deliberate move, which is what actually happened
+  here. ⚠️ **Note the interaction before taking it:** the third option is already the de-facto state, and
+  it means the `[tracker-surgery]` marker is currently unverifiable for any well-timed surgery — which is
+  the `M47`/`M48` hand-forward re-opening in a new form. **Live.** Filed by `M71`.
+
+- **`minor` · `scripts/mutate.php`'s concurrent-suite guard passes VACUOUSLY when Docker is unreachable.**
+  Found by a read-only agent during `M71`'s fan-out, in the file this project wrote to end vacuous
+  successes. Its `R1` probe shells a `docker exec` and **does not capture the exit status**: when the
+  daemon is down, the container is renamed, or `--container` is mistyped, `exec` returns empty output,
+  `(int) trim('')` is `0`, the `!== 0` comparison is false, and the guard reports that no suite is
+  running. ⛔ *"Refuse to run beside a live suite"* silently becomes *"assume no suite is running"* in
+  **precisely the situation that makes it likely** — a broken or restarting Docker. The failure it exists
+  to prevent is `M34`'s, where a concurrent `php artisan test` dropped the schema under a live mutation
+  run and produced three phantom failures that read as real ones. ✅ **The hardened form already exists
+  one file away**: `scripts/preflight.php` tests `is_numeric()` on the same probe and warns *"could not
+  probe"* on anything else, so this is a two-line change with a written precedent rather than a design
+  question. **Live.** Filed by `M71`.
+
+- **`minor` · Two more scripts have `backlog-triage.php`'s destructive default, and the row that filed
+  that defect names one of them as its harmless counter-example.** Measured by a read-only agent across
+  all eighteen files in `scripts/` during `M71`'s fan-out. ⛔ **`scripts/gate-baselines.php` has the
+  identical shape** — `--dry-run` prints to STDOUT and the **default path writes** `docs/gate-baselines.md`
+  — while the open row asserts it is *"harmless because [it] default[s] to rendering to STDOUT"*. That
+  sentence is false, and it is load-bearing, because it is what makes the original row look like a
+  one-file fix. ⛔ **And `scripts/regenerate-brand-ramp-fixture.php` is worse than either**: no `getopt`,
+  no `$argv` inspection, no `exit`, no conditional of any kind — every invocation overwrites
+  `tests/fixtures/brand-ramp.json`, which is asserted hex-for-hex by a Pest suite **and** by the
+  design-system's TypeScript mirror. Its own docblock says running it *"turns [a bug] into [a deliberate
+  engine change] without anyone noticing"*. ⚠️ **The alias claim is wrong in the same direction**: three
+  scripts have no `composer.json` alias, not one — `backlog-triage.php`, `pre-push-guard.php` (driven by
+  the hook) and `regenerate-brand-ramp-fixture.php` (driven by nothing). **The class has three members
+  and should be fixed as a class**, with a `--help` arm and a refusal on any unrecognised option; the
+  refusal is the half that matters, and it must read `$argv`, because `getopt()` cannot report what it
+  discarded. **Live.** Filed by `M71`.
+
+- **`minor` · `docs/backlog-triage.md` is generated stale by its own close-out, and the drift is on the
+  trunk now.** Measured during `M71`'s fan-out: `69eaaf2` added 13 lines to `docs/feature-backlog.md` in
+  **the same commit** that regenerated the triage from the pre-addendum tree, so every generated line
+  anchor below that insertion point is 13 too low — including the ones in *"Suggested next batch"*, which
+  is the section a reader is meant to act on. `php scripts/backlog-triage.php --check` would exit 1 today
+  and **nothing runs it**. ⛔ **The one instrument that watches this file is tuned to be silent about
+  exactly this**: `scripts/state.php` reports staleness in *commits*, and excludes commits inside
+  `ci.yml`'s `paths-ignore` — which a close-out's triage regeneration always is. So the gap is not
+  "unobserved", it is "observed for staleness and blind to content". ⚠️ **The cheapest wiring is one line
+  and the open row does not consider it**: `scripts/loop.php`'s `$gates` array already runs `state --check`
+  on the host and already distinguishes exit 2 from exit 1, which is the three-way contract this script
+  publishes. ⛔ **What genuinely needs deciding first** is that wiring it changes what a close-out is
+  *obliged* to do, since the file goes stale by construction on every merge that touches a row — and the
+  increment that closes this row would red its own new gate on its own close-out, which is the trap
+  `pre-push-guard.php` records `M52` walking into. **Live.** Filed by `M71`.
+
+- **`minor` · *"`ci.yml` is the USER'S FILE"* is asserted by one backlog row and by nothing else.**
+  Checked across the whole repository during `M71`'s fan-out because it was the stated reason a row was
+  filed rather than fixed: the phrase appears **exactly once**, in the row that asserts it. ⛔ It is in no
+  standing rule, no ADR and no decision. `CLAUDE.md` does not mention `.github/` at all; its only
+  ownership rule routes *decisions* to `docs/claims/decisions.md`. `D13` treats `ci.yml` as a **hub file**
+  and explicitly budgets one hub-touching row per batch — which is a budget, not a fence. ⛔ **And the
+  file's own history refutes it flatly**: seven increments have edited it inside their own pull requests,
+  its inline comments are written in increment voice, and the `--omit=dev` flag on the very `npm audit`
+  line in question **was itself written by an increment**. ⚠️ **This matters beyond tidiness** — it is the
+  premise on which the `npm audit` false-red row was deferred, and that row has now reddened the trunk
+  twice. A constraint nobody wrote down is not a constraint; if `ci.yml` really is out of bounds, it
+  belongs in `CLAUDE.md`, and if it is not, the rows deferring on it should be re-costed. **Live.**
+  Filed by `M71`.
+
+- **`minor` · `M59`'s undeclared-`http-server` row undercounts on both of its numbers.** Re-measured
+  during `M71`'s fan-out, before the row was considered for a batch. ⛔ **`wait-on` is equally
+  undeclared**, and the row says the opposite — *"`concurrently` and `wait-on` are at least present in the
+  root tree"*. It is present only as a **fourth-level transitive** of `@storybook/test-runner`, pinned by
+  `jest-process-manager`, reachable purely by hoisting, and declared by nothing in this repository. That
+  is the more insidious of the two failure modes, because it disappears the day the test runner reshuffles
+  its dependency tree. ⚠️ **And the count is two invocations, not three** — one in `ci.yml`'s axe job and
+  one in `README.md`; the phrase *"both halves of the README recipe"* counts `http-server` and `wait-on`,
+  which are different packages. ⛔ **No existing gate can prove a fix**: `DocumentedCommandDriftTest`
+  reads the `scripts` map of the two `package.json` files and **never** their dependency blocks, so
+  deleting a declared devDependency would turn nothing red. The remedy is therefore not *"one
+  devDependency line"* — it is two packages, two regenerated lockfiles, and a new gate. ✅ Ownership is
+  settled rather than open: the axe step runs with `working-directory: packages/design-system`, so that
+  package owns them. **Live.** Filed by `M71`.
+
+- **`minor` · `M59`'s `ds:storybook` alias row rests on a false premise and the alias alone would not
+  work.** Re-measured during `M71`'s fan-out. ⛔ The row's argument is that the alias *"would also give
+  the component library a local preview, **which nothing currently documents**"*.
+  `packages/design-system/README.md` documents `npm run storybook` in a fenced block — and, worse for the
+  repo and better for the row, the very next line is a mapping table from package scripts to root aliases
+  that lists three of the four and **silently omits the one with no alias**. The defect is not an
+  undocumented preview; it is a document that maps its own scripts to root aliases and quietly drops the
+  unmapped one. ⛔ **And the one-line remedy does not deliver a preview**: `docker-compose.yml`'s `node`
+  service publishes `5173` and **not** `6006`, and the package script binds without `--host`, so
+  `storybook dev` inside that container answers nothing a host browser can reach — the same shape as the
+  README's own *"Blank page / Vite HMR under Docker"* note. A working preview needs the port published and
+  a host bind, in a live-stack file the row never mentions. **Live.** Filed by `M71`.

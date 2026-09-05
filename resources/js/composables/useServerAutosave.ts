@@ -158,6 +158,11 @@ export function createServerAutosave(options: ServerAutosaveOptions): ServerAuto
     let pendingWhileInFlight = false;
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
     let backstopTimer: ReturnType<typeof setInterval> | null = null;
+    // M71 — whether the `beforeunload` guard is currently attached, and whether this composable has been
+    // torn down for good. `standDown()` is recoverable and `dispose()` is not; before M71 nothing told
+    // them apart once `teardown()` had run, which is why neither guard ever came back.
+    let unloadGuardArmed = false;
+    let disposed = false;
 
     const post =
         options.post ??
@@ -363,6 +368,11 @@ export function createServerAutosave(options: ServerAutosaveOptions): ServerAuto
                 return;
             }
             dirty = true;
+            // M71 — the next dirty edit is what brings the leave prompt and the backstop back after a
+            // `standDown()`. It has to sit beside `schedule()` rather than inside it: `flush()` and the
+            // backstop both call `run()` without ever scheduling, so arming from there would miss the
+            // step-navigation path below.
+            armGuards();
             schedule();
         },
         { deep: true },
@@ -375,16 +385,54 @@ export function createServerAutosave(options: ServerAutosaveOptions): ServerAuto
             return;
         }
         dirty = true;
+        armGuards();
         void flush();
     });
 
-    // DIRTY-GATED backstop. `useAutosave.ts` fires its interval unconditionally, which is harmless for an
-    // IndexedDB put and would be a pointless request every 30 seconds forever over HTTP.
-    backstopTimer = setInterval(() => {
-        if (dirty && options.enabled.value && state.value !== 'stopped') {
-            void run();
+    /**
+     * The two protections that must OUTLIVE a stand-down, armed together because they are lost together.
+     *
+     * ⛔ INCREMENT M71 — BEFORE THIS, BOTH WERE ARMED EXACTLY ONCE AT CONSTRUCTION AND `teardown()` TOOK
+     * THEM AWAY FOR THE REST OF THE PAGE'S LIFE. `standDown()`'s own note says `state` is deliberately not
+     * set to `stopped` so that "the answer watcher re-arms the loop on the next keystroke, which is what a
+     * keyer who gets a 422 back and keeps typing needs" — and the SAVE loop did re-arm. Neither of these
+     * did. A keyer whose Submit came back 422 kept typing into a page that still saved, no longer warned
+     * them on close, and had lost the periodic retry that recovers a save stuck in `error`.
+     *
+     * ⚠️ TWO THINGS, NOT ONE, AND THE SECOND IS THE ONE NOBODY NOTICED. `clearTimers()` clears the backstop
+     * interval as well as the debounce timer, and `schedule()` re-creates only the debounce timer — the
+     * backstop was a single `setInterval` at construction with nothing anywhere that could make another.
+     *
+     * ⚠️ IDEMPOTENT BY CONSTRUCTION, because the watcher calls this on EVERY dirty edit. A second
+     * `addEventListener` with the same function reference is a no-op in the DOM, but `unloadGuardArmed`
+     * makes that explicit rather than relying on it, and the null check is what stops a second interval
+     * leaking on every keystroke.
+     */
+    function armGuards(): void {
+        // `dispose()` is a real teardown — the component is going away and nothing may resurrect it. In a
+        // browser the watcher dies with the component and this is unreachable; in Vitest the composable is
+        // driven with no component around it, so the flag is what makes the two agree.
+        if (disposed) {
+            return;
         }
-    }, backstopMs);
+
+        // DIRTY-GATED backstop. `useAutosave.ts` fires its interval unconditionally, which is harmless for
+        // an IndexedDB put and would be a pointless request every 30 seconds forever over HTTP.
+        if (backstopTimer === null) {
+            backstopTimer = setInterval(() => {
+                if (dirty && options.enabled.value && state.value !== 'stopped') {
+                    void run();
+                }
+            }, backstopMs);
+        }
+
+        if (typeof window !== 'undefined' && !unloadGuardArmed) {
+            window.addEventListener('beforeunload', onBeforeUnload);
+            unloadGuardArmed = true;
+        }
+    }
+
+    armGuards();
 
     /**
      * The last-chance write, shared by `beforeunload` (a real browser navigation) and `dispose()` (an Inertia
@@ -472,9 +520,6 @@ export function createServerAutosave(options: ServerAutosaveOptions): ServerAuto
         postKeepalive();
     }
 
-    if (typeof window !== 'undefined') {
-        window.addEventListener('beforeunload', onBeforeUnload);
-    }
 
     /**
      * ⚠️ FLUSHES BEFORE TEARING DOWN, and the first draft of this did not — which was a silent data-loss
@@ -495,6 +540,7 @@ export function createServerAutosave(options: ServerAutosaveOptions): ServerAuto
         if (typeof window !== 'undefined') {
             window.removeEventListener('beforeunload', onBeforeUnload);
         }
+        unloadGuardArmed = false;
     }
 
     /**
@@ -549,6 +595,14 @@ export function createServerAutosave(options: ServerAutosaveOptions): ServerAuto
      * "your changes are no longer being saved" alert through `message`, and this is not a failure. It
      * also means the answer watcher re-arms the loop on the next keystroke, which is what a keyer who
      * gets a 422 back and keeps typing needs.
+     *
+     * ⛔ AND UNTIL M71 THAT SENTENCE WAS ONLY TWO-THIRDS TRUE, WHICH IS THE DEFECT THIS FUNCTION SHIPPED
+     * WITH. The save loop re-armed; the `beforeunload` prompt and the dirty-gated backstop did not,
+     * because `teardown()` takes both and only the debounce timer was ever re-created. `armGuards()` in
+     * the watcher is what makes the whole sentence true. ⚠️ The live branch is NARROWER than the row that
+     * found it claimed: `Encode.vue` keeps the page mounted only when the refusal carries an errors bag,
+     * so the conflict refusals — which return `back()` with a toast and no errors — remount and get a
+     * fresh composable anyway. It is the 422 that lands here and keeps the same instance.
      */
     function standDown(): void {
         dirty = false;
@@ -580,6 +634,9 @@ export function createServerAutosave(options: ServerAutosaveOptions): ServerAuto
                 });
             }
         }
+        // M71 — set BEFORE `teardown()`, not after, so that a continuation scheduled above can never race
+        // an `armGuards()` back into existence between the two statements.
+        disposed = true;
         teardown();
     }
 

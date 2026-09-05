@@ -116,11 +116,11 @@ docker compose run --rm --entrypoint sh e2e -c 'cd packages/design-system && npx
 > (`@meridian/design-system` also exports `./tokens` → `dist/tokens.ts` from the same generated
 > directory. Nothing imports it today, but it is the same artifact behind a second export path.)
 
-> ⛔ **AND ON `ds:storybook:build` THE EXIT CODE IS THE LIAR — the exact opposite of the line above,
-> so do not carry one habit into the other.** Against an incomplete `packages/design-system` tree it
-> dies with `Cannot find module '@storybook/vue3-vite/preset'` and then **exits `0`**: Storybook's
-> anonymous crash-report prompt runs after the error and swallows the status. `ds:install` is the
-> fix. The tell is the stack trace and the absent `Output directory:` line, never `$?`.
+> ⛔ **`ds:storybook:build` USED TO LIE ABOUT ITS EXIT CODE, AND WHAT FIXED IT IS ONE FLAG.** Against
+> an incomplete tree it dies with `Cannot find module '@storybook/vue3-vite/preset'`; before
+> `--disable-telemetry` it then **exited `0`** — and nothing "swallowed" the status, which is the part
+> the old note got wrong. The crash-report prompt binds only a `keypress` listener, so on a non-TTY
+> stdin it never settles, the rethrow is never reached, and Node exits on a drained event loop.
 
 ## Windows / Laragon gotchas
 

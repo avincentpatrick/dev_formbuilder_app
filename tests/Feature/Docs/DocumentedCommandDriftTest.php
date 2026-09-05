@@ -78,6 +78,33 @@ const DOCUMENTED_COMMAND_DOCUMENT = 'README.md';
 const DOCUMENTED_COMMAND_BROWSER_RUNNERS = ['test-storybook', 'playwright'];
 
 /**
+ * A resolved leaf reaching this invokes the Storybook BUILD cli, which exits 0 on a crash unless
+ * telemetry is disabled (M71).
+ *
+ * ⛔ THE FAILURE IT GUARDS IS NOT THE ONE THE README USED TO DESCRIBE, AND THE DIFFERENCE DECIDES
+ * THE FIX. Nothing "swallows" the status: the preset error is thrown as critical and `withTelemetry`
+ * rethrows it unconditionally, so the cli's own `.catch(() => process.exit(1))` would fire. What
+ * happens instead is ABANDONMENT — the bundled `prompts` base class binds only a `keypress`
+ * listener and no readline `close`/EOF handler, so on a non-TTY stdin the crash-report confirm never
+ * settles, the rethrow is never reached, the event loop drains and Node exits with its default 0.
+ * Answering the prompt is therefore not a fix and neither is a retry; removing it from the code path
+ * is, which is what the flag does — with `disableTelemetry` truthy the reporter is never constructed.
+ *
+ * ⚠️ THE FLAG AND NOT THE ENVIRONMENT VARIABLE, DELIBERATELY. `STORYBOOK_DISABLE_TELEMETRY=1 …` sets
+ * the same option's default and is what CI would reach for, but it is not valid `cmd.exe` syntax and
+ * would break this script for the Windows host README.md still documents as supported.
+ *
+ * ⚠️ Matched with a boundary rather than `str_contains`, so the npm script NAME `build-storybook` is
+ * never mistaken for the cli invocation `storybook build` that it resolves to.
+ */
+const DOCUMENTED_COMMAND_BUILD_INVOCATION = '/(?<![\w-])storybook\s+build(?![\w-])/';
+
+const DOCUMENTED_COMMAND_TELEMETRY_FLAG = '--disable-telemetry';
+
+/** Floor: the arm below cannot fail on nothing, so it fails here instead. */
+const DOCUMENTED_COMMAND_MIN_BUILD_INVOCATIONS = 1;
+
+/**
  * Every line of the gated document that a reader would COPY, keyed by 1-based line number.
  *
  * Fenced blocks only; comment lines and blank lines dropped. `explode` and never `preg_split` on
@@ -357,6 +384,40 @@ it('passes --url wherever it invokes the storybook test runner', function (): vo
     expect($violations)->toBe([], implode("\n", $violations));
 });
 
+it('disables telemetry wherever it prescribes a storybook build', function (): void {
+    // Derived, not declared, exactly like the `--url` arm above: the rule exists only for the scripts
+    // README.md actually tells a reader to run. A build script nobody is pointed at is nobody's trap.
+    $violations = [];
+    $seen = 0;
+
+    foreach (documentedCommandNpmInvocations() as $invocation) {
+        $leaf = documentedCommandResolve($invocation['script']);
+
+        if ($leaf === null || preg_match(DOCUMENTED_COMMAND_BUILD_INVOCATION, $leaf) !== 1) {
+            continue;
+        }
+
+        $seen++;
+
+        if (! str_contains($leaf, DOCUMENTED_COMMAND_TELEMETRY_FLAG)) {
+            $violations[] = DOCUMENTED_COMMAND_DOCUMENT.':'.$invocation['line'].
+                ' names `npm run '.$invocation['script'].'`, which resolves to `'.$leaf.
+                '`. A Storybook build without `'.DOCUMENTED_COMMAND_TELEMETRY_FLAG.'` exits 0 when it '.
+                'crashes: the crash-report prompt never settles on a non-TTY stdin, so the rethrow is '.
+                'never reached and Node exits on a drained event loop. Every check of this command\'s '.
+                'status is then vacuous, which is the whole reason the flag is here.';
+        }
+    }
+
+    expect($seen)->toBeGreaterThanOrEqual(
+        DOCUMENTED_COMMAND_MIN_BUILD_INVOCATIONS,
+        'Discovery floor: resolved '.$seen.' storybook-build invocation(s) from '.
+        DOCUMENTED_COMMAND_DOCUMENT.'. An arm that matched nothing is green for the wrong reason.'
+    );
+
+    expect($violations)->toBe([], implode("\n", $violations));
+});
+
 it('still resolves the script graph the other arms discriminate over', function (): void {
     // The discriminating control, kept as an assertion rather than a comment. Both of these are
     // real root scripts reached through the same `npm --prefix` indirection, and they differ in
@@ -371,4 +432,12 @@ it('still resolves the script graph the other arms discriminate over', function 
     // And the musl set must actually contain the service the README's block talks to, or the
     // second arm is green because it matched nothing rather than because nothing is wrong.
     expect(documentedCommandMuslServices())->toContain('node');
+
+    // M71 — the same discriminating pair for the telemetry arm, and it keys on the property that arm
+    // selects with rather than on the flag it then asserts. `ds:storybook:build` resolves to a build;
+    // `ds:test` resolves to `test-storybook`, which contains the word and is NOT one. A boundary that
+    // stopped distinguishing them, or a repair that swept `ds:storybook:build` out of the README,
+    // turns this red while the sweep above stays green on an empty set.
+    expect(preg_match(DOCUMENTED_COMMAND_BUILD_INVOCATION, (string) documentedCommandResolve('ds:storybook:build')))->toBe(1);
+    expect(preg_match(DOCUMENTED_COMMAND_BUILD_INVOCATION, (string) documentedCommandResolve('ds:test')))->toBe(0);
 });

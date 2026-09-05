@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Submissions;
 
+use App\Enums\AnswerEnvelope;
 use App\Enums\FieldType;
 use App\Models\FormField;
 use App\Support\Forms\LocaleVariant;
@@ -53,11 +54,36 @@ final class SchemaValueFormatter
             return $this->boolLabel($answer);
         }
 
-        // Geospatial (Increment G5b1): the object-valued GeoJSON envelope must be summarised BEFORE the
-        // generic is_array join below (which would stringify its keys). geopoint → "lat, lon (±m)";
-        // geotrace/geoshape → "Line/Area — N points".
-        if ($type->isGeo()) {
-            return $this->formatGeo($type, $answer);
+        // ── OBJECT-VALUED ANSWERS (G5b1 geo; M74 media and the two grids).
+        //
+        // Every one of these MUST be summarised HERE — below the empty guard above, and above the
+        // generic is_array join below. That position is the whole arm: the join walks an array's
+        // VALUES and applies scalar() to each, which json_encodes any non-scalar one and drops the
+        // KEYS entirely. G5b1 stated the rule for geo; M74 found that two families added afterwards
+        // had never been given an arm, so a photo answer rendered as machine noise on the inbox, the
+        // export and the PDF, and — through SubmissionRowProjector::answerValues(), which has three
+        // callers and not one — was written into Google Sheets and Airtable.
+        //
+        // ⛔ THE ROW THAT FILED THIS DESCRIBED THE WRONG MECHANISM, AND THE CORRECTION IS WHY THE ARM
+        //    SITS HERE. It blamed the trailing scalar($answer) fallback at the bottom of this method.
+        //    An object-valued answer never reaches it: it is an array, so it hits the join first and
+        //    is json_encoded PER ELEMENT.
+        //
+        // ⛔ AND THE MOST DANGEROUS CASE PRODUCES NO JSON AT ALL. A likert_matrix stores {row: score}
+        //    with scalar leaves, so the join rendered it as "4; 5; 3" — every row label silently
+        //    dropped, and indistinguishable from a legitimate multi-select. A gate asserting "the
+        //    output contains no JSON" is GREEN against that, which is why the vectors pin whole
+        //    strings.
+        $rendered = match (AnswerEnvelope::for($type)) {
+            AnswerEnvelope::Geo => $this->formatGeo($type, $answer),
+            AnswerEnvelope::Media => $this->formatMedia($answer),
+            AnswerEnvelope::Grid => $this->formatGrid($answer),
+            AnswerEnvelope::ScoreGrid => $this->formatScoreGrid($answer),
+            AnswerEnvelope::None => null,
+        };
+
+        if ($rendered !== null) {
+            return $rendered;
         }
 
         // Choice fields resolve values to labels; cascading select does too (its `config.options` carry
@@ -199,6 +225,141 @@ final class SchemaValueFormatter
         }
 
         return (string) $value;
+    }
+
+    /**
+     * Summarise a media answer (Increment M74): the files, named, joined with "; ".
+     *
+     * ⛔ NAMES AND NOT A COUNT, AND THAT WAS ALREADY DECIDED IN THIS TREE. `FieldInput.vue` renders the
+     * same answer to the same user while they encode it, and its comment says why: it *"names the files
+     * rather than showing a bare count, because '2 files' gives an editor nothing to check against the
+     * paper form in front of them."* Its rung order is the one mirrored here. Shipping a count would
+     * give one file two names on two screens, which is the drift this class exists to prevent.
+     *
+     * ⚠️ `name` is OPTIONAL in the stored envelope ({@see StructuralAnswerNormalizer::canonicalizeMediaRef()}),
+     * so `mime` is a real rung rather than a courtesy — a camera capture routinely has no filename.
+     * ⚠️ `id` is deliberately NOT a rung. It is the right thing to show beside a control that is about
+     * to replace the file and the wrong thing to write into a record a human reads.
+     *
+     * Malformed → '', fail-closed, on {@see formatGeo()}'s precedent: falling through to the join is
+     * the defect this method exists to close.
+     */
+    private function formatMedia(mixed $answer): string
+    {
+        if (! is_array($answer) || ! array_is_list($answer)) {
+            return '';
+        }
+
+        $names = [];
+
+        foreach ($answer as $ref) {
+            if (! is_array($ref)) {
+                continue;
+            }
+
+            $name = $ref['name'] ?? null;
+            $mime = $ref['mime'] ?? null;
+
+            $names[] = is_string($name) && $name !== ''
+                ? $name
+                : (is_string($mime) && $mime !== '' ? $mime : 'Attached file');
+        }
+
+        return implode('; ', $names);
+    }
+
+    /**
+     * Summarise a matrix answer (Increment M74): `{row:{col:cell}}` → `row: col=cell, col=cell; row: …`.
+     *
+     * ⛔ THE ROW IDENTITY IS THE POINT. The generic join `implode`s an associative array's VALUES, so
+     * the row keys vanished — a grid rendered as `{"c1":"v1"}; {"c2":"v2"}`, which is both machine noise
+     * AND missing the only thing that made the cells interpretable.
+     *
+     * ⚠️ Row and column values here are the author-declared `config.rows`/`config.columns` VALUES, not
+     * their labels. Resolving those to labels needs the field's config threaded in and is filed as its
+     * own row; this method fixes the noise, not the vocabulary.
+     * ⚠️ A cell containing "; " or ", " is ambiguous. That limit is inherited, not new — a multi-select
+     * option label containing "; " has been ambiguous since F7 — and it is stated rather than solved.
+     */
+    private function formatGrid(mixed $answer): string
+    {
+        if (! is_array($answer) || array_is_list($answer)) {
+            return '';
+        }
+
+        $rows = [];
+
+        foreach ($this->sortedKeys($answer) as $rowKey) {
+            $cells = $answer[$rowKey];
+
+            if (! is_array($cells) || array_is_list($cells)) {
+                continue;
+            }
+
+            $pairs = [];
+
+            foreach ($this->sortedKeys($cells) as $colKey) {
+                $pairs[] = $colKey.'='.$this->scalarString($this->scalar($cells[$colKey]));
+            }
+
+            if ($pairs !== []) {
+                $rows[] = $rowKey.': '.implode(', ', $pairs);
+            }
+        }
+
+        return implode('; ', $rows);
+    }
+
+    /**
+     * Summarise a likert-matrix answer (Increment M74): `{row:score}` → `row=score; row=score`.
+     *
+     * ⛔ THIS IS THE CASE THE ROW THAT FILED THE DEFECT DID NOT CONTAIN, AND IT IS THE WORST OF THE
+     * THREE. Its leaves are already scalars, so the generic join produced NO JSON — just `4; 5; 3`,
+     * with every row label dropped. That is not machine noise a reader discards; it is plausible data
+     * that an analyst reads as a multi-select, and it was being written into third-party systems of
+     * record. A check for "did we emit JSON" cannot see it.
+     */
+    private function formatScoreGrid(mixed $answer): string
+    {
+        if (! is_array($answer) || array_is_list($answer)) {
+            return '';
+        }
+
+        $scores = [];
+
+        foreach ($this->sortedKeys($answer) as $rowKey) {
+            $scores[] = $rowKey.'='.$this->scalarString($this->scalar($answer[$rowKey]));
+        }
+
+        return implode('; ', $scores);
+    }
+
+    /**
+     * The keys of a decoded JSON object in an order BOTH engines reproduce byte-for-byte (M74).
+     *
+     * ⛔ NEITHER ENGINE'S NATURAL ORDER IS USABLE, WHICH IS WHY THIS EXISTS. PHP's `json_decode` keeps
+     * insertion order and silently turns `"10"` into the INT key 10; JavaScript's `Object.keys()` hoists
+     * integer-like keys to the front in NUMERIC order. A Likert grid whose rows are `1`, `2`, `3` is the
+     * ordinary case, so the two engines disagree on the most likely real input. Sorting is what makes
+     * the twins mirrorable.
+     *
+     * ⛔ AND THE OBVIOUS SORT IS WRONG ABOVE THE BMP — MEASURED, NOT ASSUMED. `ksort(SORT_STRING)`
+     * compares UTF-8 BYTES, which is CODE POINT order. JavaScript's default `.sort()` compares UTF-16
+     * CODE UNITS, where an astral character is a surrogate pair at U+D800-DBFF and therefore sorts
+     * BEFORE every BMP character from U+E000 up. Probed both ways: a key set of ASCII, Tagalog
+     * diacritics and one emoji agreed on both engines and CONCEALED the whole question; a set pairing
+     * a fullwidth `＃` (U+FF03) with an emoji disagreed. `display-value.ts` therefore sorts by CODE
+     * POINT rather than with a bare `.sort()`, and the two agree on both sets.
+     *
+     * @param  array<array-key, mixed>  $map
+     * @return list<string>
+     */
+    private function sortedKeys(array $map): array
+    {
+        $keys = array_map(static fn ($key): string => (string) $key, array_keys($map));
+        sort($keys, SORT_STRING);
+
+        return $keys;
     }
 
     /**

@@ -182,3 +182,77 @@ describe('semantics H6b deliberately did NOT change', function (): void {
             ->toBe('Fever; zzz; Fever');
     });
 });
+
+// Increment M74 — the object-valued families that reached the generic `is_array` join and were
+// `json_encode`d per element. These duplicate the values pinned by `tests/golden/templates/formatting.json`
+// deliberately: the vectors prove the TWO ENGINES agree, and these prove which PHP METHOD is wrong when
+// they stop agreeing. A vector failure names a fixture; this names `formatMedia`/`formatGrid`.
+describe('object-valued answers (M74)', function (): void {
+    it('names the files in a media answer rather than emitting their envelopes', function (): void {
+        $f = new SchemaValueFormatter;
+        $answer = [
+            ['id' => 'att-1', 'mime' => 'image/jpeg', 'name' => 'scan.png'],
+            ['id' => 'att-2', 'name' => 'back.png'],
+        ];
+
+        expect($f->displayValue(FieldType::ImageCapture, $answer, []))->toBe('scan.png; back.png');
+    });
+
+    it('falls a nameless media ref through to its mime, then to a label, but never to its id', function (): void {
+        $f = new SchemaValueFormatter;
+        $answer = [['id' => 'att-3', 'mime' => 'application/pdf'], ['id' => 'att-4']];
+
+        // ⚠️ The id assertion is the one that would go quietly wrong: showing it is defensible on the
+        // encode screen (MediaInput.vue does) and is noise in a record a human reads.
+        expect($f->displayValue(FieldType::FileUpload, $answer, []))
+            ->toBe('application/pdf; Attached file')
+            ->and($f->displayValue(FieldType::FileUpload, $answer, []))->not->toContain('att-4');
+    });
+
+    it('keeps row AND column identity in a matrix', function (): void {
+        $f = new SchemaValueFormatter;
+        $answer = ['q1' => ['c1' => 'v1', 'c2' => 'v2'], 'q2' => ['c1' => 'v3']];
+
+        expect($f->displayValue(FieldType::Matrix, $answer, []))->toBe('q1: c1=v1, c2=v2; q2: c1=v3');
+    });
+
+    it('keeps row identity in a likert matrix, which produced no JSON to notice', function (): void {
+        // ⛔ The dangerous case. Its leaves are already scalars, so the old join emitted `4; 5; 3` — no
+        // JSON at all, every row label dropped, and indistinguishable from a multi-select. An assertion
+        // that the output carries no `{` passes against the defect; this pins the whole string.
+        $f = new SchemaValueFormatter;
+
+        expect($f->displayValue(FieldType::LikertMatrix, ['q1' => '4', 'q2' => '5', 'q3' => '3'], []))
+            ->toBe('q1=4; q2=5; q3=3');
+    });
+
+    it('routes every grid leaf through the pinned scalar rule, not a bare cast', function (): void {
+        // Amendment A7 at a new leaf: a native bool is '1' and not 'true'.
+        $f = new SchemaValueFormatter;
+
+        expect($f->displayValue(FieldType::LikertMatrix, ['q1' => true, 'q2' => 0.1], []))
+            ->toBe('q1=1; q2=0.1');
+    });
+
+    it('renders a malformed grid or media answer blank rather than falling through to the join', function (): void {
+        // Fail closed, on formatGeo()'s precedent. Falling through is the defect these arms close.
+        $f = new SchemaValueFormatter;
+
+        expect($f->displayValue(FieldType::Matrix, ['a', 'b'], []))->toBe('')
+            ->and($f->displayValue(FieldType::LikertMatrix, ['a', 'b'], []))->toBe('')
+            ->and($f->displayValue(FieldType::Signature, ['id' => 'not-a-list'], []))->toBe('');
+    });
+
+    it('leaves the non-object families exactly as they were', function (): void {
+        // ⛔ THE NON-VACUITY PARTNER FOR THE WHOLE BLOCK. Every case above is satisfied by a dispatch
+        // that routes EVERYTHING through a new arm; only this catches it. AnalyticsFieldEligibility
+        // groups MultiSelect and CascadingSelect with the grids, which is exactly the wrong partition
+        // to reuse, and this is the assertion that says so.
+        $f = new SchemaValueFormatter;
+        $config = ['options' => [['value' => 'c', 'label' => 'Cough'], ['value' => 'f', 'label' => 'Fever']]];
+
+        expect($f->displayValue(FieldType::MultiSelect, ['c', 'f'], $config))->toBe('Cough; Fever')
+            ->and($f->displayValue(FieldType::Geopoint, ['coordinates' => [121.0, 14.6]], []))->toBe('14.6, 121')
+            ->and($f->displayValue(FieldType::YesNo, true, []))->toBe('Yes');
+    });
+});

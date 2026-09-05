@@ -46,6 +46,14 @@ const HAS_OPTIONS = new Set(['single_select', 'multi_select', 'dropdown', 'liker
 /** Mirror of `FieldType::isGeo()`. */
 const GEO_TYPES = new Set(['geopoint', 'geotrace', 'geoshape']);
 
+/**
+ * Mirror of `FieldType::isMedia()` — the same five strings `semantic-validator.ts`'s `MEDIA_FIELD_TYPES`
+ * holds. On the PHP side this partition is `App\Enums\AnswerEnvelope`, a `match` with no `default` so an
+ * unclassified field type is a PHPStan error; there is no equivalent forcing device here, which is why
+ * the golden corpus pins each of these families rather than trusting the Set to stay in step.
+ */
+const MEDIA_TYPES = new Set(['file_upload', 'image_capture', 'audio_capture', 'video_capture', 'signature']);
+
 /** Mirror of `boolLabel()`'s truthy strings — CLOSED and CASE-SENSITIVE (PHP's `in_array(…, true)`). */
 const TRUTHY_STRINGS = new Set(['1', 'true', 'yes', 'on']);
 
@@ -240,9 +248,101 @@ function formatGeo(type: string, answer: unknown): string {
 }
 
 /**
+ * The keys of a decoded JSON object in the order PHP's `sort($keys, SORT_STRING)` produces (M74).
+ *
+ * ⛔ A BARE `.sort()` IS WRONG HERE, AND IT WAS MEASURED RATHER THAN REASONED. PHP compares UTF-8
+ * BYTES, which is CODE POINT order. JavaScript's default comparator compares UTF-16 CODE UNITS, where
+ * an astral character is a surrogate pair at U+D800-DBFF and therefore sorts BEFORE every BMP
+ * character from U+E000 upward. Probed both ways against the PHP: a key set of ASCII, Tagalog
+ * diacritics and one emoji AGREED — and concealed the whole question — while a set pairing a fullwidth
+ * `＃` (U+FF03) with an emoji DISAGREED. Comparing by code point makes the two identical on both sets.
+ *
+ * ⚠️ Sorting at all is not cosmetic: PHP's `json_decode` keeps insertion order and turns `"10"` into an
+ * INT key, while `Object.keys()` hoists integer-like keys to the front in numeric order. A Likert grid
+ * with rows `1`, `2`, `3` is the ordinary case, so unsorted twins diverge on the most likely input.
+ */
+function sortedKeys(map: Record<string, unknown>): string[] {
+    return Object.keys(map).sort((a, b) => {
+        const left = Array.from(a);
+        const right = Array.from(b);
+        const shared = Math.min(left.length, right.length);
+
+        for (let i = 0; i < shared; i += 1) {
+            const x = left[i]!.codePointAt(0)!;
+            const y = right[i]!.codePointAt(0)!;
+
+            if (x !== y) {
+                return x < y ? -1 : 1;
+            }
+        }
+
+        return left.length - right.length;
+    });
+}
+
+/**
+ * `formatMedia()` — the files, named, joined with `'; '`. Rungs are `name`, then `mime`, then the
+ * literal `Attached file`; `id` is deliberately not one. See the PHP for why each.
+ */
+function formatMedia(answer: unknown): string {
+    if (!Array.isArray(answer)) {
+        return '';
+    }
+
+    return answer
+        .filter((ref) => isPlainObject(ref))
+        .map((ref) => {
+            const name = (ref as Record<string, unknown>).name;
+            const mime = (ref as Record<string, unknown>).mime;
+
+            if (typeof name === 'string' && name !== '') {
+                return name;
+            }
+
+            return typeof mime === 'string' && mime !== '' ? mime : 'Attached file';
+        })
+        .join('; ');
+}
+
+/** `formatGrid()` — `{row:{col:cell}}` → `row: col=cell, col=cell; row: …`. Malformed → `''`. */
+function formatGrid(answer: unknown): string {
+    if (!isPlainObject(answer)) {
+        return '';
+    }
+
+    const rows: string[] = [];
+
+    for (const rowKey of sortedKeys(answer)) {
+        const cells = answer[rowKey];
+
+        if (!isPlainObject(cells)) {
+            continue;
+        }
+
+        const pairs = sortedKeys(cells).map((colKey) => `${colKey}=${scalar(cells[colKey])}`);
+
+        if (pairs.length > 0) {
+            rows.push(`${rowKey}: ${pairs.join(', ')}`);
+        }
+    }
+
+    return rows.join('; ');
+}
+
+/** `formatScoreGrid()` — `{row:score}` → `row=score; row=score`. Malformed → `''`. */
+function formatScoreGrid(answer: unknown): string {
+    if (!isPlainObject(answer)) {
+        return '';
+    }
+
+    return sortedKeys(answer).map((rowKey) => `${rowKey}=${scalar(answer[rowKey])}`).join('; ');
+}
+
+/**
  * Format one stored answer for display. Branch ORDER is the contract, not a style choice — the empty
- * guard precedes `yes_no` (so an unanswered yes/no is blank, not "No"), and geo precedes the array join
- * (which would otherwise stringify the GeoJSON envelope's keys).
+ * guard precedes `yes_no` (so an unanswered yes/no is blank, not "No"), and every OBJECT-VALUED family
+ * precedes the array join (which would otherwise walk the envelope's VALUES, `json_encode` each
+ * non-scalar one and drop the keys entirely).
  *
  * @param type    the raw `field_type` string, as it appears in the frozen snapshot
  * @param answer  the stored answer, or null/undefined when there is none
@@ -271,6 +371,21 @@ export function displayValue(
 
     if (GEO_TYPES.has(type)) {
         return formatGeo(type, answer);
+    }
+
+    // M74 — the three families added after this formatter was written, each of which reached the join
+    // below and rendered machine noise. `likert_matrix` is the one that produced no JSON at all: its
+    // leaves are scalars, so the join emitted `4; 5; 3` with every row label dropped.
+    if (MEDIA_TYPES.has(type)) {
+        return formatMedia(answer);
+    }
+
+    if (type === 'matrix') {
+        return formatGrid(answer);
+    }
+
+    if (type === 'likert_matrix') {
+        return formatScoreGrid(answer);
     }
 
     // The `||` is load-bearing: `cascading_select` is NOT a `hasOptions()` type.

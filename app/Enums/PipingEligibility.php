@@ -99,8 +99,14 @@ enum PipingEligibility: string
             // ── Object-valued grids ─────────────────────────────────────────────────────────────────
             // `{row:{col:cell}}` / `{row:score}`. Already banned as expression operands by
             // ExpressionValidationGate, so one rule now governs both reference kinds. Without the
-            // exclusion they would reach displayValue()'s is_array branch and json_encode each row into
-            // the middle of a question.
+            // exclusion they would reach displayValue()'s is_array branch, which drops the row keys —
+            // json_encoding each ROW for a matrix, and for a likert_matrix emitting nothing worse than
+            // a bare list of scores with no row labels at all.
+            // ⚠️ M74 GAVE displayValue() REAL ARMS FOR BOTH, so the "machine noise" half of this
+            // reasoning is spent: a grid now renders `q1: c1=v1; q2: c1=v3`. THE EXCLUSION STANDS
+            // UNCHANGED on the other half — a two-dimensional answer flattened into the middle of a
+            // sentence is not a sentence, and §3.1's revisit trigger (a stated need to pipe one into
+            // prose) has not fired.
             FieldType::Matrix, FieldType::LikertMatrix => self::Excluded,
 
             // ── Object-valued GeoJSON envelopes ─────────────────────────────────────────────────────
@@ -110,8 +116,12 @@ enum PipingEligibility: string
             FieldType::Geopoint, FieldType::Geotrace, FieldType::Geoshape => self::Excluded,
 
             // ── Attachment-reference envelopes ──────────────────────────────────────────────────────
-            // The stored answer is a list of attachment references; displayValue() would fall through to
-            // its json_encode scalar fallback and render machine noise into a question. Excluded
+            // The stored answer is a list of attachment references. ⚠️ M74 CORRECTED THIS SENTENCE'S
+            // MECHANISM AND THEN SPENT IT: such an answer never reached the "json_encode scalar
+            // fallback" — being a list, it hit the is_array branch first and was json_encoded PER
+            // ENVELOPE — and displayValue() now names the files instead. THE EXCLUSION STANDS on the
+            // remaining ground: a filename is not an answer to the question a hole is asking, and a
+            // piped one would imply the file itself is reachable from the sentence. Excluded
             // EXPLICITLY rather than by inheriting an expression-operand ban — §3.1 notes that media
             // types, unlike composite and geo, are NOT currently banned as expression operands, so there
             // is no ban here to lean on.

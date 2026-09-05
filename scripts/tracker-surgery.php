@@ -298,7 +298,7 @@ foreach ($removedFromTracker as $key => $n) {
 }
 
 if ($missing !== []) {
-    $failures[] = "A1 multiset — ".count($missing).' line hash(es) left the tracker without arriving in '.
+    $failures[] = 'A1 multiset — '.count($missing).' line hash(es) left the tracker without arriving in '.
         "the archive at the same multiplicity:\n    ".implode("\n    ", array_slice($missing, 0, 10));
 } else {
     $notes[] = 'A1 multiset — every removed line arrived with its exact multiplicity';
@@ -315,10 +315,10 @@ $notes[] = sprintf('A2 bytes — before %s, after %s, residual %s, declared adde
 
 if ($residual !== $addedBytes) {
     $failures[] = sprintf(
-        "A2 byte conservation — before + declared_added != after. before=%d declared_added=%d after=%d, ".
+        'A2 byte conservation — before + declared_added != after. before=%d declared_added=%d after=%d, '.
         "off by %d.\n    M41's first run failed here by exactly ONE byte against a correct tree: the ".
-        "formula omitted the JOIN SEAM between the old archive tail and the first inserted line. If ".
-        "this is off by a small number, suspect the seam before you suspect the surgery.",
+        'formula omitted the JOIN SEAM between the old archive tail and the first inserted line. If '.
+        'this is off by a small number, suspect the seam before you suspect the surgery.',
         $before, $addedBytes, $after, $residual - $addedBytes
     );
 } else {
@@ -402,7 +402,7 @@ $notes[] = sprintf('A4 slice — %d line(s) between prefix %d and suffix %d, sha
 if (count($removedInOrder) !== $removedTotal) {
     $failures[] = sprintf(
         'A4 slice — the removal is not ONE contiguous region: A1 counted %d removed line(s), the '.
-        "prefix/suffix span holds %d. A surgery that takes two separate slices cannot be proved by a ".
+        'prefix/suffix span holds %d. A surgery that takes two separate slices cannot be proved by a '.
         'single region hash, and should be performed and verified one slice at a time.',
         $removedTotal, count($removedInOrder)
     );
@@ -412,7 +412,7 @@ $archiveBody = $archiveAfter;
 $needle = implode("\n", $removedInOrder);
 
 if (! str_contains($archiveBody, $needle)) {
-    $failures[] = "A4 slice hash — the removed lines do not appear in the archive as ONE contiguous, ".
+    $failures[] = 'A4 slice hash — the removed lines do not appear in the archive as ONE contiguous, '.
         "byte-identical region.\n    They may have arrived reordered, re-wrapped, or in pieces. A1 can ".
         'pass while this fails, which is the entire reason both exist.';
 } else {

@@ -6227,8 +6227,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   unreachable here for this same reason. The two share only a file. **Live.** Filed by `M74`.
 
 - **`minor` · What a media cell should SAY beyond a filename, and what shape a grid answer takes in a
-  spreadsheet, are two product questions `M74` deliberately did not answer.** Filed by `M74` (2026-09-05) at
-  the moment the scope was decided rather than after. `M74` shipped the non-product core — never emit raw
+  spreadsheet, are two product questions `M74` deliberately did not answer.** Recorded 2026-09-05 at the
+  moment the scope was decided rather than after. `M74` shipped the non-product core — never emit raw
   `json_encode`, preserve row identity, name the files — and two questions survive it, each of which changes
   what a customer sees rather than whether the output is machine noise. **(1) A signed link.** An export cell
   a reviewer can click through to the attachment needs a URL policy, an expiry, and a decision about whether

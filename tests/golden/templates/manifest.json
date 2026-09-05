@@ -1,11 +1,11 @@
 {
   "template_version": "1.0",
-  "total": 76,
+  "total": 85,
   "files": {
     "literals": 9,
     "holes": 12,
     "escapes": 8,
     "parse-errors": 11,
-    "formatting": 36
+    "formatting": 45
   }
 }

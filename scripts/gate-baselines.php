@@ -36,6 +36,15 @@ declare(strict_types=1);
  *   php scripts/gate-baselines.php --dry-run       # print, do not write
  */
 
+/**
+ * How far behind `origin/main` a run's head sha may be and still be baselined from (M74).
+ *
+ * ⚠️ A COMMIT COUNT, NEVER A DURATION. See the guard below for the argument; in one line, the
+ * nightly `schedule` run this script is required to accept is hours old by construction and zero
+ * commits behind, so age would refuse the one run added as insurance against an outage.
+ */
+const MAX_COMMITS_BEHIND = 20;
+
 $root = dirname(__DIR__);
 chdir($root);
 
@@ -44,7 +53,7 @@ $runId = isset($opts['run']) ? (string) $opts['run'] : null;
 
 if ($runId === null) {
     fwrite(STDOUT, "gate-baselines: no --run given; finding the latest successful CI run on main...\n");
-    $json = sh('gh run list --branch main --workflow CI --status success --limit 1 --json databaseId,headSha,createdAt');
+    $json = sh(gate_baselines_gh().' run list --branch main --workflow CI --status success --limit 1 --json databaseId,headSha,createdAt');
     $runs = json_decode($json, true);
 
     if (! is_array($runs) || $runs === []) {
@@ -57,7 +66,7 @@ if ($runId === null) {
 
 fwrite(STDOUT, "gate-baselines: reading run {$runId}...\n");
 
-$meta = json_decode(sh('gh run view '.escapeshellarg($runId).' --json databaseId,headSha,createdAt,conclusion,url,event,headBranch'), true);
+$meta = json_decode(sh(gate_baselines_gh().' run view '.escapeshellarg($runId).' --json databaseId,headSha,createdAt,conclusion,url,event,headBranch'), true);
 
 if (! is_array($meta)) {
     fwrite(STDERR, "gate-baselines: could not read run {$runId}.\n");
@@ -101,9 +110,87 @@ if ($event === 'pull_request') {
     exit(1);
 }
 
+// ── M74. THE M39 ARMS ABOVE ASK *WHAT KIND OF RUN IS THIS*. THIS ONE ASKS *IS IT THE RUN WE MEANT*.
+//    Measured during M73's own close-out: the no---run branch took run 33184885256 — a real,
+//    successful, `push` run on `main` from 2026-08-28 — while the intended run had already concluded
+//    and appears first on every subsequent invocation of the identical command. The file was written,
+//    reported success, and carried baselines from a tree 141 commits behind.
+//
+//    ⛔ EVERY M39 ARM PASSES THAT RUN. conclusion `success`, headBranch `main`, event `push`: all
+//    three green. The guard checked what kind of run it was and never whether it was recent, and
+//    `gh run list` documents NO ordering guarantee and offers no sort flag — so `[0]` is a
+//    convention, not a contract. `--run=` discipline is NOT the remedy, because the default path is
+//    what every close-out uses.
+//
+//    ⚠️ AND THE ONLY TELL WAS A LINE THAT READS LIKE A SCRAPER BUG. The stale run also reported
+//    "1 metric(s) NOT FOUND", because a log that old predates a pattern this script now expects. On a
+//    run merely a few days stale there would have been no signal at all.
+$headSha = (string) ($meta['headSha'] ?? '');
+
+if (preg_match('/^[0-9a-f]{40}$/', $headSha) !== 1) {
+    fwrite(STDERR, "gate-baselines: run {$runId} reports no usable head sha, so its recency cannot be\n".
+                   "                judged. Refusing rather than measuring an unknown tree.\n");
+    exit(1);
+}
+
+// ⛔ THREE-WAY, NOT TWO. `--is-ancestor` answers 0 (yes) or 1 (no) and reserves everything else for
+//    "could not decide" — a bad object, a missing origin/main, no git on PATH. Collapsing the third
+//    into either verdict is the succeeds-on-empty-input family this repository has measured six
+//    times, so it gets its own message and its own refusal.
+//    ⚠️ Operand order is the REVERSE of scripts/preflight.php:123, which asks the opposite question
+//    (is the trunk an ancestor of my branch). Do not "fix" one to match the other.
+//    ⚠️ And this must NOT `git fetch`: a read that mutates local git state is a surprise, and the
+//    operator can always fetch and re-run.
+sh(gate_baselines_git().' merge-base --is-ancestor '.escapeshellarg($headSha).' origin/main', $ancestorStatus);
+
+if ($ancestorStatus === 1) {
+    fwrite(STDERR, "gate-baselines: run {$runId}'s head sha {$headSha} is not an ancestor of\n".
+                   "                origin/main. It measures a tree that is not on the trunk.\n");
+    exit(1);
+}
+
+if ($ancestorStatus !== 0) {
+    fwrite(STDERR, "gate-baselines: git could not decide whether {$headSha} is on origin/main\n".
+                   "                (exit {$ancestorStatus}). Fetch origin and re-run. Refusing rather\n".
+                   "                than assuming, because a check that cannot measure is not a pass.\n");
+    exit(1);
+}
+
+// ⛔ DISTANCE, NOT WALL-CLOCK AGE, AND THE CARVE-OUT IS THE WHOLE REASON. A nightly `schedule` run is
+//    eight hours old by breakfast and is a PERFECT measurement of a quiet trunk; any sane age check
+//    refuses it, and the block above says in terms that refusing those would break a designed feature
+//    to fix a different one. Distance says zero behind and passes it — and refuses the same cron run
+//    once the trunk has genuinely moved, which is the behaviour actually wanted.
+//
+//    ⚠️ THIS IS A RAW COUNT, INCLUDING `paths-ignore`d COMMITS, AND DELIBERATELY NOT state.php's
+//    commits_behind_trunk(). That function is not reusable here on three separate grounds, each
+//    measured rather than assumed: it computes DISTANCE ONLY AND NEVER ANCESTRY (a non-ancestor sha
+//    yields a happy finite count, so it cannot supply the arm above); scripts/state.php executes and
+//    exits at file scope, so it cannot be required; and shelling to it would be CIRCULAR, because its
+//    derive_baselines() reads docs/gate-baselines.md to find the sha it measures and this script is
+//    that file's writer. So the two git calls are inlined, and the open row's "the measurement exists
+//    and is not wired to the writer" is half false.
+//
+//    The ceiling is generous by an order of magnitude against the 141 that motivated it, and sits
+//    above the handful of close-out commits that legitimately land between a run and its stamp.
+$behindRaw = trim(sh(gate_baselines_git().' rev-list --count '.escapeshellarg($headSha.'..origin/main'), $behindStatus));
+
+if ($behindStatus !== 0 || preg_match('/^\d+$/', $behindRaw) !== 1) {
+    fwrite(STDERR, "gate-baselines: could not count how far run {$runId} is behind origin/main\n".
+                   "                (exit {$behindStatus}, output '{$behindRaw}'). Refusing.\n");
+    exit(1);
+}
+
+if ((int) $behindRaw > MAX_COMMITS_BEHIND) {
+    fwrite(STDERR, "gate-baselines: run {$runId} is {$behindRaw} commits behind origin/main (ceiling ".
+                   MAX_COMMITS_BEHIND.").\n                Its figures measure a tree that has moved. Re-run once a newer CI run\n".
+                   "                on main has concluded, or pass --run= for a run you have checked yourself.\n");
+    exit(1);
+}
+
 // An outage-killed job reports `cancelled` with steps: [] — it never acquired a runner and proves
 // nothing. A run whose jobs have real steps is the only kind worth baselining from (I5).
-$jobs = json_decode(sh('gh api '.escapeshellarg("repos/:owner/:repo/actions/runs/{$runId}/jobs").
+$jobs = json_decode(sh(gate_baselines_gh().' api '.escapeshellarg("repos/:owner/:repo/actions/runs/{$runId}/jobs").
                        ' --jq '.escapeshellarg('[.jobs[] | {name, conclusion, steps: (.steps|length)}]')), true);
 
 $stepless = [];
@@ -120,7 +207,7 @@ if ($stepless !== []) {
     exit(1);
 }
 
-$log = sh('gh run view '.escapeshellarg($runId).' --log');
+$log = sh(gate_baselines_gh().' run view '.escapeshellarg($runId).' --log');
 
 if (trim($log) === '') {
     fwrite(STDERR, "gate-baselines: the log for run {$runId} is empty (it may have expired).\n");
@@ -281,10 +368,47 @@ if ($missing > 0) {
 
 exit(0);
 
-function sh(string $command): string
+/**
+ * ⚠️ THE BY-REF `$status` IS NOT DECORATION — IT IS WHAT MAKES THE RECENCY GUARD WRITABLE AT ALL.
+ * Until M74 this helper discarded the exit status, so every caller could see output and never
+ * failure. `git merge-base --is-ancestor` answers ONLY through its exit status and prints nothing,
+ * so an ancestry check against the old signature would have read an empty string and passed —
+ * the succeeds-on-empty-input family this repository has now measured six times. The shape is
+ * `scripts/mutate.php`'s `shell_out()`, copied rather than reinvented.
+ */
+function sh(string $command, ?int &$status = null): string
 {
     $output = [];
-    exec($command.' 2>&1', $output);
+    exec($command.' 2>&1', $output, $status);
 
     return implode("\n", $output);
+}
+
+/**
+ * The GitHub CLI, overridable by `GATE_BASELINES_GH`. Shape copied from `mutate.php`'s `docker_bin()`,
+ * including its argument: the stub replaces the RUNTIME, never a guard. Every refusal below still runs
+ * exactly as it does in anger.
+ */
+function gate_baselines_gh(): string
+{
+    $override = getenv('GATE_BASELINES_GH');
+
+    return ($override === false || $override === '') ? 'gh' : $override;
+}
+
+/**
+ * Git, overridable by `GATE_BASELINES_GIT`.
+ *
+ * ⛔ A `gh`-ONLY SEAM WOULD PROVE THE ENVIRONMENT RATHER THAN THE GUARD, and that is why this second
+ * one exists. With a real `git` the "head sha is not on the trunk" arm cannot be driven at all: a
+ * fabricated sha makes git exit 128 (`bad object`), which is a THIRD outcome and not "not an
+ * ancestor" — so the case would pass through the arm it does not name. Worse, git is absent inside
+ * the app container where Pest runs (see tests/Feature/Docs/MutateHarnessTest.php), so the arms would
+ * measure the runner instead of the code.
+ */
+function gate_baselines_git(): string
+{
+    $override = getenv('GATE_BASELINES_GIT');
+
+    return ($override === false || $override === '') ? 'git' : $override;
 }

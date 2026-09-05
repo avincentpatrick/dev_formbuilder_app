@@ -32,7 +32,7 @@
  */
 import { computed, nextTick, ref, watch } from 'vue';
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
-import { MdsBreadcrumb, MdsButton, MdsCard, type BreadcrumbItem } from '@meridian/design-system';
+import { MdsAlert, MdsBreadcrumb, MdsButton, MdsCard, type BreadcrumbItem } from '@meridian/design-system';
 import PageHeader from '@/components/shell/PageHeader.vue';
 import { createServerAutosave } from '@/composables/useServerAutosave';
 import FieldInput, { type AnswerValue, type EncodeField } from '@/components/submissions/FieldInput.vue';
@@ -756,6 +756,73 @@ function submitEdit(): void {
         },
     );
 }
+
+/*
+ * ── THE ESCAPE ROUTE FROM A REFUSED CORRECTION (Increment M74) ──────────────────────────────────────
+ *
+ * M62 left the editor's typed corrections on the page and deliberately did NOT re-arm the guard, so a
+ * second Save is refused too — see `editBaseline` above, where that is argued as the point rather than
+ * a shortcoming. What it did not leave was a way OUT. The row filed against it says the toast fades;
+ * ⚠️ IT DOES NOT — `useToast` auto-dismisses only `type !== 'error'` and this refusal is an error, so
+ * the toast persists until dismissed. The real defect is narrower and differently shaped:
+ *
+ *   1. the notice is DISMISSIBLE, so one click leaves a page that looks normal and can never be saved;
+ *   2. the errors bag is keyed `baseline`, which is not a rendered field — the controller says exactly
+ *      that at its own catch site — so nothing on the page itself carries the condition.
+ *
+ * Hence a NON-dismissible alert whose message is the SERVER's sentence, plus a two-step discard.
+ */
+const conflictRoot = ref<HTMLElement | null>(null);
+const discardArmed = ref(false);
+
+/** The server's own refusal sentence, or null when this page is not in the refused state. */
+const conflictMessage = computed<string | null>(() =>
+    isEditing.value ? (pageErrors.value.baseline ?? null) : null,
+);
+
+/**
+ * Move focus to the SAFE control, never the destructive one — an accidental Enter must not destroy a
+ * page of typed corrections. Queried from the DOM rather than through a template ref, because
+ * `SubmissionOutbox.vue` records that the ref version of this was dead code and its suite could not
+ * tell: the assertion was on the emitted event rather than on `document.activeElement`.
+ */
+async function armDiscard(): Promise<void> {
+    discardArmed.value = true;
+    await nextTick();
+    conflictRoot.value?.querySelector<HTMLElement>('[data-conflict-keep]')?.focus();
+}
+
+function cancelDiscard(): void {
+    discardArmed.value = false;
+}
+
+/**
+ * ⛔ A REAL BROWSER NAVIGATION, NEVER `router.visit(url, { preserveState: false })`.
+ *
+ * The end state looks the same and the reasoning is not. M62's entire finding was that
+ * `preserveState`'s semantics had been misread once — it gates the component re-key, never the props —
+ * and betting this guard on a second, opposite reading of the same flag (that `false` reliably re-runs
+ * `setup()` and re-seeds `editBaseline`) is the same bet that lost. `location.reload()` destroys the JS
+ * context outright; there is no flag left to misread, and the row's own ⛔ constraint — that this must
+ * never become a one-click adopt-the-new-baseline — holds by construction rather than by argument.
+ *
+ * ⚠️ AND IT COSTS NOTHING IN LIFECYCLE. Autosave is unconditionally off in edit mode, so although
+ * `useServerAutosave` does register a `beforeunload` listener, its body early-returns because `dirty`
+ * is never set here. No native leave prompt fires. ⚠️ That same fact is a SEPARATE defect, filed
+ * rather than fixed in this increment: nothing warns an editor who navigates away by any other means.
+ */
+function confirmDiscard(): void {
+    discardArmed.value = false;
+    window.location.reload();
+}
+
+/** Escape cancels the confirm rather than leaving it armed — `SubmissionOutbox.vue`'s affordance. */
+function onConflictKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Escape' && discardArmed.value) {
+        event.stopPropagation();
+        cancelDiscard();
+    }
+}
 </script>
 
 <template>
@@ -856,6 +923,43 @@ function submitEdit(): void {
         <div v-if="autosave.state.value === 'stopped'" class="encode__degraded" role="alert">
             <strong class="encode__degraded-title">Your changes are no longer being saved</strong>
             <span class="encode__degraded-body">{{ autosave.message.value }}</span>
+        </div>
+
+        <!-- M74 — the refused correction, and the way out of it.
+             `MdsAlert` rather than a sixth hand-rolled notice, and NOT `MdsBanner`: Banner's whole API is
+             `message: string` with no slots, and this needs a button. `dismissible` stays at its default
+             FALSE, which the component's own boundary docblock decides — "hiding a live condition hides a
+             fact", and this condition is still true for as long as the page is refused.
+             ⚠️ `assertive` is correct here and is the MIRROR IMAGE of the `encode__editing` banner's
+             argument below: that one is `role="status"` because it is present at first paint, where a live
+             region inserted with its content already in it is not reliably announced. This node is inserted
+             AFTER a PATCH returns, which is exactly the case `role="alert"` exists for. Do not "fix" it.
+             The message is the SERVER's sentence, not a hard-coded one — which is also what makes the
+             control behavioural rather than structural. -->
+        <div v-if="conflictMessage !== null" ref="conflictRoot" @keydown="onConflictKeydown">
+            <MdsAlert
+                tone="danger"
+                assertive
+                title="This response was changed somewhere else"
+                :message="conflictMessage"
+            >
+                <template #actions>
+                    <template v-if="discardArmed">
+                        <span class="encode__conflict-confirm">
+                            This deletes every change you have typed on this page.
+                        </span>
+                        <MdsButton data-conflict-keep size="sm" variant="secondary" @click="cancelDiscard">
+                            Keep my changes
+                        </MdsButton>
+                        <MdsButton size="sm" variant="destructive" @click="confirmDiscard">
+                            Discard and reload
+                        </MdsButton>
+                    </template>
+                    <MdsButton v-else size="sm" variant="secondary" @click="armDiscard">
+                        Discard my changes and reload
+                    </MdsButton>
+                </template>
+            </MdsAlert>
         </div>
 
         <!-- Pruned-answer report (H21c): the previous submission WAS recorded — the copy must say so while
@@ -1192,6 +1296,15 @@ function submitEdit(): void {
 
 .encode__degraded-body {
     color: var(--mds-color-text-secondary);
+    font-size: var(--mds-type-body-sm-font-size);
+    line-height: var(--mds-type-body-sm-line-height);
+}
+
+/* M74 — the armed half of the discard confirm. It inherits the alert's tone foreground rather than
+   naming a colour, for the same reason MdsAlert's own dismiss control does: a neutral element on a
+   tinted field is the one thing that would not re-colour with the alert it belongs to. */
+.encode__conflict-confirm {
+    align-self: center;
     font-size: var(--mds-type-body-sm-font-size);
     line-height: var(--mds-type-body-sm-line-height);
 }

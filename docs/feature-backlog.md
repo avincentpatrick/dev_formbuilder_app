@@ -1580,14 +1580,30 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   mutation pass, and because the neighbouring row about a refused correction's escape route is where the UX
   half of this belongs. **Live.** Filed by `M68`.
 
-- **`minor` · Nothing offers a way out of a refused correction except a browser reload.** Filed by M62
+- ✅ **CLOSED BY `M74` (2026-09-05) — `minor` · ~~Nothing offers a way out of a refused correction except a browser reload.~~** Filed by M62
   (2026-09-02), the moment the scope was decided rather than after. M62 keeps the editor's typed corrections
   on the page and keeps the guard armed, so a second Save is refused too and the only route forward is the
   browser's own refresh. 👤 **The user was asked and chose the snapshot-only fix**, so this is a deferral of
   record, not an oversight. What is missing is a durable conflict notice (the toast fades, leaving a page
   that looks normal and can never be saved) and an explicit *"discard my changes and reload"* action.
   ⛔ **Whatever is built must not become a one-click adopt-the-new-baseline**, which is the silent lost
-  update the closed row above exists to prevent. **Live.** Filed by `M62`.
+  update the closed row above exists to prevent. Filed by `M62`.
+  ⛔ **AS BUILT BY `M74` (2026-09-05), AND THIS ROW'S STATED HARM IS FALSE.** *"The toast fades"* — it does
+  not. `useToast` auto-dismisses only `type !== 'error'` and `SubmissionEditController::update()` sends
+  `'error'`, so the toast persists until dismissed. **The real defect is narrower and differently shaped:**
+  the notice is **dismissible**, so one click leaves a page that looks normal and can never be saved; and
+  the errors bag is keyed `baseline`, which no field renders — the controller says exactly that at its own
+  catch site. **As built:** a non-dismissible `MdsAlert` carrying the SERVER's sentence, plus an inline
+  two-step discard ending in `window.location.reload()`.
+  ⛔ **A REAL BROWSER NAVIGATION, NEVER `router.visit(url, { preserveState: false })`.** The end state is
+  identical; the argument is not. `M62`'s whole finding was that `preserveState`'s semantics had been
+  misread once, and betting the lost-update guard on a second, opposite reading of the same flag is that
+  bet again. ⚠️ **The row's ⛔ constraint is NOT gate-enforceable and the test says so** — happy-dom cannot
+  tell a destroyed JS context from a re-key, so asserting the router was unused is a **proxy**, not the
+  constraint. ⚠️ **The row's implied lifecycle obstacle does not exist, which made this cheaper:** autosave
+  is off in edit mode, so `useServerAutosave` registers `beforeunload` but its body early-returns because
+  `dirty` is never set. 👤 **That same fact is a separate data-loss defect; the user was asked and chose to
+  file it rather than fold it in.** It is the row below.
 
 - ✅ **CLOSED BY `M13` (2026-08-25) — `major` · ~~`/api/v1/sync/submissions` creates submissions against ANY
   form in the tenant, with no per-form authorization at all.~~** Filed 2026-08-24 by M11's adversarial pass;
@@ -1869,9 +1885,9 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   that path), which is precisely the shape that stops being true after an unrelated change. Not a live
   defect; a live blind spot. M12's own seven refusal cases all assert the message. Filed by `M12`. **Not live** — a test-coverage question rather than a defect: each fixture can raise only its intended cause in today's tree, judged by `M65`.
 
-- **`minor` · Every object-valued answer that the piping layer excludes renders as `json_encode` machine
+- ✅ **CLOSED BY `M74` (2026-09-05) — `minor` · ~~Every object-valued answer that the piping layer excludes renders as `json_encode` machine
   noise on the inbox, the export and the PDF — because those three surfaces have no exclusion and no
-  display arm.** ⛔ **FOUND BY `M48` INSIDE THE `## Next Session` BLOCK IT WAS ARCHIVING, RECORDED THERE
+  display arm.~~** ⛔ **FOUND BY `M48` INSIDE THE `## Next Session` BLOCK IT WAS ARCHIVING, RECORDED THERE
   SINCE `G6` AND FILED NOWHERE ELSE** — the J4b1 shape, and it would have become invisible to a *file*
   search the moment that block moved. `SchemaValueFormatter::displayValue()` has arms for `YesNo`, for geo
   (`formatGeo()`) and for option-bearing choice types; everything else falls to `scalar()`, which is
@@ -1891,7 +1907,32 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   **Pinned by no test.** ⚠️ **The remedy is a display arm, not an exclusion** — a submission export may not
   simply omit an answered question the way a template may decline to pipe one — so it is a decision about
   what a media cell *says* (filename? count? a signed link?), which is why this is filed rather than fixed.
-  Cited by symbol throughout, deliberately: the anchors here have moved once already. **Live.** Filed by `M48`.
+  Cited by symbol throughout, deliberately: the anchors here have moved once already. Filed by `M48`.
+  ⛔ **AS BUILT BY `M74` (2026-09-05), AND THE ROW UNDERSTATED ITSELF IN THREE SEPARATE WAYS.**
+  (1) **Its stated MECHANISM is wrong**, and the fix depends on the correction: an object-valued answer
+  never reaches the trailing `scalar($answer)` fallback. It is an array, so it hits the `is_array` join
+  FIRST, which applies `scalar()` **per element**. The arms therefore sit above that join and below the
+  empty guard — the position discipline the geo arm had already documented for itself.
+  (2) **"Seven field types" is six, and the seventh is worse than the six.** `likert_matrix` stores
+  `{row:score}` with SCALAR leaves, so it produced **no JSON at all** — just `4; 5; 3`, every row label
+  silently dropped and indistinguishable from a legitimate multi-select. That is plausible **wrong data**,
+  not machine noise, and ⛔ **a gate asserting "the output contains no JSON" is GREEN against it** — which
+  is why the vectors pin whole strings. No row had ever named this case.
+  (3) **"Four call sites" is a floor and the blast radius is six surfaces.**
+  `SubmissionRowProjector::answerValues()` has THREE callers — `SubmissionExporter`,
+  `GoogleSheetsConnector` and `AirtableConnector` — so the noise was being written into third-party
+  **systems of record**, where it cannot be un-pushed without a re-sync.
+  ⛔ **AND A SECOND ENGINE EXISTS THAT THE ROW DOES NOT NAME.** `resources/public-runtime/engine/display-value.ts`
+  is a byte-parity twin, publicly exported, with the same missing arms; its own header warns that an
+  incomplete twin fails invisibly. There is no `display-value.test.ts`, so `tests/golden/templates/formatting.json`
+  is not *one* of the ways to redden it — it is the **only** way. Nine vectors added, manifest moved in lockstep.
+  **As built:** a fifth no-`default` `match` enum, `App\Enums\AnswerEnvelope`, so an unclassified field type
+  is a PHPStan level-8 error. A predicate was rejected deliberately: `isMedia()` carries `default => false`,
+  and this row exists *because* two families were added and nobody added an arm.
+  ⚠️ **`AnalyticsFieldEligibility` is NOT the same partition** and reusing it ships a regression — it groups
+  `MultiSelect` and `CascadingSelect` with the grids, which reddens two existing vectors.
+  👤 **The user was asked and chose ONE rendering on every surface, connectors included.** The rendering
+  itself was not a new call: `FieldInput.vue` had already decided `name ?? mime ?? 'Attached file'` in terms.
 
 ### Gamification
 
@@ -5711,6 +5752,25 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   produces the right answer is harder to notice than one that corrupts**, and it is why the remedy's
   refusal half matters more than its `--help` half. ⚠️ Note also that all three occurrences so far were an
   operator asking the script how to run it; none was a typo.
+  ➕ **CENSUS RE-MEASURED BY `M74` (2026-09-05), WHICH DELIBERATELY DID NOT TAKE THIS ROW.** It would have been
+  a second hub-touching row under `D13`, and taking only its `gate-baselines.php` third would have falsified
+  this row's own census a fourth time — so the census is corrected here instead. ⛔ **Three numbers moved:**
+  `scripts/` holds **twenty** files, not eighteen (`npm-audit-judge.php` and `tracker-surgery.php` both landed
+  after this row was written); **four** scripts have no `composer.json` alias, not three — `npm-audit-judge.php`
+  is the fourth and is invoked directly from `ci.yml`; and `scripts/gate-baselines.php` **does** have an alias,
+  so the "usual way to discover how to run it is the way that overwrites a file" argument applies to
+  `backlog-triage.php` and `regenerate-brand-ramp-fixture.php` but not to it.
+  ✅ **What the class HAS is now exact: three members** — `backlog-triage.php`, `gate-baselines.php` and
+  `regenerate-brand-ramp-fixture.php` are the only scripts whose DEFAULT action writes a tracked file. The
+  permissive-`getopt` property is a much larger floor (nine), and the two must not be conflated.
+  ⛔ **AND THE REMEDY IS NOW A TRANSPLANT RATHER THAN A DESIGN.** `scripts/npm-audit-judge.php` implements the
+  exact refusal this row prescribes — reading `$argv`, splitting on `=` so a valued option survives, and
+  putting the `--help` arm AFTER the refusal so `--help --bogus` still refuses — and its own comment cites
+  this row by description. ⚠️ **A value-taking option is the trap**: `gate-baselines.php` accepts `--run=`, so
+  a naive `in_array($argument, …)` refuses a correct invocation.
+  ⚠️ **`regenerate-brand-ramp-fixture.php` needs more than the others and it is worth pricing before starting**:
+  its write target is hard-coded, so it cannot be driven by a control at all without an `--out=` seam, and a
+  `--help`-only fix leaves a bare accidental invocation still overwriting the fixture.
 
 - **`minor` · `docs/backlog-triage.md` is generated stale by its own close-out, and the drift is on the
   trunk now.** Measured during `M71`'s fan-out: `69eaaf2` added 13 lines to `docs/feature-backlog.md` in
@@ -5886,6 +5946,17 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   needs a device primed before `M61`**, and this repository cannot tell whether one exists, which is the
   same shape as the mixed-case `public_slug` row. But it means canonicalizing the origin response does
   not heal already-cached shells, and that is a premise `M61` recorded as settled.
+  ➕ **`M74` MOVED HALF OF ANOTHER ROW'S REMEDY IN HERE, WHERE IT BELONGS.** The `brand-cache.test.ts`
+  coverage row prescribed *"one case asserting which request `put` was called with, **and** a `redirected: true`
+  field on the fake response"*. ⛔ **The second half is INERT as a coverage change and is really a fix to
+  THIS row**: nothing anywhere reads `redirected`, and `refreshCachedShells()` gates on `response.status === 200`
+  while a followed redirect **is** 200 — so adding the field asserts nothing until `refreshCachedShells()`
+  itself changes. `M74` shipped the key assertion alone and left this half here rather than editing
+  `lib/brand-cache.ts`, which would have put two open rows on one non-hub file under `D13`.
+  ⚠️ **Whoever takes this owes the interaction, not just the fix:** `M74`'s new key assertion pins TODAY's
+  behaviour — that `put` is called with the original request — and a repair that skips redirected responses
+  changes that to *not called at all*. The assertion is expected to move with the fix; it is not a regression
+  when it does.
   **Latent.** Filed by `M72`.
 
 - ✅ **CLOSED BY `M73` (2026-09-05) — `minor` · ~~A draft is pinned to TWO different form versions in two tables after a silent share-token re-mint.~~**
@@ -6012,6 +6083,29 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   narrower than `/f/*`'s and it shares `maxEntries: 80` rather than 20. ⚠️ **What is NOT known is whether
   it is reachable at all**, and that is the row: either it is, and it is the same one-line fix, or it is
   not, and the route should say so where the next reader will look. **Live.** Filed by `M73`.
+  ➕ **`M74` ANSWERED THE ROW'S OWN OPEN QUESTION READ-ONLY, WITHOUT TAKING THE ROW.** It was not in the batch
+  (a fifth row under `D13`), but the reachability verdict is the expensive half and is recorded here so the
+  taker does not re-derive it. ⛔ **STATUS 0 IS UNREACHABLE ON THIS ROUTE, closed three independent ways.**
+  (1) An `opaque` response requires a cross-origin `no-cors` request; Workbox's `Router` computes `sameOrigin`
+  from the REQUEST url and this matcher demands it, so no match can produce one — and `resources/` contains
+  zero `no-cors` and zero `redirect:` call sites. (2) An `opaqueredirect` requires `redirect: 'manual'`, which
+  only NAVIGATION requests carry, and the service worker registers with `{ scope: '/f/' }`, so a `/build/`
+  URL is never a navigation; subresources use `redirect: 'follow'` and resolve to a `basic` 200.
+  (3) The one residual path — a same-origin `/build/` request redirected cross-origin — has no producer: no
+  `ASSET_URL`, no `Route::fallback`, no scheme/host canonicalizing middleware, and nginx's `try_files` sends a
+  missing asset to Laravel, which 404s. A 404 is already refused by `cacheOkAndOpaquePlugin`.
+  ⚠️ **CANNOT VERIFY a production edge** (a CDN or WAF in front of the app) — nothing in this repository can
+  settle that, and the repo's own webserver config is what was read.
+  ⚠️ **SO THE ROW'S SECOND BRANCH IS THE LIVE ONE, and the shape of the close changes with it.** An e2e
+  assertion that no `/build/` entry has `status 0` would be **vacuously green by construction**, because no
+  such traffic exists — the failure mode this spec's own comments already name. The honest close is the
+  one-line plugin *plus* a comment recording WHY status 0 cannot arrive; a non-vacuous measurement would need
+  a temporary route that 302s cross-origin, which is a probe, not a gate.
+  ➕ **And the census is a floor:** `sw.ts` registers three routes explicitly and a FOURTH implicitly via
+  `precacheAndRoute()`, whose `PrecacheStrategy` admits anything with `status < 400` — more permissive than
+  either rule. It is inert only because `vite.config.ts` sets `injectManifest.globPatterns: []`, so the
+  shipped bundle precaches an empty list. *"Three routes, two rules"* is really *four routes, three rules,
+  one dead by configuration.*
 
 - **`minor` · The triage generator silently drops any citation written as a PARTIAL path, and a partial
   path is strictly worse than a bare filename.** Found by `M73`'s fan-out. `resolve_token()` in
@@ -6028,8 +6122,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   SUFFIX match and refuse an ambiguous one — the second is stricter and matches the file's existing
   *"more than one file is UNRESOLVED, never resolved to the first hit"* rule. **Live.** Filed by `M73`.
 
-- **`minor` · `brand-cache.test.ts` asserts `put` by CALL COUNT and never by key, so its central defect is
-  invisible to it.** Found by `M73`'s fan-out. `refreshCachedShells()` re-`put`s under the ORIGINAL request
+- ✅ **CLOSED BY `M74` (2026-09-05) — `minor` · ~~`brand-cache.test.ts` asserts `put` by CALL COUNT and never by key, so its central defect is
+  invisible to it.~~** Found by `M73`'s fan-out. `refreshCachedShells()` re-`put`s under the ORIGINAL request
   object, which is what the open `lib/brand-cache.ts` row says renews a mis-cased key. The suite that
   covers this file is otherwise thorough — ten cases, a resume-skip with a non-vacuity partner, a
   404-not-cached rule, an offline defer — but its `fakeCaches()` models a key as `{ url } as Request` and a
@@ -6040,7 +6134,19 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   a `redirected: true` field on the fake response. It needs no browser, unlike everything else in this
   area. ⚠️ Filed separately from the `brand-cache.ts` row because that one is `latent` behind a device
   primed before `M61`, and **this one is not** — the coverage gap is real today whatever the defect's
-  reachability. **Live.** Filed by `M73`.
+  reachability. Filed by `M73`.
+  ✅ **AS BUILT BY `M74` (2026-09-05): three key assertions, one per case, each chosen because `entries[0]`
+  is a DIFFERENT wrong key in each** — the current shell the sweep skips, then the token-bearing resume key
+  (so the mutant renews on disk exactly the credential-bearing document the skip exists to expire), then the
+  URL whose fetch REJECTED, which pins that the sweep cached the entry that succeeded. Nothing asserted that
+  last property before. **Measured both ways:** the wrong-key mutant reddens the three new assertions while
+  all seven count-based ones stay green, and the resume-skip mutant reddens the COUNT while the new assertion
+  is insensitive to it — the correct division of labour, not double coverage.
+  ⛔ **THE ROW'S REMEDY IS TWO THINGS WEARING ONE HAT, AND ONLY ONE OF THEM IS TEST-ONLY.** The proposed
+  `redirected: true` fake field is **inert alone**: nothing reads `redirected`, and `brand-cache.ts` gates on
+  `status === 200` while a followed redirect *is* 200. Making it bite means editing `refreshCachedShells()`,
+  which belongs to the `latent` `lib/brand-cache.ts` row and would have put two open rows on one non-hub
+  file. **That half is moved to that row rather than dropped.**
 
 - **`minor` · `SubmissionFinalizer` is a SECOND writer of `submission_answers.form_version_id`, and it
   would erase the evidence of a divergence rather than record it.** Found by `M73`'s fan-out while closing
@@ -6056,9 +6162,9 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   reachable and self-consistent at the same time. The row is a request for an assertion that the two
   writers cannot disagree, not for a change to either. **Latent** — it needs a promote of a diverged
   draft, which no current path can produce. Filed by `M73`.
-- **`minor` · `gate-baselines.php` trusts `gh run list --limit 1` to mean "newest", and it does not — the
+- ✅ **CLOSED BY `M74` (2026-09-05) — `minor` · ~~`gate-baselines.php` trusts `gh run list --limit 1` to mean "newest", and it does not — the
   file written to end stale numbers was stamped from an EIGHT-DAY-OLD run, and its own guard cannot see
-  it.** Measured by `M73` (2026-09-05) during its own close-out, which is the only reason it was caught.
+  it.~~** Measured by `M73` (2026-09-05) during its own close-out, which is the only reason it was caught.
   The no-`--run` branch takes `gh run list --branch main --workflow CI --status success --limit 1` and uses
   `[0]` as the newest run. ⛔ **On one invocation it returned `33184885256` — a real, successful, `push`
   run on `main` from 2026-08-28** — while the intended run `33958516257` had already concluded `success`
@@ -6079,4 +6185,84 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   this staleness for the file it writes, so the measurement exists and is not wired to the writer.
   ⚠️ **Whoever takes it should also decide what a NOT FOUND row means for the write**: today the script
   writes the file anyway and reports the count afterwards, which is the same accept-then-mention shape as
-  the `npm audit` judge row. **Live.** Filed by `M73`.
+  the `npm audit` judge row. Filed by `M73`.
+  ✅ **AS BUILT BY `M74` (2026-09-05) — three arms, all exiting 1 with their OWN sentence, inserted after the
+  `pull_request` refusal and above both expensive network calls.** The head sha must be readable; it must be
+  an **ancestor** of `origin/main`, judged **THREE-WAY** (0 yes, 1 no, anything else *"could not decide"* with
+  a distinct message and its own refusal, because collapsing the third into either verdict is the
+  succeeds-on-empty-input family this repository has now measured six times); and it must be within
+  `MAX_COMMITS_BEHIND` of the trunk.
+  ⛔ **DISTANCE, NOT WALL-CLOCK AGE, AND THAT IS WHAT PRESERVES THE CARVE-OUT.** The nightly `schedule` run
+  this script is *required* to accept is hours old by construction and zero commits behind, so an age check
+  would refuse the one run added as insurance against an outage. Proven by mutation: replacing distance with
+  a six-hour age check reddens the `nightly-schedule` case and nothing else.
+  ⛔ **THE ROW IS HALF WRONG ABOUT ITS OWN REMEDY, AND THE FALSE HALF IS THE REUSE.** `state.php`'s
+  `commits_behind_trunk()` computes **distance only, never ancestry** — measured, a non-ancestor sha yields a
+  happy finite count — `state.php` executes at file scope so it cannot be `require`d, and shelling to it is
+  **circular**, because `derive_baselines()` parses `docs/gate-baselines.md` to find the sha it measures and
+  this script is that file's writer. The two `git` calls are inlined.
+  ⚠️ **The row also misquotes its own command:** it already carried `--json databaseId,headSha,createdAt`, so
+  the recency data was fetched and thrown away — which made the fix smaller than the row implies.
+  ⚠️ **CANNOT VERIFY the mis-ordering by reproduction** — five invocations today were strictly descending by
+  `createdAt`. What is verified: the stale run is real with every claimed property (ancestor, 141 commits
+  behind), `gh` documents no ordering guarantee and offers no sort flag, and `8abe432` records it
+  contemporaneously. **The guard does not depend on reproducing it.**
+  ⚠️ **The NOT-FOUND-row question this row raises is deliberately NOT answered here** and stays open below.
+
+- **`minor` · The correction page has no autosave and no armed leave prompt, so an editor who navigates away
+  loses every character they typed, silently.** Found by `M74` while building the escape route beside it, and
+  👤 **the user was asked and chose to file it rather than fold it in.** `Encode.vue`'s autosave is
+  `enabled: … && !isEditing.value`, so on the edit channel it never runs; `useServerAutosave` DOES register a
+  `beforeunload` listener at construction, but its handler early-returns because `dirty` is only ever set
+  inside the `enabled` guard. ⛔ **SO THE OBVIOUS REMEDY — "arm the listener in edit mode" — IS ALREADY DONE
+  AND WOULD NOT HELP**, and stating that is the point of this row: the mechanism is the DIRTY FLAG, not the
+  listener. A taker who reads the symptom and reaches for `addEventListener` will find it already there and
+  conclude the row is stale. ⚠️ **The harm is exactly the value the concurrency machinery claims for itself.**
+  `Encode.vue` argues that a refused correction is survivable because *"the editor keeps every character they
+  typed and can copy it out"* — which depends entirely on the page staying put, and nothing makes it stay put.
+  Cancel, a breadcrumb, or a closed tab all discard it with no prompt and no trace. ⚠️ **And `M74` shipped a
+  deliberate "discard my changes and reload" button onto this page**, which makes the asymmetry worse rather
+  than better: the destructive action is now two-click confirmed while the accidental one is free.
+  ⚠️ **It is NOT the `M68` row about `dispose()`'s teardown** — that row's `preventDefault()` path is
+  unreachable here for this same reason. The two share only a file. **Live.** Filed by `M74`.
+
+- **`minor` · What a media cell should SAY beyond a filename, and what shape a grid answer takes in a
+  spreadsheet, are two product questions `M74` deliberately did not answer.** Filed by `M74` (2026-09-05) at
+  the moment the scope was decided rather than after. `M74` shipped the non-product core — never emit raw
+  `json_encode`, preserve row identity, name the files — and two questions survive it, each of which changes
+  what a customer sees rather than whether the output is machine noise. **(1) A signed link.** An export cell
+  a reviewer can click through to the attachment needs a URL policy, an expiry, and a decision about whether
+  an XLSX may carry a credentialed link off the platform at all; `AttachmentPolicy` and the metered-export
+  audit row both bear on it. **(2) The grid's column shape.** `M74` renders a matrix into ONE cell as
+  `q1: c1=v1; q2: c1=v3`. A spreadsheet consumer may want one column per row-and-column pair instead, which
+  is a change to `SubmissionRowProjector`'s header union and therefore to the `MappableColumnCatalog` a
+  tenant has already mapped in Google Sheets and Airtable. ⚠️ **The second is the one with a migration-shaped
+  cost hiding in it** — a mapped column that changes identity is a broken sync, not a re-render, and that is
+  why it is a row rather than a refinement. ⚠️ **Also unresolved and cheaper:** the grid arms render row and
+  column VALUES, not their author-defined LABELS, because resolving those needs the field's `config` threaded
+  into `displayValue()`. **Live.** Filed by `M74`.
+
+- **`minor` · `gate-baselines.php` writes the file BEFORE it judges whether every metric was found, so a
+  NOT FOUND row ships and is reported afterwards.** Split out of the `gh run list` row `M74` closed, which
+  raised it and deliberately did not answer it. `file_put_contents()` runs three lines ahead of the
+  `$missing > 0` check, so a run with a broken pattern still rewrites `docs/gate-baselines.md` and *then*
+  exits 1 — the accept-then-mention shape the `npm audit` judge row also names. ⛔ **And under `--dry-run` the
+  NOT FOUND message never prints at all**: that branch exits on the count without writing the diagnostic, so
+  the only signal is an exit code. ⚠️ **This was the ONLY tell that the eight-day-old run was wrong** — a log
+  that old predated a pattern the script now expects, so it reported *"1 metric(s) NOT FOUND"*, which reads
+  like a scraper bug rather than like a wrong run. The remedy is to move the write below the judgement and to
+  print the diagnostic on both paths; ⚠️ **note it flips `--dry-run`'s exit semantics**, which is why it was
+  not folded into a guard change that had its own controls to prove. **Live.** Filed by `M74`.
+
+- **`minor` · `brand-cache.ts` re-`put`s through the raw Cache API rather than a Workbox strategy, so the
+  bytes are renewed and the seven-day expiry clock is not.** Found by `M74` while closing the coverage row
+  beside it. `refreshCachedShells()` calls `cache.put()` directly on the `Cache` object; `ExpirationPlugin`'s
+  IndexedDB timestamp for that entry is therefore never touched, so a shell refreshed on day six is still
+  evicted on day seven as though it had not been. ⚠️ **The module's own docblock reads as though the entry is
+  renewed in every sense** — *"the stale entries are REFRESHED — fetched and re-`put` — and the cache is
+  never emptied"* — which is true of the bytes and false of the clock, and that sentence is what a reader
+  will act on. ⚠️ **Sized `minor` because the failure is benign today**: an evicted shell is re-fetched when
+  online and the brand sync re-runs. It stops being benign if anything starts relying on the refresh to
+  EXTEND offline availability. ⚠️ **A second-order note for whoever takes it:** `maxEntries` bookkeeping is
+  unaffected only because these keys already exist — a variant that ADDS a key this way would leave an entry
+  Workbox cannot see at all. **Live.** Filed by `M74`.

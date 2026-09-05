@@ -311,6 +311,20 @@ rewriting its answers are different powers.
 9. **Two tabs, same submission**, both on the edit page. Save in tab A, then save in tab B. **Expect:** tab B
    is refused with "Someone else changed this submission while you were editing it. Reload the page…", and
    tab A's correction survives. The same guard catches pressing browser-Back after a save and saving again.
+10. **The leave guard (Increment M75).** Open Edit answers, change one answer, and *without saving* press
+    **Cancel**. **Expect:** you stay on the page, and an amber "You have unsaved corrections" alert appears
+    with **Stay on this page** / **Leave and discard**. Press Stay — the alert goes and your text is intact.
+    Press Cancel again, then Leave and discard — **expect** you land where Cancel was going. Repeat with a
+    **breadcrumb** and with a **sidebar** item; all three behave the same. ⚠️ Then close the tab with
+    unsaved changes: **expect** the browser's own "Leave site?" prompt.
+11. **Two things that must NOT prompt**, and both are the reason step 10 is worth doing by hand. With
+    unsaved corrections on screen, (a) flip the **dark-mode toggle** in the top bar — **expect** the theme to
+    change with **no** alert, because that is not a navigation; and (b) press **Discard my changes and
+    reload**, confirm it, and **expect** exactly one confirmation — the page's own two-click one — and **no**
+    browser "Leave site?" dialog on top of it.
+12. Now open a form in **create** mode (New submission), type something, and press Cancel. **Expect:** *no*
+    prompt — the draft channel saves what you typed on the way out, so there is nothing to warn about. The
+    asymmetry with step 10 is deliberate.
 
 ---
 

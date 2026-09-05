@@ -7,6 +7,7 @@ import {
     listForSubmission,
     localMediaRefId,
     markUploaded,
+    repointToSubmission,
     rewriteLocalMediaIds,
     stash,
     type StashInput,
@@ -92,5 +93,41 @@ describe('media-queue helpers', () => {
         await stash(db, stashInput('l1'));
         await markUploaded(db, 'l1', 'att-9');
         expect(await db.media_queue.get('l1')).toMatchObject({ status: 'uploaded', attachment_id: 'att-9' });
+    });
+});
+
+describe('repointToSubmission (M72)', () => {
+    it("moves the source row's blobs and refuses to touch anybody else's", async () => {
+        // ⛔ THE FILTER IS THE POINT, NOT THE MOVE. `attachToSubmission` claims only UNOWNED rows because
+        // M21 narrowed it after an abandoned draft's refs were silently re-pointed and a stranger's photo
+        // uploaded as somebody else's attachment. This helper moves OWNED rows, so it has to prove it moves
+        // only the ones the caller names — otherwise it is that same defect under a new name.
+        await stash(db, stashInput('mine'));
+        await stash(db, stashInput('theirs'));
+        await stash(db, stashInput('unowned'));
+        await attachToSubmission(db, ['mine'], 'review-uuid');
+        await attachToSubmission(db, ['theirs'], 'stranger-uuid');
+
+        await repointToSubmission(db, ['mine', 'theirs', 'unowned'], 'review-uuid', 'parked-uuid');
+
+        expect((await listForSubmission(db, 'parked-uuid')).map((r) => r.attachment_local_id)).toEqual(['mine']);
+        expect((await listForSubmission(db, 'stranger-uuid')).map((r) => r.attachment_local_id)).toEqual(['theirs']);
+        expect(await listForSubmission(db, 'review-uuid')).toEqual([]);
+        // The unowned row stays unowned: this helper is not a second way to claim one.
+        expect((await db.media_queue.get('unowned'))?.client_submission_uuid).toBeNull();
+    });
+
+    it('is a no-op on an empty list and on a self-move', async () => {
+        // A self-move is what a caller passes when the review never minted a distinct uuid. Rewriting a row
+        // to the value it already holds is harmless, but returning early makes that a stated property
+        // rather than an accident of Dexie semantics.
+        await stash(db, stashInput('solo'));
+        await attachToSubmission(db, ['solo'], 'same-uuid');
+
+        await repointToSubmission(db, [], 'same-uuid', 'other-uuid');
+        expect((await db.media_queue.get('solo'))?.client_submission_uuid).toBe('same-uuid');
+
+        await repointToSubmission(db, ['solo'], 'same-uuid', 'same-uuid');
+        expect((await db.media_queue.get('solo'))?.client_submission_uuid).toBe('same-uuid');
     });
 });

@@ -242,13 +242,46 @@ jobs:
         # Linux-only transitive optional deps (e.g. @emnapi); install reconciles them.
         run: npm install --no-audit --no-fund
 
+      # ⛔ FETCH AND JUDGE ARE TWO STEPS, AND A RETRY LOOP IS THE WRONG FIX (M72).
+      # `npm audit --omit=dev --audit-level=high` exits 1 for BOTH "a high advisory was found" and
+      # "the registry could not be reached". That conflation reddened `main` twice on consecutive
+      # increments — M69's PR run 33818367732 (network timeout) and M70's POST-MERGE run 33852073344
+      # (503) — and each time the fix was to re-run a red gate, which is the habit every other control
+      # in this repository exists to prevent. A retry would fix the flake and PRESERVE the conflation:
+      # a genuine outage would then read as a clean audit. So the discriminator is the PAYLOAD.
+      #
+      # --omit=dev is unchanged and deliberately so: it blocks on vulnerabilities that reach the
+      # shipped runtime bundle, not dev/build tooling. The dev tree carries transitive advisories
+      # (e.g. the brace-expansion DoS) whose only remaining copies are override-immune bundled deps
+      # (@bundled-es-modules/glob via style-dictionary), so a full-tree gate would hard-block every PR
+      # on a non-shippable dev-tooling DoS. That scope was locked with the user in PR #61; M72 fixed
+      # the conflation and moved nothing about the threshold.
+      - name: npm audit — fetch advisories (registry reachability is NOT a merge signal)
+        # continue-on-error is load-bearing: without it npm's own exit 1 kills the job before the
+        # judge runs and the conflation is back. The step still renders as failed-but-ignored, which
+        # is the "fail differently" primitive, and it needs no new job and no new required context.
+        continue-on-error: true
+        run: npm audit --json --omit=dev > npm-audit.json
+
       - name: npm audit (SCA — high/critical in PRODUCTION deps blocks merge)
-        # --omit=dev: block on vulnerabilities that reach the shipped runtime bundle, not dev/build
-        # tooling. The dev tree carries transitive advisories (e.g. the brace-expansion DoS) whose only
-        # remaining copies are override-immune bundled deps (@bundled-es-modules/glob via style-dictionary),
-        # so a full-tree gate would hard-block every PR on a non-shippable dev-tooling DoS. Production deps
-        # stay strictly gated.
-        run: npm audit --omit=dev --audit-level=high
+        # The severity-threshold flag is gone from the npm command line ON PURPOSE (named, not
+        # quoted -- a comment that spells a token a gate forbids is this repo's fifth such trap): the
+        # threshold now lives in
+        # scripts/npm-audit-judge.php as a constant, which is what makes it drivable by a deliberate
+        # defect. tests/Feature/Docs/NpmAuditJudgeTest.php is its control.
+        run: |
+          set +e
+          php scripts/npm-audit-judge.php npm-audit.json
+          code=$?
+          set -e
+          # ⚠️ GitHub's default shell is `bash -e`. Without the fence above, the judge's non-zero
+          # aborts this step before code=$? is read and the design silently reverts to a hard block.
+          if [ "$code" = "2" ]; then
+            echo "::warning title=npm audit NOT MEASURED::the advisory endpoint was unreachable; no dependency was judged"
+            echo "⚠️ **npm audit did not run.** The registry was unreachable, so **nothing was measured** about this tree's dependencies. This is a green gate that judged nothing — see D16." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          exit $code
 
       - name: Secret scan (gitleaks)
         run: |

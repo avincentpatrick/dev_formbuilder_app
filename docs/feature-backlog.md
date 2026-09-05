@@ -1142,7 +1142,31 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   Proven by a hand-rolled control (`scripts/mutate.php` is Pest-only): `MU7` reverting the fix reddens the
   network **and** resolving cases while the terminal case stays green; `MU8` removing the terminal arm
   reddens only the terminal case. Neither can pass for the other's reason.
-- **`minor` · A failed conflict-review recovery can strand the respondent's only copy of their answers.**
+- ~~**`minor` · A failed conflict-review recovery can strand the respondent's only copy of their answers.**~~
+  ✅ **DONE — M72 (2026-09-05). EVIDENCE HELD BYTE-FOR-BYTE; THE PRESCRIBED REMEDY DOES NOT WORK AND
+  WAS REJECTED ON THE CODE.** ⛔ *"Keep the queued row until recovery succeeds"* leaves it at
+  `status: 'pending'`, which is **exactly** what `listPending` selects for both the in-tab driver and
+  `sw.ts`'s background sync — so it is re-POSTed within seconds and re-parked as a **second** `conflict`
+  row, or escalated to `needs_attention`. Making it work needs a new held status reaching `db.ts`'s
+  `OutboxStatus`, `outbox-status.ts`'s exhaustive descriptor map, `reap.ts`'s media-sparing filter, the
+  retry guards and two list components. ✅ **What shipped adds no state at all**: `setAnswers` goes
+  through `patchUnsent`, which refuses only a `synced` row, so it writes cleanly onto the parked
+  `conflict` row. No driver touches a conflict row, `beginConflictReview` already seeds from
+  `row.answers`, and `reap.ts` already spares its media — so a reload re-surfaces the review **with** the
+  corrections. `App.vue` has held `resolvingUuid` since `G8c` and only ever passed the boolean down;
+  that is the whole reason the component had nowhere to put them. ⛔ **TWO PREMISE CORRECTIONS, BOTH
+  RECORDED AT THE SITE.** *"The ordinary (non-resolving) path is NOT affected"* is **false** — a
+  null-code `handleDrift` is reached from a republish, autosave's key is pinned to the old
+  `form_version_id`, and `reap.ts:8-14` already spells out that the pre-republish row is never written,
+  read or deleted again. And *"it reaches the outbox contract `lib/replay.ts` and the background driver
+  share"* is **false**: it reaches neither, and that is true only of the remedy that was rejected.
+  ⚠️ **THE HEADLINE IS ALSO OVERSTATED**: a review runs under a **fresh** uuid, so the parked row survives
+  and it is the review EDITS and any media picked during the review that are lost — narrower than *"the
+  only copy"*, and still a respondent losing work they were asked to redo. ✅ Media follows via a new
+  `repointToSubmission` filtered on the **source** uuid — deliberately a second, narrower write rather
+  than loosening `attachToSubmission`, whose unowned-only filter is what `M21` added after a stranger's
+  photo was uploaded as somebody else's attachment. ✅ **Two hand-rolled Vitest controls, both CAUGHT**
+  with baselines green first and both files restored by byte comparison (`mutate.php` is Pest-only).
   Found while closing the row directly above, and it is a data question the copy fix could only warn about.
   `RuntimeSession.vue`'s `handleSubmitError` calls `discardRow(db, uuid)` for **every** `ApiError` — deleting
   the parked outbox row — and only then dispatches `handleDrift()`. A conflict-review session
@@ -4550,7 +4574,25 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   and not a fix. **The real remedy is `STORYBOOK_DISABLE_TELEMETRY=1` or `--disable-telemetry` in the
   package script**, which needs checking against `ci.yml`'s axe job before it is set globally — CI is on a
   clean tree and has never hit this, so the change is untested where it matters most. **Live.** Filed by `M59`.
-- **`minor` · The design-system dev server has no root alias, so the one script that would make the axe
+- ~~**`minor` · The design-system dev server has no root alias, so the one script that would make the axe~~
+  ✅ **DONE — M72 (2026-09-05). THE ARTEFACT FACT HELD AND THE REASON TO CARE WAS ALREADY DEAD.**
+  `M71` was right that *"which nothing currently documents"* is false — `packages/design-system/README.md`
+  has documented `npm run storybook` all along. What survives is that the alias set and the script set
+  were not a bijection, and the consequence was larger than either row said: **there was no
+  browser-reachable path to the design system in ANY form.** `storybook dev` binds 6006 and
+  `docker-compose.yml` published only 5173; `storybook-static` is gitignored **and** outside nginx's
+  docroot, so the `web` service cannot serve it either; and a static Storybook does not open usefully
+  over `file://`. On a project whose README opens with *"One system, every page"*, **39 components and 42
+  story files** sat behind a port nothing forwarded. ✅ Shipped: 6006 published, `ds:storybook` added,
+  `--host 0.0.0.0` for consistency with the `node` service's own vite invocation, and the mapping
+  sentence replaced by a real table. ⛔ **AND THE GATE IS THE POINT.**
+  `tests/Feature/Docs/DocumentedCommandDriftTest.php` reads `README.md` at `base_path()` and **never
+  opens the design-system README**, which is why that file's defect was invisible from the day it was
+  written; a new arm joins the two facts nobody had joined — *a prescribed command resolving to a
+  port-binding dev server must have that host port published by the compose service it runs in* — with
+  **both numbers derived**, the port from the package script and the publication from the compose file.
+  ✅ **Two controls: removing the alias reddens the alias arm; removing the port reddens the new arm
+  ALONE**, which is what says it is not decorative.
   one-liner work is unreachable from the vocabulary every document uses.** Filed by M59 (2026-09-02).
   `packages/design-system/package.json` carries `storybook dev -p 6006 --no-open`; the root `package.json`
   aliases `ds:install`, `ds:tokens`, `ds:storybook:build` and `ds:test` and **not that one**. ⚠️ **This is
@@ -4629,7 +4671,29 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   exact-match-then-lowered two-step lookup costs a second query on every 404 probe, forks the resolution
   rule permanently, and still leaves the legacy row unreachable at its lowercase spelling. **Not live here;
   a deployment obligation.** Filed by `M61`. **Not live** — a deployment obligation rather than a defect here; every writer in the tree emits lowercase, judged by `M65`.
-- **`minor` · Nothing proves the offline path M61's redirect exists to protect.** Filed by M61
+- ~~**`minor` · Nothing proves the offline path M61's redirect exists to protect.** Filed by M61~~
+  ✅ **DONE — M72 (2026-09-05), AND BUILDING THE PROOF FALSIFIED WHAT WAS BEING PROTECTED.** ⛔ **MEASURED
+  AT THE BROWSER: after a mis-cased entry the shell cache holds TWO keys, not one** —
+  `/f/clinic-intake` at `status 200, type 'basic'` and `/f/Clinic-Intake` at `status 0,
+  type 'opaqueredirect'`. The belief — the row's, and the reasoning in `sw.ts` — was that
+  canonicalization leaves a single key. It does not: the sibling `guest-schema` route filters with
+  `CacheableResponsePlugin({ statuses: [200] })` and the `/f/*` navigation route does not, so Workbox's
+  status filter never runs there. ✅ **AND THE GUARANTEE HOLDS ANYWAY, BY A MECHANISM NOBODY HAD
+  DESCRIBED**: offline, a mis-cased entry still renders, because the browser follows the cached
+  opaqueredirect to the canonical entry. So this is a correct outcome nobody had established, plus a junk
+  entry consuming one of `maxEntries: 20` — filed as its own row below, since the fix is in
+  `resources/public-runtime/sw.ts`, a hub file this batch's single budget had already been spent on.
+  ⚠️ **ONE CLAUSE OF THE ROW IS FALSE AND TAKING IT AT FACE VALUE WOULD HAVE PRODUCED A DUPLICATE TEST**:
+  *"nor that an installed PWA launched at its `start_url` finds the shell offline"* implies zero
+  coverage, and `:78-82` of that spec already proves the offline render for the canonical entry. The
+  uncovered thing was the **mis-cased precondition**. ⛔ **THE SEQUENCE IS PART OF THE TEST**: the
+  mis-cased navigation happens only after the SW claims the client, because the spec's own comment
+  records that the first navigation is uncontrolled — mis-casing first passes on an empty cache exactly
+  as it would with the 301 deleted. ✅ Nine tests green across mobile/tablet/desktop; the deliberate
+  defect in `GuestFormController::mint`'s 301 turns the new test **red and the other two green**.
+  ⚠️ **CONTROL LIMIT, STATED**: Playwright aborts a test at its first failed assertion, so that control
+  proves the redirect assertion and not the two cache-shape assertions beneath it; those were measured
+  live by probe instead. `scripts/mutate.php` cannot reach a Playwright spec.
   (2026-09-02) at the moment the gate shipped, so the limit is a filed constraint rather than a comment
   nobody re-reads. No suite asserts that after a mis-cased entry `caches.open('guest-shell-html').keys()`
   holds the **canonical** URL and not the mis-cased one, nor that an installed PWA launched at its
@@ -5277,7 +5341,27 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   is that a floor is a ratchet and will need maintaining**, which is why this is filed rather than
   guessed at. **Live.** Filed by `M49`.
 
-- **`minor` · `npm audit` cannot distinguish "the registry is unreachable" from "your dependencies are
+- ~~**`minor` · `npm audit` cannot distinguish "the registry is unreachable" from "your dependencies are~~
+  ✅ **DONE — M72 (2026-09-05). THE ROW HELD IN FULL, AND THE ONE THING IT GOT WRONG WAS ITS OWN
+  BLOCKER.** Fetching and judging are now two steps. `scripts/npm-audit-judge.php` reads the report
+  `npm audit --json --omit=dev` writes and exits **0** judged clean · **1** high/critical in production
+  deps · **2** the advisories were never obtained — the three-way contract `tracker-surgery.php` and
+  `pre-push-guard.php` already publish, reused rather than invented. ⛔ **THE RECOGNITION TEST IS
+  POSITIVE AND THAT IS THE WHOLE DESIGN**: it keys on `metadata.vulnerabilities` being present, never on
+  `error` being absent, because the negative form puts every unrecognised shape — a future npm, a
+  truncated file, an HTML error page — silently into CLEAN, which is this row's own defect one layer up.
+  The `unrecognised-shape` fixture exists to prove exactly that, and it is the only one of the five that
+  a wrongly-written judge would fail. ⚠️ **TWO DETAILS SILENTLY REVERT THE DESIGN IF LOST, so both are
+  asserted structurally**: `continue-on-error: true` on the fetch, without which npm's own exit 1 kills
+  the job before the judge runs; and the `set +e` / `set -e` fence, because GitHub's default shell is
+  `bash -e` and the judge's non-zero would otherwise abort the step before `code=$?` is read. ⚠️ The
+  threshold moved OFF the npm command line into the judge, which is what makes it drivable by a
+  mutation; the `--omit=dev` scope did **not** move — that policy was locked with the user in PR #61.
+  ✅ **Four controls, all CAUGHT**, and they are paired rather than redundant: mutating the judge reddens
+  the behavioural cases, mutating the workflow reddens the structural one, and neither can pass for the
+  other's reason. ⛔ **RESIDUAL LIMIT, FILED RATHER THAN BURIED — exit 2 makes a *required* context green
+  while nothing was measured**, annotated with a `::warning::` and a job summary. That is a real member
+  of the vacuous-success family; it is `D16` and its own row below.
   vulnerable", and both hard-block a merge.** Measured on `M69`'s own PR run (33818367732), which went
   5/6 with the sixth job dying at step 19 of 23: `npm warn audit network timeout at:
   https://registry.npmjs.org/-/npm/v1/security/advisories/bulk` followed by `npm error audit endpoint
@@ -5598,7 +5682,24 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   increment that closes this row would red its own new gate on its own close-out, which is the trap
   `pre-push-guard.php` records `M52` walking into. **Live.** Filed by `M71`.
 
-- **`minor` · *"`ci.yml` is the USER'S FILE"* is asserted by one backlog row and by nothing else.**
+- ~~**`minor` · *"`ci.yml` is the USER'S FILE"* is asserted by one backlog row and by nothing else.**~~
+  ✅ **DONE — M72 (2026-09-05), BY TAKING THE ROW IT WAS BLOCKING, WHICH IS THE ONLY ONE OF ITS TWO ARMS
+  THAT SURVIVES.** Re-verified independently: the phrase appears **exactly once** in this repository, in
+  the row asserting it; `CLAUDE.md` does not mention `.github/` at all; no ADR covers ownership; and
+  `git log --follow` returns **24** commits of which **seven** are M-series increments inside their own
+  pull requests (`M28`, `M39`, `M40`, `M46`, `M48`, `M49`, `M57`). ⛔ **AND THE ROW UNDERCOUNTS ITSELF**:
+  under any reading wider than the M-series, `I0`, `I5`, `I11b`, `H2`, `G5b1`, `F6a`, `E`, `C3`, `B2c`,
+  `B1` and `A` edited it too — roughly nineteen increment-authored commits. The error runs in the safe
+  direction. ⛔ **A THING THE ROW MISSES AND IT CUTS ITS OWN WAY: `docs/claims/decisions.md` IS NOT SILENT
+  ON THIS FILE.** `D8` asks how `ci.yml` should regain the trunk observation and **recommends an option**
+  — so the standing decision record already treats it as editable, which corroborates the row from a
+  direction it never looked. ⛔ **ITS OTHER ARM IS REJECTED, NOT DEFERRED:** writing *"`ci.yml` is out of
+  bounds"* into `CLAUDE.md` would enshrine a claim seven increments' history refutes. ⚠️ **ONE CAVEAT THE
+  ROW OMITS AND WHICH CHANGED WHAT WAS BUILT:** `PROGRESS_ARCHIVE.md:544` records `7154d5f` as carrying
+  **two decisions locked with the user** — the agent wrote the `--omit=dev` flag, the *policy* was
+  user-ratified. So `M72` fixed the conflation and moved neither the scope nor the threshold. **Closed
+  with the `npm audit` row above rather than as a row of its own, because its entire remaining diff is a
+  sentence in this file** — which the batching contract excludes from a footprint.
   Checked across the whole repository during `M71`'s fan-out because it was the stated reason a row was
   filed rather than fixed: the phrase appears **exactly once**, in the row that asserts it. ⛔ It is in no
   standing rule, no ADR and no decision. `CLAUDE.md` does not mention `.github/` at all; its only
@@ -5627,7 +5728,26 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   settled rather than open: the axe step runs with `working-directory: packages/design-system`, so that
   package owns them. **Live.** Filed by `M71`.
 
-- **`minor` · `M59`'s `ds:storybook` alias row rests on a false premise and the alias alone would not
+- ~~**`minor` · `M59`'s `ds:storybook` alias row rests on a false premise and the alias alone would not~~
+  ✅ **DONE — M72 (2026-09-05), AND THIS ROW'S OWN MECHANISM IS FALSE IN THE HALF IT USED FOR SIZING.**
+  Its conclusion is right — a compose-file change is required — and its reason is not. It asserts *"the
+  package script binds without `--host`"*; read out of the installed Storybook 8.6, `-h, --host` is
+  declared with **no default value**, and Node's `listen({port, host: undefined})` binds the
+  **unspecified** address, i.e. every interface. **Publishing 6006 is sufficient on its own**;
+  `--host 0.0.0.0` was added for consistency, not necessity. ⚠️ **AND IT MISATTRIBUTES A CITATION**: the
+  *"Blank page / Vite HMR under Docker"* note it invokes two sentences after citing the design-system
+  README lives at **root** `README.md:134`, and it says the opposite of what the row uses it for — a
+  client-side URL problem on a server that binds correctly. ⚠️ **BOTH ROWS ALSO INHERITED A STALE FRAMING
+  NEITHER CHECKED**: that README still called itself a *"Phase 0 seed"* whose components were
+  *"(Phase 0: `Button`)"*, six lines above the block they were arguing about. ⛔ **AND THE MEASUREMENT
+  THAT ONLY STARTING THE SERVER COULD PRODUCE: publishing the port is NECESSARY AND NOT SUFFICIENT.**
+  A Windows-host `npm install` here runs `--no-bin-links`, leaving a **split tree** — the `storybook` CLI
+  hoisted to the root `node_modules`, `@storybook/vue3-vite` only in the package's, and no `storybook`
+  shim in the package's `.bin` — so the root CLI resolves presets from the root tree and dies on
+  `Cannot find module '@storybook/vue3-vite/preset'`, naming a package that **is** installed one
+  directory away. `docker compose exec node npm run ds:install` produces a coherent install; the preview
+  then answered **HTTP 200 from the host in ~25s**. Recorded in that README, with the honest note that
+  **nothing gates it and nothing can** — it is a property of a gitignored `node_modules`.
   work.** Re-measured during `M71`'s fan-out. ⛔ The row's argument is that the alias *"would also give
   the component library a local preview, **which nothing currently documents**"*.
   `packages/design-system/README.md` documents `npm run storybook` in a fenced block — and, worse for the
@@ -5639,3 +5759,136 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `storybook dev` inside that container answers nothing a host browser can reach — the same shape as the
   README's own *"Blank page / Vite HMR under Docker"* note. A working preview needs the port published and
   a host bind, in a live-stack file the row never mentions. **Live.** Filed by `M71`.
+
+- **`minor` · The `/f/*` navigation route caches an opaqueredirect, because it is the one route whose
+  sibling filters for `200` and it does not.** Measured by `M72` (2026-09-05) at the browser while
+  building the proof `M61` asked for, and it is the reason that proof came back saying something other
+  than what the row it closed expected. After a mis-cased entry, `guest-shell-html` holds **two** keys:
+  `/f/clinic-intake` at `status 200, type 'basic'` and `/f/Clinic-Intake` at `status 0,
+  type 'opaqueredirect'`. ⛔ **The asymmetry is one line.** `resources/public-runtime/sw.ts`'s
+  `guest-schema` route carries `new CacheableResponsePlugin({ statuses: [200] })`; the `/f/*` navigation
+  route carries only `ExpirationPlugin`, so Workbox's status filter never runs and the 301 stub is
+  stored. ✅ **This is NOT a broken offline path, and saying so is the point of filing it rather than
+  calling it a bug**: the browser follows a cached opaqueredirect to the canonical entry, which is
+  cached correctly, so a mis-cased entry still renders offline — measured, not argued. ⚠️ **What it costs
+  is a slot.** `maxEntries: 20` is shared, so enough mis-cased variants evict the canonical shell, and
+  *that* is the failure — silent, device-local, and reached only by a respondent who was already using a
+  wrong-cased link. ⚠️ **Filed rather than fixed for a stated reason**: the fix is in `sw.ts`, a hub file,
+  and `D13` allows one hub-touching row per batch, which `M72` spent on `ci.yml`. The remedy is the
+  sibling route's own line. **Live.** Filed by `M72`.
+
+- **`minor` · `scripts/mutate.php`'s `run_pest()` MANUFACTURES a `SURVIVED` verdict when Docker is
+  unreachable, which is worse than the guard defect filed beside it.** Found by a read-only agent during
+  `M72`'s fan-out, in the same file and the same shape as the concurrent-suite row above. `run_pest()`
+  calls `shell_out()` without the status argument, so a failed `docker exec` returns `''`; no line starts
+  with `Tests:`, `$failed` stays `0`, and the baseline gate `if ($baseline['failed'] > 0)` **passes an
+  unmeasured baseline** — defeating this file's own headline rule, *a red proves nothing if you cannot
+  show it was green*. The verdict `$mutant['failed'] > $baseline['failed']` is then `0 > 0`, false, and
+  the harness prints *"SURVIVED — the mutant changed NOTHING… That is the finding — file it rather than
+  explaining it away"* and exits `EXIT_SURVIVED`. ⛔ **A Docker outage does not merely skip a check: it
+  fabricates a finding that reads as a measured result and invites a backlog row.** ⚠️ The existing
+  comment (*"the exit code cannot be trusted — pest has returned 0 alongside `Tests: 5 failed`"*)
+  justifies ignoring the code as a **failure** signal and not as a **did-it-run** signal. ⚠️ **Both
+  `git status --porcelain` checks have the same shape**, including the post-restore one whose message is
+  *"is STILL DIRTY after the restore. Do not trust this tree."* — it cannot fire if git is what broke,
+  and git is **absent inside the app container**, so any in-container invocation has a permanently
+  vacuous `R2`. ✅ The correct pattern is 60 lines away in the same file: the `php -l` probe captures
+  `$lintStatus` through `shell_out`'s existing by-ref third parameter and checks it.
+  **Live.** Filed by `M72`.
+
+- **`minor` · `lib/brand-cache.ts` is a SECOND writer to `guest-shell-html`, and it renews a mis-cased
+  key with a response a navigation cannot use.** Found during `M72`'s fan-out; `M61`'s docblock
+  enumerates four storage systems and treats the service worker as the sole author of this cache's keys.
+  `refreshCachedShells()` iterates `cache.keys()` and does
+  `doFetch(request.url, { credentials: 'omit' })` — default `redirect: 'follow'` — then re-`put`s under
+  the **original** request. ⛔ **So a device primed before `M61` has its legacy `/f/Clinic-Intake` entry
+  re-fetched, redirected, and written back under the MIS-CASED key**, renewed on every brand change
+  rather than ageing out, and the canonical key is still never created. ⛔ **And the response it stores
+  has `redirected === true`, which a browser REFUSES to serve for a navigation request** — so the renewed
+  entry is not merely mis-keyed, it is unusable offline. That is a dead navigation rather than a stale
+  colour, which is the exact trade that file's own header says it exists to refuse. Workbox ships
+  `copyRedirectedCacheableResponsesPlugin` for this class and nothing here uses it. ⚠️ **Latent — it
+  needs a device primed before `M61`**, and this repository cannot tell whether one exists, which is the
+  same shape as the mixed-case `public_slug` row. But it means canonicalizing the origin response does
+  not heal already-cached shells, and that is a premise `M61` recorded as settled.
+  **Latent.** Filed by `M72`.
+
+- **`minor` · A draft is pinned to TWO different form versions in two tables after a silent share-token
+  re-mint.** Found during `M72`'s fan-out while verifying the `draft_answers` key row, and it is the
+  server-side root of that client-side symptom rather than a restatement of it.
+  `SubmissionDraftService` moves `submission_answers.form_version_id` and `answers_schema_checksum` to
+  the saving version, while the `forceFill` on the parent leaves `submissions.form_version_id` at its
+  create-time value. ⛔ **`withFreshToken` re-mints silently on the 24-hour share-token expiry**, so a
+  long-lived session that spans a republish saves against v2 while its `submissions` row still says v1,
+  and `GuestDraftResumeController` then reports the v1 value to a client whose schema is v2. ⚠️ **The
+  row this was found under is `latent` and this one is the reason it is only latent** — the divergence
+  is real and its visible consequence is absorbed by the visit guard and the checksum guard, which is
+  luck rather than design. ⚠️ **Do not take the obvious repair casually**: making `updateDraft` move the
+  parent's version is a behaviour change to a shipped guest path, and
+  `tests/Feature/Guest/GuestDraftRuntimeTest.php` has a case (*"refuses loudly, rather than promoting
+  against a different graph, when the branch is republished"*) that depends on the draft staying pinned.
+  **Live.** Filed by `M72`.
+
+- **`minor` · `docs/data-dictionary.md` documents nine `tenants` columns that exist in no migration, and
+  its enum catalog contradicts the enum.** Measured by `M72`'s fan-out while sizing the documented-literal
+  gate, and filed rather than folded in because it is a documentation increment rather than a cell
+  repair. `tenants.timezone`, `settings`, `is_tax_exempt`, `billing_email`, `billing_country`, `tax_id`,
+  `trial_ends_at`, `suspended_at` and `deleted_at` are all documented with a Default and none of them
+  exists — `Tenant::getCustomColumns()` is the authoritative list — while the real `data` json column
+  stancl spills into is documented nowhere. ⛔ **And the enum catalog is wrong about the same column the
+  literal-default drift names**: it lists `trial`, `active`, `suspended`, `cancelled` for `TenantStatus`
+  where the enum declares exactly **two** cases, and the table's own preamble claims every enum matches
+  *"each enum's Postgres CHECK constraint"* — `tenants.status` has no CHECK constraint in any migration.
+  ⚠️ **Three of these are reachable for free by the documented-LITERAL gate** already filed (they document
+  a default on a column that does not exist, which that test's `$unknown` arm already catches and cannot
+  reach today only because the cells are literal-shaped). The other six are not, and need the census this
+  row is for. **Live.** Filed by `M72`.
+
+- **`minor` · `DROP_BYTE_LIMIT` is an absolute constant unindexed to a ceiling `R1`'s own discipline keeps
+  ratcheting, so sampling bias is the symptom and the missing index is the cause.** Re-measured by `M72`
+  before the `R7` dead-zone row above was considered for a batch, and it strengthens that row rather than
+  restating it. ⛔ **That row says *"surgeries at 161,528 and up"* and the gap had ALREADY CLOSED before
+  `M71`**: `M60`'s declared surgery dropped **101,273** bytes and armed `R7` only because that happens to
+  clear 50,000 twice over. ⛔ **And *"the size of a surgery is a function of how long it was deferred"* is
+  false as stated** — headroom-at-surgery against drop is `M41` 48,137→938,007 · `M45` 91,559→161,528 ·
+  `M48` 39,793→198,909 · `M60` 3,970→101,273 · `M71` 1,355→29,200. No monotone relationship; the *most*
+  deferred produced the *smallest* drop. ✅ **What IS monotone is the fraction**: every surgery removes
+  22–65% of the file, and `TRACKER_BYTE_CEILING` has been ratcheted 1,500,000 → 600,000 → 400,000 →
+  200,000 → 130,000. So 50,000 was *"3.2× below the smallest surgery"* in a 400,000-byte world and is
+  today **38% of the entire ceiling** — every future ratchet widens the dead zone regardless of how early
+  anyone acts. ✅ **The fractional threshold has room the absolute one does not**: ordinary drops top out
+  at **4.78%** and surgeries start at **22.70%**, a **4.75×** gap against the 2.03× the row rightly calls
+  too tight. A `C12` case at `keepFiller = 705` reproduces `M71`'s shape at 21.6% and needs no change to
+  `write_fixture_files()`. **Live.** Filed by `M72`.
+
+- **`minor` · `scripts/next.php` never clips the release HEADING, so a third of the hand-off is
+  byte-identical noise.** Measured by `M72` while verifying the lead-paragraph row above, whose stated
+  harm does **not** reproduce today. `clip()` is applied to the summary alone; the heading is rendered
+  whole. The four current headings are 279, 279, 260 and 278 characters, of which roughly **130 each** is
+  the identical tail *"(merged as PR #NNN, `<sha>`, 6/6 green with real step counts — Static analysis 23
+  · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)"* — about **520 characters of verbatim
+  repetition inside a 3,594-byte hand-off**, which is more budget than the 220-character summary clip the
+  other row is about. ⚠️ **And every lead opens with two invariant sentences** — *"Shipped `<date>`.
+  Branch `<slug>`."* — spending ~45 of the 220-character summary budget on a date and a branch name in
+  every one of the four slots. Both trims are deterministic rather than heuristic, and stripping the
+  boilerplate would have fixed `M42`'s own manifest case too. ⛔ **No gate exists**: nothing in `tests/`,
+  `.github/` or `composer.json`'s `quality` list executes or asserts anything about `scripts/next.php`,
+  so a fix must create its first control — and `next.php` runs top-to-bottom and shells out to
+  `state.php`, so a Pest test cannot `require` it without a `PHP_SAPI`/`realpath($argv[0])` guard or a
+  `--claim=` seam. Without one, the control is unfalsifiable and the increment ships a decorative gate.
+  **Live.** Filed by `M72`.
+
+- **`minor` · The `npm audit` judge makes a REQUIRED context green while nothing was measured, and that
+  is a deliberate trade rather than an oversight.** Recorded by `M72` (2026-09-05) at the moment the
+  decision was taken, rather than left as a comment in the workflow. When the advisory endpoint is
+  unreachable the judge exits `2`, `ci.yml` renders a `::warning::` and a job summary, and the step exits
+  `0` — so `Static analysis, style & security` is green having judged **no dependency at all**. ⛔ **That
+  is a member of the same vacuous-success family this repository catalogues** (`I5`'s `steps: []`, Pint
+  before its probe, `M61`'s `e2e` wrong form, `M69`'s PHPStan-crash-exits-0), and it is being accepted
+  knowingly because the alternative it replaces is worse: a false red that gets re-run until it passes,
+  which reddened `main` twice on consecutive increments. ⚠️ **The costed alternative is a separate
+  non-required job**, which buys a visible pending state at the price of a runner and a second
+  `npm install`; it was not taken because `D7` fixes the six required contexts by job name and adding one
+  is a branch-protection change. ⚠️ **The honest gap is that nobody is obliged to read the annotation.**
+  A stronger form would fail the step on N consecutive unreachable runs, which needs state the workflow
+  does not have today. Recorded as `D16`. **Live.** Filed by `M72`.

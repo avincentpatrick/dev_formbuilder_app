@@ -23,6 +23,92 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
+### D15 — `D13`'s one-hub-row cap is now the binding constraint on batch composition, and it is stricter than its own purpose. Keep it, relax it to per-file, or re-derive the hub set per batch?
+
+**Filed 2026-09-05 by Lane A, during `M72`, at the moment the cap decided a batch that value had not.**
+Recorded here rather than as a row because `D13` is a user decision and an increment does not re-scope
+one of those on its own judgement.
+
+⛔ **WHAT `M72` MEASURED, AND IT IS THE WHOLE QUESTION.** Fifteen rows were verified read-only before the
+branch was cut. **Five of the six highest-value live rows touch a hub file — and they touch five
+DIFFERENT ones**: `.github/workflows/ci.yml`, `scripts/mutate.php`, `scripts/backlog-triage.php`,
+`scripts/tracker-lint-controls.php` and `docs/data-dictionary.md`. `D13` allows **one row per batch** to
+touch a hub, so four of those five were unselectable this increment for a reason that has nothing to do
+with them.
+
+⛔ **THE CAP EXISTS TO PREVENT COLLISION, AND ROWS IN FIVE DIFFERENT FILES CANNOT COLLIDE.** `D13`'s own
+reasoning says so: the 26-row component *"is glued only by hub files … which are meta-files, not product
+code"*, and the rule it derived is *"no two rows in a batch may cite the same non-hub file, and at most
+one row may touch a hub file."* The first clause is per-file. The second is per-batch, and that
+asymmetry is what now binds. ⚠️ **It was a sound rule when it was written and the tree has moved under
+it**: the remaining queue is overwhelmingly meta/tooling debt concentrated in a handful of files,
+because that is what six consecutive increments of gate work produces.
+
+⚠️ **AND IT ALREADY COST THIS INCREMENT SOMETHING CONCRETE.** `M72`'s `R3` built the proof `M61` asked
+for, the proof found a live defect in `resources/public-runtime/sw.ts` — a hub file — and the fix is the
+one line its sibling route already carries. It could not be taken, because `R1` had spent the budget. It
+is now a row, and the next increment will pay the re-derivation cost to close a defect that was fully
+diagnosed while the file was open.
+
+**The options, none of them a rewrite of `D13`:**
+
+1. **Keep it as written.** The cap has never yet caused a wrong batch, only a smaller one, and `D13`'s
+   measured ~42% saving does not depend on which rows are in the batch. Costs: the meta/tooling queue
+   drains at one hub row per increment regardless of how cheap the fixes are.
+2. ✅ **Relax the second clause to match the first: *no two rows in a batch may touch the SAME hub
+   file*.** This is what the cap is for, stated the way the other clause already is. Every batch `M72`
+   could have built satisfies it trivially, and it would have let `R3` close its own finding.
+   **Recommended.** ⚠️ The honest cost: a batch touching four hub files is a wider blast radius for
+   `D13`'s bisection rule, so it is worth pairing with *at most two hub-touching rows* until measured.
+3. **Re-derive the hub set per batch rather than globally.** A file is a hub only relative to the rows
+   still open, and `scripts/backlog-triage.php` recomputes it every run — so the set is already dynamic
+   and this option only changes the threshold. Cheapest to implement, least principled: it makes the
+   cap loosen automatically as the queue drains, which is the opposite of what a safety rule should do.
+
+⚠️ **Whatever is chosen, `D13`'s batch SIZE is not in question.** It is answered, proven seven times, and
+this entry is about which rows may sit together — not how many.
+
+---
+
+### D16 — The `npm audit` judge makes a required status check green when the registry is unreachable. Accept it, isolate it, or keep the hard block?
+
+**Filed 2026-09-05 by Lane A, during `M72`, at the moment the trade was taken rather than after.** It is
+here and not only in the backlog because it deliberately weakens a **merge gate**, and the class it joins
+is one this repository has spent four increments learning to refuse.
+
+**What was fixed.** `npm audit --omit=dev --audit-level=high` exits `1` both when a high advisory exists
+and when the advisory endpoint cannot be reached. That single indistinguishable red hit `main` twice on
+consecutive increments — `M69`'s PR run and `M70`'s **post-merge run on the trunk** — and both times the
+remedy was to re-run a red gate, which is the habit every other control here exists to prevent. Fetching
+and judging are now separate, and the judge exits `0` clean · `1` blocked · `2` never measured.
+
+⛔ **WHAT IT COSTS, STATED PLAINLY.** On exit `2` the workflow emits a `::warning::` and a job summary and
+**exits 0**, so `Static analysis, style & security` — one of `D7`'s six required contexts — reports green
+having judged no dependency at all. **That is a vacuous success**, the same family as `I5`'s `steps: []`,
+Pint before its probe, `M61`'s `e2e` wrong form and `M69`'s PHPStan-crash-exits-0. It is being accepted
+knowingly, which is the only honest way to accept one.
+
+**The options:**
+
+1. ✅ **As built: green with an annotation.** The failure it replaces is worse — a false red teaches the
+   operator to re-run a red gate, and a false green here is bounded (it cannot hide a *known* advisory,
+   only the absence of a measurement). **Recommended**, because the alternative was measured on the
+   trunk twice and this has not yet been observed at all. ⚠️ Its real weakness is that nobody is obliged
+   to read the annotation.
+2. **A separate, non-required job.** An unreachable registry then shows as a genuinely failed check that
+   does not block, which is the most truthful rendering. Costs a runner and a second `npm install` per
+   run, and adding a job means touching the branch-protection ruleset `D7` fixed by name — the class of
+   change that stays with the user.
+3. **Keep the hard block.** Truthful about having measured nothing, and it reddens `main` on somebody
+   else's outage. This is the status quo the row was filed against.
+
+⚠️ **A fourth shape exists and is not offered, because it needs state the workflow does not have:** fail
+after *N consecutive* unreachable runs. That distinguishes a blip from an outage and is the right answer
+if this recurs; it wants a cache key or a repository variable, and guessing at one inside this increment
+is how a gate acquires a second thing to get wrong.
+
+---
+
 ### D14 — The compliance spec promised audit events for deleting and restoring a submission, and there is no delete or restore surface at all. Build it, or record it as not built?
 
 **Filed 2026-09-04 by Lane A, during `M70`, at the moment the row's deciding premise was falsified.**

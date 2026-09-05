@@ -6,6 +6,11 @@ import { ApiError } from '../lib/api-client';
 import { normalizeError } from '../lib/error-normalizer';
 import type { Bootstrap } from '../lib/types';
 import { field, schemaResponse, section } from './fixtures';
+import { openDb } from '../lib/db';
+import { enqueue } from '../lib/outbox';
+
+/** Increment M72 — the parked conflict row a review is resolving. */
+const PARKED_UUID = '0192f1a2-b3c4-7d5e-8f90-000000000072';
 
 const SUBMISSION_ID = '0192f1a2-b3c4-7d5e-8f90-1a2b3c4d5e6f';
 // Increment J2e — the server-issued handle now rides on the submit result and on the `submitted` emit, so a
@@ -1255,6 +1260,77 @@ describe('RuntimeSession — the 409 a respondent is told the truth about (Incre
         expect(notice).toContain('keep this page open');
 
         wrapper.unmount();
+    });
+
+    // ⛔ INCREMENT M72 — the case above is now HALF of a pair, and this is the other half. It mounts
+    // WITHOUT `resolvingUuid`, so nothing durable was written and the cautious sentence is still the true
+    // one. These two cases must disagree, and they must disagree for the reason named in each: a change
+    // that made both say the same thing would either re-introduce M66's false promise or keep telling a
+    // respondent their saved work is unsaved.
+    it("flushes a failed review's corrections onto the parked row, so a reload does not rewind them", async () => {
+        // THE DEFECT: `handleSubmitError` discards the row it just enqueued for EVERY ApiError, before
+        // `handleDrift` runs, and a resolving session has autosave disabled because the parked row is meant
+        // to be the durable copy. So when remint() then fails, the corrections live only in memory.
+        const db = openDb();
+        await db.outbox.clear();
+        await enqueue(db, {
+            client_submission_uuid: PARKED_UUID,
+            slug: bootstrap.slug,
+            form_version_id: 'v1',
+            checksum: 'c1',
+            answers: { name: 'Adah' },
+            locale: 'en',
+            device_id: 'dev-1',
+            app_version: 'test',
+            respondent_session_id: null,
+            base_content_checksum: null,
+        });
+        await db.outbox.update(PARKED_UUID, { status: 'conflict', conflict_code: 'submission_conflict' });
+
+        const client = fakeClient({
+            submit: vi.fn(rejecting('form_updated', 'This form has been updated.')),
+            remint: vi.fn(async () => {
+                throw new TypeError('Failed to fetch');
+            }),
+        });
+        const wrapper = mount(RuntimeSession, {
+            props: {
+                schema: conflictSchema(),
+                bootstrap,
+                client,
+                resolving: true,
+                resolvingUuid: PARKED_UUID,
+                // The review re-mounts against the parked row's answers, exactly as App.vue seeds it.
+                initialAnswers: { name: 'Adah' },
+            },
+        });
+
+        // The correction the respondent came here to make.
+        await wrapper.find('input').setValue('Ada Lovelace');
+        await wrapper.find('form').trigger('submit');
+        await settle();
+
+        // ⚠️ NOT `settle()` ALONE. This describe block's own header records that its fixed five macrotask
+        // ticks lost a Dexie chain one run in three and the assertion then read `undefined` — "a real defect
+        // in the test, not a run to re-roll until it passes". The recovery flush is one more link in exactly
+        // that chain, so this waits for the write instead of hoping for it.
+        await vi.waitFor(async () => {
+            expect((await db.outbox.get(PARKED_UUID))?.answers.name).toBe('Ada Lovelace');
+        });
+
+        const parked = await db.outbox.get(PARKED_UUID);
+
+        // RED BEFORE THE FIX: the parked row still carries 'Adah' and the correction is gone on reload.
+        // And the row must still be the PARKED one — a review that quietly un-parked it would be
+        // re-POSTed by the background driver within seconds, which is the remedy this row rejected.
+        expect(parked?.status).toBe('conflict');
+
+        // The sentence is now true, so it is said. Paired with the case above, which must keep saying
+        // the opposite for the mount that has no uuid to write to.
+        expect(wrapper.find('.session-notice').text()).toContain('saved on this device');
+
+        wrapper.unmount();
+        await db.outbox.clear();
     });
 });
 

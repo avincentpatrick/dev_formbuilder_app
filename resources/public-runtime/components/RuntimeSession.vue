@@ -32,8 +32,8 @@ import {
 import { ApiError } from '../lib/error-normalizer';
 import { acceptanceForReasonCode, hasScheduleConstraint } from '../lib/schedule';
 import { openDb } from '../lib/db';
-import { discardRow, enqueue } from '../lib/outbox';
-import { attachToSubmission, collectLocalMediaIds } from '../lib/media-queue';
+import { discardRow, enqueue, setAnswers } from '../lib/outbox';
+import { attachToSubmission, collectLocalMediaIds, repointToSubmission } from '../lib/media-queue';
 import { getDeviceId } from '../lib/device';
 import { touchRespondentSession } from '../lib/respondent-session';
 import { APP_VERSION } from '../lib/app-version';
@@ -49,6 +49,11 @@ const props = defineProps<{
     /** Increment G8c — this session is resolving a parked conflict (review & resubmit): suppress autosave and
      *  the sync banner, and offer a "discard this response" escape hatch. */
     resolving?: boolean;
+    /** Increment M72 — WHICH parked row this review is resolving, not merely that one is. `resolving` alone
+     *  told this component to suppress autosave and told it nothing about where the durable copy lives, so a
+     *  failed recovery had nowhere to put the reviewed answers. App.vue has held this uuid since G8c
+     *  (`resolvingUuid`) and only ever passed the boolean down. Absent/null keeps the pre-M72 behaviour. */
+    resolvingUuid?: string | null;
     /** Increment H10 — the reconciled resume seed when the session was opened from a resume link: the server
      *  draft's uuid (so the finalize promotes it), the restored locale/step, and the welcome-back banner data.
      *  Null on a normal fresh entry and on a version-drift remount (the banner is a one-time restore signal). */
@@ -205,6 +210,8 @@ async function handleDrift(conflictCode: string | null = null): Promise<void> {
         // server answered; anything else is a raw fetch rejection. Keeping the original sentence on the
         // `terminal` arm is deliberate — that is the one case it was always true for, and the phrase is
         // bound to a real 404 everywhere else in the codebase (`GuestDraftResumeController`, `App.vue`).
+        // Increment M72 — BEFORE the sentence, put the answers somewhere that survives a reload.
+        await preserveReviewedAnswers();
         notice.value = {
             type: 'error',
             message:
@@ -218,6 +225,42 @@ async function handleDrift(conflictCode: string | null = null): Promise<void> {
 }
 
 /**
+ * Increment M72 — flush a conflict review's edits back onto the PARKED row when recovery fails.
+ *
+ * ⛔ THE DEFECT THIS CLOSES. `handleSubmitError` discards the row it just enqueued, unconditionally, for
+ * every `ApiError` and BEFORE it calls `handleDrift`. A resolving session has autosave disabled by
+ * construction, because the parked row is meant to BE the durable copy. So if `remint()` or `fetchSchema()`
+ * then fails — a dropped connection is enough — every correction the respondent just made lives only in
+ * component memory, and a reload silently rewinds them to the answers they were reviewing.
+ *
+ * ⛔ AND THE OBVIOUS FIX IS THE WRONG ONE, MEASURED BEFORE THIS WAS WRITTEN. The row prescribes "keep the
+ * queued row until recovery succeeds". A retained row keeps `status: 'pending'`, which is exactly what
+ * `listPending` selects for BOTH the in-tab driver and `sw.ts`'s background sync — so it is re-POSTed
+ * within seconds and re-parked as a SECOND conflict row, or escalated to `needs_attention`. Making that
+ * work needs a new held status reaching `db.ts`'s `OutboxStatus`, `outbox-status.ts`'s exhaustive
+ * descriptor map, `reap.ts`'s media-sparing filter and both list components. That is its own increment.
+ *
+ * ✅ WHAT WORKS INSTEAD, AND IT ADDS NO STATE AT ALL. `setAnswers` goes through `patchUnsent`, which
+ * refuses only a `synced` row — so it writes cleanly onto the parked `conflict` row. No driver touches a
+ * `conflict` row, `App.vue`'s `beginConflictReview` already seeds from `row.answers`, and `reap.ts`
+ * already spares a conflict row's media. A reload therefore re-surfaces the review WITH the edits.
+ *
+ * ⚠️ Media picked during the review is owned by the review's own fresh uuid, so it is re-pointed rather
+ * than left behind — narrowly, via `repointToSubmission`, which filters on the source uuid precisely so
+ * this cannot become M21's re-pointing defect wearing a new name.
+ */
+async function preserveReviewedAnswers(): Promise<void> {
+    const parked = props.resolvingUuid;
+    if (!props.resolving || parked === null || parked === undefined) {
+        return;
+    }
+    const answers = { ...runtime.answers };
+    await setAnswers(db, parked, answers);
+    await repointToSubmission(db, collectLocalMediaIds(answers), runtime.clientSubmissionUuid, parked);
+    void sync?.refresh();
+}
+
+/**
  * The network arm's copy — and the reason it branches is a data question, not a wording one.
  *
  * ⛔ "YOUR ANSWERS ARE SAVED ON THIS DEVICE" IS FALSE IN A CONFLICT REVIEW, WHICH IS THE ONE PLACE IT WOULD
@@ -227,13 +270,23 @@ async function handleDrift(conflictCode: string | null = null): Promise<void> {
  * only in memory: reassuring the respondent would be the same class of error as the sentence this
  * increment removed, pointing the other way.
  *
- * The underlying lifecycle defect — that a failed recovery can strand the only copy — is filed rather than
- * fixed here; it reaches the outbox contract `lib/replay.ts` and the background driver share.
+ * ✅ INCREMENT M72 — CLOSED, AND THE SENTENCE ABOVE IS NOW HALF WRONG, WHICH IS WHY IT IS KEPT. When this
+ * component knows WHICH row is parked (`resolvingUuid`), `preserveReviewedAnswers()` has already flushed
+ * the reviewed answers onto it by the time this runs, so the reassurance IS true and the first arm says so.
+ * The old sentence survives as the second arm for the case that is still honest: a resolving session
+ * mounted without the uuid — a bare test mount, or any caller that has not been updated — where nothing
+ * durable was written and promising otherwise would be M66's error pointing the other way.
+ *
+ * ⚠️ AND THE ROW'S SCOPE CLAIM WAS WRONG IN THIS DIRECTION TOO: it says the fix "reaches the outbox
+ * contract `lib/replay.ts` and the background driver share." It reaches neither. That is true only of the
+ * keep-the-row remedy, which was measured and rejected — see `preserveReviewedAnswers()`.
  */
 function unreachableRecoveryMessage(): string {
-    return props.resolving
-        ? 'We could not reach the server to reload this form. Please keep this page open and try again once you are back online.'
-        : 'We could not reach the server to reload this form. Your answers are saved on this device — please check your connection and try again.';
+    return props.resolving && (props.resolvingUuid ?? null) !== null
+        ? 'We could not reach the server to reload this form. Your changes are saved on this device — please check your connection and try again.'
+        : props.resolving
+          ? 'We could not reach the server to reload this form. Please keep this page open and try again once you are back online.'
+          : 'We could not reach the server to reload this form. Your answers are saved on this device — please check your connection and try again.';
 }
 
 /**

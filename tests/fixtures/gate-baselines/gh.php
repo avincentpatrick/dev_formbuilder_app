@@ -40,8 +40,16 @@ $noun = $arguments[1] ?? '';
 
 // `gh run view <id> --log` — the scraped text. Checked BEFORE the --json arm because both are
 // `run view`, and the log arm is the one distinguished by a flag rather than by position.
+//
+// ⚠️ SCENARIO-SPECIFIC LOG, FALLING BACK TO THE SHARED ONE (M75). Until M75 this read `ci-log.txt`
+// unconditionally, which meant every scenario scraped a log satisfying all twelve patterns — so the
+// `$missing > 0` branch in scripts/gate-baselines.php could not be reached by any control, and the
+// row about what that branch DOES had nothing asserting it. The fallback is what keeps the six older
+// scenarios sharing one log, which is still right for them: they are about the recency guard, which
+// runs a hundred lines before the scrape.
 if ($verb === 'run' && $noun === 'view' && in_array('--log', $arguments, true)) {
-    fwrite(STDOUT, (string) file_get_contents(__DIR__.'/ci-log.txt'));
+    $scenarioLog = __DIR__.'/ci-log-'.$scenario.'.txt';
+    fwrite(STDOUT, (string) file_get_contents(is_file($scenarioLog) ? $scenarioLog : __DIR__.'/ci-log.txt'));
     exit(0);
 }
 

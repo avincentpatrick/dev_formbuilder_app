@@ -1,0 +1,27 @@
+### DELIBERATELY IMPLAUSIBLE NUMBERS (M74) ###
+Every figure below is a fixture value chosen so that it can never be mistaken for a real baseline.
+docs/gate-baselines.md is the only place real gate numbers live; a fixture that looked like one
+would be a second copy of a fact, which is the defect that file exists to end. The controls in
+tests/Feature/Docs/GateBaselinesTest.php assert the guard's verdict, never these figures.
+
+Tests (Pest on PostgreSQL)  2026-09-05T09:30:00.0000000Z   Tests:    1,111 passed (2,222 assertions)
+Tests (Pest on PostgreSQL)  2026-09-05T09:30:01.0000000Z   Duration: 111.11s
+
+Frontend build & type-check 2026-09-05T09:31:00.0000000Z    Test Files  33 passed (33)
+Frontend build & type-check 2026-09-05T09:31:01.0000000Z         Tests  333 passed (333)
+
+Design system a11y (axe)    2026-09-05T09:32:00.0000000Z Test Suites: 4 passed, 4 total
+Design system a11y (axe)    2026-09-05T09:32:01.0000000Z Tests:       44 passed, 44 total
+
+E2E (Playwright + axe)      2026-09-05T09:33:00.0000000Z   55 passed (6.7m)
+E2E (Playwright + axe)      2026-09-05T09:33:01.0000000Z   5 skipped
+
+Static analysis, style & security 2026-09-05T09:34:00.0000000Z  [OK] No errors
+Static analysis, style & security 2026-09-05T09:34:01.0000000Z  PASS   ................................................ 777 files
+Static analysis, style & security 2026-09-05T09:34:02.0000000Z  Controller gate passed (7 file(s) scanned).
+Static analysis, style & security 2026-09-05T09:34:03.0000000Z  Migration linter passed (8 migration(s) scanned).
+Static analysis, style & security 2026-09-05T09:34:04.0000000Z  Job payload linter passed (9 job(s) scanned).
+Static analysis, style & security 2026-09-05T09:34:05.0000000Z  Constraint boundary linter passed (11 migration file(s) scanned, 12 constraint(s) checked, 13 constraint(s) unresolved).
+Static analysis, style & security 2026-09-05T09:34:06.0000000Z  Component-import linter passed (14 SFC(s) scanned).
+
+Contract tests (OpenAPI)    2026-09-05T09:35:00.0000000Z   openapi.json is byte-identical to the generated spec.

@@ -6209,8 +6209,34 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   contemporaneously. **The guard does not depend on reproducing it.**
   ⚠️ **The NOT-FOUND-row question this row raises is deliberately NOT answered here** and stays open below.
 
-- **`minor` · The correction page has no autosave and no armed leave prompt, so an editor who navigates away
-  loses every character they typed, silently.** Found by `M74` while building the escape route beside it, and
+- ✅ **CLOSED BY `M75` (2026-09-06) — `minor` · ~~The correction page has no autosave and no armed leave
+  prompt, so an editor who navigates away loses every character they typed, silently.~~** ✅ **Every citation
+  held byte for byte — the only row of the four whose evidence needed no correction** — and its warning was
+  worth the words: the obvious remedy really is already done and really would not have helped.
+  ✅ **CLOSED: the leave-prompt half.** A guard local to `Encode.vue`, armed in edit mode only, covering all
+  three escape routes the row names — a real browser navigation via `beforeunload`, and every Inertia visit
+  (Cancel, a breadcrumb, the sidebar, the palette) via `router.on('before')`, which fires for none of them
+  otherwise. Cancelling offers **Stay on this page** / **Leave and discard**, and leaving re-issues the visit
+  rather than making the keyer click twice.
+  ⛔ **AND THE OBVIOUS SHAPE OF THAT FIX SHIPS A DEFECT OF ITS OWN, WHICH IS THE FINDING WORTH KEEPING.** A
+  bare visit hook fires on the **dark-mode toggle**: `ThemeQuickToggle` sits in `TopNav` sits in `AppLayout`,
+  which this page uses, and it persists through `router.patch('/settings/appearance', …)` — a visit that
+  never leaves the page. So a keyer switching to dark mode is asked whether to discard their corrections, and
+  **declining it silently drops the theme preference**, which has no error path. Excluding non-GET visits
+  closes it and exempts `submitEdit()`'s own PATCH for free. ⛔ **A second exclusion nobody would have
+  noticed**: `Router.prefetch()` fires the same cancelable `before` event, so without a `prefetch` clause the
+  first `<Link prefetch>` in the shell pops this dialog **on hover** — armed and invisible, since nothing
+  passes `prefetch` today.
+  ⚠️ **`confirmDiscard()` now disarms the guard before reloading**, or `M74`'s two-click confirm gains a
+  browser dialog on top of it — asking twice for one decision. The docblock that argued `location.reload()`
+  "costs nothing in lifecycle" is corrected in the same commit, since this is precisely what made it false.
+  ⛔ **NOT CLOSED — the "no autosave" half, and it is not a gap so much as a different row.** It needs an
+  endpoint that does not exist: `draft_url` is null in edit mode on purpose, and the only other write channel
+  demotes Approved → UnderReview and writes an audit row **per save**. That is a product decision, filed below.
+  ⚠️ **A test-file correctness fix came out of this and is worth knowing about**: nothing in `encode.test.ts`
+  ever unmounted, so every case left a live component holding a `beforeunload` listener on the shared window.
+  Measured: with the new unmount loop disabled, two of the new cases fail.
+  ⬇️ **The row as filed:** Found by `M74` while building the escape route beside it, and
   👤 **the user was asked and chose to file it rather than fold it in.** `Encode.vue`'s autosave is
   `enabled: … && !isEditing.value`, so on the edit channel it never runs; `useServerAutosave` DOES register a
   `beforeunload` listener at construction, but its handler early-returns because `dirty` is only ever set
@@ -6242,8 +6268,38 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   column VALUES, not their author-defined LABELS, because resolving those needs the field's `config` threaded
   into `displayValue()`. **Live.** Filed by `M74`.
 
-- **`minor` · `gate-baselines.php` writes the file BEFORE it judges whether every metric was found, so a
-  NOT FOUND row ships and is reported afterwards.** Split out of the `gh run list` row `M74` closed, which
+- ✅ **CLOSED BY `M75` (2026-09-06) — `minor` · ~~`gate-baselines.php` writes the file BEFORE it judges
+  whether every metric was found, so a NOT FOUND row ships and is reported afterwards.~~** ✅ **The mechanism
+  held to the line** — the write sat three lines above the `$missing > 0` judgement.
+  ⛔ **AND THE THING THE ROW DID NOT NAME IS WORSE THAN THE THING IT DID.** `gate-baselines: wrote
+  docs/gate-baselines.md from run N.` printed **unconditionally**, before the judgement — so the script
+  announced success and then contradicted itself on stderr. That sentence is now printed only when nothing
+  is missing, and the count is reported on **both** exits, on stderr, where `--dry-run`'s document on stdout
+  cannot be corrupted by it.
+  ⛔ **TWO OF THE ROW'S OWN CLAIMS ARE FALSE AND ARE NOW PINNED AS FALSE BY A TEST.** (1) *"Under `--dry-run`
+  the NOT FOUND message never prints at all … the only signal is an exit code."* It is not: the **document**
+  carries a row **naming** the failing metric and `--dry-run` writes that document to stdout, which is
+  strictly more actionable than a count. What was genuinely missing was the count. (2) *"It flips
+  `--dry-run`'s exit semantics."* Both paths already exited `1` on a missing metric — measured.
+  ⛔ **THE PRESCRIBED REMEDY WAS NOT TAKEN, DELIBERATELY.** *"Move the write below the judgement"* is a
+  refusal-to-write; `M70` already adjudicated a refuse-instead-of-write remedy **for this same script** and
+  rejected it, and it strands close-out step 3 — `scripts/next.php` stamps *"regenerate it"* until the file
+  moves, so a refusal nags forever with nothing able to satisfy it. **A NOT FOUND row in the file names the
+  unscraped metric; an absent file names nothing.**
+  ⛔ **THE BRANCH HAD ZERO COVERAGE AND COULD NOT BE GIVEN ANY**, which is the part worth carrying forward.
+  All six scenarios shared one `ci-log.txt` satisfying all twelve patterns, and every control ran
+  `--dry-run` because the default action writes the repository's own tracked baselines. Both ends are fixed:
+  `gh.php` serves `ci-log-<scenario>.txt` when one exists, and `GATE_BASELINES_OUT` redirects the
+  destination — the same shape as the `GH`/`GIT` seams, a destination replaced and no guard weakened. The
+  sha256-invariance case still passes, which is what shows the seam did not cost that invariant.
+  ✅ **The helper moved from `exec(… 2>&1)` to `proc_open`**, because merged streams made "the diagnostic is
+  on stderr" structurally unprovable — and that retired the `putenv()` dance and the cmd.exe note behind it.
+  ⚠️ **Sizing correction for the record:** the row's urgency is inherited from an incident `M74` already
+  closed by a louder guard — `MAX_COMMITS_BEHIND` refuses that 141-behind run about a hundred lines before
+  the metric loop — so the scenario the row narrates cannot recur. The accept-then-announce shape was still
+  real, and `docs/gate-baselines.md` sits inside `ci.yml`'s `paths-ignore`, so nothing in CI would ever have
+  seen a bad file reach the trunk.
+  ⬇️ **The row as filed:** Split out of the `gh run list` row `M74` closed, which
   raised it and deliberately did not answer it. `file_put_contents()` runs three lines ahead of the
   `$missing > 0` check, so a run with a broken pattern still rewrites `docs/gate-baselines.md` and *then*
   exits 1 — the accept-then-mention shape the `npm audit` judge row also names. ⛔ **And under `--dry-run` the
@@ -6254,8 +6310,37 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   print the diagnostic on both paths; ⚠️ **note it flips `--dry-run`'s exit semantics**, which is why it was
   not folded into a guard change that had its own controls to prove. **Live.** Filed by `M74`.
 
-- **`minor` · `brand-cache.ts` re-`put`s through the raw Cache API rather than a Workbox strategy, so the
-  bytes are renewed and the seven-day expiry clock is not.** Found by `M74` while closing the coverage row
+- ✅ **CLOSED BY `M75` (2026-09-06) — `minor` · ~~`brand-cache.ts` re-`put`s through the raw Cache API rather
+  than a Workbox strategy, so the bytes are renewed and the seven-day expiry clock is not.~~** ✅ **Every fact
+  the row states held**, and `brand-cache.ts:168` really was the only raw Cache API write in the repository.
+  ⛔ **THE TITLE'S REMEDY CANNOT RUN WHERE THIS CODE RUNS, THREE INDEPENDENT WAYS.** `brand-cache.ts` executes
+  in the WINDOW: `Strategy.handleAll()` needs a `FetchEvent` and throws there; `sw.ts`'s shell route matches
+  `request.mode === 'navigate'`, and navigate mode is not constructible from script; so the strategy is
+  unreachable. The working seam is `CacheExpiration.updateTimestamp()` — the same bookkeeping the plugin
+  drives, minus the deletion — and it was proved to run under happy-dom before a line of the fix was written.
+  ⛔ **`expireEntries()` IS DELIBERATELY NOT IMPORTED.** It deletes, and this module's axiom is *re-prime,
+  never purge*.
+  ⚠️ **THE ROW DESCRIBES ONE CLOCK AND WORKBOX HAS TWO, WHICH IS WHY NOTHING NOTICED FOR SO LONG.** Deletion
+  is driven by the IndexedDB timestamp, which a raw `put` never touches; read-freshness is decided from the
+  cached response's own `Date` header, which a raw `put` **does** renew. So the defect was invisible to
+  anything that merely read an entry back, and it bit hardest on exactly the shells this module exists for —
+  the ones nobody navigates to, where nothing else ever stamps the entry.
+  ⚠️ **AND THE ROW'S SEVERITY FRAMING OVERSTATED THE TRIGGER**: the sweep runs once per **brand change**, not
+  per boot, so "refreshed on day six" needs a tenant ramp edit on day six.
+  ⛔ **THE ROW'S OWN SECOND-ORDER NOTE IS BACKWARDS, AND THE CORRECTION IS NOW AT THE CALL SITE.** It says
+  `maxEntries` bookkeeping is "unaffected". `maxEntries` is enforced by walking the `timestamp` index
+  newest-first, so it is a recency-of-USE order — and renewing the swept entries replaces that with sweep
+  order for one boot, leaving the resume shell (the one entry deliberately not renewed) sorting oldest.
+  ⚠️ **The prior state was the anomaly**: a fresh body with a stale timestamp is a combination Workbox's own
+  model cannot produce, so there was no correct ordering to preserve — only a different wrong one. **Whether
+  the sweep should be narrower is a design question the row did not know it was asking, and it is filed below
+  rather than decided inside a `minor` row.**
+  ✅ **Four docblock sentences that stated the false model are corrected**, including `isResumeShell()`'s
+  SECURITY rationale — which argued the skip stops a re-`put` "RENEWING a token-bearing document
+  indefinitely", a renewal that until now did not happen. **That predicate was belt-and-braces; it is
+  load-bearing now.** `SHELL_CACHE` and the expiry config moved to `lib/shell-cache.ts`, ending a
+  "must match `sw.ts`" comment that was a duplicate with a note attached.
+  ⬇️ **The row as filed:** Found by `M74` while closing the coverage row
   beside it. `refreshCachedShells()` calls `cache.put()` directly on the `Cache` object; `ExpirationPlugin`'s
   IndexedDB timestamp for that entry is therefore never touched, so a shell refreshed on day six is still
   evicted on day seven as though it had not been. ⚠️ **The module's own docblock reads as though the entry is
@@ -6267,8 +6352,29 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   unaffected only because these keys already exist — a variant that ADDS a key this way would leave an entry
   Workbox cannot see at all. **Live.** Filed by `M74`.
 
-- **`minor` · A Vitest case asserts that a `setTimeout(…, 0)` fired, so its green depends on machine load
-  rather than on the code.** Found by `M74` during a full local suite run, and filed rather than fixed
+- ✅ **CLOSED BY `M75` (2026-09-06) — `minor` · ~~A Vitest case asserts that a `setTimeout(…, 0)` fired, so
+  its green depends on machine load rather than on the code.~~** ⛔ **THE ROW'S EVIDENCE HELD AND ITS CENTRAL
+  DIAGNOSIS WAS WRONG, IN THE DIRECTION THAT MATTERS: THE CASE WAS NOT FLAKY, IT WAS VACUOUS.** happy-dom
+  supplies `crypto.subtle`, so `solveChallenge()` awaited a real WebCrypto digest on **every** candidate and
+  the test's zero-delay timer fired after candidate **zero** — roughly 10 ms in, thousands of iterations
+  before the first `yieldToEventLoop()` at `n = 4999`. The assertion never reached the yield at all.
+  ⛔ **MEASURED, NOT REASONED: with `challenge.ts`'s yield line deleted outright the case still passed
+  11/11.** A row filed as *"this sometimes goes red for the wrong reason"* was in fact *"this can never go
+  red for the right one"*.
+  ⛔ **BOTH PRESCRIBED REMEDIES FAIL.** Fake timers **deadlock** — `vi.runAllTimersAsync()` resolves as soon
+  as no fake timer is pending and the solver schedules none until `n = 4999`. The injected scheduler seam
+  removes the race but not the cost, cannot assert the default hook at all (a counting stub replaces the one
+  thing that makes `yieldToEventLoop` a macrotask), and would pin a cadence that is fiction: `config/guest.php`
+  sets `max_number` to 120000, so production yields **24** times, not the 2 a 20000-space fixture would fix.
+  ✅ **What works was already in the file ten lines above** — run the case on the pure-JS fallback with
+  `vi.stubGlobal('crypto', {})`, where `sha256Hex()` is synchronous so the timer can only fire if the solver
+  yielded. Deterministic, mutation-sensitive (the same deletion now reddens exactly this case), and
+  **78 ms against 747 ms**. A test-only edit; the production-code change the row asked for was not needed.
+  ⚠️ **AND THE LOAD ARTEFACT `M74` SAW WAS REAL, WITH A DIFFERENT CAUSE**: 747 ms against Vitest's 5000 ms
+  default `testTimeout`. The cost was the flake; the vacuity was the defect.
+  ⚠️ **What is NOT closed, and is filed below**: nothing pins the yield on the `crypto.subtle` path, where it
+  is unobservable by this technique, and nothing anywhere asserts the yield CADENCE.
+  ⬇️ **The row as filed:** Found by `M74` during a full local suite run, and filed rather than fixed
   because it is not this increment's row and the fix is a real design choice.
   `resources/public-runtime/__tests__/challenge.test.ts`'s *"yields to the event loop on a long search"*
   sets a zero-delay timer, awaits `solveChallenge()` over a deliberately long search, and asserts the timer
@@ -6284,3 +6390,89 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   scheduler seam and count the yields, or fake the timers so the assertion is deterministic. Both make the
   test say *"the solver called its yield hook N times"*, which is the claim, instead of *"the event loop
   happened to be free"*, which is the weather. **Live.** Filed by `M74`.
+
+- **`minor` · PHPStan run where `CLAUDE.md` says to run it reports 18 errors, and `docs/gate-baselines.md`
+  records the CI figure as "OK, no errors".** Found by `M75` (2026-09-06) while measuring a gate it had
+  predicted could not move. `CLAUDE.md`'s gate table says PHPStan is **container only**; run there —
+  `vendor/bin/phpstan analyse --no-progress`, the exact command `composer run analyse` wraps — it reports
+  **18 errors**, every one of them `Access to an undefined property` on an Eloquent model
+  (`FormField::$default_value`, `$appearance`, `$created_by`; `User::$two_factor_secret`;
+  `FormSection::$icon`, `$color`; `FormVersionResource::$description`). ⛔ **The columns are real** —
+  `default_value` is declared in `2026_07_06_000205_create_form_fields_table.php` — and the models carry
+  `@property` blocks that do not cover these, so this is Larastan resolving model properties **without a
+  schema it can read**, not a code defect. ⚠️ **The divergence is the defect, not the 18.** A local run of a
+  merge gate that disagrees with CI in the direction of MORE errors trains the reader to ignore it, and the
+  failure mode is not the wasted hunt — it is the nineteenth error, which is real and invisible in a wall of
+  eighteen that are not. ⚠️ **`M75` could prove its own diff was unaffected only because it touched no file
+  under `app`, `database` or `routes` at all**, so the analysis input was byte-identical to the trunk; an
+  increment that touches one of those three has no such argument available and nothing to compare against.
+  ⚠️ **Two migrations are also `Pending` locally** (`…000109_create_sso_verified_domains_table` and
+  `…000110`), which is a separate observation and does NOT explain these errors — none of the flagged columns
+  belongs to those migrations. **Whoever takes it should decide between three things, and they are not
+  equivalent**: make the local run reproduce CI (a documented pre-step), record the local figure alongside
+  the CI one in `docs/gate-baselines.md` so the gap is stated rather than discovered, or add the missing
+  `@property` lines so both environments agree. **Live.** Filed by `M75`.
+
+- **`minor` · Six `DOMException [AbortError]` stack traces print during a fully green Vitest run, and a
+  stack trace on a passing run is what teaches a reader to skip stack traces.** Found by `M75` (2026-09-06)
+  while fixing two of them. A full `npx vitest run --pool=forks` exits **0** with 134 files and 2343 tests
+  passing, and prints six `AbortError` traces from `happy-dom`'s `teardownWindow` aborting requests still in
+  flight when a suite's window is torn down. ⛔ **`M75` measured the attribution rather than guessing it**:
+  `encode.test.ts` accounted for two of them before this increment and would have contributed two more once
+  it began unmounting components, and stubbing `fetch` for the teardown itself took that file to **zero**.
+  The remaining six are in other suites and were not investigated. ⚠️ **The remedy transfers exactly and is
+  one line** — stub `fetch` around whatever tears the component down — but ⛔ **`globalThis.fetch = …` does
+  NOT work and was tried first**: it changes nothing under happy-dom, and `vi.stubGlobal` is what reaches the
+  binding the code calls. That is the whole trap, and it is the reason this is worth a row rather than a
+  passing note. ⚠️ **Sized `minor` because nothing is failing** — which is also precisely why it persists.
+  **Live.** Filed by `M75`.
+
+- **`minor` · The brand sweep now renews every entry it touches, which resets `maxEntries` eviction from
+  recency-of-use to sweep order — and nobody has decided whether the sweep should be narrower.** Found by
+  `M75` (2026-09-06) as a direct consequence of the clock fix it shipped, and recorded at the moment the
+  scope was decided rather than after. `workbox-expiration` enforces `maxEntries` by walking the `timestamp`
+  index newest-first and deleting past the 20th survivor, so that index is a recency-of-**use** order —
+  `ExpirationPlugin` stamps an entry on every read as well as every write. `refreshCachedShells()` renews
+  nearly every entry in one pass, so on the boots where it runs the order becomes `cache.keys()` order
+  instead. ⚠️ **It re-establishes itself as entries are read again, and the writes are staggered rather than
+  identical** (each waits on its own fetch — 8 ms apart in the probe that established this), so this is a
+  one-off reordering per brand change and not a permanent degradation. ⛔ **But two consequences deserve a
+  decision rather than a docblock.** (1) The resume shell, alone in not being renewed, now sorts **oldest**,
+  so on a device holding more than twenty shells it is the first eviction — consistent with why
+  `isResumeShell()` exists, and the opposite of what its *"SKIPPED, NEVER PURGED"* docblock implies. (2)
+  `isResumeShell()` **fails open** on an unparseable URL, and that used to cost a token-bearing shell nothing
+  but rewritten bytes; it now costs it a renewed lifetime. ⚠️ **The prior state was the anomaly** — a fresh
+  body with a stale timestamp is a combination Workbox's own model cannot produce — so there is no
+  "restore the old ordering" option; the real choices are to narrow the sweep, to stagger deliberately, or to
+  accept it and say so. **Live.** Filed by `M75`.
+
+- **`minor` · The proof-of-work yield is pinned on the fallback path only, and its CADENCE is asserted
+  nowhere at all.** Found by `M75` (2026-09-06) while replacing the vacuous assertion that preceded it, and
+  filed rather than folded in because the second half needs a decision. ⛔ **The honest limit of the new
+  case**: under `crypto.subtle` — which happy-dom supplies and which every https respondent gets — the
+  awaited native digest turns the event loop on **every** candidate, so `yieldToEventLoop()` being called or
+  not is unobservable by a timer. The property is real on that path and nothing pins it there. ⛔ **And the
+  cadence is worse than unpinned, it is unexamined.** `challenge.ts` yields at `n % 5000 === 4999`;
+  `config/guest.php` sets `max_number` to **120000**, so a worst-case production solve yields **24** times
+  and no test, comment or document anywhere states that number or why 5000 is the right interval. ⚠️ **A
+  seam-and-count rewrite would pin a cadence derived from a 20000-space fixture — two yields — which is
+  fiction against the real search space**, so the fix is not simply "inject the hook". ⚠️ **Why it matters
+  beyond tidiness**: the solver runs inside `ApiClient.submit()`, which the service worker also calls while
+  draining the outbox, and a SW cannot spawn a Worker — so the interval is the only thing standing between a
+  long solve and every other fetch that worker is handling. **Live.** Filed by `M75`.
+
+- **`minor` · A correction still cannot be autosaved, and the reason is an endpoint that does not exist plus
+  a product decision nobody has taken.** Split out by `M75` (2026-09-06) from the leave-prompt row it closed,
+  which named both halves and could only build one. `Encode.vue`'s autosave is off in edit mode by design and
+  the presenter sends a null `draft_url` there, both deliberately: an edit autosaved down the DRAFT channel
+  overwrites a respondent's answers with no `update` policy check and no audit row, and
+  `SubmissionEditRoutesTest` pins `draft` and `draft_url` null in edit mode precisely so that cannot drift.
+  ⛔ **So the missing piece is not a flag, it is a channel.** The only existing write path for a correction is
+  `PATCH /submissions/{submission}/answers`, and `SubmissionAnswerEditService` sends an Approved response back
+  to **UnderReview** and writes an audit ledger row on every call — so a debounced autosave on that channel
+  means one demotion and one audit row **per tick**, which is not a smaller version of the current behaviour
+  but a different product. ⚠️ **The leave guard makes this less urgent and not less real**: an editor is now
+  warned rather than silently losing work, but an hour of transcription still lives only in the tab.
+  👤 **The decision is the user's**: a draft-shaped side table for in-progress corrections, an explicit
+  "save a working copy" action, or a documented statement that corrections are not resumable. **Live.**
+  Filed by `M75`.

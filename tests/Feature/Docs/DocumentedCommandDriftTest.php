@@ -105,6 +105,17 @@ const DOCUMENTED_COMMAND_TELEMETRY_FLAG = '--disable-telemetry';
 const DOCUMENTED_COMMAND_MIN_BUILD_INVOCATIONS = 1;
 
 /**
+ * A dev server that binds a port, as prescribed by a package script — `storybook dev -p 6006`,
+ * `vite --port 5173`. The port is captured, because the point of the arm below is to compare it to
+ * what the compose service publishes.
+ *
+ * ⚠️ DERIVED FROM THE SCRIPT, NEVER DECLARED HERE. A list of "our dev servers" is a second copy of
+ * a fact and drifts from the package.json that owns it, which is the failure this whole file exists
+ * to catch one level up.
+ */
+const DOCUMENTED_COMMAND_DEV_SERVER_PORT = '/(?<![\w-])(?:dev|serve|start)(?![\w-]).*?(?:-p|--port)[ =]+(\d{2,5})/';
+
+/**
  * Every line of the gated document that a reader would COPY, keyed by 1-based line number.
  *
  * Fenced blocks only; comment lines and blank lines dropped. `explode` and never `preg_split` on
@@ -157,6 +168,49 @@ function documentedCommandLines(): array
     );
 
     return $commands;
+}
+
+/**
+ * The host ports a compose service publishes, read from the compose file rather than declared.
+ *
+ * Only the HOST side of `"<host>:<container>"` is returned — that is the number a browser on this
+ * machine can reach, and reaching it is the whole claim the arm below checks.
+ *
+ * @return list<int>
+ */
+function documentedCommandPublishedPorts(string $service): array
+{
+    $path = base_path('docker-compose.yml');
+
+    expect(is_file($path))->toBeTrue(
+        'Discovery floor: docker-compose.yml was not found at '.$path.'.'
+    );
+
+    $ports = [];
+    $current = null;
+    $inPorts = false;
+
+    foreach (explode("
+", (string) file_get_contents($path)) as $line) {
+        if (preg_match('/^  ([a-z][\w-]*):\s*$/', $line, $match) === 1) {
+            $current = $match[1];
+            $inPorts = false;
+
+            continue;
+        }
+
+        if (preg_match('/^    ([a-z][\w-]*):/', $line, $match) === 1) {
+            $inPorts = $match[1] === 'ports';
+
+            continue;
+        }
+
+        if ($inPorts && $current === $service && preg_match('/^\s*-\s*"?(\d{2,5}):/', $line, $match) === 1) {
+            $ports[] = (int) $match[1];
+        }
+    }
+
+    return $ports;
 }
 
 /** The `scripts` map of one package.json, keyed by script name. */
@@ -416,6 +470,60 @@ it('disables telemetry wherever it prescribes a storybook build', function (): v
     );
 
     expect($violations)->toBe([], implode("\n", $violations));
+});
+
+it('publishes the host port of every dev server it prescribes inside a compose service', function (): void {
+    // ⛔ WHY THIS ARM EXISTS (M72). `packages/design-system/README.md` documented `npm run storybook`
+    // for as long as it has existed, the root had aliases for three of its four scripts, and the
+    // `node` service published 5173 and not 6006 — so the ONE command that would show a developer the
+    // design system started a server nothing on the host could reach. Nothing was wrong in any single
+    // file; the defect lived in the JOIN between a prescribed command and a published port, which is
+    // exactly the shape this file was built for and the one nobody had asserted.
+    //
+    // ⚠️ It reads the port out of the SCRIPT and the publication out of the COMPOSE FILE. Neither
+    // number is written here, so this cannot go stale against the tree it measures.
+    $musl = documentedCommandMuslServices();
+    $checked = 0;
+    $violations = [];
+
+    foreach (documentedCommandComposeInvocations() as $invocation) {
+        if (preg_match('/npm\s+run\s+([\w:.-]+)/', $invocation['command'], $match) !== 1) {
+            continue;
+        }
+
+        $leaf = documentedCommandResolve($match[1]);
+
+        if ($leaf === null || preg_match(DOCUMENTED_COMMAND_DEV_SERVER_PORT, $leaf, $port) !== 1) {
+            continue;
+        }
+
+        $checked++;
+        $wanted = (int) $port[1];
+        $published = documentedCommandPublishedPorts($invocation['service']);
+
+        if (! in_array($wanted, $published, true)) {
+            $violations[] = DOCUMENTED_COMMAND_DOCUMENT.':'.$invocation['line'].
+                ' runs `npm run '.$match[1].'` in the service `'.$invocation['service'].
+                '`. That resolves to `'.$leaf.'`, which binds port '.$wanted.
+                ', and docker-compose.yml publishes ['.implode(', ', $published).'] for that service. '.
+                'The server starts and nothing on the host can reach it — a prescribed command that '.
+                'appears to work and does nothing.';
+        }
+    }
+
+    expect($checked)->toBeGreaterThan(
+        0,
+        'Discovery floor: no prescribed command resolved to a port-binding dev server, so this arm '.
+        'compared nothing. A selector that matches none of them cannot fail, which is the decorative '.
+        'gate M43 measured — it fails here instead of reporting a clean run.'
+    );
+
+    expect($violations)->toBe([], implode("
+", $violations));
+
+    // The service the block actually talks to must be in the set the musl arm scopes over, or these
+    // two arms are quietly measuring different documents.
+    expect($musl)->toContain('node');
 });
 
 it('still resolves the script graph the other arms discriminate over', function (): void {

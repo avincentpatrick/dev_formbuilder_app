@@ -86,8 +86,8 @@ docker compose exec node npm run ds:tokens      # writes packages/design-system/
 docker compose exec node npm run build          # production assets
 docker compose exec node npm run type-check     # vue-tsc
 
-# Design system — the two above are the bootstrap; these are the rest.
-docker compose exec node npm run ds:tokens              # re-run after editing tokens/*.json
+# Design system — ds:install/ds:tokens above are the bootstrap; re-run ds:tokens after editing tokens/*.json.
+docker compose exec node npm run ds:storybook            # local preview -> http://localhost:6006
 docker compose exec node npm run ds:storybook:build     # -> packages/design-system/storybook-static
 
 # axe every story (WCAG 2.2 AA) — the merge-blocking gate, run the way ci.yml runs it.

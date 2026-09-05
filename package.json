@@ -11,6 +11,7 @@
         "test:watch": "vitest",
         "ds:install": "npm --prefix packages/design-system install",
         "ds:tokens": "npm --prefix packages/design-system run build:tokens",
+        "ds:storybook": "npm --prefix packages/design-system run storybook",
         "ds:storybook:build": "npm --prefix packages/design-system run build-storybook",
         "ds:test": "npm --prefix packages/design-system run test-storybook",
         "e2e": "playwright test",

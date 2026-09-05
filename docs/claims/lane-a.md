@@ -168,6 +168,46 @@ Namespaces spent: migration prefix `2026_08_17_000111`. No ADR, no sub-decision 
 **`D13` compliance, checked against measured file sets rather than row text:** four rows, no two sharing
 a non-hub file, exactly **one** hub-touching row (`R1`, `docs/security-threat-model.md`).
 
+---
+
+⛔ **CLAIM EXTENDED, 2026-09-06, AND THIS IS ITS OWN PUSHED COMMIT BEFORE THE FILE WAS TOUCHED AGAIN.**
+`R1`'s first test run found a **live, uncovered break of the invitation accept flow**, in a file `R1`
+already claims (`app/Http/Controllers/Tenant/InvitationController.php`). It is not the row's subject and
+it is not a regression this increment introduced — it is a defect the whole suite is blind to.
+
+**What was measured, through the real HTTP stack and then again at the database.** A genuine newcomer
+accepting an invitation is redirected to `/dashboard`, their membership becomes `Active`, their role is
+granted and they are logged in — and `registerInvitedPlaceholder()`'s `forceFill(...)->save()` writes
+**zero rows and throws nothing**. After a successful accept, on both the app and the privileged
+connection, `email_verified_at` is **NULL** — a column that `forceFill` sets unconditionally. So the
+chosen **password**, the **name**, the **verification stamp** and both **consent timestamps** are all
+silently discarded.
+
+**The mechanism, proved directly rather than reasoned about.** `users_app_update` is `USING true`, so the
+UPDATE policy is not the obstacle — the **SELECT** policy is. `users_users_visibility` admits a row only
+when `id = app.current_user_id` or the user holds an **`active`** membership in the current tenant, and
+PostgreSQL applies SELECT policies to an `UPDATE` whose `WHERE` reads a column. At that moment the visitor
+is **not yet logged in** (`accept()` calls `Auth::login()` afterwards) and the membership is still
+**`Invited`** (`memberships->accept()` also runs afterwards), so the row is invisible and the update
+matches nothing. Measured as `rows=0` on the default connection and `rows=1` on `pgsql_auth`.
+
+⚠️ **WHY NOTHING CAUGHT IT.** `MembershipRoutesTest`'s end-to-end case asserts the membership status, the
+`joined_at`, the role and that the session is authenticated. **It never asserts the credential** — which
+is the exact shape this repository already records for `SubmissionReferenceDisclosureTest` and which
+`InvitationIdentityTest`'s own header states as a rule: *"assert what the system ended up doing, never
+that a method was called"*. Every refusal case here asserts the password is **unchanged**, and unchanged
+is what a dropped write also looks like.
+
+⚠️ **The consequence is worse than a lost form post**: the account is left unverified, so the `verified`
+middleware turns it into a lockout with no error to trace — which is, verbatim, the failure
+`SsoUserProvisioner::createUser()`'s docblock predicted for its own write and defended against, one file
+away, and which nobody carried across to this one.
+
+**Taken rather than filed**, because it is live, it breaks the product's commonest onboarding door, and
+the file is already open under this claim. Filed as a `major` row in the same commit so the record exists
+independently of this narrative. ⚠️ **It bears on `D5`/`D12`** — the series-exit clause counts open
+`major` rows, and this one was open and invisible the entire time that count read zero.
+
 **Prediction, written before the run.**
 
 - **PHPStan: zero on the host and in CI, eighteen in the container, and the gap is `R3`'s subject.**

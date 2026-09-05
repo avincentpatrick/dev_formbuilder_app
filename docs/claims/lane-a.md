@@ -16,183 +16,80 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M73`, the eighth batched increment: three rows closing four, and three premises the fan-out falsified before the branch was cut (m73-shell-cache-draft-pin-mutate-guards)
+## Status: NO ACTIVE CLAIM — `M73` is merged; three rows closed four, and every one of the three had a premise that was false
 
-Taken 2026-09-05. Branch `m73-shell-cache-draft-pin-mutate-guards`, cut from `origin/main` at
-`b2de5d23f6394bf99466cd4777427ab2573bd7e0`, PR into `main`.
+`M73` closed **four** rows with three pieces of work and filed **five**, spending **one** hub slot.
+`state.php` counts the tree; do not take that sentence's arithmetic on trust.
 
-**The batch, under `D13` as written** — three pieces of work, four rows closed, **one hub slot**
-(`scripts/mutate.php`). No two rows share a non-hub file.
+⛔ **THE ONE THING `M73` WOULD MOST LIKE TO HAND ON: THE THREE-AXIS SPLIT IS NOT A FORMALITY, AND THIS
+INCREMENT IS THE CLEANEST EVIDENCE OF IT YET.** Three rows were taken. **All three had sound evidence and
+a false premise, and two of the three had a remedy or a deterrent that was also wrong.** A claim that
+recorded only *"the row is real"* would have been right about every one of them and useful about none.
 
-- **`R1`** — `docs/feature-backlog.md`, the `M72` row *"The `/f/*` navigation route caches an
-  opaqueredirect, because it is the one route whose sibling filters for `200` and it does not."*
-- **`R2`** — the `M72` row *"A draft is pinned to TWO different form versions in two tables after a
-  silent share-token re-mint."*
-- **`R3`** — the `M72` row *"`scripts/mutate.php`'s `run_pest()` MANUFACTURES a `SURVIVED` verdict
-  when Docker is unreachable"* **merged with** the `M71` row *"`scripts/mutate.php`'s
-  concurrent-suite guard passes VACUOUSLY when Docker is unreachable."* As two rows they are
-  unbatchable — both touch one hub file. As one row they cost one hub slot and are cheaper than two
-  increments.
+⚠️ **AND THE FALSE HALVES WERE NOT DECORATIVE — TWO OF THEM WOULD HAVE CHANGED WHAT GOT BUILT.**
+`R1`'s premise (*"`sw.ts` is a hub file"*) is what had deferred it for an entire increment; it is not a hub
+and never was. `R2`'s deterrent (*"a test depends on the draft staying pinned"*) is what would have stopped
+a taker choosing the repair — and it is false, so the repair was **ungated rather than forbidden**, which
+is strictly more dangerous than the row implied.
 
-⛔ **`D15` IS OPEN AND THIS INCREMENT DOES NOT RE-SCOPE IT.** It is a user decision. But see `R1`'s
-premise below: the evidence `D15` offers for itself is **falsified**, and that is recorded here rather
-than argued into a change.
+---
 
-### Evidence verified
+## RELEASED — `M73`, the eighth batched increment: three rows closing four, and every one of the three carried a premise that was false (merged as PR #264, `f555148`, 6/6 green with real step counts — Static analysis 24 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 
-**`R1` — the fact holds, the MECHANISM IS REFUTED, and the scope is undercounted.**
-✅ The plugin lists resolve exactly as filed: the `guest-schema` route carries
-`CacheableResponsePlugin({ statuses: [200] })`, the `/f/*` navigation route carries only
-`ExpirationPlugin`, and `maxEntries: 20` is real.
-⛔ **The row's explanation is false.** It says *"Workbox's status filter never runs"*. `NetworkFirst`'s
-constructor tests `'cacheWillUpdate' in p` — **not plugin presence** — and `ExpirationPlugin` declares
-only `cachedResponseWillBeUsed` and `cacheDidUpdate`. So `cacheOkAndOpaquePlugin` **is** prepended, it
-**does** run, and it admits `status === 200 || status === 0` **by design**. The stub is cached because
-a filter *allowed* it, not because none ran. **Measured against the shipped bundle, not only against
-`node_modules`**: `public/build/sw.js` carries both the permissive `cacheWillUpdate` and the `.some()`
-guard, twice.
-⛔ **The false sentence is in FOUR places** — this file's own `M72` release ×3 and
-`tests/e2e/public-runtime-offline.spec.ts`'s header comment. Correcting the backlog row alone would
-leave the record teaching it.
-⚠️ **Undercounted: two of THREE routes lack the strict filter.** `guest-shell-assets` has the identical
-omission and no row names it. The row's headline is a 1-of-2 framing of a 1-of-3 fact.
+### What shipped, per row
 
-**`R2` — holds in full, and UNDERSTATES ITSELF.** All four clauses resolve: the answer row moves to the
-saving version, the parent's `forceFill` sets three fields and none of them is the version,
-`withFreshToken` re-mints on `401 share_token_expired` against `current_published_version_id`, and the
-resume controller reports the parent's value from a query that does not even fetch the answer row's.
-⚠️ **It is a THREE-way divergence, not two.** The third copy is the **resume token's `vid` claim** —
-signed, 30-day, and emailed to the respondent — so one resume response returns `form_version_id: v1`
-beside a share token minted at v2.
-⚠️ **And the sharp mechanism is unstated in the row**: the `401` is raised in middleware, **before** the
-controller, so the expiry path bypasses the `form_updated` republish guard entirely. That is what makes
-the divergence reachable at all.
+1. **`R1` — the `/f/*` opaqueredirect** (`M72`). The fix is the sibling route's own
+   `CacheableResponsePlugin({ statuses: [200] })`, and **it was not written until a browser probe said so**.
+   ⛔ **THE PRESCRIBED REMEDY WAS EXPECTED TO BE WRONG AND WAS RIGHT.** The read-only fan-out argued —
+   correctly from vendor source — that dropping the cached stub would break the offline mis-cased render,
+   because the row itself credits that stub with delivering the guarantee. **Measured, both arms, entries
+   printed per arm: with the stub gone the cache holds ONE key and the offline render still passes.** So
+   the exculpation was false as well as the mechanism, and *what actually delivers the guarantee is now an
+   open row rather than a third confident model of this one route.*
+   ⚠️ **The mechanism was false in four places**, of which three are this file's own `M72` release. Those
+   are a dated record and were **not** rewritten — the correction lives in the backlog row, in
+   `tests/e2e/public-runtime-offline.spec.ts`'s header where a reader will act on it, and here.
+2. **`R2` — the draft pinned to two versions** (`M72`). `saveDraft()` re-reads the pin from the existing
+   draft, which is what the staff channel already does. ⛔ **The alternative repair would have changed
+   ELEVEN downstream readers** — the PDF, the export column union, the row projector, the inbox, the admin
+   answer edit, the audit ledger and the outbound `SubmissionCreated` payload — by promoting a draft onto a
+   graph the respondent never saw. The chosen one changes one.
+3. **`R3` — `mutate.php`'s manufactured verdicts** (`M72` + `M71`, merged). Two rows, one file, one shape;
+   as two rows `D13` forbade them, as one they cost a single hub slot. ⛔ **The mutant arm restores BEFORE
+   it refuses**, because `run_pest()` runs a second time after the mutant is on disk and the obvious
+   refusal would abort between the write and the restore — `M62` exactly.
 
-**`R3` — holds, with two corrections.** `shell_out()` takes a by-ref `$status` and **four of its five
-call sites discard it**: the concurrent-suite probe, both `git status --porcelain` checks, and
-`run_pest()`. Only the `php -l` probe captures. The chain to a fabricated verdict resolves exactly as
-filed — no `Tests:` line, `$failed` stays `0`, the baseline gate `0 > 0` passes an unmeasured baseline,
-and the harness prints `SURVIVED` and exits `EXIT_SURVIVED`.
-✅ **git is genuinely absent from the app container** — `php:8.4-fpm-alpine`, and no `apk add` installs
-it — so the post-restore *"do not trust this tree"* check cannot fire if git is what broke.
-⚠️ **Correction 1:** `run_pest`'s command ends in `2>&1`, so its output is **non-empty** (the daemon
-error is captured). The outcome is unchanged but the mechanism differs from the concurrent-suite probe,
-which has no `2>&1` — **so the two sites need different guards, which neither row says.**
-⚠️ **Correction 2:** *"the correct pattern is 60 lines away"* is wrong in the figure; the pattern exists
-exactly as described.
+### How the prediction fared
 
-### Premise verified
+- ❌ **"I expect the fan-out's model — that removing the stub breaks the offline mis-cased render — to be
+  confirmed."** **Wrong**, and it was flagged in the claim as the one trusted least. The probe refuted it.
+  Naming it in advance is what made the probe non-negotiable instead of a nicety.
+- ✅ **"PHPStan cannot move."** Held, and it was measured rather than asserted: the base file was restored
+  in place, re-analysed, and the count was identical. Asserted equal to `docs/gate-baselines.md`, never
+  restated.
+- ✅ **"Vitest's file count is unchanged; Pest gains exactly one file."** Both held.
+- ⚠️ **"Second most likely wrong: `R3`'s redis discriminator."** **Right to distrust it, and for a reason
+  better than the one given.** The claim worried it depended on a second container being live. The real
+  problem was worse: no such container exists on a CI runner **at all**, so the case would have collapsed
+  onto the first guard and proved the wrong one — silently. The stub seam exists because of that.
+- ⚠️ **The e2e prediction was too confident in the wrong direction.** One case failed on tablet. Reverting
+  `sw.ts` and re-running made it **strictly worse** — 3 passed / 6 failed, the same test failing on two
+  viewports plus others — which is `M61`'s recorded dev-DB signature and not the diff. The control is the
+  only reason that sentence is a measurement rather than a hope.
 
-**`R1` — FALSE, and it un-blocks the row.** The row was filed rather than fixed because *"the fix is in
-`sw.ts`, a hub file, and `D13` allows one hub-touching row per batch"*. `HUB_THRESHOLD` is **3**;
-**exactly two open rows cite `sw.ts`**; and `docs/backlog-triage.md`'s hub table — regenerated by `M72`
-in its own close-out, in the same commit range that wrote the row — **omits `sw.ts`** and lists it in
-the *non-hub* cites column of two rows. **The `D13` budget never bound.**
-⛔ **`D15` inherits the miscount**: its motivating sentence is *"it is why `R3` could not fix the defect
-it had just fully diagnosed"*. That reason is not true. The decision may still be worth having; this
-evidence for it is not.
-⚠️ **A second writer exists and the fix cannot reach it.** `lib/brand-cache.ts` writes
-`guest-shell-html` through the **raw Cache API**, never through Workbox — so no plugin list, no
-`cacheWillUpdate`. A device primed before the fix keeps renewing the mis-cased key regardless.
+### What `M73` measured that no row had asked for
 
-**`R2` — MATERIALLY FALSE.** The row says the consequence is *"absorbed by the visit guard and the
-checksum guard"*. **Both run only on the resume boot.** The divergence is written on a live autosave
-tick inside an already-mounted session, where neither is reachable — they are structurally inert, the
-same phrase `M70` used when it corrected the sibling row.
-⛔ **What actually absorbs it is server-side and is neither of them**: `promote()`'s re-assert on the
-parent's pin, and it absorbs it by **refusing the respondent a 409 at Submit**, after which the client
-mints a fresh uuid and **abandons the draft**. The row calls itself latent; the outcome is live and
-respondent-facing.
-⚠️ **A second writer of `submission_answers.form_version_id` exists** — `SubmissionFinalizer::finalize()`
-— which on a reachable promote would rewrite the answer row **back** to the parent's version, erasing
-the evidence. Unreachable today, and it is precisely why moving the parent forward is internally
-coherent and externally dangerous.
-
-**`R3` — holds, and the two rows are NOT one fix.** The sibling's claim that *"the hardened form already
-exists one file away"* resolves: `preflight.php` tests `is_numeric()` on the same probe.
-⚠️ **But porting `is_numeric` alone does not reproduce it** — preflight's probe carries `2>&1` and
-mutate's does not, so mutate's diagnostic would print empty. Both halves are needed.
-⚠️ *"Any in-container invocation has a permanently vacuous `R2`"* is true but describes an invocation the
-file explicitly disclaims (*"Runs on the HOST"*) — **and nothing enforces it**, which strengthens the row
-rather than weakening it.
-
-### Remedy verdict
-
-**`R1` — mechanically sound, behaviourally SUSPECT, and NOT WRITTEN UNTIL A PROBE SAYS SO.** The
-prescribed one-liner works at the mechanism level: `cachePut` returns `false`, the response still
-reaches the page, nothing throws. ⛔ **But its only behavioural effect is to stop caching the redirect
-stub — and the stub is what the row itself credits with delivering the offline mis-cased render**, which
-`tests/e2e/public-runtime-offline.spec.ts` asserts end to end. The prescribed fix may therefore redden a
-currently-passing guarantee, and it also costs the lie-fi shortcut the network timeout arm serves from
-that entry.
-⛔ **`M72` handed forward that a model good enough to write a test from is not a measurement, and this is
-the same route that taught it.** Two successive models reasoned correctly from Workbox source and were
-both wrong here; the fan-out's model is a third in that family. **Step one is a browser probe printing
-cache keys with `status` and `type`, network off.** If offline still renders, the fix ships with an
-absence-assertion case — ⚠️ **the existing stray loop cannot be that control**, because with the stray
-gone the loop body never executes and it is **vacuously green**. If offline breaks, this increment ships
-the mechanism correction and re-files the row with the measured reason, and takes no `sw.ts` behaviour
-change. **User-decided, before the branch was cut.**
-
-**`R2` — the row's own warning is FALSE, which is worse than it being right.** It says
-`GuestDraftRuntimeTest`'s *"refuses loudly, rather than promoting against a different graph"* case
-depends on the draft staying pinned. **It does not.** That case uses the **original** token, never
-re-minted, with no clock travel, and `saveDraft`'s Stage-2a throws on the **token's** version before
-`updateDraft` is entered. It never reads the parent's pin. ⛔ **So the obvious repair is UNGATED, not
-forbidden** — nothing in the suite goes red if a taker moves the parent forward.
-✅ **Remedy taken (user-decided): re-pin from the existing draft on the update path**, exactly as the
-staff channel already does — which makes the guest channel obey an invariant three shipped comments
-assert, and removes the *"accident"* one of them names. It changes **one** downstream reader; moving the
-parent forward would change **eleven**, including the PDF, the export column union, the inbox, the audit
-ledger and the outbound `SubmissionCreated` payload. It also closes the v1-rendered / v2-normalized `422`
-as a side effect, because Stage-1 then normalizes against the schema the SPA is actually rendering.
-⚠️ **The true root fix is client-side and is deliberately NOT taken**: the mint response carries no
-version, so `withFreshToken` cannot know the pin moved. That repair collides with the open row at
-`docs/feature-backlog.md:1423` on `api-client.ts` and has no fixture — `App.vue` is mounted by **zero**
-Vitest tests. Filed, paired with that row, as its own increment.
-
-**`R3` — implementable, and the control is the hard half.** Promote the existing `UNMEASURED` sentinel
-from a printed **label** to a **refusal**: the honest predicate is *did a `Tests:` line arrive*, not the
-exit code — which preserves this file's own correct note that Pest returns `0` alongside `Tests: 5
-failed`. Capture the status at all four unguarded sites.
-⛔ **The control must be a Pest file, not a `scripts/*-controls.php` sibling**, and the precedent already
-records why: Pest needs no `composer.json` alias and no `ci.yml` step, **keeping two more hub files out
-of this diff**. A sibling would push the batch to three hub files — dead on arrival.
-⛔ **AND THE OBVIOUS CONTROL PROVES THE WRONG GUARD.** A hardened concurrent-suite probe runs *first*, so
-a nonexistent `--container=` aborts there and the `run_pest` guard is never exercised. The discriminator
-is a container that **passes** the suite probe and **fails** the pest exec — `dev_formbuilder_app-redis-1`
-has busybox `sh`/`ps`/`wc` and no `php`, measured read-only during the fan-out.
-⚠️ **The two `git status` arms have no seam at all.** Proving them needs a new indirection, which is a
-design decision rather than a fix, and is **filed rather than smuggled in**.
-
-Files: `resources/public-runtime/sw.ts`, `tests/e2e/public-runtime-offline.spec.ts`,
-`app/Services/Submissions/SubmissionDraftService.php`, `tests/Feature/Guest/GuestDraftRuntimeTest.php`,
-`scripts/mutate.php`, `tests/Feature/Docs/MutateHarnessTest.php` (new), `docs/feature-backlog.md`,
-`docs/claims/lane-a.md`, `docs/claims/decisions.md`, `PROGRESS.md` (own block only),
-`docs/backlog-triage.md` and `docs/gate-baselines.md` (both regenerated, never hand-edited).
-
-Shared artefacts taken: `docs/feature-backlog.md`, `docs/claims/decisions.md`, `PROGRESS.md` (own block
-only), `tests/e2e/public-runtime-offline.spec.ts`. **`openapi.json` and `phpunit.xml` are NOT taken** —
-the `@throws` row that would have touched the contract was dropped on the evidence.
-
-Paired files taken: none.
-
-Namespaces spent: **nothing from either namespace.** No migration — `R2` is a behaviour change with no
-schema change, so `2026_08_17_000111` stays free. No ADR; `0023` stays free and `0010` stays reserved for
-H1d. No `ADR-0016 §D<n>`, no threat-model row, and `#16` stays free.
-
-Prediction: **PHPStan cannot move** — the diff reaches `app/` in exactly one file and adds no new type
-surface, so quoting an unchanged number would be the defect; it is asserted equal to
-`docs/gate-baselines.md`, never restated. **Vitest's file count is unchanged** — no `.test.ts` is added
-or removed — and Pest gains exactly one file, so the Pest step count is the one baseline figure expected
-to move. **The E2E step count moves only if `R1`'s probe permits the fix**; if the probe refutes it, E2E
-is unchanged and that is the honest outcome rather than a failure. ⚠️ **The prediction most likely to be
-wrong is `R1`'s probe result.** I expect the fan-out's model — that removing the stub breaks the offline
-mis-cased render — to be **confirmed**, but that model is the third in a family of two that were already
-wrong about this exact route, and I am recording that I trust it least. ⚠️ **Second most likely wrong:
-`R3`'s redis discriminator**, which depends on a second container being live and could abort at the
-suite probe rather than at `run_pest` for a reason that has nothing to do with the fix.
-
+- ⛔ **The triage generator silently drops any citation written as a PARTIAL path.** `resolve_token()`
+  resolves a slashed token only by `is_file()` against the literal string, so the basename index — which
+  would have resolved it — is skipped **because the citation was more specific**. Such a row is reported as
+  *"no file harvested"*, can never be batched, and **contributes to no file's hub degree**. Both `D13` and
+  `D15` reason about that degree, so **the hub set is a floor**.
+- ⛔ **`D15`'s own worked example is a miscount.** It argues the cap *"already cost this increment something
+  concrete"*. `sw.ts` is cited by two open rows against a threshold of three, and the triage `M72`
+  regenerated in its own close-out lists it as a NON-hub cite. The question survives; the argument does not.
+- ⚠️ **Six of `mutate.php`'s guards, and the `@throws` row, all turned on the same question**: whether an
+  operation that produced no output had succeeded or had never run. That family now has a name in this
+  repository and five recorded members; this increment adds four more call sites to the count.
 ---
 
 ## RELEASED — `M72`, the seventh batched increment: four rows closing six, and the first whose shape was decided by a constraint rather than by value (merged as PR #263, `05368b2`, 6/6 green with real step counts - Static analysis 24 * E2E 20 * Contract 16 * Frontend 12 * Pest 11 * axe 11)

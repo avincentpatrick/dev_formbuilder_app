@@ -16,17 +16,158 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M75` is merged; four rows closed, five filed, and three of the four prescribed fixes were wrong
+## Status: ACTIVE CLAIM — `M76`, the eleventh batched increment: four rows (`m76-batched-rows`)
 
-`M75` closed **four** rows and filed **five**, spending **one** hub slot. `state.php` counts the tree; do
-not take that sentence's arithmetic on trust.
+**Taken 2026-09-06.** Branch `m76-batched-rows`, cut from `origin/main` at `88a0ee2`, PR into `main`.
+Rows selected from a read-only fan-out over **eight** candidates — twice what the batch needs — because
+`docs/backlog-triage.md` ranks by *operability* and harvests its collision data from row **text**, which
+is itself an open row (`M73`). Every file set below was measured from the code instead.
 
-⛔ **THE ONE THING `M75` WOULD MOST LIKE TO HAND ON: "FLAKY" AND "VACUOUS" LOOK IDENTICAL FROM THE OUTSIDE,
-AND ONLY A MUTATION TELLS THEM APART.** `R4` was filed as a case that sometimes loses a race. It was a case
-that could never win one: on the path it actually ran, the assertion was satisfied thousands of iterations
-before the code it names was reached, and **deleting that code outright left it green**. Every reading of the
-row — including four independent ones — accepted its framing and argued only about which remedy to apply.
-What broke the framing was running the mutation before writing anything.
+⛔ **BEFORE THE ROWS — TWO HOST GATES ARE STUBBED IN THIS SESSION AND EVERY NUMBER THEY PRINT IS A
+FABRICATION.** `vendor/bin/phpstan analyse --no-progress` returns a small JSON object claiming `passed`
+with zero errors, and `vendor/bin/pint --test` returns the same shape — **without running**. Measured
+three ways rather than inferred: neither string is that tool's output format; both are **insensitive to
+their arguments** (`--level=0`, and `pint --test app`, return the identical blob); and `--version` still
+returns the genuine `PHPStan 2.2.4`, so the binaries are ordinary Composer bin proxies and not replaced
+files. ⛔ **The interception is in this session's harness, not in the repository** — `.claude/` holds no
+hook, and nothing is committed. **Consequence, binding on this increment: no host Pint or PHPStan figure
+may be reported as measured, by me or by any agent.** CI is the only trustworthy source for both, and
+`R3` below is the row that explains why the *container* is not the fallback either.
+
+---
+
+### `R1` — a token holder can still set the password on any never-verified self-registration (`M8`, `docs/feature-backlog.md:2390`) · **THE HUB ROW**
+
+**Evidence verified.** Held at every citation, and the exploit is reachable rather than theoretical.
+`TenantMembershipService::identityIsEstablished()` has **five** arms, not the row's four, and every one
+reads false for this population. `routes/tenant.php`'s invitation group carries **neither `auth` nor
+`verified`**, so the predicate is the entire gate: a token holder needs only the emailed token, and
+`registerInvitedPlaceholder()` force-fills a chosen password, stamps `email_verified_at`, and calls
+`Auth::login()`. `Features::registration()` is enabled and `RegistrationGate` returns true for the
+central host. A scoped grep confirms `password_set_at` exists **nowhere** in the tree but prose — six
+mentions, every one describing the unbuilt column.
+
+**Premise verified — held in three places, false in two, and both false ones are in the remedy's own
+mechanics, which is where this row has never been checked.** ✅ `M70`'s correction that the
+`E2eSeeder`/`auth-axe` cost is stale is confirmed **mechanically** rather than by archaeology: the
+fixture is built by a private helper that never routes through any of the four password writers, so the
+cost is **zero**, not "probably zero". ✅ Both provisioners already stamp `email_verified_at`, so leaving
+the new column NULL there changes no answer. ✅ `docs/data-dictionary.md` — a hub file — puts `users`
+explicitly out of scope, so the column table to edit is `docs/multi-tenancy-rbac-design.md`, which is
+not one. ⛔ **FALSE: the row's own prescribed write does not work.** `app/Models/User.php` declares
+`#[Fillable([...])]` as a PHP *attribute*, so adding `password_set_at` to `CreateNewUser`'s
+`User::create([...])` array is **silently discarded** with nothing thrown. ⛔ **FALSE: the vulnerable
+population is larger than "central-host registration".** `attachMember()` returns NULL on a full seat
+quota, which lands a *subdomain* registrant in the identical state — a second entrance the row never
+names.
+
+**Remedy verdict — WORKS WITH CORRECTION, and the correction removes the blocker.** The prescribed
+column is right and its prescribed *stamping* is wrong (see above). `M70`'s "the only honest backfill
+re-derives the predicate in SQL" is **too pessimistic**: the predicate becomes **monotonic** —
+established if `password_set_at` is set **or** any of the five existing arms holds — which can only ever
+add established accounts and never remove one, so it manufactures no lockout and needs no backfill in
+order to be safe. Verified sound at all four call sites including `SsoUserProvisioner`, the one place
+where *more established* means *more refused*.
+
+### `R2` — the resume boot renders a v2 schema holding v1 answers and then abandons the draft (`M21`, `docs/feature-backlog.md:1423`)
+
+**Evidence verified — partially false, and half of what `M70` left standing has since died.**
+`withFreshToken`'s re-mint does genuinely diverge the versions, but only at the single `fetchSchema()`
+inside `loadResume` itself, on a resume boot whose service-worker-cached shell carries an already-expired
+24h share token. ⛔ The `onRedraft` leg `M70` preserved is now **version-equal by construction**:
+`SubmissionDraftService` re-reads the draft's own pin and refuses a superseded one, so the 409 it
+describes is unreachable.
+
+**Premise verified — partially false, and the harm is worse than the row's framing.** The row and `M70`
+both describe the outcome as *"the guard fires"*, i.e. a rejected draft. Measured, it is a **silent data
+loss**: the respondent's newer local tier is discarded in `reconcile.ts` **with no note**, the v2 schema
+renders under a *"welcome back"* greeting holding v1 answers, and the first autosave then 409s them onto
+`onReschema` with a fresh uuid — abandoning the server draft **and the emailed resume link with it**.
+✅ Confirmed: `App.vue` is mounted by **zero** Vitest tests, so a naive fix ships green and proves nothing.
+
+**Remedy verdict — all three candidate remedies are wrong, and the tree already contains the right one.**
+`GuestDraftResumeController` already mints a correctly-pinned share token, `api-client.ts` already
+decodes it, **and nothing reads it** — while a docblock one method away documents the hand-off as though
+it happened. Adopting it costs two production files and roughly six lines, removes the divergence on
+every path rather than one, and makes an existing false docblock true.
+
+### `R3` — the bind-mount iterator blindness `CLAUDE.md` records for the lint gates also reaches Larastan and **seven Pest sweeps**, none of which has a floor (`M75`, `docs/feature-backlog.md:6394`)
+
+**Evidence verified — the 18 errors are real; the row's framing of them is not.** The row asks the taker
+to choose between three remedies and does not know the cause. ⛔ **The cause is this repository's own
+most-documented trap reaching inside a vendor library.** Measured in the app container, same directory,
+same process: `RecursiveDirectoryIterator` returns **86** of `database/migrations`, while `glob`,
+`scandir`, a recursive `scandir` walk and `Symfony\Component\Finder` each return the true **113**.
+Larastan's migration reader uses the blind one, and the 27 files it drops own the flagged properties.
+So all three of the row's remedies are wrong: hand-written `@property` lines paper over a vendor
+enumeration bug, and neither of the other two closes anything.
+
+**Premise verified — false, and the row is a floor by a factor of three.** `CLAUDE.md` already records
+this trap, but scopes it to *the lint gates*. Measured across the container's whole tree:
+**app 719 of 814 · tests 472 of 512 · database 130 of 157**, with `routes` and `resources` clean at zero
+missing. ⛔ **Seven `tests/Feature/` files use the blind iterator** — the row names none of them, and
+`M75`'s own fan-out found two. Unlike `controller-gate`, which `M36` gave a floor precisely for this,
+**not one of the seven asserts a floor**, so each reports passed while blind on every local run.
+
+**Remedy verdict — measured before anything was written.** `Symfony\Component\Finder` is already a
+first-party Laravel dependency and returns the true count in the container; the floor is the half that
+survives a future mount changing again. The vendor instance cannot be fixed from here and is recorded as
+a stated limit rather than guessed at.
+
+### `R4` — the six `AbortError` traces are all in the file `M75` reported it had taken to zero (`M75`, `docs/feature-backlog.md:6416`)
+
+**Evidence verified — partially false, in the direction that matters.** The row says the six remaining
+traces are *"in other suites and were not investigated"*. Measured by subtraction: the other 61
+`resources/js` suites and all 84 public-runtime and design-system suites emit **zero**, and neither of
+those trees contains a real `fetch` call site at all. **All six are `encode.test.ts` itself** — the very
+file `M75`'s release records as having been taken to zero.
+
+**Premise verified — false.** The row believes the escaped requests are torn-down-window artefacts, so
+its remedy is a teardown stub. They are issued **mid-test** by the un-debounced step-navigation flush,
+which a teardown stub cannot reach. The real invariant is **ten** escaped requests, not six, split
+non-deterministically between `AbortError` and an `ECONNREFUSED` aggregate the row never mentions.
+
+**Remedy verdict — right shape, wrong location.** One line, in `beforeEach` rather than in teardown.
+⚠️ **It is not gateable as an assertion** — the run exits 0 with the traces printed — and that is
+recorded as a finding rather than smuggled past as a fix.
+
+---
+
+Files: `database/migrations/2026_08_17_000111_add_password_set_at_to_users_table.php` (new) ·
+`app/Models/User.php` · `app/Actions/Fortify/CreateNewUser.php` · `app/Actions/Fortify/ResetUserPassword.php` ·
+`app/Actions/Fortify/UpdateUserPassword.php` · `app/Http/Controllers/Tenant/InvitationController.php` ·
+`app/Services/Tenancy/TenantMembershipService.php` · `app/Services/Sso/SsoUserProvisioner.php` ·
+`app/Services/Auth/GoogleSignInProvisioner.php` · `database/seeders/E2eSeeder.php` ·
+`tests/Feature/Tenancy/InvitationIdentityTest.php` · `docs/multi-tenancy-rbac-design.md` ·
+`resources/public-runtime/lib/api-client.ts` · `resources/public-runtime/App.vue` ·
+`resources/public-runtime/__tests__/resume-boot.test.ts` (new) ·
+`tests/Feature/Analytics/AnalyticsIndexShapeTest.php` · `tests/Feature/Docs/BacklogProvenanceTest.php` ·
+`tests/Feature/Docs/DocumentedCommandDriftTest.php` · `tests/Feature/Docs/DocumentedSettingKeyDriftTest.php` ·
+`tests/Feature/Notifications/NotificationTableGuardTest.php` · `tests/Feature/Submissions/ClientUuidScopeTest.php` ·
+`tests/Feature/Submissions/SubmissionReferenceDisclosureTest.php` ·
+`resources/js/Pages/submissions/encode.test.ts`.
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/security-threat-model.md` (**the one hub file**,
+`R1`), `docs/multi-tenancy-rbac-design.md`, `PROGRESS.md` (own block only), `docs/claims/lane-a.md`.
+Paired files taken: none.
+Namespaces spent: migration prefix `2026_08_17_000111`. No ADR, no sub-decision id.
+
+**`D13` compliance, checked against measured file sets rather than row text:** four rows, no two sharing
+a non-hub file, exactly **one** hub-touching row (`R1`, `docs/security-threat-model.md`).
+
+**Prediction, written before the run.**
+
+- **PHPStan and Pint: I decline to predict a local number and will report neither.** See the stub finding
+  above. `R1` touches `app/` and `database/`, so PHPStan *can* move for the first time in four
+  increments, and CI is the only place that will honestly say so.
+- **Pest: +1 file, and `R3` reddens something.** I expect making seven blind sweeps see 95 more `app/`
+  files, 40 more `tests/` files and 27 more migrations to surface at least one real failure that was
+  invisible until now. **This is the prediction I least trust and most want to be wrong**, because if all
+  seven stay green after the fix the honest reading is not *"we were fine"* — it is that I have not
+  proved the sweeps can fail at all, and each then needs a mutation before it may be called fixed.
+- **Vitest: 134 to 135 files.** `R2` adds `resume-boot.test.ts`; `R4` edits a file without adding one.
+- **E2E: green and, for `R1`, uninformative.** The invitation fixture provably does not move, so
+  `auth-axe.spec.ts` scans an unchanged DOM. `R2` touches the public runtime, which e2e does reach.
+- **Storybook axe: cannot move** — no file under `packages/design-system/` is in the diff.
 
 ---
 

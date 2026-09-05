@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Tests\Support\SourceTree;
 
 uses(RefreshDatabase::class);
 
@@ -46,22 +47,19 @@ function uuidScopeSourceWithoutComments(string $path): string
     return $out;
 }
 
-/** Every `.php` under `app/`, as absolute paths. */
+/**
+ * Every `.php` under `app/`, as absolute paths.
+ *
+ * ⛔ THIS WAS A `RecursiveDirectoryIterator` UNTIL M76, AND THE FLOOR BELOW IS WHY THAT MATTERED RATHER
+ * THAN MERELY BEING UNTIDY. Over this project's Windows bind mount that iterator returned 719 of the 814
+ * files under `app/` — silently, per-directory, dropping `app/Enums` whole and, for a sweep whose entire
+ * job is to find an unscoped query, ALL 52 files under `app/Http/Controllers/Tenant`. A new offender added
+ * in a tenant controller was invisible to this file on every local run. {@see SourceTree}
+ * carries the measurement and the disagreement guard.
+ */
 function uuidScopeSourceFiles(): array
 {
-    $files = [];
-    $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator(base_path('app')));
-
-    /** @var SplFileInfo $file */
-    foreach ($iterator as $file) {
-        if ($file->isFile() && $file->getExtension() === 'php') {
-            $files[] = $file->getPathname();
-        }
-    }
-
-    sort($files);
-
-    return $files;
+    return SourceTree::filesUnder(base_path('app'));
 }
 
 it('queries client_submission_uuid in exactly one file in the whole application', function (): void {
@@ -88,7 +86,13 @@ it('queries client_submission_uuid in exactly one file in the whole application'
     // resolver holds exactly two queries — the scoped resolve and the tenant-wide existence probe — so a
     // count that is not 2 means either a copy was added inside the allowlisted file or the regex stopped
     // matching the code it is written about.
-    expect($scanned)->toBeGreaterThan(200)
+    //
+    // ⛔ THE FLOOR WAS `toBeGreaterThan(200)` UNTIL M76 AND IT WAS DECORATIVE. `app/` held 814 files, the
+    // blind iterator returned 719, and 719 clears 200 as comfortably as 814 does — so the floor that
+    // existed to prove non-vacuity sat through the loss of every tenant controller without moving. A floor
+    // set an order of magnitude below the tree it guards is not a floor. 800 is chosen against a measured
+    // 814: close enough to catch a directory disappearing, loose enough to survive ordinary churn.
+    expect($scanned)->toBeGreaterThan(800)
         ->and($occurrences)->toBe(2);
 
     expect($offenders)->toBe([

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Actions\Fortify\ResetUserPassword;
 use App\Enums\TenantUserStatus;
 use App\Models\Tenant;
 use App\Models\TenantUser;
@@ -10,6 +11,7 @@ use App\Services\Tenancy\TenantMembershipService;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
@@ -526,4 +528,215 @@ it('publishes no holder for a guest, which is the ordinary invitation page', fun
         ->assertInertia(fn ($page) => $page->component('invitations/Show', false)
             ->where('isUnusedPlaceholder', true)
             ->where('signedInAs', null));
+});
+
+/*
+|--------------------------------------------------------------------------
+| Increment M76 — residual 30: `password_set_at`
+|--------------------------------------------------------------------------
+|
+| The cases above pin the five arms M8 shipped. Every one of them reads FALSE for an account created by
+| central-host self-registration and never used, so a token holder still got the password-setting arm —
+| which is the residual M8 filed and this increment closes with a positive column.
+|
+| ⛔ THE FIRST CASE BELOW IS THE ONE THAT MATTERS, AND IT IS NOT THE ONE ABOUT THE PREDICATE. `password_set_at`
+| is deliberately absent from `User`'s `#[Fillable]` attribute, so a `User::create([... 'password_set_at' =>
+| now()])` writes NOTHING and throws NOTHING. The backlog row that prescribed this fix prescribed exactly
+| that spelling. If a later author "tidies" `CreateNewUser` back to `User::create()`, the column silently
+| stops being written, this whole feature reverts to a no-op, and every other test in this file still
+| passes. That case is the only thing standing between here and there.
+*/
+
+it('stamps password_set_at when a person registers, which mass assignment would have dropped in silence', function (): void {
+    fakeHibp([]);
+
+    $password = 'Correct-Horse-Battery-9';
+
+    $this->post('/register', [
+        'name' => 'Self Registered',
+        'email' => 'm76-selfreg@platformaudittest.local',
+        'password' => $password,
+        'password_confirmation' => $password,
+    ]);
+
+    $this->assertAuthenticated();
+
+    // ⚠️ READ ON THE APP CONNECTION, NOT VIA `m8StoredUser()` LIKE EVERY OTHER CASE IN THIS FILE.
+    // `pgsql_privileged` is a SEPARATE connection whose writes commit outside the test transaction, which
+    // is exactly why the helpers use it to SEED. Registration writes on the DEFAULT connection inside the
+    // transaction, so a privileged read of that row cannot see it at all.
+    // ⚠️ AND THE GUC HAS TO BE SET BY HAND. `users_users_visibility` admits a row only for
+    // `app.current_user_id` or an active co-tenant, and that setting is applied by middleware PER REQUEST
+    // — it is not still in force in the test process afterwards, so a bare `fresh()` returns null. There
+    // is no tenant here: central-host registration deliberately creates no membership, which is the whole
+    // reason this account is the vulnerable shape.
+    // ⛔ IT MUST BE A RE-READ RATHER THAN THE IN-MEMORY MODEL. `forceFill()` sets the attribute in memory
+    // whether or not it reaches the database, so asserting on `Auth::user()` directly would pass under the
+    // very mass-assignment regression this case exists to catch.
+    $id = Auth::id();
+    expect($id)->not->toBeNull();
+
+    TenantContext::applyLocal(null, $id);
+    $stored = User::query()->find($id);
+
+    expect($stored)->not->toBeNull()
+        ->and($stored->password_set_at)->not->toBeNull()
+        // ⚠️ AND THE PROXY IS STILL NULL, WHICH IS WHAT MAKES THIS ACCOUNT THE VULNERABLE SHAPE. If a
+        // future Fortify config starts stamping `email_verified_at` at registration, this expectation
+        // fails and whoever changed it learns that the case below no longer proves what it claims.
+        ->and($stored->email_verified_at)->toBeNull();
+});
+
+it('refuses to take over a self-registered account that has never been verified', function (): void {
+    fakeHibp();
+
+    // ⚠️ THE EXACT POPULATION RESIDUAL 30 DESCRIBED, BUILT FROM ITS OWN DESCRIPTION: no verified address,
+    // no second factor, no Google link, no membership anywhere. Before M76 every arm read false and the
+    // token holder was handed `registerInvitedPlaceholder()`.
+    $victim = m8Identity('Self Registered Person', ['password_set_at' => now()]);
+    $before = m8StoredUser($victim);
+
+    $tenant = m8InviteInto($victim, 'selfreg-token');
+
+    $this->from('http://acme.meridian.test/invitations/selfreg-token')
+        ->post('http://acme.meridian.test/invitations/selfreg-token', [
+            'name' => 'Whoever Holds The Token',
+            'password' => 'Attacker-Chosen-Pass-9',
+        ])
+        ->assertRedirect('http://acme.meridian.test/login');
+
+    $this->assertGuest();
+
+    $after = m8StoredUser($victim);
+    expect($after->password)->toBe($before->password)
+        ->and($after->name)->toBe('Self Registered Person')
+        ->and($after->email_verified_at)->toBeNull();
+
+    enterTenant($tenant->id);
+    expect(TenantUser::query()->where('user_id', $victim->id)->first()->status)
+        ->toBe(TenantUserStatus::Invited);
+});
+
+it('does not offer the password form to a self-registered account, so the page cannot promise a refusal', function (): void {
+    // ⛔ `withoutVite()` IS LOAD-BEARING AND ITS ABSENCE PASSES LOCALLY. Rendering the Inertia root view
+    // resolves the Vite manifest, which exists on a developer machine that has built the front end and does
+    // NOT exist in the Pest CI job — so without this the request 500s there and `assertInertia` reports
+    // *"Not a valid Inertia response"*, a message that says nothing about the cause. This case was written
+    // without it, passed locally, and reddened CI; every other Inertia case in this file already carries it.
+    $this->withoutVite();
+
+    $victim = m8Identity('Self Registered Person', ['password_set_at' => now()]);
+    m8InviteInto($victim, 'selfreg-page-token');
+
+    // `assertOk()` before `assertInertia()`, on the sibling case's pattern: a non-200 is the far more
+    // likely failure and it names itself, where the Inertia assertion does not.
+    $this->get('http://acme.meridian.test/invitations/selfreg-page-token')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->component('invitations/Show', false)
+            ->where('isUnusedPlaceholder', false));
+});
+
+it('stamps password_set_at when a placeholder accepts, so a SECOND token meets an established identity', function (): void {
+    fakeHibp();
+
+    // The genuinely-new person the invitation arm exists for: nothing set, so they get the form.
+    $newcomer = m8Identity('Genuine Newcomer');
+    $tenant = m8InviteInto($newcomer, 'newcomer-token');
+
+    $this->withoutVite()->post('http://acme.meridian.test/invitations/newcomer-token', [
+        'name' => 'Genuine Newcomer',
+        'password' => 'Their-Own-Choice-9',
+    ])->assertRedirect('/dashboard');
+
+    // Read on the APP connection, not `pgsql_privileged`: the accept writes inside the test transaction
+    // and the privileged connection commits outside it, so it would return the pre-accept row. Entering
+    // the tenant as this user is what satisfies the join-shape RLS policy on `users`.
+    enterTenant($tenant->id, $newcomer->id);
+    $stored = User::query()->find($newcomer->id);
+
+    // ⚠️ NOT REDUNDANT BESIDE `email_verified_at`, WHICH THE SAME `forceFill` ALSO STAMPS. The point is
+    // that the DIRECT fact is recorded rather than inferred from a proxy — making the proxy load-bearing
+    // is how the original defect came to exist.
+    expect($stored->password_set_at)->not->toBeNull()
+        ->and($stored->email_verified_at)->not->toBeNull();
+});
+
+it('stamps password_set_at on a forgotten-password reset, which is how the pre-migration population drains', function (): void {
+    fakeHibp();
+
+    // ⚠️ THE ACCOUNT PRE-DATES THE COLUMN — `password_set_at` NULL and nothing else set. This is the
+    // residual the migration deliberately does NOT backfill, and this case is the mechanism by which such
+    // an account leaves it. Asserting the null first is what stops this passing vacuously.
+    $legacy = m8Identity('Legacy Person');
+    expect(m8StoredUser($legacy)->password_set_at)->toBeNull();
+
+    // The action is driven directly rather than over HTTP, because the reset LINK is Fortify's and is
+    // covered elsewhere — what is unproved is whether this action stamps the column. Kept on the
+    // privileged connection so the write commits where `m8StoredUser()` can read it back; the default
+    // connection would write inside the test transaction, which that helper cannot see.
+    $legacy->setConnection('pgsql_privileged');
+
+    // `password_confirmation` is required: `passwordRules()` carries `confirmed`, which the invitation
+    // surface is the one documented exception to.
+    app(ResetUserPassword::class)->reset($legacy, [
+        'password' => 'A-Brand-New-Choice-9',
+        'password_confirmation' => 'A-Brand-New-Choice-9',
+    ]);
+
+    expect(m8StoredUser($legacy)->password_set_at)->not->toBeNull();
+});
+
+/*
+|--------------------------------------------------------------------------
+| Increment M76 — the accept arm's write actually reaches the database
+|--------------------------------------------------------------------------
+|
+| ⛔ NOT THE SAME QUESTION AS "DOES ACCEPT WORK", AND THAT DISTINCTION IS THE WHOLE DEFECT.
+| `MembershipRoutesTest`'s end-to-end case asserts the membership status, `joined_at`, the granted role and
+| that the session is authenticated — all four of which were TRUE while `registerInvitedPlaceholder()`'s
+| `save()` was updating ZERO rows and throwing nothing. The invitee's chosen password, their name, the
+| verification stamp and both consent timestamps were discarded on every successful accept, and the account
+| was left unverified: a `verified`-middleware lockout with no error to trace.
+|
+| ⚠️ EVERY REFUSAL CASE ABOVE ASSERTS THE PASSWORD IS UNCHANGED — AND UNCHANGED IS ALSO WHAT A DROPPED
+| WRITE LOOKS LIKE. A file full of them can therefore be entirely green against a controller whose write
+| arm is inert, which is why the permissive direction needs its own credential assertion rather than
+| another status check.
+*/
+
+it('actually persists the password an invitee chooses, rather than updating zero rows in silence', function (): void {
+    fakeHibp();
+    $this->withoutVite();
+
+    $newcomer = m8Identity('Genuine Newcomer');
+    $before = m8StoredUser($newcomer);
+
+    $tenant = m8InviteInto($newcomer, 'persist-token');
+
+    $this->post('http://acme.meridian.test/invitations/persist-token', [
+        'name' => 'Their Chosen Name',
+        'password' => 'Their-Own-Choice-9',
+    ])->assertRedirect('/dashboard');
+
+    // ⚠️ READ ON `pgsql_privileged`, WHICH IS WHAT MAKES THIS CASE MEAN ANYTHING. The row is committed
+    // outside the test transaction and the fix writes on `pgsql_auth`, which is also outside it — so this
+    // read sees the real, durable state rather than the test's own uncommitted view.
+    $after = m8StoredUser($newcomer);
+
+    // The credential itself, byte-for-byte against the placeholder hash it had to replace.
+    expect($after->password)->not->toBe($before->password)
+        ->and(Hash::check('Their-Own-Choice-9', $after->password))->toBeTrue()
+        // `email_verified_at` is the tell that exposed the defect: the array sets it unconditionally, so a
+        // NULL here can only mean the statement matched no row.
+        ->and($after->email_verified_at)->not->toBeNull()
+        ->and($after->password_set_at)->not->toBeNull()
+        // The consents are a compliance record, and they were being dropped with everything else.
+        ->and($after->tos_accepted_at)->not->toBeNull()
+        ->and($after->privacy_policy_accepted_at)->not->toBeNull()
+        ->and($after->name)->toBe('Their Chosen Name');
+
+    // And the membership still lands, so this is not a fix that traded one arm for the other.
+    enterTenant($tenant->id, $newcomer->id);
+    expect(TenantUser::query()->where('user_id', $newcomer->id)->first()->status)
+        ->toBe(TenantUserStatus::Active);
 });

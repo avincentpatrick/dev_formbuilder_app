@@ -223,10 +223,22 @@ function onUnavailable(acceptance: ScheduleAcceptance): void {
     phase.value = 'unavailable';
 }
 
-// Increment H10 — open from a resume link. The web shell already embedded a fresh pinned-version SHARE token
-// (data-share-token), so the existing `client` is ready; the resume-read gives the saved answers + a server
-// "last saved" to reconcile against any same-device local draft, and the draft's uuid so the eventual submit
-// PROMOTES that row. A promoted/reaped/expired draft → a resume-specific terminal message.
+// Increment H10 — open from a resume link. The resume-read gives the saved answers + a server "last saved"
+// to reconcile against any same-device local draft, and the draft's uuid so the eventual submit PROMOTES
+// that row. A promoted/reaped/expired draft → a resume-specific terminal message.
+//
+// ⛔ THE SENTENCE THAT USED TO OPEN THIS COMMENT WAS THE DEFECT, AND IT READ AS REASSURANCE: *"The web shell
+// already embedded a fresh pinned-version SHARE token (data-share-token), so the existing `client` is
+// ready."* On the one path that matters it is not fresh. A resume boot is exactly the boot most likely to be
+// served from the service worker's cached shell, and that HTML carries whatever token was minted when it was
+// cached — up to seven days old against a 24h share token. `fetchSchema()` below then 401s,
+// `withFreshToken()` transparently re-mints through `GET /f/{slug}`, and THAT route pins
+// `current_published_version_id` rather than the draft's version. The page renders the new schema while
+// `server.formVersionId` names the old one, and `reconcileDraft` silently drops the respondent's newer local
+// tier on the mismatch: a v2 form under a "welcome back" greeting holding v1 answers, whose first autosave
+// 409s them onto a fresh uuid and abandons the server draft and the emailed resume link with it.
+// ⚠️ The fix is not a new endpoint — `resumeDraft()` has always returned a correctly-pinned share token and
+// nobody read it. See `client.adoptToken()` below.
 async function loadResume(resumeToken: string): Promise<void> {
     let server;
     try {
@@ -243,6 +255,13 @@ async function loadResume(resumeToken: string): Promise<void> {
         phase.value = 'error';
         return;
     }
+
+    // ⛔ BEFORE `fetchSchema()`, NEVER AFTER — the whole point is which version the schema is fetched AT.
+    // `resumeDraft()` minted this token against the draft's own `form_version_id`, so adopting it makes the
+    // schema below and `server.formVersionId` two names for one version BY CONSTRUCTION, on every path:
+    // the pre-mount boot, `onRedraft()`'s mid-session re-read, and a client that has already been re-minted
+    // by an earlier expiry. It also removes the 401-and-retry round trip that used to hide the divergence.
+    client.adoptToken(server.shareToken);
 
     schema.value = await client.fetchSchema();
 

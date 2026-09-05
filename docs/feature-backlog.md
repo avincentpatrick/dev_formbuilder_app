@@ -1420,7 +1420,33 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   because vitest opens every one with a colour escape: it reported CAUGHT three times with no evidence of
   *which* assertion caught it. The `sw.ts` arm is filed below.
 
-- **`minor` · The two `draft_answers` readers disagree about which `form_version_id` they mean.** The
+- ✅ **CLOSED BY `M76` (2026-09-06) — `minor` · ~~The two `draft_answers` readers disagree about which `form_version_id` they mean.~~**
+  ⛔ **HALF OF WHAT `M70` LEFT STANDING HAS SINCE DIED, AND THE OTHER HALF WAS UNDERSTATED.** The
+  `onRedraft` leg `M70` preserved is now **version-equal by construction** — `SubmissionDraftService`
+  re-reads the draft's own pin and refuses a superseded one, so the 409 it describes is unreachable. What
+  survives is the single `fetchSchema()` inside `loadResume` on a resume boot whose service-worker-cached
+  shell carries an already-expired token: it 401s, `withFreshToken` re-mints through `GET /f/{slug}`, and
+  **that** route pins `current_published_version_id`.
+  ⛔ **THE HARM IS NOT A REJECTED DRAFT, WHICH IS HOW BOTH THE ROW AND `M70` DESCRIBED IT.** The
+  respondent's newer local tier is discarded in `reconcile.ts` **with no note**, a v2 schema renders under
+  a *"welcome back"* greeting holding v1 answers, and their first autosave 409s them onto `onReschema` with
+  a fresh uuid — **abandoning the server draft and the emailed resume link with it**.
+  ✅ **NONE OF THE THREE CANDIDATE REMEDIES WAS TAKEN, BECAUSE THE TREE ALREADY CONTAINED THE FIX.**
+  `GuestDraftResumeController` has always minted a share token pinned to the **draft's** version,
+  `api-client.ts` has always decoded it into `ResumeDraftResult.shareToken`, and `resumeDraft()`'s own
+  docblock says *"the response carries a fresh SHARE token the caller then hands to `createApiClient`"* —
+  **a hand-off that was documented and never implemented**. `client.adoptToken(server.shareToken)` before
+  the schema fetch costs two production files and about six lines, removes the divergence on every path
+  rather than one, and makes an existing false docblock true.
+  ✅ **PROVED BY THE FIRST VITEST MOUNT OF `App.vue` IN THE REPOSITORY.** The row warned that *"a naive fix
+  ships with a green suite that proves nothing"* and it was right — `App.vue` was mounted by zero tests.
+  `resources/public-runtime/__tests__/resume-boot.test.ts` asserts both the token and the **order**, since
+  adopting after the fetch would leave the defect intact with the fix apparently present; a permissive
+  ordinary-entry control stops it passing against unconditional adoption. Mutation caught.
+  ⚠️ **A static import of `App.vue` is required** — a dynamic `import()` inside the test body never
+  resolves under this setup, which cost an hour and is recorded in the file. Closed by `M76`.
+
+  **The row as it stood, kept because its correction history is the audit trail.** The
   autosave writes with the **currently published** version; `App.vue`'s resume read fetches with the version
   the **server draft** was pinned to. They coincide only until a republish intervenes, after which the
   resume path probes a key the live session never writes — the orphan slot in the row above. Benign today
@@ -2387,8 +2413,31 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `vue-tsc --noEmit` **and** `vite build` both still exit 0. That gate gap is filed as its own row under
   *Test suite & CI gates*.~~** Filed by `M8`.
 
-- **`minor` · A self-registered account that was never verified is indistinguishable from an invite
-  placeholder, so a token holder can still overwrite its password.** The residual M8 deliberately left,
+- ✅ **CLOSED BY `M76` (2026-09-06) — `minor` · ~~A self-registered account that was never verified is indistinguishable from an invite placeholder, so a token holder can still overwrite its password.~~**
+  `users.password_set_at` ships, stamped by all four password writers, and `identityIsEstablished()` gains
+  it as a **first, positive arm**. Evidence held at every citation and the exploit was reachable: the
+  invitation routes carry neither `auth` nor `verified`, so the predicate is the entire gate.
+  ⛔ **THE ROW'S PRESCRIBED WRITE DOES NOT WORK AND WOULD HAVE SHIPPED A COLUMN NOBODY WROTE.** `User`
+  declares `#[Fillable([...])]` as a PHP **attribute**, so the prescribed
+  `User::create([... 'password_set_at' => now()])` is discarded **in silence**, with no exception and no
+  log. The column is deliberately kept OUT of `Fillable` — it is a security signal — and every writer
+  stamps it through `forceFill()`. A regression test drives registration end to end and asserts the column
+  on a re-read, because the in-memory model carries the attribute either way.
+  ✅ **AND `M70`'s "the only honest backfill re-derives the predicate in SQL" IS TOO PESSIMISTIC, WHICH IS
+  WHAT MADE THIS SHIPPABLE.** The new arm is **monotonic** — a disjunct can only move an account from *not
+  established* to *established*, never the reverse — so **no backfill is needed and no lockout can be
+  manufactured**, which was the row's stated blocker. ⚠️ **The residual is narrowed rather than erased**:
+  an account that self-registered before the migration and has still never verified, enrolled, linked or
+  joined stays in the old state until it next sets a password. Said plainly here so the closed row is not
+  read as *"nobody is exposed"*. ✅ `M70`'s other correction is confirmed **mechanically**: the
+  `E2eSeeder`/`auth-axe` cost is **zero**, not "probably zero" — the fixture is built by a private helper
+  that routes through none of the four writers.
+  ⛔ **PREMISE ALSO FALSE: the vulnerable population is larger than "central-host registration".**
+  `attachMember()` returns NULL on a full seat quota, landing a **subdomain** registrant in the identical
+  state. A second entrance the row never named. Residual 30 in `docs/security-threat-model.md` is closed
+  with it. Three mutations caught. Closed by `M76`.
+
+  **The row as it stood, kept because its reasoning is the audit trail.** The residual M8 deliberately left,
   filed here the moment it was decided rather than left in a plan where no backlog search would reach it.
   `CreateNewUser` does not stamp `email_verified_at`, central-host registration creates no membership, and
   `google_id` / `two_factor_confirmed_at` are NULL — so every arm of `identityIsEstablished()` reads false
@@ -2418,6 +2467,31 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   ⚠️ **Two adjacent writers need an explicit decision the row does not make**: `SsoUserProvisioner` and
   `GoogleSignInProvisioner` mint accounts with no password the person chose — leaving them NULL is right,
   but only if stated, since both already stamp `email_verified_at` and would be established anyway.
+
+- ✅ **CLOSED BY `M76` (2026-09-06) — `major` · ~~The invitation accept arm writes ZERO rows and throws nothing, so an invitee's chosen password is silently discarded.~~**
+  ⛔ **FILED AND CLOSED IN THE SAME INCREMENT, AND FILED ANYWAY BECAUSE THE RECORD MATTERS MORE THAN THE
+  TIDINESS.** Found by the row above's first test run. A genuine newcomer accepting an invitation was
+  redirected to `/dashboard`, their membership became `Active`, their role was granted and they were
+  logged in — while `registerInvitedPlaceholder()`'s `forceFill(...)->save()` **updated no row at all**.
+  Measured through the real HTTP stack: after a successful accept `email_verified_at` was **NULL** on both
+  the app and the privileged connection, and that column is set unconditionally. The chosen **password**,
+  the **name** and both **consent timestamps** went with it.
+  ⛔ **THE OBSTACLE IS THE SELECT POLICY, NOT THE UPDATE POLICY — SO READING THE UPDATE POLICY EXONERATES
+  IT.** `users_app_update` is `USING true`. `users_users_visibility` admits a row only for
+  `app.current_user_id` or an **active** membership in the current tenant, and PostgreSQL applies SELECT
+  policies to an `UPDATE` whose `WHERE` reads a column. At that point the visitor is not yet authenticated
+  and the membership is still `Invited`. Measured `rows=0` on the default connection, `rows=1` on
+  `pgsql_auth`, which is where the write now goes — the same connection the row was read on.
+  ⚠️ **NOT fixed by moving the call below `memberships->accept()`**, which would also make the row visible
+  and would leave a rejected password having already activated the membership.
+  ⛔ **WHY NOTHING CAUGHT IT, WHICH IS THE TRANSFERABLE HALF.** `MembershipRoutesTest`'s end-to-end case
+  asserts the membership status, `joined_at`, the granted role and that the session is authenticated —
+  **all four were true while the write was inert** — and never asserts the credential. Confirmed by
+  mutation: reverting the fix leaves that suite entirely green and reddens only the new case.
+  ⚠️ **The consequence was a lockout with no error to trace**, which is verbatim the failure
+  `SsoUserProvisioner::createUser()` defends against one file away and which nobody carried across.
+  ⚠️ **It bears on `D5`/`D12`**: the series-exit clause counts open `major` rows, and this one was open and
+  invisible for the entire time that count read zero. Closed by `M76`. Filed by `M76`.
 - **`minor` · M8's GRANT removed an accidental backstop that a mutation argument was leaning on.**
   `meridian_auth` used to hold `SELECT, UPDATE` on `users` **and nothing else**, and both
   `MemberSearchArm`'s docblock and RBAC §9 cited that as the reason swapping the arm to `pgsql_auth`
@@ -6391,8 +6465,32 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   test say *"the solver called its yield hook N times"*, which is the claim, instead of *"the event loop
   happened to be free"*, which is the weather. **Live.** Filed by `M74`.
 
-- **`minor` · PHPStan run where `CLAUDE.md` says to run it reports 18 errors, and `docs/gate-baselines.md`
-  records the CI figure as "OK, no errors".** Found by `M75` (2026-09-06) while measuring a gate it had
+- ✅ **CLOSED BY `M76` (2026-09-06) — `minor` · ~~PHPStan run where `CLAUDE.md` says to run it reports 18 errors, and `docs/gate-baselines.md` records the CI figure as "OK, no errors".~~**
+  ⛔ **THE ROW ASKS THE TAKER TO CHOOSE BETWEEN THREE REMEDIES AND DOES NOT KNOW THE CAUSE. ALL THREE ARE
+  WRONG.** The cause is this repository's own most-documented trap reaching inside a vendor library.
+  Measured in the app container, same directory and same process: `RecursiveDirectoryIterator` returns
+  **86** of `database/migrations`, while `glob`, `scandir`, a recursive `scandir` walk and
+  `Symfony\Component\Finder` each return the true **113**. Larastan's migration reader uses the blind one,
+  and the 27 files it drops own every one of the flagged properties. Hand-written `@property` lines would
+  paper over a vendor enumeration bug.
+  ✅ **AND THE DIVERGENCE IS NOT HOST-VERSUS-CI — IT IS CONTAINER-VERSUS-EVERYTHING-ELSE.** The **host**
+  reports **zero**, matching CI. Proved rather than assumed: a deliberately broken file under `app/` turns
+  the host run red with file, line, message and identifier, and removing it returns it to zero.
+  ⛔ **SO THE HONEST REMEDY IS TO STOP SENDING PHPStan TO THE CONTAINER — `CLAUDE.md`'s gate table is wrong
+  in exactly the way and for exactly the reason it already sends the five lint gates to the host two rows
+  above. THAT EDIT IS FILED, NOT TAKEN**, because `CLAUDE.md` is a second hub file and `D13` allows one;
+  `D15`, which asks for that cap to be relaxed, is open, and an increment does not relax a user decision on
+  its own judgement while the request to relax it is pending. See the row below.
+  ⛔ **WHAT THE ROW IS A FLOOR FOR, BY A FACTOR OF THREE.** `CLAUDE.md` scopes this trap to the lint gates.
+  Measured across the container's whole tree: **app 719 of 814 · tests 472 of 512 · database 130 of 157**,
+  `routes` and `resources` clean. Whole directories vanish — `app/Enums`, and all **52** files under
+  `app/Http/Controllers/Tenant`. **Three `tests/Feature/` sweeps used the blind iterator** and now use
+  `Tests\Support\SourceTree`, which cross-checks two independent enumerators; `ClientUuidScopeTest`'s floor
+  was `toBeGreaterThan(200)` against a tree of 814 and slept through the loss of 95 files, and
+  `SubmissionReferenceDisclosureTest` had **no floor at all**. Both are security sweeps, and the directory
+  they were blind to is where their offenders would live. Mutation caught. Closed by `M76`.
+
+  **The row as it stood.** Found by `M75` (2026-09-06) while measuring a gate it had
   predicted could not move. `CLAUDE.md`'s gate table says PHPStan is **container only**; run there —
   `vendor/bin/phpstan analyse --no-progress`, the exact command `composer run analyse` wraps — it reports
   **18 errors**, every one of them `Access to an undefined property` on an Eloquent model
@@ -6413,8 +6511,26 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the CI one in `docs/gate-baselines.md` so the gap is stated rather than discovered, or add the missing
   `@property` lines so both environments agree. **Live.** Filed by `M75`.
 
-- **`minor` · Six `DOMException [AbortError]` stack traces print during a fully green Vitest run, and a
-  stack trace on a passing run is what teaches a reader to skip stack traces.** Found by `M75` (2026-09-06)
+- ✅ **CLOSED BY `M76` (2026-09-06) — `minor` · ~~Six `DOMException [AbortError]` stack traces print during a fully green Vitest run.~~**
+  ⛔ **"THE REMAINING SIX ARE IN OTHER SUITES" IS FALSE. ALL OF THEM WERE IN `encode.test.ts` — THE FILE
+  `M75`'s RELEASE RECORDS AS HAVING BEEN TAKEN TO ZERO.** Proved by subtraction: the other 61
+  `resources/js` suites and all 84 public-runtime and design-system suites emit **zero**, and neither of
+  those trees contains a real `fetch` call site.
+  ⛔ **AND THE REMEDY WAS IN THE WRONG PLACE.** `M75` read them as teardown artefacts and stubbed `fetch`
+  in `afterEach`. That is real and it is not all of them: the autosave composable also flushes on a step
+  change, **un-debounced and mid-case**, long before any teardown, so those requests met the real `fetch`.
+  The stub belongs in `beforeEach` as well — the `afterEach` one is still needed, because that hook's own
+  `vi.unstubAllGlobals()` restores the real `fetch` before the unmount runs.
+  ⚠️ **THE COUNT IS WRONG TOO, AND COUNTING THE SYMPTOM IS WHY.** The invariant is **ten** escaped
+  requests, not six, and what they print is not stable: run alone this file emitted **ten**
+  `AggregateError`/`ECONNREFUSED` traces and **zero** `AbortError`, because nothing was tearing a window
+  down in time to abort them first. In a full run the teardown wins some of those races and the same
+  requests surface as `AbortError`. Ten deterministic escapes looked like six flaky traces.
+  ✅ **Measured after: 60 matching lines from that file → 0, and a full 135-file run prints none at all.**
+  ⚠️ **It is not gateable as an assertion** — the run exits 0 with the traces printed — so this is closed
+  on a measurement, not on a new gate, and that is stated rather than smuggled past. Closed by `M76`.
+
+  **The row as it stood.** Found by `M75` (2026-09-06)
   while fixing two of them. A full `npx vitest run --pool=forks` exits **0** with 134 files and 2343 tests
   passing, and prints six `AbortError` traces from `happy-dom`'s `teardownWindow` aborting requests still in
   flight when a suite's window is torn down. ⛔ **`M75` measured the attribution rather than guessing it**:
@@ -6476,3 +6592,69 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   👤 **The decision is the user's**: a draft-shaped side table for in-progress corrections, an explicit
   "save a working copy" action, or a documented statement that corrections are not resumable. **Live.**
   Filed by `M75`.
+
+- **`minor` · `CLAUDE.md`'s gate table sends PHPStan to the container, one row below the rule that explains
+  why the container is wrong.** Measured by `M76` (2026-09-06) while closing the 18-phantom-errors row.
+  The table says *"PHPStan — Container only"*, and two rows above it says the five lint gates must run on
+  the **host** because *"inside the app container `RecursiveDirectoryIterator` descends the Windows bind
+  mount only partially"*. That is not a property of those five scripts — it is a property of PHP's SPL
+  directory iterators on this mount, and it reaches Larastan, which is the entire cause of the 18
+  `Access to an undefined property` errors a container run reports against CI's zero. ✅ **Measured both
+  ways rather than argued**: the host reports **zero**, matching CI, and a deliberately broken file under
+  `app/` turns the host run red with file, line, message and identifier before being removed.
+  ⛔ **NOT TAKEN FOR A REASON THAT IS ABOUT PROCESS, NOT DIFFICULTY — IT IS A ONE-LINE EDIT.** `CLAUDE.md`
+  is a hub file, `M76` had already spent its one `D13` hub slot on `docs/security-threat-model.md`, and
+  `D15` — which asks for exactly that cap to be relaxed — is **open**. An increment does not relax a user
+  decision on its own judgement while the request to relax it is pending. ⚠️ **Whoever takes it should fix
+  the generator prose in `scripts/gate-baselines.php` in the same PR**, since `docs/gate-baselines.md`
+  repeats the lint-gate-only framing and is regenerated from that script. **Live.** Filed by `M76`.
+
+- **`minor` · PHPUnit's own collector loses 40 test files in the container, and a local run reports green
+  without them.** Measured by `M76` (2026-09-06). `phpunit.xml` declares its suites as `<directory>`
+  entries, which PHPUnit expands through `SebastianBergmann\FileIterator\Facade` — an SPL directory
+  iterator, and therefore blind on this bind mount. Measured: **385 of 425** `*Test.php` files collected,
+  and the 40 missing were the **whole of `tests/Feature/Forms`** — every form lifecycle, policy, publish,
+  schedule and RLS test in the repository, never loaded, never run, and never reported absent.
+  ✅ **`tests/Feature/Docs/SuiteCollectionFloorTest.php` now makes it loud**, comparing the collector
+  against `Tests\Support\SourceTree` and naming the missing files. It is **green on the host and in CI**
+  (neither truncates) and **red in the container**, which is the truth in both places.
+  ⛔ **THE OBVIOUS THEORY IS FALSE AND WAS TESTED: there is no entry-count threshold to document.**
+  Synthetic directories of up to sixty files, created from inside the container on the same mount, do not
+  truncate at all; `tests/Feature` holds 41 entries and enumerates perfectly while `tests/Feature/Forms`
+  holds 46 and collapses to 6. The next directory to go blind cannot be predicted, which is why this is a
+  gate and not a list. 👤 **What is left for the user is `D17`**: whether that permanent local red is
+  wanted, or whether it should be softened. **Live** until `D17` is answered. Filed by `M76`.
+
+- **`minor` · `R7` pins the checkout depth to `PR commits + 1`, so a depth of 50 keeps every gate green
+  while blinding the secret scan to 1,100 of 1,181 commits.** Measured by `M76`'s read-only fan-out
+  (2026-09-06) while verifying `M49`'s open `fetch-depth` row, and recorded here so the expensive half is
+  not re-derived. ✅ **Two of that row's premises are stale**: the depth IS pinned — by `R7`'s clone-shape
+  assertion in `scripts/tracker-lint.php`, which `M49` shipped in the same increment that filed the row —
+  and the integer governs **two** steps rather than three, because `tracker-lint-controls` builds its
+  fixtures in `sys_get_temp_dir()`. ✅ **And `detect --source .` really does scan history**, proved from
+  `.gitleaksignore`'s commit-scoped fingerprints, one of which resolves to a `PROGRESS.md` line that
+  exists only in history. ⛔ **What remains is sharper than the row states**: `R7`'s pin is satisfied by any
+  depth at or above the PR's commit count, so the range between that and full history is entirely
+  unguarded, and `ci.yml`'s own comment claiming a reduction would *"fail LOUDLY"* is false across it.
+  ⚠️ **The remedy that dominates all three of the row's uncosted candidates** is a
+  `git rev-parse --is-shallow-repository` fence folded into the gitleaks step — an exact boolean needing no
+  floor, no ratchet and no payload — plus a `tests/Feature/Docs/` assertion on the workflow file, built on
+  the `NpmAuditJudgeTest` precedent, which is mutation-drivable because `fetch-depth: 0` occurs exactly
+  once in `ci.yml`. The row's third candidate (`--log-opts`) is outright wrong for a scan with no memory.
+  **Not taken**: `ci.yml` is a hub file and `M76`'s slot was spent. **Live.** Filed by `M76`.
+
+- **`minor` · The partial-path citation row's consequences are mostly false, and the measurement that
+  settles `D15`'s dependency is done.** Measured by `M76`'s fan-out (2026-09-06). The mechanism in
+  `scripts/backlog-triage.php` is exactly as filed — a slashed token gets one `is_file()` attempt and never
+  falls back. ⛔ **But `M73` overstated what it costs, and `D15` was waiting on this.** Measured over all 91
+  open rows: **8 slashed tokens across 6 rows** fail to resolve, and fixing them moves **no file across the
+  hub threshold of 3** (largest gain 0→2), changes **nothing** in the suggested batch, and moves **not one**
+  row out of *"no file harvested"* (27 before and after). ⛔ *"`render_batch` skips it by construction"* is
+  **false** — that function has no such filter, and the exclusion is an accident of the citation-health
+  tiebreak. ✅ **The remedy's stated decision is settled by the tree, not by the user**: the unambiguous-
+  **suffix** variant resolves 6 of 8 where the basename fallback resolves 5, and is the only one that
+  handles `members/Index.vue`, whose basename is 12-way ambiguous. ⚠️ **What will bite the taker is the
+  control, not the fix**: the script has no test seam and calls `trunk_sha()` above both `--check` and
+  `--dry-run`, so with git absent from the app container a Pest control exits 2 before reaching the
+  resolver. ⚠️ **And it should be taken together with the two destructive-default rows**, which collide on
+  the same hub file. **Live.** Filed by `M76`.

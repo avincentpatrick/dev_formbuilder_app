@@ -119,6 +119,15 @@ final class TenantExtractColumns
                 .'platform\'s identities are CENTRAL (ADR-0017 Context §2) — one human, one password, N workspaces. '
                 .'An extract handed to one tenant would therefore carry material for an identity that is still '
                 .'active in workspaces that tenant has nothing to do with.',
+            'password_set_at' => 'When a human last CHOSE the password on a CENTRAL identity (M76), which puts '
+                .'it in `two_factor_confirmed_at`\'s class rather than in a timestamp\'s: a fact about the '
+                .'person\'s security posture on the PLATFORM, not about their membership of this workspace. '
+                .'⛔ And the NULL is worse than the value. NULL means no human has ever set this password — an '
+                .'invite placeholder, an SSO/Google-provisioned account, or a pre-M76 self-registration that '
+                .'has never verified, enrolled, linked or joined. That last group is precisely the population '
+                .'whose password an invitation-token holder could once overwrite, so a column of NULLs is a '
+                .'ready-made shortlist for the defect this column was added to close. The populated value is '
+                .'credential-rotation intelligence on top.',
             'remember_token' => 'A live session credential: presenting it authenticates as this person with '
                 .'no password and no second factor, on the same central identity as above.',
             'two_factor_secret' => 'The TOTP seed. Anyone holding it can generate the person\'s second factor '

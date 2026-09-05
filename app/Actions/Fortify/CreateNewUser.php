@@ -38,10 +38,21 @@ class CreateNewUser implements CreatesNewUsers
             'password' => $this->passwordRules(),
         ])->validate();
 
-        return User::create([
+        // ⛔ `forceFill()` RATHER THAN `User::create([...])`, AND THE DIFFERENCE IS THE WHOLE POINT OF M76.
+        // `password_set_at` is deliberately NOT in `User`'s `#[Fillable]` attribute — it decides whether a
+        // holder of an invitation token may overwrite this account's password, so it must not be reachable
+        // by mass assignment. Passing it to `create()` would therefore have been dropped **in silence**,
+        // with no exception and no log, and this door — self-registration — is the exact door that
+        // manufactured the population the column exists to protect. One INSERT, not two.
+        $user = new User;
+
+        $user->forceFill([
             'name' => $input['name'],
             'email' => $input['email'],
             'password' => Hash::make($input['password']),
-        ]);
+            'password_set_at' => now(),
+        ])->save();
+
+        return $user;
     }
 }

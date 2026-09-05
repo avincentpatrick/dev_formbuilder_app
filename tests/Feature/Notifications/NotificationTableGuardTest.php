@@ -7,6 +7,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Facades\Schema;
 use ReflectionClass;
+use Tests\Support\SourceTree;
 
 uses(RefreshDatabase::class);
 
@@ -34,16 +35,18 @@ it('keeps the table in OUR shape, not the framework channel\'s', function (): vo
 it('never routes a notification through the database channel', function (): void {
     $classes = [];
 
-    $files = new RecursiveIteratorIterator(
-        new RecursiveDirectoryIterator(app_path('Notifications'), FilesystemIterator::SKIP_DOTS)
-    );
+    // ⛔ WAS A `RecursiveDirectoryIterator` UNTIL M76. Over this project's Windows bind mount the SPL
+    // directory iterators truncate per-directory and silently — `app/Enums` and all 52 files under
+    // `app/Http/Controllers/Tenant` vanished entirely — so a notification added to a directory that
+    // happened to be dropped would never have been reflected over at all, and this case would have
+    // reported that it checked them. {@see \Tests\Support\SourceTree} for the measurement.
+    $files = SourceTree::filesUnder(app_path('Notifications'));
 
-    foreach ($files as $file) {
-        if ($file->getExtension() !== 'php') {
-            continue;
-        }
+    // Non-vacuity: this gate is a reflection sweep, and a sweep over an empty list passes.
+    expect($files)->not->toBeEmpty();
 
-        $relative = str_replace([app_path(), '.php', DIRECTORY_SEPARATOR], ['', '', '\\'], $file->getPathname());
+    foreach ($files as $path) {
+        $relative = str_replace([app_path(), '.php', DIRECTORY_SEPARATOR], ['', '', '\\'], $path);
         $class = 'App'.$relative;
 
         if (! class_exists($class) || (new ReflectionClass($class))->isAbstract()) {

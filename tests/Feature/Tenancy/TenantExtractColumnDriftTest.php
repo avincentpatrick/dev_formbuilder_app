@@ -90,7 +90,7 @@ const EXTRACTED_COLUMN_CENSUS = [
     'tenant_users' => 'created_at id invite_expires_at invite_token invited_at invited_by invited_role_id joined_at onboarding_dismissed_at removed_at removed_by status tenant_id updated_at user_id',
     'tenants' => 'brand_ramp created_at data default_locale draft_ttl_days id logo_attachment_id maintenance_message maintenance_mode name owner_user_id primary_color slug status supported_locales updated_at',
     'usage_counters' => 'created_at id last_incremented_at limit_snapshot metric period_end period_start subscription_id tenant_id updated_at value',
-    'users' => 'created_at deleted_at email email_verified_at google_id id is_super_admin last_active_tenant_id name password privacy_policy_accepted_at remember_token tos_accepted_at two_factor_confirmed_at two_factor_recovery_codes two_factor_secret updated_at',
+    'users' => 'created_at deleted_at email email_verified_at google_id id is_super_admin last_active_tenant_id name password password_set_at privacy_policy_accepted_at remember_token tos_accepted_at two_factor_confirmed_at two_factor_recovery_codes two_factor_secret updated_at',
     'webhook_deliveries' => 'attempt_count connection_subscription_id created_at event_id event_type id last_attempted_at max_attempts next_retry_at payload payload_attachment_id response_body_excerpt response_status_code response_time_ms signature status tenant_id unconfirmed_write_at updated_at webhook_endpoint_id',
     'webhook_endpoints' => 'consecutive_failure_count created_at created_by deleted_at disabled_reason event_types form_id id last_failure_at last_success_at name secret secret_previous secret_previous_expires_at signing_algorithm status tenant_id updated_at url',
 ];
@@ -228,6 +228,29 @@ it('withholds every credential column on users', function (): void {
         ->toContain('two_factor_recovery_codes')
         ->toContain('last_active_tenant_id')
         ->toContain('google_id');
+});
+
+it('withholds every PLATFORM-POSTURE column on users, which the credential list above does not cover', function (): void {
+    // ⚠️ A SECOND LIST, ADDED BY M76, BECAUSE THE ONE ABOVE MEANS SOMETHING NARROWER THAN IT PROTECTS.
+    // That list is explicitly *"the ones that AUTHENTICATE or globally identify a central identity"*, and
+    // three withheld columns are neither: `two_factor_confirmed_at`, `is_super_admin` and — as of M76 —
+    // `password_set_at`. They are withheld for a different reason, stated in `TenantExtractColumns`: they
+    // describe the person's security posture on the PLATFORM rather than their membership of this
+    // workspace, and a map of them is an attacker's shortlist.
+    //
+    // ⛔ NONE OF THE THREE WAS GUARDED BY ANYTHING UNTIL NOW. Deleting `two_factor_confirmed_at` from
+    // `WITHHELD` left this entire file green while shipping it into the next artefact — the exact
+    // census-passes-while-the-decision-is-lost failure the `google_id` note above records, sitting
+    // unnoticed in the file that records it. Adding `password_set_at` is what surfaced it, so the two
+    // pre-existing ones are covered here rather than left for the next person to rediscover.
+    //
+    // ⚠️ `password_set_at`'s NULL is the sharp end and is why it belongs on a list rather than in a
+    // docblock: NULL means no human ever chose this password, which for a pre-M76 self-registration is
+    // precisely the population whose password an invitation-token holder could once overwrite.
+    expect(array_keys(TenantExtractColumns::withheldFor('users')))
+        ->toContain('two_factor_confirmed_at')
+        ->toContain('is_super_admin')
+        ->toContain('password_set_at');
 });
 
 it('withholds the live half of an in-flight Google sign-in', function (): void {

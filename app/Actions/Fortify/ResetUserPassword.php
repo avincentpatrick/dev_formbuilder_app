@@ -25,8 +25,12 @@ class ResetUserPassword implements ResetsUserPasswords
             'password' => $this->passwordRules(),
         ])->validate();
 
+        // `password_set_at` (M76): a forgotten-password reset is a human choosing a password, which is
+        // exactly what that column records. It is also the path by which an account that pre-dates the
+        // column leaves the unprotected population, so stamping it here is what drains that residual.
         $user->forceFill([
             'password' => Hash::make($input['password']),
+            'password_set_at' => now(),
         ])->save();
     }
 }

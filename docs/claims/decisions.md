@@ -23,6 +23,57 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
+### D17 — A local container Pest run silently omits 40 test files. `M76` made that loud, which makes every local run RED. Keep it, soften it, or change how the suite is run?
+
+**Filed 2026-09-06 by Lane A, during `M76`, at the moment the gate was written.** Recorded here rather than
+decided in the increment because it changes the user's daily development loop, which is not an increment's
+call to make on its own judgement.
+
+⛔ **WHAT WAS MEASURED, AND IT IS NOT IN DISPUTE.** `phpunit.xml` declares its suites as `<directory>`
+entries, which PHPUnit expands through `SebastianBergmann\FileIterator\Facade` — an SPL directory iterator,
+and therefore subject to this project's bind-mount truncation. In `dev_formbuilder_app-app-1`: **385 of 425**
+`*Test.php` files are collected, and the 40 missing are the **whole of `tests/Feature/Forms`** — every form
+lifecycle, policy, publish, schedule and RLS test in the repository. They are never loaded, never run, and
+never reported absent. A local full-suite run has been printing a green summary for a suite missing 9% of
+its files, including the directory covering the product's central object.
+
+⚠️ **THE HOST AND CI ARE BOTH FINE**, which is what makes this hard to see and easy to under-rate: the
+blindness exists only where a human reads the result, and never where the merge gate does.
+
+**What `M76` shipped**, because a gate that reports green while blind is the defect this repository is built
+around: `tests/Feature/Docs/SuiteCollectionFloorTest.php` compares the collector against a reliable
+enumerator and fails, naming the missing files. It is **green on the host and in CI** and **red in the
+container**. It blocks no merge.
+
+⛔ **THE HONEST COST, STATED BECAUSE IT CUTS AGAINST THE FIX.** A container Pest run is now permanently red
+until the mount is worked around — and **a permanently-red test teaches a reader to skip red**, which is
+this project's own argument, made verbatim in the `AbortError` row `M76` closed in the same increment
+(*"a stack trace on a passing run is what teaches a reader to skip stack traces"*). That argument does not
+stop applying because the signal is one we like.
+
+**The options:**
+
+1. ✅ **Keep it as shipped.** The suite really is incomplete and the gate says so with the file list. The
+   remedy is available and cheap — `pest tests/Feature/Forms` collects those files correctly when the
+   directory is named explicitly — so the red is *actionable* rather than merely true. **Recommended**,
+   on the grounds that the alternative is a known 40-file hole nobody is reminded of. ⚠️ Its weakness is
+   the one above: it is red on every local run, forever, until something outside this repository changes.
+2. **Soften it to a warning the run prints without failing.** Keeps the information, removes the fatigue —
+   and is precisely the decorative-gate shape `M43` measured and this project rejects, so it is listed to
+   be refused explicitly rather than left as an unexamined middle.
+3. **Change how the suite is run, and let the gate stay strict.** Give `composer` a test script that
+   enumerates the leaf directories reliably and passes them explicitly, so the local run actually collects
+   all 425 and the gate goes green honestly. **This is the only option that fixes the defect rather than
+   reporting it**, and it is the most work: it needs a wrapper that is itself proved, and it changes the
+   documented way to run tests. If the answer is 3, the gate from option 1 stays exactly as it is — it
+   becomes the thing that proves the wrapper works.
+
+⚠️ **Whatever is chosen, the measurement stands and the trap is not this repository's to fix at source:**
+every SPL directory iterator truncates on this mount under every flag combination, and the next directory to
+go blind **cannot be predicted** — synthetic directories of up to sixty files do not truncate, while a real
+46-entry directory collapses to 6. That is why `M76` shipped a comparison rather than a documented list.
+
+---
 ### D15 — `D13`'s one-hub-row cap is now the binding constraint on batch composition, and it is stricter than its own purpose. Keep it, relax it to per-file, or re-derive the hub set per batch?
 
 **Filed 2026-09-05 by Lane A, during `M72`, at the moment the cap decided a batch that value had not.**

@@ -874,6 +874,24 @@ final class TenantMembershipService
             return true;
         }
 
+        // ⛔ THE POSITIVE ARM, ADDED BY M76, AND IT IS FIRST BECAUSE IT IS THE ONLY ONE THAT ANSWERS THE
+        // QUESTION THIS METHOD IS ACTUALLY ASKING. Every other arm is a proxy — *"did they verify an
+        // address"*, *"did they enrol a second factor"*, *"were they once a member somewhere"* — and each
+        // is evidence that the identity is real rather than evidence that a HUMAN CHOSE THIS PASSWORD.
+        // `password_set_at` is the direct record, written by all four password writers and by nothing else.
+        //
+        // ⚠️ ADDING IT IS MONOTONIC, WHICH IS WHAT MADE THE COLUMN SHIPPABLE WITHOUT A BACKFILL. A new
+        // disjunct can only move an account from *not established* to *established*, never the reverse, so
+        // no live invitation placeholder can be locked out by its arrival — which is the lockout the
+        // backlog row correctly feared, and the reason it concluded the only honest backfill was a fourth
+        // copy of this predicate in SQL. There is no fourth copy: there is no backfill.
+        // ⚠️ The cost of that is stated rather than hidden: an account that self-registered BEFORE the
+        // migration and has still never verified, enrolled, linked or joined stays in the old state until
+        // it next sets a password. The population is closed at the top, not emptied.
+        if ($user->password_set_at !== null) {
+            return true;
+        }
+
         if ($user->email_verified_at !== null
             || $user->two_factor_confirmed_at !== null
             || $user->google_id !== null) {

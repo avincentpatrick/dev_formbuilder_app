@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Http\Controllers\Public\GuestDraftResumeController;
 use App\Models\Submission;
 use App\Support\Submissions\SubmissionReference;
+use Tests\Support\SourceTree;
 
 /**
  * Increment J2e — `submissions.reference` is a DISPLAY HANDLE AND NEVER A CREDENTIAL, asserted rather than
@@ -39,22 +40,21 @@ function referenceSourceWithoutComments(string $path): string
     return $out;
 }
 
-/** Every `.php` under `app/`, as absolute paths. */
+/**
+ * Every `.php` under `app/`, as absolute paths.
+ *
+ * ⛔ THIS WAS A `RecursiveDirectoryIterator` UNTIL M76, AND THIS FILE HAD NO FLOOR AT ALL, WHICH IS THE
+ * WORSE OF THE TWO POSITIONS. Over this project's Windows bind mount that iterator returned 719 of the 814
+ * files under `app/`, dropping whole directories — including all 52 under `app/Http/Controllers/Tenant`.
+ * The sole assertion here is an exact-equality on the offender list, so it stayed green precisely BECAUSE
+ * it found nothing new: the one legitimate site lives in `app/Models/`, which survived the truncation,
+ * while a `where('reference', …)` added in a tenant controller — the exact shape the docblock above says
+ * this file exists to prevent — could never have been seen locally. {@see SourceTree}
+ * carries the measurement and the disagreement guard.
+ */
 function appSourceFiles(): array
 {
-    $files = [];
-    $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator(base_path('app')));
-
-    /** @var SplFileInfo $file */
-    foreach ($iterator as $file) {
-        if ($file->isFile() && $file->getExtension() === 'php') {
-            $files[] = $file->getPathname();
-        }
-    }
-
-    sort($files);
-
-    return $files;
+    return SourceTree::filesUnder(base_path('app'));
 }
 
 it('queries submissions.reference in exactly one place in the whole application', function (): void {
@@ -63,8 +63,10 @@ it('queries submissions.reference in exactly one place in the whole application'
     // search. A SECOND site is the thing this case exists to make impossible to add quietly, because the
     // second one is where somebody reaches for a reference as a lookup key on a public route.
     $offenders = [];
+    $scanned = 0;
 
     foreach (appSourceFiles() as $path) {
+        $scanned++;
         $code = referenceSourceWithoutComments($path);
 
         // ⚠️ CASE-INSENSITIVE, AND THAT IS NOT A DETAIL. The first draft of this lint matched `where(` only,
@@ -76,6 +78,12 @@ it('queries submissions.reference in exactly one place in the whole application'
             $offenders[] = str_replace(base_path().DIRECTORY_SEPARATOR, '', $path);
         }
     }
+
+    // ⚠️ NON-VACUITY FIRST, ADDED BY M76 BECAUSE THIS FILE HAD NONE. An exact-equality on the offender
+    // list looks self-protecting — a blind sweep that lost `Submission.php` would redden — but that is
+    // only true for the ONE file already on the list. Losing any of the other 813 is invisible to it,
+    // which is exactly the direction a new offender arrives from. 800 is chosen against a measured 814.
+    expect($scanned)->toBeGreaterThan(800);
 
     expect($offenders)->toBe(['app'.DIRECTORY_SEPARATOR.'Models'.DIRECTORY_SEPARATOR.'Submission.php']);
 });

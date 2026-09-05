@@ -43,7 +43,19 @@ use Spatie\Permission\Traits\HasRoles;
  * @property ?string $google_id Google's `sub` (J3c2 / ADR-0019 §D1). Unique; NULL on almost every row.
  * @property bool $is_super_admin Global platform-staff flag (RBAC §9); never a Spatie role.
  * @property ?Carbon $two_factor_confirmed_at Set once 2FA enrollment is confirmed.
+ * @property ?Carbon $password_set_at When a HUMAN last chose this password (M76). NULL on an invitation
+ *                                    placeholder and on an SSO/Google-provisioned account, both of which
+ *                                    hold a random hash nobody chose.
  */
+// ⛔ `password_set_at` IS DELIBERATELY ABSENT FROM `Fillable`, AND ITS ABSENCE IS LOAD-BEARING RATHER THAN
+//    AN OVERSIGHT. It is the positive half of the predicate that decides whether a holder of an invitation
+//    token may overwrite an account's password ({@see \App\Services\Tenancy\TenantMembershipService::identityIsEstablished()}),
+//    so it must never be reachable by mass assignment from anything resembling request input. Every one of
+//    its four writers stamps it through `forceFill()` on purpose.
+//    ⚠️ AND THIS IS AN ATTRIBUTE, NOT `protected $fillable` — which is why a grep for the property finds
+//    nothing and why adding the column to a `User::create([...])` array would be discarded IN SILENCE,
+//    with no exception and no log. The backlog row that prescribed this fix prescribed exactly that,
+//    and it would have shipped a column that was never written.
 #[Fillable(['name', 'email', 'password'])]
 #[Hidden(['password', 'remember_token', 'two_factor_secret', 'two_factor_recovery_codes'])]
 class User extends Authenticatable implements MustVerifyEmail
@@ -184,6 +196,7 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         return [
             'email_verified_at' => 'datetime',
+            'password_set_at' => 'datetime',
             'two_factor_confirmed_at' => 'datetime',
             'tos_accepted_at' => 'datetime',
             'privacy_policy_accepted_at' => 'datetime',

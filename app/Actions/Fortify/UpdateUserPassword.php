@@ -28,8 +28,11 @@ class UpdateUserPassword implements UpdatesUserPasswords
             'current_password.current_password' => __('The provided password does not match your current password.'),
         ])->validateWithBag('updatePassword');
 
+        // `password_set_at` (M76): a signed-in password change is the strongest possible instance of a
+        // human choosing a password — this arm already required `current_password`.
         $user->forceFill([
             'password' => Hash::make($input['password']),
+            'password_set_at' => now(),
         ])->save();
     }
 }

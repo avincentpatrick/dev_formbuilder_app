@@ -15,12 +15,22 @@
  * ⛔ ONE CLASS OF SHELL IS DELIBERATELY LEFT TO GO STALE: a resume link. See `isResumeShell()`.
  *
  * ── RE-PRIME, NEVER PURGE, AND THIS IS THE WHOLE DESIGN ───────────────────────────────────────────
- * `caches.delete('guest-shell-html')` is the obvious fix and it is the wrong one. A stale brand is
+ * `caches.delete(SHELL_CACHE)` is the obvious fix and it is the wrong one. A stale brand is
  * COSMETIC; a purged shell costs a fieldworker offline access to a form they deliberately primed,
  * which is a core product promise (PRD offline data collection). Trading the second for the first is
- * a bad trade in any brand's favour. So the stale entries are REFRESHED — fetched and re-`put` — and
- * the cache is never emptied. Worst case the refresh fails and the respondent sees last week's
- * colours; they never lose the form.
+ * a bad trade in any brand's favour. So the stale entries are REFRESHED — fetched, re-`put`, and
+ * their expiry clock renewed — and the cache is never emptied. Worst case the refresh fails and the
+ * respondent sees last week's colours; they never lose the form.
+ *
+ * ⛔ "AND THEIR EXPIRY CLOCK RENEWED" IS AN M75 CORRECTION, NOT A RESTATEMENT. Until M75 this
+ * paragraph said only "fetched and re-`put`", which was true of the bytes and false of the clock, and
+ * that sentence is what a reader acted on. `sw.ts` expires this cache with Workbox's
+ * `ExpirationPlugin`, which keeps its own timestamps in IndexedDB and updates them from ONE place —
+ * `StrategyHandler.cachePut` → `cacheDidUpdate`. A raw `cache.put()` never reaches it, so a shell
+ * refreshed on day six was still deleted on day seven as though it had not been. ⚠️ WORKBOX HAS TWO
+ * CLOCKS AND ONLY ONE WAS BROKEN: read-freshness is decided from the cached response's own `Date`
+ * header, which a raw `put` DOES renew, so the defect was invisible to anything that merely read an
+ * entry back. It bit exactly the shells this module exists for — the ones nobody navigates to.
  *
  * ── WHY THE FINGERPRINT IS NOT ADVANCED WHEN OFFLINE ──────────────────────────────────────────────
  * The stored fingerprint means "the cached shells have been refreshed for THIS ramp". Writing it
@@ -33,13 +43,13 @@
  * without a service worker.
  */
 
+import { CacheExpiration } from 'workbox-expiration';
+
 import type { MeridianDb } from './db';
+import { SHELL_CACHE, SHELL_EXPIRATION } from './shell-cache';
 
 /** The `app_state` key holding the ramp fingerprint the cached shells were last refreshed for. */
 export const BRAND_VERSION_KEY = 'brand_version';
-
-/** Must match the `cacheName` of sw.ts's `/f/*` navigation route — the only cache carrying brand. */
-export const SHELL_CACHE = 'guest-shell-html';
 
 export type BrandSyncOutcome =
     /** The cached shells already match this ramp (the overwhelmingly common path). */
@@ -108,14 +118,32 @@ export async function syncBrandedShellCache(deps: BrandCacheDeps): Promise<Brand
  * ⛔ A resume shell's body carries `data-resume-token` (`public-runtime.blade.php`), and that token
  * is the whole credential for `GET /api/v1/public/drafts/{resumeToken}`, which answers with the
  * respondent's full answer map. The shell is cached like any other `/f/…` navigation — `sw.ts`
- * NetworkFirst, `guest-shell-html`, seven days — and `refreshCachedShells()` would otherwise
- * re-`put` it from every later boot, RENEWING a token-bearing document on disk indefinitely instead
- * of letting it age out. That renewal is what this predicate stops.
+ * NetworkFirst, `SHELL_CACHE`, seven days — and `refreshCachedShells()` would otherwise renew it
+ * from every later sweep, keeping a token-bearing document on disk indefinitely instead of letting
+ * it age out. That renewal is what this predicate stops.
  *
- * ⚠️ SKIPPED, NEVER PURGED, on the same reasoning as the rest of this module. Deleting the entry
- * would cost a respondent offline access to a form they deliberately primed, which is the trade this
- * file exists to refuse. Skipping it means the entry expires on `sw.ts`'s seven-day clock and is
- * never renewed; the worst anyone sees in the meantime is last week's colours on a resume link.
+ * ⛔ AND UNTIL M75 THIS PARAGRAPH WAS DESCRIBING SOMETHING THAT DID NOT HAPPEN. The sweep re-`put`
+ * bytes through the raw Cache API, which never touched `ExpirationPlugin`'s IndexedDB timestamp, so a
+ * skipped resume shell and a swept ordinary one aged out on exactly the same clock. **This predicate
+ * was belt-and-braces; M75 made it load-bearing**, and that is the direction to be glad of — the
+ * carve-out was written for a threat the code was not yet capable of.
+ *
+ * ⚠️ SKIPPED, NEVER PURGED — AND M75 ADDS A REAL QUALIFICATION TO THAT, MEASURED RATHER THAN
+ * REASONED. Deleting the entry would cost a respondent offline access to a form they deliberately
+ * primed, which is the trade this file exists to refuse, and nothing here deletes anything. But
+ * `maxEntries` does: `workbox-expiration` enforces it by walking the `timestamp` index newest-first
+ * and deleting past the 20th survivor. Now that a sweep renews every OTHER swept entry's timestamp
+ * and deliberately not this one, a resume shell on a device holding more than twenty shells becomes
+ * the FIRST eviction rather than a middling one. That is consistent with why the carve-out exists —
+ * a credential-bearing document leaving sooner is the direction this file wants — but it is an
+ * eviction this docblock did not previously imply, and `refreshCachedShells()` records the ordering
+ * change in full.
+ *
+ * ⚠️ AND THE FAIL-OPEN BELOW IS NOW A DIFFERENT TRADE. Returning FALSE on an unparseable URL used to
+ * cost a token-bearing shell nothing but rewritten bytes; it now costs it a renewed lifetime. The
+ * argument for fail-open is still the stronger one — a predicate that throws swallows the whole
+ * sweep — but it is no longer free, and whoever revisits it should weigh the new price rather than
+ * the old one.
  *
  * ⚠️ TWO PREFIXES CARRY THIS AND THEY ARE NOT THE SAME ONE. Matched here is the guest ROUTE,
  * `/f/resume/{resumeToken}` (`routes/tenant.php`). The resume READ is a different path,
@@ -135,14 +163,46 @@ export function isResumeShell(url: string): boolean {
 }
 
 /**
- * Re-fetch and re-`put` every cached guest shell except the current one and any resume link.
+ * Re-fetch, re-`put` and re-date every cached guest shell except the current one and any resume link.
  *
- * Two rules that look like defensiveness and are not:
+ * Three rules that look like defensiveness and are not:
  *  - **Only a 200 is written.** A `cache.put` of a 404 (the form was unpublished) or a 500 would
  *    replace a working offline shell with an error page — strictly worse than the stale brand this
  *    function exists to fix.
  *  - **Each entry is independent.** One dead URL must not abort the sweep for the others, so every
  *    fetch is caught individually rather than the whole loop being wrapped.
+ *  - **The clock is renewed with the bytes, and never separately from them.** `updateTimestamp()` sits
+ *    inside the same `try` as the `put` and immediately after it, so the two either both happen or the
+ *    entry is left exactly as it was.
+ *
+ * ── ⛔ WHY THE CLOCK NEEDS A SECOND CALL AT ALL (M75) ─────────────────────────────────────────────
+ * `sw.ts` expires this cache with `ExpirationPlugin`, whose timestamps live in IndexedDB and are
+ * written from exactly one place: `StrategyHandler.cachePut` → `cacheDidUpdate`. This module cannot
+ * go through that path. It runs in the WINDOW, and a Workbox `Strategy` needs a `FetchEvent` to
+ * handle — `Strategy.handleAll()` throws outside a worker. Nor can the fetch below be made to match
+ * the route: `sw.ts` matches `request.mode === 'navigate'`, and `mode: 'navigate'` is not
+ * constructible from script. So the strategy is unreachable from here in three independent ways, and
+ * `CacheExpiration` — the same bookkeeping the plugin drives, minus the deletion — is the seam.
+ *
+ * ⛔ `expireEntries()` IS DELIBERATELY NOT CALLED. It deletes, and this module's axiom is re-prime,
+ * never purge. `updateTimestamp()` writes one record and removes nothing.
+ *
+ * ⚠️ AND IT CHANGES `maxEntries` EVICTION ORDER, WHICH IS THE HONEST COST AND WAS MEASURED, NOT
+ * ASSUMED. Workbox enforces `maxEntries` by walking the `timestamp` index newest-first and deleting
+ * everything past the Nth survivor, so that index is a recency-of-USE order — `ExpirationPlugin`
+ * stamps an entry on every read as well as every write. A sweep renews nearly every entry at once,
+ * which replaces that order with sweep order (`cache.keys()`, i.e. insertion order) for one boot. The
+ * writes are staggered rather than identical, because each one waits on its own network fetch — 8 ms
+ * apart in the probe that established this — so the order is well-defined rather than a tie-break on
+ * the primary key. It re-establishes itself as entries are read again. ⚠️ Two consequences worth
+ * knowing: the resume shell, alone in not being renewed, sorts oldest (see `isResumeShell()`), and a
+ * device holding more than twenty shells can lose one it used recently. ⚠️ THE PRIOR STATE WAS THE
+ * ANOMALY: a fresh body with a stale timestamp is a combination Workbox's own model cannot produce,
+ * so there was no correct ordering to preserve — only a different wrong one.
+ *
+ * ⚠️ A blocked IndexedDB (private mode) makes `updateTimestamp()` throw. The per-entry `catch` takes
+ * it, the sweep continues, and that entry is left with renewed bytes and a stale clock — exactly the
+ * pre-M75 behaviour, which is the right thing to degrade to and is not silently better than it looks.
  */
 async function refreshCachedShells(cacheStorage: CacheStorage, doFetch: typeof fetch, currentUrl: string): Promise<void> {
     if (!(await cacheStorage.has(SHELL_CACHE))) {
@@ -151,6 +211,7 @@ async function refreshCachedShells(cacheStorage: CacheStorage, doFetch: typeof f
 
     const cache = await cacheStorage.open(SHELL_CACHE);
     const entries = await cache.keys();
+    const expiration = new CacheExpiration(SHELL_CACHE, { ...SHELL_EXPIRATION });
 
     for (const request of entries) {
         if (request.url === currentUrl) {
@@ -166,9 +227,10 @@ async function refreshCachedShells(cacheStorage: CacheStorage, doFetch: typeof f
 
             if (response.status === 200) {
                 await cache.put(request, response);
+                await expiration.updateTimestamp(request.url);
             }
         } catch {
-            // Offline mid-sweep, or that form is gone. Leave the existing entry alone.
+            // Offline mid-sweep, that form is gone, or IndexedDB refused. Leave the existing entry alone.
         }
     }
 }

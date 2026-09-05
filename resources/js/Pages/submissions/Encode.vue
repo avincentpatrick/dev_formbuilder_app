@@ -30,7 +30,7 @@
  * field binds to `answers[sectionKey][i][fieldKey]` and its 422 keys `answers.<sectionKey>[i].<fieldKey>`; a
  * min/max count failure keys the bare `answers.<sectionKey>`.
  */
-import { computed, nextTick, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import { MdsAlert, MdsBreadcrumb, MdsButton, MdsCard, type BreadcrumbItem } from '@meridian/design-system';
 import PageHeader from '@/components/shell/PageHeader.vue';
@@ -388,7 +388,7 @@ function flatValue(fieldKey: string): AnswerValue {
 function setFlatValue(fieldKey: string, value: AnswerValue): void {
     runtime.setAnswer(fieldKey, value as never);
     runtime.markTouched(fieldKey);
-    armAutosave();
+    markEdited();
 }
 
 function fieldError(fieldKey: string): string | undefined {
@@ -425,18 +425,18 @@ function instanceValue(sectionKey: string, index: number, fieldKey: string): Ans
  */
 function addInstance(sectionKey: string): void {
     runtime.addInstance(sectionKey);
-    armAutosave();
+    markEdited();
 }
 
 function removeInstance(sectionKey: string, index: number): void {
     runtime.removeInstance(sectionKey, index);
-    armAutosave();
+    markEdited();
 }
 
 function setInstanceValue(sectionKey: string, index: number, fieldKey: string, value: AnswerValue): void {
     runtime.setInstanceAnswer(sectionKey, index, fieldKey, value as never);
     runtime.markInstanceTouched(sectionKey, index, fieldKey);
-    armAutosave();
+    markEdited();
 }
 
 function boundsHint(block: Block): string | null {
@@ -538,8 +538,18 @@ const autosave = createServerAutosave({
     enabled: computed(() => autosaveArmed.value && !isEditing.value && (isOpen.value || props.draft !== null)),
 });
 
-function armAutosave(): void {
+/**
+ * The one funnel every real edit on this page goes through — four call sites, all of them above.
+ *
+ * ⛔ RENAMED FROM `armAutosave()` IN M75 BECAUSE IT NOW ARMS TWO THINGS, and the second one exists on
+ * the channel where the first is switched off forever. These four sites are already this page's only
+ * definition of "a keyer changed something" — the repeat-instance docblock above records that leaving
+ * two of them out silently cost a whole class of session its persistence — so hanging the edit-mode
+ * leave guard anywhere else would be inventing a second, weaker definition of the same event.
+ */
+function markEdited(): void {
     autosaveArmed.value = true;
+    editDirty.value = true;
 }
 
 /** The header indicator. Null before the first save, so a fresh page carries no stale "Saved" claim. */
@@ -806,15 +816,167 @@ function cancelDiscard(): void {
  * context outright; there is no flag left to misread, and the row's own ⛔ constraint — that this must
  * never become a one-click adopt-the-new-baseline — holds by construction rather than by argument.
  *
- * ⚠️ AND IT COSTS NOTHING IN LIFECYCLE. Autosave is unconditionally off in edit mode, so although
- * `useServerAutosave` does register a `beforeunload` listener, its body early-returns because `dirty`
- * is never set here. No native leave prompt fires. ⚠️ That same fact is a SEPARATE defect, filed
- * rather than fixed in this increment: nothing warns an editor who navigates away by any other means.
+ * ⛔ IT USED TO COST NOTHING IN LIFECYCLE, AND SINCE M75 IT COSTS ONE LINE. The paragraph that stood
+ * here said: autosave is off in edit mode, so although `useServerAutosave` registers a `beforeunload`
+ * listener its body early-returns, and "No native leave prompt fires." That was true, it was the whole
+ * reason a real browser navigation was safe to use here — and it was ALSO the separate defect this
+ * docblock filed in the same breath: nothing warned an editor who navigated away by any other means.
+ * M75 closed that, which means a `beforeunload` guard IS armed now, so `confirmDiscard()` disarms it
+ * before reloading. Without that the keyer is asked twice for one decision, the second time in a
+ * browser dialog this page cannot word. See the guard below.
  */
 function confirmDiscard(): void {
     discardArmed.value = false;
+    // ⛔ M75 — DISARM THE LEAVE GUARD FIRST, AND THIS IS NOT TIDINESS. `location.reload()` is a real
+    // browser navigation, so without this the guard's `beforeunload` raises the browser's native
+    // "Leave site?" dialog ON TOP OF the two-click confirm the keyer has just completed — asking twice
+    // for one decision, the second time in a dialog this page cannot style or label.
+    leaving = true;
     window.location.reload();
 }
+
+/* ── The unsaved-corrections guard (Increment M75) ─────────────────────────────────────────────── */
+
+/**
+ * ⛔ WHY THIS IS NOT `useServerAutosave`'s `beforeunload`, WHICH IS ALREADY ATTACHED AND ALREADY
+ * CORRECT. `armGuards()` adds that listener at construction on every channel, this one included, so
+ * the obvious remedy — "arm the listener in edit mode" — is already done and changes nothing. Its
+ * handler early-returns because `dirty` is only ever set behind the `enabled` guard, and `enabled` is
+ * false forever here. ⚠️ AND `dirty` MUST NOT SIMPLY BE ARMED FROM OUTSIDE: it is a module-local
+ * `let` with no setter on the returned object, and arming it would also start the debounced POST to
+ * `props.draft_url`, which is null in edit mode on purpose (`EncodeFormPresenter::present`) because an
+ * edit autosaved down the draft channel overwrites a respondent's answers with no `update` policy
+ * check and no audit row. The mechanism is the flag, the flag is deliberately unreachable, so the
+ * guard lives here instead of there.
+ *
+ * ⛔ EDIT MODE ONLY, AND THE ASYMMETRY IS THE POINT RATHER THAN AN OVERSIGHT. On the draft channel
+ * `dispose()` fires a last-chance keepalive save when the component unmounts, so clicking Cancel
+ * PERSISTS the work. There is nothing to warn about there, and a prompt would be a lie.
+ *
+ * ⛔ WHAT THIS GUARD DELIBERATELY DOES NOT DO: autosave an edit. That half needs an endpoint that does
+ * not exist and a product decision about demotion — `SubmissionAnswerEditService` sends an approved
+ * response back to review and writes an audit row per save — so it is filed rather than assumed.
+ */
+const editDirty = ref(false);
+const leaveArmed = ref(false);
+const leaveRoot = ref<HTMLElement | null>(null);
+let pendingVisit: GuardedVisit | null = null;
+let leaving = false;
+let stopBeforeVisit: (() => void) | null = null;
+
+/** The part of Inertia's `before` payload this page reads. Deliberately narrower than `PendingVisit`. */
+interface GuardedVisit {
+    url: URL;
+    method: string;
+    prefetch?: boolean;
+    replace?: boolean;
+    preserveScroll?: boolean;
+    preserveState?: boolean;
+}
+
+function guardApplies(): boolean {
+    return isEditing.value && editDirty.value && !leaving;
+}
+
+/** A real browser navigation — closing the tab, reloading, typing a URL. The native prompt is all there is. */
+function onGuardedUnload(event: BeforeUnloadEvent): void {
+    if (!guardApplies()) {
+        return;
+    }
+
+    event.preventDefault();
+}
+
+/**
+ * An Inertia client-side visit — Cancel, a breadcrumb, the sidebar, the command palette. `beforeunload`
+ * never fires for any of them, which is why the row could call this page's corrections free to discard.
+ *
+ * ⛔ TWO VISITS ARE EXCLUDED AND BOTH EXCLUSIONS WERE MEASURED RATHER THAN GUESSED.
+ *
+ * 1. **A non-GET visit never leaves this page.** `ThemeQuickToggle` sits in `TopNav`, which sits in
+ *    `AppLayout`, which this page uses — so the dark-mode switch is on screen during every correction,
+ *    and it persists through `router.patch('/settings/appearance', …)`. Without this clause the keyer
+ *    gets "you have unsaved corrections" for changing the theme, and declining it silently drops the
+ *    theme preference, which has no error path. `submitEdit()` is excluded by the same clause for free,
+ *    and deliberately does NOT set `leaving` — a 422 leaves the keyer on the page with the guard intact.
+ * 2. **A prefetch is not a navigation.** `Router.prefetch()` fires the same cancelable `before` event as
+ *    `Router.visit()`, so without this clause a future `<Link prefetch>` anywhere in the shell would pop
+ *    this dialog on HOVER. Nothing passes `prefetch` today, which is exactly why the tripwire would sit
+ *    armed and unnoticed until someone did.
+ */
+function onGuardedVisit(event: Event): boolean | void {
+    if (!guardApplies()) {
+        return;
+    }
+
+    const { visit } = (event as CustomEvent<{ visit: GuardedVisit }>).detail;
+
+    if (visit.prefetch === true || visit.method.toLowerCase() !== 'get') {
+        return;
+    }
+
+    pendingVisit = visit;
+    leaveArmed.value = true;
+    void nextTick().then(() => {
+        leaveRoot.value?.querySelector<HTMLElement>('[data-leave-stay]')?.focus();
+    });
+
+    return false; // `onGlobalEvent` turns a `false` return into `preventDefault()`, cancelling the visit
+}
+
+function stayOnPage(): void {
+    leaveArmed.value = false;
+    pendingVisit = null;
+}
+
+/**
+ * Re-issue the visit the guard cancelled, rather than asking the keyer to click the same link twice.
+ *
+ * ⚠️ `visit.url` ALREADY CARRIES THE QUERY STRING — Inertia merges a GET visit's `data` into the URL
+ * before it fires `before`, so re-issuing from the URL alone loses nothing. This is only ever reached
+ * for a GET, by the exclusion above.
+ */
+function leaveAnyway(): void {
+    const visit = pendingVisit;
+
+    leaveArmed.value = false;
+    pendingVisit = null;
+
+    if (visit === null) {
+        return;
+    }
+
+    leaving = true;
+    router.visit(visit.url, {
+        replace: visit.replace,
+        preserveScroll: visit.preserveScroll,
+        preserveState: visit.preserveState,
+    });
+}
+
+/** Escape keeps the keyer where they are — the safe half, matching `onConflictKeydown` beside it. */
+function onLeaveKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Escape' && leaveArmed.value) {
+        event.stopPropagation();
+        stayOnPage();
+    }
+}
+
+// ⚠️ REGISTERED UNCONDITIONALLY AND GATED IN `guardApplies()`, so there is ONE arming path rather than
+// one per channel. `Encode.vue` had no lifecycle hooks at all before this.
+onMounted(() => {
+    window.addEventListener('beforeunload', onGuardedUnload);
+    stopBeforeVisit = router.on('before', onGuardedVisit);
+});
+
+// ⛔ `router.on()` HANDS BACK ITS OWN UNSUBSCRIBE AND DROPPING IT IS A MEASURED LEAK IN THIS CODEBASE —
+// `useMemberStreak` records that after forty navigations one navigation fired forty requests. A leaked
+// `before` handler is worse than a leaked fetch: every dead copy can still cancel a visit.
+onBeforeUnmount(() => {
+    window.removeEventListener('beforeunload', onGuardedUnload);
+    stopBeforeVisit?.();
+    stopBeforeVisit = null;
+});
 
 /** Escape cancels the confirm rather than leaving it armed — `SubmissionOutbox.vue`'s affordance. */
 function onConflictKeydown(event: KeyboardEvent): void {
@@ -936,6 +1098,31 @@ function onConflictKeydown(event: KeyboardEvent): void {
              AFTER a PATCH returns, which is exactly the case `role="alert"` exists for. Do not "fix" it.
              The message is the SERVER's sentence, not a hard-coded one — which is also what makes the
              control behavioural rather than structural. -->
+        <!-- The unsaved-corrections guard (M75). ⛔ THE ASYMMETRY THIS CLOSES: before it, the DESTRUCTIVE
+             action on this page was two-click confirmed while the ACCIDENTAL one — Cancel, a breadcrumb, a
+             sidebar item, a closed tab — discarded every character with no prompt and no trace. `assertive`
+             for the same reason the conflict alert below is: this node is inserted in response to something
+             the keyer just did, which is exactly what `role="alert"` is for.
+             ⚠️ The copy names the channel rather than the control, because "unsaved" is only true here —
+             on the draft channel the same click saves. -->
+        <div v-if="leaveArmed" ref="leaveRoot" @keydown="onLeaveKeydown">
+            <MdsAlert
+                tone="warning"
+                assertive
+                title="You have unsaved corrections"
+                message="Nothing on the edit channel is saved until you choose Save changes. Leaving now discards every change you have typed."
+            >
+                <template #actions>
+                    <MdsButton data-leave-stay size="sm" variant="secondary" @click="stayOnPage">
+                        Stay on this page
+                    </MdsButton>
+                    <MdsButton size="sm" variant="destructive" @click="leaveAnyway">
+                        Leave and discard
+                    </MdsButton>
+                </template>
+            </MdsAlert>
+        </div>
+
         <div v-if="conflictMessage !== null" ref="conflictRoot" @keydown="onConflictKeydown">
             <MdsAlert
                 tone="danger"

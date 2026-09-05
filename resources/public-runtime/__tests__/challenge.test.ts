@@ -96,14 +96,40 @@ describe('solveChallenge', () => {
     it('yields to the event loop on a long search rather than freezing the caller', async () => {
         // The solver runs inside ApiClient.submit(), which the SERVICE WORKER also calls when draining the
         // outbox — and a SW cannot spawn a Worker. Blocking there stalls every other fetch it handles.
-        let ticked = false;
-        setTimeout(() => {
-            ticked = true;
-        }, 0);
+        //
+        // ⛔ THE `crypto` STUB IS THIS CASE'S SUBJECT, NOT ITS SCENERY (M75). Before it, the case ran on
+        // `crypto.subtle`, which happy-dom supplies — so every candidate was an AWAITED native digest, the
+        // event loop turned on each one, and this timer fired after candidate ZERO. It never reached the
+        // first `yieldToEventLoop()` at n = 4999 at all. MEASURED: with `challenge.ts`'s yield line deleted
+        // outright the case still passed 11/11. It asserted nothing about the solver — it was VACUOUS, and
+        // the row that filed it as a race had the diagnosis backwards.
+        //
+        // On the fallback path `sha256Hex()` is synchronous, so the loop between two yields never returns to
+        // the event loop. The timer can therefore fire ONLY if the solver actually yielded, and the same
+        // mutation turns this red. ⚠️ It is also ~10x cheaper — MEASURED at 78 ms here against 747 ms on the
+        // subtle path — and that 747 ms against Vitest's 5000 ms default `testTimeout` is the load artefact
+        // M74 filed as a race. The cost was the flake; the vacuity was the defect.
+        //
+        // ⚠️ HONEST LIMIT: this pins the yield on the fallback path only. On the subtle path the property is
+        // real but unobservable by this technique, because the awaited digest yields on every candidate
+        // whether or not `yieldToEventLoop()` is ever called.
+        const realCrypto = globalThis.crypto;
 
-        await solveChallenge(challengeFor(12000, 20000));
+        try {
+            vi.stubGlobal('crypto', {});
+            expect(hasSubtleCrypto()).toBe(false);
 
-        expect(ticked).toBe(true);
+            let ticked = false;
+            setTimeout(() => {
+                ticked = true;
+            }, 0);
+
+            await solveChallenge(challengeFor(12000, 20000));
+
+            expect(ticked).toBe(true);
+        } finally {
+            vi.stubGlobal('crypto', realCrypto);
+        }
     });
 });
 

@@ -33,12 +33,32 @@ const mocks = vi.hoisted(() => ({
     },
     post: vi.fn(),
     patch: vi.fn(),
+    visit: vi.fn(),
+    // ⛔ M75 — `on` IS NOT OPTIONAL SCENERY. `Encode.vue` registers `router.on('before', …)` in
+    // `onMounted`, so a mock without it throws a TypeError in EVERY mount in this file, not only in the
+    // cases that exercise the guard. `beforeVisit` captures the handler because the `Link` stub below is
+    // a bare `<a>` that never calls `router.visit()` — clicking Cancel cannot reach the guard, so the
+    // registered callback is invoked directly. That is the pattern `useNotificationFeed.test.ts` uses
+    // for `router.on('navigate', …)`, and for the same reason.
+    on: vi.fn(),
+    beforeVisit: null as null | ((event: Event) => boolean | void),
 }));
 
 vi.mock('@inertiajs/vue3', () => ({
     Head: { name: 'Head', render: () => null },
     Link: { name: 'Link', template: '<a><slot /></a>' },
-    router: { post: mocks.post, patch: mocks.patch },
+    router: {
+        post: mocks.post,
+        patch: mocks.patch,
+        visit: mocks.visit,
+        on: (type: string, callback: (event: Event) => boolean | void) => {
+            if (type === 'before') {
+                mocks.beforeVisit = callback;
+            }
+
+            return mocks.on(type, callback);
+        },
+    },
     usePage: () => ({ props: mocks.pageProps }),
 }));
 
@@ -173,9 +193,48 @@ function payload(o: PayloadOptions): Record<string, unknown> {
     };
 }
 
+/**
+ * ⛔ EVERY MOUNT IS TRACKED AND UNMOUNTED (M75), AND THAT IS A CORRECTNESS FIX RATHER THAN HYGIENE.
+ * Nothing here unmounted before, so each case left a live component behind — and a live `Encode.vue`
+ * keeps a `beforeunload` listener on the shared `window`: `useServerAutosave`'s, and since M75 the
+ * edit-mode leave guard's as well. By the time a late case dispatched a `beforeunload` to ask "does
+ * this page warn?", every earlier dirty create-mode mount was still answering yes, so the assertion
+ * measured the file's history instead of the component. `useServerAutosave.test.ts` records the same
+ * trap and the same remedy at its own head.
+ */
+const mountedWrappers: VueWrapper[] = [];
+
 function mountEncode(props: Record<string, unknown>): VueWrapper {
-    return mount(Encode, { props: props as never });
+    const wrapper = mount(Encode, { props: props as never });
+    mountedWrappers.push(wrapper);
+
+    return wrapper;
 }
+
+afterEach(() => {
+    // ⛔ `fetch` IS STUBBED FOR THE TEARDOWN ITSELF, AND THE FIRST DRAFT OF THIS DID NOT DO IT.
+    // Unmounting a dirty create-mode page runs `dispose()`, which fires the last-chance keepalive POST —
+    // and by then the case's own `vi.unstubAllGlobals()` has already put the REAL `fetch` back, so the
+    // request is still in flight when happy-dom tears the window down and prints
+    // `DOMException [AbortError]` on a run that exits 0. A stack trace on a PASSING run is the thing
+    // that teaches a reader to skip stack traces.
+    // ⚠️ MEASURED, BECAUSE THE ATTRIBUTION IS NOT OBVIOUS: with the unmount loop disabled this file still
+    // printed TWO of those traces, so two predate M75 and the unmount added two more. This stub removes
+    // all four. ⚠️ `globalThis.fetch = …` does NOT work here — it was tried first and changed nothing;
+    // `vi.stubGlobal` is what actually reaches the binding the composable calls.
+    vi.stubGlobal(
+        'fetch',
+        vi.fn(() => Promise.resolve({ ok: true, status: 204, json: () => Promise.resolve({}) })),
+    );
+
+    try {
+        while (mountedWrappers.length > 0) {
+            mountedWrappers.pop()?.unmount();
+        }
+    } finally {
+        vi.unstubAllGlobals();
+    }
+});
 
 /** Every field label currently rendered, in DOM order — the page's answer to "what can the keyer see?". */
 function visibleLabels(wrapper: VueWrapper): string[] {
@@ -646,6 +705,172 @@ describe('Encode.vue — edit mode (I9c)', () => {
     beforeEach(() => {
         mocks.post.mockClear();
         mocks.patch.mockClear();
+        mocks.visit.mockClear();
+        mocks.beforeVisit = null;
+    });
+
+    /* ── The unsaved-corrections guard (M75) ──────────────────────────────────────────────────── */
+
+    /** A cancelable `before` payload in the shape `Encode.vue` reads off the event. */
+    function beforeEvent(visit: Record<string, unknown> = {}): CustomEvent {
+        return new CustomEvent('inertia:before', {
+            cancelable: true,
+            detail: {
+                visit: { url: new URL('http://localhost/submissions'), method: 'get', ...visit },
+            },
+        });
+    }
+
+    /** Drive the handler the page gave `router.on('before', …)`. True when it CANCELLED the visit. */
+    function visitWasBlocked(visit: Record<string, unknown> = {}): boolean {
+        expect(mocks.beforeVisit, 'the page registered no `before` handler').not.toBeNull();
+
+        return mocks.beforeVisit!(beforeEvent(visit)) === false;
+    }
+
+    /** Dispatch a real cancelable `beforeunload` and report whether anything asked to stop the exit. */
+    function unloadIsWarned(): boolean {
+        const event = new Event('beforeunload', { cancelable: true });
+        window.dispatchEvent(event);
+
+        return event.defaultPrevented;
+    }
+
+    it('warns and cancels an Inertia navigation once corrections have been typed, and not before', async () => {
+        // ⛔ THE ROW'S DEFECT, AT THE THREE ESCAPE ROUTES IT NAMES. `beforeunload` never fires for an
+        // Inertia visit, so Cancel, a breadcrumb and every sidebar item discarded the whole correction
+        // with no prompt and no trace — while M74's own "discard my changes" button was two-click
+        // confirmed. The destructive path was guarded and the accidental one was free.
+        const wrapper = mountEncode(editPayload());
+
+        // ⚠️ THE NON-VACUITY PARTNER, AND IT IS NOT DECORATION: a guard that blocked EVERY visit would
+        // satisfy the assertion below on its own.
+        expect(visitWasBlocked()).toBe(false);
+        expect(wrapper.text()).not.toContain('You have unsaved corrections');
+
+        await typeInto(wrapper, 'Comments', 'Corrected text');
+
+        expect(visitWasBlocked()).toBe(true);
+        await nextTick();
+        expect(wrapper.text()).toContain('You have unsaved corrections');
+    });
+
+    it('does NOT warn on a non-GET visit — the dark-mode toggle is on screen the whole time', async () => {
+        // ⛔ MEASURED, NOT IMAGINED. `ThemeQuickToggle` renders unconditionally in `TopNav`, `TopNav` in
+        // `AppLayout`, and `app.ts` gives this page `AppLayout` — so the theme switch is on screen during
+        // every correction, and it persists through `router.patch('/settings/appearance', …)`, a visit
+        // that never leaves the page. A guard without this clause pops "you have unsaved corrections"
+        // when a keyer switches to dark mode, and declining it silently drops the preference, which has
+        // no error path at all. `submitEdit()`'s own PATCH is excluded by the same clause.
+        const wrapper = mountEncode(editPayload());
+        await typeInto(wrapper, 'Comments', 'Corrected text');
+
+        expect(visitWasBlocked({ method: 'patch' })).toBe(false);
+        expect(visitWasBlocked({ method: 'PATCH' })).toBe(false);
+        // The partner: the same page, the same dirty state, a GET — so this cannot be passing because
+        // the guard is simply off.
+        expect(visitWasBlocked()).toBe(true);
+    });
+
+    it('does NOT warn on a prefetch, which fires the same cancelable event as a navigation', async () => {
+        // ⛔ A TRIPWIRE THAT WOULD HAVE SAT ARMED AND UNNOTICED. `Router.prefetch()` fires `before`
+        // exactly as `Router.visit()` does, so without the `prefetch` clause the first `<Link prefetch>`
+        // anywhere in the shell raises this dialog on HOVER. Nothing passes `prefetch` today — which is
+        // precisely why nothing would have caught it.
+        const wrapper = mountEncode(editPayload());
+        await typeInto(wrapper, 'Comments', 'Corrected text');
+
+        expect(visitWasBlocked({ prefetch: true })).toBe(false);
+        expect(visitWasBlocked()).toBe(true);
+    });
+
+    it('re-issues the cancelled visit when the keyer chooses to leave, rather than asking for a second click', async () => {
+        const wrapper = mountEncode(editPayload());
+        await typeInto(wrapper, 'Comments', 'Corrected text');
+        expect(visitWasBlocked()).toBe(true);
+        await nextTick();
+
+        const leave = wrapper.findAll('button').find((el) => el.text().includes('Leave and discard'));
+        expect(leave, 'no "Leave and discard" control is rendered').toBeDefined();
+        await leave!.trigger('click');
+
+        expect(mocks.visit).toHaveBeenCalledTimes(1);
+        expect(String(mocks.visit.mock.calls[0][0])).toBe('http://localhost/submissions');
+        // ⛔ AND THE GUARD MUST STAND DOWN FOR THAT RE-ISSUE, or the page cancels its own navigation and
+        // the keyer is trapped on it — the failure mode a leave guard is most likely to ship with.
+        expect(visitWasBlocked()).toBe(false);
+    });
+
+    it('stays put on the safe choice, and leaves the cancelled visit cancelled', async () => {
+        const wrapper = mountEncode(editPayload());
+        await typeInto(wrapper, 'Comments', 'Corrected text');
+        expect(visitWasBlocked()).toBe(true);
+        await nextTick();
+
+        const stay = wrapper.findAll('button').find((el) => el.text().includes('Stay on this page'));
+        expect(stay, 'no "Stay on this page" control is rendered').toBeDefined();
+        await stay!.trigger('click');
+
+        expect(mocks.visit).not.toHaveBeenCalled();
+        expect(wrapper.text()).not.toContain('You have unsaved corrections');
+        // Still armed: staying is not a decision to stop being warned.
+        expect(visitWasBlocked()).toBe(true);
+    });
+
+    it('warns on a real browser navigation too, and stops warning once the page is torn down', async () => {
+        const wrapper = mountEncode(editPayload());
+
+        expect(unloadIsWarned()).toBe(false);
+        await typeInto(wrapper, 'Comments', 'Corrected text');
+        expect(unloadIsWarned()).toBe(true);
+
+        // ⛔ THE LEAK HALF, AND IT IS A MEASURED CLASS IN THIS CODEBASE — `useMemberStreak` records that
+        // an un-unsubscribed `router.on` turned one navigation into forty requests. A leaked `before`
+        // handler is worse than a leaked fetch, because a dead copy can still cancel a live visit.
+        wrapper.unmount();
+        mountedWrappers.pop();
+
+        expect(unloadIsWarned()).toBe(false);
+    });
+
+    it('does not put a native prompt on top of the two-click discard confirm', async () => {
+        // ⚠️ `confirmDiscard()` reloads the page, which IS a real browser navigation — so arming the
+        // leave guard without disarming it here asks the keyer twice for one decision, the second time
+        // in a browser dialog this page cannot word. `location` is replaced so the reload is observable
+        // rather than fatal.
+        const reloads: number[] = [];
+        const original = window.location;
+        Object.defineProperty(window, 'location', { configurable: true, value: { reload: () => reloads.push(1) } });
+
+        try {
+            mocks.pageProps.errors = { baseline: 'This response was changed somewhere else.' };
+            const wrapper = mountEncode(editPayload());
+            await typeInto(wrapper, 'Comments', 'Corrected text');
+            expect(unloadIsWarned()).toBe(true);
+
+            const arm = wrapper.findAll('button').find((el) => el.text().includes('Discard my changes and reload'));
+            expect(arm, 'no discard control is rendered').toBeDefined();
+            await arm!.trigger('click');
+            const confirm = wrapper.findAll('button').find((el) => el.text().includes('Discard and reload'));
+            expect(confirm, 'no discard confirm is rendered').toBeDefined();
+            await confirm!.trigger('click');
+
+            expect(reloads).toHaveLength(1);
+            expect(unloadIsWarned()).toBe(false);
+        } finally {
+            Object.defineProperty(window, 'location', { configurable: true, value: original });
+        }
+    });
+
+    it('never warns in CREATE mode, where leaving the page SAVES rather than discards', async () => {
+        // ⛔ THE ASYMMETRY IS THE DESIGN. On the draft channel `dispose()` fires a last-chance keepalive
+        // when the component unmounts, so clicking Cancel persists the work — a prompt there would be a
+        // lie. This is also the control that stops the guard being "warn on everything".
+        const wrapper = mountEncode(createPayload());
+        await typeInto(wrapper, 'Comments', 'Something typed');
+
+        expect(visitWasBlocked()).toBe(false);
+        expect(wrapper.text()).not.toContain('You have unsaved corrections');
     });
 
     it('hydrates the answers from `editing`, not from `draft`', () => {

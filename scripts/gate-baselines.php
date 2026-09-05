@@ -355,16 +355,31 @@ MARKDOWN;
 
 if (isset($opts['dry-run'])) {
     fwrite(STDOUT, $document);
+    // M75 — the count reaches BOTH exits now. It used to reach only the write path, so a `--dry-run`
+    // with a broken pattern signalled by exit code alone.
+    report_missing($missing, false);
+
     exit($missing === 0 ? 0 : 1);
 }
 
-file_put_contents($root.'/docs/gate-baselines.md', $document);
-fwrite(STDOUT, "gate-baselines: wrote docs/gate-baselines.md from run {$runId}.\n");
+file_put_contents(gate_baselines_out(), $document);
 
+// ⛔ M75 — THE JUDGEMENT COMES BEFORE THE SUCCESS SENTENCE, AND THE WRITE STAYS WHERE IT WAS.
+// What this row was filed for is that `gate-baselines: wrote … from run N.` printed UNCONDITIONALLY,
+// three lines above the check that decides whether the run was any good — so a scrape with a broken
+// pattern announced success and then contradicted itself on stderr.
+// ⛔ AND MOVING THE WRITE IS THE FIX THAT WAS *NOT* TAKEN, deliberately. The row prescribes it; a
+// refusal-to-write was already adjudicated for THIS script during M70 and rejected, and it breaks
+// close-out step 3 — `scripts/next.php` stamps "regenerate it" until the file moves, so a refusal
+// leaves the hand-off nagging forever with no way to satisfy it. A NOT FOUND row in the file is a
+// LOUD artefact that says exactly which metric is unscraped; no file at all is a quiet one.
 if ($missing > 0) {
-    fwrite(STDERR, "gate-baselines: {$missing} metric(s) NOT FOUND — patterns need fixing.\n");
+    report_missing($missing, true);
+
     exit(1);
 }
+
+fwrite(STDOUT, "gate-baselines: wrote docs/gate-baselines.md from run {$runId}.\n");
 
 exit(0);
 
@@ -411,4 +426,52 @@ function gate_baselines_git(): string
     $override = getenv('GATE_BASELINES_GIT');
 
     return ($override === false || $override === '') ? 'git' : $override;
+}
+
+/**
+ * Where the document is written, overridable by `GATE_BASELINES_OUT` (M75).
+ *
+ * ⛔ WHY A THIRD SEAM, WHEN TWO ALREADY FELT LIKE ENOUGH. The row this closes is about what happens on
+ * the WRITE — a scrape with a broken pattern announcing success — and **every control this file had
+ * ran `--dry-run`**, for the good reason stated in `GateBaselinesTest`: the default action writes the
+ * repository's own tracked baselines, so a control that ran it for real would overwrite them with
+ * fixture garbage on every suite run. The branch the row is about therefore had **zero** coverage and
+ * no way to be given any. This seam is the smallest thing that changes that, and it is the same shape
+ * as the two above: it replaces a destination, never a guard. Every refusal still runs in full.
+ *
+ * ⚠️ AND THE INVARIANT IT MUST NOT COST US IS ALREADY ASSERTED: `GateBaselinesTest` ends by pinning the
+ * sha256 of `docs/gate-baselines.md` across every scenario. A control that pointed this at the real
+ * file would redden there rather than quietly corrupt the repository.
+ */
+function gate_baselines_out(): string
+{
+    $override = getenv('GATE_BASELINES_OUT');
+
+    return ($override === false || $override === '') ? dirname(__DIR__).'/docs/gate-baselines.md' : $override;
+}
+
+/**
+ * Announce the NOT FOUND count, from whichever exit got here (M75).
+ *
+ * ⛔ THE WORDING IS CONSTRAINED AND THE CONSTRAINT IS NOT COSMETIC. It must not contain the literal
+ * `**NOT FOUND**`: `GateBaselinesTest`'s happy-path case asserts the output does NOT contain that
+ * string, as a substring check, and the document's own miss row is spelled exactly that way. A
+ * diagnostic wearing the document's spelling would make that assertion unfalsifiable.
+ *
+ * ⚠️ STDERR ON BOTH PATHS, WHICH MATTERS MOST ON THE ONE THAT LOOKS LIKE IT MATTERS LEAST: `--dry-run`
+ * writes the whole document to stdout, so a diagnostic mixed in there would corrupt anything piping it.
+ */
+function report_missing(int $missing, bool $written): void
+{
+    if ($missing === 0) {
+        return;
+    }
+
+    fwrite(STDERR, sprintf(
+        "gate-baselines: %d metric(s) NOT FOUND — patterns need fixing. %s\n",
+        $missing,
+        $written
+            ? 'The file was written anyway and says so per row; fix the pattern and re-run before trusting it.'
+            : 'Nothing was written (--dry-run).'
+    ));
 }

@@ -19,6 +19,7 @@ import { ExpirationPlugin } from 'workbox-expiration';
 import { clientsClaim } from 'workbox-core';
 import { openDb } from './lib/db';
 import { replayOutbox } from './lib/replay';
+import { SHELL_CACHE, SHELL_EXPIRATION } from './lib/shell-cache';
 
 declare const self: ServiceWorkerGlobalScope & {
     __WB_MANIFEST: Array<string | { url: string; revision: string | null }>;
@@ -62,15 +63,16 @@ registerRoute(
 );
 
 // The shell HTML for /f/* navigations (serves the cached shell offline).
+//
+// ⚠️ M75 — THE NAME AND THE EXPIRY COME FROM `lib/shell-cache.ts` RATHER THAN FROM LITERALS HERE, and
+// that is the one route where it matters: `lib/brand-cache.ts` writes into this cache from the WINDOW
+// and renews this same clock, so a literal here would be one of two copies of a fact.
 registerRoute(
     ({ request, url, sameOrigin }) => request.mode === 'navigate' && sameOrigin && url.pathname.startsWith('/f/'),
     new NetworkFirst({
-        cacheName: 'guest-shell-html',
+        cacheName: SHELL_CACHE,
         networkTimeoutSeconds: 5,
-        plugins: [
-            new CacheableResponsePlugin({ statuses: [200] }),
-            new ExpirationPlugin({ maxEntries: 20, maxAgeSeconds: 7 * DAY }),
-        ],
+        plugins: [new CacheableResponsePlugin({ statuses: [200] }), new ExpirationPlugin({ ...SHELL_EXPIRATION })],
     }),
 );
 

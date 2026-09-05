@@ -53,6 +53,10 @@ const GATE_BASELINES_SCENARIOS = [
     'foreign-sha',
     'git-undecidable',
     'unreadable-sha',
+    // M75 — the first scenario that gets PAST the recency guard and then fails to scrape. Every one
+    // above shares `ci-log.txt`, which satisfies all twelve patterns, so until this one the
+    // `$missing > 0` branch could not be reached by any control at all.
+    'missing-metric',
 ];
 
 function gateBaselinesFixtureDir(): string
@@ -61,31 +65,58 @@ function gateBaselinesFixtureDir(): string
 }
 
 /**
- * Run the generator over one scenario, always in --dry-run, and return [exitCode, stdout+stderr].
+ * Run the generator over one scenario and return [exitCode, stdout, stderr] — SEPARATELY.
+ *
+ * ⛔ `proc_open` RATHER THAN `exec(… 2>&1)`, AND THE OLD FORM MADE ONE PROPERTY UNPROVABLE (M75). The
+ * helper used to merge the streams, so nothing here could tell stdout from stderr — and the property
+ * M75 added is exactly that the NOT FOUND diagnostic goes to STDERR while `--dry-run`'s document goes
+ * to STDOUT. That separation is the only reason `--dry-run` can be piped at all. A helper that cannot
+ * see it cannot test it, and a case asserting on the merged text would have passed either way.
+ *
+ * ⚠️ IT ALSO RETIRES THE `putenv()` DANCE. The environment is handed to `proc_open` as an array, so
+ * there is no process-global state to set and unset, and the Windows note the old helper carried —
+ * `exec()` runs through cmd.exe, which has no inline `VAR=value cmd` syntax — stops applying rather
+ * than being worked around.
+ *
+ * @param  array<string, string>  $env  extra environment, e.g. GATE_BASELINES_OUT
+ * @return array{0: int, 1: string, 2: string}
+ */
+function gateBaselinesRunStreams(string $scenario, string $arguments = '--dry-run', array $env = []): array
+{
+    $php = escapeshellarg(PHP_BINARY);
+    $dir = gateBaselinesFixtureDir();
+
+    $environment = array_merge(getenv(), [
+        'GATE_BASELINES_SCENARIO' => $scenario,
+        'GATE_BASELINES_GH' => $php.' '.escapeshellarg($dir.'/gh.php'),
+        'GATE_BASELINES_GIT' => $php.' '.escapeshellarg($dir.'/git.php'),
+    ], $env);
+
+    $command = $php.' '.escapeshellarg(base_path('scripts/gate-baselines.php')).' '.$arguments;
+    $pipes = [];
+    $process = proc_open($command, [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, base_path(), $environment);
+
+    expect(is_resource($process))->toBeTrue('could not start '.$command);
+
+    $stdout = (string) stream_get_contents($pipes[1]);
+    $stderr = (string) stream_get_contents($pipes[2]);
+    fclose($pipes[1]);
+    fclose($pipes[2]);
+
+    // Read the status from proc_close itself: a pipe hides the exit status.
+    return [proc_close($process), $stdout, $stderr];
+}
+
+/**
+ * The merged view, for the recency cases that predate the split and do not care which stream spoke.
  *
  * @return array{0: int, 1: string}
  */
 function gateBaselinesRun(string $scenario): array
 {
-    $php = escapeshellarg(PHP_BINARY);
-    $dir = gateBaselinesFixtureDir();
+    [$status, $stdout, $stderr] = gateBaselinesRunStreams($scenario);
 
-    putenv('GATE_BASELINES_SCENARIO='.$scenario);
-    putenv('GATE_BASELINES_GH='.$php.' '.escapeshellarg($dir.'/gh.php'));
-    putenv('GATE_BASELINES_GIT='.$php.' '.escapeshellarg($dir.'/git.php'));
-
-    $command = $php.' '.escapeshellarg(base_path('scripts/gate-baselines.php')).' --dry-run';
-
-    $output = [];
-    $status = 0;
-    // Read the status directly: a pipe hides the exit status.
-    exec($command.' 2>&1', $output, $status);
-
-    putenv('GATE_BASELINES_SCENARIO');
-    putenv('GATE_BASELINES_GH');
-    putenv('GATE_BASELINES_GIT');
-
-    return [$status, implode("\n", $output)];
+    return [$status, $stdout."\n".$stderr];
 }
 
 it('has every fixture the controls name, and the directory holds nothing else', function (): void {
@@ -136,6 +167,69 @@ it('accepts the nightly schedule run, which is hours old and zero commits behind
     //    with a head sha level with the trunk, so ANY wall-clock age check refuses it and a commit
     //    distance check passes it. That is the whole argument for distance over age, made executable.
     expect($status)->toBe(0, $output);
+});
+
+it('names the unscraped metric on stdout and the count on STDERR, and says nothing was written', function (): void {
+    // ⛔ THE HALF OF THE ROW THAT WAS FALSE, PINNED SO IT CANNOT BE RE-FILED. The row says the NOT
+    //    FOUND message "never prints at all" under --dry-run and that "the only signal is an exit
+    //    code". It is not: the DOCUMENT carries a row naming the failing metric, which is strictly
+    //    more actionable than the count. What was genuinely missing is the count itself, on stderr.
+    [$status, $stdout, $stderr] = gateBaselinesRunStreams('missing-metric');
+
+    expect($status)->toBe(1, $stdout.$stderr);
+    expect($stdout)->toContain('**NOT FOUND**');
+    expect($stdout)->toContain('citation-liveness-lint');
+
+    // ⛔ THE STREAM IS THE ASSERTION, NOT SCENERY. --dry-run's whole output IS the document, so a
+    //    diagnostic on stdout would corrupt anything piping it. Only the split helper can see this.
+    expect($stderr)->toContain('1 metric(s) NOT FOUND');
+    expect($stderr)->toContain('Nothing was written');
+    expect($stdout)->not->toContain('metric(s) NOT FOUND');
+});
+
+it('WRITES the file when a metric is unscraped, and does not call that success', function (): void {
+    // ⛔ THE ROW'S OWN REMEDY IS THE ONE THING THIS CASE REFUSES. It prescribes moving the write below
+    //    the judgement — a refusal-to-write — which M70 already adjudicated for this script and
+    //    rejected, and which strands close-out step 3: scripts/next.php stamps "regenerate it" until
+    //    the file moves, so a refusal nags forever with nothing that can satisfy it. A NOT FOUND row
+    //    in the file says WHICH metric is unscraped; an absent file says nothing.
+    // ⚠️ THIS IS THE FIRST CONTROL IN THIS FILE THAT EXERCISES THE WRITE AT ALL, via GATE_BASELINES_OUT.
+    //    Everything else runs --dry-run so the repository's own baselines are never touched — an
+    //    invariant the last case in this file still asserts by sha256, and which this seam preserves
+    //    by redirecting the destination rather than by weakening any guard.
+    $out = tempnam(sys_get_temp_dir(), 'gate-baselines-');
+
+    try {
+        [$status, $stdout, $stderr] = gateBaselinesRunStreams('missing-metric', '', ['GATE_BASELINES_OUT' => $out]);
+
+        expect($status)->toBe(1, $stdout.$stderr);
+        expect(file_get_contents($out))->toContain('**NOT FOUND**');
+
+        // ⛔ THE DEFECT, PINNED. This sentence used to print UNCONDITIONALLY, three lines above the
+        //    judgement — so the script announced success and then contradicted itself on stderr.
+        expect($stdout)->not->toContain('wrote docs/gate-baselines.md');
+        expect($stderr)->toContain('1 metric(s) NOT FOUND');
+        expect($stderr)->toContain('written anyway');
+    } finally {
+        @unlink($out);
+    }
+});
+
+it('still says so plainly when the scrape DID find everything — the non-vacuity partner', function (): void {
+    // Without this, "does not print the success sentence" is satisfied by a script that never prints
+    // it at all, which is the same defect wearing the opposite sign.
+    $out = tempnam(sys_get_temp_dir(), 'gate-baselines-');
+
+    try {
+        [$status, $stdout, $stderr] = gateBaselinesRunStreams('recent-push', '', ['GATE_BASELINES_OUT' => $out]);
+
+        expect($status)->toBe(0, $stdout.$stderr);
+        expect($stdout)->toContain('wrote docs/gate-baselines.md');
+        expect($stderr)->not->toContain('NOT FOUND');
+        expect(file_get_contents($out))->not->toContain('**NOT FOUND**');
+    } finally {
+        @unlink($out);
+    }
 });
 
 it('refuses a stale run on main, which every M39 arm accepts', function (): void {

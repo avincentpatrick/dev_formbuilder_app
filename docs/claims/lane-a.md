@@ -16,158 +16,91 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M74`, the ninth batched increment: four rows, and both product rows understate themselves (m74-batched-rows)
+## Status: NO ACTIVE CLAIM — `M74` is merged; four rows closed, five filed, and the two probes that mattered both refuted their first answer
 
-Taken 2026-09-05. Branch `m74-batched-rows`, cut from `origin/main` at this claim commit (parent
-`4ce319d`), PR into `main`. Four rows under `D13`, one hub slot spent on `R4`.
+`M74` closed **four** rows and filed **five**, spending **one** hub slot. `state.php` counts the tree; do
+not take that sentence's arithmetic on trust.
 
-| | Row | `docs/feature-backlog.md` | Hub |
-|---|---|---|---|
-| `R1` | Every object-valued answer renders as `json_encode` machine noise on the inbox, the export and the PDF | `:1872` (`M48`) | — |
-| `R2` | Nothing offers a way out of a refused correction except a browser reload | `:1583` (`M62`) | — |
-| `R3` | `brand-cache.test.ts` asserts `put` by CALL COUNT and never by key | `:6031` (`M73`) | — |
-| `R4` | `gate-baselines.php` trusts `gh run list --limit 1` to mean "newest", and it does not | `:6059` (`M73`) | ✅ `scripts/gate-baselines.php` |
+⛔ **THE ONE THING `M74` WOULD MOST LIKE TO HAND ON: A PROBE THAT AGREES IS NOT A PROBE THAT MEASURED.**
+Twice in one increment, the first measurement came back green and the second — built to discriminate rather
+than to confirm — refuted it. The cross-engine key-order probe over ASCII, Tagalog diacritics and one emoji
+**agreed on both engines**; pairing a fullwidth `＃` with an emoji **disagreed**, and shipping on the first
+result would have put a silent twin divergence into a published export. The A7 grid vector chose `true` and
+`0.1`, values where PHP's bare cast *happens* to equal the pinned rule, so the mutation meant to prove it
+**SURVIVED**. ⚠️ **Both are the H6a `3.5` shape** — a sample that cannot fail is indistinguishable from a
+rule that holds — and both were caught by a control rather than by a later increment.
 
-⛔ **NOT TAKEN, AND RECORDED HERE RATHER THAN AFTER.** `:5610` + `:5688`, the destructive-default class,
-would be a second hub-touching row. Their own remedy says *"the class has three members and should be
-fixed as a class"*, so taking only the `gate-baselines.php` third would falsify their census a fourth
-time. Their census is instead **corrected in place** by this increment.
+---
 
-### Evidence verified
+## RELEASED — `M74`, the ninth batched increment: four rows, and both product rows understated themselves (merged as PR #265, `966e63d`, 6/6 green with real step counts — Static analysis 24 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 
-**`R1` — held, and the row understates itself in three ways.** `SchemaValueFormatter.php:46-80`
-`displayValue()` — arms at `:52` (`YesNo`), `:59` (`isGeo`), `:66` (`hasOptions`); `scalar()` at
-`:151-154` is `is_scalar($value) ? $value : (string) json_encode($value)`, verbatim. `FieldType::isMedia()`
-exists at `:198-203` and this class never calls it. `PipingEligibility.php:99-119` excludes the two
-families in its own words, citing this fallback. ⛔ **But the row's stated MECHANISM is wrong**: an
-object answer never reaches the trailing `scalar($answer)` at `:77` — it hits the `is_array` branch at
-`:68-75` first, which applies `scalar()` **per element**. ⛔ **And "seven field types" is six**:
-`coerceLikertMatrix()` (`StructuralAnswerNormalizer.php:618-642`) stores scalar leaves, so a
-`likert_matrix` renders `4; 5; 3` — **no JSON at all, and the row labels silently dropped**. That is a
-third failure mode the row does not contain, and it is the dangerous one.
+**Shipped 2026-09-05.** Branch `m74-batched-rows`. Three of the four rows carried a false premise; two of
+the four carried a false *mechanism* as well, and in both cases the correction changed what got built.
 
-**`R2` — citations held; the row's own stated harm is FALSE.** Route `routes/tenant.php:741-742`; guard
-`SubmissionAnswerEditService.php:135-136` and `:202-203`; refusal `SubmissionEditController.php:135-139`
-(a **302**, not a 409/422); client `Encode.vue:729-757`, baseline snapshotted at `:704` and pinned by
-`encode.test.ts:791-816`. ⛔ **"The toast fades" is false** — `useToast.ts` auto-dismisses only
-`type !== 'error'` and the controller sends `'error'`, so it persists. The real defect is that the notice
-is **dismissible** and that the errors bag is keyed `baseline`, which is not a rendered field —
-`SubmissionEditController.php:113-114` says exactly that.
+### What shipped, per row
 
-**`R3` — held exactly, every figure.** Ten cases; `fakeCaches():19-36` models a key as `{ url } as Request`
-(`:28`) and a response as `({ status }) as Response` (`:36`); all four `put` assertions (`:81`, `:115`,
-`:162`, `:184`) are counts, and there is **no** `toHaveBeenCalledWith` on `put` anywhere in the file.
-`brand-cache.ts:168` re-`put`s under the original request. The mutant was traced through all ten cases:
-**10/10 green.**
+1. **`R1` — object-valued answers render as `json_encode` noise** (`M48`). The row describes three surfaces
+   and one failure mode. ⛔ **It is six surfaces and three failure modes.**
+   `SubmissionRowProjector::answerValues()` has **three** callers, two of them `GoogleSheetsConnector` and
+   `AirtableConnector`, so this was being written into **third-party systems of record**. And the third
+   failure mode is not in the row: a `likert_matrix` stores scalar leaves, so it rendered as `4; 5; 3` —
+   **no JSON at all**, every row label dropped, indistinguishable from a multi-select. ⛔ **A gate asserting
+   *"the output contains no JSON"* is GREEN against that**, which is why the vectors pin whole strings.
+   The row's *mechanism* was also wrong — an object answer hits the `is_array` join and is encoded per
+   element, never the trailing `scalar()` fallback — and the fix's position depends on that correction.
+   Shipped as `AnswerEnvelope`, a no-`default` `match` over all 31 types, with the TypeScript twin mirrored
+   in the same commit. 👤 **The user chose one rendering on every surface, connectors included.**
+2. **`R2` — no way out of a refused correction** (`M62`). ⛔ **The row's stated harm is false**: `useToast`
+   auto-dismisses only non-error toasts, so it persists. The real defect is a **dismissible** notice and an
+   errors bag keyed on a field the page never renders. A non-dismissible `MdsAlert` carrying the *server's*
+   sentence, plus a two-step discard ending in `window.location.reload()` — never an Inertia visit, because
+   `M62`'s whole finding was that `preserveState` had been misread once.
+3. **`R3` — `put` asserted by call count** (`M73`). Three key assertions, each where `entries[0]` is a
+   *different* wrong key. Scoped to the test file only, which is what kept it legal under `D13`.
+4. **`R4` — `gh run list --limit 1` is not "newest"** (`M73`, the hub row). Three arms; ancestry judged
+   **three-way**; the ceiling is **commit distance, not wall-clock age**, which is what preserves the
+   nightly-`schedule` carve-out.
 
-**`R4` — held, with one correction that makes the remedy smaller.** `gate-baselines.php:45-56`; the M39
-guard is exactly `:67`, `:89`, `:96`, and nothing reads `createdAt` or `headSha` except to print them at
-`:226`. Run `33184885256` is real and has every claimed property — measured: an ancestor of `origin/main`,
-**141** commits behind. ⛔ **The row misquotes its own command**: it already carries
-`--json databaseId,headSha,createdAt`, so **the recency data is fetched at `:47` and then thrown away**.
-⚠️ **CANNOT VERIFY by reproduction** — the mis-ordering does not reproduce today (five runs, strictly
-descending by `createdAt`); `gh` documents no ordering guarantee and offers no sort flag, and `8abe432`'s
-body records the incident contemporaneously.
+### How the prediction fared, including the parts that were wrong
 
-### Premise verified
+- ⛔ **RIGHT TO DISTRUST IT, AND IT WAS THE ONE I NAMED.** The claim said the least-trusted prediction was
+  that `ksort(SORT_STRING)` and `Object.keys().sort()` agree byte-for-byte. **They do not** — UTF-8 bytes
+  are code-point order, UTF-16 code units are not, and an astral character sorts before every BMP character
+  from U+E000 up. ⚠️ **And the first probe missed it.** Naming it in advance is what made the discriminator
+  non-negotiable instead of a nicety.
+- ⛔ **WRONG AND UNANTICIPATED: one mutation SURVIVED.** Replacing the grid arms' `scalarString(scalar(v))`
+  with a bare `(string)` cast reddened nothing, because the vector's values were ones PHP casts identically.
+  Corrected in its own commit rather than quietly.
+- ✅ **"PHPStan is reached but cannot move."** Held, and measured rather than asserted: the base files were
+  restored in place, re-analysed, and the count was identical. Restored afterwards by sha256.
+- ✅ **"Pint +4 files."** Exactly +4. ✅ **"Vitest cannot move."** 134, unchanged, as predicted — and the
+  claim's warning that an unchanged number reads as *"the front-end work did not land"* is why it is said
+  here too.
+- ⚠️ **The `citation-liveness` ledger was named as the second-riskiest gate and did not move at all** (17 of
+  18, unchanged). The gate that actually caught something was `BacklogProvenanceTest`, which nothing had
+  flagged: a row I wrote recorded *"Filed by `M74`"* twice, and exactly one may be the record.
+- ⚠️ **AND IT CAUGHT IT IN CI RATHER THAN LOCALLY, WHICH IS THE HONEST COST OF A SHORTCUT.** The full local
+  Pest run was **terminated as too slow**, and the suites the diff touched were run individually — a set
+  that does not include `tests/Feature/Docs/BacklogProvenanceTest.php`, because the diff *touched* the
+  backlog rather than that test.
 
-**`R1` — FALSE, and in the direction that matters.** The row believes four call sites reach
-`displayValue()` and that three surfaces are affected. ⛔ **`SubmissionRowProjector::answerValues()` has
-THREE callers** — `SubmissionExporter.php:133`, `GoogleSheetsConnector.php:414`, `AirtableConnector.php:421`
-— so the blast radius is **six surfaces**, and the noise is **written into third-party systems of record**
-where it cannot be un-pushed without a re-sync. ⛔ **And a second engine exists that the row does not know
-about**: `resources/public-runtime/engine/display-value.ts` is a byte-parity twin, publicly exported at
-`engine/index.ts:27`, with the same missing arms — its own header says *"an incomplete twin fails
-invisibly the moment anything reuses it."* A PHP-only fix ships a silent divergence.
+### What `M74` measured that no row had asked for
 
-**`R2` — held in substance, false in its precondition, and the correction makes the fix CHEAPER.** The row
-assumes a lifecycle obstacle. There is none: autosave is unconditionally off in edit mode
-(`Encode.vue:538`), so although `useServerAutosave.ts:429-435` **does** register `beforeunload`, its body
-early-returns at `:515-517` because `dirty` is never set. A hard navigation raises no native dialog. ⚠️
-**The neighbouring `M68` row at `:1568` is NOT the same work** — its `preventDefault()` path is unreachable
-here for that same reason; the two share only `Encode.vue`.
-
-**`R3` — held, and it is what keeps the batch legal.** The row's reason for being filed separately from the
-`latent` `:5874` row still stands. ⛔ **But its remedy's second half belongs to that row, not this one**: a
-`redirected: true` fake field is **inert alone** (nothing reads `redirected`; `brand-cache.ts:167` gates on
-`status === 200` and a followed redirect *is* 200), so making it bite means editing `refreshCachedShells()`
-— which would put two open rows on one non-hub file. Scoped to the key assertion only.
-
-**`R4` — HALF FALSE, and the false half is the remedy's stated reuse.** The row says `state.php` *"already
-computes exactly this staleness … and is not wired to the writer."* `commits_behind_trunk()` at
-`state.php:803` computes **distance only, never ancestry** — measured:
-`git rev-list --count <non-ancestor>..origin/main` returns a happy finite number (886). It cannot be
-`require`d (`state.php` executes and exits at `:90-137`), and shelling to it is **circular** —
-`derive_baselines():855` parses `docs/gate-baselines.md` to find the sha it measures, and this script is
-that file's writer. ⚠️ **A carve-out is part of the premise and the row omits it**: `ci.yml:59-61` and
-`gate-baselines.php:82-85` require `schedule` and `workflow_dispatch` runs on main to keep being accepted,
-so a wall-clock age check would break a designed feature to fix a different one.
-
-### Remedy verdict
-
-- **`R1` — works, understated, and its "product decision" is smaller than the row thinks.** Measured before
-  the test: the arm must sit **above** the `is_array` join at `:68` (the geo comment's own position
-  argument) and **below** the empty guard at `:48`. Shipping as a fifth no-`default` `match` enum
-  (`AnswerEnvelope`) rather than a predicate, because `isMedia():200-203` carries `default => false` — the
-  widening hazard four in-tree docblocks already name by line, and the reason this row exists at all.
-  ⛔ **`AnalyticsFieldEligibility` is NOT reusable**: its `:103` lumps `MultiSelect`/`CascadingSelect` with
-  the grids and would redden two existing vectors. The rendering is **not** a new call —
-  `FieldInput.vue:476-477` already decided `name ?? mime ?? 'Attached file'` in terms. 👤 **The user was
-  asked and chose one rendering on every surface, connectors included.** The signed-link and
-  matrix-column-shape halves are deferred as their own row.
-- **`R2` — works, and is smaller than the row implies.** No PHP change, no new prop; `MdsAlert` with
-  `dismissible` at its default `false` plus its `actions` slot, and `window.location.reload()`. ⛔ **Never
-  `router.visit(url, { preserveState: false })`** — `M62`'s whole finding was that `preserveState`'s
-  semantics had been misread once (`Encode.vue:692-702`), and betting the lost-update guard on a second,
-  opposite reading of the same flag is that bet again. ⚠️ **The row's ⛔ constraint is not gate-enforceable**:
-  happy-dom cannot tell a destroyed context from a re-key. Shipping the both-halves proxy and saying so
-  rather than implying a gate exists where only a comment does.
-- **`R3` — works, and buys exactly one discrimination.** The `put(request,…) → put(entries[0],…)` mutant.
-  The no-op mutant is already caught by the existing counts and the resume-skip mutant by the count at
-  `:115`; the new assertion is insensitive to that one, correctly. It will not be oversold in the release.
-- **`R4` — works, but not as prescribed.** The two git calls are **inlined**, for the circularity above.
-  Ancestry is **three-way, not two** — `0` on trunk, `1` refuse *"not an ancestor"*, anything else refuse
-  with a **different** message, because "cannot measure" read as "fine" is the family this repository has
-  measured five times. The ceiling is **commit distance, not wall-clock age**, which is what preserves the
-  nightly-`schedule` carve-out. Needs two runtime seams (`GATE_BASELINES_GH`, `GATE_BASELINES_GIT`) and a
-  by-ref `$status` on `sh()`: a `gh`-only seam proves the environment rather than the guard, and **git is
-  absent inside the app container** where Pest runs.
-
-Files: `app/Enums/AnswerEnvelope.php` (new) · `app/Enums/PipingEligibility.php` ·
-`app/Services/Submissions/SchemaValueFormatter.php` · `resources/public-runtime/engine/display-value.ts` ·
-`resources/public-runtime/__tests__/brand-cache.test.ts` · `resources/js/Pages/submissions/Encode.vue` ·
-`resources/js/Pages/submissions/encode.test.ts` · `scripts/gate-baselines.php` ·
-`tests/Feature/Docs/GateBaselinesTest.php` (new) · `tests/fixtures/gate-baselines/*` (new) ·
-`tests/Unit/Submissions/SchemaValueFormatterTest.php` · `tests/golden/templates/formatting.json` ·
-`tests/golden/templates/manifest.json` · `docs/piping-output-encoding-design.md` ·
-`docs/feature-backlog.md` · `docs/claims/decisions.md` · `PROGRESS.md` (own block only).
-
-Shared artefacts taken: `docs/piping-output-encoding-design.md`, `docs/feature-backlog.md`,
-`docs/claims/decisions.md`, `PROGRESS.md` (own block only). No `openapi.json`, no `phpunit.xml`, no
-top-level `tests/e2e/*.spec.ts`.
-Paired files taken: none.
-Namespaces spent: nothing from either namespace — no migration, no ADR, no `§D<n>`. `M74` only.
-
-Prediction, written before the run:
-- **Pest moves, roughly +19 cases** (8 golden vectors, ~5 unit, ~7 for `R4`). The **assertion** delta is
-  not forecastable and will be quoted from the run rather than predicted.
-- **Vitest cannot move.** The metric is a FILE count; `R1` adds no `.test.ts` (there is no
-  `display-value.test.ts` — the twin runs only through `golden-templates.test.ts`), and `R2`/`R3` add cases
-  to existing files. ⚠️ **An unchanged number here will read as "the front-end work did not land."**
-- **PHPStan is reached but should not move.** Only `R1` touches `app/`; `R2`/`R3`/`R4` cannot move it at
-  all, and that will be said rather than an unchanged number quoted. Asserted equal to
-  `docs/gate-baselines.md`, never restated.
-- **Pint +4 files.** **E2E, Storybook axe and the contract job cannot move** — no spec, no design-system
-  source, no route or response shape.
-- ⛔ **The one I most expect to be wrong: that `ksort(SORT_STRING)` and `Object.keys().sort()` agree
-  byte-for-byte over every reachable row-key set.** PHP compares UTF-8 bytes, JavaScript compares UTF-16
-  code units. ASCII and integer-like keys I have reasoned through and believe; non-ASCII I have **not
-  executed**, and `H6b` amendment `A8` exists precisely because a Filipino author's labels are real. A
-  two-container probe runs **before** the first vector is written.
-- ⚠️ **Second: `citation-liveness-lint`.** Its ledger sits one below its ceiling, so one rotten tier-1
-  citation minted during close-out reddens it — and `R1`'s row is *"cited by symbol, deliberately"*, so
-  re-citing it by `file:line` would be both a regression against its own choice and the likeliest way to
-  mint one.
+- ⛔ **A Vitest case whose green depends on machine load.** `challenge.test.ts` asserts a `setTimeout(0)`
+  fired during a long solve. It failed in a full 134-file run on a loaded host and passed **11/11** alone,
+  and `lib/challenge.ts` has **no imports at all**, so nothing in the diff could reach it. Filed rather than
+  waved through: a case that cannot tell *"the solver never yielded"* from *"the host was busy"* gets re-run
+  until it passes.
+- ⛔ **`guest-shell-assets`' own open question is ANSWERED without the row being taken.** Status 0 is
+  unreachable there, closed three independent ways — so an e2e assertion over natural traffic would be
+  **vacuously green by construction**. Recorded in the row so the taker does not re-derive the expensive
+  half. Its census is also a floor: four routes and three cacheability rules, one dead by configuration.
+- ⚠️ **The destructive-default class's census had rotted in three places** and is corrected in place rather
+  than by taking the row: twenty scripts not eighteen, four unaliased not three, and `gate-baselines.php`
+  *does* have an alias. Its remedy is now a **transplant** — `npm-audit-judge.php` implements it exactly.
+- ⚠️ **`R4`'s prescribed reuse of `state.php` is half false**, and all three reasons were measured:
+  `commits_behind_trunk()` computes distance and **never ancestry**, `state.php` cannot be `require`d, and
+  shelling to it is **circular** because it reads the very file this script writes.
 
 ---
 

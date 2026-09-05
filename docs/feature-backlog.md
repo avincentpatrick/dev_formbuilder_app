@@ -6266,3 +6266,21 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   EXTEND offline availability. ⚠️ **A second-order note for whoever takes it:** `maxEntries` bookkeeping is
   unaffected only because these keys already exist — a variant that ADDS a key this way would leave an entry
   Workbox cannot see at all. **Live.** Filed by `M74`.
+
+- **`minor` · A Vitest case asserts that a `setTimeout(…, 0)` fired, so its green depends on machine load
+  rather than on the code.** Found by `M74` during a full local suite run, and filed rather than fixed
+  because it is not this increment's row and the fix is a real design choice.
+  `resources/public-runtime/__tests__/challenge.test.ts`'s *"yields to the event loop on a long search"*
+  sets a zero-delay timer, awaits `solveChallenge()` over a deliberately long search, and asserts the timer
+  ran. ⛔ **Measured both ways**: it FAILED in a full 134-file run on a loaded host and PASSED 11/11 when the
+  file was run alone, and `lib/challenge.ts` has **no imports at all**, so nothing in that increment's diff
+  could reach it. **It is a load artifact, not a regression** — and that is exactly what makes it worth a
+  row: the case cannot distinguish *"the solver never yielded"* from *"the host was too busy to run a
+  macrotask in time"*, so it will go red on a slow CI runner and be re-run until it passes, which is the
+  habit every other control here exists to prevent. ⚠️ **The property under test is real and worth keeping**:
+  the solver runs inside `ApiClient.submit()`, which the service worker also calls, and a SW cannot spawn a
+  Worker — so blocking there stalls every other fetch it handles. The case documents that at its own site.
+  ✅ **The remedy is to assert the MECHANISM rather than a race**: drive the yield through an injected
+  scheduler seam and count the yields, or fake the timers so the assertion is deterministic. Both make the
+  test say *"the solver called its yield hook N times"*, which is the claim, instead of *"the event loop
+  happened to be free"*, which is the weather. **Live.** Filed by `M74`.

@@ -16,49 +16,248 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M71` is merged; the increment was forced into a surgery, and the gate that exists to notice one did not
+## Status: ACTIVE CLAIM — `M72`, the seventh batched increment: four rows closing six, and the first whose shape was decided by a *constraint* rather than by value (`m72-batched-rows`)
 
-`M71` closed **three** rows and filed **seven**, so the open count moved **81 → 85** with **zero
-`major`** and `UNMARKED=0`; severity bullets ever moved 181 → 188. `state.php` counts the tree; do not
-take that sentence's arithmetic on trust.
+Taken 2026-09-05. Branch `m72-batched-rows`, cut from `origin/main` at `7717435`, PR into `main`.
 
-⛔ **THE ONE THING `M71` WOULD MOST LIKE TO HAND ON: A GATE'S THRESHOLD CAN BE CALIBRATED ON A BIASED
-SAMPLE OF ITS OWN SUBJECT, AND THE BIAS IS INVISIBLE UNTIL SOMEBODY DOES THE THING WELL.** `R7`'s
-`DROP_BYTE_LIMIT` was derived from the full history of this file — surgeries at 161,528 bytes and up,
-ordinary drops at 14,340 and below, an order of magnitude apart. That gap is real and the arithmetic
-was right. But **every surgery in that sample was performed at the last possible moment**, because each
-was triggered by the ceiling rather than chosen; their size measures how long they were deferred, not
-what a surgery is. `M71` acted at **1,355 bytes of headroom** instead of waiting, moved 29,867 bytes,
-and `R7` classified it as an ordinary edit. **The calibration rewards leaving it late.** Filed, not
-re-cut — adjusting a threshold from one new data point inside the increment that produced it is the
-move the threshold exists to prevent.
+**Fifteen rows were verified read-only before this branch was cut.** The four taken close **six**
+backlog rows between them, because two of the four are a row plus the row that re-costs it.
 
-1. ⛔ **A HARNESS'S FIRST-RUN CHECK WAS WRONG, ON THE INCREMENT BUILDING THE CURE FOR EXACTLY THAT.**
-   The row says three of four surgeries had a defective first-run check. `tracker-surgery.php`'s slice
-   recovery was the fourth: it marked the *last* occurrences of a duplicated line rather than the removed
-   ones, so blank lines came back scrambled and A4 failed against a **correct** fixture. Caught by the
-   positive control, first run. Recovered by common prefix/suffix.
-2. ⛔ **AND THE CONTROLS WERE WRONG IN A WAY ONLY A MUTATION COULD FIND — THE `M30` FAMILY, THIRD
-   OCCURRENCE.** Weakening the counted multiset to a set left all eight green. They asserted
-   `toContain('A1 multiset')`, and that substring appears in the **pass** note as well as the failure, so
-   the cases were riding on an exit code that two other proofs also drive. A control asserting a string
-   that is true in both directions is not a control. Now keyed on failure-only text.
-3. ⚠️ **A DOCUMENTATION EDIT INSIDE THE MOVE WOULD HAVE FAILED A CORRECT SURGERY, AND THE FIX IS
-   SEQUENCING RATHER THAN A LOOSER CHECK.** Updating the footer note in the same operation makes its old
-   text a line that left the tracker and never arrived in the archive — precisely what the multiset
-   assertion refuses. It went in a separate commit. Worth knowing before the sixth surgery.
-4. ✅ **THE PAIRED-CONTROL DISCIPLINE PAID OFF FOUR TIMES.** Every fix here has two controls that cannot
-   pass for each other's reason: re-arm removed reddens both re-arm cases and leaves the `dispose()`
-   discriminator green, while removing the `disposed` guard reddens **only** the discriminator; the
-   storybook flag reddens its arm alone, while breaking the selector reddens the arm **and** the
-   discriminator.
+⛔ **`D13`'s ONE-HUB-ROW CAP — NOT VALUE — DECIDED THIS BATCH, AND THAT IS A FINDING RATHER THAN A
+COMPLAINT.** Five of the six highest-value live rows touch a hub file, and they touch *different* ones:
+`.github/workflows/ci.yml`, `scripts/mutate.php`, `scripts/backlog-triage.php`,
+`scripts/tracker-lint-controls.php`, `docs/data-dictionary.md`. The cap exists to prevent **collision**,
+and rows landing in five different files cannot collide with each other — so the rule as written is
+stricter than its own purpose, and it is now the binding constraint on batch composition rather than a
+formality. Filed as `D15` with a recommendation; **not** worked around, because `D13` is a user decision.
 
-⛔ **`D9` must never be started without an explicit answer.** Open decisions: `D1`, `D3`, `D4`, `D8`,
-`D9`, `D10`, `D11`, `D12`, `D14`. `D12` — whether to end the M-series — is still the one thing that needs
-the user, and `M71` deliberately did not touch it. **`D13` is answered, proven six times, and not to be
-re-asked.**
+⛔ **THE TRIAGE'S OWN SUGGESTED BATCH DOES NOT SURVIVE VERIFICATION, AND THREE OF THESE FOUR ROWS ARE
+NOT IN IT.** Of its four proposals, `M42`:4098 came back **latent** — its stated harm does not reproduce
+on today's four newest releases, and its remedy (b) is *falsified*: **zero of the newest nine** releases
+writes its first `###` heading as a one-line summary of its finding, which is the premise that remedy
+rests on entirely. `M68`:1736 came back **defer** — `M70` already settled the coupling it calls an
+unmade decision. The file says its order is operability and not priority; this is what that costs.
 
-⛔ **RUN `php scripts/state.php` FOR EVERY NUMBER.**
+⚠️ **AND THE ORDER HAS A SECOND COST NOBODY HAS NAMED: SIX CONSECUTIVE INCREMENTS (`M66`–`M71`) HAVE
+BEEN META/TOOLING WORK.** Product rows with measured respondent-facing harm sit below the tooling rows
+purely because their citations are older, not because they matter less. This batch is deliberately
+mixed, and row 2 is the one with a real user losing real data.
+
+Rows, quoted enough to identify them, all in `docs/feature-backlog.md`:
+
+1. **`minor` · `npm audit` cannot distinguish "the registry is unreachable" from "your dependencies are
+   vulnerable", and both hard-block a merge.** `:5280`, filed by `M69`. **Taken together with
+   `minor` · *"`ci.yml` is the USER'S FILE"* is asserted by one backlog row and by nothing else**
+   (`:5601`, filed by `M71`), which is the row that deferred it twice. **This is the batch's one
+   hub-touching row.**
+2. **`minor` · A failed conflict-review recovery can strand the respondent's only copy of their
+   answers.** `:1145`, filed by `M66`.
+3. **`minor` · Nothing proves the offline path `M61`'s redirect exists to protect.** `:4632`, filed by
+   `M61`.
+4. **`minor` · The design-system dev server has no root alias** (`:4553`, `M59`) **taken together with
+   `minor` · `M59`'s `ds:storybook` alias row rests on a false premise and the alias alone would not
+   work** (`:5630`, `M71`).
+
+⛔ **A CONSTRAINT THAT BINDS EVERY ROW AND IS AT ZERO HEADROOM:** `scripts/citation-liveness-lint.php`
+reports **18 rotten against `LEDGER_ROT_CEILING = 18`**. It is in `composer run quality`, so **any edit
+that moves a line `docs/feature-backlog.md` cites reddens a merge-blocking gate.** Each row's
+line-anchor exposure was checked *before* selection: `ci.yml:208` is cited and sits **above** row 1's
+edit, so it does not move; `README.md:169` is cited twice and sits **below** row 4's edit, so it does.
+
+### Evidence verified
+
+**Row 1 (`M69`:5280 + `M71`:5601) — both hold, and `:5601` understates its own history.**
+`.github/workflows/ci.yml` runs `npm audit --omit=dev --audit-level=high` as a single step inside job
+`Static analysis, style & security`, and that command exits **1** for *both* "a high advisory was found"
+and `npm error audit endpoint returned an error`. Two occurrences on consecutive increments, both
+named in the row: `M69`'s PR run `33818367732` (network timeout) and `M70`'s **post-merge run on the
+trunk** `33852073344` (503) — two different registry failures, one indistinguishable red.
+For `:5601`: the phrase *"`ci.yml` is the USER'S FILE"* appears **exactly once** in the repository, in
+the row asserting it. `CLAUDE.md` does not mention `.github/` at all. `git log --follow` returns **24**
+commits on that file, **seven** of them M-series increments inside their own pull requests (`M28`,
+`M39`, `M40`, `M46`, `M48`, `M49`, `M57`), and `git log -S'--omit=dev'` returns exactly one commit —
+`7154d5f` (#61) — so the flag on the very line in question **was written by an increment.** ⚠️ Under any
+broader reading the row *undercounts*: `I0`, `I5`, `I11b`, `H2`, `G5b1`, `F6a`, `E`, `C3`, `B2c`, `B1`
+and `A` edited it too, ~19 increment-authored commits in all. The error runs in the safe direction.
+
+**Row 2 (`M66`:1145) — holds byte-for-byte, every code claim.** `RuntimeSession.vue:267-269` discards
+the outbox row unconditionally for **every** `ApiError`, and it does so *before* `handleDrift()` at
+`:278`. `handleDrift`'s catch at `:193-218` only sets `notice.value`. A resolving session has autosave
+hard-disabled — `RuntimeSession.vue:136-137` (*"the durable copy is the parked outbox row"*) and
+`useAutosave.ts:103-112`, which returns a **fully inert** object when `enabled === false`.
+`outbox.ts:141-162`'s `discardRow` deletes the `media_queue` rows for that uuid in the same
+transaction, which is the row's own unrecorded ⚠️ and is exactly right.
+
+**Row 3 (`M61`:4632) — holds, and is stronger than filed.** The only cache assertion anywhere in
+`tests/e2e/` is a **non-emptiness** check (`public-runtime-offline.spec.ts:67-69`); no spec ever reads
+an entry's `.url`, and **no spec anywhere navigates a mis-cased slug**. The cache name
+`'guest-shell-html'` is confirmed at `sw.ts:68` and independently pinned at `lib/brand-cache.ts:42`.
+The offline harness the row credits the file with is all present: the secure-origin launch flag, the
+guest `storageState` bypass, the `serviceWorker.ready` wait, the `caches.open(...).keys()` poll and
+`context.setOffline`.
+
+**Row 4 (`M59`:4553 + `M71`:5630) — all citations resolve; one is misattributed.**
+`packages/design-system/package.json` has `"storybook": "storybook dev -p 6006 --no-open"`; the root
+has `ds:install`, `ds:tokens`, `ds:storybook:build` and `ds:test` and **no `ds:storybook`**.
+`packages/design-system/README.md:29` maps three of the four to root aliases and silently drops the
+unmapped one — though it is a one-sentence run-on and not the *"mapping table"* `M71` calls it, so the
+fix must **author** a table rather than edit one. `docker-compose.yml`'s `node` service publishes
+**5173 and not 6006**. ⚠️ `M71` cites the *"Blank page / Vite HMR under Docker"* note as belonging to
+the design-system README two sentences after citing that file; it is at **root** `README.md:134`, and
+it says the opposite of what the row uses it for — it describes a client-side URL problem on a server
+that binds *correctly*.
+
+### Premise verified
+
+**Row 1 — `:5601`'s premise holds and is corroborated from a direction it did not look.** No ADR covers
+`ci.yml` ownership, and `docs/claims/decisions.md` is *not silent* on the file: **`D8` proposes editing
+it and recommends an option.** So the standing decision record already treats it as editable. ⚠️ One
+caveat `:5601` omits and this claim keeps: `PROGRESS_ARCHIVE.md:544` records `7154d5f` as carrying
+**two decisions locked with the user** — the agent wrote the flag, the *policy* was user-ratified. So
+the production-only scope and the high/critical threshold stay exactly where they are; only the
+**conflation** is being fixed. ⛔ And `:5601`'s own remedy has two arms of which **only one survives**:
+writing *"`ci.yml` is out of bounds"* into `CLAUDE.md` would enshrine a claim seven increments' history
+refutes. The surviving arm is *re-cost the rows deferring on it*, whose entire diff is one file the
+batching contract excludes — which is why it is closed **with** row 1 rather than worked as a row.
+
+**Row 2 — ⛔ THE ROW'S CARVE-OUT IS FALSE AND ITS HEADLINE IS OVERSTATED, IN OPPOSITE DIRECTIONS.**
+*"the ordinary (non-resolving) path is NOT affected"* is **false**: a null-code `handleDrift` is
+reached from `form_updated` / `submission_version_superseded` — a **republish** — and autosave's
+primary key is `[options.formVersionId, options.slug]` pinned to `props.schema.version.id`, while
+`api-client.ts`'s `fetchSchema` is unpinned. `reap.ts:8-14` states the consequence in its own words:
+the pre-republish row *"is from that moment never written, read, or deleted again — by anything,
+including the TTL."* Autosave is never cleared on the `ApiError` path.
+And *"the respondent's **only** copy"* is **overstated**: `beginConflictReview` sets
+`resumeSeed.value = null` (`App.vue:415`) and a review session mints a **fresh** uuid, which `App.vue:372`
+says outright — so the row `handleSubmitError` discards is the one `submit()` just enqueued, not the
+parked one. The parked `conflict` row survives on disk. **What is actually lost is the review edits and
+any media picked during the review** — narrower than the headline, and still real.
+
+**Row 3 — one clause is FALSE and taking the row at face value produces a duplicate test.** *"nor that
+an installed PWA launched at its `start_url` finds the shell offline"* implies zero coverage;
+`public-runtime-offline.spec.ts:78-82` **already** proves an offline render at the `start_url` for the
+canonical entry path. The uncovered thing is the **mis-cased precondition**, not the `start_url`
+render. ⚠️ A second premise, newly falsified and not this row's fault: the row (and `M61`'s docblock)
+model `guest-shell-html` as having **one** writer. `lib/brand-cache.ts`'s `refreshCachedShells()` is a
+second, writing from the **page** with the default `redirect: 'follow'` and re-`put`ting under the
+**original** request key. It does not affect this row's test (the e2e tenant is unbranded, so the
+fingerprint compares equal and the sweep never runs) but it falsifies *"canonicalizing the origin
+response keeps the cache canonical"*. Filed rather than folded in.
+
+**Row 4 — ⛔ BOTH ROWS ARE PARTLY WRONG, IN OPPOSITE DIRECTIONS, AND ONE OF THE ERRORS IS THE SIZING
+ARGUMENT.** `M59`'s reason to care — *"which nothing currently documents"* — is **false**;
+`packages/design-system/README.md:24` documents `npm run storybook` in a fenced block, and `M71` kills
+it correctly. But `M71`'s own **mechanism** is **false**: it claims *"the package script binds without
+`--host`"*. Read out of the installed Storybook 8.6, `-h, --host` is declared with **no default value**,
+and Node's `listen({port, host: undefined})` binds the **unspecified** address — every interface, not
+loopback. **Publishing 6006 is sufficient on its own**; `--host 0.0.0.0` is belt-and-braces. `M71`'s
+conclusion (a compose-file change is required) survives; the argument it used to say the row is bigger
+than a one-liner does not. ⚠️ **And both rows inherited a stale framing neither checked:**
+`packages/design-system/README.md:6,17` still says *"Phase 0 seed … (Phase 0: `Button`)"* while the
+tree carries **39 component directories and 39 story files** — so the fix must repair that too, or ship
+a preview whose own README says it holds one component.
+
+### Remedy verdict
+
+**Row 1 — WORKS, and the exit code cannot be part of it.** `npm audit --omit=dev --audit-level=high`
+exits 1 for both outcomes, so the discriminator must be the **payload**: `npm audit --json` emits
+`metadata.vulnerabilities` when it measured and an object keyed `error` when it could not. ⛔ **The
+judge keys POSITIVELY on `metadata.vulnerabilities`, never on the absence of `error`** — otherwise an
+unrecognised npm shape lands silently in CLEAN, which is the same defect one layer up. Fetch and judge
+split into two steps; the fetch carries `continue-on-error: true` so npm's own exit 1 cannot kill the
+job before the judge runs. ⚠️ **Two things that silently revert the design if lost:** GitHub's default
+shell is `bash -e`, so the judge's non-zero must sit inside a `set +e` / `set -e` fence or `code=$?` is
+never read; and `--audit-level=high` moves out of the CLI **into** the judge, which is what makes the
+threshold testable instead of an argument nothing can drive. Three-way exit reused rather than
+invented: `0` judged clean / `1` blocked / `2` never measured, the contract
+`scripts/tracker-surgery.php` and `scripts/pre-push-guard.php` already publish. ⚠️ **Residual limit,
+stated rather than discovered:** exit 2 makes a *required* context green while nothing was measured —
+the vacuous-success family this repository catalogues. Annotated with `::warning::` and a step summary,
+and filed as `D16` plus its own backlog row. `D7`'s six required contexts are **job** names and the
+change stays inside `static-analysis`, so nothing becomes non-required.
+
+**Row 2 — the row's own remedy DOES NOT WORK; the one that does reuses an existing helper.**
+⛔ *"keep the row until recovery succeeds"* fails on the code: a retained row keeps `status: 'pending'`
+(`outbox.ts:65`), which is **exactly** what `listPending` selects for both the tab driver and
+`sw.ts:83/90` — so it is re-POSTed within seconds and re-parked as a *second* `conflict` row, or
+escalated to `needs_attention`. Making it work needs a new held state reaching `db.ts:127`,
+`outbox-status.ts:56` (a `Record<OutboxStatus, …>`, exhaustive by design), `reap.ts:210-212`, the retry
+guards and two list components. That is its own increment.
+✅ **What works:** `setAnswers(db, uuid, answers)` (`outbox.ts:207`) goes through `patchUnsent`, which
+refuses only `status === 'synced'` (`:440`) — so it writes **cleanly onto the parked `conflict` row**.
+On a failed recovery in a resolving session, flush the reviewed answers back onto the parked row and
+re-point the review's media to the parked uuid. A reload then re-surfaces the row **with** the edits:
+`beginConflictReview` already seeds from `row.answers` (`App.vue:414`), no driver touches a `conflict`
+row, and `reap.ts:212` already spares its media. Cost: `RuntimeSession` must learn the parked uuid,
+which lives at `App.vue:95` and is handed down today only as the boolean `:resolving` at `:535`; and
+`attachToSubmission` links only rows whose uuid is null (`media-queue.ts:72`), so the re-point needs a
+small helper. **Measured before the test was written**, as `M36`'s field requires.
+
+**Row 3 — reachable, and the guard is genuinely two-sided, which is unusual.** Delete the
+`if ($slug !== $form->public_slug)` block in `GuestFormController::mint` and **both halves flip red**:
+`/f/Clinic-Intake` becomes cached and `/f/clinic-intake` does not. ⛔ **But the sequence decides whether
+it measures anything.** A test whose first action is `goto('/f/Clinic-Intake')` runs before the SW
+controls the client — the spec's own `:48-51` comment says the first navigation is uncontrolled — so
+the SW never sees the mis-cased request and `not.toContain` passes **for the wrong reason**, exactly as
+it would with the 301 deleted. The order must be: canonical goto → await `serviceWorker.ready`
+(`sw.ts:74-75`'s `skipWaiting()` + `clientsClaim()` claim the open client) → mis-cased goto → wait for
+a non-empty cache → assert. ⛔ **And a non-vacuity floor is not optional**: the existing SW leg is a
+silent-skip `if (swAvailable)` branch, so a bare `not.toContain` is green if the secure-origin flag
+stops taking effect. ⛔ **Do not assert that the mis-cased URL renders offline** — after `M61` it
+deliberately cannot, and a test written from the row's summary would assert the opposite of the design.
+
+**Row 4 — `M59`'s remedy alone DOES NOT deliver what it claims; `M71`'s does, for half the reason it
+gives.** The alias resolves to `storybook dev -p 6006` inside the `node` service whose 6006 is
+unpublished, so nothing on the host can reach it — as a *documentation* fix it works, as a *preview* it
+does not. Publishing 6006 is the necessary and sufficient half (see the `--host` finding above).
+⛔ **And without a root-README line the whole fix is ungated:**
+`tests/Feature/Docs/DocumentedCommandDriftTest.php`'s `DOCUMENTED_COMMAND_DOCUMENT` is `'README.md'` at
+`base_path()` and **never opens the design-system README** — which is also why that file's mapping
+defect has been invisible since it was written. Adding the root line makes
+`it('prescribes only npm scripts that exist')` gate the alias; a **new arm** — *wherever the README
+prescribes a script resolving to `storybook dev -p N`, `docker-compose.yml`'s musl service must publish
+N* — gates the port, and fits the file's own doctrine since `documentedCommandMuslServices()` already
+reads `docker-compose.yml`.
+
+Files: `.github/workflows/ci.yml` · `scripts/npm-audit-judge.php` (new) ·
+`tests/Feature/Docs/NpmAuditJudgeTest.php` (new) · `tests/fixtures/npm-audit/*.json` (new) ·
+`resources/public-runtime/components/RuntimeSession.vue` · `resources/public-runtime/App.vue` ·
+`resources/public-runtime/lib/media-queue.ts` · `resources/public-runtime/__tests__/components.test.ts` ·
+`tests/e2e/public-runtime-offline.spec.ts` · `docker-compose.yml` · `package.json` ·
+`packages/design-system/package.json` · `packages/design-system/README.md` · `README.md` ·
+`tests/Feature/Docs/DocumentedCommandDriftTest.php` · `docs/feature-backlog.md` ·
+`docs/claims/decisions.md` · `PROGRESS.md` (own block only).
+
+Shared artefacts taken: `.github/workflows/ci.yml`, `docker-compose.yml`, `README.md`,
+`tests/e2e/public-runtime-offline.spec.ts`, `docs/feature-backlog.md`, `docs/claims/decisions.md`,
+`PROGRESS.md` (own block only). **`openapi.json` and `phpunit.xml` are NOT taken** — no `app/` route or
+resource changes, so no contract drift is expected.
+
+Paired files taken: **none.** Row 2 edits `resources/public-runtime/**`, and the 7(b-bis) gates that
+read across that boundary — `clipped-node-containment.test.ts` and `token-references.test.ts` — key on
+`KNOWN_UNGUARDED` membership and on `var(--mds-<ramp>-<step>)` usage respectively; neither is touched by
+a logic change with no template or CSS edit. ⚠️ Re-checked rather than assumed, because `M20` recorded
+this exact class costing 48 red tests.
+
+Namespaces spent: **nothing from either namespace** — no ADR, no migration prefix, no `§D<n>`.
+`docs/adr/0010` stays reserved for H1d.
+
+Prediction, written before the run so it can be measured against rather than explained afterwards:
+
+- **PHPStan will not move, and I will say so instead of quoting a number.** It scans `app`, `database`
+  and `routes`; this diff touches none of them.
+- **`openapi.json` will be byte-identical.** No `app/` change at all.
+- **Vitest's file count stays put and its test count rises by 2.** Row 2 adds cases to an existing file.
+- **Pest's count rises by the new `NpmAuditJudgeTest` cases plus one `DocumentedCommandDriftTest` arm.**
+- ⛔ **The one I most expect to be wrong is row 4's citation arithmetic.** `README.md:169` is cited
+  twice from `docs/feature-backlog.md` and `citation-liveness-lint` has **zero** headroom, so a
+  one-line insertion above it takes rot 18 → 20 and reddens `composer run quality`. I expect to get the
+  repair right on the second attempt, not the first, and I expect at least one *other* citation to move
+  that this prediction has not anticipated.
+- **Second most likely wrong: the ENOAUDIT fixture shape.** npm's stdout on an unreachable endpoint is
+  version-dependent and I am constructing it rather than capturing it from a real outage. The design is
+  built to survive that — an unrecognised shape must land in CANNOT-MEASURE — and the
+  `unrecognised-shape` fixture is there precisely to prove the fallback rather than the guess.
 
 ---
 

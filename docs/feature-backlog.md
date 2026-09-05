@@ -6056,3 +6056,27 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   reachable and self-consistent at the same time. The row is a request for an assertion that the two
   writers cannot disagree, not for a change to either. **Latent** — it needs a promote of a diverged
   draft, which no current path can produce. Filed by `M73`.
+- **`minor` · `gate-baselines.php` trusts `gh run list --limit 1` to mean "newest", and it does not — the
+  file written to end stale numbers was stamped from an EIGHT-DAY-OLD run, and its own guard cannot see
+  it.** Measured by `M73` (2026-09-05) during its own close-out, which is the only reason it was caught.
+  The no-`--run` branch takes `gh run list --branch main --workflow CI --status success --limit 1` and uses
+  `[0]` as the newest run. ⛔ **On one invocation it returned `33184885256` — a real, successful, `push`
+  run on `main` from 2026-08-28** — while the intended run `33958516257` had already concluded `success`
+  and appears first on every subsequent invocation of the identical command. The file was written, reported
+  success, and carried baselines from a tree eight days behind.
+  ⛔ **`M39`'s GUARD CANNOT CATCH THIS, AND THE REASON IS THE POINT.** That guard was added after this file
+  was stamped from a `pull_request` run on a feature branch, so it validates the SELECTED run's
+  `conclusion`, `event` and `headBranch` — and a stale run on `main` satisfies **all three**. The guard
+  checks *what kind of run this is* and never *whether it is the run we meant*. **Recency is the one
+  property it does not assert, and it is the one that failed.**
+  ✅ **There WAS a tell, and it is worth keeping**: the run also reported *"1 metric(s) NOT FOUND — patterns
+  need fixing"*, because a log that old predates a pattern the script now expects. So the only signal was a
+  line that reads like a scraper bug rather than like a wrong run — and on a run that happened to be recent
+  enough, there would have been no signal at all.
+  ⚠️ **The remedy is small and should not be `--run=` discipline**, because the default path is what every
+  close-out uses: assert the selected run's `headSha` is an ancestor of `origin/main` **and** within a
+  stated age or commit distance of it, and refuse rather than warn. `state.php` already computes exactly
+  this staleness for the file it writes, so the measurement exists and is not wired to the writer.
+  ⚠️ **Whoever takes it should also decide what a NOT FOUND row means for the write**: today the script
+  writes the file anyway and reports the count afterwards, which is the same accept-then-mention shape as
+  the `npm audit` judge row. **Live.** Filed by `M73`.

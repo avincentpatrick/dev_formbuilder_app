@@ -1,6 +1,8 @@
+import { openDB } from 'idb';
 import { describe, expect, it, vi } from 'vitest';
-import { BRAND_VERSION_KEY, isResumeShell, SHELL_CACHE, syncBrandedShellCache } from '../lib/brand-cache';
+import { BRAND_VERSION_KEY, isResumeShell, syncBrandedShellCache } from '../lib/brand-cache';
 import { openDb, type MeridianDb } from '../lib/db';
+import { SHELL_CACHE } from '../lib/shell-cache';
 
 /*
  * Increment H23b — the offline half of guest-runtime branding.
@@ -38,6 +40,35 @@ const respond = (status: number) => ({ status }) as Response;
 const OTHER_SHELL = 'http://acme.test/f/other';
 const CURRENT_SHELL = 'http://acme.test/f/intake';
 const RESUME_SHELL = 'http://acme.test/f/resume/tok-abc123';
+
+/**
+ * Every URL Workbox's expiry bookkeeping holds a timestamp for, in `SHELL_CACHE`.
+ *
+ * ⛔ THIS REACHES INTO A VENDOR SCHEMA ON PURPOSE (M75). `workbox-expiration` keeps its clock in an
+ * IndexedDB store this project never opens in production, and the whole defect the clock case exists
+ * for was that a write LOOKED like it renewed the entry and did not. An assertion on an injected
+ * seam would have passed against that defect too — the only thing that cannot is reading back what
+ * the vendor actually stored. If Workbox renames the store, this reddens, which is precisely when
+ * `refreshCachedShells()` would silently stop renewing anything.
+ *
+ * ⚠️ The store name is a CONSTANT inside `CacheTimestampsModel`, so unlike the Dexie databases above
+ * it cannot be made unique per case. The clock case therefore uses URLs no other case uses, and
+ * filters to them, rather than asserting over the whole store.
+ */
+async function stampedUrls(): Promise<string[]> {
+    const db = await openDB('workbox-expiration', 1);
+
+    if (!db.objectStoreNames.contains('cache-entries')) {
+        db.close();
+
+        return []; // nothing has written a timestamp yet — an empty set, not a failure
+    }
+
+    const rows = (await db.getAllFromIndex('cache-entries', 'cacheName', SHELL_CACHE)) as Array<{ url: string }>;
+    db.close();
+
+    return rows.map((row) => row.url).sort();
+}
 
 describe('syncBrandedShellCache', () => {
     it('does nothing when the cached shells already match this ramp', async () => {
@@ -94,10 +125,14 @@ describe('syncBrandedShellCache', () => {
 
     it('leaves a resume link alone while still refreshing the ordinary shell beside it', async () => {
         // ⛔ A resume shell's HTML carries `data-resume-token`, and that token is the whole credential
-        // for the resume read, which answers with the respondent's full answer map. Re-`put`ing it on
+        // for the resume read, which answers with the respondent's full answer map. Sweeping it on
         // every later boot RENEWS a credential-bearing document on disk indefinitely; skipping it lets
         // sw.ts's seven-day expiry collect it. Skipped and not purged — deleting it would cost offline
         // access to a form the respondent deliberately primed.
+        // ⚠️ M75 — "RENEWS … INDEFINITELY" ONLY BECAME TRUE IN M75, AND THIS COMMENT ASSERTED IT
+        // BEFORE THEN. A raw `cache.put()` renewed the bytes and never the expiry clock, so a swept
+        // shell and a skipped one aged out together and this skip changed nothing about lifetime. The
+        // case below is the one that can now tell those apart.
         const db = freshDb();
         await db.app_state.put({ key: BRAND_VERSION_KEY, value: 'old000000000' });
         const { caches, put } = fakeCaches({ [SHELL_CACHE]: [RESUME_SHELL, OTHER_SHELL] });
@@ -124,6 +159,52 @@ describe('syncBrandedShellCache', () => {
         // the ordinary shell's body under the token-bearing key — renewing on disk exactly the
         // credential-bearing document the skip above exists to let expire. The count is blind to it.
         expect(put).toHaveBeenCalledWith({ url: OTHER_SHELL }, { status: 200 });
+        await db.delete();
+    });
+
+    it('renews the Workbox expiry clock for the shell it re-puts, and for no other entry', async () => {
+        // ⛔ THE DEFECT THIS CASE EXISTS FOR PASSED EVERY OTHER CASE IN THIS FILE. Until M75 the sweep
+        // renewed bytes through the raw Cache API and never touched `ExpirationPlugin`'s IndexedDB
+        // timestamp, so a shell refreshed on day six was still deleted on day seven as though it had
+        // not been — and every assertion above, all of which watch `put`, was green throughout. What
+        // separates the two is reading back what Workbox actually stored.
+        //
+        // ⚠️ URLs UNIQUE TO THIS CASE. The expiry store's name is a constant inside Workbox, so it is
+        // shared with every other case in this file; `stampedUrls()` explains why that cannot be fixed
+        // by renaming. Filtering to `clock-` is what makes the assertion exact rather than merely
+        // non-empty.
+        const SWEPT = 'http://acme.test/f/clock-swept';
+        const CURRENT = 'http://acme.test/f/clock-current';
+        const RESUME = 'http://acme.test/f/resume/clock-token';
+
+        const db = freshDb();
+        await db.app_state.put({ key: BRAND_VERSION_KEY, value: 'old000000000' });
+        const { caches, put } = fakeCaches({ [SHELL_CACHE]: [CURRENT, RESUME, SWEPT] });
+        const doFetch = vi.fn().mockResolvedValue(respond(200));
+
+        const outcome = await syncBrandedShellCache({
+            brandVersion: 'new000000000',
+            db,
+            currentUrl: CURRENT,
+            caches,
+            fetch: doFetch as unknown as typeof fetch,
+            navigator: { onLine: true } as Navigator,
+        });
+
+        expect(outcome).toBe('refreshed');
+
+        // The positive half and both negative halves in one assertion. ⛔ The RESUME exclusion is the
+        // security half: renewing that entry's clock is what `isResumeShell()` exists to prevent, and
+        // it only became preventable in M75 — before it, the skip renewed nothing either way.
+        const clockEntries = (await stampedUrls()).filter((url) => url.includes('clock-'));
+
+        expect(clockEntries).toEqual([SWEPT]);
+
+        // ⚠️ ORDER IS DELIBERATE AND WAS CORRECTED AFTER MEASURING. With this above the clock
+        // assertion, deleting the `isResumeShell()` skip reddened this case on the CALL COUNT — so
+        // the clock half, which is what this case is for, was never the thing that caught it. A case
+        // whose subject is short-circuited by its scenery proves the scenery.
+        expect(put).toHaveBeenCalledTimes(1);
         await db.delete();
     });
 

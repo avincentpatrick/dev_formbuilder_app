@@ -905,3 +905,77 @@ it('409s a guest submit whose draft moved inside promote’s pre-lock window (dr
         ->and(Submission::findOrFail($draftId)->status)->toBe(SubmissionStatus::Draft)
         ->and($survived)->toBe($moved);
 });
+
+// ── M73 — the draft's pin survives a silent share-token re-mint ───────────────────────────────
+
+/*
+ * ⛔ THE DIVERGENCE THIS PINS, AND WHY NOTHING SAW IT BEFORE. `withFreshToken` re-mints on the 24-hour
+ * share-token expiry and `GuestFormController::mint()` returns `current_published_version_id`, so a
+ * session that outlives its token across a republish carries v2 while its draft is still pinned to v1.
+ * The 401 is raised in `EstablishGuestTenantContext`, BEFORE the controller, so the `form_updated` guard
+ * in `GuestDraftController` never sees it — which is the whole reason this is reachable.
+ *
+ * `updateDraft()` then wrote `form_version_id` and `answers_schema_checksum` onto the ANSWER row from the
+ * caller's version while the head row's `forceFill` (three fields, none of them the version) left the
+ * parent on v1. Two tables, two versions, and `GuestDraftResumeController` reporting the parent's value
+ * to a client whose schema is the other one.
+ *
+ * ⚠️ M72 FILED THIS AS `latent` AND SAID THE CONSEQUENCE WAS "ABSORBED BY THE VISIT GUARD AND THE CHECKSUM
+ * GUARD". BOTH OF THOSE RUN ONLY ON THE RESUME BOOT — the divergence is written on a live autosave tick
+ * inside an already-mounted session, where neither is reachable. What actually absorbed it was
+ * `promote()`'s server-side re-assert on the parent's pin, and it absorbed it by refusing the RESPONDENT a
+ * 409 at Submit, after which the client mints a fresh uuid and abandons the draft.
+ *
+ * ⚠️ AND THE ROW'S STATED DETERRENT IS FALSE, WHICH IS WORSE THAN IT BEING RIGHT. It warned that the
+ * "refuses loudly…" case above depends on the draft staying pinned. It does not: that case uses the
+ * ORIGINAL token, never re-minted, and `saveDraft`'s Stage-2a throws on the TOKEN's version before
+ * `updateDraft()` is entered. It never reads the parent's pin, so the obvious repair was UNGATED rather
+ * than forbidden — nothing in the suite went red either way. That is what this case fixes.
+ */
+it('re-pins an existing draft to ITS OWN version when a silent re-mint hands it a newer one', function (): void {
+    $f = draftFixture();
+    $uuid = Uuid::uuid7()->toString();
+
+    TenantContext::flush();
+    $this->postJson("http://acme.meridian.test/api/v1/public/f/{$f->token}/draft", [
+        'answers' => ['full_name' => 'Ada'],
+        'client_submission_uuid' => $uuid,
+    ])->assertCreated();
+
+    enterTenant($f->tenant->id);
+    $pinned = (string) Submission::query()->firstOrFail()->form_version_id;
+
+    // The author republishes: v2 becomes Published and v1 becomes Superseded.
+    enterTenant($f->tenant->id, $f->owner->id);
+    app(PublishService::class)->publish($f->form->refresh(), $f->owner);
+    $republished = (string) $f->form->refresh()->current_published_version_id;
+
+    expect($republished)->not->toBe($pinned);
+
+    // ⚠️ THIS IS THE RE-MINT, REPRODUCED SERVER-SIDE AND WITHOUT CLOCK TRAVEL. `draftShareToken()` mints
+    // `current_published_version_id`, which is the exact expression `GuestFormController::mint()` uses —
+    // so this token is byte-for-byte the kind `withFreshToken` obtains, and the expiry that triggers it is
+    // not what the defect depends on.
+    $reminted = draftShareToken($f->form->refresh());
+
+    TenantContext::flush();
+
+    // ⛔ RED BEFORE M73. This returned 200 and wrote v2 onto the answer row while the head row stayed on
+    // v1. It now refuses at the FIRST autosave, with the 409 the keyer already handles, instead of letting
+    // the divergence be written and surface at Submit ten minutes of typing later.
+    $this->postJson("http://acme.meridian.test/api/v1/public/f/{$reminted}/draft", [
+        'answers' => ['full_name' => 'Ada Lovelace'],
+        'client_submission_uuid' => $uuid,
+    ])
+        ->assertStatus(409)
+        ->assertJsonPath('error.code', 'submission_version_superseded');
+
+    // ⛔ AND THE STRUCTURAL HALF, WHICH IS THE ROW'S ACTUAL SUBJECT. A remedy that refused the save but
+    // still moved one of the two columns would satisfy the assertion above and leave the defect in place.
+    enterTenant($f->tenant->id);
+    $row = Submission::query()->firstOrFail();
+    $answers = SubmissionAnswer::query()->where('submission_id', $row->id)->firstOrFail();
+
+    expect((string) $row->form_version_id)->toBe($pinned)
+        ->and((string) $answers->form_version_id)->toBe($pinned);
+});

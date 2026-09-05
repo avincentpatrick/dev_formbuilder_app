@@ -80,6 +80,38 @@ final class SubmissionDraftService
     {
         $version = $payload->version;
 
+        // ⛔ AN EXISTING DRAFT IS SAVED AGAINST ITS OWN PIN, NEVER AGAINST THE CALLER'S VERSION (M73).
+        // `SubmissionController::store()` has always said the version is ASYMMETRIC on the draft branch —
+        // "passing v2 for a v1-pinned draft leaves a head row on v1 with an answer row on v2, a mismatch
+        // nothing rejects, which surfaces months later as a wrong PDF or a wrong export column" — and it
+        // added that "the guest channel avoids this only by accident of its version coming from the share
+        // token, which happens to be the draft's". THAT ACCIDENT STOPPED HOLDING. `withFreshToken`
+        // silently re-mints on the 24-hour share-token expiry and the mint returns
+        // `current_published_version_id`, so a session that outlives its token across a republish carries
+        // v2 while its draft is still pinned to v1. The 401 is raised in EstablishGuestTenantContext,
+        // BEFORE the controller, so the `form_updated` guard in GuestDraftController never sees it.
+        //
+        // Re-reading the pin here removes the accident rather than relying on it, and it is what the staff
+        // channel already does (SubmissionController resolves $version from the draft, so this is a no-op
+        // there). Two consequences, both wanted:
+        //   - Stage 1 below normalizes against the schema the draft is pinned to — which is the one the SPA
+        //     is still RENDERING — instead of against a graph the respondent has never seen.
+        //   - Stage 2a then refuses at the FIRST autosave after a republish, with the 409 the keyer already
+        //     handles, rather than letting the divergence be written and surface at Submit ten minutes of
+        //     typing later. The end state was always a 409 and an abandoned draft; this only makes it early.
+        //
+        // ⚠️ NOT the alternative repair. Moving `submissions.form_version_id` FORWARD would make the two
+        // tables agree by promoting the draft onto a graph the respondent never saw, and would change
+        // eleven downstream readers — the PDF, the export column union, the row projector, the inbox, the
+        // admin answer edit, the audit ledger and the outbound SubmissionCreated payload.
+        $existing = $payload->clientSubmissionUuid === null
+            ? null
+            : ClientUuidResolver::resolve($payload->clientSubmissionUuid, $version->form_id, $payload->respondentUserId);
+
+        if ($existing !== null && $existing->form_version_id !== $version->id) {
+            $version = FormVersion::query()->findOrFail($existing->form_version_id);
+        }
+
         // Stage 2a — a draft may only be saved against the published version (integrity runs for drafts).
         if ($version->status !== FormVersionStatus::Published) {
             throw SubmissionException::versionNotPublished();
@@ -98,20 +130,21 @@ final class SubmissionDraftService
         $checksum = AnswersContentChecksum::of($normalized);
         $completeness = DraftCompleteness::of($fields, $sections, $normalized);
 
-        if ($payload->clientSubmissionUuid !== null) {
-            $existing = ClientUuidResolver::resolve($payload->clientSubmissionUuid, $version->form_id, $payload->respondentUserId);
-            if ($existing !== null) {
-                // Grace window (Increment H12a): an EXISTING draft keeps autosaving even after the form closes,
-                // so a respondent mid-fill is never stranded — no start guard on this branch.
-                //
-                // Increment P3a — the ONE site that carries the lost-update baseline, because it is the only
-                // one where the caller genuinely read this draft before writing to it.
-                return $this->updateDraft(
-                    $existing, $version, $normalized, $checksum, $completeness, $payload->draftCurrentStep,
-                    checkBaseline: $payload->checkBaseline,
-                    baseline: $payload->baseContentChecksum,
-                );
-            }
+        if ($existing !== null) {
+            // Grace window (Increment H12a): an EXISTING draft keeps autosaving even after the form closes,
+            // so a respondent mid-fill is never stranded — no start guard on this branch.
+            //
+            // Increment P3a — the ONE site that carries the lost-update baseline, because it is the only
+            // one where the caller genuinely read this draft before writing to it.
+            //
+            // ⚠️ $version is the DRAFT'S pin here, re-read above — so updateDraft's write of
+            // `form_version_id` and `answers_schema_checksum` onto the answer row can no longer disagree
+            // with the head row's, which is the divergence M72 measured.
+            return $this->updateDraft(
+                $existing, $version, $normalized, $checksum, $completeness, $payload->draftCurrentStep,
+                checkBaseline: $payload->checkBaseline,
+                baseline: $payload->baseContentChecksum,
+            );
         }
 
         // ⚠️ AND THE TENANT IS A WIDER DOMAIN THAN THE SCOPE WE JUST SEARCHED (M11). The partial unique index

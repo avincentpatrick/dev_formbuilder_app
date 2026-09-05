@@ -55,18 +55,24 @@ const ARCHIVE = 'PROGRESS_ARCHIVE.md';
 // dozen. Say the number rather than the adjective; the adjective is what survived four ratchets
 // unexamined.
 //
-// ⛔ THE ~40 KB TARGET IS NOW ARGUABLE FOR THE FIRST TIME, AND THE SECTION BLOCKING IT HAS CHANGED
-// AGAIN — WHICH IS WHY THIS COMMENT NAMES THE MEASUREMENT AND NOT A SECTION IT INHERITED. The
-// previous version said the blocker was `## Current Status` at 67,982 bytes and 42%; by the time
-// this increment opened the file that section was 110,268 bytes and 56.3%, so the figure was stale
-// in the direction that mattered and the headroom was down to 3,970 — about one close-out from a
-// red trunk. What blocks the target now is `## Standing Rules` at 51,072 bytes, which is 53.9% of
-// the file and its largest section by a wide margin; `## Current Status` is ~8,100 and `## Next
-// Session` 5,644. Whether that section should move is a question about a CONSTITUTION rather than a
-// ledger — it holds live imperatives, not dated records, so it is not the same kind of move as the
-// four above — and it is deliberately NOT filed here: a comment naming the next obligation is the
-// thing that goes stale first, and this one has now been proved to do exactly that twice.
-// The headroom prints on every run, so a ceiling that has drifted is visible rather than inferred.
+// ⛔ THIS COMMENT HAS NOW GONE STALE THREE TIMES, EXACTLY AS ITS OWN LAST SENTENCE PREDICTED, AND THE
+// THIRD IS RECORDED HERE RATHER THAN QUIETLY OVERWRITTEN. It has twice named a "blocking section" and
+// twice been wrong within a few increments: it said `## Current Status` at 67,982 bytes and 42%, then
+// 110,268 and 56.3%, then — the version this replaces — that `## Standing Rules` blocked the target
+// while `## Current Status` was "~8,100". When M71 measured it, `## Current Status` was 42,737 bytes
+// and 33.2% and had regrown +3,919 bytes in a single day. `## Standing Rules` is the only figure that
+// has ever held, at 51,072, because it is byte-frozen. ⚠️ THE LESSON IS NOT "MEASURE AGAIN": it is
+// that a section name in a comment is a forward claim, and this file has no way to keep one true.
+// Read the sizes off the tree — the headroom prints on every run — and treat any section named here
+// as a date-stamped observation rather than as the next obligation.
+//
+// ⛔ AND R7 DID NOT ARM ON M71'S SURGERY, WHICH IS THE MORE USEFUL FINDING AND IS FILED AS ITS OWN
+// ROW. That move dropped 29,867 bytes — real, deliberate, and BELOW `DROP_BYTE_LIMIT`. The threshold
+// below was sized against a history whose surgeries were all enormous, and they were enormous because
+// each was left until the ceiling forced it. M71 acted at 1,355 bytes of headroom instead of waiting,
+// and the reward for that is a drop the gate classifies as an ordinary edit. **The calibration
+// rewards leaving it late.** Not adjusted here: re-cutting a threshold from a single new data point,
+// inside the increment that produced it, is the move the threshold exists to prevent.
 const TRACKER_BYTE_CEILING = 130000;
 
 // ⛔ TWO THRESHOLDS, BECAUSE THE LINE ONE IS BLIND TO THE ONLY SURGERY THIS GATE HAS EVER SEEN.

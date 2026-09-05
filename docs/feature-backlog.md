@@ -5701,6 +5701,16 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   and should be fixed as a class**, with a `--help` arm and a refusal on any unrecognised option; the
   refusal is the half that matters, and it must read `$argv`, because `getopt()` cannot report what it
   discarded. **Live.** Filed by `M71`.
+  ⚠️ **A THIRD INDEPENDENT OCCURRENCE, `M73` (2026-09-05), AND THE FIRST AGAINST `gate-baselines.php`
+  RATHER THAN `backlog-triage.php`.** Closing out `M73`, `php scripts/gate-baselines.php --help` was run to
+  read the usage before regenerating — there is no help arm, so it fell straight through to the write path,
+  rewrote `docs/gate-baselines.md` and reported success. ⛔ **What makes this worth adding rather than
+  merely tallying: it wrote the CORRECT content.** The script's no-`--run` branch finds the latest
+  successful run on `main`, which happened to be the very run the close-out wanted — so the accident was
+  invisible in the diff and would have been invisible in review. **A destructive default that usually
+  produces the right answer is harder to notice than one that corrupts**, and it is why the remedy's
+  refusal half matters more than its `--help` half. ⚠️ Note also that all three occurrences so far were an
+  operator asking the script how to run it; none was a typo.
 
 - **`minor` · `docs/backlog-triage.md` is generated stale by its own close-out, and the drift is on the
   trunk now.** Measured during `M71`'s fan-out: `69eaaf2` added 13 lines to `docs/feature-backlog.md` in

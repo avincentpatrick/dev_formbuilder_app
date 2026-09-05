@@ -1791,6 +1791,17 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   takes this must make the export part of the control**, or it measures the committed file and proves
   nothing — and should note the arm's floor is `>= 1` with exactly one route in scope today, so a
   generalized assertion could be satisfied by that one route forever.
+  ⚠️ **RE-VERIFIED AND DELIBERATELY NOT TAKEN BY `M73` (2026-09-05).** The mechanism holds exactly:
+  `$declared` is consumed only for its emptiness, HTTP status is a single slot, and the two causes collapse
+  onto one `409`. `M70`'s correction above also holds at both ends, and `M73` adds nothing to it — which is
+  itself the finding, because it means **the only thing left for a taker is the in-suite gate, and the
+  repo-level one is already green-or-red correctly.** Recorded so the next fan-out does not re-derive this
+  a third time.
+  ⛔ **ONE COST `M70` DID NOT NAME, AND IT IS A PROPERTY CHANGE RATHER THAN A LINE CHANGE.**
+  `tests/Feature/Api/OpenApiContractTest.php` advertises *"No DB."* in its own header and applies no
+  `RefreshDatabase`; `ci.yml` provisions and migrates a database for the export because it introspects the
+  models for response shapes. **So "make the export part of the control" converts a deliberately DB-free
+  file into a DB test**, which is a decision about that file rather than a step in this row.
 
 - **`minor` · The sync surface's read and write are gated on different permission families, so no single
   non-admin role can complete the offline loop.** Filed 2026-08-25 by M13. `GET /sync/manifest` needs
@@ -5649,7 +5660,19 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   it means the `[tracker-surgery]` marker is currently unverifiable for any well-timed surgery — which is
   the `M47`/`M48` hand-forward re-opening in a new form. **Live.** Filed by `M71`.
 
-- **`minor` · `scripts/mutate.php`'s concurrent-suite guard passes VACUOUSLY when Docker is unreachable.**
+- ✅ **CLOSED BY `M73` (2026-09-05), TOGETHER WITH THE `M72` ROW BELOW — `minor` · ~~`scripts/mutate.php`'s concurrent-suite guard passes VACUOUSLY when Docker is unreachable.~~**
+  The probe now captures the exit status and tests `is_numeric()`, matching `preflight.php`.
+  ⚠️ **THE ROW NAMED ONLY HALF THE FIX, AND THAT HALF ALONE IS NOT SUFFICIENT.** *"The hardened form
+  already exists one file away"* is true as far as it goes, but `preflight.php`'s probe also carries
+  **`2>&1`** and this one did not — so porting `is_numeric` alone would have refused while printing an
+  EMPTY diagnostic, naming nothing at the moment a reader most needs the cause. Both halves are the guard.
+  ✅ **And the `git status` sibling is closed with it.** git is ABSENT from the app container while
+  `/var/www/html/.git` is visible over the bind mount, so BOTH `git status --porcelain` checks passed
+  vacuously in any in-container invocation — `trim('') !== ''` is false whether the tree is clean or git
+  could not run at all. Both now capture the status, including the post-restore one whose message is *"Do
+  not trust this tree."*
+  ⚠️ **The two rows could not be batched as two rows** — one hub file, `D13` — and merging them into one
+  cost a single hub slot instead of two increments. Closed by `M73`.
   Found by a read-only agent during `M71`'s fan-out, in the file this project wrote to end vacuous
   successes. Its `R1` probe shells a `docker exec` and **does not capture the exit status**: when the
   daemon is down, the container is renamed, or `--container` is mistyped, `exec` returns empty output,
@@ -5773,8 +5796,24 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   README's own *"Blank page / Vite HMR under Docker"* note. A working preview needs the port published and
   a host bind, in a live-stack file the row never mentions. **Live.** Filed by `M71`.
 
-- **`minor` · The `/f/*` navigation route caches an opaqueredirect, because it is the one route whose
-  sibling filters for `200` and it does not.** Measured by `M72` (2026-09-05) at the browser while
+- ✅ **CLOSED BY `M73` (2026-09-05) — `minor` · ~~The `/f/*` navigation route caches an opaqueredirect, because it is the one route whose sibling filters for `200` and it does not.~~**
+  The `/f/*` route now carries the sibling `guest-schema` route's own
+  `CacheableResponsePlugin({ statuses: [200] })`. **Measured at the browser, both arms, entries printed per
+  arm**: without it the shell cache holds `/f/Clinic-Intake` at `status 0, opaqueredirect` beside the
+  canonical `status 200, basic`; with it, one key.
+  ⛔ **THE ROW'S MECHANISM WAS FALSE, AND ITS EXCULPATION WAS FALSE IN THE DIRECTION THAT MATTERED.**
+  *"Workbox's status filter never runs"* — it does. `NetworkFirst`'s constructor tests
+  `'cacheWillUpdate' in p`, **not** whether any plugin is present, and `ExpirationPlugin` declares only
+  `cachedResponseWillBeUsed` and `cacheDidUpdate` — so `cacheOkAndOpaquePlugin` **is** prepended and it
+  admits `status === 200 || status === 0` **by design**. The stub was cached because a filter ALLOWED it,
+  not because none ran. Verified in the shipped `public/build/sw.js`, not only in `node_modules`.
+  ⛔ **And the row credited the offline mis-cased render to the browser following the cached stub.** If
+  that were the mechanism, dropping the stub would break the offline path. It does not: with no stub at all
+  the render still passes. **What actually delivers the guarantee is NOT established** — filed below rather
+  than guessed at a third time on the one route that has already produced two confident wrong models.
+  ⚠️ **The premise that deferred it was also false**: *"the fix is in `sw.ts`, a hub file"*. `sw.ts` is
+  cited by **two** open rows against a `HUB_THRESHOLD` of 3, and the triage `M72` regenerated in its own
+  close-out lists it as a NON-hub cite. The `D13` budget never bound. Closed by `M73`. Measured by `M72` (2026-09-05) at the browser while
   building the proof `M61` asked for, and it is the reason that proof came back saying something other
   than what the row it closed expected. After a mis-cased entry, `guest-shell-html` holds **two** keys:
   `/f/clinic-intake` at `status 200, type 'basic'` and `/f/Clinic-Intake` at `status 0,
@@ -5790,8 +5829,21 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   and `D13` allows one hub-touching row per batch, which `M72` spent on `ci.yml`. The remedy is the
   sibling route's own line. **Live.** Filed by `M72`.
 
-- **`minor` · `scripts/mutate.php`'s `run_pest()` MANUFACTURES a `SURVIVED` verdict when Docker is
-  unreachable, which is worse than the guard defect filed beside it.** Found by a read-only agent during
+- ✅ **CLOSED BY `M73` (2026-09-05), TOGETHER WITH THE `M71` ROW IT SHARES A FILE AND A SHAPE WITH — `minor` · ~~`scripts/mutate.php`'s `run_pest()` MANUFACTURES a `SURVIVED` verdict when Docker is unreachable, which is worse than the guard defect filed beside it.~~**
+  `run_pest()` now returns `measured` — the presence of a `Tests:` summary line, which is the only positive
+  evidence that Pest itself spoke — and both call sites refuse an unmeasured run. The exit code stays a
+  **did-it-run** signal and never a **failure** signal, which is the distinction this file's own comment
+  already drew and which the row quoted correctly.
+  ⛔ **THE MUTANT ARM RESTORES BEFORE IT REFUSES, AND NEITHER ROW NAMED THIS.** `run_pest()` is called a
+  second time AFTER the mutant is on disk, so the obvious refusal — written inside `run_pest()` — would
+  abort between the write and the restore and leave the mutant behind, which is exactly how `M62` corrupted
+  a tree. The refusal therefore lives at the CALL SITE, with the original bytes in scope.
+  ⚠️ **One correction**: `run_pest`'s command ends in `2>&1`, so its capture is NON-empty — the daemon
+  error IS caught. The outcome was unchanged, but the mechanism differs from the concurrent-suite probe,
+  which had no `2>&1`, **so the two sites needed different guards** and neither row said so.
+  Six controls in `tests/Feature/Docs/MutateHarnessTest.php`, driven through a `MUTATE_DOCKER` stub seam
+  because the discriminator needs a reachable php-less runtime and none exists on a CI runner. Four
+  mutations, all CAUGHT, each reddening a DIFFERENT case. Closed by `M73`. Found by a read-only agent during
   `M72`'s fan-out, in the same file and the same shape as the concurrent-suite row above. `run_pest()`
   calls `shell_out()` without the status argument, so a failed `docker exec` returns `''`; no line starts
   with `Tests:`, `$failed` stays `0`, and the baseline gate `if ($baseline['failed'] > 0)` **passes an
@@ -5826,8 +5878,26 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   not heal already-cached shells, and that is a premise `M61` recorded as settled.
   **Latent.** Filed by `M72`.
 
-- **`minor` · A draft is pinned to TWO different form versions in two tables after a silent share-token
-  re-mint.** Found during `M72`'s fan-out while verifying the `draft_answers` key row, and it is the
+- ✅ **CLOSED BY `M73` (2026-09-05) — `minor` · ~~A draft is pinned to TWO different form versions in two tables after a silent share-token re-mint.~~**
+  `saveDraft()` now re-reads the pin from the EXISTING draft before Stage-2a, so an existing draft is saved
+  against its own version and never the caller's — which is what the staff channel already does, making
+  this a no-op there. `SubmissionController::store()` had already recorded that *"the guest channel avoids
+  this only by accident of its version coming from the share token, which happens to be the draft's"*; that
+  accident is now removed rather than relied on.
+  ⛔ **THE ROW'S STATED DETERRENT WAS FALSE, WHICH IS WORSE THAN IT BEING RIGHT.** It warned that
+  `GuestDraftRuntimeTest`'s *"refuses loudly…"* case depends on the draft staying pinned. That case uses the
+  ORIGINAL token, never re-minted, with no clock travel, and `saveDraft`'s Stage-2a throws on the TOKEN's
+  version before `updateDraft()` is entered — it never reads the parent's pin at all. **The obvious repair
+  was UNGATED rather than forbidden**, and nothing in the suite would have gone red either way.
+  ⛔ **And the premise was materially false.** *"Absorbed by the visit guard and the checksum guard"* — both
+  run only on the resume boot, while the divergence is written on a live autosave tick inside an
+  already-mounted session, where neither is reachable. What absorbed it was `promote()`'s server-side
+  re-assert, and it absorbed it **by refusing the RESPONDENT a 409 at Submit**, after which the client mints
+  a fresh uuid and abandons the draft. The row called itself `latent`; the outcome is live and
+  respondent-facing, and the fix only makes the refusal EARLY.
+  ✅ **It also understated itself — three live copies, not two.** The third is the resume token's `vid`
+  claim: signed, 30-day, and emailed to the respondent. Closed by `M73`; 510 passed across
+  `tests/Feature/Submissions` and `tests/Feature/Guest`, and the mutation was CAUGHT. Found during `M72`'s fan-out while verifying the `draft_answers` key row, and it is the
   server-side root of that client-side symptom rather than a restatement of it.
   `SubmissionDraftService` moves `submission_answers.form_version_id` and `answers_schema_checksum` to
   the saving version, while the `forceFill` on the parent leaves `submissions.form_version_id` at its
@@ -5905,3 +5975,74 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   is a branch-protection change. ⚠️ **The honest gap is that nobody is obliged to read the annotation.**
   A stronger form would fail the step on N consecutive unreachable runs, which needs state the workflow
   does not have today. Recorded as `D16`. **Live.** Filed by `M72`.
+- **`minor` · What actually delivers the offline mis-cased render is unknown, and TWO confident models of
+  it have now been wrong.** Measured by `M73` (2026-09-05) while closing the `/f/*` opaqueredirect row, and
+  filed rather than guessed at because this exact route has already produced two wrong answers that were
+  each good enough to write a test from. `M72` recorded that offline entry at a mis-cased url survives
+  *"because the browser follows a cached opaqueredirect to the canonical entry"*. ⛔ **That is refuted:
+  with the strict status filter in place the stub is never cached at all, the shell cache holds exactly one
+  key, and the offline render still passes.** So the guarantee does not depend on the cached stub, and
+  nothing in this repository now describes what it does depend on. ⚠️ **The candidates are not equivalent
+  and the difference is testable**: Chromium's own HTTP cache may hold the 301 and redirect before the SW
+  handler's rejection matters, or the navigation may be re-driven after `respondWith` rejects. ⛔ **Why it
+  matters rather than being trivia**: the surviving mechanism decides whether the guarantee is robust to a
+  cache eviction, to a `Cache-Control` change on the 301, or to the seven-day expiry — and a mechanism
+  nobody has named cannot be protected by a gate. The instrument already exists
+  (`tests/e2e/public-runtime-offline.spec.ts` reads cached responses by `status` and `type`); what is
+  missing is a probe of the REDIRECT path with the SW's own cache emptied. **Live.** Filed by `M73`.
+
+- **`minor` · `guest-shell-assets` has the identical missing status filter, and no row has ever named it.**
+  Found by `M73`'s fan-out while verifying the `/f/*` row, which framed itself as *"the one route whose
+  sibling filters for `200`"*. ⛔ **There are THREE routes and TWO of them lacked the strict filter** — the
+  headline was a 1-of-2 framing of a 1-of-3 fact, and closing `/f/*` leaves `guest-shell-assets` as the
+  only unfiltered one. It is a `StaleWhileRevalidate` over `/build/`, whose constructor prepends the same
+  permissive `cacheOkAndOpaquePlugin`, so it too stores `status === 0`. ⚠️ **Sized `minor` and NOT folded
+  in, for a stated reason**: `/build/` is same-origin and hashed, so a status-0 response there needs a
+  redirect or an opaque response that this route's matcher makes hard to reach — the exposure is far
+  narrower than `/f/*`'s and it shares `maxEntries: 80` rather than 20. ⚠️ **What is NOT known is whether
+  it is reachable at all**, and that is the row: either it is, and it is the same one-line fix, or it is
+  not, and the route should say so where the next reader will look. **Live.** Filed by `M73`.
+
+- **`minor` · The triage generator silently drops any citation written as a PARTIAL path, and a partial
+  path is strictly worse than a bare filename.** Found by `M73`'s fan-out. `resolve_token()` in
+  `scripts/backlog-triage.php` branches on whether the token contains a `/`: if it does, the ONLY
+  resolution attempted is `is_file($token)` against the literal string, so a row citing
+  `` `lib/brand-cache.ts` `` resolves to nothing, because the real path is
+  `resources/public-runtime/lib/brand-cache.ts`. ⛔ **The bare-basename index — which WOULD have resolved
+  `` `brand-cache.ts` `` unambiguously — is skipped precisely BECAUSE the citation was more specific.**
+  ⛔ **The consequence is not cosmetic.** Such a row is reported as *"no file harvested"*, can never be
+  collision-checked into a batch (`render_batch` skips it by construction), and **contributes nothing to
+  any file's hub degree** — so it silently biases the hub set that `D13` and `D15` both turn on. At least
+  one open row is in this state today. ✅ **The remedy is small and has a decision in it**: try the
+  basename index as a fallback when a slashed token does not resolve, or resolve slashed tokens as a
+  SUFFIX match and refuse an ambiguous one — the second is stricter and matches the file's existing
+  *"more than one file is UNRESOLVED, never resolved to the first hit"* rule. **Live.** Filed by `M73`.
+
+- **`minor` · `brand-cache.test.ts` asserts `put` by CALL COUNT and never by key, so its central defect is
+  invisible to it.** Found by `M73`'s fan-out. `refreshCachedShells()` re-`put`s under the ORIGINAL request
+  object, which is what the open `lib/brand-cache.ts` row says renews a mis-cased key. The suite that
+  covers this file is otherwise thorough — ten cases, a resume-skip with a non-vacuity partner, a
+  404-not-cached rule, an offline defer — but its `fakeCaches()` models a key as `{ url } as Request` and a
+  response as `({ status }) as Response`. ⛔ **So it has no notion of `redirected`, no notion of a redirect
+  being followed, and no notion of the response url differing from the key it is stored under** — every
+  case passes under a mutant that writes the right response to the WRONG key. ✅ **This is the cheapest
+  control found in that whole investigation**: one case asserting which request `put` was called with, and
+  a `redirected: true` field on the fake response. It needs no browser, unlike everything else in this
+  area. ⚠️ Filed separately from the `brand-cache.ts` row because that one is `latent` behind a device
+  primed before `M61`, and **this one is not** — the coverage gap is real today whatever the defect's
+  reachability. **Live.** Filed by `M73`.
+
+- **`minor` · `SubmissionFinalizer` is a SECOND writer of `submission_answers.form_version_id`, and it
+  would erase the evidence of a divergence rather than record it.** Found by `M73`'s fan-out while closing
+  the draft-pin row, whose premise was that one class owns that column. `finalize()` writes both
+  `form_version_id` and `answers_schema_checksum` onto the answer row from the `$version` `promote()`
+  resolved — which is read from the PARENT's pin. ⛔ **So on a successful promotion of a diverged draft it
+  would rewrite the answer row BACK to the parent's version, over answers normalized against a different
+  graph, converging the two columns onto the wrong one and destroying the only trace that they ever
+  disagreed.** ✅ **It is unreachable today and `M73` did not make it reachable** — `promote()`'s own
+  re-assert refuses first, because a re-mint implies a republish implies the pinned version is
+  `Superseded`, and `PublishService` never re-publishes an old version. ⚠️ **It is filed because it is the
+  reason the rejected repair was dangerous**: moving the parent forward would have made this path
+  reachable and self-consistent at the same time. The row is a request for an assertion that the two
+  writers cannot disagree, not for a change to either. **Latent** — it needs a promote of a diverged
+  draft, which no current path can produce. Filed by `M73`.

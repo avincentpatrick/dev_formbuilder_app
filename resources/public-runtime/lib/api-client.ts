@@ -48,6 +48,28 @@ export interface ApiClient {
     saveDraft(payload: SaveDraftPayload): Promise<SaveDraftResult>;
     remint(): Promise<MintResponse>;
     token(): string;
+    /**
+     * Adopt a share token minted elsewhere, for the resume path (Increment M76).
+     *
+     * ⛔ THIS EXISTS BECAUSE `resumeDraft()` ALREADY RETURNS A CORRECTLY-PINNED SHARE TOKEN AND NOTHING
+     * READ IT. `GuestDraftResumeController` mints that token against the DRAFT's `form_version_id`, this
+     * module decodes it into `ResumeDraftResult.shareToken`, and {@link resumeDraft}'s own docblock says
+     * *"the response carries a fresh SHARE token the caller then hands to `createApiClient` for the resumed
+     * session"* — a hand-off that was documented and never implemented.
+     *
+     * ⚠️ WHAT THAT COST. `App.vue` kept using the token embedded in the shell, which on a
+     * service-worker-cached resume boot can already be expired. `fetchSchema()` then 401s, `withFreshToken`
+     * re-mints through `GET /f/{slug}` — which pins `current_published_version_id` — and the page renders
+     * the NEW schema while `server.formVersionId` still names the OLD one. The respondent's newer local
+     * answers are then discarded without a note, a v2 form appears under a *"welcome back"* greeting
+     * holding v1 answers, and the first autosave 409s them onto a fresh uuid, abandoning the server draft
+     * and the emailed resume link with it.
+     *
+     * ⚠️ A SETTER RATHER THAN A SECOND `createApiClient()`: the client also carries `challengeRequired`,
+     * learned from the last `fetchSchema()`, and rebuilding it would silently reset that to its default and
+     * cost a round trip on the next submit.
+     */
+    adoptToken(token: string): void;
 }
 
 async function parseBody(response: Response): Promise<unknown> {
@@ -128,6 +150,10 @@ export function createApiClient(options: { token: string; slug: string; fetch?: 
     return {
         token: () => currentToken,
         remint,
+
+        adoptToken(token: string): void {
+            currentToken = token;
+        },
 
         async fetchSchema(): Promise<SchemaResponse> {
             const body = await withFreshToken<{ data: SchemaResponse }>((token) =>

@@ -310,6 +310,25 @@ beforeEach(() => {
     mocks.pageProps.errors = {};
     mocks.pageProps.flash = {};
     mocks.post.mockReset();
+
+    // ⛔ `fetch` IS STUBBED FOR THE WHOLE CASE, NOT ONLY FOR THE TEARDOWN — WHICH IS WHERE M75 PUT IT AND
+    // WHY THE TRACES SURVIVED IT. M75 read the escaping requests as an artefact of the window being torn
+    // down while a `dispose()` keepalive was in flight, and stubbed `afterEach` accordingly. That is real
+    // and it is not all of them: the autosave composable ALSO flushes on a step change, un-debounced and
+    // mid-case, long before any teardown — so those requests met the real `fetch` and left the process.
+    // ⚠️ MEASURED RATHER THAN INFERRED, AND THE ROW'S OWN NUMBER IS WRONG. The invariant is TEN escaped
+    // requests, not the six the backlog row counted, and what they PRINT is not stable: run alone this
+    // file emitted ten `AggregateError`/`ECONNREFUSED` traces and zero `AbortError`, because nothing was
+    // tearing a window down in time to abort them first. In a full 134-file run the teardown wins some of
+    // those races and the same requests surface as `DOMException [AbortError]`. Counting the SYMPTOM is
+    // what made this look like six flaky traces instead of ten deterministic escapes.
+    // ⚠️ `globalThis.fetch = …` does NOT reach the binding under happy-dom — it was tried first and changed
+    // nothing. `vi.stubGlobal` is what works, and the `afterEach` stub is still needed as well, because
+    // that hook's own `vi.unstubAllGlobals()` restores the real `fetch` before the unmount runs.
+    vi.stubGlobal(
+        'fetch',
+        vi.fn(() => Promise.resolve({ ok: true, status: 204, json: () => Promise.resolve({}) })),
+    );
 });
 
 describe('encode page — client relevance', () => {

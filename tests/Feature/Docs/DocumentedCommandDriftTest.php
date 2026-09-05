@@ -190,8 +190,7 @@ function documentedCommandPublishedPorts(string $service): array
     $current = null;
     $inPorts = false;
 
-    foreach (explode("
-", (string) file_get_contents($path)) as $line) {
+    foreach (explode("\n", (string) file_get_contents($path)) as $line) {
         if (preg_match('/^  ([a-z][\w-]*):\s*$/', $line, $match) === 1) {
             $current = $match[1];
             $inPorts = false;
@@ -518,8 +517,7 @@ it('publishes the host port of every dev server it prescribes inside a compose s
         'gate M43 measured — it fails here instead of reporting a clean run.'
     );
 
-    expect($violations)->toBe([], implode("
-", $violations));
+    expect($violations)->toBe([], implode("\n", $violations));
 
     // The service the block actually talks to must be in the set the musl arm scopes over, or these
     // two arms are quietly measuring different documents.

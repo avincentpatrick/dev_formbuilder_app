@@ -114,7 +114,7 @@ if (in_array('--help', $arguments, true)) {
 }
 
 if (count($positional) !== 1) {
-    fwrite(STDERR, "npm-audit-judge: expected exactly one report path, got ".count($positional).".\n\n".npm_audit_usage());
+    fwrite(STDERR, 'npm-audit-judge: expected exactly one report path, got '.count($positional).".\n\n".npm_audit_usage());
 
     exit(NPM_AUDIT_EXIT_CANNOT_MEASURE);
 }
@@ -185,7 +185,7 @@ function npm_audit_judge(string $path): int
     }
 
     if ($blocking === []) {
-        fwrite(STDOUT, "npm-audit-judge: JUDGED CLEAN at the blocking threshold (".
+        fwrite(STDOUT, 'npm-audit-judge: JUDGED CLEAN at the blocking threshold ('.
             implode(' · ', NPM_AUDIT_BLOCKING).").\n");
         fwrite(STDOUT, 'npm-audit-judge: production advisories — '.implode(' · ', $tally)."\n");
 
@@ -279,7 +279,7 @@ function npm_audit_usage(): string
         "Judges a report written by `npm audit --json --omit=dev`. It does NOT fetch: fetching and\n".
         "judging are separate steps precisely because npm's exit code cannot tell an unreachable\n".
         "registry from a vulnerable dependency.\n\n".
-        "  0  judged, and clean at the blocking threshold (".implode(', ', NPM_AUDIT_BLOCKING).")\n".
+        '  0  judged, and clean at the blocking threshold ('.implode(', ', NPM_AUDIT_BLOCKING).")\n".
         "  1  a blocking advisory reaches production dependencies — the merge is blocked\n".
         "  2  the advisories were never obtained, so NOTHING was judged\n\n".
         "See the block at the top of this file for why exit 2 exists and why the recognition test is\n".

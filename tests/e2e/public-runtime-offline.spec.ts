@@ -277,3 +277,119 @@ test('Public runtime — reviews & resolves a parked conflict (Increment G8c)', 
         { timeout: 20_000 },
     );
 });
+
+// ⛔ INCREMENT M72 — WHAT M61's CANONICALIZATION REDIRECT ACTUALLY PROTECTS, ASSERTED FOR THE FIRST TIME,
+// AND IT IS NOT WHAT THE BACKLOG ROW (OR sw.ts's OWN DOCBLOCK) BELIEVED.
+//
+// M61 made `/f/Clinic-Intake` 301 to `/f/clinic-intake` so the shell cache is keyed by ONE url. Nothing
+// proved it: `GuestRuntimeTest` pins the 301 and `PwaManifestTest` pins the manifest's canonical
+// `start_url` under a mis-cased path, but Cache Storage is a browser API and Pest cannot see a cache key.
+//
+// ⛔ MEASURED, AND THE BELIEF WAS FALSE. After a mis-cased entry the cache holds TWO keys, not one:
+//     /f/clinic-intake  -> status 200, type 'basic'          (the real shell)
+//     /f/Clinic-Intake  -> status 0,   type 'opaqueredirect' (the 301, cached)
+// The sibling `guest-schema` route filters with `CacheableResponsePlugin({ statuses: [200] })` and this
+// route does not, so Workbox's status filter never runs here. The offline path still WORKS — the browser
+// follows a cached opaqueredirect to the canonical entry, which is cached properly — so the guarantee is
+// real; it is delivered by a mechanism nobody had described. Filed as its own row, because the fix is in
+// `resources/public-runtime/sw.ts`, a hub file this increment's budget was already spent on.
+//
+// ⚠️ SO THIS TEST ASSERTS THE GUARANTEE AND PINS THE SHAPE. What must never change is that the mis-cased
+// key is not a SECOND COPY OF THE SHELL: delete the `if ($slug !== $form->public_slug)` block in
+// `GuestFormController::mint` and the mis-cased url answers 200 directly, the cache gains a real duplicate
+// shell, and the two shape assertions below go red together.
+//
+// ⚠️ THE SEQUENCE IS PART OF THE TEST. Navigating mis-cased FIRST would prove nothing: this file records
+// above that the first navigation happens before the SW activates and is uncontrolled, so the SW would
+// never see the request and every assertion would pass on an empty cache — the succeeds-on-empty-input
+// family this project has now measured five times.
+test('Public runtime — a mis-cased entry never becomes a second cached shell, and still renders offline', async ({
+    page,
+    context,
+}) => {
+    await page.goto('/f/clinic-intake', { waitUntil: 'networkidle' });
+    await page
+        .getByRole('heading', { name: 'Clinic Intake', level: 1 })
+        .waitFor({ state: 'visible', timeout: 15_000 });
+
+    const swAvailable = await page.evaluate(() => 'serviceWorker' in navigator);
+
+    // ⛔ AN AUDIBLE SKIP, NOT A SILENT ONE. The test above guards its SW leg with `if (swAvailable)` and
+    // reports PASS when the secure-origin launch flag stops taking effect — documented there as deliberate,
+    // and exactly the hazard a cache assertion would inherit.
+    test.skip(!swAvailable, 'no service worker on this origin — the secure-origin launch flag did not take');
+
+    await page.evaluate(async () => {
+        await Promise.race([
+            navigator.serviceWorker.ready,
+            new Promise((resolve) => setTimeout(resolve, 10_000)),
+        ]);
+    });
+    await page.reload({ waitUntil: 'networkidle' });
+    await page
+        .getByRole('heading', { name: 'Clinic Intake', level: 1 })
+        .waitFor({ state: 'visible', timeout: 15_000 });
+
+    // The SW controls this client now, so it sees the mis-cased navigation and whatever the origin answers.
+    const misCased = await page.goto('/f/Clinic-Intake', { waitUntil: 'networkidle' });
+
+    // The redirect itself, proven at the browser rather than in Pest: the mis-cased request is what started
+    // this navigation and the canonical url is where it ended.
+    expect(misCased?.request().redirectedFrom()?.url()).toContain('/f/Clinic-Intake');
+    expect(new URL(page.url()).pathname).toBe('/f/clinic-intake');
+
+    // Read the cached RESPONSES, not just the keys — the shape is the whole finding, and a key list alone
+    // cannot tell a redirect stub from a duplicate shell.
+    const cached = await page.waitForFunction(
+        async () => {
+            if (!(await caches.keys()).includes('guest-shell-html')) {
+                return false;
+            }
+            const cache = await caches.open('guest-shell-html');
+            const keys = await cache.keys();
+            if (keys.length === 0) {
+                return false;
+            }
+            const found: Array<{ path: string; status: number; type: string }> = [];
+            for (const request of keys) {
+                const response = await cache.match(request);
+                found.push({
+                    path: new URL(request.url).pathname,
+                    status: response?.status ?? -1,
+                    type: response?.type ?? 'none',
+                });
+            }
+
+            return found;
+        },
+        null,
+        { timeout: 15_000 },
+    );
+
+    const entries = (await cached.jsonValue()) as Array<{ path: string; status: number; type: string }>;
+
+    // The non-vacuity floor, an assertion rather than a comment: without it every check below is satisfied
+    // by an empty cache, which is precisely the state a broken secure-origin flag produces.
+    expect(entries.length).toBeGreaterThan(0);
+
+    // (1) The canonical url is cached as a real, servable shell. This is what M61 built.
+    expect(entries).toContainEqual({ path: '/f/clinic-intake', status: 200, type: 'basic' });
+
+    // (2) And the mis-cased url is NOT a second copy of it. It may be absent, or present as the cached
+    //     redirect — but it must never be a servable 200 shell, because two shells under two keys is the
+    //     state the canonicalization exists to prevent and the one `maxEntries: 20` would then evict from.
+    const strays = entries.filter((entry) => entry.path !== '/f/clinic-intake');
+    for (const stray of strays) {
+        expect(stray.status).not.toBe(200);
+    }
+
+    // (3) The respondent-facing guarantee, which is what "the offline path M61's redirect exists to
+    //     protect" actually means: with the network gone, entering at the MIS-CASED url still reaches the
+    //     rendered form. Asserted end to end rather than reasoned about from the cache shape.
+    await context.setOffline(true);
+    await page.goto('/f/Clinic-Intake', { waitUntil: 'commit' });
+    await page
+        .getByRole('heading', { name: 'Clinic Intake', level: 1 })
+        .waitFor({ state: 'visible', timeout: 15_000 });
+    await context.setOffline(false);
+});

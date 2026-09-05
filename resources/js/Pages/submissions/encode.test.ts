@@ -815,6 +815,113 @@ describe('Encode.vue — edit mode (I9c)', () => {
         // silent lost update. The snapshot means the second Save is refused too, which is the point.
         expect((mocks.patch.mock.calls[1][1] as Record<string, unknown>).baseline).toBe('checksum-baseline-1');
     });
+
+    /*
+     * Increment M74 — a refused correction now has a way OUT.
+     *
+     * M62 kept the corrections and kept the guard armed, which is right and is argued at `editBaseline`.
+     * What it left was a page that can never be saved and no route forward but the browser's own reload.
+     *
+     * ⚠️ THE ROW FILED AGAINST IT SAYS THE TOAST FADES. IT DOES NOT — `useToast` auto-dismisses only
+     * `type !== 'error'`. The real defect is that the notice is DISMISSIBLE and that the errors bag is
+     * keyed `baseline`, a key no field renders. Both halves are asserted below.
+     */
+
+    it('renders a NON-dismissible conflict alert carrying the server sentence', async () => {
+        mocks.pageProps.errors = { baseline: 'This response was changed by someone else.' };
+        const wrapper = mountEncode(editPayload());
+        await nextTick();
+
+        // ⛔ THE BEHAVIOURAL HALF. Asserting only that an alert exists is satisfied by a hard-coded
+        // string, and the whole point is that the page carries the SERVER's reason.
+        expect(wrapper.text()).toContain('This response was changed by someone else.');
+
+        // The structural half, and it is the row's actual complaint: a dismiss control on a condition
+        // that is still true lets one click restore a page that looks normal and can never be saved.
+        // MdsAlert renders its dismiss as a button with an aria-label, so its ABSENCE is checkable.
+        expect(wrapper.find('[aria-label="Dismiss"]').exists()).toBe(false);
+        expect(wrapper.find('[role="alert"]').exists()).toBe(true);
+    });
+
+    it('renders nothing of the sort when there is no baseline refusal', async () => {
+        // ⛔ THE REFUSES-NOTHING PARTNER. Every assertion above is satisfied by a component that renders
+        // the alert unconditionally; only this catches it.
+        mocks.pageProps.errors = {};
+        const wrapper = mountEncode(editPayload());
+        await nextTick();
+
+        expect(wrapper.text()).not.toContain('Discard my changes and reload');
+    });
+
+    it('requires TWO clicks to discard, and moves focus to the safe control in between', async () => {
+        mocks.pageProps.errors = { baseline: 'Changed somewhere else.' };
+        // ⚠️ ATTACHED, AND THAT IS PART OF THE ASSERTION RATHER THAN A DETAIL. `mount()` renders
+        // detached by default, and `focus()` on an off-document element does not move
+        // `document.activeElement` — so the focus case fails for a reason that has nothing to do with
+        // the component. Measured: it failed exactly that way on first run.
+        const wrapper = mount(Encode, { props: editPayload() as never, attachTo: document.body });
+        await nextTick();
+
+        const original = window.location;
+        let reloads = 0;
+        // Replace ONLY `window.location`, never the whole window: stubbing the global tears out the DOM
+        // event constructors test-utils needs to dispatch a click (the precedent is audit/index.test.ts).
+        Object.defineProperty(window, 'location', {
+            configurable: true,
+            value: { reload: () => { reloads += 1; } },
+        });
+
+        try {
+            const arm = wrapper.findAll('button').find((b) => b.text().includes('Discard my changes'));
+            await arm!.trigger('click');
+
+            // One click arms; it does not act. A single-step destructive control on a page holding a
+            // page of typed corrections is the failure this two-step exists to prevent.
+            expect(reloads).toBe(0);
+
+            // ⚠️ ASSERTED ON `document.activeElement`, NEVER ON AN EMITTED EVENT. SubmissionOutbox.vue
+            // records that the template-ref version of this focus move was DEAD CODE and its suite could
+            // not tell, because the assertion was on the event rather than on where focus actually went.
+            await nextTick();
+            expect(document.activeElement?.getAttribute('data-conflict-keep')).not.toBeNull();
+
+            const confirm = wrapper.findAll('button').find((b) => b.text().includes('Discard and reload'));
+            await confirm!.trigger('click');
+
+            expect(reloads).toBe(1);
+
+            // ⛔ AND THE ROW'S ⛔ CONSTRAINT, AS FAR AS A GATE CAN CARRY IT. This must never become a
+            // one-click adopt-the-new-baseline, which means it must be a real browser navigation and not
+            // an Inertia visit that re-keys the component and re-seeds `editBaseline` from fresh props.
+            // happy-dom cannot distinguish a destroyed JS context from a re-key, so no case can prove the
+            // constraint directly; asserting that the router was NOT used is the enforceable proxy, and
+            // it is a proxy rather than the thing itself.
+            expect(mocks.patch).not.toHaveBeenCalled();
+        } finally {
+            Object.defineProperty(window, 'location', { configurable: true, value: original });
+            wrapper.unmount();
+        }
+    });
+
+    it('cancels the armed discard on Escape, and on the Keep control', async () => {
+        mocks.pageProps.errors = { baseline: 'Changed somewhere else.' };
+        const wrapper = mountEncode(editPayload());
+        await nextTick();
+
+        const arm = () => wrapper.findAll('button').find((b) => b.text().includes('Discard my changes'));
+
+        await arm()!.trigger('click');
+        expect(wrapper.text()).toContain('Discard and reload');
+
+        await wrapper.find('[data-conflict-keep]').trigger('keydown', { key: 'Escape' });
+        expect(wrapper.text()).not.toContain('Discard and reload');
+        // Re-armable afterwards: a cancel that also destroyed the escape route would be its own trap.
+        expect(arm()).toBeTruthy();
+
+        await arm()!.trigger('click');
+        await wrapper.find('[data-conflict-keep]').trigger('click');
+        expect(wrapper.text()).not.toContain('Discard and reload');
+    });
 });
 
 /*

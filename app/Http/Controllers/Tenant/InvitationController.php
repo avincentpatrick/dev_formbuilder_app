@@ -229,12 +229,54 @@ final class InvitationController extends Controller
             'password' => $this->passwordRulesUnconfirmed(),
         ]);
 
+        // ⛔ THE WRITE GOES BACK ON `pgsql_auth`, THE CONNECTION THIS ROW WAS READ ON, AND UNTIL M76 IT DID
+        // NOT — SO IT UPDATED ZERO ROWS AND THREW NOTHING. Measured through the real HTTP stack: after a
+        // successful accept the invitee was redirected to `/dashboard`, their membership was `Active`,
+        // their role was granted, they were logged in — and `email_verified_at`, which the array below sets
+        // unconditionally, was still NULL on both the app and the privileged connection. The chosen
+        // password, the name and both consent stamps were discarded with it.
+        //
+        // ⚠️ THE OBSTACLE IS THE **SELECT** POLICY, NOT THE UPDATE POLICY, WHICH IS WHY READING THE UPDATE
+        // POLICY WOULD HAVE EXONERATED IT. `users_app_update` is `USING true`. `users_users_visibility`
+        // admits a row only when `id = app.current_user_id` OR the user holds an **active** membership in
+        // the current tenant, and PostgreSQL applies SELECT policies to an `UPDATE` whose `WHERE` reads a
+        // column. At this point in {@see self::accept()} the visitor is **not yet authenticated**
+        // (`Auth::login()` comes after) and the membership is still **`Invited`** (`accept()` comes after),
+        // so the row is invisible and the statement matches nothing. Measured: `rows=0` here, `rows=1` on
+        // `pgsql_auth`, which carries `users_auth_select USING true` and the table-level
+        // `GRANT SELECT, UPDATE ON users TO meridian_auth`.
+        //
+        // ⛔ DO NOT "SIMPLIFY" THIS BY MOVING THE CALL BELOW `memberships->accept()` TO MAKE THE ROW
+        // VISIBLE. It would work and it would be wrong: this method VALIDATES, so a rejected password would
+        // then leave the membership already activated for an account with no password — trading a silent
+        // write failure for a silent authorization grant.
+        //
+        // ⚠️ AND THIS IS EXACTLY THE FAILURE {@see \App\Services\Sso\SsoUserProvisioner::createUser()}
+        // DEFENDS AGAINST ONE FILE AWAY, in those words: *"A follow-up `save()` would match no policy,
+        // update ZERO rows, throw nothing, and leave the account unverified — which the `verified`
+        // middleware then turns into a lockout with no error to trace."* Nobody carried it across.
+        //
+        // ⚠️ `password_set_at` (M76) is not redundant beside `email_verified_at`. This is the moment the
+        // placeholder stops being one, and recording the DIRECT fact is what makes the arm self-closing: a
+        // second token for the same address now meets an established identity. Letting the proxy stand in
+        // for it is how the takeover this increment closed came to exist.
+        $connection = $user->getConnectionName();
+
+        $user->setConnection('pgsql_auth');
+
         $user->forceFill([
             'name' => $validated['name'],
             'password' => Hash::make($validated['password']),
+            'password_set_at' => now(),
             'email_verified_at' => now(),
             'tos_accepted_at' => now(),
             'privacy_policy_accepted_at' => now(),
         ])->save();
+
+        // Handed back on the connection it arrived on: everything after this — the membership write, the
+        // role grant, `Auth::login()` — belongs to the app role and its RLS, and leaving the elevated
+        // connection attached to a model that outlives this method is how a narrow carve-out becomes a
+        // general one.
+        $user->setConnection($connection);
     }
 }

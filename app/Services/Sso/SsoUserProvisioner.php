@@ -257,6 +257,12 @@ final class SsoUserProvisioner
             // Random and immediately discarded: the column is NOT NULL and nobody, including this process,
             // can present it. Password reset stays available as the escape hatch if a tenant turns SSO off.
             'password' => Hash::make(Str::random(64)),
+            // ⚠️ `password_set_at` IS DELIBERATELY LEFT NULL, AND M76 STATES IT HERE RATHER THAN LEAVING IT
+            // TO BE INFERRED FROM ITS ABSENCE. That column means *"a human chose this password"*; the hash
+            // above is one nobody has ever seen, so NULL is the truthful value and stamping it would make
+            // the column mean *"a row exists"*, which is what it was created to stop meaning.
+            // ✅ It costs nothing here: `email_verified_at` below already establishes this identity through
+            // the arm beneath the new one, so `identityIsEstablished()` returns the same answer either way.
             'email_verified_at' => now(),
         ])->save();
 

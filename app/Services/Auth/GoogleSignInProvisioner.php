@@ -310,6 +310,10 @@ final class GoogleSignInProvisioner
             // Random and immediately discarded: the column is NOT NULL and nobody, including this process,
             // can present it. Password reset stays available as the escape hatch.
             'password' => Hash::make(Str::random(64)),
+            // ⚠️ `password_set_at` IS DELIBERATELY LEFT NULL (M76), for the reason
+            // {@see \App\Services\Sso\SsoUserProvisioner::createUser()} states at length: nobody chose the
+            // hash above, so NULL is the truthful value. Costless here as well — this account is already
+            // established twice over, by `google_id` and by `email_verified_at`.
             'email_verified_at' => now(),
         ])->save();
 

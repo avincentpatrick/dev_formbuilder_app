@@ -227,11 +227,15 @@ describe('object-valued answers (M74)', function (): void {
     });
 
     it('routes every grid leaf through the pinned scalar rule, not a bare cast', function (): void {
-        // Amendment A7 at a new leaf: a native bool is '1' and not 'true'.
+        // Amendment A7 at a new leaf.
+        // ⛔ THE VALUES ARE THE ASSERTION HERE. The first draft used `true` and `0.1`, and a mutation
+        // replacing scalarString() with `(string)` SURVIVED — PHP casts both identically to the pinned
+        // rule. These three DISAGREE: the bare cast gives '0.33333333333333' (precision=14) and
+        // '1.0E-5'. That is H6a's `3.5` mistake exactly, caught by the control this time.
         $f = new SchemaValueFormatter;
 
-        expect($f->displayValue(FieldType::LikertMatrix, ['q1' => true, 'q2' => 0.1], []))
-            ->toBe('q1=1; q2=0.1');
+        expect($f->displayValue(FieldType::LikertMatrix, ['q1' => true, 'q2' => 1 / 3, 'q3' => 1e-5], []))
+            ->toBe('q1=1; q2=0.3333333333; q3=0.00001');
     });
 
     it('renders a malformed grid or media answer blank rather than falling through to the join', function (): void {

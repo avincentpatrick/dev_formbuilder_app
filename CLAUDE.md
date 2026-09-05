@@ -151,9 +151,14 @@ the parent commit and accidentally gives the right answer.
   dozen of them outweigh hundreds of ordinary ones. `scripts/tracker-lint.php` holds both limits and
   prints both deltas on every run; read them there rather than restating either here.
 - **Split by pre-measured line index, never by search.** These files contain verbatim examples of their
-  own anchors; that is how a search once deleted a thousand lines and merged green. Prove a move by a
-  counted multiset of line hashes plus exact byte conservation — never by "the archive got bigger", and
-  never with a tolerance.
+  own anchors; that is how a search once deleted a thousand lines and merged green.
+- ⛔ **Prove the move with `scripts/tracker-surgery.php`, and never by hand.** It holds the assertions —
+  a counted multiset of line hashes, exact byte conservation with the added bytes stated rather than
+  inferred, the paths touched, and an independent slice hash — and it **refuses with a distinct exit
+  status rather than passing** when it cannot measure. Run it while both files are still uncommitted:
+  the paths arm reads the working tree, so it sees nothing once the change is committed. Every surgery
+  before it hand-rolled this check and threw it away, and most of those checks were wrong on their first
+  run against a correct tree. Never prove a move by "the archive got bigger", and never with a tolerance.
 - **Do not cite line numbers in a file you are editing.** Counts and filenames are stable; line numbers
   are not.
 

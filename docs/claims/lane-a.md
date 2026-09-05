@@ -16,19 +16,177 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M74` is merged; four rows closed, five filed, and the two probes that mattered both refuted their first answer
+## Status: ACTIVE CLAIM — the tenth batched increment: four rows, and the fan-out overturned the prescribed fix on three of them (`m75-batched-rows`)
 
-`M74` closed **four** rows and filed **five**, spending **one** hub slot. `state.php` counts the tree; do
-not take that sentence's arithmetic on trust.
+Taken 2026-09-06. Branch `m75-batched-rows`, cut from `origin/main` at `bbe97dd`, PR into `main`.
+Selected under `D13` off the regenerated `docs/backlog-triage.md`: four live rows, no two citing the same
+non-hub file, **one** hub-touching row (`R1`). `D15` is open and is **not** being re-scoped here — the batch
+obeys the cap as written.
 
-⛔ **THE ONE THING `M74` WOULD MOST LIKE TO HAND ON: A PROBE THAT AGREES IS NOT A PROBE THAT MEASURED.**
-Twice in one increment, the first measurement came back green and the second — built to discriminate rather
-than to confirm — refuted it. The cross-engine key-order probe over ASCII, Tagalog diacritics and one emoji
-**agreed on both engines**; pairing a fullwidth `＃` with an emoji **disagreed**, and shipping on the first
-result would have put a silent twin divergence into a published export. The A7 grid vector chose `true` and
-`0.1`, values where PHP's bare cast *happens* to equal the pinned rule, so the mutation meant to prove it
-**SURVIVED**. ⚠️ **Both are the H6a `3.5` shape** — a sample that cannot fail is indistinguishable from a
-rule that holds — and both were caught by a control rather than by a later increment.
+Rows, all four filed by `M74`:
+
+- **`R1`** — *`gate-baselines.php` writes the file BEFORE it judges whether every metric was found, so a NOT
+  FOUND row ships and is reported afterwards.* `docs/feature-backlog.md:6245`. **The hub row.**
+- **`R2`** — *The correction page has no autosave and no armed leave prompt, so an editor who navigates away
+  loses every character they typed, silently.* `docs/feature-backlog.md:6212`.
+- **`R3`** — *`brand-cache.ts` re-`put`s through the raw Cache API rather than a Workbox strategy, so the
+  bytes are renewed and the seven-day expiry clock is not.* `docs/feature-backlog.md:6257`.
+- **`R4`** — *A Vitest case asserts that a `setTimeout(…, 0)` fired, so its green depends on machine load
+  rather than on the code.* `docs/feature-backlog.md:6270`.
+
+⛔ **THE HEADLINE, WRITTEN BEFORE THE FIRST FILE WAS OPENED: THREE OF THE FOUR PRESCRIBED FIXES ARE WRONG,
+AND ONE ROW'S CENTRAL DIAGNOSIS IS WRONG.** `R4` says the case is a race the event loop sometimes loses. It
+is not a race at all — it is **vacuous on the path it actually runs**, and the load artefact `M74` saw has a
+different cause entirely. That was found by a read-only mutation against a scratch copy, not by reading.
+
+### Evidence verified
+
+- **`R1` — PARTLY FALSE, and the false half is a sub-claim rather than the mechanism.** ✅ Held to the line:
+  `file_put_contents()` at `scripts/gate-baselines.php:361` sits three lines above the `$missing > 0`
+  judgement at `:364`; the `--dry-run` branch at `:356-358` exits on the count and never reaches the `:365`
+  diagnostic; the row is a faithful split of the deferral paragraph in the `gh run list` row `M74` closed.
+  ⛔ **And one thing the row does not name is worse than what it does**: `:362` prints
+  *"wrote docs/gate-baselines.md from run …"* — an unconditional **success sentence** — before the
+  judgement. ⛔ **FALSE: *"under `--dry-run` the NOT FOUND message never prints at all … the only signal is
+  an exit code."*** The document itself carries a `**NOT FOUND**` row that **names the failing metric**, and
+  `--dry-run` writes that document to stdout; the count diagnostic on stderr is the only half that is
+  suppressed. `tests/Feature/Docs/GateBaselinesTest.php:127` asserts on exactly those bytes, so the row's
+  claim contradicts a live assertion. ⛔ **FALSE: *"it flips `--dry-run`'s exit semantics."*** Both paths
+  already exit `1` on a missing metric — `:358` and `:366` — measured, not read.
+- **`R2` — HELD, byte for byte, at every citation.** `enabled: autosaveArmed.value && !isEditing.value && …`
+  at `resources/js/Pages/submissions/Encode.vue:538`; `armGuards()` really does attach `beforeunload` at
+  construction (`resources/js/composables/useServerAutosave.ts:437`); `onBeforeUnload` early-returns at
+  `:515` because `dirty` is only ever set behind the `enabled` guard (`:360`, `:370`, `:384-387`); the quoted
+  `Encode.vue` argument, `M74`'s two-click discard and the non-identity with the `M68` `dispose()` row all
+  check out.
+- **`R3` — HELD, and the row understates itself.** `cache.put(request, response)` at
+  `resources/public-runtime/lib/brand-cache.ts:168` is the only raw Cache API write in the repository, and it
+  bypasses the single path (`StrategyHandler.cachePut` → `cacheDidUpdate`) that touches `ExpirationPlugin`'s
+  IndexedDB timestamp. The quoted docblock sentence is verbatim. ⚠️ **The same false model is stated in
+  several further places, one of them the SECURITY rationale for `isResumeShell()`** (`:108-118`), which
+  argues the skip exists to stop a re-`put` *"RENEWING a token-bearing document on disk indefinitely"* — a
+  renewal that, today, does not happen.
+- **`R4` — the citations hold and THE DIAGNOSIS DOES NOT.** ⛔ **happy-dom supplies `crypto.subtle`, so
+  `solveChallenge()` awaits a real WebCrypto digest on every iteration and the test's zero-delay timer fires
+  after digest `n = 0` — roughly 10 ms in, thousands of iterations before the first `yieldToEventLoop()` at
+  `n = 4999`.** The case therefore **never observes the yield on the path it runs**, and survives deleting
+  `challenge.ts:156` outright. It is a vacuous assertion, not a race. ⚠️ **The load artefact `M74` measured
+  is real and has a different cause**: Vitest's default 5000 ms `testTimeout` against a solve measured at
+  2.1–4.8 s on an idle host.
+
+### Premise verified
+
+- **`R1` — UNDERSTATED, in the direction that matters.** No second caller, no twin, no test goes red on the
+  fix. ⛔ **But `docs/gate-baselines.md` is inside `ci.yml`'s `paths-ignore`**, so a file written from a
+  broken pattern reaches the trunk with **no CI run at all** — the row's "ships" has no gate behind it.
+  ⛔ **And the `$missing > 0` branch has ZERO control coverage**: all six scenarios in
+  `GATE_BASELINES_SCENARIOS` share one `ci-log.txt` (`tests/fixtures/gate-baselines/gh.php:44` hardcodes it)
+  which satisfies all twelve patterns, and four of the six refuse before the scrape is reached. ⚠️ **The
+  row's urgency is inherited from an incident `M74` already closed by a louder guard** — `MAX_COMMITS_BEHIND`
+  refuses that 141-behind run about a hundred lines before the metric loop — so the narrated scenario cannot
+  recur. That lowers the sizing and does not kill the row: the accept-then-report shape is still there.
+- **`R2` — UNDERSTATED, and the obvious remedy carries a LIVE defect of its own.** ⛔ **A global
+  `router.on('before', …)` confirm — the shape every reading of this row converges on — fires on the
+  DARK-MODE TOGGLE.** `ThemeQuickToggle.vue` → `useTheme.ts:90` issues
+  `router.patch('/settings/appearance', …, { preserveScroll: true, preserveState: true })`, a visit that
+  never leaves the page; `ThemeQuickToggle` renders unconditionally in `TopNav.vue`, which renders
+  unconditionally in `AppLayout.vue`, and `app.ts` gives `submissions/Encode` that layout. So the control is
+  on screen during every correction, and declining the dialog also silently drops the theme preference.
+  ⚠️ Three further premises: `encode.test.ts:38-42` mocks `@inertiajs/vue3` with **no `on`**, so the guard
+  throws in every mount in that file until the mock gains it; `Encode.vue:807-812` currently argues
+  `location.reload()` is safe *because* "No native leave prompt fires", which the fix falsifies; and an
+  un-unsubscribed `router.on` is a **measured** leak here (`useMemberStreak.ts:80-94`).
+  ⚠️ **Server side, the "no autosave" half of the row's title is not buildable without a product decision**:
+  `SubmissionEditRoutesTest.php:120-121` pins `draft` and `draft_url` null in edit mode, and the only other
+  write channel demotes Approved → UnderReview and writes an audit row per tick. **Only the leave-prompt
+  half is in scope.**
+- **`R3` — UNDERSTATED on three separate axes.** ⚠️ **The sweep runs once per BRAND CHANGE, not per boot** —
+  `brand-cache.ts:84` returns `unchanged` while the fingerprint matches — so "a shell refreshed on day six"
+  needs a tenant ramp edit on day six. ⛔ **Workbox has TWO clocks and the row describes one.** Deletion is
+  driven by the IndexedDB timestamp (`CacheTimestampsModel`), which a raw `put` never touches; read-freshness
+  is driven by the cached response's own `Date` header (`ExpirationPlugin._isResponseDateFresh`), which a raw
+  `put` **does** renew. The harm survives that split and lands hardest on exactly the shells this module
+  exists for — ones the respondent never navigates to, so nothing ever calls `updateTimestamp` for them.
+  ⛔ **The title's "use a Workbox strategy" cannot run where this code runs**: `brand-cache.ts` executes in
+  the window, and `Strategy.handleAll()` throws `ReferenceError: FetchEvent is not defined` there.
+- **`R4` — PARTLY FALSE, and the false clause is the one that argues for keeping the case as written.**
+  *"The case documents that at its own site"* is not true: on the path it runs it documents nothing. ✅ The
+  ownership and caller picture holds — `solveChallenge()` really is called from `ApiClient.submit()`
+  (`api-client.ts:94`), which the service worker really does drive. ⚠️ **And a number no reading of the row
+  had opened**: `config/guest.php:70` sets `max_number` to **120000**, so production yields **24** times, not
+  the 2 a 20000-space fixture would pin.
+
+### Remedy verdict
+
+- **`R1` — WRONG, and rejected once already for this same script.** The row prescribes *"move the write below
+  the judgement"*. That is a refusal-to-write, and this file's `M70` release already adjudicated a
+  refuse-instead-of-write remedy **for `gate-baselines.php`** and rejected it; `CLAUDE.md` close-out step 3
+  and `scripts/next.php`'s "regenerate it" stamp both assume the file gets written.
+  ✅ **What will be built instead, and it is narrower:** make the `:362` success sentence conditional so the
+  script cannot announce a success it has not judged, print the count diagnostic on **both** paths, and give
+  the `$missing > 0` branch **its first control**. ⚠️ Two constraints measured up front: the new diagnostic
+  must not contain the literal `**NOT FOUND**` (`GateBaselinesTest.php:127` is a substring assertion), and
+  `gateBaselinesRun()` merges the streams, so "printed on stderr" is unprovable through that helper as
+  written.
+- **`R2` — NONE OFFERED, and the row says so deliberately.** *"The mechanism is the DIRTY FLAG, not the
+  listener"* is a **diagnosis of why `onBeforeUnload` early-returns**, not an instruction to set `dirty`:
+  `dirty` is a module-local `let` at `useServerAutosave.ts:154` and is not reachable from outside. ✅ **The
+  fix will be a guard local to `Encode.vue`, armed only in edit mode** — never a reach into the composable,
+  and never a bare global visit hook, because of the theme-toggle defect above.
+- **`R3` — the row prescribes nothing; the working fix is `CacheExpiration.updateTimestamp()`**, which needs
+  no service-worker globals. ⛔ **And it asks for a design decision the row does not know it is asking for.**
+  `maxEntries` eviction is ordered by that same timestamp, so renewing the swept entries **resets the
+  eviction order from recency-of-use to sweep order**, and makes the resume shell — the one entry
+  deliberately not renewed — the first eviction under >20-shell pressure, which is the opposite of what
+  `isResumeShell()`'s *"SKIPPED, NEVER PURGED"* docblock claims. ⚠️ **The prior state is the anomaly, not the
+  fix**: a fresh body with a stale timestamp is a state Workbox's own model cannot produce. Taking the fix,
+  documenting the ordering consequence where the backwards second-order note is today, and filing the
+  narrowing question rather than deciding it inside a `minor` row. ⛔ **`expireEntries()` will not be
+  imported**: it is a deletion path, and this module's axiom is *"re-prime, never purge"*.
+- **`R4` — BOTH PRESCRIBED REMEDIES FAIL, and the working one is a test-only edit the row rules out.**
+  Fake timers **deadlock**: `vi.runAllTimersAsync()` resolves as soon as no fake timer is pending, and the
+  solver schedules none until `n = 4999`. The injected scheduler seam removes the race but not the flake,
+  cannot assert the default hook at all, and would pin a cadence that is fiction against a production
+  `max_number` of 120000. ✅ **What works is already in the file ten lines above**: run the case on the
+  pure-JS fallback with `vi.stubGlobal('crypto', {})`. On that path the yield is load-bearing — present, the
+  timer fires around 23 ms in and the whole case takes 70–85 ms; deleted, `ticked` stays **false**.
+  Deterministic, mutation-sensitive and roughly twelvefold cheaper, with **no production-code change**.
+
+Files: `scripts/gate-baselines.php`, `tests/Feature/Docs/GateBaselinesTest.php`,
+`tests/fixtures/gate-baselines/gh.php` and its new scenario fixtures;
+`resources/js/Pages/submissions/Encode.vue`, `resources/js/Pages/submissions/encode.test.ts`;
+`resources/public-runtime/lib/brand-cache.ts`, `resources/public-runtime/lib/shell-cache.ts` (new),
+`resources/public-runtime/sw.ts`, `resources/public-runtime/__tests__/brand-cache.test.ts`;
+`resources/public-runtime/__tests__/challenge.test.ts`; plus the close-out artefacts
+(`docs/feature-backlog.md`, `docs/claims/lane-a.md`, `PROGRESS.md`, `docs/gate-baselines.md`,
+`docs/backlog-triage.md`) and `docs/TESTING-GUIDE.md` for `R2`'s manual step.
+
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/claims/lane-a.md`, `docs/TESTING-GUIDE.md`,
+`PROGRESS.md` (own block only), `docs/gate-baselines.md`, `docs/backlog-triage.md`. Lane B is retired, so
+none of them has a second writer.
+
+Paired files taken: none. `SyncStatus.vue` is untouched, so `clipped-node-containment.test.ts`'s
+`KNOWN_UNGUARDED` list is not disturbed.
+
+Namespaces spent: **nothing from either namespace** — no migration prefix, no ADR (`0010` stays reserved for
+H1d), no `§D`. `M75` is the increment number and it is claimed by this commit.
+
+Prediction: Pint **+3 or +4 files** on the PHP side. PHPStan **cannot move** — it scans `app`, `database`
+and `routes`, and every PHP file in this diff is in `scripts/` or `tests/`; I will restore the base files and
+re-measure rather than quote an unchanged number. Vitest **+0 files** on `R2` and `R4` (both edit existing
+suites) and **+0** on `R3` unless the shared-constants module earns its own suite, so the `134` in
+`docs/gate-baselines.md` should be unchanged — and an unchanged number there reads as *"the front-end work
+did not land"*, which is why it is predicted out loud. E2E: `public-runtime-offline.spec.ts` is the only
+spec `R3` can reach, and it reads `{path,status,type}` only and never advances time, so it **cannot observe
+the clock either way**; I expect it green and uninformative, and will say so rather than claim it as
+coverage.
+
+⛔ **The prediction I least trust, named in advance:** that `CacheExpiration.updateTimestamp()` can be called
+from the window at all in the **built** bundle. It works under `fake-indexeddb` in Vitest — I have read the
+source and it touches no service-worker global — but `workbox-expiration` has never been in the page program
+before, and `npm run type-check` runs `vue-tsc` twice over two different `lib` sets. If that is where this
+breaks, it breaks at the gate rather than in a test, and the fallback is to inject the clock write as a
+dependency the way `caches` and `fetch` already are.
 
 ---
 

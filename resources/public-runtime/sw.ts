@@ -67,7 +67,10 @@ registerRoute(
     new NetworkFirst({
         cacheName: 'guest-shell-html',
         networkTimeoutSeconds: 5,
-        plugins: [new ExpirationPlugin({ maxEntries: 20, maxAgeSeconds: 7 * DAY })],
+        plugins: [
+            new CacheableResponsePlugin({ statuses: [200] }),
+            new ExpirationPlugin({ maxEntries: 20, maxAgeSeconds: 7 * DAY }),
+        ],
     }),
 );
 

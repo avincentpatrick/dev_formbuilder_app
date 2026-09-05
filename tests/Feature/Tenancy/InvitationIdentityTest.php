@@ -618,11 +618,22 @@ it('refuses to take over a self-registered account that has never been verified'
 });
 
 it('does not offer the password form to a self-registered account, so the page cannot promise a refusal', function (): void {
+    // ⛔ `withoutVite()` IS LOAD-BEARING AND ITS ABSENCE PASSES LOCALLY. Rendering the Inertia root view
+    // resolves the Vite manifest, which exists on a developer machine that has built the front end and does
+    // NOT exist in the Pest CI job — so without this the request 500s there and `assertInertia` reports
+    // *"Not a valid Inertia response"*, a message that says nothing about the cause. This case was written
+    // without it, passed locally, and reddened CI; every other Inertia case in this file already carries it.
+    $this->withoutVite();
+
     $victim = m8Identity('Self Registered Person', ['password_set_at' => now()]);
     m8InviteInto($victim, 'selfreg-page-token');
 
+    // `assertOk()` before `assertInertia()`, on the sibling case's pattern: a non-200 is the far more
+    // likely failure and it names itself, where the Inertia assertion does not.
     $this->get('http://acme.meridian.test/invitations/selfreg-page-token')
-        ->assertInertia(fn ($page) => $page->where('isUnusedPlaceholder', false));
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->component('invitations/Show', false)
+            ->where('isUnusedPlaceholder', false));
 });
 
 it('stamps password_set_at when a placeholder accepts, so a SECOND token meets an established identity', function (): void {

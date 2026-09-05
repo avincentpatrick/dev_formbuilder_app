@@ -72,20 +72,47 @@ if (! is_file($absolute)) {
 }
 
 // R1. Never run beside a live suite. Standing Rule 7(c), and M34's phantom failures.
+//
+// ⛔ THE `2>&1` AND THE `is_numeric` ARE ONE GUARD, NOT TWO, AND M71's ROW NAMED ONLY HALF OF IT.
+// Without the status capture, a failed `docker exec` returned '' and `(int) trim('')` is 0 — so
+// "refuse to run beside a live suite" silently became "assume no suite is running", in precisely the
+// situation that makes a broken daemon likely. But porting `is_numeric` alone from preflight.php does
+// not reproduce preflight's behaviour: preflight's probe carries `2>&1` and this one did not, so the
+// daemon's error went to the console uncaptured and the diagnostic here would print empty.
 $probe = "ps -eo args | grep -E '[v]endor/bin/pest|[a]rtisan test' | wc -l";
-$running = (int) trim(shell_out(sprintf(
-    'docker exec %s sh -c %s',
+$running = trim(shell_out(sprintf(
+    '%s exec %s sh -c %s 2>&1',
+    docker_bin(),
     escapeshellarg($container),
     escapeshellarg($probe)
-)));
+), $probeStatus));
 
-if ($running !== 0) {
+if ($probeStatus !== 0 || ! is_numeric($running)) {
+    abort("could not probe {$container} for a running suite, so this run cannot know whether one is ".
+          "live. Refusing rather than assuming (M71).\n".
+          '  exit status: '.var_export($probeStatus, true)."\n".
+          '  output: '.($running === '' ? '(empty)' : $running));
+}
+
+if ((int) $running !== 0) {
     abort("{$running} Pest/artisan-test process(es) already running in {$container}. ".
           'A concurrent migrate:fresh will drop the schema under this run (M34).');
 }
 
 // R2. The target must be clean, or the restore in R5 cannot be trusted.
-if (trim(shell_out('git status --porcelain '.escapeshellarg($file))) !== '') {
+//
+// ⛔ THE STATUS CAPTURE IS THE POINT: git is ABSENT from the app container (php:8.4-fpm-alpine never
+// installs it) while /var/www/html/.git is visible over the bind mount, so an in-container invocation
+// of this file — which its own header disclaims but nothing enforces — made both `git status` checks
+// pass VACUOUSLY. `trim('') !== ''` is false whether the tree is clean or git could not run at all.
+$dirty = shell_out('git status --porcelain '.escapeshellarg($file), $gitStatus);
+
+if ($gitStatus !== 0) {
+    abort("could not run `git status` for {$file}, so the cleanliness of the target is UNKNOWN. ".
+          'This file runs on the HOST; git is absent from the app container.');
+}
+
+if (trim($dirty) !== '') {
     abort("{$file} has uncommitted changes. Commit or stash them — the restore compares bytes ".
           'against the file as it stands NOW, so a dirty target silently bakes in your edits.');
 }
@@ -112,6 +139,17 @@ if (isset($opts['skip-baseline'])) {
     report("BASELINE — running {$tests} unmutated");
     $baseline = run_pest($container, $tests);
     report($baseline['summary']);
+
+    // ⛔ AN UNMEASURED BASELINE IS NOT A GREEN ONE, AND THE GATE BELOW CANNOT TELL THEM APART.
+    // When `docker exec` fails, no line starts with `Tests:`, `failed` stays 0, `0 > 0` is false, and
+    // this run went on to print SURVIVED — fabricating a finding that reads as a measured result and
+    // invites a backlog row. The sentinel string was already printed; it was never acted on.
+    if (! $baseline['measured']) {
+        abort('the baseline did not RUN — no `Tests:` summary line came back, so it is UNMEASURED '.
+              "rather than green. A red proves nothing if you cannot show it was green.\n".
+              '  exit status: '.var_export($baseline['status'], true)."\n".
+              '  last output: '.last_line($baseline['raw']));
+    }
 
     if ($baseline['failed'] > 0) {
         abort("the baseline is NOT green ({$baseline['failed']} failed). Fix that first — a red ".
@@ -155,11 +193,30 @@ report("MUTANT — running {$tests}");
 $mutant = run_pest($container, $tests);
 report($mutant['summary']);
 
+// ⛔ RESTORE BEFORE REFUSING. THE MUTANT IS ON DISK AT THIS POINT. M62 corrupted a tree exactly here —
+// a harness that aborts between the write and the restore leaves the mutant behind, and a second run
+// then stacks another on top of it. So this refusal is at the CALL SITE with $original in scope, and
+// not inside run_pest() where the same check would have no way to undo the write.
+if (! $mutant['measured']) {
+    restore($absolute, $original, $shaBefore);
+    abort('the mutant run did not RUN — no `Tests:` summary line came back. The file has been '.
+          "restored; this run is UNMEASURED and is NOT a SURVIVED verdict.\n".
+          '  exit status: '.var_export($mutant['status'], true)."\n".
+          '  last output: '.last_line($mutant['raw']));
+}
+
 // R5. Restore by BYTE COMPARISON. Never `git checkout --` (M9).
 restore($absolute, $original, $shaBefore);
 report("restored; sha256 back to {$shaBefore}");
 
-if (trim(shell_out('git status --porcelain '.escapeshellarg($file))) !== '') {
+$dirtyAfter = shell_out('git status --porcelain '.escapeshellarg($file), $gitStatusAfter);
+
+if ($gitStatusAfter !== 0) {
+    abort("could not run `git status` for {$file} after the restore, so the tree's state is UNKNOWN. ".
+          'The restore itself compared bytes and passed, but do not trust this tree until git works.');
+}
+
+if (trim($dirtyAfter) !== '') {
     abort("{$file} is STILL DIRTY after the restore. Do not trust this tree.");
 }
 
@@ -243,20 +300,27 @@ function restore(string $absolute, string $original, string $expectedSha): void
 }
 
 /**
- * @return array{summary: string, failed: int, failures: list<string>, raw: string}
+ * @return array{summary: string, failed: int, failures: list<string>, raw: string, measured: bool, status: int|null}
  */
 function run_pest(string $container, string $tests): array
 {
     $raw = shell_out(sprintf(
-        'docker exec %s php -d memory_limit=2G vendor/bin/pest %s 2>&1',
+        '%s exec %s php -d memory_limit=2G vendor/bin/pest %s 2>&1',
+        docker_bin(),
         escapeshellarg($container),
         $tests
-    ));
+    ), $status);
 
-    // The exit code cannot be trusted — vendor/bin/pest has returned 0 alongside "Tests: 5 failed"
-    // in this repository. Read the summary line, never the status.
+    // ⛔ THE EXIT CODE IS NOT A FAILURE SIGNAL, BUT IT IS A DID-IT-RUN SIGNAL, AND CONFLATING THE TWO IS
+    // WHAT MADE THIS FUNCTION MANUFACTURE VERDICTS. vendor/bin/pest has returned 0 alongside
+    // "Tests: 5 failed" in this repository, so the count still comes from the summary line and never
+    // from the status. What the status IS good for is telling a suite that ran red from a `docker exec`
+    // that never reached Pest at all — and those two used to be indistinguishable here, both yielding
+    // failed = 0. `measured` is the discriminator: the presence of a summary line, which is the only
+    // positive evidence that Pest itself spoke.
     $failed = 0;
     $summary = 'Tests: (no summary line found — treat this run as UNMEASURED)';
+    $measured = false;
     $failures = [];
 
     foreach (explode("\n", $raw) as $line) {
@@ -264,6 +328,7 @@ function run_pest(string $container, string $tests): array
 
         if (str_starts_with($plain, 'Tests:')) {
             $summary = $plain;
+            $measured = true;
 
             if (preg_match('/(\d+)\s+failed/', $plain, $matches) === 1) {
                 $failed = (int) $matches[1];
@@ -275,7 +340,43 @@ function run_pest(string $container, string $tests): array
         }
     }
 
-    return ['summary' => $summary, 'failed' => $failed, 'failures' => $failures, 'raw' => $raw];
+    return [
+        'summary' => $summary,
+        'failed' => $failed,
+        'failures' => $failures,
+        'raw' => $raw,
+        'measured' => $measured,
+        'status' => $status,
+    ];
+}
+
+/**
+ * The container runtime, overridable by `MUTATE_DOCKER`.
+ *
+ * ⛔ THIS SEAM EXISTS SO THE GUARDS ABOVE CAN BE PROVED, AND WITHOUT IT THEY CANNOT BE. Both refusals
+ * fire on how `docker exec` FAILS, and the two failures must be told apart: a probe that cannot run at
+ * all, and a probe that runs while Pest never does. Driving that from real containers needs a live
+ * php-less one — it exists on this host (`dev_formbuilder_app-redis-1`, busybox `sh`/`ps`/`wc`, no
+ * `php`) and does NOT exist on a CI runner, where the `run_pest` case would abort at R1 instead and
+ * the control would silently prove the wrong guard. A stub named here makes both arms deterministic
+ * everywhere. See tests/Feature/Docs/MutateHarnessTest.php.
+ *
+ * ⚠️ It is not a back door: the stub replaces the RUNTIME, never a guard. Every refusal, the token
+ * uniqueness check, the sha256 move and the byte restore all still run exactly as they do in anger.
+ */
+function docker_bin(): string
+{
+    $override = getenv('MUTATE_DOCKER');
+
+    return ($override === false || $override === '') ? 'docker' : $override;
+}
+
+/** The last non-empty line of a captured run, for a diagnostic that names the real cause. */
+function last_line(string $raw): string
+{
+    $lines = array_values(array_filter(array_map('trim', explode("\n", $raw)), static fn (string $l): bool => $l !== ''));
+
+    return $lines === [] ? '(no output at all)' : (string) end($lines);
 }
 
 function shell_out(string $command, ?int &$status = null): string

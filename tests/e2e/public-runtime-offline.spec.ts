@@ -285,19 +285,32 @@ test('Public runtime — reviews & resolves a parked conflict (Increment G8c)', 
 // proved it: `GuestRuntimeTest` pins the 301 and `PwaManifestTest` pins the manifest's canonical
 // `start_url` under a mis-cased path, but Cache Storage is a browser API and Pest cannot see a cache key.
 //
-// ⛔ MEASURED, AND THE BELIEF WAS FALSE. After a mis-cased entry the cache holds TWO keys, not one:
+// ⛔ M72 MEASURED TWO KEYS AND M73 CLOSED IT. Before the fix the cache held TWO keys, not one:
 //     /f/clinic-intake  -> status 200, type 'basic'          (the real shell)
 //     /f/Clinic-Intake  -> status 0,   type 'opaqueredirect' (the 301, cached)
-// The sibling `guest-schema` route filters with `CacheableResponsePlugin({ statuses: [200] })` and this
-// route does not, so Workbox's status filter never runs here. The offline path still WORKS — the browser
-// follows a cached opaqueredirect to the canonical entry, which is cached properly — so the guarantee is
-// real; it is delivered by a mechanism nobody had described. Filed as its own row, because the fix is in
-// `resources/public-runtime/sw.ts`, a hub file this increment's budget was already spent on.
+// It now holds exactly ONE — the canonical shell — because the `/f/*` route carries the sibling
+// `guest-schema` route's own `CacheableResponsePlugin({ statuses: [200] })`. BOTH shapes were measured at
+// this browser, with the plugin line present and then reverted, and the entries printed per arm.
 //
-// ⚠️ SO THIS TEST ASSERTS THE GUARANTEE AND PINS THE SHAPE. What must never change is that the mis-cased
-// key is not a SECOND COPY OF THE SHELL: delete the `if ($slug !== $form->public_slug)` block in
-// `GuestFormController::mint` and the mis-cased url answers 200 directly, the cache gains a real duplicate
-// shell, and the two shape assertions below go red together.
+// ⛔ AND M72's STATED MECHANISM WAS FALSE — it is corrected here rather than carried, because a wrong
+// mechanism in a test header is what the next reader acts on. M72 said "Workbox's status filter never runs
+// here". It does. `NetworkFirst`'s constructor tests `'cacheWillUpdate' in p` — NOT whether any plugin is
+// present — and `ExpirationPlugin` declares only `cachedResponseWillBeUsed` and `cacheDidUpdate`, so
+// `cacheOkAndOpaquePlugin` IS prepended and DOES run. That default admits `status === 200 || status === 0`
+// deliberately. The stub was cached because a filter ALLOWED it, not because none ran. Verified in the
+// shipped `public/build/sw.js`, not only in `node_modules`.
+//
+// ⚠️ AND THE EXCULPATION WAS ALSO WRONG, IN THE DIRECTION THAT MATTERS. M72 wrote that the offline render
+// survives *because* the browser follows the cached opaqueredirect. If that were the mechanism, dropping the
+// stub would break the offline path. It does not: with ONE key and no stub at all, assertion (3) below still
+// passes. So the guarantee does not depend on the cached stub, and what does deliver it is NOT established
+// here — filed as its own row rather than guessed at a second time on this exact route.
+//
+// ⚠️ SO THIS TEST ASSERTS THE GUARANTEE AND PINS THE SHAPE. Two mutations must redden it, and they are
+// different mutations: remove the `CacheableResponsePlugin` line from the `/f/*` route in `sw.ts` and the
+// stub returns (assertion 2); delete the `if ($slug !== $form->public_slug)` block in
+// `GuestFormController::mint` and the mis-cased url answers 200 directly, so the cache gains a real
+// duplicate shell (assertions 1 and 2 together).
 //
 // ⚠️ THE SEQUENCE IS PART OF THE TEST. Navigating mis-cased FIRST would prove nothing: this file records
 // above that the first navigation happens before the SW activates and is uncontrolled, so the SW would
@@ -378,10 +391,11 @@ test('Public runtime — a mis-cased entry never becomes a second cached shell, 
     // (2) And the mis-cased url is NOT a second copy of it. It may be absent, or present as the cached
     //     redirect — but it must never be a servable 200 shell, because two shells under two keys is the
     //     state the canonicalization exists to prevent and the one `maxEntries: 20` would then evict from.
-    const strays = entries.filter((entry) => entry.path !== '/f/clinic-intake');
-    for (const stray of strays) {
-        expect(stray.status).not.toBe(200);
-    }
+    // ⛔ AN EXACT ASSERTION, AND THE LOOP IT REPLACES COULD NOT DO THIS JOB. The old form filtered for
+    //    strays and asserted `.not.toBe(200)` on each — so once the stray is gone the loop body never
+    //    executes and it is VACUOUSLY GREEN. It was fix-tolerant by construction: it passed both before and
+    //    after the plugin line, and therefore could never have proved it. Compare the whole key SET.
+    expect(entries.map((entry) => entry.path).sort()).toEqual(['/f/clinic-intake']);
 
     // (3) The respondent-facing guarantee, which is what "the offline path M61's redirect exists to
     //     protect" actually means: with the network gone, entering at the MIS-CASED url still reaches the

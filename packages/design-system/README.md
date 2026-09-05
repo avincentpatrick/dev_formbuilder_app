@@ -43,3 +43,17 @@ directory, and the root `README.md` makes it the mandatory first bootstrap step.
 
 ⚠️ **From the host, run them through the container**, e.g.
 `docker compose exec node npm run ds:storybook`, then open `http://localhost:6006`.
+
+⛔ **AND `ds:install` MUST HAVE BEEN RUN *INSIDE THE CONTAINER*, OR `ds:storybook` DIES ON A MISSING
+PRESET — measured, not predicted (M72).** A Windows-host `npm install` here uses `--no-bin-links`
+(root `README.md` says why: a nested esbuild-bin file lock), which leaves a **split tree**: the
+`storybook` CLI hoisted to the root `node_modules` and `@storybook/vue3-vite` only in this package's.
+The root CLI then resolves presets from the root tree and fails with
+`Cannot find module '@storybook/vue3-vite/preset'` — a message that names a package which *is*
+installed, one directory away. `docker compose exec node npm run ds:install` produces a coherent
+Linux install and the preview then answers on the first try.
+
+⚠️ **Nothing gates this and nothing can.** It is a property of a developer's `node_modules`, which is
+gitignored — not of any artefact in the repository. `tests/Feature/Docs/DocumentedCommandDriftTest.php`
+proves the port is published and the alias exists; whether *your* tree can start the server is what
+this paragraph is for.

@@ -4,6 +4,8 @@
 **Status:** Draft v1.0 — covers both OCR channels named in the architecture plan's Main Features #1 (single-form) and #2 (linelist/batch), the second of which legacy's own planning docs confirmed as "scoped but never fully completed." This document is this product's chance to actually finish that idea, per the plan's own framing.
 **Phase**: 3, per `docs/PRD.md`'s roadmap — an optional channel, not core MVP.
 
+<!-- pipeline: id=ocr-channels title="PRD Features #1 and #2 — both OCR channels, per-form and linelist" phase=3 state=held size=XL blocker="user: needs filled paper-form samples and ground-truth data only the user can supply" -->
+
 ---
 
 ## 1. Both Channels, One Underlying Model

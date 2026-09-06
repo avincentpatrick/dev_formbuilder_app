@@ -3,6 +3,8 @@
 **Project:** Form-Builder SaaS (`dev_formbuilder_app`)
 **Status:** Draft v2.0 — operationalizes **`docs/adr/0005-hosting-self-hosted-windows-server.md`** (self-hosted on Windows Server 2016), which **supersedes ADR-0003** (Laravel Cloud). This document fills in the platform-specific operational detail: environments, the git-driven deploy pipeline, secrets, the self-managed Postgres backup/DR runbook, queue/worker supervision, and the Windows service topology. It also operationalizes `docs/non-functional-requirements.md` §2/§8's availability & durability targets — now self-managed.
 
+<!-- pipeline: id=track-b-deployment title="Track B — stand up the ADR-0005 self-hosted production host" phase=4 state=held size=XL blocker="user: deferred until app development is done, and needs the host itself" -->
+
 ---
 
 ## 1. What's Already Decided (not repeated in full)

@@ -16,20 +16,172 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M76` is merged; four rows closed, five filed, and the increment was extended mid-build by a live break of the invitation accept flow
+## Status: ACTIVE CLAIM — `M77`, the twelfth batched increment: four rows, one of them closing two (`m77-batched-rows`)
 
-`M76` closed **four** rows and filed **five**, spending **one** hub slot. `state.php` counts the tree; do
-not take that sentence's arithmetic on trust.
+Taken 2026-09-06. Branch `m77-batched-rows`, cut from `origin/main` at `4ede7f8`, PR into `main`.
 
-⛔ **THE ONE THING `M76` WOULD MOST LIKE TO HAND ON: I ASSERTED A TOOL WAS LYING FROM THREE PIECES OF
-CIRCUMSTANTIAL EVIDENCE, AND PUBLISHED IT, WITHOUT RUNNING THE ONE TEST THAT SETTLES IT.** The claim
-opened by declaring the host `phpstan` and `pint` binaries stubbed — the output was not their format, it
-was insensitive to arguments, and `--version` still worked. All three observations were real and the
-conclusion was wrong. A deliberately broken file turns the host run red with file, line, message and
-identifier. **This project already has the rule and it is written down: a green result proves nothing
-about an instrument you have just started trusting — only a deliberate defect that turns it red does.**
-I applied it to the gate I was writing and not to the claim I was making about the harness, which is the
-more expensive of the two places to skip it.
+**Selected from a read-only fan-out over EIGHT candidates, each verified by one agent and then attacked
+by a second whose brief was to refute it.** ⛔ **The adversarial arm broke FIVE of the eight verdicts on
+measured grounds, and three of those five are in this batch** — so what follows is the corrected
+position, not the first one. The refutations are the reason this claim's remedies differ from the rows'.
+
+Rows, all four from `docs/feature-backlog.md`:
+
+- **`R1` (the hub row, `.github/workflows/ci.yml`) — `:6628` *"`R7` pins the checkout depth to `PR commits + 1`, so a depth of 50 keeps every gate green while blinding the secret scan"* (`M76`), which also closes `:5468` *"Nothing pins `fetch-depth` for the SECRET SCAN"* (`M49`).**
+- **`R2` — `:6149` *"`guest-shell-assets` has the identical missing status filter, and no row has ever named it"* (`M73`).**
+- **`R3` — `:6565` *"The proof-of-work yield is pinned on the fallback path only, and its CADENCE is asserted nowhere at all"* (`M75`).**
+- **`R4` — `:1693` *"The `reviewer` role's seeded description and `SubmissionPolicy::create()` contradict each other"* (`M13`).**
+
+⚠️ **Why the live security row is NOT in this batch, stated because leaving it out was a real cost.**
+`:3209` (`PUT /user/profile-information` is a second mail cannon) is the only *live, exploitable* row of
+the eight. It is out because `docs/security-threat-model.md:161` names that route as unbound **by
+decision** and *"filed as its own backlog row"* — so binding it obliges an edit to that file, which is a
+hub file (4 open rows), and `D13` allows **one** hub-touching row per batch. `R1` spends it, closing two
+rows to `:3209`'s one. `D15` asks exactly this question and is OPEN, so this batch obeys `D13` as
+written rather than pre-empting it. Everything the fan-out measured about `:3209` — including a live,
+previously unfiled defect found beside it — is written into the backlog this increment so the cost is
+paid once.
+
+### Evidence verified
+
+- **`R1` — HOLDS structurally, and the row's ARITHMETIC IS STALE.** `ci.yml:116` carries `fetch-depth: 0`
+  and that literal occurs **exactly once** in the file (measured with `wc -l`, per the host trap; the
+  bare word `fetch-depth` occurs three times, twice in prose at `:200`/`:209`). The gitleaks step is
+  `ci.yml:286-290`, `gitleaks detect --source . --no-banner --redact --exit-code 1`, and it lives in the
+  **same** `static-analysis` job as that checkout — so the scan is **not blind today**. `R7`'s clone-shape
+  assertion is in `scripts/tracker-lint.php`'s `resolve_r7_base()` (`$expected = (int) $declared + 1`).
+  The pin was measured rather than read: a scratch bare mirror shallow-cloned at depths 1–10 against a
+  real 7-commit merge gives R7 **red at depth ≤ 6, green at depth 7**, where the clone holds 17 of 815
+  commits. *"Pins the depth to PR commits + 1"* is **exact**. ⛔ **The numbers are wrong:**
+  `git rev-list --count HEAD` is **987**, not 1,181 — that figure was this local clone's `--all`
+  (**1,187**), and `actions/checkout` fetches one refspec so a CI clone never holds the local ref set.
+  Neither 987 nor 1,187 yields the row's *"1,100"*. `ci.yml:114`'s own companion literal
+  (*"20 MB over 866 commits"*) is stale the same way.
+- **`R2` — HOLDS at every citation.** `resources/public-runtime/sw.ts` registers three routes;
+  `guest-shell-assets` is a `StaleWhileRevalidate` over `/build/` and is the only one of the three whose
+  plugins array carries no `CacheableResponsePlugin`. Workbox prepends `cacheOkAndOpaquePlugin`
+  (`status === 200 || status === 0`) when none is supplied — confirmed against the vendored workbox
+  7.4.1, which reports **2 plugins today (the prepend happened) and 2 with the fix (no prepend)**.
+- **`R3` — HOLDS.** `challenge.ts:156` is `if (n % 5000 === 4999) await yieldToEventLoop();` and
+  `config/guest.php:70` sets `max_number` to `120000`. A worst-case solve therefore yields on the order
+  of two dozen times, and no test, comment or document anywhere states that interval or defends it.
+- **`R4` — HOLDS on both halves, verbatim.** `database/seeders/RolePermissionSeeder.php:104` documents
+  the role as *"Review submissions on forms they collaborate on; may also encode + export those forms."*
+  and grants `submissions.create`. `SubmissionPolicy::create()` requires `submissions.create` **and** a
+  published version **and** (`forms.edit.any` **or** `ResourceCapacity::Editor` on that form). A
+  reviewer's grant is reviewer capacity, so the seeded sentence is false for a plain Reviewer.
+
+### Premise verified
+
+⛔ **All four rows carry a false or stale premise, and in three of them it changes what ships.**
+
+- **`R1` — PARTLY FALSE, and the falsification is the row's own arithmetic** (above). What HOLDS, and
+  was re-derived independently of the row: `gitleaks detect --source .` really scans **history**, proved
+  from `.gitleaksignore`'s three commit-scoped fingerprints, whose commits sit 596–617 back from HEAD and
+  one of whose regions exists **only** in `PROGRESS_ARCHIVE.md` today — a working-tree scan could never
+  have produced it. `.gitleaksignore`'s own header records the direct measurement: at depth 2 the scan
+  saw two commits; at depth 0 it saw 818 and immediately reported three previously unreachable findings.
+  ⛔ **And `ci.yml:200`'s claim that R7 makes a future depth reduction *"fail LOUDLY"* is false across the
+  whole range above the pin** — which is the row, now measured rather than argued.
+- **`R2` — PARTLY FALSE, and it is `M74`'s addendum rather than the row that is wrong.** The addendum
+  closed the reachability question *"three independent ways"*; one of the three is a survey rather than a
+  proof, so the honest form is a **precondition** (a cross-origin redirect for a same-origin `/build/`
+  URL — an edge CDN/WAF, an `ASSET_URL`, or a canonicalising redirect, none of which exist here), not an
+  all-clear. ⛔ **A sibling premise is stale too**: the row says the fix would be *"the same one-line
+  fix"* as `/f/*`'s, and there is **no `sw.test.ts` in this repository** — only `register-sw.test.ts`.
+  Any proof is a new file, not an added case.
+- **`R3` — PARTLY FALSE, and inverted.** The row frames the yield as protecting the **service worker**
+  draining the outbox. A SW is always a secure context, therefore always takes the `crypto.subtle` path,
+  where the awaited native digest already turns the event loop on every candidate — so the yield does
+  **nothing** there. The context it actually serves is the **insecure-embed tab**, which has the pure-JS
+  solver and, for the same secure-context reason, no service worker at all. `challenge.ts`'s module
+  docblock states the inverted version, and is what fed the row its premise.
+- **`R4` — PARTLY FALSE, and it is the row's *"this is an authorization decision"* framing that fails.**
+  The contradiction is not two defensible readings of one fact; it is **one code behaviour against
+  several documentation surfaces**, of which the fan-out found at least four stale — including two
+  inside `docs/multi-tenancy-rbac-design.md`'s §8.3, the section a reader would treat as authoritative.
+  `:553` describes `SubmissionPolicy`'s review check as capacity-specific when `review()` goes through
+  `ResourceGrantResolver::holdsAny()` and accepts **either** capacity; `:215` says a Reviewer **and a
+  Viewer** can both reach the encode screen, which is false for both. So most of this row is a
+  documentation reconciliation against the code, and the genuine user question that remains is narrower
+  than the row states.
+
+### Remedy verdict
+
+- **`R1` — WORKS AS WRITTEN, with one correction the row does not name and which would have cost the
+  proof.** `git rev-parse --is-shallow-repository` was measured to return `true` at every finite depth
+  1–10 and `false` on a full clone and on this repo — an exact boolean over what `actions/checkout`
+  produces. ⛔ **It EXITS 0 IN BOTH STATES**, so `if git rev-parse …; then fail; fi` is always red and
+  `if ! …` is never red; the fence must compare the printed **string**, which also fails closed on an
+  empty capture. ⛔ **AND THE FENCE'S ERROR MESSAGE MUST NOT CONTAIN THE TOKEN IT GUARDS.**
+  `scripts/mutate.php` aborts unless the old token occurs **exactly once**, so a message quoting
+  `fetch-depth` followed by its value turns this increment's only proof from CAUGHT into *no verdict at
+  all*. That is the trap `ci.yml:267-268` already documents fourteen lines above the gitleaks step, and
+  the first draft of this remedy walked into it.
+- **`R2` — WORKS, BUT THE PRESCRIBED PROOF DOES NOT.** Adding `CacheableResponsePlugin({statuses:[200]})`
+  is correct and is a no-op in production (the delta is `{0}`, and status 0 is unreachable here). ⛔ **The
+  test shape the fan-out first prescribed — asserting `cacheWillUpdate({response:{status:0}})` returns
+  null — was measured against the vendored workbox and THROWS**: `CacheableResponse.isResponseCacheable()`
+  opens with an `assert.isInstance(response, Response)` guard in non-production builds, three lines above
+  the status check it was quoting. All three routes would go red, so it is not a weak discriminator, it
+  is a non-functioning test. The only status-0 `Response` obtainable is `Response.error()` —
+  `new Response(null, {status: 0})` throws `RangeError` — and happy-dom supplies it. ⚠️ **Nobody has yet
+  run the corrected form**, and workbox's dev-logger branch on the not-cacheable path is the risk.
+- **`R3` — WORKS, BUT THE OBVIOUS INVARIANT IS ARITHMETICALLY FALSE, AND MEASURED SO.** Sweeping every
+  answer in `[0,120000]` against a faithful re-implementation of the loop:
+  `yields === floor(tried / 5000)` is **wrong for 24 of 120,001 answers** — every answer at
+  `n ≡ 4999 (mod 5000)`, because the loop **returns on the match before reaching the yield check**.
+  `yields === floor((tried - 1) / 5000)` is wrong for **none**. ⛔ **The existing fixture
+  `challengeFor(12000, 20000)` is one of the answers where the WRONG formula coincidentally agrees**, so
+  a test written to the obvious invariant passes green while encoding a falsehood, and neither candidate
+  mutation would catch it. The cadence *value* stays a decision; the seam and the corrected invariant do
+  not.
+- **`R4` — THE ROW OFFERS TWO REMEDIES AND BOTH ARE WIDER THAN NEEDED.** *"Widen `create()` to accept
+  reviewer capacity"* is an access change and is genuinely the user's call. *"Correct the seeder's
+  sentence and drop `submissions.create`"* is wrong in its second half: the permission is load-bearing —
+  it is what makes the editor-capacity path work and what entitles `write:submissions` — so dropping it
+  would break a working configuration. What ships is the intersection neither option states: **correct
+  the prose on every stale surface, change no access**, and put the narrowed question to the user.
+
+Files: `.github/workflows/ci.yml`, `tests/Feature/Docs/SecretScanDepthTest.php` (new),
+`resources/public-runtime/sw.ts`, `resources/public-runtime/__tests__/sw.test.ts` (new),
+`resources/public-runtime/lib/challenge.ts`, `resources/public-runtime/__tests__/challenge.test.ts`,
+`database/seeders/RolePermissionSeeder.php`, `docs/multi-tenancy-rbac-design.md`,
+`docs/ACCESS-MATRIX.md`, `docs/feature-backlog.md`, `docs/claims/decisions.md`,
+`docs/claims/lane-a.md`, `PROGRESS.md`, `docs/gate-baselines.md`, `docs/backlog-triage.md`.
+
+Shared artefacts taken: `docs/multi-tenancy-rbac-design.md`, `docs/ACCESS-MATRIX.md`,
+`docs/feature-backlog.md`, `docs/claims/decisions.md`, `docs/gate-baselines.md`,
+`docs/backlog-triage.md`, `PROGRESS.md` (own block only). **`docs/security-threat-model.md` and
+`docs/data-dictionary.md` are deliberately NOT taken** — see the hub-slot note above.
+
+Paired files taken: none. ⚠️ `config/guest.php` is **read** by `R3` and not edited; the interval lives
+in `challenge.ts`.
+
+Namespaces spent: one `§D` id for the proof-of-work interval question and one for the reviewer-role
+authorization question. **No migration prefix and no ADR** — and `docs/adr/`'s single gap stays reserved
+for H1d.
+
+Prediction, written before the run:
+
+- **Vitest 135 → 137** (a new `sw.test.ts`; the `challenge.test.ts` cases add no file, so the second
+  file is the one I am least sure of). ⚠️ **This is the prediction I least trust, and specifically the
+  `sw.test.ts` half**: `sw.ts` has never been mounted in this repository, the corrected status-0 probe
+  has not been run, and workbox's dev-logger branch dereferences `getFriendlyURL()` and iterates
+  `response.headers` on exactly the path the test drives. If it cannot be made to run, `R2` ships the
+  production fix plus the precondition comment and **says the proof was not built** — it does not ship a
+  test that passes for the wrong reason.
+- **Pest +1 file** (`SecretScanDepthTest`), and **PHPStan unchanged at its baseline**. The diff touches
+  `database/seeders/`, which is inside PHPStan's scope, but a comment change cannot move it — said aloud
+  because an unchanged number otherwise reads as *"the back-end work did not land"*.
+- **Pint: no change.** The `.php` edits are a seeder comment and one new test.
+- **E2E green and uninformative for all four rows.** `R2` is the only one reaching shipped worker code,
+  and its production delta is provably empty.
+- **Storybook axe cannot move** — no component, story or token is touched.
+- ⛔ **`R1`'s mutation is this increment's real proof and I expect it to be CAUGHT**:
+  `scripts/mutate.php` swapping `fetch-depth: 0` → `fetch-depth: 2`, **committed** rather than left in
+  the working tree. It abstains — non-zero with no verdict — if the fence's own message quotes the token,
+  which is the failure mode this claim exists to have anticipated.
 
 ---
 

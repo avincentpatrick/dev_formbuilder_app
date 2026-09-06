@@ -58,7 +58,10 @@ registerRoute(
     ({ url, sameOrigin }) => sameOrigin && url.pathname.startsWith('/build/'),
     new StaleWhileRevalidate({
         cacheName: 'guest-shell-assets',
-        plugins: [new ExpirationPlugin({ maxEntries: 80, maxAgeSeconds: 30 * DAY })],
+        plugins: [
+            new CacheableResponsePlugin({ statuses: [200] }),
+            new ExpirationPlugin({ maxEntries: 80, maxAgeSeconds: 30 * DAY }),
+        ],
     }),
 );
 

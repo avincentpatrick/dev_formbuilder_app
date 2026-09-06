@@ -77,15 +77,21 @@ file, never copy out of it. `state.php` reports how far behind the trunk that fi
 
 ## Taking a row
 
-- The queue is `docs/feature-backlog.md`. Read `docs/backlog-triage.md` first for the ranked order —
-  and treat its counts as a dated census, not as the tree. `state.php` counts the tree.
+- **The queue is `docs/pipeline.md` — one generated, ordered line holding every remaining task.**
+  Regenerate it with `php scripts/pipeline.php`; never hand-edit it. `docs/backlog-triage.md` keeps
+  its own job — the operability ranking *within* the defect segment — and its counts are a dated
+  census rather than the tree. `state.php` counts the tree.
+- A plan item enters the line by a marker at its **point of truth**, never by a second list. The
+  grammar is in `scripts/pipeline.php`'s header. A marker inside a table or a list breaks the render,
+  so it goes at the end of the section it governs and carries its own title.
 - Decisions live in `docs/claims/decisions.md`. When something is genuinely the user's call, **append
   the question, two or three real options and your recommendation, then take the next row in the same
   turn.** Never idle on a question, and never re-ask an open one.
-- **A held row is out of scope, not pending.** Never report it, count it, schedule it, or ask about it.
-  It re-enters only on the user's explicit signal.
-- Compute progress over buildable scope only. When a phase's remaining rows are all held, start the
-  next phase without asking.
+- **A held row is unscheduled, not invisible.** It sits in the line, in its position, with its blocker
+  named. Do not start one, do not offer it as the next step, and do not re-derive its blocker for the
+  user — it becomes work only on their explicit signal. **Progress is counted over the whole pipeline,
+  held rows included**, and the generator refuses a held row that names no blocker.
+- When a phase's remaining rows are all held, start the next phase without asking.
 
 ## Where each gate actually runs
 

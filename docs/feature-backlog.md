@@ -7108,3 +7108,385 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   residual 31 still says *"exactly one server-derived equality predicate"* while `ADR-0002` was amended
   twelve days earlier to record **two** consumers. ⚠️ The rule is restated in **13 files / 15 occurrences**,
   not the three the open row names, so "amend all three documents" undercounts by ten. **Live.** Filed by `M78`.
+
+- **`minor` · `forms.single_page_mode` has no write surface outside the seeders, so single-page mode is
+  unreachable for a real tenant — and its documented default disagrees across four documents.** Measured by
+  `M79`'s sweeps (2026-09-06), brought here by `M80` through the three-term join — absent in code **and**
+  unfiled **and** undecided — then attacked by a refuter that did not overturn it. ⛔ **NO WRITER OUTSIDE
+  SEEDERS.** Declared at `app/Models/Form.php:41`, `:88` and `:120`, read at
+  `app/Services/Submissions/EncodeFormPresenter.php:210` and
+  `app/Services/Submissions/PublicFormPresenter.php:39` — and every assignment in the tree is a seeder or a
+  test (`database/seeders/DemoSeeder.php:535`, `database/seeders/E2eSeeder.php:372`, `:474` and `:534`,
+  `tests/Feature/Submissions/EncodeStepPayloadTest.php:76`). The sole creation path,
+  `app/Services/Forms/FormService.php:67`, opens a `Form::create([` whose six explicit keys on the lines
+  below it omit the column, so every real form takes the database default. No `FormRequest` names it, and
+  `resources/js/Pages/forms/` has no toggle. ⚠️ **The sibling establishes this is a gap and not a house
+  style**: `save_and_resume` carries a dedicated writer stack —
+  `app/Http/Requests/Forms/UpdateSaveResumeRequest.php` and
+  `app/Http/Controllers/Tenant/FormSaveResumeController.php`. ⛔ **THE DEFAULT HALF IS NARROWER THAN THE
+  SWEEP OFFERED AND WORSE THAN IT LOOKS.** It is not doc-vs-code; it is four documents holding two
+  incompatible values. `database/migrations/2026_07_06_000201_create_forms_table.php:46` and
+  `docs/data-dictionary.md:221` say `false`. `docs/ux/form-filling-ux-flow.md:337` calls `true` "the literal
+  default for a new form" and `docs/PRD.md:103` agrees. So repairing one pair does not settle it. ⚠️ The
+  cost is already on the record: `PROGRESS_ARCHIVE.md:297` logs an E2E timeout caused by the seeded form
+  defaulting to multi-step. **Live.** Filed by `M80`.
+
+- **`minor` · `forms.allow_manual_encoding` is documented as Feature #7's capability flag and has neither a
+  reader nor a writer — the only one of five inert `allow_*` flags whose feature actually shipped.**
+  Measured by `M79`'s sweeps (2026-09-06), joined and refuted by `M80`. Five sites hold the name and none
+  consults it: `app/Models/Form.php:83` (`$fillable`), `app/Models/Form.php:115` (cast),
+  `database/migrations/2026_07_06_000201_create_forms_table.php:41` (default `true`),
+  `tests/Feature/Tenancy/TenantExtractColumnDriftTest.php:53` (a column-name census) and the documenting
+  row at `docs/data-dictionary.md:216`. The two places that would consult it gate on something else —
+  `app/Policies/SubmissionPolicy.php:42` returns `submissions.create` with the published-version and
+  Editor-grant conjuncts on the lines below, summarised at `app/Policies/SubmissionPolicy.php:33`, and no
+  conjunct is this flag; the encode routes at `routes/tenant.php:656` reason explicitly about two *other*
+  omitted gates without mentioning it. ⚠️ **TWO CORRECTIONS THE JOIN MADE TO THE FINDING, AND BOTH CHANGE
+  THE ROW.** (a) It is one of **five** unread flags — `allow_api_import`, `allow_offline_sync`,
+  `allow_ocr_single` and `allow_ocr_linelist` are equally reader-less. The other four sit ahead of unbuilt
+  or held features and `docs/data-dictionary.md:217` carries that rationale explicitly; this one's feature
+  is built, which is what makes it filable rather than a ratified absence. (b) The `$fillable` entry is
+  **not** a mass-assignment risk: `app/Services/Forms/FormService.php:67` opens an explicit six-key array,
+  so nothing can set it either. ⚠️ **The remedy is genuinely two-directional** — `docs/PRD.md:252` opens
+  Feature #7 and its acceptance criteria never ask for a per-form off switch, so narrowing
+  `docs/data-dictionary.md:216` is as defensible as wiring the gate, and the row should be taken with both
+  priced. Precedent for the shape: `users.last_active_tenant_id`, already in this file. **Live.**
+  Filed by `M80`.
+
+- **`minor` · `forms.allow_offline_sync` has no reader anywhere — neither the sync manifest nor the PWA
+  install entry honours the per-form offline gate that two documents describe, and it defaults to `true`.**
+  Measured by `M79`'s sweeps (2026-09-06), joined and refuted by `M80`. Seven hits, all declaration:
+  `database/migrations/2026_07_06_000201_create_forms_table.php:45`, `app/Models/Form.php:87` and `:119`,
+  `tests/Feature/Tenancy/TenantExtractColumnDriftTest.php:53`, and the three documenting lines
+  `docs/data-dictionary.md:220`, `docs/erd.md` (inside the `forms` entity block) and
+  `docs/ux/form-filling-ux-flow.md:49`. ⛔ **THE SWEEP NAMED THE MANIFEST AND MISSED THE LOAD-BEARING
+  HALF.** Both surfaces gate on the **plan** entitlement instead: `routes/api.php:293` carries
+  `feature:offline_sync` and `app/Http/Controllers/Api/V1/SyncManifestController.php:69` never touches the
+  column — but the installed PWA entry at `app/Http/Controllers/Public/PwaManifestController.php:66` is the
+  one `docs/ux/form-filling-ux-flow.md:49` explicitly conditions on the per-form flag, and it gates
+  `allow_guest_submissions` there, the published version at `:67` and the tenant-level module at `:68` —
+  never the per-form column. ⚠️ **The AND-both contract is implemented for the sibling**, which is why the
+  omission reads as a gap: `app/Http/Controllers/Tenant/SubmissionDraftController.php:41` states the
+  doctrine, `app/Http/Controllers/Public/GuestDraftController.php:73` enforces the per-form half and
+  `app/Services/Submissions/PublicFormPresenter.php:44` ANDs the two. ⚠️ **Calibration, so this is not
+  over-filed:** it is one of the family of **five** inert flags the row above enumerates. It earns its own
+  row only because offline sync **shipped** — the sync routes, the PWA manifest,
+  `tests/Feature/Entitlements/OfflineSyncGateTest.php` — whereas the OCR flags are parked ahead of held
+  work. **Live.** Filed by `M80`.
+
+- **`minor` · The documented async export API — `POST /api/v1/forms/{form}/exports` and
+  `GET /api/v1/exports/{export}` — has zero routes and no `exports` job row, while the substrate §7.3 names
+  ships almost entirely, with only the submission PDF using it.** Measured by `M79`'s sweeps (2026-09-06),
+  joined and refuted by `M80`. `routes/api.php` registers 68 routes and none matches `exports`; the
+  nearest, `routes/api.php:402`, is a synchronous analytics stream. There is no `exports` table, no
+  `Export` model, no `openapi.json` path. ⛔ **BUT "THE ENTIRE LIFECYCLE IS MISSING" IS WRONG, AND THE
+  CORRECTION IS THE USEFUL PART.** Nearly every named need already exists under other names:
+  `app/Enums/QueueName.php:40` (`Exports`), `app/Jobs/Submissions/GeneratePdfJob.php:59` which carries that
+  queue and whose docblock at `:30` records the queue "has existed with none since H2", the dispatcher at
+  `routes/tenant.php:723`, `AttachmentKind::export_artifact` at `docs/data-dictionary.md:41` and
+  `NotificationType::export_ready` at `docs/data-dictionary.md:55`, the `exports_count` meter, and a 12/min
+  fairness ceiling at `config/queue-fairness.php:68`. ⚠️ **One named piece does NOT ship, and the row would
+  overstate itself by claiming otherwise:** §7.3 also says completion is signalled by a realtime Reverb
+  push, and there is no broadcasting config in the tree at all —
+  `app/Jobs/Submissions/GeneratePdfJob.php:40` says so itself. What is genuinely absent is the job row, the
+  two endpoints and any status read. ⚠️ **It is also not specific to exports** — `PATCH /tenant`, form
+  write CRUD, the draft group, `GET/PATCH/DELETE /submissions/{submission}`, attachments, `users`/`roles`
+  and `subscription` are absent from `routes/api.php` the same way, and the sibling rows in this block name
+  them. **Live.** Filed by `M80`.
+
+- **`minor` · The documented `Users & roles` API resource group (`GET/POST /api/v1/users`, `/api/v1/roles`)
+  has zero routes, and a shipped schema decision was already paid for it.** Measured by `M79`'s sweeps
+  (2026-09-06), joined and refuted by `M80`. Not one of the 68 route registrations in `routes/api.php`
+  contains `users` or `roles`; `app/Http/Controllers/Api/V1/` holds 22 controllers and none is a user, role
+  or member controller; no `read:users` / `write:roles` Sanctum ability exists. The capability ships on the
+  web surface only — `routes/tenant.php:409`, `:411`, `:417`, `:419`, `:421`. ⛔ **THE CODE ALREADY NAMES
+  THE CONSEQUENCE:** `app/Http/Resources/Api/V1/AuditResource.php:28` says in as many words that there is
+  no `/api/v1/users` endpoint, so an API-only consumer of `GET /api/v1/audits` receives `user_id` and
+  `acting_as_user_id` UUIDs it cannot resolve. ⛔ **AND THE ENDPOINT WAS NEVER RETRACTED — IT SHAPED THE
+  SCHEMA.** `docs/multi-tenancy-rbac-design.md:56` gives the forward reference to `GET /api/v1/roles` as
+  the reason roles use UUIDv7 rather than Spatie's bigint PKs, echoed at `app/Models/Role.php:13` and in
+  the comment opening at `config/permission.php:20`. ⚠️ **The one near-miss is a circular pointer, not a
+  deferral**: `docs/multi-tenancy-rbac-design.md:711` defers the request/response *shapes* to Doc #14, and
+  `docs/api-specification.md:13` points straight back at §7.1 as the authoritative inventory. Neither
+  defers the build. This repository builds `/api/v1` twins deliberately — `routes/tenant.php:755` says
+  so — so the web surface does not discharge it. **Live.** Filed by `M80`.
+
+- **`minor` · §7.1's `Form draft` row pins four `/api/v1` builder endpoints registered nowhere, and the
+  `validations` sub-resource exists on neither surface.** Measured by `M79`'s sweeps (2026-09-06), joined
+  and refuted by `M80`. `docs/architecture/technical-architecture.md:443` pins
+  `GET/PATCH /api/v1/forms/{form}/draft`, `.../sections`, `.../fields` and `.../fields/{field}/validations`.
+  The forms family in `routes/api.php` is `:168`, `:172`, `:176`, `:180`, `:187`, `:194` and `:200` — read,
+  publish and xlsform-import only. ⛔ **"THE ENTIRE BUILDER CRUD API IS UNREGISTERED" IS FALSE AS WORDED
+  AND THE ROW MUST NOT REPEAT IT.** The builder ships on the tenant-web surface — `routes/tenant.php:553`
+  through `:587`, all `can:update,form`, all on `FormBuilderController`. What is absent is the `/api/v1`
+  **twin**, which this repository treats as a separate obligation:
+  `docs/xlsform-interop-spec.md:138` records both surfaces for the adjacent export, and
+  `routes/tenant.php:518` calls its own route "the browser-facing twin of the doc-pinned /api/v1 endpoint".
+  ⚠️ **Two of the four pinned groups are twinned outright, one only partly, one not at all** — sections and
+  fields have full web twins, the draft READ exists as `GET /forms/{form}/builder` at
+  `routes/tenant.php:552` with **no** PATCH-the-draft twin anywhere in that block, and:
+  ⛔ **THE SHARPER FINDING THE SWEEP MISSED:** `.../fields/{field}/validations` exists on **neither**
+  surface. Validations are written inline from the field payload —
+  `app/Services/Forms/FormBuilderService.php:157`, `:322` and `:331` — so nothing in the tree implements
+  them as an addressable resource at all. ⚠️ Adjacent and deliberately in scope of the same repair:
+  `docs/architecture/technical-architecture.md:441` also pins `POST /api/v1/forms` and
+  `PATCH/DELETE /api/v1/forms/{form}`, and only the two GETs exist. **Live.** Filed by `M80`.
+
+- **`minor` · The parity matrix scores API/programmatic import as Phase-1 shipped, and the code's own enum
+  docblock calls it a later channel.** Measured by `M79`'s sweeps (2026-09-06), joined and refuted by
+  `M80`. `docs/competitive-feature-parity-matrix.md:58` scores the row ✓ for this product, and the legend
+  at `docs/competitive-feature-parity-matrix.md:7` defines ✓ as "fully supported today";
+  `docs/competitive-feature-parity-matrix.md:118` repeats the claim. ⛔ **THE PREMISE UNDER THE ✓ IS
+  FALSE.** The row leans on "the same Phase-1 `POST /submissions` endpoint as manual encoding" — and that
+  endpoint is `routes/tenant.php:666`, a session-authenticated Inertia **web** route no token-holding
+  caller can reach. `routes/api.php` has four submission-writing routes (`:300` sync, `:308` promote,
+  `:531` the public guest post and `:565` the guest draft store, which reaches
+  `app/Services/Submissions/SubmissionDraftService.php:409` and creates a `submissions` row) and
+  `openapi.json` carries 51 paths, none of them `/forms/{form}/submissions`. ⛔ **AND NO APPLICATION CODE
+  PATH WRITES THE CHANNEL.** The only `SubmissionSource::` writers under `app/` are
+  `app/Http/Controllers/Api/V1/SyncSubmissionController.php:140`,
+  `app/Http/Controllers/Public/GuestDraftController.php:93`,
+  `app/Http/Controllers/Public/GuestSubmissionController.php:170`,
+  `app/Http/Controllers/Tenant/SubmissionController.php:117` and
+  `app/Http/Controllers/Tenant/SubmissionDraftController.php:97` — never `ApiImport`. ⚠️ **Scope that
+  precisely, because the pipeline DOES accept the value**: `database/seeders/DemoSeeder.php:923` and
+  `tests/Feature/Submissions/SubmissionPipelineTest.php` pass it in directly, so what is missing is an HTTP
+  ingress, not pipeline support. The contradiction is in the code itself:
+  `app/Enums/SubmissionSource.php:9` lists `api_import` among "the later channels". ⚠️ **Documentary, not
+  live for an integrator**: the generated contract they build a client from never serves the phantom path.
+  ⚠️ Stale premise found in passing — `routes/api.php:285` asserts a bound `forms/{form}/submissions` route
+  exists in the Group-B surface, and it does not. **Live.** Filed by `M80`.
+
+- **`minor` · §7.1's flat webhook-delivery paths and §7.4's per-tenant delivery-log UI both contradict the
+  same document's per-endpoint spec, and only the per-endpoint form was built.** Measured by `M79`'s sweeps
+  (2026-09-06), joined and refuted by `M80`. Every delivery listing in the tree is parent-scoped —
+  `routes/api.php:323`, `routes/api.php:328`, `routes/tenant.php:770`, and the query chains opening at
+  `app/Http/Controllers/Api/V1/WebhookDeliveryController.php:31` and
+  `app/Services/Webhooks/WebhookEndpointPresenter.php:105`, whose `webhook_endpoint_id` predicates sit on
+  the following line in each — and `openapi.json` carries the nested pair only. ⛔ **DO NOT TAKE THIS AS
+  "BUILD `GET /api/v1/webhooks/deliveries`".** The sweep missed that the same document contradicts its own
+  cited line 34 lines later: `docs/architecture/technical-architecture.md:487` specifies a **per-endpoint**
+  delivery log, `docs/webhook-integration-design.md:104` says the same and is the spec
+  `app/Http/Controllers/Api/V1/WebhookDeliveryController.php:16` cites, and the §7.1 column is headed
+  `Representative endpoints` at `docs/architecture/technical-architecture.md:437`. The as-built follows the
+  later, more specific document. ⚠️ **So the row splits in two and only the second half is a capability
+  question.** (a) Two stale flat paths — `docs/architecture/technical-architecture.md:453` and
+  `docs/webhook-integration-design.md:105` — want narrowing to the nested form. (b)
+  `docs/architecture/technical-architecture.md:486` promises the dead-letter queue is visible in a
+  per-tenant delivery-log UI, and no such view exists: `resources/js/Pages/webhooks/` holds only
+  `Index.vue` and `Show.vue`, and `resources/js/Pages/webhooks/Index.vue:125` surfaces a delivery **count**
+  as a stat tile, not a log. ⚠️ **The gap is narrower than "the DLQ is unsurfaced"**, and saying so keeps
+  the row honest: `app/Enums/WebhookDeliveryStatus.php:33` is a real `dead_lettered` case and
+  `resources/js/Pages/webhooks/Show.vue:266` renders delivery status generically, so the state is visible
+  per endpoint — what is missing is the cross-endpoint view and any explicit dead-letter labelling.
+  **Live.** Filed by `M80`.
+
+- **`minor` · §7.1 names a `/api/v1/webhooks/endpoints` path segment that exists nowhere in the tree, and
+  it is a floor rather than a census.** Measured by `M79`'s sweeps (2026-09-06), joined and refuted by
+  `M80`; the join rated this one `medium` confidence where its neighbours were `high`, and the reason is
+  recorded below. Built is `/api/v1/webhooks` — `routes/api.php:317`, `:320`, `:339`, `:342`, `:345` — with
+  no `endpoints` segment anywhere; `openapi.json` exports exactly six `/webhooks*` paths and none carries
+  it; outside this ledger the literal `webhooks/endpoints` returns **one** hit in the whole repository, the
+  documenting line `docs/architecture/technical-architecture.md:452` itself. Tests corroborate the built
+  shape — `tests/Feature/Webhooks/WebhookEndpointApiTest.php:50`. ⚠️ **A ROW IS A FLOOR:** the same table's
+  next line, `docs/architecture/technical-architecture.md:453`, carries two more wrong paths, repeated a
+  third time at `docs/webhook-integration-design.md:105` — which is the sibling row above, and the two want
+  taking together. ⛔ **The header's "authored before any migration or application code exists" does not
+  make §7.1 a frozen artifact**, which is the objection this row expects: the very same table is maintained
+  against as-built at `docs/architecture/technical-architecture.md:445` and `:446`, so §7.1's paths were
+  left behind by maintenance that reached their immediate neighbours. ⚠️ Severity is `minor` because
+  `openapi.json` is drift-gated in CI and correct, so nobody generating a client is misled; the exposure is
+  a reader planning against §7.1. **Live.** Filed by `M80`.
+
+- **`minor` · NFR §8 sets a 30-day soft-delete grace period before a hard-deletion job, and for the three
+  entities it names there is no purge job, no grace-period config value, and nothing that soft-deletes.**
+  Measured by `M79`'s sweeps (2026-09-06), joined and refuted by `M80`.
+  `docs/non-functional-requirements.md:105` states the target for forms, submissions and attachments.
+  `app/Jobs/Maintenance/` holds seven jobs, scheduled in the block opening at `routes/console.php:47`, and
+  none reads `deleted_at`. The two that do hard-delete are keyed on something else —
+  `app/Jobs/Maintenance/PruneFailedJobsJob.php:52` prunes `failed_jobs`, and
+  `app/Jobs/Submissions/ReapTenantDraftsJob.php:37` terminates a chain selecting on `draft_expires_at` and
+  force-deletes *precisely because* a tombstone would reserve `client_submission_uuid`, which is the
+  opposite mechanism from the one §8 describes. No grace-period knob exists in `config/`, and nothing under
+  `app/` calls `onlyTrashed()`. ⛔ **THE JOIN FOUND IT MORE ABSENT THAN THE SWEEP DID, AND THE SCOPE MATTERS
+  OR THE CLAIM IS FALSE: for forms, submissions and attachments there is no soft-delete WRITER either**, so
+  the promised job would have nothing of §8's own subjects to purge.
+  `app/Services/Submissions/ClientUuidResolver.php:75` says as much, `app/Policies/FormPolicy.php:120`
+  declares `delete()` and the permission is seeded at `database/seeders/RolePermissionSeeder.php:54`, yet
+  not one of the 22 `Route::delete` registrations across `routes/` is for a form, submission or attachment.
+  ⚠️ **Three soft-delete writers DO exist elsewhere and §8's "etc." arguably reaches them** —
+  `app/Services/Webhooks/WebhookEndpointService.php:178`,
+  `app/Services/Connectors/ConnectionService.php:164` and
+  `app/Services/Connectors/ConnectionSubscriptionService.php:114` each soft-delete and say so in a trailing
+  comment — so a taker should settle whether §8 is scoped to its three named entities before sizing the
+  job. ⚠️ **Two more places in one further document promise the same unbuilt jobs** —
+  `docs/data-dictionary.md:131` and `docs/data-dictionary.md:542`, the latter an S3 object-deletion job
+  that does not exist, which is the half carrying real future cost since orphaned objects outlive their
+  rows. ⚠️ **Take it with `D14`, not independently**: `D14` recommends leaving the submission
+  delete/restore surface unbuilt, decides the surface rather than the grace period, and says nothing about
+  forms or attachments. `docs/non-functional-requirements.md:115` is §10 Out of Scope and does not list
+  this. **Live.** Filed by `M80`.
+
+- **`minor` · `docs/api-specification.md:63` states in the present tense that every unsafe request is
+  deduplicated against a 24-hour Redis cache keyed on `(tenant_id, endpoint, Idempotency-Key)`, and no
+  header, middleware or cache exists.** Measured by `M79`'s sweeps (2026-09-06), joined and refuted by
+  `M80`. The literal `Idempotency-Key` returns exactly two hits repository-wide: the documenting line and
+  one archive note. `ls app/Http/Middleware/` holds 29 entries and none is an idempotency middleware.
+  `openapi.json` carries no such parameter object on any operation. ⚠️ **Eighty `idempoten*` hits exist
+  under `app/` and `resources/` — state the scope, because repository-wide the figure is several hundred —
+  and every one is a different, domain-specific mechanism**: `client_submission_uuid` offline replay
+  (`app/Services/Submissions/SubmissionPipeline.php:92`), webhook delivery keyed on `(endpoint, event_id)`
+  (`app/Services/Webhooks/WebhookEventDispatcher.php:23`), gamification award keys
+  (`app/Services/Gamification/PointsRecorder.php:155`). None is Redis-backed, none has a 24-hour TTL, none
+  replays a stored response. ⛔ **THE ODD-ONE-OUT ARGUMENT IS WHAT MAKES THIS FILABLE:** §2.4's immediate
+  neighbour §2.5 **is** built, and the honest citation for that is the limiter registrations rather than
+  the quota middleware — `app/Providers/AppServiceProvider.php:374` names §2.5 by name in its comment and
+  `:377` registers the 600/min `api` limiter it pins, with the guest arm at `:400` and
+  `EnforceGuestFormRateLimit` for the per-form dial. (`EnforceApiRequestQuota` enforces the *monthly*
+  ADR-0008 quota and `MeterApiUsage` explicitly disclaims enforcement, so neither is a §2.5 implementation
+  — a point worth having straight before quoting them.) ⛔ **AND A DEFERRAL WAS MADE ONCE AND LAPSED, WHICH
+  THE JOIN SURFACED RATHER THAN BURIED.** `PROGRESS_ARCHIVE.md:322` records "Idempotency-Key (§2.4)
+  deferred" inside Increment E's documented-not-fixed list. It names no reason, it targets **Phase 1** —
+  long closed — and it was never converted into a queue row, nor were its three siblings from the same
+  sentence. `docs/api-specification.md:304` is §4 Out of Scope and does not carry it. That archive note is
+  the record of a deferral nobody filed, which is exactly what this row corrects. **Live.**
+  Filed by `M80`.
+
+- **`minor` · The per-endpoint `include_answers: true` webhook payload opt-in has no key anywhere — and
+  four other files appear to record it as a deferral already taken.** Measured by `M79`'s sweeps
+  (2026-09-06). ⛔ **UNJUDGED, AND THAT IS THE STATED PRECONDITION: the three-term join has not been run on
+  this row.** Its join agent died on a usage limit mid-run; `M80` filed it rather than hold it until the
+  limit reset, because withholding measured findings is the defect this increment exists to correct. ⚠️
+  **The prior is unkind — 73% of the judged cohort was rejected.** Of the 41 findings from the same sweeps
+  that did return a verdict, 30 were rejected: 17 were decisions already taken, 6 were duplicates and 7 did
+  not survive re-derivation. ⛔ **AND THIS ROW LOOKS LIKE THAT LARGEST BUCKET, SO CHECK IT FIRST.** `M80`'s
+  own citation pass found the deferral stated four times outside the cited design doc:
+  `docs/data-privacy-gdpr-compliance.md:77` and `docs/piping-output-encoding-design.md:279` each say the
+  opt-in "stays deferred", as do `PROGRESS_ARCHIVE.md:6859`, `:6864` and `:6865`. ⚠️ **What keeps the row
+  fair rather than already-answered:** `docs/webhook-integration-design.md:171` is that document's own
+  §6 Out of Scope and lists three deferrals, none of them this — so the design doc read alone genuinely
+  presents it as an available tenant choice, which is what `docs/webhook-integration-design.md:41` does.
+  The sweep's remaining evidence: `grep` over `app/`, `database/`, `config/` and `routes/` returns one
+  hit — `config/webhooks.php:79`, a comment calling it forward infrastructure. No column on
+  `webhook_endpoints`, no validation rule, no branch in the payload builders. **Latent.** Filed by `M80`.
+
+- **`minor` · Structured JSON application logs are documented in the present tense and `config/logging.php`
+  has no JSON formatter on any channel.** Measured by `M79`'s sweeps (2026-09-06). ⛔ **UNJUDGED — the
+  three-term join has not been run on this row**, its agent having died on a usage limit; filed anyway
+  rather than held. ⚠️ **Prior: 73% of the judged cohort from these same sweeps was rejected** (17
+  already-decided, 6 duplicates, 7 not re-derivable), so verify before taking. The sweep's evidence:
+  `docs/observability-incident-response.md:19` asserts "**Structured (JSON) logs**, not free-text — every
+  log line is machine-parseable", while `config/logging.php:61` (`single`) and `config/logging.php:68`
+  (`daily`) declare only driver, path, level and placeholder replacement, so both use Monolog's default
+  free-text `LineFormatter`. The only `formatter` key in the file is `config/logging.php:104`, on the
+  `stderr` channel, reading an env var with no default. `JsonFormatter` appears nowhere in `app/` or
+  `config/`. ⚠️ **Premise a taker needs before choosing a remedy:** that document carries
+  `**Status:** Draft v1.0` at `docs/observability-incident-response.md:4` and its §1 is headed "What's
+  Already Decided", so it is a design artifact — yet the cited sentence is written in the present
+  indicative. The repair may be a Monolog formatter or a tense correction, and which one is the actual
+  question. **Latent.** Filed by `M80`.
+
+- **`minor` · Correlation IDs threaded through every log line — `request_id` and `job_chain_id` — have no
+  mechanism at all.** Measured by `M79`'s sweeps (2026-09-06). ⛔ **UNJUDGED — the three-term join has not
+  been run on this row**, its agent having died on a usage limit; filed anyway rather than held. ⚠️
+  **Prior: 73% of the judged cohort from these same sweeps was rejected**, so verify before taking. The
+  sweep's evidence: `docs/observability-incident-response.md:20` describes the threading as live, and
+  outside this ledger `job_chain_id` returns exactly one hit repository-wide — that documenting line
+  itself. There is no `Log::withContext` and no use of Laravel's `Context` facade anywhere in `app/`,
+  `config/` or `routes/`; every `TenantContext::` hit is the unrelated RLS helper. Every `request_id` in
+  `app/` is a SAML column — `app/Models/SsoAuthRequest.php:30` and
+  `app/Services/Sso/SsoAuthRequestService.php:70` on `sso_auth_requests`, and
+  `app/Models/SsoAuthFailure.php:34` on `sso_auth_failures` — an IdP-minted request identifier, not a log
+  correlation id. No middleware attaches one and no job propagates one. ⚠️ Pairs with the JSON-logs row
+  above: the two cite adjacent lines of the same section and share one remedy surface — a Monolog formatter
+  plus context processors — so check for overlap before taking either. **Latent.** Filed by `M80`.
+
+- **`minor` · The API rate-limit table promises 300 requests/minute per authenticated user and no such
+  limiter is defined.** Measured by `M79`'s sweeps (2026-09-06). ⛔ **UNJUDGED — the three-term join has
+  not been run on this row**, its agent having died on a usage limit; filed anyway rather than held. ⚠️
+  **Prior: 73% of the judged cohort from these same sweeps was rejected**, so verify before taking. The
+  sweep's evidence: `docs/api-specification.md:73` pins the figure, and the literal returns one hit — that
+  row. ⛔ **THE ENUMERATION MUST NOT BE READ AS A CENSUS, AND `M80` CORRECTED IT BEFORE FILING:** the sweep
+  named eight limiter sites; the tree actually holds **24** `RateLimiter::for()` registrations across three
+  providers — 14 in `app/Providers/AppServiceProvider.php`, 9 in `app/Providers/FortifyServiceProvider.php`
+  and one job limiter at `app/Providers/QueueServiceProvider.php:64` that the sweep never named. The
+  representative case is `app/Providers/AppServiceProvider.php:377` (`api`, 600/min); every other
+  registration was read for its per-minute value and none is 300, none is user-keyed at that figure.
+  ⚠️ **"The only throttle on an authenticated tenant route" is likewise too strong** —
+  `routes/tenant.php:952` (`throttle:120,1`) is the only *numeric-literal* throttle inside the `auth` group,
+  while `routes/tenant.php:385` and `:395` carry named limiters in the same group, both 20/min. Neither is
+  300, so the conclusion survives; a taker grepping `throttle:` will get three hits and should not read
+  that as the row being overtaken. ⚠️ **Premise for whoever writes the remedy:**
+  `app/Providers/AppServiceProvider.php:374` records that `throttle:api` is priority-sorted *ahead of*
+  authentication, so `$request->user()` is unresolved inside that closure and it keys on the token hash — a
+  per-user 300/min limiter has to solve that ordering rather than copy the `api` shape. **Latent.**
+  Filed by `M80`.
+
+- **`minor` · `export_artifact` objects are documented as auto-deleted seven days after generation, and no
+  scheduled cleanup task is declared.** Measured by `M79`'s sweeps (2026-09-06). ⛔ **UNJUDGED — the
+  three-term join has not been run on this row**, its agent having died on a usage limit; filed anyway
+  rather than held. ⚠️ **Prior: 73% of the judged cohort from these same sweeps was rejected**, so verify
+  before taking. The sweep's evidence: `docs/deployment-infrastructure.md:129` states it operatively and
+  names a scheduled cleanup task for local disk. The scheduled block opening at `routes/console.php:47`
+  declares exactly seven entries — failed-jobs prune, usage roll-up, draft reaping, scheduled-form sweep,
+  webhook retry sweep, connector-token refresh and custom-domain verification — and none touches export
+  artifacts. The identifier resolves only to the enum case `app/Enums/AttachmentKind.php:31` and a
+  storage-key comment at `app/Services/Submissions/SubmissionPdfStorage.php:30`. There is no seven-day
+  constant and no `App\Jobs\Maintenance` class for it. ⚠️ Adjacent to the NFR §8 purge row above; both are
+  unbuilt retention jobs and a single sweep design would serve them. **Latent.** Filed by `M80`.
+
+- **`minor` · ADR-0007 §D11 describes three queue connections that `config/queue.php` does not define, and
+  asserts they are annotated as forbidden when they were deleted.** Measured by `M79`'s sweeps
+  (2026-09-06). ⛔ **UNJUDGED — the three-term join has not been run on this row**, its agent having died
+  on a usage limit; filed anyway rather than held. ⚠️ **Prior: 73% of the judged cohort from these same
+  sweeps was rejected**, so verify before taking. The sweep's evidence:
+  `docs/adr/0007-async-execution-substrate.md:114` asserts both halves in the present tense — that
+  `deferred`, `background` and `failover` shipped in `config/queue.php`, and that they "are annotated as
+  forbidden in config". `config/queue.php:40` opens the connections array and defines only `sync` (`:42`),
+  `database` (`:48`), `beanstalkd` (`:69`), `sqs` (`:78`) and `redis` (`:89`). The config's own header at
+  `config/queue.php:29` records that the three were **removed**, deliberately, so that
+  `QUEUE_CONNECTION=deferred` throws loudly at boot. ⚠️ **`M80` read the whole of line 114 and the row is
+  weaker than the sweep made it sound**, which is worth knowing before taking it: the same sentence
+  continues "deleting them outright is the cleaner option and is left to H2's judgment" — so deletion was
+  an anticipated outcome delegated to H2, and H2 did exactly that. The stale present-tense assertion is
+  real; the reader-harm argument is not. ⚠️ The cited line also carries its own stale citation, naming
+  `config/queue.php:76-90` as where the three shipped; those lines are now the `sqs` block and the opening
+  of `redis`. **Latent.** Filed by `M80`.
+
+- **`minor` · The documented guest per-IP rate limit of 100/min has no definition — the ceiling on the
+  surface that row describes is 60.** Measured by `M79`'s sweeps (2026-09-06). ⛔ **UNJUDGED — the
+  three-term join has not been run on this row**, its agent having died on a usage limit; filed anyway
+  rather than held. ⚠️ **Prior: 73% of the judged cohort from these same sweeps was rejected**, so verify
+  before taking. The sweep's evidence: under the heading `### 2.5 Rate Limits` at
+  `docs/api-specification.md:65`, a table introduced as "Concrete numbers" at
+  `docs/api-specification.md:67` pins "Guest respondent (per IP, across all tokens) | 100 requests/minute"
+  at `docs/api-specification.md:72`. The guest submit surface's per-IP arm resolves through
+  `app/Providers/AppServiceProvider.php:408` to `config/guest.php:40`, which is 60. ⚠️ **Say "the surface
+  that row describes", not "the only per-IP ceiling"** — `config/guest.php` defines three:
+  `submit_per_ip` 60 (`:40`), `mint_per_ip` 30 (`:41`) and `challenge_per_ip` 90 (`:49`). None is 100.
+  ⚠️ **And they are env-overridable defaults, not fixed definitions** — each is written
+  `(int) env('GUEST_*', N)`, and no file in the repo sets those variables, so 60 is what a default
+  deployment gets while a deployment could set 100 with no code change. That narrows the claim from "has no
+  definition" to "has no definition at the default". ⛔ **What makes this a defect rather than an
+  approximation:** the per-token figure in the same table matches `config/guest.php:39` exactly, so the
+  table reads as authoritative. **Latent.** Filed by `M80`.
+
+- **`minor` · "1 concurrent sync export per form, additional requests 429" — no concurrency guard exists on
+  any export path.** Measured by `M79`'s sweeps (2026-09-06). ⛔ **UNJUDGED — the three-term join has not
+  been run on this row**, its agent having died on a usage limit; filed anyway rather than held. ⚠️
+  **Prior: 73% of the judged cohort from these same sweeps was rejected**, so verify before taking. The
+  sweep's evidence: `docs/api-specification.md:75` promises the behaviour. ⛔ **`M80` NARROWED TWO
+  ABSOLUTES THAT WERE FALSE AS WORDED, AND BOTH MATTER TO WHOEVER TAKES IT.** (a) The only *cache-backed or
+  distributed* locks in `app/` are `app/Jobs/Connectors/RefreshOneConnectionJob.php:77`, a per-connection
+  OAuth refresh lock, and `app/Jobs/MaintenanceJob.php:105`, the maintenance overlap guard — but row-level
+  `lockForUpdate()` appears about twenty times, and one is a pointed counterexample:
+  `app/Services/Submissions/FormAcceptanceGuard.php:89` is a per-form lock that already serialises
+  concurrent finalizers on the same form, on the submit path rather than the export path. (b) The export
+  routes are **not** unthrottled: `routes/api.php:187` and `routes/api.php:402` sit in the group whose
+  middleware array carries `throttle:api` at `routes/api.php:152`, so they inherit the 600/min burst
+  limiter. What is genuinely absent is an export-scoped or per-form guard — and a per-minute limiter cannot
+  express a concurrency ceiling at all, which is the row's real point. ⚠️ Note the shape difference from
+  its table neighbours: this is a **concurrency** promise, so a limiter audit that checks `RateLimiter::for`
+  definitions passes straight over it. ⚠️ Pairs with the async-export row above —
+  `docs/architecture/technical-architecture.md:469` opens §7.3 and defines both export modes, and neither
+  is built. **Latent.** Filed by `M80`.

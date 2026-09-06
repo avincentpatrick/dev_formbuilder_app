@@ -121,7 +121,17 @@ const TIER2_FILES = ['docs/feature-backlog.md'];
 // own failure message prescribes. ⛔ THE FIRST DRAFT OF THAT REPAIR NAMED THE WRONG SECTION — it
 // invented a G11 entry the archive does not have, and only opening the archive caught it. A citation
 // repaired by guess is the defect this gate exists to catch, committed by the increment holding it.
-const LEDGER_ROT_CEILING = 18;
+// ⚠️ 18 -> 17 by M80 (2026-09-07), and this one discharges an obligation that was MISSED rather than
+// one M80 itself created. M80 added 128 ledger citations and zero rot; the count was ALREADY 17 on the
+// trunk before it opened a file. So some increment between M48 and M79 repaired a citation and did not
+// lower this constant in the same commit — leaving the gate one free slot, which is the one thing a
+// ratchet exists to deny. ⛔ THE DISCRIMINATION WAS OBSERVED, NOT ASSUMED, AND BY ACCIDENT: M80's first
+// draft cited `docs/erd.md:114` (inside a mermaid fence), `PwaManifestController.php:64` (blank, off by
+// two from the live gate at :66) and `competitive-feature-parity-matrix.md:8` (blank, the legend is at
+// :7). The gate went RED at 20 and green again at 17 once all three were re-pointed — so this ceiling
+// is lowered onto a bound this session watched hold and watched break, which is the only evidence that
+// counts for a gate number.
+const LEDGER_ROT_CEILING = 17;
 
 /** R3 floors. Three, because there are three independent ways for this gate to pass while blind. */
 const MIN_EXPECTED_DOCUMENTS = 40;

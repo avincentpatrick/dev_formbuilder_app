@@ -19,7 +19,21 @@
  * ── ⚠️ NO WEB WORKER ─────────────────────────────────────────────────────────────────────────────────
  * The solver runs inside `ApiClient.submit()`, which the SERVICE WORKER also calls when it drains the
  * offline outbox — and a service worker cannot spawn a Worker. Two solvers would be strictly worse than
- * one, so this yields cooperatively instead (see `solve`), keeping both the tab and the SW responsive.
+ * one, so this yields cooperatively instead (see `solveChallenge`).
+ *
+ * ⛔ AND THE PARAGRAPH ABOVE USED TO SAY THE YIELD KEEPS "BOTH THE TAB AND THE SW RESPONSIVE", WHICH IS
+ * BACKWARDS — CORRECTED IN M77, MEASURED RATHER THAN REASONED. A service worker only ever runs in a
+ * SECURE context, so it always takes the `crypto.subtle` branch, and an awaited native digest already
+ * turns the event loop on every candidate: measured in this project's node container, a `setTimeout(…, 0)`
+ * fires during a run of 200 awaited `crypto.subtle.digest()` calls and does NOT fire during 200 awaited
+ * already-resolved promises. So in the service worker `yieldToEventLoop()` changes nothing; the loop was
+ * interruptible without it.
+ *
+ * The context the cooperative yield actually serves is the INSECURE EMBED — an `http://` host page, where
+ * `crypto.subtle` is undefined, the solver falls back to the synchronous `sha256Hex()` above, and awaiting
+ * it is a microtask that never lets a timer run. That context has no service worker either, for the same
+ * secure-context reason. One paragraph, two claims, both inverted: the yield is a TAB protection on the
+ * FALLBACK path, and the SW sentence is why nobody looked there.
  */
 
 /** The wire shape the server issues. Field names follow Altcha's; we claim no compatibility with it. */
@@ -123,9 +137,32 @@ async function subtleSha256Hex(message: string): Promise<string> {
     return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-/** Yield to the event loop so a long solve blocks neither the tab's paint nor the SW's other work. */
+/** Yield to the event loop so a long fallback solve does not freeze the embedding tab's paint. */
 function yieldToEventLoop(): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+/**
+ * How many candidates the solver tests between cooperative yields.
+ *
+ * ⚠️ THE VALUE IS NOT DERIVED FROM ANYTHING, AND SAYING SO IS THE POINT (M77). It has been 5000 since
+ * I8b with no stated basis, while `config/guest.php`'s `max_number` is 120000 — so a worst-case
+ * production solve on the fallback path yields 24 times, and nothing anywhere records why 5000 rather
+ * than 500 or 50000. Exported so the cadence can be ASSERTED rather than re-spelled by a test; whether
+ * the number itself is right is a live question and is filed as a decision, not settled here.
+ */
+export const YIELD_EVERY = 5000;
+
+/**
+ * Whether the solver yields after testing candidate `n`.
+ *
+ * ⛔ THE `- 1` IS THE WHOLE FUNCTION AND IT IS EASY TO GET WRONG IN THE OTHER DIRECTION. Yielding at
+ * `n % YIELD_EVERY === 0` would fire on candidate ZERO — before any work has been done — and then one
+ * candidate EARLY forever after. Extracted as a named predicate so the boundary is pinned by a test
+ * that reads it directly, instead of living only inside a loop condition nothing can reach.
+ */
+export function shouldYieldAt(n: number): boolean {
+    return n % YIELD_EVERY === YIELD_EVERY - 1;
 }
 
 /**
@@ -135,7 +172,10 @@ function yieldToEventLoop(): Promise<void> {
  * server and this client disagree about the search space, which is a deployment fault the caller should
  * surface as a failed submission rather than paper over with a header the server will reject anyway.
  */
-export async function solveChallenge(challenge: Challenge): Promise<ChallengeSolution> {
+export async function solveChallenge(
+    challenge: Challenge,
+    onYield: () => Promise<void> = yieldToEventLoop,
+): Promise<ChallengeSolution> {
     const digest = hasSubtleCrypto()
         ? subtleSha256Hex
         : async (message: string): Promise<string> => sha256Hex(message);
@@ -151,9 +191,10 @@ export async function solveChallenge(challenge: Challenge): Promise<ChallengeSol
             };
         }
 
-        // Every ~5k candidates. Frequent enough that a slow fallback solve stays interruptible, rare
-        // enough that the yields themselves do not dominate the runtime.
-        if (n % 5000 === 4999) await yieldToEventLoop();
+        // Frequent enough that a slow fallback solve stays interruptible, rare enough that the yields
+        // themselves do not dominate the runtime. `onYield` is a seam for the cadence test and has no
+        // production caller — the default is the real thing, so no call site changes.
+        if (shouldYieldAt(n)) await onYield();
     }
 
     throw new Error(`Challenge unsolvable within ${challenge.maxnumber}`);

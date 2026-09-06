@@ -16,22 +16,156 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M77` is merged; five rows closed, seven filed, and three of the four prescribed remedies were corrected by the adversarial arm before a line was written
+## Status: ACTIVE CLAIM — `M78`, the thirteenth batched increment: four rows, and the adversarial arm found a bigger defect than the row in three of four (`m78-batched-rows`)
 
-`M77` closed **five** rows and filed **seven**, spending **one** hub slot and appending **two**
-decisions. `state.php` counts the tree; do not take that sentence's arithmetic on trust.
+Taken 2026-09-06. Branch `m78-batched-rows`, cut from `origin/main` at `092d264`, PR into `main`.
 
-⛔ **THE ONE THING `M77` WOULD MOST LIKE TO HAND ON: I READ `M76`'s LESSON AT THE START OF THE
-SESSION, QUOTED IT CORRECTLY, AND THEN WALKED INTO IT — TWICE, IN TWO DIFFERENT FORMS.** `M76`'s
-release records that *"a dynamic `import()` of `App.vue` inside a Vitest case never resolves; a static
-import at file scope works."* I read that, wrote a new test file with `await import('../sw')` inside a
-`beforeEach`, and lost an hour to a bare hook timeout. The same session's second instance: my own test
-docblock asserted *"the case that did not exist"* about a case that **did** exist, forty lines below it
-in the file I was editing — the *"no test asserts this"* false premise the claim template names as this
-repository's most-repeated. **Both failures are one failure: I filed each lesson under the ARTEFACT it
-was learned on — `App.vue`, other people's rows — rather than under the SHAPE.** A lesson you can quote
-is not a lesson you have applied, and the test for whether you have applied it is whether you looked
-for it in the thing actually in front of you.
+Rows, all from `docs/feature-backlog.md`, selected by a read-only fan-out over **eight** candidates
+under `D13` — each verified by one agent, then attacked by a second whose only brief was to refute the
+first. ⛔ **Seven of the eight rows carried something false, and the adversarial arm broke the crux of
+three of the four verdicts it attacked.** Two candidates were dropped on measured grounds and are
+recorded below rather than silently skipped.
+
+- `R1` — *"Neither Fortify form on `/settings` can render a validation error, and the mechanism is one
+  missing `errorBag`."* (`docs/feature-backlog.md:6778`, filed `M77`)
+- `R2` — *"The `@throws` contract sweep cannot see the loss of ONE of two declared causes."*
+  (`:1828`, `M68`) **plus** *"The `@throws` sweep row's prescribed remedy is SELF-NULLIFYING."*
+  (`:6810`, `M77`) — one row closing two.
+- `R3` — *"`bootstrap/app.php` and `FortifyServiceProvider` both record a middleware index that is off
+  by one."* (`:6843`, `M77`)
+- `R4` — *"The service worker caches a credential-bearing resume shell, and only the RENEWAL of it was
+  closed."* (`:5724`, `M70`)
+
+### Evidence verified
+
+- **`R1` — HOLDS, and it is the only row in the batch proved by RENDERING it rather than by reading.**
+  `app/Actions/Fortify/UpdateUserProfileInformation.php:34` and `UpdateUserPassword.php:29` call
+  `validateWithBag`; `resources/js/Pages/Settings/Index.vue:133`/`:146` pass only `preserveScroll`;
+  the template binds flat `profile.errors.email` (`:177`) and `password.errors.current_password`
+  (`:384`). Driven live at `http://demo.localhost:8080/settings` under Playwright: submitting the real
+  profile form with a duplicate address leaves the DOM **byte-identical before and after**, all eight
+  `.mds-field__error` nodes empty. ⚠️ One nit: the row says `errorBag` occurs *"exactly once"*; a
+  literal grep says **2** (`auth/VerifyEmail.vue:45` and its test at `:113`) — self-consistent, because
+  the row names the second itself in the next clause.
+- **`R2` — HOLDS.** `tests/Feature/Api/OpenApiContractTest.php:342-345` filters `$declared`, `:347-349`
+  consumes it **for emptiness only**, and both arms' floors are `>= 1` (`:396`, `:430`). Cardinality is
+  discarded exactly as filed. Suite green at 7 passed / 113 assertions.
+- **`R3` — ⛔ WRONG. THE ROW IS REFUTED AND IT CLOSES ON THE REFUTATION.** All three numbers in both
+  comments — 5, 6 and 13 — are **correct today**. The row's contradicting 4/5 reproduces, but its
+  instrument does not measure what it thinks: `route:list --json` never expands the `web` group, which
+  appears in the output as the literal *string* `"web"` at index 0. Run the real pipeline
+  (`Router::gatherRouteMiddleware`, after the kernel syncs its groups) and `Authenticate:web` is at 5
+  and `ThrottleFortifyEndpoints` at 6 on every authenticated route. ⛔ **The file that would have hosted
+  the fix already carries the warning the row walked into** —
+  `tests/Feature/Tenancy/TenancyMiddlewarePriorityTest.php:140`, *"`gatherRouteMiddleware()`, NOT
+  `$route->gatherMiddleware()`, AND THE FIRST DRAFT OF THIS TEST WENT RED ON THE DIFFERENCE."*
+- **`R4` — HOLDS, and the row understates itself.** The initial write survives at
+  `resources/public-runtime/sw.ts:88-95`; `/f/resume/{token}` is a same-origin navigation under `/f/`
+  and matches. `routes/api.php:572-594` carries **no auth middleware** — `EstablishGuestDraftContext`
+  is the whole gate — and the response returns the full answer map **plus a freshly minted share
+  token**, so the URL segment is a write credential and not only a read. ⛔ **And one citation site is
+  factually wrong**: `routes/api.php:586` names `guest-shell-html` where the cache is `guest-schema`.
+
+### Premise verified
+
+- **`R1` — ⛔ PARTLY WRONG, TWICE, AND BOTH CORRECTIONS ENLARGE IT.** The row's census was
+  `grep validateWithBag app/`, which finds two. Fortify also bags **on the exception**, in vendor:
+  `ConfirmTwoFactorAuthentication.php:46` throws `->errorBag('confirmTwoFactorAuthentication')`. Its
+  consumer `resources/js/components/settings/TwoFactorSetup.vue:89` posts with no `errorBag` while
+  binding `confirmForm.errors.code`. ⛔ **And that component is not a third form on `/settings` — it is
+  ONE component mounted on THREE pages, two of which are lockout gates**: `Pages/admin/TwoFactorSetup.vue:21`
+  (the super-admin MFA gate, whose own test docblock calls it *"a lockout"*) and
+  `Pages/auth/TwoFactorRequired.vue:31` (the tenant enforcement interstitial, where the only other
+  affordance is *sign out*). A mistyped TOTP on either renders nothing. **There is no fourth bag** —
+  exhaustively measured across `vendor/` and `app/`: three bags, four consumers, three broken.
+  ⚠️ `docs/backlog-triage.md:67` harvests this row's files as `Settings/Index.vue · auth/VerifyEmail.vue`
+  — **`VerifyEmail.vue` is the file that is already CORRECT**, and the one needing the edit is absent.
+- **`R2` — HOLDS as filed; the interesting premise is one the row never had.** `git blame` confirms
+  exactly three prior authoring passes (`M68`, `M70`, `M73`), none of which stated the self-nullification.
+  Neither `openapi.json` nor the test file is a hub (`HUB_THRESHOLD = 3`, `scripts/backlog-triage.php:59`).
+- **`R3` — n/a (row refuted at evidence).** ⛔ **But the commit the row inspected created a REAL
+  off-by-one next door that the row never opened**: `app/Http/Middleware/EnforceGuestFormRateLimit.php:21`
+  says `bootstrap/app.php`'s priority list puts `ThrottleRequests` at index 6. `M43` inserted
+  `ThrottleFortifyEndpoints` into that slot; it is index **7** now. Verified independently by ordinal
+  count of the priority array.
+- **`R4` — HOLDS, with three additions the row does not carry.** (1) There is a **second writer** to
+  that cache, `lib/brand-cache.ts:229`, from the window — already its own filed row. (2) The exposure is
+  larger than stated: Cache Storage is origin-scoped and not per-document, and ⛔ **the credential IS the
+  cache key** — `caches.open('guest-shell-html').keys()` leaks every resume token on the device without
+  reading a single body, so stripping the token from the HTML would not close it. (3) The obvious
+  case-sensitivity attack on the skip was **checked and refuted**: Symfony applies the `i` modifier to
+  the host regex only, so `/f/Resume/…` 404s and is never cached.
+
+### Remedy verdict
+
+- **`R1` — WORKS, and the mechanism is not the one the row's phrasing implies.** All four branches of
+  `Inertia\Middleware::resolveValidationErrors()` measured live. ⛔ **The `X-Inertia-Error-Bag` header is
+  INERT here** — the guard is `$bags->has('default') && header`, and with no default bag the two
+  responses are byte-identical. The fix is entirely client-side: `getScopedErrors()` unwraps the map for
+  `onError`. ✅ **Proved by a clean A/B on the running app**: `auth/VerifyEmail.vue`, the one page that
+  already passes `errorBag`, hits the *same endpoint* with the *same bag* and the *same duplicate email*
+  in the same session and renders *"The email has already been taken."*
+- **`R2` — ⛔ THE ROW'S ARGUMENT IS RIGHT AND ITS CONCLUSION IS TOO SMALL.** `6810`'s self-nullification
+  logic is airtight and neither agent could break it. But "the sweep cannot see it" is not "the repo
+  cannot see it": case 4 (`:263`) hardcodes the path and both codes, and CI re-exports and byte-diffs, so
+  no single-tag deletion reaches green CI. ⛔ **Measured by simulated export with a byte-identical control
+  proving the probe clean**, a tag deletion moves the document ~3,000 bytes. ⛔ **But for a tag that
+  merely duplicates what middleware already publishes, the whole CI cover degenerates to a FOUR-LINE JSON
+  KEY REORDER** — serialisation order, not a contract gate. **And the real hole is an UNDECLARED set, not
+  a declared one:** `POST /public/f/{shareToken}/submissions` reaches `promote()` a frame down, its own
+  source comment says it answers `409 draft_conflict`, and its exported 409 publishes only `form_updated`
+  — invisible to case 4, to both sweep arms and to the export diff simultaneously. ⛔ **That falsifies
+  `app/Support/OpenApi/SubmissionRefusalResponseExtension.php:33-35`**, which asserts those channels
+  *"already document theirs."* ⚠️ Also: `M77`'s consolation that an FQ-spelled tag fires the floor
+  *"loudly"* is **half false** — true for the 403 arm, false for the 409 arm, where the sibling tag keeps
+  the route in scope and the arm goes silently green.
+- **`R3` — none offered that survives; the row prescribes a test asserting an ordinal, and that test would
+  be a liability.** The index is not stable — it differs per route (5 on guest routes, 6 on authenticated),
+  moves with the `web` group's contents and with `config/fortify.php`. **Nothing in the code depends on
+  the number**; `ThrottleFortifyEndpoints::handle()` reads `$route->getName()` and indexes nothing. The
+  load-bearing property is the *relation*, which `TenancyMiddlewarePriorityTest` already asserts in kind.
+- **`R4` — ⛔ BOTH STATED BLOCKERS ARE DEAD, AND THE REPLACEMENT IS A TRADE NOBODY HAD PRICED.**
+  Blocker (2), *"there is no `sw.test.ts`"*, is stale: `M77` created it in `1685faf`, **after** this row
+  was filed, and it captures each route's `match` and never invokes one. Ran it: **7 passed**. Blocker
+  (1), *"it costs offline resume access outright"*, is false: `loadResume()`'s first statement is a bare
+  fetch to a path **no SW route matches**, so offline it rejects and the Dexie read two calls downstream
+  is unreachable. ⛔ **But my own replacement conclusion — "an error card versus an error page" — was
+  itself refuted.** The cached shell also carries the offline pill, the always-render `SyncStatus`
+  surface, per-row Discard, conflict Review and a live reconnect drain; and for a respondent who only
+  ever opened the emailed link it is their **sole cached navigation**. ⛔ **And a two-line fix would make
+  `isResumeShell()` in `brand-cache.ts` guard a condition that can no longer arise, turning its three
+  dedicated tests vacuously green** — the succeeds-on-empty-input shape this repo gates against, and the
+  exact predicate `M75` worked to make load-bearing. **So the purge is a real product trade and it goes to
+  the user as a decision, not into this diff.**
+
+Files: `resources/js/Pages/Settings/Index.vue` · `resources/js/components/settings/TwoFactorSetup.vue` ·
+a new paired Vitest for the settings page · a new Pest case pinning the bag names ·
+`tests/Feature/Api/OpenApiContractTest.php` · `app/Http/Controllers/Public/GuestSubmissionController.php` ·
+`app/Support/OpenApi/SubmissionRefusalResponseExtension.php` · `openapi.json` (regenerated, never hand-edited) ·
+`app/Http/Middleware/EnforceGuestFormRateLimit.php` · `routes/api.php` (one comment) ·
+`resources/public-runtime/__tests__/sw.test.ts`.
+
+Shared artefacts taken: `docs/feature-backlog.md` · `docs/claims/lane-a.md` · `docs/claims/decisions.md` ·
+`docs/offline-first-sync-design.md` · `openapi.json` · `PROGRESS.md` (own status block and own hand-off
+line only). **No hub file is touched — the batch spends ZERO of `D13`'s one hub slot.**
+
+Paired files taken: none. `clipped-node-containment.test.ts`'s `KNOWN_UNGUARDED` and
+`token-references.test.ts`'s `APP_SCAN_ROOT` are both untouched by this diff.
+
+Namespaces spent: nothing from the migration or ADR namespaces. One decision id is appended for `R4`'s
+product trade.
+
+Prediction: Vitest **136 → 138** (a settings-page spec and no new public-runtime file, since the `sw.ts`
+matcher assertions land in the existing `sw.test.ts`). Pest **+1 file**. PHPStan unchanged — but
+`app/` **is** touched this time, so an unchanged number is a real result rather than an absent one.
+Pint: no change, 1466 files. Storybook axe: cannot move. E2E: green and, unlike `M77`, I expect it to be
+genuinely uninformative for all four rows — no spec submits a settings form, none navigates `/f/resume/`,
+and I am saying so in advance precisely because `M77` used that word and was wrong.
+⛔ **The one I most expect to be wrong is `openapi.json`.** Adding `@throws` to the guest submission
+action changes a generated artefact that CI byte-diffs against a fresh export, and the regeneration needs
+the database. If the local export and CI's disagree by so much as a key order, the Contract job goes red
+for a reason that has nothing to do with the defect — and the adversarial pass already measured that a
+tag can move that file by a four-line reorder alone.
 
 ---
 

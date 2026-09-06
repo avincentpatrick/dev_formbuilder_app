@@ -6866,3 +6866,24 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   user's, and it changes a string another increment deliberately pinned in `sync-status.test.ts`. Whoever
   takes it should render the panel before rewording it — `M15`'s note says that is what caught it last
   time. **Live.** Filed by `M77`.
+
+- **`minor` · `public-runtime-offline.spec.ts`'s parked-conflict case is FLAKY across viewport projects,
+  and `D2` makes that a merge-blocking property.** Measured by `M77` (2026-09-06) while running the specs
+  its own diff reached, and isolated with a control rather than assumed. Two consecutive runs of
+  *"reviews & resolves a parked conflict (Increment G8c)"* failed on **different projects each time** —
+  first `mobile` + `desktop`, then `tablet` — always at the same line, `expect(reviewButton).toBeVisible()`
+  on `getByTestId('review-conflicts')` with a 15 s timeout. ✅ **It is NOT caused by the `sw.ts` change
+  that increment shipped**: reverting `resources/public-runtime/sw.ts` to its pre-`M77` bytes, rebuilding
+  the worker and re-running the same case reproduced the failure, so it predates the status filter. ⚠️
+  **Why it matters rather than being ordinary e2e noise**: `D2` is answered — *"a flaky e2e result now
+  fails CI"* — so a case that fails on a rotating third of its projects is a merge blocker that will
+  redden unrelated pull requests, and the rotation is exactly what makes it read as somebody else's fault.
+  ⚠️ **What is NOT known** is whether it flakes in CI or only on this host; a local run is one worker
+  against a stack that is also serving a dev Vite, and the timeout is a visibility wait rather than a
+  network wait. Whoever takes it should get a CI failure on record before tuning anything, because the
+  obvious remedy — raising the timeout — is the one that converts a flake into a slow pass without
+  learning why. ⚠️ **Two neighbours worth reading first**: the open row about what actually delivers the
+  offline mis-cased render (two confident models of that spec have already been wrong), and the fact that
+  running this spec at all needs `public/hot` moved aside — with a dev Vite running, Laravel emits
+  dev-server asset URLs the e2e container cannot reach and **`global-setup` dies at the login form**,
+  which looks like a broken fixture and is not. **Live.** Filed by `M77`.

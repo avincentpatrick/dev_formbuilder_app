@@ -16,7 +16,87 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M79` is merged; the project has one queue, and two of the defects found were this increment's own
+## Status: ACTIVE CLAIM — `M80`, filing the invisible findings: nineteen rows that were real and in no queue (`m80-file-the-invisible`)
+
+Taken 2026-09-06. Branch `m80-file-the-invisible`, cut from `origin/main` at `3f0a88a`, PR into `main`.
+
+⛔ **NOT A `D13` BATCHED ROW.** A user-directed increment, and a direct correction of `M79`'s worst
+judgement. `M79` built the single pipeline and then **withheld 49 measured findings from it** on the
+grounds that they were unverified. The user rejected that reasoning: *"why did we do this realignment
+if they will still be hidden and not included in the pipeline?"* They were right, and the mechanism to
+include them honestly already existed and was not used — this repository's liveness vocabulary has
+`latent`, meaning *"real, but needs a stated precondition first"*, which is exactly what an unverified
+finding is.
+
+### Evidence verified
+
+The 49 findings came from seven blind sweeps with **no adversarial stage**. Each was put through the
+three-term join — **absent in code AND absent from `docs/feature-backlog.md` AND absent from
+`docs/claims/decisions.md`** — with survivors then attacked by a second agent briefed only to kill
+them. 41 of 49 returned a verdict before a usage limit stopped the run:
+
+| verdict | count |
+|---|---|
+| **file-it** | **11** |
+| recorded-decision | 17 |
+| duplicate | 6 |
+| false-finding | 7 |
+
+⛔ **73% WERE REJECTED, WHICH SETTLES A QUESTION `M79` GOT HALF RIGHT.** Filing all 49 raw would have
+put 30 bad rows into the queue whose whole purpose is to be trustworthy — so *verifying* was correct.
+*Withholding them from the user while unverified* was not. Both are true and `M79` conflated them.
+
+⚠️ **Four of the six duplicates are `M79`'s own markers** — the retention key, the retention job, the
+`pii_erased_at` writer and the tenants columns. The join caught the increment duplicating itself, which
+is the strongest evidence available that the dedup term was not ceremonial.
+
+⚠️ **The refuters overturned ZERO this time**, against 11 of 20 on the previous fan-out. The
+difference is the join: a single-pass *"is it absent"* verdict is near a coin toss on this corpus,
+because absence is a permanent legitimate state here; *"absent AND unfiled AND undecided"* is not.
+
+### Premise verified
+
+**What this increment believes about the world around the finding, and one belief was false.**
+
+- **"Unverified means unfileable."** ⛔ **FALSE, and it is `M79`'s error restated.** `docs/pipeline.md`
+  carries `state` and `blocker`; the backlog carries `live` / `latent` / `not-live` gated for presence
+  by `tests/Feature/Docs/BacklogProvenanceTest.php`. A finding whose join has not been run is a
+  textbook `latent` row with a stated precondition. Nothing required it to be hidden.
+- **"The 30 rejects need rows too."** Holds as FALSE, deliberately: 6 are already filed, 17 are
+  decisions already taken with citations, 7 did not survive re-derivation. None is a pending task.
+  They are reported to the user by name rather than summarised into a count, which is what *"nothing
+  hidden"* requires — a row for a settled decision would be noise, not transparency.
+- **8 findings are UNJUDGED**, their join agents having died on the usage limit. They are filed
+  `latent` with that stated as the precondition rather than held back until the limit resets. This is
+  the whole point of the increment.
+
+### Remedy verdict
+
+The prescribed remedy — *file them* — works, and the only design question was where. **Filing into
+`docs/feature-backlog.md` rather than as pipeline markers**, because `scripts/pipeline.php` already
+consumes that ledger through `backlog-triage.php --json`: a finding filed as an ordinary row flows into
+the line automatically, inherits the operability ranking, and needs no second mechanism. A marker would
+have been a parallel path for the same kind of object.
+
+⚠️ **Measured before writing:** `docs/feature-backlog.md` is ~745 KB and `PROGRESS.md` sits at roughly
+6,100 bytes of `tracker-lint` R1 headroom, so this increment adds to the backlog and must not add
+narrative to the tracker beyond its own status bullet.
+
+Files: `docs/feature-backlog.md` (nineteen new rows), `docs/backlog-triage.md` and `docs/pipeline.md`
+(both regenerated), `docs/claims/lane-a.md`, `PROGRESS.md` (own status block and hand-off only).
+
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/backlog-triage.md`, `docs/pipeline.md`,
+`PROGRESS.md` (own block only).
+Paired files taken: none.
+Namespaces spent: **nothing from either namespace.** No ADR, no migration prefix, no decision id.
+
+Prediction: PHPStan **cannot move** — docs only. Pint touches nothing. Vitest, axe and E2E are
+untouched. `BacklogProvenanceTest` is the gate most likely to fire, because every new row must carry a
+severity marker, a liveness marker and a filer, and nineteen rows is nineteen chances to omit one.
+`citation-liveness-lint` is the second, since each row cites a `path:line` that must resolve.
+**The prediction I most expect to be wrong: that the open-row count lands at exactly 119.** `M79`
+destroyed a row with a search-based edit and only arithmetic caught it; the same class of error is
+available here, so the count is asserted before and after rather than assumed.
 
 ## RELEASED — `M79`, the single pipeline: one ordered line, held work included (merged as PR #270, `fd1daf0`, 6/6 green with real step counts — Static analysis 24 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

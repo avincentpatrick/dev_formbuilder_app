@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Public;
 
 use App\Enums\SubmissionSource;
+use App\Exceptions\Submissions\SubmissionConflictException;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Public\Concerns\ReadsGuestShareToken;
 use App\Http\Requests\Public\GuestDraftRequest;
@@ -38,10 +39,23 @@ final class GuestDraftController extends Controller
 {
     use ReadsGuestShareToken;
 
+    // ⛔ THE SECOND INSTANCE OF M78's UNDECLARED-409, AND IT WAS FOUND BY DISTRUSTING THE FIX FOR THE FIRST.
+    // While correcting `SubmissionRefusalResponseExtension`'s claim that the draft channel "already
+    // documents theirs", that claim was checked rather than repeated — and it is false here too. This
+    // action passes `checkBaseline: true` (see the call below, and P3a's note beside it), so
+    // `SubmissionDraftService::updateDraft()` can throw `SubmissionConflictException::draftConcurrentlyModified()`
+    // a frame down. The controller's own inline envelope covers only `form_updated`, which is the refusal it
+    // returns ITSELF — an inline envelope is evidence about the first cause and says nothing about a thrown
+    // second one. Same shape as `GuestSubmissionController::store()`, same remedy, one route apart.
+    // ⚠️ Kept as a `//` block, not a docblock: Scramble publishes a docblock description verbatim into
+    // `openapi.json`, and internal commentary has no business in a public contract.
     /**
      * Create or update a guest draft and return a resume token for it.
      *
      * @unauthenticated
+     *
+     * @throws SubmissionConflictException `draft_conflict` — the baseline this request claims no longer matches
+     *                                     the stored draft, so saving would silently discard another device's write.
      */
     public function store(
         GuestDraftRequest $request,

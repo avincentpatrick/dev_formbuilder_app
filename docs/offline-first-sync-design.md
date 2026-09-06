@@ -142,6 +142,22 @@ What does not self-heal is every **other** `/f/…` shell the device cached earl
 
 **The obvious fix — `caches.delete('guest-shell-html')` — is the wrong one, and the reasoning is the design.** A stale brand is cosmetic; a purged shell costs a fieldworker offline access to a form they deliberately primed, which is a core promise of this document. So the stale entries are **refreshed** and the cache is never emptied:
 
+> ⛔ **CORRECTION (M78, 2026-09-06) — THE PARAGRAPH ABOVE IS TRUE OF A `/f/{slug}` SHELL AND FALSE OF THE
+> "emailed resume link" IT NAMES ALONGSIDE IT.** A primed `/f/{slug}` shell really does render offline,
+> because its schema is independently cached under `guest-schema`. A `/f/resume/{token}` shell does
+> **not** and never has: `App.vue`'s `loadResume()` opens with `resumeDraft(resumeToken)`, a bare fetch to
+> `GET /api/v1/public/drafts/…` — a path **no service-worker route matches**, deliberately, because
+> caching it would put a complete answer document on disk. Offline that fetch rejects, the catch sets the
+> error phase and returns, and the IndexedDB read two calls further down is structurally unreachable.
+> **Measured, not inferred**, and now pinned by `resources/public-runtime/__tests__/sw.test.ts`.
+>
+> ⚠️ **What a cached resume shell DOES buy is real, and it is not the form.** It is the app shell, the
+> offline indicator and the always-render sync surface — including the "Sync now" action §7 below makes
+> the iOS Background-Sync fallback. For a respondent who only ever opened an emailed link, that entry is
+> their **only** cached navigation, so purging it costs them the whole offline surface rather than the
+> form. That is the honest statement of the trade, and it is why the credential-exposure question this
+> cache raises is an open decision rather than an oversight.
+
 1. The shell embeds `data-brand-version`, a 12-hex fingerprint of the rendered ramp (`'none'` when unbranded), derived only from the ramp hexes — no clock, no row id, so it is stable across renders and across web nodes.
 2. After mount, the SPA compares it with `app_state['brand_version']`. Equal ⇒ do nothing, which is the overwhelmingly common path.
 3. Different **and offline** ⇒ **defer**: change nothing, including the stored fingerprint. Advancing it without having refreshed anything would be a lie that permanently suppresses the retry, since every later boot would compare equal and skip.

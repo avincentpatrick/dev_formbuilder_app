@@ -130,7 +130,14 @@ const profile = useForm({
     email: page.props.auth.user?.email ?? '',
 });
 function saveProfile(): void {
-    profile.put('/user/profile-information', { preserveScroll: true });
+    // ⛔ `errorBag` IS LOAD-BEARING, NOT DECORATION (M78). `UpdateUserProfileInformation` ends in
+    // `validateWithBag('updateProfileInformation')`, so with no `default` bag on the session Inertia's
+    // `resolveValidationErrors()` returns the whole BAG MAP — `{updateProfileInformation: {email: …}}` —
+    // and every flat `profile.errors.<field>` lookup in the template below is `undefined`. Without this
+    // option a duplicate email, an invalid address or a breached password renders NOTHING here.
+    // ⚠️ The `X-Inertia-Error-Bag` HEADER cannot fix it: that branch is guarded by `$bags->has('default')`,
+    // which is false precisely when the bag is in use. The unwrap is client-side, in `getScopedErrors()`.
+    profile.put('/user/profile-information', { errorBag: 'updateProfileInformation', preserveScroll: true });
 }
 
 // Drafts — tenant-level "Save and finish later" expiry (Increment H10). Owner/Admin only; PATCHes the one
@@ -143,7 +150,11 @@ function saveDraftSettings(): void {
 // Password (Fortify: PUT /user/password)
 const password = useForm({ current_password: '', password: '', password_confirmation: '' });
 function savePassword(): void {
+    // The `updatePassword` bag is Fortify's, named by `UpdateUserPassword`'s own `validateWithBag()` call.
+    // ⚠️ Without it `onError` still FIRES — the errors object is non-empty — so the reset below runs and
+    // clears the fields while nothing explains why. See `saveProfile()` for the mechanism.
     password.put('/user/password', {
+        errorBag: 'updatePassword',
         preserveScroll: true,
         onSuccess: () => password.reset(),
         onError: () => password.reset('password', 'password_confirmation'),

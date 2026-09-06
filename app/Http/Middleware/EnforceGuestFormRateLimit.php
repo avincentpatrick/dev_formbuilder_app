@@ -18,12 +18,22 @@ use Symfony\Component\HttpFoundation\Response;
  *
  * ── ⚠️ WHY THIS IS A MIDDLEWARE AND NOT A `RateLimiter::for()` CLOSURE ────────────────────────────────
  * The obvious implementation is to teach the existing `guest` limiter about the form. It cannot work.
- * `bootstrap/app.php`'s priority list puts `ThrottleRequests` at index 6, while
+ * `bootstrap/app.php`'s priority list puts `ThrottleRequests` ahead of the tenancy classes, while
  * {@see EstablishGuestTenantContext} is not in that list at all — so the throttle runs BEFORE any tenant
  * GUC is set, and `forms` is FORCE ROW LEVEL SECURITY. The read would return zero rows, and the dial
  * would silently do nothing. Setting the GUC inside a limiter closure would duplicate the context
  * middleware, break its deliberate verify-then-apply ordering, and leave no `terminate()` to pair the
  * `forget()` with (ADR-0002 §D2).
+ *
+ * ⛔ THE ORDINAL THIS SENTENCE USED TO CARRY WAS WRONG, AND IT WAS THE COMMIT NEXT DOOR THAT BROKE IT (M78).
+ * It read *"puts `ThrottleRequests` at index 6"*, which was true when it was written (2026-08-08). `M43`
+ * then inserted `ThrottleFortifyEndpoints` into that exact slot, moving `ThrottleRequests` to 7 — so the
+ * number rotted without this file being touched, which is the whole case against writing one. The claim
+ * that carries the argument is the RELATION (throttle before tenancy), and the relation never moved.
+ * `config/fortify.php` already documents the same ordering prose-only for the same reason; follow that,
+ * not the ordinal. ⚠️ A backlog row filed against the two `M43` comments alleging they were off by one was
+ * REFUTED — 5, 6 and 13 are all correct there — because `route:list --json` never expands the `web` group
+ * and so cannot be read as an execution order. `TenancyMiddlewarePriorityTest:140` says so at length.
  *
  * So the cheap, DB-free velocity ceiling stays where it is — rejecting a flood before it costs a query —
  * and the per-form dial runs here, after context. Attached PER-ROUTE rather than to the group: route

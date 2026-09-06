@@ -86,7 +86,18 @@ function enable(): void {
 }
 
 function confirm(): void {
+    // ⛔ THE BAG IS SET ON THE EXCEPTION, IN VENDOR, SO NO `validateWithBag` GREP OF `app/` FINDS IT (M78).
+    // `Laravel\Fortify\Actions\ConfirmTwoFactorAuthentication` throws
+    // `ValidationException::withMessages([...])->errorBag('confirmTwoFactorAuthentication')`, which reaches
+    // `page.props.errors` as a bag map exactly like the two `/settings` forms. Without this option
+    // `confirmForm.errors.code` is always undefined and a wrong six-digit code renders nothing.
+    // ⚠️ THIS COMPONENT IS MOUNTED ON THREE PAGES AND TWO OF THEM ARE LOCKOUT GATES —
+    // `Pages/admin/TwoFactorSetup.vue` (super-admin MFA, no other console route is reachable) and
+    // `Pages/auth/TwoFactorRequired.vue` (tenant enforcement, where the only other affordance is sign out).
+    // On those two, a silent failure leaves no way to tell a mistyped code from a broken page.
+    // ⚠️ Only THIS call needs a bag: enable/disable/regenerate carry no validator at all.
     confirmForm.post('/user/confirmed-two-factor-authentication', {
+        errorBag: 'confirmTwoFactorAuthentication',
         preserveScroll: true,
         onSuccess: () => confirmForm.reset('code'),
     });

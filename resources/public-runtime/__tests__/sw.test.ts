@@ -118,6 +118,38 @@ function routeFor(cacheName: string): { cacheName?: string; plugins?: unknown[] 
     return found!.strategy;
 }
 
+type MatchArg = { request: Request; url: URL; sameOrigin: boolean };
+
+/**
+ * The route's MATCHER, which decides whether a URL enters the cache at all.
+ *
+ * ⚠️ Until M78 this file captured `match` and never invoked one, so every assertion here was about what a
+ * route does with a response it had ALREADY decided to handle — and nothing at all about which URLs it
+ * claims. That is the half the credential-exposure question turns on.
+ */
+function matcherFor(cacheName: string): (o: MatchArg) => boolean {
+    const found = routes.find((r) => r.strategy.cacheName === cacheName);
+    expect(found, `sw.ts registers no route with cacheName '${cacheName}'`).toBeDefined();
+    return found!.match as (o: MatchArg) => boolean;
+}
+
+/**
+ * A navigation probe.
+ *
+ * ⛔ `request.mode` IS NOT SETTABLE FROM SCRIPT — `new Request(url, { mode: 'navigate' })` throws, and
+ * `lib/brand-cache.ts` records the same constraint for the same reason. So the probe is an object literal
+ * cast, exactly as `Response.error()` is the only way to reach status 0 in the arms below. A real `Request`
+ * here would not be more faithful; it would be impossible.
+ */
+function nav(path: string): MatchArg {
+    return { request: { mode: 'navigate' } as Request, url: new URL(`https://acme.test${path}`), sameOrigin: true };
+}
+
+/** A same-origin `fetch()`, which is what every API call and every `remint()` actually is. */
+function apiGet(path: string): MatchArg {
+    return { request: { mode: 'cors' } as Request, url: new URL(`https://acme.test${path}`), sameOrigin: true };
+}
+
 describe('sw.ts runtime cache route table', () => {
     it('registers the three runtime caches', () => {
         // A floor on the table itself. Without it, a route deleted outright would take its own
@@ -151,4 +183,61 @@ describe('sw.ts runtime cache route table', () => {
             expect(await isCacheable(routeFor(cacheName), Response.error())).toBe(false);
         },
     );
+});
+
+describe('sw.ts route matchers — which URLs enter a cache at all', () => {
+    it('claims a guest form shell navigation for the shell cache, and only that cache', () => {
+        // The control. If this goes red the runtime has stopped caching the thing it exists to cache and
+        // every assertion below is measuring a worker that no longer works offline.
+        expect(matcherFor('guest-shell-html')(nav('/f/clinic-intake'))).toBe(true);
+        expect(matcherFor('guest-schema')(nav('/f/clinic-intake'))).toBe(false);
+        expect(matcherFor('guest-shell-assets')(nav('/f/clinic-intake'))).toBe(false);
+    });
+
+    it('does not claim a schema fetch as a navigation', () => {
+        // `remint()` and `fetchSchema()` are `fetch()`, never navigations, so the shell route must not
+        // take them even though their path starts with `/f/` after the API prefix.
+        expect(matcherFor('guest-schema')(apiGet('/api/v1/public/f/some-share-token'))).toBe(true);
+        expect(matcherFor('guest-shell-html')(apiGet('/api/v1/public/f/some-share-token'))).toBe(false);
+    });
+
+    it('⛔ KEEPS THE RESUME READ OUT OF EVERY CACHE, WHICH ONE ROUTE RENAME WOULD UNDO', () => {
+        // ⛔ THIS IS THE HIGHEST-VALUE ASSERTION IN THE FILE AND IT PINS AN ACCIDENT (M78).
+        // `GET /api/v1/public/drafts/{resumeToken}` answers the FULL answer map plus a freshly minted
+        // share token, and it carries no auth middleware — the token in the path is the whole credential.
+        // It escapes caching for exactly one reason: its prefix is `drafts/` and the schema route matches
+        // `f/`. `routes/api.php` warns about this at the site, in prose, where nothing can enforce it.
+        // Rename the route under `f/`, or consolidate the two public API groups, and a complete answer
+        // document lands in a cache with a seven-day clock. This arm is what turns that comment into a gate.
+        // ✅ PROVED BY DELIBERATE DEFECT, NOT BY OBSERVING A PASS (M78). Widen the schema route's prefix
+        // in `sw.ts` from `/api/v1/public/f/` to `/api/v1/public/` — one token, sha256 confirmed to move —
+        // and THIS ARM ALONE goes red (`expected true to be false`) while the other ten stay green,
+        // control included. That is the rename this comment warns about, performed. `scripts/mutate.php`
+        // could not drive it: it runs Pest in the app container, and this is Vitest — the limitation
+        // already filed as its own backlog row. So the mutation was applied by hand, with the sha256
+        // checked before and after and the restore verified by byte comparison rather than `git checkout`.
+        const resumeRead = apiGet('/api/v1/public/drafts/eyJhbGciOi.some.token');
+
+        expect(matcherFor('guest-schema')(resumeRead)).toBe(false);
+        expect(matcherFor('guest-shell-html')(resumeRead)).toBe(false);
+        expect(matcherFor('guest-shell-assets')(resumeRead)).toBe(false);
+    });
+
+    it('⚠️ RECORDS THAT THE RESUME SHELL *IS* CACHED TODAY — a pinned exposure, not an endorsement', () => {
+        // ⚠️ THIS ARM ASSERTS A DEFECT, DELIBERATELY, AND IT MUST NOT BE "FIXED" BY EDITING THE EXPECTATION.
+        // `/f/resume/{token}` is a same-origin navigation under `/f/`, so the shell route takes it and the
+        // credential-bearing HTML sits in `guest-shell-html` for seven days. Worse, Cache Storage is
+        // ORIGIN-scoped rather than per-document, and the token is the cache KEY — so
+        // `caches.open('guest-shell-html').keys()` leaks every resume token on the device without reading a
+        // single body, which is why stripping `data-resume-token` from the HTML would not close it.
+        //
+        // It is pinned `true` rather than fixed because removing the write is a real product trade that is
+        // the user's call, not this increment's: for a respondent who only ever opened the emailed link
+        // this entry is their ONLY cached navigation, and it carries the always-visible "Sync now" that
+        // `docs/non-functional-requirements.md` §7 makes the iOS Background-Sync fallback. See the decision
+        // appended by M78 in `docs/claims/decisions.md`. Whoever answers it flips this arm to `false` and
+        // adds the predicate — and must also decide what happens to `isResumeShell()` in
+        // `lib/brand-cache.ts`, whose three cases go VACUOUSLY GREEN the moment no resume key can exist.
+        expect(matcherFor('guest-shell-html')(nav('/f/resume/eyJhbGciOi.some.token'))).toBe(true);
+    });
 });

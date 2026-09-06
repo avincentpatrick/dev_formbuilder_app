@@ -581,14 +581,27 @@ Route::prefix('api/v1/public')
     ])
     ->group(function (): void {
         // ⛔ THE `drafts/` PREFIX IS LOAD-BEARING AND IS THE ONLY THING KEEPING THIS OUT OF CACHE STORAGE.
-        // This is a GET answering with the respondent's FULL answer map, and sw.ts NetworkFirst-caches
-        // GETs under `/api/v1/public/f/` — so moving this route under `f/`, or consolidating this group
-        // with the share-token group above, would put a complete answer document into `guest-shell-html`
-        // for seven days. Same hazard the POST-not-GET note on the challenge route records, reached from
-        // the other side: there the verb is what saves it, here it is the path.
+        // This is a GET answering with the respondent's FULL answer map — plus a freshly minted share
+        // token, so the URL segment is a WRITE credential and not only a read — and sw.ts caches GETs
+        // under `/api/v1/public/f/`. Moving this route under `f/`, or consolidating this group with the
+        // share-token group above, would put a complete answer document into `guest-schema` for seven
+        // days. Same hazard the POST-not-GET note on the challenge route records, reached from the other
+        // side: there the verb is what saves it, here it is the path.
+        // ⛔ THIS COMMENT NAMED `guest-shell-html` UNTIL M78 AND THAT WAS WRONG — that cache requires
+        // `request.mode === 'navigate'`, which an `Accept: application/json` GET never is. The harm was
+        // stated correctly and the destination was not, in the one place a reader would check it.
+        // ✅ THE WARNING IS NOW A GATE, not prose: `__tests__/sw.test.ts` invokes the real matchers and
+        // asserts this path is claimed by NONE of the three caches. Widening the schema prefix by one
+        // path segment reddens that arm alone — measured, not assumed.
         // ⚠️ The resume PAGE (`/f/resume/{resumeToken}`, routes/tenant.php) is a different matter and IS
         // cached — its HTML carries `data-resume-token`. lib/brand-cache.ts's `isResumeShell()` stops the
-        // brand sweep renewing that entry; nothing stops the initial cache write, deliberately, because
-        // purging it would cost offline access to a primed form.
+        // brand sweep renewing that entry; nothing stops the initial cache write.
+        // ⛔ THE REASON THAT USED TO BE GIVEN HERE — "purging it would cost offline access to a primed
+        // form" — IS FALSE, AND M78 MEASURED IT. `App.vue`'s `loadResume()` opens with a bare fetch to
+        // THIS endpoint, which no service-worker route matches, so offline it rejects and the IndexedDB
+        // read two calls downstream is unreachable: a cached resume shell has never rendered the form
+        // offline. What the entry does carry is the app shell, the offline pill and the always-visible
+        // "Sync now" — which for a respondent who only ever opened an emailed link is their ONLY cached
+        // navigation. That is the real trade, and it is an open decision rather than a settled rationale.
         Route::get('drafts/{resumeToken}', [GuestDraftResumeController::class, 'show'])->name('drafts.resume');
     });

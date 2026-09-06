@@ -202,3 +202,5 @@ Because submissions pin to a specific, immutable `form_version_id`, an offline c
 - Full real-time, character-level collaborative co-editing → explicitly not planned (§8).
 - Form-template instantiation mechanics (cloning a `form_templates` blueprint into a brand-new form + initial draft) → already specified in `docs/data-dictionary.md` §12, not re-derived here.
 - OCR-linelist's interaction with versioning (an OCR-linelist batch always submits against whatever version is currently published, by definition, same as any other channel) → Doc #17 (OCR Pipeline Design Doc) for the OCR-specific mechanics.
+
+<!-- pipeline: id=version-diff-ui title="PRD Feature #8 — the interactive field-by-field version-diff view" phase=3 state=ready size=L -->

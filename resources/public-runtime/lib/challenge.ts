@@ -162,7 +162,7 @@ export const YIELD_EVERY = 5000;
  * that reads it directly, instead of living only inside a loop condition nothing can reach.
  */
 export function shouldYieldAt(n: number): boolean {
-    return n % YIELD_EVERY === YIELD_EVERY - 1;
+    return n % YIELD_EVERY === 0;
 }
 
 /**

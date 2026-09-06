@@ -36,10 +36,6 @@ For the platform's **own** tenant-facing users (the staff who log in and build f
 > ⚠️ **`tenants:extract` IS NOT THIS, AND THE DISTINCTION IS WORTH STATING BEFORE SOMEBODY ASSUMES OTHERWISE (added 2026-08-14, P2b / ADR-0018).** Phase 4 built a **per-tenant** extraction command: `php artisan tenants:extract <tenant>` writes one workspace's record as NDJSON plus a manifest. Its subject is a **controller's workspace**, not a **data subject**, and the two artefacts differ in every respect that matters here. The tenant extract deliberately **withholds nine `users` columns** (four are credentials for a *central* identity — one human, N workspaces — and `last_active_tenant_id` is another workspace's UUID), deliberately **excludes `user_ui_preferences`** because it follows the person rather than the workspace, and deliberately **contains every member of the workspace**, which is the opposite of what a subject request may disclose. The subject-data export tool specified in the two rows above **has not been built**; nothing in `app/` implements it today. Reaching for `tenants:extract` to answer an Article 15 or Article 20 request would over-disclose (other people's rows) and under-disclose (the requester's own preferences, and their rows in workspaces other than the one extracted) at the same time.
 | **Right to restriction of processing / right to object** | **Lighter-touch, support-case-driven for Phase 1** — rather than a fully automated self-service toggle (which would require modeling a "processing restricted" state across every table this data touches, a materially larger scope than currently justified), these are handled as a manual support-team action in Phase 1, using the same `settings`/super-admin tooling `docs/multi-tenancy-rbac-design.md` §9 already describes. Flagged as a Phase 2+ candidate for self-service automation if volume ever justifies it — an honest scope decision, not a silent gap. |
 
-<!-- pipeline: id=gdpr-subject-export title="Build the subject-data export for Article 15 access and Article 20 portability" phase=4 state=ready size=L -->
-<!-- pipeline: id=gdpr-erasure-execution title="Give submissions.pii_erased_at a writer — the erasure mechanic is documented and has none" phase=4 state=ready size=M -->
-<!-- pipeline: id=gdpr-legal-posture title="The GDPR, legal and pricing posture decisions" phase=4 state=held size=S blocker="user: the GDPR, legal and pricing calls are the user's own" -->
-
 ---
 
 ## 4. Retention
@@ -47,8 +43,6 @@ For the platform's **own** tenant-facing users (the staff who log in and build f
 **Default: indefinite retention, opt-in per-tenant automatic deletion** — deliberately not defaulting to auto-deletion, because this product's dual audience (`docs/PRD.md` §2) includes M&E/research tenants for whom multi-year historical data is the *point* of the product, alongside business tenants who may have a genuine compliance reason to auto-purge after a fixed window (e.g., job-application forms under a 1-year retention policy). A one-size-fits-all default would be wrong for at least one of these audiences.
 
 **Mechanism**: reuses the existing tenant-scoped `settings` key-value table (`docs/data-dictionary.md` §20) rather than introducing a new table — a new settings key, e.g. `retention.submission_retention_days` (integer, `NULL` = retain indefinitely, the default). A scheduled job, run per-tenant, transitions `submissions` older than the configured window into `status = 'archived'` (the terminal state `docs/data-dictionary.md` §7's `SubmissionStatus` enum already added "for retention workflows") and/or triggers the same PII-erasure mechanic as §3, at the tenant's configured choice — **which of the two (archive vs. erase) a given retention policy performs is a tenant-configurable choice**, not a single hardcoded behavior, since "stop actively processing" and "destroy the personal data" are legally distinct actions with different implications.
-
-<!-- pipeline: id=retention-sweep-job title="Build the per-tenant retention sweep and its settings key — both documented, neither exists" phase=4 state=ready size=M -->
 
 ---
 
@@ -123,3 +117,11 @@ GDPR Art. 33 requires notifying the relevant supervisory authority within 72 hou
 - Breach detection/response mechanics → Doc #23.
 - Plan-tier-specific data-retention/export quotas (if any) → Doc #24.
 - The actual, counsel-reviewed DPA and Privacy Policy documents themselves — this document supplies inputs, not final legal text (§7).
+
+<!-- The pipeline markers below are DELIBERATELY at end-of-file. A marker inserted mid-document
+     shifts every line beneath it, and this repository cites documents as `path:N` — 25 such
+     citations point into the files that carry markers. End-of-file shifts nothing. -->
+<!-- pipeline: id=gdpr-subject-export title="Build the subject-data export for Article 15 access and Article 20 portability" phase=4 state=ready size=L -->
+<!-- pipeline: id=gdpr-erasure-execution title="Give submissions.pii_erased_at a writer — the erasure mechanic is documented and has none" phase=4 state=ready size=M -->
+<!-- pipeline: id=gdpr-legal-posture title="The GDPR, legal and pricing posture decisions" phase=4 state=held size=S blocker="user: the GDPR, legal and pricing calls are the user's own" -->
+<!-- pipeline: id=retention-sweep-job title="Build the per-tenant retention sweep and its settings key — both documented, neither exists" phase=4 state=ready size=M -->

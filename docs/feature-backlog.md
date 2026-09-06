@@ -1690,8 +1690,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `forbidden` result and the batch continues" is ONE observable that both mutations violate, and nothing can
   observe a guard's absence without observing a refusal. Recorded as what the contract is rather than
   engineered around. Filed by `M11`.
-- **`minor` · The `reviewer` role's seeded description and `SubmissionPolicy::create()` contradict each
-  other.** Filed 2026-08-25 by M13, which made the contradiction observable on a second surface and
+- ✅ **CLOSED BY `M77` (2026-09-06) — `minor` · ~~The `reviewer` role's seeded description and `SubmissionPolicy::create()` contradict each
+  other.~~** Filed 2026-08-25 by M13, which made the contradiction observable on a second surface and
   deliberately did not resolve it. `RolePermissionSeeder::MATRIX` documents that role as *"Review submissions
   on forms they collaborate on; **may also encode** + export those forms"*, and it holds `submissions.create`
   accordingly — but `SubmissionPolicy::create()` has required `forms.edit.any` or **EDITOR** capacity since
@@ -1703,6 +1703,32 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   correct the seeder's sentence and drop `submissions.create` from the role), so it belongs to the user
   rather than to a defect fix. `SubmissionPolicy::create()`'s own docblock argues the tightening at length
   and notes *"no existing test asserted the old behaviour"*, which is why it went unnoticed. Filed by `M13`. **Live** — the seeded role description and the policy still disagree in the tree, so a reader resolving one against the other gets the wrong answer, judged by `M65`.
+  ✅ **DONE — `M77` (2026-09-06), and the row's own framing is what turned out to be wrong.** ⛔ **THIS WAS
+  NEVER "TWO DEFENSIBLE READINGS": IT WAS ONE CODE BEHAVIOUR AND FIVE DOCUMENTS DESCRIBING IT INCORRECTLY.**
+  Corrected: the seeder comment, `docs/multi-tenancy-rbac-design.md`'s §3 role table, its §5 matrix row, its
+  §8.3 shape sentence, and `docs/ACCESS-MATRIX.md`'s permission grid. **No access changed.** The narrowed
+  product question — should the ROLE gain encoding, or is documenting the gap the whole answer — is `D19`.
+  ⛔ **THE ROW'S SECOND REMEDY WOULD HAVE BROKEN A WORKING CONFIGURATION.** It proposed dropping
+  `submissions.create` from the role. That permission is the coarse half a **reviewer-role member holding an
+  EDITOR grant** needs in order to encode, and it is what entitles the `write:submissions` API ability;
+  dropping it breaks the one composition that makes the role usable for a person who does both jobs.
+  ⛔ **AND §8.3 WAS THE WORST OF THE FIVE, BECAUSE IT IS THE SECTION A READER TREATS AS AUTHORITATIVE.** It
+  described `SubmissionPolicy`'s review check as running against `capacity = 'reviewer'`. `review()` calls
+  `collaboratesWith()` → `ResourceGrantResolver::holdsAny()`, which loops `ResourceCapacity::cases()` and
+  accepts **either**. Were it capacity-specific, reviewing and encoding would be **mutually exclusive on
+  every form**: `capacity` sits outside `resource_grants_target_user_unique` and a grant is replaced rather
+  than added, so nobody can hold both capacities on one form.
+  ⚠️ **A SIXTH SURFACE WAS FOUND AND IS ALSO CORRECTED**: §8's breadcrumb note said a Reviewer and a Viewer
+  can both reach *"the encode screen"*, which is false for **both** — a Viewer holds no `submissions.create`
+  at all. The breadcrumb defect that note actually describes is real and untouched.
+  ⛔ **AND THE ROW'S "NO TEST" PREMISE IS FALSE — AS WAS THIS INCREMENT'S FIRST DRAFT OF ITS OWN FIX.**
+  The G10a case *"requires EDITOR capacity to manually encode"* in
+  `tests/Feature/Submissions/SubmissionPolicyTest.php` has pinned the refusal all along; `M13`'s row, and
+  **both arms of `M77`'s read-only fan-out**, all missed it, and one arm proposed adding the case that was
+  already there. So the defect was **purely documentary**. The new case earns its place on a narrower
+  claim: it asserts the coarse permission IS held, and it proves the reviewer-plus-editor-capacity
+  composition with **one** member — the G10a case proves the editor half with a *form_editor* user, so
+  nothing anywhere covered that configuration or the capacity-insensitivity of `review()`.
 - ✅ **CLOSED BY `M68` (2026-09-03) — `minor` · ~~Neither sync route documents the 403 its in-controller policy gate now returns.~~**
   `GET /sync/manifest` now documents its `403` through the shared `AuthorizationException` component.
   ⛔ **THE ROW'S PREMISE IS HALF FALSE, AND THE CORRECTION IS WHAT SET THE SCOPE.** Only the `GET` can answer
@@ -5465,8 +5491,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   cannot drive. **Filed by M48 (2026-08-31)**, which found it by making the mistake the gate exists to
   catch. **Live.** Filed by `M48`.
 
-- **`minor` · Nothing pins `fetch-depth` for the SECRET SCAN, whose blindness is silent and whose
-  stakes are the highest of the three gates that integer governs.** Split out by `M49` (2026-08-31)
+- ✅ **CLOSED BY `M77` (2026-09-06) — `minor` · ~~Nothing pins `fetch-depth` for the SECRET SCAN, whose blindness is silent and whose
+  stakes are the highest of the three gates that integer governs.~~** Split out by `M49` (2026-08-31)
   from the `R7` checkout-depth row it closed, because that row's remedy — comparing the range's
   commit count against the payload's — is available to `R7` and **is not available here.** `ci.yml`
   runs `gitleaks detect --source .`, which scans git **history**: at `fetch-depth: 2` it was checking
@@ -5479,6 +5505,17 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   explicit `--log-opts` range derived from the event payload, as `R7` now does. ⚠️ **The honest note
   is that a floor is a ratchet and will need maintaining**, which is why this is filed rather than
   guessed at. **Live.** Filed by `M49`.
+  ✅ **DONE — `M77` (2026-09-06), in the same commit as `M76`'s sharpening of this row below.** ⛔ **THE
+  ROW'S THREE CANDIDATES WERE ALL DOMINATED BY A FOURTH IT DID NOT CONSIDER**, and its own stated worry
+  — *"a floor is a ratchet and will need maintaining"* — is exactly what that fourth option removes.
+  `git rev-parse --is-shallow-repository` is an **exact boolean over the state `actions/checkout`
+  produces**: no floor, no ratchet, no payload, and nothing to maintain as the repository grows. A
+  commit-count floor would have needed raising forever; an `--log-opts` range is wrong for a scanner
+  with no memory of prior runs. ⚠️ **One premise this row states is false and was worth measuring**:
+  it says the depth is unpinned, and `R7`'s clone-shape assertion — shipped by `M49` in the very same
+  commit that filed this row (`12b0ef5`, confirmed with `git log -S` on both files) — does pin it. Just
+  not usefully: it is satisfied by any depth at or above the PR's commit count plus one, and on a
+  `push` or `schedule` event it asserts nothing about clone shape at all.
 
 - ~~**`minor` · `npm audit` cannot distinguish "the registry is unreachable" from "your dependencies are~~
   ✅ **DONE — M72 (2026-09-05). THE ROW HELD IN FULL, AND THE ONE THING IT GOT WRONG WAS ITS OWN
@@ -6146,7 +6183,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   (`tests/e2e/public-runtime-offline.spec.ts` reads cached responses by `status` and `type`); what is
   missing is a probe of the REDIRECT path with the SW's own cache emptied. **Live.** Filed by `M73`.
 
-- **`minor` · `guest-shell-assets` has the identical missing status filter, and no row has ever named it.**
+- ✅ **CLOSED BY `M77` (2026-09-06) — `minor` · ~~`guest-shell-assets` has the identical missing status filter, and no row has ever named it.~~**
   Found by `M73`'s fan-out while verifying the `/f/*` row, which framed itself as *"the one route whose
   sibling filters for `200`"*. ⛔ **There are THREE routes and TWO of them lacked the strict filter** — the
   headline was a 1-of-2 framing of a 1-of-3 fact, and closing `/f/*` leaves `guest-shell-assets` as the
@@ -6180,6 +6217,27 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   either rule. It is inert only because `vite.config.ts` sets `injectManifest.globPatterns: []`, so the
   shipped bundle precaches an empty list. *"Three routes, two rules"* is really *four routes, three rules,
   one dead by configuration.*
+  ✅ **DONE — `M77` (2026-09-06), and it took `M74`'s second branch, softened by one degree.** The plugin
+  is added and the comment beside it is written as a **precondition, not an all-clear**: it names the three
+  things that would make status 0 arrive (an edge CDN or WAF in front of `/build/`, an `ASSET_URL` pointing
+  the bundle at another origin, a canonicalising redirect), none of which exist here. `M74`'s own
+  *"CANNOT VERIFY a production edge"* is precisely why an all-clear would have been the wrong artefact.
+  ⛔ **THE PROOF `M74` DID NOT KNOW WAS BUILDABLE IS BUILT, AND THE OBVIOUS FORM OF IT DOES NOT WORK.**
+  `resources/public-runtime/__tests__/sw.test.ts` is the **first mount of `sw.ts` in this repository**. The
+  natural probe — asserting `cacheWillUpdate({ response: { status: 0 } })` returns null — **throws**:
+  `CacheableResponse.isResponseCacheable()` opens with `assert.isInstance(response, Response)` in every
+  non-production build, three lines above the status comparison, so a plain object literal reddens all three
+  routes together rather than only the unfiltered one. `new Response(null, { status: 0 })` is unavailable too
+  (`RangeError`, status must be 200..599). **`Response.error()` is the only status-0 `Response` the platform
+  offers**, and happy-dom supplies it.
+  ✅ **Proved by deliberate defect, with the discriminator the project requires**: stripping the plugin back
+  out turns **exactly one** arm red — `guest-shell-assets` — while the two sibling routes stay green.
+  ⚠️ **Also silenced Workbox's dev-logger output**, which dumps the whole `Response` for every rejection and
+  put six screens of noise on a fully passing run. Vite strips that branch from the shipped worker, so it
+  changes nothing about production — but a green run that prints walls of text is what teaches a reader to
+  skip output, which is the argument `M76` closed the `AbortError` row on.
+  ➕ **The four-routes-three-rules census above is confirmed and unchanged**; the precache route stays inert
+  by configuration and was not touched.
 
 - **`minor` · The triage generator silently drops any citation written as a PARTIAL path, and a partial
   path is strictly worse than a bare filename.** Found by `M73`'s fan-out. `resolve_token()` in
@@ -6562,8 +6620,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   "restore the old ordering" option; the real choices are to narrow the sweep, to stagger deliberately, or to
   accept it and say so. **Live.** Filed by `M75`.
 
-- **`minor` · The proof-of-work yield is pinned on the fallback path only, and its CADENCE is asserted
-  nowhere at all.** Found by `M75` (2026-09-06) while replacing the vacuous assertion that preceded it, and
+- ✅ **CLOSED BY `M77` (2026-09-06) — `minor` · ~~The proof-of-work yield is pinned on the fallback path only, and its CADENCE is asserted
+  nowhere at all.~~** Found by `M75` (2026-09-06) while replacing the vacuous assertion that preceded it, and
   filed rather than folded in because the second half needs a decision. ⛔ **The honest limit of the new
   case**: under `crypto.subtle` — which happy-dom supplies and which every https respondent gets — the
   awaited native digest turns the event loop on **every** candidate, so `yieldToEventLoop()` being called or
@@ -6576,6 +6634,31 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   beyond tidiness**: the solver runs inside `ApiClient.submit()`, which the service worker also calls while
   draining the outbox, and a SW cannot spawn a Worker — so the interval is the only thing standing between a
   long solve and every other fetch that worker is handling. **Live.** Filed by `M75`.
+  ✅ **DONE — `M77` (2026-09-06). The cadence is pinned; the interval's VALUE is `D18` and deliberately is
+  not.** `challenge.ts` now exports `YIELD_EVERY` and `shouldYieldAt(n)` and takes an `onYield` seam with
+  the real function as its default, so no call site changed.
+  ⛔ **THE ROW'S CLOSING ARGUMENT IS INVERTED, AND THE INVERSION CAME FROM A DOCBLOCK THAT WAS ALSO WRONG.**
+  The row says the interval is *"the only thing standing between a long solve and every other fetch that
+  worker is handling"*. A service worker is **always** a secure context, therefore always takes the
+  `crypto.subtle` branch, and an awaited native digest already turns the event loop on every candidate —
+  measured in this project's node container: a `setTimeout(…, 0)` fires during 200 awaited
+  `crypto.subtle.digest()` calls and does **not** fire during 200 awaited already-resolved promises. **So
+  the yield does nothing in the service worker.** What it protects is the **insecure-embed tab**, which has
+  the synchronous fallback hash and — for the same secure-context reason — no service worker at all.
+  `challenge.ts`'s *"NO WEB WORKER"* paragraph asserted the opposite and is corrected in place.
+  ⛔ **AND THE OBVIOUS INVARIANT IS ARITHMETICALLY FALSE, WHICH IS THE HALF THAT WOULD HAVE SHIPPED A
+  GREEN LIE.** `yields === floor(candidatesTried / YIELD_EVERY)` is wrong for **24 of the 120,001** answers
+  in the real search space — every answer at `n ≡ YIELD_EVERY - 1 (mod YIELD_EVERY)`, because the match
+  RETURNS before the yield check is reached. The true form is `floor(answer / YIELD_EVERY)`, wrong for
+  none, and both were swept exhaustively rather than reasoned about. ⚠️ **`M75`'s own existing fixture
+  `challengeFor(12000, 20000)` is one of the answers where the wrong formula coincidentally agrees**, so a
+  test written to the plausible invariant would have passed green while encoding a falsehood.
+  ✅ **Proved by deliberate defect**: `shouldYieldAt` changed to the plausible wrong offset
+  (`n % YIELD_EVERY === 0`) turns **8** cases red across both new tables.
+  ⚠️ **STATED LIMIT, because it is the shape that makes gates vacuous**: both tables derive their
+  expectations FROM `YIELD_EVERY`, so re-tuning the interval moves them and stays green. That is
+  deliberate — pinning the value would be a gate asserting this repository's own open question — and it
+  means these cases see a mis-COUNTING, never a re-tuning.
 
 - **`minor` · A correction still cannot be autosaved, and the reason is an endpoint that does not exist plus
   a product decision nobody has taken.** Split out by `M75` (2026-09-06) from the leave-prompt row it closed,
@@ -6608,6 +6691,19 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   decision on its own judgement while the request to relax it is pending. ⚠️ **Whoever takes it should fix
   the generator prose in `scripts/gate-baselines.php` in the same PR**, since `docs/gate-baselines.md`
   repeats the lint-gate-only framing and is regenerated from that script. **Live.** Filed by `M76`.
+  ➕ **`M77` (2026-09-06) RE-MEASURED THIS INDEPENDENTLY AND ADDS THE MECHANISM AT FILE GRANULARITY**,
+  because `M76` established the cause and not the specific link, and the specific link is what makes the
+  row impossible to misread. In `dev_formbuilder_app-app-1`, over `database/migrations`: the SPL iterator
+  enumerates **87 of 114** files while `scandir` and `glob` both return all 114 — **27 missing**, and
+  `2026_07_06_000205_create_form_fields_table.php` is one of them. That file declares `default_value`,
+  which is exactly the property the first reported error calls undefined on `App\Models\FormField`.
+  Larastan derives model property types from the migrations, so the phantom errors are not a vague
+  side-effect of the blindness: **each one is a column whose declaring migration the iterator cannot
+  see.** ⚠️ Confirmed on the host in the same session — `phpstan` reports **0 errors** there, against
+  **18** in the container on the identical tree, which is the divergence a reader will otherwise spend an
+  hour on. ⚠️ **A second, unrelated container-only obstacle worth naming beside it**: a full
+  `php artisan test` run dies at PHP's default 128 MB, and `-d memory_limit` on the `artisan` process
+  does not reach the Pest child — invoke `vendor/bin/pest` directly.
 
 - **`minor` · PHPUnit's own collector loses 40 test files in the container, and a local run reports green
   without them.** Measured by `M76` (2026-09-06). `phpunit.xml` declares its suites as `<directory>`
@@ -6625,8 +6721,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   gate and not a list. 👤 **What is left for the user is `D17`**: whether that permanent local red is
   wanted, or whether it should be softened. **Live** until `D17` is answered. Filed by `M76`.
 
-- **`minor` · `R7` pins the checkout depth to `PR commits + 1`, so a depth of 50 keeps every gate green
-  while blinding the secret scan to 1,100 of 1,181 commits.** Measured by `M76`'s read-only fan-out
+- ✅ **CLOSED BY `M77` (2026-09-06) — `minor` · ~~`R7` pins the checkout depth to `PR commits + 1`, so a depth of 50 keeps every gate green
+  while blinding the secret scan to 1,100 of 1,181 commits.~~** Measured by `M76`'s read-only fan-out
   (2026-09-06) while verifying `M49`'s open `fetch-depth` row, and recorded here so the expensive half is
   not re-derived. ✅ **Two of that row's premises are stale**: the depth IS pinned — by `R7`'s clone-shape
   assertion in `scripts/tracker-lint.php`, which `M49` shipped in the same increment that filed the row —
@@ -6642,6 +6738,26 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the `NpmAuditJudgeTest` precedent, which is mutation-drivable because `fetch-depth: 0` occurs exactly
   once in `ci.yml`. The row's third candidate (`--log-opts`) is outright wrong for a scan with no memory.
   **Not taken**: `ci.yml` is a hub file and `M76`'s slot was spent. **Live.** Filed by `M76`.
+  ✅ **DONE — `M77` (2026-09-06), spending its one hub slot here, and CLOSING `M49`'s row above in the
+  same commit.** The fence is `git rev-parse --is-shallow-repository` folded into the gitleaks step, and
+  `tests/Feature/Docs/SecretScanDepthTest.php` is its control. ⛔ **THE ROW'S REMEDY WAS RIGHT AND ITS
+  ARITHMETIC WAS WRONG.** `git rev-list --count HEAD` is **987**, not 1,181 — the latter was the local
+  clone's `--all` (1,187), and `actions/checkout` fetches one refspec, so a CI clone never holds the local
+  ref set. Neither figure yields *"1,100"*. ⛔ **AND THE PIN IS EXACT, MEASURED RATHER THAN INFERRED**: a
+  scratch bare mirror shallow-cloned at depths 1–10 against a real 7-commit merge puts R7 red at 6 and
+  green at 7, with the clone holding 17 of 815 commits.
+  ⛔ **TWO TRAPS THE ROW DID NOT NAME, AND EITHER WOULD HAVE SHIPPED A DECORATIVE GATE.**
+  (1) `git rev-parse --is-shallow-repository` **exits 0 in both states** — it prints the answer — so an
+  exit-status fence is either always red or never red; the string comparison is the whole gate.
+  (2) The obvious error message *"must check out with <the key>: 0"* spells the exact token
+  `scripts/mutate.php` mutates, which would make the token occur twice and turn the proof from CAUGHT
+  into an abort with no verdict. That is this repository's token-in-prose trap, and `ci.yml` documents an
+  earlier instance of it fourteen lines above the step being edited.
+  ⚠️ **A THIRD instance bit the new gate on its first run** and is recorded in the test file: an ordering
+  assertion over the step's raw body found `gitleaks detect` inside the explanatory comment and concluded
+  the fence ran after the scan. The gate reads executable lines only, as `NpmAuditJudgeTest` already
+  prescribes for the same reason.
+  ✅ **Proved by deliberate defect**: `mutate.php` swapping the depth to a bounded value reports CAUGHT.
 
 - **`minor` · The partial-path citation row's consequences are mostly false, and the measurement that
   settles `D15`'s dependency is done.** Measured by `M76`'s fan-out (2026-09-06). The mechanism in
@@ -6658,3 +6774,116 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `--dry-run`, so with git absent from the app container a Pest control exits 2 before reaching the
   resolver. ⚠️ **And it should be taken together with the two destructive-default rows**, which collide on
   the same hub file. **Live.** Filed by `M76`.
+
+- **`minor` · Neither Fortify form on `/settings` can render a validation error, and the mechanism is one
+  missing `errorBag`.** Found by `M77`'s fan-out (2026-09-06) while sizing the `PUT
+  /user/profile-information` rate-limit row, at a line that row already cites — the row was not taken, and
+  this is a different, live defect beside it. `UpdateUserProfileInformation` and `UpdateUserPassword` both
+  call `validateWithBag('updateProfileInformation')` / `('updatePassword')`. Inertia's
+  `Middleware::resolveValidationErrors()` returns the bag map whenever no `default` bag exists, so
+  `page.props.errors` is `{updateProfileInformation: {…}}` — while `resources/js/Pages/Settings/Index.vue`
+  calls `.put()` with **no** `errorBag` and its template binds `profile.errors.email` and
+  `password.errors.current_password`, which are therefore always undefined. ⛔ **So a duplicate email, an
+  invalid address, a wrong `current_password` or a breached password all render NOTHING on `/settings`
+  today**, and the password form's `onError` clears the fields with no explanation shown. ⚠️ **The tell that
+  this is a real omission rather than a convention**: `errorBag` occurs **exactly once** in the entire
+  frontend, at `resources/js/Pages/auth/VerifyEmail.vue`, whose paired Vitest pins it. ⚠️ **It also makes
+  the deferred rate-limit row strictly worse when that row is taken**: a `ThrottleRequestsException` is a
+  429 rather than a bagged validation response, so it lands nowhere in these forms either. **Live.**
+  Filed by `M77`.
+
+- **`minor` · Two user-supplied predicates now run on the `pgsql_auth` connection, against a standing rule
+  that says none may.** Found by `M77`'s fan-out (2026-09-06). `docs/multi-tenancy-rbac-design.md` states
+  the rule in terms — *"no user-supplied predicate may ever run on `pgsql_auth`"* — and it is restated in
+  `docs/adr/0002-multi-tenancy-shared-db-rls.md` and in `docs/security-threat-model.md`, whose residual
+  entry defends the grant on the grounds that it is *"consumed by exactly one server-derived equality
+  predicate"* and names **a second consumer of the grant as its explicit revisit trigger**.
+  `UpdateUserProfileInformation` runs `Rule::unique('pgsql_auth.users', 'email')` on an attacker-supplied
+  value, and `CreateNewUser` does the same. ⚠️ **Two consumers, both user-supplied, so the stated trigger
+  has fired.** ⚠️ **Sized `minor` deliberately and NOT as a live injection**: `Rule::unique` binds its value
+  as a parameter, so this is a widening of a deliberately-narrow blast radius rather than a reachable
+  exploit — the row is that the documented invariant and the tree now disagree, and three documents defend
+  a property that no longer holds. ⚠️ **Whoever takes it must decide the direction**: narrow the code back
+  onto the default connection, or amend all three documents to describe the rule that is actually being
+  kept. Do not amend one and not the others. **Live.** Filed by `M77`.
+
+- **`minor` · The `@throws` sweep row's prescribed remedy is SELF-NULLIFYING, which no pass has said in
+  three re-derivations.** Measured by `M77`'s fan-out (2026-09-06) and recorded here rather than closing the
+  row, because the row was not in this increment's batch. The open row above prescribes asserting that the
+  rendered `code` description contains each **declared** cause, and `M70` narrowed that to *"derive the
+  expected code set FROM THE DOCBLOCK"*. ⛔ **An expectation derived from the docblock moves with the
+  docblock.** Delete `@throws SubmissionConflictException` from `SubmissionPromoteController::store()`: the
+  derived expectation shrinks to the surviving code, the re-exported 409 shrinks to exactly the branch that
+  satisfies it, and the arm goes **green**. The regression the row exists to catch is a docblock LOSING a
+  tag, so the remedy cannot catch it — for any route, ever. ⚠️ **It kills the obvious fallback too**: a
+  hardcoded class→marker map is still iterated over the declared set, so it shrinks the same way. **The only
+  shape that can detect docblock incompleteness is a per-route expectation INDEPENDENT of the docblock**,
+  which is what the existing case 4 already is. ⚠️ **So the honest close is probably "cannot be built as
+  specified, and the existing case is the answer"**, not a new gate — but that is the taker's call and the
+  argument above is the expensive half, banked so a fourth fan-out is not spent on it. ⚠️ **One real defect
+  found beside it and NOT settled**: the sweep's helper matches `'@throws '.class_basename($exception)`, so a
+  fully-qualified `@throws` tag matches nothing; on today's tree each arm has exactly one route in scope, so
+  an FQ-spelled tag EMPTIES the walk and the `>= 1` floor fires — meaning it is currently caught, loudly, by
+  accident of there being no second route to hold the floor up. **Live.** Filed by `M77`.
+
+- **`minor` · The data-dictionary row's CHECK-constraint census is wrong, and the correction is the opposite
+  of a tidy-up.** Measured by `M77`'s fan-out (2026-09-06) directly against `pg_constraint` on the running
+  database, and recorded so the next taker does not repeat a survey that has now been got wrong once.
+  A grep-based census over `database/migrations/` concluded that **3 of 16** enum-catalog rows carry a
+  Postgres CHECK. Measured live: the schema holds **44** CHECK constraints, the catalog has **28** rows, not
+  16, and **11** of them are backed by one. ⛔ **`form_versions_status_chk` is the case that explains the
+  miss**: it is live, it constrains a column the grep census listed as unconstrained, and it is created by
+  first-party code in `app/Support/Migrations/PublishedVersionGuard.php` — **outside `database/migrations/`**
+  and named with a `_chk` suffix the pattern did not match. ⚠️ **That is this repository's two-enumerators-
+  disagreeing failure, committed by a survey of the document that exists to prevent it.** ⚠️ **Acting on the
+  wrong number would have been worse than the vague preamble it replaced**: it would tell a reader that
+  seven database-enforced columns are unenforced. Whoever takes the row should census from `pg_constraint`,
+  not from the migrations directory. **Live.** Filed by `M77`.
+
+- **`minor` · `bootstrap/app.php` and `FortifyServiceProvider` both record a middleware index that is off by
+  one.** Found by `M77`'s fan-out (2026-09-06) and reproduced on the host with `php artisan route:list
+  --path=user/profile-information --json`. Both files carry the comment *"Authenticate runs at index 5 and
+  this middleware at 6"*; the live route table puts `Illuminate\Auth\Middleware\Authenticate:web` at **4**
+  and `ThrottleFortifyEndpoints` at **5**, with `web` unexpanded at 0. ⚠️ **Filed rather than fixed because
+  it is two copies of a fact in two files** — the same shape those files exist to guard — and the durable
+  question is whether an ordering that load-bearing should be asserted by a test rather than described in a
+  comment that drifts. ⚠️ **It is a comment, so nothing is broken**; it is filed because the next reader
+  reasoning about middleware order from either file will be wrong by one, and two increments have now
+  written middleware-order code near it. **Live.** Filed by `M77`.
+
+- **`minor` · The storage-quota row's stated blocker is not real, and its re-aim needs a copy decision
+  nobody has made.** Measured by `M77`'s fan-out (2026-09-06); the row was verified and deliberately NOT
+  taken, and this records both halves so the next attempt starts from the measurement. ✅ **The blocker is
+  false**: the row says touching the device-wide count *"risks the boot drain that ADR-0021 makes
+  load-bearing"*. The boot trigger reads `pending.value` alone, `queued` is a local const escaping into one
+  string, and no candidate remedy goes near `listPending`/`retryAll` — so the drain cannot be reached from
+  this fix. ⛔ **But the obvious re-aim is a trap.** The panel's region is titled *"My submissions on this
+  device"*, which is its accessible name, so *"on this device"* is already the LOCATION word and *"My"* the
+  ownership word; read in situ the three sentences reconcile. Relabelling the device-wide `queued` as
+  *"N responses on this device"* would place a device-wide number under an ownership heading — plausibly
+  manufacturing the very contradiction `M15` recorded fixing. ⚠️ **So the remaining work is a copy call**
+  (*"across all sessions on this device"*, a visit-scoped count, or no number at all), it is genuinely the
+  user's, and it changes a string another increment deliberately pinned in `sync-status.test.ts`. Whoever
+  takes it should render the panel before rewording it — `M15`'s note says that is what caught it last
+  time. **Live.** Filed by `M77`.
+
+- **`minor` · `public-runtime-offline.spec.ts`'s parked-conflict case is FLAKY across viewport projects,
+  and `D2` makes that a merge-blocking property.** Measured by `M77` (2026-09-06) while running the specs
+  its own diff reached, and isolated with a control rather than assumed. Two consecutive runs of
+  *"reviews & resolves a parked conflict (Increment G8c)"* failed on **different projects each time** —
+  first `mobile` + `desktop`, then `tablet` — always at the same line, `expect(reviewButton).toBeVisible()`
+  on `getByTestId('review-conflicts')` with a 15 s timeout. ✅ **It is NOT caused by the `sw.ts` change
+  that increment shipped**: reverting `resources/public-runtime/sw.ts` to its pre-`M77` bytes, rebuilding
+  the worker and re-running the same case reproduced the failure, so it predates the status filter. ⚠️
+  **Why it matters rather than being ordinary e2e noise**: `D2` is answered — *"a flaky e2e result now
+  fails CI"* — so a case that fails on a rotating third of its projects is a merge blocker that will
+  redden unrelated pull requests, and the rotation is exactly what makes it read as somebody else's fault.
+  ⚠️ **What is NOT known** is whether it flakes in CI or only on this host; a local run is one worker
+  against a stack that is also serving a dev Vite, and the timeout is a visibility wait rather than a
+  network wait. Whoever takes it should get a CI failure on record before tuning anything, because the
+  obvious remedy — raising the timeout — is the one that converts a flake into a slow pass without
+  learning why. ⚠️ **Two neighbours worth reading first**: the open row about what actually delivers the
+  offline mis-cased render (two confident models of that spec have already been wrong), and the fact that
+  running this spec at all needs `public/hot` moved aside — with a dev Vite running, Laravel emits
+  dev-server asset URLs the e2e container cannot reach and **`global-setup` dies at the login form**,
+  which looks like a broken fixture and is not. **Live.** Filed by `M77`.

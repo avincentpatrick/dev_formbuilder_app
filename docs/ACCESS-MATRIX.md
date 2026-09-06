@@ -206,7 +206,7 @@ The catalog is **closed**: five roles, twenty-nine permissions, defined once in
 
 | Permission | O | A | E | R | V |
 |---|:-:|:-:|:-:|:-:|:-:|
-| `submissions.create` | ✅ | ✅ | ✅ | ✅ | — |
+| `submissions.create` ⚠️ | ✅ | ✅ | ✅ | ✅ | — |
 | `submissions.edit.any` | ✅ | ✅ | — | — | — |
 | `submissions.edit.own` | — | — | ✅ | — | — |
 | `submissions.review.any` | ✅ | ✅ | — | — | — |
@@ -225,6 +225,14 @@ The catalog is **closed**: five roles, twenty-nine permissions, defined once in
 | `audit_log.view` | ✅ | ✅ | — | — | — |
 | `feedback.submit` | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `feedback.view` | ✅ | ✅ | — | — | — |
+
+⚠️ **`submissions.create` — a ✅ here is the PERMISSION, not the capability, and for the Reviewer those
+differ (M77).** This grid records what `RolePermissionSeeder` grants. `SubmissionPolicy::create()`
+additionally requires `forms.edit.any` or **editor** capacity on the specific form, since the G10a
+tightening made encoding an authoring act — and a Reviewer's resource grant is *reviewer* capacity. So a
+plain Reviewer holds this permission and can still encode on **no form at all**; it takes a second,
+editor-capacity grant. Every other cell in this table is a permission whose policy adds only the usual
+`.own` collaborator scoping, which is why this is the only row carrying a warning.
 
 **Totals:** Owner 25 · Admin 23 · Form editor 9 · Reviewer 6 · Viewer 4.
 

@@ -23,6 +23,101 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
+### D19 — A Reviewer holds `submissions.create` and can encode on no form. `M77` made every document say so. Should the ROLE now gain encoding, or is documenting the gap the whole answer?
+
+**Filed 2026-09-06 by Lane A, during `M77`, at the moment the documentation was corrected.** `M13`
+filed this as *"both readings are defensible and choosing between them is an authorization
+decision"*. ⛔ **That framing is now measurably wrong in its first half, and the entry says so rather
+than reproducing it.** There were not two readings of one fact; there was **one code behaviour and
+five documents describing it incorrectly** — the seeder comment, `docs/multi-tenancy-rbac-design.md`'s
+§3 role table, its §5 matrix row, its §8.3 shape sentence and `docs/ACCESS-MATRIX.md`. All five are
+corrected and no access changed. What is left is genuinely a product question, and it is narrower.
+
+⚠️ **WHAT IS TRUE IN THE TREE, MEASURED.** `RolePermissionSeeder` grants the role
+`submissions.create`. `SubmissionPolicy::create()` requires that permission **and** a published
+version **and** (`forms.edit.any` **or** `ResourceCapacity::Editor` on the form). A reviewer's grant
+is reviewer capacity, so **a plain Reviewer can manual-encode on no form at all.** The behaviour was
+already correct and already covered — the G10a case
+`tests/Feature/Submissions/SubmissionPolicyTest.php` *"requires EDITOR capacity to manually encode"*
+has pinned it since G10a, which `M13`'s row and both arms of `M77`'s fan-out all missed.
+
+⚠️ **AND THE PERMISSION IS LOAD-BEARING, SO `M13`'s SECOND OPTION WOULD HAVE BROKEN SOMETHING.** That
+option was *"correct the sentence and drop `submissions.create` from the role"*. Dropping it breaks
+the one configuration that makes the role composable: a **reviewer-role member holding an editor
+grant**, who may both review and encode. `review()` resolves through
+`ResourceGrantResolver::holdsAny()`, which accepts either capacity, so that member keeps reviewing;
+`create()` passes on the editor capacity; and `submissions.create` is the coarse half both need.
+Nothing asserted that configuration before `M77`; a case now does.
+
+**The options:**
+
+1. ✅ **Leave the behaviour exactly as it is — the documentation was the entire defect.**
+   A Reviewer reviews; encoding is an authoring act and needs an editor grant, which G10a decided
+   deliberately and for a stated reason (at subtree scale a reviewer grant on an interior node would
+   otherwise confer write access to every form beneath it). The composable path already exists for
+   the *"this person does both"* case. **Recommended.** ⚠️ Its cost is that
+   `docs/ACCESS-MATRIX.md`'s grid now needs a warning footnote to be read correctly, because a
+   permission a role holds but can never exercise alone is a genuinely confusing thing to publish.
+2. **Widen `create()` to accept reviewer capacity** — i.e. make the five documents' original claim
+   true instead of correcting them. ⛔ This reverses G10a on the merits, not on a technicality, and
+   the subtree argument is the reason to expect it to be wrong: `includes_descendants` grants exist,
+   and a reviewer grant on a region node would hand out encoding across every form in that region.
+   If this is chosen it should be scoped to **direct form grants only**, never node grants, which is
+   a third behaviour neither document describes today.
+3. **Drop `submissions.create` from the role and give the composable case its own mechanism.**
+   Honest about the role being review-only, but it deletes the working reviewer-plus-editor path and
+   replaces it with nothing; a second grant type or a role change would have to be designed. Listed
+   because it is `M13`'s stated option and should be refused explicitly rather than ignored.
+
+---
+
+### D18 — The proof-of-work solver yields every 5000 candidates against a 120000 search space, and nothing has ever decided that number. Keep 5000, derive it, or make it configurable?
+
+**Filed 2026-09-06 by Lane A, during `M77`, alongside the cadence gate that pins everything EXCEPT
+the value.** The row asked for the cadence; the cadence is now asserted
+(`resources/public-runtime/__tests__/challenge.test.ts`, offset within a block and number of blocks,
+proved by deliberate defect). ⛔ **The interval's VALUE is the half a test must not decide, because
+a test whose expectation derives from the constant it guards cannot see the constant change** — so
+pinning 5000 there would have been a gate asserting this project's own undecided question.
+
+⚠️ **WHAT IS MEASURED AND NOT IN DISPUTE.** `challenge.ts` yields at `n % 5000 === 4999`;
+`config/guest.php` sets `max_number` to `120000`; so a worst-case solve yields **24** times, and the
+count is `floor(answer / 5000)` — the final partial block never yields, because the match returns
+before the check. 5000 has been the value since I8b with **no stated basis anywhere** — no comment,
+no test, no document.
+
+⛔ **AND THE REASON THE YIELD EXISTS WAS RECORDED BACKWARDS UNTIL `M77`, WHICH IS WHY THE NUMBER
+MATTERS LESS THAN IT LOOKS.** `challenge.ts`'s docblock said the yield keeps *"both the tab and the
+SW responsive"*. A service worker is always a secure context, always takes the `crypto.subtle`
+branch, and an awaited native digest already turns the event loop on every candidate — measured in
+this project's node container: a `setTimeout(…, 0)` fires during 200 awaited
+`crypto.subtle.digest()` calls and does **not** fire during 200 awaited resolved promises. **So the
+yield does nothing in the service worker.** It serves the **insecure-embed tab** — an `http://` host
+page, where `crypto.subtle` is undefined, the solver falls back to the synchronous `sha256Hex()`,
+and that context has no service worker either. The interval is therefore a *paint-responsiveness*
+knob for one deployment shape, not a *fetch-starvation* knob for the outbox drain.
+
+**The options:**
+
+1. ✅ **Keep 5000 and let the corrected docblock be the record.** It is now documented what the yield
+   is for, what it costs (24 yields worst case) and why the SW is unaffected — which is everything a
+   future reader needs, and the value has caused no measured problem in the one context that uses
+   it. **Recommended**, on the grounds that nobody has reported a janky embedded solve and inventing
+   a target for a knob nobody is pulling is how a decorative constant becomes a decorative gate.
+2. **Derive it from a target frame budget** — e.g. yield roughly every 16 ms of fallback hashing,
+   measured once and turned into a constant with the measurement written beside it. Principled, and
+   it would replace an unexplained number with an explained one. ⚠️ The honest cost: the pure-JS
+   hash rate varies by an order of magnitude across the low-end Android devices this fallback exists
+   for, so a single derived constant is only better than 5000 if the measurement names the device it
+   was taken on — otherwise it is the same arbitrary number with a more confident comment.
+3. **Move it to `config/guest.php` beside `max_number`.** The two numbers genuinely are related (the
+   yield count is a function of both) and an operator could then tune it per deployment. ⛔ Listed to
+   be refused unless option 2 is also taken: it is a client-side constant that would have to be
+   serialised into the challenge payload or the bundle, which adds a wire field and a second copy of
+   a fact to solve a problem nobody has reported.
+
+---
+
 ### D17 — A local container Pest run silently omits 40 test files. `M76` made that loud, which makes every local run RED. Keep it, soften it, or change how the suite is run?
 
 **Filed 2026-09-06 by Lane A, during `M76`, at the moment the gate was written.** Recorded here rather than

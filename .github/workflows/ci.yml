@@ -113,6 +113,14 @@ jobs:
           # number — `3` would fail the next three-commit PR and fail it SILENTLY, as a red gate that
           # reads like a missing marker. Cost measured before choosing: full history is 20 MB over 866
           # commits. Only this job needs it; nothing else here reads the commit graph.
+          #
+          # ⚠️ M77 — THAT MEASUREMENT IS DATED, NOT WRONG, AND IT IS LEFT STANDING FOR THAT REASON. The
+          # commit count has grown past 866 and will keep growing; the local pack is 13.5 MiB today,
+          # which is a different quantity measured a different way and is NOT a correction of the 20 MB.
+          # The cost argument is unaffected either way, and it is the only thing the sentence is for.
+          # ⛔ What DOES need saying beside it: this key is now load-bearing for the SECRET SCAN as well
+          # as for R7, and reducing it no longer merely costs a marker check — see the fence on the
+          # gitleaks step, which is the thing that actually catches a reduction.
           fetch-depth: 0
 
       - name: Setup PHP
@@ -285,6 +293,37 @@ jobs:
 
       - name: Secret scan (gitleaks)
         run: |
+          # ⛔ THE CLONE-SHAPE FENCE, AND IT IS NOT REDUNDANT WITH R7 (M77, closing M49's row and
+          # M76's sharpening of it). `gitleaks detect --source .` scans git HISTORY, so a shallow
+          # clone makes it report "no leaks found" while blind. Measured, not assumed: at a bounded
+          # depth of 2 this scan saw two commits; unbounded it saw 818 and immediately reported three
+          # findings that are fingerprinted in .gitleaksignore to this day — one of them on a commit
+          # ~600 back whose text survives only in PROGRESS_ARCHIVE.md, which a working-tree scan
+          # could never have produced.
+          #
+          # ⛔ R7's clone-shape assertion in scripts/tracker-lint.php does NOT cover this, and the
+          # comment above claiming a reduction would "fail LOUDLY" is false across the range that
+          # matters. R7 is satisfied by any depth at or above the PR's commit count plus one —
+          # measured exactly against a real 7-commit merge: red at 6, green at 7, with the clone
+          # holding 17 of 815 commits. Everything between that floor and full history is unguarded,
+          # and on a `push`, `schedule` or `workflow_dispatch` event R7 asserts nothing about clone
+          # shape at all. This fence is an exact boolean over the state actions/checkout produces,
+          # needing no floor, no ratchet and no payload.
+          #
+          # ⛔ `git rev-parse --is-shallow-repository` EXITS 0 IN BOTH STATES — it PRINTS the answer.
+          # So `if git rev-parse ...; then fail; fi` is always red and `if ! git rev-parse ...` is
+          # never red: comparing the printed string is the whole gate, not a stylistic choice. An
+          # empty capture (ancient git, wrong cwd) is also != false, so it fails closed.
+          #
+          # ⚠️ THE MESSAGE BELOW DELIBERATELY DOES NOT SPELL THE CHECKOUT KEY FOLLOWED BY ITS VALUE.
+          # scripts/mutate.php requires its token to occur EXACTLY ONCE in the file it rewrites, so a
+          # fence quoting the token it guards would turn this gate's only proof from CAUGHT into no
+          # verdict at all. Same trap, same file, as the --audit-level note fourteen lines above.
+          # tests/Feature/Docs/SecretScanDepthTest.php is the control.
+          if [ "$(git rev-parse --is-shallow-repository)" != "false" ]; then
+            echo "::error title=Secret scan CANNOT MEASURE::the clone is shallow and this scan reads git history, so it would report no leaks while blind. The static-analysis job must check out with full history (depth 0)."
+            exit 1
+          fi
           curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.21.2/gitleaks_8.21.2_linux_x64.tar.gz \
             | tar -xz gitleaks
           ./gitleaks detect --source . --no-banner --redact --exit-code 1

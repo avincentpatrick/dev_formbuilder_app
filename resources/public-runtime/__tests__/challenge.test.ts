@@ -1,6 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { encodeSolution, hasSubtleCrypto, sha256Hex, solveChallenge, type Challenge } from '../lib/challenge';
+import {
+    encodeSolution,
+    hasSubtleCrypto,
+    sha256Hex,
+    shouldYieldAt,
+    solveChallenge,
+    YIELD_EVERY,
+    type Challenge,
+} from '../lib/challenge';
 
 /**
  * The guest proof-of-work solver (Increment I8b).
@@ -127,6 +135,96 @@ describe('solveChallenge', () => {
             await solveChallenge(challengeFor(12000, 20000));
 
             expect(ticked).toBe(true);
+        } finally {
+            vi.stubGlobal('crypto', realCrypto);
+        }
+    });
+});
+
+describe('the yield cadence', () => {
+    /**
+     * ⛔ WHY THIS BLOCK EXISTS AT ALL (M77). The case above pins THAT the solver yields; nothing pinned
+     * HOW OFTEN. `challenge.ts` yielded at a bare `n % 5000 === 4999` while `config/guest.php` sets
+     * `max_number` to 120000 — so a worst-case fallback solve yields 24 times and no test, comment or
+     * document stated that number or defended the interval. The interval's VALUE is a live decision;
+     * its cadence is not, and this is the half that can be pinned honestly.
+     *
+     * ⚠️ IT IS PINNED THROUGH AN INJECTED `onYield`, NOT A TIMER, AND THAT IS WHAT MAKES IT SCALE-FREE.
+     * The timer technique the case above uses can only ever answer "at least one yield happened", and
+     * only on the fallback path. Counting calls answers "exactly this many", on either path.
+     *
+     * ⛔ THE HONEST LIMIT, STATED BECAUSE IT IS THE SHAPE THAT SILENTLY MAKES GATES VACUOUS. Both tables
+     * below derive their expectations FROM `YIELD_EVERY`, so changing the interval from 5000 to 2500
+     * moves the expectations with it and everything stays green. That is DELIBERATE — the interval's
+     * value is an open decision and pinning it here would be this repository asserting its own
+     * undecided question — but it means these cases cannot detect a re-tuning, only a mis-COUNTING.
+     * A test whose expectation is derived from the thing it tests can never catch a change to that
+     * thing; the scope is therefore the offset within a block and the number of blocks, and a
+     * deliberate defect was run against exactly those (see the release notes).
+     */
+    const countingSolve = async (answer: number, maxnumber: number): Promise<number> => {
+        let yields = 0;
+        await solveChallenge(challengeFor(answer, maxnumber), async () => {
+            yields++;
+        });
+
+        return yields;
+    };
+
+    it.each([
+        [0, false],
+        [1, false],
+        [YIELD_EVERY - 2, false],
+        [YIELD_EVERY - 1, true],
+        [YIELD_EVERY, false],
+        [2 * YIELD_EVERY - 1, true],
+    ])('shouldYieldAt(%i) is %s', (n, expected) => {
+        // ⛔ THE PREDICATE'S BOUNDARY, READ DIRECTLY. The plausible wrong form, `n % YIELD_EVERY === 0`,
+        // fires on candidate ZERO — before any work — and then one candidate early forever. Both rows
+        // of this table that mention 0 exist to kill it.
+        expect(shouldYieldAt(n)).toBe(expected);
+    });
+
+    it.each([
+        [0, 0],
+        [YIELD_EVERY - 2, 0],
+        [YIELD_EVERY - 1, 0],
+        [YIELD_EVERY, 1],
+        [2 * YIELD_EVERY - 1, 1],
+        [2 * YIELD_EVERY, 2],
+    ])('yields floor(answer / YIELD_EVERY) times when the answer is %i', async (answer, expected) => {
+        // ⛔ THE FORMULA IS `floor(answer / YIELD_EVERY)`, AND THE OBVIOUS ALTERNATIVE IS FALSE.
+        // `floor(candidatesTried / YIELD_EVERY)` looks equivalent and is wrong for every answer at
+        // `n ≡ YIELD_EVERY - 1 (mod YIELD_EVERY)` — measured by sweeping all 120,001 answers in the real
+        // search space: 24 disagreements, zero for the form asserted here. The reason is one line of
+        // `solveChallenge`: the match RETURNS before the yield check is reached, so the final partial
+        // block never yields.
+        //
+        // ⚠️ THE TWO ROWS THAT CARRY THIS ARE `YIELD_EVERY - 1` AND `2 * YIELD_EVERY - 1`. Every other
+        // row here passes under the wrong formula too — including, by coincidence, the 12000/20000
+        // fixture the case above already uses, which is why the defect could survive a test suite that
+        // looked like it covered this.
+        const realCrypto = globalThis.crypto;
+
+        try {
+            // The fallback path: ~10x cheaper than the subtle path for the same candidate count
+            // (measured at 78 ms vs 747 ms for 12k), and the yield count is identical on both.
+            vi.stubGlobal('crypto', {});
+
+            expect(await countingSolve(answer, answer + 1)).toBe(expected);
+        } finally {
+            vi.stubGlobal('crypto', realCrypto);
+        }
+    });
+
+    it('never yields when the search space is smaller than one interval', async () => {
+        // The common case in production: the server picks `n` uniformly in [0, max_number], so most
+        // solves are long — but a short one must not pay for a yield it does not need.
+        const realCrypto = globalThis.crypto;
+
+        try {
+            vi.stubGlobal('crypto', {});
+            expect(await countingSolve(10, 100)).toBe(0);
         } finally {
             vi.stubGlobal('crypto', realCrypto);
         }

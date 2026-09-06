@@ -16,7 +16,125 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M78` is merged; four rows closed, ten filed, and a correction that repeated the error it was correcting
+## Status: ACTIVE CLAIM — `M79`, the single pipeline: one ordered line, and a gate that makes an unqueued plan item impossible (`m79-one-pipeline`)
+
+Taken 2026-09-06. Branch `m79-one-pipeline`, cut from `origin/main` at `bc9f38e`, PR into `main`.
+
+⛔ **NOT A `D13` BATCHED ROW.** This is a user-directed increment. Their instruction, verbatim:
+*"please fix that now so we only look in a 1 straight line. we will never finish this project if we
+will hide or exclude tasks in the main pipeline."* The approved plan is held outside the repository
+and carries the full design plus every measured correction to it. This claim is increment **1 of 3** —
+the spine. The gate is the second; coverage is the third.
+
+The defect, stated once: `docs/PRD.md` and `PROGRESS.md`'s roadmap say what the product should be;
+`docs/feature-backlog.md` and its generated triage say what the next increment works on. **Nothing
+links them** — `scripts/state.php` and `scripts/backlog-triage.php` have never opened the PRD. A plan
+item with no hand-written queue row is documented and unscheduled at the same time.
+
+### Evidence verified
+
+The row here is five realignments, each checked against the merged tree rather than quoted:
+
+- **`PROGRESS.md`'s Phase-3 row** — *"remainder = H16b/H16c (need Google/Airtable creds)"*: **FALSE
+  since 2026-08-13.** H16b merged as #134/#135/#136, H16c as #138/#139/#140. Its cell still reads
+  `BUILDING`. **HELD as a defect.**
+- **The Phase-1-completion row** — *"I0, I1, I2 DONE"*: **FALSE.** I0 through I12 all merged
+  (#100 to #121) and the branch landed as #179, 419 commits over 1,074 files. **HELD.**
+- **The Phase-4 row** — *"CRDT sync = the last Lane B row, not started"*: **FALSE.** Rescoped to P3a
+  and merged as #168; contradicted by the Lane B queue line in the same file. **HELD.**
+- **The Lane A queue line** — *"J4c to J5, 2 rows left"*: **FALSE since 2026-08-17**, when the
+  J-queue closed. **HELD.**
+- **Four plan items with no queue row** — GDPR subject-data export
+  (`docs/data-privacy-gdpr-compliance.md:36` states it outright), right-to-erasure execution
+  (`submissions.pii_erased_at`: four `app/` hits, three declarations and a docblock, **zero writers**),
+  the retention sweep (`retention.submission_retention_days`: **0 hits** across `app/`, `config/`,
+  `database/`, `routes/`, measured three times), and PRD Feature #8's version-diff UI. **ALL FOUR HELD.**
+
+⚠️ **One correction to my own filing:** I first reported `pii_erased_at` as three declaration hits. It
+is **four** — the fourth is a docblock naming the column while explaining that nothing writes it. That
+matters to the gate: a rule reading "referenced outside a declaration site" would read the warning as
+a use. Comments must be excluded, exactly as `DocumentedCommandDriftTest` already does.
+
+### Premise verified
+
+What the design believes about the world *around* the defect. Three beliefs, measured; **two were
+false and one was dangerous**:
+
+- **"This is new territory."** ⛔ **FALSE.** A `Documented*DriftTest` family already exists —
+  `DocumentedCommandDriftTest`, `DocumentedSettingKeyDriftTest`, `DocumentedDefaultDriftTest`. This
+  work joins that family's conventions rather than inventing a parallel style: both directions never
+  containment, assert an artefact never a behaviour, nothing hard-coded, comment lines skipped,
+  prefixed helper names.
+- **"The family's *test, not a lint script* argument applies here."** ⛔ **FALSE, AND THIS IS THE
+  DANGEROUS ONE.** All three headers argue that a test needs no alias, no `quality` entry and no
+  `ci.yml` step. That rests on a condition `DocumentedCommandDriftTest` states about itself: it
+  *"reads three named files and iterates no directory."* Every gate in the family avoids directory
+  iteration. **This gate cannot** — discovering markers means walking `docs/**` and `app/**`, and Pest
+  runs in the container, where that walk truncates: `D17` measured 40 test files lost, and the
+  previous increment pinned 87 of 114 migrations. A container test that iterates is blind and reports
+  green. **Host lint script confirmed — for this reason, not the one the plan gave.**
+- ⛔ **Consequent defect in the approved plan, struck before it was built:** widening
+  `DocumentedSettingKeyDriftTest` to a directory-scanned corpus would convert a working named-file
+  container test into a directory-iterating one, silently blinding it. **Not doing it.** The widened
+  arm goes in the host lint; that test keeps its named files untouched.
+
+### Remedy verdict
+
+The plan's prescribed design was measured before a line was written. **Four of its predicates were
+wrong, and all four are corrected:**
+
+- **The queue predicate (arrow chains) — WRONG.** Predicted 2 matches; measured **16**, including the
+  held-list line, three status bullets, three roadmap rows, the `docker compose` chain and two
+  Gotchas entries. **Replaced by a derived one:** three-or-more struck-through tokens on a line, which
+  matches **exactly** the two lane-queue lines and nothing else. At a threshold of two it also catches
+  a roadmap row, so three is measured rather than chosen.
+- **The deferral vocabulary — WRONG, and near-worthless as a discovery instrument.** Predicted about
+  24 sites; measured **20**. **Precision 5%** — one genuine obligation — and **recall about 2%**,
+  since 0 of 54 sweep findings are reachable by any phrase. `deferred to Phase` is 12 of the 20 with
+  *structurally zero* precision: a thing assigned to a phase is by definition scheduled.
+  `not implemented` matches **nothing**, and *"Not yet implemented"* defeats it by one word on the
+  very line that then asserts "Built in H2" over two jobs that were never built. **A dead vocabulary
+  entry cannot be proved by `scripts/mutate.php` at all**, which is how it was caught.
+- **`is not built` — FALSE POSITIVE CONFIRMED.** It matches *"is not built **on** `StepProjection`"*,
+  a different sense of the word. Needs a negative lookahead.
+- **The roadmap row count — WRONG.** The plan said 8; measured **7**.
+
+⛔ **And the plan is missing its load-bearing rule.** Absence alone cannot work here: *documented is
+not built* is a **permanent legitimate state** on this project, since 12 of the 20 classified lines
+are ratified decisions. The predicate must be the three-term join — **absent in code AND absent from
+`docs/feature-backlog.md` AND absent from `docs/claims/decisions.md`**. Validated by sampling seven
+sweep findings against the backlog: `single_page_mode`, `allow_manual_encoding`, `allow_offline_sync`,
+`source_batch_id`, `include_answers`, `correlation` and `Idempotency` — **0 mentions each.**
+
+**Method note, because it changed the answer:** 48 agents; 20 candidate lines each verified by one and
+then attacked by a second briefed only to refute it. **The refuters overturned 11 of 20.** A truncated
+first run reported 1 obligation; the complete run reports **10**. A single-pass verdict on this corpus
+is close to a coin toss, and that is a finding about method rather than about any row.
+
+Files: `docs/pipeline.md` (new, generated), `scripts/pipeline.php` (new),
+`scripts/backlog-triage.php` (add `--json`), `scripts/state.php` (a pipeline derivation plus a render
+section), `scripts/next.php` (name the pipeline in the generated line), `scripts/loop.php` (`assess`
+refuses a row that is not ready), `PROGRESS.md` (own status block, the roadmap Status column, the
+Pipeline region), `PROGRESS_ARCHIVE.md` (receive the displaced cells and the two lane-queue lines),
+`CLAUDE.md` (the held-row rule), `docs/claims/decisions.md` (append the next decision), plus marker
+insertions in the plan documents the generator reads.
+
+Shared artefacts taken: `PROGRESS.md` (own block only), `PROGRESS_ARCHIVE.md`, `CLAUDE.md`,
+`docs/claims/decisions.md`, `docs/pipeline.md`, and the documents receiving markers.
+Paired files taken: none.
+Namespaces spent: **one decision id**, derived at the moment of writing rather than typed here.
+**No ADR, no migration prefix.** The reserved ADR gap stays reserved.
+
+Prediction: PHPStan **cannot move** — this increment is `scripts/` and docs only, and it scans `app`,
+`database` and `routes`; I will say that rather than quote an unchanged number. Pint will touch
+`scripts/` and I expect one `single_quote` or trailing-comma fix. Vitest, axe and E2E are untouched
+and I will not run hours of E2E for a docs-and-scripts diff. `tracker-lint` R1 headroom should
+**increase**, since the roadmap Status column and the queue block leave `PROGRESS.md`, and R7 will
+**not** arm because the drop sits under both its line and byte limits — the dead zone the previous
+surgery increment filed. The surgery is proved with `scripts/tracker-surgery.php` regardless.
+**The prediction I most expect to be wrong: that `docs/pipeline.md` passes `citation-liveness-lint`
+first time.** It is a tier-1 document built almost entirely of `path:line` citations, and every
+previous generated artefact here has needed a round trip with that gate.
 
 `M78` closed **four** rows and filed **ten**, spending **zero** hub slots and appending **one**
 decision. `state.php` counts the tree; do not take that sentence's arithmetic on trust.

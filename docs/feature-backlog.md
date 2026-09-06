@@ -7490,3 +7490,25 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   definitions passes straight over it. ⚠️ Pairs with the async-export row above —
   `docs/architecture/technical-architecture.md:469` opens §7.3 and defines both export modes, and neither
   is built. **Latent.** Filed by `M80`.
+
+- **`minor` · `PROGRESS.md` is within roughly one status bullet of its `tracker-lint` R1 byte ceiling, and
+  the two surfaces a session actually reads before pushing both stay silent about it.** Found by `M80`
+  during its own close-out (2026-09-07), filed rather than taken because the remedy is a tracker surgery
+  and this increment's subject was the backlog. `scripts/tracker-lint.php:76` sets the ceiling at 130,000
+  bytes and the file stands at roughly 126.3 KB after `M80`'s bullet — under **4 KB of headroom**, against
+  a status bullet that has cost between two and three KB in each of the last several increments. So the
+  next increment fits and the one after it does not. ⛔ **THE TRAP IS NOT THE CEILING, IT IS WHERE THE
+  SIGNAL ARRIVES.** `scripts/next.php` generates the hand-off line the next session reads first and never
+  consults the ceiling — grepping it for the constant, for `ceiling` or for `headroom` returns nothing —
+  and `scripts/preflight.php:274` reports the tracker's **line** count under its structural section but not
+  its byte count, which is the half that binds; `CLAUDE.md` records that the byte half is the one that
+  catches this file, because its bullets are single lines thousands of bytes long. The first signal is
+  therefore `tracker-lint` reddening in CI on a push that has already happened, at close-out, with a PR
+  open — the worst available moment. ⚠️ **Two honest remedies, and they are not exclusive.** (a) A tracker
+  surgery moving the oldest status bullets to `PROGRESS_ARCHIVE.md`, proven with
+  `scripts/tracker-surgery.php` rather than by hand and landed with the surgery marker at line start —
+  which buys headroom but does not move the signal. (b) Teach `next.php` and `preflight` to report the
+  remaining headroom the way `state.php` already reports how stale the gate baselines are, so the warning
+  precedes the push instead of following it. ⚠️ Note the shape: this is a self-announcing constraint that
+  is nonetheless invisible **where it matters**, which is the same defect class `M80` itself was filed to
+  correct. **Live.** Filed by `M80`.

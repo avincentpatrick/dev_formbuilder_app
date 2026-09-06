@@ -16,87 +16,97 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M80`, filing the invisible findings: nineteen rows that were real and in no queue (`m80-file-the-invisible`)
+## Status: NO ACTIVE CLAIM — `M80` is merged; nothing measured is now unqueued, and the findings were right about absence and wrong about detail
 
-Taken 2026-09-06. Branch `m80-file-the-invisible`, cut from `origin/main` at `3f0a88a`, PR into `main`.
+## RELEASED — `M80`, filing the invisible: nineteen rows that were real and in no queue (merged as PR #271, `ef847c7`, 6/6 green with real step counts — Static analysis 24 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 
-⛔ **NOT A `D13` BATCHED ROW.** A user-directed increment, and a direct correction of `M79`'s worst
-judgement. `M79` built the single pipeline and then **withheld 49 measured findings from it** on the
-grounds that they were unverified. The user rejected that reasoning: *"why did we do this realignment
-if they will still be hidden and not included in the pipeline?"* They were right, and the mechanism to
-include them honestly already existed and was not used — this repository's liveness vocabulary has
-`latent`, meaning *"real, but needs a stated precondition first"*, which is exactly what an unverified
-finding is.
+Shipped 2026-09-07. Branch `m80-file-the-invisible`, cut from `origin/main` at `3f0a88a`. **Not a `D13`
+batched row — a user-directed increment INSERTED AHEAD OF THE GATE**, and a direct correction of `M79`'s
+worst judgement. It does not displace `M79`'s "1 of 3": the gate is still next, coverage after it.
 
-### Evidence verified
+**What shipped.** Nineteen rows into `docs/feature-backlog.md`: **11 `Live`** that survived the
+three-term join — absent in code **and** unfiled **and** undecided — plus a refuter that overturned
+zero, and **8 `Latent`** whose join agents died on a usage limit, filed with *"the three-term join has
+not been run"* as their stated precondition and the cohort's 73% rejection rate recorded as the prior.
+The other 30 are named rather than counted: 17 decisions already taken, 6 duplicates (four of them
+`M79`'s own markers), 7 that did not survive re-derivation. Filing into the ledger rather than as
+pipeline markers was the whole design, and it worked with no second mechanism: `scripts/pipeline.php`
+consumes the ledger through `backlog-triage.php --json`, so the line went **109 → 128 rows** on
+regeneration alone, the 11 entering as `ready` and the 8 as `blocked` with `precondition: row is
+latent` — in the line, in position, blocker named.
 
-The 49 findings came from seven blind sweeps with **no adversarial stage**. Each was put through the
-three-term join — **absent in code AND absent from `docs/feature-backlog.md` AND absent from
-`docs/claims/decisions.md`** — with survivors then attacked by a second agent briefed only to kill
-them. 41 of 49 returned a verdict before a usage limit stopped the run:
+⛔ **THE HEADLINE IS THAT THE FINDINGS WERE RIGHT ABOUT ABSENCE AND WRONG ABOUT DETAIL, AND ONLY A
+SECOND PASS COULD SEPARATE THOSE.** A 19-agent verification opened **all 170 citations** and
+re-derived every absence claim independently. **Zero absence claims failed** — every documented thing
+these rows say is missing is genuinely missing. But the same pass returned **six confirmed
+imprecisions** and a dozen more corrections, all fixed before merge: **four counts were simply wrong**
+(`routes/api.php` 72 → **68**, its URIs 67 → **68**, `openapi.json` paths 52 → **51**, `Route::delete`
+16 → **22**) and **three absolutes were too strong** — *"nothing ever writes the channel"* is true of
+`app/` but not of seeders and tests; *"there is no soft-delete writer"* is true only for NFR §8's three
+named entities, since three services soft-delete and say so in a trailing comment; *"the only locks in
+`app/`"* is true only of distributed locks, and `FormAcceptanceGuard` already serialises per form on
+the submit path. A policy was cited two statements early, an `AttachmentKind`/`NotificationType` pair
+was collapsed onto one line, a schedule block was anchored on its second member, and a limiter
+enumeration of eight is really **24 across three providers**.
 
-| verdict | count |
-|---|---|
-| **file-it** | **11** |
-| recorded-decision | 17 |
-| duplicate | 6 |
-| false-finding | 7 |
+⚠️ **AND ONE "CORRECTION" WAS ITSELF WRONG, WHICH IS THE REASON TO RE-MEASURE RATHER THAN RE-TRUST.**
+Checking the verifier's `RateLimiter::for` count of 24, a bare grep returned **29** — five of those
+were the string appearing inside *docblocks arguing about limiters*, three of them in middleware
+explaining why it is **not** a `RateLimiter::for` closure. The verifier was right and the re-derivation
+was wrong; the row would have shipped a worse number than the one it was replacing. Every remaining
+count in the nineteen was then measured directly rather than accepted from either side.
 
-⛔ **73% WERE REJECTED, WHICH SETTLES A QUESTION `M79` GOT HALF RIGHT.** Filing all 49 raw would have
-put 30 bad rows into the queue whose whole purpose is to be trustworthy — so *verifying* was correct.
-*Withholding them from the user while unverified* was not. Both are true and `M79` conflated them.
+### How the prediction fared
 
-⚠️ **Four of the six duplicates are `M79`'s own markers** — the retention key, the retention job, the
-`pii_erased_at` writer and the tenants columns. The join caught the increment duplicating itself, which
-is the strongest evidence available that the dedup term was not ceremonial.
+- ⛔ **"`BacklogProvenanceTest` is the gate most likely to fire" — WRONG, and it never fired at all**,
+  passing 4/47 on the first run and again after the rewrite. The reason is worth keeping: the gate's
+  own parser was re-implemented locally and run over the block **before** it was appended, so the
+  contract was satisfied by construction rather than by luck. A gate cannot fire on a diff built
+  against its own rules.
+- ✅ **"`citation-liveness-lint` is the second" — RIGHT, and it was the only gate that went red.** The
+  ordering was backwards: the gate named second fired and the gate named first did not. Three of the
+  nineteen carried a dead citation — `docs/erd.md:114` inside a mermaid fence, and
+  `PwaManifestController.php:64` and `competitive-feature-parity-matrix.md:8` both blank, each **off by
+  one or two** from the live line it meant. All three were the kind that resolve to a plausible-looking
+  file and land on nothing.
+- ✅ **"The prediction I most expect to be wrong: that the open-row count lands at exactly 119" — it
+  landed at exactly 119.** The one named as least trusted held. It was not left to arithmetic:
+  the row-**ID set** was diffed before and after (19 added, **0 lost**), and because the block was
+  appended at EOF the 745,495 pre-existing bytes are byte-identical by sha256 with `git` reporting
+  insertions only. `M79`'s destroyed-row class was made structurally impossible rather than checked for.
+  ⚠️ **The ledger then closed at 120, not 119, and both numbers are the record:** a twentieth row was
+  filed during close-out under `CLAUDE.md`'s *"file anything you decided not to fix, the moment you decide
+  it"* — `PROGRESS.md` is within about one status bullet of its `tracker-lint` R1 byte ceiling, and
+  neither `next.php` nor `preflight` reports the byte half, so the first signal would be CI reddening on
+  an already-pushed commit. Self-announcing, yet invisible where it matters — the same defect class this
+  increment exists to correct, which is why it was filed rather than left for the next session to hit.
+- ⚠️ **"Pint touches nothing" — WRONG the moment the ratchet moved.** The diff stopped being docs-only
+  and Pint scanned 1,468 files, passing. **"PHPStan cannot move" — RIGHT, but for the stated reason
+  rather than the stated premise**: it scans `app`, `database` and `routes`, so a `scripts/` change
+  cannot reach it either. Static analysis stayed at 24 steps; no CI step was added.
 
-⚠️ **The refuters overturned ZERO this time**, against 11 of 20 on the previous fan-out. The
-difference is the join: a single-pass *"is it absent"* verdict is near a coin toss on this corpus,
-because absence is a permanent legitimate state here; *"absent AND unfiled AND undecided"* is not.
+### The ratchet, taken rather than filed
 
-### Premise verified
+`LEDGER_ROT_CEILING` **18 → 17**. This discharges an obligation that was **missed rather than created
+here**: the count was already 17 on the trunk before this branch opened a file, so an increment between
+`M48` and `M79` repaired a citation and did not lower the constant in the same commit — leaving the
+gate one free slot, which is the one thing a ratchet exists to deny. ⛔ **The bound was watched break
+and hold in this session, by accident**: red at 20 on the three dead citations above, green again at 17
+once re-pointed. That is the only evidence that counts for a gate number, and it arrived for free. The
+nineteen rows carry **156 citations and add zero rot**.
 
-**What this increment believes about the world around the finding, and one belief was false.**
+### What the next reader should not re-derive
 
-- **"Unverified means unfileable."** ⛔ **FALSE, and it is `M79`'s error restated.** `docs/pipeline.md`
-  carries `state` and `blocker`; the backlog carries `live` / `latent` / `not-live` gated for presence
-  by `tests/Feature/Docs/BacklogProvenanceTest.php`. A finding whose join has not been run is a
-  textbook `latent` row with a stated precondition. Nothing required it to be hidden.
-- **"The 30 rejects need rows too."** Holds as FALSE, deliberately: 6 are already filed, 17 are
-  decisions already taken with citations, 7 did not survive re-derivation. None is a pending task.
-  They are reported to the user by name rather than summarised into a count, which is what *"nothing
-  hidden"* requires — a row for a settled decision would be noise, not transparency.
-- **8 findings are UNJUDGED**, their join agents having died on the usage limit. They are filed
-  `latent` with that stated as the precondition rather than held back until the limit resets. This is
-  the whole point of the increment.
+⚠️ **The `include_answers` row is the one most likely to be rejected, and it says so itself.** `M80`'s
+citation pass found the opt-in recorded as an already-taken deferral in four files the sweep never
+cited — `docs/data-privacy-gdpr-compliance.md:77`, `docs/piping-output-encoding-design.md:279` and
+three `PROGRESS_ARCHIVE.md` entries. It is still filed `Latent` rather than resolved, because one
+agent's read is not the three-term join and the precondition is precisely that the join has not run;
+but the evidence is in the row so nobody spends the discovery twice.
 
-### Remedy verdict
-
-The prescribed remedy — *file them* — works, and the only design question was where. **Filing into
-`docs/feature-backlog.md` rather than as pipeline markers**, because `scripts/pipeline.php` already
-consumes that ledger through `backlog-triage.php --json`: a finding filed as an ordinary row flows into
-the line automatically, inherits the operability ranking, and needs no second mechanism. A marker would
-have been a parallel path for the same kind of object.
-
-⚠️ **Measured before writing:** `docs/feature-backlog.md` is ~745 KB and `PROGRESS.md` sits at roughly
-6,100 bytes of `tracker-lint` R1 headroom, so this increment adds to the backlog and must not add
-narrative to the tracker beyond its own status bullet.
-
-Files: `docs/feature-backlog.md` (nineteen new rows), `docs/backlog-triage.md` and `docs/pipeline.md`
-(both regenerated), `docs/claims/lane-a.md`, `PROGRESS.md` (own status block and hand-off only).
-
-Shared artefacts taken: `docs/feature-backlog.md`, `docs/backlog-triage.md`, `docs/pipeline.md`,
-`PROGRESS.md` (own block only).
-Paired files taken: none.
-Namespaces spent: **nothing from either namespace.** No ADR, no migration prefix, no decision id.
-
-Prediction: PHPStan **cannot move** — docs only. Pint touches nothing. Vitest, axe and E2E are
-untouched. `BacklogProvenanceTest` is the gate most likely to fire, because every new row must carry a
-severity marker, a liveness marker and a filer, and nineteen rows is nineteen chances to omit one.
-`citation-liveness-lint` is the second, since each row cites a `path:line` that must resolve.
-**The prediction I most expect to be wrong: that the open-row count lands at exactly 119.** `M79`
-destroyed a row with a search-based edit and only arithmetic caught it; the same class of error is
-available here, so the count is asserted before and after rather than assumed.
+⚠️ **`Latent` did the work `M79` said no vocabulary could do.** The eight unjudged rows are queued,
+counted, ordered and blocked-with-a-named-blocker without any claim that they are verified. Nothing
+about the mechanism needed building — the objection was never mechanical.
 
 ## RELEASED — `M79`, the single pipeline: one ordered line, held work included (merged as PR #270, `fd1daf0`, 6/6 green with real step counts — Static analysis 24 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

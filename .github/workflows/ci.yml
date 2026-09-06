@@ -113,6 +113,14 @@ jobs:
           # number — `3` would fail the next three-commit PR and fail it SILENTLY, as a red gate that
           # reads like a missing marker. Cost measured before choosing: full history is 20 MB over 866
           # commits. Only this job needs it; nothing else here reads the commit graph.
+          #
+          # ⚠️ M77 — THAT MEASUREMENT IS DATED, NOT WRONG, AND IT IS LEFT STANDING FOR THAT REASON. The
+          # commit count has grown past 866 and will keep growing; the local pack is 13.5 MiB today,
+          # which is a different quantity measured a different way and is NOT a correction of the 20 MB.
+          # The cost argument is unaffected either way, and it is the only thing the sentence is for.
+          # ⛔ What DOES need saying beside it: this key is now load-bearing for the SECRET SCAN as well
+          # as for R7, and reducing it no longer merely costs a marker check — see the fence on the
+          # gitleaks step, which is the thing that actually catches a reduction.
           fetch-depth: 0
 
       - name: Setup PHP

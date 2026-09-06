@@ -39,11 +39,29 @@ precacheAndRoute(self.__WB_MANIFEST);
 cleanupOutdatedCaches();
 
 // The hashed public-runtime JS/CSS (and shared chunks) it pulls in.
+//
+// ⛔ THE STATUS FILTER IS NOT DECORATION, AND IT WAS THE LAST OF THE THREE ROUTES TO GET ONE (M77).
+// Workbox prepends its own `cacheOkAndOpaquePlugin` to any strategy that supplies no
+// CacheableResponsePlugin, and that default admits `status === 0` — an OPAQUE response — BY DESIGN.
+// The two routes below have always filtered for 200; this one did not, and the row that found the
+// /f/* instance framed itself as "the one route whose sibling filters for 200", which was a 1-of-2
+// reading of a 1-of-3 fact.
+//
+// ⚠️ WRITTEN AS A PRECONDITION RATHER THAN AN ALL-CLEAR, WHICH IS THE POINT OF THE COMMENT.
+// Status 0 is NOT reachable here today: `/build/` is same-origin and hashed, and this route's own
+// matcher requires `sameOrigin`, so an opaque response would need a cross-origin redirect for a
+// same-origin URL. What would change that is an edge CDN or WAF in front of /build/, an `ASSET_URL`
+// pointing the bundle at another origin, or a canonicalising redirect — none of which exist in this
+// deployment. The filter costs nothing (the production delta is exactly {0}) and removes the need
+// for the next reader to re-derive that survey, which has now been done twice.
 registerRoute(
     ({ url, sameOrigin }) => sameOrigin && url.pathname.startsWith('/build/'),
     new StaleWhileRevalidate({
         cacheName: 'guest-shell-assets',
-        plugins: [new ExpirationPlugin({ maxEntries: 80, maxAgeSeconds: 30 * DAY })],
+        plugins: [
+            new CacheableResponsePlugin({ statuses: [200] }),
+            new ExpirationPlugin({ maxEntries: 80, maxAgeSeconds: 30 * DAY }),
+        ],
     }),
 );
 

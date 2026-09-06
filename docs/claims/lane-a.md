@@ -155,8 +155,15 @@ Paired files taken: none. `clipped-node-containment.test.ts`'s `KNOWN_UNGUARDED`
 Namespaces spent: nothing from the migration or ADR namespaces. One decision id is appended for `R4`'s
 product trade.
 
-Prediction: Vitest **136 → 138** (a settings-page spec and no new public-runtime file, since the `sw.ts`
-matcher assertions land in the existing `sw.test.ts`). Pest **+1 file**. PHPStan unchanged — but
+Prediction: Vitest **136 → 137** — one new settings-page spec, and no new public-runtime file, since the
+`sw.ts` matcher assertions land in the existing `sw.test.ts` and the 2FA assertions extend the existing
+`TwoFactorSetup.test.ts`. ⛔ **CORRECTED BEFORE THE FIRST GATE RAN: this line was pushed reading "136 →
+138" in the same breath as "a settings-page spec", and one new file is 137.** That is precisely the
+defect `M77`'s release recorded — *"a number written beside its own refutation is worse than a number
+written alone, because it proves the sentence was not read after it was written"* — reproduced by the
+increment that quoted it, which is `M77`'s OTHER lesson about filing a lesson under the artefact rather
+than the shape. Corrected here rather than explained in the release, because an active claim is a
+forward declaration and not a dated record. Pest **+1 file**. PHPStan unchanged — but
 `app/` **is** touched this time, so an unchanged number is a real result rather than an absent one.
 Pint: no change, 1466 files. Storybook axe: cannot move. E2E: green and, unlike `M77`, I expect it to be
 genuinely uninformative for all four rows — no spec submits a settings form, none navigates `/f/resume/`,

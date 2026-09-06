@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Public;
 
 use App\Enums\SubmissionSource;
 use App\Enums\SubmissionStatus;
+use App\Exceptions\Submissions\SubmissionConflictException;
 use App\Exceptions\Submissions\SubmissionValidationException;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Public\Concerns\ReadsGuestShareToken;
@@ -48,11 +49,30 @@ final class GuestSubmissionController extends Controller
 {
     use ReadsGuestShareToken;
 
+    // ⛔ THE `@throws` BELOW IS THE CONTRACT, NOT DOCUMENTATION (M78). This action reaches `promote()` a
+    // frame down whenever a draft exists, so it can answer a 409 whose code is `draft_conflict` — the body
+    // of this method says so in its own words — and until M78 the published contract advertised only
+    // `form_updated` here. An integrator branching on `error.code` had no way to know the other code existed.
+    // ⚠️ IT WAS INVISIBLE TO EVERY GATE SIMULTANEOUSLY, which is why it survived four passes over the two
+    // `@throws` backlog rows: `OpenApiContractTest`'s sweep only reaches actions that ALREADY declare a tag,
+    // its promote case hardcodes the promote path, and the CI export diff stayed green because the document
+    // faithfully reflected an incomplete inference. Those rows argue about cardinality inside a DECLARED
+    // set; this was an UNDECLARED one, which is why re-deriving them could never have found it.
+    // ⚠️ Declaring it is also what puts this route in the sweep's scope from now on — the tag is the only
+    // signal Scramble has for a refusal raised outside the action's own frame.
+    //
+    // ⛔ AND THIS BLOCK IS A `//` COMMENT RATHER THAN PART OF THE DOCBLOCK ON PURPOSE, MEASURED. Scramble
+    // publishes a docblock's description verbatim as the operation's `description`, so the first draft of
+    // this note shipped ten lines of internal commentary into the public `openapi.json`. Keep the docblock
+    // to what an integrator should read.
     /**
      * Submit a guest response for a share token through the unified submission pipeline (or, if the response
      * was saved as a draft, promote that draft).
      *
      * @unauthenticated
+     *
+     * @throws SubmissionConflictException `draft_conflict` — the baseline in the payload no longer matches the
+     *                                     stored draft, so promoting would finalize a stale answer document.
      */
     public function store(
         GuestSubmissionRequest $request,

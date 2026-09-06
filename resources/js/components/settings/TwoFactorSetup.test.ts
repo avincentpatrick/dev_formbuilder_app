@@ -139,3 +139,38 @@ describe('the other two states', () => {
         expect(panel.text()).toContain('Two-factor authentication is on.');
     });
 });
+
+describe('the confirmation error bag (M78)', () => {
+    it('⛔ posts the enrolment code under the bag Fortify validates into', async () => {
+        // ⛔ WITHOUT THIS OPTION A WRONG SIX-DIGIT CODE RENDERS NOTHING, ON THREE PAGES.
+        // The bag is not set by any `validateWithBag()` in `app/` — it is thrown ON THE EXCEPTION inside
+        // `vendor/laravel/fortify/src/Actions/ConfirmTwoFactorAuthentication.php`, which is why a grep of
+        // first-party code missed it and the backlog row that found the two `/settings` forms did not name
+        // this one. Inertia then delivers `{confirmTwoFactorAuthentication: {code: …}}` and the template's
+        // `confirmForm.errors.code` reads undefined forever.
+        //
+        // ⚠️ TWO OF THIS COMPONENT'S THREE MOUNT POINTS ARE LOCKOUT GATES — `Pages/admin/TwoFactorSetup.vue`
+        // (super-admin MFA, where `superadmin.mfa` allows no other console route) and
+        // `Pages/auth/TwoFactorRequired.vue` (tenant enforcement, where the only other affordance is sign
+        // out). On those, silence leaves no way to tell a mistyped code from a broken page.
+        //
+        // ⚠️ THIS ARM PINS A STRING LITERAL AND THAT IS ONLY HALF A CONTRACT — it stays green if the SERVER
+        // renames its bag. The other half is `tests/Feature/Settings/FortifyErrorBagTest.php`, which drives
+        // the real route, reads the bag off the session and compares it to this same literal, so the two
+        // ends cannot drift apart silently.
+        stubSidecars(200);
+
+        const panel = render({ enabled: true, confirmed: false, needsPasswordConfirmation: false });
+        await flushPromises();
+
+        const form = panel.find('form');
+        expect(form.exists(), 'the confirmation form must render before its submit can be asserted').toBe(true);
+
+        await form.trigger('submit');
+
+        expect(mocks.formPost).toHaveBeenCalledWith(
+            '/user/confirmed-two-factor-authentication',
+            expect.objectContaining({ errorBag: 'confirmTwoFactorAuthentication' }),
+        );
+    });
+});

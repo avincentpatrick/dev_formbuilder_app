@@ -307,9 +307,20 @@ it('documents the 409 the promote route can actually answer, and names its cause
  * floor inside the helper would be satisfied by the *other* arm's exceptions and every assertion in
  * the empty arm would go vacuous while the shared floor stayed green.
  *
- * Matched on the SHORT name, which is what both spellings end in: an imported `@throws Foo` and a
- * fully-qualified `@throws \App\Exceptions\Submissions\Foo` both contain it, so one arm covers both and
- * no backslash needs writing here.
+ * ⛔ THIS PARAGRAPH USED TO CLAIM THE MATCH COVERS BOTH SPELLINGS. IT DOES NOT, AND THE CODE THREE LINES
+ * BELOW SAYS SO (M78). The needle is `'@throws '.class_basename($exception)` — the short name with a
+ * SPACE in front of it. An imported `@throws Foo` contains it; a fully-qualified
+ * `@throws \App\Exceptions\Submissions\Foo` does **not**, because the character after the space is a
+ * backslash. Measured in PHP, not reasoned: the FQ form returns `false`. The old sentence's premise
+ * ("both spellings end in the short name") was true and its conclusion did not follow from it.
+ *
+ * ⚠️ ZERO LIVE INSTANCES TODAY — all 95 `@throws` across `app/` are imported, so nothing is being missed
+ * right now; the defect is that the comment told a future author the opposite. **And the consolation
+ * `M77` recorded for this case is only half true**: it says an FQ-spelled tag empties the walk so the
+ * `>= 1` floor fires loudly. That holds for the 403 arm, which has one route with one tag. It does NOT
+ * hold for the 409 arm, where promote declares TWO — FQ-spell one and the sibling keeps `$declared`
+ * non-empty, the route stays in scope, the floor is satisfied, and the arm goes SILENTLY GREEN.
+ * If a fully-qualified `@throws` is ever wanted, this needle is what must change first.
  *
  * @param  list<class-string<Throwable>>  $exceptions
  * @return array<string, string> document path => lowercase HTTP verb

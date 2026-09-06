@@ -28,9 +28,27 @@ use Dedoc\Scramble\Support\Type\Type;
  *
  * ⚠️ IT IS DELIBERATELY GENERAL RATHER THAN A PATCH ON THE PROMOTE ROUTE. Any submission action that
  * declares one of these two `@throws` documents its 409 without anyone remembering to — which is the
- * defect class the row was one instance of. The row named one route; the same pair of exceptions is
- * raised by the draft, submit and edit channels, whose controllers return their envelopes inline and so
- * already document theirs.
+ * defect class the row was one instance of.
+ *
+ * ⛔ THE SENTENCE THAT USED TO FOLLOW WAS FALSE, AND IT WAS FALSE ABOUT THE EXACT ROUTE IT REASSURED YOU
+ * ABOUT (M78). It read: *"the same pair of exceptions is raised by the draft, submit and edit channels,
+ * whose controllers return their envelopes inline and so already document theirs."* Measured against the
+ * committed contract, `POST /public/f/{shareToken}/submissions` published **only** `form_updated`, while
+ * its own body comment says a stale baseline throws `SubmissionConflictException` and renders as 409
+ * `draft_conflict`. The inline envelope documents the refusal the controller returns ITSELF; it cannot
+ * document one thrown a frame below, which is the whole reason this extension exists. So the reassurance
+ * was exactly inverted: an inline envelope is evidence of the FIRST cause being documented and says
+ * nothing about the second.
+ *
+ * ⛔ AND THERE WERE **TWO**, WHICH IS THE PART WORTH KEEPING. The first draft of this correction ended
+ * *"the draft and edit channels were re-checked and are genuinely inline-only"* — written before it was
+ * checked. It is false: `GuestDraftController::store()` passes `checkBaseline: true`, so
+ * `SubmissionDraftService::updateDraft()` throws `draftConcurrentlyModified()` a frame below it, and that
+ * route published only `form_updated` too. **A correction to a census that repeats the census's own method
+ * inherits its error.** Both actions now declare the tag and the contract carries both branches on each.
+ * ⚠️ The tenant channels (`Tenant/SubmissionController`, `Tenant/SubmissionDraftController`) reach
+ * `promote()` as well but are `routes/tenant.php` routes, outside the `/api/v1` surface this document
+ * covers — verified, not assumed, and the reason they are named here is so the next reader need not.
  *
  * ⚠️ NO `reference()` METHOD, AND THAT IS A DECISION. `TypeTransformer` calls `reference()` only when it
  * exists (`method_exists`), and a class that defines one registers a shared `components/responses` entry.

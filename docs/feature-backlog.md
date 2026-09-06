@@ -6691,6 +6691,19 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   decision on its own judgement while the request to relax it is pending. ⚠️ **Whoever takes it should fix
   the generator prose in `scripts/gate-baselines.php` in the same PR**, since `docs/gate-baselines.md`
   repeats the lint-gate-only framing and is regenerated from that script. **Live.** Filed by `M76`.
+  ➕ **`M77` (2026-09-06) RE-MEASURED THIS INDEPENDENTLY AND ADDS THE MECHANISM AT FILE GRANULARITY**,
+  because `M76` established the cause and not the specific link, and the specific link is what makes the
+  row impossible to misread. In `dev_formbuilder_app-app-1`, over `database/migrations`: the SPL iterator
+  enumerates **87 of 114** files while `scandir` and `glob` both return all 114 — **27 missing**, and
+  `2026_07_06_000205_create_form_fields_table.php` is one of them. That file declares `default_value`,
+  which is exactly the property the first reported error calls undefined on `App\Models\FormField`.
+  Larastan derives model property types from the migrations, so the phantom errors are not a vague
+  side-effect of the blindness: **each one is a column whose declaring migration the iterator cannot
+  see.** ⚠️ Confirmed on the host in the same session — `phpstan` reports **0 errors** there, against
+  **18** in the container on the identical tree, which is the divergence a reader will otherwise spend an
+  hour on. ⚠️ **A second, unrelated container-only obstacle worth naming beside it**: a full
+  `php artisan test` run dies at PHP's default 128 MB, and `-d memory_limit` on the `artisan` process
+  does not reach the Pest child — invoke `vendor/bin/pest` directly.
 
 - **`minor` · PHPUnit's own collector loses 40 test files in the container, and a local run reports green
   without them.** Measured by `M76` (2026-09-06). `phpunit.xml` declares its suites as `<directory>`

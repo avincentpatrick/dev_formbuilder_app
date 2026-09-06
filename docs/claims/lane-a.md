@@ -16,174 +16,139 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M77`, the twelfth batched increment: four rows, one of them closing two (`m77-batched-rows`)
+## Status: NO ACTIVE CLAIM — `M77` is merged; five rows closed, seven filed, and three of the four prescribed remedies were corrected by the adversarial arm before a line was written
 
-Taken 2026-09-06. Branch `m77-batched-rows`, cut from `origin/main` at `4ede7f8`, PR into `main`.
+`M77` closed **five** rows and filed **seven**, spending **one** hub slot and appending **two**
+decisions. `state.php` counts the tree; do not take that sentence's arithmetic on trust.
 
-**Selected from a read-only fan-out over EIGHT candidates, each verified by one agent and then attacked
-by a second whose brief was to refute it.** ⛔ **The adversarial arm broke FIVE of the eight verdicts on
-measured grounds, and three of those five are in this batch** — so what follows is the corrected
-position, not the first one. The refutations are the reason this claim's remedies differ from the rows'.
-
-Rows, all four from `docs/feature-backlog.md`:
-
-- **`R1` (the hub row, `.github/workflows/ci.yml`) — `:6628` *"`R7` pins the checkout depth to `PR commits + 1`, so a depth of 50 keeps every gate green while blinding the secret scan"* (`M76`), which also closes `:5468` *"Nothing pins `fetch-depth` for the SECRET SCAN"* (`M49`).**
-- **`R2` — `:6149` *"`guest-shell-assets` has the identical missing status filter, and no row has ever named it"* (`M73`).**
-- **`R3` — `:6565` *"The proof-of-work yield is pinned on the fallback path only, and its CADENCE is asserted nowhere at all"* (`M75`).**
-- **`R4` — `:1693` *"The `reviewer` role's seeded description and `SubmissionPolicy::create()` contradict each other"* (`M13`).**
-
-⚠️ **Why the live security row is NOT in this batch, stated because leaving it out was a real cost.**
-`:3209` (`PUT /user/profile-information` is a second mail cannon) is the only *live, exploitable* row of
-the eight. It is out because `docs/security-threat-model.md:161` names that route as unbound **by
-decision** and *"filed as its own backlog row"* — so binding it obliges an edit to that file, which is a
-hub file (4 open rows), and `D13` allows **one** hub-touching row per batch. `R1` spends it, closing two
-rows to `:3209`'s one. `D15` asks exactly this question and is OPEN, so this batch obeys `D13` as
-written rather than pre-empting it. Everything the fan-out measured about `:3209` — including a live,
-previously unfiled defect found beside it — is written into the backlog this increment so the cost is
-paid once.
-
-### Evidence verified
-
-- **`R1` — HOLDS structurally, and the row's ARITHMETIC IS STALE.** `ci.yml:116` carries `fetch-depth: 0`
-  and that literal occurs **exactly once** in the file (measured with `wc -l`, per the host trap; the
-  bare word `fetch-depth` occurs three times, twice in prose at `:200`/`:209`). The gitleaks step is
-  `ci.yml:286-290`, `gitleaks detect --source . --no-banner --redact --exit-code 1`, and it lives in the
-  **same** `static-analysis` job as that checkout — so the scan is **not blind today**. `R7`'s clone-shape
-  assertion is in `scripts/tracker-lint.php`'s `resolve_r7_base()` (`$expected = (int) $declared + 1`).
-  The pin was measured rather than read: a scratch bare mirror shallow-cloned at depths 1–10 against a
-  real 7-commit merge gives R7 **red at depth ≤ 6, green at depth 7**, where the clone holds 17 of 815
-  commits. *"Pins the depth to PR commits + 1"* is **exact**. ⛔ **The numbers are wrong:**
-  `git rev-list --count HEAD` is **987**, not 1,181 — that figure was this local clone's `--all`
-  (**1,187**), and `actions/checkout` fetches one refspec so a CI clone never holds the local ref set.
-  Neither 987 nor 1,187 yields the row's *"1,100"*. `ci.yml:114`'s own companion literal
-  (*"20 MB over 866 commits"*) is stale the same way.
-- **`R2` — HOLDS at every citation.** `resources/public-runtime/sw.ts` registers three routes;
-  `guest-shell-assets` is a `StaleWhileRevalidate` over `/build/` and is the only one of the three whose
-  plugins array carries no `CacheableResponsePlugin`. Workbox prepends `cacheOkAndOpaquePlugin`
-  (`status === 200 || status === 0`) when none is supplied — confirmed against the vendored workbox
-  7.4.1, which reports **2 plugins today (the prepend happened) and 2 with the fix (no prepend)**.
-- **`R3` — HOLDS.** `challenge.ts:156` is `if (n % 5000 === 4999) await yieldToEventLoop();` and
-  `config/guest.php:70` sets `max_number` to `120000`. A worst-case solve therefore yields on the order
-  of two dozen times, and no test, comment or document anywhere states that interval or defends it.
-- **`R4` — HOLDS on both halves, verbatim.** `database/seeders/RolePermissionSeeder.php:104` documents
-  the role as *"Review submissions on forms they collaborate on; may also encode + export those forms."*
-  and grants `submissions.create`. `SubmissionPolicy::create()` requires `submissions.create` **and** a
-  published version **and** (`forms.edit.any` **or** `ResourceCapacity::Editor` on that form). A
-  reviewer's grant is reviewer capacity, so the seeded sentence is false for a plain Reviewer.
-
-### Premise verified
-
-⛔ **All four rows carry a false or stale premise, and in three of them it changes what ships.**
-
-- **`R1` — PARTLY FALSE, and the falsification is the row's own arithmetic** (above). What HOLDS, and
-  was re-derived independently of the row: `gitleaks detect --source .` really scans **history**, proved
-  from `.gitleaksignore`'s three commit-scoped fingerprints, whose commits sit 596–617 back from HEAD and
-  one of whose regions exists **only** in `PROGRESS_ARCHIVE.md` today — a working-tree scan could never
-  have produced it. `.gitleaksignore`'s own header records the direct measurement: at depth 2 the scan
-  saw two commits; at depth 0 it saw 818 and immediately reported three previously unreachable findings.
-  ⛔ **And `ci.yml:200`'s claim that R7 makes a future depth reduction *"fail LOUDLY"* is false across the
-  whole range above the pin** — which is the row, now measured rather than argued.
-- **`R2` — PARTLY FALSE, and it is `M74`'s addendum rather than the row that is wrong.** The addendum
-  closed the reachability question *"three independent ways"*; one of the three is a survey rather than a
-  proof, so the honest form is a **precondition** (a cross-origin redirect for a same-origin `/build/`
-  URL — an edge CDN/WAF, an `ASSET_URL`, or a canonicalising redirect, none of which exist here), not an
-  all-clear. ⛔ **A sibling premise is stale too**: the row says the fix would be *"the same one-line
-  fix"* as `/f/*`'s, and there is **no `sw.test.ts` in this repository** — only `register-sw.test.ts`.
-  Any proof is a new file, not an added case.
-- **`R3` — PARTLY FALSE, and inverted.** The row frames the yield as protecting the **service worker**
-  draining the outbox. A SW is always a secure context, therefore always takes the `crypto.subtle` path,
-  where the awaited native digest already turns the event loop on every candidate — so the yield does
-  **nothing** there. The context it actually serves is the **insecure-embed tab**, which has the pure-JS
-  solver and, for the same secure-context reason, no service worker at all. `challenge.ts`'s module
-  docblock states the inverted version, and is what fed the row its premise.
-- **`R4` — PARTLY FALSE, and it is the row's *"this is an authorization decision"* framing that fails.**
-  The contradiction is not two defensible readings of one fact; it is **one code behaviour against
-  several documentation surfaces**, of which the fan-out found at least four stale — including two
-  inside `docs/multi-tenancy-rbac-design.md`'s §8.3, the section a reader would treat as authoritative.
-  `:553` describes `SubmissionPolicy`'s review check as capacity-specific when `review()` goes through
-  `ResourceGrantResolver::holdsAny()` and accepts **either** capacity; `:215` says a Reviewer **and a
-  Viewer** can both reach the encode screen, which is false for both. So most of this row is a
-  documentation reconciliation against the code, and the genuine user question that remains is narrower
-  than the row states.
-
-### Remedy verdict
-
-- **`R1` — WORKS AS WRITTEN, with one correction the row does not name and which would have cost the
-  proof.** `git rev-parse --is-shallow-repository` was measured to return `true` at every finite depth
-  1–10 and `false` on a full clone and on this repo — an exact boolean over what `actions/checkout`
-  produces. ⛔ **It EXITS 0 IN BOTH STATES**, so `if git rev-parse …; then fail; fi` is always red and
-  `if ! …` is never red; the fence must compare the printed **string**, which also fails closed on an
-  empty capture. ⛔ **AND THE FENCE'S ERROR MESSAGE MUST NOT CONTAIN THE TOKEN IT GUARDS.**
-  `scripts/mutate.php` aborts unless the old token occurs **exactly once**, so a message quoting
-  `fetch-depth` followed by its value turns this increment's only proof from CAUGHT into *no verdict at
-  all*. That is the trap `ci.yml:267-268` already documents fourteen lines above the gitleaks step, and
-  the first draft of this remedy walked into it.
-- **`R2` — WORKS, BUT THE PRESCRIBED PROOF DOES NOT.** Adding `CacheableResponsePlugin({statuses:[200]})`
-  is correct and is a no-op in production (the delta is `{0}`, and status 0 is unreachable here). ⛔ **The
-  test shape the fan-out first prescribed — asserting `cacheWillUpdate({response:{status:0}})` returns
-  null — was measured against the vendored workbox and THROWS**: `CacheableResponse.isResponseCacheable()`
-  opens with an `assert.isInstance(response, Response)` guard in non-production builds, three lines above
-  the status check it was quoting. All three routes would go red, so it is not a weak discriminator, it
-  is a non-functioning test. The only status-0 `Response` obtainable is `Response.error()` —
-  `new Response(null, {status: 0})` throws `RangeError` — and happy-dom supplies it. ⚠️ **Nobody has yet
-  run the corrected form**, and workbox's dev-logger branch on the not-cacheable path is the risk.
-- **`R3` — WORKS, BUT THE OBVIOUS INVARIANT IS ARITHMETICALLY FALSE, AND MEASURED SO.** Sweeping every
-  answer in `[0,120000]` against a faithful re-implementation of the loop:
-  `yields === floor(tried / 5000)` is **wrong for 24 of 120,001 answers** — every answer at
-  `n ≡ 4999 (mod 5000)`, because the loop **returns on the match before reaching the yield check**.
-  `yields === floor((tried - 1) / 5000)` is wrong for **none**. ⛔ **The existing fixture
-  `challengeFor(12000, 20000)` is one of the answers where the WRONG formula coincidentally agrees**, so
-  a test written to the obvious invariant passes green while encoding a falsehood, and neither candidate
-  mutation would catch it. The cadence *value* stays a decision; the seam and the corrected invariant do
-  not.
-- **`R4` — THE ROW OFFERS TWO REMEDIES AND BOTH ARE WIDER THAN NEEDED.** *"Widen `create()` to accept
-  reviewer capacity"* is an access change and is genuinely the user's call. *"Correct the seeder's
-  sentence and drop `submissions.create`"* is wrong in its second half: the permission is load-bearing —
-  it is what makes the editor-capacity path work and what entitles `write:submissions` — so dropping it
-  would break a working configuration. What ships is the intersection neither option states: **correct
-  the prose on every stale surface, change no access**, and put the narrowed question to the user.
-
-Files: `.github/workflows/ci.yml`, `tests/Feature/Docs/SecretScanDepthTest.php` (new),
-`resources/public-runtime/sw.ts`, `resources/public-runtime/__tests__/sw.test.ts` (new),
-`resources/public-runtime/lib/challenge.ts`, `resources/public-runtime/__tests__/challenge.test.ts`,
-`database/seeders/RolePermissionSeeder.php`, `docs/multi-tenancy-rbac-design.md`,
-`docs/ACCESS-MATRIX.md`, `docs/feature-backlog.md`, `docs/claims/decisions.md`,
-`docs/claims/lane-a.md`, `PROGRESS.md`, `docs/gate-baselines.md`, `docs/backlog-triage.md`.
-
-Shared artefacts taken: `docs/multi-tenancy-rbac-design.md`, `docs/ACCESS-MATRIX.md`,
-`docs/feature-backlog.md`, `docs/claims/decisions.md`, `docs/gate-baselines.md`,
-`docs/backlog-triage.md`, `PROGRESS.md` (own block only). **`docs/security-threat-model.md` and
-`docs/data-dictionary.md` are deliberately NOT taken** — see the hub-slot note above.
-
-Paired files taken: none. ⚠️ `config/guest.php` is **read** by `R3` and not edited; the interval lives
-in `challenge.ts`.
-
-Namespaces spent: one `§D` id for the proof-of-work interval question and one for the reviewer-role
-authorization question. **No migration prefix and no ADR** — and `docs/adr/`'s single gap stays reserved
-for H1d.
-
-Prediction, written before the run:
-
-- **Vitest 135 → 137** (a new `sw.test.ts`; the `challenge.test.ts` cases add no file, so the second
-  file is the one I am least sure of). ⚠️ **This is the prediction I least trust, and specifically the
-  `sw.test.ts` half**: `sw.ts` has never been mounted in this repository, the corrected status-0 probe
-  has not been run, and workbox's dev-logger branch dereferences `getFriendlyURL()` and iterates
-  `response.headers` on exactly the path the test drives. If it cannot be made to run, `R2` ships the
-  production fix plus the precondition comment and **says the proof was not built** — it does not ship a
-  test that passes for the wrong reason.
-- **Pest +1 file** (`SecretScanDepthTest`), and **PHPStan unchanged at its baseline**. The diff touches
-  `database/seeders/`, which is inside PHPStan's scope, but a comment change cannot move it — said aloud
-  because an unchanged number otherwise reads as *"the back-end work did not land"*.
-- **Pint: no change.** The `.php` edits are a seeder comment and one new test.
-- **E2E green and uninformative for all four rows.** `R2` is the only one reaching shipped worker code,
-  and its production delta is provably empty.
-- **Storybook axe cannot move** — no component, story or token is touched.
-- ⛔ **`R1`'s mutation is this increment's real proof and I expect it to be CAUGHT**:
-  `scripts/mutate.php` swapping `fetch-depth: 0` → `fetch-depth: 2`, **committed** rather than left in
-  the working tree. It abstains — non-zero with no verdict — if the fence's own message quotes the token,
-  which is the failure mode this claim exists to have anticipated.
+⛔ **THE ONE THING `M77` WOULD MOST LIKE TO HAND ON: I READ `M76`'s LESSON AT THE START OF THE
+SESSION, QUOTED IT CORRECTLY, AND THEN WALKED INTO IT — TWICE, IN TWO DIFFERENT FORMS.** `M76`'s
+release records that *"a dynamic `import()` of `App.vue` inside a Vitest case never resolves; a static
+import at file scope works."* I read that, wrote a new test file with `await import('../sw')` inside a
+`beforeEach`, and lost an hour to a bare hook timeout. The same session's second instance: my own test
+docblock asserted *"the case that did not exist"* about a case that **did** exist, forty lines below it
+in the file I was editing — the *"no test asserts this"* false premise the claim template names as this
+repository's most-repeated. **Both failures are one failure: I filed each lesson under the ARTEFACT it
+was learned on — `App.vue`, other people's rows — rather than under the SHAPE.** A lesson you can quote
+is not a lesson you have applied, and the test for whether you have applied it is whether you looked
+for it in the thing actually in front of you.
 
 ---
+
+## RELEASED — `M77`, the twelfth batched increment: four rows closing five, and the adversarial arm broke five of the eight verdicts that chose them (merged as PR #268, `1685faf`, 6/6 green with real step counts — Static analysis 24 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
+
+**Shipped 2026-09-06.** Branch `m77-batched-rows`. Rows were selected from a read-only fan-out over
+**eight** candidates, each verified by one agent and then attacked by a second whose only brief was to
+refute the first. ⛔ **THE ADVERSARIAL ARM IS THE HEADLINE: it broke FIVE of the eight verdicts on
+measured grounds, three of them in this batch.** Every one of those refutations was a *measurement* the
+verifier had not run — the vendored workbox called directly, the solver loop re-implemented and swept,
+`pg_constraint` queried live — and not a difference of opinion. **Three of the four prescribed remedies
+changed as a result, before a line of implementation was written.**
+
+### What shipped, per row
+
+1. **`R1` — the secret scan is fenced on clone shape** (the hub row, `.github/workflows/ci.yml`), and it
+   **closes two rows**: `M49`'s original and `M76`'s sharpening of it. ✅ Evidence held structurally and
+   the pin is exact, measured rather than inferred: a scratch bare mirror shallow-cloned at depths 1–10
+   against a real 7-commit merge puts `R7` red at 6 and green at 7, with the clone holding 17 of 815
+   commits. ⛔ **The row's arithmetic is wrong** — `rev-list --count HEAD` is **987**, not 1,181; that
+   figure was the local clone's `--all` (1,187), and `actions/checkout` fetches one refspec so a CI clone
+   never holds the local ref set. ⛔ **Two traps the row did not name, either of which ships a decorative
+   gate.** `git rev-parse --is-shallow-repository` **exits 0 in both states**, so an exit-status fence is
+   always-red or never-red and the string comparison is the whole gate. And the natural error message —
+   *"must check out with `<the key>: 0`"* — spells the exact token `mutate.php` mutates, which makes it
+   occur twice and turns the proof from CAUGHT into an abort with no verdict. ✅ **Proved: CAUGHT.**
+2. **`R2` — `guest-shell-assets` gets the status filter its two siblings have** (`M73`). ✅ The
+   production change is one plugin and its delta is provably `{0}`. ⛔ **The prescribed proof does not
+   work, and it was measured against the vendored workbox rather than reasoned about**:
+   `CacheableResponse.isResponseCacheable()` opens with `assert.isInstance(response, Response)` in every
+   non-production build, three lines above the status comparison — so a `{ status: 0 }` literal THROWS
+   and reddens all three routes together. `new Response(null, {status: 0})` throws `RangeError`;
+   **`Response.error()` is the only status-0 `Response` the platform offers.** ✅ **First mount of
+   `sw.ts` in this repository**, and the control reddens **exactly one** arm.
+3. **`R3` — the proof-of-work yield cadence is pinned** (`M75`). ⛔ **The row's premise is inverted and
+   the docblock that taught it to the row was inverted too.** A service worker is always a secure
+   context, always takes the `crypto.subtle` branch, and an awaited native digest already turns the event
+   loop — measured: a `setTimeout(…, 0)` fires during 200 awaited `crypto.subtle.digest()` calls and does
+   **not** fire during 200 awaited resolved promises. The yield does nothing in the SW; it serves the
+   insecure-embed tab, which has no service worker at all. ⛔ **And the plausible invariant is
+   arithmetically false**: `floor(tried / YIELD_EVERY)` is wrong for **24 of 120,001** answers, because
+   the match returns before the yield check. `floor(answer / YIELD_EVERY)` is wrong for none. ⚠️ **`M75`'s
+   own fixture is one of the answers where the wrong formula coincidentally agrees**, so the plausible
+   test would have passed green while encoding a falsehood.
+4. **`R4` — five documents reconciled with the reviewer-encode behaviour** (`M13`). ⛔ **The row's
+   framing was the defect: this was never two defensible readings, it was one code behaviour and five
+   wrong descriptions.** No access changed. ⛔ **§8.3 was the worst of them** — it called
+   `SubmissionPolicy`'s review check capacity-specific when `review()` goes through `holdsAny()`, which
+   loops every capacity; were it capacity-specific, reviewing and encoding would be **mutually exclusive
+   on every form**, since `capacity` sits outside `resource_grants_target_user_unique` and a grant is
+   replaced rather than added. ⛔ **And the row's second remedy would have broken something**: dropping
+   `submissions.create` kills the reviewer-plus-editor-capacity composition, which nothing asserted.
+
+### How the prediction fared, including the parts that were wrong
+
+- ⛔ **WRONG — "Vitest 135 → 137". It is 136, and the claim contradicted itself in its own
+  parenthetical**, which said in the same breath that `challenge.test.ts` adds no file. One new file is
+  136. A number written beside its own refutation is worse than a number written alone, because it
+  proves the sentence was not read after it was written.
+- ⚠️ **HALF RIGHT, AND THE INTERESTING HALF WAS WRONG — "the `sw.test.ts` half is the prediction I least
+  trust ... workbox's dev-logger branch is the risk."** The file *was* the right thing to distrust and
+  the dev-logger was **not** the risk: it worked first time and only needed silencing for noise. What
+  actually bit was `await import()` inside a hook — and it **passed alone and beside one neighbour**,
+  failing only in the full 136-file run. ⛔ **So the trap is LOAD-DEPENDENT, which `M76` did not know**,
+  and the failing configuration is the one a developer runs least and CI runs always. The naive read is
+  *"flaky test"* and the naive fix is a retry.
+- ✅ **"Pest +1 file."** Exact — `SecretScanDepthTest`.
+- ✅ **"PHPStan unchanged at its baseline."** Held: **0 on the host**, and CI's Static analysis green.
+  ⚠️ Said aloud in the claim precisely because an unchanged number reads as *"the back-end work did not
+  land"*, and this increment did touch `database/`.
+- ✅ **"Pint: no change."** Held, 1466 files, and the scan proved itself on a deliberate probe.
+- ⛔ **WRONG — "E2E green and UNINFORMATIVE for all four rows."** Green in CI, yes. Uninformative, no: it
+  surfaced a **flaky** case and a host-only environment trap, both now filed. The word was chosen to mean
+  *"will not tell us anything about the rows"* and it was still the wrong word, because a run that
+  changes what you file is not uninformative.
+- ✅ **"Storybook axe cannot move."** Held.
+- ✅ **"`R1`'s mutation is the increment's real proof and I expect it to be CAUGHT."** CAUGHT, and the
+  abstention it warned about did not happen — because the claim anticipated it and the message was
+  worded around the token.
+
+### What `M77` measured that no row had asked for
+
+- ⛔ **A CONTROL CAUGHT A DEFECT IN THE NEW GATE ON ITS FIRST RUN — THE THIRD INSTANCE OF THIS FILE'S OWN
+  TRAP.** `SecretScanDepthTest`'s ordering arm found `gitleaks detect` **inside the explanatory comment**
+  and concluded the fence ran after the scan. `ci.yml` documents an earlier instance of exactly this
+  fourteen lines above the step being edited, and `NpmAuditJudgeTest` already prescribes the remedy:
+  a gate reads **executable lines only**; the prose is free to describe what no longer runs.
+- ⛔ **THE CONTAINER'S ITERATOR BLINDNESS, PINNED TO A SINGLE FILE.** `M76` established that it reaches
+  Larastan; `M77` measured the link. Over `database/migrations` the SPL iterator enumerates **87 of 114**
+  files while `scandir` and `glob` return all 114, and among the 27 missing is
+  `2026_07_06_000205_create_form_fields_table.php` — which declares `default_value`, the exact property
+  the first phantom error calls undefined. **Each of the 18 container-only errors is a column whose
+  declaring migration the iterator cannot see.** Host: 0. Container: 18. Same tree.
+- ⚠️ **A full `php artisan test` dies at PHP's default 128 MB, and `-d memory_limit` on the `artisan`
+  process does not reach the Pest child** — invoke `vendor/bin/pest` directly. Costs a run to discover
+  and reads as a suite failure.
+- ⚠️ **`makeCollaborator()` called twice on one form raises 23505**, which is not a test-helper wart: it
+  is `resource_grants_target_user_unique` demonstrating the one-capacity-per-target rule the §8.3
+  correction turns on. The regression case re-grants by UPDATE, the way `ResourceGrantService` does.
+- ⚠️ **Running the offline e2e spec locally needs `public/hot` moved aside.** With a dev Vite alive,
+  Laravel emits dev-server asset URLs the e2e container cannot reach and `global-setup` dies at the login
+  form — which looks exactly like a broken fixture and is not.
+- ⚠️ **The parked-conflict e2e case is flaky and it was ISOLATED rather than assumed**: reverting `sw.ts`
+  to its pre-`M77` bytes, rebuilding the worker and re-running reproduced the failure, on a *different*
+  viewport project than the run before. **It did not reproduce in CI**, which is one observation and not
+  a verdict. `D2` makes this merge-blocking, so it is filed.
+
+### What was deliberately NOT taken, and the cost of that
+
+⚠️ **`PUT /user/profile-information` — the only LIVE, EXPLOITABLE row of the eight — is not in this
+batch.** `docs/security-threat-model.md` names that route as unbound *by decision*, so binding it obliges
+an edit to that file, which is also a hub file, and `D13` permits one hub-touching row. `R1` spent it and
+closed two rows to this one's one. `D15` asks exactly that question and is **open**, so the batch obeyed
+`D13` as written rather than relaxing a user decision on its own judgement. ⛔ **Everything the fan-out
+measured about it is filed so the cost is paid once — including a live defect found beside it that no row
+had ever named: neither Fortify form on `/settings` can render a validation error at all**, because the
+server bags them and the page passes no `errorBag`.
 
 ## RELEASED — `M76`, the eleventh batched increment: four rows, and a live break of the invitation accept flow found on the way (merged as PR #267, `593a900`, 6/6 green with real step counts — Static analysis 24 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

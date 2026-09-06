@@ -161,3 +161,8 @@ Phase 3's spine (`PROGRESS.md`, the H-map) lands entitlements **early** (H5), so
 - `docs/audit-compliance-logging-spec.md`; `app/Support/Audit/AuditLogger.php`, `app/Services/Admin/SuperAdminService.php` — the H4 audit substrate and the adopt-context pattern §D10 reuses.
 - `docs/multi-tenancy-rbac-design.md` §9 (super-admin console), `docs/non-functional-requirements.md` §2 (SLA target), `docs/observability-incident-response.md` §8 (per-tier SLA).
 - `composer.json`/`composer.lock` — verified to contain **no** `laravel/cashier` or `stripe/stripe-php` at authoring time (the premise of §D1). Re-verify at implementation time per this project's standing caveat on fast-changing external facts.
+
+<!-- The pipeline markers below are DELIBERATELY at end-of-file. A marker inserted mid-document
+     shifts every line beneath it, and this repository cites documents as `path:N` — 25 such
+     citations point into the files that carry markers. End-of-file shifts nothing. -->
+<!-- pipeline: id=payments-checkout title="Embedded payments and self-serve billing — Cashier, Stripe Checkout, Stripe Tax" phase=4 state=held size=XL blocker="user: needs a Stripe account; cut from Phase 3 by decision 2026-07-21" -->

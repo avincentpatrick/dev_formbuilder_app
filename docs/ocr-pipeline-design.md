@@ -206,3 +206,8 @@ The footer states, per version and re-derived from that version's own frozen byt
 - Handwriting-recognition accuracy improvements beyond what the chosen OCR provider natively offers — this document orchestrates around the provider's capability, it does not attempt to improve the provider's own model. **Note the one lever this product does hold, and has already pulled: the LAYOUT is ours** (§2.5), and comb fields buy character segmentation before the provider's model ever runs. Further layout-side levers (fiducial marks, drop-out ink colours, a per-page identity block) are §2.5.8's recorded limitations, not this bullet's subject.
 - Printing a blank form in a locale other than the form's default; content-aware answer-area sizing; fiducial/registration marks — all §2.5.8, deferred with their reasons rather than dropped.
 - OCR-specific field-level audit trail beyond what `docs/audit-compliance-logging-spec.md` already covers for ordinary submission review actions.
+
+<!-- The pipeline markers below are DELIBERATELY at end-of-file. A marker inserted mid-document
+     shifts every line beneath it, and this repository cites documents as `path:N` — 25 such
+     citations point into the files that carry markers. End-of-file shifts nothing. -->
+<!-- pipeline: id=ocr-channels title="PRD Features #1 and #2 — both OCR channels, per-form and linelist" phase=3 state=held size=XL blocker="user: needs filled paper-form samples and ground-truth data only the user can supply" -->

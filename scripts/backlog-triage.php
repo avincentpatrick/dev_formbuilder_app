@@ -39,6 +39,10 @@ declare(strict_types=1);
 |   php scripts/backlog-triage.php              # regenerate docs/backlog-triage.md
 |   php scripts/backlog-triage.php --dry-run    # print it, write nothing
 |   php scripts/backlog-triage.php --check      # exit 1 if the file on disk has drifted from the tree
+|   php scripts/backlog-triage.php --json       # the ORDERED open rows + the hub set, for pipeline.php
+|
+| ⛔ AN UNRECOGNISED FLAG IS REFUSED, NOT IGNORED. getopt() discards what it does not know and the
+| no-flag action rewrites a committed file, so a typo used to regenerate the document silently.
 |
 | ⚠️ --check IS DELIBERATELY WIRED INTO NOTHING. It is not in `composer run quality` and has no CI
 | step. Making it a gate changes what a close-out is obliged to do, which is a decision rather than a
@@ -64,9 +68,53 @@ const BATCH_MAX = 4;
 /** Directories that are not this repository's own source. */
 const SKIP_DIRS = ['.git', 'vendor', 'node_modules', 'storage', 'public/build', '.idea', 'coverage'];
 
-$opts = getopt('', ['dry-run', 'check']);
+/** Every flag this script accepts. Read by getopt AND by the argv fence below. */
+const FLAGS = ['dry-run', 'check', 'json', 'help'];
+
+$opts = getopt('', FLAGS);
+
+// getopt() silently DISCARDS what it does not recognise, and this script's no-flag action REWRITES a
+// committed file — so a mistyped flag regenerated the document while the operator believed they had
+// asked for something else. Reading $argv is the only way to see what getopt() threw away. Refuse
+// rather than fall through to the write.
+foreach (array_slice($argv, 1) as $argument) {
+    if (! in_array(ltrim($argument, '-'), FLAGS, true)) {
+        fwrite(STDERR, sprintf(
+            'backlog-triage: unrecognised argument %s. Known: --%s. Refusing rather than falling '
+            ."through to the default, which rewrites %s.\n",
+            $argument,
+            implode(' --', FLAGS),
+            TRIAGE
+        ));
+
+        exit(1);
+    }
+}
+
+// --help prints and exits BEFORE any measurement. The row that filed this named the write-on-help
+// path specifically: an operator reaching for usage text used to dirty the tree and be told it
+// succeeded.
+if (isset($opts['help'])) {
+    fwrite(STDOUT, implode("\n", [
+        'backlog-triage — regenerate '.TRIAGE.' from the tree.',
+        '',
+        '  php scripts/backlog-triage.php              rewrite '.TRIAGE,
+        '  php scripts/backlog-triage.php --dry-run    print it, write nothing',
+        '  php scripts/backlog-triage.php --check      exit 1 if the file on disk has drifted',
+        '  php scripts/backlog-triage.php --json       the ordered open rows + hub set, for pipeline.php',
+        '  php scripts/backlog-triage.php --help       this text',
+        '',
+        'Exit 0 = written, clean, or printed. 1 = drift or a refused argument. 2 = could not measure.',
+        'THE DEFAULT ACTION WRITES. An unrecognised flag is refused rather than falling through to it.',
+        '',
+    ])."\n");
+
+    exit(0);
+}
+
 $dryRun = isset($opts['dry-run']);
 $check = isset($opts['check']);
+$json = isset($opts['json']);
 
 // ---------------------------------------------------------------------------------------------
 // Measurement
@@ -122,6 +170,32 @@ $document = render_banner($sha, $state).$body;
 // ---------------------------------------------------------------------------------------------
 // Output
 // ---------------------------------------------------------------------------------------------
+
+// The ordered rows, for a consumer that must not re-derive them. `scripts/pipeline.php` reads this:
+// the ranking is computed once, here, and consumed as an array index — never sorted a second time by
+// a caller, which is how two orderings drift apart.
+if ($json) {
+    fwrite(STDOUT, json_encode([
+        'sha' => $sha,
+        'hub_threshold' => HUB_THRESHOLD,
+        'hubs' => array_values($hubs),
+        'open' => array_map(static fn (array $row): array => [
+            'id' => $row['id'],
+            'line' => $row['line'],
+            'severity' => $row['severity'],
+            'liveness' => $row['liveness'],
+            'provenance' => $row['provenance'],
+            'headline' => $row['headline'],
+            'paths' => $row['paths'],
+            'non_hub' => $row['nonHub'],
+            'touches_hub' => $row['touchesHub'],
+            'unresolved' => $row['unresolved'],
+        ], $open),
+    ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE).'
+');
+
+    exit(0);
+}
 
 if ($check) {
     exit(run_check($body));

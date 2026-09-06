@@ -23,6 +23,49 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
+### D21 — `docs/pipeline.md` is merge-gated but sits in no `paths-ignore`, so every close-out now triggers a full CI run. Accept the cost, exempt it, or split the file?
+
+**Filed 2026-09-06 by Lane A, during `M79`, at the moment the file was created.** Recorded here rather
+than decided in the increment because it changes what a close-out costs on every future increment, and
+because the neighbouring territory is already an open question (`D8`).
+
+⛔ **THE TRADE, STATED PLAINLY.** `docs/backlog-triage.md` and `docs/gate-baselines.md` are both inside
+`ci.yml`'s `paths-ignore`, and both are *advisory* — nothing fails when they drift, `state.php` merely
+reports how stale they are. `docs/pipeline.md` is different in kind: it is the **single queue**, and the
+gate `M80` builds makes its drift a **merge failure**. A file whose freshness is merge-gated cannot be
+in `paths-ignore`, because a push touching only that file would produce **no run at all** — and this
+project has already established that a skipped run is not a pending one, so the trunk would carry drift
+with nothing able to say so.
+
+⚠️ **WHAT IT COSTS, MEASURED RATHER THAN ESTIMATED.** A close-out is four or five commits, and today
+every one of them is inside `paths-ignore` and produces no run. With `docs/pipeline.md` outside it,
+each close-out that regenerates the pipeline triggers the full six-job pipeline — roughly eighteen
+minutes of runner time for a diff that is one generated markdown file.
+
+**The options:**
+
+1. ✅ **Leave it outside `paths-ignore` and pay the run.** The gate is only worth having if it can
+   actually fire on the trunk, and correctness on the single queue is worth eighteen minutes.
+   **Recommended.** ⚠️ Its honest cost is that the close-out choreography gets slower for everyone, on
+   every increment, forever.
+2. **Add it to `paths-ignore` and accept that `P1` can only fire on a pull request.** Cheaper, and the
+   PR arm still catches the ordinary case, since a human regenerating by hand does it on a branch. ⛔
+   The hole it leaves is the one `M71` walked into from the other side: a close-out push straight to
+   the trunk is exactly the shape that produces no run, so the trunk could carry a drifted queue until
+   the next PR — red on arrival, which `M40` established can never merge.
+3. **Split the file — a small gated index plus an ungated body.** The index carries the counts and the
+   provenance and is merge-gated; the long table is regenerated freely. ⛔ Listed to be refused unless
+   the cost in option 1 actually bites: it is two files where the whole point of this increment was to
+   have one, and a second copy of the counts is precisely the defect the pipeline exists to end.
+
+⚠️ **DO NOT SETTLE `D8` HERE.** `D8` asks how `ci.yml` should regain the trunk observation that a
+tracker surgery loses, and it is adjacent enough to look like the same question. It is not: `D8` is
+about a *diff shape* that produces no run, this is about *one file's* membership. Answering this one
+does not answer that one, and an increment that quietly did both would be spending a user decision it
+was not given.
+
+---
+
 ### D20 — The service worker caches a credential-bearing resume shell, where the credential IS the cache key. Purge it, keep it, or split the difference?
 
 **Filed 2026-09-06 by Lane A, during `M78`, at the moment the row's two stated blockers were both

@@ -158,14 +158,20 @@ function render_line(string $lane, array $state): string
         //    `git log -S BATCHED -- scripts/next.php` returns nothing, which is how that was established.
         //    ⚠️ AN ANSWERED DECISION THAT ONLY A HAND-EDIT CARRIES IS ONE REGENERATION FROM GONE.
         in_array('D13', $state['decisions']['answered'] ?? [], true)
-            ? 'Take the next BATCHED increment under D13 — 3-4 live rows sharing no non-hub file, at most one'
+            ? 'THE QUEUE IS docs/pipeline.md — one GENERATED ordered line holding every remaining task, '
+                .'plan work first and the defect ledger behind it ('.(int) $state['pipeline']['rows'].' rows, '
+                .(int) $state['pipeline']['held'].' held). A held row sits in it with its blocker named: do not '
+                .'start one and do not offer it as the next step, but it IS counted. Then: take the next BATCHED '
+                .'increment under D13 — 3-4 live rows sharing no non-hub file, at most one'
                 .' hub-touching row — from docs/feature-backlog.md ('.$state['backlog']['open'].' open, '
                 .$state['backlog']['by_severity']['major'].' major), ranked in docs/backlog-triage.md, which is'
                 .' GENERATED from the tree — regenerate it rather than reading a stale one, and treat its order'
                 .' as operability and not priority. D13\'s saving is proven and the batch size is not to be'
                 .' revisited; plan against its own ~42% model rather than any single increment\'s figure.'
                 .' Verify each row\'s evidence, its remedy AND its premise separately, and record them per row.'
-            : 'Take the next row from docs/feature-backlog.md — '.$state['backlog']['open'].' open ('
+            : 'THE QUEUE IS docs/pipeline.md ('.(int) $state['pipeline']['rows'].' rows, '
+                .(int) $state['pipeline']['held'].' held, generated). Then take the next row from '
+                .'docs/feature-backlog.md — '.$state['backlog']['open'].' open ('
                 .$state['backlog']['by_severity']['major'].' major), ranked in docs/backlog-triage.md, which is'
                 .' GENERATED from the tree — regenerate it rather than reading a stale one, and treat its order'
                 .' as operability and not priority. Verify the row\'s evidence and its remedy separately.',

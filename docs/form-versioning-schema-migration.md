@@ -202,3 +202,8 @@ Because submissions pin to a specific, immutable `form_version_id`, an offline c
 - Full real-time, character-level collaborative co-editing → explicitly not planned (§8).
 - Form-template instantiation mechanics (cloning a `form_templates` blueprint into a brand-new form + initial draft) → already specified in `docs/data-dictionary.md` §12, not re-derived here.
 - OCR-linelist's interaction with versioning (an OCR-linelist batch always submits against whatever version is currently published, by definition, same as any other channel) → Doc #17 (OCR Pipeline Design Doc) for the OCR-specific mechanics.
+
+<!-- The pipeline markers below are DELIBERATELY at end-of-file. A marker inserted mid-document
+     shifts every line beneath it, and this repository cites documents as `path:N` — 25 such
+     citations point into the files that carry markers. End-of-file shifts nothing. -->
+<!-- pipeline: id=version-diff-ui title="PRD Feature #8 — the interactive field-by-field version-diff view" phase=3 state=ready size=L -->

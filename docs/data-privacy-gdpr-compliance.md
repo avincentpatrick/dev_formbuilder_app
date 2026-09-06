@@ -117,3 +117,11 @@ GDPR Art. 33 requires notifying the relevant supervisory authority within 72 hou
 - Breach detection/response mechanics → Doc #23.
 - Plan-tier-specific data-retention/export quotas (if any) → Doc #24.
 - The actual, counsel-reviewed DPA and Privacy Policy documents themselves — this document supplies inputs, not final legal text (§7).
+
+<!-- The pipeline markers below are DELIBERATELY at end-of-file. A marker inserted mid-document
+     shifts every line beneath it, and this repository cites documents as `path:N` — 25 such
+     citations point into the files that carry markers. End-of-file shifts nothing. -->
+<!-- pipeline: id=gdpr-subject-export title="Build the subject-data export for Article 15 access and Article 20 portability" phase=4 state=ready size=L -->
+<!-- pipeline: id=gdpr-erasure-execution title="Give submissions.pii_erased_at a writer — the erasure mechanic is documented and has none" phase=4 state=ready size=M -->
+<!-- pipeline: id=gdpr-legal-posture title="The GDPR, legal and pricing posture decisions" phase=4 state=held size=S blocker="user: the GDPR, legal and pricing calls are the user's own" -->
+<!-- pipeline: id=retention-sweep-job title="Build the per-tenant retention sweep and its settings key — both documented, neither exists" phase=4 state=ready size=M -->

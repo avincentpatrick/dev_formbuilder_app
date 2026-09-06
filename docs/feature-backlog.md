@@ -5829,6 +5829,23 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   half that matters, because the succeeds-on-empty-input family this project has now measured five times is
   exactly a wrong invocation that reports success. **Live.** Filed by `M70`.
 
+- **`minor` · The triage generator's collision check harvests citations from row TEXT, so it proposes
+  batches that collide.** `scripts/backlog-triage.php` builds its *"Suggested next batch"* by comparing the
+  files each row **names**, and `D13`'s selection rule is *"no two rows citing the same non-hub file"* — so
+  a row whose fix cannot avoid a file it never mentions is scored as touching nothing. ⛔ **Measured on the
+  generator's own output at `M70`:** it proposed `M42`'s *"`tracker-lint` R8 guards `CLAUDE.md`"* and
+  `M60`'s *"Four tracker surgeries have now hand-rolled the same verification harness"* in one batch. Both
+  fixes land in `scripts/tracker-lint-controls.php` — the first because a new rule group needs `$cases`
+  entries and a parameterised `write_fixture_files()`, which hard-codes a `## Standing Rules` fixture body
+  and would therefore execute the new rule inside all eleven existing `R7` fixtures; the second because
+  that file is the row's explicitly named mould. The first row is scored *"hub files only"*. ⚠️ **The
+  failure is silent and points the wrong way**: an unharvestable citation makes a row look MORE separable,
+  not less, so the generator's confidence is highest exactly where it is least earned. **Not live** — the
+  file already states that it cannot check a row whose files were not harvested, and the proposal is
+  labelled *"a proposal to check, not a schedule"*; what is missing is that a row with **partial** harvest
+  is indistinguishable from a fully-harvested one. The cheap improvement is to mark rows whose harvest is
+  incomplete rather than to guess their footprints. Filed by `M70`.
+
 
 - **`minor` · `scripts/loop.php --assess` does not read `docs/pipeline.md`, so it cannot refuse a row on its PIPELINE state.** Filed 2026-09-06 by `M79`, deliberately unfixed there. `HELD_TOPICS` refuses the five held topics by substring match on the row text, which is a coarser mechanism that happens to cover the same ground today — so this is a redundancy gap rather than a live hole. ⚠️ **The reason to wait is not effort:** making a STOP-LIST depend on a generated file means an incomplete generation makes the stop-list under-refuse, and an under-refusing stop list is unsafe where an over-refusing one is merely annoying. It belongs with the gate that guarantees the pipeline is complete, not before it. **Live.** Filed by `M79`.
 

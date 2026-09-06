@@ -34,6 +34,12 @@ uses(RefreshDatabase::class);
 | read the real bag off the session, then compare it to the literal harvested from the page — so BOTH ends
 | move together or this file goes red. The two halves are `expect($bags)` below and `errorBagLiteralsFor()`.
 |
+| ✅ PROVED BY DELIBERATE DEFECT, NOT BY OBSERVING A PASS — `php scripts/mutate.php`, label M78-bag-name-drift.
+| Renaming the CLIENT's bag by one character (`updateProfileInformation` -> `…X`) takes the baseline from
+| 5 passed / 17 assertions to 2 failed, and the two that go red are exactly the two that tie the ends: the
+| profile case and the census case. sha256 moved and returned to its original value on restore. That is the
+| realistic drift — one side renamed, the other not — and it is the failure this file exists to make loud.
+|
 | ⛔ NOTHING IN THE REPOSITORY SAW THIS BEFORE. `grep -rn errorBag tests/` was ZERO; none of the 73
 | `assertSessionHasErrors`/`assertInvalid` call sites touches a bagged route; and every Pest test that hits
 | these three endpoints asserts the happy path (`FortifyRouteContextTest` ends three cases in

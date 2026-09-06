@@ -1825,7 +1825,34 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   ⚠️ **The honest sizing is that this is worth less than it looks** — an integrator can already branch on
   `status`, which IS now enumerated, and `error.code` only narrows the `error` case. **Live.** Filed by `M69`.
 
-- **`minor` · The `@throws` contract sweep cannot see the loss of ONE of two declared causes.**
+- ~~**`minor` · The `@throws` contract sweep cannot see the loss of ONE of two declared causes.**~~
+  ⛔ **CLOSED — `M78` (2026-09-06), AND NOT AS SPECIFIED. THE MECHANISM IS REAL, ITS CONSEQUENCE IS ALREADY
+  COVERED, AND THE TREE'S ACTUAL HOLE WAS A DIFFERENT AND LARGER ONE.** The mechanism holds exactly:
+  `$declared` is filtered and then consumed for EMPTINESS only, so its cardinality is discarded, and both
+  arms' floors are `>= 1`. But *"the sweep cannot see it"* is not *"the repo cannot see it"*: case 4
+  hardcodes the promote path and both codes, each code occurs in exactly one `anyOf` branch, and CI
+  re-exports the contract and byte-diffs it — measured by simulated export, with an unmutated control
+  proving the probe clean, a single-tag deletion moves the document by ~3,000 bytes. **No single-tag
+  deletion reaches green CI.** ⚠️ Two honest limits on that cover: the branch ruleset has no
+  `pull_request` rule, so CI *catches* a direct push rather than *blocking* it; and for a tag that merely
+  duplicates what middleware already publishes, the cover degenerates to a four-line JSON key reorder.
+  ⛔ **THE FINDING THAT MATTERS: THIS ROW AND ITS SUCCESSOR BOTH ARGUE ABOUT CARDINALITY INSIDE A DECLARED
+  SET, AND THE LIVE DEFECT WAS AN UNDECLARED ONE.** `POST /public/f/{shareToken}/submissions` reaches
+  `promote()` a frame down — its own body comment says so — and published only `form_updated`. It was
+  invisible to case 4, to both sweep arms and to the export diff *simultaneously*, which is why four passes
+  over this row could never have found it. ⛔ **And there were TWO**: `GuestDraftController::store()` passes
+  `checkBaseline: true`, so `updateDraft()` throws `draftConcurrentlyModified()` a frame below it, and that
+  route published only `form_updated` as well. The second was found by CHECKING the correction written for
+  the first rather than repeating its census — a correction that reuses the census's method inherits its
+  error. Both actions now declare the tag, the contract carries both branches on each, the sweep's scope
+  grew from 2 actions to 4, and the contract suite went 113 → 115 assertions.
+  ⛔ **`SubmissionRefusalResponseExtension`'s docblock is what made this invisible to reading**: it asserted
+  the draft/submit/edit channels *"already document theirs"* because they return their envelopes inline.
+  Exactly inverted — an inline envelope is evidence about the refusal the controller returns ITSELF and says
+  nothing about one thrown a frame below, which is the whole reason that extension exists. Corrected in place.
+  ⚠️ **No new gate was built, deliberately** — see the successor row's closure for why the obvious one
+  cannot catch what was actually found here.
+
   Filed 2026-09-03 by `M68`, and **measured rather than predicted: a control removing a single `@throws`
   tag from `SubmissionPromoteController::store()` SURVIVED with all seven contract cases green.** Both arms
   of the sweep in `tests/Feature/Api/OpenApiContractTest.php` ask *"does this operation document status
@@ -5734,7 +5761,35 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   new predicate clause in `sw.ts` could be deleted with the entire Vitest suite still green, and only a new
   e2e case in `tests/e2e/public-runtime-offline.spec.ts` — which today asserts offline rendering of
   `/f/{slug}`, not `/f/resume/…` — could see it. **Whoever takes this owes the e2e case first, or the fix
-  is unfalsifiable.** ⚠️ **And the cheaper half of the exposure is not in `sw.ts` at all:** the resume READ
+  is unfalsifiable.**
+  ⛔ **RE-AIMED BY `M78` (2026-09-06): BOTH STATED BLOCKERS ARE DEAD, AND WHAT REPLACES THEM IS A PRODUCT
+  TRADE THAT IS THE USER'S CALL — SEE `D20`. THE ROW STAYS OPEN ON THAT DECISION AND ON NOTHING ELSE.**
+  ✅ **Blocker (2) is stale.** *"There is no `sw.test.ts`"* was true when filed; `M77` created it in
+  `1685faf`, three increments later. It captures every route's `match` and — until `M78` — never invoked
+  one. `M78` made those matchers live and added the assertion this row's *"one route rename re-opens it"*
+  warning was asking for: the resume READ is claimed by NO cache, proved CAUGHT by widening the schema
+  prefix one path segment, which reddens that arm alone out of eleven.
+  ⛔ **Blocker (1) is FALSE, measured.** *"It costs offline resume access outright"* — `App.vue`'s
+  `loadResume()` opens with `resumeDraft(resumeToken)`, a bare fetch to a path no service-worker route
+  matches; offline it rejects and the IndexedDB read two calls downstream is structurally unreachable.
+  **A cached resume shell has never rendered the form offline.** `docs/offline-first-sync-design.md` claimed
+  otherwise and has been corrected in place.
+  ⛔ **AND THE OBVIOUS FIX IS NOT TWO LINES, FOR THREE SEPARATE REASONS, ALL MEASURED.** (1) Purging the
+  entry costs a resume-link-only respondent their ONLY cached navigation — with it goes the offline pill,
+  the sync surface and the always-visible *"Sync now"* that `docs/non-functional-requirements.md` §7 makes
+  the iOS Background-Sync fallback (corroborated by a stored Playwright accessibility snapshot showing that
+  surface rendering on an empty queue). (2) It makes `isResumeShell()` in `lib/brand-cache.ts` guard a
+  condition that can no longer arise, turning its three dedicated cases **vacuously green** — the
+  succeeds-on-empty-input shape this repo gates against, and the exact predicate `M75` worked to make
+  load-bearing. (3) Resolving those cases makes this row cite `brand-cache.test.ts`, **the one non-hub file
+  the open second-writer row already cites**, barring the two from one batch under `D13` — which is
+  precisely what `M74` refused to do. The triage harvester cannot see (3), because it harvests from prose.
+  ⚠️ **The exposure is also LARGER than this row states**: Cache Storage is origin-scoped rather than
+  per-document, and the credential IS the cache key — `caches.open('guest-shell-html').keys()` enumerates
+  every resume token on the device without reading a body, so stripping `data-resume-token` from the HTML
+  would not close it. ✅ Sharpened, not just re-scoped: the resume response also returns a freshly minted
+  share token, so the URL segment is a WRITE credential, not only a read.
+ ⚠️ **And the cheaper half of the exposure is not in `sw.ts` at all:** the resume READ
   escapes caching only because its path prefix is `drafts/` rather than `f/`; `routes/api.php` now says so
   at the site, and one route rename or a consolidation of the two public groups re-opens it. **Live.**
   Filed by `M70`.
@@ -6775,22 +6830,32 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   resolver. ⚠️ **And it should be taken together with the two destructive-default rows**, which collide on
   the same hub file. **Live.** Filed by `M76`.
 
-- **`minor` · Neither Fortify form on `/settings` can render a validation error, and the mechanism is one
-  missing `errorBag`.** Found by `M77`'s fan-out (2026-09-06) while sizing the `PUT
-  /user/profile-information` rate-limit row, at a line that row already cites — the row was not taken, and
-  this is a different, live defect beside it. `UpdateUserProfileInformation` and `UpdateUserPassword` both
-  call `validateWithBag('updateProfileInformation')` / `('updatePassword')`. Inertia's
-  `Middleware::resolveValidationErrors()` returns the bag map whenever no `default` bag exists, so
-  `page.props.errors` is `{updateProfileInformation: {…}}` — while `resources/js/Pages/Settings/Index.vue`
-  calls `.put()` with **no** `errorBag` and its template binds `profile.errors.email` and
-  `password.errors.current_password`, which are therefore always undefined. ⛔ **So a duplicate email, an
-  invalid address, a wrong `current_password` or a breached password all render NOTHING on `/settings`
-  today**, and the password form's `onError` clears the fields with no explanation shown. ⚠️ **The tell that
-  this is a real omission rather than a convention**: `errorBag` occurs **exactly once** in the entire
-  frontend, at `resources/js/Pages/auth/VerifyEmail.vue`, whose paired Vitest pins it. ⚠️ **It also makes
-  the deferred rate-limit row strictly worse when that row is taken**: a `ThrottleRequestsException` is a
-  429 rather than a bagged validation response, so it lands nowhere in these forms either. **Live.**
-  Filed by `M77`.
+- ~~**`minor` · Neither Fortify form on `/settings` can render a validation error, and the mechanism is one
+  missing `errorBag`.**~~
+  ✅ **CLOSED — `M78` (2026-09-06). EVERY CITATION HELD, THE REMEDY WORKED, AND THE ROW UNDERSTATED ITSELF
+  BY ONE FORM AND TWO PAGES.** The mechanism is exactly as filed and was proved by RENDERING it rather than
+  by reading: driving `/settings` under Playwright and submitting the profile form with a duplicate address
+  left the DOM **byte-identical before and after**, all eight `.mds-field__error` nodes empty. The control
+  that settles the remedy is `auth/VerifyEmail.vue` — same endpoint, same bag, same duplicate address, same
+  session — which renders the message, so the only variable is the visit option.
+  ⛔ **THE ROW'S CENSUS WAS `grep validateWithBag app/`, AND FORTIFY ALSO BAGS ON THE EXCEPTION, IN VENDOR.**
+  `ConfirmTwoFactorAuthentication` throws `->errorBag('confirmTwoFactorAuthentication')`, so
+  `components/settings/TwoFactorSetup.vue` had the identical defect — and it is not a third form on this
+  page, it is ONE component mounted on THREE pages, two of them lockout gates: `Pages/admin/TwoFactorSetup.vue`
+  (super-admin MFA, where `superadmin.mfa` allows no other console route) and `Pages/auth/TwoFactorRequired.vue`
+  (tenant enforcement, where the only other affordance is sign out). **A mistyped TOTP on either rendered
+  nothing, so a person could not tell a wrong code from a broken page.** There is no fourth bag — measured
+  exhaustively across `vendor/` and `app/`: three bags, four consumers, three broken.
+  ⚠️ **THE `X-Inertia-Error-Bag` HEADER IS INERT AND THAT MATTERS FOR THE NEXT READER**: the middleware
+  guards it with `$bags->has('default') && header`, which is false in exactly the case a bag is used — the
+  two responses are byte-identical. The unwrap is client-side, in `getScopedErrors()`.
+  ✅ **Gated at BOTH ends, deliberately.** A Vitest pins the literal the page sends (`Pages/Settings/Index.test.ts`,
+  the page's first test ever, plus a case in `TwoFactorSetup.test.ts`); `tests/Feature/Settings/FortifyErrorBagTest.php`
+  drives the real routes, reads the bag off the session and compares it to that same literal, so a rename on
+  either side is red. Positive control: renaming the client bag by one character.
+  ⚠️ **The deferred rate-limit note stays true and is unaffected** — a `ThrottleRequestsException` is a 429,
+  not a bagged validation response, so it still lands nowhere in these forms. Filed by `M77`.
+
 
 - **`minor` · Two user-supplied predicates now run on the `pgsql_auth` connection, against a standing rule
   that says none may.** Found by `M77`'s fan-out (2026-09-06). `docs/multi-tenancy-rbac-design.md` states
@@ -6807,8 +6872,27 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   onto the default connection, or amend all three documents to describe the rule that is actually being
   kept. Do not amend one and not the others. **Live.** Filed by `M77`.
 
-- **`minor` · The `@throws` sweep row's prescribed remedy is SELF-NULLIFYING, which no pass has said in
-  three re-derivations.** Measured by `M77`'s fan-out (2026-09-06) and recorded here rather than closing the
+- ~~**`minor` · The `@throws` sweep row's prescribed remedy is SELF-NULLIFYING, which no pass has said in
+  three re-derivations.**~~
+  ✅ **CLOSED — `M78` (2026-09-06). THE ARGUMENT IS CORRECT, UNBREAKABLE AND BANKED — AND IT STOPPED ONE
+  SHAPE TOO EARLY.** Two agents attacked the self-nullification and neither could break it: an expectation
+  derived from the docblock moves with the docblock, and a hardcoded class-to-marker map iterated over the
+  declared set shrinks identically. ⚠️ **But it enumerated two shapes and concluded "cannot be built".**
+  A committed FLOOR fixture — `route => list<class-string>`, asserted `fixture ⊆ harvested` — does not move
+  when the docblock moves, reddens in an ordinary Pest run with no DB and no export, and has precedent in
+  this very file (case 1 pins ~20 literal paths with `toContain`) and across the tree (`tests/fixtures/*.json`,
+  the golden-vector suites). **It was still not built, for a better reason than the row gives**: it is
+  `⊆`-shaped, so it is structurally blind to a route carrying NO tag — which is exactly the live defect this
+  pair turned out to be hiding. See the parent row's closure.
+  ⛔ **AND THIS ROW'S OWN CONSOLATION IS HALF FALSE, WHICH IS THE PART WORTH KEEPING.** It says an FQ-spelled
+  `@throws` empties the walk so the `>= 1` floor fires *"loudly"*. True of the **403 arm** (one route, one
+  tag). **False of the 409 arm**: FQ-spell one of promote's two and the sibling keeps `$declared` non-empty,
+  the route stays in scope, the floor is satisfied, and the arm goes SILENTLY GREEN. ✅ The underlying
+  contradiction is fixed: `OpenApiContractTest`'s helper docblock claimed the needle matches a
+  fully-qualified `@throws`; the needle is `'@throws '.class_basename($e)`, which returns `false` for the FQ
+  form — measured in PHP, not reasoned. Zero live instances today (all 95 `@throws` across `app/` are
+  imported), so the defect was that the comment told a future author the opposite.
+ Measured by `M77`'s fan-out (2026-09-06) and recorded here rather than closing the
   row, because the row was not in this increment's batch. The open row above prescribes asserting that the
   rendered `code` description contains each **declared** cause, and `M70` narrowed that to *"derive the
   expected code set FROM THE DOCBLOCK"*. ⛔ **An expectation derived from the docblock moves with the
@@ -6840,8 +6924,28 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   seven database-enforced columns are unenforced. Whoever takes the row should census from `pg_constraint`,
   not from the migrations directory. **Live.** Filed by `M77`.
 
-- **`minor` · `bootstrap/app.php` and `FortifyServiceProvider` both record a middleware index that is off by
-  one.** Found by `M77`'s fan-out (2026-09-06) and reproduced on the host with `php artisan route:list
+- ~~**`minor` · `bootstrap/app.php` and `FortifyServiceProvider` both record a middleware index that is off by
+  one.**~~
+  ⛔ **CLOSED — `M78` (2026-09-06). THE ROW IS REFUTED: ALL THREE NUMBERS ARE CORRECT, AND THE INSTRUMENT
+  THAT SAID OTHERWISE CANNOT MEASURE AN EXECUTION ORDER.** `route:list --path=... --json` reproduces the
+  row's 4/5 — and its own output carries the literal STRING `"web"` at index 0, unexpanded. Nothing
+  executes `"web"`. Run what the framework runs (`Router::gatherRouteMiddleware($route)`, after the HTTP
+  kernel syncs its groups) and `Authenticate:web` is at **5** and `ThrottleFortifyEndpoints` at **6** on
+  every authenticated route the comment is about; the `13` sub-claim reproduces too, by filtering the class
+  out of `getMiddlewarePriority()` and re-sorting. ⚠️ **The index legitimately DIFFERS per route** — it is
+  5 on the ten guest routes, which carry no `Authenticate` at all — so a test asserting an ordinal would be
+  a liability rather than a gate. Nothing in the code depends on the number: `ThrottleFortifyEndpoints`
+  reads `$route->getName()` and indexes nothing.
+  ⛔ **AND THE FILE THAT WOULD HAVE HOSTED THE FIX ALREADY CARRIED THE WARNING THE ROW WALKED INTO** —
+  `tests/Feature/Tenancy/TenancyMiddlewarePriorityTest.php:140`: *"`gatherRouteMiddleware()`, NOT
+  `$route->gatherMiddleware()`, AND THE FIRST DRAFT OF THIS TEST WENT RED ON THE DIFFERENCE."*
+  ✅ **THE ROW WAS WRONG AND THE INCREMENT STILL SHIPPED A REAL FIX, ONE FILE AWAY.**
+  `app/Http/Middleware/EnforceGuestFormRateLimit.php:21` said the priority list puts `ThrottleRequests` at
+  index 6. True when written (2026-08-08); `M43` — **the very commit this row was filed against** — inserted
+  `ThrottleFortifyEndpoints` into that slot and moved it to 7. The row inspected two comments and never
+  opened the third. Corrected to state the RELATION (throttle before tenancy), which is what the argument
+  actually rests on and which never moved, following `config/fortify.php`'s prose-only precedent.
+ Found by `M77`'s fan-out (2026-09-06) and reproduced on the host with `php artisan route:list
   --path=user/profile-information --json`. Both files carry the comment *"Authenticate runs at index 5 and
   this middleware at 6"*; the live route table puts `Illuminate\Auth\Middleware\Authenticate:web` at **4**
   and `ThrottleFortifyEndpoints` at **5**, with `web` unexpanded at 0. ⚠️ **Filed rather than fixed because
@@ -6887,3 +6991,115 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   running this spec at all needs `public/hot` moved aside — with a dev Vite running, Laravel emits
   dev-server asset URLs the e2e container cannot reach and **`global-setup` dies at the login form**,
   which looks like a broken fixture and is not. **Live.** Filed by `M77`.
+
+- **`minor` · `preserveReviewedAnswers()` writes a media reference it has already deleted, in seconds, with
+  no grace window.** Measured by `M78`'s adversarial fan-out (2026-09-06) while attacking a different row,
+  and filed rather than fixed because the remedy is the same product decision that row is parked on.
+  `RuntimeSession.vue`'s `handleSubmitError` opens, unconditionally for every `ApiError`, with
+  `discardRow(db, uuid)` — and `deleteRow` removes that uuid's `media_queue` rows. Only afterwards does
+  `handleDrift`'s catch reach `preserveReviewedAnswers()`, which writes an answers map **still containing
+  `local:<id>`** onto the parked conflict row and then calls `repointToSubmission` against a table that no
+  longer holds the row; `.modify()` on zero matches is silent. ⛔ **So the parked row is left carrying an
+  unresolvable media ref — the failure mode the reaper's one-hour grace exists to bound, reached by a second
+  route that needs no waiting at all.** If that row is ever replayed, `replay.ts` finds `local:` ids,
+  `listForSubmission` returns nothing, and it parks as `needs_attention` with *"queued media is incomplete"*.
+  ⚠️ **Contained, not harmless**: a `conflict` row is never picked by `listPending` and `retryRow` refuses
+  one, so today it surfaces as a re-opened review whose media is gone rather than an immediate failure.
+  ⚠️ **`repointToSubmission` is a SECOND ownership writer that post-dates the reaper row** (`M72`), which is
+  why no earlier pass saw it. **Live.** Filed by `M78`.
+
+- **`minor` · `reap.test.ts` leaves the mark set's status list unpinned, so a third of it can be deleted
+  with all 14 cases green.** Measured by `M78` (2026-09-06). `liveLocalMediaIds` spares blobs referenced by
+  outbox rows with status `pending`, `needs_attention` or `conflict` — but **every** outbox row in
+  `reap.test.ts` is created by `enqueue`, which writes `status: 'pending'`. Mutating the `anyOf` to
+  `.anyOf('pending')` leaves the whole file green. ⚠️ The `conflict` arm is exactly what the open
+  conflict-review row's cheapest remedy leans on, so a fix built on it would rest on an unpinned line.
+  Two cases (one `conflict`, one `needs_attention`) close it. **Live.** Filed by `M78`.
+
+- **`minor` · The public runtime's media pick path has ZERO test coverage of any kind, and no e2e seeded
+  form has a media field at all.** Measured by `M78` (2026-09-06). `grep -rn "stashOffline|OfflineMediaKey"`
+  over the test trees returns **zero** hits: `stash()` is reached in tests only by direct
+  `db.media_queue.put()`, never through the real provider at `App.vue`. And `E2eSeeder` publishes five
+  slugs, **none with a media field** — the only media form it builds is left a DRAFT with no public slug,
+  so no e2e run has ever exercised guest media end to end. ⚠️ **This is why the conflict-review media row
+  has stayed theoretical through three passes**: the combination it describes cannot be reproduced by any
+  fixture in the repository. Whoever takes it needs a seeded media form first. **Live.** Filed by `M78`.
+
+- **`minor` · The data dictionary documents `tenants.status` defaulting to a value that is not a legal case
+  of the enum it names.** Measured by `M78`'s fan-out (2026-09-06) against the live database. The row
+  documents `'trial'`; the live default is `'active'`, set in the create-table migration. ⛔ **And
+  `TenantStatus` declares exactly two cases — `Active` and `Suspended`** — so `'trial'` is not merely the
+  wrong default, it is unrepresentable. ⚠️ The dictionary's enum catalog separately lists four values
+  (`trial, active, suspended, cancelled`) for the same column; **that half is already filed** under the
+  `M72` tenants-column row, and this is the DEFAULT half, which is not. ⚠️ It is also the single live drift
+  the deferred documented-literal gate would find, so the two are worth taking together. **Live.** Filed by `M78`.
+
+- **`minor` · `forms.timezone` is documented as defaulting to NULL and the database defaults it to `'UTC'`.**
+  Measured by `M78`'s fan-out (2026-09-06) against the live schema; the default is set in the
+  add-schedule-to-forms migration. ⚠️ **Filed separately from the `tenants.status` row because it hides in a
+  different bucket**: the documented cell reads `NULL`, so a literal-vs-literal comparison skips it entirely
+  and only a NULL-policy rule can see it. A gate built for the literal half alone would still miss this
+  one. **Live.** Filed by `M78`.
+
+- **`minor` · Two columns are documented under the wrong table in the data dictionary.** Measured by `M78`'s
+  fan-out (2026-09-06). `draft_expires_at` and `draft_current_step` are documented inside the
+  `submission_answers` section; **both columns exist on `submissions`**. ⚠️ Not covered by the open `M72`
+  row, which is `tenants`-only, and not reachable by any default-drift gate, which compares a documented
+  default to a column it looks up **by the section it is written under** — so a misplaced row is either
+  skipped as unknown or compared against the wrong table. **Live.** Filed by `M78`.
+
+- **`minor` · Nine live tables have no dictionary section, and they are not all framework scaffolding.**
+  Measured by `M78`'s fan-out (2026-09-06): 20 live base tables have no column table, of which most are
+  Laravel/Sanctum/PostGIS scaffolding and one (`submission_geo_index`) is already filed. The remainder are
+  first-party or security-relevant and are documented nowhere: `impersonation_tokens`, `probes`,
+  `global_probes`, `skeleton_probes`, and the whole spatie-permission set (`roles`, `permissions`,
+  `model_has_roles`, `model_has_permissions`, `role_has_permissions`). ⚠️ `impersonation_tokens` and the
+  permission tables are the ones that matter — the RBAC design document has no column table for any of them,
+  so the schema of record for this application's authorization model is undocumented. **Live.** Filed by `M78`.
+
+- **`minor` · The documented-literal drift gate needs three normalizer rules, not "a normalizer per type",
+  and one of the row's two justifications is fabricated.** Measured by `M78`'s fan-out (2026-09-06) over all
+  86 comparable pairs. ⛔ **The row's *"`false` where a document writes `No`"* example is WRONG: zero
+  `Default` cells in either document contain `No` or `Yes` — that is the **PII?** column.** All 21 boolean
+  defaults compare byte-identical with no normalization at all. The other justification
+  (`'local'::character varying` vs `'local'`) holds exactly, with 43 siblings. Measured ablation: stripping
+  the `::type` cast is needed by 44 pairs, stripping quotes by 3, canonicalizing JSON whitespace by 1, and
+  **lowercasing by zero — a dead rule.** Three rules cover 85 of 86. ⚠️ **And the sizing is inverted**: a
+  naive draft fires on **1** formatting difference and **2** real drifts, not the other way round.
+  ⛔ **Two dependencies the row does not carry**: building it turns the open `M72` tenants-column row red
+  unless taken with it (its three phantom columns are literal-shaped and land in this gate's `$unknown`
+  arm), and although the row cites only the test file, the drift is IN `docs/data-dictionary.md`, so the
+  work spends the batch's one hub slot. The triage's harvest is optimistic here. **Live.** Filed by `M78`.
+
+- **`minor` · `MdsSegmentedControl`'s stretch-clamp census is short by two consumers, one candidate fix is a
+  no-op, and the 30px figure cannot be reproduced.** Measured by `M78`'s fan-out (2026-09-06) against the
+  built `dist/tokens.css`, not only the token source. The open spill row names two stretch-clamped hosts;
+  there are **four** — `.sheets-fields` and `.encode-field` are the identical flex-column-implicit-stretch
+  shape and are named nowhere, the latter on the submission encode path. ⛔ **`flex-shrink: 1` on `__seg` is
+  a no-op** — it is the initial value — so one of the candidate remedies is dead on arrival and the row's
+  phrasing is what makes it look live. ⛔ **The 30px is asserted, not measured**: its only provenance is a
+  CI failure message computing spill past `.app-shell__content`, a different box from the scrollbar the row's
+  title names, and that code path is now unreachable because the underlying defects are fixed — no test,
+  fixture or snapshot records the number. ⚠️ It is also token- and font-stack-dependent. ⚠️ **And it cannot
+  be proven by Vitest**: happy-dom lays nothing out, so a unit test can only pin the declaration's source
+  text; the vehicle is a ~6-line element-level Playwright assertion already used twice in the e2e tree.
+  ⚠️ The row's *"this falsifies J8"* clause is **already landed history**, not outstanding work. **Live.**
+  Filed by `M78`.
+
+- **`minor` · The standing `pgsql_auth` rule was never literally true, and its stated revisit trigger names a
+  different grant.** Measured by `M78`'s fan-out (2026-09-06); filed rather than taken because the open row
+  that prompted it prescribes a direction that is a live regression. ⛔ **Direction (a), "narrow back onto
+  the default connection", BREAKS PRODUCTION AND NO TEST WOULD CATCH IT**: `users` is under FORCE RLS, so
+  the default connection sees **0** rows for a taken address where the auth connection sees **1** — not only
+  cross-tenant but for an invited-but-not-yet-active member of the same tenant — and the unique index then
+  rejects the write as a raw 23505 → 500 instead of a validation error. Under `RefreshDatabase` the auth
+  connection cannot see the test transaction, so every registration test uses a fresh address and passes
+  either way. ⛔ **The rule as worded has never held**: the login form's email has always run as a predicate
+  on `pgsql_auth` (`retrieveByCredentials()` is deliberately not overridden), as has the invite form's. The
+  invariant actually kept is the one `GoogleSignInProvisioner` states — *no user-supplied predicate beyond
+  exact equality*. ⛔ **And the threat model's revisit trigger names "a second consumer of the NEW grant"**
+  (`tenant_users`), which `Rule::unique('pgsql_auth.users')` does not consume — so the stated trigger has
+  not fired. ⚠️ **A real stale count exists in the other direction**: `docs/security-threat-model.md`
+  residual 31 still says *"exactly one server-derived equality predicate"* while `ADR-0002` was amended
+  twelve days earlier to record **two** consumers. ⚠️ The rule is restated in **13 files / 15 occurrences**,
+  not the three the open row names, so "amend all three documents" undercounts by ten. **Live.** Filed by `M78`.

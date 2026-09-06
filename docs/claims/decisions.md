@@ -23,6 +23,66 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
+### D20 — The service worker caches a credential-bearing resume shell, where the credential IS the cache key. Purge it, keep it, or split the difference?
+
+**Filed 2026-09-06 by Lane A, during `M78`, at the moment the row's two stated blockers were both
+measured dead and a real trade was found underneath them.** The row (`M70`) asks to stop caching
+`/f/resume/{token}`. Its two reasons for not doing so are now known to be false, and what replaced them
+is a genuine product question rather than an engineering one — which is why this is here and not in the
+diff.
+
+**The exposure, measured.** `GET /api/v1/public/drafts/{resumeToken}` carries **no auth middleware**; the
+token in the path is the whole credential, and the response is the respondent's full answer map **plus a
+freshly minted share token**, so it is a write credential too. The resume navigation is cached under
+`guest-shell-html` on a seven-day clock. ⛔ **Cache Storage is ORIGIN-scoped, not per-document, and the
+token is the cache KEY** — so any same-origin script can run
+`caches.open('guest-shell-html').keys()` and enumerate every resume token on the device **without reading
+a single response body**. Stripping `data-resume-token` from the HTML would therefore not close it.
+
+**What purging actually costs, measured — and it is not what the row says.** *"It costs offline resume
+access outright"* is **false**: `App.vue`'s `loadResume()` opens with a bare fetch to a path no
+service-worker route matches, so offline it rejects and the IndexedDB read two calls downstream is
+unreachable. **A cached resume shell has never rendered the form offline.** What it does carry is the app
+shell, the offline indicator and the always-render sync surface — including the *"Sync now"* action
+`docs/non-functional-requirements.md` §7 makes the iOS Background-Sync fallback. ⚠️ **For a respondent who
+only ever opened an emailed link, that entry is their ONLY cached navigation**, so purging it costs them
+the entire offline surface, not the form.
+
+**Three real options.**
+
+1. ⭐ **Purge the resume shell from the cache, and accept that a resume-link-only respondent has no offline
+   surface.** One predicate on the shell route. ⚠️ It is **not** a two-line change: it makes
+   `isResumeShell()` in `lib/brand-cache.ts` guard a condition that can no longer arise, turning its three
+   dedicated cases **vacuously green** — the succeeds-on-empty-input shape this repository gates against
+   everywhere, and the exact predicate `M75` worked to make load-bearing. Those cases must be deleted or
+   explicitly re-labelled as unreachable in the same PR. ⚠️ And resolving them makes the row cite
+   `brand-cache.test.ts`, the one non-hub file the open second-writer row already cites, so under `D13` the
+   two rows can no longer share a batch — the situation `M74` deliberately refused to create.
+2. **Keep the write and close the enumeration instead** — cache the resume navigation under a
+   **token-free key** (rewrite the cache key to a constant like `/f/resume/`, serving the shell from a
+   single entry) so `keys()` leaks nothing and the offline surface survives. Costs: one shell serves every
+   resume session on the device, so the brand-refresh sweep and the seven-day clock both become per-device
+   rather than per-link, and `isResumeShell()` stays meaningful. This is the option the row never
+   considered, and it is the only one that keeps both properties.
+3. **Do nothing and record the exposure as accepted**, on the grounds that reading it already requires
+   same-origin script execution on the tenant origin — i.e. an XSS or a compromised bundle, at which point
+   the attacker can read the live token from the page anyway. ⚠️ The counter-argument is durability: the
+   cache holds **every** resume token the device has seen for seven days, where the page holds one.
+
+**Recommendation: option 2, and it is not close.** Option 1 trades a real, documented accessibility
+fallback for a threat that requires same-origin code execution, and it does so while manufacturing three
+vacuous tests and a batching conflict. Option 3 leaves a seven-day, device-wide credential store in place
+for no benefit once option 2 is known to exist. Option 2 removes the enumeration primitive — which is the
+part that turns one compromised session into every resume link on the device — while keeping the offline
+surface the requirements commit to. ⚠️ **It needs its own measurement before being taken**: whether a
+constant-key shell breaks the resume boot's own `data-resume-token` read, since the served HTML would then
+be some *other* session's. If it does, option 1 becomes the fallback and its three vacuous tests must be
+handled as described.
+
+**Until this is answered**, `resources/public-runtime/__tests__/sw.test.ts` pins the current behaviour
+explicitly — one arm asserts the resume shell IS matched today, labelled as a pinned exposure rather than
+an endorsement, so the state cannot drift silently in either direction.
+
 ### D19 — A Reviewer holds `submissions.create` and can encode on no form. `M77` made every document say so. Should the ROLE now gain encoding, or is documenting the gap the whole answer?
 
 **Filed 2026-09-06 by Lane A, during `M77`, at the moment the documentation was corrected.** `M13`

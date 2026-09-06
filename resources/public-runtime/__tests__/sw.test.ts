@@ -24,10 +24,48 @@
  * `Response.error()`, which happy-dom supplies.
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-/** Every `registerRoute()` call `sw.ts` makes, in source order, captured at import time. */
-const routes: Array<{ match: unknown; strategy: { cacheName?: string; plugins?: unknown[] } }> = [];
+/**
+ * ⛔ THE MODULE IS IMPORTED STATICALLY, AT FILE SCOPE, AND THAT IS NOT A STYLE CHOICE — IT IS THE
+ * SECOND INSTANCE OF A TRAP `M76` RECORDED AND `M77` WALKED INTO ANYWAY. The first draft of this file
+ * did `await import('../sw')` inside a `beforeEach`. It passed when the file was run alone and when
+ * run beside `register-sw.test.ts`, and **timed out in a full 136-file run** — "Hook timed out in
+ * 10000ms", pointing at the hook and naming nothing else. `M76` hit the identical shape mounting
+ * `App.vue` and wrote down the remedy verbatim: a dynamic `import()` inside a Vitest case or hook may
+ * never resolve; a static import at file scope works.
+ *
+ * ⚠️ WHAT `M76` DID NOT KNOW, AND THIS RUN MEASURED: IT IS LOAD-DEPENDENT. That is what makes it
+ * expensive — the failing configuration is the full suite, which is the one a developer runs least
+ * often and CI runs always, so the naive read is "flaky test" and the fix is a retry.
+ *
+ * The globals below are set in a `vi.hoisted()` block because a static import evaluates `sw.ts`'s
+ * module body immediately, before any hook could run. `sw.ts` needs exactly one thing to exist at
+ * that moment: `self.skipWaiting`. `precacheAndRoute(self.__WB_MANIFEST)` is mocked to a no-op, so
+ * the manifest's value is irrelevant, and it is supplied only so the read is not a surprise later.
+ */
+const { routes } = vi.hoisted(() => {
+    const captured: Array<{ match: unknown; strategy: { cacheName?: string; plugins?: unknown[] } }> = [];
+
+    const scope = globalThis as unknown as {
+        __WB_MANIFEST: unknown[];
+        __WB_DISABLE_DEV_LOGS: boolean;
+        skipWaiting: () => void;
+    };
+
+    scope.__WB_MANIFEST = [];
+    scope.skipWaiting = () => undefined;
+
+    // ⚠️ The opaque-response arm walks Workbox's not-cacheable branch, which in a non-production build
+    // dumps the whole `Response` and its headers to stdout for EVERY rejection — six screens of noise
+    // on a fully passing run. This repository's own rule, from the AbortError row M76 closed: output on
+    // a green run is what teaches a reader to skip output. Vite strips this branch from the shipped
+    // worker (`public/build/sw.js` contains none of these strings), so it changes nothing about
+    // production.
+    scope.__WB_DISABLE_DEV_LOGS = true;
+
+    return { routes: captured };
+});
 
 vi.mock('workbox-routing', () => ({
     registerRoute: (match: unknown, strategy: { cacheName?: string; plugins?: unknown[] }) => {
@@ -46,29 +84,8 @@ vi.mock('workbox-core', () => ({ clientsClaim: () => undefined }));
 vi.mock('../lib/db', () => ({ openDb: () => Promise.resolve({}) }));
 vi.mock('../lib/replay', () => ({ replayOutbox: () => Promise.resolve(undefined) }));
 
-/**
- * `sw.ts` is a worker module: it declares `self` as a `ServiceWorkerGlobalScope` and reads
- * `self.__WB_MANIFEST`, which the bundler injects. Under happy-dom `self` is the window, so the
- * manifest and the two lifecycle listeners have to exist before the module body runs.
- */
-beforeEach(async () => {
-    routes.length = 0;
-    (globalThis as unknown as { __WB_MANIFEST: unknown[] }).__WB_MANIFEST = [];
-    (self as unknown as { __WB_MANIFEST: unknown[] }).__WB_MANIFEST = [];
-    (self as unknown as { skipWaiting: () => void }).skipWaiting = () => undefined;
-
-    // ⚠️ The opaque-response arm walks Workbox's not-cacheable branch, which in a non-production
-    // build dumps the whole `Response` and its headers to stdout for EVERY rejection — six screens
-    // of noise on a fully passing run. This repository's own rule, from the AbortError row M76
-    // closed: output on a green run is what teaches a reader to skip output. Vite strips this branch
-    // from the shipped worker entirely (`public/build/sw.js` contains none of these strings), so
-    // silencing it here changes nothing about what ships.
-    (globalThis as unknown as { __WB_DISABLE_DEV_LOGS: boolean }).__WB_DISABLE_DEV_LOGS = true;
-    (self as unknown as { __WB_DISABLE_DEV_LOGS: boolean }).__WB_DISABLE_DEV_LOGS = true;
-
-    vi.resetModules();
-    await import('../sw');
-});
+// The subject. Static, at file scope — see the note at the top of this file.
+import '../sw';
 
 /**
  * Ask a strategy's plugin chain the one question the cache actually asks it: may this response be

@@ -101,7 +101,18 @@ class RolePermissionSeeder extends Seeder
             'submissions.view', 'dashboard.form.view',
             'feedback.submit',
         ],
-        // Review submissions on forms they collaborate on; may also encode + export those forms.
+        // Review + export submissions on forms they collaborate on.
+        //
+        // ⛔ `submissions.create` HERE IS NOT "MAY ENCODE", AND THIS COMMENT SAID IT WAS UNTIL M77.
+        // `SubmissionPolicy::create()` has required `forms.edit.any` OR **editor** capacity on the form
+        // since the G10a tightening (encoding is an authoring act), and a reviewer's grant is reviewer
+        // capacity — so a plain Reviewer can encode on NO form at all. The permission stays because it
+        // is load-bearing in two places: it is the coarse half a Reviewer who ALSO holds an editor grant
+        // needs in order to encode, and it is what entitles the `write:submissions` API ability. Dropping
+        // it would break a working configuration; only the sentence was wrong.
+        //
+        // ⚠️ `submissions.review.own` is the one that is capacity-INSENSITIVE: it resolves through
+        // `ResourceGrantResolver::holdsAny()`, which accepts a grant of either capacity.
         'reviewer' => [
             'submissions.create', 'submissions.review.own', 'submissions.export',
             'submissions.view', 'dashboard.form.view',

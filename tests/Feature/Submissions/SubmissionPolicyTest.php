@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Enums\ResourceCapacity;
 use App\Enums\SubmissionSource;
 use App\Enums\SubmissionStatus;
+use App\Models\ResourceGrant;
 use App\Models\Submission;
 use App\Models\User;
 use App\Services\Authorization\ResourceGrantResolver;
@@ -109,6 +110,71 @@ it('scopes a reviewer to collaborated forms and allows review there', function (
     makeCollaborator($form, $reviewer, ResourceCapacity::Reviewer);
     expect($reviewer->can('view', $submission))->toBeTrue()
         ->and($reviewer->can('export', [Submission::class, $form]))->toBeTrue()
+        ->and($reviewer->can('review', $submission))->toBeTrue();
+});
+
+it('lets ONE reviewer-role member both review and encode once their grant is editor capacity', function (): void {
+    /*
+     * M77, closing M13's row. ⛔ THE FIRST DRAFT OF THIS CASE CLAIMED TO BE "THE CASE THAT DID NOT
+     * EXIST", AND THAT WAS FALSE — the G10a case below ("requires EDITOR capacity to manually encode")
+     * already pins a reviewer-capacity grant refusing `create`. Both arms of M77's read-only fan-out
+     * missed it too, and one of them proposed adding exactly the case that was already there. Recorded
+     * rather than quietly deleted, because "no test asserts this" is the single most repeated false
+     * premise in this repository's history and it was about to be repeated here.
+     *
+     * ⚠️ SO M13's DEFECT WAS PURELY DOCUMENTARY, WHICH IS THE SHARPER FINDING. The behaviour was
+     * already correct AND already tested; five documents — the seeder comment, the RBAC design doc's
+     * role table, its §5 matrix row, its §8.3 shape sentence and `docs/ACCESS-MATRIX.md` — simply
+     * disagreed with it. No access changed in M77.
+     *
+     * WHAT THIS CASE ADDS THAT THE G10a ONE DOES NOT, and the only reason it earns its place:
+     *   (1) It asserts the coarse permission IS held (`$reviewer->can('submissions.create')`). The G10a
+     *       case says so only in a comment, and it is the half every stale document read as "may
+     *       encode" — so it is the half that has to be visible when someone next reads this file.
+     *   (2) It uses ONE member throughout. The G10a case proves the editor half with a *form_editor*
+     *       user, so nothing anywhere proved that a REVIEWER-role member can hold editor capacity and
+     *       get both review and encode. That configuration is why `submissions.create` must stay on
+     *       the role — M13's own prescribed remedy was to drop it, which would break this.
+     *   (3) It therefore pins the §8.3 correction: `review()` still passes under an EDITOR grant,
+     *       because `collaboratesWith()` is `ResourceGrantResolver::holdsAny()`, which accepts either
+     *       capacity. The design doc said that check was capacity-specific. If it were, this
+     *       configuration would be impossible — `capacity` sits outside
+     *       `resource_grants_target_user_unique` and a grant is replaced rather than added, so nobody
+     *       can hold both capacities on one form.
+     */
+    $tenant = inboxTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    $form = publishedInboxForm($tenant, $owner);
+    $submission = seedInboxSubmission($form, $owner, SubmissionStatus::Submitted, ['full_name' => 'X']);
+
+    $reviewer = User::factory()->create();
+    enterTenant($tenant->id, $reviewer->id);
+    makeActiveMember($reviewer, 'reviewer');
+
+    // The coarse Spatie permission IS held — this is the half every document read as "may encode".
+    expect($reviewer->can('submissions.create'))->toBeTrue();
+
+    makeCollaborator($form, $reviewer, ResourceCapacity::Reviewer);
+
+    // ⛔ …and the policy still refuses, because G10a requires editor capacity for an authoring act.
+    expect($reviewer->can('create', [Submission::class, $form]))->toBeFalse()
+        ->and($reviewer->can('review', $submission))->toBeTrue();
+
+    // ⛔ RE-GRANTED BY REPLACEMENT, NOT BY A SECOND ROW, AND THE DIFFERENCE IS THE DOCUMENTED FACT.
+    // `makeCollaborator()` inserts, so calling it twice here raises 23505 on
+    // `resource_grants_target_user_unique` — measured, and it is exactly the constraint that makes
+    // "one capacity per target" true. `ResourceGrantService::grant()` handles this in production by
+    // UPDATING the existing grant; this mirrors that without dragging the service's actor-permission
+    // and tenant-resolution machinery into a policy truth-table test.
+    ResourceGrant::query()
+        ->where('scopeable_type', $form->getMorphClass())
+        ->where('scopeable_id', $form->getKey())
+        ->where('user_id', $reviewer->id)
+        ->update(['capacity' => ResourceCapacity::Editor->value]);
+    app(ResourceGrantResolver::class)->forget($reviewer->id);
+
+    expect($reviewer->can('create', [Submission::class, $form]))->toBeTrue()
         ->and($reviewer->can('review', $submission))->toBeTrue();
 });
 

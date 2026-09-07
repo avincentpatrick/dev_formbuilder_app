@@ -414,12 +414,40 @@ function documentedDefaultKnownColumns(): array
     return array_fill_keys(array_map(static fn (object $r): string => $r->k, $found), true);
 }
 
-it('does not document a database-side default the database does not have', function (): void {
+/**
+ * The FUNCTION arm's classification, collected once so each finding can be asserted separately.
+ *
+ * ⛔ WHY THIS IS A COLLECTOR AND NOT A LOOP INSIDE ONE `it()` (M84). Both arms used to collect
+ * every bucket in one pass and then assert them in sequence, and Pest aborts a test at its first
+ * failed expectation — so a run reported only the earliest non-empty bucket and a reader could not
+ * see the whole drift set. M83 met that directly: its first run showed three `$unknown` cells and
+ * said nothing at all about `tenants.status`, which was sitting in `$drift` behind them and only
+ * became visible once the first bucket was cleared.
+ *
+ * ⚠️ AND THE REASON THE OLD SHAPE LOOKED DEFENSIBLE IS FALSE. The row that filed this argued the
+ * sequence was deliberate — that a column which does not exist "poisons" any comparison of its
+ * value, so unknowns genuinely should be read first. That is true of the CLASSIFICATION and it is
+ * already enforced below by the early `continue`s, which make the buckets disjoint: a cell in
+ * `unknown` can never reach the normalizer and can never enter `drift`. Nothing was being protected
+ * by asserting them in order. The sequence bought a reading order and nothing else.
+ *
+ * ⛔ WHAT THIS DOES NOT FIX, STATED SO THE NEXT READER DOES NOT ASSUME IT DID. The executed
+ * assertion chain is EIGHT long, not three, and the five that fire FIRST are floors inside the
+ * collectors — the three discovery floors in `documentedDefaultAllCells()` and the closed-vocabulary
+ * and literal floors in `documentedDefaultLiteralCells()`. Splitting the classification cannot reach
+ * them: when a floor fails, the later arms' data has not been computed yet, and every test in this
+ * file routes through the same collectors, so one vocabulary failure still blinds the whole file.
+ * That is a real limit of this repair and is filed rather than hidden.
+ *
+ * @return array{unknown: list<string>, phantom: list<string>}
+ */
+function documentedDefaultFunctionFindings(): array
+{
     $actual = documentedDefaultActual();
     $known = documentedDefaultKnownColumns();
 
-    $phantom = [];
     $unknown = [];
+    $phantom = [];
 
     foreach (documentedDefaultCells() as $cell) {
         $key = $cell['table'].'.'.$cell['column'];
@@ -435,38 +463,19 @@ it('does not document a database-side default the database does not have', funct
         }
     }
 
-    expect($unknown)->toBe(
-        [],
-        "A documented database-side default names a column that does not exist:\n".implode("\n", $unknown)
-    );
+    return ['unknown' => $unknown, 'phantom' => $phantom];
+}
 
-    expect($phantom)->toBe(
-        [],
-        'The Default column claims a database-side default the database does not have — the value is '.
-        "supplied by the application, so the document must say so:\n".implode("\n", $phantom)
-    );
-});
-
-it('still recognises the two defaults that are real', function (): void {
-    // The discriminating control, kept as an assertion rather than a comment: both of these ARE
-    // database-side, put there by ->useCurrent(). A repair that swept now() out of the corpus
-    // wholesale, or a parser that stopped finding function-shaped cells at all, turns this red while
-    // the sweep above stays green.
-    $documented = array_map(
-        static fn (array $c): string => $c['table'].'.'.$c['column'],
-        documentedDefaultCells()
-    );
-
-    expect($documented)->toContain('audits.created_at');
-    expect($documented)->toContain('feedback_reports.submitted_at');
-
-    $actual = documentedDefaultActual();
-
-    expect(array_key_exists('audits.created_at', $actual))->toBeTrue();
-    expect(array_key_exists('feedback_reports.submitted_at', $actual))->toBeTrue();
-});
-
-it('does not document a literal default that disagrees with the database', function (): void {
+/**
+ * The LITERAL arm's classification, collected once for the same reason as the function arm above.
+ *
+ * The three buckets are disjoint by construction — each branch below `continue`s — so the order they
+ * are asserted in carries no meaning, which is exactly why they are asserted independently.
+ *
+ * @return array{unknown: list<string>, phantom: list<string>, drift: list<string>}
+ */
+function documentedDefaultLiteralFindings(): array
+{
     $actual = documentedDefaultActual();
     $known = documentedDefaultKnownColumns();
 
@@ -500,10 +509,58 @@ it('does not document a literal default that disagrees with the database', funct
         }
     }
 
+    return ['unknown' => $unknown, 'phantom' => $phantom, 'drift' => $drift];
+}
+
+it('does not document a database-side default on a column that does not exist', function (): void {
+    $unknown = documentedDefaultFunctionFindings()['unknown'];
+
+    expect($unknown)->toBe(
+        [],
+        "A documented database-side default names a column that does not exist:\n".implode("\n", $unknown)
+    );
+});
+
+it('does not document a database-side default the database does not have', function (): void {
+    $phantom = documentedDefaultFunctionFindings()['phantom'];
+
+    expect($phantom)->toBe(
+        [],
+        'The Default column claims a database-side default the database does not have — the value is '.
+        "supplied by the application, so the document must say so:\n".implode("\n", $phantom)
+    );
+});
+
+it('still recognises the two defaults that are real', function (): void {
+    // The discriminating control, kept as an assertion rather than a comment: both of these ARE
+    // database-side, put there by ->useCurrent(). A repair that swept now() out of the corpus
+    // wholesale, or a parser that stopped finding function-shaped cells at all, turns this red while
+    // the sweep above stays green.
+    $documented = array_map(
+        static fn (array $c): string => $c['table'].'.'.$c['column'],
+        documentedDefaultCells()
+    );
+
+    expect($documented)->toContain('audits.created_at');
+    expect($documented)->toContain('feedback_reports.submitted_at');
+
+    $actual = documentedDefaultActual();
+
+    expect(array_key_exists('audits.created_at', $actual))->toBeTrue();
+    expect(array_key_exists('feedback_reports.submitted_at', $actual))->toBeTrue();
+});
+
+it('does not document a literal default on a column that does not exist', function (): void {
+    $unknown = documentedDefaultLiteralFindings()['unknown'];
+
     expect($unknown)->toBe(
         [],
         "A documented literal default names a column that does not exist:\n".implode("\n", $unknown)
     );
+});
+
+it('does not document a literal value the database does not default to', function (): void {
+    $phantom = documentedDefaultLiteralFindings()['phantom'];
 
     expect($phantom)->toBe(
         [],
@@ -511,6 +568,10 @@ it('does not document a literal default that disagrees with the database', funct
         "database supplies no default and the cell should say where the value comes from, or the\n".
         "default was dropped from a migration:\n".implode("\n", $phantom)
     );
+});
+
+it('does not document a literal default that disagrees with the database', function (): void {
+    $drift = documentedDefaultLiteralFindings()['drift'];
 
     expect($drift)->toBe(
         [],

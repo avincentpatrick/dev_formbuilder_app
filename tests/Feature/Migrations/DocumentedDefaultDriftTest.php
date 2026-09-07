@@ -24,14 +24,21 @@ uses(RefreshDatabase::class);
 | infer defaults from `->default()` / `->useCurrent()` / `->nullable()` / raw `DB::statement`, which
 | is inference offered against a question `information_schema` answers exactly.
 |
-| ⚠️ WHAT THIS DOES NOT CHECK, DELIBERATELY. Only cells naming a FUNCTION (`now()`, `uuidv7()`) are
-| compared. A literal cell — `'{}'::jsonb`, `false`, `0` — is left alone: literals are where the
-| false-positive surface lives, and a documented literal that disagrees with the database is a
-| different and much noisier question. Filed in `docs/feature-backlog.md` rather than left here.
+| ✅ M83 ADDED THE LITERAL ARM THE PARAGRAPH HERE USED TO DEFER, AND THE DEFERRAL'S REASONING WAS
+| MEASURABLY WRONG. It said literals "are where the false-positive surface lives" and needed "a
+| normalizer per type". Measured over every comparable pair: 41 of 86 match with NO normalization at
+| all, THREE type-agnostic string rules take it to 85 of 87, and the fourth candidate — lowercasing —
+| fixes zero. The noise was three cells, not a class.
 |
-| ⚠️ AND IT CHECKS PRESENCE, NOT EQUALITY. `now()` is documented where PostgreSQL reports
-| `CURRENT_TIMESTAMP`; both are the same default expressed two ways, and demanding string equality
-| would fail on a synonym rather than on a defect.
+| ⛔ THE TWO ARMS ASK DIFFERENT QUESTIONS AND MUST NOT BE MERGED. The function arm checks PRESENCE:
+| `now()` is documented where PostgreSQL reports `CURRENT_TIMESTAMP`, and demanding string equality
+| there would fail on a synonym rather than on a defect. The literal arm checks EQUALITY, because a
+| documented `'trial'` against a live `'active'` is not a synonym — it is the drift.
+|
+| ⛔ AND A LITERAL CELL IS A DATABASE-SIDE DEFAULT, WHICH THE DICTIONARY'S OWN PREAMBLE DENIED UNTIL
+| THIS INCREMENT. It read "Everywhere else the value is supplied by the application"; 102 columns
+| carry a live default and the documented literals record them, 41 of 86 byte-identically. A document
+| that says one thing and does another is the reason this arm can exist at all.
 |
 | Raw `DB::select` against `information_schema`, never `Schema::` — what is being proven is what the
 | database stores, and a Blueprint-level answer would describe a migration's intent instead.
@@ -54,6 +61,42 @@ const DOCUMENTED_DEFAULT_MIN_DOCUMENTS = 2;
 const DOCUMENTED_DEFAULT_MIN_TABLES = 30;
 
 const DOCUMENTED_DEFAULT_MIN_ROWS = 450;
+
+/**
+ * A floor for the LITERAL arm specifically (M83).
+ *
+ * ⛔ The function arm has no floor of its own and reaches exactly TWO cells of 570 rows — only the
+ * named controls in the second test stop it reporting green over nothing. The literal arm is 45×
+ * larger, so it gets the floor the older arm never had. Measured 89 on the tree this was written
+ * against; 86 after this increment's own `tenants` repair removes three phantom rows. 70 sits far
+ * enough below to survive ordinary editing and far enough above zero that a broken sentinel
+ * vocabulary — which would silently reclassify every literal cell as prose — fails LOUDLY.
+ */
+const DOCUMENTED_DEFAULT_MIN_LITERAL_CELLS = 70;
+
+/**
+ * The closed vocabulary of Default cells that record a NON-database origin.
+ *
+ * ⛔ CLOSED, AND IT FAILS ON ANYTHING IT DOES NOT KNOW. The pattern is
+ * `tests/Feature/Docs/DocumentedSettingKeyDriftTest.php`'s, and its reason carries over exactly: a
+ * default coerced to something plausible is worse than one that fails. `the emailAddress urn` is the
+ * proof — it is prose sitting in a Default cell, and the column it describes really does carry a
+ * database-side default.
+ *
+ * ⚠️ `application-generated (HasUuidv7)` contains parentheses but not the empty pair `()`, so the
+ * function arm's `str_contains($cell, '()')` correctly does not claim it. That is load-bearing, not
+ * a coincidence: 32 cells depend on it.
+ */
+const DOCUMENTED_DEFAULT_SENTINELS = [
+    'NULL',
+    '—',
+    'set by Eloquent',
+    'application-generated (HasUuidv7)',
+    'auto-increment',
+    'identity',
+    '*derived*',
+    'the emailAddress urn',
+];
 
 /** The exact header line every column table in the corpus uses. */
 const DOCUMENTED_DEFAULT_HEADER = '| Column | Type | Nullable | Default | PII? | Description |';
@@ -82,7 +125,12 @@ function documentedDefaultDocuments(): array
 }
 
 /**
- * Parse one document into the column rows whose Default cell names a function.
+ * Parse one document into EVERY column row, with its Default cell verbatim.
+ *
+ * ⚠️ M83 widened this from "rows whose Default cell names a function" to all of them, because the
+ * literal arm below needs the same rows the function arm does and a second parser would be a second
+ * copy of this document's conventions. The function-shaped filter now lives in
+ * `documentedDefaultCells()`, so that arm's behaviour is byte-for-byte what it was.
  *
  * The table name comes from the nearest preceding `##`/`###` heading that names one — the FIRST
  * backticked identifier in it, because RBAC §8's heading names two tables and its own §8.1/§8.2
@@ -147,10 +195,6 @@ function documentedDefaultParse(string $path): array
         $columnCell = $fields[1];
         $defaultCell = trim(str_replace('`', '', $fields[4]));
 
-        if (! str_contains($defaultCell, '()')) {
-            continue;
-        }
-
         // One cell may name several columns, e.g. created_at / updated_at.
         foreach (explode('/', $columnCell) as $piece) {
             $column = trim(str_replace('`', '', $piece));
@@ -172,11 +216,11 @@ function documentedDefaultParse(string $path): array
 }
 
 /**
- * Every function-shaped Default cell in the corpus, with the floors already asserted.
+ * EVERY Default cell in the corpus, with the discovery floors already asserted.
  *
  * @return list<array{doc: string, table: string, column: string, default: string}>
  */
-function documentedDefaultCells(): array
+function documentedDefaultAllCells(): array
 {
     $documents = documentedDefaultDocuments();
 
@@ -208,6 +252,126 @@ function documentedDefaultCells(): array
     );
 
     return $cells;
+}
+
+/**
+ * The FUNCTION-shaped cells — this gate's original arm, filtered here instead of in the parser.
+ *
+ * @return list<array{doc: string, table: string, column: string, default: string}>
+ */
+function documentedDefaultCells(): array
+{
+    return array_values(array_filter(
+        documentedDefaultAllCells(),
+        static fn (array $cell): bool => str_contains($cell['default'], '()')
+    ));
+}
+
+/**
+ * Is this Default cell a VALUE, as opposed to prose describing where a value comes from?
+ *
+ * ⛔ THIS PREDICATE IS THE WHOLE DESIGN, NOT A CONVENIENCE. Widen the literal collector to "every
+ * non-empty cell that is not a function" and the phantom arm below fires 328 times — 220 `NULL`, 74
+ * `set by Eloquent`, 32 `application-generated (HasUuidv7)`, 2 `*derived*`. None of those is a value,
+ * and none of them is a defect. It is the difference between a four-failure gate and a 341-failure
+ * one, which is the difference between a gate that can merge and `M40`'s that never could.
+ *
+ * Deliberately NOT accepting a bare `{`/`[`: every JSON default in this corpus is written quoted, so
+ * an unquoted one would be a new convention, and a rule that governs no line cannot be reddened.
+ * An unrecognised shape falls through to the sentinel check and fails loudly, which is the point.
+ */
+function documentedDefaultIsValueShaped(string $cell): bool
+{
+    return $cell === 'true'
+        || $cell === 'false'
+        || preg_match('/^-?\d+(?:\.\d+)?$/', $cell) === 1
+        || (strlen($cell) >= 2 && str_starts_with($cell, "'") && str_ends_with($cell, "'"));
+}
+
+/**
+ * Reduce a documented cell and a live `information_schema` default to one comparable form.
+ *
+ * ⛔ THE ORDER OF THE FIRST TWO RULES IS LOAD-BEARING AND NOTHING IN THE BACKLOG SAID SO.
+ * `scope_nodes.depth` is `'0'::smallint` and `usage_counters.value` is `'0'::bigint`, while eight
+ * other integer columns store a bare `0` — and all ten are documented identically as `0`. Unquote
+ * before stripping the cast and `'0'::bigint` becomes `0'::bigint`; strip the cast first and it
+ * becomes a clean `'0'`, then `0`. Either rule alone yields two false failures over one physical
+ * value.
+ *
+ * ⚠️ The fourth candidate rule — lowercasing — is DEAD. It was measured over every comparable pair
+ * and fixes zero of them, so it is not here. See `docs/feature-backlog.md`'s M78 ablation.
+ */
+function documentedDefaultNormalize(string $value): string
+{
+    $value = trim($value);
+
+    // 1. The trailing Postgres cast: `::character varying`, `::jsonb`, `::bigint`, `::varchar(20)`.
+    $value = (string) preg_replace('/::"?[a-z][a-z0-9_ ]*"?(?:\(\d+(?:,\d+)?\))?$/i', '', $value);
+
+    // 2. The surrounding single quotes Postgres puts on every non-numeric literal.
+    if (strlen($value) >= 2 && str_starts_with($value, "'") && str_ends_with($value, "'")) {
+        $value = str_replace("''", "'", substr($value, 1, -1));
+    }
+
+    // 3. JSON whitespace. `'["monthly","yearly"]'` and `'["monthly", "yearly"]'` are one value.
+    //    Decoded as objects rather than associative arrays deliberately: `json_decode('{}', true)`
+    //    is `[]`, which would re-encode to `[]` and make an empty object and an empty array compare
+    //    equal — a real drift this gate would then miss.
+    if (str_starts_with($value, '{') || str_starts_with($value, '[')) {
+        $decoded = json_decode($value, false);
+
+        if (json_last_error() === JSON_ERROR_NONE) {
+            $value = (string) json_encode($decoded);
+        }
+    }
+
+    return $value;
+}
+
+/**
+ * Every VALUE-shaped Default cell, with the sentinel vocabulary and the literal floor asserted.
+ *
+ * @return list<array{doc: string, table: string, column: string, default: string}>
+ */
+function documentedDefaultLiteralCells(): array
+{
+    $literal = [];
+    $unrecognised = [];
+
+    foreach (documentedDefaultAllCells() as $cell) {
+        if (str_contains($cell['default'], '()')) {
+            continue;
+        }
+
+        if (in_array($cell['default'], DOCUMENTED_DEFAULT_SENTINELS, true)) {
+            continue;
+        }
+
+        if (documentedDefaultIsValueShaped($cell['default'])) {
+            $literal[] = $cell;
+
+            continue;
+        }
+
+        $unrecognised[] = $cell['doc'].' — '.$cell['table'].'.'.$cell['column'].
+            ' reads '.$cell['default'];
+    }
+
+    expect($unrecognised)->toBe(
+        [],
+        "A Default cell is neither a value, a function, nor a known sentinel. Add it to\n".
+        "DOCUMENTED_DEFAULT_SENTINELS if it describes where the value comes from, or write it as a\n".
+        "value if it is one — do not leave it for this gate to guess:\n".implode("\n", $unrecognised)
+    );
+
+    expect(count($literal))->toBeGreaterThanOrEqual(
+        DOCUMENTED_DEFAULT_MIN_LITERAL_CELLS,
+        'Discovery floor: value-shaped Default cells found ('.count($literal).'). A drop here means '.
+        'the sentinel vocabulary or the value predicate has swallowed the corpus, which would make '.
+        'the literal arm below green over nothing.'
+    );
+
+    return $literal;
 }
 
 /**
@@ -300,4 +464,92 @@ it('still recognises the two defaults that are real', function (): void {
 
     expect(array_key_exists('audits.created_at', $actual))->toBeTrue();
     expect(array_key_exists('feedback_reports.submitted_at', $actual))->toBeTrue();
+});
+
+it('does not document a literal default that disagrees with the database', function (): void {
+    $actual = documentedDefaultActual();
+    $known = documentedDefaultKnownColumns();
+
+    $unknown = [];
+    $phantom = [];
+    $drift = [];
+
+    foreach (documentedDefaultLiteralCells() as $cell) {
+        $key = $cell['table'].'.'.$cell['column'];
+
+        if (! isset($known[$key])) {
+            $unknown[] = $cell['doc'].' — '.$key.' documents '.$cell['default'].
+                ', and no such column exists';
+
+            continue;
+        }
+
+        if (! isset($actual[$key])) {
+            $phantom[] = $cell['doc'].' — '.$key.' documents the value '.$cell['default'].
+                ', and the column has no database-side default';
+
+            continue;
+        }
+
+        $documented = documentedDefaultNormalize($cell['default']);
+        $live = documentedDefaultNormalize($actual[$key]);
+
+        if ($documented !== $live) {
+            $drift[] = $cell['doc'].' — '.$key.' documents '.$cell['default'].
+                ', the database has '.$actual[$key];
+        }
+    }
+
+    expect($unknown)->toBe(
+        [],
+        "A documented literal default names a column that does not exist:\n".implode("\n", $unknown)
+    );
+
+    expect($phantom)->toBe(
+        [],
+        "The Default column states a value the database does not default to at all — either the\n".
+        "database supplies no default and the cell should say where the value comes from, or the\n".
+        "default was dropped from a migration:\n".implode("\n", $phantom)
+    );
+
+    expect($drift)->toBe(
+        [],
+        "A documented literal default disagrees with the live schema after normalization. These are\n".
+        "compared with the Postgres cast stripped, quotes removed and JSON whitespace canonicalized,\n".
+        "so what remains is a real difference in value:\n".implode("\n", $drift)
+    );
+});
+
+it('attributes every column table to a table that exists', function (): void {
+    // The parser takes a table name from the FIRST backticked identifier in the nearest preceding
+    // heading, and a heading carrying none does not reset it. Neither failure is visible today —
+    // all attributions resolve — but both are silent by construction, and M82 measured in this same
+    // repository that positional attribution can be meaningless while looking authoritative. This
+    // converts the next one from a confident wrong answer into a red build.
+    /** @var list<object{t: string}> $found */
+    $found = DB::select(
+        "select table_name as t from information_schema.tables
+         where table_schema = 'public' and table_type = 'BASE TABLE'"
+    );
+
+    $live = array_fill_keys(array_map(static fn (object $r): string => $r->t, $found), true);
+
+    $attributed = array_values(array_unique(array_map(
+        static fn (array $cell): string => $cell['table'],
+        documentedDefaultAllCells()
+    )));
+
+    sort($attributed);
+
+    $missing = array_values(array_filter(
+        $attributed,
+        static fn (string $table): bool => ! isset($live[$table])
+    ));
+
+    expect($missing)->toBe(
+        [],
+        "A column table is attributed to a name that is not a live table. Either the heading above it\n".
+        "names no table and the rows inherited the previous section's, or the heading names two and\n".
+        "only the first was taken:\n".implode("\n", $missing)
+    );
 });

@@ -49,12 +49,16 @@ silently, and nothing in the repository can see it.
 
 ### Row 1 — NEW, filed by this increment: two increments' status bullets were destroyed by their successors
 
-**Evidence verified** — measured against the tree, cited from nowhere. Harvesting `` `M<n>` IS MERGED ``
+### Evidence verified
+
+ measured against the tree, cited from nowhere. Harvesting `` `M<n>` IS MERGED ``
 across both tracker files yields 75 numbers; `M75` and `M76` are in neither. `git log -S` names the two
 commits, and both diffs are a replacement of the predecessor's bullet line rather than an insertion. The
 bullets are recoverable byte-exactly from `4ede7f8^` (3,002 bytes) and `092d264^` (4,772 bytes).
 
-**Premise verified** — the four beliefs this row rests on, each measured separately. (1) The healthy
+### Premise verified
+
+ the four beliefs this row rests on, each measured separately. (1) The healthy
 close-out shape is `2 / 1`: confirmed across every `docs(M78..M85)` close-out. (2) Neither bullet reached
 `PROGRESS_ARCHIVE.md`: confirmed by grep over the whole file, not by the section a surgery would have
 used. (3) `tracker-lint` cannot see it — R7's limits are 200 lines and 50,000 bytes, and `4ede7f8`'s
@@ -62,7 +66,9 @@ tracker delta is **+0 lines and +1,770 bytes**. Not a near miss: the wrong sign.
 it — no Pest case in `tests/Feature/Docs/`, and no lint gate reads a status bullet for anything but R6's
 hand-off marker.
 
-**Remedy verdict** — measured before the gate was written. The predicate that catches it exactly:
+### Remedy verdict
+
+ measured before the gate was written. The predicate that catches it exactly:
 **every increment carrying a `## RELEASED` heading in a claim file must have exactly one status bullet
 across the two tracker files.** Run against the tree it is red on `M75` and `M76` and on nothing else —
 48 released headings, 0 duplicates, 0 other misses. ⚠️ **The converse is NOT assertable and must not
@@ -82,7 +88,9 @@ on its expected verdict, and the new cases go red for the new reason.
 
 ### Row 2 — `docs/feature-backlog.md:7085`, `preserveReviewedAnswers()` writes media it has already deleted
 
-**Evidence verified** — every citation resolves and holds. `handleSubmitError` opens with an
+### Evidence verified
+
+ every citation resolves and holds. `handleSubmitError` opens with an
 unconditional `await discardRow(db, uuid)` for **every** `ApiError`; `deleteRow` drops that uuid's
 `media_queue` rows in the same transaction; `preserveReviewedAnswers()` then calls `repointToSubmission`
 over ids whose rows are already gone, and the `.modify()` matches zero rows silently.
@@ -94,7 +102,9 @@ a **`pending`** row — which `listPending` does pick and which replays to `need
 containment argument, that a `conflict` row is never picked, is true and does not cover the path its own
 mechanism creates.
 
-**Premise verified** — held, with one correction. That `repointToSubmission` is a second ownership writer
+### Premise verified
+
+ held, with one correction. That `repointToSubmission` is a second ownership writer
 post-dating `reap.ts`, whose header still enumerates two deleters and knows nothing of it: **held**. That
 it was filed rather than fixed because the remedy is the parked product decision at `:1353`: **held**.
 Zero test coverage of the offline-pick path, and no e2e able to reach it while no seeded form has a media
@@ -105,28 +115,36 @@ picked during the review "is re-pointed rather than left behind — narrowly, vi
 It is not; it was deleted two calls earlier. Correcting the comment is half the repair, and it is the
 `M85` shape again — a defect and its own documentation echoing each other.
 
-**Remedy verdict** — the row prescribes none; measured, the smallest correct one is to rescue ownership
+### Remedy verdict
+
+ the row prescribes none; measured, the smallest correct one is to rescue ownership
 *before* the delete. ⛔ Two candidates are **forbidden**: sparing media inside `deleteRow`/`discardRow`
 re-opens the retention defect `reap.ts` exists for and reddens a pinned assertion, and lengthening
 `MEDIA_ORPHAN_GRACE_MS` is a no-op because the reaper never runs on this path.
 
 ### Row 3 — `docs/feature-backlog.md:7921`, `User::defaultUiTheme()` as a fourth copy
 
-**Evidence verified** — the four copies still agree, and ⛔ **the headline clause is FALSE.**
+### Evidence verified
+
+ the four copies still agree, and ⛔ **the headline clause is FALSE.**
 `tests/Feature/Theme/ThemeEmissionTest.php` asserts `uiTheme()` with a strict whole-array `toBe()` on all
 three values, and says in its own comment that the strictness is deliberate. A gate does reach the
 method. The true statement is narrower and the row never makes it: **no gate compares the method to the
 document or to the schema** — and the gate that does reach it is a *fifth* hardcoded copy, which is the
 same defect one layer out.
 
-**Premise verified** — ⛔ **"four homes" is a floor, not a census, and the row named half.** At least
+### Premise verified
+
+ ⛔ **"four homes" is a floor, not a census, and the row named half.** At least
 eight restatements of these three literals exist, including two separate blocks in the theme test and a
 frontend settings test; two more restate them as branch conditions. The precondition that the literal arm
 really does compare all three: **held**. Ownership: **held**, and pointedly — the row was filed by the
 increment that had `docs/data-dictionary.md` open, and it never opened the theme test that already
 asserts the values it says nothing asserts.
 
-**Remedy verdict** — the row rejects the cheap fix for the right reason (a third parser of that table,
+### Remedy verdict
+
+ the row rejects the cheap fix for the right reason (a third parser of that table,
 and two independent readers of it already exist), and its two durable options are **one and a half**.
 Reading from the column defaults is **not feasible and the reason is structural**: the method's primary
 caller is a `rescue()` fallback that exists precisely for when the tenant database context is not
@@ -138,7 +156,9 @@ cheap fix it rejects is the one that would spend the batch's only hub slot.
 
 ### Row 4 — `docs/feature-backlog.md:7048`, the storage-quota re-aim: corrected, not closed
 
-**Evidence verified** — held on the code, ⛔ **FALSE on the row's own test citation.** The row says a
+### Evidence verified
+
+ held on the code, ⛔ **FALSE on the row's own test citation.** The row says a
 re-aim "changes a string another increment deliberately pinned in `sync-status.test.ts`". That file
 carries no quota assertion and structurally cannot: its fixture holds a null `quotaWarning`, so the
 paragraph never renders there. The only pin is a `toContain('90%')` in a different file, which no
@@ -146,7 +166,9 @@ re-wording of the count clause would break. **The row over-prices its own remain
 next reader at the wrong file** — and the triage has already harvested that wrong file into the collision
 graph, so `D13` has been batching this row against a file its repair never touches.
 
-**Premise verified** — ⚠️ **corrected against the row and in its favour at once.** Against: a documented
+### Premise verified
+
+ ⚠️ **corrected against the row and in its favour at once.** Against: a documented
 premise the row misses — an ADR's scoping table states the device-wide count "drives the boot drain and
 the storage-quota estimate", and two test rationales restate it, so scoping the *number* contradicts a
 written decision where copy-only does not. In its favour: the strongest objection to the re-aim is one
@@ -154,7 +176,9 @@ the row does not make — the visit-scoped sentence two lines above already read
 device** have not been sent yet", so the proposal would print the same phrase with a different number in
 adjacent paragraphs.
 
-**Remedy verdict** — feasible and one line, but it is **a copy decision and therefore the user's**. The
+### Remedy verdict
+
+ feasible and one line, but it is **a copy decision and therefore the user's**. The
 question, two real options and a recommendation go to `docs/claims/decisions.md`; the row is **corrected
 and left open**, not closed. ⚠️ It is published `ready` in `docs/pipeline.md` while its own text says it
 cannot be finished, which is `docs/feature-backlog.md:8046` reproducing on a second row.

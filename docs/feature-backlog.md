@@ -7491,8 +7491,19 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `docs/architecture/technical-architecture.md:469` opens §7.3 and defines both export modes, and neither
   is built. **Latent.** Filed by `M80`.
 
-- **`minor` · `PROGRESS.md` is within roughly one status bullet of its `tracker-lint` R1 byte ceiling, and
-  the two surfaces a session actually reads before pushing both stay silent about it.** Found by `M80`
+- ~~**`minor` · `PROGRESS.md` is within roughly one status bullet of its `tracker-lint` R1 byte ceiling, and
+  the two surfaces a session actually reads before pushing both stay silent about it.**~~
+  ✅ **DONE — `M81` (2026-09-07). BOTH REMEDIES TAKEN, AND THE ROW WAS RIGHT THAT THEY ARE NOT EXCLUSIVE.**
+  (a) Six status bullets — `M72` down to `M67`, 6 lines and 17,547 bytes — moved to `PROGRESS_ARCHIVE.md`,
+  taking headroom from **3,078 to 20,626 bytes**. (b) `scripts/next.php` and `scripts/preflight.php` now
+  report the BYTE headroom, reading the ceiling out of `scripts/tracker-lint.php` rather than restating it,
+  and `next.php` emits its warning only when it binds so an ordinary increment pays no bytes for it.
+  ⛔ **AND THE SURGERY ITSELF ALMOST DESTROYED WHAT IT MOVED.** The first splice removed the six lines and
+  inserted only the batch note, deleting 17,547 bytes outright; `scripts/tracker-surgery.php` refused it on
+  the hash multiset, byte conservation and the contiguous-slice hash simultaneously. **No other gate here
+  would have noticed** — the same shape as `M79`.'.s destroyed row. ⚠️ **R7 still did not arm**, at −17,548
+  bytes against a 50,000 limit, so the dead-zone row this one sits beside (`R-f90ce3d7`) is untouched and
+  remains open. Originally found by `M80`
   during its own close-out (2026-09-07), filed rather than taken because the remedy is a tracker surgery
   and this increment's subject was the backlog. `scripts/tracker-lint.php:76` sets the ceiling at 130,000
   bytes and the file stands at roughly 126.3 KB after `M80`'s bullet — under **4 KB of headroom**, against

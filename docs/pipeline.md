@@ -150,7 +150,7 @@ is the mechanism that produced five separate realignments.
 | 128 | `gdpr-legal-posture` | The GDPR, legal and pricing posture decisions | `docs/data-privacy-gdpr-compliance.md:126` | 4 | held | user: the GDPR, legal and pricing calls are the user's own | S |
 | 129 | `payments-checkout` | Embedded payments and self-serve billing — Cashier, Stripe Checkout, Stripe Tax | `docs/adr/0008-entitlement-and-metering.md:168` | 4 | held | user: needs a Stripe account; cut from Phase 3 by decision 2026-07-21 | XL |
 | 130 | `track-b-deployment` | Track B — stand up the ADR-0005 self-hosted production host | `docs/deployment-infrastructure.md:260` | 4 | held | user: deferred until app development is done, and needs the host itself | XL |
-| 131 | `uploading-import` | All uploading and import features, including bulk Excel and CSV | `PROGRESS.md:309` | — | held | user: held by the explicit-signal decision of 2026-08-09; re-enters only on their go-signal | XL |
+| 131 | `uploading-import` | All uploading and import features, including bulk Excel and CSV | `PROGRESS.md:303` | — | held | user: held by the explicit-signal decision of 2026-08-09; re-enters only on their go-signal | XL |
 
 ## Off the line
 

@@ -81,6 +81,12 @@ file, never copy out of it. `state.php` reports how far behind the trunk that fi
   Regenerate it with `php scripts/pipeline.php`; never hand-edit it. `docs/backlog-triage.md` keeps
   its own job — the operability ranking *within* the defect segment — and its counts are a dated
   census rather than the tree. `state.php` counts the tree.
+- **`scripts/pipeline-lint.php` gates that line on every push, and it runs on the host.** It refuses a
+  hand edit, a roadmap phase claiming work in flight without naming a row still in the line, a second
+  queue, a held row missing from either the line or `loop.php`'s stop-list, and a documented column
+  that exists, is used by nothing and is scheduled nowhere. ⛔ **It proves that what is written down is
+  queued — never that everything worth writing down has been.** An obligation living only in a document
+  no rule reads is still invisible to it.
 - A plan item enters the line by a marker at its **point of truth**, never by a second list. The
   grammar is in `scripts/pipeline.php`'s header. A marker inside a table or a list breaks the render,
   so it goes at the end of the section it governs and carries its own title.

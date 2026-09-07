@@ -82,6 +82,7 @@
         "tracker-lint-controls": "@php scripts/tracker-lint-controls.php",
         "tracker-surgery": "@php scripts/tracker-surgery.php",
         "citation-liveness-lint": "@php scripts/citation-liveness-lint.php",
+        "pipeline-lint": "@php scripts/pipeline-lint.php",
         "preflight": "@php scripts/preflight.php",
         "gate-baselines": "@php scripts/gate-baselines.php",
         "mutate": "@php scripts/mutate.php",
@@ -98,7 +99,8 @@
             "@mail-attribute-lint",
             "@tracker-lint",
             "@tracker-lint-controls",
-            "@citation-liveness-lint"
+            "@citation-liveness-lint",
+            "@pipeline-lint"
         ],
         "post-autoload-dump": [
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",

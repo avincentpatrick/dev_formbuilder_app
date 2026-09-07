@@ -364,7 +364,7 @@ function build_push_fixture(string $dir, bool $declared, int $keepFiller): array
  * of them showing a net byte GAIN. Every case built here therefore has R7 GREEN and R9 the only rule
  * with anything to say — which is the demonstration that R9 is not a restatement of R7.
  *
- * @param array{claims?: bool, releases?: int, drop?: list<int>, duplicate?: list<int>} $r9
+ * @param  array{claims?: bool, releases?: int, drop?: list<int>, duplicate?: list<int>}  $r9
  * @return array{dir: string, base: string}
  */
 function build_r9_fixture(string $dir, array $r9): array
@@ -432,7 +432,7 @@ function build_pr_fixture(string $dir): array
  * ⚠️ The bullet block is byte-identical between a fixture's before and after states unless $r9 says
  * otherwise, so it cannot move R7's delta — which is the property that lets it be added at all.
  *
- * @param array{claims?: bool, releases?: int, drop?: list<int>, duplicate?: list<int>} $r9
+ * @param  array{claims?: bool, releases?: int, drop?: list<int>, duplicate?: list<int>}  $r9
  */
 function write_fixture_files(string $dir, int $fillerLines, array $r9 = []): void
 {

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Enums;
 
+use App\Models\User;
 use App\Models\UserUiPreference;
 
 /**
@@ -34,7 +35,7 @@ enum ThemeMode: string
      *
      * ⛔ INCREMENT M86 — THIS EXISTS TO DELETE COPIES, SO ADDING IT WITHOUT MOVING THE CALLERS WOULD
      * MAKE THINGS WORSE. `'system'` was written as a bare literal in the creating migration and again
-     * in {@see \App\Models\User::defaultUiTheme()}, alongside the live column default and
+     * in {@see User::defaultUiTheme()}, alongside the live column default and
      * `docs/data-dictionary.md` §19 — four homes for one fact, all agreeing, none derived from another.
      * Both writable copies now call this. The two that remain are a database default and a document,
      * which are compared to each other by `tests/Feature/Migrations/DocumentedDefaultDriftTest.php`.

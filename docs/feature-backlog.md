@@ -8138,8 +8138,9 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - **`minor` · Four citations point into UNTRACKED trees and can never resolve, and nothing separates them
   from citations that are merely broken.** Measured by `M85` (2026-09-07) while widening the resolver.
-  After the widening, 17 citations remain unresolved; four of them name `node_modules/dexie/dist/dexie.js`
-  (three times) and `vendor/laravel/fortify/routes/routes.php`. ⚠️ **These are legitimate citations into
+  After the widening, 17 citations remain unresolved; four of them name a `dexie` distribution file under
+  the npm tree (three times) and a Fortify routes file under the composer tree — written here WITHOUT
+  their paths, for the reason the LAST row in this file records. ⚠️ **These are legitimate citations into
   real code** — the argument for citing a vendored file by line is the same as for any other — but
   `git ls-files` cannot see them, so they will be unresolved forever and they sit in the same bucket as a
   typo. ⛔ **The consequence is on the FLOOR, not the tier**: `MIN_EXPECTED_RESOLVED` is compared against a
@@ -8177,3 +8178,20 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   can actually be repaired. It needs a parser that can tell a closed row from an open one — which
   `scripts/pipeline.php` and `scripts/backlog-triage.php` both already do, so the parser exists twice and
   neither copy is reachable from here. **Live.** Filed by `M85`.
+
+- **`minor` · The generated queue's ORDER depends on which UNTRACKED directories happen to exist, and
+  `docs/pipeline.md` is merge-gated on that order.** Measured by `M85` (2026-09-07) by tripping it: CI
+  failed `pipeline-lint` P1 with `docs/pipeline.md` DRIFTED while `php scripts/pipeline.php --check` was
+  green on the host, on the same commit. ⛔ **`scripts/backlog-triage.php` resolves a slashed citation
+  token with `is_file()` against the WORKING TREE rather than against the tracked set** — unlike
+  `scripts/citation-liveness-lint.php`, which asks `git ls-files`. A row citing a path under the npm or
+  composer tree therefore resolves on a developer host and fails to resolve in a CI job that installed
+  only one of them, which moves the row between citation-health tiers, which reorders the whole line,
+  which is a merge failure. ⚠️ **The trigger was a row filed in the same increment**, and the immediate
+  fix was to reword that row so it names no such path — which works and is not a fix: the next row to
+  cite a vendored file re-triggers it, and the reword is invisible to anyone who has not read this.
+  ⛔ **THE REAL FIX IS ONE LINE AND IT IS IN A HUB FILE**, which is why it is filed rather than taken
+  here: resolve against the tracked set the script already has every reason to read. ⚠️ **Note the
+  asymmetry that hid it**: the two scripts carry the SAME partial-path blindness — one of them was fixed
+  this increment — but they resolve against two DIFFERENT universes, and nothing anywhere says so.
+  **Live.** Filed by `M85`.

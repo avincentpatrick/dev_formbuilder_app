@@ -16,7 +16,151 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M83` is merged; the next increment is a fresh `D13` batch
+## Status: ACTIVE CLAIM — `M84`, a three-row `D13` batch: two unprovable gates and a predicate that reads the wrong end of the line (`m84-d13-batch`)
+
+Taken 2026-09-07. Branch `m84-d13-batch`, cut from `origin/main` at `f67c618`, PR into `main`.
+**The fifteenth `D13` batched increment.** Rows, all `minor`, all marked `live`:
+
+- **R1 — `docs/feature-backlog.md:7826`** (`R-d40c6b7e`, filed `M83`) — *the literal arm's three
+  assertions are sequenced, so a run reports only the first arm that fails.*
+- **R2 — `docs/feature-backlog.md:7048`** (`R-172ec2c0`, filed `M78`) — *`reap.test.ts` leaves the
+  mark set's status list unpinned, so a third of it can be deleted with all 14 cases green.*
+- **R3 — `docs/feature-backlog.md:7676`** (`R-0f2d6521`, filed `M82`) — *`carries_a_disposition()`
+  reads the FIRST italic parenthetical on an acceptance bullet.* **This is the batch's ONE
+  hub-touching row** (`scripts/pipeline-lint.php`).
+
+⛔ **THE GENERATED BATCH PROPOSAL WAS NOT TAKEN, AND THE REASON IS A ROW `M83` FILED.**
+`docs/backlog-triage.md`'s *"Suggested next batch"* proposed `4166` + `5810` + `5867` + `6755`.
+**`4166` and `5867` both land in `scripts/tracker-lint.php` and `scripts/tracker-lint-controls.php`** —
+`4166` needs a new rule group with its own controls entries and a parameterised fixture writer,
+`5867` re-calibrates `R7`'s thresholds and those same controls — so the proposal violates `D13`'s own
+selection rule. That is exactly `R-d8575314` (`docs/feature-backlog.md:7812`), *"the triage generator
+harvested a row as hub-free whose repair could only be made in a hub file, and the batch it then
+proposed violated `D13`"*, reproducing one increment after it was filed. The batch below was composed
+by hand from a read-only fan-out over ten candidate rows.
+
+### Evidence verified
+
+**R1 — `7826`: HELD.** The row carries no `path:N` citations; it cites by symbol, and every symbol
+resolves. The single collecting loop is `DocumentedDefaultDriftTest.php:477-501` and the three
+expectations are at `:503`, `:508` and `:515`; Pest aborts on the first failed expectation, so the
+row's claim is exact. The three failure messages each name only their own arm. The older function arm
+has the same shape at `:438`/`:443`, and the adding commit confirms that ordering is original to
+`M58`. The claim that both function-arm arrays have always been empty holds: that arm is pinned to
+exactly two cells, `audits.created_at` and `feedback_reports.submitted_at`, both live and both
+defaulted.
+
+**R2 — `7048`: HELD**, every citation re-measured rather than read off the row. `liveLocalMediaIds` is
+`reap.ts:201`, its mark set `reap.ts:210-217`. `enqueue` writes a pending status at `outbox.ts:65`,
+and the only outbox writers in `reap.test.ts` are `enqueue` at `:156`/`:222` and `markSynced` at
+`:234` — no `markConflict`, no `markNeedsAttention`, no direct put or update anywhere in the file. The
+case count is exactly 14. The narrowing mutation was traced case by case: all 14 stay green.
+
+**R3 — `7676`: PARTLY HELD — one citation is FALSE AS WRITTEN.** The predicate, its sole caller
+(`pipeline-lint.php:1112`), the closed vocabulary at `:229` and the 93/89 constants at `:233`/`:235`
+with digest `55529a3ee0686949` all resolve, and a live verbose run reproduces them. ⛔ **But the row
+offers an italic `(e.g., CAPTCHA)` parenthetical as the hazard shape "the PRD's bullets do carry", and
+the live text at `docs/PRD.md:199` is in PLAIN parentheses.** No acceptance bullet in the PRD carries
+a second italic parenthetical at all; in all four that carry one, the first IS the disposition. The
+shape the row presents as present is invisible to the predicate, so the hazard needs an author to
+write it — which the repository does elsewhere, but not here and not yet.
+
+### Premise verified
+
+**R1: PARTLY FALSE, and the false half is the row's stated reason for preferring the cheap fix.** The
+row argues unknowns "genuinely should be read first" because a column that does not exist poisons any
+comparison of its value. That is true of the CLASSIFICATION and is already enforced by code the row
+never mentions — the early continues at `:484` and `:491` make the three buckets disjoint, so a cell
+in the unknown bucket can never reach the normalizer and can never enter drift. **Nothing is poisoned
+by asserting all three together;** the sequence buys a reading order and nothing else. ⚠️ **And false
+by omission: the executed assertion chain is EIGHT, not three.** Five floors fire before the
+classification pass exists — three discovery floors at `:227`, `:244`, `:249`, then the
+closed-vocabulary and literal floors at `:360` and `:367` — and for those the row's cheap fix is
+structurally impossible, because the later arms' data has not been computed when they fire. All four
+cases in the file route through the same collector, so one vocabulary failure blinds the whole file,
+attribution arm included.
+
+**R2: PARTLY FALSE.** The load-bearing half holds and is *stronger* than the row states: the narrowing
+mutation leaves **all 137 Vitest files** green, not merely this one — `reapAbandoned` is also reached
+from `useSyncOutbox.ts:220` and `replay.ts:184`, and every media fixture in those suites is either
+uuid-linked (skipped at `reap.ts:156`) or inside the one-hour grace (spared at `:165`). ⛔ **The
+cross-row clause is false.** The row says the conflict arm "is exactly what the open conflict-review
+row's cheapest remedy leans on". Neither open conflict row depends on the status list: `1353`'s
+cheapest remedy is a NEW protected set threaded from the runtime's provider that does not go through
+the mark set at all, and `7030` leans on `listPending`/`retryRow` refusing a conflict row, over media
+that is uuid-linked and therefore skipped before status is ever read. **The defect is untouched; the
+row's priority argument is not.**
+
+**R3: PARTLY FALSE, and the rotted half is a live instance the row denies.** One copy, one caller, no
+second implementation, no document specifying the convention — holds. "Fails in the under-collecting
+direction" holds, but for a reason the row does not give: the pin compares a count AND a digest over
+site identities, so movement in either direction is red; what the defect actually costs is not a
+silent green but a false refusal an author can only clear by leaving the constant permanently one too
+high. ⛔ **"The 93/89 split reconciles exactly against a hand count" is FALSE.** The 89 reconciles
+against the PREDICATE. `docs/PRD.md:311` and `:314` are acceptance bullets sitting in the residue
+whose outcome the PRD states directly underneath them, as indented continuation bullets at `:312` and
+`:315`. The collector rejects the two-space indent, so both parents count as undispositioned. **A hand
+count of criteria whose outcome the PRD records is 87, not 89** — the same failure class as the row,
+and LIVE, which the row denies. ⚠️ **Unstated precondition:** `D24` is an open user decision whose
+option 2 retires this arm outright. The pipeline row is ready with no blocker, so this is not a hold,
+but the arm's existence is under an open question and a reviewer should know it.
+
+### Remedy verdict
+
+**R1: WORKS — and the row's preference between its two options is backwards.** The cheap fix (print a
+count of what the later arms hold, inside the earlier arm's message) is mechanically correct: the
+collecting loop completes before the first expectation, and the message is built eagerly. ⛔ **But it
+cannot be proved by this project's own standard** — no deliberate defect turns a message-text
+improvement red, short of a meta-test asserting on a string builder, which is the vacuous shape this
+repository already rejects — and it does not reach the five pre-pass floors at all. The "thorough" fix
+(three cases over one shared collector) works, is small, and **is already the house pattern**:
+`ConstraintBoundaryDriftTest`, `TenantTableClassificationDriftTest` and `TenantExtractColumnDriftTest`
+all do exactly this over shared collectors. `DocumentedDefaultDriftTest` is the outlier, not the
+innovator. **Taking the option the row files as expensive, because it is the only one that can be
+proved.**
+
+**R2: WORKS, with one refinement the row does not state.** `markConflict` and `markNeedsAttention`
+both route through `patchUnsent`, which refuses only a synced or missing row, so each lands cleanly on
+a row created by the existing fixture shape; the existing helpers already produce the aged null-uuid
+orphan and the local media reference the cases need. ⚠️ **A bare "it spared the blob" assertion is
+vacuous against a do-nothing-reaper mutant** — `lane-b.md:1462` already recorded that hole for this
+exact file. Each new case seeds a SECOND, unreferenced aged orphan and asserts the discrimination
+rather than the absence of action.
+
+**R3: WORKS, and it closes a second defect the row does not claim.** Require the disposition to be the
+LAST thing on the line: trim, test for the closing token as a suffix, find the opening token with a
+LAST-match search, then run the same vocabulary loop. Measured side by side against the current
+predicate over synthetic bullets and over the live corpus. ⛔ **The constants do NOT move** — the
+repaired predicate is strictly narrower except where a line carries two or more opening tokens, and no
+acceptance bullet does; all four dispositioned bullets already end with the closing token. So the
+residue stays 89 and the digest stays `55529a3ee0686949`, **which is exactly why the mutation proof is
+not optional.** ⚠️ **A naive anchored regex passes today only by luck** — `docs/PRD.md:211` carries an
+inner closing bracket earlier in the line — so the last-match form is the one to ship. ✅ **The row
+frames the current rule as purely under-collecting; it already over-collects too** — a bullet that
+merely QUOTES a disposition first discharges itself today, which is the mention-versus-declaration
+trap this same increment removed from `P2b` and `P2c`, still sitting in `P2e`. The prescribed remedy
+removes it as a side effect. ⛔ **NOT TAKEN HERE: the two live sub-bullet dispositions.** Accepting the
+indented continuation form moves the residue 89 to 87 and edits a pinned constant, and it is entangled
+with `D24`. **It is filed, not smuggled in.**
+
+Files: `tests/Feature/Migrations/DocumentedDefaultDriftTest.php` (R1),
+`resources/public-runtime/__tests__/reap.test.ts` (R2), `scripts/pipeline-lint.php` and
+`tests/Feature/Docs/PipelineLintControlsTest.php` (R3).
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/backlog-triage.md`,
+`docs/gate-baselines.md`, `PROGRESS.md` (own status block and own hand-off line only).
+Paired files taken: none.
+Namespaces spent: **nothing from either namespace** — no migration, no ADR, no exceptions entry.
+Prediction: R1 and R3 are Pest and provable with `scripts/mutate.php` directly; **R2 is not**, because
+`mutate.php` drives Pest in a container and R2's proof is Vitest — that positive control is
+hand-rolled, which is open row `4281` being paid rather than fixed. I expect **six mutants, all
+CAUGHT**. PHPStan cannot move: the diff is one PHP script plus tests, and the container scan covers
+`app`, `database` and `routes` only. ⚠️ **The thing I most expect to be wrong is R3's claim that the
+constants do not move** — it was derived analytically over the live corpus rather than by running the
+repaired predicate in place, and every increment in this repository that predicted a count before
+running it has been wrong at least once. The second candidate is the `citation-liveness` tier-1 arm on
+`docs/pipeline.md`: the ledger tier sits at **17 against a ceiling of 17 with zero headroom**, so the
+queue artefacts are regenerated AFTER the ledger edits and BEFORE the push, which is `M83`'s lesson
+rather than `CLAUDE.md`'s close-out ordering.
 
 ## RELEASED — `M83`, the documented-literal default arm: a gate sized as a rewrite that was one filter (merged as PR #274, `5112ee9`, 6/6 green with real step counts — Static analysis 25 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

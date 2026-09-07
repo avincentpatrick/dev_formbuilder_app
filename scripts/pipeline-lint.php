@@ -582,18 +582,23 @@ function p2d_artefact_drift(array $rows): void
     foreach ($cells as $cell) {
         $column = $cell['column'];
 
+        // ⚠️ THE TERMS ARE A CONJUNCTION, SO THEIR ORDER CHANGES ONLY THE COST — AND IT CHANGES IT BY
+        // AN ORDER OF MAGNITUDE. The corpus term reads files; the other three are string tests over
+        // buffers already in memory. Running the cheap ones first leaves the walk with a handful of
+        // candidates instead of every documented column.
+
         // Term 1 — it must exist.
         if (! str_contains($schema, "'".$column."'")) {
             continue;
         }
 
-        // Term 2 — nothing may use it.
-        if (column_is_used($column, $corpus)) {
+        // Terms 3, 4 and 5 — the ledger, the decision record and the line.
+        if (str_contains($scheduled, $column)) {
             continue;
         }
 
-        // Terms 3, 4 and 5 — the ledger, the decision record and the line.
-        if (str_contains($scheduled, $column)) {
+        // Term 2 — nothing may use it. Last, because it is the only one that touches a disk.
+        if (column_is_used($column, $corpus)) {
             continue;
         }
 

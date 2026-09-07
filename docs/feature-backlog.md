@@ -4661,9 +4661,22 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   from the per-table rows — which is what those rows are for — gets it wrong thirty times. **The fix is
   mechanical but not one-line**: either the column rows say "application-generated" or the preamble's
   conditional is repeated per row; choosing which is a documentation decision, not a lookup. **Live.** Filed by `M46`.
-- **`minor` · The documented-default gate reads FUNCTION-shaped cells only, so a documented LITERAL that
-  disagrees with the database is invisible to it.** Filed by `M58` (2026-09-01) at the moment the scope was
-  decided, rather than left as a comment inside the test nobody re-reads.
+- ~~**`minor` · The documented-default gate reads FUNCTION-shaped cells only, so a documented LITERAL that
+  disagrees with the database is invisible to it.**~~
+  ✅ **DONE — M83 (2026-09-07). THE ROW'S EVIDENCE HELD AND UNDERSTATED ITSELF; BOTH CLAUSES OF ITS REMEDY
+  WERE FALSE.** The filter was one line and its reach was **2 cells of 570 parsed rows** — the two its own
+  control names — against **89 value-shaped literal cells**. ⛔ *"Needs a normalizer per type"* is wrong:
+  **three type-agnostic string rules cover 85 of 87** comparable pairs — strip the trailing `::type`, strip
+  the quotes, canonicalize JSON whitespace — and the fourth candidate, lowercasing, fixes **zero**.
+  ⛔ *"The honest sizing is a second gate"* is wrong the same way `7033` was: **the gate already existed**,
+  so the work was inverting one cell filter, not building a twin. ⚠️ **Two evidence nits, neither
+  material:** the row's example cell `'{}'::jsonb` does not occur — **zero** documented `Default` cells
+  contain `::` at all — and the docblock's *"569 column rows"* was 570. ⛔ **AND THE ROW'S OWN PREMISE — THAT
+  LITERALS ARE "THE NOISY HALF" — WAS THE DOCUMENT'S ERROR, NOT THE DATABASE'S.** The dictionary's
+  convention paragraph claimed *"everywhere else the value is supplied by the application"*; **102 columns
+  carry a live default and 41 of 86 pairs matched byte-for-byte with no normalization at all.** The noise
+  was three cells. Original filing follows. **Filed by `M58` (2026-09-01) at the moment the scope was
+  decided, rather than left as a comment inside the test nobody re-reads.**
   `tests/Feature/Migrations/DocumentedDefaultDriftTest.php` compares a `Default` cell to the live schema
   only when the cell names a function — `now()`, `uuidv7()`. A cell reading `'{}'::jsonb`, `false`, `0` or
   `'trial'` is skipped. ⚠️ **That is not a small remainder**: it is most of the column, and the corpus
@@ -6178,6 +6191,25 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   a default on a column that does not exist, which that test's `$unknown` arm already catches and cannot
   reach today only because the cells are literal-shaped). The other six are not, and need the census this
   row is for. **Live.** Filed by `M72`.
+  ✅ **PARTIALLY DISCHARGED BY `M83` (2026-09-07) — THE THREE LITERAL-SHAPED COLUMNS ARE GONE, THE CENSUS IS
+  NOT. THE ROW'S OWN PARTITION WAS EXACT.** Measured: the literal-shaped cells naming a non-existent column
+  number **exactly three** and are exactly this row's three — `is_tax_exempt` `false`, `timezone` `'UTC'`,
+  `settings` `'{}'`. They are now tombstones, and the `TenantStatus` catalog entry is corrected to its two
+  real cases. ⛔ **THE REPAIR WAS DONE AS TOMBSTONES RATHER THAN DELETIONS, AND THAT IS NOT A STYLE
+  PREFERENCE.** `scripts/citation-liveness-lint.php` reads **tier-2 rot 17 against a ceiling of 17** — zero
+  headroom — and there are **24 `data-dictionary.md:N` citations** in the tree, 12 of them below the
+  `tenants` table. A −7 deletion reddens the gate; **17 of 21 plausible line deltas do**, and `+1`, `+3` and
+  `+5` breach the zero-tolerance tier-1 arm. Tombstoning is **line-neutral**, and the document had already
+  established the form twice, on `domain` and `data_residency_region`. **Measured after: 1441 lines before,
+  1441 after, tier-2 still 17.**
+  ⛔ **WHAT THIS ROW STILL OWES, AND ONE THING IT DOES NOT KNOW.** The six `NULL`-shaped phantoms
+  (`billing_email`, `billing_country`, `tax_id`, `trial_ends_at`, `suspended_at`, `deleted_at`); the two
+  **undocumented live columns** — `data`, the stancl virtual-column store, and **`draft_ttl_days`, which
+  this row does not mention at all** though §20's Design Note 1 cites it as if it were documented; and the
+  preamble's universal *"matching each enum's Postgres `CHECK` constraint"*, which is false for far more
+  than `tenants.status`. ⚠️ **Taking any of it requires re-pointing the twelve citations first**, and the
+  liveness gate asserts a cited line is *alive*, never that it still says what the citation claims — so an
+  arithmetic re-point merges green while being wrong. **Still live.**
 
 - **`minor` · `DROP_BYTE_LIMIT` is an absolute constant unindexed to a ceiling `R1`'s own discipline keeps
   ratcheting, so sampling bias is the symptom and the missing index is the cause.** Re-measured by `M72`
@@ -7030,8 +7062,19 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   has stayed theoretical through three passes**: the combination it describes cannot be reproduced by any
   fixture in the repository. Whoever takes it needs a seeded media form first. **Live.** Filed by `M78`.
 
-- **`minor` · The data dictionary documents `tenants.status` defaulting to a value that is not a legal case
-  of the enum it names.** Measured by `M78`'s fan-out (2026-09-06) against the live database. The row
+- ~~**`minor` · The data dictionary documents `tenants.status` defaulting to a value that is not a legal case
+  of the enum it names.**~~
+  ✅ **DONE — M83 (2026-09-07). EVERY CITATION HELD; THE PREMISE DID NOT.** The cell read `'trial'`, the
+  migration declares `->default('active')`, and `TenantStatus` has two cases, so the value was
+  unrepresentable exactly as the row says. The `Default` cell and the enum catalog entry are both corrected.
+  ⛔ **The premise that was stale is the sizing.** The row calls this *"the deferred documented-literal
+  gate"*, implying none exists; `DocumentedDefaultDriftTest` already scanned the same corpus with both a
+  `$phantom` and an `$unknown` arm and only skipped literal cells. The fix was widening one filter.
+  ✅ **The row's *"the two are worth taking together"* was right, and understated.** `tenants.status` was
+  **the single real drift across all 86 comparable pairs** — the literal arm found it, went red on it, and
+  went green when it was repaired, which is the positive control for the equality arm on a real defect
+  rather than a synthetic one. Original filing follows. **Measured by `M78`'s fan-out (2026-09-06) against
+  the live database.** The row
   documents `'trial'`; the live default is `'active'`, set in the create-table migration. ⛔ **And
   `TenantStatus` declares exactly two cases — `Active` and `Suspended`** — so `'trial'` is not merely the
   wrong default, it is unrepresentable. ⚠️ The dictionary's enum catalog separately lists four values
@@ -7062,9 +7105,25 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   permission tables are the ones that matter — the RBAC design document has no column table for any of them,
   so the schema of record for this application's authorization model is undocumented. **Live.** Filed by `M78`.
 
-- **`minor` · The documented-literal drift gate needs three normalizer rules, not "a normalizer per type",
-  and one of the row's two justifications is fabricated.** Measured by `M78`'s fan-out (2026-09-06) over all
-  86 comparable pairs. ⛔ **The row's *"`false` where a document writes `No`"* example is WRONG: zero
+- ~~**`minor` · The documented-literal drift gate needs three normalizer rules, not "a normalizer per type",
+  and one of the row's two justifications is fabricated.**~~
+  ✅ **DONE — M83 (2026-09-07). EVERY ABLATION NUMBER REPRODUCED EXACTLY; TWO COUNTS ARE CORRECTED AND ONE
+  OF THEM IS AN INTERNAL CONTRADICTION IN THE ROW.** Independently re-measured: cast **44**, quotes **3**,
+  JSON whitespace **1**, lowercasing **0 — dead**, and the `'local'` vs `'local'::character varying` pair
+  holds with 43 siblings. Zero `Default` cells contain `No`/`Yes`; that is the **PII?** column, as the row
+  says. ⛔ **Corrected: *"all 21 boolean defaults"* is 29** — 20 `false` and 9 `true`, cross-checked from the
+  database side. ⛔ **Corrected: *"85 of 86"* is 85 of 87, and the row cannot be self-consistent as
+  written.** `forms.timezone` is documented `NULL`, so it is not value-shaped and sits **outside** the 86 —
+  the row's *"86 comparable pairs"* and its *"2 real drifts"* are answers from two different collectors.
+  Under one collector the set is 87 and the two survivors are exactly the two drifts. ✅ **Its two stated
+  dependencies were both real**: the `M72` tenants row went red on exactly three `$unknown` cells, and the
+  work did spend the batch's hub slot. ⛔ **AND IT MISSED THE ONE THING THAT DECIDED THE DESIGN.** Widening
+  the collector to every non-function literal fires the shared `$phantom` arm **328 times** — 220 `NULL`,
+  74 `set by Eloquent`, 32 `application-generated (HasUuidv7)`, 2 `*derived*`, **none value-shaped.** The
+  value-shaped predicate is the only thing holding that arm at zero, and no row named it. ⚠️ **Normalizer
+  ORDER is load-bearing and unstated too**: `'0'::bigint` and `'0'::smallint` sit beside eight bare `0`s,
+  all ten documented `0` — strip the cast before the quotes or two false failures appear over one physical
+  value. Original filing follows. **Measured by `M78`'s fan-out (2026-09-06) over all 86 comparable pairs.** ⛔ **The row's *"`false` where a document writes `No`"* example is WRONG: zero
   `Default` cells in either document contain `No` or `Yes` — that is the **PII?** column.** All 21 boolean
   defaults compare byte-identical with no normalization at all. The other justification
   (`'local'::character varying` vs `'local'`) holds exactly, with 43 siblings. Measured ablation: stripping
@@ -7671,3 +7730,108 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   count the body's table rows instead of reading the banner, which removes the reason the banner has to
   be trustworthy at all and is the smaller change — but it makes `state.php` parse the row table, and
   `loop.php`'s recorded lesson is about exactly what a second parser costs. **Live.** Filed by `M82`.
+
+- **`minor` · `scripts/citation-liveness-lint.php` sits AT its ceiling with zero headroom, so any edit
+  that shifts a line in `docs/data-dictionary.md` is a merge failure and nothing says so.** Measured by
+  `M83` (2026-09-07) while sizing the `tenants` repair, and it is why that repair shipped as tombstones
+  rather than deletions. `--report` reads **tier-2 rotten = 17** against `LEDGER_ROT_CEILING = 17`, with
+  tier 1 at zero tolerance. There are **24 `data-dictionary.md:N` citations** in the tree — 6 in
+  `docs/adr/0008-entitlement-and-metering.md` (tier 1), 13 in this ledger, the rest excluded — and **12
+  target a line below the `tenants` table**. Swept over deltas −15…+6, **17 of 21 merge RED**; `+1`, `+3`
+  and `+5` breach tier 1. ⛔ **The ratchet is the mechanism and it is working as designed — the defect is
+  that the constraint is invisible.** Nothing in `CLAUDE.md`, the hand-off or the dictionary itself says
+  this file is line-pinned by 24 citations, one of which has no tolerance at all, so the next increment
+  to take the open `M72` census will discover it by merging red. ⚠️ **The fix is not to raise the
+  ceiling** — that retires the only pressure keeping the ledger's citations honest. Candidates, none
+  costed: have the lint name the pinned files in its own `--report` output; or teach it to re-point a
+  citation whose target moved by a computable offset within one commit, which is the harder and more
+  valuable half. **Live.** Filed by `M83`.
+
+- **`minor` · The citation gate asserts a cited line is ALIVE, never that it still says what the citation
+  claims — so re-pointing a shifted citation arithmetically merges green while being wrong.** Found by
+  `M83` (2026-09-07) as the direct consequence of the row above: the liveness predicate is BLANK /
+  horizontal rule / fence / table separator / out-of-range, and **every other line passes**. So a bulk
+  offset applied after a document edit satisfies the gate whether or not any citation still lands on its
+  subject. ⛔ **This is the same class as the row recording that `pipeline.php` reports a verdict is
+  RECORDED and never that it is RIGHT**, and it is the reason the `M72` census cannot be discharged by
+  arithmetic. ⚠️ **A real check is not obviously cheap**: it needs each citation to carry something about
+  its target — an anchor, a quoted fragment, a heading — which is a corpus-wide change to how this
+  repository cites, not a change to the gate. **Two of the twelve pinned citations already need semantic
+  re-aiming rather than an offset**, because the rows they point at are the ones a full repair deletes.
+  **Live.** Filed by `M83`.
+
+- **`minor` · The data dictionary's enum catalog contradicts the enum for `ComparisonOperator` and
+  `UsageMetric` as well, and nothing gates the catalog at all.** Measured by `M83`'s fan-out (2026-09-07)
+  against `app/Enums/`, while correcting the `TenantStatus` entry the open `M72` row names. The catalog
+  lists `gt, lt, eq, neq, is_null, contains` for `ComparisonOperator` and asserts it mirrors legacy's
+  6-row `rule_formulas` lookup; the enum declares **8** — `Gte` and `Lte` are absent from the document.
+  `UsageMetric` lists 7 against an enum of **8** (`WebhookEndpointsCount` missing). ⛔ **And the catalog's
+  preamble claims every value list matches each enum's Postgres `CHECK` constraint — false for at least
+  15 of the 28 enum-backed columns**, including `forms.status`, `submissions.status`/`source` and
+  `form_fields.field_type`. ⚠️ **The gate-shaped half is the point**: three tests read
+  `docs/data-dictionary.md` and **none reads the catalog**, so `TenantStatus` was wrong for months with a
+  full suite green. `tests/Feature/Docs/DocumentedSettingKeyDriftTest.php` is the precedent to copy — its
+  own comment requires **set equality in both directions, never containment**, which is exactly the
+  property that would have caught all three. **Live.** Filed by `M83`.
+
+- **`minor` · Six `Default` cells describe a column as application-supplied when the database does supply
+  a default, and one of the two words used is factually wrong.** Measured by `M83` (2026-09-07) while
+  building the closed sentinel vocabulary the literal arm needs. Four cells read `auto-increment` and two
+  read `identity`; all six name columns whose live default is a `nextval(...)` sequence, so the cell says
+  the application supplies a value that Postgres supplies. ⛔ **And `identity` is wrong twice over** —
+  `point_awards.id` and `badge_awards.id` are `nextval`-backed bigserial, **not** `GENERATED AS IDENTITY`,
+  which is a different Postgres mechanism with different `INSERT` semantics. ⚠️ **They are in the sentinel
+  vocabulary deliberately and that is the honest short-term answer**: promoting them to comparable would
+  compare a documented word against `nextval('x_id_seq'::regclass)` and need a sequence rule the ablation
+  shows nothing else wants. The repair is to the document — say `bigserial` and let the cells name the
+  real default — and it belongs with the `M72` census rather than beside a gate. **Live.** Filed by `M83`.
+
+- **`minor` · Three `tenants` cells disagree with the live schema on Type and Nullable, and no gate
+  compares either column.** Found by `M83` (2026-09-07) by opening the citations of the rows it was
+  closing and reading what sat beside them — the row-is-a-floor discipline, and it found three. `name` is
+  documented `varchar(150)` and is **255** live; `slug` is documented `varchar(100)` and is **255**;
+  `owner_user_id` is documented **Nullable: No** and the column is **nullable**. ⛔ **The gate-shaped half
+  is that `DocumentedDefaultDriftTest` compares the `Default` cell and nothing else**, so the other four
+  cells of every one of 570 rows are unasserted — and `Nullable` is the one a reader consults before
+  writing an insert. ⚠️ **Sizing honestly: the Type cell is not mechanically comparable.** It carries
+  prose and abbreviations the schema does not use, so a naive equality arm is red on arrival across the
+  corpus — the shape `M40` established can never merge. **`Nullable` is a clean three-value comparison
+  and is the half worth building first.** **Live.** Filed by `M83`.
+
+- **`minor` · `User::defaultUiTheme()` is a fourth copy of three defaults the new literal arm compares,
+  and it is the one copy no gate reaches.** Found by `M83`'s fan-out (2026-09-07). `theme_mode`,
+  `font_size_scale` and `use_dyslexia_friendly_font` now have four homes: the migration, the live schema,
+  `docs/data-dictionary.md` §19 and this method. **All four agree today** — verified against
+  `ThemeMode::System`, `FontSizeScale::Standard` and `false` — so this is filed for its shape and not as a
+  live drift. ⛔ **The literal arm closes the doc-to-database edge and leaves doc-to-code open**, which is
+  the same two-copies-of-a-fact class the increment was about, one layer out. ⚠️ **The cheap version is
+  not the right one**: asserting the method against the document is a third parser of the same table, and
+  the durable fix is for the method to stop restating values at all — read them from the column defaults,
+  or from one enum both sides already cite. **Live.** Filed by `M83`.
+
+- **`minor` · The triage generator harvested a row as hub-free whose repair could only be made in a hub
+  file, and the batch it then proposed violated `D13`.** Measured by `M83` (2026-09-07) against its own
+  regenerated `docs/backlog-triage.md`. The suggested batch paired a hub-only row with the
+  documented-default row, whose only harvested cite is
+  `tests/Feature/Migrations/DocumentedDefaultDriftTest.php` — a non-hub file. **But that row's defect is a
+  document**: the drift it names is in `docs/data-dictionary.md`, the #1 hub at 11 citing rows, and no
+  repair of it can avoid touching that file. Two hub-touching rows, which the rule forbids. ⛔ **The cause
+  is that the generator harvests the files a row CITES, and a row cites where the evidence is, not where
+  the fix lands.** Those are different sets and nothing distinguishes them. ⚠️ **It is a floor rather than
+  a census, exactly like the row bodies it reads** — this is one measured instance, and how often the two
+  sets diverge across the other open rows is unmeasured. **The honest repair is probably not in the
+  generator**: a row would have to declare its repair surface, which is a change to how rows are written.
+  **Live.** Filed by `M83`.
+
+- **`minor` · The literal arm's three assertions are sequenced, so a run reports only the first arm that
+  fails and a reader cannot see the whole drift set.** Measured by `M83` (2026-09-07) about the gate it
+  just wrote, from watching it happen twice in one increment. `$unknown`, `$phantom` and `$drift` are collected
+  in one pass and then asserted in that order, so the first non-empty one aborts the test: the initial run
+  showed three `$unknown` cells and said nothing about `tenants.status`, which only appeared after they
+  were repaired. ⚠️ **The ordering is deliberate and worth keeping** — a column that does not exist
+  poisons any comparison of its value, so unknowns genuinely should be read first — **but deliberate and
+  invisible are different properties**, and nothing in the failure message tells a reader that two more
+  arms were never evaluated. ⛔ **The same shape sits in the older function arm**, which has asserted
+  `$unknown` before `$phantom` since `M58` and has never been noticed because both have been empty. The
+  cheap fix is a count of what the later arms hold, printed in the earlier arm's message; the thorough one
+  is three `it()` blocks sharing one collector. **Live.** Filed by `M83`.

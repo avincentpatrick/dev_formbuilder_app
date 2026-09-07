@@ -782,6 +782,59 @@ it('P2e — reddens when a DISPOSITIONED criterion is deleted, which the residue
     });
 });
 
+/**
+ * ⛔ THE TWO CASES BELOW ASSERT **CLEAN**, WHICH IS THE ONLY HONEST SHAPE HERE AND IS ALSO THE WEAKEST
+ * ONE, SO SAY SO (M84). `carries_a_disposition()` used to read the FIRST italic parenthetical on a
+ * bullet; it now requires the disposition to be the LAST thing on the line. Both predicates give the
+ * same answer on every bullet in the live PRD — the residue is 89 and the digest unchanged either way
+ * — so `php scripts/pipeline-lint.php` cannot tell them apart and proves nothing about this repair.
+ *
+ * These two perturbations are the shapes where they DIVERGE. Under the shipped predicate each stays
+ * green; under the first-match predicate each reddens, in opposite directions. ⚠️ A green case proves
+ * nothing on its own: the proof is the mutation that restores the old body and turns both red, and it
+ * is recorded in the increment rather than left implicit.
+ *
+ * Both edit a line IN PLACE so the fixture's line count does not move, which is the shape the
+ * `P2a — RETITLED` and `P2b — RENUMBERED` cases already establish.
+ */
+it('P2e — a dispositioned criterion whose PROSE also carries an italic parenthetical still counts as dispositioned', function (): void {
+    // UNDER-COLLECT, the direction the row filed. This bullet already ends with a real disposition and
+    // already carries `(e.g., CAPTCHA)` earlier in its prose — in PLAIN parentheses, which the
+    // predicate cannot see. Italicising that aside creates the hazard the row described as if it were
+    // already present. First-match reads `e.g., CAPTCHA`, finds no vocabulary word, and counts a
+    // dispositioned criterion as residue: 89 becomes 90.
+    $anchor = '- Per-form, configurable rate limiting / bot-challenge (e.g., CAPTCHA) is available to curb spam submissions.';
+    $prd = pipelineLintDoc('docs/PRD.md');
+
+    expect($prd)->toContain($anchor);
+
+    $hazard = str_replace('(e.g., CAPTCHA)', '*(e.g., CAPTCHA)*', $anchor);
+
+    pipelineLintPerturb('docs/PRD.md', str_replace($anchor, $hazard, $prd), function (int $status, string $output): void {
+        expect($status)->toBe(PIPELINE_LINT_CLEAN, $output);
+        expect($output)->toContain('89 undispositioned acceptance bullet(s)');
+    });
+});
+
+it('P2e — a criterion that merely QUOTES a disposition mid-line does not discharge itself', function (): void {
+    // ⛔ OVER-COLLECT, AND THE ROW DID NOT CLAIM THIS DIRECTION AT ALL. It is the worse one: under
+    // first-match a bullet that only MENTIONS a disposition leaves the residue set, so a live product
+    // commitment stops being counted as outstanding. 89 becomes 88. This is the same
+    // mention-versus-declaration trap `P2b`'s narrating-heading carve-out and `P2c`'s strip_mentions()
+    // already carry; `P2e` was the arm still exposed to it.
+    $anchor = '- A user can upload a single-page image or PDF, associated with a specific form and its currently published version.';
+    $prd = pipelineLintDoc('docs/PRD.md');
+
+    expect($prd)->toContain($anchor);
+
+    $quoting = $anchor.' The sibling criterion reads *(Shipped: in an earlier increment.)* — this one has not been.';
+
+    pipelineLintPerturb('docs/PRD.md', str_replace($anchor, $quoting, $prd), function (int $status, string $output): void {
+        expect($status)->toBe(PIPELINE_LINT_CLEAN, $output);
+        expect($output)->toContain('89 undispositioned acceptance bullet(s)');
+    });
+});
+
 it('the coverage rules REFUSE rather than passing when the generator publishes no corpus', function (): void {
     // ⛔ THE ANSWER TO M81's FORWARD CAUTION. A gate that falls back to walking its own tree can
     // demand a disposition in a file the generator never opens, and any marker added to satisfy it

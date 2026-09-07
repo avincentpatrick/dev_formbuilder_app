@@ -273,6 +273,34 @@ $atLineStart = preg_match_all('/^\*\*'.preg_quote($marker, '/').'/m', $progress)
 
 info('total lines', (string) substr_count($progress, "\n"));
 
+// ⛔ THE BYTE HALF IS THE ONE THAT BINDS, AND UNTIL M81 NEITHER SURFACE A SESSION READS BEFORE
+// PUSHING REPORTED IT. The line count above cannot see the constraint at all: this file's hand-off
+// and status bullets are single lines thousands of bytes long, so a few dozen of them outweigh
+// hundreds of ordinary ones. The first signal was therefore `tracker-lint` reddening in CI on a
+// push that had already happened, at close-out, with a pull request open — the worst available
+// moment. The ceiling is READ OUT OF THE GATE rather than restated here, because a second copy of a
+// threshold is the defect this whole increment is about.
+$ceiling = null;
+
+if (preg_match('/const TRACKER_BYTE_CEILING = (\d+);/', (string) file_get_contents($root.'/scripts/tracker-lint.php'), $m) === 1) {
+    $ceiling = (int) $m[1];
+}
+
+if ($ceiling === null) {
+    note('could not read the byte ceiling out of scripts/tracker-lint.php, so the headroom below is unknown');
+} else {
+    $headroom = $ceiling - strlen($progress);
+    $line = sprintf('%s bytes, %s of headroom under the R1 ceiling of %s', number_format(strlen($progress)), number_format($headroom), number_format($ceiling));
+
+    // A status bullet has cost between two and three KB in each of the last several increments, so
+    // one bullet of headroom is the honest warning threshold rather than zero.
+    info('tracker bytes', $line);
+
+    if ($headroom < 4000) {
+        warn('PROGRESS.md has under one close-out of byte headroom — plan a tracker surgery BEFORE you push, not after CI says so.');
+    }
+}
+
 if ($atLineStart === 1) {
     pass('hand-off marker for lane '.strtoupper($lane).' appears exactly once at line start');
 } else {
@@ -313,11 +341,18 @@ if (! is_file($baselinePath)) {
     }
 }
 
-// ── The six lint gates. Opt-in because they are slow, and reported HOST-first on purpose.
+// ── The eight lint gates. Opt-in because they are slow, and reported HOST-first on purpose.
+//
+// ⚠️ THE COUNT IN THIS COMMENT SAID "SIX" WHILE THE ARRAY HELD SEVEN, AND IT HAD BEEN WRONG SINCE
+// `citation-liveness-lint` JOINED. It is the same defect class the gates below exist to catch — a
+// number in prose, restating something the line under it already says — so it is now derived in the
+// output rather than trusted here. This list is deliberately NOT the same set as `quality`'s or
+// `ci.yml`'s: `tracker-lint` and its controls are absent because they read the commit graph, which
+// is meaningless on a working tree mid-session.
 if (isset($opts['with-gates'])) {
     section('Lint gates (host)');
 
-    foreach (['controller-gate', 'migration-lint', 'job-payload-lint', 'constraint-boundary-lint', 'component-import-lint', 'mail-attribute-lint', 'citation-liveness-lint'] as $gate) {
+    foreach (['controller-gate', 'migration-lint', 'job-payload-lint', 'constraint-boundary-lint', 'component-import-lint', 'mail-attribute-lint', 'citation-liveness-lint', 'pipeline-lint'] as $gate) {
         $status = 0;
         $out = sh('php '.escapeshellarg('scripts/'.$gate.'.php').' 2>&1', $status);
         $status === 0 ? pass(trim(last_line($out))) : fail(trim($out));

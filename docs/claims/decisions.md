@@ -23,6 +23,75 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
+### D23 — `scripts/loop.php` refuses held work by a hand-written keyword list, and there is now a gate proving the pipeline holds every held row. Keep the list, derive it, or cross-check it?
+
+**Filed 2026-09-07 by Lane A, during `M81`, at the moment `P4` was written.** The row that asks for
+this (`R-3401f9b1`, `docs/feature-backlog.md:5850`) explicitly defers itself *to this gate*, so the
+question is now answerable and was not before.
+
+**The situation, measured.** `scripts/loop.php` carries `HELD_TOPICS`, twelve keywords matched as
+substrings against a candidate row's text. `docs/pipeline.md` carries five `state=held` rows, each
+with a named blocker. The two are **many-to-one** — `payment`, `payments`, `stripe` and `billing` all
+reach the one payments row — which is why `M81`'s `P4` asserts bidirectional **coverage** rather than
+the set equality the approved design specified, a shape that cannot be written against these two.
+
+⛔ **THE ASYMMETRY IS THE WHOLE DECISION, AND IT IS NOT AESTHETIC.** An **over**-refusing stop-list is
+annoying: an unattended run declines a row it could have taken, and a human notices. An
+**under**-refusing one is unsafe: an unattended run **starts held work**, which is the one thing the
+user has repeatedly and explicitly forbidden. So the two directions of error are not equally priced,
+and any option that makes the stop-list depend on something that could be incomplete is buying tidiness
+with the expensive kind of failure.
+
+**The options:**
+
+1. ✅ **Keep the literal list, cross-checked both ways by `P4`. (RECOMMENDED.)** This is what
+   `M81` shipped. The list stays a hand-written stop-list that cannot be made incomplete by a
+   generation failure, and the gate refuses any drift between it and the line — in both directions, so
+   neither a dropped keyword nor a dropped row can pass. It is the `ADR_RESERVED` precedent exactly: a
+   fact that cannot be derived safely is written down once and then machine-checked against everything
+   that would otherwise duplicate it. ⚠️ Its honest cost is that the list is still a second artefact,
+   and someone adding a held row must add a keyword too — but the gate now tells them so, immediately.
+2. **Derive `HELD_TOPICS` from `docs/pipeline.md` and delete the literal.** One artefact instead of
+   two, and the duplication disappears. ⛔ **It buys that with the expensive direction of failure**:
+   the stop-list would then be exactly as complete as the last generation, and a generation that went
+   blind — the failure `P5`'s floors exist for — would silently produce an *empty* stop-list, which
+   refuses nothing at all. A gate that fails safe cannot depend on a file that can fail short.
+3. **Keep both and drop the cross-check**, on the grounds that the coarse substring match happens to
+   cover the same ground today. This is the state before `M81` and it is listed to be refused
+   explicitly: "happens to cover the same ground today" is a measurement with no gate behind it, and
+   the whole increment exists because five realignments were caught by audits rather than by gates.
+
+---
+
+### D22 — The pipeline generator's own discovery floor is 40 against a live scan of 869. Ratchet it, leave it, or let the gate carry the only binding floor?
+
+**Filed 2026-09-07 by Lane A, during `M81`, while sizing `P5`.** Not fixed in the increment that found
+it, deliberately — see the last option.
+
+**What was measured.** `scripts/pipeline.php` sets `MIN_SCANNED_FILES = 40` and its comment cites the
+two real blindness events this project has recorded: `controller-gate` reporting `passed` while seeing
+49 of 97 files, and the container's iterator pinned at 87 of 114 migrations. The live scan reaches
+**869**. ⛔ **So the floor carries 22x slack, and neither cited event would have tripped it** — a walk
+losing half the corpus returns 434 and passes comfortably. `M81`'s `P5` therefore carries its own floor
+at **600**, which is the one that now binds, and the gate refuses rather than ruling over a short list.
+
+**The options:**
+
+1. ✅ **Leave the generator's floor where it is; the gate carries the binding one. (RECOMMENDED.)**
+   The two floors are not duplicates — they answer different questions. The generator's protects
+   anyone running it standalone and has to survive a corpus that legitimately shrinks; the gate's
+   protects the merge and can be tight because it is re-measured every time the corpus is. ⚠️ The cost
+   is that a bare `php scripts/pipeline.php` can still write a pipeline from a half-blind scan, and
+   only the gate afterwards would say so.
+2. **Ratchet `MIN_SCANNED_FILES` to a measured value the way `TRACKER_BYTE_CEILING` has been ratcheted
+   four times.** Closes the standalone hole. ⛔ **The reason it is not simply done here** is the lesson
+   that constant's own comment records: re-cutting a threshold from a single new data point, inside the
+   increment that produced it, is the move the threshold exists to prevent. A ratchet also has to be
+   maintained, and this corpus grows every increment.
+3. **Delete the generator's floor entirely and let the gate own it.** One floor, no drift between two
+   numbers. ⛔ Refused unless the user prefers it: it makes a standalone generation silently
+   unprotected, and `docs/pipeline.md` is regenerated by hand at every close-out.
+
 ### D21 — `docs/pipeline.md` is merge-gated but sits in no `paths-ignore`, so every close-out now triggers a full CI run. Accept the cost, exempt it, or split the file?
 
 **Filed 2026-09-06 by Lane A, during `M79`, at the moment the file was created.** Recorded here rather

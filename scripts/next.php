@@ -180,13 +180,51 @@ function render_line(string $lane, array $state): string
             : 'Open decisions: '.implode(', ', $decisions).' — do not re-ask them and do not stall; record a'
                 .' recommendation and take the next row in the same turn.',
         $baselines.'; never restate its figures here.',
+        tracker_headroom_warning(),
         'RECENT LESSONS, read from the newest releases in '.$config['claim'].' rather than retyped: '
             .implode(' ', recent_lessons($config['claim'])),
         sprintf('On finish: close the row, release the claim, regenerate the baselines from your own merge run,'
             .' php scripts/next.php --lane=%s --write, then a 3-5 bullet status and the bare next prompt.', $lane),
     ];
 
-    return '**LANE '.$upper.' NEXT PROMPT →** `'.strip_backticks(implode(' ', $parts)).'`';
+    return '**LANE '.$upper.' NEXT PROMPT →** `'.strip_backticks(implode(' ', array_filter($parts))).'`';
+}
+
+/**
+ * Warn the NEXT session about the tracker byte ceiling, before it writes anything.
+ *
+ * ⛔ THE CONSTRAINT IS SELF-ANNOUNCING AND WAS NONETHELESS INVISIBLE WHERE IT MATTERED. `tracker-lint`
+ * prints the headroom on every run, but nothing a session reads BEFORE pushing did: this file never
+ * consulted the ceiling, and `preflight` reported the tracker's line count, which is the half that
+ * does not bind — a status bullet is one line and two to three thousand bytes. So the first signal
+ * was CI reddening on a push that had already happened, at close-out, with a pull request open.
+ *
+ * Emitted only when it binds, so an ordinary increment pays no bytes for it — which matters, because
+ * this sentence would otherwise consume the very headroom it is warning about.
+ */
+function tracker_headroom_warning(): string
+{
+    $tracker = @file_get_contents('PROGRESS.md');
+    $gate = @file_get_contents('scripts/tracker-lint.php');
+
+    if ($tracker === false || $gate === false
+        || preg_match('/const TRACKER_BYTE_CEILING = (\d+);/', $gate, $m) !== 1) {
+        return '';
+    }
+
+    $headroom = (int) $m[1] - strlen($tracker);
+
+    if ($headroom >= 4000) {
+        return '';
+    }
+
+    return sprintf(
+        '⚠️ PROGRESS.md has %s bytes of headroom under the tracker-lint R1 ceiling — under one status '
+        .'bullet, which has cost two to three KB in each of the last several increments. Plan a tracker '
+        .'surgery BEFORE you push: run php scripts/tracker-lint.php yourself, and prove the move with '
+        .'scripts/tracker-surgery.php while both files are still uncommitted.',
+        number_format($headroom)
+    );
 }
 
 /**

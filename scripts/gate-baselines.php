@@ -281,6 +281,11 @@ $metrics = [
         'pattern' => '/Component-import linter passed \((\d+) SFC/',
         'format' => static fn (array $m): string => "{$m[1]} SFCs",
     ],
+    'pipeline-lint' => [
+        'job' => 'Static analysis, style & security',
+        'pattern' => '/pipeline-lint: passed \((\d+) rule groups, (\d+) row\(s\), (\d+) held, (\d+) file\(s\) scanned/',
+        'format' => static fn (array $m): string => "{$m[2]} rows, {$m[3]} held, {$m[1]} rule groups, {$m[4]} files",
+    ],
     'citation-liveness-lint' => [
         'job' => 'Static analysis, style & security',
         'pattern' => '/Citation liveness linter passed \((\d+) document\(s\) scanned, (\d+) citation\(s\) checked, (\d+) resolved, (\d+) unresolved; ledger tier (\d+) rotten, ceiling (\d+)/',

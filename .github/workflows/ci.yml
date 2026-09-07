@@ -236,6 +236,21 @@ jobs:
       - name: Citation liveness linter (no citation into a blank line, rule or fence)
         run: composer run citation-liveness-lint
 
+      # M81. The gate over `docs/pipeline.md`, the one ordered line of remaining work. Five separate
+      # realignments have found work that was documented and unscheduled at the same time, and every
+      # one was caught by a human audit rather than by a gate. Registered as its own step for the
+      # same reason every linter above is: no CI job runs `composer run quality`.
+      #
+      # ⛔ IT MUST RUN ON A RUNNER AND NEVER IN THE APP CONTAINER. It walks a directory, and inside
+      # the container `RecursiveDirectoryIterator` descends the Windows bind mount only partially —
+      # a gate with no floor reports `passed` while blind. The floors it carries fail as exit 2 for
+      # that reason, and `tests/Feature/Docs/PipelineLintControlsTest.php` proves each of them.
+      #
+      # ⛔ IT PROVES THAT WHAT IS WRITTEN DOWN IS QUEUED, NEVER THAT EVERYTHING WORTH WRITING DOWN
+      # HAS BEEN. An obligation living only in a document no rule reads is still invisible to it.
+      - name: Pipeline lint (one queue, no drift, no hidden held row, no dormant documented column)
+        run: composer run pipeline-lint
+
       - name: Composer audit (SCA)
         run: composer audit
 

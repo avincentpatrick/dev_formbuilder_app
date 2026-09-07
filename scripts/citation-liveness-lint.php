@@ -44,7 +44,7 @@ declare(strict_types=1);
  *   R3  The scan must find documents, extract citations, and resolve them. Any of the three coming
  *       back below its floor FAILS, because this gate has three independent ways to pass while blind.
  *
- * ⚠️ FOUR TRAPS MEASURED WHILE BUILDING THIS, EACH OF WHICH PRODUCED A WRONG ANSWER FIRST:
+ * ⚠️ FIVE TRAPS MEASURED HERE, EACH OF WHICH PRODUCED A WRONG ANSWER FIRST (four while building it):
  *
  *   1. LINES ARE SPLIT WITH explode(), NEVER preg_split ON `\R` OR A NEWLINE CLASS. Byte 0x85 is a
  *      newline to PCRE without `/u`, and it occurs INSIDE common UTF-8 emoji — `✅` is E2 9C 85.
@@ -57,6 +57,11 @@ declare(strict_types=1);
  *   4. A BARE BASENAME PREFERS THE REPOSITORY ROOT. `README.md` matches both the root file and
  *      `packages/design-system/README.md`; without root-preference the three dead `README.md`
  *      citations this gate was built to catch resolve to nothing and it reports a clean run.
+ *   5. A PARTIAL PATH RESOLVES BY UNAMBIGUOUS SUFFIX, OR NOT AT ALL. Abandoning it — which this
+ *      gate did until M85 — is strictly worse than trap 4's bare name, because a partial path
+ *      carries MORE information and got LESS resolution for it. Measured: fifteen live citations
+ *      across the gated tiers were counted, printed and never line-checked, and one of the fifteen
+ *      was dead. `scripts/backlog-triage.php` carries the same blindness with a lesser consequence.
  *
  * ⚠️ ANCHOR LINE ONLY. For a range `N-M` only line N is checked. Whole-range checking was
  * prototyped and rejected: a legitimate citation into a method spans blank lines, and the
@@ -131,7 +136,22 @@ const TIER2_FILES = ['docs/feature-backlog.md'];
 // :7). The gate went RED at 20 and green again at 17 once all three were re-pointed — so this ceiling
 // is lowered onto a bound this session watched hold and watched break, which is the only evidence that
 // counts for a gate number.
-const LEDGER_ROT_CEILING = 17;
+// ⚠️ 17 -> 18 by M85 (2026-09-07), and this is the FIRST RAISE — which the paragraph above permits only
+// with the reason stated, so here it is. ⛔ THE LEDGER DID NOT GET WORSE. Not one citation in it changed;
+// the RESOLVER did. `resolve_token()` abandoned every partial-path citation instead of resolving it, so
+// fifteen live citations across the gated tiers were counted, printed and never line-checked. Widening it
+// to an unambiguous-suffix match line-checks all fifteen, and exactly ONE of them turns out to be dead:
+// `docs/feature-backlog.md:2881` cites `Checklist/Checklist.vue:289-295`, which is blank. **The rot was
+// always there. The gate could not see it.** Raising the ceiling by exactly the count the widening exposed
+// is the only move that does not either hide a real defect or forbid a real repair.
+// ⛔ AND RE-POINTING IT IS NOT AVAILABLE, WHICH IS THIS ENTRY'S WHOLE ARGUMENT RATHER THAN AN EXCUSE. That
+// citation sits under "*The original row, preserved:*" inside a row CLOSED by `M20` — the exact structural
+// class the paragraph above already names as un-ratchetable, where the dead citation IS the evidence for
+// the closure and repairing it falsifies a dated record. The row that asked for this widening prescribed
+// re-pointing the corpse first; measured against the tree, that remedy is forbidden by this constant's own
+// contract. ⚠️ THE STANDING REFINEMENT IS UNCHANGED AND IS NOW WORTH MORE: exempt struck-through rows and
+// this ceiling can start ratcheting again on the citations that CAN be repaired. Filed, not taken here.
+const LEDGER_ROT_CEILING = 18;
 
 /** R3 floors. Three, because there are three independent ways for this gate to pass while blind. */
 const MIN_EXPECTED_DOCUMENTS = 40;
@@ -522,7 +542,24 @@ function resolve_token(string $token, array $index): ?string
     }
 
     if (str_contains($token, '/')) {
-        return null;
+        // Trap 5 (M85): a PARTIAL path resolves by UNAMBIGUOUS SUFFIX, or not at all. Abandoning it —
+        // which is what this arm used to do — is strictly worse than the bare-basename case below,
+        // because a partial path carries MORE information and got LESS resolution for it. Fifteen live
+        // citations were counted, printed and never line-checked on that account.
+        //
+        // ⚠️ THE AMBIGUITY RULE IS THE BASENAME RULE'S, NOT ITS OPPOSITE. Two matches resolve to
+        // nothing rather than to the first, for the reason trap 4 records: a wrong resolution is worse
+        // than none, because it line-checks a file the citation never meant.
+        //
+        // ⚠️ ROOT-PREFERENCE IS DELIBERATELY NOT REPEATED HERE. It exists for `README.md`, where the
+        // root file is the overwhelmingly likely referent of a bare name. A token that already carries
+        // a directory segment has stated its intent, and guessing past that would undo the statement.
+        $suffixed = array_values(array_filter(
+            $index['byBasename'][basename($token)] ?? [],
+            static fn (string $candidate): bool => str_ends_with($candidate, '/'.$token)
+        ));
+
+        return count($suffixed) === 1 ? $suffixed[0] : null;
     }
 
     $candidates = $index['byBasename'][$token] ?? [];

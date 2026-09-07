@@ -236,6 +236,18 @@ jobs:
       - name: Citation liveness linter (no citation into a blank line, rule or fence)
         run: composer run citation-liveness-lint
 
+      # M85. The gate above had NO controls of any kind, and M85 changed its resolver — a partial
+      # path now resolves by unambiguous suffix instead of being abandoned, which is what stopped
+      # fifteen live citations from being counted, printed and never line-checked. A resolver change
+      # nothing can turn red is the decorative gate M43 measured.
+      #
+      # ⛔ IT IS A HOST SCRIPT RATHER THAN A PEST FILE BECAUSE THE GATE'S INPUT IS THE GIT INDEX, and
+      # `git` is not installed in the app container — so a Pest control would be permanently red
+      # locally while green here, which is the state one open row already describes. The cost, stated
+      # in the file: `scripts/mutate.php` cannot drive it, exactly as for tracker-lint-controls.
+      - name: Citation liveness controls (the partial-path resolver, both ways)
+        run: composer run citation-liveness-lint-controls
+
       # M81. The gate over `docs/pipeline.md`, the one ordered line of remaining work. Five separate
       # realignments have found work that was documented and unscheduled at the same time, and every
       # one was caught by a human audit rather than by a gate. Registered as its own step for the

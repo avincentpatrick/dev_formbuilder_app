@@ -562,13 +562,13 @@ it('classifies every Default cell it discovered', function (): void {
 
     expect($classified['unrecognised'])->toBe(
         [],
-        "A Default cell is neither a value, a function, nor a known sentinel. Add it to
-".
-        "DOCUMENTED_DEFAULT_SENTINELS if it describes where the value comes from, or write it as a
-".
-        "value if it is one — do not leave it for this gate to guess:
-".implode("
-", $classified['unrecognised'])
+        'A Default cell is neither a value, a function, nor a known sentinel. Add it to
+'.
+        'DOCUMENTED_DEFAULT_SENTINELS if it describes where the value comes from, or write it as a
+'.
+        'value if it is one — do not leave it for this gate to guess:
+'.implode('
+', $classified['unrecognised'])
     );
 
     expect(count($classified['literal']))->toBeGreaterThanOrEqual(

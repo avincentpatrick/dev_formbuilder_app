@@ -16,7 +16,119 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M80` is merged; nothing measured is now unqueued, and the findings were right about absence and wrong about detail
+## Status: ACTIVE CLAIM — `M81`, the gate: `scripts/pipeline-lint.php` (`m81-the-gate`)
+
+Taken 2026-09-07. Branch `m81-the-gate`, cut from `origin/main` at `e3fec57`, PR into `main`.
+Row: **not a `D13` batched row and not a ledger row** — a user-directed increment, **2 of 3**, the one
+`M79` and `M80` both hand forward as *"the gate is next; coverage is after it."* Its specification is
+the approved design at `this-is-a-statu-mossy-riddle.md` §*The gate*, and this increment's own plan is
+`state-next-m81-adr-0023-migration-2026-golden-valley.md`, both under the user's plans directory.
+Scope settled with the user before opening a file: the structural rules **P1, P3, P3c, P4, P5, P6**
+plus **P2d**, the load-bearing documented-artefact drift rule; the deferral-phrase vocabulary
+(P2a–P2c) and the 89-bullet residue (P2e) stay for increment 3; the roadmap Status column stays
+hand-written and is **gated where it stands** rather than converted to a generated region.
+
+### Evidence verified
+
+Measured against the merged tree at `e3fec57`, not against the design's prose.
+
+- `scripts/pipeline.php:559` and `docs/pipeline.md:161-163` — **hold.** These are the only two places
+  `scripts/pipeline-lint.php` is named tree-wide, and both say the file does not exist yet.
+- `pipeline.php --json` / `--check` — **hold, and the design understates them.** Both flags already
+  exist; `--check` exits 0 today. `backlog-triage.php --json` also already exists, since `M65` and not
+  `M79`, so that step of the approved plan is **already paid**.
+- `MIN_SCANNED_FILES = 40` at `scripts/pipeline.php:102` — **holds as a constant and fails as a
+  floor.** The live scan reaches **869 files**: 22x slack, so a walk that went half-blind in the way
+  the constant's own comment cites (49 of 97, 87 of 114) sails through it.
+- `scripts/loop.php:44-47` `HELD_TOPICS` — **does not hold as described.** See the premise below.
+- `tracker-lint` R1 — **holds and binds.** `PROGRESS.md` is **126,582 bytes against a 130,000
+  ceiling**: **3,418 bytes** of headroom against `M80`'s own status bullet at **2,714**.
+- `citation-liveness-lint` — **holds at its limit.** 17 rotten ledger citations against a ceiling of
+  17. Zero headroom, so any citation this increment adds that does not resolve reddens it.
+- `scripts/preflight.php:316` — **holds.** The comment says *"six lint gates"* and the array lists
+  **seven**.
+
+### Premise verified
+
+The design's premise is what it believes about the world *around* the gate, and this is the half that
+was wrong. **Six predicates measured wrong before a line was written**, which is the same result
+`M79` got from the same discipline on the same document.
+
+1. **P4 cannot assert set equality.** `HELD_TOPICS` is **12 keywords** mapping **many-to-one** onto
+   5 held rows, not a 5-element set. The implementable form is bidirectional **coverage** — every
+   keyword matches at least one held row, every held row matched by at least one keyword — which I
+   verified green today and which is still reddenable in both directions.
+2. **P3 is red on arrival.** The only `BUILDING` roadmap row names its three GDPR items **in prose**
+   — *"subject-data export, erasure execution, the retention sweep"* — never as `gdpr-subject-export`.
+   Making that cell cite ids is the rule working, and is in scope.
+3. **P3c is red on arrival too, against the record of its own repair.** `M79` already archived both
+   lane queues, so the struck-token predicate now matches **nothing**; the only `rows left` hit is a
+   **quotation** inside `PROGRESS.md:117`, the sentence documenting the fix.
+4. **Adjacency is forbidden, not merely unnecessary.** `PROGRESS.md:306-308` records that markers sit
+   at end-of-file deliberately, because a mid-document marker shifted 25 `path:N` citations — `M79`
+   found it by its own gate going red (`R-c9fd2b36`). Attribution is by nearest preceding heading.
+5. **Three further sites in `PROGRESS.md` are mention-not-declaration traps**, all live: Rule 5's
+   superseded paragraphs still stand verbatim beneath its superseding banner, so the third copy of the
+   held list is still greppable prose; the Phase 4 cell contains the sentence it corrects, twice; and
+   `next.php`'s generated hand-off line is a second copy of the counts. P3c exempts **generated
+   regions by construction** — a region rewritten every close-out cannot drift — never by allow-list.
+6. **`state.php` is silently coupled to the banner.** `derive_pipeline()` pins `render_banner()` with
+   four regexes that **degrade to `null` rather than erroring**, so editing the banner blinds
+   `state.php` with no signal anywhere. Nothing gates it today; P5 will.
+
+⚠️ **And one premise I checked rather than inherited.** A verification pass reported Standing Rule
+7(f)'s gamification sentence — *"is in NEITHER queue above… a real build row still outstanding"* — as
+an unqueued obligation. **It is not.** The engine shipped: 21 service classes under
+`app/Services/Gamification/`, `docs/adr/0020-gamification-awarding-substrate.md`, and its own
+migrations. It is a **stale sentence**, and it is precisely the false positive P2d must not fire on.
+
+### Remedy verdict
+
+- **The rule set: works, with P4 and P3 reshaped as above.** P1 is nearly free — `pipeline.php
+  --check` already answers it. P6 is **not** a duplicate of the generator's
+  `assert_not_self_arming()`: that checks what it is about to *write*, this checks what is on *disk*.
+- **P2d's prescribed predicate is wrong and the design's own late measurement says so.** Absence
+  alone cannot separate a decision from a debt — *documented is not built* is a permanent legitimate
+  state here. The working predicate is the three-term join: **absent-in-code AND absent-from
+  `docs/feature-backlog.md` AND absent-from `docs/claims/decisions.md`**. *"Outside a declaration
+  site"* must also exclude **comments**: `pii_erased_at` has four hits, three declarations plus a
+  docblock naming it, so a gate reading its own warning as a use clears itself.
+- **The prescribed controls are structurally wrong, and the fix comes from precedent.** The plan says
+  *"synthetic fixture trees only, never the live repo"* and a Pest `PipelineLintControlsTest`. Those
+  two conflict: Pest runs in the container, where `RecursiveDirectoryIterator` truncates the bind
+  mount, so **a container test that iterates is blind and reports green**. `mutate.php` cannot be
+  swapped out either — its `--tests` takes Pest paths only (`R-eecdb678`). The resolution is
+  `tracker-lint-controls.php`'s mechanism hosted in a Pest file: **build the fixture under
+  `sys_get_temp_dir()` — container-local, not the bind mount — copy the live gate's shipped bytes into
+  the fixture's `scripts/`, let its own `chdir(dirname(__DIR__))` reroot it, and stub the generator
+  through a seam** the way `MutateHarnessTest` stubs its runtime. That drives **live** gate bytes,
+  iterates nothing, adds no composer or workflow surface, and routes around `R-eecdb678` rather than
+  closing it — which the close-out must say, so the row does not look addressed.
+- **The tracker surgery is forced, not optional.** `M81` cannot add a status bullet into 3,418 bytes.
+  `R-2c220af7` names both remedies and this increment takes both.
+
+Files: `scripts/pipeline-lint.php` (new), `tests/Feature/Docs/PipelineLintControlsTest.php` (new),
+`tests/fixtures/pipeline-lint/` (new), `scripts/pipeline.php`, `scripts/preflight.php`,
+`scripts/next.php`, `scripts/gate-baselines.php`, `tests/fixtures/gate-baselines/ci-log.txt`,
+`composer.json`, `.github/workflows/ci.yml`, `docs/pipeline.md` (generated), `docs/feature-backlog.md`,
+`docs/claims/decisions.md`, `PROGRESS.md`, `PROGRESS_ARCHIVE.md`.
+Shared artefacts taken: `PROGRESS.md` (own block only, plus the Phase 4 roadmap cell and the surgery),
+`PROGRESS_ARCHIVE.md`, `docs/feature-backlog.md`, `docs/claims/decisions.md`, `docs/pipeline.md`,
+`composer.json`, `.github/workflows/ci.yml`. `phpunit.xml` is **not** expected — named so a surprise is visible.
+Paired files taken: none.
+Namespaces spent: **`M81`, and nothing else** — no migration prefix, no ADR, no sub-decision id. The
+ADR gap stays reserved for H1d.
+Prediction: **Pint will fire**, because the diff is mostly `scripts/`, and that is where `M79` lost
+time to the doubled-backslash collapse — I will build every escape as a character code and verify the
+bytes. **PHPStan cannot move** and will not be quoted: it scans `app`, `database` and `routes`, and
+this diff reaches none of them. **`tracker-lint` R1 headroom will increase**, stated in bytes before
+and after. **R7 will not arm** on the surgery — under `DROP_BYTE_LIMIT`, the `M71` dead zone — and
+`tracker-surgery.php` runs anyway, while both files are uncommitted. **Static analysis gains exactly
+one step**, and the count is read from the regenerated baselines rather than restated here.
+⚠️ **The prediction I least trust: that `citation-liveness-lint` stays green.** It sits at 17 of 17
+with zero headroom, `docs/pipeline.md` contributed 110 tier-1 citations, and this increment both
+regenerates that file and adds citations to a claim, a plan, a decision and up to a dozen backlog
+rows. `M79` predicted the same gate would fail, and it did — but not by the mechanism it named.
 
 ## RELEASED — `M80`, filing the invisible: nineteen rows that were real and in no queue (merged as PR #271, `ef847c7`, 6/6 green with real step counts — Static analysis 24 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

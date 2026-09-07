@@ -7557,3 +7557,72 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   floor cannot catch. ⛔ **Not fixed here because both available repairs are worse**: parsing the model
   to find the real `$casts` array is a PHP parser this gate has no business carrying, and dropping the
   cast arm entirely returns the ten false positives. **Live.** Filed by `M81`.
+
+- **`minor` · `scripts/pipeline-lint.php`'s four coverage rules read the MARKDOWN half of the corpus
+  only, and three deferral sentences live in the PHP half where nothing can see them.** Filed
+  2026-09-07 by `M82` at the moment the trade was made. The rules take their file list from
+  `scripts/pipeline.php --corpus`, which is the right corpus and is one shared definition — then filter
+  it to `.md`, because P2a's feature headings, P2b's section headings and P2e's acceptance bullets are
+  markdown structures that have no analogue in PHP. **P2c has no such excuse**: its predicate is a
+  sentence, and a sentence in a docblock is a sentence. Measured against the 814 PHP files in the same
+  corpus, the shipped vocabulary matches three — `app/Enums/AnalyticsAxis.php:15`,
+  `app/Enums/FormBotChallenge.php:22` and `app/Services/Submissions/SubmissionInboxPresenter.php:301`.
+  ⚠️ **The fix is not "drop the filter"**: widening P2c alone means one of the four rules reads a
+  corpus the other three do not, which is the two-definitions defect one level down, and the constant
+  and digest both have to be re-measured over 869 files rather than 55. ⛔ **And `CLAUDE.md` is outside
+  the generator's corpus entirely**, so a deferral stated in the imperatives is invisible to every one
+  of these rules — that one is by design (a marker there could never be read by the generator either)
+  and is recorded so the next author does not read the silence as coverage. **Live.** Filed by `M82`.
+
+- **`minor` · `scripts/pipeline.php` accepts two markers carrying the SAME id and emits two rows,
+  and nothing anywhere says so.** Filed 2026-09-07 by `M82`, found while placing this increment's two
+  residue markers. `parse_marker()` refuses an unknown key, a state outside the vocabulary, a size
+  outside the vocabulary and a non-`ready` state naming no blocker — **it does not check the id it just
+  parsed against the ids it has already seen.** The consequence is precisely the duplicate-fact defect
+  the whole one-queue design exists to end: the same obligation appears twice in the line, the counts
+  in the banner and in `scripts/state.php` both go up, and `pipeline-lint` P3's citation check is
+  satisfied by either copy. ⚠️ **It is a live hazard rather than a theoretical one, and the shape is
+  known**: the coverage rules make it *more* likely, because the natural way to satisfy a reader asking
+  "where is this feature queued?" is to copy the marker to the second document that describes it. ⛔
+  **The refusal must be a `cannot_measure`, not a fail** — a duplicate id means the row set is
+  ambiguous, and ruling over an ambiguous set is what the exit-2 contract exists to prevent.
+  **Live.** Filed by `M82`.
+
+- **`minor` · `scripts/pipeline.php --help` promises that "a done state must cite where it landed" and
+  `parse_marker()` never asks for it.** Filed 2026-09-07 by `M82`. The `done` key is in `MARKER_KEYS`
+  and the blocker requirement is enforced for every state except `ready` and `done`, so a
+  `state=done` marker with no `done=` citation parses cleanly, leaves the line, and lands in
+  `off_the_line` with nothing recording where it went. ⚠️ **The reason this matters more than it
+  looks:** `off_the_line` is the half `pipeline-lint` P3 reads to tell a FINISHED id from a MISTYPED
+  one, and an uncited `done` row is exactly the claim nobody can check — the same shape as the three
+  roadmap cells that described work finished months earlier. ⚠️ **It is a documented rule with no
+  enforcement, which is the weaker half of the pair this project keeps finding**: the help text is the
+  specification and the parser is the gate, and they disagree today. **Live.** Filed by `M82`.
+
+- **`minor` · The `pipeline-lint` controls mirror the LIVE corpus, so a defect in one of the four
+  coverage predicates reddens all 38 cases and drowns the control that names it.** Filed 2026-09-07 by
+  `M82`, measured rather than predicted: of eight mutations driven through `scripts/mutate.php`, **five
+  turned every case red** and only three isolated to the case that was predicted for them. The cause is
+  deliberate and is recorded in the fixture's own header — the four rules pin a DIGEST over site
+  identities, an identity carries the file path, and a synthetic corpus can reproduce the shipped
+  counts but never the shipped digests. So the fixture copies the real markdown documents, which makes
+  `pipelineLintPerturb()`'s baseline assertion fire for every case as soon as a predicate mis-collects
+  anywhere in the tree. ⚠️ **The information is not lost, it is relocated**: each of those five was
+  re-measured against the live tree and the delta recorded exactly (23→24 sections, 8→9 deferrals
+  twice, and two caught by the digest with the count unchanged). ⛔ **The repair is not "stop mirroring
+  the corpus"** — that trades a readability problem for a blind digest — but a per-case corpus subset,
+  where a case publishes only the documents it needs, so a predicate defect elsewhere cannot reach it.
+  **Live.** Filed by `M82`.
+
+- **`minor` · `carries_a_disposition()` reads the FIRST italic parenthetical on an acceptance bullet,
+  so a bullet whose prose already contains one hides its own disposition.** Filed 2026-09-07 by `M82`.
+  The predicate is `/\*\((.+)$/` plus a closed vocabulary, and the PRD's bullets do carry incidental
+  parentheticals — `*(e.g., CAPTCHA)*` is the shape. A bullet carrying an incidental one BEFORE its
+  disposition parenthetical reads as undispositioned, which is the **under**-collecting direction:
+  it inflates the residue rather than shrinking it, so it fails loud rather than silent and the
+  constant simply sits one too high. ⚠️ **No live instance today** — the 93/89 split reconciles exactly
+  against a hand count — so this is filed as the fragility it is rather than as a defect with a
+  victim. ⛔ **The obvious fix is wrong**: scanning every parenthetical on the line and accepting any
+  that opens with a vocabulary word would let a bullet QUOTING a disposition discharge itself, which
+  is the mention-versus-declaration trap this same increment removed from P2b and P2c. The real repair
+  is to require the disposition parenthetical to be the LAST thing on the line. **Live.** Filed by `M82`.

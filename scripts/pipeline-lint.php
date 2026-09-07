@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /*
- * Pipeline lint (M81) — the gate over the one ordered line.
+ * Pipeline lint (M81 structural, M82 coverage) — the gate over the one ordered line.
  *
  * WHY THIS EXISTS. `scripts/pipeline.php` (M79) made every remaining task visible in one generated
  * line. It could not make an UNQUEUED one impossible, and said so in its own output: "until it lands
@@ -43,6 +43,22 @@ declare(strict_types=1);
  *
  *   P5   The generator's own file floor is 40 against a live scan of 869 — 22x slack, so a walk that
  *        went half-blind in exactly the way the constant's comment cites would sail through it.
+ *
+ *   P2a  The design said every obligation site carries a marker or an explicit state=n/a. NO SUCH
+ *   P2b  ATTRIBUTION EXISTS: every live marker sits at END OF FILE by a deliberate, recorded
+ *   P2c  convention, so a marker's position says nothing about what it discharges — and file-scoped
+ *   P2e  attribution would have let one marker in docs/PRD.md discharge all fourteen features at
+ *        once. The block above the coverage constants records what is built instead, and why.
+ *        Measured separately: the design's REPLACEMENT deferral vocabulary matches 114 lines against
+ *        the original seven's 25, and its "deferral whose destination phase has closed" predicate —
+ *        which it calls worth more than the whole phrase list — has ZERO precision on this tree.
+ *
+ * ⚠️ EACH COVERAGE REFINEMENT WAS MEASURED AGAINST THE LIVE CORPUS, NOT ONLY AGAINST A FIXTURE, and
+ * every one removes exactly one live false positive. Deleting P2b's narration guard takes the section
+ * count 23 -> 24; deleting P2c's quotation arm takes the deferral count 8 -> 9; deleting its negative
+ * lookahead does the same. Two more were caught only by the digest, with the count unchanged: an
+ * identity keyed on heading text rather than feature number, and one that stops stripping a section
+ * number. That last pair is the whole argument for pinning a digest as well as a count.
  *
  * ⚠️ AND THE DECLARATION SET FOR P2d IS FOUR THINGS, NOT ONE. Measured on the column this rule exists
  * for: its occurrences are a property docblock, a fillable entry, a cast entry, a docblock stating it

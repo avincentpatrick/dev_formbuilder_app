@@ -302,3 +302,4 @@ Plan (full G-map + entry-point rationale): `C:\Users\DOH\.claude\plans\read-prog
      shifts every line beneath it, and this repository cites documents as `path:N` — 25 such
      citations point into the files that carry markers. End-of-file shifts nothing. -->
 <!-- pipeline: id=uploading-import title="All uploading and import features, including bulk Excel and CSV" phase=n/a state=held size=XL blocker="user: held by the explicit-signal decision of 2026-08-09; re-enters only on their go-signal" -->
+<!-- pipeline: id=deferral-site-disposition title="Give every documented deferral section and deferral sentence a recorded disposition" phase=n/a state=ready size=L -->

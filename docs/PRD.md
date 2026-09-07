@@ -523,3 +523,8 @@ Plot any form/data-collection tool on two axes: **rigor** (repeat groups, offlin
 ---
 
 *This PRD operationalizes the product-facing decisions in the approved architecture plan (`hi-lets-create-a-federated-meteor.md`) into a standalone document. Where this PRD makes a concrete choice the source plan left open at a fine-grained level (e.g., the OCR confidence-threshold default, the specific Phase-1 field-type list, the working codename), that choice is noted inline as a PRD-level decision, consistent with — but not dictated verbatim by — the approved plan, and should be revisited as real product and engineering work begins.*
+
+<!-- The pipeline markers below are DELIBERATELY at end-of-file. A marker inserted mid-document
+     shifts every line beneath it, and this repository cites documents as `path:N` — 25 such
+     citations point into the files that carry markers. End-of-file shifts nothing. -->
+<!-- pipeline: id=prd-feature-disposition title="Record what became of each documented product feature and acceptance criterion" phase=n/a state=ready size=XL -->

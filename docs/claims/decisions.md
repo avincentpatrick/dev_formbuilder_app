@@ -23,6 +23,51 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
+### D26 — The offline panel's storage-quota line counts every visit's submissions while the three sentences beside it count only this one. Reword the line, re-scope the number, or drop the count?
+
+**Filed 2026-09-07 by Lane A, during `M85`, after a read-only fan-out found the row's stated blocker was
+false and the residue was a copy call.** Recorded here rather than left as a row because two increments
+have now looked at it, and both stopped at the same place: **what remains is what the sentence should
+say, and that is the user's.**
+
+⛔ **THE ROW'S STATED BLOCKER IS MEASURABLY FALSE, WHICH IS WHY THIS IS A DECISION AND NOT A HOLD.** The
+row (`docs/feature-backlog.md`, filed `M21`) says touching the device-wide count *"risks the boot drain
+that ADR-0021 makes load-bearing"*. It does not. The boot trigger reads `pending` alone; `queued` is a
+local `const` whose only consumer is the warning string, and it escapes nowhere. `M77` reached the same
+conclusion independently and filed a second row saying so, which is itself a signal.
+
+**What a respondent actually reads**, three consecutive `<p>` elements under a heading that already says
+*"My submissions on this device"*: a visit-scoped summary, a visit-scoped *"responses from earlier
+sessions on this device"* note, and then a device-wide *"N responses waiting to send"*. ⚠️ **The quota
+line therefore discloses nothing the panel does not already state deliberately, in plainer words** —
+which deflates the row's own harm claim, and neither row says so. It renders only above 80% of quota, so
+it is rare rather than hypothetical.
+
+**The options, all one line of code:**
+
+1. ✅ **Say what it counts: *"N responses across all sessions on this device"*.** Honest, matches the
+   heading's own location framing, and leaves the megabytes and the count measuring the same population.
+   Wordier, and it is the only option that needs no other number to move. **Recommended.**
+2. **Re-scope the count to the visit** — the value `SyncStatus.vue` already computes as `unsent`. Then
+   the count is visit-scoped and the megabytes are still device-wide, which is the same mismatch
+   inverted and harder to notice.
+3. **Drop the count, keep MB and percentage.** Contradicts `docs/offline-first-sync-design.md`, which
+   specifies *"you have N submissions queued and using X MB"* — so it also owes a document edit.
+
+⚠️ **WHICHEVER IS CHOSEN, RENDER THE PANEL BEFORE SHIPPING IT.** `M15`'s note on this component records
+that no unit test could see the defect it introduced and that it took rendering the hand-over to catch —
+and `M77` repeated the instruction. ⚠️ **And the gate here is weaker than it looks**: the existing case
+asserts `toContain('1 response')` with a single enqueued row, so it cannot tell device-wide from
+visit-scoped at all. A two-visit case in the same `describe` block reddens under option 2 and should be
+written whichever option is taken, because otherwise the scope is enforced by nothing.
+
+⚠️ **Three stale citations sit in the exact files a repair opens**, and they are free to fix in the same
+pass: two cite `docs/offline-first-sync-design.md:93` for a spec that is now at `:192`, and one cites
+`:103` for a *"Sync now"* rule that has also moved. They resolve to live lines, so the citation gate is
+blind to them by design.
+
+---
+
 ### D25 — `P2c`, the deferral-phrase arm, measures 5% precision and ~2% recall. Keep it, drop it, or re-aim it as a staleness lint?
 
 **Filed 2026-09-07 by Lane A, during `M82`, at the moment the arm was written rather than after.**

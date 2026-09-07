@@ -3,15 +3,18 @@
 declare(strict_types=1);
 
 use App\Enums\FieldType;
+use App\Enums\FormVersionStatus;
 use App\Enums\IndexedDataType;
 use App\Enums\RequiredMode;
 use App\Enums\SubmissionSource;
 use App\Enums\SubmissionStatus;
 use App\Events\SubmissionCreated;
+use App\Exceptions\Submissions\FormNotAcceptingSubmissionException;
 use App\Exceptions\Submissions\SubmissionConflictException;
 use App\Exceptions\Submissions\SubmissionException;
 use App\Exceptions\Submissions\SubmissionValidationException;
 use App\Models\Audit;
+use App\Models\Form;
 use App\Models\FormVersion;
 use App\Models\Submission;
 use App\Models\SubmissionAnswer;
@@ -716,6 +719,149 @@ it('reads the checksum UNDER the lock, not before the transaction opens', functi
     // the refusal rolls it back along with everything else — an artefact of where this case has to stage,
     // not a property of the guard. A real racing device commits in its own transaction and its answers do
     // survive; the HEADLINE case, which stages before the lock, is what asserts that.
+    expect($fired())->toBeTrue()
+        ->and(Submission::findOrFail($id)->status)->toBe(SubmissionStatus::Draft);
+});
+
+/*
+|--------------------------------------------------------------------------
+| Increment M85 — the THIRD pre-lock door. Stage 2a and the scheduled-form grace window were both decided
+| before promote() opened its transaction and were never re-decided under the row lock. An admin republishing
+| in that window superseded the pinned version and the promote finalized against it anyway, so the loud
+| `409 submission_version_superseded` the contract publishes did not fire. Nothing became INCONSISTENT — the
+| draft is pinned to its version and its answer row points at the same one — which is exactly why no existing
+| case caught it: what was lost is the respondent being told the form moved under them.
+|
+| ⚠️ M12'S CHECKSUM GUARD CANNOT COVER THIS, AND THAT IS WHY IT IS A SEPARATE PAIR OF CASES. PublishService
+| never touches `submission_answers`, so the document is byte-identical across a republish and the compare
+| passes. The two guards refuse two different things through the same window.
+*/
+
+it('HEADLINE: refuses a promote whose version was republished past between the pre-lock read and the lock', function (): void {
+    // THE DEFECT, staged as the real interleaving. Before M85 this promote finalized against a version the
+    // form had already superseded, returned `created: true`, and told nobody.
+    //
+    // ⚠️ THE VERSION IS SUPERSEDED BY A REAL REPUBLISH, NOT BY WRITING THE COLUMN. PublishService flips the
+    // outgoing version as part of publishing the next draft, so staging it any other way would test a state
+    // the application never actually produces — the same reasoning SubmissionPromoteApiTest states.
+    $version = resumableVersion($this->tenant, $this->user);
+    $form = Form::findOrFail($version->form_id);
+    $uuid = Str::uuid()->toString();
+    $payload = p3aPayload($version, $uuid);
+
+    $seed = $this->drafts->saveDraft($payload(['applicant' => 'Ada', 'age' => '30']));
+    $id = $seed->submission->id;
+
+    // The admin's republish, committed inside promote()'s pre-lock window.
+    $fired = interleaveDuringPromote(function () use ($form): void {
+        addFormField($form->refresh()->draftVersion, test()->user, 'phone', FieldType::ShortText, 5);
+        app(PublishService::class)->publish($form->refresh(), test()->user);
+    });
+
+    Event::fake([SubmissionCreated::class]);
+
+    expect(fn () => $this->drafts->promote(Submission::findOrFail($id)))
+        ->toThrow(SubmissionException::class, 'A submission can only be created against a published form version.');
+
+    // ⚠️ NON-VACUITY, TWO WAYS: the interleave has to have fired, AND it has to have produced the state this
+    // case is about. Without the second assertion a republish that silently failed would read as a pass.
+    expect($fired())->toBeTrue()
+        ->and(FormVersion::findOrFail($version->id)->status)->toBe(FormVersionStatus::Superseded);
+
+    $row = Submission::findOrFail($id);
+
+    expect($row->status)->toBe(SubmissionStatus::Draft)   // NOT finalized against a superseded version
+        ->and($row->submitted_at)->toBeNull()
+        ->and($row->draft_expires_at)->not->toBeNull()    // still resumable, still reapable
+        ->and(SubmissionAnswerIndex::query()->where('submission_id', $id)->count())->toBe(0)
+        ->and(Audit::query()->where('auditable_id', $id)->count())->toBe(0);
+
+    Event::assertNotDispatched(SubmissionCreated::class);
+});
+
+it('re-reads the version UNDER the lock, not only before the transaction opens', function (): void {
+    // ⚠️ THIS PINS THE GUARD'S PLACEMENT, AND IT IS THE ONLY CASE THAT CAN. The pre-lock check at Stage 2a
+    // is deliberately KEPT as a cheap fast-fail, so deleting the in-lock re-assert leaves a promote that
+    // still refuses every SEQUENTIAL republish — every other case in this file and in
+    // SubmissionPromoteApiTest stays green. What a pre-lock check cannot see is a republish landing between
+    // itself and the lock, which is the whole reason the re-assert belongs inside the transaction.
+    //
+    // ⚠️ THE STAGING POINT IS THE ANSWER-DOCUMENT READ, WHICH IS PRE-LOCK BY CONSTRUCTION. That is the
+    // honest window: the pre-lock check has already passed when the republish commits.
+    $version = resumableVersion($this->tenant, $this->user);
+    $form = Form::findOrFail($version->form_id);
+    $uuid = Str::uuid()->toString();
+    $payload = p3aPayload($version, $uuid);
+
+    $seed = $this->drafts->saveDraft($payload(['applicant' => 'Ada', 'age' => '30']));
+    $id = $seed->submission->id;
+
+    $fired = interleaveDuringPromote(function () use ($form): void {
+        addFormField($form->refresh()->draftVersion, test()->user, 'phone', FieldType::ShortText, 5);
+        app(PublishService::class)->publish($form->refresh(), test()->user);
+    });
+
+    try {
+        $this->drafts->promote(Submission::findOrFail($id));
+        $this->fail('promote() finalized against a version superseded in its pre-lock window');
+    } catch (SubmissionException $e) {
+        // The MESSAGE, not the class: SubmissionException is the family the whole Stage-2a/refusal set
+        // raises, and `bootstrap/app.php` maps this message to `409 submission_version_superseded`.
+        expect($e->getMessage())->toBe(SubmissionException::versionNotPublished()->getMessage());
+    }
+
+    expect($fired())->toBeTrue();
+});
+
+it('promotes normally when nothing republished in the window', function (): void {
+    // THE CONTROL THAT KEEPS THE NEW RE-ASSERT FROM BEING OVER-STRONG. A guard that re-read the version and
+    // compared it to anything but `published` — or that took the wrong row — would refuse here too, and the
+    // whole save-and-resume flow would be dead. The interleave still fires, so the two cases differ only in
+    // WHAT the racing writer did.
+    $version = resumableVersion($this->tenant, $this->user);
+    $uuid = Str::uuid()->toString();
+    $payload = p3aPayload($version, $uuid);
+
+    $seed = $this->drafts->saveDraft($payload(['applicant' => 'Ada', 'age' => '30']));
+    $id = $seed->submission->id;
+
+    // A racing write that touches neither the version nor the document.
+    $fired = interleaveDuringPromote(function () use ($id): void {
+        Submission::query()->whereKey($id)->update(['last_saved_at' => now()]);
+    });
+
+    $result = $this->drafts->promote(Submission::findOrFail($id));
+
+    expect($fired())->toBeTrue()
+        ->and($result->created)->toBeTrue()
+        ->and($result->submission->status)->toBe(SubmissionStatus::Submitted)
+        ->and(FormVersion::findOrFail($version->id)->status)->toBe(FormVersionStatus::Published);
+});
+
+it('re-runs the grace-window check UNDER the lock, so a form closing in the window is refused', function (): void {
+    // ⚠️ THE SECOND OF THE TWO RE-ASSERTS, PINNED SEPARATELY, BECAUSE ONE MUTANT MUST NOT PROVE BOTH.
+    // assertCanPromote() was decided beside Stage 2a and moved with it; a case that only exercised the
+    // version arm would leave the grace-window re-run enforced by nothing but the line above it.
+    //
+    // ⚠️ THE STAGED WRITE IS A CLOSE INSTANT MOVED BEHIND THE DRAFT'S OWN created_at, which is the ONE state
+    // this guard refuses — a draft that should never have started. A close instant moved to merely "now"
+    // would be admitted by design, because the whole point of the grace window is that a draft started
+    // before the close may still be promoted after it.
+    $version = resumableVersion($this->tenant, $this->user);
+    $form = Form::findOrFail($version->form_id);
+    $uuid = Str::uuid()->toString();
+    $payload = p3aPayload($version, $uuid);
+
+    $seed = $this->drafts->saveDraft($payload(['applicant' => 'Ada', 'age' => '30']));
+    $id = $seed->submission->id;
+
+    $fired = interleaveDuringPromote(function () use ($form): void {
+        Form::query()->whereKey($form->id)->update(['closes_at' => now()->subDay()]);
+    });
+
+    expect(fn () => $this->drafts->promote(Submission::findOrFail($id)))
+        ->toThrow(FormNotAcceptingSubmissionException::class);
+
     expect($fired())->toBeTrue()
         ->and(Submission::findOrFail($id)->status)->toBe(SubmissionStatus::Draft);
 });

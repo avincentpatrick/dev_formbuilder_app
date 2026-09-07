@@ -169,9 +169,11 @@ if ($scan['files'] < MIN_SCANNED_FILES) {
 // the TREE rather than of the queue, and a consumer that needs only the file list should not have to
 // buy the rest. It sits AFTER the floor above, so a walk that has gone blind still refuses.
 if ($corpusOnly) {
-    fwrite(STDOUT, implode("
-", $scan['paths'])."
-");
+    // ⚠️ chr(10) rather than the escape, and rather than PHP_EOL. The escape is written here as a
+    // character code because this host's tool layer collapses a doubled backslash, which turned the
+    // first draft of this line into a literal newline inside a string — valid PHP, and Pint caught it.
+    // PHP_EOL was the second draft and is worse: it makes a MACHINE-READABLE list platform-dependent.
+    fwrite(STDOUT, implode(chr(10), $scan['paths']).chr(10));
 
     exit(0);
 }

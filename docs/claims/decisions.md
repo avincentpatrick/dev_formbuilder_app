@@ -23,6 +23,91 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
+### D25 — `P2c`, the deferral-phrase arm, measures 5% precision and ~2% recall. Keep it, drop it, or re-aim it as a staleness lint?
+
+**Filed 2026-09-07 by Lane A, during `M82`, at the moment the arm was written rather than after.**
+The approved design named this arm as one of the things that would make an unqueued obligation
+impossible. It is not that, and the honest thing is to say so before it is inherited as though it were.
+
+**The measurements, three independent passes, all agreeing.** The approved design's own verification
+run classified twenty vocabulary hits and found **one** genuine unscheduled obligation — precision 5%.
+Its seven blind sweeps found fifty-four unscheduled items and reported, independently each time, that
+**zero** of them were reachable by any phrase — recall ~2%. This increment re-measured the vocabulary
+against the live corpus: the original seven phrases match 25 lines, and the design's proposed
+**replacement** six match **114**, one entry of which (`does not exist|has no writer`) alone matches 45
+including `CLAUDE.md`'s own *"an unpushed claim does not exist"* and a line of a **generated** file.
+
+⛔ **AND THE DESIGN'S OWN PROPOSED IMPROVEMENT IS WORSE THAN THE THING IT IMPROVES.** It records a
+nuance it calls *"worth more than the whole phrase list"* — a deferral whose destination phase has
+already closed. Measured: 26 lines name a destination phase, 10 of them target a phase the roadmap
+reads `COMPLETE`, and **all 10 are records of a discharge or of a superseded statement**, e.g.
+*"~~deferred to a Phase 0 spike~~ — RESOLVED"*. Zero precision, on the predicate the design ranked
+highest. That is not an argument against measuring; it is the fourth time in this project that a
+predicate over prose has turned out to be reading the record of a repair.
+
+**What shipped, and what it is actually worth.** Four phrases, each anchored to a line that exists
+today, matching **eight** sites; three of the original seven are gone because a rule that governs no
+line cannot be reddened. Of the eight, roughly half are visibly **stale sentences** — documents still
+calling built things unbuilt — and the rest are genuine standing statements. It costs nothing to run
+and it pins those eight against a count and a digest, so a ninth cannot appear unnoticed.
+
+**The options.**
+
+1. **Keep it as shipped, sold as bookkeeping and not as prevention (RECOMMENDED).** It is nine lines
+   of vocabulary plus a shared pin, it caught two live false-positive classes during construction that
+   are now controls, and its yield — stale sentences — is a real rot class this project keeps finding
+   by hand. Its header already says in capitals what it is not. Cost: one more constant pair to move
+   when a document gains or loses a sentence, which is the same cost every other pinned corpus carries.
+2. **Drop the arm entirely.** Defensible on the numbers alone, and it would remove four phrases, two
+   constants and three controls. ⛔ The cost is that the eight sites stop being counted at all, and an
+   uncounted site is exactly the state five realignments were spent correcting — the arm's *precision*
+   is bad, but its *pinning* is not the thing that is bad.
+3. **Re-aim it as a staleness lint** — fire only where a not-built sentence sits in a document that
+   also claims the thing shipped. That is where its real yield is, and it is a genuinely better rule.
+   ⚠️ It is also a different increment: the join needs a build-evidence term, which is `P2d`'s
+   five-term machinery pointed at prose, and prose has no join key. Recommend this as a follow-up to
+   option 1 rather than instead of it.
+
+**Recommendation: option 1**, with the header wording kept exactly as harsh as it is.
+
+### D24 — The coverage rules pin a residue of 134 undischarged obligation sites. Schedule the sweep, or leave the residue pinned indefinitely?
+
+**Filed 2026-09-07 by Lane A, during `M82`.** This is the question `P2e` was designed to make
+answerable rather than to answer, and it is a product call rather than an engineering one.
+
+**The situation, measured.** Four corpora are now enumerated and pinned: **14** PRD feature headings,
+**23** sections declaring a disposition, **8** deferral sentences, and **93** PRD acceptance criteria
+of which **89** carry no disposition. Nothing discharges any of them today. Requiring a disposition on
+each would have been red on arrival by 134 failures, which `M40` established is a gate that gets
+deleted rather than satisfied — so the residue is pinned instead, and it is visible in the line as two
+rows: `prd-feature-disposition` (XL) and `deferral-site-disposition` (L).
+
+⛔ **THE PINNING IS NOT THE ANSWER, IT IS THE QUESTION MADE VISIBLE.** What the gate now guarantees is
+that the residue cannot GROW unnoticed. It guarantees nothing about the residue shrinking, and a
+constant that never moves is indistinguishable, in five years, from a fact nobody ever intended to act
+on. The five realignments this whole design exists to prevent were each about work that was documented
+and unscheduled; 89 acceptance criteria with no recorded outcome is that condition, written down.
+
+**The options.**
+
+1. **Work the two rows as ordinary increments when they reach the front of the line (RECOMMENDED).**
+   `prd-feature-disposition` is genuinely large — 89 criteria each needing a verdict measured against
+   the code, which is the discipline that found `Phase-1 COMPLETE` to be false — but it is exactly the
+   audit this project has repeatedly paid for by hand. `deferral-site-disposition` is much smaller and
+   could be taken first. Cost: two increments, one of them XL.
+2. **Disposition only at the FEATURE level and retire `P2e`'s bullet arm.** Fourteen verdicts instead
+   of 89, and it is where most of the value is. ⚠️ The approved design measured this option and
+   rejected it: a feature-level arm *"would not have caught item 4 alone"* — the specific unscheduled
+   obligation that motivated the sweep sat in a bullet, not in a heading.
+3. **Leave the residue pinned and act only opportunistically** — whenever an increment touches a
+   feature, disposition its criteria and lower the constant. ⚠️ Honest, cheap, and it is what will
+   happen by default if nothing is decided; the risk is that it is also what "we will get to it"
+   looked like in each of the five realignments.
+
+**Recommendation: option 1, with `deferral-site-disposition` taken first** as the smaller of the two
+and the one whose eight sentences are already known to be half stale.
+
+
 ### D23 — `scripts/loop.php` refuses held work by a hand-written keyword list, and there is now a gate proving the pipeline holds every held row. Keep the list, derive it, or cross-check it?
 
 **Filed 2026-09-07 by Lane A, during `M81`, at the moment `P4` was written.** The row that asks for

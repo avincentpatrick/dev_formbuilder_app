@@ -16,137 +16,120 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M85`, the sixteenth `D13` batch: three rows, two of them filed wrong by the increment that filed them (m85-d13-batch)
+## Status: NO ACTIVE CLAIM — `M85` is merged; the next increment is a fresh `D13` batch
 
-Taken 2026-09-07. Branch `m85-d13-batch`, cut from origin/main at `6ec7603`, PR into main.
-Rows: `docs/feature-backlog.md:1912` (`promote()` re-asserts the version is published BEFORE the
-lock and never again under it), `docs/feature-backlog.md:7977` (`DocumentedDefaultDriftTest`'s
-executed assertion chain is EIGHT long, and the five that fire FIRST cannot be split), and
-`docs/feature-backlog.md:7930` (`scripts/citation-liveness-lint.php` carries a SECOND copy of the
-partial-path blindness, in the ZERO-TOLERANCE tier).
+## RELEASED — `M85`, three rows, two of them filed wrong by the increment that filed them (merged as PR #276, `cbbed68`, 6/6 green with real step counts — Static analysis 26 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 
-⛔ **THE GENERATED PROPOSAL VIOLATED `D13` AGAIN, AND IT IS THE SAME PROPOSAL `M84` REFUSED.**
-`docs/backlog-triage.md` proposed `4166` + `5810` + `5867` + `6755`. `4166` repairs R8 and `5867`
-repairs R7 — **both are rules inside the one file `scripts/tracker-lint.php`**, and both also touch
-the hub `scripts/tracker-lint-controls.php`. That is two independent `D13` breaches in one
-proposal, `R-d8575314` reproducing itself for a **second** increment running. The batch below was
-composed by hand from a nine-row read-only fan-out.
+Shipped 2026-09-07. Branch `m85-d13-batch`, cut from `origin/main` at `6ec7603`. **The sixteenth `D13`
+batched increment — three rows closed, one corrected with a measured census, seven filed, one
+decision opened.** Static analysis moved 25 → 26: the new controls step.
 
-⚠️ **THE HUB CAP BOUND THE FOURTH SLOT, AND THIS IS THE SECOND CONSECUTIVE INCREMENT IT HAS.**
-`7855`, `7843` and `6950` all repair `docs/data-dictionary.md` — the #1 hub at 14 open citing rows —
-so each could only be *the* hub row, and `7930` is worth more. `7843` and `7855` additionally
-collide with `7977` on `tests/Feature/Migrations/DocumentedDefaultDriftTest.php`. **Three rows is
-`D13`-compliant and a fourth was not available without breaking it.** Recorded as evidence for the
-open `D15`, not as a re-scope of it.
+⛔ **THE GENERATED PROPOSAL VIOLATED `D13` AGAIN, AND IT WAS THE SAME PROPOSAL `M84` REFUSED.** It
+offered `4166` + `5810` + `5867` + `6755`; `4166` repairs R8 and `5867` repairs R7, and **both are
+rules inside the one file `scripts/tracker-lint.php`**, both also touching the hub
+`scripts/tracker-lint-controls.php`. `R-d8575314` reproducing itself for a **second** increment
+running. Composed by hand from a nine-row read-only fan-out instead.
 
-### Evidence verified
+⚠️ **THE HUB CAP BOUND THE FOURTH SLOT FOR THE SECOND CONSECUTIVE INCREMENT.** `7855`, `7843` and
+`6950` all repair `docs/data-dictionary.md` — the #1 hub at 14 open citing rows — and `7843`/`7855`
+additionally collide with `7977` on `DocumentedDefaultDriftTest.php`. Three rows is `D13`-compliant
+and a fourth was not available without breaking it. Evidence for the open `D15`, not a re-scope of it.
 
-**`1912` — held, with one clause half false.** `SubmissionDraftService.php:190` is the pre-lock
-status check; `DB::transaction(` opens 40 lines later at `:230`; the lock is `:231`; the in-lock
-re-asserts are the row status at `:235` and M12's checksum at `:274-277`. **No `FormVersion` read of
-any kind occurs between `:230` and `:291`.** `PublishService.php:89-92` supersedes the outgoing
-version in its own transaction and does not touch `submission_answers`, so M12's checksum guard does
-not incidentally catch it. The lost 409 is `bootstrap/app.php:438`. ⚠️ *"neither `form_versions` nor
-`forms` is locked there"* — **half false**: `forms` **is** locked on both sides
-(`PublishService.php:41`; and promote via `SubmissionFinalizer.php:73` → `FormAcceptanceGuard.php:89`),
-but only when `max_responses !== null` and only at `:288`, after the status write. The row's
-conclusion survives; its stated reason understates what is already available.
+⛔ **TWO OF THE THREE ROWS WERE FILED WRONG BY THE INCREMENT THAT FILED THEM, AND BOTH WERE FILED BY
+`M84` — YESTERDAY.** This is the sixth increment running where the premise field carried the finding,
+and the first where the false premise was in a row **one day old** rather than one aged into being
+wrong. A row is not made reliable by being recent.
 
-**`7977` — the headline number is false, and it describes a file its own increment deleted.** There
-is no assertion chain of eight anywhere: the longest executed chain is **7** (the control) and the
-arm the row is about runs **6**. Eight is the *pre-M84* count — 3 discovery floors + 2 literal floors
-+ 3 arms in one `it()` — and `fda9601`, the commit that filed this row, is the commit that split it.
-*"The five that fire FIRST"* holds for 3 of 7 cases; the other 4 never enter
-`documentedDefaultLiteralCells()` and execute three floors. *"All seven cases route through the same
-two collectors"* is false as written — cases 3 and 7 route through neither.
+| row | evidence | premise | remedy |
+|---|---|---|---|
+| `1912` | held, one clause **half false** | held, and the row named **two instances of four** | works, and its stated reason to hesitate understates what was available |
+| `7977` | **headline number false** — describes the file its own commit deleted | **false**, and the same false sentence was shipped into the source docblock | **stated blocker false**; the cheap fix is a subset of what it prescribes |
+| `7930` | held exactly, arithmetic reproduced to the citation | **two corrections**, both narrowing its framing | **forbidden by the gate's own contract** |
 
-**`7930` — every citation held, and the arithmetic reproduces exactly.** The two blind resolvers are
-`scripts/citation-liveness-lint.php:520-526` and `scripts/backlog-triage.php:395-397`. The escape is
-`:454-458`: `$unresolved++` and `$missing[]`, then `continue` — `$missing` is read only by `--report`
-(which `exit(0)`s), and `$unresolved` appears only inside the **pass** message at `:273/276`. No
-failure branch and no floor reads either. `LEDGER_ROT_CEILING = 17` at `:134`, compared strictly at
-`:255`; a live read-only run prints `ledger tier 17 rotten, ceiling 17` — **headroom exactly zero**.
-`packages/design-system/src/components/Checklist/Checklist.vue:289` is blank, confirmed with `cat -A`.
+⛔ **`7977` ECHOED A DEFECT IN THE CODE IT DESCRIBED.** It claims a broken sentinel vocabulary *"still
+blinds the whole file — including the attribution arm"*. `DOCUMENTED_DEFAULT_SENTINELS` is read at
+one site, reachable from three of seven cases; the attribution arm never enters that path. **The same
+sentence was in the docblock `M84` wrote**, so the row was quoting the code's own wrong self-model
+back at itself. Correcting both was half the repair. Its headline — *"the executed chain is EIGHT
+long"* — is the **pre-`M84`** count: `fda9601`, the commit that filed the row, is the commit that
+reduced it to six.
 
-### Premise verified
+✅ **A REPORTING REPAIR PROVED IN BOTH DIRECTIONS, WHICH IS NOW THE HOUSE METHOD RATHER THAN A ONE-OFF.**
+`M84` established it; `M85` used it without re-deriving it. The same two mutants against the parent
+version and the shipped one: **discovery broken 7 red of 7 → 3 of 9**, and **sentinel broken 3 of 7 →
+1 of 9**, the classification case alone. The parent run also independently falsified the row — under
+the sentinel mutant the attribution arm was **green**.
 
-**`1912` — held and understated.** Four call sites reach `promote()` (`SubmissionPromoteController.php:49`,
-`SubmissionController.php:131` and `:144`, `GuestSubmissionController.php:108`) and **none wraps it in a
-transaction**, so *"outside any transaction"* holds for every entry point rather than for the service in
-isolation. The 409 is already contract-gated (`openapi.json:4765`, `OpenApiContractTest.php:291`), so a
-fix does **not** move `openapi.json` — which matters, because the Contract job exports fresh and diffs.
+⛔ **`7930`'s PRESCRIBED REMEDY IS FORBIDDEN BY THE GATE'S OWN CONTRACT, AND ONLY OPENING THE TARGET
+SHOWED IT.** The row says to re-point the newly-visible dead citations first. There is exactly one,
+and it sits under *"The original row, preserved:"* inside a row closed by `M20` —
+`LEDGER_ROT_CEILING`'s own docblock names that class as the reason the ceiling can never reach zero,
+because the dead citation **is** the evidence for the closure. So the ceiling moved **17 → 18**, the
+first raise, with its reason recorded in the constant: the ledger did not change at all, the resolver
+got better, and the rot was always there. ⚠️ **My prediction named the ratchet arithmetic as the thing
+I most expected to be wrong. It was wrong — but not in the direction I guessed.** I expected the count
+to land at 16 and the constant to ratchet down. The count was right at 18; what I had not considered
+was that the repair itself was illegal.
 
-**`7977` — false, and the false sentence was SHIPPED INTO THE SOURCE by the increment that filed it.**
-The row says a broken sentinel vocabulary *"still blinds the whole file — including the attribution
-arm"*. `DOCUMENTED_DEFAULT_SENTINELS` is referenced at exactly **one** site, `:346`, reachable only
-from cases 4, 5 and 6. It reddens **3 of 7**; cases 1, 2, 3 and **7 — the attribution arm `M83`
-isolated — are provably unaffected.** The same false claim is in the docblock `M84` wrote at
-`DocumentedDefaultDriftTest.php:439`. **The row is echoing a defect in the code it describes**, so
-the repair has to fix both or the next reader re-derives the same wrong model.
+⚠️ **`7930` UNDERSTATED ITSELF BY FIFTEEN.** Not *"a citation"* — **19 partial-path citations were
+unresolved across the gated tiers and 15 resolve under the suffix arm**, every one counted, printed
+and never line-checked. 742 resolved → 757. And its flagship tier-1 instance is **alive**, so the
+widening buys zero tier-1 detections; the citation is substantively wrong, but that is the class this
+gate cannot see by design.
 
-**`7930` — two material corrections, both narrowing the row's own framing.** (1) The tier-1 instance
-it leads with is **not a dead citation**: `Pages/submissions/Encode.vue:897` resolves and line 897 is
-alive, so widening the resolver leaves tier 1 at **0 rotten** and buys zero new tier-1 detections.
-(That citation *is* substantively wrong — it describes a control that lives ~350 lines away — but that
-is `7810`'s class, which this gate cannot see by design.) (2) The row's *"honest sequence"* of two
-increments is a **policy preference, not a mechanical necessity**: re-pointing the corpse in the same
-commit leaves the count at 17 under a strict `>` and merges green, and triggers no ratchet obligation
-because an unresolved citation was never in the count.
+⛔ **THE GATE HAD NO CONTROLS OF ANY KIND, AND A PEST FILE WAS STRUCTURALLY IMPOSSIBLE.** `git` is not
+installed in the app container — `sh: git: not found`, exit 127 — and the gate reads its tracked set
+with `git ls-files`, so a Pest control answers CANNOT MEASURE locally while passing in CI, whose
+`tests` job runs on the runner rather than in the app image. **That is a second instance of the
+`SuiteCollectionFloorTest` state, and it was avoided rather than shipped**: the controls are a host
+script, six cases, wired into `quality` and its own CI step. The cost is stated — `mutate.php` drives
+Pest only, so it cannot drive them, exactly as for `tracker-lint-controls.php`. Proved by running all
+six against a deliberately reverted resolver: **C2 and C3 fail, C1/C4/C5/C6 stay green**, bytes
+restored by sha256 comparison.
 
-### Remedy verdict
+⛔ **CI CAUGHT A DEFECT THE HOST CANNOT SEE, AND IT WAS IN A ROW THIS INCREMENT FILED.** `pipeline-lint`
+P1 failed with `docs/pipeline.md` DRIFTED while `php scripts/pipeline.php --check` was **green on the
+host, on the same commit**. `scripts/backlog-triage.php` resolves a slashed citation with `is_file()`
+against the **working tree**; `citation-liveness-lint.php` asks **`git ls-files`**. A row I filed cited
+`node_modules/dexie/dist/dexie.js` — present here, absent in the static-analysis job — so the row
+changed citation-health tier and the whole generated line reordered. ⚠️ **Two sibling scripts carrying
+the same partial-path blindness resolve against two different universes, and nothing anywhere said
+so.** The immediate fix was to reword the row; the real one is a line in a hub file and is filed.
+**Every harvested path across all open rows is now verified tracked.**
 
-**`1912` — works, and the reddening harness already exists.** The row prescribes moving both
-re-assertions inside the transaction alongside M12's. `interleaveDuringPromote()` (`tests/Pest.php:1369`)
-is already used by five test files; its default needle fires on the **pre-transaction** read at `:206`,
-and the in-lock checksum read at `:274` emits different SQL, so the needle cannot mis-fire.
-⚠️ **The row does not state that its fix is a narrowing rather than a closure**: on a form with
-`max_responses` promote already serialises against `PublishService` on the `forms` row; on an uncapped
-form nothing does. Taking `Form::lockForUpdate()` on every promote is a throughput decision, not a bug
-fix, and is out of scope.
+⚠️ **AND CLOSURE PROSE WAS THE DEFECT FOR THE FIFTH TIME.** Narrating the dead citation verbatim in
+`7930`'s closure **added a nineteenth corpse** against a ceiling of 18. Describe a dead citation
+without its line number.
 
-**`7977` — the row's stated blocker is false and its prescription is a superset of the cheap fix.**
-*"Splitting is structurally impossible for them"* — the five floors lift out of the two collectors into
-dedicated cases exactly the way the other three did; a floor breach then reddens one **named** case
-while the other six still execute. The row's own remedy (a floor that reports what it could not
-compute) is fine but is not needed to reach the reporting property. What is genuinely impossible is
-having the classification arms print *meaningful counts* over a collapsed corpus — a real claim, and a
-different one from the one filed.
+✅ **THE PREDICTION HELD ON ITS MAIN CLAIM.** I said Pest would go red first on `7930`, once, at 18
+against a ceiling of 17, and that I wanted to see that failure rather than avoid it because a green
+first run would mean the resolver had not widened. It went red exactly there. PHPStan did not move, as
+predicted. What I did not predict at all was the CI-only drift.
 
-**`7930` — works, and is badly understated on scale.** Not one un-checked citation: **19 partial-path
-citations are unresolved across the gated tiers, 15 of which resolve under an unambiguous-suffix arm**
-(1 tier-1, 14 ledger) — counted, printed, and never line-checked. Widening exposes exactly **one** new
-corpse, and it is the one the row names. ⛔ **Red on arrival is confirmed to the citation: 17 + 1 = 18
-against a strict ceiling of 17.** The same dead line is cited twice (`docs/feature-backlog.md:2881`
-slashed, `:2848` bare) — repairing both drops the tier to 16 and the ratchet obligation at `:102-108`
-then **requires** lowering the constant in the same commit. ⚠️ **The row mentions no control, and that
-is its largest under-cost**: `tests/Feature/Docs/CitationLivenessLintTest.php` does not exist, and
-`scripts/mutate.php` drives Pest only, so without a new Pest seam the resolver change **cannot be
-proved at all**.
+**Filed seven**, six from the fan-out and one from tripping it: the two remaining instances of the
+pre-lock shape; the git-absent-in-container limit on any index-reading gate; four citations into
+untracked trees that can never resolve; a hostname-and-port parsed as a citation; rot hidden behind
+the `docs/claims/**` exclusion; the struck-through-row exemption that would let the ceiling ratchet
+again; and the working-tree-dependent queue order. **`D26`** opened for the storage-quota copy call,
+whose stated blocker was measured false by two increments independently.
 
-Files: `app/Services/Submissions/SubmissionDraftService.php`,
-`tests/Feature/Submissions/SubmissionDraftServiceTest.php`,
-`tests/Feature/Migrations/DocumentedDefaultDriftTest.php`,
-`scripts/citation-liveness-lint.php`,
-`tests/Feature/Docs/CitationLivenessLintTest.php` (new),
-`docs/feature-backlog.md`, `docs/claims/decisions.md`, `docs/pipeline.md`,
-`docs/backlog-triage.md`, `docs/gate-baselines.md`, `PROGRESS.md`, `docs/claims/lane-a.md`.
-Shared artefacts taken: `docs/feature-backlog.md`, `docs/claims/decisions.md`, `docs/pipeline.md`,
-`docs/backlog-triage.md`, `docs/gate-baselines.md`, `PROGRESS.md` (own block only). **Not** taken:
-`openapi.json`, `phpunit.xml`, any `tests/e2e/*.spec.ts`, `docs/data-dictionary.md`.
-Paired files taken: none.
-Namespaces spent: nothing from either namespace — no migration, no ADR, no `§D<n>`. One new
-`docs/claims/decisions.md` entry is appended for the storage-quota copy call, which spends a
-`D`-number and no namespace.
-Prediction: Pest goes red first, once, on `7930` — the widened resolver lands the ledger tier at 18
-against a ceiling of 17 before the two citations are re-pointed, and I expect to see that failure
-rather than to avoid it, because it is the row's central claim and a green first run would mean the
-resolver did not widen. PHPStan will not move: `scripts/` is outside its paths and the one `app/`
-edit relocates two existing statements. Frontend, axe and E2E are untouched by every file above.
-**The thing I most expect to be wrong is the ratchet arithmetic** — that repairing both citations
-lands the tier at exactly 16 and that `LEDGER_ROT_CEILING` must therefore move to 16 in the same
-commit. It is derived from a re-implementation of the linter's own resolver rather than from the
-linter, and `M84` proved that a hand-rolled re-implementation of a gate's parser is the thing that
-goes wrong. I will run the real script before touching the constant.
+⚠️ **`5810` WAS CORRECTED RATHER THAN TAKEN, AND ITS HEADLINE IS FALSE.** *"Asserted by nothing"* — **30
+of §1's 41 documented cells are pinned by 19 test files**, thirteen of them outside the directory the
+row scopes itself to. Its real defect stands (nothing compares the document to the code in either
+direction) and it understates itself on five axes, including **five documented audit events that are
+never emitted at all** and one, `users`/`is_super_admin`, with no write surface anywhere in `app/`.
+
+**Mutation verdicts — five, all CAUGHT, plus one both-directions control pair and one host-script
+revert control.**
+
+| | mutant | arm proved |
+|---|---|---|
+| `m1` | in-lock version re-assert deleted | the two version cases; the grace-window case stays green |
+| `m2` | the re-READ deleted, the check left comparing the pre-lock object | the same two — which is what proves the re-read, not the check |
+| `m3` | in-lock grace-window re-run deleted | the grace-window case **alone** |
+| `m4` | discovery broken, vs parent **and** shipped | 7 red of 7 → 3 of 9 |
+| `m5` | sentinel vocabulary broken, vs parent **and** shipped | 3 red of 7 → 1 of 9, and the attribution arm green on the parent |
+| `r1` | the resolver reverted, host controls | C2 and C3 fail; C1/C4/C5/C6 indifferent |
 
 ## RELEASED — `M84`, two unprovable gates and a predicate that reads the wrong end of the line (merged as PR #275, `fda9601`, 6/6 green with real step counts — Static analysis 25 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

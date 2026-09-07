@@ -7804,8 +7804,9 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   Filed 2026-09-07 by `M82`, found by `P1` going red during this increment's own close-out — the gate
   working, and a coupling nobody had written down. `PROGRESS.md` carries `deferral-site-disposition`
   and `uploading-import` at end of file; a close-out prepends one status bullet under
-  `## Current Status`, every line below moves by one, and the generated line's `Source` column goes
-  from `PROGRESS.md:304` to `:305`. ⚠️ **The end-of-file convention does NOT prevent this and was never
+  `## Current Status`, every line below moves by one, and the generated line's `Source` column for
+  both markers advances with it — as this row's own example citation proved in `M85` by dying of it.
+  ⚠️ **The end-of-file convention does NOT prevent this and was never
   claimed to** — it prevents a marker *insertion* from shifting other documents' citations; it cannot
   help when the shift comes from a line added above it in the same file. ⛔ **The failure mode is the
   timing, not the drift**: `CLAUDE.md`'s close-out order regenerates the baselines and runs

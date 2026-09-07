@@ -16,7 +16,63 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M86` is merged; the next increment is a fresh `D13` batch
+## Status: ACTIVE CLAIM — `M87`, the eighteenth `D13` batch: a CHECK-constraint census measured from `pg_constraint`, the last unbound Fortify mail route, a pre-lock shape with two more instances, and a stretch-clamp census short by two (`m87-d13-batch`)
+
+Taken 2026-09-08. Branch `m87-d13-batch`, cut from `origin/main` at `b05d008`, PR into `main`.
+
+⛔ **THE GENERATED PROPOSAL WAS REJECTED AGAIN, AND FOR THE THIRD DIFFERENT REASON.** `docs/backlog-triage.md`'s
+`## Suggested next batch` offers `4189` · `6820` · `7015` · `5918`. Three of those four touch a hub file —
+`4189` repairs `scripts/tracker-lint-controls.php` (4 rows), `7015` repairs `docs/data-dictionary.md` (13) and
+`5918` repairs `scripts/pipeline.php` (12) — so the proposal breaks `D13`'s one-hub-row cap by two. The fourth,
+`6820`, is decision-blocked in its own body (*"the decision is the user's"*), which is `8144`'s defect exactly:
+the generator derives `state` from liveness alone. `M83` and `M86` each rejected this proposal for a *different*
+mechanism; the recurrence is now three-for-three and is itself evidence for `D15`.
+
+**The batch, chosen by hand under `D13`'s letter — one hub-touching row, no two rows sharing a non-hub file:**
+
+| # | Row | Hub? | Non-hub files it would touch |
+|---|---|---|---|
+| 1 | `docs/feature-backlog.md:7015` — the data-dictionary CHECK-constraint census is wrong | **yes** — `docs/data-dictionary.md` | `app/Support/Migrations/PublishedVersionGuard.php` (read), a new `tests/Feature/Docs/` arm |
+| 2 | `docs/feature-backlog.md:3285` — `PUT /user/profile-information` is a second mail cannon | no | `app/Providers/FortifyServiceProvider.php`, `app/Http/Middleware/ThrottleFortifyEndpoints.php`, `tests/Feature/Auth/FortifyRateLimitTest.php` |
+| 3 | `docs/feature-backlog.md:8208` — `promote()`'s pre-lock shape has two more instances | no | `app/Services/Submissions/SubmissionDraftService.php`, `app/Services/Submissions/SubmissionPipeline.php` |
+| 4 | `docs/feature-backlog.md:7285` — `MdsSegmentedControl`'s stretch-clamp census is short by two | no | `packages/design-system/src/components/SegmentedControl/`, `resources/js/components/builder/ConfigPanel.vue`, `docs/ux/exceptions-log.md` |
+
+⚠️ **`docs/feature-backlog.md` is in the hub table at 3 citing rows and is deliberately not counted here.**
+Every closure and every correction edits the ledger, so counting it would make no batch legal at all — which is
+a fact about the cap `D15` is open on, and is recorded rather than argued.
+
+### Evidence verified
+
+⏳ **PENDING — the read-only fan-out is running, one agent per row over disjoint files (`D13` clause 2).**
+This heading is written before the first file is opened because the claim is a pushed commit; it is amended in
+its own pushed commit the moment the fan-out reports, and the amendment is what the gates see.
+
+### Premise verified
+
+⏳ **PENDING — same fan-out.** Each row is asked its premise separately from its evidence: `7015` believes a
+grep census over `database/migrations/` is the wrong instrument and that first-party migration code lives
+outside that directory; `3285` believes the route is unbound **by a recorded decision** and that removing it
+from `FORTIFY_UNBOUND_BY_DECISION` turns an existing gate red; `8208` believes the two further instances are
+**not** straight copies of the promote fix; `7285` believes the 30px figure has no surviving provenance and
+that `flex-shrink: 1` is the initial value.
+
+### Remedy verdict
+
+⏳ **PENDING — measured before any test is written (`D13` clause 2, and the `M30`–`M34` reason for it).**
+
+Files: `docs/claims/lane-a.md`, `docs/feature-backlog.md`, plus the per-row files in the table above.
+Shared artefacts taken: `docs/data-dictionary.md`, `docs/feature-backlog.md`, `docs/claims/decisions.md`,
+`docs/ux/exceptions-log.md`, `PROGRESS.md` (own status block only), `docs/pipeline.md` and
+`docs/backlog-triage.md` (both generated), `docs/gate-baselines.md` (regenerated at close-out).
+Paired files taken: none.
+Namespaces spent: nothing from either namespace at open. A decision id may be spent if `8208`'s product call
+or `7285`'s copy question needs one; the next free is derived at the moment of writing, never read from prose.
+Prediction: the Pest suite moves up by the new `tests/Feature/Docs` arm and the `FortifyRateLimitTest`
+coverage-equality arm; Static analysis holds at its current step count because no CI step is added; the
+citation gate is the one I most expect to be wrong, because `docs/data-dictionary.md` is line-pinned by
+two dozen citations sitting at their ceiling and row 1 edits it — `M83` paid exactly this and the lesson was
+to stay line-neutral, which a census correction that changes cell CONTENT can do and a census correction that
+adds ROWS cannot.
 
 ## RELEASED — `M86`, a tracker surgery, two status bullets recovered from git, and the gate that would have seen them go (merged as PR #277, `8ae8e0a`, 6/6 green with real step counts — Static analysis 26 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

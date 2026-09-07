@@ -66,6 +66,37 @@ pass: two cite `docs/offline-first-sync-design.md:93` for a spec that is now at 
 `:103` for a *"Sync now"* rule that has also moved. They resolve to live lines, so the citation gate is
 blind to them by design.
 
+
+---
+
+⚠️ **`M86` ADDENDUM (2026-09-07) — THREE MEASUREMENTS THIS ENTRY DID NOT HAVE, AND ONE OF THEM IS A
+STRONGER ARGUMENT AGAINST OPTION 2 THAN THE ONE RECORDED ABOVE.**
+
+⛔ **(1) THE STRONGEST OBJECTION TO OPTION 2 IS ADJACENCY, NOT THE INVERTED MISMATCH.** `SyncStatus.vue`
+already renders, for the **visit-scoped** number, the sentence *"N responses on this device have not been
+sent yet"* — pinned verbatim in `sync-status.test.ts`. Re-scoping the quota line to the visit would print
+**the same phrase with a different number two paragraphs apart**. That is worse for a reader than the
+imprecision it fixes, and it is a reason to reject option 2 outright rather than to rank it second.
+
+⛔ **(2) OPTION 2 ALSO CONTRADICTS A WRITTEN DECISION, WHICH NOTHING ABOVE NOTES.**
+`docs/adr/0021-respondent-scoped-device-outbox.md`'s scoping table states that the device-wide `counts`
+*"drives the boot drain and the storage-quota estimate"* — the estimate, not only the drain — and two test
+rationales restate it as the reason the count is device-wide. So option 2 owes an ADR amendment, which
+moves it out of *one line of code* and into a decision about a shipped ADR. Option 1 owes nothing.
+
+⛔ **(3) THE `M77` ROW PRICES ITS OWN REMAINING WORK AGAINST THE WRONG FILE.** It says a re-aim *"changes
+a string another increment deliberately pinned in `sync-status.test.ts`"*. That file carries **no quota
+assertion and structurally cannot** — its fixture holds a null `quotaWarning`, so the paragraph never
+renders in that suite. The only pin is a `90%` assertion in `sync-outbox.test.ts`, which no re-wording of
+the count clause would break. ⚠️ **And the triage has already harvested that wrong file into the collision
+graph**, so `D13` has been batching the row against a file its repair never opens.
+
+✅ **NONE OF THIS CHANGES THE RECOMMENDATION — OPTION 1 — IT STRENGTHENS IT**, and it removes option 2
+from contention on two independent grounds rather than one. ⚠️ **`M86` NEARLY FILED THIS A SECOND TIME AS
+A NEW DECISION**, because the `M77` row says *"a product decision nobody has taken"* and cites nothing.
+**A row that names a decision without naming WHICH one costs the next increment exactly the
+re-derivation this entry exists to prevent** — and the roster is now long enough that the collision is
+not obvious. Corrected in the ledger: that row now names this entry.
 ---
 
 ### D25 — `P2c`, the deferral-phrase arm, measures 5% precision and ~2% recall. Keep it, drop it, or re-aim it as a staleness lint?

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Enums;
 
+use App\Models\User;
 use App\Models\UserUiPreference;
 
 /**
@@ -27,6 +28,27 @@ enum ThemeMode: string
     public static function values(): array
     {
         return array_map(static fn (self $case): string => $case->value, self::cases());
+    }
+
+    /**
+     * The product default, and the ONE place it is written.
+     *
+     * ⛔ INCREMENT M86 — THIS EXISTS TO DELETE COPIES, SO ADDING IT WITHOUT MOVING THE CALLERS WOULD
+     * MAKE THINGS WORSE. `'system'` was written as a bare literal in the creating migration and again
+     * in {@see User::defaultUiTheme()}, alongside the live column default and
+     * `docs/data-dictionary.md` §19 — four homes for one fact, all agreeing, none derived from another.
+     * Both writable copies now call this. The two that remain are a database default and a document,
+     * which are compared to each other by `tests/Feature/Migrations/DocumentedDefaultDriftTest.php`.
+     *
+     * ⚠️ Calling it from the migration is the in-house idiom rather than an invention — the plans,
+     * audits and webhook tables already build CHECK constraints from `values()` — and it is safe on a
+     * migration that has already run, because the emitted value is byte-identical to the literal it
+     * replaces. The default this returns must therefore never be changed without a migration that
+     * alters the column: this is the name of the existing default, not a lever for changing it.
+     */
+    public static function default(): self
+    {
+        return self::System;
     }
 
     /**

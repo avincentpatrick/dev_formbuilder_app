@@ -3,10 +3,13 @@
 declare(strict_types=1);
 
 use App\Enums\AccentToken;
+use App\Enums\FontSizeScale;
+use App\Enums\ThemeMode;
 use App\Models\User;
 use App\Models\UserUiPreference;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
 
 uses(RefreshDatabase::class);
@@ -176,4 +179,47 @@ it('refuses to emit an attribute value outside the whitelist', function (): void
         ->and($htmlTag)->not->toContain('sepia')
         ->and($htmlTag)->not->toContain('crimson')
         ->and($htmlTag)->not->toContain('gigantic');
+});
+
+/*
+|--------------------------------------------------------------------------
+| Increment M86 — the edge nothing compared: the enum default against the LIVE COLUMN DEFAULT.
+|--------------------------------------------------------------------------
+| docs/feature-backlog.md:7921 filed `User::defaultUiTheme()` as "a fourth copy no gate reaches", and
+| the second half of that sentence is FALSE — the strict toBe() above already reddens if the method
+| drifts. What was true, and what the row never said, is narrower: NO gate compared the method to the
+| SCHEMA or to the document. tests/Feature/Migrations/DocumentedDefaultDriftTest.php compares the
+| document to the database; this compares the code to the database; together the three agree by
+| transitivity rather than through three separate parsers of one table — which is the third parser
+| that row correctly refused to build.
+|
+| ⛔ THIS DOES NOT RESTATE THE LITERALS AND MUST NOT. It asserts that two independently-maintained
+| sources agree, so it stays true when the product default legitimately changes, and goes red exactly
+| when one side moves without the other. The literals in the degradation case above are a different
+| thing and are correct: an assertion that derived its expectation from the code under test would
+| prove nothing at all.
+*/
+it('keeps the enum product default and the live column default in agreement', function (): void {
+    $defaults = collect(DB::select(
+        "select column_name, column_default
+         from information_schema.columns
+         where table_schema = 'public' and table_name = 'user_ui_preferences'"
+    ))->keyBy('column_name');
+
+    // Postgres reports a varchar default as `'system'::character varying`; the cast is the storage
+    // engine talking about itself and is not part of the value.
+    $literal = static function (?string $raw): ?string {
+        if ($raw === null) {
+            return null;
+        }
+
+        return trim((string) preg_replace('/::[a-z ]+$/i', '', trim($raw)), "'");
+    };
+
+    expect($literal($defaults['theme_mode']->column_default ?? null))->toBe(ThemeMode::default()->value)
+        ->and($literal($defaults['font_size_scale']->column_default ?? null))->toBe(FontSizeScale::default()->value)
+        // The third axis has no enum and no possible one, so it is pinned against the method directly.
+        // That is the honest shape for a boolean, and it is why the row's remedy closes two of three.
+        ->and($literal($defaults['use_dyslexia_friendly_font']->column_default ?? null))
+        ->toBe(User::defaultUiTheme()['dyslexiaFont'] ? 'true' : 'false');
 });

@@ -3,6 +3,7 @@ import { openDb, type MeridianDb } from '../lib/db';
 import {
     attachToSubmission,
     collectLocalMediaIds,
+    detachFromSubmission,
     isLocalMediaId,
     listForSubmission,
     localMediaRefId,
@@ -129,5 +130,56 @@ describe('repointToSubmission (M72)', () => {
 
         await repointToSubmission(db, ['solo'], 'same-uuid', 'same-uuid');
         expect((await db.media_queue.get('solo'))?.client_submission_uuid).toBe('same-uuid');
+    });
+});
+
+describe('detachFromSubmission (M86)', () => {
+    it("releases only the named rows the caller owns, and deletes nothing", async () => {
+        // ⛔ THE DEFECT THIS EXISTS FOR. `handleSubmitError` discards the outbox row for every ApiError and
+        // `deleteRow` takes that uuid's media with it, in the same transaction — while the answers map
+        // survives the call on all three of its arms, still naming those blobs. Releasing them keeps the
+        // blob and lets whichever arm wins claim it back, which is what `attachToSubmission` already does
+        // for a fresh pick.
+        await stash(db, stashInput('mine'));
+        await stash(db, stashInput('alsomine'));
+        await stash(db, stashInput('theirs'));
+        await attachToSubmission(db, ['mine', 'alsomine'], 'review-uuid');
+        await attachToSubmission(db, ['theirs'], 'stranger-uuid');
+
+        await detachFromSubmission(db, ['mine', 'theirs'], 'review-uuid');
+
+        // Released, not deleted — the row is the point.
+        expect((await db.media_queue.get('mine'))?.client_submission_uuid).toBeNull();
+        expect(await db.media_queue.get('mine')).not.toBeUndefined();
+        // Not named, so not released.
+        expect((await db.media_queue.get('alsomine'))?.client_submission_uuid).toBe('review-uuid');
+        // Named but owned by somebody else: releasing it would be M21 wearing a third name.
+        expect((await db.media_queue.get('theirs'))?.client_submission_uuid).toBe('stranger-uuid');
+    });
+
+    it('is a no-op on an empty list', async () => {
+        await stash(db, stashInput('solo'));
+        await attachToSubmission(db, ['solo'], 'same-uuid');
+
+        await detachFromSubmission(db, [], 'same-uuid');
+
+        expect((await db.media_queue.get('solo'))?.client_submission_uuid).toBe('same-uuid');
+    });
+
+    it('round-trips with repointToSubmission, which is the conflict-review path end to end', async () => {
+        // The sequence RuntimeSession now runs: release before the discard, then claim onto the parked row
+        // from the unclaimed state. `from` is null on the second call precisely BECAUSE of the first, and a
+        // test that only exercised the two helpers separately would not pin that they compose.
+        await stash(db, stashInput('pick'));
+        await stash(db, stashInput('stranger-unowned'));
+        await attachToSubmission(db, ['pick'], 'review-uuid');
+
+        await detachFromSubmission(db, ['pick'], 'review-uuid');
+        await repointToSubmission(db, ['pick'], null, 'parked-uuid');
+
+        expect((await listForSubmission(db, 'parked-uuid')).map((r) => r.attachment_local_id)).toEqual(['pick']);
+        // A null `from` is an owner value, not a wildcard: an unclaimed row the caller did not name is
+        // untouched, which is the property that keeps this narrow.
+        expect((await db.media_queue.get('stranger-unowned'))?.client_submission_uuid).toBeNull();
     });
 });

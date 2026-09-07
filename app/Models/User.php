@@ -274,9 +274,17 @@ class User extends Authenticatable implements MustVerifyEmail
     public static function defaultUiTheme(): array
     {
         return [
-            'mode' => ThemeMode::System->value,
+            // ⛔ INCREMENT M86 — `default()`, NOT the case name. Naming the case here made this a fourth
+            // copy of a fact the migration, the live column default and docs/data-dictionary.md §19 also
+            // hold: `ThemeMode::System` is a value of the enum, while the product DEFAULT is a separate
+            // fact that happened to equal it. Two things that agree are not one thing.
+            'mode' => ThemeMode::default()->value,
             'accent' => null,
-            'fontSize' => FontSizeScale::Standard->value,
+            'fontSize' => FontSizeScale::default()->value,
+            // ⚠️ STILL A LITERAL, AND DELIBERATELY SO. `use_dyslexia_friendly_font` is a boolean with no
+            // enum and no possible one, so this axis keeps its copy in the migration and here. The row
+            // that prescribed "one enum both sides already cite" closes two of these three; saying which
+            // beats implying all three moved.
             'dyslexiaFont' => false,
         ];
     }

@@ -452,6 +452,117 @@ if (! is_file(IMPERATIVES)) {
     $notes[] = sprintf('%s is %d bytes, %d lines, carrying no namespace literal', IMPERATIVES, strlen($imperatives), $imperativeLines);
 }
 
+// ── R9. Every released increment keeps exactly one status bullet. ────────────────────────────────
+//
+// WHY THIS EXISTS, AND IT IS NOT A HYPOTHETICAL. M75's and M76's status bullets were DESTROYED by
+// their own successors' close-outs, and were found by accident eleven increments later while someone
+// measured a surgery. Each close-out wrote the incoming bullet OVER its predecessor instead of
+// prepending it: 4ede7f8 and 092d264 are each 2 added / 2 removed against PROGRESS.md, where every
+// close-out from M78 onward is 2 / 1. Neither bullet ever reached PROGRESS_ARCHIVE.md. 7,774 bytes of
+// record gone, in two ordinary close-outs, merged green.
+//
+// ⛔ R7 COULD NOT HAVE SEEN IT, AND NOT BECAUSE IT SAT NEAR A THRESHOLD. 4ede7f8's tracker delta is
+// +0 lines and +1,770 BYTES — a net GAIN, because the bullet that arrived was larger than the one it
+// destroyed. DROP_LIMIT and DROP_BYTE_LIMIT guard catastrophes. A one-line overwrite of a
+// multi-kilobyte bullet is not a catastrophe at any calibration, so re-tuning them could never reach
+// this. It needed a different question, which is what this rule asks.
+//
+// THE PREDICATE: every increment carrying a numbered `## RELEASED` heading in a claim file has
+// EXACTLY ONE status bullet across the two tracker files. The claim files are the authority for what
+// was released; the tracker pair is the authority for what is recorded; this compares the first
+// against the second and only in that direction.
+//
+// ⛔ THE CONVERSE IS NOT ASSERTABLE AND MUST NEVER BE ADDED. Bullets M3-M35 predate the claim-file
+// convention entirely and carry no release heading, so demanding a heading per bullet is RED ON
+// ARRIVAL — the state M40 established can never merge. So is the rule that looks obvious here and is
+// wrong: "the M-series has no gaps". It has holes at M4, M8, M10, M24, M36 and M37, none of which is
+// a defect, because a claimed number that never shipped is a reservation and not a loss.
+//
+// The floor is here for M36's reason, and it is the half that matters most: a claim corpus that has
+// been renamed, moved or emptied must FAIL rather than pass for free. A rule with nothing to compare
+// reports `passed` while blind, which is the exact shape four lint gates were caught in.
+const CLAIM_FILES = ['docs/claims/lane-a.md', 'docs/claims/lane-b.md'];
+const MIN_EXPECTED_RELEASES = 40;
+
+$released = [];
+$claimsSeen = 0;
+
+foreach (CLAIM_FILES as $claimFile) {
+    if (! is_file($claimFile)) {
+        continue;
+    }
+
+    $claimsSeen++;
+    $claim = read_or_die($claimFile);
+
+    // Anchored and line-bounded: `.` does not cross a newline without /s, so a heading carrying no
+    // number simply does not match — which is correct, and is not a parse failure.
+    if (preg_match_all('/^## RELEASED\b.*?`M(\d+)`/mu', $claim, $m) > 0) {
+        foreach ($m[1] as $number) {
+            $released[(int) $number] = $claimFile;
+        }
+    }
+}
+
+if ($claimsSeen === 0) {
+    fail('R9 bullets', 'no claim file exists at '.implode(' or ', CLAIM_FILES).'. They are this rule\'s '.
+        'authority for what was released; with none present it is comparing against nothing, and a '.
+        'rule that measures nothing must fail rather than report green.');
+} elseif (count($released) < MIN_EXPECTED_RELEASES) {
+    fail('R9 bullets', sprintf(
+        'only %d numbered `## RELEASED` heading(s) across %d claim file(s), under the floor of %d. '.
+        'Either the claim corpus has been truncated, or the heading grammar moved and this rule is '.
+        'now reading a shape that no longer exists. Both are failures; neither is a passing state.',
+        count($released), $claimsSeen, MIN_EXPECTED_RELEASES));
+} else {
+    $bullets = [];
+
+    foreach ([TRACKER => $tracker, ARCHIVE => $archive] as $where => $text) {
+        if (preg_match_all('/`M(\d+)` IS MERGED/u', $text, $m) > 0) {
+            foreach ($m[1] as $number) {
+                $bullets[(int) $number][] = $where;
+            }
+        }
+    }
+
+    ksort($released);
+    $lost = [];
+    $doubled = [];
+
+    foreach ($released as $number => $claimFile) {
+        $homes = $bullets[$number] ?? [];
+
+        if ($homes === []) {
+            $lost[] = sprintf('M%d (released in %s)', $number, $claimFile);
+        } elseif (count($homes) > 1) {
+            $doubled[] = sprintf('M%d appears %d time(s), in %s', $number, count($homes),
+                implode(' and ', array_unique($homes)));
+        }
+    }
+
+    if ($lost !== []) {
+        fail('R9 bullets', sprintf(
+            "%d released increment(s) have NO status bullet in %s or %s:\n    %s\n".
+            '    A released increment whose bullet is in neither file did not have it archived — it '.
+            'had it DESTROYED, and the way that happens is a close-out overwriting its predecessor '.
+            'instead of prepending. Recover it from git rather than writing a new one: the bullet '.
+            'that was there is the record, and a fresh paraphrase of it is not.',
+            count($lost), TRACKER, ARCHIVE, implode("\n    ", $lost)));
+    } elseif ($doubled !== []) {
+        fail('R9 bullets', sprintf(
+            "%d released increment(s) have MORE THAN ONE status bullet:\n    %s\n".
+            '    A surgery copies rather than moves when this happens, and two copies of a bullet '.
+            'drift exactly as two copies of anything else here do.',
+            count($doubled), implode("\n    ", $doubled)));
+    } else {
+        pass('R9 bullets', sprintf('all %d released increment(s) have exactly one status bullet across %s and %s',
+            count($released), TRACKER, ARCHIVE));
+    }
+
+    $notes[] = sprintf('R9 compared %d released increment(s) from %d claim file(s) against %d bulleted increment(s)',
+        count($released), $claimsSeen, count($bullets));
+}
+
 // ── Report. ──────────────────────────────────────────────────────────────────────────────────────
 foreach ($notes as $note) {
     fwrite(STDOUT, "tracker-lint: {$note}\n");
@@ -463,7 +574,7 @@ if ($failures !== []) {
     exit(1);
 }
 
-fwrite(STDOUT, "tracker-lint: passed (8 rule groups, both tracker files and CLAUDE.md scanned).\n");
+fwrite(STDOUT, "tracker-lint: passed (9 rule groups, both tracker files, CLAUDE.md and the claim corpus scanned).\n");
 exit(0);
 
 function fail(string $rule, string $message): void

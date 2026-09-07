@@ -5937,6 +5937,18 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   here. ⚠️ **Note the interaction before taking it:** the third option is already the de-facto state, and
   it means the `[tracker-surgery]` marker is currently unverifiable for any well-timed surgery — which is
   the `M47`/`M48` hand-forward re-opening in a new form. **Live.** Filed by `M71`.
+  ⚠️ **SECOND MEASURED INSTANCE, `M86` (2026-09-07), AND IT STRENGTHENS THE ROW RATHER THAN REPEATING IT.**
+  `M86`'s surgery moved 6 lines and 21,415 bytes — declared, marked, and proved by
+  `scripts/tracker-surgery.php` on all four assertions — and `R7` printed *"under both limits"* again. Two
+  consecutive well-timed surgeries are now invisible to the gate that exists to see them.
+  ⛔ **AND THE SAME INCREMENT FOUND A CASE NO RE-CALIBRATION COULD EVER REACH, WHICH CHANGES THE ANSWER.**
+  `M75`'s and `M76`'s status bullets were destroyed by their successors' close-outs, and `4ede7f8`'s tracker
+  delta is **+0 lines and +1,770 bytes — a net GAIN**, because the bullet that arrived was larger than the
+  one it destroyed. **Not a near miss: the wrong sign.** So "lower the limit" is not merely awkward, it is
+  the wrong instrument for that family, and the third candidate this row names — key the arm on the marker's
+  PRESENCE — is the only one of the three that would have caught either. `R9` now covers the destruction
+  case from a different direction, which means this row is no longer the only thing standing between the
+  tracker and a silent loss. **Still live, and now better specified.**
 
 - ✅ **CLOSED BY `M73` (2026-09-05), TOGETHER WITH THE `M72` ROW BELOW — `minor` · ~~`scripts/mutate.php`'s concurrent-suite guard passes VACUOUSLY when Docker is unreachable.~~**
   The probe now captures the exit status and tests `is_numeric()`, matching `preflight.php`.
@@ -7060,6 +7072,30 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   user's, and it changes a string another increment deliberately pinned in `sync-status.test.ts`. Whoever
   takes it should render the panel before rewording it — `M15`'s note says that is what caught it last
   time. **Live.** Filed by `M77`.
+  ⛔ **EVIDENCE CORRECTED BY `M86` (2026-09-07) WITHOUT CLOSING THE ROW — THE CITATION THIS ROW MAKES ABOUT
+  ITS OWN COST IS FALSE.** It says a re-aim *"changes a string another increment deliberately pinned in
+  `sync-status.test.ts`"*. That file carries **no quota assertion and structurally cannot**: its fixture
+  holds a null `quotaWarning`, so the paragraph never renders in that suite. The only pin is a
+  `toContain('90%')` in `sync-outbox.test.ts`, which **no re-wording of the count clause would break**.
+  ⚠️ **So the row over-prices its own remaining work, and it points the next reader at the wrong file** —
+  and `docs/backlog-triage.md` has already harvested that wrong file into the collision graph, so `D13` has
+  been batching this row against a file its repair never touches.
+  ⚠️ **PREMISE CORRECTED IN BOTH DIRECTIONS.** *Against the row:* there IS a documented premise it misses —
+  `docs/adr/0021-respondent-scoped-device-outbox.md`'s scoping table states that the device-wide count
+  *"drives the boot drain and the storage-quota estimate"*, and two test rationales restate it, so a fix that
+  scopes the **number** contradicts a written decision where a copy-only fix does not. *In its favour:* the
+  strongest objection to the re-aim is one the row never makes — the visit-scoped sentence two lines above
+  already reads *"N responses **on this device** have not been sent yet"*, so the proposal would print the
+  same phrase with a different number in adjacent paragraphs.
+  ⛔ **LEFT OPEN DELIBERATELY: THE REMAINING QUESTION IS A COPY DECISION AND THEREFORE THE USER’S — AND IT
+  IS ALREADY OPEN AS `D26`, WHICH THIS ROW DOES NOT NAME.** `M86` nearly filed it a second time on the
+  strength of this row’s *"a product decision nobody has taken"*, which cites nothing. **A row that names
+  a decision without naming WHICH one costs the next increment the re-derivation the decisions file exists
+  to prevent**, and the roster is long enough now that the collision is not obvious. `D26` gained three
+  measurements from this increment rather than a duplicate entry. ⚠️ **And it is published `state=ready` in
+  `docs/pipeline.md` while its own text says it cannot be finished**, which is the `pipeline.php` liveness
+  row reproducing on a second row — cited by name rather than by line, because a line number in this file
+  is not stable and the citation gate cannot tell a shifted one from a live one.
 
 - **`minor` · `public-runtime-offline.spec.ts`'s parked-conflict case is FLAKY across viewport projects,
   and `D2` makes that a merge-blocking property.** Measured by `M77` (2026-09-06) while running the specs
@@ -7082,7 +7118,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   dev-server asset URLs the e2e container cannot reach and **`global-setup` dies at the login form**,
   which looks like a broken fixture and is not. **Live.** Filed by `M77`.
 
-- **`minor` · `preserveReviewedAnswers()` writes a media reference it has already deleted, in seconds, with
+- ~~**`minor` · `preserveReviewedAnswers()` writes a media reference it has already deleted, in seconds, with
   no grace window.** Measured by `M78`'s adversarial fan-out (2026-09-06) while attacking a different row,
   and filed rather than fixed because the remedy is the same product decision that row is parked on.
   `RuntimeSession.vue`'s `handleSubmitError` opens, unconditionally for every `ApiError`, with
@@ -7096,7 +7132,33 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   ⚠️ **Contained, not harmless**: a `conflict` row is never picked by `listPending` and `retryRow` refuses
   one, so today it surfaces as a re-opened review whose media is gone rather than an immediate failure.
   ⚠️ **`repointToSubmission` is a SECOND ownership writer that post-dates the reaper row** (`M72`), which is
-  why no earlier pass saw it. **Live.** Filed by `M78`.
+  why no earlier pass saw it. **Live.** Filed by `M78`.~~
+  ✅ **CLOSED BY `M86` (2026-09-07). THE EVIDENCE HELD AT EVERY CITATION AND THE ROW UNDERSTATED ITS OWN
+  BLAST RADIUS, WHICH IS THE FINDING.** The delete sits **upstream of the branch**, so it reaches all three
+  `ApiError` arms rather than only the parked-conflict path this row describes. The `reschema` arm is the
+  common one: the session remounts carrying these very answers under a **fresh uuid on a `pending` row**,
+  which `listPending` *does* pick and which replays to `needs_attention`. ⛔ **So this row's own containment
+  argument — "a `conflict` row is never picked by `listPending`" — is true, and does not cover the path its
+  own mechanism creates.** Two cases now pin both arms.
+  ⛔ **THE CODE'S DOCBLOCK STATED THE FALSE MODEL, AND THAT IS WHY THIS SURVIVED FOURTEEN INCREMENTS.**
+  `preserveReviewedAnswers()`'s comment read *"media picked during the review … is re-pointed rather than
+  left behind — narrowly, via `repointToSubmission`"*. It was not re-pointed: the rows had been deleted two
+  calls earlier, so the `.modify()` matched nothing every time. **The docblock and the code agreed with each
+  other and both were wrong about a transaction upstream of both** — the `M85` shape again, and correcting
+  the comment was half the repair.
+  ✅ **THE REMEDY IS `detachFromSubmission`, AND IT ADDS NO STATE.** Releasing the blobs to the *unclaimed*
+  state before the discard puts them in a condition the system already models: it is what a fresh pick looks
+  like before `attachToSubmission` claims it, `reap.ts`'s `liveLocalMediaIds` already walks `conflict` rows'
+  answers so a parked review's blob is live and never swept, and `MEDIA_ORPHAN_GRACE_MS` is one hour rather
+  than five minutes *for this exact case* by its own docblock. No new status, no `db.ts` version bump, no
+  descriptor map — which is what the rejected "keep the queued row" remedy would have cost.
+  ⚠️ **Two candidate fixes were measured and refused:** sparing media inside `deleteRow`/`discardRow`
+  re-opens the retention defect `reap.ts` exists for and reddens a pinned assertion, and lengthening the
+  grace window is a **no-op** because the reaper never runs on this path — the rows are deleted, not aged out.
+  ⚠️ **PROVED BY MUTATION, NOT BY BEING GREEN, AND `scripts/mutate.php` COULD NOT DRIVE IT** — it hardcodes
+  `vendor/bin/pest` and this is Vitest, which is `docs/feature-backlog.md:4304` exactly. Same discipline by
+  hand: tokens from files, abort unless the sha256 moves, restore by byte comparison. Removing the detach
+  call gives **2 failed | 44 passed**, and the two are precisely the new cases. Restored byte-identical.
 
 - ~~**`minor` · `reap.test.ts` leaves the mark set's status list unpinned, so a third of it can be deleted
   with all 14 cases green.**~~
@@ -7918,7 +7980,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   corpus — the shape `M40` established can never merge. **`Nullable` is a clean three-value comparison
   and is the half worth building first.** **Live.** Filed by `M83`.
 
-- **`minor` · `User::defaultUiTheme()` is a fourth copy of three defaults the new literal arm compares,
+- ~~**`minor` · `User::defaultUiTheme()` is a fourth copy of three defaults the new literal arm compares,
   and it is the one copy no gate reaches.** Found by `M83`'s fan-out (2026-09-07). `theme_mode`,
   `font_size_scale` and `use_dyslexia_friendly_font` now have four homes: the migration, the live schema,
   `docs/data-dictionary.md` §19 and this method. **All four agree today** — verified against
@@ -7927,7 +7989,43 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the same two-copies-of-a-fact class the increment was about, one layer out. ⚠️ **The cheap version is
   not the right one**: asserting the method against the document is a third parser of the same table, and
   the durable fix is for the method to stop restating values at all — read them from the column defaults,
-  or from one enum both sides already cite. **Live.** Filed by `M83`.
+  or from one enum both sides already cite. **Live.** Filed by `M83`.~~
+  ✅ **CLOSED BY `M86` (2026-09-07), AND ⛔ THE HEADLINE CLAUSE WAS FALSE — ONE FILE READ REFUTES IT.**
+  *"the one copy no gate reaches"*: `tests/Feature/Theme/ThemeEmissionTest.php` asserts `uiTheme()` with a
+  strict whole-array `toBe()` on all three values, and says in its own comment that the strictness is
+  deliberate. Change `ThemeMode::System` in the method and that test goes red. **The true statement is
+  narrower and this row never makes it: no gate compared the method to the SCHEMA or to the DOCUMENT.**
+  ⛔ **"FOUR HOMES" IS A FLOOR, NOT A CENSUS, AND THE ROW NAMED HALF.** At least **eight** restatements of
+  these three literals exist — the two migrations, the live schema, the dictionary, the method, **two
+  separate blocks inside the theme test**, and a frontend settings test — plus two more that restate them
+  as branch conditions in `useTheme.ts` and `app.blade.php`.
+  ⚠️ **THE TEST'S LITERALS ARE NOT A DEFECT AND WERE DELIBERATELY LEFT.** An assertion that derived its
+  expectation from the code under test would prove nothing; a pin is supposed to restate the value
+  independently. That is a different thing from a second *source*, and conflating them would have made the
+  suite weaker in the name of tidiness.
+  ⛔ **THE ROW'S FIRST DURABLE OPTION IS NOT FEASIBLE, AND STRUCTURALLY RATHER THAN EXPENSIVELY.** *"Read
+  them from the column defaults"*: the method's primary caller is the `rescue()` fallback that exists so a
+  request can render **when the tenant database context has not been established**, so sourcing the fallback
+  for a failed database read *from the database* is circular — and its second caller runs on every guest
+  request. Two callers refute it independently.
+  ✅ **THE SECOND OPTION SHIPPED, AND IT CLOSES TWO OF THE THREE AXES.** `ThemeMode::default()` and
+  `FontSizeScale::default()` are now the one written place, called by both migrations and by the method.
+  Importing an app enum into a migration is the in-house idiom rather than an invention — plans, audits and
+  webhooks already build CHECKs from `values()` — and editing an applied migration is safe here because the
+  emitted value is byte-identical to the literal it replaces. ⚠️ **`use_dyslexia_friendly_font` keeps its
+  literal: it is a boolean with no enum and no possible one.** Said outright rather than implied.
+  ✅ **AND THE GATE THE ROW ACTUALLY WANTED IS THE ONE EDGE NOTHING COVERED:** the enum default is now
+  compared to the **live `information_schema` column default**. `DocumentedDefaultDriftTest` already
+  compares the document to the database, so the three agree by transitivity rather than through a third
+  parser of that table — the third parser this row correctly refused to build. It restates no literal, so a
+  legitimate change of default keeps it green and only a one-sided move reddens it.
+  ⚠️ **`scripts/mutate.php` drove it and the result is sharper than a bare CAUGHT:** mutating the migration's
+  default to `'dark'` gives **1 failed, 8 passed** — exactly the new case, with the pre-existing strict pin
+  still **green**, because that one reads the method and not the schema. That is the demonstration that the
+  new assertion covers an edge the old one cannot see, rather than duplicating it.
+  ⛔ **AND THE TRIAGE HAS THIS ROW'S HUB ARITHMETIC BACKWARDS**, filing it as *"hub files only"*: the durable
+  fix touches five non-hub files and **zero** hubs, while the cheap fix the row rejected is the one that
+  would have spent the batch's single hub slot on `docs/data-dictionary.md`. Filed as its own row below.
 
 - **`minor` · The triage generator harvested a row as hub-free whose repair could only be made in a hub
   file, and the batch it then proposed violated `D13`.** Measured by `M83` (2026-09-07) against its own
@@ -8196,3 +8294,110 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   asymmetry that hid it**: the two scripts carry the SAME partial-path blindness — one of them was fixed
   this increment — but they resolve against two DIFFERENT universes, and nothing anywhere says so.
   **Live.** Filed by `M85`.
+
+- ~~**`minor` · Two increments' status bullets were DESTROYED by their successors' close-outs, and nothing
+  in the repository could see it.**~~
+  ✅ **FILED AND CLOSED BY `M86` (2026-09-07). FOUND BY ACCIDENT WHILE MEASURING A SURGERY, NOT BY ANY GATE
+  AND NOT BY ANY SWEEP.** `M75`'s and `M76`'s status bullets exist in neither `PROGRESS.md` nor
+  `PROGRESS_ARCHIVE.md`. Neither was archived and neither was deleted on purpose: **each was overwritten by
+  the next increment's close-out**, which wrote the incoming bullet *over* its predecessor instead of
+  prepending it. `4ede7f8` and `092d264` are each **`2` added / `2` removed** against `PROGRESS.md` in
+  `git numstat`, where every close-out from `M78` onward is **`2` / `1`**. 7,774 bytes of record, gone in two
+  ordinary close-outs, merged green, eleven increments ago.
+  ⛔ **`R7` COULD NOT HAVE SEEN IT, AND NOT BECAUSE IT SAT NEAR A THRESHOLD.** `4ede7f8`'s tracker delta is
+  **+0 lines and +1,770 bytes — a net GAIN**, because the bullet that arrived was larger than the one it
+  destroyed. `DROP_LIMIT` and `DROP_BYTE_LIMIT` guard catastrophes; a one-line overwrite of a multi-kilobyte
+  bullet is not one at **any** calibration, so re-tuning them could never have reached this. It needed a
+  different question.
+  ✅ **`tracker-lint` R9 IS THAT QUESTION:** every increment carrying a numbered `## RELEASED` heading in a
+  claim file has **exactly one** status bullet across the two tracker files. Against the tree it is red on
+  `M75` and `M76` and on nothing else — 48 released headings, 0 duplicates, 0 other misses.
+  ⛔ **THE CONVERSE IS NOT ASSERTABLE AND THE GATE SAYS SO TWICE.** Bullets `M3`–`M35` predate the claim-file
+  convention and carry no release heading, so demanding a heading per bullet is **red on arrival**. So is the
+  rule that looks obvious and is wrong — *"the M-series has no gaps"* — because it has holes at `M4`, `M8`,
+  `M10`, `M24`, `M36` and `M37`, and **not one of them is a defect**: a claimed number that never shipped is
+  a reservation, not a loss.
+  ✅ **BOTH BULLETS RECOVERED BYTE-EXACTLY FROM GIT** and restored to their descending place between `M77`
+  and `M74`. Recovering rather than paraphrasing was the point: the bullet that was there is the record.
+  ⚠️ **`scripts/mutate.php` cannot drive a host lint gate over plain files** — the `mutate.php` row above,
+  again — so the proof is five committed control cases. `C12` shows R9 is not red on arrival; `C13`
+  reproduces the overwrite shape and **`R7` prints `[ok] … under both limits` in the same run that R9 fails**,
+  which is the demonstration that R9 is not a restatement of R7; `C14` and `C16` are the blind-gate floors;
+  `C15` catches a surgery that copies instead of moving. The shared fixture writer gained a claim corpus —
+  the collector widening that could have detonated the eleven existing cases — and did not: all sixteen land
+  on their expected verdicts. Filed by `M86`.
+
+- **`minor` · `scripts/tracker-lint.php` is cited by ZERO of the open rows while owning the defects of at
+  least two of them, so no collision check can ever see it.** Measured by `M86` (2026-09-07) from
+  `scripts/backlog-triage.php --json`. Its harvested degree is not low, it is **nil** — so it appears in no
+  `cites` column and in no hub table **at any threshold**, and no amount of reading the generated proposal
+  could have surfaced the collision. ⛔ **The two rows it owns are the two the generator has proposed
+  together in every trunk regeneration since `M82`'s close-out**: the R8 row and the R7 byte-threshold row,
+  which repair the same file and were refused by hand by `M84`, `M85` and `M86` — none of the three recording
+  that the pairing was structural rather than an intermittent misfire. ⚠️ **The cause is not a harvesting
+  bug:** a row that says only *"R7"* and *"R8"* names no path, and inferring an owning file from a rule name
+  is not something a generator can do. **That is the one sense in which the sibling row's "the repair is not
+  in the generator" is right**, and it is narrower than that row states. **Live.** Filed by `M86`.
+
+- **`minor` · The triage generator PRINTS a refusal rule it does not implement, and two open rows lean on
+  that sentence.** Measured by `M86` (2026-09-07). `render_batch()` in `scripts/backlog-triage.php` emits
+  *"A row whose files were not harvested cannot be checked for collision and is not proposed"*, and the loop
+  beneath it carries **no such guard**. A zero-harvest row is skipped only *incidentally*, because the
+  ranking puts it last and the batch cap is reached first; and the renderer prints the same *"no non-hub
+  file"* marker for a zero-harvest row and a hub-only row, so the output cannot tell them apart either.
+  ⛔ **This is a documented-behaviour-versus-code gap inside the file whose job is to find those**, and it is
+  load-bearing: the older of the two duplicate rows below cites that very sentence as its reason for filing
+  itself *not live*. ⚠️ **The repair is cheap and fails in the safe direction:** implement the printed
+  sentence and extend it — refuse to propose a row whose harvest is empty, whose harvest is entirely hub
+  files, or that carries an unresolved citation. Under that rule the R8 row would not have been proposed at
+  all. It already renders *"No batch could be formed"*, so a smaller batch is an existing state rather than a
+  new one. **Not taken here: `scripts/backlog-triage.php` is a hub and `D13` allows one hub-touching row per
+  batch, which `M86` spent on `tracker-lint`.** **Live.** Filed by `M86`.
+
+- **`minor` · Two open rows file the same triage-generator defect with OPPOSITE liveness verdicts, and
+  neither cites the other.** Measured by `M86` (2026-09-07). The `M70` row — *"the collision check harvests
+  citations from row TEXT, so it proposes batches that collide"* — and the `M83` row — *"the generator
+  harvested a row as hub-free whose repair could only be made in a hub file"* — are the same finding in
+  nearly the same words, one increment apart. ⛔ **The `M70` row is filed `not live`; the `M83` row is filed
+  `live`. Both are open.** ⛔ **And they prescribe opposite repairs**: the older says the cheap improvement
+  is to mark rows whose harvest is incomplete — i.e. **in** the generator — and the newer says *"the honest
+  repair is probably not in the generator"*. ⚠️ **Whoever takes either must reconcile all three of those
+  before writing any code**, because a row's liveness verdict is what `scripts/pipeline.php` derives its
+  queue state from, so two contradictory verdicts on one defect means the queue is publishing a state for it
+  that is half wrong by construction. **Live.** Filed by `M86`.
+
+- **`minor` · `D13` caps a batch at one row that TOUCHES a hub file; the generator implements one that
+  CITES one.** Measured by `M86` (2026-09-07). The decision's wording is *touch*; `render_batch()` derives
+  its hub test from the harvested cite set, and a row cites where its evidence is rather than where its fix
+  lands. ⛔ **Under the decision's own words the proposal `M86` was handed is a literal violation and not
+  merely a violation of intent:** one of its rows cites the tracker-lint controls file directly, and a second
+  rewrites that same file's fixtures without citing it. ⚠️ **This is not a re-scope of `D13`** — that
+  decision is the user's and is answered — it is a defect in the thing implementing it, and it is filed apart
+  from the duplicate-row problem above because repairing either leaves the other standing. ⚠️ **`D15` is
+  already open on the hub cap; this is an input to it and not a substitute for answering it.** **Live.**
+  Filed by `M86`.
+
+- **`minor` · The archived status bullets live in TWO non-contiguous places, and that is what made the batch
+  numbering go wrong.** Measured by `M86` (2026-09-07) while performing a surgery. `M71`'s batch was appended
+  to the end of a release narrative several thousand lines below the `## Archived status bullets` heading
+  rather than head-inserted into it, so anyone counting batches from that section gets a number short by one.
+  ⛔ **The archive consequently carried TWO different batches both labelled "THIRD"**, each author having
+  numbered by counting the notes they could see, and the tracker's footer enumerated three while four existed
+  and never learned of the most recent. ✅ **`M86` stopped the tracker footer counting by hand** — the batch
+  notes are dated and signed, and the dates are the ordering — **but deliberately did not move `M71`'s
+  batch**, because relocating it is a second surgery with its own proof obligation and does not belong inside
+  an increment already performing one. ⚠️ **Whoever moves it should use `scripts/tracker-surgery.php` with
+  its explicit before-state arguments**, since both halves of that move are inside one file and the ordinary
+  git-based before-state cannot express it. **Live.** Filed by `M86`.
+
+- **`minor` · No control harness drives the real `scripts/backlog-triage.php` or `scripts/pipeline.php`, and
+  the one harness that looks like it does stubs the generator.** Measured by `M86` (2026-09-07).
+  `tests/Feature/Docs/PipelineLintControlsTest.php` builds its fixture around a **stub** generator printing
+  canned JSON — its own header says so — so it proves `pipeline-lint`'s reading of a generator's output and
+  nothing at all about either generator's behaviour. ⛔ **Between them those two scripts decide the batch,
+  the queue order and the merge-gated contents of `docs/pipeline.md`**, and several open rows prescribe
+  repairs inside them. `scripts/tracker-lint.php` and `scripts/citation-liveness-lint.php` both have
+  committed control harnesses; these two — the ones that choose what work happens next — have none.
+  ⚠️ **The shape to copy exists and is proven twice over**: copy the shipped bytes into a fixture root, drive
+  synthetic inputs, assert the verdict. `M86` extended one of those harnesses without altering its design, so
+  the cost here is known rather than estimated. **Live.** Filed by `M86`.

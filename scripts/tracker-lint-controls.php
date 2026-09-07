@@ -75,6 +75,11 @@ const FILLER_LINES = 900;
 const FILLER_KEEP_AFTER_BIG_CUT = 100;   // removes 800 lines / ~80,000 bytes — over both limits
 const FILLER_KEEP_AFTER_SMALL_CUT = 890; //  removes  10 lines /  ~1,000 bytes — under both
 
+// R9's floor in the gate is MIN_EXPECTED_RELEASES. This must clear it, and the margin is deliberate:
+// a fixture sitting ON the floor cannot tell a working floor from an off-by-one in it. C16 supplies
+// the under-floor case explicitly rather than by shaving this number.
+const FIXTURE_RELEASES = 45;
+
 // A 40-hex string that is deliberately not an object in any repository this builds.
 const ABSENT_SHA = '0123456789abcdef0123456789abcdef01234567';
 const ZERO_SHA = '0000000000000000000000000000000000000000';
@@ -113,6 +118,14 @@ $pushDeclared = build_push_fixture($scratch.'/push-declared', true, FILLER_KEEP_
 $pushUndeclared = build_push_fixture($scratch.'/push-undeclared', false, FILLER_KEEP_AFTER_BIG_CUT);
 $pushOrdinary = build_push_fixture($scratch.'/push-ordinary', false, FILLER_KEEP_AFTER_SMALL_CUT);
 $pr = build_pr_fixture($scratch.'/pull-request');
+
+// R9. One fixture per way of breaking it, because a single fixture toggled four ways cannot show
+// that the four failures are distinguishable — and R9's whole value is that it says WHICH.
+$r9Healthy = build_r9_fixture($scratch.'/r9-healthy', []);
+$r9Overwritten = build_r9_fixture($scratch.'/r9-overwritten', ['drop' => [12]]);
+$r9NoClaims = build_r9_fixture($scratch.'/r9-no-claims', ['claims' => false]);
+$r9Doubled = build_r9_fixture($scratch.'/r9-doubled', ['duplicate' => [12]]);
+$r9Truncated = build_r9_fixture($scratch.'/r9-truncated', ['releases' => 6]);
 
 // ── The cases. ───────────────────────────────────────────────────────────────────────────────────
 //
@@ -211,6 +224,53 @@ $cases = [
         'expect_exit' => 0,
         'expect_out' => 'under both limits',
     ],
+
+    // ── R9. Every released increment keeps exactly one status bullet. ────────────────────────────
+    //
+    // ⛔ C12 IS THE ONE THAT PROVES R9 IS NOT RED ON ARRIVAL, AND IT IS NOT THE ONE THAT PROVES R9
+    // WORKS. C13 is. A rule that never fires has never been shown to be a rule at all — which is
+    // the state R7 was in for eight increments — so the four red cases below are the harness and
+    // C12 is the baseline they are measured against.
+    [
+        'id' => 'C12',
+        'what' => 'R9 baseline — every released increment has exactly one bullet, so R9 is not red on arrival',
+        'repo' => $r9Healthy,
+        'env' => ['GITHUB_EVENT_NAME' => 'push', 'TRACKER_LINT_BASE_SHA' => $r9Healthy['base']],
+        'expect_exit' => 0,
+        'expect_out' => 'all 45 released increment(s) have exactly one status bullet',
+    ],
+    [
+        'id' => 'C13',
+        'what' => "THE M77 SHAPE — a close-out overwrites its predecessor's bullet, R7 green, R9 red",
+        'repo' => $r9Overwritten,
+        'env' => ['GITHUB_EVENT_NAME' => 'push', 'TRACKER_LINT_BASE_SHA' => $r9Overwritten['base']],
+        'expect_exit' => 1,
+        'expect_out' => 'M12 (released in docs/claims/lane-a.md)',
+    ],
+    [
+        'id' => 'C14',
+        'what' => 'the claim corpus is GONE — a rule with nothing to compare must fail, not pass for free',
+        'repo' => $r9NoClaims,
+        'env' => ['GITHUB_EVENT_NAME' => 'push', 'TRACKER_LINT_BASE_SHA' => $r9NoClaims['base']],
+        'expect_exit' => 1,
+        'expect_out' => 'no claim file exists at',
+    ],
+    [
+        'id' => 'C15',
+        'what' => 'a surgery COPIED a bullet instead of moving it — two homes for one increment',
+        'repo' => $r9Doubled,
+        'env' => ['GITHUB_EVENT_NAME' => 'push', 'TRACKER_LINT_BASE_SHA' => $r9Doubled['base']],
+        'expect_exit' => 1,
+        'expect_out' => 'MORE THAN ONE status bullet',
+    ],
+    [
+        'id' => 'C16',
+        'what' => 'the claim corpus is present but TRUNCATED below the floor — the M36 blind-gate shape',
+        'repo' => $r9Truncated,
+        'env' => ['GITHUB_EVENT_NAME' => 'push', 'TRACKER_LINT_BASE_SHA' => $r9Truncated['base']],
+        'expect_exit' => 1,
+        'expect_out' => 'under the floor of',
+    ],
 ];
 
 $failed = [];
@@ -252,7 +312,8 @@ if ($failed !== []) {
 }
 
 fwrite(STDOUT, sprintf('tracker-lint-controls: passed (%d cases; the push arm, the pull_request arm, '
-    ."three cannot-measure paths and two demonstrations of the pre-M49 defect).\n", count($cases)));
+    .'three cannot-measure paths, two demonstrations of the pre-M49 defect, and four ways of breaking '
+    ."R9 while R7 stays green).\n", count($cases)));
 exit(0);
 
 // ── Fixture construction. ────────────────────────────────────────────────────────────────────────
@@ -294,6 +355,37 @@ function build_push_fixture(string $dir, bool $declared, int $keepFiller): array
 }
 
 /**
+ * A two-commit history whose SECOND commit is an ordinary close-out — same filler, so R7 sees a
+ * delta of a few hundred bytes and reports "under both limits" — carrying whatever R9 defect the
+ * case asked for.
+ *
+ * ⛔ THAT SHAPE IS THE POINT AND NOT A CONVENIENCE. It is the shape of the two real commits that
+ * destroyed M75's and M76's bullets: an ordinary close-out, well under both of R7's thresholds, one
+ * of them showing a net byte GAIN. Every case built here therefore has R7 GREEN and R9 the only rule
+ * with anything to say — which is the demonstration that R9 is not a restatement of R7.
+ *
+ * @param  array{claims?: bool, releases?: int, drop?: list<int>, duplicate?: list<int>}  $r9
+ * @return array{dir: string, base: string}
+ */
+function build_r9_fixture(string $dir, array $r9): array
+{
+    git_init($dir);
+
+    write_fixture_files($dir, FILLER_LINES);
+    $base = git_commit($dir, "fixture: the tracker before the close-out\n");
+
+    // ⚠️ THE SMALL CUT IS HERE SO THE SECOND COMMIT IS NEVER EMPTY. The healthy case applies no R9
+    // change at all, so with an unchanged filler `git commit` finds nothing to commit and the whole
+    // harness aborts — which is how this was found, and it is exactly the succeeds-on-empty-input
+    // family in its refusing form. A guaranteed delta also keeps the R9 cases honest about R7: every
+    // one of them now has a real, measured, under-threshold drop rather than no drop at all.
+    write_fixture_files($dir, FILLER_KEEP_AFTER_SMALL_CUT, $r9);
+    git_commit($dir, "fixture: an ordinary close-out, well under both of R7's thresholds\n");
+
+    return ['dir' => $dir, 'base' => $base];
+}
+
+/**
  * A base branch, a three-commit topic branch whose FIRST commit carries the edit and the marker, and
  * a real merge commit whose first parent is the base tip — which is the shape actions/checkout hands
  * a workflow on a pull_request event.
@@ -328,21 +420,55 @@ function build_pr_fixture(string $dir): array
 }
 
 /**
- * Synthetic tracker files that satisfy R1 through R6 and R8, so every case fails or passes on R7
- * alone. Deliberately NOT copies of the repository's own — see the header.
+ * Synthetic tracker files that satisfy R1 through R6 and R8, so every case fails or passes on the
+ * rule under test alone. Deliberately NOT copies of the repository's own — see the header.
+ *
+ * ⛔ THE $r9 ARGUMENT DEFAULTS TO A HEALTHY CORPUS, AND THAT IS LOAD-BEARING. R9 needs a claim corpus
+ * that the eleven R7 cases have no reason to carry, and this function is shared by every one of them.
+ * A widened collector that reddens the arms sharing it is the failure M83 measured; the default here
+ * therefore writes a corpus that SATISFIES R9, so the R7 cases keep failing and passing on R7 alone.
+ * The R9 cases pass an explicit $r9 to break it, one way per case.
+ *
+ * ⚠️ The bullet block is byte-identical between a fixture's before and after states unless $r9 says
+ * otherwise, so it cannot move R7's delta — which is the property that lets it be added at all.
+ *
+ * @param  array{claims?: bool, releases?: int, drop?: list<int>, duplicate?: list<int>}  $r9
  */
-function write_fixture_files(string $dir, int $fillerLines): void
+function write_fixture_files(string $dir, int $fillerLines, array $r9 = []): void
 {
+    $writeClaims = $r9['claims'] ?? true;
+    $releases = $r9['releases'] ?? FIXTURE_RELEASES;
+    $drop = $r9['drop'] ?? [];
+    $duplicate = $r9['duplicate'] ?? [];
+
     $filler = '';
 
     for ($i = 1; $i <= $fillerLines; $i++) {
         $filler .= sprintf("- filler %04d %s\n", $i, str_repeat('x', 90));
     }
 
+    // Newest first, exactly as the real tracker orders them, so a dropped bullet reproduces the
+    // shape of a close-out that overwrote its predecessor rather than an arbitrary hole.
+    $bullets = '';
+
+    for ($n = $releases; $n >= 1; $n--) {
+        if (in_array($n, $drop, true)) {
+            continue;
+        }
+
+        $bullet = sprintf("- **`M%d` IS MERGED (fixture).** A synthetic status bullet.\n", $n);
+        $bullets .= $bullet;
+
+        if (in_array($n, $duplicate, true)) {
+            $bullets .= $bullet;
+        }
+    }
+
     $tracker = "# Tracker fixture\n\n"
         ."## Standing Rules\n\n"
         ."One rule, so the heading exists exactly once.\n\n"
         ."## Current Status\n\n"
+        .$bullets."\n"
         // One marker, because M50 retired Lane B and R6 now counts the SET of hand-off
         // markers rather than only the lanes it knows about. A second marker here would
         // fail every case in this harness, which is the new check doing its job.
@@ -363,6 +489,34 @@ function write_fixture_files(string $dir, int $fillerLines): void
     file_put_contents($dir.'/PROGRESS.md', $tracker);
     file_put_contents($dir.'/PROGRESS_ARCHIVE.md', $archive);
     file_put_contents($dir.'/CLAUDE.md', $imperatives);
+
+    // R9's authority for what was released. Written LAST and removed rather than emptied when the
+    // case wants it absent, because R9 distinguishes "no claim file" from "a claim file with too
+    // few headings" and the two failures say different things.
+    $claimDir = $dir.'/docs/claims';
+
+    if (! is_dir($claimDir) && ! @mkdir($claimDir, 0777, true) && ! is_dir($claimDir)) {
+        fwrite(STDERR, "tracker-lint-controls: CANNOT RUN — could not create {$claimDir}.\n");
+        exit(2);
+    }
+
+    $claimPath = $claimDir.'/lane-a.md';
+
+    if (! $writeClaims) {
+        if (is_file($claimPath)) {
+            unlink($claimPath);
+        }
+
+        return;
+    }
+
+    $claim = "# Lane A fixture\n\n## Status: NO ACTIVE CLAIM\n\n";
+
+    for ($n = $releases; $n >= 1; $n--) {
+        $claim .= sprintf("## RELEASED — `M%d`, a fixture release (merged as PR #%d)\n\nOne paragraph.\n\n", $n, 100 + $n);
+    }
+
+    file_put_contents($claimPath, $claim);
 }
 
 // ── git and process plumbing. ────────────────────────────────────────────────────────────────────

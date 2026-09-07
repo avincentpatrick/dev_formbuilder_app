@@ -1909,9 +1909,32 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   authorization decision, and `ApiAbilities` records four separate refusals to widen an existing ability for
   exactly this reason (a new ability cannot be held retroactively; a widened one is). Recorded so the
   decision is taken deliberately if a Reviewer-facing encoder client is ever built. Filed by `M13`. **Not live** — a recorded authorization decision with five standing refusals to widen beside it, not a reachable defect, judged by `M65`.
-- **`minor` · `promote()` re-asserts the version is published BEFORE the lock and never again under it.**
-  Filed 2026-08-25 by M12, which closed the identical pre-lock shape one field over and deliberately did not
-  fold this in. `SubmissionDraftService::promote()` checks `$version->status !== FormVersionStatus::Published`
+- ~~**`minor` · `promote()` re-asserts the version is published BEFORE the lock and never again under it.**~~
+  ✅ **DONE — M85 (2026-09-07). THE EVIDENCE HELD; ONE CLAUSE OF THE ROW'S HESITATION IS HALF FALSE, AND
+  THE ROW NAMED TWO INSTANCES OF FOUR.** Both re-assertions now run inside the transaction, under the
+  `submissions` row lock, between the status re-assert and M12's checksum compare — that order in both
+  directions, because a concurrent promote is a documented idempotent no-op rather than a conflict, and a
+  republish must report as the superseded-version refusal it is rather than as a draft conflict it is not.
+  The pre-lock checks are KEPT as cheap fast-fails, which is this method's own established idiom for the
+  status check above them.
+  ⛔ **THE ROW'S REASON TO WEIGH IT RATHER THAN DO IT IS HALF FALSE.** *"Neither `form_versions` nor
+  `forms` is locked there"* — `form_versions` is locked nowhere, true; but `forms` **is** locked on both
+  sides, by `PublishService` for the whole publish and by `FormAcceptanceGuard::assertCapacity()` on the
+  promote side — only when `max_responses !== null`, and only after the status write. So on a CAPPED form
+  the two paths already serialize and this is a closure; on an uncapped one nothing orders them and it is
+  a narrowing. The row's conclusion survives and its stated reason understates what was available.
+  ⚠️ **AND THE ROW IS A FLOOR: FOUR INSTANCES OF THE SHAPE, NOT TWO.** `saveDraft()` at
+  `app/Services/Submissions/SubmissionDraftService.php:116` carries it 74 lines ABOVE this citation in the
+  same class — its transaction is `updateDraft()`, whose in-lock block re-asserts the row status and the
+  client baseline and never the version — and `app/Services/Submissions/SubmissionPipeline.php:71` carries
+  it on the submit path. Neither is fixed here: refusing an autosave under the lock is a product decision
+  about the resume flow rather than a bug fix. **Filed as its own row.**
+  ⚠️ **THREE MUTANTS, ALL CAUGHT, WITH CLEAN ARM ISOLATION.** Deleting the whole in-lock re-assert reddens
+  the two version cases; deleting only the RE-READ and leaving the check to compare the pre-lock object
+  reddens the same two, which is what proves the re-read rather than the check is load-bearing; deleting
+  the grace-window re-run reddens the grace-window case alone.
+  *The original row, preserved:* Filed 2026-08-25 by M12, which closed the identical pre-lock shape one
+  field over and deliberately did not fold this in. `SubmissionDraftService::promote()` checks `$version->status !== FormVersionStatus::Published`
   outside any transaction, and the in-lock block re-asserts only the row's own status and (since M12) the
   answer document's checksum — so an admin republishing between that check and the lock lets a draft finalize
   against a version the form has already moved past. **Live**, but narrow on purpose: the draft is pinned to
@@ -5826,6 +5849,36 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   ⚠️ **The document side needs a discriminator too** — a naive scan of backticked tokens in the events
   column harvests `owner_user_id`, `is_super_admin` and `status`, which are column names in prose. **Live.**
   Filed by `M70`.
+  ⛔ **PREMISE CORRECTED BY `M85` (2026-09-07), READ-ONLY, AND THE HEADLINE IS THE PART THAT IS FALSE.**
+  *"Asserted by nothing"* is wrong: **30 of §1's 41 documented (alias, event) cells are pinned by 19 test
+  files.** The row's own framing — *"all twelve files in `tests/Feature/Audit/`"* — is where it went wrong
+  twice over. Six of those twelve assert §1.1/§3/§4 surfaces rather than §1 event cells, and **thirteen
+  files OUTSIDE that directory** assert §1 tuples: `WebhookEndpointApiTest`, `WebhookSecretRotationTest`,
+  `ConnectorOAuthFlowTest`, `SuperAdminAssignPlanTest`, `TenantDetailConsoleTest`, `FeedbackConsoleTest`,
+  `PlatformSettingsWriteTest`, `TenantAppSettingsTest`, `OpenTenantRegistrationTest`, `MemberRoleChangeTest`,
+  `SubmissionAnswerEditTest`, `GeneratePdfJobTest` and the two impersonation files. A repair scoped to the
+  named directory misses both halves. **What IS true, and is the row's real defect, is that nothing compares
+  the DOCUMENT to the CODE in either direction** — no test, no lint script, nothing reads the spec file.
+  **11 cells are asserted by nothing at all.**
+  ⛔ **AND FIVE DOCUMENTED EVENTS ARE NEVER EMITTED, WHICH THE ROW DOES NOT SAY AND WHICH CHANGES ITS
+  REMEDY.** `form`/`deleted`, `settings`/`created`, `tenant_users`/`updated`, `tenant_users`/`deleted`
+  (whose documented value `removed` is not even a case of `AuditEvent`), and `users`/`updated`. Plus one
+  false parenthetical: `tenant_users`/`created` is documented as covering *"invite sent"* and `invite()`
+  writes no audit row — already recorded as false in `app/Services/Gamification/AuditReplayMap.php` and in
+  `docs/adr/0020-gamification-awarding-substrate.md`, and never propagated back to §1. **The drift has
+  survived a full increment that knew about it.** ⚠️ Runtime observation cannot prove a completeness claim
+  about an event with no surface to drive, so the row's two candidate mechanisms answer a different half of
+  the problem than it thinks. `users`/`updated` is the sharpest: **nothing in `app/` writes
+  `is_super_admin` at all**, which makes it a `D14`-shaped decision rather than a repair.
+  ⚠️ **The row's own numbers, checked.** *"34 call sites"* — exact. *"Three services absent from the
+  harvest entirely"* — held, and a fourth is half-invisible (`ConnectionService` passes the event through a
+  ternary). *"Ten aliases"* — the row then enumerates **eight**, and eight is the reproducible figure. Of
+  those eight red aliases, **four are pure parser artifacts** and four carry genuinely dead cells.
+  ⚠️ **And the discriminator problem is on the ALIAS column too, which the row never mentions:** seven
+  alias cells carry italic increment suffixes and one is not an alias but a whole sentence, so an
+  alias-column parser goes red on **8 of 18 rows** before it reads a single event. **Still live**, and the
+  next taker should re-scope it: the gate is `S` on the `DocumentedSettingKeyDriftTest` template; what
+  makes it `M` is six separate *is the document wrong or the code wrong?* calls the row does not enumerate.
 
 - ✅ **DONE — M79 (2026-09-06). BOTH HALVES OF THE PRESCRIBED REMEDY SHIPPED AND EACH WAS PROVED BY RUNNING THE ROW'S OWN SCENARIO, NOT BY READING.** `--jsonn` now refuses with exit 1 and leaves `docs/backlog-triage.md` byte-identical; `--help` prints usage, exits 0, and leaves it byte-identical. The row was right that the refusal is the half that matters, and right that this is the only script in `scripts/` whose default action is a write — the fence reads `$argv` directly, because `getopt()` discards what it does not know and there is no other way to see what it threw away. ⚠️ **Taken as a side-effect rather than as a claimed row:** M79 was adding `--json` for `scripts/pipeline.php` and had to touch this exact argument handling, so fixing it was cheaper than working around it. Original filing follows. **`minor` · `scripts/backlog-triage.php` accepts no arguments and its default action is destructive, so
   any unrecognised flag rewrites the file.** `getopt('', ['dry-run', 'check'])` silently discards every
@@ -7927,8 +7980,37 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   is three `it()` blocks sharing one collector. **Live.** Filed by `M83`.
 
 
-- **`minor` · `scripts/citation-liveness-lint.php` carries a SECOND copy of the partial-path blindness,
-  and there it silently un-checks a citation in the ZERO-TOLERANCE tier.** Measured by `M84`'s fan-out
+- ~~**`minor` · `scripts/citation-liveness-lint.php` carries a SECOND copy of the partial-path blindness,
+  and there it silently un-checks a citation in the ZERO-TOLERANCE tier.**~~
+  ✅ **DONE — M85 (2026-09-07). EVERY CITATION HELD AND THE ARITHMETIC REPRODUCED EXACTLY, BUT THE ROW
+  UNDERSTATED THE SCALE BY FIFTEEN AND ITS PRESCRIBED REMEDY IS FORBIDDEN BY THE GATE'S OWN CONTRACT.**
+  `resolve_token()` now resolves a partial path by unambiguous suffix — ambiguity resolves to nothing,
+  for trap 4's reason, because a wrong resolution line-checks a file the citation never named. Measured
+  on the trunk: **742 resolved to 757, 32 unresolved to 17.**
+  ⛔ **NOT "A CITATION" — FIFTEEN.** Across the gated tiers, 19 partial-path citations were unresolved
+  and 15 of them resolve under the suffix arm (1 tier-1, 14 ledger). Every one was counted, printed and
+  never line-checked. The remaining 4 point into `node_modules/` and `vendor/`, which are untracked and
+  can never resolve — a separate class, filed below.
+  ⛔ **AND THE REMEDY IS THE HALF THAT WAS WRONG.** The row prescribes re-pointing the newly-visible dead
+  citations first, in their own increment. There is exactly ONE: the preserved `M1` filing in the
+  design-system section cites `Checklist/Checklist.vue` at a line that is blank — written here WITHOUT its
+  line number on purpose, because quoting it would add a nineteenth corpse to the tier this row is about.
+  It sits under *"The original row, preserved:"* inside a row **closed by `M20`**. `LEDGER_ROT_CEILING`'s own docblock names that structural class as the reason
+  the ceiling can never ratchet to zero: the dead citation IS the evidence for the closure, and repairing
+  it falsifies a dated record. **The prescribed sequence is not available.** The ceiling therefore moves
+  17 → 18 — a raise, which the constant permits with the reason stated, and the reason is that the ledger
+  did not change at all. The resolver got better and the rot was always there.
+  ⚠️ **THE ROW'S FLAGSHIP TIER-1 INSTANCE IS ALIVE.** `Pages/submissions/Encode.vue:897` resolves and
+  line 897 is not blank, so widening leaves tier 1 at **0 rotten** and buys zero new tier-1 detections.
+  That citation is substantively wrong — it describes a control ~350 lines away — but that is the class
+  this gate cannot see by design, and an open row already owns it.
+  ⛔ **THE ROW MENTIONED NO CONTROL, AND THAT WAS ITS LARGEST UNDER-COST.** The gate had none of any kind.
+  `scripts/citation-liveness-lint-controls.php` is new, six cases, wired into `quality` and its own CI
+  step — and it is a HOST script rather than a Pest file because the gate reads the git index and **`git`
+  is not installed in the app container** (`sh: git: not found`, exit 127), so a Pest control would be
+  permanently red locally and green in CI. Proved by running all six against a deliberately reverted
+  resolver: **C2 and C3 fail, C1/C4/C5/C6 stay green**, bytes restored by sha256 comparison.
+  *The original row, preserved:* Measured by `M84`'s fan-out
   (2026-09-07) while verifying the open triage-generator row that filed the FIRST copy. Both scripts
   resolve a citation token the same way — a token containing a slash is looked up as a literal path and,
   failing that, abandoned — but the consequences are not the same, and the second one is worse. In
@@ -7974,8 +8056,30 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   section; the expensive half is deciding whether a decision-blocked row is `held` or a fourth state.
   **Live.** Filed by `M84`.
 
-- **`minor` · `DocumentedDefaultDriftTest`'s executed assertion chain is EIGHT long, and the five that
-  fire FIRST cannot be split the way the other three were.** Found by `M84` (2026-09-07) while closing
+- ~~**`minor` · `DocumentedDefaultDriftTest`'s executed assertion chain is EIGHT long, and the five that
+  fire FIRST cannot be split the way the other three were.**~~
+  ✅ **DONE — M85 (2026-09-07). THREE OF THIS ROW'S FOUR CLAIMS ARE FALSE, INCLUDING ITS HEADLINE NUMBER
+  AND ITS STATED BLOCKER, AND ONE OF THEM WAS SHIPPED INTO THE SOURCE BY THE SAME COMMIT THAT FILED IT.**
+  The five floors lifted out of the two collectors into `it('discovers the documented corpus')` and
+  `it('classifies every Default cell it discovered')`; seven cases became nine, and the collectors now
+  compute without asserting.
+  ⛔ **EIGHT WAS THE PRE-`M84` COUNT.** After `M84`'s own split the longest executed chain was **seven**
+  (the control) and this arm's was **six**. `fda9601` — the commit that filed this row — is the commit
+  that reduced it. The row is written in the present tense about a file its own increment deleted.
+  ⛔ **"SPLITTING IS STRUCTURALLY IMPOSSIBLE FOR THEM" IS FALSE.** They lift out exactly the way the
+  classification did. What is genuinely impossible is having the classification arms print *meaningful
+  counts* over a collapsed corpus — a real claim, and a different one.
+  ⛔ **AND "ALL SEVEN CASES … SO A SINGLE BROKEN SENTINEL VOCABULARY STILL BLINDS THE WHOLE FILE —
+  INCLUDING THE ATTRIBUTION ARM" IS FALSE IN THE ALARMING DIRECTION.** `DOCUMENTED_DEFAULT_SENTINELS` is
+  read at exactly one site, reachable only from the three literal arms. **The same false sentence was in
+  the docblock `M84` wrote at `DocumentedDefaultDriftTest.php:439`**, so the row was echoing a defect in
+  the code it described; both are corrected.
+  ⚠️ **PROVED IN BOTH DIRECTIONS, BECAUSE A REPORTING REPAIR IS RED EITHER WAY.** The same two mutants
+  were run against the parent version as a control. Discovery broken: **7 red of 7** on the parent, none
+  naming discovery — **3 red of 9** shipped. Sentinel vocabulary broken: **3 red of 7** on the parent —
+  **1 red of 9** shipped, the classification case alone. The parent run also independently falsifies the
+  row: the attribution arm was **green** under the sentinel mutant.
+  *The original row, preserved:* Found by `M84` (2026-09-07) while closing
   the row about the three sequenced classification arms — this is the half that repair cannot reach, and
   it is filed rather than left implied. Three discovery floors inside `documentedDefaultAllCells()` and
   the closed-vocabulary and literal floors inside `documentedDefaultLiteralCells()` all `expect()` before
@@ -8001,3 +8105,93 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   continuation may carry a disposition at all is entangled with the open `D24`, whose option 2 retires
   the bullet-level arm outright. Two edits to one constant in one increment, for two different reasons,
   is how a pinned number stops meaning anything. **Live.** Filed by `M84`.
+
+- **`minor` · `promote()`'s pre-lock shape has two more instances, and one of them is 74 lines above the
+  row that named it.** Measured by `M85` (2026-09-07) while closing that row, which named two instances of
+  four. `SubmissionDraftService::saveDraft()` checks `$version->status !== FormVersionStatus::Published`
+  before its transaction; the transaction is `updateDraft()`, whose in-lock block re-asserts the row status
+  and optionally the client baseline and **never the version**. `SubmissionPipeline::persist()` carries the
+  same check on the submit path ahead of its own `DB::transaction`. ⚠️ **NEITHER IS A STRAIGHT COPY OF THE
+  PROMOTE FIX, WHICH IS WHY THEY ARE FILED RATHER THAN SWEPT IN.** Refusing an AUTOSAVE under the lock
+  because the form republished mid-save is a product call about the save-and-resume flow, not a bug fix —
+  a respondent mid-form would lose the save rather than be told anything useful, and the existing behaviour
+  (Stage 2a refuses at the FIRST autosave after a republish) may well be the right one. The submit path is
+  weaker still: no row exists to lock yet, so there is nothing to re-assert *under*. ⚠️ **Third, lower
+  confidence:** `AttachmentReferenceValidator::validate()` is a DB-backed pre-lock check too, and M12's
+  checksum guard covers the answer document rather than the attachments table, so an attachment deleted in
+  the window is not re-detected. Not traced to a reachable race. **Live.** Filed by `M85`.
+
+- **`minor` · No gate whose input is the GIT INDEX can have a Pest control, because `git` is not installed
+  in the app container.** Measured by `M85` (2026-09-07) at the moment it tried to write one:
+  `sh: git: not found`, exit 127. `scripts/citation-liveness-lint.php` reads its tracked set with
+  `git ls-files`, so a Pest control asserting on it answers CANNOT MEASURE locally — while passing in CI,
+  whose `tests` job runs on `ubuntu-latest` directly rather than in the app image. ⛔ **THAT IS A SECOND
+  INSTANCE OF THE `SuiteCollectionFloorTest` STATE, AND IT WAS AVOIDED RATHER THAN SHIPPED**: M85 made the
+  controls a HOST script instead. ⚠️ **The cost is real and is now paid twice.** `scripts/mutate.php`
+  drives Pest in a container and nothing else, so neither `scripts/tracker-lint-controls.php` nor
+  `scripts/citation-liveness-lint-controls.php` can be turned red by the harness — both are proved by
+  reverting the gate by hand and comparing verdicts, which works and is not repeatable by anyone who has
+  not read the release. ⚠️ **The obvious remedy — install `git` in the app image — is not obviously right**:
+  it would let Pest tests shell out to git, which is a much larger surface than this one gate needs, and
+  the container is deliberately not a development shell. The alternative is `mutate.php --command=`, which
+  an open row already proposes for a different reason. **Live.** Filed by `M85`.
+
+- **`minor` · Four citations point into UNTRACKED trees and can never resolve, and nothing separates them
+  from citations that are merely broken.** Measured by `M85` (2026-09-07) while widening the resolver.
+  After the widening, 17 citations remain unresolved; four of them name a `dexie` distribution file under
+  the npm tree (three times) and a Fortify routes file under the composer tree — written here WITHOUT
+  their paths, for the reason the LAST row in this file records. ⚠️ **These are legitimate citations into
+  real code** — the argument for citing a vendored file by line is the same as for any other — but
+  `git ls-files` cannot see them, so they will be unresolved forever and they sit in the same bucket as a
+  typo. ⛔ **The consequence is on the FLOOR, not the tier**: `MIN_EXPECTED_RESOLVED` is compared against a
+  number that permanently under-counts, and a reader of `--report` cannot tell the permanent four from the
+  repairable rest. A `[[unresolvable]]` marker beside the existing `ALLOW_MARKER`, or a second reported
+  bucket, would separate them. **Live.** Filed by `M85`.
+
+- **`minor` · `docs/ACCESS-MATRIX.md` cites a HOSTNAME AND PORT, which the citation pattern parses as a
+  path and line.** Measured by `M85` (2026-09-07). `acme.meridian.test:8000` matches `CITATION_PATTERN` —
+  `.test` is a letter-leading extension of eight characters or fewer, and `8000` is the line number — so it
+  is counted as a citation, fails to resolve, and inflates both `checked` and `unresolved`. ⛔ **THIS IS
+  TRAP 2 RECURRING IN A SHAPE THE FIX FOR IT DOES NOT COVER.** That trap was WCAG ratios (`4.5:1`), and the
+  guard added for it requires the extension to start with a letter — which a TLD does. ⚠️ **It is one
+  citation and the gate is not wrong about anything because of it**, which is exactly why it is filed
+  rather than fixed: the cheap remedies (a TLD deny-list, requiring a `/` or a known extension) each trade
+  a false positive for a false negative, and this gate's header states that it prefers a false negative.
+  Someone should choose deliberately rather than patch it in passing. **Live.** Filed by `M85`.
+
+- **`minor` · The `docs/claims/**` exclusion hides rot the `--report` measurement is read as covering.**
+  Measured by `M85` (2026-09-07) while measuring the widening. The claims tier is excluded from tier 1 for
+  a sound reason — a citation inside a dated record is correct AS HISTORY — but 13 partial-path citations
+  live there, 10 of them suffix-resolvable, and **at least one is rotten**: `docs/claims/lane-b.md` cites
+  `lib/db.ts` at a line of `resources/public-runtime/lib/db.ts` that is blank. ⚠️ **Nothing is wrong with
+  the exclusion.** What is wrong is that `--report` is the measurement every increment quotes, and it
+  reports the excluded tiers alongside the gated ones without saying that its excluded-tier rot figure was
+  itself understated by the resolver. **Live.** Filed by `M85`.
+
+- **`minor` · `LEDGER_ROT_CEILING` cannot ratchet down while preserved original filings are counted, and
+  `M85` has now paid that in the other direction.** Measured by `M85` (2026-09-07). The constant's own
+  docblock has always said the ceiling cannot reach zero because closed rows keep their original filings
+  and those citations are dead by design. ⛔ **M85 turned that from a floor into a RAISE**: the widened
+  resolver exposed exactly one new corpse and it is one of those preserved filings, so the only legal move
+  was 17 → 18. ⚠️ **The standing refinement is unchanged and is now worth strictly more than when it was
+  written**: exempt struck-through rows, and the ceiling can start ratcheting again on the citations that
+  can actually be repaired. It needs a parser that can tell a closed row from an open one — which
+  `scripts/pipeline.php` and `scripts/backlog-triage.php` both already do, so the parser exists twice and
+  neither copy is reachable from here. **Live.** Filed by `M85`.
+
+- **`minor` · The generated queue's ORDER depends on which UNTRACKED directories happen to exist, and
+  `docs/pipeline.md` is merge-gated on that order.** Measured by `M85` (2026-09-07) by tripping it: CI
+  failed `pipeline-lint` P1 with `docs/pipeline.md` DRIFTED while `php scripts/pipeline.php --check` was
+  green on the host, on the same commit. ⛔ **`scripts/backlog-triage.php` resolves a slashed citation
+  token with `is_file()` against the WORKING TREE rather than against the tracked set** — unlike
+  `scripts/citation-liveness-lint.php`, which asks `git ls-files`. A row citing a path under the npm or
+  composer tree therefore resolves on a developer host and fails to resolve in a CI job that installed
+  only one of them, which moves the row between citation-health tiers, which reorders the whole line,
+  which is a merge failure. ⚠️ **The trigger was a row filed in the same increment**, and the immediate
+  fix was to reword that row so it names no such path — which works and is not a fix: the next row to
+  cite a vendored file re-triggers it, and the reword is invisible to anyone who has not read this.
+  ⛔ **THE REAL FIX IS ONE LINE AND IT IS IN A HUB FILE**, which is why it is filed rather than taken
+  here: resolve against the tracked set the script already has every reason to read. ⚠️ **Note the
+  asymmetry that hid it**: the two scripts carry the SAME partial-path blindness — one of them was fixed
+  this increment — but they resolve against two DIFFERENT universes, and nothing anywhere says so.
+  **Live.** Filed by `M85`.

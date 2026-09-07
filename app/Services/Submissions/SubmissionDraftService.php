@@ -187,6 +187,11 @@ final class SubmissionDraftService
 
         // Stage 2a — promotion re-asserts the version is still published (the same backstop submit() applies),
         // so a draft against a superseded version fails loudly rather than finalizing silently.
+        //
+        // ⚠️ CHEAP PRE-CHECK ONLY, EXACTLY LIKE THE STATUS CHECK ABOVE IT (Increment M85). This runs outside
+        // any transaction, tens of milliseconds before the lock, so it spares Stage 3 for the sequential case
+        // and settles nothing about a concurrent one. The AUTHORITATIVE re-assert is inside the transaction,
+        // under the row lock, beside M12's checksum compare — see the block there for why.
         if ($version->status !== FormVersionStatus::Published) {
             throw SubmissionException::versionNotPublished();
         }
@@ -194,6 +199,8 @@ final class SubmissionDraftService
         // Scheduled-form grace window (Increment H12a): a draft STARTED before the form closed may still be
         // promoted after close (the whole point of save-and-resume) — only a draft created at/after the close
         // instant is refused. The response cap is still enforced transactionally in the finalizer below.
+        //
+        // ⚠️ ALSO A CHEAP PRE-CHECK ONLY (Increment M85), and re-run under the lock for the same reason.
         $form = Form::query()->findOrFail($draft->form_id);
         $this->acceptance->assertCanPromote($form, $draft);
 
@@ -235,6 +242,42 @@ final class SubmissionDraftService
             if ($row->status !== SubmissionStatus::Draft) {
                 return new SubmissionResult($row, created: false);
             }
+
+            // ── ⚠️ THE PRE-LOCK ADMISSION CHECKS (Increment M85) — THE THIRD DOOR M12 DID NOT CLOSE ──────
+            // Stage 2a and the grace window were BOTH decided before the lock, forty lines up, and were never
+            // re-decided under it. An admin republishing in that window supersedes the pinned version
+            // ({@see PublishService}, which flips the outgoing row inside its own transaction) and this
+            // promote finalized happily against it — the loud `409 submission_version_superseded` the
+            // contract publishes simply did not fire.
+            //
+            // ⚠️ NOTHING BECAME INCONSISTENT, WHICH IS WHY THIS IS A REFUSAL RATHER THAN A REPAIR. The draft
+            // is pinned to `form_version_id` and its answer row already points at the same version, so the
+            // finalized submission is coherent; what was lost is the respondent being TOLD that the form
+            // moved under them.
+            //
+            // ⚠️ M12'S CHECKSUM GUARD DOES NOT INCIDENTALLY COVER THIS. `PublishService` does not touch
+            // `submission_answers`, so the document is byte-identical across a republish and the compare
+            // below passes.
+            //
+            // ⚠️ ORDER IS LOAD-BEARING IN BOTH DIRECTIONS. It runs AFTER the status re-assert for the same
+            // reason M12's does — a concurrent promote that won under the lock is a documented idempotent
+            // no-op, not a conflict — and BEFORE the checksum compare, so that a republish is reported as
+            // the superseded-version refusal it is rather than as a draft conflict it is not.
+            //
+            // ⚠️ THIS NARROWS THE WINDOW; IT DOES NOT CLOSE IT. Both reads are taken under the `submissions`
+            // row lock, which `PublishService` does not contend on — it locks `forms`. On a form carrying a
+            // `max_responses` cap the two paths DO serialize, because `FormAcceptanceGuard::assertCapacity()`
+            // takes the same `forms` lock; on an uncapped form nothing orders them, and a republish
+            // committing between these two reads and the write below is still admitted. Closing that means
+            // taking `Form::lockForUpdate()` on every promote, which is a throughput decision rather than a
+            // bug fix, and is deliberately not taken here.
+            $version = FormVersion::query()->whereKey($version->id)->firstOrFail();
+            if ($version->status !== FormVersionStatus::Published) {
+                throw SubmissionException::versionNotPublished();
+            }
+
+            $form = Form::query()->whereKey($form->id)->firstOrFail();
+            $this->acceptance->assertCanPromote($form, $row);
 
             // ── ⚠️ THE PRE-LOCK LOST UPDATE (Increment M12) — THE SECOND WRITE DOOR P3a DID NOT CLOSE ───
             // Everything this method is about to finalize was computed BEFORE the lock: the answers at the

@@ -7626,3 +7626,23 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   that opens with a vocabulary word would let a bullet QUOTING a disposition discharge itself, which
   is the mention-versus-declaration trap this same increment removed from P2b and P2c. The real repair
   is to require the disposition parenthetical to be the LAST thing on the line. **Live.** Filed by `M82`.
+
+- **`minor` · Every close-out drifts `docs/pipeline.md`, because a status bullet added to
+  `PROGRESS.md` shifts the two markers at its end and the generated line cites them by `path:N`.**
+  Filed 2026-09-07 by `M82`, found by `P1` going red during this increment's own close-out — the gate
+  working, and a coupling nobody had written down. `PROGRESS.md` carries `deferral-site-disposition`
+  and `uploading-import` at end of file; a close-out prepends one status bullet under
+  `## Current Status`, every line below moves by one, and the generated line's `Source` column goes
+  from `PROGRESS.md:304` to `:305`. ⚠️ **The end-of-file convention does NOT prevent this and was never
+  claimed to** — it prevents a marker *insertion* from shifting other documents' citations; it cannot
+  help when the shift comes from a line added above it in the same file. ⛔ **The failure mode is the
+  timing, not the drift**: `CLAUDE.md`'s close-out order regenerates the baselines and runs
+  `next.php` but never says *regenerate the pipeline last*, so the natural sequence — regenerate,
+  write the status bullet, push — lands `P1` red in CI **with the PR already open**, which is the
+  `R-2c220af7` shape `M81` fixed for tracker bytes and is the worst available moment. ⚠️ **Two
+  candidate repairs, and the cheap one may be wrong**: `scripts/next.php --write` already edits
+  `PROGRESS.md` at exactly the right point in the sequence and could regenerate the line afterwards —
+  but that makes an instrument write a second generated file, which is the coupling `state.php`
+  deliberately refuses (*"`state.php` must NOT call `pipeline.php`"*). The other is a `preflight`
+  arm reporting the drift before a push, which is where the equivalent tracker-byte signal was put.
+  **Live.** Filed by `M82`.

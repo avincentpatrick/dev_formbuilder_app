@@ -16,114 +16,126 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M82`, the coverage rules: P2a, P2b, P2c and P2e (`m82-coverage`)
+## Status: NO ACTIVE CLAIM — `M82` is merged; the pipeline design is complete in all three increments
 
-Taken 2026-09-07. Branch `m82-coverage`, cut from `origin/main` at `7e33586`, PR into `main`.
-Row: **not a backlog row — a user-directed increment, 3 of 3** of the approved pipeline design
-(increment 3: *"Add P2a–P2c and P2e"*). `M79` built the spine, `M81` built the gate's structural rules
-plus `P2d`. This is coverage: the obligation-site rules that make a documented-but-unmarked plan item
-impossible.
+## RELEASED — `M82`, the coverage rules: an obligation site cannot appear unnoticed (merged as PR #273, `10a71cc`, 6/6 green with real step counts — Static analysis 25 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 
-### Evidence verified
+Shipped 2026-09-07. Branch `m82-coverage`, cut from `origin/main` at `7e33586`. **Not a `D13` batched
+row — a user-directed increment, 3 of 3**, and the last of the approved pipeline design. `M79` built
+the spine, `M81` the gate's structural rules plus `P2d`, this the coverage.
 
-Every figure the design and the `M81` release carry was re-measured against this tree before a rule
-was designed. **The design is wrong or stale in five places, and one of them invalidates the discharge
-mechanism all four rules were going to be built on.**
+**What shipped.** Four rules in `scripts/pipeline-lint.php` — `P2a` PRD feature headings, `P2b`
+sections declaring a disposition, `P2c` deferral sentences, `P2e` acceptance criteria and their
+undispositioned residue — each enumerated, floored, and pinned by **a count and a digest**. Eleven
+rule groups now, up from seven. `scripts/pipeline.php` gains a `corpus` key on `--json` and a
+`--corpus` flag. Two markers place the residue in the line as `prd-feature-disposition` (XL) and
+`deferral-site-disposition` (L); the line goes **130 → 138 rows**. 16 new controls and 8 mutations.
 
-- ✅ **The 14 `### Feature #N` headings hold** — `docs/PRD.md:162` … `:362`, exactly 14, and **not one
-  of them carries a pipeline marker**. `docs/PRD.md` carries no marker at all.
-- ✅ **93 PRD acceptance bullets, 4 dispositioned, 89 residue** — the design's own figure reproduces
-  exactly under a closed disposition vocabulary (`Shipped`, `Partially shipped`, `Built`, `Deferred`,
-  `ADR-`, each inside the italic parenthetical the PRD already uses).
-- ⚠️ **The deferral vocabulary is worse than the release recorded, and the design's REPLACEMENT list
-  is worse still.** Measured over the generator's corpus with code spans stripped: the original seven
-  phrases match 25 lines; the six-phrase replacement the design prescribes matches **114**. `not
-  implemented` matches **0** (dead, as recorded); `deferred to Phase` matches 12 and every one is a
-  ratified decision or a record of a discharge (zero precision, as recorded). Of the replacement's own
-  entries, `does not exist|has no writer` alone matches 45 lines — including `CLAUDE.md:39`
-  (*"an unpushed claim does not exist"*) and `docs/gate-baselines.md:49`, a generated file.
-  **Four phrases survive with a live anchor and no measured false-positive class** — `has not been
-  built`, `is not built` with a negative lookahead, `still unbuilt`, `remains unbuilt` — **9 sites**
-  after code-span stripping.
-- ⚠️ **The design's "a deferral whose destination phase has already closed" nuance — the predicate it
-  calls "worth more than the whole phrase list" — measures ZERO precision on this tree.** 26 lines
-  name a destination phase; 10 target a phase the roadmap reads `COMPLETE` (Phases 0, 2, 3); **all 10
-  are records of a discharge or of a superseded statement**, e.g. *"~~deferred to a Phase 0 spike~~ —
-  RESOLVED"* and *"§6 deferred the connectors' auth-flow design to Phase 3; ADR-0009 IS that design
-  and this is its build"*. The mention-versus-declaration trap again, at corpus scale.
-- ⚠️ **The line is 130 rows, not the 129 the design and the gate's own header both state** — the
-  `M81` close-out added one. Cited because two shipped floors are sized off it.
-
-### Premise verified
-
-⛔ **THE DESIGN'S DISCHARGE MECHANISM DOES NOT EXIST, AND THAT IS THIS INCREMENT'S LOAD-BEARING
-CORRECTION.** All four rules were to be *"every obligation site carries a marker or an explicit
-`state=n/a`"*, with `M81`'s measured correction #3 prescribing attribution **by nearest preceding
-heading**. Measured: **all nine live markers sit at END OF FILE**, under a comment in each file
-stating that placement is deliberate — *"a marker inserted mid-document shifts every line beneath it,
+⛔ **THE APPROVED DESIGN'S DISCHARGE MECHANISM DOES NOT EXIST, AND THAT IS THE HEADLINE.** All four
+rules were specified as *"every obligation site carries a marker or an explicit `state=n/a`"*, and
+`M81`'s own measured correction prescribed attribution **by nearest preceding heading**. Measured
+before a line was written: **all nine live markers sit at END OF FILE**, under a comment in each file
+saying that placement is deliberate — *"a marker inserted mid-document shifts every line beneath it,
 and this repository cites documents as `path:N` — 25 such citations point into the files that carry
 markers."* So the nearest preceding heading of a marker is **whichever section happens to be last**,
-and attribution by position carries no information. The four sections that *appear* discharged under
-nearest-heading attribution are discharged by coincidence of file layout.
+and position carries no information at all. The four sections that *appeared* discharged under that
+attribution were discharged by coincidence of file layout.
 
-⛔ **AND FILE-SCOPED ATTRIBUTION, THE OBVIOUS REPAIR, IS SELF-DEFEATING INSIDE THIS INCREMENT.** Under
-it one marker anywhere in `docs/PRD.md` discharges all 14 feature sections at once — and this
-increment must add a marker to `docs/PRD.md`, because the design requires the residue itself to become
-a pipeline row. The rule would be silently satisfied by the commit that files the work it measures.
+⛔ **AND FILE-SCOPED ATTRIBUTION, THE OBVIOUS REPAIR, WOULD HAVE BEEN SATISFIED BY THIS INCREMENT'S OWN
+COMMIT.** Under it one marker anywhere in `docs/PRD.md` discharges all fourteen feature sections — and
+the design requires the residue to become a row, which meant adding a marker there. The rule would
+have been silently satisfied by the commit that filed the work it was measuring.
 
-⚠️ **Two further premises, both true and both load-bearing.** (1) `CLAUDE.md` is **not** in the
-generator's corpus (`PROGRESS.md` + `docs/**` + `app/**`, minus the ledgers), so a sweep that includes
-it — as my first one did — measures a file no marker could ever be read from. The `M81` release's
-forward caution is exactly this: **the two corpora must derive from one shared definition.** (2) The
-gate may not restate that definition; `scripts/pipeline.php --json` must expose it, on the
-`off_the_line` precedent `M81` already set — a new key touches no rendered byte, so `--check` stays
-green.
+**So the rules pin rather than discharge.** They do not claim to know whether a site is queued; they
+claim **the set of obligation sites is unchanged**, which is `tracker-lint`'s own
+`EXPECTED_CROSS_FILE_NEXT_SESSION` pattern — whose comment records that it shipped pinning a
+**known-bad** state because asserting the good one would have been red on arrival. Here the good state
+is **134 undischarged sites** away, which is the `M40` gate that can never merge.
 
-### Remedy verdict
+⛔ **THE DESIGN'S REPLACEMENT DEFERRAL VOCABULARY IS THREE TIMES WORSE THAN WHAT IT REPLACES, AND ITS
+HIGHEST-RANKED PREDICATE HAS ZERO PRECISION.** Measured over the generator's corpus with code spans
+stripped: the original seven phrases match **25** lines, the six-phrase replacement matches **114**,
+and `does not exist|has no writer` alone matches **45** — including `CLAUDE.md`'s own *"an unpushed
+claim does not exist"* and a line of a **generated** file. The design also records a nuance it calls
+*"worth more than the whole phrase list"* — a deferral whose destination phase has already closed.
+Measured: 26 lines name a destination phase, **10 target a phase the roadmap reads `COMPLETE`, and all
+10 are records of a discharge or of a superseded statement**, e.g. *"~~deferred to a Phase 0 spike~~ —
+RESOLVED"*. What shipped is four phrases, each anchored to a line that exists today; `not implemented`
+(0 hits), `deferred to Phase` (12, all ratified) and `Phase 2/3 enhancement` (2, one file) are gone,
+because **a rule that governs no line cannot be reddened**.
 
-**The prescribed remedy — marker-or-`state=n/a` per site — is structurally impossible as written** (no
-attribution exists) and **would be red on arrival even if it were possible**: 14 + 20 + 8 + 89 = **131
-undischarged sites**, the `M40` gate-that-can-never-merge shape the design's own `P2e` exists to
-avoid. `state=n/a reason=` is additionally not in the grammar — `reason` is not one of the seven
-`MARKER_KEYS`, and a non-`ready`/`done` state already requires `blocker`, so the design's key is a
-second name for a field that exists.
+⛔ **THE MENTION-AS-DECLARATION TRAP FIRED TWICE MORE, IN MY OWN TWO NEW PREDICATES, WHICH IS THE FIFTH
+AND SIXTH TIME THIS REPOSITORY HAS SHIPPED IT.** `P2b`'s first predicate collected *"Import Target: an
+Existing Form's Draft (resolving the deferred question)"* — a section **closing** a deferral, read as
+one opening it. `P2c`'s first predicate collected `docs/multi-tenancy-rbac-design.md:672`, a line
+whose full text is *"this line read **"the feature is NOT BUILT YET"** until the pre-merge review"* —
+the repair, quoting the defect. Both are now controls, and the second added a quotation-stripping arm
+alongside the code-span one the family already had.
 
-**What is built instead is the `P2e` mechanism generalised, rather than a fourth rule beside three
-others:** each of the four corpora is **enumerated, floored, and pinned by exact equality** —
-`tracker-lint`'s own `EXPECTED_CROSS_FILE_NEXT_SESSION` pattern, whose comment records that it shipped
-pinning a known-bad state for precisely this reason. The gate does not claim to know whether a site is
-queued; it claims **the set of obligation sites is unchanged**, so a new PRD feature, a new
-Out-of-Scope section or a new "still unbuilt" sentence cannot reach the trunk without an author either
-queuing it or deliberately moving a constant. A count alone is blind to a **swap** — remove one site,
-add another — which is `tracker-surgery.php`'s recorded lesson that *a deleted block is simply a
-smaller file*; so each corpus also pins a **digest over line-number-free site identities**, stable
-under prose editing and not under an addition, a removal or a move.
+⚠️ **AND MY FIRST TIGHTENING OF `P2b` WAS WRONG IN THE OTHER DIRECTION, WHICH IS WORTH RECORDING
+BECAUSE IT LOOKED PRINCIPLED.** Requiring the disposition word to open the heading or a bracketed
+clause excluded the one false positive — and also **four legitimate sections**, including the PRD's own
+*"7. Non-Goals / Explicitly Out of Scope"*, because a section number or an adjective precedes the word.
+Measured 20 where the truth is **23**. The shipped rule instead treats the canonical names as always
+declaring, and the bare word as declaring only where it is used as a NAME or opens the parenthetical
+qualifying the section.
 
-⚠️ **`P2c` ships as bookkeeping and says so in its own header.** Measured precision 5%, recall ~2%. It
-is kept for disposition hygiene and for the stale sentences it surfaces, and is **not** sold as the
-thing that prevents a sixth realignment. The release's rule that *a rule governing no line cannot be
-reddened* is applied to each phrase individually, which is what removed `not implemented`.
+**The mutations, each predicting its red case BEFORE the run, and all eight CAUGHT.** Tokens were
+written to the session scratchpad and passed to `scripts/mutate.php` by path, never through a shell.
 
-Files: `scripts/pipeline-lint.php`, `scripts/pipeline.php`, `tests/Feature/Docs/PipelineLintControlsTest.php`,
-`docs/pipeline.md`, `docs/PRD.md`, `PROGRESS.md`, `docs/feature-backlog.md`, `docs/claims/decisions.md`,
-`docs/claims/lane-a.md`, `docs/gate-baselines.md`, `scripts/gate-baselines.php`,
-`tests/fixtures/gate-baselines/ci-log.txt`.
-Shared artefacts taken: `docs/pipeline.md`, `docs/PRD.md`, `docs/feature-backlog.md`,
-`docs/claims/decisions.md`, `PROGRESS.md` (own status block and hand-off line only),
-`docs/gate-baselines.md`.
-Paired files taken: `scripts/gate-baselines.php` with `tests/fixtures/gate-baselines/ci-log.txt` — a
-new metric without its synthetic log line takes `GateBaselinesTest` red.
-Namespaces spent: **nothing from either namespace** — no migration, no ADR. Two new decision ids and
-two new pipeline marker ids.
-Prediction: PHPStan **cannot move** — it scans `app`, `database` and `routes`, and this diff is
-scripts, tests and docs. Pest gains the new control cases and nothing else; Vitest, axe and E2E are
-untouched. Static analysis is unchanged in step count — the gate is already its own step, and this
-increment adds rules to it rather than a step. `citation-liveness-lint` has **zero headroom** at 17 of
-17, so any citation I add that does not resolve reddens it.
-**The one I most expect to be wrong: `P2c`'s site count of 9.** It is the only corpus whose predicate
-is a prose pattern rather than a structural token, four of its nine hits are already visibly stale
-sentences rather than obligations, and every prior pass over this vocabulary — including two inside
-the approved design — has returned a different number.
+| # | The deliberate defect | Result | Effect on the LIVE tree |
+|---|---|---|---|
+| `MU1` | `P2b`'s disposition test becomes a bare substring over the heading | **CAUGHT** | sections 23 → **24** |
+| `MU2` | `P2c` stops stripping italic quotations | **CAUGHT** | deferrals 8 → **9** |
+| `MU3` | `P2c`'s `is not built` loses its negative lookahead | **CAUGHT** | deferrals 8 → **9** |
+| `MU4` | `pin()` stops comparing the digest | **CAUGHT** | 1 control red, isolated — the `P2a` swap |
+| `MU5` | `P2e` stops pinning the acceptance-criteria total | **CAUGHT** | 2 controls red, isolated |
+| `MU6` | `normalise_heading` stops stripping the section number | **CAUGHT** | **digest moves, count unchanged** |
+| `MU7` | `coverage_corpus` skips an unreadable path instead of refusing | **CAUGHT** | 1 control red, isolated |
+| `MU8` | `P2a`'s identity becomes the whole heading line | **CAUGHT** | **digest moves, count unchanged** |
+
+⚠️ **`MU6` AND `MU8` ARE THE ENTIRE ARGUMENT FOR THE DIGEST**, and they are the two the count could not
+see. ⚠️ **And five of the eight reddened all 38 controls rather than the one predicted, which is a
+finding about the CONTROLS rather than about the gate** — the fixture mirrors the live corpus (an
+identity carries a file path, so a synthetic corpus can reproduce the counts and never the digests),
+so a predicate that mis-collects anywhere in the tree breaks every case's baseline assertion. The
+information was recovered by re-measuring each mutant against the tree directly — the third column
+above — and the readability cost is filed rather than argued away.
+
+⚠️ **THE CONTAINER LOSES 95 FILES AND NOT ONE OF THEM IS MARKDOWN.** Measured on both sides: the
+generator's walk reaches **869** files from the host and **774** inside the app container, and the
+markdown half is **55 in both, path for path**. That is why these four rules can be driven from a
+container test at all while the gate itself still cannot be — `P2d` walks `app/`, which is exactly
+where the loss falls. The controls carry a floor on that finding so a change in it fails loudly.
+
+⚠️ **The doubled-backslash collapse trap fired, and PINT is what caught it** — not a test, not a gate.
+`--corpus`'s separator was written as an escape, the tool layer collapsed it, and the shipped line
+carried a **literal newline inside a double-quoted string**: valid PHP, correct output, and
+`single_quote` flagged it. It is now `chr(10)`, which is what `CLAUDE.md` prescribes for this host.
+`PHP_EOL` was the second draft and is worse — it makes a machine-readable list platform-dependent.
+
+✅ **THE CLAIM'S PREDICTION NAMED THE RIGHT THING.** It said *"the one I most expect to be wrong is
+`P2c`'s site count of 9"*, on the grounds that it is the only corpus whose predicate is prose. It is
+**8** — the quotation arm removed one, after the live mention-as-declaration case was found. PHPStan
+could not move and did not; Vitest, axe and E2E were untouched; `citation-liveness` held at 17 of 17
+with zero headroom.
+
+⚠️ **Filed, not fixed — six rows.** The generator **accepts two markers carrying the same id** and
+emits two rows, with nothing anywhere saying so — a live hazard these very rules make *more* likely,
+since the natural way to answer "where is this queued?" is to copy the marker to the second document.
+`--help` promises that a `done` state cites where it landed and `parse_marker()` never asks. The
+coverage rules read only the **markdown** half of the corpus, and three deferral sentences live in the
+PHP half (`app/Enums/AnalyticsAxis.php:15` and two others). The controls' corpus mirroring drowns the
+control that names a defect. And `carries_a_disposition()` reads the **first** italic parenthetical
+rather than the last, which inflates the residue rather than shrinking it — fails loud, no live case.
+**And the sixth was found by `P1` going red during this very close-out**: a status bullet added to
+`PROGRESS.md` shifts the two markers at its end, the generated line cites them by `path:N`, and so
+**every close-out drifts `docs/pipeline.md`** — a coupling nobody had written down, whose natural
+sequence lands `P1` red in CI with the PR already open.
+
+👤 **New for the user: `D24`** (134 pinned sites — schedule the sweep, or leave the residue pinned?)
+and **`D25`** (`P2c` measures 5% precision — keep it as bookkeeping, drop it, or re-aim it as a
+staleness lint?).
 
 ## RELEASED — `M81`, the gate: an unqueued obligation is now a merge failure (merged as PR #272, `89398c4`, 6/6 green with real step counts — Static analysis 25 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

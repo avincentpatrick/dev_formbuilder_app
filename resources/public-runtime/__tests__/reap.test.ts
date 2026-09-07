@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { openDb, type DraftRow, type MediaQueueRow, type MeridianDb } from '../lib/db';
-import { enqueue, markSynced } from '../lib/outbox';
+import { enqueue, markConflict, markNeedsAttention, markSynced } from '../lib/outbox';
 import { localMediaRefId } from '../lib/media-queue';
 import { MEDIA_ORPHAN_GRACE_MS, reapAbandoned } from '../lib/reap';
 import { replayOutbox } from '../lib/replay';
@@ -171,6 +171,74 @@ describe('reapAbandoned — media_queue', () => {
     });
 
     /**
+     * ⛔ THE MARK SET HAS THREE STATUSES AND ONLY `pending` WAS PINNED (M84). Every outbox row in this file
+     * was created by `enqueue`, which writes `pending`, so narrowing `liveLocalMediaIds()` to
+     * `.anyOf('pending')` deleted two-thirds of the mark set with all fourteen cases — and, measured, all
+     * 137 Vitest files — still green. `reapAbandoned` is reached from `useSyncOutbox` and `replay.ts` too,
+     * and every media fixture in those suites is either uuid-linked or inside the grace, so nothing
+     * anywhere else covered it either.
+     *
+     * ⚠️ EACH CASE SEEDS A SECOND, UNREFERENCED ORPHAN OF THE SAME AGE AND ASSERTS THE EXACT TALLY. A bare
+     * "it spared the blob" assertion is vacuous against a do-nothing reaper — `lane-b.md:1462` recorded
+     * that hole for this very file — so the discrimination is what is pinned: `named` survives BECAUSE a
+     * conflict row names it, `stray` dies because nothing does, and the count separates the two.
+     */
+    it('spares an orphaned blob that a CONFLICT outbox row still names', async () => {
+        await db.media_queue.put(media({ attachment_local_id: 'named', created_at: iso(NOW - 5 * DAY) }));
+        await db.media_queue.put(media({ attachment_local_id: 'stray', created_at: iso(NOW - 5 * DAY) }));
+        await enqueue(db, {
+            client_submission_uuid: 'u1',
+            slug: 'clinic-intake',
+            form_version_id: 'v1',
+            checksum: 'c1',
+            answers: withMediaRef('named'),
+            locale: 'en',
+            device_id: 'dev',
+            app_version: 'test',
+            respondent_session_id: 'visit-1',
+            base_content_checksum: null,
+        });
+        await markConflict(db, 'u1', 'the server copy is newer', 'form_updated');
+
+        // The status is asserted, not assumed: patchUnsent refuses a synced row, so a fixture that failed
+        // to move would silently re-test the `pending` arm this case exists to distinguish itself from.
+        expect(await db.outbox.get('u1')).toMatchObject({ status: 'conflict' });
+
+        expect(await reapAbandoned(db, NOW)).toEqual({ drafts: 0, media: 1 });
+        expect(await db.media_queue.get('named')).toBeDefined();
+        expect(await db.media_queue.get('stray')).toBeUndefined();
+    });
+
+    /**
+     * The third arm. A `needs_attention` row is the terminal state of the incomplete-media path itself —
+     * `replay.ts` refuses to POST a row whose `local:` ref resolves to nothing and parks it here after five
+     * attempts — so reaping a blob such a row still names would make that state permanent and unrecoverable.
+     */
+    it('spares an orphaned blob that a NEEDS_ATTENTION outbox row still names', async () => {
+        await db.media_queue.put(media({ attachment_local_id: 'named', created_at: iso(NOW - 5 * DAY) }));
+        await db.media_queue.put(media({ attachment_local_id: 'stray', created_at: iso(NOW - 5 * DAY) }));
+        await enqueue(db, {
+            client_submission_uuid: 'u1',
+            slug: 'clinic-intake',
+            form_version_id: 'v1',
+            checksum: 'c1',
+            answers: withMediaRef('named'),
+            locale: 'en',
+            device_id: 'dev',
+            app_version: 'test',
+            respondent_session_id: 'visit-1',
+            base_content_checksum: null,
+        });
+        await markNeedsAttention(db, 'u1', 'the payload was rejected');
+
+        expect(await db.outbox.get('u1')).toMatchObject({ status: 'needs_attention' });
+
+        expect(await reapAbandoned(db, NOW)).toEqual({ drafts: 0, media: 1 });
+        expect(await db.media_queue.get('named')).toBeDefined();
+        expect(await db.media_queue.get('stray')).toBeUndefined();
+    });
+
+    /**
      * THE GRACE WINDOW EXISTS FOR EXACTLY ONE THING: a `local:` ref that is live in memory and not yet in
      * any row this module can read — the autosave debounce, and the conflict-review session, which runs
      * with autosave inert and writes no draft row at all.
@@ -215,8 +283,16 @@ describe('reapAbandoned — media_queue', () => {
 
     /**
      * A DELIVERED ROW'S ANSWERS ARE SCRUBBED AND ITS MEDIA DELETED IN ONE TRANSACTION (I10d), so `synced`
-     * is excluded from the mark set. This pins that the exclusion is safe rather than merely cheap: after a
-     * sync there is nothing left in that row to name a blob, and nothing left of the blob to name.
+     * is excluded from the mark set.
+     *
+     * ⛔ THIS DOCBLOCK USED TO CLAIM THIS CASE PINS THAT EXCLUSION. IT DOES NOT, AND IT CANNOT (M84). The
+     * row here carries no `local:` ref and there is no `media_queue` row at all, so every mutation to the
+     * mark set leaves the case green; it asserts only that the reaper does not touch the outbox table.
+     * ⚠️ AND THE CLAIM IS UNPINNABLE RATHER THAN MERELY UNPINNED: `markSynced` empties `answers` in the
+     * same transaction, so a synced row can never name a blob and adding `synced` to the mark set is
+     * observationally inert. There is no honest test to write — so the DOCBLOCK is the thing that was
+     * wrong, and correcting it is the whole repair. The three statuses that ARE load-bearing are pinned
+     * by the three `spares an orphaned blob …` cases above.
      */
     it('leaves the outbox itself untouched', async () => {
         await enqueue(db, {

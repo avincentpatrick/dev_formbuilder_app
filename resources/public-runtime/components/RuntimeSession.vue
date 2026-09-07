@@ -33,7 +33,12 @@ import { ApiError } from '../lib/error-normalizer';
 import { acceptanceForReasonCode, hasScheduleConstraint } from '../lib/schedule';
 import { openDb } from '../lib/db';
 import { discardRow, enqueue, setAnswers } from '../lib/outbox';
-import { attachToSubmission, collectLocalMediaIds, repointToSubmission } from '../lib/media-queue';
+import {
+    attachToSubmission,
+    collectLocalMediaIds,
+    detachFromSubmission,
+    repointToSubmission,
+} from '../lib/media-queue';
 import { getDeviceId } from '../lib/device';
 import { touchRespondentSession } from '../lib/respondent-session';
 import { APP_VERSION } from '../lib/app-version';
@@ -245,9 +250,17 @@ async function handleDrift(conflictCode: string | null = null): Promise<void> {
  * `conflict` row, `App.vue`'s `beginConflictReview` already seeds from `row.answers`, and `reap.ts`
  * already spares a conflict row's media. A reload therefore re-surfaces the review WITH the edits.
  *
- * ⚠️ Media picked during the review is owned by the review's own fresh uuid, so it is re-pointed rather
- * than left behind — narrowly, via `repointToSubmission`, which filters on the source uuid precisely so
- * this cannot become M21's re-pointing defect wearing a new name.
+ * ⛔ INCREMENT M86 — THE SENTENCE THAT USED TO BE HERE WAS FALSE WHEN IT WAS WRITTEN, AND IT IS THE
+ * REASON THE DEFECT SURVIVED FOURTEEN INCREMENTS. It read: "media picked during the review is owned by
+ * the review's own fresh uuid, so it is re-pointed rather than left behind." It was not re-pointed. By
+ * the time this function runs, `handleSubmitError` has called `discardRow`, whose `deleteRow` had
+ * already deleted every one of those `media_queue` rows — so `repointToSubmission` filtered on a uuid
+ * that owned nothing and modified zero rows, silently, every time. The docblock and the code agreed
+ * with each other and both were wrong about the transaction two calls upstream.
+ *
+ * ✅ It is true now. `handleSubmitError` releases the blobs to the unclaimed state before discarding,
+ * and the call below claims them onto the parked row from there — which is why its `from` is `null`
+ * and not `runtime.clientSubmissionUuid`. The filter is exactly as narrow as M72 made it.
  */
 async function preserveReviewedAnswers(): Promise<void> {
     const parked = props.resolvingUuid;
@@ -256,7 +269,7 @@ async function preserveReviewedAnswers(): Promise<void> {
     }
     const answers = { ...runtime.answers };
     await setAnswers(db, parked, answers);
-    await repointToSubmission(db, collectLocalMediaIds(answers), runtime.clientSubmissionUuid, parked);
+    await repointToSubmission(db, collectLocalMediaIds(answers), null, parked);
     void sync?.refresh();
 }
 
@@ -319,6 +332,16 @@ function handleRedraft(conflictCode: string): void {
  *  failure leaves it pending for the background driver (→ 'queued'). */
 async function handleSubmitError(error: unknown, uuid: string): Promise<SubmitOutcome> {
     if (error instanceof ApiError) {
+        // ⛔ INCREMENT M86 — RELEASE THE MEDIA BEFORE THE DISCARD, BECAUSE `deleteRow` TAKES IT WITH THE
+        // ROW. `discardRow` drops this uuid's `media_queue` rows in the same transaction, and it always
+        // has; what changed is that the answers map survives this call on ALL THREE arms below — the
+        // `field` arm leaves the respondent on the page to fix a 422 and resubmit, the `refresh` arm
+        // remounts under a fresh uuid carrying these very answers, and the conflict arms park them on
+        // another row. Every one of them was carrying `local:` refs to blobs deleted here, and
+        // `preserveReviewedAnswers` was re-pointing rows that no longer existed — a `.modify()` over an
+        // empty match set, which succeeds silently. Releasing them to the unclaimed state keeps the
+        // blob and lets whichever arm wins claim it back; see `detachFromSubmission`.
+        await detachFromSubmission(db, collectLocalMediaIds(runtime.answers), uuid);
         await discardRow(db, uuid);
         void sync?.refresh();
         const normalized = error.normalized;

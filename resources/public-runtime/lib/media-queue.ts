@@ -84,11 +84,17 @@ export async function attachToSubmission(db: MeridianDb, attachmentLocalIds: str
  * onto the parked row — so it is a second, narrower write rather than a loosened first one.
  *
  * `from` is required and filtered on for that reason: without it this is the M21 defect with a new name.
+ *
+ * ⛔ INCREMENT M86 — `from` MAY NOW BE `null`, AND THAT IS NOT A LOOSENING. `null` is a real owner value
+ * in this table, not a wildcard: it is the unclaimed state `attachToSubmission` selects for. Passing it
+ * moves blobs that `detachFromSubmission` has just released, and the filter is exactly as narrow as it
+ * was — `row.client_submission_uuid === from` with `from === null` matches unclaimed rows and nothing
+ * else. What would be the M21 defect is dropping the filter, and it is still here.
  */
 export async function repointToSubmission(
     db: MeridianDb,
     attachmentLocalIds: string[],
-    from: string,
+    from: string | null,
     to: string,
 ): Promise<void> {
     if (attachmentLocalIds.length === 0 || from === to) {
@@ -99,6 +105,43 @@ export async function repointToSubmission(
         .anyOf(attachmentLocalIds)
         .filter((row) => row.client_submission_uuid === from)
         .modify({ client_submission_uuid: to });
+}
+
+/**
+ * Release blobs a row owns back to the unclaimed state, WITHOUT deleting them.
+ *
+ * ⛔ INCREMENT M86 — WHY THIS EXISTS, AND IT IS NOT SYMMETRY FOR ITS OWN SAKE. `handleSubmitError`
+ * discards the outbox row it just enqueued for EVERY `ApiError`, and `deleteRow` drops that uuid's
+ * `media_queue` rows in the same transaction. But the answers map is still live in component memory
+ * on all three of its arms — the respondent fixes a 422 and resubmits, or the session remounts under
+ * a fresh uuid, or a conflict review parks its edits — so every one of them carried `local:` refs to
+ * blobs that no longer existed. `repointToSubmission` was already being called over ids whose rows
+ * had been deleted two calls earlier, matching nothing, silently.
+ *
+ * ✅ AND THE RESTING STATE THIS PRODUCES IS ONE THE SYSTEM ALREADY MODELS, WHICH IS THE WHOLE REASON
+ * TO PREFER IT TO A NEW STATUS. An unclaimed blob is what a fresh pick is before `attachToSubmission`
+ * claims it, so the resubmit path re-claims these with no new code. `reap.ts`'s `liveLocalMediaIds`
+ * walks `pending`, `needs_attention` and `conflict` rows' answers, so a blob a parked review still
+ * names is live and is never swept; and for the interval where a ref exists only in memory,
+ * `MEDIA_ORPHAN_GRACE_MS` is the one-hour window whose docblock names this exact case as the reason
+ * it is an hour rather than five minutes. No new status, no `db.ts` version bump, no descriptor map.
+ *
+ * ⚠️ Filtered on the owner for `repointToSubmission`'s reason: releasing a blob this row does not own
+ * is M21 wearing a third name.
+ */
+export async function detachFromSubmission(
+    db: MeridianDb,
+    attachmentLocalIds: string[],
+    from: string,
+): Promise<void> {
+    if (attachmentLocalIds.length === 0) {
+        return;
+    }
+    await db.media_queue
+        .where('attachment_local_id')
+        .anyOf(attachmentLocalIds)
+        .filter((row) => row.client_submission_uuid === from)
+        .modify({ client_submission_uuid: null });
 }
 
 export function listForSubmission(db: MeridianDb, uuid: string): Promise<MediaQueueRow[]> {

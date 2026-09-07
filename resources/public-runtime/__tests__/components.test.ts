@@ -8,6 +8,7 @@ import type { Bootstrap } from '../lib/types';
 import { field, schemaResponse, section } from './fixtures';
 import { openDb } from '../lib/db';
 import { enqueue } from '../lib/outbox';
+import { attachToSubmission, listForSubmission, localMediaRefId, stash } from '../lib/media-queue';
 
 /** Increment M72 — the parked conflict row a review is resolving. */
 const PARKED_UUID = '0192f1a2-b3c4-7d5e-8f90-000000000072';
@@ -1331,6 +1332,132 @@ describe('RuntimeSession — the 409 a respondent is told the truth about (Incre
 
         wrapper.unmount();
         await db.outbox.clear();
+    });
+
+    // ⛔ INCREMENT M86 — THE TWO CASES BELOW ARE THE ONES THE M72 PAIR ABOVE COULD NOT SEE, AND THE ROW
+    // THAT FILED THIS SCOPED IT TO THE FIRST OF THEM. `handleSubmitError` discards the row for EVERY
+    // ApiError and `deleteRow` takes that uuid's media_queue rows with it, in the same transaction —
+    // BEFORE the branch. So the blob was gone on all three arms, and `preserveReviewedAnswers` was
+    // re-pointing rows that no longer existed: a `.modify()` over an empty match set, which succeeds and
+    // reports nothing. The conflict arm is the one that was filed; the `reschema` arm is the common one.
+    const mediaSchema = () =>
+        schemaResponse({
+            form: { save_and_resume: true },
+            fields: [field({ key: 'name', label: 'Full name' }), field({ key: 'photo', label: 'Photo', field_type: 'media' })],
+        });
+
+    async function stashPick(db: ReturnType<typeof openDb>, localId: string): Promise<void> {
+        await stash(db, {
+            attachment_local_id: localId,
+            field_key: 'photo',
+            blob: new Blob(['x'], { type: 'image/png' }),
+            name: 'pick.png',
+            mime: 'image/png',
+            size: 1,
+        });
+    }
+
+    it("keeps a review's media pick when recovery fails, and lands it on the parked row", async () => {
+        // RED BEFORE THE FIX: the media_queue row is DELETED by discardRow, the parked row's answers keep a
+        // `local:` ref to a blob that no longer exists, and replay drives that row to needs_attention.
+        const db = openDb();
+        await db.outbox.clear();
+        await db.media_queue.clear();
+        await stashPick(db, 'pick-conflict');
+        await enqueue(db, {
+            client_submission_uuid: PARKED_UUID,
+            slug: bootstrap.slug,
+            form_version_id: 'v1',
+            checksum: 'c1',
+            answers: { name: 'Adah' },
+            locale: 'en',
+            device_id: 'dev-1',
+            app_version: 'test',
+            respondent_session_id: null,
+            base_content_checksum: null,
+        });
+        await db.outbox.update(PARKED_UUID, { status: 'conflict', conflict_code: 'submission_conflict' });
+
+        const client = fakeClient({
+            submit: vi.fn(rejecting('form_updated', 'This form has been updated.')),
+            remint: vi.fn(async () => {
+                throw new TypeError('Failed to fetch');
+            }),
+        });
+        const wrapper = mount(RuntimeSession, {
+            props: {
+                schema: mediaSchema(),
+                bootstrap,
+                client,
+                resolving: true,
+                resolvingUuid: PARKED_UUID,
+                initialAnswers: { name: 'Adah', photo: [{ id: localMediaRefId('pick-conflict') }] },
+            },
+        });
+
+        await wrapper.find('input').setValue('Ada Lovelace');
+        await wrapper.find('form').trigger('submit');
+        await settle();
+
+        await vi.waitFor(async () => {
+            expect((await db.outbox.get(PARKED_UUID))?.answers.name).toBe('Ada Lovelace');
+        });
+
+        // The blob still EXISTS — released, never deleted — and it followed the answers onto the parked row.
+        expect(await db.media_queue.get('pick-conflict')).not.toBeUndefined();
+        await vi.waitFor(async () => {
+            expect((await listForSubmission(db, PARKED_UUID)).map((r) => r.attachment_local_id)).toEqual([
+                'pick-conflict',
+            ]);
+        });
+
+        wrapper.unmount();
+        await db.outbox.clear();
+        await db.media_queue.clear();
+    });
+
+    it('keeps a media pick across an ORDINARY version-drift remount, which is the arm the row never named', async () => {
+        // ⛔ THIS IS THE COMMON PATH AND IT WAS BROKEN TOO. `reschema` remounts with these very answers under
+        // a FRESH uuid, so the `local:` refs are live in memory while their blobs had already been deleted.
+        // That row is `pending`, so listPending DOES pick it and replay drives it to needs_attention — the
+        // containment argument the filing row made ("a conflict row is never picked") never covered this.
+        const db = openDb();
+        await db.outbox.clear();
+        await db.media_queue.clear();
+        await stashPick(db, 'pick-reschema');
+
+        const next = mediaSchema();
+        const client = fakeClient({
+            submit: vi.fn(rejecting('form_updated', 'This form has been updated.')),
+            remint: vi.fn(async () => undefined),
+            fetchSchema: vi.fn(async () => next),
+        });
+        const wrapper = mount(RuntimeSession, {
+            props: {
+                schema: mediaSchema(),
+                bootstrap,
+                client,
+                initialAnswers: { name: 'Ada', photo: [{ id: localMediaRefId('pick-reschema') }] },
+            },
+        });
+
+        await wrapper.find('form').trigger('submit');
+        await settle();
+        await waitForEmit(wrapper, 'reschema');
+
+        // Released to the unclaimed state rather than deleted, which is exactly what a fresh pick looks like
+        // — so the remounted session's submit re-claims it through attachToSubmission with no new code.
+        const row = await db.media_queue.get('pick-reschema');
+        expect(row).not.toBeUndefined();
+        expect(row?.client_submission_uuid).toBeNull();
+
+        // And the answers the remount carries still name it, which is what makes the blob live to reap.ts.
+        const payload = wrapper.emitted('reschema')?.[0]?.[0] as { answers: Record<string, unknown> };
+        expect(payload.answers.photo).toEqual([{ id: localMediaRefId('pick-reschema') }]);
+
+        wrapper.unmount();
+        await db.outbox.clear();
+        await db.media_queue.clear();
     });
 });
 

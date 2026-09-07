@@ -7637,9 +7637,16 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   claimed to** — it prevents a marker *insertion* from shifting other documents' citations; it cannot
   help when the shift comes from a line added above it in the same file. ⛔ **The failure mode is the
   timing, not the drift**: `CLAUDE.md`'s close-out order regenerates the baselines and runs
-  `next.php` but never says *regenerate the pipeline last*, so the natural sequence — regenerate,
+  `next.php` but names no order at all, so the natural sequence — regenerate,
   write the status bullet, push — lands `P1` red in CI **with the PR already open**, which is the
-  `R-2c220af7` shape `M81` fixed for tracker bytes and is the worst available moment. ⚠️ **Two
+  `R-2c220af7` shape `M81` fixed for tracker bytes and is the worst available moment. ⛔ **AND THE
+  FIRST DRAFT OF THIS ROW PRESCRIBED THE WRONG ORDER, WHICH IS WHY THE ORDER IS SPELLED OUT HERE**:
+  it said *regenerate the pipeline last, after `next.php --write`* — and `next.php` READS the
+  pipeline census to build the hand-off line, so that order shipped a hand-off naming 138 rows
+  against a tree holding 139, in the same close-out that filed this row. ✅ **The order is: the
+  status bullet FIRST** (it adds a line and shifts the end-of-file markers), **then `pipeline.php`,
+  then `next.php --write`** — which replaces one line in place and shifts nothing, so nothing
+  drifts behind it.
   candidate repairs, and the cheap one may be wrong**: `scripts/next.php --write` already edits
   `PROGRESS.md` at exactly the right point in the sequence and could regenerate the line afterwards —
   but that makes an instrument write a second generated file, which is the coupling `state.php`

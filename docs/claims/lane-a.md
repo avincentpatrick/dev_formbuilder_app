@@ -29,7 +29,7 @@ sections declaring a disposition, `P2c` deferral sentences, `P2e` acceptance cri
 undispositioned residue — each enumerated, floored, and pinned by **a count and a digest**. Eleven
 rule groups now, up from seven. `scripts/pipeline.php` gains a `corpus` key on `--json` and a
 `--corpus` flag. Two markers place the residue in the line as `prd-feature-disposition` (XL) and
-`deferral-site-disposition` (L); the line goes **130 → 138 rows**. 16 new controls and 8 mutations.
+`deferral-site-disposition` (L); the line goes **130 → 139 rows**. 16 new controls and 8 mutations.
 
 ⛔ **THE APPROVED DESIGN'S DISCHARGE MECHANISM DOES NOT EXIST, AND THAT IS THE HEADLINE.** All four
 rules were specified as *"every obligation site carries a marker or an explicit `state=n/a`"*, and
@@ -120,7 +120,7 @@ carried a **literal newline inside a double-quoted string**: valid PHP, correct 
 could not move and did not; Vitest, axe and E2E were untouched; `citation-liveness` held at 17 of 17
 with zero headroom.
 
-⚠️ **Filed, not fixed — six rows.** The generator **accepts two markers carrying the same id** and
+⚠️ **Filed, not fixed — seven rows.** The generator **accepts two markers carrying the same id** and
 emits two rows, with nothing anywhere saying so — a live hazard these very rules make *more* likely,
 since the natural way to answer "where is this queued?" is to copy the marker to the second document.
 `--help` promises that a `done` state cites where it landed and `parse_marker()` never asks. The
@@ -131,7 +131,7 @@ rather than the last, which inflates the residue rather than shrinking it — fa
 **And the sixth was found by `P1` going red during this very close-out**: a status bullet added to
 `PROGRESS.md` shifts the two markers at its end, the generated line cites them by `path:N`, and so
 **every close-out drifts `docs/pipeline.md`** — a coupling nobody had written down, whose natural
-sequence lands `P1` red in CI with the PR already open.
+sequence lands `P1` red in CI with the PR already open. **And the seventh, found while chasing a count disagreement that turned out to be innocent: `--check` compares the file only from `## The line` onward, so the BANNER is outside the drift check — and `state.php` reads its whole pipeline census out of exactly that line.**
 
 👤 **New for the user: `D24`** (134 pinned sites — schedule the sweep, or leave the residue pinned?)
 and **`D25`** (`P2c` measures 5% precision — keep it as bookkeeping, drop it, or re-aim it as a

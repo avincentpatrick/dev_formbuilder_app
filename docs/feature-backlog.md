@@ -7646,3 +7646,21 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   deliberately refuses (*"`state.php` must NOT call `pipeline.php`"*). The other is a `preflight`
   arm reporting the drift before a push, which is where the equivalent tracker-byte signal was put.
   **Live.** Filed by `M82`.
+
+- **`minor` · `pipeline.php --check` compares the file only from `## The line` onward, so the BANNER —
+  the one part a human would hand-correct, and the part `state.php` reads its census from — is outside
+  the drift check entirely.** Filed 2026-09-07 by `M82`, measured while chasing a 130-vs-131
+  disagreement that turned out to be innocent. `run_check()` takes `substr($disk, strpos($disk,
+  '## The line'))` and compares that against the freshly rendered body; everything above it is never
+  looked at. ⛔ **And `scripts/state.php` `derive_pipeline()` parses `**N row(s)**` and `N held` out of
+  exactly that banner line** — so a hand edit there gives every session, every hand-off and every
+  `state.php` run a false pipeline census while `pipeline-lint` P1 reports the file current. The
+  generated document's own warning that hand-editing it is a defect is the only thing standing in front
+  of it. ⚠️ **The exclusion is deliberate and the obvious fix is wrong:** the banner carries the trunk
+  sha, and comparing it byte-for-byte would report *staleness* as *drift*, which the generator's own
+  comment says are different questions — that is why `--check` starts where it does. ⛔ **Two real
+  repairs, neither free.** Compare the banner with the sha masked, which keeps the two questions apart
+  and adds a second sha-shaped regex to keep in step with the renderer; or have `derive_pipeline()`
+  count the body's table rows instead of reading the banner, which removes the reason the banner has to
+  be trustworthy at all and is the smaller change — but it makes `state.php` parse the row table, and
+  `loop.php`'s recorded lesson is about exactly what a second parser costs. **Live.** Filed by `M82`.

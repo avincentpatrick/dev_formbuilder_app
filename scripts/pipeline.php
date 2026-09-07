@@ -188,11 +188,20 @@ assert_not_self_arming($document);
 // ---------------------------------------------------------------------------------------------
 
 if ($json) {
+    // ⚠️ `off_the_line` CARRIES THE done AND n/a ROWS, AND IT IS NOT A CONVENIENCE. Without it a
+    // consumer cannot tell a FINISHED id from a MISTYPED one — both are simply absent from `rows` —
+    // and `scripts/pipeline-lint.php` P3 has to tell exactly those two apart to judge whether a
+    // roadmap row claiming work in flight is telling the truth. This adds a key and touches no
+    // rendered byte, so `--check` is unaffected.
     fwrite(STDOUT, json_encode([
         'sha' => $sha,
         'files_scanned' => $scan['files'],
         'counts' => census($open),
         'rows' => $open,
+        'off_the_line' => array_values(array_filter(
+            $rows,
+            static fn (array $r): bool => in_array($r['state'], ['done', 'n/a'], true)
+        )),
     ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)."\n");
 
     exit(0);
@@ -555,9 +564,16 @@ function render_body(array $open, array $all, array $scan): string
 
     $out .= "\n## What this file cannot see\n\n";
     $out .= sprintf(
-        "Scanned **%d file(s)**. A plan obligation with no marker at its point of truth is invisible\n"
-        ."here — that is what `scripts/pipeline-lint.php` exists to make impossible, and until it\n"
-        ."lands this file is a floor rather than a census.\n",
+        "Scanned **%d file(s)**, and `scripts/pipeline-lint.php` now gates this file on every push —\n"
+        ."it refuses a hand edit, a roadmap phase claiming work in flight without naming a live row,\n"
+        ."a second queue, a held row missing from either this line or the stop-list that guards\n"
+        ."unattended work, and a documented column that exists, is used by nothing, and is scheduled\n"
+        ."nowhere.\n\n"
+        ."⛔ **It is still a floor rather than a census, and the remaining gap is narrower than it\n"
+        ."was rather than closed.** The gate proves that what IS written down is queued and\n"
+        ."consistent. It cannot prove that everything worth writing down has been: an obligation\n"
+        ."living only in a document no rule reads is still invisible here, and the coverage rules\n"
+        ."that widen which documents count are the increment after this one.\n",
         $scan['files']
     );
 

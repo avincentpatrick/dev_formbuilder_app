@@ -7512,3 +7512,37 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   precedes the push instead of following it. ⚠️ Note the shape: this is a self-announcing constraint that
   is nonetheless invisible **where it matters**, which is the same defect class `M80` itself was filed to
   correct. **Live.** Filed by `M80`.
+
+- **`minor` · Four `subscriptions` lifecycle columns are documented, exist in the schema, and have
+  literally no reader and no writer — the first thing `P2d` found on the tree it was built against.**
+  Found 2026-09-07 by `M81`'s new `scripts/pipeline-lint.php` P2d arm, and filed rather than fixed
+  because the feature that would write them is **held**. `subscriptions.current_period_starts_at`
+  (`docs/data-dictionary.md:750`), `current_period_ends_at` (`:751`), `cancels_at` (`:752`) and
+  `canceled_at` (`:753`) each occur in exactly five places and **not one of them is a use**: a
+  `@property` docblock, a `$fillable` entry and a `$casts` entry in `app/Models/Subscription.php`, the
+  `timestampTz` line in `database/migrations/2026_07_23_000002_create_subscriptions_table.php`, and the
+  space-separated column inventory in `tests/Feature/Tenancy/TenantExtractColumnDriftTest.php:84`.
+  ⚠️ **They are the Stripe subscription-lifecycle fields**, so the writer is the held `payments-checkout`
+  row — needs a Stripe account, cut from Phase 3 by the decision of 2026-07-21. ⛔ **The reason this is a
+  row and not a marker: the columns are not themselves held, the FEATURE is**, and inventing a held
+  pipeline row per dormant column would put four rows in the line whose blocker is a fifth row's
+  blocker. The honest form is one filed row naming all four, which is also what discharges P2d's ledger
+  term. ⚠️ **The remedy is a decision, not a fix** — when payments is unheld these columns get their
+  writer, and if payments is ever abandoned the columns and their documentation should go together.
+  **Live.** Filed by `M81`.
+
+- **`minor` · `scripts/pipeline-lint.php` P2d recognises a cast by a CLOSED VOCABULARY of cast names, so
+  a cast this project adopts later reads as a write and silently un-dormants its column.** Filed
+  2026-09-07 by `M81` at the moment the trade was made, rather than left as a comment. The arm has to
+  separate an Eloquent `$casts` entry from an array-literal write, and **the two are byte-identical in
+  shape** — `'x' => 'datetime',` against `'x' => Carbon::now(),` — so shape cannot do it and the value
+  must. ⛔ **The first draft accepted any right-hand side and reported TEN live columns as dormant**,
+  two of which were being written one frame from where it said nothing touched them
+  (`app/Services/Sso/SsoDomainService.php:97`, `app/Services/Attachments/AttachmentStorageService.php:89`).
+  That is the over-collecting direction and it manufactures defects. ⚠️ **The residual risk runs the
+  other way and is smaller but real**: the vocabulary lists the cast names this corpus uses today, so a
+  custom cast class not spelled `::class`, or a future built-in, falls outside it, is read as a write,
+  and the column stops being reported — **failing SILENT rather than loud**, which is the direction a
+  floor cannot catch. ⛔ **Not fixed here because both available repairs are worse**: parsing the model
+  to find the real `$casts` array is a PHP parser this gate has no business carrying, and dropping the
+  cast arm entirely returns the ten false positives. **Live.** Filed by `M81`.

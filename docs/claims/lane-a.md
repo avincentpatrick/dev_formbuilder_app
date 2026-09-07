@@ -16,7 +16,149 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M82` is merged; the pipeline design is complete in all three increments
+## Status: ACTIVE CLAIM — `M83`, the documented-literal default arm (`m83-literal-default-drift`)
+
+Taken 2026-09-07. Branch `m83-literal-default-drift`, cut from origin/main at `cbab2c1`, PR into main.
+**The fourteenth `D13` batched increment — three rows closed, one partially discharged and re-scoped.**
+
+Rows:
+- **`docs/feature-backlog.md:4664`** (`M58`) — *"The documented-default gate reads FUNCTION-shaped cells
+  only, so a documented LITERAL that disagrees with the database is invisible to it."*
+- **`docs/feature-backlog.md:7065`** (`M78`) — *"The documented-literal drift gate needs three normalizer
+  rules, not 'a normalizer per type', and one of the row's two justifications is fabricated."*
+- **`docs/feature-backlog.md:7033`** (`M78`) — *"The data dictionary documents `tenants.status` defaulting
+  to a value that is not a legal case of the enum it names."*
+- **`docs/feature-backlog.md:6167`** (`M72`) — *"`docs/data-dictionary.md` documents nine `tenants` columns
+  that exist in no migration, and its enum catalog contradicts the enum."* **PARTIALLY discharged only —
+  see `Remedy verdict`.** Its three literal-shaped columns are forced by the gate and go; the other six,
+  the census and the catalog stay open, re-scoped by a measured correction.
+
+⚠️ **THE BATCH IS ONE HUB UNIT, NOT FOUR INDEPENDENT ROWS, AND THAT IS DELIBERATE.** `7065`'s own
+measurement says building the gate turns `6167` red unless it is taken with it, so they cannot be
+separated without merging a red gate. That spends the single `D13` hub slot on `docs/data-dictionary.md`
+— the same shape `M73` recorded when two rows had to move together and *"merging them into one cost a
+single hub slot instead of two increments."* **Filed as evidence for `D15`, which asks exactly this;
+not a re-scoping of `D13`, which is the user's.**
+
+### Evidence verified
+
+- **`4664` — HOLDS, and the row understates itself by two orders of magnitude.** The filter is one line,
+  `tests/Feature/Migrations/DocumentedDefaultDriftTest.php:150`: `if (! str_contains($defaultCell, '()'))`.
+  Measured reach today: **2 cells of 570 parsed rows** — `audits.created_at` and `feedback_reports.submitted_at`,
+  exactly the two its own control names. Literal-shaped cells: **89 value-shaped**, 481 sentinels.
+  ⚠️ **Two evidence nits.** The row's example cell `'{}'::jsonb` **does not occur** — **zero** documented
+  `Default` cells contain `::` at all; the document writes `'{}'` and Postgres reports the cast. And the
+  docblock's *"569 column rows"* is now **570**.
+- **`7065` — CONFIRMED, every number reproduces, with two corrections.** Cast rule needed by **44**, quote
+  rule by **3**, JSON-whitespace by **1**, lowercasing by **0 (dead)**. `'local'` vs `'local'::character
+  varying` holds with 43 siblings. Zero `Default` cells contain `No`/`Yes`; that is the **PII?** column
+  (`No` x549). ⛔ **Corrected: *"all 21 boolean defaults"* is 29** — 20 `false` + 9 `true`, cross-checked
+  from the DB side (`data_type='boolean' and column_default is not null` = 29). ⛔ **Corrected: *"85 of 86"*
+  is 85 of 87.** `forms.timezone`'s documented cell is `NULL`, so it is not value-shaped and sits
+  outside the 86 — the row's *"86 pairs"* and its *"2 real drifts"* cannot both be true of one collector.
+- **`7033` — HOLDS, every citation resolves.** `docs/data-dictionary.md` reads
+  `| `status` | `varchar(20)` — PHP enum: `TenantStatus` | No | `'trial'` | No | …`; live is
+  `'active'::character varying` from `create_tenants_table.php` (`->default('active')`); `TenantStatus`
+  declares exactly two cases, `Active` and `Suspended`, so `'trial'` is unrepresentable.
+- **`6167` — HOLDS, and its arithmetic is exact.** All nine columns are documented with a non-empty
+  `Default` and none exists; live `tenants` has 16 columns. `Tenant::getCustomColumns()` returns 15 — the
+  live 16 minus `data` — and is authoritative. The catalog reads `trial, active, suspended, cancelled`
+  against a two-case enum, under a preamble claiming every enum matches *"each enum's Postgres `CHECK`
+  constraint"*; `pg_constraint` for `tenants` returns only two FKs, the pkey and the slug unique — **no
+  CHECK**, in the live DB or in any of the five `tenants` migrations. ✅ **Its *"three reachable for free"*
+  is exactly right**: the literal-shaped cells naming a non-existent column number exactly three and are
+  exactly its three — `is_tax_exempt` `false`, `timezone` `'UTC'`, `settings` `'{}'`. The other six are
+  `NULL`-shaped.
+
+### Premise verified
+
+- ⛔ **`7033`'s premise is STALE IN THE ONE PLACE THAT DECIDES THE SIZING.** It calls this *"the deferred
+  documented-literal gate"*, and `4664` sizes the work as *"a second gate, not widen the predicate"*.
+  **The gate already exists** — same corpus, same parser, both a `$phantom` and an `$unknown` arm, and
+  discovery floors. The work is *invert one cell filter inside a file that is already written*, which is
+  ~40–60 lines and not a second gate. **Both rows are wrong about the cost, in the same direction.**
+- ⛔ **AND THE DOCUMENT'S OWN CONVENTION PARAGRAPH CONTRADICTS THE GATE THIS INCREMENT IS BUILDING.**
+  `docs/data-dictionary.md`'s *"What the `Default` column below means"* states: *"Exactly two columns in
+  this schema have one … **Everywhere else the value is supplied by the application**."* Measured:
+  **102 columns carry a live database-side default**, and the documented literal cells record them —
+  **41 of 86 byte-identical with no normalization at all**, 85 of 87 after three rules. That is not
+  coincidence, it is the document already doing the thing its preamble denies. ✅ **The "exactly two"
+  half survives** — restricted to FUNCTION-shaped cells it is true of the documented corpus; the third
+  live `CURRENT_TIMESTAMP` is `failed_jobs.failed_at`, framework scaffolding the document declares out of
+  scope. **It is the sentence after it that is false, and it is the sentence a literal arm falsifies.**
+- ⛔ **THE PHANTOM ROWS ARE LOAD-BEARING IN TWO OTHER DOCUMENTS, WHICH `6167` DOES NOT CARRY.**
+  `docs/non-functional-requirements.md` calls `tenants.timezone`/`default_locale` *"already-modeled
+  columns"*, and `docs/pricing-feature-gating-matrix.md` builds a Stripe-Tax paragraph on
+  `billing_country`, `tax_id` and `is_tax_exempt` **citing §1 as its source**. Deleting the rows alone
+  reproduces the `data_residency_region` failure `ADR-0017` records, three times over.
+- ⛔ **TWO `tenants` ROWS ARE DELIBERATE TOMBSTONES AND MUST NOT BE DELETED OR REDDENED.** `domain` and
+  `data_residency_region` both carry *"⚠️ **This column does not exist — corrected …**"* in their own
+  Description and are kept on purpose. They must be carved out **by property — a Description marker —
+  never by an allow-list of names.**
+- ⚠️ **A SIBLING PARSER READS THE SAME CORPUS BY THE SAME CONVENTION AND IS STRICTER.**
+  `scripts/pipeline-lint.php`'s `DICTIONARY_HEADER` is the byte-identical twin of
+  `DOCUMENTED_DEFAULT_HEADER`, with its own floors and its own `dictionary_parse()` behind P2d. It
+  requires the Column cell to be exactly one backticked identifier, so it drops all 14 `created_at /
+  updated_at` rows — 570 − 14 = **556**, the figure in its own header. **If the test's parser moves, that
+  is the sibling that must stay in step.**
+- ✅ **The complete set of programmatic readers of `docs/data-dictionary.md` is four files** — this test,
+  `DocumentedSettingKeyDriftTest`, `scripts/pipeline-lint.php` and `scripts/citation-liveness-lint.php`.
+  The ~40 other mentions are docblock prose citing by **section number**, never by line, so the repair
+  does not reach them. It would reach all of them at once if a future increment renumbered sections.
+- ⚠️ **A FOURTH COPY OF THREE OF THE COMPARED DEFAULTS LIVES IN CODE AND IS GATED BY NOTHING.**
+  `app/Models/User.php`'s `defaultUiTheme()` restates the `user_ui_preferences` defaults —
+  `theme_mode`, `font_size_scale`, `use_dyslexia_friendly_font` are all in the 86 comparable pairs. All
+  four agree today; the point is the shape. **A doc-vs-DB gate closes one edge and leaves
+  doc-vs-`defaultUiTheme()` open** — the same two-copies-of-a-fact class, one layer out.
+- ✅ **The corpus discovery misses nothing.** `glob(docs/*.md)` is one level; all 31 markdown files under
+  `docs/**/` were searched for the exact header — **zero hits**. And the container sees both documents,
+  so `M82`'s 95-lost-corpus-files trap does not reach this gate.
+
+### Remedy verdict
+
+⛔ **`4664`'s prescribed remedy is FALSE AS MEASURED, in both of its clauses.** *"Needs a normalizer per
+type"* — three **type-agnostic string** rules cover 85 of 87, and the fourth candidate is dead. *"The
+honest sizing is a second gate"* — see the premise above. **`7065` is right, and right for the right
+reasons; `4664` is the row whose remedy does not survive measurement.**
+
+⛔ **THE 328-CELL TRAP NEITHER ROW CARRIES, AND IT IS THE WHOLE DESIGN.** Both arms share one collector in
+one `it()`. Widen it to *every non-empty literal cell* and the `$phantom` arm fires **328 times** — `NULL`
+x220, `set by Eloquent` x74, `application-generated (HasUuidv7)` x32, `*derived*` x2 — **none of them
+value-shaped.** The value-shaped predicate is not a nicety; it is the single thing that holds the phantom
+arm at 0 while the literal arm goes live. It is the difference between a 4-failure gate and a 341-failure
+one, and neither row says so.
+
+⚠️ **NORMALIZER ORDER IS LOAD-BEARING AND NOBODY STATED IT.** `scope_nodes.depth` is `'0'::smallint` and
+`usage_counters.value` is `'0'::bigint` while eight other integer columns store bare `0` — and **all ten
+are documented identically as `0`**. Strip the cast **first**, then the quotes; either rule alone produces
+two false failures over the same physical value.
+
+⛔ **AND THE REPAIR IS GATED BY A CEILING WITH ZERO HEADROOM, WHICH IS WHY `6167` IS NOT CLOSED.**
+`scripts/citation-liveness-lint.php --report` reads **tier-2 rotten = 17 against `LEDGER_ROT_CEILING = 17`**,
+tier-1 at zero tolerance. There are **24 `data-dictionary.md:N` citations** in the tree, 12 of them below
+the `tenants` table, and **17 of 21 plausible line-deltas merge RED** — `+1`, `+3` and `+5` hit tier 1.
+The full repair is −7 net, which reddens it. ⚠️ **And the gate asserts a cited line is ALIVE, never that
+it says what the citation claims** — so re-pointing arithmetically passes green while being wrong, and
+two of the twelve need semantic re-aiming because the rows they target are the ones being deleted.
+
+✅ **So the shipped repair is the minimum the gate forces, measured at −3 net, which the sweep reads
+SAFE:** `tenants.status` → `'active'`, the `TenantStatus` catalog → `active`, `suspended`, the three
+literal-shaped phantom rows removed, and the convention paragraph's false universal corrected.
+**`6167` stays open** with a recorded correction naming what is discharged and what the census still owes
+— its own text already partitions it that way (*"the other six … need the census this row is for"*).
+
+Files: `tests/Feature/Migrations/DocumentedDefaultDriftTest.php`, `docs/data-dictionary.md`,
+`docs/feature-backlog.md`, `docs/claims/lane-a.md`, `PROGRESS.md`, `docs/pipeline.md`,
+`docs/backlog-triage.md`, `docs/gate-baselines.md`.
+Shared artefacts taken: `docs/data-dictionary.md`, `docs/feature-backlog.md`, `docs/pipeline.md`,
+`docs/backlog-triage.md`, `docs/gate-baselines.md`, `PROGRESS.md` (own block only).
+Paired files taken: none.
+Namespaces spent: `M83`. No migration prefix, no ADR, no `§D`.
+Prediction: the literal arm goes red on first run with **exactly 4 items** — `tenants.status` in the
+equality arm and the three `tenants` phantoms in `$unknown` — and green after the repair. **The one I
+most expect to be wrong is the line-delta arithmetic**: I expect to land −3 and I expect
+`citation-liveness-lint.php` to disagree with my count at least once, because every previous increment
+that predicted a line delta in this repository got it wrong before it got it right.
 
 ## RELEASED — `M82`, the coverage rules: an obligation site cannot appear unnoticed (merged as PR #273, `10a71cc`, 6/6 green with real step counts — Static analysis 25 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

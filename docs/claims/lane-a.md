@@ -16,7 +16,114 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M81` is merged; the gate is live and the two defects it caught first were its own
+## Status: ACTIVE CLAIM — `M82`, the coverage rules: P2a, P2b, P2c and P2e (`m82-coverage`)
+
+Taken 2026-09-07. Branch `m82-coverage`, cut from `origin/main` at `7e33586`, PR into `main`.
+Row: **not a backlog row — a user-directed increment, 3 of 3** of the approved pipeline design
+(increment 3: *"Add P2a–P2c and P2e"*). `M79` built the spine, `M81` built the gate's structural rules
+plus `P2d`. This is coverage: the obligation-site rules that make a documented-but-unmarked plan item
+impossible.
+
+### Evidence verified
+
+Every figure the design and the `M81` release carry was re-measured against this tree before a rule
+was designed. **The design is wrong or stale in five places, and one of them invalidates the discharge
+mechanism all four rules were going to be built on.**
+
+- ✅ **The 14 `### Feature #N` headings hold** — `docs/PRD.md:162` … `:362`, exactly 14, and **not one
+  of them carries a pipeline marker**. `docs/PRD.md` carries no marker at all.
+- ✅ **93 PRD acceptance bullets, 4 dispositioned, 89 residue** — the design's own figure reproduces
+  exactly under a closed disposition vocabulary (`Shipped`, `Partially shipped`, `Built`, `Deferred`,
+  `ADR-`, each inside the italic parenthetical the PRD already uses).
+- ⚠️ **The deferral vocabulary is worse than the release recorded, and the design's REPLACEMENT list
+  is worse still.** Measured over the generator's corpus with code spans stripped: the original seven
+  phrases match 25 lines; the six-phrase replacement the design prescribes matches **114**. `not
+  implemented` matches **0** (dead, as recorded); `deferred to Phase` matches 12 and every one is a
+  ratified decision or a record of a discharge (zero precision, as recorded). Of the replacement's own
+  entries, `does not exist|has no writer` alone matches 45 lines — including `CLAUDE.md:39`
+  (*"an unpushed claim does not exist"*) and `docs/gate-baselines.md:49`, a generated file.
+  **Four phrases survive with a live anchor and no measured false-positive class** — `has not been
+  built`, `is not built` with a negative lookahead, `still unbuilt`, `remains unbuilt` — **9 sites**
+  after code-span stripping.
+- ⚠️ **The design's "a deferral whose destination phase has already closed" nuance — the predicate it
+  calls "worth more than the whole phrase list" — measures ZERO precision on this tree.** 26 lines
+  name a destination phase; 10 target a phase the roadmap reads `COMPLETE` (Phases 0, 2, 3); **all 10
+  are records of a discharge or of a superseded statement**, e.g. *"~~deferred to a Phase 0 spike~~ —
+  RESOLVED"* and *"§6 deferred the connectors' auth-flow design to Phase 3; ADR-0009 IS that design
+  and this is its build"*. The mention-versus-declaration trap again, at corpus scale.
+- ⚠️ **The line is 130 rows, not the 129 the design and the gate's own header both state** — the
+  `M81` close-out added one. Cited because two shipped floors are sized off it.
+
+### Premise verified
+
+⛔ **THE DESIGN'S DISCHARGE MECHANISM DOES NOT EXIST, AND THAT IS THIS INCREMENT'S LOAD-BEARING
+CORRECTION.** All four rules were to be *"every obligation site carries a marker or an explicit
+`state=n/a`"*, with `M81`'s measured correction #3 prescribing attribution **by nearest preceding
+heading**. Measured: **all nine live markers sit at END OF FILE**, under a comment in each file
+stating that placement is deliberate — *"a marker inserted mid-document shifts every line beneath it,
+and this repository cites documents as `path:N` — 25 such citations point into the files that carry
+markers."* So the nearest preceding heading of a marker is **whichever section happens to be last**,
+and attribution by position carries no information. The four sections that *appear* discharged under
+nearest-heading attribution are discharged by coincidence of file layout.
+
+⛔ **AND FILE-SCOPED ATTRIBUTION, THE OBVIOUS REPAIR, IS SELF-DEFEATING INSIDE THIS INCREMENT.** Under
+it one marker anywhere in `docs/PRD.md` discharges all 14 feature sections at once — and this
+increment must add a marker to `docs/PRD.md`, because the design requires the residue itself to become
+a pipeline row. The rule would be silently satisfied by the commit that files the work it measures.
+
+⚠️ **Two further premises, both true and both load-bearing.** (1) `CLAUDE.md` is **not** in the
+generator's corpus (`PROGRESS.md` + `docs/**` + `app/**`, minus the ledgers), so a sweep that includes
+it — as my first one did — measures a file no marker could ever be read from. The `M81` release's
+forward caution is exactly this: **the two corpora must derive from one shared definition.** (2) The
+gate may not restate that definition; `scripts/pipeline.php --json` must expose it, on the
+`off_the_line` precedent `M81` already set — a new key touches no rendered byte, so `--check` stays
+green.
+
+### Remedy verdict
+
+**The prescribed remedy — marker-or-`state=n/a` per site — is structurally impossible as written** (no
+attribution exists) and **would be red on arrival even if it were possible**: 14 + 20 + 8 + 89 = **131
+undischarged sites**, the `M40` gate-that-can-never-merge shape the design's own `P2e` exists to
+avoid. `state=n/a reason=` is additionally not in the grammar — `reason` is not one of the seven
+`MARKER_KEYS`, and a non-`ready`/`done` state already requires `blocker`, so the design's key is a
+second name for a field that exists.
+
+**What is built instead is the `P2e` mechanism generalised, rather than a fourth rule beside three
+others:** each of the four corpora is **enumerated, floored, and pinned by exact equality** —
+`tracker-lint`'s own `EXPECTED_CROSS_FILE_NEXT_SESSION` pattern, whose comment records that it shipped
+pinning a known-bad state for precisely this reason. The gate does not claim to know whether a site is
+queued; it claims **the set of obligation sites is unchanged**, so a new PRD feature, a new
+Out-of-Scope section or a new "still unbuilt" sentence cannot reach the trunk without an author either
+queuing it or deliberately moving a constant. A count alone is blind to a **swap** — remove one site,
+add another — which is `tracker-surgery.php`'s recorded lesson that *a deleted block is simply a
+smaller file*; so each corpus also pins a **digest over line-number-free site identities**, stable
+under prose editing and not under an addition, a removal or a move.
+
+⚠️ **`P2c` ships as bookkeeping and says so in its own header.** Measured precision 5%, recall ~2%. It
+is kept for disposition hygiene and for the stale sentences it surfaces, and is **not** sold as the
+thing that prevents a sixth realignment. The release's rule that *a rule governing no line cannot be
+reddened* is applied to each phrase individually, which is what removed `not implemented`.
+
+Files: `scripts/pipeline-lint.php`, `scripts/pipeline.php`, `tests/Feature/Docs/PipelineLintControlsTest.php`,
+`docs/pipeline.md`, `docs/PRD.md`, `PROGRESS.md`, `docs/feature-backlog.md`, `docs/claims/decisions.md`,
+`docs/claims/lane-a.md`, `docs/gate-baselines.md`, `scripts/gate-baselines.php`,
+`tests/fixtures/gate-baselines/ci-log.txt`.
+Shared artefacts taken: `docs/pipeline.md`, `docs/PRD.md`, `docs/feature-backlog.md`,
+`docs/claims/decisions.md`, `PROGRESS.md` (own status block and hand-off line only),
+`docs/gate-baselines.md`.
+Paired files taken: `scripts/gate-baselines.php` with `tests/fixtures/gate-baselines/ci-log.txt` — a
+new metric without its synthetic log line takes `GateBaselinesTest` red.
+Namespaces spent: **nothing from either namespace** — no migration, no ADR. Two new decision ids and
+two new pipeline marker ids.
+Prediction: PHPStan **cannot move** — it scans `app`, `database` and `routes`, and this diff is
+scripts, tests and docs. Pest gains the new control cases and nothing else; Vitest, axe and E2E are
+untouched. Static analysis is unchanged in step count — the gate is already its own step, and this
+increment adds rules to it rather than a step. `citation-liveness-lint` has **zero headroom** at 17 of
+17, so any citation I add that does not resolve reddens it.
+**The one I most expect to be wrong: `P2c`'s site count of 9.** It is the only corpus whose predicate
+is a prose pattern rather than a structural token, four of its nine hits are already visibly stale
+sentences rather than obligations, and every prior pass over this vocabulary — including two inside
+the approved design — has returned a different number.
 
 ## RELEASED — `M81`, the gate: an unqueued obligation is now a merge failure (merged as PR #272, `89398c4`, 6/6 green with real step counts — Static analysis 25 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

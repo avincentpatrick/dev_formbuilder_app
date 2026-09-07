@@ -216,25 +216,19 @@ function documentedDefaultParse(string $path): array
 }
 
 /**
- * What discovery actually found — the three counts AND the cells, and NOTHING asserted.
+ * EVERY Default cell in the corpus, with the discovery floors already asserted.
  *
- * ⛔ THE FLOORS USED TO LIVE IN HERE, AND MOVING THEM OUT IS THE WHOLE OF M85's REPAIR. A floor
- * asserted inside a collector fires inside whichever test happened to call the collector first, so
- * a renamed heading reddened an arm named for something else entirely and aborted it before it
- * computed anything. The floors are now asserted by `it('discovers the documented corpus')` alone:
- * a discovery failure reddens the case that NAMES discovery, the build is still red, and the six
- * classification arms still run and still report whatever they could compute.
- *
- * ⚠️ THE GREEN-OVER-NOTHING GUARANTEE IS PRESERVED AT THE BUILD, NOT PER CASE. If discovery
- * collapses, the classification arms below may pass over an empty corpus — but the dedicated floor
- * case is red, so the build is red and its message names the real fault. That is the trade, stated:
- * a vacuous green in a named-but-not-guilty case, against a red that says what broke.
- *
- * @return array{documents: int, tables: int, rows: int, cells: list<array{doc: string, table: string, column: string, default: string}>}
+ * @return list<array{doc: string, table: string, column: string, default: string}>
  */
-function documentedDefaultDiscovery(): array
+function documentedDefaultAllCells(): array
 {
     $documents = documentedDefaultDocuments();
+
+    expect(count($documents))->toBeGreaterThanOrEqual(
+        DOCUMENTED_DEFAULT_MIN_DOCUMENTS,
+        'Discovery floor: fewer documents carry a column table than this corpus is known to have. '.
+        'A renamed heading or a reformatted table header makes this gate blind, so it fails instead.'
+    );
 
     $tables = 0;
     $rows = 0;
@@ -247,17 +241,17 @@ function documentedDefaultDiscovery(): array
         $cells = array_merge($cells, $parsed['cells']);
     }
 
-    return ['documents' => count($documents), 'tables' => $tables, 'rows' => $rows, 'cells' => $cells];
-}
+    expect($tables)->toBeGreaterThanOrEqual(
+        DOCUMENTED_DEFAULT_MIN_TABLES,
+        'Discovery floor: column tables found ('.$tables.').'
+    );
 
-/**
- * EVERY Default cell in the corpus. The discovery floors are asserted by their own case, not here.
- *
- * @return list<array{doc: string, table: string, column: string, default: string}>
- */
-function documentedDefaultAllCells(): array
-{
-    return documentedDefaultDiscovery()['cells'];
+    expect($rows)->toBeGreaterThanOrEqual(
+        DOCUMENTED_DEFAULT_MIN_ROWS,
+        'Discovery floor: column rows scanned ('.$rows.').'
+    );
+
+    return $cells;
 }
 
 /**
@@ -335,14 +329,11 @@ function documentedDefaultNormalize(string $value): string
 }
 
 /**
- * The classification of every Default cell into literal and unrecognised, and NOTHING asserted.
+ * Every VALUE-shaped Default cell, with the sentinel vocabulary and the literal floor asserted.
  *
- * ⛔ SAME MOVE AS `documentedDefaultDiscovery()`, AND THE SAME REASON. The closed-vocabulary and
- * literal floors are asserted by `it('classifies every Default cell it discovered')` alone.
- *
- * @return array{literal: list<array{doc: string, table: string, column: string, default: string}>, unrecognised: list<string>}
+ * @return list<array{doc: string, table: string, column: string, default: string}>
  */
-function documentedDefaultClassification(): array
+function documentedDefaultLiteralCells(): array
 {
     $literal = [];
     $unrecognised = [];
@@ -366,17 +357,21 @@ function documentedDefaultClassification(): array
             ' reads '.$cell['default'];
     }
 
-    return ['literal' => $literal, 'unrecognised' => $unrecognised];
-}
+    expect($unrecognised)->toBe(
+        [],
+        "A Default cell is neither a value, a function, nor a known sentinel. Add it to\n".
+        "DOCUMENTED_DEFAULT_SENTINELS if it describes where the value comes from, or write it as a\n".
+        "value if it is one — do not leave it for this gate to guess:\n".implode("\n", $unrecognised)
+    );
 
-/**
- * Every VALUE-shaped Default cell. The vocabulary and literal floors are asserted by their own case.
- *
- * @return list<array{doc: string, table: string, column: string, default: string}>
- */
-function documentedDefaultLiteralCells(): array
-{
-    return documentedDefaultClassification()['literal'];
+    expect(count($literal))->toBeGreaterThanOrEqual(
+        DOCUMENTED_DEFAULT_MIN_LITERAL_CELLS,
+        'Discovery floor: value-shaped Default cells found ('.count($literal).'). A drop here means '.
+        'the sentinel vocabulary or the value predicate has swallowed the corpus, which would make '.
+        'the literal arm below green over nothing.'
+    );
+
+    return $literal;
 }
 
 /**
@@ -436,19 +431,13 @@ function documentedDefaultKnownColumns(): array
  * `unknown` can never reach the normalizer and can never enter `drift`. Nothing was being protected
  * by asserting them in order. The sequence bought a reading order and nothing else.
  *
- * ✅ THE RESIDUE THIS PARAGRAPH USED TO DESCRIBE WAS CLOSED BY M85, AND BOTH OF ITS CLAIMS WERE
- * WRONG. It said the executed chain was EIGHT long and that the five collector floors could not be
- * split. **Eight was the count of the file this very commit deleted** — after M83's split the
- * longest executed chain was seven and this arm's was six — and the floors lifted out of the two
- * collectors exactly the way the classification did, into `it('discovers the documented corpus')`
- * and `it('classifies every Default cell it discovered')`.
- *
- * ⛔ AND ITS THIRD CLAIM WAS THE ONE WORTH RECORDING, BECAUSE IT WAS FALSE IN THE ALARMING
- * DIRECTION. *"One vocabulary failure still blinds the whole file"* was never true:
- * `DOCUMENTED_DEFAULT_SENTINELS` is read at exactly one site, inside the classifier, reachable only
- * from the three literal arms. It reddens three of seven cases. The attribution arm M83 isolated —
- * named here as collateral — never enters that call path at all. What genuinely reached every case
- * was DISCOVERY, which is why discovery is the floor that got its own case first.
+ * ⛔ WHAT THIS DOES NOT FIX, STATED SO THE NEXT READER DOES NOT ASSUME IT DID. The executed
+ * assertion chain is EIGHT long, not three, and the five that fire FIRST are floors inside the
+ * collectors — the three discovery floors in `documentedDefaultAllCells()` and the closed-vocabulary
+ * and literal floors in `documentedDefaultLiteralCells()`. Splitting the classification cannot reach
+ * them: when a floor fails, the later arms' data has not been computed yet, and every test in this
+ * file routes through the same collectors, so one vocabulary failure still blinds the whole file.
+ * That is a real limit of this repair and is filed rather than hidden.
  *
  * @return array{unknown: list<string>, phantom: list<string>}
  */
@@ -522,62 +511,6 @@ function documentedDefaultLiteralFindings(): array
 
     return ['unknown' => $unknown, 'phantom' => $phantom, 'drift' => $drift];
 }
-
-it('discovers the documented corpus', function (): void {
-    // ⛔ THE THREE DISCOVERY FLOORS, ASSERTED HERE AND NOWHERE ELSE (M85). They used to fire inside
-    // documentedDefaultAllCells(), which meant a renamed heading reddened whichever arm happened to call
-    // the collector first and aborted it before it computed anything — a build that said "does not
-    // document a database-side default on a column that does not exist" when what had actually happened
-    // was that the parser stopped finding tables.
-    //
-    // ⚠️ THIS CASE IS THE ONE THAT MAY NOT BE DELETED WITHOUT REPLACING IT. It is the only thing standing
-    // between a collapsed corpus and six arms that pass over nothing.
-    $found = documentedDefaultDiscovery();
-
-    expect($found['documents'])->toBeGreaterThanOrEqual(
-        DOCUMENTED_DEFAULT_MIN_DOCUMENTS,
-        'Discovery floor: fewer documents carry a column table than this corpus is known to have '.
-        '('.$found['documents'].'). A renamed heading or a reformatted table header makes this gate '.
-        'blind, so it fails instead.'
-    );
-
-    expect($found['tables'])->toBeGreaterThanOrEqual(
-        DOCUMENTED_DEFAULT_MIN_TABLES,
-        'Discovery floor: column tables found ('.$found['tables'].').'
-    );
-
-    expect($found['rows'])->toBeGreaterThanOrEqual(
-        DOCUMENTED_DEFAULT_MIN_ROWS,
-        'Discovery floor: column rows scanned ('.$found['rows'].').'
-    );
-});
-
-it('classifies every Default cell it discovered', function (): void {
-    // ⛔ THE CLOSED-VOCABULARY AND LITERAL FLOORS, ASSERTED HERE AND NOWHERE ELSE (M85). Same move as
-    // the case above and the same reason — but note the asymmetry the row that filed this got wrong:
-    // these two floors were NEVER file-wide. DOCUMENTED_DEFAULT_SENTINELS is read at one site, in the
-    // classifier, reached only by the three literal arms. Splitting them out narrows a three-case
-    // failure to a one-case failure; splitting discovery out narrowed a seven-case one.
-    $classified = documentedDefaultClassification();
-
-    expect($classified['unrecognised'])->toBe(
-        [],
-        "A Default cell is neither a value, a function, nor a known sentinel. Add it to
-".
-        "DOCUMENTED_DEFAULT_SENTINELS if it describes where the value comes from, or write it as a
-".
-        "value if it is one — do not leave it for this gate to guess:
-".implode("
-", $classified['unrecognised'])
-    );
-
-    expect(count($classified['literal']))->toBeGreaterThanOrEqual(
-        DOCUMENTED_DEFAULT_MIN_LITERAL_CELLS,
-        'Discovery floor: value-shaped Default cells found ('.count($classified['literal']).'). A drop '.
-        'here means the sentinel vocabulary or the value predicate has swallowed the corpus, which '.
-        'would make the three literal arms green over nothing.'
-    );
-});
 
 it('does not document a database-side default on a column that does not exist', function (): void {
     $unknown = documentedDefaultFunctionFindings()['unknown'];

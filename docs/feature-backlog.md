@@ -7045,8 +7045,40 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   ⚠️ **`repointToSubmission` is a SECOND ownership writer that post-dates the reaper row** (`M72`), which is
   why no earlier pass saw it. **Live.** Filed by `M78`.
 
-- **`minor` · `reap.test.ts` leaves the mark set's status list unpinned, so a third of it can be deleted
-  with all 14 cases green.** Measured by `M78` (2026-09-06). `liveLocalMediaIds` spares blobs referenced by
+- ~~**`minor` · `reap.test.ts` leaves the mark set's status list unpinned, so a third of it can be deleted
+  with all 14 cases green.**~~
+  ✅ **DONE — M84 (2026-09-07). EVERY CITATION HELD AND THE DEFECT IS WIDER THAN THE ROW SAYS; ITS
+  CROSS-ROW CLAUSE IS FALSE.** Two cases now pin the `conflict` and `needs_attention` arms.
+  ⚠️ **THE ROW UNDERSTATES ITS OWN ARITHMETIC AND ITS BLAST RADIUS.** *"A third of it"* is two-thirds —
+  narrowing the mark set to `pending` drops two of three statuses. And it does not merely leave *"the
+  whole file"* green: `reapAbandoned` is also reached from `useSyncOutbox` and `replay.ts`, and every
+  media fixture in those suites is either uuid-linked or inside the grace, so the mutation left **all
+  137 Vitest files** green. Nothing anywhere covered these two arms.
+  ⛔ **THE CROSS-ROW CLAUSE IS FALSE, AND IT WAS THE ROW'S PRIORITY ARGUMENT.** It says the `conflict`
+  arm *"is exactly what the open conflict-review row's cheapest remedy leans on"*. Neither open
+  conflict-review row depends on the status list: one leans on a NEW protected set threaded from the
+  runtime's provider, which does not go through the mark set at all; the other leans on `listPending`
+  and `retryRow` refusing a conflict row, over media that is uuid-linked and therefore skipped before
+  status is ever read. The defect is untouched by this; only the reason to hurry was wrong.
+  ✅ **EACH CASE PINS DISCRIMINATION, NOT INACTION.** A bare *"it spared the blob"* assertion is vacuous
+  against a do-nothing reaper — `lane-b.md:1462` recorded that hole for this very file — so each case
+  seeds a SECOND unreferenced orphan of the same age and asserts the exact tally.
+  ✅ **FOUR MUTANTS, ALL CAUGHT, AND TWO OF THEM ISOLATE THE ARMS.** Narrowing to `pending` reddens both
+  new cases and leaves the original fourteen green — which is the row's own claim, reproduced as a
+  measurement. Restoring `conflict` alone reddens the `needs_attention` case alone and vice versa, so
+  each case pins its own arm rather than the pair jointly. Making the live set unconditionally empty
+  reddens both, which is the non-vacuity control.
+  ⚠️ **THE HARNESS WAS HAND-ROLLED AND ITS OWN FIRST VERSION WAS WRONG**, which is the open row about
+  `scripts/mutate.php` driving only Pest being paid rather than fixed. Vitest prints two summary lines,
+  and a naive scan matched `Test Files  1 passed` — reporting a sixteen-test baseline as one and, far
+  worse, able to read a RED baseline as `0 failed`. Caught by the count disagreeing with a known good
+  run. The baseline-must-be-green rule is only as good as the parser that reads it.
+  ✅ **AND ONE DOCBLOCK WAS THE DEFECT.** The neighbouring case *"leaves the outbox itself untouched"*
+  claimed to pin that `synced` is safely excluded from the mark set. It pins nothing of the kind, and
+  the claim is UNPINNABLE: `markSynced` empties `answers` in the same transaction, so a synced row can
+  never name a blob and adding `synced` to the set is observationally inert. There is no honest test to
+  write, so the docblock was corrected instead.
+  Original filing follows. Measured by `M78` (2026-09-06). `liveLocalMediaIds` spares blobs referenced by
   outbox rows with status `pending`, `needs_attention` or `conflict` — but **every** outbox row in
   `reap.test.ts` is created by `enqueue`, which writes `status: 'pending'`. Mutating the `anyOf` to
   `.anyOf('pending')` leaves the whole file green. ⚠️ The `conflict` arm is exactly what the open
@@ -7673,8 +7705,36 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   where a case publishes only the documents it needs, so a predicate defect elsewhere cannot reach it.
   **Live.** Filed by `M82`.
 
-- **`minor` · `carries_a_disposition()` reads the FIRST italic parenthetical on an acceptance bullet,
-  so a bullet whose prose already contains one hides its own disposition.** Filed 2026-09-07 by `M82`.
+- ~~**`minor` · `carries_a_disposition()` reads the FIRST italic parenthetical on an acceptance bullet,
+  so a bullet whose prose already contains one hides its own disposition.**~~
+  ✅ **DONE — M84 (2026-09-07). THE DEFECT IS REAL AND RUNS IN BOTH DIRECTIONS; ONE OF THE ROW'S
+  CITATIONS IS FALSE AND ITS "NO LIVE INSTANCE" IS TOO CONFIDENT.** The predicate now requires the
+  disposition to be the LAST thing on the line — a suffix test plus a last-match search.
+  ⛔ **THE ROW MISSED THE WORSE HALF.** It frames the first-match rule as purely under-collecting. It
+  also OVER-collects: a bullet that merely QUOTES a disposition first discharges itself, so a live
+  product commitment silently leaves the residue set. That is the mention-versus-declaration trap the
+  same increment removed from `P2b` and `P2c`, still sitting in `P2e` — and the row names that trap
+  only as something the *obvious fix* would introduce, not as something already shipped.
+  ⚠️ **ONE CITATION IS FALSE AS WRITTEN.** The row offers `*(e.g., CAPTCHA)*` as a shape *"the PRD's
+  bullets do carry"*. The live text is in PLAIN parentheses, and no acceptance bullet in the PRD holds
+  a second italic parenthetical at all — in all four that hold one, the first IS the disposition. The
+  hazard needed an author to write it, which is why the control below has to create it.
+  ⛔ **NOT AN ANCHORED REGEX, AND THE REASON IS MEASURED.** A pattern anchored at both ends passes today
+  only by luck: one acceptance bullet carries an inner `)` earlier in its line, so a `[^)]+` body stops
+  in the wrong place the moment such a bullet also carries a disposition.
+  ✅ **THE CONSTANTS DO NOT MOVE — RESIDUE 89, DIGEST UNCHANGED — WHICH IS WHY THE PROOF IS THE WHOLE
+  JOB.** The live gate is green under both predicates, so it can distinguish nothing. Two controls
+  cover the shapes where they diverge, both editing a line IN PLACE so the fixture's line count does
+  not move. Three mutants settle them: restoring the first-match body reddens **both** and only those
+  two of forty; dropping the suffix guard alone reddens the QUOTES case alone; turning the last-match
+  search back into a first-match search reddens the incidental-parenthetical case alone.
+  ⚠️ **The `M82`-filed corpus-mirroring effect did not appear** — the controls mirror the live corpus,
+  so a mis-collecting mutation was expected to redden all thirty-eight; it reddened exactly the two
+  aimed at. Recorded because it was predicted and did not happen.
+  ⛔ **WHAT WAS DELIBERATELY LEFT: the row's "no live instance today" is wrong**, and the live instance
+  is filed as its own row rather than smuggled into this repair, because fixing it moves a pinned
+  constant and is entangled with the open `D24`.
+  Original filing follows. Filed 2026-09-07 by `M82`.
   The predicate is `/\*\((.+)$/` plus a closed vocabulary, and the PRD's bullets do carry incidental
   parentheticals — `*(e.g., CAPTCHA)*` is the shape. A bullet carrying an incidental one BEFORE its
   disposition parenthetical reads as undispositioned, which is the **under**-collecting direction:
@@ -7758,6 +7818,12 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   its target — an anchor, a quoted fragment, a heading — which is a corpus-wide change to how this
   repository cites, not a change to the gate. **Two of the twelve pinned citations already need semantic
   re-aiming rather than an offset**, because the rows they point at are the ones a full repair deletes.
+  ⚠️ **A MEASURED INSTANCE, FOUND BY `M84` (2026-09-07) WITHOUT LOOKING FOR ONE.**
+  `docs/adr/0007-async-execution-substrate.md` cites `docs/feature-backlog.md:85` for a quoted sentence
+  about enabling infrastructure. Line 85 is a **table header row**. It is not blank, not a rule, not a
+  fence and not a separator, so it resolves and the zero-tolerance tier reports green over a citation
+  that points at nothing like its subject. The row predicted this shape; here it is, in the tier where
+  the ceiling cannot absorb it.
   **Live.** Filed by `M83`.
 
 - **`minor` · The data dictionary's enum catalog contradicts the enum for `ComparisonOperator` and
@@ -7823,8 +7889,32 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   generator**: a row would have to declare its repair surface, which is a change to how rows are written.
   **Live.** Filed by `M83`.
 
-- **`minor` · The literal arm's three assertions are sequenced, so a run reports only the first arm that
-  fails and a reader cannot see the whole drift set.** Measured by `M83` (2026-09-07) about the gate it
+- ~~**`minor` · The literal arm's three assertions are sequenced, so a run reports only the first arm that
+  fails and a reader cannot see the whole drift set.**~~
+  ✅ **DONE — M84 (2026-09-07). THE EVIDENCE HELD EXACTLY; THE ROW'S DEFENCE OF THE ORDERING IS FALSE,
+  AND ITS TWO OPTIONS ARE THE WRONG WAY ROUND.** Both arms are now one `it()` per finding over a shared
+  collector — four cases became seven — which is the file's own house pattern rather than an invention:
+  `ConstraintBoundaryDriftTest`, `TenantTableClassificationDriftTest` and `TenantExtractColumnDriftTest`
+  all already assert one finding per case over a shared collector. `DocumentedDefaultDriftTest` was the
+  outlier.
+  ⛔ **THE SEQUENCE WAS PROTECTING NOTHING.** The row argues the ordering is *"deliberate and worth
+  keeping"* because a column that does not exist poisons any comparison of its value. That is true of
+  the CLASSIFICATION and it is already enforced by code the row does not mention — the two early
+  `continue`s make the buckets disjoint, so a cell in `$unknown` can never reach the normalizer and can
+  never enter `$drift`. Nothing was being protected by asserting them in order.
+  ⛔ **THE ROW PREFERS THE OPTION THAT CANNOT BE PROVED.** Its cheap fix — a count of the later arms
+  printed in the earlier arm's message — is mechanically correct, but no deliberate defect turns a
+  message-text improvement red short of a meta-test asserting on a string builder, which is the
+  decorative shape this project already rejects. The option the row files as expensive is the only one
+  a mutation can settle, so it is the one that shipped.
+  ✅ **PROVED BEFORE AND AFTER RATHER THAN ASSERTED.** One mutant fires TWO arms at once — a column
+  renamed so it names nothing live, and a correct documented literal changed to a wrong value, in a
+  single two-line token. Against the PRE-repair file it reddens **one** test and the drift stays
+  invisible behind it (1 failed, 3 passed). Against the shipped file it reddens **two** (2 failed, 5
+  passed). That is the whole property of this repair, measured in both directions.
+  ⚠️ **WHAT IT DOES NOT FIX IS FILED SEPARATELY**: the executed chain is eight assertions long, and the
+  five collector floors that fire first cannot be split at all.
+  Original filing follows. Measured by `M83` (2026-09-07) about the gate it
   just wrote, from watching it happen twice in one increment. `$unknown`, `$phantom` and `$drift` are collected
   in one pass and then asserted in that order, so the first non-empty one aborts the test: the initial run
   showed three `$unknown` cells and said nothing about `tenants.status`, which only appeared after they
@@ -7835,3 +7925,79 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `$unknown` before `$phantom` since `M58` and has never been noticed because both have been empty. The
   cheap fix is a count of what the later arms hold, printed in the earlier arm's message; the thorough one
   is three `it()` blocks sharing one collector. **Live.** Filed by `M83`.
+
+
+- **`minor` · `scripts/citation-liveness-lint.php` carries a SECOND copy of the partial-path blindness,
+  and there it silently un-checks a citation in the ZERO-TOLERANCE tier.** Measured by `M84`'s fan-out
+  (2026-09-07) while verifying the open triage-generator row that filed the FIRST copy. Both scripts
+  resolve a citation token the same way — a token containing a slash is looked up as a literal path and,
+  failing that, abandoned — but the consequences are not the same, and the second one is worse. In
+  `scripts/backlog-triage.php` an unresolved token only costs a row its ranking. Here an unresolved
+  citation is counted and printed and **never fails the gate**, so a partial-path `path:N` citation in
+  the tier-1 corpus is never line-checked at all. ⛔ **There is a live instance:**
+  `docs/ux/design-system-reference.md` cites a partial path into `resources/js/Pages/submissions/` that
+  resolves to nothing, and it sits inside the zero-tolerance tier reporting green. ⛔ **AND THE REPAIR IS
+  RED ON ARRIVAL, WHICH IS WHY THIS IS FILED RATHER THAN FIXED.** Patching the unambiguous-suffix arm in
+  takes the ledger tier from **17 rotten to 18 against `LEDGER_ROT_CEILING = 17`**, whose comparison is
+  strict and whose headroom is zero — the newly-exposed corpse being a `Checklist/Checklist.vue` citation
+  that lands on a blank line. It is the `M83` lesson exactly: widening a collector detonates the arms
+  that share it. The honest sequence is to re-point the newly-visible dead citations first, in their own
+  increment, and only then widen the resolver. **Live.** Filed by `M84`.
+
+- **`minor` · `scripts/mutate.php` cannot prove ANY gate whose truthful container answer is RED, and a
+  shipped gate is already in that state.** Measured by `M84`'s fan-out (2026-09-07). The harness runs a
+  baseline first and aborts on `the baseline is NOT green`, which is correct and load-bearing — a red
+  that was already red proves nothing. But `tests/Feature/Docs/SuiteCollectionFloorTest.php` is
+  **permanently red in the app container by design**: it reports that PHPUnit's collector sees 388 of the
+  428 test files on disk, and that is a true statement about this host. So the one gate that measures the
+  collector hole can never be proved by deliberate defect here, and neither can any future gate whose
+  honest container answer is red. ⚠️ **This is a sharper instance of the open row recording that the
+  harness drives only Pest in a container**, and it is a different mechanism: that row is about the
+  RUNNER, this one is about the BASELINE PRECONDITION. ⛔ **It also re-prices an open decision.** `D17`
+  and the row it belongs to both cost the permanent red purely as reader fatigue — *"a permanently-red
+  test teaches a reader to skip red"*. The larger cost is that it disarms this repository's mandated
+  proof device for that file. `--skip-baseline` is not a way out: the harness itself says such a run
+  cannot tell a mutation-caused failure from a pre-existing one, which is no verdict. **Live.** Filed by
+  `M84`.
+
+- **`minor` · `scripts/pipeline.php` derives a defect row's state from LIVENESS alone, so a row blocked
+  on an open USER DECISION is published as `state=ready`.** Measured by `M84`'s fan-out (2026-09-07)
+  against a row it had just refused to take for exactly that reason. The generator maps a `live` marker
+  to `ready` and has no way to see that a row's remaining half is a question handed to the user: the
+  PHPUnit-collector row is `ready` with blocker `—` in the generated line, while its own text says it is
+  *"live until `D17` is answered"* and `D17` sits open in `docs/claims/decisions.md`. ⚠️ **The queue
+  therefore offers as startable a row whose only remaining work is a decision an increment may not
+  take** — which is the one thing the held-row machinery exists to prevent, arriving through a door it
+  does not watch. ⛔ **The generated file already warns that `state=ready` on work that is actually
+  blocked passes everything**, so this is that warning with a measured instance attached rather than a
+  new claim. The cheap repair is a marker key naming a decision id, checked against the `## OPEN`
+  section; the expensive half is deciding whether a decision-blocked row is `held` or a fourth state.
+  **Live.** Filed by `M84`.
+
+- **`minor` · `DocumentedDefaultDriftTest`'s executed assertion chain is EIGHT long, and the five that
+  fire FIRST cannot be split the way the other three were.** Found by `M84` (2026-09-07) while closing
+  the row about the three sequenced classification arms — this is the half that repair cannot reach, and
+  it is filed rather than left implied. Three discovery floors inside `documentedDefaultAllCells()` and
+  the closed-vocabulary and literal floors inside `documentedDefaultLiteralCells()` all `expect()` before
+  any classification exists. ⛔ **Splitting is structurally impossible for them**: when a floor fails, the
+  later arms' data has not been computed, so there is nothing to report a count of. ⚠️ **And all seven
+  cases in the file route through the same two collectors**, so a single broken sentinel vocabulary still
+  blinds the whole file — including the attribution arm, which `M83` deliberately isolated so that it
+  could redden alone. The honest repair is not another split but a way for a collector floor to report
+  what it could NOT compute, which is a different shape from anything in this file today. **Live.** Filed
+  by `M84`.
+
+- **`minor` · Two PRD acceptance criteria are dispositioned in INDENTED CONTINUATION bullets the
+  collector skips, so `P2e`'s residue reconciles against its own predicate rather than against the
+  document.** Measured by `M84`'s fan-out (2026-09-07) while repairing `carries_a_disposition()`. The
+  closed row asserted that *"the 93/89 split reconciles exactly against a hand count"*. It does not.
+  `docs/PRD.md` states the outcome of two criteria on the line BELOW each of them, as two-space-indented
+  continuation bullets reading *"As built (I5)"* — and `p2e_acceptance_residue()` collects only lines
+  opening with `- `, so both parents are counted as undispositioned. **A hand count of criteria whose
+  outcome the PRD records is 87, not 89.** ⚠️ It is the same failure class as the row just closed — a
+  disposition the predicate cannot see — and unlike that one it has a LIVE instance. ⛔ **It was
+  deliberately not folded into that repair.** Accepting the continuation form moves
+  `EXPECTED_UNDISPOSITIONED_BULLETS` and its digest, and the question of whether an indented
+  continuation may carry a disposition at all is entangled with the open `D24`, whose option 2 retires
+  the bullet-level arm outright. Two edits to one constant in one increment, for two different reasons,
+  is how a pinned number stops meaning anything. **Live.** Filed by `M84`.

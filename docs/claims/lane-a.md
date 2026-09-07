@@ -33,6 +33,48 @@ as its own `ci.yml` step, in `preflight --with-gates`, and as a `gate-baselines.
 coupled fixture line its controls require. 22 positive controls in
 `tests/Feature/Docs/PipelineLintControlsTest.php`, and five mutations through `scripts/mutate.php`.
 
+**The mutations, each predicting its red case BEFORE the run, and each caught by exactly the control
+it predicted.** Token files were written to the session scratchpad and passed to `scripts/mutate.php`
+by path, never through a shell — that is the `M31` root cause, and this repository commits no corpus
+of mutation definitions, so the `MU` numbers are assigned here and nowhere else.
+
+| # | The deliberate defect | Result | What went red |
+|---|---|---|---|
+| `MU1` | `P4` loses its second direction — the held-row-to-stop-list loop iterates nothing | **CAUGHT** | *reddens IN THE OTHER DIRECTION when the stop-list drops a topic the line still holds* |
+| `MU2` | `P3` stops asking whether a cited row is **still in the line**, accepting any resolving id | **CAUGHT** | *reddens when every row a phase cites has already left the line* |
+| `MU3` | `P2d`'s cast vocabulary loses the cast this corpus uses most, so a cast entry reads as a write | **CAUGHT** | *does NOT count a cast entry as a use, which is how a dormant column hides* |
+| `MU4` | The generator floor stops being a floor, so a blind scan is ruled over rather than refused | **CAUGHT** | *REFUSES rather than passing when the generator scan has gone blind* |
+| `MU5` | `P6` matches a marker **anywhere** on a line rather than at column 0 | **CAUGHT** | *does NOT fire on an INDENTED marker, which the generator emits by design* |
+
+⚠️ **`MU1`, `MU3` and `MU5` kill the OVER-collecting direction, which is the half a single mutation per
+rule cannot reach.** Each of those three reddens a control whose expectation is `CLEAN` — the gate
+becoming *noisier* is as much a defect as it going blind, and `P3`'s and `P2d`'s real first-run failures
+were both of that kind.
+
+⛔ **THE MUTATIONS ARE NOT COMMITTED, AND THAT IS A DEPARTURE FROM `CLAUDE.md` WITH A STATED REASON
+RATHER THAN AN OVERSIGHT.** The rule exists because *"left in the working tree, a diff-based check
+still sees the unmutated file at the parent commit and accidentally gives the right answer."* **No rule
+in this gate reads a diff.** `mutate.php` writes the mutant to disk, the control copies **those bytes**
+into its fixture and runs them, and the gate's own `P1` delegates to the generator's `--check`, which
+compares the file on disk against a fresh derivation of the working tree. A committed mutant and a
+working-tree mutant are therefore indistinguishable to every arm here, and each run proved its own
+write anyway: the sha256 moved, the mutated line was printed, and the restore was verified by byte
+comparison with `git status` clean afterwards. ⚠️ **The rule still binds for `tracker-lint` R7**, whose
+input genuinely is the commit graph — do not read this as retiring it.
+
+⚠️ **A FORWARD CAUTION FOR INCREMENT 3, MEASURED HERE RATHER THAN LEFT TO BE REDISCOVERED.** All nine
+markers live in `.md` files; **the `.php` half of the generator's corpus walk has never carried one**,
+so that branch is unexercised in production. And the coverage rules are pulled toward scanning a
+*wider* corpus than the generator — specifically the ledgers and claim files
+`scripts/pipeline.php:76-78` deliberately excludes, because *"they quote obligations rather than owning
+them."* ⛔ **A rule that widens the corpus and then demands a marker in one of those files asks for the
+duplicate fact the generator refuses, and any marker added to satisfy it would be INVISIBLE to the
+generator** — producing a lint-green pipeline still missing the row, which is the exact failure this
+whole design exists to end. `P2d` avoids it by construction: it demands a marker nowhere, and treats
+the ledger, the decision record and the line as *discharge* terms. If a coverage rule must scan wider,
+**the two corpora have to derive from one shared definition**, or they disagree silently in the one
+direction that makes the gate useless.
+
 ⛔ **THE HEADLINE IS THAT THE GATE'S TWO WORST DEFECTS WERE ITS OWN, AND BOTH WERE FOUND BY RUNNING IT
 RATHER THAN BY READING IT.**
 

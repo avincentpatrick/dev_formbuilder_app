@@ -7957,8 +7957,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   and the row it belongs to both cost the permanent red purely as reader fatigue — *"a permanently-red
   test teaches a reader to skip red"*. The larger cost is that it disarms this repository's mandated
   proof device for that file. `--skip-baseline` is not a way out: the harness itself says such a run
-  cannot tell a mutation-caused failure from a pre-existing one, which is no verdict. **Live.** Filed by
-  `M84`.
+  cannot tell a mutation-caused failure from a pre-existing one, which is no verdict.
+  **Live.** Filed by `M84`.
 
 - **`minor` · `scripts/pipeline.php` derives a defect row's state from LIVENESS alone, so a row blocked
   on an open USER DECISION is published as `state=ready`.** Measured by `M84`'s fan-out (2026-09-07)
@@ -7984,8 +7984,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   cases in the file route through the same two collectors**, so a single broken sentinel vocabulary still
   blinds the whole file — including the attribution arm, which `M83` deliberately isolated so that it
   could redden alone. The honest repair is not another split but a way for a collector floor to report
-  what it could NOT compute, which is a different shape from anything in this file today. **Live.** Filed
-  by `M84`.
+  what it could NOT compute, which is a different shape from anything in this file today.
+  **Live.** Filed by `M84`.
 
 - **`minor` · Two PRD acceptance criteria are dispositioned in INDENTED CONTINUATION bullets the
   collector skips, so `P2e`'s residue reconciles against its own predicate rather than against the

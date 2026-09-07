@@ -76,10 +76,21 @@ use Symfony\Component\HttpFoundation\Response;
  * `throttle:login` and nothing else, which is the failure mode of the alternative design (a group-wide
  * `throttle:` entry on the config array above).
  *
- * ⚠️ TWO WRITE ROUTES ARE UNBOUND BY DECISION RATHER THAN BY OVERSIGHT — `logout` and
- * `user-profile-information.update`. Both are named in `FortifyRateLimitTest`'s decided-unbound list with
- * their reasons, and the coverage gate passes *because that decision is recorded*: remove either from that
- * list and it goes red naming the route. The reasons live there rather than here so there is one copy.
+ * ⚠️ ONE WRITE ROUTE IS UNBOUND BY DECISION RATHER THAN BY OVERSIGHT — `logout`, and only `logout`. It is
+ * named in `FortifyRateLimitTest`'s decided-unbound list with its reason, and the coverage gate passes
+ * *because that decision is recorded*: remove it from that list and it goes red naming the route. The
+ * reason lives there rather than here so there is one copy.
+ *
+ * ⛔ IT WAS TWO UNTIL `M87`. `user-profile-information.update` came off that list and into the map below,
+ * because the decision recorded for it had stopped being defensible: it was excluded as a route that
+ * "verifies no credential", and M43's scope in fact already included two routes that verify none
+ * (`register.store` and `password.email`, the latter a pure mail dispatcher — the very analogue the row
+ * argued from). The phrase was a label applied afterwards, not the boundary that was drawn.
+ * ⚠️ AND THE LIST'S SAFETY IS NOW ASSERTED IN BOTH DIRECTIONS. Until `M87` the gate only caught a name
+ * REMOVED from the decided-unbound list while still unmapped; a name LEFT on it after being mapped stayed
+ * green forever, so a repair that added the map entry and forgot the list would have shipped a stale
+ * decision of record. `FortifyRateLimitTest` now asserts that every name on that list is genuinely
+ * unmapped and unaliased.
  */
 final class ThrottleFortifyEndpoints
 {
@@ -105,6 +116,11 @@ final class ThrottleFortifyEndpoints
             'user-password.update' => 'password-update',
             'password.confirm.store' => 'password-confirm',
             'two-factor.confirm' => 'two-factor-confirm',
+
+            // Authenticated, sends mail to an address the CALLER supplies, and asks a cross-tenant
+            // uniqueness question on the way. Two arms in the limiter: tight on an address change, loose
+            // on a name change, because only one of the two is an exposure. See FortifyServiceProvider.
+            'user-profile-information.update' => 'profile-information-update',
 
             // The 2FA lifecycle verbs. Looser: they mutate enrolment rather than test a secret.
             'two-factor.enable' => 'two-factor-manage',

@@ -44,15 +44,18 @@ uses(RefreshDatabase::class);
 */
 
 /**
- * The two write routes deliberately left unbound, each with the reason it is not an oversight.
+ * The write routes deliberately left unbound, each with the reason it is not an oversight.
  *
- * `logout` accepts no credential, and throttling it strands somebody in a session they are trying to
- * leave. `user-profile-information.update` IS a real exposure — it nulls `email_verified_at` and sends a
- * verification mail on every address change, so it is a second mail cannon aimed at arbitrary recipients —
- * and it is out because this increment's scope was set at the eight credential-bearing routes. It is filed
- * as its own backlog row rather than left here as a silent gap.
+ * `logout` accepts no credential, and throttling it strands somebody in a session they are trying to leave.
+ *
+ * ⛔ `user-profile-information.update` LEFT THIS LIST IN `M87`, AND THE REASON IT WAS HERE DID NOT SURVIVE
+ * BEING CHECKED. It was excluded as a route that verifies no credential — but M43's scope already included
+ * two that verify none, `register.store` and `password.email`, and the second is a pure mail dispatcher,
+ * which is the exact analogue the exposure was argued from. ⚠️ The "eight credential-bearing routes" figure
+ * is itself only true counting distinct URI paths: `two-factor.enable` and `two-factor.disable` share one
+ * path, so the map ships nine names on eight paths and three documents repeat "eight" without saying so.
  */
-const FORTIFY_UNBOUND_BY_DECISION = ['logout', 'user-profile-information.update'];
+const FORTIFY_UNBOUND_BY_DECISION = ['logout'];
 
 /**
  * The `throttle:` parameters already declared on a route, resolved through the router's own alias map.
@@ -163,6 +166,51 @@ it('bounds every Fortify write route exactly once, by alias or by map', function
 
     expect($uncovered)->toBe([], 'a Fortify write route is bounded by nothing and is not on the decided-unbound list');
     expect($doubled)->toBe([], 'a Fortify write route is throttled twice — once by alias and once by the map');
+});
+
+/*
+ * Increment M87 — THE OTHER DIRECTION OF THE DECIDED-UNBOUND LIST, WHICH WAS NOT ASSERTED AT ALL.
+ *
+ * ⛔ THE HOLE, STATED AS IT WAS FOUND. The case above reddens when a name is REMOVED from the list while
+ * still unbounded. It cannot see the opposite: a name LEFT on the list after the route was bound reads as
+ * `$skipped = true`, which only ever suppresses a finding, so the suite stays green while a recorded
+ * decision of record says the route is deliberately unprotected. That is not a hypothetical — it is the
+ * exact mistake available to the increment that bound `user-profile-information.update`, one edit away
+ * from being made, and nothing in this file or in `FortifyTwoFactorCoverageTest` would have caught it.
+ *
+ * ⚠️ IT IS ASSERTED ON THE ROUTE TABLE, NOT ON THE CONSTANT. A case comparing the constant against a
+ * literal would pin today's list and have to be edited every time the list legitimately changes, which is
+ * the second-copy hazard this file's header already refuses. What is checked is the PROPERTY: a name on
+ * this list must be bound by nothing, or the list is lying about it.
+ */
+it('keeps the decided-unbound list free of routes that are in fact bound', function (): void {
+    $map = ThrottleFortifyEndpoints::limiters();
+    $stale = [];
+
+    foreach (fortifyRoutes() as $route) {
+        $name = (string) $route->getName();
+
+        if (! in_array($name, FORTIFY_UNBOUND_BY_DECISION, true)) {
+            continue;
+        }
+
+        if (array_key_exists($name, $map) || fortifyThrottleParams($route) !== []) {
+            $stale[] = $name;
+        }
+    }
+
+    expect($stale)->toBe([], 'a route is recorded as deliberately unbound and is in fact throttled — the decision of record is stale');
+
+    // ⛔ THE FLOOR. `$stale` is empty when the list is honest AND when the loop matched nothing at all —
+    // a renamed route, or a `fortifyRoutes()` that stopped resolving. Without this the case above is
+    // vacuous and green, which is the shape this repository keeps paying for.
+    // ⚠️ AND NOT `toContain($decided, '<message>')`: Pest reads EVERY argument to `toContain` as another
+    // needle, so the message becomes a second thing the array must hold and the case fails on its own
+    // explanation. Caught by this floor going red on a correct tree the first time it was run.
+    $names = array_map(static fn ($route): string => (string) $route->getName(), fortifyRoutes());
+    $missing = array_values(array_diff(FORTIFY_UNBOUND_BY_DECISION, $names));
+
+    expect($missing)->toBe([], 'a name on the decided-unbound list matches no live route, so the list is asserting nothing');
 });
 
 it('names only live write routes in the map', function (): void {
@@ -279,4 +327,67 @@ it('refuses a sixth two-factor confirmation in a minute', function (): void {
     }
 
     $this->actingAs($user)->post('/user/confirmed-two-factor-authentication', $guess)->assertStatus(429);
+});
+
+/*
+ * Increment M87 — `PUT /user/profile-information`, and the reason it takes THREE cases rather than one.
+ *
+ * The limiter has two arms, and a single "does it 429" case would pass with the name arm deleted, the
+ * address arm deleted, or the two swapped. So: the address arm bites, the name arm does not bite at the
+ * address arm's ceiling, and the bucket is per-identity. The third is the M30 assertion again — it is
+ * cheap and it is the one that has actually caught something in this file.
+ */
+it('refuses a seventh address change in a minute, and does not spend that bucket on a name change', function (): void {
+    $alice = fortifyRateLimitMember();
+
+    // ⚠️ SIX NAME CHANGES FIRST, AT THE ADDRESS ARM'S CEILING. If the two arms shared a bucket — or if the
+    // limiter compared nothing and keyed everything alike — the address change below would already be
+    // refused, and this case is the only thing in the suite that would notice.
+    foreach (range(1, 6) as $i) {
+        $this->actingAs($alice)->put('/user/profile-information', [
+            'name' => 'Renamed '.$i,
+            'email' => $alice->email,
+        ])->assertStatus(302);
+    }
+
+    $addressChange = static fn (int $i): array => ['name' => 'Alice', 'email' => 'probe'.$i.'@example.test'];
+
+    $first = $this->actingAs($alice)->put('/user/profile-information', $addressChange(1));
+    expect($first->getStatusCode())->not->toBe(429, 'the first address change must reach the controller, or this case is vacuous');
+
+    foreach (range(2, 6) as $i) {
+        $this->actingAs($alice)->put('/user/profile-information', $addressChange($i));
+    }
+
+    // ⛔ THE EXPOSURE, IN ONE REQUEST. Unbounded, this door sends a verification mail to ANY address a
+    // caller names, on the queue every other transactional mail shares — and asks a cross-tenant
+    // "does this account exist" question on the way, via `Rule::unique('pgsql_auth.users')`.
+    $this->actingAs($alice)->put('/user/profile-information', $addressChange(7))->assertStatus(429);
+});
+
+it('keeps the profile-information bucket per identity rather than per deployment', function (): void {
+    $alice = fortifyRateLimitMember();
+    $bob = fortifyRateLimitMember();
+
+    foreach (range(1, 6) as $i) {
+        $this->actingAs($alice)->put('/user/profile-information', ['name' => 'Alice', 'email' => 'probe'.$i.'@example.test']);
+    }
+
+    $this->actingAs($alice)->put('/user/profile-information', ['name' => 'Alice', 'email' => 'probe7@example.test'])->assertStatus(429);
+
+    // Same minute, same arm, different account: keyed on anything but the identity — `by('')`, or the IP
+    // in a test process where every request shares one — this is a 429 and one bucket covers everybody.
+    $this->actingAs($bob)->put('/user/profile-information', ['name' => 'Bob', 'email' => 'bob-new@example.test'])->assertStatus(302);
+});
+
+it('reads a case-only address edit as the name arm, not as an address change', function (): void {
+    // ⚠️ `config/fortify.php` lowercases usernames, but in `ProfileInformationController::update()` — AFTER
+    // the middleware — so the limiter must lowercase for itself. Without that, changing `A@x.test` to
+    // `a@x.test` spends the tight bucket, and this is the case that says so.
+    $alice = fortifyRateLimitMember();
+    $shouted = strtoupper($alice->email);
+
+    foreach (range(1, 7) as $ignored) {
+        $this->actingAs($alice)->put('/user/profile-information', ['name' => 'Alice', 'email' => $shouted])->assertStatus(302);
+    }
 });

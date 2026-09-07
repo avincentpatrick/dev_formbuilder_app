@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { nextTick, ref, reactive } from 'vue';
 
@@ -804,5 +807,119 @@ describe('useServerAutosave — standing down for a caller that will write the d
         await vi.advanceTimersByTimeAsync(1_100);
 
         expect(post.mock.calls.length).toBeGreaterThan(afterTyping);
+    });
+});
+
+/*
+ * Increment M87 — the FOURTH cause, and the gate that counts instead of a comment.
+ *
+ * ⛔ M67 ADDED `CONFLICT_COPY` BECAUSE A CAUSE WITHOUT A SENTENCE IS TOLD THE WRONG ONE, AND THEN EXACTLY
+ * THAT HAPPENED AGAIN TO `CONFLICT_COPY` ITSELF. `SubmissionDraftController::resolveTarget()` has answered
+ * a superseded version pin with a typed `409 form_updated` since the M73 re-pin — its own comment there
+ * says a typed 409 *"is what lets the composable stop permanently and say why"* — and the map had no key
+ * for it, so the keyer read *"This response has already been submitted"*. Nothing had been submitted.
+ *
+ * ⛔ THE PER-CODE CASE BELOW IS NOT THE POINT; THE COVERAGE ARM IS. A hand-written case per cause is what
+ * was already here, and it is what let the fourth cause through: it can only assert about causes its
+ * author knew of. So the list of causes is DERIVED from the server's own source, and the gate is an
+ * equality over that list — the next code added server-side reddens here, naming itself, with no edit.
+ */
+describe('useServerAutosave — every 409 this channel can return has its own sentence', () => {
+    function conflict(code: string): Response {
+        return {
+            ok: false,
+            status: 409,
+            json: async () => ({ error: { code, message: 'nope' } }),
+        } as unknown as Response;
+    }
+
+    /** The sentence `FINALIZED_COPY` falls back to. Duplicated deliberately: a test that imported it would
+     *  move with it, and what is being asserted is that the OTHER causes do not read like this one. */
+    const FALLBACK_FRAGMENT = 'already been submitted';
+
+    /**
+     * The one cause for which the fallback sentence is the correct sentence, so it is the one code that may
+     * match `FALLBACK_FRAGMENT`. Everything else reaching that sentence is the defect this file exists for.
+     */
+    const FALLBACK_IS_CORRECT_FOR = 'draft_already_finalized';
+
+    /**
+     * Raised only by `SubmissionPipeline` and deliberately suspended for drafts, so it cannot reach this
+     * endpoint. It is excluded by NAME with its reason rather than by a filter, because an exclusion nobody
+     * has to state is an exclusion nobody re-checks — the shape `FORTIFY_UNBOUND_BY_DECISION` already uses.
+     */
+    const NOT_REACHABLE_ON_THIS_CHANNEL = ['submission_conflict'];
+
+    const CONTROLLER = 'app/Http/Controllers/Tenant/SubmissionDraftController.php';
+    const EXCEPTION = 'app/Exceptions/Submissions/SubmissionConflictException.php';
+
+    /** Codes the controller writes as a literal into a 409 envelope. */
+    function literalCodes(php: string): string[] {
+        return [...php.matchAll(/ApiErrorResponse::make\(\s*409\s*,\s*'([a-z_]+)'/g)].map((m) => m[1]);
+    }
+
+    /** Codes carried by `SubmissionConflictException`, which the controller re-emits as `$e->code()`. */
+    function exceptionCodes(php: string): string[] {
+        return [...php.matchAll(/'([a-z_]+)',\s*\n\s*\);/g)].map((m) => m[1]);
+    }
+
+    const controllerSource = readFileSync(join(process.cwd(), CONTROLLER), 'utf8');
+    const exceptionSource = readFileSync(join(process.cwd(), EXCEPTION), 'utf8');
+
+    const serverCodes = [
+        ...new Set([
+            ...literalCodes(controllerSource),
+            ...exceptionCodes(exceptionSource).filter((code) => !NOT_REACHABLE_ON_THIS_CHANNEL.includes(code)),
+        ]),
+    ].sort();
+
+    /*
+     * ⛔ THE FLOOR. Both derivations are regexes over source text, and a regex that stops matching yields an
+     * EMPTY list — which would make every case below vacuous and the suite green while blind. This is the
+     * assertion that fails instead, and it names the two causes whose absence would mean the parse broke
+     * rather than the server changed.
+     */
+    it('derives a non-empty cause list from the server source, so the coverage arm cannot pass blind', () => {
+        expect(serverCodes.length).toBeGreaterThanOrEqual(4);
+        expect(serverCodes).toContain('form_updated');
+        expect(serverCodes).toContain('submission_uuid_claimed');
+    });
+
+    it.each(serverCodes)('gives %s a sentence of its own rather than the fallback', async (code) => {
+        const post = vi.fn(async () => conflict(code));
+        const { autosave, answers } = harness({ post, baseContentChecksum: 'stale' });
+
+        answers.a = '1';
+        await nextTick();
+        await vi.advanceTimersByTimeAsync(150);
+
+        expect(autosave.state.value).toBe('stopped');
+
+        if (code === FALLBACK_IS_CORRECT_FOR) {
+            expect(autosave.message.value).toContain(FALLBACK_FRAGMENT);
+
+            return;
+        }
+
+        // ⚠️ ASSERTED ON THE MESSAGE, NEVER THE STATE. Every cause ends in `stopped`, so a state assertion
+        // passes identically whether the map has the key or not — which is how the third cause survived two
+        // increments of green, and how the fourth survived M67 itself.
+        expect(autosave.message.value).not.toContain(FALLBACK_FRAGMENT);
+    });
+
+    it('tells a republished form apart from a submitted response and from a lost update', async () => {
+        const post = vi.fn(async () => conflict('form_updated'));
+        const { autosave, answers } = harness({ post });
+
+        answers.a = '1';
+        await nextTick();
+        await vi.advanceTimersByTimeAsync(150);
+
+        expect(autosave.state.value).toBe('stopped');
+        // The FORM moved, not the response and not the answers. Nothing was submitted...
+        expect(autosave.message.value).not.toContain('already been submitted');
+        // ...and `draft_conflict`'s remedy is wrong here: there are no newer ANSWERS to pick up.
+        expect(autosave.message.value).not.toContain('pick up the newer answers');
+        expect(autosave.message.value).toContain('This form was updated');
     });
 });

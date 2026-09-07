@@ -28,6 +28,15 @@ enum FontSizeScale: string
     }
 
     /**
+     * The product default, and the ONE place it is written — see {@see ThemeMode::default()} for why
+     * this shape exists and for the constraint that comes with it.
+     */
+    public static function default(): self
+    {
+        return self::Standard;
+    }
+
+    /**
      * The `data-font-size` value to emit on <html>, or null to emit no attribute.
      *
      * "Standard" is the ABSENCE of the attribute, mirroring {@see ThemeMode::System}.

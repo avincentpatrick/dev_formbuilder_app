@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\ThemeMode;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -21,7 +22,8 @@ return new class extends Migration
         Schema::create('user_ui_preferences', function (Blueprint $table): void {
             $table->uuid('id')->primary();
             $table->foreignUuid('user_id')->unique()->constrained('users')->cascadeOnDelete();
-            $table->string('theme_mode', 10)->default('system'); // system | light | dark
+            // App\Enums\ThemeMode — the vocabulary and the default both come from the enum (M86).
+            $table->string('theme_mode', 10)->default(ThemeMode::default()->value);
             $table->timestampsTz();
         });
 

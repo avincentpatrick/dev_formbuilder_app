@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\FontSizeScale;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -34,7 +35,8 @@ return new class extends Migration
         Schema::table('user_ui_preferences', function (Blueprint $table): void {
             // NULL = product default (Blueprint). Whitelisted in the application layer, not by CHECK.
             $table->string('accent_token', 30)->nullable();
-            $table->string('font_size_scale', 15)->default('standard'); // standard | large | extra_large
+            // App\Enums\FontSizeScale — the vocabulary and the default both come from the enum (M86).
+            $table->string('font_size_scale', 15)->default(FontSizeScale::default()->value);
             $table->boolean('use_dyslexia_friendly_font')->default(false);
         });
     }

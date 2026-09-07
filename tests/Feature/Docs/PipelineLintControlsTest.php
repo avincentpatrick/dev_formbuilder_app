@@ -82,8 +82,14 @@ function pipelineLintRoot(): string
     pipelineLintWrite('docs/feature-backlog.md', "# Backlog\n\n- nothing filed.\n");
     pipelineLintWrite('docs/claims/decisions.md', "# Decisions\n\n- nothing decided.\n");
     pipelineLintWrite('docs/adr/0001-example.md', "# ADR 1\n\nNothing rejected here.\n");
-    pipelineLintWrite('docs/data-dictionary.md', pipelineLintDictionary(0, 25, 15));
-    pipelineLintWrite('docs/second-dictionary.md', pipelineLintDictionary(25, 10, 15));
+
+    // ⚠️ NAMED so they cannot collide with the REAL `docs/data-dictionary.md`, which the coverage
+    // corpus below copies in. A synthetic file overwriting a real one would make the fixture measure
+    // itself.
+    pipelineLintWrite('docs/fixture-dictionary-a.md', pipelineLintDictionary(0, 25, 15));
+    pipelineLintWrite('docs/fixture-dictionary-b.md', pipelineLintDictionary(25, 10, 15));
+
+    pipelineLintCopyCoverageCorpus();
 
     // The schema declares every documented column, so term 1 never masks a later term.
     $schema = "<?php\n\n// Fixture schema.\n";
@@ -114,6 +120,72 @@ function pipelineLintRoot(): string
     }
 
     return $root;
+}
+
+/**
+ * Copy the LIVE markdown corpus into the fixture, and remember what was copied.
+ *
+ * ⛔ THIS IS THE ONE PLACE THE FIXTURE MIRRORS THE REPOSITORY INSTEAD OF INVENTING IT, AND THE REASON
+ * IS THE DIGEST. P2a, P2b, P2c and P2e pin a digest over site identities, and an identity carries the
+ * file path — so a synthetic corpus can reproduce the shipped COUNTS and can never reproduce the
+ * shipped DIGESTS. The choice was between weakening the gate to a count, which is blind to a swap and
+ * is the exact hole `scripts/tracker-surgery.php` exists to fill, and pointing the controls at the
+ * real prose. The real prose is also the better evidence: these four predicates are then measured
+ * against the documents they will actually rule over, not against text written to satisfy them.
+ *
+ * ⚠️ THE COROLLARY IS WORTH STATING. If the trunk itself violates one of these four rules, the base
+ * fixture is red and every case below reports "the baseline was not green before the perturbation"
+ * rather than its own failure. That is the honest reading — a control cannot prove a red gate reddens
+ * — and the gate's own CI step is where that failure is meant to be read.
+ *
+ * The list is taken from the GENERATOR, never re-derived: `corpus()` is one definition, and a second
+ * walk here would be a second definition that agrees until it does not. It is asked through
+ * `--corpus` rather than `--json` because this runs in a container with no git remote, and `--json`
+ * needs the defect ranking and the trunk sha — the corpus needs neither.
+ *
+ * ⚠️ AND THE BIND MOUNT DOES TRUNCATE HERE — IT JUST DOES NOT TRUNCATE THIS HALF, WHICH WAS MEASURED
+ * RATHER THAN HOPED. Run from the host the walk reaches 869 files; run inside the app container it
+ * reaches 774. All 95 of the lost files are under `app/`, and the markdown half is 55 in both, path
+ * for path. That is why these four rules can be driven from a container test at all while the gate
+ * itself still cannot be — P2d walks `app/` and would go blind. The floor below is what turns a
+ * change in that finding into a loud failure instead of four quietly wrong counts.
+ *
+ * @return list<string>
+ */
+function pipelineLintCoverageCorpus(): array
+{
+    static $paths = null;
+
+    if ($paths !== null) {
+        return $paths;
+    }
+
+    $output = [];
+    $status = 0;
+    exec(escapeshellarg(PHP_BINARY).' '.escapeshellarg(base_path('scripts/pipeline.php')).' --corpus 2>&1', $output, $status);
+
+    expect($status)->toBe(0, "the generator could not be read for its corpus:\n".implode("\n", $output));
+
+    $paths = array_values(array_filter(
+        array_map(static fn (string $line): string => trim($line), $output),
+        static fn (string $path): bool => str_ends_with($path, '.md') && $path !== 'PROGRESS.md'
+    ));
+
+    expect(count($paths))->toBeGreaterThanOrEqual(
+        50,
+        'the markdown corpus reached '.count($paths).' file(s). It is 55 on the host AND inside the '
+        .'container; a smaller number here means the bind-mount truncation has reached the half these '
+        .'rules read, and every count below would be wrong rather than merely different.'
+    );
+
+    return $paths;
+}
+
+function pipelineLintCopyCoverageCorpus(): void
+{
+    foreach (pipelineLintCoverageCorpus() as $path) {
+        pipelineLintWrite($path, (string) file_get_contents(base_path($path)));
+    }
 }
 
 /** A documented column name, stable across the schema, the corpus and the dictionary. */
@@ -210,6 +282,9 @@ function pipelineLintDocument(array $overrides = []): string
     $document = [
         'sha' => str_repeat('a', 40),
         'files_scanned' => 869,
+        // The coverage rules read THIS list and never walk a tree, which is what lets one case add a
+        // heading to one copied document without disturbing any other rule.
+        'corpus' => array_merge(['PROGRESS.md'], pipelineLintCoverageCorpus()),
         'rows' => $rows,
         'off_the_line' => [[
             'id' => 'finished-row',
@@ -339,7 +414,7 @@ it('is GREEN on a well-formed fixture, which every case below is measured agains
     [$status, $output] = pipelineLintRun();
 
     expect($status)->toBe(PIPELINE_LINT_CLEAN, $output);
-    expect($output)->toContain('passed (7 rule groups');
+    expect($output)->toContain('passed (11 rule groups');
 });
 
 it('P1 — reddens when the generator reports the committed line has drifted', function (): void {
@@ -526,5 +601,218 @@ it('P6 — does NOT fire on an INDENTED marker, which the generator emits by des
 
     pipelineLintPerturb('docs/pipeline.md', $body, function (int $status, string $output): void {
         expect($status)->toBe(PIPELINE_LINT_CLEAN, $output);
+    });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// The coverage rules (M82). Every case below perturbs a COPY of a real document, so the predicate
+// under test is measured against the prose it will actually rule over.
+//
+// ⚠️ SEVERAL CASES REDDEN TWO RULES AT ONCE AND THAT IS NOT SLOPPINESS. The four corpora overlap in
+// `docs/PRD.md` by construction — a feature heading is P2a's site and the anchor P2e attributes its
+// bullets to — so removing one moves both. Each case asserts the rule it is about; the second
+// failure is a true consequence of the same edit, and avoiding it would mean writing a perturbation
+// nobody would ever make.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+
+/** Read a copied corpus document out of the fixture, for a case that edits real prose. */
+function pipelineLintDoc(string $relative): string
+{
+    return (string) file_get_contents(pipelineLintRoot().'/'.$relative);
+}
+
+it('P2a — reddens when a newly documented feature appears with nothing scheduling it', function (): void {
+    $prd = pipelineLintDoc('docs/PRD.md')."\n### Feature #15 — A newly documented feature\n";
+
+    pipelineLintPerturb('docs/PRD.md', $prd, function (int $status, string $output): void {
+        expect($status)->toBe(PIPELINE_LINT_FAILED, $output);
+        expect($output)->toContain('holds 15 documented feature heading(s)');
+        expect($output)->toContain('pinned expectation is 14');
+    });
+});
+
+it('P2a — reddens IN THE OTHER DIRECTION when a documented feature quietly disappears', function (): void {
+    // ⛔ THE HALF A ONE-WAY RULE CANNOT SEE. Above, work is added and nobody schedules it. Here a
+    // stated product commitment is deleted, and no other gate in this repository would notice —
+    // a deleted heading is simply a smaller file, which is how M79 destroyed a backlog row and
+    // merged green.
+    $prd = str_replace('### Feature #14 — ', '### Two-Factor Authentication — ', pipelineLintDoc('docs/PRD.md'));
+
+    pipelineLintPerturb('docs/PRD.md', $prd, function (int $status, string $output): void {
+        expect($status)->toBe(PIPELINE_LINT_FAILED, $output);
+        expect($output)->toContain('holds 13 documented feature heading(s)');
+    });
+});
+
+it('P2a — reddens on a SWAP, which no count can see and which is why a digest is pinned', function (): void {
+    // One feature renumbered: the corpus still holds fourteen, and it is not the same fourteen.
+    $prd = str_replace('### Feature #14 — ', '### Feature #99 — ', pipelineLintDoc('docs/PRD.md'));
+
+    pipelineLintPerturb('docs/PRD.md', $prd, function (int $status, string $output): void {
+        expect($status)->toBe(PIPELINE_LINT_FAILED, $output);
+        expect($output)->toContain('SET of documented feature heading(s) has changed while its SIZE has not');
+    });
+});
+
+it('P2a — does NOT fire when a feature is RETITLED, which is prose and not an obligation', function (): void {
+    // ⛔ THE OVER-COLLECTING DIRECTION. A rule keyed on heading text turns every copy-edit into a
+    // merge failure, and a gate that cries on ordinary editing is a gate somebody deletes.
+    $prd = str_replace(
+        '### Feature #12 — Audit trail (user-facing)',
+        '### Feature #12 — Audit trail, as the user sees it',
+        pipelineLintDoc('docs/PRD.md')
+    );
+
+    pipelineLintPerturb('docs/PRD.md', $prd, function (int $status, string $output): void {
+        expect($status)->toBe(PIPELINE_LINT_CLEAN, $output);
+    });
+});
+
+it('P2b — reddens when a document grows a new Out of Scope section', function (): void {
+    $guide = pipelineLintDoc('docs/TESTING-GUIDE.md')."\n## 12. Out of Scope / Deferred\n\n- A newly deferred thing.\n";
+
+    pipelineLintPerturb('docs/TESTING-GUIDE.md', $guide, function (int $status, string $output): void {
+        expect($status)->toBe(PIPELINE_LINT_FAILED, $output);
+        expect($output)->toContain('holds 24 section(s) declaring a disposition');
+    });
+});
+
+it('P2b — does NOT fire on a heading that NARRATES a deferral rather than declaring one', function (): void {
+    // ⛔ THE MEASURED FALSE POSITIVE, REPRODUCED AS A CONTROL. A substring test over headings collects
+    // "(resolving the deferred question)" — a section CLOSING a deferral, read as one opening it.
+    // That is the mention-versus-declaration trap, which this repository has now shipped five times,
+    // twice inside the gate built to catch it.
+    $guide = pipelineLintDoc('docs/TESTING-GUIDE.md')
+        ."\n## 12. Import Target: an Existing Draft (resolving the deferred question)\n";
+
+    pipelineLintPerturb('docs/TESTING-GUIDE.md', $guide, function (int $status, string $output): void {
+        expect($status)->toBe(PIPELINE_LINT_CLEAN, $output);
+    });
+});
+
+it('P2b — does NOT fire when a section is RENUMBERED, which shifts every heading below it', function (): void {
+    $strategy = str_replace(
+        '## 7. Out of Scope / Deferred',
+        '## 8. Out of Scope / Deferred',
+        pipelineLintDoc('docs/testing-strategy.md')
+    );
+
+    pipelineLintPerturb('docs/testing-strategy.md', $strategy, function (int $status, string $output): void {
+        expect($status)->toBe(PIPELINE_LINT_CLEAN, $output);
+    });
+});
+
+it('P2c — reddens when a document gains a sentence saying something is not built', function (): void {
+    $guide = pipelineLintDoc('docs/TESTING-GUIDE.md')."\nThe export runner is still unbuilt.\n";
+
+    pipelineLintPerturb('docs/TESTING-GUIDE.md', $guide, function (int $status, string $output): void {
+        expect($status)->toBe(PIPELINE_LINT_FAILED, $output);
+        expect($output)->toContain('holds 9 deferral sentence(s)');
+    });
+});
+
+it('P2c — does NOT fire on the phrase inside a QUOTATION, which is a record of a repair', function (): void {
+    // ⛔ THIS WAS LIVE ON THE TRUNK, in the multi-tenancy RBAC design: a line stating that it USED to
+    // say the feature was not built, and no longer does. Without the quotation arm the gate counts
+    // the repair as an obligation — the same failure P3 shipped on its first run.
+    $guide = pipelineLintDoc('docs/TESTING-GUIDE.md')
+        ."\nThis line read *\"the export runner is still unbuilt\"* until the runner shipped.\n";
+
+    pipelineLintPerturb('docs/TESTING-GUIDE.md', $guide, function (int $status, string $output): void {
+        expect($status)->toBe(PIPELINE_LINT_CLEAN, $output);
+    });
+});
+
+it('P2c — does NOT fire on "is not built ON", which is a sentence about composition', function (): void {
+    // The negative lookahead, and the phrase it protects is live: the design pass found
+    // "is not built on StepProjection" and read it as a declaration that something was missing.
+    $guide = pipelineLintDoc('docs/TESTING-GUIDE.md')
+        ."\nThe submissions projection is not built on the step projection, deliberately.\n";
+
+    pipelineLintPerturb('docs/TESTING-GUIDE.md', $guide, function (int $status, string $output): void {
+        expect($status)->toBe(PIPELINE_LINT_CLEAN, $output);
+    });
+});
+
+it('P2e — reddens when a new acceptance criterion carries no disposition', function (): void {
+    $anchor = '- A user can upload a single-page image or PDF, associated with a specific form and its currently published version.';
+    $prd = str_replace(
+        $anchor,
+        $anchor."\n- A newly promised capability with nothing recording what became of it.",
+        pipelineLintDoc('docs/PRD.md')
+    );
+
+    pipelineLintPerturb('docs/PRD.md', $prd, function (int $status, string $output): void {
+        expect($status)->toBe(PIPELINE_LINT_FAILED, $output);
+        expect($output)->toContain('states 94 acceptance criteria');
+    });
+});
+
+it('P2e — reddens when a criterion GAINS a disposition, because the constant moves with the work', function (): void {
+    // ⚠️ NOT A FALSE POSITIVE — IT IS THE MECHANISM. Dispositioning a bullet is progress, and the
+    // increment that makes it lowers the constant in the same commit. tracker-lint records the same
+    // discipline for its own residue: a gate whose expectation an increment invalidates must be
+    // updated BY that increment, or main merges red.
+    $anchor = '- A user can upload a single-page image or PDF, associated with a specific form and its currently published version.';
+    $prd = str_replace($anchor, $anchor.' *(Shipped: a fixture increment.)*', pipelineLintDoc('docs/PRD.md'));
+
+    pipelineLintPerturb('docs/PRD.md', $prd, function (int $status, string $output): void {
+        expect($status)->toBe(PIPELINE_LINT_FAILED, $output);
+        expect($output)->toContain('holds 88 undispositioned acceptance bullet(s)');
+    });
+});
+
+it('P2e — reddens when a DISPOSITIONED criterion is deleted, which the residue alone cannot see', function (): void {
+    // ⛔ WHY P2e PINS THE CORPUS AS WELL AS THE RESIDUE. Deleting a bullet that already carried its
+    // disposition leaves the residue at exactly 89 — a rule watching only the residue reports green
+    // while a stated product commitment has been removed from the document.
+    $lines = explode("\n", pipelineLintDoc('docs/PRD.md'));
+
+    foreach ($lines as $i => $line) {
+        if (str_starts_with($line, '- ') && str_contains($line, '*(')) {
+            unset($lines[$i]);
+
+            break;
+        }
+    }
+
+    pipelineLintPerturb('docs/PRD.md', implode("\n", $lines), function (int $status, string $output): void {
+        expect($status)->toBe(PIPELINE_LINT_FAILED, $output);
+        expect($output)->toContain('states 92 acceptance criteria');
+    });
+});
+
+it('the coverage rules REFUSE rather than passing when the generator publishes no corpus', function (): void {
+    // ⛔ THE ANSWER TO M81's FORWARD CAUTION. A gate that falls back to walking its own tree can
+    // demand a disposition in a file the generator never opens, and any marker added to satisfy it
+    // would be INVISIBLE to the generator — a lint-green pipeline still missing the row.
+    $document = json_decode(pipelineLintDocument(), true);
+    unset($document['corpus']);
+
+    pipelineLintPerturb(
+        'fixture-document.json',
+        (string) json_encode($document, JSON_PRETTY_PRINT),
+        function (int $status, string $output): void {
+            expect($status)->toBe(PIPELINE_LINT_CANNOT_MEASURE, $output);
+            expect($output)->toContain('the generator published no corpus');
+        }
+    );
+});
+
+it('the coverage rules REFUSE rather than passing when the published corpus has gone blind', function (): void {
+    pipelineLintPerturb('fixture-document.json', pipelineLintDocument(['corpus' => ['PROGRESS.md']]), function (int $status, string $output): void {
+        expect($status)->toBe(PIPELINE_LINT_CANNOT_MEASURE, $output);
+        expect($output)->toContain('under the floor of 10');
+    });
+});
+
+it('the coverage rules REFUSE rather than passing when a published corpus path is unreadable', function (): void {
+    // A skipped file is a silently smaller corpus, and a smaller corpus here reads as work having
+    // been dispositioned rather than as a gate that cannot see.
+    $corpus = array_merge(['PROGRESS.md'], pipelineLintCoverageCorpus(), ['docs/a-document-that-is-not-there.md']);
+
+    pipelineLintPerturb('fixture-document.json', pipelineLintDocument(['corpus' => $corpus]), function (int $status, string $output): void {
+        expect($status)->toBe(PIPELINE_LINT_CANNOT_MEASURE, $output);
+        expect($output)->toContain('not readable from here');
     });
 });

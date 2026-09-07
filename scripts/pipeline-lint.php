@@ -103,6 +103,124 @@ const MIN_COLUMN_ROWS = 450;
 const MIN_APP_FILES = 600;
 
 /**
+ * ═══ THE COVERAGE RULES (M82) — P2a, P2b, P2c, P2e ═══════════════════════════════════════════════
+ *
+ * ⛔ THE APPROVED DESIGN'S DISCHARGE MECHANISM DOES NOT EXIST, AND EVERY CONSTANT BELOW IS SHAPED BY
+ * THAT. All four rules were specified as "every obligation site carries a marker or an explicit
+ * state=n/a", with M81's own correction prescribing attribution by NEAREST PRECEDING HEADING.
+ * Measured before a line was written: all nine live markers sit at END OF FILE, under a comment in
+ * each file saying that placement is deliberate — "a marker inserted mid-document shifts every line
+ * beneath it, and this repository cites documents as path:N". So the nearest preceding heading of a
+ * marker is whichever section happens to be LAST, and position carries no information at all. The
+ * four sections that appeared discharged under that attribution were discharged by coincidence of
+ * file layout.
+ *
+ * ⛔ AND FILE-SCOPED ATTRIBUTION, THE OBVIOUS REPAIR, IS SELF-DEFEATING. Under it one marker anywhere
+ * in docs/PRD.md discharges all fourteen feature sections at once — and the increment that wrote
+ * these rules had to add a marker there, because the residue itself becomes a row. The rule would
+ * have been satisfied by the commit that filed the work it was measuring.
+ *
+ * SO THESE RULES DO NOT CLAIM TO KNOW WHETHER A SITE IS QUEUED. They claim the SET OF OBLIGATION
+ * SITES IS UNCHANGED: a new PRD feature, a new Out-of-Scope section or a new "still unbuilt" sentence
+ * cannot reach the trunk without an author either queuing it or deliberately moving a constant. That
+ * is tracker-lint's EXPECTED_CROSS_FILE_NEXT_SESSION pattern, whose own comment records that it
+ * shipped pinning a KNOWN-BAD state because asserting the good one would have been red on arrival —
+ * here the good state is 131 undischarged sites away, which is the M40 gate that can never merge.
+ *
+ * ⚠️ A GATE WHOSE EXPECTATION AN INCREMENT INVALIDATES MUST BE UPDATED BY THAT INCREMENT, or main
+ * merges red. Disposition a site and you lower the constant in the same commit; that is the point.
+ *
+ * ⛔ EACH CORPUS PINS A DIGEST AS WELL AS A COUNT, AND THE DIGEST IS THE HALF THAT EARNS ITS KEEP. A
+ * count alone is blind to a SWAP — remove one site, add another — which is exactly the shape
+ * tracker-surgery.php exists for: a deleted block is simply a smaller file, and this repository has
+ * shipped that reading twice. The digest is taken over LINE-NUMBER-FREE identities, so ordinary prose
+ * editing and the line shifts a marker causes leave it alone, while an addition, a removal or a move
+ * between files does not. Run with --verbose to see the sites it is taken over.
+ */
+
+/** P2a — the PRD's feature headings. Floor first: a blind scan must refuse, not report a change. */
+const MIN_FEATURE_SITES = 10;
+
+const EXPECTED_FEATURE_SITES = 14;
+
+const DIGEST_FEATURE_SITES = '04021df8ddc03536';
+
+/**
+ * P2b — sections that DECLARE a disposition.
+ *
+ * ⚠️ THE PREDICATE SEPARATES A HEADING THAT NAMES ITS DISPOSITION FROM ONE THAT NARRATES SOMEBODY
+ * ELSE'S, AND IT WAS MEASURED INTO THAT SHAPE. A plain substring test over headings collected
+ * "Import Target: an Existing Form's Draft (resolving the deferred question)" — a section RESOLVING a
+ * deferral, read as one declaring it, which is the mention-versus-declaration trap for the fifth time
+ * in this repository. The canonical section names are unambiguous and always count; the bare word
+ * "deferred" counts only where it is used as a NAME (capitalised) or opens the parenthetical that
+ * qualifies the section, and not where it sits inside a phrase describing something else.
+ */
+const MIN_DISPOSITION_SECTIONS = 16;
+
+const EXPECTED_DISPOSITION_SECTIONS = 23;
+
+const DIGEST_DISPOSITION_SECTIONS = 'd5dc9f0538d3c191';
+
+/**
+ * P2c — the deferral-phrase vocabulary.
+ *
+ * ⛔ THIS ARM IS BOOKKEEPING, NOT DISCOVERY, AND IT SAYS SO HERE SO NOBODY SELLS IT AS PREVENTION.
+ * Measured across two independent passes: PRECISION 5% (twenty hits yielded one genuine unscheduled
+ * obligation) and RECALL ~2% (zero of fifty-four sweep findings is reachable by any phrase). It is
+ * kept for disposition hygiene and for the stale sentences it surfaces — documents still calling
+ * built things unbuilt — and for nothing more.
+ *
+ * ⛔ EVERY PHRASE IS ANCHORED TO A LINE THAT EXISTS TODAY, WHICH IS WHY THREE OF THE ORIGINAL SEVEN
+ * ARE ABSENT. "not implemented" matches NOTHING (and is worse than dead: the one line it was written
+ * for reads "not yet implemented", and the intervening word defeats the substring). "deferred to
+ * Phase" matches twelve lines and every one is a ratified decision — a thing assigned to a phase is
+ * BY DEFINITION scheduled. "Phase 2/3 enhancement" matches two lines in the one file that motivated
+ * it: a memorised answer, not a rule. A RULE THAT GOVERNS NO LINE CANNOT BE REDDENED AND MUST NOT
+ * SHIP.
+ *
+ * ⛔ AND THE DESIGN'S REPLACEMENT LIST IS WORSE THAN WHAT IT REPLACES — measured, not argued. Its six
+ * phrases match 114 lines against the original seven's 25; "does not exist|has no writer" alone
+ * matches 45, including CLAUDE.md's own "an unpushed claim does not exist" and a line of a GENERATED
+ * file. The same measurement retired the design's "a deferral whose destination phase has closed"
+ * predicate, which it calls worth more than the whole phrase list: ten lines target a phase the
+ * roadmap reads COMPLETE, and all ten are records of a discharge or of a superseded statement.
+ */
+const DEFERRAL_VOCABULARY = [
+    'has not been built' => '/has not been built/i',
+    'is not built' => '/is not built\b(?! on| upon| atop| around| against)/i',
+    'still unbuilt' => '/still unbuilt/i',
+    'remains unbuilt' => '/remains unbuilt/i',
+];
+
+const MIN_DEFERRAL_SITES = 4;
+
+const EXPECTED_DEFERRAL_SITES = 8;
+
+const DIGEST_DEFERRAL_SITES = '01597bbb027f0f74';
+
+/**
+ * P2e — the PRD's acceptance criteria, and the residue that carries no disposition.
+ *
+ * ⛔ THE RESIDUE CONSTANT IS WHY THIS RULE CAN MERGE AT ALL. Eighty-nine of ninety-three acceptance
+ * bullets carry no disposition; requiring one on each today builds a gate nobody can ever go green
+ * against, which M40 established is a gate that gets deleted rather than satisfied. The residue is
+ * pinned instead, and it is itself a row in the line — visible work rather than work assumed away.
+ *
+ * A DISPOSITION IS THE PARENTHETICAL THE PRD ALREADY USES, and the vocabulary is closed for the same
+ * reason the roadmap's is: free prose is accountable to nothing.
+ */
+const DISPOSITION_VOCABULARY = ['Shipped', 'Partially shipped', 'Built', 'Deferred', 'ADR-'];
+
+const MIN_ACCEPTANCE_BULLETS = 70;
+
+const EXPECTED_ACCEPTANCE_BULLETS = 93;
+
+const EXPECTED_UNDISPOSITIONED_BULLETS = 89;
+
+const DIGEST_UNDISPOSITIONED_BULLETS = '55529a3ee0686949';
+
+/**
  * The closed vocabulary a roadmap Status cell may speak.
  *
  * Closed rather than free text because three cells claimed in-progress work that had finished months
@@ -218,6 +336,14 @@ p4_held_visibility($held);
 // ── P2d. Documented artefacts that exist, are used by nothing, and are scheduled nowhere. ────────
 p2d_artefact_drift($rows);
 
+// ── P2a / P2b / P2c / P2e. The obligation corpora, over the GENERATOR'S OWN file list. ──────────
+$coverage = coverage_corpus($document);
+
+p2a_prd_features($coverage);
+p2b_disposition_sections($coverage);
+p2c_deferral_sites($coverage);
+p2e_acceptance_residue($coverage);
+
 // ── P6. The generated file may not arm the next run. ────────────────────────────────────────────
 p6_self_arming();
 
@@ -233,7 +359,7 @@ if ($failures !== []) {
 }
 
 fwrite(STDOUT, sprintf(
-    "pipeline-lint: passed (7 rule groups, %d row(s), %d held, %d file(s) scanned).\n",
+    "pipeline-lint: passed (11 rule groups, %d row(s), %d held, %d file(s) scanned).\n",
     count($rows),
     count($held),
     $document['files_scanned']
@@ -624,6 +750,404 @@ function p2d_artefact_drift(array $rows): void
         count($documents),
         count($corpus)
     ));
+}
+
+/**
+ * The markdown half of the generator's corpus, TAKEN FROM THE GENERATOR AND NEVER RESTATED.
+ *
+ * ⛔ THIS IS THE ANSWER TO M81's FORWARD CAUTION, AND IT IS THE REASON `--json` GREW A KEY. A
+ * coverage rule that walks its own tree can demand a disposition in a file the generator never opens,
+ * and any marker added to satisfy it would be INVISIBLE to the generator — a lint-green pipeline
+ * still missing the row, which is the exact failure this whole design exists to end. The two corpora
+ * are therefore ONE DEFINITION rather than two that happen to agree. Measured while writing this: a
+ * hand-rolled reproduction reached 56 markdown files against the generator's 55, and the extra was
+ * `CLAUDE.md`, in which a marker could never have been read.
+ *
+ * @return list<array{path: string, lines: list<string>}>
+ */
+function coverage_corpus(array $document): array
+{
+    if (! isset($document['corpus']) || ! is_array($document['corpus'])) {
+        cannot_measure('the generator published no corpus, so the coverage rules would have to walk '
+            .'their own tree — and a corpus the generator cannot see is one no marker can be read '
+            .'from. Refusing rather than ruling over a second, silently different definition.');
+    }
+
+    $out = [];
+
+    foreach ($document['corpus'] as $path) {
+        if (! is_string($path) || ! str_ends_with($path, '.md')) {
+            continue;
+        }
+
+        if (! is_file($path)) {
+            cannot_measure(sprintf(
+                'the generator published %s in its corpus and it is not readable from here. A skipped '
+                .'file is a silently smaller corpus, which reads as work having been dispositioned.',
+                $path
+            ));
+        }
+
+        $out[] = ['path' => $path, 'lines' => explode("\n", (string) file_get_contents($path))];
+    }
+
+    return $out;
+}
+
+/**
+ * The shared shape of all four coverage rules: a floor that REFUSES, a count that must match, and a
+ * digest that catches the swap a count cannot see.
+ *
+ * ⚠️ THE FLOOR AND THE COUNT ARE NOT THE SAME CHECK EVEN THOUGH EITHER WOULD CATCH A COLLAPSE. A
+ * corpus that has gone blind must exit 2 — could not measure — because reporting it as a rule failure
+ * tells the author that the DOCUMENTS changed when what changed is the gate's own sight. That
+ * distinction is the whole reason the M65+ generation fails floors as 2, and it is the difference
+ * between "somebody dispositioned fourteen features" and "the walk saw nothing".
+ *
+ * @param  list<array{identity: string, where: string}>  $sites
+ */
+function pin(string $rule, string $what, array $sites, int $floor, int $expected, string $expectedDigest): void
+{
+    global $verbose;
+
+    $count = count($sites);
+
+    if ($count < $floor) {
+        cannot_measure(sprintf(
+            '%s reached %d %s, under the floor of %d. A corpus walk that has gone blind returns a '
+            .'SHORT LIST rather than an error, and a short list here reads as work dispositioned.',
+            $rule,
+            $count,
+            $what,
+            $floor
+        ));
+    }
+
+    $identities = array_map(static fn (array $site): string => $site['identity'], $sites);
+    sort($identities);
+    $digest = substr(hash('sha256', implode("\n", $identities)), 0, 16);
+
+    if ($verbose) {
+        foreach ($sites as $site) {
+            fwrite(STDOUT, sprintf("pipeline-lint: [site] %s — %s (%s)\n", $rule, $site['identity'], $site['where']));
+        }
+    }
+
+    if ($count !== $expected) {
+        fail($rule, sprintf(
+            'the corpus holds %d %s and the pinned expectation is %d. Either queue what was added and '
+            .'raise the constant, or record the disposition that removed one and lower it — IN THIS '
+            .'COMMIT, or the trunk merges red. The digest to pin alongside it is %s.',
+            $count,
+            $what,
+            $expected,
+            $digest
+        ));
+
+        return;
+    }
+
+    if ($digest !== $expectedDigest) {
+        fail($rule, sprintf(
+            'the SET of %s has changed while its SIZE has not — one was removed and another added, '
+            .'which no count can see and which is exactly the shape tracker-surgery.php exists for. '
+            .'Digest %s, pinned %s. Run with --verbose to see the sites it is taken over.',
+            $what,
+            $digest,
+            $expectedDigest
+        ));
+
+        return;
+    }
+
+    pass($rule, sprintf('%d %s, digest %s', $count, $what, $digest));
+}
+
+/**
+ * Make every identity unique, in corpus order, so a digest is a set rather than a multiset.
+ *
+ * Two sites can legitimately share one identity — the same phrase twice in one document — and a
+ * collapsed duplicate would take the digest silently out of step with the count.
+ *
+ * @param  list<array{identity: string, where: string}>  $sites
+ * @return list<array{identity: string, where: string}>
+ */
+function identify(array $sites): array
+{
+    $seen = [];
+    $out = [];
+
+    foreach ($sites as $site) {
+        $key = $site['identity'];
+        $seen[$key] = ($seen[$key] ?? 0) + 1;
+
+        if ($seen[$key] > 1) {
+            $site['identity'] = $key.'#'.$seen[$key];
+        }
+
+        $out[] = $site;
+    }
+
+    return $out;
+}
+
+/**
+ * P2a — the documented product features.
+ *
+ * The PRD's fourteen `### Feature #N` headings are the highest-level obligation this repository
+ * states about itself, and not one of them carried a marker when this rule was written. The heading
+ * NUMBER is the identity, not its title: a feature renamed is the same obligation, and the PRD's own
+ * §5 records that the numbering is kept for traceability and never renumbered.
+ */
+function p2a_prd_features(array $corpus): void
+{
+    $sites = [];
+
+    foreach ($corpus as $file) {
+        foreach ($file['lines'] as $i => $line) {
+            if (preg_match('/^#{1,6} Feature #(\d+)\b/', rtrim($line, "\r"), $m) === 1) {
+                $sites[] = [
+                    'identity' => $file['path'].'#feature-'.$m[1],
+                    'where' => $file['path'].':'.($i + 1),
+                ];
+            }
+        }
+    }
+
+    pin(
+        'P2a features',
+        'documented feature heading(s)',
+        identify($sites),
+        MIN_FEATURE_SITES,
+        EXPECTED_FEATURE_SITES,
+        DIGEST_FEATURE_SITES
+    );
+}
+
+/**
+ * P2b — sections that declare a disposition.
+ *
+ * A document announcing "Out of Scope / Deferred" is stating future work, or stating that there is
+ * none; either way the statement is an obligation site and a new one may not appear unnoticed. The
+ * identity is the heading with its SECTION NUMBER STRIPPED — inserting a section above renumbers
+ * every heading below it, and that is a renumbering rather than a new obligation.
+ */
+function p2b_disposition_sections(array $corpus): void
+{
+    $sites = [];
+
+    foreach ($corpus as $file) {
+        foreach ($file['lines'] as $i => $line) {
+            if (preg_match('/^#{1,6} (.*)$/', rtrim($line, "\r"), $m) !== 1) {
+                continue;
+            }
+
+            if (! declares_a_disposition($m[1])) {
+                continue;
+            }
+
+            $sites[] = [
+                'identity' => $file['path'].'#'.normalise_heading($m[1]),
+                'where' => $file['path'].':'.($i + 1),
+            ];
+        }
+    }
+
+    pin(
+        'P2b sections',
+        'section(s) declaring a disposition',
+        identify($sites),
+        MIN_DISPOSITION_SECTIONS,
+        EXPECTED_DISPOSITION_SECTIONS,
+        DIGEST_DISPOSITION_SECTIONS
+    );
+}
+
+/**
+ * Does this heading NAME its disposition, or narrate somebody else's?
+ *
+ * ⛔ MEASURED INTO THIS SHAPE BY A LIVE FALSE POSITIVE. A substring test over headings collected
+ * "Import Target: an Existing Form's Draft (resolving the deferred question)" — a section RESOLVING a
+ * deferral, read as one declaring it. The canonical names are never adjectives and always declare;
+ * the bare word is a declaration where it is used as a NAME or opens the parenthetical qualifying the
+ * section, and not where it sits inside a phrase about something else.
+ */
+function declares_a_disposition(string $heading): bool
+{
+    if (preg_match('/(out[- ]of[- ]scope|non-?goals?)/i', $heading) === 1) {
+        return true;
+    }
+
+    return preg_match('/\bDeferred\b/', $heading) === 1
+        || preg_match('/[(\[]\s*deferred\b/i', $heading) === 1;
+}
+
+function normalise_heading(string $heading): string
+{
+    $text = (string) preg_replace('/^\d+(\.\d+)*\.?\s*/', '', strip_emphasis($heading));
+
+    return strtolower(trim((string) preg_replace('/\s+/', ' ', $text)));
+}
+
+/**
+ * P2c — sentences declaring that something is not built.
+ *
+ * See DEFERRAL_VOCABULARY above for what this arm is worth, which is much less than the design
+ * assumed and is written down rather than implied. The identity is the file and the PHRASE, not the
+ * sentence: rewording a paragraph is not a new obligation, and moving it to another document is.
+ */
+function p2c_deferral_sites(array $corpus): void
+{
+    $sites = [];
+
+    foreach ($corpus as $file) {
+        foreach ($file['lines'] as $i => $line) {
+            $text = strip_mentions(rtrim($line, "\r"));
+
+            foreach (DEFERRAL_VOCABULARY as $label => $pattern) {
+                if (preg_match($pattern, $text) !== 1) {
+                    continue;
+                }
+
+                $sites[] = [
+                    'identity' => $file['path'].'#'.$label,
+                    'where' => $file['path'].':'.($i + 1),
+                ];
+
+                break;
+            }
+        }
+    }
+
+    pin(
+        'P2c deferrals',
+        'deferral sentence(s)',
+        identify($sites),
+        MIN_DEFERRAL_SITES,
+        EXPECTED_DEFERRAL_SITES,
+        DIGEST_DEFERRAL_SITES
+    );
+}
+
+/**
+ * Remove the spans in which this corpus MENTIONS a phrase rather than asserting it.
+ *
+ * ⛔ THE QUOTATION ARM WAS ADDED BECAUSE THE TRAP WAS LIVE, FOR THE FIFTH TIME IN THIS REPOSITORY.
+ * `docs/multi-tenancy-rbac-design.md` carries a line reading, in full, that it USED to say the
+ * feature was not built and no longer does — the repair, quoting the defect. Without this the gate
+ * counts that repair as an obligation, which is the same failure P3 shipped on its first run.
+ *
+ * ⚠️ THE NARROW FORM IS DELIBERATE. This repository quotes its own prior text as *"…"*, and stripping
+ * every quoted span was measured to give the SAME eight sites — so the narrower rule is taken,
+ * because it cannot swallow a declaration that merely happens to contain a quoted phrase.
+ */
+function strip_mentions(string $line): string
+{
+    return (string) preg_replace('/\*"[^"]*"\*/', '', (string) preg_replace('/`[^`]*`/', '', $line));
+}
+
+/**
+ * P2e — the acceptance criteria, and the residue carrying no disposition.
+ *
+ * TWO CHECKS, AND THE FIRST IS WHY THE SECOND MEANS ANYTHING. The corpus size is pinned as well as
+ * the residue: a rule watching only the residue goes green when a whole feature's criteria are
+ * deleted, because deleting an undispositioned bullet lowers the residue exactly as dispositioning
+ * one does. The two together say what happened.
+ */
+function p2e_acceptance_residue(array $corpus): void
+{
+    $bullets = [];
+
+    foreach ($corpus as $file) {
+        $feature = null;
+        $inAcceptance = false;
+        $ordinal = 0;
+
+        foreach ($file['lines'] as $i => $line) {
+            $text = rtrim($line, "\r");
+
+            if (preg_match('/^#{1,6} (.*)$/', $text, $m) === 1) {
+                $feature = preg_match('/^Feature #(\d+)\b/', $m[1], $f) === 1 ? $f[1] : null;
+                $inAcceptance = false;
+                $ordinal = 0;
+
+                continue;
+            }
+
+            if ($feature === null) {
+                continue;
+            }
+
+            if (preg_match('/^Acceptance criteria/i', $text) === 1) {
+                $inAcceptance = true;
+
+                continue;
+            }
+
+            if (! $inAcceptance || ! str_starts_with($text, '- ')) {
+                continue;
+            }
+
+            $ordinal++;
+
+            $bullets[] = [
+                'identity' => $file['path'].'#feature-'.$feature.'#'.$ordinal,
+                'where' => $file['path'].':'.($i + 1),
+                'dispositioned' => carries_a_disposition($text),
+            ];
+        }
+    }
+
+    if (count($bullets) < MIN_ACCEPTANCE_BULLETS) {
+        cannot_measure(sprintf(
+            'P2e reached %d acceptance bullet(s), under the floor of %d. The PRD is one file and a '
+            .'walk that cannot see it makes this rule vacuous in the direction that reports green.',
+            count($bullets),
+            MIN_ACCEPTANCE_BULLETS
+        ));
+    }
+
+    if (count($bullets) !== EXPECTED_ACCEPTANCE_BULLETS) {
+        fail('P2e residue', sprintf(
+            'the PRD states %d acceptance criteria and the pinned expectation is %d. A criterion added '
+            .'or removed is a change to what this product promises, and it is not a bookkeeping edit.',
+            count($bullets),
+            EXPECTED_ACCEPTANCE_BULLETS
+        ));
+    }
+
+    // The floor is zero, deliberately: the corpus floor above already refuses a blind walk, and a
+    // residue that has genuinely reached zero is the state this rule wants to be able to report.
+    pin(
+        'P2e residue',
+        'undispositioned acceptance bullet(s)',
+        identify(array_values(array_filter($bullets, static fn (array $b): bool => ! $b['dispositioned']))),
+        0,
+        EXPECTED_UNDISPOSITIONED_BULLETS,
+        DIGEST_UNDISPOSITIONED_BULLETS
+    );
+}
+
+/**
+ * Does this acceptance bullet record what became of it?
+ *
+ * The PRD's own device: an italic parenthetical opening with a word from the closed vocabulary. Free
+ * prose is not accepted for the reason the roadmap's Status column is not — a cell accountable to no
+ * vocabulary is one nothing can read.
+ */
+function carries_a_disposition(string $bullet): bool
+{
+    if (preg_match('/\*\((.+)$/', $bullet, $m) !== 1) {
+        return false;
+    }
+
+    foreach (DISPOSITION_VOCABULARY as $word) {
+        if (stripos($m[1], $word) === 0) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 /**

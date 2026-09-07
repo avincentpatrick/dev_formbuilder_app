@@ -102,7 +102,7 @@ const SIZES = ['S', 'M', 'L', 'XL'];
 const MIN_SCANNED_FILES = 40;
 const MIN_DEFECT_ROWS = 50;
 
-$flags = ['dry-run', 'check', 'json', 'help'];
+$flags = ['dry-run', 'check', 'json', 'corpus', 'help'];
 $opts = getopt('', $flags);
 
 foreach (array_slice($argv, 1) as $argument) {
@@ -127,6 +127,7 @@ if (isset($opts['help'])) {
         '  php scripts/pipeline.php --dry-run    print it, write nothing',
         '  php scripts/pipeline.php --check      exit 1 if the file on disk has drifted',
         '  php scripts/pipeline.php --json       the ordered rows, for a machine',
+        '  php scripts/pipeline.php --corpus     the files a marker may live in, one per line',
         '  php scripts/pipeline.php --help       this text',
         '',
         'A plan item enters by a marker at its point of truth, at column 0:',
@@ -143,6 +144,7 @@ if (isset($opts['help'])) {
 $dryRun = isset($opts['dry-run']);
 $check = isset($opts['check']);
 $json = isset($opts['json']);
+$corpusOnly = isset($opts['corpus']);
 
 // ---------------------------------------------------------------------------------------------
 // Measurement
@@ -159,6 +161,19 @@ if ($scan['files'] < MIN_SCANNED_FILES) {
         $scan['files'],
         MIN_SCANNED_FILES
     ));
+}
+
+// ⚠️ `--corpus` ANSWERS WITHOUT THE LEDGER, AND THAT IS THE WHOLE REASON IT EXISTS. `--json` needs
+// the defect ranking and the trunk sha, so it cannot run where there is no git remote — which is
+// exactly where `tests/Feature/Docs/PipelineLintControlsTest.php` runs. The corpus is a property of
+// the TREE rather than of the queue, and a consumer that needs only the file list should not have to
+// buy the rest. It sits AFTER the floor above, so a walk that has gone blind still refuses.
+if ($corpusOnly) {
+    fwrite(STDOUT, implode("
+", $scan['paths'])."
+");
+
+    exit(0);
 }
 
 $defects = read_defects();
@@ -193,9 +208,18 @@ if ($json) {
     // and `scripts/pipeline-lint.php` P3 has to tell exactly those two apart to judge whether a
     // roadmap row claiming work in flight is telling the truth. This adds a key and touches no
     // rendered byte, so `--check` is unaffected.
+    // ⛔ `corpus` IS THE FILE LIST ITSELF, AND IT IS THE ANSWER TO M81's FORWARD CAUTION. The
+    // coverage rules in `scripts/pipeline-lint.php` must rule over the same files a marker could be
+    // READ from, or the two disagree in the one direction that makes the gate useless: a rule
+    // demanding a disposition in a file this walk never opens asks for a fact no marker can carry.
+    // Publishing the list is what makes the two corpora ONE DEFINITION rather than two that agree
+    // today. Measured while writing it: a hand-rolled reproduction of `corpus()` in the gate reached
+    // 56 markdown files against this walk's 55 — the extra was `CLAUDE.md`, which is deliberately
+    // outside the walk and in which a marker would be invisible.
     fwrite(STDOUT, json_encode([
         'sha' => $sha,
         'files_scanned' => $scan['files'],
+        'corpus' => $scan['paths'],
         'counts' => census($open),
         'rows' => $open,
         'off_the_line' => array_values(array_filter(
@@ -241,15 +265,18 @@ exit(0);
 /**
  * Walk the corpus for line-anchored markers.
  *
- * @return array{markers: list<array<string, mixed>>, files: int}
+ * ⚠️ The paths come back with the markers, and `files` is derived from THAT LIST rather than counted
+ * alongside it. A separately-incremented counter is a second measurement of one thing, and this file
+ * exists because two copies of a fact drift apart.
+ *
+ * @return array{markers: list<array<string, mixed>>, files: int, paths: list<string>}
  */
 function scan_markers(): array
 {
     $markers = [];
-    $files = 0;
+    $paths = corpus();
 
-    foreach (corpus() as $path) {
-        $files++;
+    foreach ($paths as $path) {
         $lines = explode("\n", (string) file_get_contents($path));
 
         foreach ($lines as $i => $line) {
@@ -264,7 +291,7 @@ function scan_markers(): array
         }
     }
 
-    return ['markers' => $markers, 'files' => $files];
+    return ['markers' => $markers, 'files' => count($paths), 'paths' => $paths];
 }
 
 /**

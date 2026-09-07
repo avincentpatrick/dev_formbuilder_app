@@ -1150,15 +1150,52 @@ function p2e_acceptance_residue(array $corpus): void
  * The PRD's own device: an italic parenthetical opening with a word from the closed vocabulary. Free
  * prose is not accepted for the reason the roadmap's Status column is not — a cell accountable to no
  * vocabulary is one nothing can read.
+ *
+ * ⛔ THE DISPOSITION MUST BE THE LAST THING ON THE LINE, AND IT IS THE SAME MENTION-VERSUS-DECLARATION
+ * TRAP `P2b` AND `P2c` ALREADY CARRY (M84). This predicate used to take the FIRST italic parenthetical
+ * on the bullet, which is wrong in both directions:
+ *
+ *   UNDER-COLLECTS — a bullet whose prose opens with an incidental parenthetical hides its own real
+ *   disposition behind it, so a criterion that HAS been dispositioned is counted as residue.
+ *   ⚠️ OVER-COLLECTS, which the row that filed this did not claim and is the worse half — a bullet that
+ *   merely QUOTES a disposition discharges itself, so a live product commitment silently leaves the
+ *   residue set. A declaration is the one at the END; everything earlier is prose.
+ *
+ * ⛔ IT FAILS LOUD RATHER THAN SILENT, AND NOT FOR THE REASON THE ROW GAVE. `pin()` compares a COUNT
+ * and a DIGEST over site identities, so movement in EITHER direction is red. What the old predicate
+ * actually cost was not a green build over a miscount but a false refusal an author could only clear
+ * by leaving the constant permanently one too high — recording a dispositioned criterion as residue
+ * for good.
+ *
+ * ⚠️ WHY THIS IS NOT AN ANCHORED REGEX. The obvious repair is a pattern anchored at both ends, and it
+ * passes today ONLY by luck: `docs/PRD.md:211` carries an inner `)` earlier in its line, so a
+ * `[^)]+` body stops in the wrong place the moment such a bullet also carries a disposition. A
+ * LAST-match search plus a suffix test has no such dependency on what the prose contains.
+ *
+ * ⛔ WHAT THIS DELIBERATELY DOES NOT DO. `docs/PRD.md:311` and `:314` are dispositioned in INDENTED
+ * CONTINUATION bullets on the following line, which the collector skips — so the residue count of 89
+ * reconciles against this predicate and not against what the document records, where the honest
+ * figure is 87. Accepting the continuation form moves a pinned constant and is entangled with the
+ * open `D24`, so it is filed rather than smuggled in here.
  */
 function carries_a_disposition(string $bullet): bool
 {
-    if (preg_match('/\*\((.+)$/', $bullet, $m) !== 1) {
+    $trimmed = rtrim($bullet);
+
+    if (! str_ends_with($trimmed, ')*')) {
         return false;
     }
 
+    $opens = strrpos($trimmed, '*(');
+
+    if ($opens === false) {
+        return false;
+    }
+
+    $inner = substr($trimmed, $opens + 2);
+
     foreach (DISPOSITION_VOCABULARY as $word) {
-        if (stripos($m[1], $word) === 0) {
+        if (stripos($inner, $word) === 0) {
             return true;
         }
     }

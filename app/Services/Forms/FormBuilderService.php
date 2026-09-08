@@ -83,17 +83,21 @@ final class FormBuilderService
         $this->assertDraftChild($form, $section);
         $this->assertNoDrift($section, $expectedVersion);
 
-        $section->fill([
-            'key' => $data['key'],
-            'label' => $data['label'],
-            'description' => $data['description'] ?? null,
-            'is_repeatable' => (bool) ($data['is_repeatable'] ?? false),
-            'min_instances' => $data['min_instances'] ?? null,
-            'max_instances' => $data['max_instances'] ?? null,
-            'relevant_expression' => $data['relevant_expression'] ?? null,
-        ])->save();
+        return DB::transaction(function () use ($form, $section, $data): FormSection {
+            $this->assertStillDraftChild($form, $section);
 
-        return $section->refresh();
+            $section->fill([
+                'key' => $data['key'],
+                'label' => $data['label'],
+                'description' => $data['description'] ?? null,
+                'is_repeatable' => (bool) ($data['is_repeatable'] ?? false),
+                'min_instances' => $data['min_instances'] ?? null,
+                'max_instances' => $data['max_instances'] ?? null,
+                'relevant_expression' => $data['relevant_expression'] ?? null,
+            ])->save();
+
+            return $section->refresh();
+        });
     }
 
     public function deleteSection(Form $form, FormSection $section): void
@@ -136,7 +140,9 @@ final class FormBuilderService
         $this->assertDraftChild($form, $field);
         $this->assertNoDrift($field, $expectedVersion);
 
-        return DB::transaction(function () use ($field, $user, $data): FormField {
+        return DB::transaction(function () use ($form, $field, $user, $data): FormField {
+            $this->assertStillDraftChild($form, $field);
+
             $field->fill([
                 'key' => $data['key'],
                 'label' => $data['label'],
@@ -305,6 +311,56 @@ final class FormBuilderService
     private function assertDraftChild(Form $form, FormSection|FormField $child): void
     {
         if ($form->draft_version_id === null || $child->form_version_id !== $form->draft_version_id) {
+            throw FormException::childNotInDraft();
+        }
+    }
+
+    /**
+     * The same question, re-decided INSIDE the transaction and from the database (Increment M88).
+     *
+     * ⛔ {@see self::assertDraftChild()} READS THE ROUTE-BOUND MODELS, WHICH IS A SNAPSHOT FROM
+     * BEFORE THE REQUEST DID ANYTHING. `$form->draft_version_id` is whatever it was when route-model
+     * binding loaded it, so if a publish, restore, XLSForm import or archive commits between that
+     * load and this write, the guard compares two stale values, agrees with itself, and lets the
+     * write through. {@see \Tests\Feature\Forms\BuilderDraftGuardTest}'s own header says that guard
+     * "turns a write against a published version into a 422 instead of a silent zero-row write" —
+     * true only when the version was ALREADY published at bind time, which is the case it tested.
+     *
+     * ⚠️ WHAT THE CALLER ACTUALLY SAW WITHOUT THIS. The `draft_child` RLS policy makes the UPDATE
+     * match zero rows, `save()` reports success either way, and `updateField()` returns
+     * `$field->refresh()` — so the builder received **200 OK carrying the pre-edit values** and the
+     * user watched their edit revert with no error at all. That is the defect this closes.
+     *
+     * ⛔ NO LOCK, DELIBERATELY, AND THE PRECEDENT IS M85's. `docs/form-versioning-schema-migration.md`
+     * §3.4 states that the `forms` row lock serializes create/publish/discard/restore and
+     * "does not serialize ordinary field-level edits" — a written decision, not an oversight, so
+     * adding {@see self::lockDraft()} here would be a reversal of it rather than a bug fix. A plain
+     * re-read is enough: READ COMMITTED re-evaluates each statement, so a transaction that starts
+     * after the other side commits sees the new `draft_version_id` and the deleted child. M85 closed
+     * the promote door the same way, with a re-read and no lock.
+     *
+     * ⚠️ WHAT IT DOES NOT CLOSE, STATED SO THE NEXT READER DOES NOT ASSUME OTHERWISE: an edit that
+     * commits *inside* a publish transaction — after its snapshot read and before its commit — still
+     * lands on rows the frozen `schema_snapshot` and `checksum` no longer describe. That window is
+     * lock-shaped and is filed as its own row.
+     */
+    private function assertStillDraftChild(Form $form, FormSection|FormField $child): void
+    {
+        $current = Form::query()->whereKey($form->id)->first();
+
+        if ($current === null || $current->draft_version_id === null) {
+            throw FormException::childNotInDraft();
+        }
+
+        // The child is re-read too, and not only the form: a restore, an import or a delete removes
+        // the row while leaving `draft_version_id` untouched, so the form alone cannot see it.
+        $live = $child->newQuery()->whereKey($child->getKey())->first();
+
+        if (! $live instanceof FormSection && ! $live instanceof FormField) {
+            throw FormException::childNotInDraft();
+        }
+
+        if ($live->form_version_id !== $current->draft_version_id) {
             throw FormException::childNotInDraft();
         }
     }

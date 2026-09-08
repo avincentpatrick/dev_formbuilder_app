@@ -16,7 +16,80 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M87` is merged; the next increment is a fresh `D13` batch
+## Status: ACTIVE CLAIM — `M88`, the nineteenth `D13` batch: the two remaining lock asymmetries, four inert `subscriptions` lifecycle columns, and an enum catalog gated against the database and nothing else (`m88-d13-batch`)
+
+Taken 2026-09-08. Branch `m88-d13-batch`, cut from `origin/main` at `05195a6`, PR into `main`.
+
+⛔ **THE GENERATED PROPOSAL IS REJECTED FOR THE FOURTH INCREMENT RUNNING, AND THIS TIME THE MECHANISM IS
+ONE THE LEDGER ALREADY OWNS AS AN OPEN ROW.** `docs/backlog-triage.md`'s `## Suggested next batch` offers
+`4242` · `6873` · `5971` · `8404`. Read by `D13`'s letter — *at most one row may **touch** a hub file* —
+three of the four break the cap: `4242` repairs `scripts/tracker-lint.php` and its subject is `CLAUDE.md`
+(8 rows) and `PROGRESS.md` (3); `5971`'s repair can only be made in `scripts/pipeline.php` (12) or
+`scripts/citation-liveness-lint.php` (6); `8404`'s can only be made in `scripts/citation-liveness-lint.php`
+(6). ⚠️ **The generator is not malfunctioning — it is doing what `docs/feature-backlog.md:8523` says it
+does**, implementing *cites* where the decision says *touches*, and every one of those three rows cites only
+a non-hub file while repairing a hub. This is the fourth consecutive rejection and the second for a
+mechanism with an open row of its own; `M83`, `M86` and `M87` rejected it for three other reasons.
+It is further evidence for `D15` and is recorded rather than re-argued.
+
+**The batch, chosen by hand under `D13`'s letter — one hub-touching row, no two rows sharing a non-hub file:**
+
+| # | Row | Hub? | Non-hub files it would touch |
+|---|---|---|---|
+| 1 | `docs/feature-backlog.md:8570` — `FormBuilderService::updateField()`/`updateSection()` are the only mutators there that do not lock the draft | no | `app/Services/Forms/FormBuilderService.php`, `app/Services/Forms/PublishService.php` (read), a `tests/Feature/Forms/` arm |
+| 2 | `docs/feature-backlog.md:8559` — the schedule window is re-asserted under the lock on the promote door and on no other | no | `app/Services/Submissions/SubmissionPipeline.php`, `app/Services/Submissions/SubmissionDraftService.php`, `app/Services/Submissions/SubmissionFinalizer.php`, `app/Services/Forms/FormService.php` |
+| 3 | `docs/feature-backlog.md:7833` — four `subscriptions` lifecycle columns are documented, exist in the schema, and have no reader and no writer | no | `app/Models/Subscription.php`, `database/migrations/2026_07_23_000002_create_subscriptions_table.php` |
+| 4 | `docs/feature-backlog.md:8597` — the enum catalog's value lists are gated against the DATABASE and against nothing else | **yes** — `docs/data-dictionary.md` | `tests/Feature/Migrations/DocumentedCheckConstraintDriftTest.php`, `app/Enums/*`, a new `tests/Feature/Docs/` arm |
+
+⚠️ **`docs/feature-backlog.md` is in the hub table at 4 citing rows and is deliberately not counted here**,
+on `M87`'s stated grounds: every closure and every correction edits the ledger, so counting it would make no
+batch legal at all.
+
+⚠️ **Rows 1 and 2 are both lock-ordering rows filed by the same `M87` fan-out, and that is deliberate rather
+than accidental duplication.** They share no file, no service and no remedy: row 1 is a missing `lockDraft()`
+inside a builder mutator, row 2 is a schedule predicate decided outside a lock on the submission side.
+Taking them together is what makes the pair of them a census rather than two more instances.
+
+⛔ **Row 4 carries a stated blocker from its sibling `8582` that this claim does NOT inherit, and the
+difference is the whole reason it is takeable.** `8582` is blocked because adding eleven catalog ROWS is not
+line-neutral against a `docs/data-dictionary.md` pinned by 24 citations at zero ledger headroom. Row 4's
+remedy is a **gate plus at most an in-cell value-list correction**, which is line-neutral by construction.
+If the fan-out finds it is not, the row is corrected rather than forced.
+
+### Evidence verified
+
+⏳ **PENDING — the read-only fan-out is running, one agent per row over disjoint files (`D13` clause 2).**
+This heading is written before the first file is opened because the claim is a pushed commit; it is amended
+in its own pushed commit the moment the fan-out reports, and the amendment is what the gates see.
+
+### Premise verified
+
+⏳ **PENDING — same fan-out, asked separately.** Each row is asked what it believes about the world *around*
+its defect: row 1 believes every *other* mutator in that service locks and that `PublishService::publish()`
+is the racing writer; row 2 believes `M85` re-asserted the window on the promote side and that
+`assertCapacity()`'s lock is conditional on `max_responses`; row 3 believes the four columns are inert in
+`app/` while payments are a Phase-4 deferral of record, which would make "no writer" correct and "a defect"
+wrong; row 4 believes the catalog's enum names are prose rather than resolvable symbols, which is the whole
+of its stated difficulty.
+
+### Remedy verdict
+
+⏳ **PENDING — measured before any test is written, per row.** Row 1 offers a remedy by implication only.
+Row 2 offers two and declines both in its own body. Row 3 offers none. Row 4 names an instrument
+(`DocumentedSettingKeyDriftTest`'s shape) and states why it was not built.
+
+Files: `docs/claims/lane-a.md`, `docs/feature-backlog.md`, `docs/backlog-triage.md`, `docs/pipeline.md`,
+`PROGRESS.md` (own block only), `docs/gate-baselines.md`, plus the per-row files in the table above.
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/backlog-triage.md`, `docs/pipeline.md`,
+`docs/data-dictionary.md`, `docs/claims/decisions.md`, `PROGRESS.md` (own block only).
+Paired files taken: none identified at claim time; the fan-out is asked to name any.
+Namespaces spent: nothing from either namespace at claim time — no migration and no ADR is expected.
+Prediction: Pest gains arms and no CI gate count moves; PHPStan CI stays at zero and the local run keeps
+its phantoms, which must be classified by MESSAGE rather than counted; Pint must be run bare on the host;
+`openapi.json` stays byte-identical because no route or resource changes. **The gate I most expect to be
+wrong is the citation gate on `docs/data-dictionary.md`** — row 4 is the hub row, the ledger tier has zero
+headroom, and that is exactly the gate that broke in `M86` and was survived only deliberately in `M87`.
+Second most likely: `docs/pipeline.md`'s own citation of `PROGRESS.md`, which every close-out drifts.
 
 ## RELEASED — `M87`, the eighteenth `D13` batch: a CHECK census measured from `pg_constraint`, the last exposed Fortify write route, a dangling label, and a pre-lock shape that is five instances rather than two (merged as PR #278, `30c3241`, 6/6 green with real step counts — Static analysis 26 · E2E 19 of 20 (the skip is the on-failure report upload) · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

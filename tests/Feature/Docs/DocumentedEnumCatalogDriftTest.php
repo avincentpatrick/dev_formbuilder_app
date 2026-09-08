@@ -363,7 +363,10 @@ it('publishes exactly the values each enum declares, in both directions', functi
     foreach ($rows as $row) {
         $class = documentedEnumCatalogClassFor($row);
 
-        if ($class === null) {
+        // A name that resolves to nothing is the FIRST arm's failure, and it owns the explanation.
+        // Without this guard `::cases()` raises a PHP Error here too, so one defect reports twice —
+        // once legibly and once as a fatal — and the fatal is the one a reader sees first.
+        if ($class === null || ! enum_exists($class)) {
             continue;
         }
 

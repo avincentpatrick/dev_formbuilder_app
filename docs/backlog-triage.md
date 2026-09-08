@@ -67,7 +67,6 @@ from it and listed separately below.
 | Two open rows file the same triage-generator defect with OPPOSITE liveness verdicts, and neither cites the other. | `M86` | 8511 | *hub files only* |
 | The archived status bullets live in TWO non-contiguous places, and that is what made the batch numbering go wrong. | `M86` | 8534 | *hub files only* |
 | Eleven value-domain `CHECK` constraints guard columns the enum catalog has no row for at all, and the fix cannot be made while the citation ledger is at its ce… | `M87` | 8582 | *hub files only* |
-| A `docs/feature-backlog.md` citation into the exceptions log resolves to a live line about a different subject, and the citation gate is built to pass exactly … | `M87` | 8620 | *hub files only* |
 | A claim file has no constrained form for a forward declaration, so the one stale declaration on the tree cannot be gated. | `M42` | 4230 | `docs/claims/lane-b.md` |
 | `scripts/next.php` takes each release's LEAD paragraph, and a lead paragraph is often a file manifest rather than the lesson. | `M42` | 4377 | `docs/claims/TEMPLATE.md` |
 | `docker compose run --rm e2e` does not work on this host as three documents prescribe it, and the most likely wrong form EXITS 0. | `M61` | 4986 | `docs/ux/design-system-reference.md` |
@@ -82,6 +81,7 @@ from it and listed separately below.
 | No gate whose input is the GIT INDEX can have a Pest control, because `git` is not installed in the app container. | `M85` | 8377 | `scripts/citation-liveness-lint-controls.php` |
 | `docs/ACCESS-MATRIX.md` cites a HOSTNAME AND PORT, which the citation pattern parses as a path and line. | `M85` | 8404 | `docs/ACCESS-MATRIX.md` |
 | `scripts/tracker-lint.php` is cited by ZERO of the open rows while owning the defects of at least two of them, so no collision check can ever see it. | `M86` | 8484 | `scripts/tracker-lint.php` |
+| A `docs/feature-backlog.md` citation into the exceptions log resolves to a live line about a different subject, and the citation gate is built to pass exactly … | `M87` | 8620 | `resources/js/composables/useServerAutosave.ts` |
 | `CLAUDE.md`'s gate table sends PHPStan to the container, one row below the rule that explains why the container is wrong. | `M76` | 6889 | `scripts/gate-baselines.php` · `database/migrations/2026_07_06_000205_create_form_fields_table.php` |
 | Two user-supplied predicates now run on the `pgsql_auth` connection, against a standing rule that says none may. | `M77` | 7015 | `docs/multi-tenancy-rbac-design.md` · `docs/adr/0002-multi-tenancy-shared-db-rls.md` |
 | `forms.allow_manual_encoding` is documented as Feature #7's capability flag and has neither a reader nor a writer — the only one of five inert `allow_*` flags … | `M80` | 7440 | `app/Policies/SubmissionPolicy.php` · `app/Services/Forms/FormService.php` |

@@ -2196,8 +2196,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   M9's the same. What the sweep did establish is what the gate below is built on: the design system has
   **zero** form elements; `resources/public-runtime/` has two, both `@submit.prevent`; **`TopNav.vue:77`
   is a deliberate `method="GET" action="/search"`** progressive-enhancement form that must keep working;
-  and every non-Inertia network call in the tree (`builderClient.ts:41`, `useServerAutosave.ts:107` and
-  `:364`, `MediaInput.vue:199`) already reads the `XSRF-TOKEN` cookie. Four of five `/logout` call sites
+  and every non-Inertia network call in the tree (`builderClient.ts:41`, `useServerAutosave.ts:190` and
+  `:487`, `MediaInput.vue:199`) already reads the `XSRF-TOKEN` cookie. Four of five `/logout` call sites
   were already correct.
   ⛔ **THE REJECTED FIX IS RECORDED IN TWO PLACES BECAUSE IT IS THE TEMPTING ONE: adding `/logout` to
   `validateCsrfTokens(except: …)`.** It resolves the 419 by REMOVING a control from a session-destroying
@@ -3185,7 +3185,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   drops `throttle:login`, but vendor `AuthenticatedSessionController.php:86` re-inserts
   `EnsureLoginIsNotThrottled` into the default pipeline on exactly that condition, and this app sets no
   `pipelines` key and never calls `Fortify::authenticateThrough`, so the branch **is** reached — 5 *failed*
-  attempts/min on `lower(email)|ip`, the same key `FortifyServiceProvider.php:160` builds. A degradation,
+  attempts/min on `lower(email)|ip`, the same key `FortifyServiceProvider.php:161` builds. A degradation,
   not an absence. **(b)** The **rename** mutation is **already covered, loudly**: on `laravel/framework`
   v13.18.1 `ThrottleRequests::resolveMaxAttempts()` throws `MissingRateLimiterException` for an unregistered
   name, so a rename 500s every login POST and reddens `AuthenticationTest.php:48` and
@@ -3217,7 +3217,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   word. `openapi.json` **byte-identical**, confirmed by `cmp` against a fresh `scramble:export`; the claim
   predicted this in writing before the file was opened, on the ground that a 429 comes from route middleware
   no controller mentions. Original filing follows.
-  — *`config/fortify.php:169-172` maps them by string and `FortifyServiceProvider.php:159,165` registers the
+  — *`config/fortify.php:169-172` maps them by string and `FortifyServiceProvider.php:160,166` registers the
   closures; Fortify `array_filter`s the middleware, so nulling either config value or renaming either
   registration produces a route with **no throttle at all** — an exhaustible 6-digit TOTP and unmetered
   credential stuffing, with nothing red. **Latent.** The project already guards exactly this elsewhere:
@@ -8626,4 +8626,12 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   instance of the open `M83` row that names the property in the abstract, and the two should be read
   together. ⚠️ **One instance is not a census.** Nothing in the tree can enumerate the others, because doing
   so requires reading each cited line and judging it against the citing sentence — which is the reason that
-  open row exists. **Live.** Filed by `M87`.
+  open row exists.
+  ⛔ **AND A SECOND INSTANCE TURNED UP BY ACCIDENT IN THE SAME INCREMENT, WHICH IS THE PART WORTH READING.**
+  A row at `docs/feature-backlog.md:2199` cites `useServerAutosave.ts:107` and `:364` as call sites that
+  *"already read the `XSRF-TOKEN` cookie"*. On `origin/main` those reads are at **170** and **467**; 107 and
+  364 are an ordinary comment and an ordinary statement. **It was already wrong before this increment**, it
+  has always been green, and it was found only because `M87` happened to edit that file and re-read the
+  lines. Repointed to the verified lines. ⚠️ **Two instances found by two accidents is not a rate**, and the
+  reason it is not is the same reason the row above exists: nobody can enumerate them.
+  **Live.** Filed by `M87`.

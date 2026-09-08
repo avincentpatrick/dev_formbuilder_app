@@ -647,6 +647,32 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `flex-wrap` is foreclosed for the topnav instance (`.topnav` is a fixed 64px with `flex-shrink: 0`),
   so it needs its own increment with a story, a DSR note and a re-measure of every consumer under the
   Linux font stack. **Live**, and now reproducible locally. Filed by `M19`.
+  ⛔ **CORRECTED BY `M87` (2026-09-08) — THE CENSUS, ONE CANDIDATE REMEDY AND THE 30px ARE ALL WRONG, AND
+  THE REASON THE HONEST FIX WAS RULED OUT IS STALE.** The `M78` row that measured this is now closed and its
+  findings are here rather than one document away.
+  ⛔ **Census: four stretch-clamped hosts, not two.** `.config__group` and `.mds-field` (members ×2) as
+  filed, plus `.sheets-fields` (`SheetsRuleFields.vue`) and `.encode-field` (`FieldInput.vue`) — the
+  identical flex-column-implicit-stretch shape, named nowhere until now, and the latter mounted by the
+  PUBLIC runtime as well as the encode page. ⚠️ Three of the four sit inside `.mds-modal__body`, also
+  `overflow-y: auto`, so they share the invisible-scrollbar mechanism this row grants only to `.config`.
+  ⛔ **`flex-shrink: 1` is a NO-OP** — it is the initial value, and it appears nowhere in the component. The
+  phrase *"neither `min-width: 0` nor `flex-shrink`"* reads as two missing things; one of them is inert. And
+  `min-width: 0` alone is incomplete rather than wrong: `__seg` carries no `overflow` and its span no
+  `text-overflow`, so it converts a fieldset-level spill into a text-level one that still extends
+  `.config`'s scrollWidth.
+  ⛔ **The 30px is struck.** Its only provenance is a comment recording a CI failure that computed spill past
+  `.app-shell__content` — a different box from the scrollbar this row's own title names — and that path is
+  now behind an expectation that no longer fails, so no gate in the tree can regenerate the number.
+  ⚠️ **The `flex-wrap` foreclosure is stale.** It was ruled out because *"`.topnav` is a fixed 64px with
+  `flex-shrink: 0`"*; the topnav instance collapses to glyphs at ≤1024 and is `display: none` at ≤899, so it
+  never reaches a state where a wrap could grow the bar. Wrapping is still a 13-call-site change needing a
+  re-measure — but not for the stated reason.
+  ⚠️ **`align-items: flex-start` on the hosts is a no-op for this defect**, written down so nobody tries it:
+  un-stretching lets the fieldset take its max-content width, which overflows the pane by the same amount.
+  👤 **What is left is a decision, and it is filed rather than guessed**, because the component-level fix
+  touches 13 call sites and the only instrument that can settle it is an e2e run in the container. ⚠️ **A
+  fourth option nobody had raised**: `Settings/Index.vue` already solves this at the HOST, with a comment
+  saying so, and three call sites are guarded by it today. Corrected by `M87`.
 
 ### Connectors & webhooks
 
@@ -2170,8 +2196,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   M9's the same. What the sweep did establish is what the gate below is built on: the design system has
   **zero** form elements; `resources/public-runtime/` has two, both `@submit.prevent`; **`TopNav.vue:77`
   is a deliberate `method="GET" action="/search"`** progressive-enhancement form that must keep working;
-  and every non-Inertia network call in the tree (`builderClient.ts:41`, `useServerAutosave.ts:107` and
-  `:364`, `MediaInput.vue:199`) already reads the `XSRF-TOKEN` cookie. Four of five `/logout` call sites
+  and every non-Inertia network call in the tree (`builderClient.ts:41`, `useServerAutosave.ts:190` and
+  `:487`, `MediaInput.vue:199`) already reads the `XSRF-TOKEN` cookie. Four of five `/logout` call sites
   were already correct.
   ⛔ **THE REJECTED FIX IS RECORDED IN TWO PLACES BECAUSE IT IS THE TEMPTING ONE: adding `/logout` to
   `validateCsrfTokens(except: …)`.** It resolves the 419 by REMOVING a control from a session-destroying
@@ -2649,7 +2675,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   alone.
   ⚠️ **IT DOES NOT CLOSE THE MAIL-CANNON ROW ON THE SAME ROUTE**, which the row itself warns about. That is a
   rate limit and its remedy is a `RateLimiter::for()` plus a `ThrottleFortifyEndpoints::limiters()` entry; it
-  stays open.
+  stays open. ✅ **No longer — `M87` (2026-09-08) bound it, by exactly that remedy.**
   **`minor` · The Fortify group serves tenant subdomains and carries no org-2FA gate, so the mint was not the
   only way past it.** Found while closing the row directly above, which named one route. `config/fortify.php`
   registers Fortify's routes in their own group — `web`, `RequirePlatformHost`, `AppSecurityHeaders`,
@@ -2662,7 +2688,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   a group-level mount. It is the same defence-in-depth severity the row above was downgraded to, for the same
   reasons: the writes are scoped to the actor's own account and the password route re-challenges. ⚠️ **A
   neighbour row already covers `PUT /user/profile-information` from the mail-cannon angle; read both before
-  taking either.** **Live.** Filed by `M66`.
+  taking either.** ✅ **`M87` (2026-09-08) closed that neighbour; the mail-cannon angle is bound and this row is unaffected.** **Live.** Filed by `M66`.
 - **`minor` · Any tenant-scoped policy read mounted on the Fortify group is silently blind, and two increments have now walked into it.**
   Filed 2026-09-03 by `M68` at the moment it walked into it, having cost a full build-and-fail cycle.
   `config/fortify.php`'s group carries no tenancy middleware at all, so `EstablishTenantDatabaseContext`
@@ -3159,7 +3185,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   drops `throttle:login`, but vendor `AuthenticatedSessionController.php:86` re-inserts
   `EnsureLoginIsNotThrottled` into the default pipeline on exactly that condition, and this app sets no
   `pipelines` key and never calls `Fortify::authenticateThrough`, so the branch **is** reached — 5 *failed*
-  attempts/min on `lower(email)|ip`, the same key `FortifyServiceProvider.php:160` builds. A degradation,
+  attempts/min on `lower(email)|ip`, the same key `FortifyServiceProvider.php:161` builds. A degradation,
   not an absence. **(b)** The **rename** mutation is **already covered, loudly**: on `laravel/framework`
   v13.18.1 `ThrottleRequests::resolveMaxAttempts()` throws `MissingRateLimiterException` for an unregistered
   name, so a rename 500s every login POST and reddens `AuthenticationTest.php:48` and
@@ -3191,7 +3217,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   word. `openapi.json` **byte-identical**, confirmed by `cmp` against a fresh `scramble:export`; the claim
   predicted this in writing before the file was opened, on the ground that a 429 comes from route middleware
   no controller mentions. Original filing follows.
-  — *`config/fortify.php:169-172` maps them by string and `FortifyServiceProvider.php:159,165` registers the
+  — *`config/fortify.php:169-172` maps them by string and `FortifyServiceProvider.php:160,166` registers the
   closures; Fortify `array_filter`s the middleware, so nulling either config value or renaming either
   registration produces a route with **no throttle at all** — an exhaustible 6-digit TOTP and unmetered
   credential stuffing, with nothing red. **Latent.** The project already guards exactly this elsewhere:
@@ -3282,7 +3308,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `RateLimiter::for()` plus one `->middleware('throttle:…')`, and it should carry a binding assertion in
   `RateLimiterBindingTest.php`, which already has the helper. **Deliberately left by M30** because it adds a
   limiter to a route that increment does not otherwise touch. Filed by `M30`.
-- **`minor` · `PUT /user/profile-information` is a second mail cannon, and it is the one Fortify write route left deliberately unbound.**
+- ~~**`minor` · `PUT /user/profile-information` is a second mail cannon, and it is the one Fortify write route left deliberately unbound.**~~
   `UpdateUserProfileInformation` nulls `email_verified_at` and calls
   `sendEmailVerificationNotification()` on **every** address change, so one authenticated session can
   dispatch unlimited verification mail to **arbitrary recipients** — the same shape as the
@@ -3298,6 +3324,33 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   and a legitimate profile save is a success, so a per-minute ceiling under about 10 will eventually
   redden `FortifyRouteContextTest` or `EmailVerificationGateTest`. The address-change arm is the one worth
   keying tightly; a name change sends no mail at all, and nothing currently distinguishes them. Filed by `M43`.
+  ✅ **CLOSED — `M87` (2026-09-08). THE REMEDY WORKED AS PRESCRIBED AND THE ROW WAS WRONG ABOUT WHY IT HAD
+  BEEN LEFT OUT.** `PUT /user/profile-information` now maps to `profile-information-update`, a two-arm
+  limiter: **6/min on an address change, 60/min on a name change**, keyed per identity.
+  ⛔ **THE RECORDED DECISION DID NOT SURVIVE BEING CHECKED.** The route was excused as one that *"verifies
+  no credential"* — but `M43`'s scope already included two routes that verify none, `register.store` and
+  `password.email`, and the second is a pure mail dispatcher, which is the exact analogue this row argues
+  from. The phrase was a label applied afterwards, not the boundary that was drawn. ⚠️ **"Eight
+  credential-bearing routes" is itself only true counting distinct URI paths** — `two-factor.enable` and
+  `two-factor.disable` share one — so the map ships nine names on eight paths, and three documents repeat
+  "eight" without saying so. Corrected in the threat model in place.
+  ⛔ **THE ROW NAMES ONE DEFECT ON THIS DOOR AND THERE ARE TWO; THE SECOND IS FREE AND INVISIBLE TO ANY
+  MAIL-SIDE CONTROL.** `UpdateUserProfileInformation` validates with `Rule::unique('pgsql_auth.users',
+  'email')` — deliberately, so uniqueness sees users outside the caller's tenant, which the RLS'd connection
+  cannot. Unbounded, that is a **cross-tenant account-enumeration oracle** readable off a 422, needing no
+  mail to be delivered. ⚠️ **And the mail half is worse than "sender reputation"**: `QueuedVerifyEmail` rides
+  `QueueName::Mail`, shared with welcome, invitation, resume-link, PDF-ready, quota-overage and connector
+  notifications — so the flood is a cross-tenant *delivery* denial.
+  ⚠️ **The row's sizing warning was over-cautious and is now measured rather than estimated.** Eight call
+  sites reach this route repo-wide, one hit each, in eight distinct test methods, with `CACHE_STORE=array`
+  giving each method its own store — and no E2E traffic at all. Any ceiling ≥ 2 was safe; six matches
+  `password-update` on the same family.
+  ⛔ **AND THE COVERAGE GATE HAD A HOLE THE ROW DOES NOT MENTION, WHICH THIS INCREMENT WAS ONE EDIT AWAY
+  FROM WALKING INTO.** `FORTIFY_UNBOUND_BY_DECISION` was only asserted in the direction that catches a name
+  REMOVED while still unbounded. A name LEFT on the list after the route was bound read as `$skipped` —
+  which only ever suppresses a finding — so the suite would have stayed green forever beside a decision of
+  record saying the route is deliberately unprotected. Now asserted in both directions, with a floor, and
+  proved by a mutation that reddens exactly the new arm and nothing else. **Closed by `M87`.**
 - **`minor` · `throttle:saml-acs`'s route BINDING is asserted by nothing, while its registration is.**
   `SsoLoginWebTest.php:285-291` loops six limiter names and asserts each resolves — which stays green when
   the binding at `routes/tenant.php:1172` is deleted, because the registration at `AppServiceProvider.php:421`
@@ -7012,8 +7065,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   an FQ-spelled tag EMPTIES the walk and the `>= 1` floor fires — meaning it is currently caught, loudly, by
   accident of there being no second route to hold the floor up. **Live.** Filed by `M77`.
 
-- **`minor` · The data-dictionary row's CHECK-constraint census is wrong, and the correction is the opposite
-  of a tidy-up.** Measured by `M77`'s fan-out (2026-09-06) directly against `pg_constraint` on the running
+- ~~**`minor` · The data-dictionary row's CHECK-constraint census is wrong, and the correction is the opposite
+  of a tidy-up.**~~ Measured by `M77`'s fan-out (2026-09-06) directly against `pg_constraint` on the running
   database, and recorded so the next taker does not repeat a survey that has now been got wrong once.
   A grep-based census over `database/migrations/` concluded that **3 of 16** enum-catalog rows carry a
   Postgres CHECK. Measured live: the schema holds **44** CHECK constraints, the catalog has **28** rows, not
@@ -7025,6 +7078,26 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   wrong number would have been worse than the vague preamble it replaced**: it would tell a reader that
   seven database-enforced columns are unenforced. Whoever takes the row should census from `pg_constraint`,
   not from the migrations directory. **Live.** Filed by `M77`.
+  ✅ **CLOSED — `M87` (2026-09-08). ALL FOUR OF ITS NUMBERS HELD EXACTLY, MEASURED AGAIN FROM
+  `pg_constraint` ON THE LIVE SCHEMA**: 44 table-level CHECK constraints, 28 catalog rows, 11 backed, and
+  `form_versions_status_chk` live and created outside `database/migrations/`. ⛔ **ITS EXPLANATION OF THE
+  MISS IS WRONG, AND THE CORRECTION IS WHAT MAKES THE GATE RIGHT.** The row attributes the grep census's
+  failure to the `_chk` suffix *"the pattern did not match"* — but **seven** `_chk`-suffixed constraints
+  live inside `database/migrations/` and a directory grep finds all seven. **Location is the discriminator,
+  not the suffix**, which is exactly why the gate reads `pg_constraint` rather than a file.
+  ✅ **The repair was line-neutral by necessity, not by taste.** `docs/data-dictionary.md` is line-pinned by
+  24 citations — 6 of them in the zero-tolerance tier — and the ledger tier sits at its ceiling with no
+  headroom, so an inserted line breaks the merge. The `DB CHECK` column was added by editing the header,
+  the separator and 29 body rows **in place**; the file's line count is unchanged and the citation gate is
+  green. ⛔ **A one-line insertion would have broken it in both tiers**, and a two-line one would have
+  survived by coincidence of the document's paragraph rhythm rather than by safety.
+  ⛔ **THE FALSE UNIVERSAL LIVED IN TWO PLACES, NOT ONE.** The row names the catalog preamble; the same
+  claim is made in the strategy paragraph above it, which is itself a zero-tolerance citation target. Both
+  are corrected.
+  ⚠️ **AND THE ROW UNDERSTATES THE HOLE IT SITS IN.** Eleven further value-domain CHECKs guard columns the
+  catalog has **no row for at all** — the connector, SSO and resource-grant vocabularies — which is a bigger
+  gap than the 17 mislabelled rows. Adding those rows is not line-neutral, so it cannot be done at the
+  current citation ceiling and is filed below rather than smuggled in. **Closed by `M87`.**
 
 - ~~**`minor` · `bootstrap/app.php` and `FortifyServiceProvider` both record a middleware index that is off by
   one.**~~
@@ -7282,8 +7355,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   arm), and although the row cites only the test file, the drift is IN `docs/data-dictionary.md`, so the
   work spends the batch's one hub slot. The triage's harvest is optimistic here. **Live.** Filed by `M78`.
 
-- **`minor` · `MdsSegmentedControl`'s stretch-clamp census is short by two consumers, one candidate fix is a
-  no-op, and the 30px figure cannot be reproduced.** Measured by `M78`'s fan-out (2026-09-06) against the
+- ~~**`minor` · `MdsSegmentedControl`'s stretch-clamp census is short by two consumers, one candidate fix is a
+  no-op, and the 30px figure cannot be reproduced.**~~ Measured by `M78`'s fan-out (2026-09-06) against the
   built `dist/tokens.css`, not only the token source. The open spill row names two stretch-clamped hosts;
   there are **four** — `.sheets-fields` and `.encode-field` are the identical flex-column-implicit-stretch
   shape and are named nowhere, the latter on the submission encode path. ⛔ **`flex-shrink: 1` on `__seg` is
@@ -7296,6 +7369,33 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   text; the vehicle is a ~6-line element-level Playwright assertion already used twice in the e2e tree.
   ⚠️ The row's *"this falsifies J8"* clause is **already landed history**, not outstanding work. **Live.**
   Filed by `M78`.
+  ✅ **CLOSED — `M87` (2026-09-08). EVERY CLAIM IN IT HELD, THE CENSUS OF FOUR IS CONFIRMED BY NAME, AND THE
+  CORRECTIONS ARE NOW WRITTEN INTO THE TWO DOCUMENTS THAT CARRIED THE WRONG NUMBERS** — the open spill row
+  above and `docs/ux/exceptions-log.md`, both edited in place to stay line-neutral because that file is in
+  the citation gate's zero-tolerance tier.
+  ✅ **Confirmed by measurement.** Thirteen call sites across nine files; exactly four are stretch-clamped —
+  `.config__group`, `.mds-field` (members ×2), `.sheets-fields` and `.encode-field`. `flex-shrink` appears
+  nowhere in the component, so that candidate remedy is both absent and inert. The 30px has no surviving
+  provenance: its only source is a comment in `tests/e2e/support/axe.ts` recording that it was computed past
+  `.app-shell__content`, a different box from the scrollbar the row names, and `KNOWN_OVERFLOWING` has been
+  empty since `M19`.
+  ⛔ **AND THE ROW UNDERSTATED ITS OWN BLAST RADIUS IN THREE WAYS.** (1) `.encode-field` is not only the
+  encode path — `FieldInput.vue` is mounted by the PUBLIC runtime too. (2) Three of the four clamped hosts
+  sit inside `.mds-modal__body`, which is also `overflow-y: auto`, so they share the *invisible*-scrollbar
+  mechanism the spill row grants only to `.config`; the census is four hosts and four blind spots, not one
+  blind spot plus three latent shapes. (3) `.sheets-fields` is very likely the worst instance and has zero
+  coverage of any kind — two segments of ~265px of label text inside a modal that goes `max-width: none`
+  below 480px, and no spec opens `RuleFormModal` at all. Filed below.
+  ✅ **A LIVE DEFECT WAS FOUND SITTING ON TOP OF TWO OF ITS OWN CITATIONS AND IS FIXED IN THE SAME
+  INCREMENT.** `members/Index.vue` wrapped both role pickers in `MdsFormField`, which renders
+  `<label for="…">` at an id `MdsSegmentedControl` cannot consume — a dangling association beside the
+  control's own `<legend>`, two competing name sources on the control an admin uses to change somebody's
+  role. axe has no rule for a `label[for]` matching nothing, so nothing in the stack reported it.
+  `MdsFormField` now takes `groupLabel`, and a source scan over every `.vue` file in `resources/js` and
+  `packages/design-system/src` fails naming any call site that wraps a self-labelling group without it —
+  because `SheetsRuleFields.vue` had already met this and left a comment, and a comment guards one file.
+  ⚠️ **What is NOT closed is whether the spill is real**, and that is the spill row's to answer, not this
+  one's. **Closed by `M87`.**
 
 - **`minor` · The standing `pgsql_auth` rule was never literally true, and its stated revisit trigger names a
   different grant.** Measured by `M78`'s fan-out (2026-09-06); filed rather than taken because the open row
@@ -7942,8 +8042,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the ceiling cannot absorb it.
   **Live.** Filed by `M83`.
 
-- **`minor` · The data dictionary's enum catalog contradicts the enum for `ComparisonOperator` and
-  `UsageMetric` as well, and nothing gates the catalog at all.** Measured by `M83`'s fan-out (2026-09-07)
+- ~~**`minor` · The data dictionary's enum catalog contradicts the enum for `ComparisonOperator` and
+  `UsageMetric` as well, and nothing gates the catalog at all.**~~ Measured by `M83`'s fan-out (2026-09-07)
   against `app/Enums/`, while correcting the `TenantStatus` entry the open `M72` row names. The catalog
   lists `gt, lt, eq, neq, is_null, contains` for `ComparisonOperator` and asserts it mirrors legacy's
   6-row `rule_formulas` lookup; the enum declares **8** — `Gte` and `Lte` are absent from the document.
@@ -7955,6 +8055,22 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   full suite green. `tests/Feature/Docs/DocumentedSettingKeyDriftTest.php` is the precedent to copy — its
   own comment requires **set equality in both directions, never containment**, which is exactly the
   property that would have caught all three. **Live.** Filed by `M83`.
+  ✅ **CLOSED — `M87` (2026-09-08), TOGETHER WITH THE `M77` CENSUS ROW, BECAUSE THEY ARE ONE DEFECT FROM TWO
+  ANGLES AND NEITHER CITED THE OTHER.** This row's "at least 15 of the 28 enum-backed columns" and that
+  row's "11 of 28 are backed" are the same measurement: 17 unbacked, minus the 2 that already disclaim in
+  cell, is 15 silently-false rows. Taking either alone would have done the work twice.
+  ✅ **The catalog now carries a per-row `DB CHECK` column measured from `pg_constraint`**, and
+  `tests/Feature/Docs/DocumentedCheckConstraintDriftTest.php` re-measures it in three directions on every
+  run — the named constraint exists and is a value domain over the documented column; no documented column
+  is guarded by a constraint the catalog omits; and the documented VALUES are the values the constraint
+  accepts. ⛔ **The third arm is this row's half, and it found a case neither row named**: `UsageMetric` was
+  short by one as filed, and `WebhookEventType` was wrong in BOTH directions — it listed `form.archived` and
+  `subscription.updated`, which the database **rejects** with `SQLSTATE 23514`, and omitted four cases it
+  accepts. `NotificationType` was correct and the gate's first parser said otherwise; the parser was fixed,
+  which is recorded because a gate that cries wolf on a correct document gets the document "fixed".
+  ⚠️ **`ComparisonOperator` is deliberately not closed by the gate**: `form_field_validations.operator`
+  has no CHECK at all, so there is nothing for a schema comparison to read. Its enum-vs-doc drift needs a
+  doc-vs-`app/Enums/` comparison, which is a different instrument and is filed below. **Closed by `M87`.**
 
 - **`minor` · Six `Default` cells describe a column as application-supplied when the database does supply
   a default, and one of the two words used is factually wrong.** Measured by `M83` (2026-09-07) while
@@ -8219,6 +8335,44 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   confidence:** `AttachmentReferenceValidator::validate()` is a DB-backed pre-lock check too, and M12's
   checksum guard covers the answer document rather than the attachments table, so an attachment deleted in
   the window is not re-detected. Not traced to a reachable race. **Live.** Filed by `M85`.
+  ⛔ **CORRECTED BY `M87` (2026-09-08) — THE CENSUS IS FIVE, NOT TWO; ONE CITATION MOVED; AND THE ROW'S
+  CENTRAL PREMISE IS HALF WRONG.** Verified by read-only fan-out against the code, then re-opened by hand.
+  ⚠️ **Evidence.** `SubmissionDraftService::saveDraft()`'s pre-lock check and `updateDraft()`'s in-lock
+  block both **held** exactly as described. ⛔ *"`SubmissionPipeline::persist()` carries the same check"* is
+  **wrong by one method**: the check is in `submit()`; `persist()` is the closure body of the transaction
+  and carries no version check at all — the row `M85` closed cited this correctly, and only this row's prose
+  re-attributed it. ⚠️ *"74 lines above"* **was exact when written and is now 79** — `M85`'s own explanatory
+  block pushed `promote()`'s check down five lines, so the increment that filed the number staled it in the
+  same commit. ⛔ **And the row omits the sharpest half of its own evidence**: `updateDraft()` then WRITES
+  `form_version_id` and `answers_schema_checksum` onto the answer row from the object it read *before* the
+  lock, so the pre-lock read is the one thing that can make those two columns lie.
+  ⚠️ **Premise.** *"Neither is a straight copy of the promote fix"* is **half wrong, and the half that is
+  wrong is the actionable one**: `saveDraft()`'s is mechanically a copy — the lock already exists, `$version`
+  is a parameter, every symbol is imported, four executable lines. What is not a copy is the CONSEQUENCE,
+  and the row conflates the two. *"A respondent mid-form would lose the save"* is **false on the guest
+  channel** — `useAutosave.ts` writes only to Dexie, the server draft POST has exactly two callers and both
+  are the explicit "Save and finish later" click, and a refusal renders a `role="status"` banner with the
+  Dexie draft intact. *"No row exists to lock yet"* is **false for capped forms**: `SubmissionFinalizer`
+  calls `assertCapacity()`, which takes `Form::lockForUpdate()` — the same `forms` row `PublishService`
+  holds for the whole publish — so on `max_responses !== null` there IS a lock, on the right row, inside the
+  transaction. That caveat is written into `SubmissionDraftService` for promote and is missing here.
+  ⛔ **THE CENSUS IS FIVE LIVE INSTANCES, NOT TWO, AND THE TWO IT MISSES ARE THE MORE SERIOUS.**
+  `SubmissionPipeline::submit()`'s `assertCanStart()` (opens_at/closes_at) is never re-decided under any
+  lock, while `M85` DID re-assert exactly that check under the lock on the promote side — an asymmetry
+  created by the fix that filed this row; and `FormBuilderService::updateField()` / `updateSection()` are the
+  only mutators in that service that do not call `lockDraft()`, which is the one instance whose consequence
+  is DATA rather than a message. Both are filed as their own rows below. `app/Http/Controllers/` contains
+  zero `DB::transaction` and zero `lockForUpdate`, so no instance can live there by construction.
+  ⚠️ **`AttachmentReferenceValidator` is real as code and unreachable as a hazard** — nothing in `app/`
+  deletes a staged attachment, and the only concurrent mutator returns `Skipped` while `scanner_enabled` is
+  false, which it is in Phase 1. The row's "not traced to a reachable race" understates it. Its path is
+  `app/Services/Attachments/`, not `Submissions/`.
+  ✅ **ONE STRAIGHT FIX WAS FOUND NEXT TO IT AND SHIPPED IN `M87`**, with no product call attached:
+  `useServerAutosave.ts`'s `CONFLICT_COPY` had three keys and this channel returns four, so `form_updated` —
+  the very refusal this row is about — fell to the fallback and told a keyer their response *"has already
+  been submitted"*. Fixed and gated by a coverage arm derived from the server's own source.
+  ⚠️ **What remains is a product decision and it is now filed as one**, covering both doors at once rather
+  than separately. Corrected by `M87`.
 
 - **`minor` · No gate whose input is the GIT INDEX can have a Pest control, because `git` is not installed
   in the app container.** Measured by `M85` (2026-09-07) at the moment it tried to write one:
@@ -8401,3 +8555,83 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   ⚠️ **The shape to copy exists and is proven twice over**: copy the shipped bytes into a fixture root, drive
   synthetic inputs, assert the verdict. `M86` extended one of those harnesses without altering its design, so
   the cost here is known rather than estimated. **Live.** Filed by `M86`.
+
+- **`minor` · The schedule window is re-asserted under the lock on the promote door and on no other, and the
+  asymmetry was created by the fix that filed the row above it.** Measured by `M87`'s fan-out (2026-09-08)
+  while verifying the pre-lock row. `SubmissionPipeline::submit()` calls `assertCanStart()` — the
+  `opens_at`/`closes_at` window — before its transaction and never re-decides it; `SubmissionDraftService`'s
+  `createDraft()` path does the same. ⛔ **`M85` DID re-assert exactly that check under the lock on the
+  promote side**, so the tree now enforces the schedule window under the lock in one place and not in the
+  other, and nothing says why. ⚠️ **There IS a lock to hang it on, conditionally**: `SubmissionFinalizer`
+  calls `assertCapacity()`, which takes `Form::lockForUpdate()` on the same `forms` row `PublishService`
+  holds — but only when `max_responses !== null`, so an unconditional fix is the throughput decision
+  `SubmissionDraftService` already declined once in writing. ⚠️ **`FormService::updateSchedule()` takes no
+  form lock at all**, which is the other end of the same window. **Live.** Filed by `M87`.
+- **`minor` · `FormBuilderService::updateField()` and `updateSection()` are the only mutators in that service
+  that do not lock the draft, and theirs is the one instance whose consequence is DATA rather than a
+  message.** Measured by `M87`'s fan-out (2026-09-08). Every other mutator there calls `lockDraft()` INSIDE
+  its transaction — `addSection`, `deleteSection`, `addField`, `deleteField`, `duplicateField`,
+  `insertFromLibrary`, `reorder`. `updateField()` opens a transaction and takes no lock; `updateSection()`
+  opens **no transaction at all**. ⛔ **`PublishService::publish()` locks `forms`, flips the draft to
+  `Published`, freezes `schema_snapshot` and `checksum`, and clones a new draft** — so an `updateField`
+  committing inside that window writes a field row onto a now-published version whose frozen snapshot and
+  checksum no longer describe it. ⚠️ **Unlike its siblings this is not a lost refusal**: the two artefacts a
+  published version exists to guarantee are silently wrong afterwards, and nothing reads them again to
+  notice. ⚠️ Not traced to a reproduction; the window is one builder request against one publish.
+  **Live.** Filed by `M87`.
+- **`minor` · Eleven value-domain `CHECK` constraints guard columns the enum catalog has no row for at all,
+  and the fix cannot be made while the citation ledger is at its ceiling.** Measured by `M87` (2026-09-08)
+  from `pg_constraint` while closing the census row. The catalog documents 28 vocabularies; the connector,
+  SSO and resource-grant families are absent entirely — `connections.provider`, `connections.status`,
+  `connection_subscriptions.status`, `sso_connections.protocol`, `sso_connections.status`,
+  `sso_connections.default_role_name`, `sso_auth_requests.intent`, `sso_auth_failures.reason`,
+  `sso_verified_domains.verification_failure_reason`, `resource_grants.capacity` and
+  `resource_grants.scopeable_type` are each database-enforced and each undocumented in the catalog.
+  ⚠️ **Their per-column cells DO say "CHECK from the enum" correctly**, so the dictionary is not lying — it
+  is incomplete in the one table a reader consults for the whole vocabulary. ⛔ **The blocker is mechanical
+  and stated so the next taker does not rediscover it**: adding eleven rows is not line-neutral,
+  `docs/data-dictionary.md` is pinned by 24 citations (6 zero-tolerance) and the ledger tier has zero
+  headroom, so this lands either after that ceiling moves or alongside a deliberate re-pointing of the
+  citations. `DocumentedCheckConstraintDriftTest` asserts only over columns the catalog names, and says so.
+  **Live.** Filed by `M87`.
+- **`minor` · The enum catalog's value lists are gated against the DATABASE and against nothing else, so the
+  17 rows with no `CHECK` can still contradict their own PHP enum.** Recorded by `M87` (2026-09-08) as the
+  residue of the row it closed. `DocumentedCheckConstraintDriftTest` compares documented cases against
+  `pg_constraint`, which is the strongest available comparison — and it is silent for every vocabulary the
+  database does not constrain, which is 17 of 28. ⛔ **`ComparisonOperator` is the known live instance**:
+  `form_field_validations.operator` has no CHECK, and the catalog's list disagrees with `app/Enums/`. The
+  instrument for that half is a doc-vs-`App\Enums\*::cases()` comparison, which
+  `DocumentedSettingKeyDriftTest` already demonstrates without touching a database. ⚠️ **Filed rather than
+  built because the enum name in the catalog is prose, not a resolvable symbol** — `TenantStatus` is not
+  `App\Enums\TenantStatus` on its face — so the mapping is either a convention this repository has not
+  stated or a second list, and choosing between those is the work. **Live.** Filed by `M87`.
+- **`minor` · `.sheets-fields` is probably the worst `MdsSegmentedControl` host in the tree and it is the one
+  with no coverage of any kind.** Measured by `M87`'s fan-out (2026-09-08) while closing the census row.
+  `SheetsRuleFields.vue`'s `modeOptions` are `"Create a sheet for me"` and `"Use one I already have"` — two
+  segments whose label text alone is roughly the width of a 520px modal, before padding — inside
+  `MdsModal`, whose panel goes `max-width: none` below 480px and whose body is `overflow-y: auto`, so a
+  spill is absorbed into a horizontal scrollbar exactly as it is in the builder's config pane. ⛔ **No e2e
+  spec opens `RuleFormModal` at all**, and neither does any spec open the members invite or change-role
+  modal — so three of the four stretch-clamped hosts are unreachable by every gate in the repository.
+  `responsive-axe.spec.ts` scans the Sheets rule detail PAGE, which is a different surface.
+  ⚠️ **It is filed with the spill row rather than folded into it** because the remedy is the same decision:
+  if the component gets a wrap or shrink affordance, all four hosts are covered at once. **Live.**
+  Filed by `M87`.
+- **`minor` · A `docs/feature-backlog.md` citation into the exceptions log resolves to a live line about a
+  different subject, and the citation gate is built to pass exactly that.** Found by `M87`'s fan-out
+  (2026-09-08). This file cites `docs/ux/exceptions-log.md:646-651` for an `overflow-x: clip` rationale;
+  those lines are entry #14's container-query rationale for the auth layout. ⛔ **The gate is not at fault
+  and that is the point**: `citation-liveness-lint` asserts a cited line is ALIVE — not blank, not a rule,
+  not a fence, not past EOF — and never that it still says what the citation claims. This is a concrete
+  instance of the open `M83` row that names the property in the abstract, and the two should be read
+  together. ⚠️ **One instance is not a census.** Nothing in the tree can enumerate the others, because doing
+  so requires reading each cited line and judging it against the citing sentence — which is the reason that
+  open row exists.
+  ⛔ **AND A SECOND INSTANCE TURNED UP BY ACCIDENT IN THE SAME INCREMENT, WHICH IS THE PART WORTH READING.**
+  A row at `docs/feature-backlog.md:2199` cites `useServerAutosave.ts:107` and `:364` as call sites that
+  *"already read the `XSRF-TOKEN` cookie"*. On `origin/main` those reads are at **170** and **467**; 107 and
+  364 are an ordinary comment and an ordinary statement. **It was already wrong before this increment**, it
+  has always been green, and it was found only because `M87` happened to edit that file and re-read the
+  lines. Repointed to the verified lines. ⚠️ **Two instances found by two accidents is not a rate**, and the
+  reason it is not is the same reason the row above exists: nobody can enumerate them.
+  **Live.** Filed by `M87`.

@@ -8,6 +8,19 @@
  * The control is provided via the default slot, which receives { id, describedby, invalid }
  * to bind onto the input — this is what guarantees the label/description wiring is never
  * forgotten by a page author.
+ *
+ * ⛔ `groupLabel` EXISTS BECAUSE A SELF-LABELLING GROUP IS THE ONE CONTROL THIS WRAPPER CANNOT WIRE,
+ * AND TWO CALL SITES HAD ALREADY WALKED INTO IT (M87). `MdsSegmentedControl` renders its OWN
+ * `fieldset` and prints `ariaLabel` as a visually-hidden `legend`; it takes no `id`, so it can
+ * never consume the slot's `id`. Wrapping one produced a `label for="…"` pointing at an element
+ * that does not exist — a dangling association and a second, competing name source — on both role
+ * pickers in members. `SheetsRuleFields.vue` carries a comment warning against the same construction
+ * and solved it by dropping the wrapper, which also drops the `aria-live` error region.
+ *
+ * With `groupLabel` the visible text renders as a `span`: no `for`, nothing to dangle, the group's
+ * own `legend` remains the single accessible name, and the error region is kept. ⚠️ axe has no rule
+ * for a `label[for]` matching nothing, so nothing in the stack would have reported it — which is why
+ * this is asserted in `FormField.test.ts` rather than left to the a11y gate.
  */
 import { computed, useId } from 'vue';
 
@@ -18,8 +31,10 @@ const props = withDefaults(
         help?: string;
         error?: string;
         inputId?: string;
+        /** The slotted control labels itself (a `fieldset`/`legend` group), so render a span. */
+        groupLabel?: boolean;
     }>(),
-    { required: false },
+    { required: false, groupLabel: false },
 );
 
 const generatedId = useId();
@@ -37,7 +52,10 @@ const describedby = computed(() => {
 
 <template>
     <div class="mds-field">
-        <label :for="fieldId" class="mds-field__label">
+        <span v-if="groupLabel" class="mds-field__label" aria-hidden="true">
+            {{ label }}<span v-if="required" class="mds-field__required"> (required)</span>
+        </span>
+        <label v-else :for="fieldId" class="mds-field__label">
             {{ label }}<span v-if="required" class="mds-field__required"> (required)</span>
         </label>
 

@@ -298,7 +298,9 @@ function canChangeRole(row: Member): boolean {
                     />
                 </MdsFormField>
 
-                <MdsFormField label="Role" :error="invite.errors.role">
+                <!-- `group-label`: MdsSegmentedControl is a self-labelling fieldset and takes no id, so a
+                     a label for="..." here would dangle. See FormField.vue. -->
+                <MdsFormField label="Role" :error="invite.errors.role" group-label>
                     <MdsSegmentedControl v-model="invite.role" :options="assignableRoles" ariaLabel="Role" />
                 </MdsFormField>
             </form>
@@ -340,7 +342,8 @@ function canChangeRole(row: Member): boolean {
                     Choose a new role for <strong>{{ roleTarget?.name }}</strong> ({{ roleTarget?.email }}).
                     It takes effect on their next request.
                 </p>
-                <MdsFormField label="Role" :error="roleForm.errors.role">
+                <!-- `group-label`, for the same reason as the invite picker above. -->
+                <MdsFormField label="Role" :error="roleForm.errors.role" group-label>
                     <MdsSegmentedControl
                         v-model="roleForm.role"
                         :options="assignableRoles"

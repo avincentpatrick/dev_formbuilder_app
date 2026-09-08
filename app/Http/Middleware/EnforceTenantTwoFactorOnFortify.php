@@ -82,8 +82,11 @@ use Symfony\Component\HttpFoundation\Response;
  * ⚠️ THIS DOES NOT CLOSE THE MAIL-CANNON ROW ON THE SAME ROUTE, and the two must not be confused.
  * `PUT /user/profile-information` dispatches verification mail to an arbitrary address on every email
  * change; that is a RATE-LIMIT defect, its remedy is a `RateLimiter::for()` plus an entry in
- * `ThrottleFortifyEndpoints::limiters()`, and it stays open. This gate narrows WHO may reach the route
- * under enforcement, which is a smaller and different claim.
+ * `ThrottleFortifyEndpoints::limiters()`. This gate narrows WHO may reach the route under enforcement,
+ * which is a smaller and different claim. ✅ **`M87` (2026-09-08) closed that row by exactly the remedy
+ * named above; this paragraph is kept rather than deleted because the DISTINCTION it draws is still the
+ * point** — and because it read *"and it stays open"* for four increments after the gate below shipped,
+ * which is what a sentence about another file's state does when nothing gates it.
  */
 final class EnforceTenantTwoFactorOnFortify
 {

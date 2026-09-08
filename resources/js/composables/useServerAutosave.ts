@@ -98,6 +98,19 @@ export interface ServerAutosave {
  * so it is absent here rather than mapped to something plausible. Adding it would document a refusal this
  * channel cannot produce.
  *
+ * ⛔ AND IT HAPPENED A SECOND TIME, TO THE VERY MAP THAT EXISTS TO END IT — `M87` (2026-09-08).
+ * `SubmissionDraftController::store()` has returned a FOURTH code on this channel since the M73 re-pin,
+ * `form_updated`, and its own comment there says a typed 409 *"is what lets the composable stop
+ * permanently and say why"*. This map had three keys, so `form_updated` fell to `FINALIZED_COPY` and the
+ * keyer was told *"already been submitted"* — the exact sentence, for the exact wrong reason, that M67
+ * added this map to stop telling them. **The map is now gated rather than commented**: a coverage-equality
+ * arm compares these keys against every 409 code the controller can emit, so the next cause added
+ * server-side reddens rather than degrades. ⚠️ AND THE CONTROLLER'S OWN *"THREE CAUSES SINCE M11"* COMMENT
+ * IS NOT WRONG, WHICH IS THE INSTRUCTIVE PART: it sits on the `SubmissionConflictException` catch and
+ * enumerates that exception's three codes correctly. `form_updated` is returned from `resolveTarget()`,
+ * fifty lines further down, and no comment in either file ties the two emitters together. A per-site
+ * comment cannot count a channel; a gate can.
+ *
  * ⚠️ NOT REUSED FROM `public-runtime/lib/conflict-notice.ts`, THOUGH ITS DECISION IS. That module addresses
  * a RESPONDENT re-mounting a fill session, and its remedy — review and submit again — is not available to a
  * keyer whose background save has stopped: there is nothing to re-mount, and the answers are still on screen.
@@ -117,6 +130,13 @@ const CONFLICT_COPY: Record<string, string> = {
     // that is not theirs — so the sentence names the identifier and the one act that helps.
     submission_uuid_claimed:
         'This response could not be matched to the draft it belongs to, so saving has stopped. Your answers are still on screen — reload the page to start a fresh draft, and copy them across before leaving.',
+    // TIMING, and about the FORM rather than the response: the form was republished while this tab was
+    // open, so the draft's pinned version is superseded and every further tick is refused. Nothing was
+    // submitted and nothing was overwritten, so neither of the other two sentences is true — and the
+    // remedy is not `draft_conflict`'s either, because there are no newer ANSWERS to pick up, only a
+    // newer form.
+    form_updated:
+        'This form was updated while you were working, so saving has stopped. Your answers are still on screen — reload the page to get the new version, and copy them across before leaving.',
 };
 
 /**

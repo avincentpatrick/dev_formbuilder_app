@@ -10,6 +10,7 @@ use App\Actions\Fortify\UpdateUserPassword;
 use App\Actions\Fortify\UpdateUserProfileInformation;
 use App\Auth\RlsAwareUserProvider;
 use App\Http\Requests\Auth\RlsAwareTwoFactorLoginRequest;
+use App\Models\User;
 use App\Services\Auth\GoogleSignInGate;
 use App\Services\Settings\RegistrationGate;
 use App\Support\Auth\PasswordPolicy;
@@ -233,5 +234,57 @@ class FortifyServiceProvider extends ServiceProvider
         // is why two-factor.confirm is split out above rather than folded in here.
         RateLimiter::for('two-factor-manage', fn (Request $request): Limit => Limit::perMinute(10)
             ->by('2fam:'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
+
+        /*
+         * Increment M87 — `PUT /user/profile-information`, the last unbound write route that is an actual
+         * exposure. ⛔ APPENDED AT THE END OF `boot()` DELIBERATELY: three live citations pin lines 159,
+         * 160 and 165 of this file, and an insertion above them breaks all three at once.
+         *
+         * ⛔ IT CLOSES TWO DEFECTS, NOT ONE, AND ONLY THE FIRST WAS FILED.
+         * (1) The mail cannon: `App\Actions\Fortify\UpdateUserProfileInformation::updateVerifiedUser()`
+         *     nulls `email_verified_at` and sends a verification mail on EVERY address change, to whatever
+         *     address was submitted — so one authenticated session could dispatch unbounded mail at
+         *     arbitrary recipients, on `QueueName::Mail`, the queue every other transactional mail in the
+         *     product shares. The consequence is cross-tenant delivery, not only sender reputation.
+         * (2) The enumeration oracle, which the row does not mention: that action validates with
+         *     `Rule::unique('pgsql_auth.users', 'email')` — deliberately, so uniqueness sees users outside
+         *     the caller's tenant — so an unbounded caller could ask "does an account exist for this
+         *     address anywhere in this deployment" as often as it liked, cross-tenant, and read the answer
+         *     off a 422. That half needs no mail to be delivered and is invisible to every mail-side
+         *     control, which is why the bound belongs HERE rather than on the notification.
+         *
+         * ⚠️ TWO ARMS, BECAUSE THE TWO SAVES ARE NOT THE SAME REQUEST. A name change sends no mail and
+         * asks the uniqueness question about an address the caller already owns; an address change does
+         * both of the things above. Keying them alike would either leave the exposure loose or throttle a
+         * keyer renaming themselves. ⚠️ `Limit::none()` was rejected for the name arm: it is free by
+         * construction (ThrottleRequests short-circuits on `Unlimited` before touching a bucket) and that
+         * is exactly the problem — an unbounded write loop with no ceiling at all, which is a worse
+         * default than a generous one.
+         *
+         * ⚠️ THE COMPARISON LOWERCASES FOR ITSELF. `config/fortify.php` sets `lowercase_usernames`, but
+         * that is applied in `ProfileInformationController::update()` — AFTER this middleware — so a
+         * case-only edit would otherwise read as an address change and spend the tight bucket.
+         * ⚠️ And the input is cast rather than trusted: `input('email')` can be absent or an array.
+         *
+         * Six matches `password-update` on the same authenticated family. Measured against the suite
+         * rather than guessed: eight call sites reach this route repo-wide, each once, in eight distinct
+         * test methods, and `phpunit.xml`'s `CACHE_STORE=array` gives each method its own store — so no
+         * existing test comes within a factor of the ceiling, and there is no E2E traffic here at all.
+         */
+        RateLimiter::for('profile-information-update', function (Request $request): Limit {
+            // ⚠️ `$user instanceof User`, NOT `$request->user()?->email ?? ''`. PHPStan reports the
+            // nullsafe as unnecessary on the left of `??` — CI runs it at ZERO errors, so that is a merge
+            // failure rather than a style note — and reading `email` off the `Authenticatable` contract
+            // rather than off the model is an undefined-property phantom. The instanceof answers both.
+            $user = $request->user();
+            $key = (string) ($user?->getAuthIdentifier() ?? $request->ip());
+            $submitted = $request->input('email');
+            $submitted = is_string($submitted) ? Str::lower(trim($submitted)) : '';
+            $current = $user instanceof User ? Str::lower($user->email) : '';
+
+            return $submitted !== '' && $submitted !== $current
+                ? Limit::perMinute(6)->by('pinfo-addr:'.$key)
+                : Limit::perMinute(60)->by('pinfo:'.$key);
+        });
     }
 }

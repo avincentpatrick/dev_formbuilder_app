@@ -11,14 +11,14 @@
  *
  * ⛔ `groupLabel` EXISTS BECAUSE A SELF-LABELLING GROUP IS THE ONE CONTROL THIS WRAPPER CANNOT WIRE,
  * AND TWO CALL SITES HAD ALREADY WALKED INTO IT (M87). `MdsSegmentedControl` renders its OWN
- * `<fieldset>` and prints `ariaLabel` as a visually-hidden `<legend>`; it takes no `id`, so it can
- * never consume the slot's `id`. Wrapping one produced a `<label for="…">` pointing at an element
+ * `fieldset` and prints `ariaLabel` as a visually-hidden `legend`; it takes no `id`, so it can
+ * never consume the slot's `id`. Wrapping one produced a `label for="…"` pointing at an element
  * that does not exist — a dangling association and a second, competing name source — on both role
  * pickers in members. `SheetsRuleFields.vue` carries a comment warning against the same construction
  * and solved it by dropping the wrapper, which also drops the `aria-live` error region.
  *
- * With `groupLabel` the visible text renders as a `<span>`: no `for`, nothing to dangle, the group's
- * own `<legend>` remains the single accessible name, and the error region is kept. ⚠️ axe has no rule
+ * With `groupLabel` the visible text renders as a `span`: no `for`, nothing to dangle, the group's
+ * own `legend` remains the single accessible name, and the error region is kept. ⚠️ axe has no rule
  * for a `label[for]` matching nothing, so nothing in the stack would have reported it — which is why
  * this is asserted in `FormField.test.ts` rather than left to the a11y gate.
  */
@@ -31,7 +31,7 @@ const props = withDefaults(
         help?: string;
         error?: string;
         inputId?: string;
-        /** The slotted control labels itself (a `<fieldset>`/`<legend>` group), so render a span. */
+        /** The slotted control labels itself (a `fieldset`/`legend` group), so render a span. */
         groupLabel?: boolean;
     }>(),
     { required: false, groupLabel: false },

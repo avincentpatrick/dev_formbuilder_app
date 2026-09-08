@@ -299,7 +299,7 @@ function canChangeRole(row: Member): boolean {
                 </MdsFormField>
 
                 <!-- `group-label`: MdsSegmentedControl is a self-labelling fieldset and takes no id, so a
-                     <label for> here would dangle. See FormField.vue. -->
+                     a label for="..." here would dangle. See FormField.vue. -->
                 <MdsFormField label="Role" :error="invite.errors.role" group-label>
                     <MdsSegmentedControl v-model="invite.role" :options="assignableRoles" ariaLabel="Role" />
                 </MdsFormField>

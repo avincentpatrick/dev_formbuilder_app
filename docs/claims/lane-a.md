@@ -43,22 +43,77 @@ a fact about the cap `D15` is open on, and is recorded rather than argued.
 
 ### Evidence verified
 
-⏳ **PENDING — the read-only fan-out is running, one agent per row over disjoint files (`D13` clause 2).**
-This heading is written before the first file is opened because the claim is a pushed commit; it is amended in
-its own pushed commit the moment the fan-out reports, and the amendment is what the gates see.
+**Four read-only agents over disjoint rows, then every load-bearing citation re-opened by hand before it was
+acted on.** Per row, per citation:
+
+- **`7015` — ALL FOUR NUMBERS HELD EXACTLY**, re-measured from `pg_constraint` on the live schema: 44
+  table-level CHECK constraints, 28 catalog rows, 11 backed, `form_versions_status_chk` live and created
+  outside `database/migrations/`. `app/Support/Migrations/PublishedVersionGuard.php` held to the line.
+  ⚠️ **The 44 is reproducible only if you say what you counted**: `contype='c'` returns 46, two of which are
+  `information_schema` domain checks with `conrelid=0`; `NOT NULL` is `pg_attribute.attnotnull` on this
+  version and is not in `pg_constraint` at all.
+- **`3285` — HELD IN SUBSTANCE, FALSE IN ATTRIBUTION.** There is no
+  `Laravel\Fortify\Actions\UpdateUserProfileInformation` in `laravel/fortify` at all — Fortify ships it as a
+  publishable stub, and this app publishes and overrides it. A repair reading "vendor" would have opened the
+  wrong file, or none. Everything else held: the route, the middleware order, the decided-unbound list, the
+  limiter map and the closest `RateLimiter::for()` analogue.
+- **`8208` — HELD, WITH ONE CITATION MOVED AND ONE NUMBER STALED BY ITS OWN AUTHOR.**
+  `SubmissionPipeline::persist()` does not carry the check; `submit()` does, and the row `M85` closed cited
+  that correctly. *"74 lines above"* was exact when written and is 79 now, because `M85`'s own explanatory
+  block pushed the other check down five lines in the same commit.
+- **`7285` — EVERY CLAIM HELD**, and the census of four is confirmed by name: `.config__group`, `.mds-field`
+  (members ×2), `.sheets-fields`, `.encode-field`, out of 13 call sites across 9 files. `flex-shrink` appears
+  nowhere in the component. The 30px has no surviving provenance in any test, fixture or snapshot.
 
 ### Premise verified
 
-⏳ **PENDING — same fan-out.** Each row is asked its premise separately from its evidence: `7015` believes a
-grep census over `database/migrations/` is the wrong instrument and that first-party migration code lives
-outside that directory; `3285` believes the route is unbound **by a recorded decision** and that removing it
-from `FORTIFY_UNBOUND_BY_DECISION` turns an existing gate red; `8208` believes the two further instances are
-**not** straight copies of the promote fix; `7285` believes the 30px figure has no surviving provenance and
-that `flex-shrink: 1` is the initial value.
+**This is the field that paid for itself this increment: three of the four rows believe something false about
+the world around their defect, and in two cases it changes what the fix is.**
+
+- **`7015` — the premise holds and its STATED MECHANISM is wrong.** A grep over `database/migrations/` is
+  indeed the wrong instrument, but not for the reason given: **seven** `_chk`-suffixed constraints live
+  inside that directory and a grep finds all seven. **Location is the discriminator, not the suffix** — which
+  is exactly why the gate reads `pg_constraint`. ⛔ **And a second premise is false by omission**: the row
+  believes the false universal lives in the catalog preamble; it is also in the strategy paragraph above,
+  which is a zero-tolerance citation target.
+- **`3285` — the recorded decision did not survive being checked.** The route was excused as verifying no
+  credential; `M43`'s scope already contained two routes that verify none, one of them a pure mail dispatcher
+  — the very analogue the row argues from. ⚠️ *"the ONE write route left unbound"* is false as written (there
+  are two; `logout` is the other and is benign). ⚠️ *"eight credential-bearing routes"* is true only counting
+  distinct URI paths, and three documents repeat it without saying so.
+- **`8208` — the central premise is HALF WRONG, and the wrong half is the actionable one.** *"Neither is a
+  straight copy"*: `saveDraft()`'s is mechanically a copy. *"A respondent would lose the save"*: false on the
+  guest channel, which has no server autosave at all. *"No row exists to lock yet"*: false for capped forms,
+  where `assertCapacity()` already holds the right `forms` row inside the transaction.
+- **`7285` — held, and it understates its own blast radius three ways**: `.encode-field` is the PUBLIC
+  runtime as well as encode; three of the four clamped hosts sit inside `.mds-modal__body`, also
+  `overflow-y: auto`, so the census is four hosts and four **blind spots**; and `.sheets-fields` is very
+  likely the worst instance and has no coverage of any kind.
 
 ### Remedy verdict
 
-⏳ **PENDING — measured before any test is written (`D13` clause 2, and the `M30`–`M34` reason for it).**
+**Measured before a line of test was written, per `D13` clause 2.**
+
+- **`7015` — works, and is constrained rather than free.** A `DB CHECK` column is expressible **in place**:
+  header, separator and 29 body rows, zero line-count change. That is not a preference — `docs/data-dictionary.md`
+  is pinned by 24 citations (6 zero-tolerance) and the ledger tier is at 18/18 with no headroom, so a
+  one-line insertion breaks the merge in both tiers and a two-line one survives by coincidence of the
+  document's paragraph rhythm. ⛔ **And a column-membership predicate would have encoded the wrong number**:
+  `form_field_validations_rule_xor_chk` is a nullability XOR that mentions a catalog column, so the naive
+  query says twelve backed rows where eleven are.
+- **`3285` — works exactly as prescribed**, and the row's sizing warning was over-cautious: eight call sites
+  reach the route repo-wide, one hit each, in eight distinct test methods, with `CACHE_STORE=array` per
+  method, and no E2E traffic. Any ceiling ≥ 2 was safe. ⛔ **The prescribed remedy is also INCOMPLETE in a
+  way the row could not see**: the coverage gate was asserted in one direction only, so a repair that added
+  the map entry and left the name on the decided-unbound list would have merged green beside a stale decision
+  of record.
+- **`8208` — no remedy offered, and what the row calls one fix is really three.** One is a straight fix with
+  no product call (`CONFLICT_COPY`'s missing fourth key — shipped); one is a product decision covering both
+  doors (filed as `D27`); one is unreachable until a real scanner is wired.
+- **`7285` — offers none; row `630`'s candidates were measured instead.** `flex-shrink: 1` is a no-op;
+  `min-width: 0` alone is incomplete rather than wrong; `align-items: flex-start` is a no-op for this defect;
+  `flex-wrap` works and its recorded foreclosure is stale. The honest outcome is a correction plus a decision
+  (`D28`), because the component-level fix touches 13 call sites and only an e2e run can settle it.
 
 Files: `docs/claims/lane-a.md`, `docs/feature-backlog.md`, plus the per-row files in the table above.
 Shared artefacts taken: `docs/data-dictionary.md`, `docs/feature-backlog.md`, `docs/claims/decisions.md`,

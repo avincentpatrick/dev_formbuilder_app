@@ -604,11 +604,11 @@ full-screen sheet — and none of those moved.
    ⛔ **CORRECTED 2026-08-26 BY M19 — "EVERY CONSUMER" WAS MEASURED ON A HOST THAT COULD NOT SEE THE FACE,
    AND THERE IS AT LEAST ONE MORE.** The paragraph above is right that the topnav is the worst instance and
    right that the component is not universally at fault. It is wrong that the topnav is the only place the
-   latent property is reached. **`ConfigPanel`'s Requiredness control spills 30px** — `Optional / Required /
+   latent property is reached. **`ConfigPanel`'s Requiredness control spills** — `Optional / Required /
    Conditional`, no icons, non-compact — inside `.config__group`, a flex column with *implicit*
    `align-items: stretch`, which clamps the fieldset below the sum of its segments' minimums. It is invisible
    rather than harmless: `.config` is `overflow-y: auto`, so it absorbs the spill into a horizontal scrollbar
-   nobody looks for. `members/Index.vue`'s two `MdsFormField` instances have the same stretch-clamped shape.
+   nobody looks for. ⛔ **BOTH FIGURES IN THIS PARAGRAPH WERE CORRECTED BY `M87` (2026-09-08).** The "30px" is struck: its only provenance was a CI failure message computing spill past `.app-shell__content` — a different box from the scrollbar named here — and that code path is now behind an expectation that no longer fails, so no test, fixture or snapshot in the tree can regenerate the number. And the census is **four hosts, not two**: `members/Index.vue`'s two `MdsFormField` instances, plus `.sheets-fields` (`SheetsRuleFields.vue`) and `.encode-field` (`FieldInput.vue`, which the PUBLIC runtime mounts as well as the encode page) — the identical flex-column-implicit-stretch shape, named nowhere until now. ⚠️ Three of the four sit inside `.mds-modal__body`, also `overflow-y: auto`, so they share the invisible-scrollbar mechanism this paragraph grants only to `.config`.
    ⚠️ **The reason J8's sweep missed them is the reason this whole class stayed hidden**: the dyslexia face
    never loaded on the dev host (`public/hot` makes `/fonts/*.woff2` cross-origin), and `system-ui` resolves
    ~27% narrower on Windows than on a CI runner. **"Measured at every width" was true; the widths were

@@ -23,6 +23,102 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
+### D28 — Should `MdsSegmentedControl` get a component-level wrap or shrink affordance, or should its four stretch-clamped hosts keep guarding themselves?
+
+**Filed 2026-09-08 by `M87`, while closing the census row that measured the answer's inputs.** Recorded
+here rather than taken, because the cheapest correct fix touches **13 call sites** and the only instrument
+that can verify it is an e2e run in the container — so this is a change whose blast radius exceeds what the
+increment that found it can honestly validate.
+
+**What is now measured, and it is why the row can be closed while this stays open:**
+
+| | |
+|---|---|
+| Call sites | 13, across 9 files |
+| Stretch-clamped hosts | **4** — `.config__group`, `.mds-field` (members ×2), `.sheets-fields`, `.encode-field` |
+| …of those, inside an `overflow-y: auto` box | **4 of 4** — `.config` for the first, `.mds-modal__body` for the other three |
+| …with any e2e coverage | **1** (the builder pane, and only through a document-level assertion that cannot see it) |
+| `flex-shrink: 1` on `__seg` | a **no-op** — the initial value, and absent from the tree |
+| The 30px | **unprovenanced** — no test, fixture or snapshot records it |
+
+⛔ **EVERY ONE OF THE FOUR ABSORBS ITS SPILL INTO A SCROLLBAR NOBODY LOOKS FOR**, which is why no gate has
+ever reported this and why "is it real today" cannot be answered from the tree. `.app-shell__content`
+measures 0 everywhere — the wrong box.
+
+**The options:**
+
+1. **`flex-wrap: wrap` on `.mds-segmented`.** Covers all four hosts at once and every call site with them.
+   ⚠️ The stated reason this was ruled out — *"`.topnav` is a fixed 64px with `flex-shrink: 0`"* — is
+   **stale**: that instance collapses to glyphs at ≤1024 and is `display: none` at ≤899, so it never
+   reaches a width where a wrap could grow the bar. Cost: a 13-call-site visual re-measure.
+2. **`min-width: 0` plus an `overflow` escape on `.mds-segmented__seg`.** Also component-level. ⚠️
+   `min-width: 0` **alone is incomplete**, not merely conservative: `__seg` carries no `overflow` and its
+   span no `text-overflow`, so it converts a fieldset-level spill into a text-level one that still extends
+   the container's scrollWidth. Adding `white-space: nowrap` to make an ellipsis work would change wrapping
+   at all 13 sites, which is the same blast radius as option 1 with less of the benefit.
+3. ✅ **Leave the component alone and guard at the host, as one host already does. Recommended.**
+   `resources/js/Pages/Settings/Index.vue` solves this exact problem with `align-items: center` plus a
+   `min-width: 0; max-width: 100%` rule on its non-text children, **with a comment saying so**, and three
+   call sites are protected by it today. It is the smallest change, it needs no re-measure of the nine
+   unaffected sites, and it is already proven in this codebase. ⚠️ Its honest cost: four hosts must each
+   remember, and the fifth one written next year will not — which is the argument for 1 or 2, and it is a
+   real one.
+
+⚠️ **Whichever is chosen, the instrument comes first.** A ~6-line element-level Playwright assertion on
+`.config`, in the shape `personalization-axe.spec.ts` already uses twice, decides whether the spill exists
+at CI's font stack — and it is the only thing that can, because the dev host never loads the dyslexia face.
+**It is not shipped here deliberately**: added blind it would either merge green and prove nothing or go
+red and block an increment on a question nobody has answered. It belongs with whichever option is taken.
+
+---
+
+### D27 — Should a form republishing mid-request refuse the write under the lock, on the save door, on both doors, or on neither?
+
+**Filed 2026-09-08 by `M87`, as the residue of the pre-lock row it corrected.** `M85` closed the promote
+door by re-reading the `FormVersion` under the existing row lock; the same shape is open on two more doors
+and **the two are one decision, not two**, because refusing under the lock is the same product statement
+in both places.
+
+**What is measured, so the decision is not taken on the row's framing:**
+
+- **The save door (`SubmissionDraftService::updateDraft()`) is mechanically a copy of the promote fix** —
+  the lock already exists, `$version` is a parameter, every symbol is imported, four executable lines. The
+  row that filed it says *"neither is a straight copy"*; that is wrong for this half, and the half it is
+  right about is the consequence rather than the code.
+- ⛔ **But it is not four lines end to end.** `SubmissionDraftController::store()` does not catch
+  `SubmissionException`, whose global web arm is a `back()` redirect the autosave `fetch` cannot read — so
+  without a typed catch the composable would retry forever against a version that will never be published
+  again. The controller change is load-bearing, not optional.
+- **The submit door (`SubmissionPipeline::submit()`) has a lock, conditionally.** `assertCapacity()` takes
+  `Form::lockForUpdate()` on the same `forms` row `PublishService` holds — but only when
+  `max_responses !== null`. An unconditional `Form::lockForUpdate()` on every submit is the throughput
+  trade `SubmissionDraftService` already declined **in writing** for promote.
+- **Respondent cost is smaller than the row implies.** On the guest channel there is no server autosave at
+  all — the only server draft write is the explicit "Save and finish later" click, and a refusal already
+  renders a banner with the Dexie draft intact. On encode, the cost is at most one 1500 ms debounce of
+  keystrokes, because the next tick is refused anyway.
+- **Nothing stages it.** The suite's only concurrent-republish helper is hard-wired to `promote()`'s
+  window, and its `skip` parameter exists specifically to step past the save.
+
+**The options:**
+
+1. ✅ **The save door only. Recommended.** It is where the lock already is, where the cost is one autosave
+   tick, and where the pre-lock read is currently used to WRITE `form_version_id` and
+   `answers_schema_checksum` onto the answer row — so it is the one door where the stale read can make
+   stored data lie rather than merely lose a refusal.
+2. **Both doors, with `pg_advisory_xact_lock` on submit.** The machinery and its trap note already exist in
+   `ScopeNodeService`. Closes the window everywhere; costs a lock acquisition on the hottest write path.
+3. **Neither — close it as recorded-and-declined.** Defensible: Stage 2a already refuses at the FIRST
+   autosave after a republish, and both tables still agree afterwards because `updateDraft()` writes both
+   version columns from the same object it read. ⚠️ This is the option the existing rows lean toward and
+   nobody has stated it as a decision, which is what makes it a decision rather than a backlog item.
+
+⚠️ **`assertCanStart()` is deliberately NOT part of this question.** The schedule window is re-asserted
+under the lock on promote and on no other door, and that asymmetry was created by the fix that filed the
+row — it is a defect with an obvious answer, so it is a queue row rather than a decision.
+
+---
+
 ### D26 — The offline panel's storage-quota line counts every visit's submissions while the three sentences beside it count only this one. Reword the line, re-scope the number, or drop the count?
 
 **Filed 2026-09-07 by Lane A, during `M85`, after a read-only fan-out found the row's stated blocker was
@@ -187,7 +283,7 @@ and the one whose eight sentences are already known to be half stale.
 ### D23 — `scripts/loop.php` refuses held work by a hand-written keyword list, and there is now a gate proving the pipeline holds every held row. Keep the list, derive it, or cross-check it?
 
 **Filed 2026-09-07 by Lane A, during `M81`, at the moment `P4` was written.** The row that asks for
-this (`R-3401f9b1`, `docs/feature-backlog.md:5850`) explicitly defers itself *to this gate*, so the
+this (`R-3401f9b1`, `docs/feature-backlog.md:5969`) explicitly defers itself *to this gate*, so the
 question is now answerable and was not before.
 
 **The situation, measured.** `scripts/loop.php` carries `HELD_TOPICS`, twelve keywords matched as
@@ -565,6 +661,30 @@ different concern, pointing the other way**: the hub set is derived from harvest
 found that `scripts/backlog-triage.php` silently drops any citation written as a PARTIAL path, so such a
 row contributes to no file's hub degree at all. **The hub set that both options reason about is a floor.**
 Filed as its own row; worth closing before this decision is taken on degree counts.
+
+⛔ **`M87` (2026-09-08) ADDS THE MEASUREMENT THIS ENTRY HAS BEEN MISSING SINCE `M73` TOOK ITS WORKED
+EXAMPLE AWAY — AND IT IS STRONGER THAN THE ONE IT REPLACES, BECAUSE IT IS ABOUT THE RULE RATHER THAN ABOUT
+ONE INCREMENT'S LUCK.** `docs/feature-backlog.md` is itself in the derived hub table, at degree **3**
+(cited by the open rows at `6024`, `7926` and `4996`). **Every closure and every correction edits the
+ledger.** So `D13`'s second clause, read to its letter — *at most one row may touch a hub file* — makes a
+batch of more than **one** row illegal, always, for every possible selection. **Eighteen batched increments
+have relied on an exemption nobody wrote down**, and the generator cannot apply it either: it implements
+*cite*, not *touch*, so it never notices.
+
+⚠️ **THAT IS NOT AN ARGUMENT FOR RELAXING THE CAP; IT IS AN ARGUMENT THAT THE CAP AS WRITTEN IS ALREADY
+NOT THE RULE ANYONE FOLLOWS.** Whichever option is chosen here should say what the ledger is, because the
+answer "it is a hub and batches may touch one of them" has been false in practice since `M65`.
+
+⚠️ **AND THE PRACTICAL BIND IS NOW MEASURED RATHER THAN ASSERTED.** Every harness script in this repository
+is a hub file — `pipeline.php` (12), `backlog-triage.php` (11), `state.php` (10), `mutate.php` (6),
+`citation-liveness-lint.php` (6), `tracker-lint-controls.php` (4), `loop.php` (4), `next.php` (3),
+`pipeline-lint.php` (3), `pre-push-guard.php` (3), `tracker-surgery.php` (3) — and `docs/data-dictionary.md`
+(13) with them. The remaining queue is overwhelmingly repairs inside those files, so the cap admits
+**exactly one harness row per increment** regardless of how cheap the rest are. `M87` composed its batch by
+hand against this constraint and rejected the generated proposal for the third increment running, for a
+third distinct mechanism — `M83`'s was a hub-free harvest of a hub-only repair, `M86`'s was a file of nil
+harvested degree, and `M87`'s was three hub-touching rows in a four-row proposal plus a fourth blocked on
+an open decision. **Three different mechanisms, one rule, no fix yet.**
 
 ---
 

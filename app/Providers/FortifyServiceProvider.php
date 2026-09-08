@@ -10,6 +10,7 @@ use App\Actions\Fortify\UpdateUserPassword;
 use App\Actions\Fortify\UpdateUserProfileInformation;
 use App\Auth\RlsAwareUserProvider;
 use App\Http\Requests\Auth\RlsAwareTwoFactorLoginRequest;
+use App\Models\User;
 use App\Services\Auth\GoogleSignInGate;
 use App\Services\Settings\RegistrationGate;
 use App\Support\Auth\PasswordPolicy;
@@ -271,10 +272,15 @@ class FortifyServiceProvider extends ServiceProvider
          * existing test comes within a factor of the ceiling, and there is no E2E traffic here at all.
          */
         RateLimiter::for('profile-information-update', function (Request $request): Limit {
-            $key = (string) ($request->user()?->getAuthIdentifier() ?? $request->ip());
+            // ⚠️ `$user instanceof User`, NOT `$request->user()?->email ?? ''`. PHPStan reports the
+            // nullsafe as unnecessary on the left of `??` — CI runs it at ZERO errors, so that is a merge
+            // failure rather than a style note — and reading `email` off the `Authenticatable` contract
+            // rather than off the model is an undefined-property phantom. The instanceof answers both.
+            $user = $request->user();
+            $key = (string) ($user?->getAuthIdentifier() ?? $request->ip());
             $submitted = $request->input('email');
             $submitted = is_string($submitted) ? Str::lower(trim($submitted)) : '';
-            $current = Str::lower((string) ($request->user()?->email ?? ''));
+            $current = $user instanceof User ? Str::lower($user->email) : '';
 
             return $submitted !== '' && $submitted !== $current
                 ? Limit::perMinute(6)->by('pinfo-addr:'.$key)

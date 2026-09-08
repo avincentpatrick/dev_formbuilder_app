@@ -16,7 +16,77 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M87`, the eighteenth `D13` batch: a CHECK-constraint census measured from `pg_constraint`, the last unbound Fortify mail route, a pre-lock shape with two more instances, and a stretch-clamp census short by two (`m87-d13-batch`)
+## Status: NO ACTIVE CLAIM — `M87` is merged; the next increment is a fresh `D13` batch
+
+## RELEASED — `M87`, the eighteenth `D13` batch: a CHECK census measured from `pg_constraint`, the last exposed Fortify write route, a dangling label, and a pre-lock shape that is five instances rather than two (merged as PR #278, `30c3241`, 6/6 green with real step counts — Static analysis 26 · E2E 19 of 20 (the skip is the on-failure report upload) · Contract 16 · Frontend 12 · Pest 11 · axe 11)
+
+Shipped 2026-09-08. Branch `m87-d13-batch`, cut from `origin/main` at `b05d008`. **Four rows closed, two
+corrected, six filed, two decisions opened, and `D15` amended with a measurement rather than re-asked.**
+
+⛔ **THE HEADLINE IS THE `Premise verified` FIELD, WHICH PAID FOR ITSELF THREE TIMES.** Three of the four
+rows believe something false about the world *around* their defect, and in two cases it changes what the
+fix is. `3285`'s recorded exemption — the route *"verifies no credential"* — is refuted by `M43`'s own
+scope, which already contained two routes that verify none, one of them a pure mail dispatcher. `8208`'s
+*"neither is a straight copy of the promote fix"* is half wrong, and the wrong half is the actionable one.
+`7015`'s stated mechanism is wrong in a way that would have produced the wrong gate: the grep census missed
+`form_versions_status_chk` by **location**, not by its `_chk` suffix — seven `_chk` constraints live inside
+`database/migrations/` and a grep finds all seven.
+
+| row | evidence | premise | remedy |
+|---|---|---|---|
+| `7015` | all four numbers **exact** | ⛔ stated mechanism wrong; universal lives in **two** places | works, but **line-neutral or the merge breaks** |
+| `3285` | held; ⛔ **the class is app-owned, not vendor** | ⛔ the recorded exemption does not survive checking | works; ⛔ the gate had a hole in the untested direction |
+| `8208` | held; one citation moved, one number staled by its own author | ⛔ **half wrong** — one instance IS a mechanical copy | none offered; three things, not one |
+| `7285` | every claim held | held, understates its blast radius **three** ways | none; row `630`'s candidates measured instead |
+
+⛔ **TWO DEFECTS WERE FOUND ON DOORS THE ROWS HAD ALREADY NAMED, AND NEITHER WAS IN ANY ROW.**
+`PUT /user/profile-information` is not only a mail cannon: `Rule::unique('pgsql_auth.users')` makes it an
+unbounded **cross-tenant account-enumeration oracle**, readable off a 422, needing no mail to be delivered
+and invisible to every mail-side control. And `members/Index.vue` wrapped both role pickers in
+`MdsFormField`, rendering a `label` whose `for` names an id `MdsSegmentedControl` cannot consume — a
+dangling association beside the control's own legend, on the control an admin uses to change somebody's
+role. axe has no rule for a `label[for]` matching nothing.
+
+✅ **EIGHT MUTATIONS, ALL CAUGHT, AND THE TWO THAT MATTER MOST REDDENED ONLY A FLOOR.** Breaking one
+derivation regex left every per-item arm **green over an empty set** and reddened the floor alone —
+assertions **11 → 5**, which is `M34`'s tell reproduced deliberately. Two others reddened exactly the newly
+added arm and nothing else, which is the proof a new assertion covers an edge the old ones cannot.
+
+⛔ **THE PREDICTION WAS RIGHT ABOUT THE GATE AND WRONG ABOUT WHY.** It named the citation gate as the one
+most likely to break, *"because `docs/data-dictionary.md` is line-pinned … and row 1 edits it"*. The
+data-dictionary repair was line-neutral and never threatened it. **The citation gate broke on a different
+file entirely**: a PHPStan repair added one `use` statement to `FortifyServiceProvider.php`, shifting every
+line by one and rotting a ledger citation — *after* the gate had been run and passed. ⚠️ **A fan-out
+warning is not protection**: it said "never insert before line 166", I complied, and an unrelated later fix
+undid the compliance. **Run that gate LAST, after the source edits.**
+
+⛔ **AND CHASING IT FOUND SOMETHING BETTER THAN THE BREAK.** `useServerAutosave.ts:107` and `:364` are
+cited as the call sites that read `XSRF-TOKEN`; on `origin/main` those reads are at **170** and **467**.
+**Wrong before this increment, always green**, found only because the increment happened to re-read the
+file — a second, independently-discovered instance of the class `M83` filed in the abstract, and it is
+recorded in the row `M87` filed about exactly that.
+
+⚠️ **TWO OTHER PREDICTIONS WERE WRONG, BOTH IN THE SAME DIRECTION — I TRUSTED A NUMBER I SHOULD HAVE
+CLASSIFIED.** PHPStan's "local baseline is 20" was stale; the true local figure is 18 phantoms and **CI
+runs at zero**, so my run of 19 hid a real failure inside what read as headroom. And the Storybook build
+rejected raw HTML tag names inside an SFC docblock that `vue-tsc`, Vitest and the app's own Vue compiler
+all accepted. ✅ **The standing note that Storybook cannot run in the musl container is half right** — the
+axe step cannot, but `npx storybook build` runs there in ~22s and is exactly the step that failed, so that
+half is locally reproducible from now on.
+
+⚠️ **`7945` WAS CLOSED WITH `7015` BECAUSE THEY ARE ONE DEFECT FROM TWO ANGLES AND NEITHER CITED THE
+OTHER** — "at least 15 of 28" and "11 of 28 backed" are the same measurement. The value-comparison arm then
+found a third drifted row on its first run that neither had named, and `WebhookEventType` turned out wrong
+in **both** directions: it listed two cases the database rejects with `SQLSTATE 23514`.
+
+⚠️ **AND THE GATE'S FIRST PARSER FAILED A CORRECT ROW.** `NotificationType` annotates its cases mid-list,
+so a leading-run parser stopped after seven of ten. The parser was fixed rather than the document —
+recorded because a gate that cries wolf on a correct document gets the document "fixed".
+
+**`D15` amended, not re-asked.** `docs/feature-backlog.md` is itself in the hub table at degree 3 and every
+closure edits it, so `D13`'s one-hub-row cap, read to its letter, makes no batch of more than one row legal
+at all. **Eighteen batched increments have relied on an exemption nobody wrote down**, and the generator
+cannot apply it either, because it implements *cite* and the decision says *touch*.
 
 Taken 2026-09-08. Branch `m87-d13-batch`, cut from `origin/main` at `b05d008`, PR into `main`.
 

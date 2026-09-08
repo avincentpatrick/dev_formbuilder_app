@@ -390,7 +390,7 @@ Was `indicator_validations`. Structured rules or an expression, modeled on XLSFo
 | `form_field_id` | `uuid` | No | — | No | FK to `form_fields.id`, `ON DELETE CASCADE` — the field this rule validates. |
 | `related_form_field_id` | `uuid` | Yes | `NULL` | No | FK to `form_fields.id`, `ON DELETE CASCADE` — the cross-referenced field for comparison-style rules (`greater_than_field`, `required_if`, etc.). Replaces legacy's `related_indicator_value`, a documented "ghost column" whose meaning drifted after a data migration — this column has exactly one meaning, always. |
 | `rule_type` | `varchar(30)` — PHP enum: `ValidationRuleType` | No | — | No | See the 11-value catalog above. |
-| `operator` | `varchar(20)` — PHP enum: `ComparisonOperator` | Yes | `NULL` | No | See the 6-value catalog above; only meaningful for comparison-style `rule_type`s. |
+| `operator` | `varchar(20)` — PHP enum: `ComparisonOperator` | Yes | `NULL` | No | See the 8-value catalog above; only meaningful for comparison-style `rule_type`s. |
 | `rule_value` | `text` | Yes | `NULL` | No | Literal operand/threshold. |
 | `expression` | `text` | Yes | `NULL` | No | Full XLSForm-style expression string. When present, **supersedes** `rule_type`/`operator`/`rule_value`/`related_form_field_id` entirely — see Design Notes. |
 | `error_message` | `varchar(500)` | Yes | `NULL` | No | — |
@@ -770,7 +770,7 @@ Metering rows backing quota enforcement and usage-based billing (plan §2.2).
 | `id` | `bigint identity` | No | auto-increment | No | Primary key — `bigint`, per the global PK strategy note: pure internal aggregation rows, never addressed externally. |
 | `tenant_id` | `uuid` | No | — | No | FK to `tenants.id`. |
 | `subscription_id` | `uuid` | Yes | `NULL` | No | FK to `subscriptions.id`. Nullable to tolerate usage recorded before any subscription exists (e.g. a free-tier trial with no Stripe subscription yet). |
-| `metric` | `varchar(30)` — PHP enum: `UsageMetric` | No | — | No | See the 7-value catalog above. |
+| `metric` | `varchar(30)` — PHP enum: `UsageMetric` | No | — | No | See the 8-value catalog above. |
 | `period_start` | `date` | No | — | No | Start of the billing/usage period this row aggregates. |
 | `period_end` | `date` | No | — | No | — |
 | `value` | `bigint` | No | `0` | No | Running aggregate for the period (count or bytes, depending on `metric`). |

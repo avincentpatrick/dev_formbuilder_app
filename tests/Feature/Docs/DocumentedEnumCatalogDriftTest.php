@@ -355,6 +355,110 @@ it('keeps both exception maps describing rows that are still in the catalog', fu
     }
 });
 
+/**
+ * The English number words the per-table sections actually use for a catalog size.
+ *
+ * A closed map on purpose. A count written in a word this map does not know fails as "unknown
+ * count prose" rather than being coerced to something plausible — the `toContain`/`toHaveKey`
+ * family of traps (M30, M43) arriving through a parser instead of through an expectation. Only
+ * `ten` occurs today, and it is emphasised (`**ten-value**`) where the rest are bare digits.
+ */
+const DOCUMENTED_ENUM_CATALOG_COUNT_WORDS = [
+    'two' => 2,
+    'three' => 3,
+    'four' => 4,
+    'five' => 5,
+    'six' => 6,
+    'seven' => 7,
+    'eight' => 8,
+    'nine' => 9,
+    'ten' => 10,
+    'eleven' => 11,
+    'twelve' => 12,
+];
+
+const DOCUMENTED_ENUM_CATALOG_MIN_POINTERS = 5;
+
+it('keeps every per-table pointer agreeing with the catalog it points at', function (): void {
+    /*
+     * ⛔ THIS ARM EXISTS BECAUSE THE CATALOG IS NOT THE ONLY PLACE THE COUNT LIVES, AND M88'S OWN
+     * FIX PROVED IT. Each table section re-states the size as "See the N-value catalog above". The
+     * row this closes believed "the catalog is the only place the ComparisonOperator value list
+     * lives"; correcting §6's catalog row to eight left `:393` still saying six, so the document
+     * contradicted itself for exactly as long as it took to measure.
+     *
+     * ⚠️ AND THE SECOND INSTANCE WAS ALREADY ON THE TRUNK. `UsageMetric`'s catalog row was widened
+     * to eight by M87; its pointer at `:773` still read seven. That row HAS a database CHECK, so it
+     * is outside the population the closed row describes — the ungated surface is the whole
+     * document, not only the seventeen unbacked vocabularies.
+     */
+    $rows = [];
+    foreach (documentedEnumCatalogRows() as $row) {
+        $rows[$row['enum']] = $row;
+    }
+
+    $lines = explode("\n", (string) file_get_contents(base_path(DOCUMENTED_ENUM_CATALOG_DOCUMENT)));
+
+    $pointers = 0;
+    $wrong = [];
+
+    foreach ($lines as $index => $line) {
+        if (preg_match('/PHP enum: `([A-Za-z]+)`/', $line, $enum) !== 1) {
+            continue;
+        }
+
+        if (preg_match('/the \*{0,2}([A-Za-z0-9]+)-value\*{0,2} catalog above/', $line, $size) !== 1) {
+            continue; // a pointer carrying no count states nothing this arm can check
+        }
+
+        $stated = ctype_digit($size[1])
+            ? (int) $size[1]
+            : (DOCUMENTED_ENUM_CATALOG_COUNT_WORDS[strtolower($size[1])] ?? null);
+
+        expect($stated)->not->toBeNull(
+            DOCUMENTED_ENUM_CATALOG_DOCUMENT.':'.($index + 1).' states its catalog size as "'.$size[1].
+            '", which is neither a number nor a word in DOCUMENTED_ENUM_CATALOG_COUNT_WORDS. Add the '.
+            'word rather than loosening the match.'
+        );
+
+        $name = $enum[1];
+
+        // ⚠️ `array_key_exists` AND NOT `expect($rows)->toHaveKey($name, $message)`. Pest reads
+        // `toHaveKey`'s second argument as the expected VALUE, not as a failure message — the same
+        // trap `toContain(needle, message)` carries, and it fails with a type error that names
+        // neither the pointer nor the catalog. Measured here on the first run.
+        expect(array_key_exists($name, $rows))->toBeTrue(
+            DOCUMENTED_ENUM_CATALOG_DOCUMENT.':'.($index + 1).' points at a catalog entry for `'.$name.
+            '`, and the catalog has no such row.'
+        );
+
+        $class = documentedEnumCatalogClassFor($rows[$name]);
+
+        if ($class === null || ! enum_exists($class)) {
+            continue;
+        }
+
+        $pointers++;
+        $actual = count(documentedEnumCatalogCases($class));
+
+        if ($stated === $actual) {
+            continue;
+        }
+
+        $wrong[] = DOCUMENTED_ENUM_CATALOG_DOCUMENT.':'.($index + 1).' says the `'.$name.
+            '` catalog has '.$stated.' values; '.$class.' declares '.$actual.'.';
+    }
+
+    expect($pointers)->toBeGreaterThanOrEqual(
+        DOCUMENTED_ENUM_CATALOG_MIN_POINTERS,
+        'Discovery floor: only '.$pointers.' per-table pointers were checked. This form is a '.
+        'convention rather than a rule, so a parser that has stopped matching it goes silent '.
+        'instead of red.'
+    );
+
+    expect($wrong)->toBe([], 'A per-table section restates a catalog size that is no longer true:'."\n  ".implode("\n  ", $wrong));
+});
+
 it('publishes exactly the values each enum declares, in both directions', function (): void {
     $rows = documentedEnumCatalogRows();
     $compared = 0;

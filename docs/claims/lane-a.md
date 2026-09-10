@@ -58,25 +58,62 @@ If the fan-out finds it is not, the row is corrected rather than forced.
 
 ### Evidence verified
 
-⏳ **PENDING — the read-only fan-out is running, one agent per row over disjoint files (`D13` clause 2).**
-This heading is written before the first file is opened because the claim is a pushed commit; it is amended
-in its own pushed commit the moment the fan-out reports, and the amendment is what the gates see.
+**Answered by a read-only fan-out (one agent per row over disjoint files, `D13` clause 2), then
+re-measured by hand against the code.** ⚠️ **Two rows — `7833` and `8597` — did NOT receive the
+adversarial refutation pass**: the workflow was stopped before those agents ran. Their verdicts and
+census findings stand on the first pass plus my own independent re-measurement, and that is weaker
+than the other two. Recorded rather than glossed.
+
+| row | verdict | what did not hold |
+|---|---|---|
+| `8570` | **held** | every citation resolves. The census of seven locking siblings is exact. ⚠️ The row's own *"lockDraft() locks the draft"* is a naming slip — it locks `forms` — which is harmless only because publish locks the same row |
+| `8559` | **partly held** | ⛔ two of eleven are false and they carry the whole argument: `FormService::updateSchedule()` **exists nowhere in the tree except this row** (it is `setSchedule()`), and *"`M85` DID re-assert exactly that check"* is false — `M85` re-asserted `assertCanPromote()`, a strictly weaker predicate, and took **no lock** |
+| `7833` | **partly held** | every file:line and every non-count number is exact to the character. ⛔ **The count is wrong: five, not four.** `trial_ends_at` sits one line above the row's own citation in both files it opens |
+| `8597` | **held** | the named live instance is real and is the **only** one: of 28 catalog rows, 26 resolve by convention, 27 are comparable, and exactly one drifts |
 
 ### Premise verified
 
-⏳ **PENDING — same fan-out, asked separately.** Each row is asked what it believes about the world *around*
-its defect: row 1 believes every *other* mutator in that service locks and that `PublishService::publish()`
-is the racing writer; row 2 believes `M85` re-asserted the window on the promote side and that
-`assertCapacity()`'s lock is conditional on `max_responses`; row 3 believes the four columns are inert in
-`app/` while payments are a Phase-4 deferral of record, which would make "no writer" correct and "a defect"
-wrong; row 4 believes the catalog's enum names are prose rather than resolvable symbols, which is the whole
-of its stated difficulty.
+⛔ **THIS IS THE INCREMENT'S HEADLINE AND IT IS FOUR FOR FOUR.** Every row's citations essentially
+held and every row's belief about the world *around* its defect was wrong. In three cases that
+changes what the fix is; in one it changes whether there is a fix at all.
+
+- **`8570` — false in the half that decides the remedy.** `docs/form-versioning-schema-migration.md`
+  §3.4 states the `forms` lock serializes create/publish/discard/restore and *"does not serialize
+  ordinary field-level edits"* — **a written decision**, so the row's implied fix (add `lockDraft()`)
+  is a documented reversal rather than a bug fix. And *"the consequence is DATA rather than a
+  message"* is conditional: post-commit, RLS makes the write a zero-row no-op returning **200 with
+  the pre-edit values**. ⚠️ The row also understates itself — `saveFieldToLibrary` is a third
+  unlocked mutator, and three more transitions delete the child rows outright.
+- **`8559` — false, and the row is moot.** It believes the promote door re-asserts the schedule
+  window; it re-asserts a different predicate. It believes a throughput declination blocks the fix;
+  that declination governs a **lock**, and the only fix in question is a lock-free re-read. It
+  believes *"nothing says why"*; two written whys exist. ⛔ And `D27` **carved this row out of a
+  decision because of the same false sentence**, so the premise had propagated into the roster.
+- **`7833` — false, and it inverts the row.** Payments-to-Phase-4 is a decision of record,
+  reconfirmed with the user and ratified in `ADR-0008`. *"No reader and no writer"* is therefore
+  **correct and expected**, not a defect. The real defect is one order of magnitude smaller and has
+  a different remedy: a labelling gap against a convention already used three times on this table.
+- **`8597` — false in its stated difficulty, which is why the gate is short.** *"The enum name is
+  prose, not a resolvable symbol"* — **26 of 28 are literally the class basename.** The real
+  difficulty is the Values cell mixing the list with prose containing more backticked tokens, and
+  the shipped `checkDriftBacktickedRun()` is exactly the wrong instrument for it.
 
 ### Remedy verdict
 
-⏳ **PENDING — measured before any test is written, per row.** Row 1 offers a remedy by implication only.
-Row 2 offers two and declines both in its own body. Row 3 offers none. Row 4 names an instrument
-(`DocumentedSettingKeyDriftTest`'s shape) and states why it was not built.
+**Measured by reading the code each would touch, before any test was written.**
+
+- **`8570` — none offered; the implied one works but reverses §3.4, so it was not taken.** Taken
+  instead: re-read the form **and the child** inside the transaction, no lock — the `M85` precedent
+  exactly. Closes the post-commit lost refusal and the collaborator-delete race; the pre-commit
+  publish-snapshot window is lock-shaped and is filed rather than forced.
+- **`8559` — wrong on three counts.** No lock is needed; the hook reaches only one of the two doors
+  it names; and refusing a submit that passed `assertCanStart()` would **contradict H12a's grace
+  window** rather than restore symmetry. Disposition: no code change, escalated to `D27`.
+- **`7833` — wrong on its premise, and would have held the row open forever.** Taken instead: apply
+  the existing dormancy convention at all three points of truth.
+- **`8597` — works, with one correction.** The named instrument (`DocumentedSettingKeyDriftTest`'s
+  shape) is right; reusing the existing catalog parser is not. Two declared cell grammars, both
+  directions compared for set equality, nothing skipped but the one row with no PHP enum.
 
 Files: `docs/claims/lane-a.md`, `docs/feature-backlog.md`, `docs/backlog-triage.md`, `docs/pipeline.md`,
 `PROGRESS.md` (own block only), `docs/gate-baselines.md`, plus the per-row files in the table above.

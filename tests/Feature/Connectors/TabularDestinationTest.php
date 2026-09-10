@@ -281,7 +281,15 @@ it('lets a reader inspect but not create — the create writes into the tenant\'
 it('is gated by the plan, like every other connector surface', function (): void {
     assignPlanTier(PlanTier::Free);
 
+    // ⛔ THIS ASSERTED `assertRedirect()` UNTIL M90, AND IT WAS PINNING THE DEFECT.
+    // `getJson()` sends `Accept: application/json`, so this is the JSON-fetch case — the one
+    // docs/feature-backlog.md:8919 said "nothing in the repo pins". It did, here, and the claim that
+    // no shipped test would move was wrong because it was measured only over the tests that DENY
+    // the field-library routes rather than over every `feature:`-gated surface.
+    // The sidecar this route serves reads `payload.message` at the top level, so a 402 it can read is
+    // the whole point of the repair; a 302 to HTML is what it used to get.
     $this->actingAs($this->admin)
         ->getJson(sheetsUrl($this->connection).'?reference=x')
-        ->assertRedirect();
+        ->assertStatus(402)
+        ->assertJsonPath('code', 'feature_not_available');
 });

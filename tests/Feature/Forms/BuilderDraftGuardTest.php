@@ -436,6 +436,10 @@ it('refuses a library CAPTURE across the version boundary, which is consistency 
     expect(fn () => app(FormBuilderService::class)->saveFieldToLibrary($boundForm, $admin, $boundField, []))
         ->toThrow(FormException::class);
 
+    // ⚠️ SCOPED TO THIS TENANT, NOT A GLOBAL COUNT. The first draft asserted `count()` was 0 and passed
+    // locally while failing in CI with "6 is identical to 0": `field_library` carries PLATFORM
+    // (NULL-tenant) rows, and how many exist depends on which seeder ran. A global count over a table
+    // with seeded rows is a test of the fixture, not of the guard.
     enterTenant($tenant->id, $admin->id);
-    expect(DB::table('field_library')->count())->toBe(0);
+    expect(DB::table('field_library')->where('tenant_id', $tenant->id)->count())->toBe(0);
 });

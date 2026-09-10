@@ -154,18 +154,39 @@ it('leaves no exception renderable that redirects without a JSON sibling', funct
 
     $redirecting = [];
     $unguarded = [];
+    $uncaptured = [];
 
     foreach ($starts as $i => $start) {
         $end = $starts[$i + 1] ?? strlen((string) $source);
         $arm = substr((string) $source, $start, $end - $start);
 
+        // The exception class is the first type in the closure signature — enough to name the offender.
+        preg_match('/render\(\s*(?:function|fn)\s*\(([^,)]+)/', $arm, $m);
+        $label = trim($m[1] ?? 'arm at offset '.$start);
+
+        // ⛔ THE CAPTURE ARM, ADDED AFTER CI CAUGHT WHAT THIS GATE DID NOT. A `function` closure that
+        // CALLS `$webJson(...)` without naming it in its `use (...)` is a PHP undefined-variable Error
+        // at runtime — a 500 on the very refusal path this repair exists to fix. One arm shipped exactly
+        // that: the body was rewritten and the `use` clause was not. The first version of this rule
+        // asked only whether the arm mentioned `$webJson(`, which that arm did, so it passed. A gate
+        // that checks the call and not the binding is checking the half that cannot fail alone.
+        //
+        // ⚠️ `fn` IS EXEMPT AND THAT IS THE LANGUAGE, NOT A CARVE-OUT. An arrow function captures by
+        // value automatically and may not carry a `use` clause at all, so requiring one would redden
+        // two correct arms. The first draft of THIS rule did exactly that — a gate written to catch an
+        // over-narrow predicate, failing by being over-broad in the opposite direction.
+        if (str_contains($arm, '$webJson(') && preg_match('/render\(\s*function\s*\(/', $arm) === 1) {
+            preg_match('/\)\s*use\s*\(([^)]*)\)/', $arm, $useClause);
+
+            if (! str_contains($useClause[1] ?? '', '$webJson')) {
+                $uncaptured[] = $label;
+            }
+        }
+
         if (! str_contains($arm, 'back()->')) {
             continue;
         }
 
-        // The exception class is the first type in the closure signature — enough to name the offender.
-        preg_match('/render\(\s*(?:function|fn)\s*\(([^,)]+)/', $arm, $m);
-        $label = trim($m[1] ?? 'arm at offset '.$start);
         $redirecting[] = $label;
 
         if (! str_contains($arm, '$webJson(')) {
@@ -176,6 +197,8 @@ it('leaves no exception renderable that redirects without a JSON sibling', funct
     expect(count($redirecting))->toBeGreaterThanOrEqual(14, 'the redirecting-arm census collapsed — see the floor note above');
 
     expect($unguarded)->toBe([], 'these exception renderables redirect with no $webJson sibling, so a JSON fetch reaching one gets HTML it cannot parse: '.implode(' · ', $unguarded));
+
+    expect($uncaptured)->toBe([], 'these renderables CALL $webJson without capturing it in their use clause, which is an undefined-variable 500 on the refusal path: '.implode(' · ', $uncaptured));
 });
 
 it('answers a JSON fetch at a module-gated web route with a readable JSON refusal', function (): void {

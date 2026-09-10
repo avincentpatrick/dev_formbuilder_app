@@ -409,7 +409,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // NOT `back()` on a GET. A bookmarked bad URL carries no referer, and `back()` would land on the
         // tenant subdomain's unrouted "/" — a 404 in place of the message. The bare index always builds a
         // valid default window, so redirecting to it cannot loop.
-        $exceptions->render(function (InvalidAnalyticsQueryException $e, Request $request) use ($isApi) {
+        $exceptions->render(function (InvalidAnalyticsQueryException $e, Request $request) use ($isApi, $webJson) {
             if ($isApi($request)) {
                 return ApiErrorResponse::make(422, 'invalid_analytics_query', $e->getMessage(), ['reason' => $e->reason()]);
             }

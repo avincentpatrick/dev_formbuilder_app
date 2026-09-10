@@ -9129,3 +9129,17 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   whether that cap should be relaxed to per-file or re-derived per batch, and this is the first measured
   case of it forbidding work rather than merely shrinking a batch. It is an input to `D15`, not a licence.
   **Live.** Filed by `M90`.
+- **`minor` · `scripts/gate-baselines.php`'s gate list and its two harness fixtures must change together,
+  nothing says so, and `M90` turned `main` red by not knowing it.** Measured by `M90` (2026-09-10), the
+  hard way. `GateBaselinesTest` drives the REAL generator against `tests/fixtures/gate-baselines/ci-log.txt`
+  and `ci-log-missing-metric.txt`, so the declared gate list and those two logs are a **paired file set**:
+  adding a fourteenth gate without adding its line to both makes the harness report one more unscraped
+  metric than its controls expect. ⛔ **Five arms went red and not one of them was about the new gate** —
+  the failure names `NOT FOUND` counts, which reads as a broken pattern rather than a missing fixture line.
+  ⚠️ **Standing Rule 7(b-bis) does not list this pair**, and neither does the generator's own header, so
+  the coupling is discoverable only by breaking it. ⚠️ **It is the same shape `M90` spent four rows on**: a
+  declared list that a second file must mirror, with no gate comparing the two — which is exactly what
+  `scripts/test-pointer-lint.php` was built to end for test-class pointers and does not cover here. The fix
+  is either a control arm asserting every key in the generator's list appears in both fixtures, or the pair
+  added to 7(b-bis); the first is a gate and the second is prose, and this repository has a stated
+  preference between those. **Live.** Filed by `M90`.

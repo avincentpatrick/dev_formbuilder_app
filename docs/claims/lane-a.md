@@ -16,7 +16,172 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M89` is merged; the next increment is a fresh `D13` batch
+## Status: ACTIVE CLAIM — `M90`, the twenty-first `D13` batch: four rows, and the fan-out broke a premise in every one of them (`m90-d13-batch`)
+
+Taken 2026-09-10. Branch `m90-d13-batch`, cut from `origin/main` at `b4111cd`, PR into `main`.
+
+Rows, chosen by hand off `docs/pipeline.md` after regenerating it, and checked against `D13`'s file-overlap rule:
+
+| # | Row | Hub? | Non-hub files the REPAIR would touch |
+|---|---|---|---|
+| 1 | `docs/feature-backlog.md:8919` — an entitlement denial answers a JSON `fetch` with a 302 to HTML | **yes** — `routes/tenant.php`, prose only | `bootstrap/app.php`, `resources/js/components/achievements/achievementsClient.ts`, `resources/js/components/integrations/integrationsClient.ts`, a new `tests/Feature/` arm |
+| 2 | `docs/feature-backlog.md:8785` — the stale-`$form` read `M88` fixed in two mutators is still live elsewhere | no | `app/Services/Forms/FormBuilderService.php`, `app/Http/Requests/Forms/UpdateFieldRequest.php`, `app/Http/Requests/Forms/UpdateSectionRequest.php`, `tests/Feature/Forms/BuilderDraftGuardTest.php` |
+| 3 | `docs/feature-backlog.md:8943` — `saveAsTemplate()` serializes a schema snapshot with no transaction at all | no | `app/Services/Forms/TemplateService.php`, `docs/form-versioning-schema-migration.md`, a new `tests/Feature/Forms/` arm |
+| 4 | `docs/feature-backlog.md:8971` — the only claimed two-connection concurrency test does not exist | no | `tests/Pest.php`, `tests/Feature/Forms/PublishLockingTest.php`, `tests/Feature/Scoping/ScopeNodeMoveLockingTest.php`, `tests/Feature/Scoping/ScopeNodeMoveTest.php`, `tests/Feature/Queue/AfterCommitDispatchTest.php`, `docs/testing-strategy.md` |
+
+⛔ **BOUNDARIES DECLARED BEFORE THE FIRST EDIT, BECAUSE THREE OF THESE ROWS HAVE OVERLAPPING NEIGHBOURHOODS AND
+`D13`'s RULE IS ABOUT THE REPAIR RATHER THAN THE CITATION.** The triage's collision graph harvested each of these
+as disjoint and it was right about the citations and short about the repairs — which is the defect
+`docs/feature-backlog.md:8153` already records.
+
+- `app/Services/Forms/FormBuilderService.php` and `tests/Feature/Forms/BuilderDraftGuardTest.php` belong to **row 2
+  alone**. Row 3 names `FieldLibrary::fromField()` as a sibling; its only *persisting* caller is
+  `FormBuilderService::saveFieldToLibrary()`, so that half is row 2's work and row 3 does not open the file.
+- `tests/Pest.php` and `tests/Feature/Forms/PublishLockingTest.php` belong to **row 4 alone**.
+- `bootstrap/app.php` belongs to **row 1 alone**.
+
+⚠️ `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/backlog-triage.md`, `PROGRESS.md`, `docs/gate-baselines.md`
+and this file are increment bookkeeping edited by every row's closure, and are not counted — the same exclusion
+`M87` recorded and `D15` is open on.
+
+### Evidence verified
+
+**Four read-only agents over disjoint rows, one adversarial reviewer per row, then every load-bearing citation
+re-opened by hand before it was acted on.** Per row:
+
+- **`8919` — FOUR OF FIVE CITATIONS HELD; THE FIFTH IS A REAL LINE AND THE WRONG ONE.** `bootstrap/app.php:333-339`
+  is byte-exact. The three `feature:field_library` routes are at `routes/tenant.php:575-580`, not `:576-585` — the
+  last four lines of the cited range are the next block's comment. `builderClient.ts` sends
+  `Accept: application/json` at `:49`. ⛔ **But `builderClient.ts:68` is unreachable on this path.** `:68` is the
+  `catch` inside `if (!response.ok)` at `:61`; `fetch` sets no `redirect` option, so the 302 is FOLLOWED to the
+  builder page, which answers **200 HTML** — `response.ok` is true, `:61` is skipped, and execution reaches `:74`
+  `await response.json()`, which throws a bare `SyntaxError` that is **not** a `BuilderRequestError`. The string
+  the user actually sees is `useBuilderStore.ts:198`'s *"Something went wrong saving your change."* ⚠️ **And on
+  `refreshLibrary()` that is a READ**, so the app tells the tenant a save failed when nothing was being saved.
+- **`8785` — EVERY CITATION HELD.** The row carries no `path:line` at all (`docs/backlog-triage.md` records it as
+  *no file harvested*), so all seven were resolved by symbol: `assertDraftChild()` at
+  `FormBuilderService.php:355-360` reads the route-bound `$form`; `M88`'s `assertStillDraftChild()` at `:391-414` is
+  called from `:89` and `:188` only; `duplicateField()` keeps `lockDraft()`'s return at `:225` and still guards with
+  the stale `$form` at `:226`; `saveFieldToLibrary()` at `:284-295` has no transaction and no lock; both request
+  classes scope their uniqueness rules on `$form->draft_version_id`.
+- **`8943` — EVERY CITATION HELD, AND ONE NUMBER IS EXACT RATHER THAN APPROXIMATE.**
+  `TemplateService.php:55-70` opens nothing; `DB` is imported at `:14` and used by `instantiate()` at `:40`, so the
+  absence is a choice in this method. `SchemaSnapshotSerializer::snapshot()` issues **precisely three** statements
+  (`:44`, `:46`, `:48`) — all plain `hasMany`, no `$appends`, no `$with`, nothing after `:48` touching the database.
+  `XlsformExporter.php:57` is exact. `FieldLibrary::fromField()` exists at `app/Models/FieldLibrary.php:133`.
+- **`8971` — THE CORE CITATION HELD AND BOTH OF THE ROW'S QUANTIFIERS ARE FALSE.**
+  `ScopeNodeMoveLockingTest.php:20-21` quotes verbatim and the file it names exists nowhere. ⛔ **But
+  `ScopeNodeConcurrentMoveTest` appears FOUR times, not once** — `ScopeNodeMoveLockingTest.php:20`,
+  `PublishLockingTest.php:33`, `docs/feature-backlog.md:8741` and the row's own sentence. ⛔ **And
+  `PublishLockingTest` does the opposite of leaning on it**: `:31-34` names the absence explicitly. Exactly ONE
+  shipped file still defers to the phantom as though it existed.
+
+### Premise verified
+
+⛔ **THIS IS THE SIXTH INCREMENT RUNNING IN WHICH `Premise verified` PAID FOR ITSELF, AND THE FIRST IN WHICH ALL
+FOUR ROWS PROPAGATED A FALSE SENTENCE THEY HAD NOT MEASURED.**
+
+- **`8919` — false in three directions, and the third one changes the fix.** (1) *"Three builder routes"* — the
+  population is at least **seven web routes across two exception classes**: the three `feature:field_library`
+  routes, four `feature:native_connectors` integration sidecars (`routes/tenant.php:838-859`, called from
+  `integrationsClient.ts`), and `/achievements/streak` (`module:gamification` → `ModuleDisabledException`, whose
+  arm at `bootstrap/app.php:346-352` is byte-identical in shape). (2) *"One arm on the `feature:` renderable"* —
+  there are **nine** `back()` arms in that file, and `docs/claims/lane-a.md` already counted seven of them
+  and concluded the 302 *"is this application's standard web refusal"*. (3) *"It changes … the pinning test with
+  it"* — **false, and measurable**: `FeatureGateWebTest.php:89-91` sends no `Accept: application/json`, so
+  `expectsJson()` is false there and an `expectsJson()`-keyed fix leaves it green. **Nothing in this repository
+  pins the JSON-fetch case at all.** ⚠️ **And the precedent for the fix is ninety lines above the defect**:
+  `bootstrap/app.php:241-243` already declares `shouldRenderJsonWhen(… || $request->expectsJson())` and names *"the
+  builder's CSRF fetch sidecar (D4a)"* in its comment — a `render()` callback that returns a response simply runs
+  first and wins.
+- **`8785` — the caller census is wrong and the two it omits are the worse pair.** There are **six** call sites of
+  `assertDraftChild()`; `M88` covered two; **four are still stale** — `:109` `deleteSection()`, `:217`
+  `deleteField()`, `:226` `duplicateField()`, `:286` `saveFieldToLibrary()`. ⛔ **The row's own diagnosis is
+  inverted**: *"they discard the locked draft"* is false of the two it names and **true of the two it omits**.
+  ⚠️ **And the request-layer half is not blocked on a decision.** No entry in `docs/claims/decisions.md` covers it;
+  the nearest open one, `D27`, is scoped explicitly to the submission doors.
+- **`8943` — the row's model of its own instrument is wrong twice.** (1) No `pgsql` connection in
+  `config/database.php` pins an isolation level, so **READ COMMITTED** is in force and every statement inside a
+  transaction takes a fresh snapshot — **a plain `DB::transaction()` would leave the three reads exactly as torn as
+  they are today.** (2) Repeating `M89`'s `lockForUpdate()` is worse than useless here: the `draft_update` policy
+  filters a locking SELECT to zero rows for a non-draft parent, and **both entry points admit a non-draft version**
+  (`FormTemplateController::templateSource()` falls back to `current_published_version_id`;
+  `StoreFormTemplateRequest` validates `form_version_id` with no status rule) — so on those inputs it would store an
+  **empty blueprint with no error**. ⚠️ **And nothing would catch it**: `TemplateRoundTripTest`, the file that
+  exists to prove this exact loop, **does not call `saveAsTemplate()`** — it hand-builds the template.
+- **`8971` — the row rots almost entirely in its premise, and it inherited three of its false sentences from the
+  comments it is complaining about.** *"No test in this repository opens a second connection"* is **false** —
+  `tests/Pest.php:745-770` is a section titled *Committed cross-connection fixtures (Increment I7a)*, and second
+  connections are routine. *"This suite has no committing-test precedent"* (`AfterCommitDispatchTest.php:25-26`) is
+  **false** — `Pest.php:745-770` **is** that precedent, and carries the cleanup recipe and the nine-red-tests
+  incident that motivated it. `Pest.php:677`'s *"see PROGRESS.md's note on that gap"* is a **second dead pointer of
+  the same species** — the note is now in `PROGRESS_ARCHIVE.md`. And the suite already stages contention:
+  `Pest.php:1369`'s `interleaveDuringPromote()`.
+
+### Remedy verdict
+
+- **`8919` — WRONG AS WRITTEN, IN A WAY THAT WOULD HAVE SHIPPED A SILENT HALF-FIX.** The prescribed arm-flip hands
+  `builderClient` an `ApiErrorResponse` body, which nests under `error` (`ApiErrorResponse.php:26-32`), while
+  `builderClient.ts:65-66` reads `payload.message` at the **top level** — so `payload.message` is `undefined` and
+  the user still gets a generic string. The web JSON arm must answer **Laravel-flat** (`{message, …}`), which is
+  the shape `builderClient` was built around and which `api-specification.md` §2.3 scopes to `/api/v1` deliberately.
+  Taken: one shared predicate over **all nine** `back()` arms, plus a structural gate so a tenth cannot arrive
+  unguarded.
+- **`8785` — NONE OFFERED, AND THE ONE THING IT DOES PRESCRIBE IS WRONG.** The service half is mechanical and
+  needs no decision: `assertStillDraftChild()` drops in, and `duplicateField()` is better served by comparing
+  against the `$draft` it already holds. ⛔ **`duplicateField()`'s failure is not a stale guard letting a write
+  through — it is a 500**: the INSERT straddles two versions, `draft_insert`'s WITH CHECK raises **42501**, and
+  `FormBuilderController::respond()` catches only `BuilderConflictException` and `FormException`. That is the same
+  unrendered-500-on-the-builder's-write-path defect `M89` spent a whole row closing for 23503, live again under a
+  different SQLSTATE. The request half is scoped on the child's own `form_version_id` — decision-free, and it also
+  closes a NULL-draft hole that makes the rule always pass.
+- **`8943` — NONE OFFERED; BOTH IMPLIED INSTRUMENTS ARE WRONG AND THE RIGHT ONE HAS AN IN-REPO PRECEDENT.**
+  `REPEATABLE READ` is status-blind, takes no lock, and cannot raise a serialization failure here because the
+  transaction's only write is an unrelated INSERT. The precedent is `TenantExtractService.php:84-86`
+  (`set transaction isolation level repeatable read`, guarded by `DB::transactionLevel() === 1`), with the reasoning
+  in `docs/adr/0018-per-tenant-extraction.md` §D6 — the same defect class in the same words. ⚠️ **The carve-out
+  comes with it**: under `RefreshDatabase` the statement is skipped on a nested transaction, so the isolation level
+  itself is untestable and the gate must pin the STATEMENT SHAPE.
+- **`8971` — NONE OFFERED, AND BOTH BRANCHES ARE MISPRICED.** Branch B (correct the comments) is right but the
+  row's scope is one file where the census is six. Branch A (write the committing harness) is **possible**, not
+  impossible — but it carries three costs the row never names, including that `TenantContext::set()` writes a
+  process-wide static mirror and that there is no `lock_timeout` anywhere, so a blocked contender **hangs the job
+  rather than failing it**. ⛔ **And a contention test could not replace what it is said to justify**:
+  `PublishLockingTest`'s load-bearing arm is that **no lock is taken after the status flip**, and a race can show a
+  lock exists but never that one is absent. Taken: Branch B, hoisted to one statement in `docs/testing-strategy.md`
+  that the comments point at, plus a gate that resolves every `*Test` class name a test comment names. Branch A is
+  filed.
+
+Files: `bootstrap/app.php`, `resources/js/components/achievements/achievementsClient.ts`,
+`resources/js/components/integrations/integrationsClient.ts`, `routes/tenant.php` (prose only),
+`app/Services/Forms/FormBuilderService.php`, `app/Http/Requests/Forms/UpdateFieldRequest.php`,
+`app/Http/Requests/Forms/UpdateSectionRequest.php`, `app/Services/Forms/TemplateService.php`,
+`tests/Pest.php`, `tests/Feature/Forms/PublishLockingTest.php`,
+`tests/Feature/Forms/BuilderDraftGuardTest.php`, `tests/Feature/Scoping/ScopeNodeMoveLockingTest.php`,
+`tests/Feature/Scoping/ScopeNodeMoveTest.php`, `tests/Feature/Queue/AfterCommitDispatchTest.php`,
+`tests/Feature/Forms/FeatureGateWebTest.php`, new arms under `tests/Feature/`,
+`docs/testing-strategy.md`, `docs/form-versioning-schema-migration.md`, `docs/feature-backlog.md`,
+`docs/pipeline.md`, `docs/backlog-triage.md`, `docs/gate-baselines.md`, `PROGRESS.md`, this file.
+
+Shared artefacts taken: `docs/testing-strategy.md`, `docs/form-versioning-schema-migration.md`,
+`docs/feature-backlog.md`, `docs/pipeline.md`, `docs/backlog-triage.md`, `docs/gate-baselines.md`,
+`PROGRESS.md` (own block only). No `openapi.json`, no `phpunit.xml`, no top-level `tests/e2e/*.spec.ts`.
+
+Paired files taken: none. `SyncStatus.vue` is untouched, so `clipped-node-containment.test.ts`'s
+`KNOWN_UNGUARDED` list is not engaged.
+
+Namespaces spent: **nothing from either** — no migration prefix, no ADR (`0023` stays free and `0010` stays
+reserved for H1d), no `§D`, no exceptions-log entry.
+
+Prediction: **Pest moves up by roughly a dozen and nothing else moves.** PHPStan cannot move — `bootstrap/`,
+`resources/` and `tests/` are outside the three paths it scans — so I will say that rather than quote an unchanged
+number. Vitest's file count is unchanged: row 1 touches only comments in `.ts` files. E2E should be untouched; the
+builder specs exercise a Starter-or-better tenant, so no `feature:` denial fires. ⚠️ **The gate I most expect to be
+wrong is row 1's structural arm** — a rule that reads `bootstrap/app.php`'s own text for a `back()`-without-JSON
+arm is a regex over PHP, and this repository's history says the first draft of such a rule matches either
+everything or nothing. ⚠️ **Second most likely wrong: row 3's statement-shape test**, because the isolation
+statement is *skipped* under `RefreshDatabase` and the naive assertion would therefore pass against an unrepaired
+tree — a vacuity trap of exactly the shape `M84` measured. Both get a mutation before they are believed.
 
 ## RELEASED — `M89`, the twentieth `D13` batch: an unrendered 500 on the builder's write path, a snapshot frozen without locking what it freezes, a cross-language vocabulary nothing compared, and a dormant-column skip that could not see a table (merged as PR #280, `d5cb42d`, 6/6 green with real step counts — Static analysis 26 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

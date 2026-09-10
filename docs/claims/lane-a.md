@@ -62,25 +62,95 @@ zero headroom binds and the row is corrected rather than forced — the `M87` le
 
 ### Evidence verified
 
-⏳ **PENDING — the read-only fan-out is running, one researcher per row over disjoint files (`D13` clause 2).**
-This heading is written before the first file is opened because the claim is a pushed commit; it is amended
-in its own pushed commit the moment the fan-out reports, and the amendment is what the gates see.
+**Answered per row, from a read-only fan-out of four researchers over disjoint files, then re-opened by
+hand before the first edit.**
+
+- **`8732`** — **five of five citations HELD.** `replaceValidations()` INSERTs `form_field_id`
+  (`FormBuilderService.php:387-390`); the FK is `constrained('form_fields')->cascadeOnDelete()`
+  (`2026_07_06_000206_create_form_field_validations_table.php:24`); `grep -ri deferrable database/`
+  returns zero; `respond()` has exactly two `catch` arms (`FormBuilderController.php:227,233`);
+  `bootstrap/app.php` registers no `QueryException` renderable across its 24 `render()` calls.
+  ⚠️ **One caveat that matters**: `bootstrap/app.php:549` *does* register a `Throwable` catch-all, but it
+  returns early for anything outside `api/v1/*`, and the builder routes are on a tenant subdomain.
+- **`8713`** — **six of six HELD, one of them understated.** `PublishService::publish()` locks `forms`
+  (`:41`), snapshots while still draft (`:69-70`), flips (`:79-86`), clones (`:114`); no `lockForUpdate`
+  exists on any of the three child tables anywhere in the tree — 25 hits in `app/`, all on `Form`,
+  `Submission`, `ScopeNode`, `SsoConnection` or a polymorphic grant target. ⚠️ **"A dozen statements" is
+  conservative**: twelve unlocked child reads sit between the `forms` lock and the snapshot, and the clone
+  is three SELECTs plus one INSERT per section, field and validation — ~60 statements for a 40-field form.
+- **`8811`** — **held except two, and both errors are undercounts.** The mirror file holds **seven**
+  vocabularies, not four, and three of the seven live in `App\Services\Expressions\` rather than
+  `App\Enums\`, so the resolver the row implies cannot reach them. ⛔ **"No test or spec references the
+  mirror file" is FALSE** — `engine/__tests__/golden-validation.test.ts:18` imports exactly the four types
+  the row names. **The row's conclusion survives its false citation**, and the reason is the finding:
+  `tsconfig.json:34-35` excludes every `*.test.ts` from `vue-tsc`, so that import is type-checked by
+  nothing. The `bot_challenge` vocabulary has **four** copies, not two.
+- **`8799`** — **held at the lines it names.** The `$scheduled` skip was a bare `str_contains` on the
+  column name with no table (`pipeline-lint.php:738` as it stood); the collector already keys each cell by
+  table (`:1431`) and the failure message prints it (`:755`). The three `stripe_*` columns exist and are
+  inert. ⚠️ **The historical claim was verified against git rather than accepted**: at `3c0cbbe` the whole
+  scheduled buffer contained `trial_ends_at` exactly twice, both inside the `tenants` phantom row, and
+  `subscriptions` appears nowhere near either. **The mask was real and it was a `tenants` mention.**
 
 ### Premise verified
 
-⏳ **PENDING — same fan-out, asked separately.** What each row believes about the world *around* its defect:
-row 1 believes 422 is what *"every other refusal on that surface returns"* and that `FormException::childNotInDraft()`
-exists and renders that way; row 2 believes the `draft_child` RLS policy cannot refuse the racing write and
-that `PublishService` is the only snapshot-freezing writer; row 3 believes the four mirrored vocabularies are
-the whole population and that no test references the mirror file; row 4 believes the collector already carries
-the table at the point of the skip, so that the fix needs *"no new plumbing"*.
+⛔ **FOUR FOR FOUR WRONG, FOR THE FIFTH INCREMENT RUNNING — AND THIS TIME ONE OF THEM CHANGED THE REPAIR
+INTO A DIFFERENT REPAIR.**
+
+- **`8732` — FALSE in two places.** *"the 422 every other refusal on that surface returns"*: the surface
+  returns **403, 404, 409, 419, 422 and a 302** depending on the refusal. ⚠️ **The 302 is a shipped defect
+  of the same family and is worse than the filed one** — a `feature:field_library` denial hits
+  `bootstrap/app.php:333-339`'s `back()` on the non-API arm, so a JSON `fetch` follows a redirect, gets
+  HTML, and the builder shows a generic "Request failed"; it is **test-pinned that way**. And *"nothing
+  renders the exception"* overstates it: `Accept: application/json` is set, so the framework renders a
+  generic JSON 500 that the builder displays as "Server Error". ⚠️ **The row is a floor**: the same
+  statement writes a SECOND foreign key, `related_form_field_id`, which `M88`'s guard does not narrow at
+  all, because the guard re-reads only the edited child.
+- **`8713` — held on RLS, FALSE on its sibling census, and the RLS half was verified against the live
+  database rather than reasoned.** `pg_policies` confirms `draft_update` carries
+  `EXISTS (... fv.status = 'draft')` as a filter, `SHOW default_transaction_isolation` is `read committed`,
+  and `EXPLAIN` on a locking child read shows the policy applied as a **Filter** rather than an error.
+  ⛔ **But `PublishService` is not the only snapshot producer**: `TemplateService::saveAsTemplate()` runs
+  the same serializer with **no transaction at all**, so its three reads cannot even see a consistent tree.
+  Filed rather than swept in.
+- **`8811` — FALSE, and it is the premise that decides the whole row.** The row says the instrument is not
+  obvious and that *choosing between a generator and a parser is the work*. **The choice was made and
+  shipped in `J3a`**: `NotificationTypeParityTest` regex-reads a union off disk and compares it to an enum,
+  `PdfFieldRoleTest` does it for a `new Set` literal, `ShellAbilityParityTest` for an interface. Three
+  working precedents predate the row. ⛔ **And its framing is misleading in the other direction**: the
+  mirror population and the enum-catalog population are different sets that overlap in 8 of ~28, so
+  *"precisely the population the new gate was built for"* is not what it looks like.
+- **`8799` — FALSE in the sentence the remedy rests on.** *"one predicate change reaches both"* is wrong,
+  and the refutation is arithmetic rather than argument: table-keying alone surfaces **8**, the literal-
+  `null` sibling alone surfaces **3**, together **13**. They are two edits in two functions, and closing
+  this row does **not** close `7858`. ⚠️ **`pipeline-lint` was already RED on the trunk when the claim was
+  cut** — P1 drift, because `M88`'s close-out prepended a `PROGRESS.md` line after `docs/pipeline.md` was
+  generated. Inherited, not caused, and cleared by the close-out's own regeneration.
 
 ### Remedy verdict
 
-⏳ **PENDING — measured before any test is written, per row.** Row 1 names one (a typed catch mapping 23503).
-Row 2 names one and calls it a decision rather than a sweep. Row 3 offers none — it names two instruments and
-says choosing between them *is* the work. Row 4 names one for its first half and inherits `7858`'s refusal for
-its second.
+- **`8732` — WORKS, with the mapping under-specified.** The typed catch is right and the house idiom is
+  `(string) $e->getCode()` with an unconditional rethrow (`SavedReportViewService::guardName()`,
+  `SubmissionPipeline`), never the constraint name. ⛔ **But the catch must wrap the transaction, not sit
+  inside it** — PostgreSQL aborts the current transaction on a violation — and
+  **`childNotInDraft()`'s message is wrong for the cause**: it names a publication that did not happen.
+  Two accurate constructors instead, and the two foreign keys are told apart by a re-read rather than by
+  parsing the driver's message.
+- **`8713` — WORKS, in exactly one placement, and the two obvious ones are silently catastrophic.** The
+  lock goes at the TOP of the transaction, before the gates. ⛔ **In `SchemaTreeCloner` it clones an EMPTY
+  TREE with no error** — the cloner runs after the flip, so the policy filter matches zero rows. That was
+  predicted from `EXPLAIN` and then **confirmed empirically by mutation**: the positive control that moves
+  the lock there turns the clone arm red. In `SchemaSnapshotSerializer` it breaks two callers that run
+  outside any transaction and one that reads published versions.
+- **`8811` — NONE OFFERED; the parser, decisively.** A generator is wrong here for four measured reasons:
+  four mirrors diverge from their enum deliberately, the files carry hand-written rationale a generator
+  destroys, the mirrors are single lines inside larger hand-authored contract files, and a new generator
+  needs a `composer.json` alias plus a `ci.yml` step where a Pest arm needs neither.
+- **`8799` — WRONG as prescribed, and a better predicate was measured rather than argued.** `table.column`
+  reddens 8 columns that are all already dispositioned in prose naming their table. **Requiring the table
+  in the same PARAGRAPH** discharges all 8, reddens nothing new on this tree, and — measured against the
+  tree at `3c0cbbe` — still reddens `subscriptions.trial_ends_at` while still discharging the `tenants`
+  phantom. It catches the defect the row was filed for and manufactures nothing.
 
 Files: `docs/claims/lane-a.md`, `docs/feature-backlog.md`, `docs/backlog-triage.md`, `docs/pipeline.md`,
 `PROGRESS.md` (own block only), `docs/gate-baselines.md`, plus the per-row files in the table above.

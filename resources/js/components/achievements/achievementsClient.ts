@@ -20,6 +20,12 @@
 // tab is open. `null` means "ask again after the next navigation", and the composable holds its last known
 // value rather than blanking the badge.
 //
+// ⚠️ THAT 403 WAS FALSE UNTIL M90, AND THE TRUE SENTENCE WAS TWO LINES ABOVE IT. On the web surface
+// `ModuleDisabledException` rendered as `back()->with('toast')` — a 302 to HTML, exactly the case line 18
+// describes for a lost tenant context — so this route answered a redirect and never a JSON 403. It is true
+// as written from M90 on: `bootstrap/app.php` answers any `expectsJson()` caller in JSON. `useMemberStreak`'s
+// `enabled` guard, which exists BECAUSE of the old behaviour, keeps the request off the wire regardless.
+//
 // ⚠️ THE 403 IS WHY `null` MUST NOT BE READ AS ZERO. A member whose workspace just disabled gamification
 // should keep seeing whatever the badge last said until the nav item itself disappears on the next full
 // page load; rendering "0" would tell them their streak had been broken, which is a claim about their

@@ -9494,3 +9494,19 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   blocker the eleven-CHECK-constraints row already carries, and the two should be taken together in an
   increment that spends its hub slot on the dictionary. ⚠️ `M92` scoped it out deliberately: its one hub
   slot went to widening `test-pointer-lint` over `routes/tenant.php`. **Live.** Filed by `M92`.
+- **`minor` · A `FormRequest` class docblock is PUBLISHED API DOCUMENTATION, and nothing says so at the
+  place where someone writes one.** Measured by `M92` (2026-09-11) when the Contract job went red on
+  `openapi.json` drift with five of six jobs green. Scramble emits an `App\Http\Requests\Api\V1`
+  class docblock **verbatim** as the `description` of that request's schema, so three paragraphs of
+  internal notes about a lint gate — written into `StoreDomainRequest` while correcting a dead test-class
+  pointer — became part of the contract shipped to integrators. ⛔ **The gate that caught it is the right
+  one and it caught it LATE**: the drift check is a CI job, so the signal arrives after a push, and the
+  local `preflight --with-gates` run has no arm for it. ⚠️ **The blast radius is wider than the one
+  file**: every FormRequest under that namespace has the same property, and several carry security
+  rationale written for a maintainer rather than for an API consumer. ⚠️ **A second finding sits inside
+  this one** — the dead pointer `M92` corrected had already propagated INTO `openapi.json`, and
+  `scripts/test-pointer-lint.php` can never see it there because the file is generated and is not a
+  mention root. A generated artefact carrying a dead pointer is a copy no gate owns. ⚠️ The cheap remedy
+  is a lint that refuses a docblock in that namespace exceeding some size, which is a proxy; the honest
+  one is a convention — contract above, maintenance notes inside the class body — with an arm that
+  checks the emitted description against it. **Live.** Filed by `M92`.

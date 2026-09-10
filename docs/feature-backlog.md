@@ -8792,8 +8792,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   inverting the which-key re-read reddens exactly the one arm that distinguishes them. A third arm pins the
   negative direction — a 23514 CHECK violation still surfaces as itself. The 302 is filed below.
   Closed by `M89`. Filed by `M88`.
-- **`minor` · The stale-`$form` read `M88` fixed in two mutators is still live in three more places, and one
-  of them is not in that service at all.** Measured by `M88`'s fan-out (2026-09-08). `assertDraftChild()`
+- ~~**`minor` · The stale-`$form` read `M88` fixed in two mutators is still live in three more places, and one
+  of them is not in that service at all.**~~ Measured by `M88`'s fan-out (2026-09-08). `assertDraftChild()`
   reads `$form->draft_version_id` off the route-bound model, and `M88` routed only `updateField()` and
   `updateSection()` through the re-reading guard. ⛔ **`duplicateField()` KEEPS `lockDraft()`'s return value
   and still guards with the stale `$form`**, and `saveFieldToLibrary()` does the same with no lock at all —
@@ -8803,7 +8803,21 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   mid-request validates uniqueness against the wrong version. ⚠️ Filed rather than swept in because the
   locking siblings' exposure is bounded by their lock while these two are not, and the request-layer half
   needs its own decision about which version a uniqueness rule should be scoped to.
-  **Live.** Filed by `M88`.
+  ✅ **CLOSED BY `M90` (2026-09-10) — FOUR SITES, NOT TWO, AND THE ROW'S OWN EXCLUSION REASON IS WHAT WAS
+  FALSE.** Every citation held. ⛔ **The row excluded the locking siblings because *"the locking siblings'
+  exposure is bounded by their lock"*, and that cannot be true**: `lockDraft()` re-reads under `FOR UPDATE`
+  and returns a FRESH draft, so the lock bounds nothing about a `$form` that went stale at route-model
+  binding — they are different objects. So `deleteSection()` and `deleteField()` were uncovered too, and
+  they are the worse pair: `draft_delete`'s `USING` clause matched zero rows, Eloquent's `delete()` returned
+  true anyway, and the controller answered `['deleted' => true]` with a 200 — `M88`'s headline symptom
+  verbatim, on the delete path. ⚠️ **`duplicateField()` was not silent at all**: a straddled INSERT hit
+  `draft_insert`'s WITH CHECK and raised **42501**, which `respond()` does not catch, so it left as a bare
+  500. The re-read makes it unreachable rather than relabelling it — `M89` deliberately declined to relabel
+  42501 and that decision stands. ⚠️ **The REQUEST-LAYER half is deliberately NOT taken, and the row was
+  right about it.** Scoping on the child's own `form_version_id` is not the decision-free improvement it
+  looks like: outside the race the two scopes are identical, and inside it the child's version is now
+  PUBLISHED and immutable, so the rule would check uniqueness inside a version no write can reach. Filed as
+  a decision. Closed by `M90`. Filed by `M88`.
 - **`minor` · The optimistic-concurrency token §8 substituted for the draft lock is CLIENT-OPTIONAL, and a
   shipped test pins it that way.** Measured by `M88`'s fan-out (2026-09-08).
   `docs/form-versioning-schema-migration.md` §3.4 declines to serialize field-level edits and leaves drift
@@ -8926,8 +8940,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   PHP never had; the declaration renamed so the grammar finds nothing; a union that references a type
   instead of restating literals; and **a case added to the PHP enum**, which is the direction the row is
   actually about and the one nothing could see before. Closed by `M89`. Filed by `M88`.
-- **`minor` · An entitlement denial on three builder routes answers a JSON `fetch` with a 302 to HTML, and
-  a shipped test pins it that way.** Found by `M89`'s fan-out (2026-09-10) while closing the 23503 row.
+- ~~**`minor` · An entitlement denial on three builder routes answers a JSON `fetch` with a 302 to HTML, and
+  a shipped test pins it that way.**~~ Found by `M89`'s fan-out (2026-09-10) while closing the 23503 row.
   `bootstrap/app.php:333-339` renders a `feature:` denial as `back()` on its non-API arm, and the
   `feature:field_library` routes — `forms.fields.from-library`, `forms.fields.save-to-library`,
   `forms.library-items` (`routes/tenant.php:576-585`) — are driven by `builderClient.ts`, which sends
@@ -8937,7 +8951,23 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   one needed a race, this one happens every time, and `tests/Feature/Forms/FeatureGateWebTest.php:89-91`
   asserts the redirect, so the behaviour is pinned rather than accidental. ⚠️ The fix is one arm on the
   `feature:` renderable, but it changes a documented refusal shape and the pinning test with it.
-  **Live.** Filed by `M89`.
+  ✅ **CLOSED BY `M90` (2026-09-10) WITH ONE SHARED PREDICATE OVER FOURTEEN ARMS, AND THE ROW'S OWN
+  PRESCRIBED FIX WOULD HAVE SHIPPED A SILENT HALF-REPAIR.** ⛔ **The remedy is wrong**: it says to reuse the
+  `/api/v1` arm, whose `ApiErrorResponse` nests everything under `error`, while `builderClient` reads
+  `payload.message` at the TOP level — so that fix returns a 402 the client still cannot read and the user
+  still sees a generic string. The web arm answers flat `{message, code, details}`; the envelope stays
+  scoped to `/api/v1` as api-specification.md §2.3 says. A mutation returning the envelope reddens exactly
+  the flatness assertions, which is why a status-only test would have passed the half-fix.
+  ⚠️ **`builderClient.ts:68` is the wrong line and the quoted string never appears**: `fetch` follows the
+  302, the referer answers 200 HTML, `response.ok` is TRUE, and `await response.json()` throws a bare
+  `SyntaxError` that is not a `BuilderRequestError` — the user sees *"Something went wrong saving your
+  change."* ⚠️ **And "three builder routes" is both too big and too small.** Only ONE was reachable in a
+  denied state (`save-to-library`, because `ConfigPanel.vue` had no client gate where every sibling
+  surface does), so *"happens every time"* was true of one button — while the HANDLER defect covered
+  fourteen arms across the file, five of them written as a ternary or an arrow fn that no `return back()`
+  grep can see. ⛔ **Three separate client-side workarounds existed for this one server defect**
+  (`useMemberStreak`'s `enabled` guard, `integrationsClient`'s read-only rule, the autosave's local catch),
+  which is the argument for repairing the server once. Closed by `M90`. Filed by `M89`.
 - **`minor` · `form_versions.checksum` cannot be re-derived from the `schema_snapshot` it is stored beside,
   because `jsonb` does not preserve key order.** Measured by `M89` (2026-09-10) when a behavioural control
   asserting exactly that failed. `SchemaSnapshotSerializer::snapshot()` builds `['sections' => …,
@@ -8950,8 +8980,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `BlankFormPrintPresenter`, `submissions.answers_schema_checksum`) treats it as an opaque stamp. ⚠️ The
   remedy is a decision rather than a fix — canonicalise on read, store the canonical JSON as `text`
   alongside, or correct the documented claim to say what the stamp actually is. **Live.** Filed by `M89`.
-- **`minor` · `TemplateService::saveAsTemplate()` serializes a schema snapshot with NO transaction at all,
-  which is weaker than the publish window `M89` just closed.** Found by `M89`'s fan-out (2026-09-10) while
+- ~~**`minor` · `TemplateService::saveAsTemplate()` serializes a schema snapshot with NO transaction at all,
+  which is weaker than the publish window `M89` just closed.**~~ Found by `M89`'s fan-out (2026-09-10) while
   sweeping the snapshot producers. `PublishService` at least held the `forms` row; `saveAsTemplate()`
   (`app/Services/Forms/TemplateService.php:55-70`) opens none, so the serializer's three child reads are
   three separately autocommitted statements and **cannot see a consistent tree even without a concurrent
@@ -8960,7 +8990,22 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `XlsformExporter::…:57` and `FieldLibrary::fromField()` — have the same shape; the exporter's output is
   transient, the library item's is persisted. ⚠️ Filed rather than swept in because wrapping a template
   save is a behaviour change on a user-facing path, and the child lock `M89` added is placement-sensitive
-  in a way this row would have to repeat. **Live.** Filed by `M89`.
+  ✅ **CLOSED BY `M90` (2026-09-10) AT REPEATABLE READ, AND BOTH INSTRUMENTS THE ROW GESTURES AT ARE
+  WRONG.** Every citation held, and the three reads are exactly three. ⛔ **A plain transaction fixes
+  nothing**: no `pgsql` connection in `config/database.php` pins an isolation level, so READ COMMITTED
+  applies and each statement inside a transaction takes its own fresh snapshot. ⛔ **And repeating `M89`'s
+  `lockForUpdate()` would be worse than useless**: the `draft_child` policy filters a locking SELECT to
+  zero rows for a non-draft parent, and BOTH entry points admit a non-draft version —
+  `FormTemplateController::templateSource()` falls back to `current_published_version_id` and the API
+  request validates `form_version_id` with no status rule — so it would persist an EMPTY blueprint with no
+  error. ⚠️ **Nothing would have caught that**: `TemplateRoundTripTest`, the file that exists to prove this
+  serialize/instantiate loop, does not call `saveAsTemplate()` at all. ⚠️ **The row's own sentence *"cannot
+  see a consistent tree even without a concurrent writer"* is false** — with no concurrent writer three
+  autocommitted reads return an identical tree, which is what makes `minor` the right grade.
+  ⚠️ **The isolation level is not observable from the suite** (the guard correctly declines on a nested
+  transaction under `RefreshDatabase`, exactly as `TenantExtractService` does), so the gate pins the
+  transaction BOUNDARY instead — which is the half that was genuinely absent. Closed by `M90`.
+  Filed by `M89`.
 - **`minor` · `P2d`'s literal-`null` blind spot hides three genuinely inert columns, and the honest repair
   needs the plumbing its own row says it does not.** Measured by `M89` (2026-09-10) while closing the
   table-blindness row, which asserted that one predicate change reaches both. **It does not**, and the
@@ -8978,8 +9023,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   signature change. That is the "no new plumbing" claim failing, and it is why this is filed rather than
   taken. Read with `docs/feature-backlog.md:7858`, which owns the closed-vocabulary half.
   **Live.** Filed by `M89`.
-- **`minor` · The repository's only claimed two-connection concurrency test does not exist, and a shipped
-  file cites it as the reason it does not race.** Found by `M89`'s fan-out (2026-09-10).
+- ~~**`minor` · The repository's only claimed two-connection concurrency test does not exist, and a shipped
+  file cites it as the reason it does not race.**~~ Found by `M89`'s fan-out (2026-09-10).
   `tests/Feature/Scoping/ScopeNodeMoveLockingTest.php:20` explains that genuine contention "lives in
   `ScopeNodeConcurrentMoveTest`, which commits" — and that name appears exactly once in the whole
   repository, in that comment. ⛔ **So the statement-shape argument every locking test in this tree leans
@@ -8988,7 +9033,22 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   ⚠️ `citation-liveness-lint` cannot see this: it reads `path:line` citations in documents, and this is a
   bare class name in a PHP comment. ⚠️ The remedy is a decision — write the committing harness, or correct
   every comment that defers to it and say plainly that this suite cannot observe contention.
-  **Live.** Filed by `M89`.
+  ✅ **CLOSED BY `M90` (2026-09-10) WITH A GATE, AND THE GATE FOUND THREE MORE PHANTOMS THE ROW DID NOT
+  KNOW ABOUT.** The core defect is real and `git log --all -S` sharpens it: the name entered the tree as a
+  COMMENT in `G10b1` and was a file in **no commit, ever**, so *"never written"* is exact rather than
+  merely absent at HEAD. ⛔ **But both of the row's quantifiers are false.** The name appears FOUR times,
+  not once; and `PublishLockingTest` does the OPPOSITE of leaning on it — it names the absence explicitly,
+  in a file `M89` wrote in the same increment that filed this row. ⛔ **Two more of the row's neighbouring
+  sentences are false and are corrected at source**: *"no test in this repository opens a second
+  connection"* (they are routine — `tests/Pest.php` has a whole committed-cross-connection section) and
+  *"this suite has no committing-test precedent"* (`I7a` IS that precedent, and carries the nine-red-tests
+  incident that produced its cleanup recipe). ✅ **`scripts/test-pointer-lint.php` now forbids the whole
+  species**, and writing it turned up three dead pointers nobody had filed — a section-routes suite, an
+  impersonation-consume suite, and a tenants-column guard already documented in-tree as never having
+  existed. ⛔ **It runs on the HOST, and that is measured rather than inherited**: as a Pest arm it
+  reported fourteen violations, nine of them phantoms, because the container's
+  `RecursiveDirectoryIterator` sees 410 test files against the host's 449. Closed by `M90`.
+  Filed by `M89`.
 - **`minor` · Four PHP-enum mirrors live in Vue SFCs and one adds a member its enum does not have, and the
   new mirror gate cannot reach any of them.** Measured by `M89` (2026-09-10) while building
   `DocumentedEnumMirrorDriftTest`. The gate declares twenty mirrors across `.ts` and `.d.ts` files; the
@@ -9015,3 +9075,57 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   ordering hazard predates it and the lock is what puts a publisher on those rows deliberately.
   ⚠️ The remedy is a retry (`DB::transaction($closure, attempts: 3)`) or a stable lock order, and choosing
   is the work. **Live.** Filed by `M89`.
+- **`minor` · The `__lead__` key reservation is enforced by two writers and asserted at the route layer by
+  nothing, and the sentence that claimed otherwise named a file that has never existed.** Found by `M90`
+  (2026-09-10) while building `scripts/test-pointer-lint.php`. `tests/Unit/Forms/StepProjectionTest.php`
+  pins the RULES by restating them, and says the call sites "themselves are exercised by" a section-routes
+  suite — which is one of the four dead test-class pointers that gate now forbids. ⛔ **Correcting the name
+  does not make the sentence true.** `BuilderRoutesTest` posts to `/forms/{form}/sections` but asserts
+  nothing about a REJECTED key, and a grep for `__lead__` across `tests/` returns only encode/PDF consumers
+  plus the projection fixture — **no test anywhere asserts that a section or field may not claim the
+  reserved key**. Doc #27 §2.1 says the reservation owes a test rather than a migration, and it is still
+  owed. ⚠️ The two unverified writers the projection test names — `SchemaBlueprintMaterializer` (templates)
+  and the field library — both write through `Model::create` with no FormRequest in the path, so the
+  request-layer rules cannot cover them even once they are asserted. **Live.** Filed by `M90`.
+- **`minor` · Two more callers of the snapshot serializer still read a torn tree, and whether they should
+  follow `M90`'s instrument is an open decision rather than an oversight.** Found by `M90` (2026-09-10)
+  while closing the `saveAsTemplate` row. `XlsformExporter::build()` and
+  `FormBuilderService::saveFieldToLibrary()` run the same three-read serializer outside any transaction.
+  ⚠️ **Their exposure is not equal and neither matches the row that was closed.** The exporter's output is
+  transient (nothing is persisted), while the library item IS persisted — but of `snapshotField()`'s three
+  reads, two feed values `FieldLibrary::fromField()` discards or filters, so the realistic tear there is a
+  cross-field validation rule resolving to a null `related_field_key` and being KEPT by the filter that
+  exists to drop it. ⛔ **The blocker is the decision, not the code**: `M90` made `saveAsTemplate()` the
+  FIRST request-path `set transaction isolation level` in this codebase, and whether that becomes a pattern
+  is `D29` in `docs/claims/decisions.md`. **Latent.** Filed by `M90`.
+- **`minor` · Four sites cite a tenants column-whitelist guard that has never existed, and the gate that
+  could see them is forced to exempt it.** Found by `M90` (2026-09-10). `scripts/test-pointer-lint.php`
+  forbids a test file naming a `*Test` class with no file behind it; this one is EXEMPTED rather than
+  fixed, because `tests/Feature/Tenancy/TenantColumnWhitelistTest.php` names it precisely to record that it
+  does not exist and that four sites cite it. ⛔ **The exemption keeps the gate honest and leaves the four
+  sites lying**: the model and three `Schema::table('tenants')` migrations still point a reader at a guard
+  they will not find. ⚠️ The gate cannot reach them at all — they are in `app/` and `database/`, and it
+  scans `tests/`. Fixing this means correcting four comments to name the three `toContain()` assertions
+  that actually exist, after checking those assertions still cover what the comments claim. **Live.**
+  Filed by `M90`.
+- **`minor` · Three client-side workarounds were built ON the JSON-refusal defect `M90` fixed, and all
+  three can now be simplified — but one of them is load-bearing until it is measured.** Found by `M90`
+  (2026-09-10). `useMemberStreak`'s `enabled` guard exists so a module-disabled tenant never issues the
+  fetch that would write an orphaned session flash; `integrationsClient` is read-only-and-never-throwing
+  for the same reason, stated twice in its own header and twice more in `routes/tenant.php`; and the draft
+  autosave catches locally because "a `back()` redirect is unreadable to the composable driving it".
+  ⛔ **The redirect half of each reason is now false** — the handler answers an `expectsJson()` caller in
+  JSON. ⚠️ **The FLASH half is not, and is unmeasured.** Every refused web request still writes
+  `->with('toast', …)` into the session; whether a JSON response consumes, ages or orphans that flash
+  decides whether `useMemberStreak`'s guard is still doing anything. `docs/gamification-design.md:408`
+  claims the orphaned toast pops "once per navigation forever", and that claim has never been measured.
+  Measure the flash before removing any of the three. **Live.** Filed by `M90`.
+- **`minor` · `D13`'s one-hub-row cap cannot admit a new lint gate at all, and `M90` broke it for exactly
+  that reason.** Measured by `M90` (2026-09-10). A gate is not a gate until it is registered, and
+  registering one means editing `composer.json` (3 citing rows) and `.github/workflows/ci.yml` (8) — both
+  hub files by the triage's own derivation. ⛔ **So the row that ships a gate ALWAYS touches two hubs, and
+  `M90`'s batch therefore violated `D13`'s second clause as written**: row 4 took both, and row 2 took
+  `docs/claims/decisions.md` as well. ⚠️ **This is recorded rather than argued** — `D15` is already open on
+  whether that cap should be relaxed to per-file or re-derived per batch, and this is the first measured
+  case of it forbidding work rather than merely shrinking a batch. It is an input to `D15`, not a licence.
+  **Live.** Filed by `M90`.

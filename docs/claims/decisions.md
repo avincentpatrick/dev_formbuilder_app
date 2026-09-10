@@ -698,6 +698,20 @@ third distinct mechanism — `M83`'s was a hub-free harvest of a hub-only repair
 harvested degree, and `M87`'s was three hub-touching rows in a four-row proposal plus a fourth blocked on
 an open decision. **Three different mechanisms, one rule, no fix yet.**
 
+⛔ **`M88` ADDS A FOURTH MECHANISM, AND IT IS THE ONE NO BATCH-COMPOSITION RULE CAN PREVENT: A CORRECTION
+CAN FORCE A HUB TOUCH THAT WAS UNKNOWABLE AT CLAIM TIME.** `M88` declared one hub-touching row
+(`docs/data-dictionary.md`) and composed the rest to be pairwise disjoint. It finished having touched
+**two** hub files, because verifying row `8559`'s *premise* revealed that the false sentence the row was
+built on had also propagated into `D27` — and `docs/claims/decisions.md` is itself a hub file at 3 citing
+rows. ⚠️ **The excess was not chosen and could not have been foreseen**: you cannot know a claim has
+propagated into the decision roster until you check it, and the alternative — knowingly leaving a false
+sentence in the roster while closing the row that proved it false — is strictly worse than exceeding the
+cap. ⚠️ **This is not the ledger exemption argued above**; it is a second, independent way the cap is
+un-followable, and it applies to the *correction* half of `D13`'s own workflow rather than to selection.
+⛔ **Whichever option is taken, it should say what happens when verification itself forces the second hub
+touch**, because that is now measured rather than hypothetical, and answering only the selection half
+would leave `D13` binding on a case no selection can control.
+
 ---
 
 ### D16 — The `npm audit` judge makes a required status check green when the registry is unreachable. Accept it, isolate it, or keep the hard block?

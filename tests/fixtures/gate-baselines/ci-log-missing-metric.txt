@@ -24,5 +24,6 @@ Static analysis, style & security 2026-09-05T09:34:04.0000000Z  Job payload lint
 Static analysis, style & security 2026-09-05T09:34:05.0000000Z  Constraint boundary linter passed (11 migration file(s) scanned, 12 constraint(s) checked, 13 constraint(s) unresolved).
 Static analysis, style & security 2026-09-05T09:34:06.0000000Z  Component-import linter passed (14 SFC(s) scanned).
 Static analysis, style & security 2026-09-05T09:34:08.0000000Z  pipeline-lint: passed (21 rule groups, 22 row(s), 23 held, 24 file(s) scanned).
+Static analysis, style & security 2026-09-05T09:34:09.0000000Z  test-pointer-lint: passed (31 test file(s), 32 `*Test` name(s) mentioned, 33 exemption(s)).
 
 Contract tests (OpenAPI)    2026-09-05T09:35:00.0000000Z   openapi.json is byte-identical to the generated spec.

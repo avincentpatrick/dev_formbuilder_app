@@ -25,5 +25,6 @@ Static analysis, style & security 2026-09-05T09:34:05.0000000Z  Constraint bound
 Static analysis, style & security 2026-09-05T09:34:06.0000000Z  Component-import linter passed (14 SFC(s) scanned).
 Static analysis, style & security 2026-09-05T09:34:07.0000000Z  Citation liveness linter passed (15 document(s) scanned, 16 citation(s) checked, 17 resolved, 18 unresolved; ledger tier 19 rotten, ceiling 20).
 Static analysis, style & security 2026-09-05T09:34:08.0000000Z  pipeline-lint: passed (21 rule groups, 22 row(s), 23 held, 24 file(s) scanned).
+Static analysis, style & security 2026-09-05T09:34:09.0000000Z  test-pointer-lint: passed (31 test file(s), 32 `*Test` name(s) mentioned, 33 exemption(s)).
 
 Contract tests (OpenAPI)    2026-09-05T09:35:00.0000000Z   openapi.json is byte-identical to the generated spec.

@@ -10,6 +10,9 @@ use App\Enums\FormVersionStatus;
 use App\Events\FormPublished;
 use App\Exceptions\Forms\FormException;
 use App\Models\Form;
+use App\Models\FormField;
+use App\Models\FormFieldValidation;
+use App\Models\FormSection;
 use App\Models\FormVersion;
 use App\Models\User;
 use App\Support\Audit\AuditLogger;
@@ -52,6 +55,36 @@ final class PublishService
             $currentPublished = $locked->current_published_version_id !== null
                 ? FormVersion::query()->whereKey($locked->current_published_version_id)->first()
                 : null;
+
+            // 0. Lock the CHILD rows this transaction is about to freeze (M89).
+            //
+            // ⛔ THE `forms` LOCK ABOVE DOES NOT REACH THEM, AND §3.4 IS WHY THAT MATTERS. It declines
+            // to serialize field-level edits, so a collaborator's updateField() runs lock-free and
+            // concurrently. Under READ COMMITTED its RLS `EXISTS (... fv.status = 'draft')` is evaluated
+            // per statement against the COMMITTED snapshot, and this version is committed-`draft` at every
+            // instant before this transaction commits — so RLS refuses nothing, and an edit landing
+            // between the reads below and the commit produces a published version whose frozen
+            // `schema_snapshot` and `checksum` predate a row that belongs to it.
+            //
+            // ⛔ IT GOES HERE, BEFORE THE GATES, AND NOT AT THE SNAPSHOT. Row locks are held to the end
+            // of the transaction, so one acquisition covers the gates, the classifier, the serializer and
+            // the cloner. Locking at the snapshot instead would leave the gates reading rows that can still
+            // move — publishing a snapshot that never passed the gate it was supposed to pass.
+            //
+            // ⛔ IT CANNOT GO IN SchemaTreeCloner OR SchemaSnapshotSerializer, AND BOTH FAIL SILENTLY.
+            // Postgres applies the UPDATE policy's USING expression to a locking SELECT as a FILTER rather
+            // than an error. The cloner runs AFTER the status flip below, so it would see its own
+            // uncommitted `published`, match zero rows and clone an EMPTY tree with no error at all. The
+            // serializer has three other callers — TemplateService and XlsformExporter, both outside any
+            // transaction, the latter reading PUBLISHED versions — which would take a lock they
+            // instantly release and export an empty workbook. The test arm pins both.
+            //
+            // A phantom INSERT is not covered by FOR UPDATE, and does not need to be: every insert path
+            // into these tables takes the `forms` lock first, except replaceValidations(), whose INSERT
+            // takes FOR KEY SHARE on the referenced form_fields row and therefore blocks on this.
+            FormSection::query()->where('form_version_id', $draft->id)->lockForUpdate()->pluck('id');
+            FormField::query()->where('form_version_id', $draft->id)->lockForUpdate()->pluck('id');
+            FormFieldValidation::query()->where('form_version_id', $draft->id)->lockForUpdate()->pluck('id');
 
             // 1. Validate the draft (throws the specific §4 violation) — structure, then expressions (F3),
             //    then templates (H6a). The template gate runs HERE so step 1 stays the single validation

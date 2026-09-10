@@ -7,6 +7,7 @@ use App\Enums\FormVersionStatus;
 use App\Exceptions\Forms\FormException;
 use App\Models\Form;
 use App\Models\FormField;
+use App\Models\FormFieldValidation;
 use App\Models\FormSection;
 use App\Models\FormVersion;
 use App\Models\Tenant;
@@ -16,7 +17,9 @@ use App\Services\Forms\FormService;
 use App\Services\Forms\PublishService;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Spatie\Permission\PermissionRegistrar;
 
 uses(RefreshDatabase::class);
@@ -241,4 +244,95 @@ it('refuses a field edit whose row another editor deleted after the models were 
 
     enterTenant($tenant->id, $admin->id);
     expect(FormField::query()->whereKey($boundField->id)->exists())->toBeFalse();
+});
+
+/*
+|--------------------------------------------------------------------------
+| M89 — the window the re-read guard cannot close surfaces as a 422, not a 500.
+|--------------------------------------------------------------------------
+| assertStillDraftChild() re-reads BEFORE the write. A delete committing after that re-read and before
+| replaceValidations()' INSERT reaches the foreign key itself, which is IMMEDIATE — there is no
+| DEFERRABLE in database/migrations/ — so PostgreSQL raises SQLSTATE 23503. Nothing rendered it:
+| bootstrap/app.php registers no QueryException renderable, its Throwable catch-all returns early for
+| anything outside `api/v1/*`, and the builder's fetch sets `Accept: application/json`, so the framework
+| answered the generic JSON 500 and the builder showed "Server Error".
+|
+| ⛔ THE RACE IS STAGED INSIDE THE TRANSACTION, WHICH IS THE ONLY WAY IT CAN BE STAGED DETERMINISTICALLY.
+| A second connection cannot see the RefreshDatabase transaction, which is why no concurrency test in this
+| repository opens one. A `creating` hook on the validation row commits the delete at exactly the instant
+| the real race does — after the guard, before the INSERT — on the one connection the test has.
+| Model event listeners registered here do not leak: each test boots a fresh dispatcher.
+*/
+
+it('answers 422, not 500, when the edited field is deleted between the guard and the write', function (): void {
+    $tenant = builderTenant();
+    $admin = User::factory()->create();
+    enterTenant($tenant->id, $admin->id);
+    makeActiveMember($admin, 'admin');
+
+    [$form, $field] = draftFormWithBoundField($tenant, $admin);
+
+    // The concurrent commit, staged at the instant the guard can no longer see it.
+    FormFieldValidation::creating(static function () use ($field): void {
+        DB::table('form_fields')->where('id', $field->id)->delete();
+    });
+
+    $response = $this->actingAs($admin)
+        ->patchJson("http://acme.meridian.test/forms/{$form->id}/fields/{$field->id}", [
+            'key' => 'edited', 'label' => 'Edited', 'is_required' => 'optional',
+            'config' => [], 'version' => null,
+            'validations' => [['rule_type' => 'min_length', 'rule_value' => '3']],
+        ]);
+
+    $response->assertStatus(422);
+    expect($response->json('message'))->toContain('removed by another editor');
+});
+
+it('names the RELATED field when that is the row a concurrent editor removed', function (): void {
+    $tenant = builderTenant();
+    $admin = User::factory()->create();
+
+    [$form, $field] = draftFormWithBoundField($tenant, $admin);
+    $sibling = app(FormBuilderService::class)->addField($form->refresh(), $admin, FieldType::ShortText, null);
+
+    // Same statement, the OTHER foreign key: `related_form_field_id`. assertStillDraftChild() re-reads
+    // only the edited child, so this half of replaceValidations() is not narrowed by the guard at all.
+    FormFieldValidation::creating(static function () use ($sibling): void {
+        DB::table('form_fields')->where('id', $sibling->id)->delete();
+    });
+
+    expect(fn () => app(FormBuilderService::class)->updateField(
+        Form::query()->whereKey($form->id)->firstOrFail(),
+        FormField::query()->whereKey($field->id)->firstOrFail(),
+        $admin,
+        [
+            'key' => 'edited', 'label' => 'Edited', 'is_required' => 'optional', 'config' => [],
+            'validations' => [[
+                'rule_type' => 'required_if',
+                'related_field_key' => $sibling->key,
+                'rule_value' => 'yes',
+            ]],
+        ],
+        null
+    ))->toThrow(FormException::class, 'A field this rule refers to was removed by another editor. Refresh the builder and try again.');
+});
+
+it('lets an unrelated constraint violation keep its own behaviour (negative control)', function (): void {
+    $tenant = builderTenant();
+    $admin = User::factory()->create();
+
+    [$form, $field] = draftFormWithBoundField($tenant, $admin);
+
+    // 23514, not 23503: the rule XOR check refuses a row carrying BOTH expression and rule_type. The
+    // catch must rethrow it untouched rather than relabel every QueryException as a removed row.
+    expect(fn () => app(FormBuilderService::class)->updateField(
+        Form::query()->whereKey($form->id)->firstOrFail(),
+        FormField::query()->whereKey($field->id)->firstOrFail(),
+        $admin,
+        [
+            'key' => 'edited', 'label' => 'Edited', 'is_required' => 'optional', 'config' => [],
+            'validations' => [['rule_type' => 'min_length', 'expression' => '${a} > 1', 'rule_value' => '3']],
+        ],
+        null
+    ))->toThrow(QueryException::class);
 });

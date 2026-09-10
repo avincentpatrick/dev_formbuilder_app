@@ -711,12 +711,36 @@ function p2d_artefact_drift(array $rows): void
     }
 
     $schema = concat_files(glob('database/migrations/*.php') ?: []);
-    $scheduled = strtolower(
-        read_or_die(BACKLOG).' '.read_or_die(DECISIONS).' '.concat_files(glob('docs/adr/*.md') ?: [])
-    );
 
+    // ⛔ THE DISPOSITION BUFFER IS A LIST OF PARAGRAPHS, NOT ONE FLAT STRING, AND THAT IS THE M89
+    // REPAIR. It used to be concatenated and searched for the column NAME with no table, so a mention of
+    // `trial_ends_at` anywhere in the ledger discharged EVERY column of that name in every table — which
+    // is how a phantom `tenants.trial_ends_at` silently discharged the real `subscriptions.trial_ends_at`
+    // and made the row it fed say four columns where there are five.
+    //
+    // ⚠ THE OBVIOUS REPAIR IS WORSE AND WAS MEASURED BEFORE BEING REJECTED. Requiring the literal
+    // `table.column` reddens EIGHT columns on this tree, and every one of them is already dispositioned —
+    // in prose that names its table in the same sentence (ADR-0008 §D1's five `subscriptions` lifecycle
+    // timestamps, ADR-0011 §D6's `submissions` axes, the ledger's `forms.allow_*` set). It would force four
+    // documents to be reworded to satisfy a string format, which is the gate serving itself rather than the
+    // reader. Requiring the table in the same PARAGRAPH discharges all eight, and — measured against the
+    // tree at 3c0cbbe — still reddens `subscriptions.trial_ends_at` while still discharging the `tenants`
+    // phantom. It catches the defect this rule was repaired for and manufactures nothing.
+    $scheduled = [];
+
+    foreach (array_merge([read_or_die(BACKLOG), read_or_die(DECISIONS)], array_map(
+        static fn (string $f): string => (string) file_get_contents($f),
+        glob('docs/adr/*.md') ?: []
+    )) as $document) {
+        foreach (paragraphs(strtolower($document)) as $paragraph) {
+            $scheduled[] = $paragraph;
+        }
+    }
+
+    // Each row of the line is its own paragraph: a row's title naming a column must name its table too,
+    // on exactly the same terms as a document does.
     foreach ($rows as $row) {
-        $scheduled .= ' '.strtolower($row['id'].' '.($row['title'] ?? '').' '.($row['headline'] ?? ''));
+        $scheduled[] = strtolower($row['id'].' '.($row['title'] ?? '').' '.($row['headline'] ?? ''));
     }
 
     $dormant = [];
@@ -734,8 +758,9 @@ function p2d_artefact_drift(array $rows): void
             continue;
         }
 
-        // Terms 3, 4 and 5 — the ledger, the decision record and the line.
-        if (str_contains($scheduled, $column)) {
+        // Terms 3, 4 and 5 — the ledger, the decision record and the line. The disposition must name
+        // the TABLE as well as the column, and in the same paragraph: see the buffer note above.
+        if (disposition_names_table($scheduled, (string) $cell['table'], $column)) {
             continue;
         }
 
@@ -1538,6 +1563,72 @@ function column_is_used(string $column, array $corpus): bool
                 continue;
             }
 
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
+ * Split a document into blank-line-separated paragraphs.
+ *
+ * ⚠ explode("
+") and never preg_split on a newline CLASS: `\R` and `
+` match a byte that occurs
+ * inside common UTF-8 emoji, and these documents are full of them — which silently shifts every
+ * paragraph after the first one. A literal "
+" has no such reading.
+ *
+ * @return list<string>
+ */
+function paragraphs(string $text): array
+{
+    $out = [];
+    $current = '';
+
+    foreach (explode("\n", $text) as $line) {
+        $blank = trim($line) === '';
+
+        // A new top-level bullet starts a paragraph too. These ledgers run dozens of consecutive
+        // bullets with no blank line between them, so blank lines ALONE would put a whole increment's
+        // worth of rows in one paragraph. Measured: bullet-scoping splits the corpus into 2365
+        // paragraphs rather than 1733 and changes NO verdict, on this tree or on the tree at 3c0cbbe
+        // — strictly tighter at no cost, which is the only kind of tightening worth taking.
+        if ($blank || str_starts_with($line, '- ') || str_starts_with($line, '* ')) {
+            if (trim($current) !== '') {
+                $out[] = $current;
+            }
+
+            $current = $blank ? '' : $line."\n";
+
+            continue;
+        }
+
+        $current .= $line."\n";
+    }
+
+    if (trim($current) !== '') {
+        $out[] = $current;
+    }
+
+    return $out;
+}
+
+/**
+ * Is this column dispositioned somewhere that also names its table?
+ *
+ * ⛔ BOTH TOKENS IN ONE PARAGRAPH, never merely both somewhere in the corpus. The whole defect this
+ * repairs is a mention of a column in a paragraph about a DIFFERENT table discharging it.
+ *
+ * @param  list<string>  $scheduled  lowercased paragraphs
+ */
+function disposition_names_table(array $scheduled, string $table, string $column): bool
+{
+    $table = strtolower($table);
+
+    foreach ($scheduled as $paragraph) {
+        if (str_contains($paragraph, $column) && str_contains($paragraph, $table)) {
             return true;
         }
     }

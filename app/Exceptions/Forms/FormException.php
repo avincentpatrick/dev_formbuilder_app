@@ -57,11 +57,41 @@ final class FormException extends RuntimeException
     /**
      * A builder mutation targeted a section/field that is not part of the form's current draft version
      * (i.e. it belongs to a published/superseded version). The draft_child RLS guard is the DB backstop;
-     * this is the service-level guard that returns a clean 403 instead of a silent zero-row write.
+     * this is the service-level guard that returns a clean 422 instead of a silent zero-row write.
+     *
+     * ⚠ The `403` this docblock claimed until M89 was never what the surface returned: the only caller,
+     * FormBuilderController::respond(), has mapped this type to 422 since it was written. The same stale
+     * `403` stood in FormBuilderService's header docblock and is corrected there too.
      */
     public static function childNotInDraft(): self
     {
         return new self('That item belongs to a published version and can no longer be edited.');
+    }
+
+    /**
+     * The row this builder edit is writing was REMOVED by a concurrent editor — a delete, a restore, an
+     * import or an archive — rather than published. Distinct from {@see self::childNotInDraft()} because
+     * the cause and the user's next move are different: nothing was published, and refetching the builder
+     * will show the row simply gone.
+     *
+     * Raised from two places that observe the same event at different instants: the pre-write re-read in
+     * FormBuilderService::assertStillDraftChild(), and — when the delete commits after that re-read
+     * — the SQLSTATE 23503 mapping around the write itself.
+     */
+    public static function childRemovedDuringEdit(): self
+    {
+        return new self('That item was removed by another editor. Refresh the builder and try again.');
+    }
+
+    /**
+     * A validation row on this field points at ANOTHER field (`related_form_field_id`) that a concurrent
+     * editor removed. The edited field itself is fine, which is why this is not
+     * {@see self::childRemovedDuringEdit()}: naming the wrong row would send the user to look at a field
+     * that is still there.
+     */
+    public static function relatedFieldRemovedDuringEdit(): self
+    {
+        return new self('A field this rule refers to was removed by another editor. Refresh the builder and try again.');
     }
 
     public static function formHasNoDraft(): self

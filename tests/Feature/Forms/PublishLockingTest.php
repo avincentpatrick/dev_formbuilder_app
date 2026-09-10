@@ -28,12 +28,17 @@ uses(RefreshDatabase::class);
 | instant before this transaction commits — so RLS refuses nothing, and the published version can end
 | up with a frozen schema_snapshot and checksum that predate a row belonging to it.
 |
-| RefreshDatabase wraps each test in one uncommitted transaction on one connection, so genuine
-| contention is unobservable — no test in this repository opens a second connection, and the one file
-| that claims a sibling which does (ScopeNodeMoveLockingTest, citing ScopeNodeConcurrentMoveTest)
-| names a file that does not exist. What IS observable, and what the concurrency argument actually
-| rests on, is the sequence of statements publish() issues. These assertions are deterministic and
-| cannot flake.
+| RefreshDatabase wraps each test in one uncommitted transaction on one connection, so lock CONTENTION
+| is unobservable. What IS observable, and what the concurrency argument actually rests on, is the
+| sequence of statements publish() issues. These assertions are deterministic and cannot flake.
+|
+| ⚠️ THIS PARAGRAPH USED TO SAY "no test in this repository opens a second connection", AND THAT WAS
+| FALSE WHEN IT WAS WRITTEN. Second connections are routine — tests/Pest.php has a whole section for
+| committed cross-connection fixtures. The true, narrower claim is that no test opens a second
+| connection to observe lock contention, and interleaving IS already staged on one connection. The
+| statement of record is `docs/testing-strategy.md` §8; it is not restated here. (This file was RIGHT
+| that ScopeNodeMoveLockingTest's committing sibling did not exist — M90 removed that sentence at its
+| source, and both files now omit the dead name rather than quoting it, per scripts/test-pointer-lint.php.)
 |
 | ⛔ THE NEGATIVE ARM IS THE LOAD-BEARING ONE. Postgres applies the UPDATE policy's USING expression to
 | a locking SELECT as a FILTER, not an error. A lockForUpdate() moved into SchemaTreeCloner would run

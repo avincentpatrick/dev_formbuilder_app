@@ -22,8 +22,14 @@ use Tests\Support\Jobs\ProbeTenantJob;
  * transaction is not visible on the queue until that transaction commits, and is never enqueued at
  * all if it rolls back. It does NOT reproduce the two-process race itself — in-process the worker
  * shares the test's PDO handle, so there is no second connection to lose the race against. That gap
- * is stated rather than papered over; reproducing it would need a committing test, of which this
- * suite has no precedent.
+ * is stated rather than papered over; reproducing it would need a committing test.
+ *
+ * ⚠️ THIS SENTENCE USED TO END "…of which this suite has no precedent", AND THAT EXPIRED AT I7a.
+ * The precedent exists, and it carries the scar tissue that makes it worth reading before use: I7a's
+ * committed fixtures turned nine unrelated tests red in CI on a locally-green tree, and the answer was
+ * registering cleanup through `beforeApplicationDestroyed(...)` from `beforeEach`. "No precedent" told
+ * a reader not to try; the truth is that trying is possible and has a known cost. `docs/testing-strategy.md`
+ * §8 is the statement of record, including the three costs a committing harness would carry.
  *
  * A NESTED transaction is used deliberately. Pest's RefreshDatabase already holds an outer
  * transaction, and Laravel's testing DatabaseTransactionsManager deliberately ignores that wrapping

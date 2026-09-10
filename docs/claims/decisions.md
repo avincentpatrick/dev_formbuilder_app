@@ -1215,6 +1215,93 @@ an increment.
 
 ---
 
+---
+
+### D29 — `M90` made `saveAsTemplate()` the FIRST request-path isolation-level change in this codebase. Should that become the pattern for the other multi-statement snapshot reads, stay a one-off, or be replaced by a different instrument?
+
+**Filed 2026-09-10 by Lane A during `M90`, while closing `docs/feature-backlog.md`'s torn-snapshot row.**
+Filed rather than decided because it sets a precedent on the request path, and the alternative to deciding
+it is that the next person copies `saveAsTemplate()` without knowing it was a first.
+
+**What was measured, before the options.** `SchemaSnapshotSerializer::snapshot()` issues exactly three
+reads. Outside a transaction they are three separately autocommitted statements, so a concurrent builder
+edit between them yields a blueprint describing a tree that existed at no instant. ⛔ **A plain transaction
+does not fix it** — no `pgsql` connection in `config/database.php` pins an isolation level, so READ
+COMMITTED applies and each statement takes its own fresh snapshot. ⛔ **And `lockForUpdate()`, the
+instrument `M89` used on the publish path, would be worse than useless here**: the `draft_child` policy
+applies its `USING` expression to a locking SELECT as a FILTER, and both entry points admit a NON-DRAFT
+version, so it would persist an EMPTY blueprint with no error and no failing test.
+
+`REPEATABLE READ` is what shipped. It is status-blind, takes no lock, and cannot raise a serialization
+failure on this path because the transaction's only write is an INSERT of an unrelated row.
+
+⚠️ **The precedent it leans on is thinner than it looks, and that is why this is a question.**
+`set transaction isolation level` occurs **once** in the whole tree before `M90` —
+`TenantExtractService`, reached only from a console command, over a 41-table offline extract
+(`docs/adr/0018-per-tenant-extraction.md` §D6). Choosing a non-default isolation level on a synchronous
+web + API POST has no in-repo analogue at all.
+
+⚠️ **And it is not testable from the suite.** `SET TRANSACTION ISOLATION LEVEL` must be a transaction's
+first statement, so it is guarded on `DB::transactionLevel() === 1` and skipped when nested — which under
+`RefreshDatabase` is always. The shipped gate pins the transaction BOUNDARY, not the level.
+
+**The options:**
+
+1. **Adopt it as the pattern** — apply the same wrapper to `XlsformExporter::build()` and
+   `FormBuilderService::saveFieldToLibrary()`, and state in `docs/form-versioning-schema-migration.md`
+   that any multi-statement canonical read takes one. Cost: two more request paths at a non-default
+   isolation level that no test can observe. **Recommended**, because the alternative is three call sites
+   of one serializer with three different consistency stories, and the two remaining ones are already
+   filed as a defect row.
+2. **Keep it a one-off.** Only the persisted, user-facing capture gets it; the exporter's output is
+   transient and the library item's realistic tear is one filtered validation rule. Cost: the next reader
+   has to work out why one caller is wrapped and two are not, and the row stays open.
+3. **Replace the instrument with a single-statement read.** Rewrite the serializer to fetch the tree in
+   one query and drop the isolation level entirely. Cost: a real rewrite of a file three surfaces depend
+   on, for a `minor` row — and it would be the largest change of the three.
+
+⚠️ **Whichever is chosen, the testability gap is not closed by any of them.** If the level itself must be
+provable, that is a fourth piece of work (a committing harness or a read-back manifest like
+`TenantExtractService`'s), and `docs/testing-strategy.md` §8 records what it would cost.
+
+---
+
+### D30 — Which version should the builder's request-layer uniqueness rules be scoped to, now that both available answers are wrong inside the race?
+
+**Filed 2026-09-10 by Lane A during `M90`.** The backlog row that prompted it said this half "needs its
+own decision", `M90`'s first pass concluded that was wrong, and **the adversarial pass restored the row's
+own judgement** — which is why it is here rather than fixed.
+
+**What was measured.** `UpdateFieldRequest` and `UpdateSectionRequest` scope their `Rule::unique(...)` on
+`$form->draft_version_id`, read off the route-bound model. If a publish commits between binding and
+validation, that names a version that is now frozen.
+
+⛔ **The obvious repair — scope on the child's own `form_version_id` — is not an improvement.** Outside the
+race the two are the same value. Inside it, the child's version is now PUBLISHED and immutable under §2/§4
+and the RLS `draft_update` policy, so the rule would be checking key uniqueness inside a version no write
+can ever reach. Both answers are wrong in the race, in opposite directions.
+
+✅ **Nothing is corrupted either way, and that is what makes this a choice rather than a defect.** `M88`'s
+re-reading guard refuses the write afterwards regardless, so the only thing at stake is **which 422 the
+user sees** — a uniqueness complaint about the wrong version, or the draft-guard's own message.
+
+**The options:**
+
+1. **Leave both rules as they are and say so in a comment.** The guard is the real gate; the request layer
+   is a convenience that produces a slightly wrong message in a race nobody has reported. **Recommended** —
+   it is the only option that adds no code, and the message it produces is wrong in a way that still tells
+   the user to reload.
+2. **Re-read the form inside the rule.** Scope on a freshly-read `draft_version_id`, so the rule is right
+   in the race. Cost: a query per validated request on the builder's hottest write path, to improve an
+   error message that is already followed by a refusal.
+3. **Make the request layer a refusal door.** Have the rules fail explicitly when the bound version is no
+   longer the draft, so the user gets the draft-guard message from the request layer rather than from the
+   service. Cost: it duplicates the guard, and duplicating a guard is how the two copies drift.
+
+⚠️ **`D27` is adjacent and does NOT cover this.** That decision is scoped to the submission save/submit
+doors; this is the builder's validation layer. They should not be answered as one.
+
+
 ## ANSWERED
 
 ### D13 — How should the remaining open backlog rows be worked, now that none of them is `major`? **In batches of 3–4 rows per increment, selected by file overlap, verified by a read-only fan-out, written by one hand.**

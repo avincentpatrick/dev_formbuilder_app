@@ -27,6 +27,7 @@
  * prohibition and Builder.vue restates it at the call site.
  */
 import { computed, ref, watch } from 'vue';
+import { useEntitlements } from '@/composables/useEntitlements';
 import {
     MdsButton,
     MdsCheckbox,
@@ -74,6 +75,14 @@ const enums = props.store.enums;
 const saving = props.store.saving;
 // Transient "Saved to library" confirmation (Increment G9b), cleared after a beat.
 const librarySaved = props.store.librarySaved;
+
+// The plan gate this pane was missing (M90, docs/feature-backlog.md:8919). Builder.vue hides the
+// Fields⇄Library toggle behind exactly this check and states the rule at its own call site — "each is
+// server-gated on its route; this only spares a 402 click" — but the Save-to-library button lives here and
+// was never given one. It was the ONE route in the whole `feature:`/`module:` population a denied tenant
+// could still reach, which is why the row that filed the server defect read as if it happened every time.
+// The server arm is repaired too and is the load-bearing half; this spares the click.
+const { feature } = useEntitlements();
 
 const optionTypes = new Set<string>();
 const advancedTypes = new Set<string>();
@@ -463,8 +472,10 @@ watch(librarySaved, (value) => {
                         </MdsFormField>
 
                         <!-- Save this field to the reusable question library (Increment G9b) — one click; the item
-                             is named from the label and appears in the left-pane Library. -->
-                        <div class="config__library">
+                             is named from the label and appears in the left-pane Library. Gated on the plan
+                             (M90) the same way Builder.vue gates the Fields⇄Library toggle: the route refuses
+                             it either way, this only spares the click. -->
+                        <div v-if="feature('field_library')" class="config__library">
                             <MdsButton
                                 variant="secondary"
                                 icon-left="plus"

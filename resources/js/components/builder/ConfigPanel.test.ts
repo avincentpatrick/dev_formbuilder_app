@@ -1,6 +1,6 @@
 import { mount } from '@vue/test-utils';
 import { computed, ref } from 'vue';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import ConfigPanel from './ConfigPanel.vue';
 import type { BuilderStore } from './useBuilderStore';
 import type { BuilderEnums, LocalField, LocalSection, PaletteGroup } from './types';
@@ -18,7 +18,23 @@ import type { BuilderEnums, LocalField, LocalSection, PaletteGroup } from './typ
  * The store is a hand-built double rather than a real `useBuilderStore` — `LogicRail.test.ts`'s precedent
  * and its reason: the real one owns fetch, undo/redo and a debounced persist queue, none of which this
  * component's switcher touches, and mounting it would make every case here a test of that instead.
+ *
+ * ── `useEntitlements` IS MOCKED, AND MUTABLY (M90) ─────────────────────────────────────────────────────
+ * The panel gained a plan gate on Save-to-library. `useEntitlements` calls Inertia's `usePage()`, which
+ * throws outside an Inertia app — `FormRowActions`/`index.test.ts` hit the same wall and mocked the
+ * composable, which is the precedent followed here. The mock is mutable rather than a constant `true`
+ * so the gate is EXERCISED rather than merely stepped around: a constant would let the `v-if` be deleted
+ * and every case below would still pass.
  */
+const mocks = vi.hoisted(() => ({
+    // Mutable for the reason `forms/index.test.ts` states about `manageScopes`: a fixed value makes the
+    // gated affordance either unmountable or ungatable in every case, and neither tests the gate.
+    fieldLibrary: { value: true },
+}));
+
+vi.mock('@/composables/useEntitlements', () => ({
+    useEntitlements: () => ({ feature: () => mocks.fieldLibrary.value }),
+}));
 
 const ENUMS: BuilderEnums = {
     required_modes: [
@@ -206,5 +222,42 @@ describe('ConfigPanel — switching a tab swaps the body', () => {
         expect(document.getElementById(labelledBy as string)?.textContent?.trim() ?? tabs[1]?.text()).toBe(
             'Options',
         );
+    });
+});
+
+describe('ConfigPanel — the plan gate on Save-to-library (M90)', () => {
+    afterEach(() => {
+        mocks.fieldLibrary.value = true;
+    });
+
+    // ⛔ THE BUTTON LIVES ON THE **ADVANCED** TAB, and the first draft of these two cases did not open it.
+    // Both passed: the positive one failed honestly, but the negative one PASSED VACUOUSLY — the button is
+    // absent from the Basics body whatever the plan says. A negative assertion about something that is never
+    // rendered in the case under test is not a gate, and it is the exact shape this repository keeps
+    // recording. The helper below opens Advanced first so both arms read the same body.
+    async function advancedBodyOf(entitled: boolean) {
+        mocks.fieldLibrary.value = entitled;
+
+        const wrapper = mountPanel(makeStore({ field: field({ field_type: 'short_text' }) }));
+        const tabs = wrapper.findAll('[role="tab"]');
+
+        // Basics · Validation · Advanced for a type with no options — asserted, not assumed, so a tab-set
+        // change renames this test's target rather than silently pointing it at the wrong body.
+        expect(tabs.map((tab) => tab.text())).toEqual(['Basics', 'Validation', 'Advanced']);
+        await tabs[2]?.trigger('click');
+
+        return wrapper;
+    }
+
+    it('renders the Save-to-library affordance when the plan includes the question library', async () => {
+        expect((await advancedBodyOf(true)).text()).toContain('Save to library');
+    });
+
+    it('hides it when the plan does not, which is the one route a denied tenant could still reach', async () => {
+        // This button was the ONLY `feature:`-gated surface in the application with no client gate, which
+        // is why the backlog row that filed the server-side defect read as if it fired on every click.
+        // The route refuses it either way; this spares the click, exactly as Builder.vue says at its own
+        // call site for the Fields-to-Library toggle.
+        expect((await advancedBodyOf(false)).text()).not.toContain('Save to library');
     });
 });

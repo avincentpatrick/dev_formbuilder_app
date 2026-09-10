@@ -147,3 +147,54 @@ Load testing (§2) runs on a separate, less-frequent cadence (e.g., nightly or p
 - Property-based testing adoption — not currently planned; a plausible future enhancement once the core suites above are mature, not a Phase 0 requirement.
 - ~~Mutation testing~~ — **this line was stale and is corrected here (H21c).** No mutation-testing *tool* is adopted and none is planned; what IS now standing practice, unprompted by any framework, is a **hand-run mutation pass over the code an increment just wrote**, one edit at a time, recording which tests each reddens. H21a, H21b and H21c each ran one, and each found something a green suite had not: H21a that dropping the post-loop mask tightening was green for two compounding reasons (the assertion was an `if/else` invariant satisfied by both behaviours, and the settle bound means the field COUNT decides which phase of an oscillation the loop halts on); H21b that §4.2's forward walk was pinned by **nothing at all**, which corrected the design document rather than a test; H21c that passing the OMITTED-filtered field list to `StepProjection` reddens **nothing**, because two lists answering different questions happen to stand in a subset relation nothing enforces.
   **The standing lesson all three share: a mutation that reddens nothing is the loudest result you can get.** It does not mean the code is redundant — it means no test reaches that path, and the right response is to find out empirically *why* before trusting either the test or the mutation.
+
+---
+
+## 8. What this suite can and cannot observe about concurrency (M90)
+
+⛔ **This section exists because SIX shipped files carried a version of this paragraph, no two of them
+agreeing, and three of the claims were false.** One of them deferred to a test file that has never existed
+in this repository's history. Cite this section; do not restate it.
+
+**What is observable, and what every locking test in this repository actually rests on, is STATEMENT
+SHAPE.** `RefreshDatabase` wraps each test in one uncommitted transaction on one connection, so a second
+connection cannot see the fixtures a test creates on the default connection. What a test *can* assert,
+deterministically and without flaking, is the sequence of statements a method issues: that a lock is taken,
+which rows it covers, in what order, how many times, and — the arm that matters most — **that no lock is
+taken after a particular point**. `tests/Feature/Scoping/ScopeNodeMoveLockingTest.php` and
+`tests/Feature/Forms/PublishLockingTest.php` are the two worked examples.
+
+⛔ **A CONTENTION TEST COULD NOT REPLACE THOSE ASSERTIONS, WHICH IS WHY THE SHAPE ARGUMENT IS NOT A
+SUBSTITUTE FOR SOMETHING BETTER — IT IS THE STRONGER INSTRUMENT FOR THIS QUESTION.** A race can demonstrate
+that a lock EXISTS. It can never demonstrate that one is ABSENT. `PublishLockingTest`'s load-bearing arm is
+exactly the second kind: a `lockForUpdate()` misplaced into `SchemaTreeCloner` would run after the status
+flip, be filtered to zero rows by the UPDATE policy's `USING` expression, and clone an EMPTY tree with no
+error while every other publish test stayed green.
+
+**Three sentences that were in the tree and are false, corrected here so they are corrected once:**
+
+1. ⛔ *"No test in this repository opens a second connection."* **False.** Second connections are routine —
+   `tests/Pest.php` has a whole section titled *Committed cross-connection fixtures (Increment I7a)*, and
+   `pgsql_privileged` is used for committed fixtures and privileged reads across many suites. The true and
+   much narrower claim is: **no test opens a second connection in order to observe lock contention.**
+2. ⛔ *"Reproducing it would need a committing test, of which this suite has no precedent."* **False, and
+   expired by `I7a`.** The precedent exists, and it carries its own scar tissue: `I7a` committed tenants,
+   nine unrelated tests went red in CI on a locally-green tree, and the answer was to register cleanup
+   through `beforeApplicationDestroyed(...)` from `beforeEach` so it runs after `RefreshDatabase`'s
+   rollback. Read that section before writing a committing test; do not re-derive it.
+3. ⛔ *"Genuine contention is unobservable here."* **Too strong.** What is unobservable is **BLOCKING**.
+   INTERLEAVING is already staged, on the one connection a test has, by `interleaveDuringPromote()` in
+   `tests/Pest.php` and by the `creating`-hook idiom in `tests/Feature/Forms/BuilderDraftGuardTest.php` —
+   both commit a concurrent write at a chosen instant inside the method under test.
+
+**If a committing two-connection harness is ever written, these are its costs, measured rather than
+guessed** — they are recorded so the next person prices the work honestly instead of discovering them:
+
+- `RefreshDatabase` transacts only the DEFAULT connection (nothing in the tree sets `$connectionsToTransact`),
+  so a contender needs its own connection and the fixtures must be committed for it to see them.
+- `TenantContext::set()` writes a **process-wide static mirror**, so setting tenant context on a second
+  connection silently clobbers the test's own. This is the reason a naive attempt fails for a reason that
+  has nothing to do with the race it was written to prove.
+- There is **no `lock_timeout` or `statement_timeout` anywhere** in `app/`, `tests/`, `config/` or
+  `database/`. A contender that blocks therefore **hangs the CI job rather than failing it**. A timeout has
+  to be set explicitly, or the harness is a CI hazard rather than a test.

@@ -674,7 +674,10 @@ function formIn(ScopeNode $node, string $title = 'Survey'): Form
  * IN-PROCESS IS DELIBERATE, not a shortcut. RefreshDatabase wraps every test in an uncommitted
  * transaction, so a separate `php artisan queue:work` process could not see the enqueued row at all.
  * Running the worker inside the test shares the same PDO connection, so it can. (This is also why the
- * suite needs no committing-test precedent — see PROGRESS.md's note on that gap.)
+ * suite needs no committing-test precedent HERE — see `docs/testing-strategy.md` §8. ⚠️ M90 repointed
+ * this: it read "see PROGRESS.md's note on that gap", and that note had been archived, so it was a
+ * second dead pointer of the same species as the phantom test-class names — and invisible to
+ * `citation-liveness-lint` for the same reason, since neither carries a `path:N`.)
  *
  * Two consequences the caller must respect:
  *   1. The worker SWALLOWS exceptions (Worker::process catches and marks the job failed), so assert

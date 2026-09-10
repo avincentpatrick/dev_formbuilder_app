@@ -16,10 +16,18 @@ uses(RefreshDatabase::class);
 |--------------------------------------------------------------------------
 | The SHAPE of move()'s locking (Increment G10b).
 |
-| `RefreshDatabase` wraps each test in an uncommitted transaction, so a second connection cannot see the
-| fixtures and genuine contention is unobservable here — that lives in ScopeNodeConcurrentMoveTest, which
-| commits. What IS observable, and what actually guards the deadlock/staleness properties, is the sequence
-| of statements move() issues. These assertions are fully deterministic and cannot flake.
+| ⛔ THIS HEADER DEFERRED TO A COMMITTING SIBLING SUITE THAT HAS NEVER EXISTED, AND M90 DELETED THE
+| SENTENCE RATHER THAN REPOINTING IT. `git log --all -S` shows the name it used entered the tree as a
+| COMMENT in G10b1 and was a file in no commit, ever — so a reader auditing the concurrency story was
+| sent somewhere that has never been written. The name is not repeated here, because `scripts/
+| test-pointer-lint.php` now forbids exactly that: a dead pointer left in prose is still a dead pointer
+| the next reader greps for. Three more of the same species were found by writing that gate.
+| The one statement of record is `docs/testing-strategy.md` §8 — cite it, do not restate it.
+|
+| What IS observable, and what actually guards the deadlock/staleness properties, is the sequence of
+| statements move() issues. These assertions are fully deterministic and cannot flake. That is not a
+| consolation prize: a race can show a lock EXISTS and can never show one is ABSENT, and the absent
+| case is the one that has actually bitten this repository (see PublishLockingTest's negative arm).
 |
 | They are the reason a reviewer can trust the concurrency argument without running a race.
 */

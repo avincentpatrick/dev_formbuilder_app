@@ -48,6 +48,7 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Foundation\Http\Middleware\HandlePrecognitiveRequests;
 use Illuminate\Http\Exceptions\ThrottleRequestsException;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Middleware\SubstituteBindings;
@@ -252,6 +253,40 @@ return Application::configure(basePath: dirname(__DIR__))
         // Form* exceptions are NOT rewritten and are matched directly.
         $isApi = fn (Request $request): bool => $request->is('api/v1/*');
 
+        // ── The WEB surface's JSON refusal (M90, docs/feature-backlog.md:8919) ────────────────────────
+        // `$isApi` keys on the PATH, so a `fetch` at a tenant WEB route — which is what the builder, scopes
+        // and integrations sidecars all are — misses every arm above and falls to the `back()` below it.
+        // `fetch` FOLLOWS that 302 by default, the referer answers 200 HTML, `response.ok` is therefore
+        // true, and the client throws a bare SyntaxError parsing HTML as JSON. The tenant is told something
+        // generic and is never told what was refused.
+        //
+        // ⛔ THIS IS NOT A NEW POLICY, IT IS AN EXISTING ONE REACHING WHERE IT WAS ALWAYS MEANT TO.
+        // `shouldRenderJsonWhen()` above already declares `expectsJson()` as this application's JSON test
+        // and names the builder's fetch sidecar in its own comment — it simply cannot reach these arms,
+        // because a `render()` callback that returns a response runs first and wins.
+        //
+        // ⚠️ FLAT, NOT THE /api/v1 ENVELOPE, AND THE CLIENT DECIDES THAT RATHER THAN TASTE.
+        // `builderClient` reads `payload.message` at the TOP level while {@see ApiErrorResponse} nests under
+        // `error`, so answering the envelope here would leave the user with the same generic string this
+        // exists to remove. The envelope stays scoped to /api/v1 exactly as api-specification.md §2.3 says.
+        //
+        // ⚠️ INERTIA IS UNAFFECTED, and that is a property of `expectsJson()` rather than a hope: an Inertia
+        // visit sends `Accept: text/html`, so it keeps the redirect-with-toast flow it has always had. The
+        // same is true of a browser navigation, which is why the shipped redirect assertions stay green.
+        //
+        // ⚠️ WHY EVERY ARM AND NOT THE ONE THAT WAS FILED. Only one route is reachable in a denied state
+        // today; the other surfaces are guarded ON THE CLIENT, and `useMemberStreak.ts` carries a
+        // thirteen-line docblock plus a runtime guard whose only purpose is to keep a request off this
+        // path. Three client-side workarounds for one server-side defect is the argument for repairing the
+        // server once, rather than for repairing the one client that forgot.
+        $webJson = function (Request $request, int $status, string $message, array $payload = []): ?JsonResponse {
+            if (! $request->expectsJson()) {
+                return null;
+            }
+
+            return response()->json(['message' => $message, ...$payload], $status);
+        };
+
         $exceptions->render(fn (ValidationException $e, Request $request) => $isApi($request)
             ? ApiErrorResponse::make(422, 'validation_failed', 'The given data was invalid.', ['fields' => $e->errors()])
             : null);
@@ -293,23 +328,25 @@ return Application::configure(basePath: dirname(__DIR__))
         // Scoping-hierarchy rule violations (Increment G10b) — a move that would cycle, or one that would
         // push the subtree past the depth cap. Both are raised upfront inside move()'s transaction, before
         // the re-path statement, so this maps a deliberate refusal rather than dressing up a 23514.
-        $exceptions->render(function (ScopeNodeException $e, Request $request) use ($isApi) {
+        $exceptions->render(function (ScopeNodeException $e, Request $request) use ($isApi, $webJson) {
             if ($isApi($request)) {
                 return ApiErrorResponse::make(422, $e->code(), $e->getMessage());
             }
 
-            return back()->with('toast', ['type' => 'error', 'message' => $e->getMessage()]);
+            return $webJson($request, 422, $e->getMessage(), ['code' => $e->code()])
+                ?? back()->with('toast', ['type' => 'error', 'message' => $e->getMessage()]);
         });
 
         // Grant escalation refusals (Increment G10b). The status travels ON the exception because the causes
         // split across two classes: an escalation refusal is a 403 (self-grant, anti-amplification) while a
         // bad request shape is a 422 (inactive recipient, descendants on a form target). See GrantException.
-        $exceptions->render(function (GrantException $e, Request $request) use ($isApi) {
+        $exceptions->render(function (GrantException $e, Request $request) use ($isApi, $webJson) {
             if ($isApi($request)) {
                 return ApiErrorResponse::make($e->status(), $e->code(), $e->getMessage());
             }
 
-            return back()->with('toast', ['type' => 'error', 'message' => $e->getMessage()]);
+            return $webJson($request, $e->status(), $e->getMessage(), ['code' => $e->code()])
+                ?? back()->with('toast', ['type' => 'error', 'message' => $e->getMessage()]);
         });
 
         // Hard-block quota refusals (H5b / ADR-0008 §D4) — a create/upload/invite past a provisioning-gauge
@@ -317,12 +354,13 @@ return Application::configure(basePath: dirname(__DIR__))
         // with the metric-specific code + {metric, limit, used} details so an integration can branch on
         // exactly which ceiling was hit; a web request bounces back with an upgrade-prompt toast. A
         // respondent's submission is never-block and can never reach here.
-        $exceptions->render(function (QuotaExceededException $e, Request $request) use ($isApi) {
+        $exceptions->render(function (QuotaExceededException $e, Request $request) use ($isApi, $webJson) {
             if ($isApi($request)) {
                 return ApiErrorResponse::make($e->status(), $e->code(), $e->getMessage(), $e->details());
             }
 
-            return back()->with('toast', ['type' => 'error', 'message' => $e->getMessage()]);
+            return $webJson($request, $e->status(), $e->getMessage(), ['code' => $e->code(), 'details' => $e->details()])
+                ?? back()->with('toast', ['type' => 'error', 'message' => $e->getMessage()]);
         });
 
         // Plan feature-gate refusals (H5c / ADR-0008 §D5) — a tenant reached a capability its plan does not
@@ -330,12 +368,13 @@ return Application::configure(basePath: dirname(__DIR__))
         // entitlement-family status as a quota refusal, with the `feature_not_available` code + {feature}
         // detail; a web request bounces back with an upgrade-prompt toast. A grandfathered tenant's override
         // resolves the feature to true and never reaches here. See FeatureGateException / RequireFeature.
-        $exceptions->render(function (FeatureGateException $e, Request $request) use ($isApi) {
+        $exceptions->render(function (FeatureGateException $e, Request $request) use ($isApi, $webJson) {
             if ($isApi($request)) {
                 return ApiErrorResponse::make($e->status(), $e->code(), $e->getMessage(), $e->details());
             }
 
-            return back()->with('toast', ['type' => 'error', 'message' => $e->getMessage()]);
+            return $webJson($request, $e->status(), $e->getMessage(), ['code' => $e->code(), 'details' => $e->details()])
+                ?? back()->with('toast', ['type' => 'error', 'message' => $e->getMessage()]);
         });
 
         // A tenant reached a capability IT switched off for itself (K1d) — raised by RequireModule. Beside
@@ -343,12 +382,13 @@ return Application::configure(basePath: dirname(__DIR__))
         // `module_disabled`, never a 402, because there is nothing to buy and the refusal is undoable from
         // inside the tenant. The two codes stay distinct so an integration can tell a plan limit it cannot
         // fix from a workspace setting somebody there can. See ModuleDisabledException.
-        $exceptions->render(function (ModuleDisabledException $e, Request $request) use ($isApi) {
+        $exceptions->render(function (ModuleDisabledException $e, Request $request) use ($isApi, $webJson) {
             if ($isApi($request)) {
                 return ApiErrorResponse::make($e->status(), $e->code(), $e->getMessage(), $e->details());
             }
 
-            return back()->with('toast', ['type' => 'error', 'message' => $e->getMessage()]);
+            return $webJson($request, $e->status(), $e->getMessage(), ['code' => $e->code(), 'details' => $e->details()])
+                ?? back()->with('toast', ['type' => 'error', 'message' => $e->getMessage()]);
         });
 
         // An analytics declaration that violates one of ADR-0011 §D7's bounds, or a saved view's stored
@@ -369,7 +409,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // NOT `back()` on a GET. A bookmarked bad URL carries no referer, and `back()` would land on the
         // tenant subdomain's unrouted "/" — a 404 in place of the message. The bare index always builds a
         // valid default window, so redirecting to it cannot loop.
-        $exceptions->render(function (InvalidAnalyticsQueryException $e, Request $request) use ($isApi) {
+        $exceptions->render(function (InvalidAnalyticsQueryException $e, Request $request) use ($isApi, $webJson) {
             if ($isApi($request)) {
                 return ApiErrorResponse::make(422, 'invalid_analytics_query', $e->getMessage(), ['reason' => $e->reason()]);
             }
@@ -379,6 +419,17 @@ return Application::configure(basePath: dirname(__DIR__))
             }
 
             $toast = ['type' => 'error', 'message' => $e->getMessage()];
+
+            // Both web branches below are redirects, so both are unreadable to a `fetch` — the GET one lands
+            // on the analytics index as HTML rather than merely bouncing back.
+            $json = $webJson($request, 422, $e->getMessage(), [
+                'code' => 'invalid_analytics_query',
+                'details' => ['reason' => $e->reason()],
+            ]);
+
+            if ($json !== null) {
+                return $json;
+            }
 
             return $request->isMethod('GET')
                 ? to_route('analytics.index')->with('toast', $toast)
@@ -396,18 +447,19 @@ return Application::configure(basePath: dirname(__DIR__))
         // XLSForm import failure (Increment G7b) — a malformed workbook rejected UPFRONT, before the
         // destructive draft-replace runs (§6). The API surface gets the stable code + {row,type} details it
         // carries; a web (builder) request bounces back with an error toast (the FormPublishController shape).
-        $exceptions->render(function (XlsformImportException $e, Request $request) use ($isApi) {
+        $exceptions->render(function (XlsformImportException $e, Request $request) use ($isApi, $webJson) {
             if ($isApi($request)) {
                 return ApiErrorResponse::make(422, $e->code(), $e->getMessage(), $e->details());
             }
 
-            return back()->with('toast', ['type' => 'error', 'message' => $e->getMessage()]);
+            return $webJson($request, 422, $e->getMessage(), ['code' => $e->code(), 'details' => $e->details()])
+                ?? back()->with('toast', ['type' => 'error', 'message' => $e->getMessage()]);
         });
 
         // Submission Pipeline per-field failure (Increment F4b, Stages 1 & 3). The API surface gets the
         // structured 422 envelope; a web (manual-encode) request bounces back with the field errors keyed
         // `answers.<field>` so the Encode form binds each message to its input, plus an error toast.
-        $exceptions->render(function (SubmissionValidationException $e, Request $request) use ($isApi) {
+        $exceptions->render(function (SubmissionValidationException $e, Request $request) use ($isApi, $webJson) {
             if ($isApi($request)) {
                 return ApiErrorResponse::make(422, 'submission_invalid', $e->getMessage(), ['fields' => $e->fieldErrors()]);
             }
@@ -418,7 +470,13 @@ return Application::configure(basePath: dirname(__DIR__))
                 $errors['answers.'.$fieldError['field']] ??= $fieldError['message'];
             }
 
-            return back()->withErrors($errors)->with('toast', ['type' => 'error', 'message' => $e->getMessage()]);
+            // The JSON arm carries the SAME keys, one message per field wrapped in a list — Laravel's flat
+            // `{message, errors}` shape, which is what a `fetch` client already reads. Same keying as the
+            // redirect so a caller that has bound to `answers.<field>` does not have to learn a second one.
+            return $webJson($request, 422, $e->getMessage(), [
+                'code' => 'submission_invalid',
+                'errors' => array_map(static fn (string $message): array => [$message], $errors),
+            ]) ?? back()->withErrors($errors)->with('toast', ['type' => 'error', 'message' => $e->getMessage()]);
         });
 
         // Submission Pipeline STATE violation (Stage 2a — the version is not the currently published one).
@@ -434,12 +492,16 @@ return Application::configure(basePath: dirname(__DIR__))
         // `promote()`, which re-asserts the DRAFT'S PINNED version: a keyer holding a v1 draft while an admin
         // publishes v2 now reaches this on a real, ordinary flow. Without an arm that is a 500 on a page the
         // user has just spent ten minutes on.
-        $exceptions->render(fn (SubmissionException $e, Request $request) => $isApi($request)
-            ? ApiErrorResponse::make(409, 'submission_version_superseded', $e->getMessage())
-            : back()->with('toast', [
-                'type' => 'error',
-                'message' => 'This form has been updated since the draft was saved, so the draft can no longer be submitted.',
-            ]));
+        $exceptions->render(function (SubmissionException $e, Request $request) use ($isApi, $webJson) {
+            if ($isApi($request)) {
+                return ApiErrorResponse::make(409, 'submission_version_superseded', $e->getMessage());
+            }
+
+            $message = 'This form has been updated since the draft was saved, so the draft can no longer be submitted.';
+
+            return $webJson($request, 409, $message, ['code' => 'submission_version_superseded'])
+                ?? back()->with('toast', ['type' => 'error', 'message' => $message]);
+        });
 
         // Submission Pipeline CONTENT conflict (Increment G8c, offline-first-sync-design §5) — the same
         // client_submission_uuid was already persisted with materially DIFFERENT answers (a genuine concurrent
@@ -455,9 +517,19 @@ return Application::configure(basePath: dirname(__DIR__))
         // answers). The draft AUTOSAVE endpoint deliberately does NOT rely on this closure: it is a JSON
         // `fetch`, so it catches locally and returns a typed envelope, because a `back()` redirect is
         // unreadable to the composable driving it.
-        $exceptions->render(fn (SubmissionConflictException $e, Request $request) => $isApi($request)
-            ? ApiErrorResponse::make(409, $e->code(), $e->getMessage())
-            : back()->with('toast', ['type' => 'error', 'message' => $e->getMessage()]));
+        //
+        // ⚠️ THAT LAST SENTENCE WAS THE FIFTH IN-REPO WORKAROUND FOR THE DEFECT M90 CLOSED, and it is left
+        // standing rather than deleted: the local catch is still the right design for an autosave (it wants a
+        // typed envelope, not an exception), but the REASON it gives — that a redirect is unreadable — no
+        // longer holds, because this closure now answers a JSON caller in JSON.
+        $exceptions->render(function (SubmissionConflictException $e, Request $request) use ($isApi, $webJson) {
+            if ($isApi($request)) {
+                return ApiErrorResponse::make(409, $e->code(), $e->getMessage());
+            }
+
+            return $webJson($request, 409, $e->getMessage(), ['code' => $e->code()])
+                ?? back()->with('toast', ['type' => 'error', 'message' => $e->getMessage()]);
+        });
 
         // Scheduled-form refusal (Increment H12a) — the form is not accepting a submission right now: not yet
         // open (`form_not_open`), closed past `closes_at` (`form_closed`), or its `max_responses` cap is full
@@ -465,12 +537,13 @@ return Application::configure(basePath: dirname(__DIR__))
         // exists; you may not submit to it now) with the boundary/cap figures in `details` so the guest SPA
         // (H12b) can render "opens soon"/"closed"/"full"; a web (manual-encode) request bounces back a toast.
         // A pre-close save-and-resume draft is exempt by the grace window and never reaches here on promote.
-        $exceptions->render(function (FormNotAcceptingSubmissionException $e, Request $request) use ($isApi) {
+        $exceptions->render(function (FormNotAcceptingSubmissionException $e, Request $request) use ($isApi, $webJson) {
             if ($isApi($request)) {
                 return ApiErrorResponse::make($e->status(), $e->code(), $e->getMessage(), $e->details());
             }
 
-            return back()->with('toast', ['type' => 'error', 'message' => $e->getMessage()]);
+            return $webJson($request, $e->status(), $e->getMessage(), ['code' => $e->code(), 'details' => $e->details()])
+                ?? back()->with('toast', ['type' => 'error', 'message' => $e->getMessage()]);
         });
 
         // Guest share-token failures (Increment F5). Thrown by EstablishGuestTenantContext BEFORE any tenant
@@ -517,12 +590,16 @@ return Application::configure(basePath: dirname(__DIR__))
         // Submit-time expression failure — a defensive backstop. Published expressions are pre-validated by
         // the F3 ExpressionValidationGate at publish, so reaching here signals a server bug, not user error;
         // the handler still report()s it. Surface a generic failure rather than a raw 500 / HTML.
-        $exceptions->render(function (ExpressionSyntaxException|ExpressionEvaluationException $e, Request $request) use ($isApi) {
+        $exceptions->render(function (ExpressionSyntaxException|ExpressionEvaluationException $e, Request $request) use ($isApi, $webJson) {
             if ($isApi($request)) {
                 return ApiErrorResponse::make(422, 'expression_error', 'A form expression could not be evaluated.');
             }
 
-            return back()->with('toast', [
+            // The generic copy is deliberate here and travels to BOTH arms: reaching this handler signals a
+            // server bug rather than user error, so the JSON caller learns no more than the toast does.
+            return $webJson($request, 422, 'This form could not be processed. Please try again or contact support.', [
+                'code' => 'expression_error',
+            ]) ?? back()->with('toast', [
                 'type' => 'error',
                 'message' => 'This form could not be processed. Please try again or contact support.',
             ]);
@@ -563,9 +640,11 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // Membership business-rule violations (B2b) are user-facing, not 500s: bounce back with a
         // validation-style error so the form (or the JSON api/* path) surfaces the reason.
-        $exceptions->render(fn (MembershipException $e) => back()->withErrors(['membership' => $e->getMessage()]));
+        $exceptions->render(fn (MembershipException $e, Request $request) => $webJson($request, 422, $e->getMessage(), ['errors' => ['membership' => [$e->getMessage()]]])
+            ?? back()->withErrors(['membership' => $e->getMessage()]));
 
         // Super-admin business-rule violations (B2c) — same posture (e.g. suspending an already-suspended
         // tenant): a user-facing redirect-back-with-error, not a 500.
-        $exceptions->render(fn (SuperAdminException $e) => back()->withErrors(['admin' => $e->getMessage()]));
+        $exceptions->render(fn (SuperAdminException $e, Request $request) => $webJson($request, 422, $e->getMessage(), ['errors' => ['admin' => [$e->getMessage()]]])
+            ?? back()->withErrors(['admin' => $e->getMessage()]));
     })->create();

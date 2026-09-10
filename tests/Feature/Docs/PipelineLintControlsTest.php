@@ -557,20 +557,64 @@ it('P2d — DOES count an array-literal write as a use, which a shape-only rule 
     });
 });
 
-it('P2d — a dormant column is DISCHARGED by filing it in the ledger', function (): void {
+/**
+ * Make fx0_col0 dormant, write $ledger as the whole ledger, and return the gate's status.
+ *
+ * The three cases below differ ONLY in that ledger text, which is what makes them a control set
+ * for the disposition predicate rather than three restatements of P2d.
+ *
+ * @return array{0: int, 1: string}
+ */
+function pipelineLintDischargedBy(string $ledger): array
+{
     pipelineLintReset();
     pipelineLintWrite('app/Generated/Use0x0.php', "<?php\n\n// the writer was deleted\n");
 
     [$before, $beforeOutput] = pipelineLintRun();
     expect($before)->toBe(PIPELINE_LINT_FAILED, $beforeOutput);
 
-    pipelineLintWrite('docs/feature-backlog.md', "# Backlog\n\n- `".pipelineLintColumn(0, 0)."` has no writer; filed.\n");
+    pipelineLintWrite('docs/feature-backlog.md', $ledger);
 
-    [$after, $afterOutput] = pipelineLintRun();
-    expect($after)->toBe(PIPELINE_LINT_CLEAN, $afterOutput);
+    $result = pipelineLintRun();
 
     pipelineLintWrite('app/Generated/Use0x0.php', "<?php\n\n\$row->update(['".pipelineLintColumn(0, 0)."' => \$value]);\n");
     pipelineLintReset();
+
+    return $result;
+}
+
+it('P2d — a dormant column is DISCHARGED by a ledger paragraph naming its column AND its table', function (): void {
+    [$after, $output] = pipelineLintDischargedBy(
+        "# Backlog\n\n- `fixture_table_0`.`".pipelineLintColumn(0, 0)."` has no writer; filed.\n"
+    );
+
+    expect($after)->toBe(PIPELINE_LINT_CLEAN, $output);
+});
+
+it('P2d — a disposition naming the WRONG table does not discharge it', function (): void {
+    // ⛔ THE DEFECT M89 REPAIRED, STAGED EXACTLY. The skip used to be a bare str_contains over the
+    // whole corpus, so a paragraph about ANOTHER table that happened to mention this column name
+    // silently discharged it. Not hypothetical: a phantom `tenants.trial_ends_at` discharged the
+    // real `subscriptions.trial_ends_at`, and the row it fed reported four columns where there were
+    // five. This case PASSES against the predicate as it stood before M89, which is the point.
+    [$after, $output] = pipelineLintDischargedBy(
+        "# Backlog\n\n- `fixture_table_1`.`".pipelineLintColumn(0, 0)."` has no writer; filed.\n"
+    );
+
+    expect($after)->toBe(PIPELINE_LINT_FAILED, $output);
+    expect($output)->toContain('is scheduled nowhere');
+});
+
+it('P2d — the table must be in the SAME paragraph, not merely somewhere in the document', function (): void {
+    // ⚠ Without this the repair degrades to "both tokens appear in the file", which any
+    // sufficiently long document satisfies by accident — a WEAKER rule than the one it replaced,
+    // wearing the same name.
+    [$after, $output] = pipelineLintDischargedBy(
+        "# Backlog\n\n- `fixture_table_0` is a table this ledger discusses at length.\n\n"
+        .'- `'.pipelineLintColumn(0, 0)."` has no writer; filed.\n"
+    );
+
+    expect($after)->toBe(PIPELINE_LINT_FAILED, $output);
 });
 
 it('P5 — REFUSES rather than passing when the generator scan has gone blind', function (): void {

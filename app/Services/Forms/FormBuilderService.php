@@ -190,6 +190,33 @@ final class FormBuilderService
         return DB::transaction(function () use ($form, $field, $user, $data): FormField {
             $this->assertStillDraftChild($form, $field);
 
+            // ⛔ M91 — THE ACQUISITION ORDER, MADE UNCONDITIONAL. Without this the order of row touches
+            // depends on whether the payload is DIRTY. Eloquent's save() checks isDirty() before it
+            // issues anything, so resubmitting an identical payload skips the UPDATE on `form_fields`
+            // entirely and this transaction's first lock lands on `form_field_validations` instead —
+            // the reverse of the publisher's, which takes `form_fields` (PublishService, all rows in one
+            // statement) and only then the validation rows. Two transactions, opposite order, and
+            // Postgres answers 40P01. ⚠️ THAT IS NOT A RENDERABLE FAILURE HERE: updateField()'s typed
+            // catch re-throws anything that is not 23503, so the loser reached the builder as the
+            // framework's generic JSON 500 — the same unrendered answer M89 fixed for the constraint case.
+            //
+            // ⛔ AND THIS IS NOT A REVERSAL OF §3.4, WHICH IS THE FIRST THING A READER WILL ASSUME.
+            // `docs/form-versioning-schema-migration.md` §3.4 declines the **forms**-row lock for ordinary
+            // field-level edits and says §8 covers them at finer grain. This is that finer grain: one row,
+            // the one this transaction is already about to write, and no `forms` row is touched. The
+            // deliberate no-lock note on assertStillDraftChild() below is about the same forms-row lock
+            // and is untouched.
+            //
+            // ⚠️ A LOCKING SELECT IS FILTERED BY THE UPDATE POLICY'S USING EXPRESSION RATHER THAN
+            // ERRORING, so a row that has stopped being a draft child between the guard above and here
+            // matches nothing — which is the same verdict the guard would have reached, reported through
+            // the same exception rather than as a silent zero-row UPDATE.
+            $locked = $field->newQuery()->whereKey($field->getKey())->lockForUpdate()->first();
+
+            if (! $locked instanceof FormField) {
+                throw FormException::childRemovedDuringEdit();
+            }
+
             $field->fill([
                 'key' => $data['key'],
                 'label' => $data['label'],

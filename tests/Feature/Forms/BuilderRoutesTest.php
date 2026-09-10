@@ -9,6 +9,7 @@ use App\Models\FormSection;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Forms\FormService;
+use App\Support\Forms\StepProjection;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -269,4 +270,96 @@ it('persists a geospatial map config and rejects an out-of-range coordinate', fu
             'version' => null,
         ])
         ->assertOk();
+});
+
+it('refuses the reserved lead-step key on both authoring routes that accept a key, and still accepts a legal one', function (): void {
+    // ⛔ WHAT `M90` FILED, AND WHAT IT GOT WRONG. The row says the `__lead__` reservation is "enforced by
+    //    two writers and asserted at the route layer by nothing". The second half was true and is what
+    //    this arm closes. THE FIRST HALF IS NOT: of the two writers it named, the field library writes
+    //    `'key' => null` (FieldLibrary::fromField), so it cannot claim any key at all; and the template
+    //    blueprint path is not reachable by a tenant actor — `form_templates.schema_blueprint` has exactly
+    //    one writer, TemplateService::saveAsTemplate, which SNAPSHOTS rows whose keys already came through
+    //    a guarded path. No route anywhere accepts a client-supplied blueprint.
+    //
+    // ⚠️ SO THE CENSUS IS TWO ROUTES, NOT FOUR. `storeSection()` takes no payload at all and
+    //    `StoreFieldRequest` has no `key` rule — both mint the key server-side — which leaves the two
+    //    PATCHes below as the only surfaces where a person may choose one. Each rejects `__lead__` by the
+    //    same `regex:/^[a-z][a-z0-9_]*$/`, and until now nothing exercised either rejection over HTTP.
+    //
+    // ⚠️ StepProjectionTest pins the RULES by restating them, which is a different property: it proves the
+    //    sentinel could not satisfy the regex, never that the regex is still ON the route. Move the rule
+    //    off UpdateSectionRequest and that file stays green; this one does not.
+    //
+    // ⛔ AND ONE HALF OF THIS WAS ALREADY COVERED, WHICH THE ROW DOES NOT SAY. `it validates the key
+    //    format and per-version uniqueness` above already drives the FIELD patch with `Not A Key` and
+    //    asserts 422, so the field regex has had HTTP coverage since D4a. What is new here is three
+    //    things it cannot give: the SECTION patch, which had no HTTP coverage of any kind before this
+    //    arm; the SENTINEL specifically, read from its constant, so that renaming LEAD_STEP_KEY to
+    //    something the regex accepts reddens here and nowhere else; and the no-write assertions, since
+    //    a 422 that persisted anyway satisfies every status check in this file.
+    $tenant = builderTenant();
+    $admin = User::factory()->create();
+    enterTenant($tenant->id, $admin->id);
+    makeActiveMember($admin, 'admin');
+    $form = app(FormService::class)->create($tenant, $admin, 'Reserved Key');
+
+    $section = $this->actingAs($admin)
+        ->postJson("http://acme.meridian.test/forms/{$form->id}/sections")->assertOk();
+    $sectionId = $section->json('id');
+    $mintedSectionKey = $section->json('key');
+
+    $add = $this->actingAs($admin)
+        ->postJson("http://acme.meridian.test/forms/{$form->id}/fields", ['field_type' => 'short_text'])
+        ->assertOk();
+    $fieldId = $add->json('id');
+    $mintedFieldKey = $add->json('key');
+
+    // The sentinel itself, read from its single definition rather than typed — a test that hard-coded
+    // `__lead__` would keep passing if the constant were changed and the regex left behind.
+    $this->actingAs($admin)
+        ->patchJson("http://acme.meridian.test/forms/{$form->id}/sections/{$sectionId}", [
+            'key' => StepProjection::LEAD_STEP_KEY,
+            'label' => 'Lead',
+        ])
+        ->assertStatus(422)
+        ->assertJsonValidationErrors('key');
+
+    $this->actingAs($admin)
+        ->patchJson("http://acme.meridian.test/forms/{$form->id}/fields/{$fieldId}", [
+            'key' => StepProjection::LEAD_STEP_KEY,
+            'label' => 'Lead',
+            'is_required' => 'optional',
+            'config' => [],
+            'validations' => [],
+            'version' => null,
+        ])
+        ->assertStatus(422)
+        ->assertJsonValidationErrors('key');
+
+    // ⛔ A 422 THAT WROTE ANYWAY IS THE FAILURE THIS PAIR EXISTS FOR. The status is the request layer's
+    //    answer; these two are the database's.
+    enterTenant($tenant->id, $admin->id);
+    expect(FormSection::query()->whereKey($sectionId)->value('key'))->toBe($mintedSectionKey);
+    expect(FormField::query()->whereKey($fieldId)->value('key'))->toBe($mintedFieldKey);
+
+    // ⛔ THE NON-VACUITY PARTNER. A request layer that refused every PATCH — a broken payload shape here,
+    //    a rule added to the wrong field — satisfies both refusals above and nothing else in this file
+    //    would say so. These two assert the same routes still accept a legal key.
+    $this->actingAs($admin)
+        ->patchJson("http://acme.meridian.test/forms/{$form->id}/sections/{$sectionId}", [
+            'key' => 'household',
+            'label' => 'Household',
+        ])
+        ->assertOk()->assertJsonPath('key', 'household');
+
+    $this->actingAs($admin)
+        ->patchJson("http://acme.meridian.test/forms/{$form->id}/fields/{$fieldId}", [
+            'key' => 'respondent_age',
+            'label' => 'Age',
+            'is_required' => 'optional',
+            'config' => [],
+            'validations' => [],
+            'version' => null,
+        ])
+        ->assertOk()->assertJsonPath('key', 'respondent_age');
 });

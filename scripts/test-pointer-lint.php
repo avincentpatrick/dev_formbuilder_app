@@ -17,7 +17,9 @@ declare(strict_types=1);
  *                               file in any commit — so "not written yet" was never true either.
  *   FormSectionRoutesTest        cited by StepProjectionTest as exercising the section call sites.
  *   ImpersonationConsumeTest     cited by ImpersonationMintTest as "the consume half".
- *   TenantCustomColumnsTest      cited by four sites as the tenants column-whitelist guard.
+ *   TenantCustomColumnsTest      named as the tenants column-whitelist guard by four sites that had
+ *                               ALREADY been corrected to cite TenantColumnWhitelistTest at P2a, and
+ *                               keep the dead name only as the one they used to carry (M91).
  * One filed, three found by writing this gate. That is the argument for a gate over a sweep: the row was
  * a census of one and the tree held four.
  *
@@ -67,7 +69,10 @@ const EXIT_VIOLATION = 1;
  */
 const EXEMPTIONS = [
     'SentinelTest' => 'the mutation harness fixture identity — tests/fixtures/mutate/ is a corpus rather than a suite, and MutateHarnessTest drives it by path',
-    'TenantCustomColumnsTest' => 'named BY TenantColumnWhitelistTest precisely to record that it has never existed and that four sites cite it; removing the mention would delete the finding',
+    // ⛔ M91: THE EXEMPTION IS STILL REQUIRED AND ITS OLD REASON WAS FALSE. The four sites it named were
+    // corrected at P2a and cite TenantColumnWhitelistTest; what survives is a CORRECTION NOTE in that
+    // file, inside tests/, which is the single mention this gate can see and the only one it exempts.
+    'TenantCustomColumnsTest' => 'named by TenantColumnWhitelistTest to record that it has never existed and was the name four sites carried until P2a; removing the mention would delete the finding',
 ];
 
 const FILE_FLOOR = 400;

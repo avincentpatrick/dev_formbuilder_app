@@ -54,11 +54,19 @@ const GATE_BASELINES_SCENARIOS = [
     'git-undecidable',
     'unreadable-sha',
     // M75 — the first scenario that gets PAST the recency guard and then fails to scrape. Every one
-    // above shares `ci-log.txt`, which satisfies all twelve patterns, so until this one the
+    // above shares `ci-log.txt`, which satisfies every declared pattern, so until this one the
     // `$missing > 0` branch could not be reached by any control at all.
     'missing-metric',
 ];
 
+/**
+ * The absolute floor under the harvest in gateBaselinesDeclaredGates(). ⛔ IT RATCHETS UP AND IS NEVER
+ * LOWERED TO MAKE A RUN GREEN — the list stood at twelve when M75 wrote the sentence above, thirteen at
+ * citation-liveness-lint and fourteen at test-pointer-lint, and two comments in this file were still
+ * saying twelve when M91 corrected them. A floor is the one form of that number that cannot go stale in
+ * the dangerous direction.
+ */
+const GATE_BASELINES_GATE_FLOOR = 14;
 function gateBaselinesFixtureDir(): string
 {
     return base_path('tests/fixtures/gate-baselines');
@@ -139,11 +147,130 @@ it('has every fixture the controls name, and the directory holds nothing else', 
         count(GATE_BASELINES_SCENARIOS).'. A fixture nothing asserts is a shape nobody has decided about.'
     );
 
-    foreach (['gh.php', 'git.php', 'ci-log.txt'] as $support) {
+    foreach (['gh.php', 'git.php', 'ci-log.txt', 'ci-log-missing-metric.txt'] as $support) {
         expect(is_file(gateBaselinesFixtureDir().'/'.$support))->toBeTrue('missing stub: '.$support);
     }
 });
 
+/**
+ * The gate list `scripts/gate-baselines.php` declares, harvested from the source rather than restated.
+ *
+ * ⛔ A THIRD COPY OF THE LIST WOULD BE THE DEFECT THIS EXISTS TO CATCH, so the names are read out of the
+ * generator and never typed here.
+ *
+ * ⛔ AND THE FLOOR IS NOT DECORATION. M87 measured a regex-derived coverage gate whose derivation broke
+ * and left every per-item arm GREEN over an empty set — assertions fell 11 to 5 while every arm still
+ * passed, and only a floor said so. This one floors in three independent directions: an absolute count
+ * that may only ever ratchet UP, a cross-check against a second harvest of the same block, and an anchor
+ * that has been in the list since M36. A broken parse fails all three; no one of them alone is enough.
+ *
+ * @return list<string>
+ */
+function gateBaselinesDeclaredGates(): array
+{
+    $source = (string) file_get_contents(base_path('scripts/gate-baselines.php'));
+    $open = strpos($source, '$metrics = [');
+
+    expect($open)->not->toBeFalse('scripts/gate-baselines.php no longer declares a `$metrics` array');
+
+    $close = strpos($source, "\n];", (int) $open);
+
+    expect($close)->not->toBeFalse('the `$metrics` array is no longer closed by a bare `];`');
+
+    $block = substr($source, (int) $open, (int) $close - (int) $open);
+
+    preg_match_all("/^ {4}'([^']+)' => \[$/m", $block, $keys);
+    /** @var list<string> $gates */
+    $gates = $keys[1];
+
+    // The second harvest: every metric declares exactly one `job`, so the two counts must agree. A
+    // key-line format change that silently shrinks the harvest cannot also shrink this one.
+    $jobs = preg_match_all("/^ {8}'job' => '/m", $block);
+
+    expect(count($gates))->toBe(
+        $jobs,
+        'harvested '.count($gates).' gate name(s) but '.$jobs.' job declaration(s) from the same block — '
+        .'the parse in gateBaselinesDeclaredGates() is broken, not the list. Fix the harvest first.'
+    );
+    expect(count($gates))->toBeGreaterThanOrEqual(
+        GATE_BASELINES_GATE_FLOOR,
+        'harvested only '.count($gates).' gate name(s), under a floor of '.GATE_BASELINES_GATE_FLOOR.'. '
+        .'This floor ratchets UP when gates are added and is never lowered to make a run green.'
+    );
+    // One needle, deliberately: `toContain()` is VARIADIC, so a second argument is a second NEEDLE and
+    // not a message. This project has measured that trap three times, under three different matchers.
+    expect($gates)->toContain('Pest (PostgreSQL)');
+
+    return $gates;
+}
+
+/**
+ * The gates the generator's `--dry-run` document reports as unscraped, read off the document itself.
+ *
+ * @return list<string>
+ */
+function gateBaselinesNotFound(string $document): array
+{
+    preg_match_all('/^\| ([^|]+?) \| \*\*NOT FOUND\*\*/m', $document, $matches);
+
+    return array_map(static fn (string $gate): string => trim($gate), $matches[1]);
+}
+
+it('gives every declared gate a line in every ci-log fixture, because the list and the fixtures are a paired set', function (): void {
+    // ⛔ WHAT THIS ADDS OVER THE FIVE ARMS BELOW, WHICH ALREADY DETECT A MISSING LINE. They detect it and
+    //    then MISDIRECT: the failure reads `1 metric(s) NOT FOUND — fix the pattern in
+    //    scripts/gate-baselines.php`, so the post-merge run that caught this told a reader to edit the one
+    //    file that was correct. M90 turned `main` red exactly here, and spent its diagnosis working out
+    //    that the gate list and these logs are a PAIRED FILE SET. This arm names the fixture instead.
+    //
+    // ⛔ AND IT ADDS ONE THING THEY CANNOT DO, WHICH IS THE HALF THAT MATTERS. The missing-metric arms
+    //    assert a COUNT (`1 metric(s) NOT FOUND`) and a SUBSTRING (`citation-liveness-lint`). Move the
+    //    deliberate omission to any other gate and both stay green — the count is still one and the
+    //    literal is still in the document, now as a value row — while the fixture has silently stopped
+    //    driving the `$missing > 0` branch it exists for. Only SET EQUALITY catches that.
+    $declared = gateBaselinesDeclaredGates();
+
+    // The one deliberate omission. This is what the `missing-metric` scenario IS — its definition, not a
+    // copy of the declared list, which is why naming it here is not the defect above.
+    $deliberatelyOmitted = ['missing-metric' => ['citation-liveness-lint']];
+
+    // A third log cannot join silently. gh.php resolves `ci-log-<scenario>.txt` and falls back to the
+    // shared `ci-log.txt`, so a log named for a scenario nobody declares is dead weight nothing drives.
+    foreach (glob(gateBaselinesFixtureDir().'/ci-log-*.txt') ?: [] as $log) {
+        $named = (string) preg_replace('/^ci-log-(.*)\.txt$/', '$1', basename($log));
+
+        expect(GATE_BASELINES_SCENARIOS)->toContain($named);
+    }
+
+    foreach (['recent-push', 'missing-metric'] as $scenario) {
+        [, $document] = gateBaselinesRunStreams($scenario);
+
+        $unscraped = gateBaselinesNotFound($document);
+        $expected = $deliberatelyOmitted[$scenario] ?? [];
+        sort($unscraped);
+        sort($expected);
+
+        $fixture = is_file(gateBaselinesFixtureDir().'/ci-log-'.$scenario.'.txt')
+            ? 'ci-log-'.$scenario.'.txt'
+            : 'ci-log.txt';
+
+        expect($unscraped)->toBe($expected, sprintf(
+            'tests/fixtures/gate-baselines/%s does not pair with the gate list in scripts/gate-baselines.php. '
+            .'unscraped: [%s]; expected: [%s]. These are a PAIRED FILE SET — a gate added to the list owes a '
+            .'line to every ci-log*.txt, and the deliberate omission in ci-log-missing-metric.txt owes its '
+            .'name to this arm. Add or move the LINE; the pattern is not what is wrong.',
+            $fixture,
+            implode(', ', $unscraped),
+            implode(', ', $expected),
+        ));
+
+        // The generator must still EMIT a row per declared gate — a dropped row would leave the set
+        // comparison above green over a document that never mentioned the gate at all.
+        foreach ($declared as $gate) {
+            expect($document)->toContain('| '.$gate.' |');
+        }
+    }
+});
 it('accepts a current push run on main, and scrapes every metric from its log', function (): void {
     [$status, $output] = gateBaselinesRun('recent-push');
 
@@ -152,7 +279,7 @@ it('accepts a current push run on main, and scrapes every metric from its log', 
     // ⛔ THE NON-VACUITY PARTNER FOR ALL FOUR REFUSALS. A guard that refused every run passes each of
     //    them and fails only here.
     // ⚠️ And the exit code alone is not enough: --dry-run also exits 1 when a metric pattern misses,
-    //    so a zero here asserts BOTH that the guard admitted the run and that all twelve rows carry a
+    //    so a zero here asserts BOTH that the guard admitted the run and that every declared row carries a
     //    value. The figures themselves are deliberately implausible fixtures and are never asserted —
     //    docs/gate-baselines.md is the only place real gate numbers live.
     expect($output)->not->toContain('**NOT FOUND**');

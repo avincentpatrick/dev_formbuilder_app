@@ -9063,8 +9063,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   pins `SubmissionStatus` as an `as const` array in a TEST file**, which its own comment at `:56-58`
   correctly calls a literal a person maintains. Filed rather than added to the gate because each needs a
   decision about what the right vocabulary is, not a comparison. **Live.** Filed by `M89`.
-- **`minor` · `updateField()` can deadlock against a publish, and the loser surfaces as the same unrendered
-  500 `M89` just fixed for the constraint case.** Found by `M89`'s fan-out (2026-09-10).
+- ~~**`minor` · `updateField()` can deadlock against a publish, and the loser surfaces as the same unrendered
+  500 `M89` just fixed for the constraint case.**~~ Found by `M89`'s fan-out (2026-09-10).
   `updateField()` touches the field row, then the validation rows, then the field row again — the INSERT's
   foreign-key check takes `FOR KEY SHARE`, which conflicts with a publisher's `FOR UPDATE`. The orders
   agree **except when Eloquent skips the `save()` entirely** because nothing is dirty, which is reachable
@@ -9074,9 +9074,29 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   lands as a generic JSON 500.** ⚠️ `M89`'s child lock makes this reachable rather than causing it — the
   ordering hazard predates it and the lock is what puts a publisher on those rows deliberately.
   ⚠️ The remedy is a retry (`DB::transaction($closure, attempts: 3)`) or a stable lock order, and choosing
-  is the work. **Live.** Filed by `M89`.
-- **`minor` · The `__lead__` key reservation is enforced by two writers and asserted at the route layer by
-  nothing, and the sentence that claimed otherwise named a file that has never existed.** Found by `M90`
+  is the work.
+  ⛔ **`M91`: THE MECHANISM HELD EXACTLY AND THE CHOICE WAS NOT ONE.** The two lock orders were re-read
+  from source — a publisher takes `form_fields` and then `form_field_validations`, each in one
+  statement — and `Model::save()` checks `isDirty()` before it issues anything, so a clean resubmit
+  really does reverse the builder's order. ⛔ **BUT THE RETRY IS UNTESTABLE IN THIS SUITE AND THAT IS
+  STRUCTURAL, not an oversight**: `ManagesTransactions::handleTransactionException()` converts a
+  concurrency error into a `DeadlockException` and rethrows it whenever `transactions > 1`, which
+  `RefreshDatabase` guarantees, so the retry loop can never fire under Pest and would ship as
+  production-only behaviour no control could prove. `attempts:` appears at none of the 92
+  `DB::transaction(` call sites. ⚠️ **And the row's second option needed splitting before it could be
+  taken**: §3.4 declines the **forms**-row lock for field-level edits and says §8 covers them at finer
+  grain, so a forms-row lock here would have reversed a written decision — a **field**-row lock does
+  not, and is that finer grain. ✅ **Shipped as one added statement in `writeField()`**, a locking
+  re-read of the row the transaction is already about to write, taken before any child row.
+  `tests/Feature/Forms/BuilderLockOrderTest.php` pins the order on BOTH the clean and dirty paths and
+  asserts the clean resubmit issues no `UPDATE` at all, which is the row's premise made executable.
+  ⚠️ **The ordering arms carry an explicit non-null floor and the reason is measured**: the index
+  helper returns `?int` and PHP evaluates `null < 5` as TRUE, so the comparison alone would have
+  passed over a statement that was never issued. Control `m4-lock-removed` reddens both ordering arms
+  and leaves the non-vacuity arm green. Closed by `M91`.
+  Filed by `M89`.
+- ~~**`minor` · The `__lead__` key reservation is enforced by two writers and asserted at the route layer by
+  nothing, and the sentence that claimed otherwise named a file that has never existed.**~~ Found by `M90`
   (2026-09-10) while building `scripts/test-pointer-lint.php`. `tests/Unit/Forms/StepProjectionTest.php`
   pins the RULES by restating them, and says the call sites "themselves are exercised by" a section-routes
   suite — which is one of the four dead test-class pointers that gate now forbids. ⛔ **Correcting the name
@@ -9086,7 +9106,22 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   reserved key**. Doc #27 §2.1 says the reservation owes a test rather than a migration, and it is still
   owed. ⚠️ The two unverified writers the projection test names — `SchemaBlueprintMaterializer` (templates)
   and the field library — both write through `Model::create` with no FormRequest in the path, so the
-  request-layer rules cannot cover them even once they are asserted. **Live.** Filed by `M90`.
+  request-layer rules cannot cover them even once they are asserted.
+  ⛔ **`M91`: THE UNASSERTED HALF WAS REAL AND THE TWO-WRITER HALF IS WRONG.** Neither named writer is
+  a writer of a caller-supplied key. `FieldLibrary::fromField()` stores `'key' => null`, so a library
+  item carries no key at all; and `form_templates.schema_blueprint` is written at exactly one site,
+  `TemplateService::saveAsTemplate()`, from a SNAPSHOT of rows whose keys already came through a
+  guarded path — **no route anywhere accepts a client-supplied blueprint**, which was checked against
+  every controller and request class rather than inferred from the write shape. ⚠️ **So the census is
+  two surfaces, not four**: `storeSection()` takes no payload and `StoreFieldRequest` has no `key`
+  rule, both minting server-side, which leaves the two PATCHes. ✅ **Both now assert the rejection over
+  HTTP** in `tests/Feature/Forms/BuilderRoutesTest.php`, reading the sentinel from its constant and
+  asserting the refusal did not write. ⚠️ **One half was already covered and the row does not say so**:
+  the FIELD patch's key regex has had HTTP coverage since `D4a` via `Not A Key`. What is new is the
+  SECTION patch, which had no HTTP coverage of any kind; the sentinel specifically, so renaming
+  `LEAD_STEP_KEY` to something the regex accepts reddens here and nowhere else; and the no-write
+  assertions. Control `m3-section-key-regex-removed` reddens the new arm alone. Closed by `M91`.
+  Filed by `M90`.
 - **`minor` · Two more callers of the snapshot serializer still read a torn tree, and whether they should
   follow `M90`'s instrument is an open decision rather than an oversight.** Found by `M90` (2026-09-10)
   while closing the `saveAsTemplate` row. `XlsformExporter::build()` and
@@ -9098,15 +9133,30 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   exists to drop it. ⛔ **The blocker is the decision, not the code**: `M90` made `saveAsTemplate()` the
   FIRST request-path `set transaction isolation level` in this codebase, and whether that becomes a pattern
   is `D29` in `docs/claims/decisions.md`. **Latent.** Filed by `M90`.
-- **`minor` · Four sites cite a tenants column-whitelist guard that has never existed, and the gate that
-  could see them is forced to exempt it.** Found by `M90` (2026-09-10). `scripts/test-pointer-lint.php`
+- ~~**`minor` · Four sites cite a tenants column-whitelist guard that has never existed, and the gate that
+  could see them is forced to exempt it.**~~ Found by `M90` (2026-09-10). `scripts/test-pointer-lint.php`
   forbids a test file naming a `*Test` class with no file behind it; this one is EXEMPTED rather than
   fixed, because `tests/Feature/Tenancy/TenantColumnWhitelistTest.php` names it precisely to record that it
   does not exist and that four sites cite it. ⛔ **The exemption keeps the gate honest and leaves the four
   sites lying**: the model and three `Schema::table('tenants')` migrations still point a reader at a guard
   they will not find. ⚠️ The gate cannot reach them at all — they are in `app/` and `database/`, and it
   scans `tests/`. Fixing this means correcting four comments to name the three `toContain()` assertions
-  that actually exist, after checking those assertions still cover what the comments claim. **Live.**
+  that actually exist, after checking those assertions still cover what the comments claim.
+  ⛔ **`M91`: THIS ROW IS INVERTED, AND ITS OWN GUARD CLAUSE IS WHAT CAUGHT IT.** *"After checking those
+  assertions still cover what the comments claim"* — the check comes back NO, twice over. **The four
+  sites are not lying and were never asked to be corrected**: all four were repaired at `P2a`
+  (`1aa906d`, 2026-08-14, four weeks before this row was filed) and cite `TenantColumnWhitelistTest`,
+  which exists and pins the list by SET EQUALITY in both directions. Each keeps the dead name only as
+  the one it used to carry. ⛔ **Applying the prescribed remedy would have downgraded four true
+  citations into false ones**, re-pointing them at three `toContain()` assertions that live in three
+  OTHER files, cover a fraction of the list, and cannot fail for a new column — the case the guard
+  exists for. ✅ **What had actually gone stale were three sentences DESCRIBING the repair in the
+  present tense**, and all three are corrected at source: `TenantColumnWhitelistTest`'s own header,
+  `scripts/test-pointer-lint.php`'s dead-pointer roster, and its exemption reason. The exemption
+  itself stays — the name still appears inside `tests/`, as a correction note, which is the one
+  mention the gate can see. ⚠️ **The row's arithmetic was right and an intermediate verdict of mine
+  was wrong**: five sites mention the string, but only four make the `pins ... by set equality` claim;
+  `app/Models/Tenant.php:71` is a past-tense attribution and not a guard citation. Closed by `M91`.
   Filed by `M90`.
 - **`minor` · Three client-side workarounds were built ON the JSON-refusal defect `M90` fixed, and all
   three can now be simplified — but one of them is load-bearing until it is measured.** Found by `M90`
@@ -9129,8 +9179,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   whether that cap should be relaxed to per-file or re-derived per batch, and this is the first measured
   case of it forbidding work rather than merely shrinking a batch. It is an input to `D15`, not a licence.
   **Live.** Filed by `M90`.
-- **`minor` · `scripts/gate-baselines.php`'s gate list and its two harness fixtures must change together,
-  nothing says so, and `M90` turned `main` red by not knowing it.** Measured by `M90` (2026-09-10), the
+- ~~**`minor` · `scripts/gate-baselines.php`'s gate list and its two harness fixtures must change together,
+  nothing says so, and `M90` turned `main` red by not knowing it.**~~ Measured by `M90` (2026-09-10), the
   hard way. `GateBaselinesTest` drives the REAL generator against `tests/fixtures/gate-baselines/ci-log.txt`
   and `ci-log-missing-metric.txt`, so the declared gate list and those two logs are a **paired file set**:
   adding a fourteenth gate without adding its line to both makes the harness report one more unscraped
@@ -9142,4 +9192,104 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `scripts/test-pointer-lint.php` was built to end for test-class pointers and does not cover here. The fix
   is either a control arm asserting every key in the generator's list appears in both fixtures, or the pair
   added to 7(b-bis); the first is a gate and the second is prose, and this repository has a stated
-  preference between those. **Live.** Filed by `M90`.
+  preference between those.
+  ⛔ **`M91`: THE COUPLING WAS ALREADY DETECTED. WHAT WAS BROKEN IS THE DIAGNOSIS, AND ONE THING NOBODY
+  HAD NAMED.** `it accepts a current push run` already asserts the document carries no `NOT FOUND`, so
+  a gate added without its fixture line does redden — it just reddens saying *"fix the pattern in
+  `scripts/gate-baselines.php`"*, pointing the reader at the one file that was correct. ⛔ **AND THE
+  REAL GAP IS THE OTHER FIXTURE**: the missing-metric arms assert a COUNT (`1 metric(s) NOT FOUND`)
+  and a SUBSTRING (`citation-liveness-lint`), so moving the deliberate omission to any other gate
+  keeps both green while the fixture silently stops driving the `$missing > 0` branch it exists for.
+  ✅ **Shipped as one arm asserting SET EQUALITY of the unscraped set per fixture**, with the gate list
+  harvested from the generator rather than restated — a third copy of that list being the defect the
+  arm exists to catch. Control `m1-moved-omission` reddens the new arm and NOTHING else, which is the
+  proof it adds detection rather than a second opinion. ⚠️ **The harvest carries a three-way floor**
+  (an absolute count that only ratchets up, a cross-check against a second harvest of the same block,
+  and an anchor name), and control `m5-harvest-regex-broken` takes assertions 106 → 70 and reddens
+  the arm rather than leaving it green over an empty set — `M87`'s failure mode, made unrepeatable
+  here. ✅ Also corrected: two prose counts saying *"all twelve"* against a list of fourteen, and the
+  support-file floor, which named `ci-log.txt` and had never asserted `ci-log-missing-metric.txt` at
+  all. ⚠️ **7(b-bis) was deliberately NOT edited** — it is scoped to cross-lane pairs and its remedy is
+  a no-op for a pair one lane always owns; the generator already names its harness in its own
+  `GATE_BASELINES_OUT` docblock. Closed by `M91`.
+  Filed by `M90`.
+- **`minor` · Seven dead test-class pointers across twelve sites live in `app/` and `database/`, and the
+  gate built to end that species cannot see one of them.** Measured by `M91` (2026-09-11) while closing
+  the tenants column-whitelist row, which is the case that proved the shape.
+  `scripts/test-pointer-lint.php` forbids a test file naming a `*Test` class with no file behind it and
+  scans `tests/` only; a census over `app/`, `database/` and `routes/` using the same predicate finds
+  **`CustomDomainClaimTest`** (4 sites — `app/Http/Requests/Api/V1/StoreDomainRequest.php:17`,
+  `app/Models/Domain.php:30`, `app/Services/Tenancy/CustomDomainService.php:32`,
+  `database/migrations/2026_08_04_000001_add_custom_domain_verification_to_domains.php:42`),
+  **`CustomDomainSweepTest`** (`app/Models/Domain.php:80`), **`EnforcePlatformMaintenanceTest`**
+  (`app/Http/Middleware/EnforcePlatformMaintenance.php:28`), **`FormListKeywordParityTest`**
+  (`app/Services/Forms/FormPresenter.php:57`), **`MemberJoinedAwardTest`**
+  (`app/Listeners/Gamification/AwardPointsForMemberJoined.php:25`), **`PdfFieldRoleParityTest`**
+  (`app/Enums/PdfFieldRole.php:28` and `:98`) and **`ToggleableModulesTest`**
+  (`app/Support/Entitlements/ToggleableModules.php:45`, `database/seeders/Data/PlanCatalog.php:26`).
+  ⛔ **Each of the seven returns ZERO mentions anywhere in `tests/`**, so none is a renamed file or a
+  class in a differently-named one — they point a reader at coverage that does not exist, which is
+  strictly worse than no pointer. ⚠️ **`TenantCustomColumnsTest`'s four sites are NOT in that count**:
+  they are deliberate correction notes and are the reason the gate carries its one exemption.
+  ⚠️ **The repair is not simply widening the scan roots.** `scan()` renders every site relative to its
+  own root, so a second root reports `Models/Tenant.php` rather than `app/Models/Tenant.php`, and the
+  `FILE_FLOOR`/`NAME_FLOOR` constants are census-shaped for `tests/` and would need per-root values.
+  Each of the seven also needs deciding individually — correct the name, write the test, or exempt it.
+  **Live.** Filed by `M91`.
+- **`minor` · Standing Rule 7(b-bis) says "Three files" against a table of five rows, inside the rule
+  that exists to keep paired files in step.** Found by `M91` (2026-09-11) while deciding whether the
+  gate-baselines pair belonged there. `PROGRESS.md`'s 7(b-bis) intro asserts in the present tense that
+  three files assert parity across the lane boundary; the table beneath it carries five, the last two
+  added later. ⛔ **It is the row above it, in the rule about exactly this defect** — a declared count
+  drifting from its own census — and it is the strongest available argument for gating counts rather
+  than writing them. ⚠️ **Filed rather than fixed deliberately**: `PROGRESS.md` is a hub file and a lane
+  edits only its own status block and hand-off line, so correcting another lane's structural prose is
+  outside what an increment may take unilaterally. ⚠️ The honest repair is probably not a corrected
+  number but a removed one — the sentence reads correctly as *"the files below"*. **Live.**
+  Filed by `M91`.
+- **`minor` · `BlueprintValidator` enforces no key FORMAT at all, and `SchemaTreeCloner` carries keys
+  forward verbatim — defence in depth rather than a live defect, and it should be recorded as which.**
+  Found by `M91` (2026-09-11) while closing the `__lead__` reservation row.
+  `app/Services/Forms/BlueprintValidator.php` checks that a blueprint section or field key is a
+  non-empty string and unique, and never that it matches the `^[a-z][a-z0-9_]*$` shape the two PATCH
+  routes require — so a blueprint naming the reserved `__lead__` step would materialize into
+  `form_sections.key`. ⛔ **This is NOT reachable by a tenant actor and the distinction is the whole
+  row**: `form_templates.schema_blueprint` has one writer, `TemplateService::saveAsTemplate()`, which
+  snapshots rows whose keys already came through a guarded path, and no route accepts a client-supplied
+  blueprint. The only hand-authored source is developer seed PHP. ⚠️ **A fourth writer of
+  `form_sections` exists that a `::create` grep does not see**: `SchemaTreeCloner::clone()` replicates
+  rows, so it propagates a bad key rather than originating one. ⚠️ **A full format rule is the wrong
+  first move** — it would turn blueprints accepted at capture time into refusals at instantiate time,
+  which is a compatibility question and not a lint. A sentinel-only refusal is the narrow version and
+  is what the `__lead__` row would have bought. **Latent.** Filed by `M91`.
+- **`minor` · A third instance of the citation class `M83` filed in the abstract: three live lines that
+  say nothing about what cites them.** Found by `M91` (2026-09-11) while checking what its own edits
+  would shift. `docs/feature-backlog.md:7546` cites `app/Services/Forms/FormBuilderService.php:157`,
+  `:322` and `:331` as the sites where *"validations are written inline from the field payload"*. All
+  three resolve and all three are alive, so the citation gate passes; `:157` is a docblock terminator,
+  `:322` is `$item->increment('usage_count')` inside the field-library counter and `:331` is
+  `reorder()`'s signature. ⛔ **None of the three has ever been about validations**, and the gate is
+  built to pass exactly this — it asserts a cited line is ALIVE, never that it still says what the
+  citation claims. ⚠️ **`M91` shifted `:322` and `:331` further** by inserting into `writeField()`, which
+  changes nothing about their correctness in either direction and is recorded so the next reader does
+  not read the drift as the defect. ⚠️ The repair is to re-derive the three from the code — the real
+  sites are `replaceValidations()` and its single caller — and it should be taken with `8043`, which
+  filed the class, rather than alone. **Live.** Filed by `M91`.
+- **`minor` · A SECOND publisher-versus-builder deadlock cycle survives `M91`'s fix, reached only through
+  a cross-field validation rule, and neither side orders its lock set.** Measured by `M91` (2026-09-11)
+  while closing the `updateField()` row, and recorded because the closure would otherwise read as closing
+  more than it did. `M91` makes `writeField()` take its OWN field row before any child row, which closes
+  the cycle the closed row names. ⛔ **It does not cover a SIBLING field row.**
+  `FormBuilderService::replaceValidations()` resolves `related_field_key` to a sibling id and inserts
+  `related_form_field_id`, whose foreign-key check takes `FOR KEY SHARE` on a `form_fields` row the
+  `whereKey()` lock never touched. ⚠️ **And the publisher's own lock set is unordered**:
+  `app/Services/Forms/PublishService.php:86` locks every field of the draft in ONE statement with no
+  `ORDER BY`, so it may acquire the sibling `Y` and then block on the builder's `X` — while the builder
+  holds `X` and waits for `Y`. 40P01, on both the clean and the dirty path, and the same typed catch
+  rethrows it as an unrendered 500. ⚠️ **It is strictly narrower than the closed row**: it needs a
+  validation rule naming another field in the same draft, where the closed one needed only a resubmit.
+  ⚠️ The remedy is a stable ORDER on both sides — `ORDER BY id` on the publisher's three lock statements,
+  and a single locking re-read over `[$field->id, ...$siblingIds]` ordered the same way, which means
+  hoisting the sibling resolution above the lock. ⛔ **Do not take it as a bug fix without deciding the
+  first half**: adding `ORDER BY` to the publish path changes a shipped locking statement that
+  `tests/Feature/Forms/PublishLockingTest.php` pins by shape. **Live.** Filed by `M91`.

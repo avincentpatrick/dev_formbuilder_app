@@ -142,8 +142,9 @@ final class FormBuilderService
      * Every deleter of a draft child — deleteField(), deleteSection(), PublishService, RestoreService,
      * XlsformImporter, FormService::archive() — takes the same `forms`-row FOR UPDATE lock, so the
      * structural mutators here are serialized against them and their check-then-write cannot race.
-     * updateField() and updateSection() are the two that deliberately do NOT lock (§3.4 declines to
-     * serialize content edits), and of those only this one writes foreign keys: replaceValidations()
+     * updateField() and updateSection() are the two that deliberately do not take THAT lock (§3.4
+     * declines to serialize content edits on the `forms` row), and of those only this one writes
+     * foreign keys: replaceValidations()
      * INSERTs `form_field_id` and `related_form_field_id`, both declared `cascadeOnDelete()` and both
      * IMMEDIATE — there is no DEFERRABLE anywhere in database/migrations/.
      *
@@ -206,6 +207,16 @@ final class FormBuilderService
             // the one this transaction is already about to write, and no `forms` row is touched. The
             // deliberate no-lock note on assertStillDraftChild() below is about the same forms-row lock
             // and is untouched.
+            //
+            // ⚠️ §8 IS THE OTHER SENTENCE A READER WILL REACH FOR, AND IT SURVIVES INTACT. It says
+            // `form_sections`/`form_fields`/`form_field_validations` use *"optimistic concurrency, not
+            // locking"*, with `updated_at` as the token and a 409 on drift. That mechanism ARBITRATES
+            // CONFLICTS and is untouched: assertNoDrift() still runs before this transaction opens and
+            // still answers 409. This lock arbitrates nothing and rejects nobody — it is transaction
+            // scoped, held for the width of one write, and exists only so two transactions agree on
+            // the ORDER they touch two tables in. A reader who reads it as a second concurrency
+            // mechanism has read it wrong, which is why the distinction is written here rather than
+            // left to be inferred.
             //
             // ⚠️ A LOCKING SELECT IS FILTERED BY THE UPDATE POLICY'S USING EXPRESSION RATHER THAN
             // ERRORING, so a row that has stopped being a draft child between the guard above and here

@@ -47,47 +47,107 @@ the `D15` exemption eighteen batched increments have relied on, recorded rather 
 in deliberately: three meta rows and no user-visible defect would be a batch that cannot be wrong in an
 interesting way.
 
+⛔ **CORRECTION 1 — THE BATCH'S LEGALITY TABLE NAMED THE WRONG HUB FILE, AND THE BATCH IS STILL LEGAL.**
+Row 1 was declared hub-touching via `scripts/gate-baselines.php`; the fix never opens it, because the arm
+harvests the gate list from the generator's source and the generator already names its harness in its own
+`GATE_BASELINES_OUT` docblock. The hub file this batch actually touches is `scripts/test-pointer-lint.php`
+(3 citing rows), under **row 2**, which the table declared `no`. **One hub row either way, so `D13` clause 1
+holds — but the table was wrong and is corrected here rather than quietly.**
+
+⚠️ **NEAR-MISS ON CLAUSE 2, AND IT WAS AN AUTHORING DECISION RATHER THAN A CHECK.** Row 3's arm landed in
+`tests/Feature/Forms/BuilderRoutesTest.php`; row 4's claim line said *"a new Pest arm"*, and the natural
+home for a builder arm is that same file. Row 4 went into a new `BuilderLockOrderTest.php` instead. **A
+claim that names a directory rather than a file cannot be collision-checked when it is written**, which is
+the half of `D13`'s selection rule nothing enforces.
+
 ### Evidence verified
 
-⏳ **FAN-OUT IN FLIGHT — this heading is populated per row as the read-only agents land, and every
-load-bearing citation is re-opened by hand before it is acted on.** What is already checked by hand at
-claim time, and is why these four rows were selected:
+**Four read-only agents over disjoint rows, then an adversarial arm against every verdict, then every
+load-bearing citation re-opened by hand before it was acted on.** Per row:
 
-- **`9101` — the four citing sites resolve exactly and are four.** `app/Models/Tenant.php:57` and `:71`,
-  `database/migrations/2026_07_23_000008_add_draft_ttl_days_to_tenants.php:19`,
-  `2026_08_05_000003_add_branding_to_tenants.php:41`, `2026_08_06_000004_add_maintenance_to_tenants.php:27`.
-  ⚠️ **That is five citations across four files, not four sites** — the row's own count needs settling.
-  `scripts/test-pointer-lint.php:70` carries the exemption and names the reason.
-- **`9132` — the paired set is real and is two files.** `tests/fixtures/gate-baselines/ci-log.txt` and
-  `ci-log-missing-metric.txt` both exist, both stamped `Sep 10 23:21` — the `M90` repair commit `8325de3`.
-- **`9078` — `StepProjection::LEAD_STEP_KEY` is the single definition** at
-  `app/Support/Forms/StepProjection.php:63`, and `__lead__` appears nowhere else in `app/` or `routes/`.
-- **`9066` — both `updateField()` sites resolve**: `app/Services/Forms/FormBuilderService.php:158` and
-  `app/Http/Controllers/Tenant/FormBuilderController.php:102`.
+- **`9132` — EVERY CITATION HELD, AND THE ROW UNDERSTATES ITS OWN FAILURE.** 14 gates declared, confirmed
+  twice (a regex parse of the block and a real generator run emitting a 14-row table); `GateBaselinesTest`
+  drives the REAL generator with only `gh`, `git` and the write destination stubbed; `ci-log.txt` satisfies
+  all 14 and `ci-log-missing-metric.txt` omits exactly one. ⛔ **The CI failure does not merely *read as* a
+  broken pattern — it PRINTS the instruction**: the document row says *"fix the pattern in
+  `scripts/gate-baselines.php`"*, naming the one file that was correct.
+- **`9101` — THE CITATIONS RESOLVE AND SAY THE OPPOSITE OF THE ROW.** All four cite
+  `TenantColumnWhitelistTest`, which exists; the dead name survives only as *"cited … until P2a"*.
+  ⚠️ **`git log -S` returns ONE commit, not two** — `8aad08b` is not an ancestor of `HEAD` and lives only on
+  an unmerged branch, so a reader reproducing that command gets a different answer. The conclusion stands on
+  `1aa906d` alone (P2a, 2026-08-14, four weeks before the row was filed).
+- **`9078` — HELD.** `LEAD_STEP_KEY` has one definition; `BuilderRoutesTest` posts to the sections route with
+  no body and asserts nothing about a rejected key. ⚠️ **The `__lead__` census in my own first pass was
+  conflated with `LEAD_STEP_KEY`**: the literal appears in **5 files, 13 lines** under `tests/`, plus
+  `resources/public-runtime/__tests__/clock.test.ts`, which is a test outside `tests/`.
+- **`9066` — HELD EXACTLY.** Both `updateField()` sites resolve; the typed catch rethrows anything that is
+  not 23503, so 40P01 falls through; the publisher takes sections → fields → validations, each in one
+  statement, at `PublishService.php:85-87`.
 
 ### Premise verified
 
-⏳ **FAN-OUT IN FLIGHT.** ⛔ **This is the field that has changed what the fix is in three of the last six
-increments, so no row here is acted on until its premise is answered separately from its evidence.** The
-premises this batch will be judged on, named before they are checked so the answer cannot be fitted to the
-work:
+⛔ **THE FIELD PAID FOR ITSELF FOR THE SEVENTH INCREMENT RUNNING, AND THIS TIME IT INVERTED A ROW.**
 
-- **`9132`** believes the fix is *"either a control arm asserting every key in the generator's list appears
-  in both fixtures, or the pair added to 7(b-bis)"*, and that this repository *"has a stated preference
-  between those"*. Both halves are premise, not evidence.
-- **`9101`** believes the four comments can be corrected *"to name the three `toContain()` assertions that
-  actually exist"* — which presumes there are three and that they cover what the comments claim.
-- **`9078`** believes `BuilderRoutesTest` *"asserts nothing about a REJECTED key"* and that the two writers
-  it names bypass every FormRequest.
-- **`9066`** believes the deadlock is reachable *"when the same payload is resubmitted"* because Eloquent
-  skips a clean `save()`, and that `M89`'s typed catch rethrows `40P01`.
+- **`9101` — FALSE, AND THE ROW'S OWN GUARD CLAUSE IS WHAT CAUGHT IT.** *"The four sites still point a reader
+  at a guard they will not find"* is not true and has not been true since `P2a`. ⛔ **The prescribed remedy
+  would have downgraded four TRUE citations into false ones.** What had rotted were three sentences
+  describing the repair in the present tense. ⚠️ **And an intermediate verdict of my own was wrong**: I
+  recorded at claim time that the citations were *"five across four files, not four"*. The adversarial arm
+  refuted it — `Tenant.php:71` is a past-tense attribution, not a `pins … by set equality` claim — so **the
+  row's arithmetic was right and my correction of it was the error.**
+- **`9078` — HALF FALSE, AND THE FALSE HALF SHRINKS THE ROW.** Neither named writer writes a caller-supplied
+  key: `FieldLibrary` stores `'key' => null`, and `form_templates.schema_blueprint` has one writer,
+  `TemplateService::saveAsTemplate()`, which snapshots already-guarded rows. ⛔ **No route accepts a
+  client-supplied blueprint**, checked against every controller and request class rather than inferred from
+  the write shape — one agent asserted the opposite and cited two *test fixtures* constructing the model
+  directly, which is what settled it. ⚠️ **And the row omits that half of it was already covered**: the
+  FIELD patch's key regex has had HTTP coverage since `D4a`.
+- **`9066` — THE MECHANISM HELD AND THE CHOICE WAS NOT A CHOICE.** The retry is **structurally untestable**:
+  `ManagesTransactions::handleTransactionException()` converts a concurrency error to a `DeadlockException`
+  and rethrows whenever `transactions > 1`, which `RefreshDatabase` guarantees, so the loop cannot fire under
+  Pest — and `attempts:` appears at none of the 92 `DB::transaction(` call sites. ⚠️ **The second option
+  needed splitting before it could be taken**: §3.4 declines the **forms**-row lock and §8 declares
+  *"optimistic concurrency, not locking"* for these three tables. A **field**-row lock reverses neither —
+  §8's 409-on-`updated_at` mechanism arbitrates conflicts and is untouched; this lock arbitrates nothing and
+  orders acquisition. **Both sentences are now addressed in the code rather than left to be inferred**, which
+  the first draft of the fix did not do.
+- **`9132` — EXPIRED, IN THE DIRECTION THAT MATTERS.** *"Nothing says so"* is false: detection already
+  existed and five arms proved it by going red. ⛔ **What was missing is the DIAGNOSIS, and one thing nobody
+  had named** — the missing-metric arms assert a count and a substring, so moving the deliberate omission to
+  another gate keeps both green while the fixture stops driving its branch. ⚠️ **7(b-bis) is the wrong home**:
+  it is scoped to cross-lane pairs and its remedy is a no-op for a pair one lane owns.
 
 ### Remedy verdict
 
-⏳ **FAN-OUT IN FLIGHT — measured before a line of test is written, per `D13` clause 2.** ⛔ **`9066` is
-the one to distrust**: it offers two remedies (`DB::transaction($closure, attempts: 3)` or a stable lock
-order) and says *"choosing is the work"*, which is a row that may be decision-blocked rather than
-buildable. If it is, it is filed as a decision and a fifth row is not substituted — `D13` allows three.
+**Measured before a line of test was written, per `D13` clause 2. Three of four prescribed remedies were
+wrong, and the fourth needed re-aiming.**
+
+- **`9132` — WORKS, re-aimed from detection to diagnosis plus set equality.** Buildable with no third copy
+  of the gate list, and as an arm in an already-discovered Pest file rather than a registered lint gate —
+  so it costs neither `composer.json` nor `ci.yml`, which is what `9123` says a new gate always costs.
+- **`9101` — WRONG, and inverted.** Recorded above.
+- **`9078` — WORKS for the route layer, IMPOSSIBLE for the POST routes the row points at** (`storeSection()`
+  accepts no payload; `StoreFieldRequest` has no `key` rule — both mint server-side).
+- **`9066` — one option untestable, one needed narrowing; shipped as one added statement.**
+
+### Controls — four mutations, all CAUGHT, with disjoint red sets
+
+| mutation | red set | what it proves |
+|---|---|---|
+| `m1-moved-omission` — move the deliberate omission to another gate | **the new arm ALONE** (1 failed, 11 passed) | the arm adds detection; the five existing arms are blind to it |
+| `m5-harvest-regex-broken` — shift the key-harvest regex by two spaces | the new arm, **assertions 106 → 70** | the three-way floor refuses to go green over an empty set — `M87`'s failure mode |
+| `m3-section-key-regex-removed` — drop the regex from `UpdateSectionRequest` | **the new arm ALONE** | the section PATCH had no HTTP coverage of any kind; the pre-existing arm drives the FIELD route |
+| `m4-lock-removed` — drop `lockForUpdate()` from `writeField()` | **both ordering arms, non-vacuity arm GREEN** | the lock is what orders the acquisition, and the partner arm is not measuring the same thing |
+
+### Measured, and not a defect in this diff
+
+⚠️ **`tests/Feature/Docs/SuiteCollectionFloorTest` is RED in the container and was red before this branch.**
+It reports 40 test files the collector cannot see — the documented Windows bind-mount truncation, which
+`docs/feature-backlog.md:6928` already owns. Reproduced with this branch's working tree stashed, and the
+files it names are ones this increment never touched.
+⚠️ **Four suites in ONE `artisan test` invocation exhaust the container's 128M limit** and die with a
+`FatalException` pointing at `routes/tenant.php:824`, which reads as a defect in that file and is not one.
+Split, every suite is green: Forms **415**, Unit/Forms **53**, Tenancy **322**.
 
 Files: as the batch table above; every path there is a candidate until its row's three verdicts land.
 Shared artefacts taken: `docs/feature-backlog.md`, `docs/claims/lane-a.md`, `docs/claims/decisions.md` (if a decision is filed), `docs/backlog-triage.md`, `docs/pipeline.md`, `docs/gate-baselines.md`, `PROGRESS.md` (own block only).

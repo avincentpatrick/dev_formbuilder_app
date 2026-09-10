@@ -137,21 +137,28 @@ it('reads a non-trivial fixture with unique case names', function (): void {
 });
 
 it('reserves the lead step key against the two authoring paths that validate keys', function (): void {
-    // Doc #27 §2.1 owes the `__lead__` reservation a test, not a migration, because it is a convention with
-    // TWO verified enforcers and TWO unverified writers — `SchemaBlueprintMaterializer` (form templates) and
-    // the field library both write through `Model::create` with no FormRequest in the path, which is the same
-    // shape Doc #26 recorded for `*_translations`.
+    // Doc #27 §2.1 owed the `__lead__` reservation a test rather than a migration, because it is a
+    // convention rather than a constraint. ✅ M91 DISCHARGED IT, and corrected the sentence that framed
+    // it. The reservation has TWO verified enforcers — `UpdateSectionRequest`'s and `UpdateFieldRequest`'s
+    // shared `regex:/^[a-z][a-z0-9_]*$/`, and `XlsformImportParser::sanitizeKey()`'s `x_` prefix.
     //
-    // What this pins is the RULES, restated from their sources so a change to either reddens here; the
-    // section call sites are exercised by `BuilderRoutesTest` and the XLSForm import suite. Both rules are
-    // private to their classes, so asserting them any closer would mean adding a test-only seam to
-    // production code for no behavioural gain.
+    // ⛔ THE "TWO UNVERIFIED WRITERS" HALF WAS FALSE IN BOTH ITS TERMS. The field library stores
+    // `'key' => null`, so a library item carries no key to collide with; and `form_templates.
+    // schema_blueprint` has exactly one writer, `TemplateService::saveAsTemplate()`, which snapshots rows
+    // whose keys already came through a guarded path — no route anywhere accepts a client-supplied
+    // blueprint. Corrected at source in `StepProjection` and in Doc #27. ⚠️ What the blueprint path does
+    // lack is a key FORMAT rule of its own, which is filed as a row rather than fixed: it is defence in
+    // depth on a path no tenant actor can reach.
     //
-    // ⚠️ M90: THE NAME HERE USED TO BE A SECTION-ROUTES SUITE THAT HAS NEVER EXISTED — one of four dead
-    // test-class pointers `scripts/test-pointer-lint.php` now forbids. And correcting the name does not
-    // make the sentence true: neither `BuilderRoutesTest` nor the import suite asserts the `__lead__`
-    // REJECTION at the route layer, so that half is pinned by nothing at all. Filed rather than quietly
-    // rewritten, because a corrected pointer to coverage that does not exist is the worse of the two.
+    // ⚠️ M90 RECORDED THAT A CORRECTED POINTER TO COVERAGE THAT DOES NOT EXIST IS THE WORSE OF TWO
+    // OPTIONS, AND THAT IS WHY THIS BLOCK NAMES A SUITE AGAIN ONLY NOW. The route-layer REJECTION is
+    // asserted over HTTP, on both PATCH routes, by
+    // `BuilderRoutesTest::'refuses the reserved lead-step key on both authoring routes that accept a key'`
+    // — which reads the sentinel from the constant below, so renaming it reddens there.
+    //
+    // What THIS case still pins is the RULES, restated from their sources so a change to either reddens
+    // here as well. Both rules are private to their classes, so asserting them any closer would mean
+    // adding a test-only seam to production code for no behavioural gain.
     expect(StepProjection::LEAD_STEP_KEY)->toBe('__lead__');
 
     // `UpdateSectionRequest`: `regex:/^[a-z][a-z0-9_]*$/` — a leading underscore is rejected outright.

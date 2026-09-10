@@ -82,6 +82,16 @@ final class PublishService
             // A phantom INSERT is not covered by FOR UPDATE, and does not need to be: every insert path
             // into these tables takes the `forms` lock first, except replaceValidations(), whose INSERT
             // takes FOR KEY SHARE on the referenced form_fields row and therefore blocks on this.
+            //
+            // ⛔ M91 — THAT LAST CLAUSE STOPPED ONE STEP SHORT, AND THE STEP IT MISSED WAS A DEADLOCK.
+            // "Blocks on this" is true only if the builder reaches its INSERT AFTER this statement
+            // ran. It did not have to: Eloquent skips a clean save(), so a resubmitted identical
+            // payload took no `form_fields` lock at all and went straight to the validation rows —
+            // this transaction then held every field and wanted the validations, while the builder
+            // held a validation row and wanted a field. 40P01, and the builder's typed catch rethrows
+            // anything that is not 23503, so it surfaced as an unrendered 500. writeField() now takes
+            // its field row before it touches any child, which is what makes the clause above true
+            // unconditionally; tests/Feature/Forms/BuilderLockOrderTest.php is what keeps it true.
             FormSection::query()->where('form_version_id', $draft->id)->lockForUpdate()->pluck('id');
             FormField::query()->where('form_version_id', $draft->id)->lockForUpdate()->pluck('id');
             FormFieldValidation::query()->where('form_version_id', $draft->id)->lockForUpdate()->pluck('id');

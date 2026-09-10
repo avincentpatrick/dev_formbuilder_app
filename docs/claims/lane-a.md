@@ -16,9 +16,51 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M91`, the twenty-second `D13` batch: a paired fixture set with no gate, four comments citing a guard that never existed, a reserved key nothing asserts, and a deadlock that lands as an unrendered 500 (`m91-d13-batch`)
+## Status: NO ACTIVE CLAIM — `M91` is merged; the next increment is a fresh `D13` batch
 
-Taken 2026-09-11. Branch `m91-d13-batch`, cut from `origin/main` at `77f46a7`, PR into `main`.
+## RELEASED — `M91`, the twenty-second `D13` batch: a paired fixture set with a gate, four comments that were already right, a reserved key nothing asserted, and a lock order that depended on a payload being dirty (merged as PR #282, `12b4a31`, 6/6 green with real step counts — Static analysis 28 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
+
+Shipped 2026-09-11. Branch `m91-d13-batch`, cut from `origin/main` at `77f46a7`. **Four rows closed — three
+by fixing, one INVERTED — six rows filed, one design doc reconciled with the code, and four positive
+controls run, all CAUGHT with disjoint red sets.**
+
+⛔ **THE HEADLINE IS THAT A ROW WAS WRONG IN THE ONE DIRECTION `Premise verified` EXISTS TO CATCH, AND ITS
+OWN GUARD CLAUSE IS WHAT CAUGHT IT.** `9101` said four sites *"still point a reader at a guard they will not
+find"*. They do not, and have not since `P2a` — four weeks before the row was filed. **Its prescribed remedy
+would have downgraded four true citations into false ones.** The row ended with *"after checking those
+assertions still cover what the comments claim"*; the check came back NO, and that is the whole finding.
+
+⛔ **AND THE ADVERSARIAL ARM REFUTED ONE OF MY OWN VERDICTS.** I recorded at claim time that the row
+miscounted — *"five citations across four files, not four"*. It did not: `Tenant.php:71` is a past-tense
+attribution rather than a *"pins the whole list by set equality"* claim, so the row said four and there are
+four. **The row was right and my correction of it was the error**, caught only because an independent pass
+was told to attack counts specifically.
+
+⚠️ **HOW THE PREDICTION FARED — RIGHT ABOUT THE GATE, WRONG ABOUT THE OUTCOME, AND WRONG IN THE SAFE
+DIRECTION.** The claim named citation-liveness as the gate most likely to break, and predicted it would
+break on a file the warning had not named. **It did not break.** It finished at exactly `ledger tier 18,
+ceiling 18` — zero headroom, the state the prediction described — and it held because the two edits that
+could have moved it were made line-neutral deliberately: Doc #27 §2.1 and §8 of the versioning doc are each
+a single long line, and each was amended in place rather than expanded. ⚠️ **The insertion into
+`writeField()` did shift the `:322` and `:331` citations at `docs/feature-backlog.md:7546`**, exactly as
+feared; they survive because that gate asserts a cited line is ALIVE and never that it still says what the
+citation claims — a third independently-found instance of the class `8043` filed, and now a row of its own.
+
+⚠️ **THE OTHER THREE PREDICTIONS HELD.** Pint green on the host, bare. PHPStan unmoved — **18 errors
+locally, every one the same `Access to an undefined property` phantom class and none at a changed line**,
+with the Static analysis job green at 28 steps. E2E was reached by none of the four rows.
+
+⚠️ **TWO HARNESS TRAPS RE-OBSERVED, BOTH ALREADY ON THE RECORD AND BOTH STILL LIVE.** A `gh run watch` on a
+run my own next push superseded **exited 0**, which is `M88`'s finding reproduced — the authority is the run
+id, never the watcher's status. And `docker compose run --rm e2e npx …` printed `unknown command 'npx'`
+rather than running anything; the entrypoint is already `node …/cli.js`, so the verb is `test`. ✅ **The
+exit status itself propagates correctly** — measured with a nonexistent spec, which exits 1 — so `4996`'s
+*"the wrong form exits 0"* is about the WRAPPER reporting, not about `docker compose run`.
+
+⚠️ **THE LOCAL E2E SPEC COULD NOT BE RUN, AND THE REASON IS THE ENVIRONMENT RATHER THAN THE DIFF.**
+`builder-axe.spec.ts` fails in `globalSetup` because the dev database holds **zero users**. The suite runs
+against `meridian_testing` and the app against `meridian`, so this is not test fallout — the dev stack is
+simply unseeded here. CI's E2E job is the authority and is green at 20 steps.
 
 ⛔ **THE GENERATED PROPOSAL IS REJECTED FOR THE FOURTH TIME, AND FOR THE FOURTH DIFFERENT REASON.**
 `docs/backlog-triage.md`'s `## Suggested next batch` offers `4252` · `6883` · `5981` · `8424`. `4252`

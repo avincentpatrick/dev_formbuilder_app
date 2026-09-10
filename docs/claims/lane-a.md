@@ -16,157 +16,102 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M89`, the twentieth `D13` batch: an unrendered 500 on the builder's write path, a snapshot frozen without locking what it freezes, a cross-language vocabulary nothing compares, and a dormant-column skip that cannot see a table (`m89-d13-batch`)
+## Status: NO ACTIVE CLAIM — `M89` is merged; the next increment is a fresh `D13` batch
 
-Taken 2026-09-10. Branch `m89-d13-batch`, cut from `origin/main` at `6d9ce08`, PR into `main`.
+## RELEASED — `M89`, the twentieth `D13` batch: an unrendered 500 on the builder's write path, a snapshot frozen without locking what it freezes, a cross-language vocabulary nothing compared, and a dormant-column skip that could not see a table (merged as PR #280, `d5cb42d`, 6/6 green with real step counts — Static analysis 26 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 
-⛔ **THE GENERATED PROPOSAL IS REJECTED FOR THE FIFTH INCREMENT RUNNING, FOR THE MECHANISM THE LEDGER
-ALREADY OWNS AS AN OPEN ROW.** `docs/backlog-triage.md`'s `## Suggested next batch` offers `4242` · `6873` ·
-`5971` · `8414`. Read by `D13`'s letter — *at most one row may **touch** a hub file* — three of the four
-break the cap: `4242`'s repair is in `scripts/tracker-lint.php` and its subjects are `CLAUDE.md` (8 rows)
-and `PROGRESS.md` (3); `5971`'s can only be made in `scripts/pipeline.php` (12); `8414`'s in
-`scripts/citation-liveness-lint.php` (6). ⚠️ **The generator is not malfunctioning** — it implements *cites*
-where the decision says *touches*, which is precisely what `docs/feature-backlog.md:8533` records as an open
-row. This is the fifth consecutive rejection; it is further evidence for `D15` and is recorded rather than
-re-argued. **And the fourth proposed row, `6873`, is independently unstartable**: its own body says the
-remedy needs *"a product decision nobody has taken"*, which is the `state=ready`-from-liveness-alone defect
-already open at `docs/feature-backlog.md:8267`.
+Shipped 2026-09-10. Branch `m89-d13-batch`, cut from `origin/main` at `6d9ce08`. **Four rows closed —
+two by fixing, one with a new gate, one by measuring that its own prescribed fix was wrong — seven rows
+filed, and twelve positive controls run.**
 
-**The batch, chosen by hand under `D13`'s letter — one hub-touching row, no two rows sharing a non-hub file:**
+⛔ **THE HEADLINE IS `Premise verified` FOR THE FIFTH INCREMENT RUNNING, AND THIS TIME IT TURNED A REPAIR
+INTO A DIFFERENT REPAIR.** Every row's premise was wrong. In two cases that changed what the fix is; in
+one it changed whether the row was takeable at all.
 
-| # | Row | Hub? | Non-hub files it would touch |
+| row | evidence | premise | remedy |
 |---|---|---|---|
-| 1 | `docs/feature-backlog.md:8732` — a builder edit whose field was deleted mid-request returns a bare 500 when the payload carries validations | no | `app/Services/Forms/FormBuilderService.php`, `app/Exceptions/FormException.php`, `bootstrap/app.php`, a `tests/Feature/Forms/` arm |
-| 2 | `docs/feature-backlog.md:8713` — the publish transaction reads the schema snapshot without locking the child rows it is about to freeze | no | `app/Services/Forms/PublishService.php`, `app/Services/Forms/SchemaSnapshotSerializer.php`, `app/Services/Forms/SchemaTreeCloner.php`, `docs/form-versioning-schema-migration.md`, a `tests/Feature/Forms/` arm |
-| 3 | `docs/feature-backlog.md:8811` — a whole file of PHP-enum mirrors in the public runtime has no parity gate | no | `resources/public-runtime/engine/enums.ts`, `resources/js/types/inertia.d.ts`, `resources/js/components/forms/types.ts`, `app/Enums/*`, a new `tests/Feature/Docs/` arm |
-| 4 | `docs/feature-backlog.md:8799` — `P2d`'s dormant-column skip is TABLE-BLIND, and its literal-`null` sibling hides three more columns | **yes** — `scripts/pipeline-lint.php` | `scripts/pipeline-lint-controls.php`, `tests/Feature/Docs/PipelineLintControlsTest.php` |
+| `8732` | 5/5 held | ⛔ false twice — the surface returns **six** statuses, and the 500 *is* rendered | works; the message names a publication that did not happen, and the row misses a second FK in its own statement |
+| `8713` | held; the window is ~60 statements, not a dozen | held on RLS, **verified against the live database** | ⛔ works in exactly **one** placement; the two obvious ones fail SILENTLY |
+| `8811` | ⛔ two citations false, both undercounts | ⛔ false and dispositive — the instrument was chosen and shipped in `J3a` | none offered; the parser, decisively |
+| `8799` | held, and the history verified against git | ⛔ *"one predicate change reaches both"* — 8 + 3 + 2 = 13 | ⛔ **wrong**: it reddens eight columns that are all already dispositioned |
 
-⚠️ **`docs/feature-backlog.md` is in the hub table at 4 citing rows and is deliberately not counted here**, on
-`M87`'s stated grounds: every closure and every correction edits the ledger, so counting it would make no
-batch legal at all.
+⛔ **`8713` — THE LOCK HAS EXACTLY ONE CORRECT PLACEMENT, `EXPLAIN` PREDICTED WHY, AND A MUTATION PROVED
+IT.** Postgres applies the UPDATE policy's `USING` expression to a locking `SELECT` as a **filter**, not an
+error. `SchemaTreeCloner` runs *after* the status flip, so a `lockForUpdate()` there sees the transaction's
+own uncommitted `published`, matches zero rows, and **clones an empty tree — no error, no failing publish,
+and every other publish test in the repository still green.** The positive control that moves the lock
+there turns the clone arm red, which is the empirical half of an argument that started as a query plan.
+The lock therefore goes at the TOP of the transaction, before the validation gates, where it also closes an
+unstated defect: an edit landing between a gate read and the snapshot publishes a snapshot that never
+passed the gate it was meant to pass. ⚠️ **§3.4 was wrong in both directions** — four operations named
+where the tree has nine, and two of the four (form creation, "draft-discard") are not among them at all.
 
-⚠️ **Rows 1 and 2 are both from `M88`'s builder-lock fan-out and share no file, no service and no remedy.**
-Row 1 is a post-guard constraint violation that surfaces unrendered on the *builder* path; row 2 is a
-snapshot read that takes no child lock inside *publish*. Row 1's repair is a typed catch, row 2's is a
-locking read. `M88`'s re-read guard is the thing that narrows row 1 and provably cannot reach row 2.
+⛔ **`8799` — THE ROW'S OWN FIX WAS MEASURED BEFORE IT WAS REJECTED, AND THE REPLACEMENT WAS MEASURED
+AGAINST TWO TREES.** Keying the skip on `table.column` reddens **eight** columns, every one already
+dispositioned in prose naming its table in the same sentence — it would force four documents to be reworded
+to satisfy a string format. Requiring the table in the same **paragraph** discharges all eight, reddens
+nothing new here, and against the tree at `3c0cbbe` **still reddens `subscriptions.trial_ends_at` while
+still discharging the `tenants` phantom that masked it**. ⚠️ **And the row's central sentence is false by
+arithmetic**: table-keying surfaces 8, the literal-`null` sibling 3, together 13 — two edits in two
+functions, so this row does **not** close `7858`. The `null` half is filed rather than folded in.
 
-⛔ **Row 4 is expected to close `docs/feature-backlog.md:7858` as well, and if it does not, the claim says so
-in the release.** `8799` states that one predicate change reaches both; `7858` states that both available
-repairs for its half are worse than the defect. Those two sentences cannot both be right, and settling which
-is part of taking the row.
+⛔ **`8811` — THE ROW WAS FILED AS UNSTARTABLE ON A PREMISE A `find` WOULD HAVE REFUTED.** It says the
+instrument is not obvious and that *choosing between a generator and a parser is the work*; `J3a` shipped
+three parsers of exactly that shape before the row existed. It also undercounts its own file — **seven**
+mirrored vocabularies, not four, three of them outside `App\Enums\` — and its claim that no spec references
+the file is **false**, though the conclusion survives, because `tsconfig.json` excludes every `*.test.ts`
+from type-checking. Twenty mirrors are now gated, in both directions, under two declared grammars.
 
-⚠️ **Row 4 is the row most likely to grow.** Un-blinding the skip makes previously-discharged columns
-undischarged, which turns a **host** gate red until each is dispositioned. Dispositioning is a ledger edit,
-which is in scope; if it turns out to need `docs/data-dictionary.md` line insertions, the citation ledger's
-zero headroom binds and the row is corrected rather than forced — the `M87` lesson, not a second attempt at it.
+⛔ **`8732` — RIGHT ABOUT ITS DEFECT AND WRONG ABOUT THE SURFACE AROUND IT.** *"The 422 every other refusal
+on that surface returns"* is false: it returns 403, 404, 409, 419, 422 **and a 302**. ⚠️ **That 302 is a
+shipped defect strictly worse than the one filed** — a `feature:` denial answers a JSON `fetch` with a
+redirect to HTML, so the builder shows "Request failed" and never says the feature is off the plan, and a
+test pins it. It needs no race. Filed. ⚠️ **And the row is a floor**: the same statement writes a second
+foreign key that `M88`'s guard does not narrow at all. The two are told apart by a re-read rather than by
+parsing the driver's message, and the prescribed `childNotInDraft()` was replaced because its message names
+a publication that did not happen.
 
-### Evidence verified
+✅ **TWELVE POSITIVE CONTROLS, ALL CAUGHT.** The two that matter most: the cloner-placed lock (above), and
+reverting P2d to its pre-`M89` predicate, which reddens **exactly the two new control cases and leaves the
+other forty green** — the precise-rather-than-drowning shape that `docs/feature-backlog.md:7915` records as
+usually absent. The mirror gate's five include the PHP-side direction, which nothing could see before.
 
-**Answered per row, from a read-only fan-out of four researchers over disjoint files, then re-opened by
-hand before the first edit.**
+⚠️ **HOW THE PREDICTION FARED — WRONG ON BOTH NAMED GATES, AND WHAT ACTUALLY BROKE WAS NEITHER.** The claim
+named `pipeline-lint` as *"the gate I most expect to be wrong"* because its controls mirror the live corpus.
+It went green, and the control it did redden was the two-case set that names the defect. The second
+prediction, `docs/pipeline.md`'s `PROGRESS.md` citation, did not break either. ⛔ **What broke was the
+citation ledger, at 19 against a ceiling of 18** — and the cause is worth recording: **a `path:line`
+citation lifted from a research report and never opened was blank on arrival.** The gate caught it in the
+same pass that filed the row. ⚠️ **`pipeline-lint` was also already RED on the trunk when the claim was
+cut** — P1 drift from `M88`'s own close-out — which is inherited rather than caused, and cleared by this
+increment's regeneration.
 
-- **`8732`** — **five of five citations HELD.** `replaceValidations()` INSERTs `form_field_id`
-  (`FormBuilderService.php:387-390`); the FK is `constrained('form_fields')->cascadeOnDelete()`
-  (`2026_07_06_000206_create_form_field_validations_table.php:24`); `grep -ri deferrable database/`
-  returns zero; `respond()` has exactly two `catch` arms (`FormBuilderController.php:227,233`);
-  `bootstrap/app.php` registers no `QueryException` renderable across its 24 `render()` calls.
-  ⚠️ **One caveat that matters**: `bootstrap/app.php:549` *does* register a `Throwable` catch-all, but it
-  returns early for anything outside `api/v1/*`, and the builder routes are on a tenant subdomain.
-- **`8713`** — **six of six HELD, one of them understated.** `PublishService::publish()` locks `forms`
-  (`:41`), snapshots while still draft (`:69-70`), flips (`:79-86`), clones (`:114`); no `lockForUpdate`
-  exists on any of the three child tables anywhere in the tree — 25 hits in `app/`, all on `Form`,
-  `Submission`, `ScopeNode`, `SsoConnection` or a polymorphic grant target. ⚠️ **"A dozen statements" is
-  conservative**: twelve unlocked child reads sit between the `forms` lock and the snapshot, and the clone
-  is three SELECTs plus one INSERT per section, field and validation — ~60 statements for a 40-field form.
-- **`8811`** — **held except two, and both errors are undercounts.** The mirror file holds **seven**
-  vocabularies, not four, and three of the seven live in `App\Services\Expressions\` rather than
-  `App\Enums\`, so the resolver the row implies cannot reach them. ⛔ **"No test or spec references the
-  mirror file" is FALSE** — `engine/__tests__/golden-validation.test.ts:18` imports exactly the four types
-  the row names. **The row's conclusion survives its false citation**, and the reason is the finding:
-  `tsconfig.json:34-35` excludes every `*.test.ts` from `vue-tsc`, so that import is type-checked by
-  nothing. The `bot_challenge` vocabulary has **four** copies, not two.
-- **`8799`** — **held at the lines it names.** The `$scheduled` skip was a bare `str_contains` on the
-  column name with no table (`pipeline-lint.php:738` as it stood); the collector already keys each cell by
-  table (`:1431`) and the failure message prints it (`:755`). The three `stripe_*` columns exist and are
-  inert. ⚠️ **The historical claim was verified against git rather than accepted**: at `3c0cbbe` the whole
-  scheduled buffer contained `trial_ends_at` exactly twice, both inside the `tenants` phantom row, and
-  `subscriptions` appears nowhere near either. **The mask was real and it was a `tenants` mention.**
+⚠️ **WHAT WAS NOT COVERED, STATED RATHER THAN GLOSSED.** **E2E did not run locally**: the loaded database
+carries no e2e seed, so the one spec this diff reaches (`builder-axe.spec.ts`) fails at global setup, and
+reseeding would rewrite the dev credentials. CI's E2E job is the authority and is counted below.
+`tests/Feature/Docs` carries its documented `SuiteCollectionFloor` red — the open `D17` decision — and the
+40 files it names were run explicitly instead. PHPStan's 18 local errors are all the known
+`undefined property` phantom family, classified by message rather than counted; CI reports zero.
 
-### Premise verified
+**Files actually edited**, against the claim's list: `app/Services/Forms/FormBuilderService.php`,
+`app/Services/Forms/PublishService.php`, `app/Exceptions/Forms/FormException.php`,
+`tests/Feature/Forms/BuilderDraftGuardTest.php`, `tests/Feature/Forms/PublishLockingTest.php` (new),
+`tests/Feature/Docs/DocumentedEnumMirrorDriftTest.php` (new),
+`tests/Feature/Docs/PipelineLintControlsTest.php`, `scripts/pipeline-lint.php`,
+`docs/form-versioning-schema-migration.md`, `docs/feature-backlog.md`, `docs/pipeline.md`,
+`docs/backlog-triage.md`, `docs/claims/lane-a.md`, `PROGRESS.md`, `docs/gate-baselines.md`.
+⚠️ **`bootstrap/app.php` was claimed and never opened** — the repair is a typed catch in the service, and
+the renderable the claim imagined would have been broader than the defect. ⚠️ **Three files were edited
+that the claim did not name**: `FormException.php`, `PublishLockingTest.php` and `PipelineLintControlsTest.php`,
+each a direct consequence of a premise finding rather than a scope change. Namespaces spent: **nothing from
+either namespace** — no migration, no ADR, as predicted.
 
-⛔ **FOUR FOR FOUR WRONG, FOR THE FIFTH INCREMENT RUNNING — AND THIS TIME ONE OF THEM CHANGED THE REPAIR
-INTO A DIFFERENT REPAIR.**
-
-- **`8732` — FALSE in two places.** *"the 422 every other refusal on that surface returns"*: the surface
-  returns **403, 404, 409, 419, 422 and a 302** depending on the refusal. ⚠️ **The 302 is a shipped defect
-  of the same family and is worse than the filed one** — a `feature:field_library` denial hits
-  `bootstrap/app.php:333-339`'s `back()` on the non-API arm, so a JSON `fetch` follows a redirect, gets
-  HTML, and the builder shows a generic "Request failed"; it is **test-pinned that way**. And *"nothing
-  renders the exception"* overstates it: `Accept: application/json` is set, so the framework renders a
-  generic JSON 500 that the builder displays as "Server Error". ⚠️ **The row is a floor**: the same
-  statement writes a SECOND foreign key, `related_form_field_id`, which `M88`'s guard does not narrow at
-  all, because the guard re-reads only the edited child.
-- **`8713` — held on RLS, FALSE on its sibling census, and the RLS half was verified against the live
-  database rather than reasoned.** `pg_policies` confirms `draft_update` carries
-  `EXISTS (... fv.status = 'draft')` as a filter, `SHOW default_transaction_isolation` is `read committed`,
-  and `EXPLAIN` on a locking child read shows the policy applied as a **Filter** rather than an error.
-  ⛔ **But `PublishService` is not the only snapshot producer**: `TemplateService::saveAsTemplate()` runs
-  the same serializer with **no transaction at all**, so its three reads cannot even see a consistent tree.
-  Filed rather than swept in.
-- **`8811` — FALSE, and it is the premise that decides the whole row.** The row says the instrument is not
-  obvious and that *choosing between a generator and a parser is the work*. **The choice was made and
-  shipped in `J3a`**: `NotificationTypeParityTest` regex-reads a union off disk and compares it to an enum,
-  `PdfFieldRoleTest` does it for a `new Set` literal, `ShellAbilityParityTest` for an interface. Three
-  working precedents predate the row. ⛔ **And its framing is misleading in the other direction**: the
-  mirror population and the enum-catalog population are different sets that overlap in 8 of ~28, so
-  *"precisely the population the new gate was built for"* is not what it looks like.
-- **`8799` — FALSE in the sentence the remedy rests on.** *"one predicate change reaches both"* is wrong,
-  and the refutation is arithmetic rather than argument: table-keying alone surfaces **8**, the literal-
-  `null` sibling alone surfaces **3**, together **13**. They are two edits in two functions, and closing
-  this row does **not** close `7858`. ⚠️ **`pipeline-lint` was already RED on the trunk when the claim was
-  cut** — P1 drift, because `M88`'s close-out prepended a `PROGRESS.md` line after `docs/pipeline.md` was
-  generated. Inherited, not caused, and cleared by the close-out's own regeneration.
-
-### Remedy verdict
-
-- **`8732` — WORKS, with the mapping under-specified.** The typed catch is right and the house idiom is
-  `(string) $e->getCode()` with an unconditional rethrow (`SavedReportViewService::guardName()`,
-  `SubmissionPipeline`), never the constraint name. ⛔ **But the catch must wrap the transaction, not sit
-  inside it** — PostgreSQL aborts the current transaction on a violation — and
-  **`childNotInDraft()`'s message is wrong for the cause**: it names a publication that did not happen.
-  Two accurate constructors instead, and the two foreign keys are told apart by a re-read rather than by
-  parsing the driver's message.
-- **`8713` — WORKS, in exactly one placement, and the two obvious ones are silently catastrophic.** The
-  lock goes at the TOP of the transaction, before the gates. ⛔ **In `SchemaTreeCloner` it clones an EMPTY
-  TREE with no error** — the cloner runs after the flip, so the policy filter matches zero rows. That was
-  predicted from `EXPLAIN` and then **confirmed empirically by mutation**: the positive control that moves
-  the lock there turns the clone arm red. In `SchemaSnapshotSerializer` it breaks two callers that run
-  outside any transaction and one that reads published versions.
-- **`8811` — NONE OFFERED; the parser, decisively.** A generator is wrong here for four measured reasons:
-  four mirrors diverge from their enum deliberately, the files carry hand-written rationale a generator
-  destroys, the mirrors are single lines inside larger hand-authored contract files, and a new generator
-  needs a `composer.json` alias plus a `ci.yml` step where a Pest arm needs neither.
-- **`8799` — WRONG as prescribed, and a better predicate was measured rather than argued.** `table.column`
-  reddens 8 columns that are all already dispositioned in prose naming their table. **Requiring the table
-  in the same PARAGRAPH** discharges all 8, reddens nothing new on this tree, and — measured against the
-  tree at `3c0cbbe` — still reddens `subscriptions.trial_ends_at` while still discharging the `tenants`
-  phantom. It catches the defect the row was filed for and manufactures nothing.
-
-Files: `docs/claims/lane-a.md`, `docs/feature-backlog.md`, `docs/backlog-triage.md`, `docs/pipeline.md`,
-`PROGRESS.md` (own block only), `docs/gate-baselines.md`, plus the per-row files in the table above.
-Shared artefacts taken: `docs/feature-backlog.md`, `docs/backlog-triage.md`, `docs/pipeline.md`,
-`docs/form-versioning-schema-migration.md`, `PROGRESS.md` (own block only).
-Paired files taken: none identified at claim time; the fan-out is asked to name any.
-Namespaces spent: nothing from either namespace at claim time — no migration and no ADR is expected.
-Prediction: Pest gains arms and no CI job's step count moves; PHPStan CI stays at zero while the local run
-keeps its phantoms, which must be classified by MESSAGE rather than counted; Pint runs bare on the host;
-`openapi.json` stays byte-identical because no route, request or resource shape changes. **The gate I most
-expect to be wrong is `pipeline-lint` itself** — row 4 edits the gate that guards the queue, its controls
-mirror the live corpus (`docs/feature-backlog.md:7915`), and a predicate change there reddens every control
-case at once rather than the one that names the defect. Second most likely: `docs/pipeline.md`'s citation
-of `PROGRESS.md`, which every close-out drifts. ⚠️ **`PROGRESS.md` is at 119,828 bytes against R1's 130,000
-and one close-out costs ~5.5KB, so this increment fits and the next one does not** — that is a finding for
-the hand-off, not work this claim takes.
+⚠️ **THE VERDICT COMMIT DID NOT REACH `main` SEPARATELY, AND THE REASON IS THE PRE-PUSH GUARD WORKING.**
+`M88`'s pattern is claim → verdicts → work, each pushed to the trunk. This increment wrote the verdicts
+after the four rows were built, so the verdict commit sat on top of work commits and
+`git push origin HEAD:main` would have pushed all five. The guard refused it, correctly, and the verdicts
+landed with the PR instead. The rule that matters — **the claim is a pushed commit before the first file is
+opened** — was met at `ca5e444`.
 
 ## RELEASED — `M88`, the nineteenth `D13` batch: two lock asymmetries that were not what they said, five dormant columns rather than four, and an enum catalog gated against the database and nothing else (merged as PR #279, `ee8ca26`, 6/6 green with real step counts — Static analysis 26 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

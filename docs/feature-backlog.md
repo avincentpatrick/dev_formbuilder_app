@@ -8358,8 +8358,11 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   transaction. That caveat is written into `SubmissionDraftService` for promote and is missing here.
   ⛔ **THE CENSUS IS FIVE LIVE INSTANCES, NOT TWO, AND THE TWO IT MISSES ARE THE MORE SERIOUS.**
   `SubmissionPipeline::submit()`'s `assertCanStart()` (opens_at/closes_at) is never re-decided under any
-  lock, while `M85` DID re-assert exactly that check under the lock on the promote side — an asymmetry
-  created by the fix that filed this row; and `FormBuilderService::updateField()` / `updateSection()` are the
+  lock — ⛔ **and the clause that stood here was FALSE, corrected by `M88` (2026-09-08): `M85` re-asserted
+  `assertCanPromote()`, a different and strictly weaker predicate, and took no lock at all, so there is no
+  promote-side re-assertion of the schedule window and no asymmetry. That third copy of the claim is why
+  `M88` corrected all of them in one commit rather than only the row it closed** — and
+  `FormBuilderService::updateField()` / `updateSection()` are the
   only mutators in that service that do not call `lockDraft()`, which is the one instance whose consequence
   is DATA rather than a message. Both are filed as their own rows below. `app/Http/Controllers/` contains
   zero `DB::transaction` and zero `lockForUpdate`, so no instance can live there by construction.
@@ -8556,17 +8559,38 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   synthetic inputs, assert the verdict. `M86` extended one of those harnesses without altering its design, so
   the cost here is known rather than estimated. **Live.** Filed by `M86`.
 
-- **`minor` · The schedule window is re-asserted under the lock on the promote door and on no other, and the
-  asymmetry was created by the fix that filed the row above it.** Measured by `M87`'s fan-out (2026-09-08)
-  while verifying the pre-lock row. `SubmissionPipeline::submit()` calls `assertCanStart()` — the
-  `opens_at`/`closes_at` window — before its transaction and never re-decides it; `SubmissionDraftService`'s
-  `createDraft()` path does the same. ⛔ **`M85` DID re-assert exactly that check under the lock on the
-  promote side**, so the tree now enforces the schedule window under the lock in one place and not in the
-  other, and nothing says why. ⚠️ **There IS a lock to hang it on, conditionally**: `SubmissionFinalizer`
-  calls `assertCapacity()`, which takes `Form::lockForUpdate()` on the same `forms` row `PublishService`
-  holds — but only when `max_responses !== null`, so an unconditional fix is the throughput decision
-  `SubmissionDraftService` already declined once in writing. ⚠️ **`FormService::updateSchedule()` takes no
-  form lock at all**, which is the other end of the same window. **Live.** Filed by `M87`.
+- ~~**`minor` · The schedule window is re-asserted under the lock on the promote door and on no other, and the
+  asymmetry was created by the fix that filed the row above it.**~~
+  ⛔ **CORRECTED AND CLOSED BY `M88` (2026-09-08) AS NO-CODE-CHANGE, AND THE CITATIONS ARE NOT WHY.** Nine of
+  eleven resolve exactly; the two that do not carry the entire argument.
+  ⛔ **`M85` DID NOT RE-ASSERT "EXACTLY THAT CHECK".** What it added on the promote side is
+  `Form::query()->whereKey($form->id)->firstOrFail()` followed by `assertCanPromote()` — a **different and
+  strictly weaker predicate**. `assertCanPromote()` refuses only a draft created at or after `closes_at` (a
+  retroactive close); `assertCanStart()` is the `now()`-window. There is therefore no promote-side
+  re-assertion of the schedule window to be symmetric with, and the asymmetry this row is named for does not
+  exist.
+  ⛔ **AND IT TAKES NO LOCK, WHICH REMOVES THE ROW'S WHOLE REMEDY.** `M85`'s fix is a lock-free **re-read**,
+  and under READ COMMITTED a re-read inside the transaction already sees a committed `setSchedule()`. So the
+  `max_responses !== null` conditionality is irrelevant, and so is the throughput declination the row leans
+  on — *"taking `Form::lockForUpdate()` on every promote … is deliberately not taken here"* governs a
+  **lock**, not a re-read.
+  ⚠️ **`FormService::updateSchedule()` DOES NOT EXIST.** The method is `setSchedule()`; the name appeared
+  nowhere in the tree except this row. The substantive half holds — it opens a transaction and takes no form
+  lock — and it is one of **seven** lock-free writers to `forms` on that service against one locked
+  (`archive`), which is filed separately rather than folded in here.
+  ⚠️ **"NOTHING SAYS WHY" IS FALSE; THERE ARE TWO WRITTEN WHYS.** `assertCanStart()`'s docblock records that
+  it *"runs early (before any transaction) so a refusal is cheap and leaves nothing to roll back"*, and the
+  draft-create path records that capacity *"is NOT gated at draft-create … the authoritative cap runs at
+  promote's finalize"* — so `createDraft()` never reaches `assertCapacity()` and has **no lock to hang
+  anything on**, which is the second of the two doors this row names.
+  ⛔ **AND THE PRESCRIBED FIX WOULD CONTRADICT H12a RATHER THAN RESTORE SYMMETRY.** The grace window exists
+  so a respondent who STARTED inside the window is not stranded; the promote door admits a close moved to
+  `now()` *by design*, and a shipped test says so in as many words. A fresh submit that passed
+  `assertCanStart()` is in exactly that position, so refusing it 300 ms later is a policy change.
+  ✅ **DISPOSITION: no code change — recorded as an amendment to `D27`, not as a silent closure.** That
+  decision's own option 3 records that stating *"neither"* is itself a decision nobody has taken, so the
+  schedule window joins `D27` as a fourth surface rather than being settled here. `D27`'s carve-out
+  paragraph asserted the same false claim and was corrected in the same commit. Closed by `M88`.
 - **`minor` · `FormBuilderService::updateField()` and `updateSection()` are the only mutators in that service
   that do not lock the draft, and theirs is the one instance whose consequence is DATA rather than a
   message.** Measured by `M87`'s fan-out (2026-09-08). Every other mutator there calls `lockDraft()` INSIDE

@@ -113,9 +113,21 @@ in both places.
    version columns from the same object it read. ⚠️ This is the option the existing rows lean toward and
    nobody has stated it as a decision, which is what makes it a decision rather than a backlog item.
 
-⚠️ **`assertCanStart()` is deliberately NOT part of this question.** The schedule window is re-asserted
-under the lock on promote and on no other door, and that asymmetry was created by the fix that filed the
-row — it is a defect with an obvious answer, so it is a queue row rather than a decision.
+⚠️ **AMENDED BY `M88` (2026-09-08) — `assertCanStart()` WAS CARVED OUT ON A PREMISE THAT IS FALSE, AND IS
+NOW THE FOURTH SURFACE OF THIS QUESTION.** This paragraph read that the schedule window *"is re-asserted
+under the lock on promote and on no other door"*, and that the asymmetry was *"a defect with an obvious
+answer, so it is a queue row rather than a decision"*. ⛔ **Measured against the code: `M85` re-asserted
+`assertCanPromote()` — which refuses only a draft created at or after `closes_at` — and NOT
+`assertCanStart()`, which is the `now()`-window; and it took NO LOCK, only a re-read.** So there is no
+promote-side re-assertion of the schedule window, no asymmetry to restore, and nothing obvious to do.
+⛔ **The remedy the carve-out assumed would contradict H12a rather than restore symmetry**: the grace window
+exists so a respondent who STARTED inside the window is not stranded, the promote door admits a close moved
+to `now()` by design and a shipped test says so, and a fresh submit that passed `assertCanStart()` is in
+exactly that position. ⚠️ **Option 3's warning therefore applies to this surface unchanged** — declining to
+act is a decision nobody has stated, not a backlog item — which is why the ledger row is closed as
+no-code-change and the question lives here instead. ⚠️ **The paragraph above on the submit door's conditional
+lock is NOT affected**: it says the throughput trade was declined *for promote*, which is exactly what the
+code comment says, and it applies it to `submit()`'s republish question rather than to the schedule window.
 
 ---
 

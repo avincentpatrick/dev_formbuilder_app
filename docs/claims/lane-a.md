@@ -183,6 +183,64 @@ everything or nothing. ⚠️ **Second most likely wrong: row 3's statement-shap
 statement is *skipped* under `RefreshDatabase` and the naive assertion would therefore pass against an unrepaired
 tree — a vacuity trap of exactly the shape `M84` measured. Both get a mutation before they are believed.
 
+
+### CLAIM CORRECTION 1 — the adversarial arm broke four of my own verdicts, and one of them broke in the ROW's favour
+
+⛔ **Pushed before the first file was opened.** One refuter per row, each told to default to *refuted* on
+anything it could not confirm by opening the file itself. Every correction below was then re-opened by hand.
+
+- **Row 1 — the population is ONE reachable route, not seven, and my `Files` list was wrong about which file
+  decides the fix.** Every other surface I counted is already guarded ON THE CLIENT: `/integrations` is itself
+  `feature:native_connectors` (`routes/tenant.php:823-824`), so its four sidecars have no denial path;
+  `/achievements/streak` is refused before it is issued by `useMemberStreak.ts:62`; the library *insert* is
+  hidden by `Builder.vue`'s `v-if="feature('field_library')"`; and `refreshLibrary()` has no caller at all.
+  ⛔ **The one reachable path is `forms.fields.save-to-library`, because `ConfigPanel.vue` renders "Save to
+  library" with no entitlement condition and imports no entitlement helper.** So the row's *"happens every
+  time"* is true of exactly one button. ⚠️ **And the strongest evidence in the whole increment is a file
+  neither the row nor my first pass opened**: `useMemberStreak.ts:29-41` is a thirteen-line docblock headed
+  *"`enabled` IS NOT AN OPTIMISATION"* that describes this defect exactly — path-keyed branch, 302, session
+  flash, *"a toast the member did nothing to provoke, on a random page, once per navigation forever"* — and
+  exists solely to work around it. **Three client-side workarounds for one server-side defect, and the fourth
+  surface forgot to build one.** That is an argument for repairing the handler, not against it.
+- **Row 1 — `routes/tenant.php` is NOT touched after all, so the batch's one hub slot moves to row 3.** Those
+  comments explain why a surface was built never to THROW, which stays true after an `expectsJson()` fix.
+  ⚠️ **And this file's own seven-handler census has rotted**: it records `:286/:297/:310/:323/:336/:389/:458`
+  and the arms are at `:296/:307/:320/:333/:346/:399/:468` today, under a header whose `bootstrap/app.php`
+  range no longer resolves to the arm it names. Cited without line numbers above for that reason.
+- **Row 2 — `42501` IS AN `M89` CARVE-OUT AND MAPPING IT WOULD BE A REVERSAL.**
+  `FormBuilderService.php:163-167` says it in as many words: *"Anything that is not the foreign key — 23505 …,
+  23514 …, **42501 when RLS refuses the row outright** — keeps the behaviour it has today rather than being
+  silently relabelled."* My remedy verdict called `duplicateField()`'s escaping 42501 *"the same defect `M89`
+  spent a whole row closing"*; it is the case `M89` deliberately left. **The repair still stands and is not a
+  reversal** — a re-read guard makes the straddled INSERT unreachable rather than relabelling its error.
+- **Row 2 — I filed a PREMISE error as a CENSUS error, which would have sent a repairer the wrong way.** The
+  row does name the locking siblings as a class and says why it excluded them. Its **reason** is what is
+  false: *"the locking siblings' exposure is bounded by their lock"* cannot be true, because `lockDraft()`
+  re-reads under `FOR UPDATE` and returns a **fresh** draft, so the lock bounds nothing about a staleness
+  that originates at route-model binding. Four sites still need the guard; the correction is to the row's
+  reasoning, not to its arithmetic.
+- **Row 2 — THE REQUEST-LAYER HALF IS DECISION-SHAPED AFTER ALL, AND THE ROW WAS RIGHT.** I claimed scoping on
+  the child's own `form_version_id` was *"decision-free and strictly better"*. It is neither. Outside the race
+  the two scopes are identical; inside it the child's version is now **published and immutable**, so the rule
+  would check uniqueness inside a version no write can reach — wrong in a different direction. Both are
+  harmless only because `assertStillDraftChild()` refuses afterwards. **The request classes are therefore not
+  edited this increment and the question is filed.** ⚠️ My "NULL-draft hole" was also wrong twice: Laravel
+  routes a null through `whereNull()`, and `assertDraftChild()`'s first clause already refuses that case.
+- **Row 3 — the row's one genuinely false clause is one I passed straight through.** *"cannot see a consistent
+  tree **even without a concurrent writer**"* is false: with no concurrent writer three autocommitted reads
+  return an identical tree. The tear needs the race, which makes `minor` the right grade.
+- **Row 3 — `REPEATABLE READ` IS NOT THE "EXACT PRECEDENT" I CALLED IT.** `set transaction isolation level`
+  occurs **once** in the whole tree, in a service reached only from a console command over a 41-table offline
+  extract. Using it here would make `saveAsTemplate()` the **first request-path isolation-level change in this
+  codebase**. Taken anyway, because the risk is measured rather than assumed — the transaction's only write is
+  an INSERT of an unrelated row, so no serialization failure is reachable — but **the general pattern question
+  is filed as a decision** rather than settled by one row, since it governs the two serializer callers this
+  increment does not touch. That filing is this batch's single hub touch.
+- **Row 4 — survives essentially intact, and one point is stronger than I put it.** `git log --all -S` shows
+  the phantom name entered as a comment in `G10b1` and the file has never existed in history, so *"never
+  written"* is exact rather than merely absent at HEAD; and `PublishLockingTest.php:33` landed **before** the
+  row was filed, so the *"appears exactly once"* quantifier was false at the instant it was written.
+
 ## RELEASED — `M89`, the twentieth `D13` batch: an unrendered 500 on the builder's write path, a snapshot frozen without locking what it freezes, a cross-language vocabulary nothing compared, and a dormant-column skip that could not see a table (merged as PR #280, `d5cb42d`, 6/6 green with real step counts — Static analysis 26 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 
 Shipped 2026-09-10. Branch `m89-d13-batch`, cut from `origin/main` at `6d9ce08`. **Four rows closed —

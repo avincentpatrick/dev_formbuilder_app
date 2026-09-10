@@ -25,7 +25,9 @@ uses(RefreshDatabase::class);
 | Minting an impersonation grant — Increment I11b, rbac §9 resolved decision 1.
 |--------------------------------------------------------------------------
 | The console half: eligibility, the token row, the ledger entry in the AFFECTED TENANT's log, and the
-| Owner's notification. The consume half is ImpersonationConsumeTest.
+| Owner's notification. The consume half is ImpersonationSessionTest, whose own header says the reverse
+| ("ImpersonationMintTest covers the console side"). ⚠️ M90 corrected this: it named a consume suite that
+| has never existed, while the file that really covers that half sat next to it pointing back here.
 |
 | ⚠️ THE MINT RUNS WITH NO AMBIENT TENANT CONTEXT, which is the whole reason this is interesting. Every
 | write it performs lands in a strict-RLS table, so each case below is also a test that the adopted-context

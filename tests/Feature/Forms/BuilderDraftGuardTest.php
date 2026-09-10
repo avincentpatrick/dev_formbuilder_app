@@ -336,3 +336,106 @@ it('lets an unrelated constraint violation keep its own behaviour (negative cont
         null
     ))->toThrow(QueryException::class);
 });
+
+/*
+|--------------------------------------------------------------------------
+| M90 — the OTHER FOUR call sites, and they do not share a symptom.
+|--------------------------------------------------------------------------
+| M88 routed `updateField()` and `updateSection()` through the re-reading guard. Four more call sites
+| kept the route-bound one: `deleteSection()`, `deleteField()`, `duplicateField()` and
+| `saveFieldToLibrary()`. The backlog row named two of them and excluded the locking pair because
+| "the locking siblings' exposure is bounded by their lock".
+|
+| ⛔ THAT REASON IS FALSE, AND IT IS WHY THE CENSUS WAS SHORT. `lockDraft()` re-reads under FOR UPDATE
+| and returns a FRESH draft; the guard compares the STALE `$form` the caller passed in. They are
+| different objects, so the lock bounds nothing about a staleness that began at route-model binding.
+|
+| ⚠️ THE FOUR NEED DIFFERENT ASSERTIONS BECAUSE THEY FAIL DIFFERENTLY, and writing one shared case for
+| them would have hidden that:
+|   - the two DELETES were silent — `draft_delete`'s USING clause matched zero rows, Eloquent's
+|     delete() returned true regardless, and the controller answered `['deleted' => true]` with a 200.
+|     So the row must still be THERE afterwards; asserting only the throw would pass against the old
+|     code's silent no-op too.
+|   - duplicateField() was NOT silent: a straddled INSERT hit `draft_insert`'s WITH CHECK and raised
+|     42501, which respond() does not catch. So the old behaviour is a QueryException, and the new one
+|     is a FormException — a test that accepted any Throwable would not tell those apart.
+*/
+
+it('refuses a field DELETE whose form was published after the models were bound, and leaves the row', function (): void {
+    $tenant = builderTenant();
+    $admin = User::factory()->create();
+
+    [$boundForm, $boundField] = draftFormWithBoundField($tenant, $admin);
+
+    app(PublishService::class)->publish(Form::query()->whereKey($boundForm->id)->firstOrFail(), $admin);
+
+    expect($boundForm->draft_version_id)->toBe($boundField->form_version_id); // the stale guard agrees
+
+    expect(fn () => app(FormBuilderService::class)->deleteField($boundForm, $boundField))
+        ->toThrow(FormException::class);
+
+    // ⛔ THE LOAD-BEARING HALF. Before M90 this returned normally and deleted NOTHING, and the
+    // controller answered `['deleted' => true]` with a 200 — so the field vanished from the builder
+    // and was still there on reload. The throw alone cannot tell that apart from a correct refusal.
+    enterTenant($tenant->id, $admin->id);
+    expect(FormField::query()->whereKey($boundField->id)->exists())->toBeTrue();
+});
+
+it('refuses a section DELETE whose form was published after the models were bound, and leaves the row', function (): void {
+    $tenant = builderTenant();
+    $admin = User::factory()->create();
+
+    enterTenant($tenant->id, $admin->id);
+    $form = app(FormService::class)->create($tenant, $admin, 'Survey');
+    $section = app(FormBuilderService::class)->addSection($form->refresh());
+
+    $boundForm = Form::query()->whereKey($form->id)->firstOrFail();
+    $boundSection = FormSection::query()->whereKey($section->id)->firstOrFail();
+
+    app(PublishService::class)->publish(Form::query()->whereKey($form->id)->firstOrFail(), $admin);
+
+    expect(fn () => app(FormBuilderService::class)->deleteSection($boundForm, $boundSection))
+        ->toThrow(FormException::class);
+
+    enterTenant($tenant->id, $admin->id);
+    expect(FormSection::query()->whereKey($boundSection->id)->exists())->toBeTrue();
+});
+
+it('refuses a DUPLICATE across the version boundary with a 422, where it used to raise 42501', function (): void {
+    $tenant = builderTenant();
+    $admin = User::factory()->create();
+
+    [$boundForm, $boundField] = draftFormWithBoundField($tenant, $admin);
+
+    app(PublishService::class)->publish(Form::query()->whereKey($boundForm->id)->firstOrFail(), $admin);
+
+    // ⚠️ FormException, NOT QueryException, and the distinction is the whole case. The old path built
+    // an INSERT carrying the stale field's `form_version_id` with the fresh draft's key and sequence;
+    // `draft_insert`'s WITH CHECK refused it as 42501, which FormBuilderController::respond() does not
+    // catch, so it left as a bare 500. M89 deliberately declined to RELABEL 42501 in updateField's
+    // typed catch — this does not relabel it either, it makes it unreachable through this path.
+    expect(fn () => app(FormBuilderService::class)->duplicateField($boundForm, $admin, $boundField))
+        ->toThrow(FormException::class);
+
+    enterTenant($tenant->id, $admin->id);
+    expect(FormField::query()->where('form_version_id', $boundField->form_version_id)->count())->toBe(1);
+});
+
+it('refuses a library CAPTURE across the version boundary, which is consistency rather than safety', function (): void {
+    $tenant = builderTenant();
+    $admin = User::factory()->create();
+
+    [$boundForm, $boundField] = draftFormWithBoundField($tenant, $admin);
+
+    app(PublishService::class)->publish(Form::query()->whereKey($boundForm->id)->firstOrFail(), $admin);
+
+    // ⚠️ STATED SO NOBODY READS MORE INTO IT THAN IS THERE. This one was never corruption: publish
+    // clones the tree forward with identical content and new ids, so the item captured in the race
+    // would have been byte-identical to a correct one. It refuses because every sibling does, and
+    // because a capture whose source the user can no longer see is a confusing thing to succeed.
+    expect(fn () => app(FormBuilderService::class)->saveFieldToLibrary($boundForm, $admin, $boundField, []))
+        ->toThrow(FormException::class);
+
+    enterTenant($tenant->id, $admin->id);
+    expect(DB::table('field_library')->count())->toBe(0);
+});

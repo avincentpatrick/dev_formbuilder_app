@@ -106,7 +106,10 @@ final class FormBuilderService
     {
         DB::transaction(function () use ($form, $section): void {
             $this->lockDraft($form);
-            $this->assertDraftChild($form, $section);
+            // M90: the RE-READING guard, not the route-bound one. Holding the `forms` lock does not bound
+            // this staleness — `lockDraft()` re-reads and returns a FRESH draft, so the lock says nothing
+            // about the `$form` this guard compares. See the note on assertStillDraftChild().
+            $this->assertStillDraftChild($form, $section);
             // The FK is ON DELETE SET NULL — the section's fields become ungrouped, not deleted.
             $section->delete();
         });
@@ -214,7 +217,12 @@ final class FormBuilderService
     {
         DB::transaction(function () use ($form, $field): void {
             $this->lockDraft($form);
-            $this->assertDraftChild($form, $field);
+            // M90, and this is the worst-symptom member of the family. With the stale guard the two snapshots
+            // agree with each other, `draft_delete`'s USING clause (which requires the parent version be
+            // `draft`) matches ZERO rows, Eloquent's delete() returns true regardless, and the controller
+            // answers `['deleted' => true]` with a 200 — the field vanishes from the builder and is still
+            // there on reload. That is M88's headline symptom, verbatim, on the delete path.
+            $this->assertStillDraftChild($form, $field);
             $field->delete(); // cascades its validations
         });
     }
@@ -223,7 +231,13 @@ final class FormBuilderService
     {
         return DB::transaction(function () use ($form, $user, $field): FormField {
             $draft = $this->lockDraft($form);
-            $this->assertDraftChild($form, $field);
+            // M90. This one is not a silent write — it is a 500. The INSERT below straddles two versions:
+            // `form_version_id` is replicated from the STALE `$field` while the key and sequence come from
+            // the FRESH `$draft`. When they disagree, `draft_insert`'s WITH CHECK raises 42501, and
+            // FormBuilderController::respond() catches only BuilderConflictException and FormException, so
+            // it escapes as a bare JSON 500. ⚠️ M89 deliberately declined to RELABEL 42501 (see the
+            // QueryException catch in updateField()); this does not relabel it, it makes it unreachable.
+            $this->assertStillDraftChild($form, $field);
 
             $copy = $field->replicate(['created_by', 'updated_by']);
             $copy->key = $this->copyKey($draft, $field->key);
@@ -283,7 +297,13 @@ final class FormBuilderService
      */
     public function saveFieldToLibrary(Form $form, User $user, FormField $field, array $meta): FieldLibrary
     {
-        $this->assertDraftChild($form, $field);
+        // M90. No lock is added and that is deliberate: §3.4 scopes the `forms` lock to STRUCTURAL builder
+        // edits and form-level transitions, and this writes no draft child at all — taking one here would be
+        // a documented reversal rather than a fix. The re-read costs nothing and refuses for the same reason
+        // its siblings do. ⚠️ The item this would have captured in the race is CONTENT-IDENTICAL, because
+        // publish clones the tree forward unchanged; refusing is the consistent answer rather than the
+        // corruption-preventing one, and it is recorded that way so nobody later reads more into it.
+        $this->assertStillDraftChild($form, $field);
 
         return FieldLibrary::create([
             ...FieldLibrary::fromField($field, $meta),
@@ -387,6 +407,23 @@ final class FormBuilderService
      * commits *inside* a publish transaction — after its snapshot read and before its commit — still
      * lands on rows the frozen `schema_snapshot` and `checksum` no longer describe. That window is
      * lock-shaped and is filed as its own row.
+     *
+     * ── M90: SIX CALL SITES, NOT TWO, AND THE FOUR ADDED ARE NOT ALL THE SAME DEFECT ──────────────
+     * M88 routed only `updateField()` and `updateSection()` through here. The backlog row that filed
+     * the rest named two more and excluded the locking pair on the ground that *"the locking siblings'
+     * exposure is bounded by their lock"*. ⛔ THAT REASON IS FALSE: {@see self::lockDraft()} re-reads
+     * under `FOR UPDATE` and returns a FRESH draft, so the lock bounds nothing about a `$form` that
+     * went stale at route-model binding — the two are different objects. The four sites differ in
+     * SYMPTOM, which is why each carries its own note rather than a shared one:
+     *
+     *   deleteSection() · deleteField()  a silent zero-row DELETE under `draft_delete`'s USING clause,
+     *                                    answered `['deleted' => true]` with a 200. M88's headline
+     *                                    symptom exactly, on the delete path.
+     *   duplicateField()                 NOT silent — a straddled INSERT, `draft_insert`'s WITH CHECK,
+     *                                    42501, and out through respond() as a bare 500.
+     *   saveFieldToLibrary()             no corruption at all: publish clones the tree forward
+     *                                    unchanged, so the captured item is content-identical either
+     *                                    way. It refuses for consistency, not for safety.
      */
     private function assertStillDraftChild(Form $form, FormSection|FormField $child): void
     {

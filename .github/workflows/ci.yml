@@ -263,6 +263,21 @@ jobs:
       - name: Pipeline lint (one queue, no drift, no hidden held row, no dormant documented column)
         run: composer run pipeline-lint
 
+      # ⛔ HOST/RUNNER ONLY, AND THAT IS MEASURED (M90). Inside the app container
+      #    RecursiveDirectoryIterator descends the Windows bind mount only partially — 410 test files
+      #    against the host's 449 — so a real file goes missing from the on-disk set and every pointer
+      #    to it reads as dangling. The first draft was a Pest arm and reported fourteen violations,
+      #    nine of them phantoms of the harness. CI's checkout is an ordinary filesystem, so it agrees
+      #    with the host, which is what makes the host authoritative.
+      - name: Test-class pointer lint (no test names a *Test file that was never written)
+        run: composer run test-pointer-lint
+
+      # The gate's own positive control: three synthetic trees plus a collapsed-floor arm, two of which
+      # must go RED. scripts/mutate.php cannot drive this one — its truthful container answer is red
+      # (docs/feature-backlog.md:8251) — so the control ships with the gate and runs beside it.
+      - name: Test-class pointer lint controls (the two red arms and the floor)
+        run: composer run test-pointer-lint-selftest
+
       - name: Composer audit (SCA)
         run: composer audit
 

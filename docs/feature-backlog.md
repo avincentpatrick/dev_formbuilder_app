@@ -3127,10 +3127,20 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the only way to know the row was describing something real rather than something plausible.
   ⚠️ **BOTH OF THE ROW'S OWN CITATIONS WERE WRONG AND ARE CORRECTED HERE.** The loop is **`:148-156`**,
   not `:124-132` — that is inside the `pages` ARRAY, in the `Two-factor required` entry's comment block.
-  The `filteredToZero` idiom is **`:175-188`**, not `:154-163`. `bootstrap/app.php:315-334` and
+  The `filteredToZero` idiom is **`:175-188`**, not `:154-163`. `bootstrap/app.php:331-345` and
   `support/console.ts:34` both hold; the former is narrower than the truth, since **seven** handlers in
   that file return the same toast redirect (`:286`, `:297`, `:310`, `:323`, `:336`, `:389`, `:458`), so a
   302 is this application's standard web refusal rather than a special case.
+  ⚠️ **`M90` RE-POINTED THAT CITATION AND CORRECTED ITS COUNT TWICE OVER.** It read `:315-334`,
+  which is now a blank line. The **seven** handlers it names (`:286`, `:297`, `:310`, `:323`, `:336`,
+  `:389`, `:458`) had already rotted by roughly ten lines before `M90` touched the file, and the count
+  itself was wrong: the true figure is **fourteen**. Five arms are written as a ternary or an arrow fn
+  rather than as `return back()`, and two of those took no `Request` parameter at all — so every
+  `grep`-shaped census of this file, including `M90`'s own first pass, undercounted it.
+  ⛔ **And the sentence's premise no longer holds for a JSON caller.** From `M90` each of those arms
+  answers an `expectsJson()` request in flat JSON and reaches `back()` only for a browser navigation or
+  an Inertia visit. The e2e consequence this row is about is unchanged, because a Playwright `goto` is a
+  browser navigation — which is why the row stays closed rather than reopening.
   ⚠️ **AND THE ROW UNDERSTATED ITSELF — FOUR PAGES ARE EXPOSED, NOT ONE.** `/achievements` on
   `module:gamification` (`routes/tenant.php:258-259`; `TenantSettingRegistry.php:145-150` defaults a
   MISSING row to true, which is the only reason it loads), plus `/analytics`, `/webhooks` and
@@ -3155,7 +3165,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   is no 302 there to catch. Original filing follows.
   — *`tests/e2e/responsive-axe.spec.ts:124-132` is `goto` → `forceTheme` → `assertClean` with no
   `waitForURL`, `toHaveURL` or heading check — and every plan/module refusal in this app answers a web
-  request with `back()->with('toast')` (`bootstrap/app.php:315-334`), i.e. a 302 the goto follows
+  request with `back()->with('toast')` (`bootstrap/app.php:331-345`), i.e. a 302 the goto follows
   silently. `/achievements` is gated by `module:gamification` and `E2eSeeder` never enables the module —
   it relies entirely on `ToggleableModules`' default — so flipping that default gives six green scans of
   the dashboard. Latent, and the idiom is present everywhere else in the shard, including the

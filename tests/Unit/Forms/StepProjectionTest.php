@@ -142,10 +142,16 @@ it('reserves the lead step key against the two authoring paths that validate key
     // the field library both write through `Model::create` with no FormRequest in the path, which is the same
     // shape Doc #26 recorded for `*_translations`.
     //
-    // What this pins is the RULES, restated from their sources so a change to either reddens here; the call
-    // sites themselves are exercised by `FormSectionRoutesTest` and the XLSForm import suite. Both rules are
+    // What this pins is the RULES, restated from their sources so a change to either reddens here; the
+    // section call sites are exercised by `BuilderRoutesTest` and the XLSForm import suite. Both rules are
     // private to their classes, so asserting them any closer would mean adding a test-only seam to
     // production code for no behavioural gain.
+    //
+    // ⚠️ M90: THE NAME HERE USED TO BE A SECTION-ROUTES SUITE THAT HAS NEVER EXISTED — one of four dead
+    // test-class pointers `scripts/test-pointer-lint.php` now forbids. And correcting the name does not
+    // make the sentence true: neither `BuilderRoutesTest` nor the import suite asserts the `__lead__`
+    // REJECTION at the route layer, so that half is pinned by nothing at all. Filed rather than quietly
+    // rewritten, because a corrected pointer to coverage that does not exist is the worse of the two.
     expect(StepProjection::LEAD_STEP_KEY)->toBe('__lead__');
 
     // `UpdateSectionRequest`: `regex:/^[a-z][a-z0-9_]*$/` — a leading underscore is rejected outright.

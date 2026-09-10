@@ -746,12 +746,12 @@ A tenant's subscription to a plan, Cashier-backed (plan §1/§2.2).
 | `stripe_status` | `varchar(40)` | No | — | No | **Deliberately free text, not a PHP enum** — mirrors Stripe's own status vocabulary verbatim (`trialing`, `active`, `past_due`, `canceled`, `unpaid`, `incomplete`, `incomplete_expired`, `paused`) as synced by Cashier's webhook handler. See Design Notes for why this is the one flagged exception to the enum-everywhere rule. **No such handler exists (2026-07-21)** — Cashier is not installed, this table has no migration, and payments are deferred to Phase 4; the row records intended design. |
 | `billing_interval` | `varchar(10)` — PHP enum: `BillingInterval` | No | — | No | — |
 | `quantity` | `integer` | No | `1` | No | Seat count, where applicable. |
-| `trial_ends_at` | `timestamptz` | Yes | `NULL` | No | — |
-| `current_period_starts_at` | `timestamptz` | Yes | `NULL` | No | — |
-| `current_period_ends_at` | `timestamptz` | Yes | `NULL` | No | — |
-| `cancels_at` | `timestamptz` | Yes | `NULL` | No | Scheduled cancel-at-period-end date. |
-| `canceled_at` | `timestamptz` | Yes | `NULL` | No | — |
-| `ended_at` | `timestamptz` | Yes | `NULL` | No | — |
+| `trial_ends_at` | `timestamptz` | Yes | `NULL` | No | Dormant until Phase 4 (ADR-0008 §D1) — no reader and no writer in `app/`. |
+| `current_period_starts_at` | `timestamptz` | Yes | `NULL` | No | Dormant until Phase 4 (ADR-0008 §D1) — no reader and no writer in `app/`. |
+| `current_period_ends_at` | `timestamptz` | Yes | `NULL` | No | Dormant until Phase 4 (ADR-0008 §D1) — no reader and no writer in `app/`. |
+| `cancels_at` | `timestamptz` | Yes | `NULL` | No | Scheduled cancel-at-period-end date. Dormant until Phase 4 (ADR-0008 §D1) — no reader and no writer in `app/`. |
+| `canceled_at` | `timestamptz` | Yes | `NULL` | No | Dormant until Phase 4 (ADR-0008 §D1) — no reader and no writer in `app/`. |
+| `ended_at` | `timestamptz` | Yes | `NULL` | No | **Live, unlike the five timestamps above** — `Subscription::scopeActive()` reads it to decide which subscription is current. |
 | `created_at` | `timestamptz` | No | set by Eloquent | No | — |
 | `updated_at` | `timestamptz` | No | set by Eloquent | No | — |
 

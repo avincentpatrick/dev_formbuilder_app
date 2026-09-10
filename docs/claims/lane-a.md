@@ -16,117 +16,109 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M88`, the nineteenth `D13` batch: the two remaining lock asymmetries, four inert `subscriptions` lifecycle columns, and an enum catalog gated against the database and nothing else (`m88-d13-batch`)
+## Status: NO ACTIVE CLAIM — `M88` is merged; the next increment is a fresh `D13` batch
 
-Taken 2026-09-08. Branch `m88-d13-batch`, cut from `origin/main` at `05195a6`, PR into `main`.
+## RELEASED — `M88`, the nineteenth `D13` batch: two lock asymmetries that were not what they said, five dormant columns rather than four, and an enum catalog gated against the database and nothing else (merged as PR #279, `ee8ca26`, 6/6 green with real step counts — Static analysis 26 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 
-⛔ **THE GENERATED PROPOSAL IS REJECTED FOR THE FOURTH INCREMENT RUNNING, AND THIS TIME THE MECHANISM IS
-ONE THE LEDGER ALREADY OWNS AS AN OPEN ROW.** `docs/backlog-triage.md`'s `## Suggested next batch` offers
-`4242` · `6873` · `5971` · `8404`. Read by `D13`'s letter — *at most one row may **touch** a hub file* —
-three of the four break the cap: `4242` repairs `scripts/tracker-lint.php` and its subject is `CLAUDE.md`
-(8 rows) and `PROGRESS.md` (3); `5971`'s repair can only be made in `scripts/pipeline.php` (12) or
-`scripts/citation-liveness-lint.php` (6); `8404`'s can only be made in `scripts/citation-liveness-lint.php`
-(6). ⚠️ **The generator is not malfunctioning — it is doing what `docs/feature-backlog.md:8523` says it
-does**, implementing *cites* where the decision says *touches*, and every one of those three rows cites only
-a non-hub file while repairing a hub. This is the fourth consecutive rejection and the second for a
-mechanism with an open row of its own; `M83`, `M86` and `M87` rejected it for three other reasons.
-It is further evidence for `D15` and is recorded rather than re-argued.
+Shipped 2026-09-10. Branch `m88-d13-batch`, cut from `origin/main` at `05195a6`. **Four rows closed —
+two by fixing, one by correcting, one with a new gate — nine rows filed, and `D27` and `D15` amended
+rather than re-asked.**
 
-**The batch, chosen by hand under `D13`'s letter — one hub-touching row, no two rows sharing a non-hub file:**
+⛔ **THE HEADLINE IS THE `Premise verified` FIELD AND IT IS FOUR FOR FOUR.** Every row's citations
+essentially held and every row's belief about the world *around* its defect was wrong. In three cases
+that changed what the fix is; in one it removed the fix entirely. This is the fourth increment running
+in which that field paid for itself, and the first in which a false premise had **propagated out of the
+row and into the decision roster**.
 
-| # | Row | Hub? | Non-hub files it would touch |
+| row | evidence | premise | remedy |
 |---|---|---|---|
-| 1 | `docs/feature-backlog.md:8570` — `FormBuilderService::updateField()`/`updateSection()` are the only mutators there that do not lock the draft | no | `app/Services/Forms/FormBuilderService.php`, `app/Services/Forms/PublishService.php` (read), a `tests/Feature/Forms/` arm |
-| 2 | `docs/feature-backlog.md:8559` — the schedule window is re-asserted under the lock on the promote door and on no other | no | `app/Services/Submissions/SubmissionPipeline.php`, `app/Services/Submissions/SubmissionDraftService.php`, `app/Services/Submissions/SubmissionFinalizer.php`, `app/Services/Forms/FormService.php` |
-| 3 | `docs/feature-backlog.md:7833` — four `subscriptions` lifecycle columns are documented, exist in the schema, and have no reader and no writer | no | `app/Models/Subscription.php`, `database/migrations/2026_07_23_000002_create_subscriptions_table.php` |
-| 4 | `docs/feature-backlog.md:8597` — the enum catalog's value lists are gated against the DATABASE and against nothing else | **yes** — `docs/data-dictionary.md` | `tests/Feature/Migrations/DocumentedCheckConstraintDriftTest.php`, `app/Enums/*`, a new `tests/Feature/Docs/` arm |
+| `8570` | held | ⛔ **§3.4 declines this lock IN WRITING** — the obvious fix is a documented reversal | none offered; a lock-free re-read taken instead |
+| `8559` | ⛔ two of eleven false, and they carry the whole argument | ⛔ **false, and the same sentence had reached `D27`** | ⛔ wrong on three counts — would contradict H12a |
+| `7833` | exact except the count — **five, not four** | ⛔ **inverts the row**: the deferral is a decision of record | ⛔ wrong; would have held the row open forever |
+| `8597` | held; the one named instance is the only one | ⛔ false in its stated difficulty — **26 of 28 resolve by convention** | works, with the named parser replaced |
 
-⚠️ **`docs/feature-backlog.md` is in the hub table at 4 citing rows and is deliberately not counted here**,
-on `M87`'s stated grounds: every closure and every correction edits the ledger, so counting it would make no
-batch legal at all.
+⛔ **`8597` — THE ROW WAS RIGHT ABOUT ITS DEFECT AND WRONG ABOUT WHY IT WAS HARD, AND THE SECOND HALF IS
+WHY THE GATE IS SHORT.** It recorded the difficulty as *"the enum name in the catalog is prose, not a
+resolvable symbol"*; **26 of the 28 names are literally the class basename**. The real difficulty is the
+Values cell, which mixes the list with prose containing more backticked tokens — a whole-cell collector
+harvests `trial` and `cancelled` from `TenantStatus`'s correction note, and a leading-run collector
+silently loses two `AttachmentKind` cases and three `NotificationType` ones. ⚠️ **The shipped
+`checkDriftBacktickedRun()` is the second kind and is safe only because its own caller skips the two rows
+it would get wrong**, so it was deliberately not reused. Two declared cell grammars instead, set equality
+both directions, 27 of 28 rows compared and one declared skip. **Both exception-map entries are findings
+in their own right**: `WebhookEventType` has no class of that name, and `NotificationChannel` has no PHP
+enum at all.
 
-⚠️ **Rows 1 and 2 are both lock-ordering rows filed by the same `M87` fan-out, and that is deliberate rather
-than accidental duplication.** They share no file, no service and no remedy: row 1 is a missing `lockDraft()`
-inside a builder mutator, row 2 is a schedule predicate decided outside a lock on the submission side.
-Taking them together is what makes the pair of them a census rather than two more instances.
+⛔ **AND THE ROW'S POPULATION WAS TOO SMALL — the ungated surface is the whole document.** Each per-table
+section restates the catalog size as *"See the N-value catalog above"*; seven carry a count and **two were
+wrong**. One of those two was **created by this increment's own correction and caught in the same pass**;
+the other has been wrong since `M87` widened `UsageMetric`, on a row that **has** a CHECK and is therefore
+outside the population the row describes.
 
-⛔ **Row 4 carries a stated blocker from its sibling `8582` that this claim does NOT inherit, and the
-difference is the whole reason it is takeable.** `8582` is blocked because adding eleven catalog ROWS is not
-line-neutral against a `docs/data-dictionary.md` pinned by 24 citations at zero ledger headroom. Row 4's
-remedy is a **gate plus at most an in-cell value-list correction**, which is line-neutral by construction.
-If the fan-out finds it is not, the row is corrected rather than forced.
+⛔ **`8570` — THE GUARD THE REPOSITORY BELIEVED IT HAD IS STALE, AND ITS OWN TEST FILE SAYS OTHERWISE.**
+`assertDraftChild()` compares two values both read at route-model-binding time, so a publish, restore,
+import, archive or sibling delete committing after that bind leaves it comparing two stale values and
+agreeing with itself. ⚠️ **And the consequence was not corruption but a silent success**: RLS made the
+write a zero-row no-op, `save()` reported success anyway, and the method returned `$field->refresh()` — a
+**200 OK carrying the pre-edit values**, so the user watched the edit revert with no error. Fixed with a
+re-read of the form **and the child**, no lock, mirroring `M85`'s promote-side precedent, because
+§3.4 states in writing that the `forms` lock *"does not serialize ordinary field-level edits"*.
 
-### Evidence verified
+⛔ **`8559` — CLOSED AS FALSE, AND THE SAME SENTENCE STOOD IN THREE PLACES.** `M85` re-asserted
+`assertCanPromote()`, not `assertCanStart()`, and took no lock; `FormService::updateSchedule()` exists
+nowhere in the tree but that row; *"nothing says why"* is refuted by two written whys. The claim had
+propagated into the `M87` correction block on the `M85` row **and into `D27`'s carve-out**, which had
+excluded the schedule window from that decision *because* of it. All three moved in one commit.
 
-**Answered by a read-only fan-out (one agent per row over disjoint files, `D13` clause 2), then
-re-measured by hand against the code.** ⚠️ **Two rows — `7833` and `8597` — did NOT receive the
-adversarial refutation pass**: the workflow was stopped before those agents ran. Their verdicts and
-census findings stand on the first pass plus my own independent re-measurement, and that is weaker
-than the other two. Recorded rather than glossed.
+⛔ **`7833` — THE CITATIONS WERE NEAR-PERFECT AND THE FRAMING INVERTED THE ROW.** Payments-to-Phase-4 is a
+decision of record, so *"no reader and no writer"* is correct and expected. The real defect is one order
+of magnitude smaller: a labelling gap against a convention already used three times on this very table.
+⚠️ **And the count was wrong because a gate is table-blind** — `P2d` skips a column by name with no table,
+so a phantom `tenants.trial_ends_at` silently discharged the real `subscriptions.trial_ends_at`.
 
-| row | verdict | what did not hold |
-|---|---|---|
-| `8570` | **held** | every citation resolves. The census of seven locking siblings is exact. ⚠️ The row's own *"lockDraft() locks the draft"* is a naming slip — it locks `forms` — which is harmless only because publish locks the same row |
-| `8559` | **partly held** | ⛔ two of eleven are false and they carry the whole argument: `FormService::updateSchedule()` **exists nowhere in the tree except this row** (it is `setSchedule()`), and *"`M85` DID re-assert exactly that check"* is false — `M85` re-asserted `assertCanPromote()`, a strictly weaker predicate, and took **no lock** |
-| `7833` | **partly held** | every file:line and every non-count number is exact to the character. ⛔ **The count is wrong: five, not four.** `trial_ends_at` sits one line above the row's own citation in both files it opens |
-| `8597` | **held** | the named live instance is real and is the **only** one: of 28 catalog rows, 26 resolve by convention, 27 are comparable, and exactly one drifts |
+⛔ **THE BATCH TOUCHED TWO HUB FILES, NOT ONE, AND THE SECOND WAS FORCED RATHER THAN CHOSEN.** The claim
+declared `docs/data-dictionary.md` as the single hub row. Correcting `8559` required editing
+`docs/claims/decisions.md`, itself a hub at 3 citing rows — and that was unknowable at claim time, because
+a claim's propagation into the roster is precisely what the premise field exists to discover.
+**Recorded in `D15` as a fourth mechanism** by which its cap cannot be followed; unlike the three already
+there, this one applies to the *correction* half of `D13`'s workflow rather than to selection.
 
-### Premise verified
+✅ **PROVED BY FIVE POSITIVE CONTROLS, ALL CAUGHT** — re-introduce the `gte`/`lte` omission; delete
+`case Gte`; a catalog row naming a non-existent enum; restore a stale pointer count; neuter the new
+builder guard, which turns **exactly the three new arms red and leaves the ten pre-existing ones green**.
+⚠️ **A sixth run was needed and is the more useful record**: the third mutant went red correctly *and*
+raised a PHP `Error` in a second arm, so one defect reported twice with the fatal first. That arm now
+defers a missing enum to the arm that owns it.
 
-⛔ **THIS IS THE INCREMENT'S HEADLINE AND IT IS FOUR FOR FOUR.** Every row's citations essentially
-held and every row's belief about the world *around* its defect was wrong. In three cases that
-changes what the fix is; in one it changes whether there is a fix at all.
+⚠️ **HOW THE PREDICTION FARED — WRONG WHERE IT MATTERED MOST, AND THE ERROR WAS IN THE SAFE DIRECTION.**
+The claim named the citation gate on `docs/data-dictionary.md` as *"the one I most expect to be wrong"*.
+**It never moved**: every document edit was made in place, the ledger stayed at exactly 18/18 with zero
+headroom consumed, and the second prediction (`docs/pipeline.md`'s `PROGRESS.md` citation) did not break
+either. The prediction was wrong because the discipline it forced was carried out, which is the outcome a
+prediction of that shape is supposed to produce. ⛔ **What actually broke was neither**: `BacklogProvenanceTest`
+went red because striking four rows replaced their whole bullet **including the `Filed by` attribution**,
+silencing all four at once — a gate the claim never mentioned, catching a class the claim never
+anticipated. ⚠️ **And Pint, run bare on the host, caught the one thing a scoped run would have missed**: a
+`{@see \Tests\...}` docblock that its own `fully_qualified_strict_types` fixer had hoisted into a real
+test-class `use` statement in production code.
 
-- **`8570` — false in the half that decides the remedy.** `docs/form-versioning-schema-migration.md`
-  §3.4 states the `forms` lock serializes create/publish/discard/restore and *"does not serialize
-  ordinary field-level edits"* — **a written decision**, so the row's implied fix (add `lockDraft()`)
-  is a documented reversal rather than a bug fix. And *"the consequence is DATA rather than a
-  message"* is conditional: post-commit, RLS makes the write a zero-row no-op returning **200 with
-  the pre-edit values**. ⚠️ The row also understates itself — `saveFieldToLibrary` is a third
-  unlocked mutator, and three more transitions delete the child rows outright.
-- **`8559` — false, and the row is moot.** It believes the promote door re-asserts the schedule
-  window; it re-asserts a different predicate. It believes a throughput declination blocks the fix;
-  that declination governs a **lock**, and the only fix in question is a lock-free re-read. It
-  believes *"nothing says why"*; two written whys exist. ⛔ And `D27` **carved this row out of a
-  decision because of the same false sentence**, so the premise had propagated into the roster.
-- **`7833` — false, and it inverts the row.** Payments-to-Phase-4 is a decision of record,
-  reconfirmed with the user and ratified in `ADR-0008`. *"No reader and no writer"* is therefore
-  **correct and expected**, not a defect. The real defect is one order of magnitude smaller and has
-  a different remedy: a labelling gap against a convention already used three times on this table.
-- **`8597` — false in its stated difficulty, which is why the gate is short.** *"The enum name is
-  prose, not a resolvable symbol"* — **26 of 28 are literally the class basename.** The real
-  difficulty is the Values cell mixing the list with prose containing more backticked tokens, and
-  the shipped `checkDriftBacktickedRun()` is exactly the wrong instrument for it.
+⚠️ **WHAT THE VERIFICATION DID NOT COVER, STATED RATHER THAN GLOSSED.** Rows `7833` and `8597` never
+received the adversarial refutation pass — the fan-out was stopped before those agents ran. Their verdicts
+rest on the first pass plus my own re-measurement against the code. The two rows that *did* get it were
+both materially corrected by it, which is the reason to say so rather than let the count imply otherwise.
 
-### Remedy verdict
-
-**Measured by reading the code each would touch, before any test was written.**
-
-- **`8570` — none offered; the implied one works but reverses §3.4, so it was not taken.** Taken
-  instead: re-read the form **and the child** inside the transaction, no lock — the `M85` precedent
-  exactly. Closes the post-commit lost refusal and the collaborator-delete race; the pre-commit
-  publish-snapshot window is lock-shaped and is filed rather than forced.
-- **`8559` — wrong on three counts.** No lock is needed; the hook reaches only one of the two doors
-  it names; and refusing a submit that passed `assertCanStart()` would **contradict H12a's grace
-  window** rather than restore symmetry. Disposition: no code change, escalated to `D27`.
-- **`7833` — wrong on its premise, and would have held the row open forever.** Taken instead: apply
-  the existing dormancy convention at all three points of truth.
-- **`8597` — works, with one correction.** The named instrument (`DocumentedSettingKeyDriftTest`'s
-  shape) is right; reusing the existing catalog parser is not. Two declared cell grammars, both
-  directions compared for set equality, nothing skipped but the one row with no PHP enum.
-
-Files: `docs/claims/lane-a.md`, `docs/feature-backlog.md`, `docs/backlog-triage.md`, `docs/pipeline.md`,
-`PROGRESS.md` (own block only), `docs/gate-baselines.md`, plus the per-row files in the table above.
-Shared artefacts taken: `docs/feature-backlog.md`, `docs/backlog-triage.md`, `docs/pipeline.md`,
-`docs/data-dictionary.md`, `docs/claims/decisions.md`, `PROGRESS.md` (own block only).
-Paired files taken: none identified at claim time; the fan-out is asked to name any.
-Namespaces spent: nothing from either namespace at claim time — no migration and no ADR is expected.
-Prediction: Pest gains arms and no CI gate count moves; PHPStan CI stays at zero and the local run keeps
-its phantoms, which must be classified by MESSAGE rather than counted; Pint must be run bare on the host;
-`openapi.json` stays byte-identical because no route or resource changes. **The gate I most expect to be
-wrong is the citation gate on `docs/data-dictionary.md`** — row 4 is the hub row, the ledger tier has zero
-headroom, and that is exactly the gate that broke in `M86` and was survived only deliberately in `M87`.
-Second most likely: `docs/pipeline.md`'s own citation of `PROGRESS.md`, which every close-out drifts.
+**Files actually edited**, against the claim's list: `app/Services/Forms/FormBuilderService.php`,
+`tests/Feature/Forms/BuilderDraftGuardTest.php`, `tests/Feature/Docs/DocumentedEnumCatalogDriftTest.php`
+(new), `docs/data-dictionary.md`, `docs/adr/0008-entitlement-and-metering.md`,
+`database/migrations/2026_07_23_000002_create_subscriptions_table.php`, `docs/feature-backlog.md`,
+`docs/claims/decisions.md`, `docs/pipeline.md`, `docs/backlog-triage.md`, `docs/claims/lane-a.md`,
+`PROGRESS.md`, `docs/gate-baselines.md`. ⚠️ **The claim predicted
+`app/Services/Submissions/*` and `app/Models/Subscription.php` for rows 2 and 3 and neither was opened** —
+both rows resolved to documentation rather than code, which is the premise finding restated as a diff.
+⚠️ **`docs/claims/decisions.md` was not on the claimed list at all**; see the two-hub note above.
+Namespaces spent: **nothing from either namespace** — no migration, no ADR, as predicted.
+⚠️ **The claim's row table cites claim-time line numbers**; the closures moved them, and the rows now sit
+at `7833`, `8569`, `8602` and `8647`. The table is left as the dated record it is.
 
 ## RELEASED — `M87`, the eighteenth `D13` batch: a CHECK census measured from `pg_constraint`, the last exposed Fortify write route, a dangling label, and a pre-lock shape that is five instances rather than two (merged as PR #278, `30c3241`, 6/6 green with real step counts — Static analysis 26 · E2E 19 of 20 (the skip is the on-failure report upload) · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

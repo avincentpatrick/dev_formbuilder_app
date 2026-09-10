@@ -27,8 +27,8 @@ use Stancl\Tenancy\Database\Models\Domain as StanclDomain;
  * the mass-assignment behaviour of sixty existing `domains()->create(['domain' => …])` fixture sites. The
  * consequence is that a `create($request->validated())` could set `verified_at` directly, so
  * {@see CustomDomainService} builds its attribute arrays explicitly and never passes
- * request data through. CustomDomainClaimTest pins that a store request carrying `verified_at` lands
- * unverified.
+ * request data through. CustomDomainApiTest pins that a store request carrying `verified_at` lands
+ * unverified (M92 corrected the name; the one it carried has never existed).
  *
  * Two inherited stancl behaviours worth knowing before touching this: ConvertsDomainsToLowercase rewrites
  * `domain` on every save (so a mixed-case fixture does not round-trip), and EnsuresDomainIsNotOccupied is an
@@ -77,7 +77,12 @@ final class Domain extends StanclDomain
      *     remains the real guard exactly as it always was.
      *  2. The service and the sweep MUST use {@see unscopedQuery()} — they exist to act on rows that
      *     are not yet usable, and would otherwise be unable to see them at all. This is the single
-     *     easiest mistake to make against this model, and CustomDomainSweepTest pins it.
+     *     easiest mistake to make against this model. ⚠️ M92 — the name this carried has never existed,
+     *     and the honest replacement is WEAKER than the sentence it replaces: no arm states this rule
+     *     directly. CustomDomainVerificationTest's three sweep arms pin it CONSEQUENTIALLY — each drives
+     *     sweep() or releaseExpiredClaims() over rows the global scope hides, so each returns zero rows
+     *     if the unscopedQuery() is dropped. CustomDomainScopeTest covers the helper itself, not this
+     *     use of it.
      */
     protected static function booted(): void
     {

@@ -25,7 +25,9 @@ use App\Services\Submissions\SubmissionPdfPresenter;
  * `resources/public-runtime/lib/schema-mapping.ts` — the set the guest SPA uses to decide a field
  * is not rendered to a respondent at all. If the two ever disagree, the PDF claims the respondent
  * saw something they did not (or hides something they did), which is the whole value of the
- * document. `PdfFieldRoleParityTest` asserts the two sets are identical, in both directions.
+ * document. `PdfFieldRoleTest` asserts the two sets are identical, in both directions, and parses the
+ * TypeScript rather than trusting a copy of it (M92 corrected the name; the one this carried has never
+ * existed).
  *
  * {@see self::Prose} has NO TypeScript twin and deliberately so — it is not a visibility question.
  * The SPA renders a `note` (it is instructions, a consent statement, a section preamble) and so
@@ -95,7 +97,7 @@ enum PdfFieldRole: string
 
             // ── Never rendered to the respondent ────────────────────────────────────────────────
             // Byte-for-byte `RENDERS_NOTHING` (schema-mapping.ts), asserted by
-            // PdfFieldRoleParityTest. `hidden` and `calculated` hold real, often important values
+            // PdfFieldRoleTest. `hidden` and `calculated` hold real, often important values
             // — a URL-prefilled case number (H7), a computed total — but the respondent never saw
             // either, so neither belongs in a record of what they saw. `page_break` is pagination.
             //

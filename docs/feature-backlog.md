@@ -7678,7 +7678,13 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   not survive re-derivation. ⛔ **AND THIS ROW LOOKS LIKE THAT LARGEST BUCKET, SO CHECK IT FIRST.** `M80`'s
   own citation pass found the deferral stated four times outside the cited design doc:
   `docs/data-privacy-gdpr-compliance.md:77` and `docs/piping-output-encoding-design.md:279` each say the
-  opt-in "stays deferred", as do `PROGRESS_ARCHIVE.md:6859`, `:6864` and `:6865`. ⚠️ **What keeps the row
+  opt-in "stays deferred", as do `PROGRESS_ARCHIVE.md:6886`, `:6891` and `:6892`. ⚠️ **M92 RE-DERIVED
+  THOSE THREE FROM THE CONTENT, AND THEY WERE ALREADY WRONG BEFORE ITS SURGERY MOVED ANYTHING.** The
+  numbers this row carried resolved to unrelated `H23`/`H24` release bullets roughly twenty-two lines
+  above the sentences it describes; the citation gate passed them because they were ALIVE, which is
+  `docs/feature-backlog.md:8043`'s class exactly, observed live. They are re-pointed by grepping for the
+  claim, never by adding the surgery's line delta to a number that was not right to begin with.
+  ⚠️ **What keeps the row
   fair rather than already-answered:** `docs/webhook-integration-design.md:171` is that document's own
   §6 Out of Scope and lists three deferrals, none of them this — so the design doc read alone genuinely
   presents it as an available tenant choice, which is what `docs/webhook-integration-design.md:41` does.

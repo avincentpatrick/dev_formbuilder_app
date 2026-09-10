@@ -54,23 +54,23 @@ from it and listed separately below.
 | The public runtime's media pick path has ZERO test coverage of any kind, and no e2e seeded form has a media field at all. | `M78` | 7286 | *hub files only* |
 | The standing `pgsql_auth` rule was never literally true, and its stated revisit trigger names a different grant. | `M78` | 7410 | *hub files only* |
 | `scripts/loop.php --assess` does not read `docs/pipeline.md`, so it cannot refuse a row on its PIPELINE state. | `M79` | 5979 | *hub files only* |
-| `scripts/pipeline.php` accepts two markers carrying the SAME id and emits two rows, and nothing anywhere says so. | `M82` | 7900 | *hub files only* |
-| `scripts/pipeline.php --help` promises that "a done state must cite where it landed" and `parse_marker()` never asks for it. | `M82` | 7914 | *hub files only* |
-| The `pipeline-lint` controls mirror the LIVE corpus, so a defect in one of the four coverage predicates reddens all 38 cases and drowns the control that names … | `M82` | 7925 | *hub files only* |
-| Every close-out drifts `docs/pipeline.md`, because a status bullet added to `PROGRESS.md` shifts the two markers at its end and the generated line cites them b… | `M82` | 7981 | *hub files only* |
-| `pipeline.php --check` compares the file only from `## The line` onward, so the BANNER — the one part a human would hand-correct, and the part `state.php` read… | `M82` | 8009 | *hub files only* |
-| `scripts/pipeline.php` derives a defect row's state from LIVENESS alone, so a row blocked on an open USER DECISION is published as `state=ready`. | `M84` | 8277 | *hub files only* |
-| Two PRD acceptance criteria are dispositioned in INDENTED CONTINUATION bullets the collector skips, so `P2e`'s residue reconciles against its own predicate rat… | `M84` | 8326 | *hub files only* |
-| `LEDGER_ROT_CEILING` cannot ratchet down while preserved original filings are counted, and `M85` has now paid that in the other direction. | `M85` | 8444 | *hub files only* |
-| The generated queue's ORDER depends on which UNTRACKED directories happen to exist, and `docs/pipeline.md` is merge-gated on that order. | `M85` | 8455 | *hub files only* |
-| The triage generator PRINTS a refusal rule it does not implement, and two open rows lean on that sentence. | `M86` | 8516 | *hub files only* |
-| Two open rows file the same triage-generator defect with OPPOSITE liveness verdicts, and neither cites the other. | `M86` | 8531 | *hub files only* |
-| The archived status bullets live in TWO non-contiguous places, and that is what made the batch numbering go wrong. | `M86` | 8554 | *hub files only* |
-| Eleven value-domain `CHECK` constraints guard columns the enum catalog has no row for at all, and the fix cannot be made while the citation ledger is at its ce… | `M87` | 8642 | *hub files only* |
-| `P2d`'s literal-`null` blind spot hides three genuinely inert columns, and the honest repair needs the plumbing its own row says it does not. | `M89` | 9037 | *hub files only* |
-| `D13`'s one-hub-row cap cannot admit a new lint gate at all, and `M90` broke it for exactly that reason. | `M90` | 9226 | *hub files only* |
-| Standing Rule 7(b-bis) says "Three files" against a table of five rows, inside the rule that exists to keep paired files in step. | `M91` | 9320 | *hub files only* |
-| `docs/data-dictionary.md` holds a fourth copy of `bot_challenge` in prose and `FormBotChallenge` is in no catalog row, and `M92` could not take it. | `M92` | 9481 | *hub files only* |
+| `scripts/pipeline.php` accepts two markers carrying the SAME id and emits two rows, and nothing anywhere says so. | `M82` | 7906 | *hub files only* |
+| `scripts/pipeline.php --help` promises that "a done state must cite where it landed" and `parse_marker()` never asks for it. | `M82` | 7920 | *hub files only* |
+| The `pipeline-lint` controls mirror the LIVE corpus, so a defect in one of the four coverage predicates reddens all 38 cases and drowns the control that names … | `M82` | 7931 | *hub files only* |
+| Every close-out drifts `docs/pipeline.md`, because a status bullet added to `PROGRESS.md` shifts the two markers at its end and the generated line cites them b… | `M82` | 7987 | *hub files only* |
+| `pipeline.php --check` compares the file only from `## The line` onward, so the BANNER — the one part a human would hand-correct, and the part `state.php` read… | `M82` | 8015 | *hub files only* |
+| `scripts/pipeline.php` derives a defect row's state from LIVENESS alone, so a row blocked on an open USER DECISION is published as `state=ready`. | `M84` | 8283 | *hub files only* |
+| Two PRD acceptance criteria are dispositioned in INDENTED CONTINUATION bullets the collector skips, so `P2e`'s residue reconciles against its own predicate rat… | `M84` | 8332 | *hub files only* |
+| `LEDGER_ROT_CEILING` cannot ratchet down while preserved original filings are counted, and `M85` has now paid that in the other direction. | `M85` | 8450 | *hub files only* |
+| The generated queue's ORDER depends on which UNTRACKED directories happen to exist, and `docs/pipeline.md` is merge-gated on that order. | `M85` | 8461 | *hub files only* |
+| The triage generator PRINTS a refusal rule it does not implement, and two open rows lean on that sentence. | `M86` | 8522 | *hub files only* |
+| Two open rows file the same triage-generator defect with OPPOSITE liveness verdicts, and neither cites the other. | `M86` | 8537 | *hub files only* |
+| The archived status bullets live in TWO non-contiguous places, and that is what made the batch numbering go wrong. | `M86` | 8560 | *hub files only* |
+| Eleven value-domain `CHECK` constraints guard columns the enum catalog has no row for at all, and the fix cannot be made while the citation ledger is at its ce… | `M87` | 8648 | *hub files only* |
+| `P2d`'s literal-`null` blind spot hides three genuinely inert columns, and the honest repair needs the plumbing its own row says it does not. | `M89` | 9043 | *hub files only* |
+| `D13`'s one-hub-row cap cannot admit a new lint gate at all, and `M90` broke it for exactly that reason. | `M90` | 9232 | *hub files only* |
+| Standing Rule 7(b-bis) says "Three files" against a table of five rows, inside the rule that exists to keep paired files in step. | `M91` | 9326 | *hub files only* |
+| `docs/data-dictionary.md` holds a fourth copy of `bot_challenge` in prose and `FormBotChallenge` is in no catalog row, and `M92` could not take it. | `M92` | 9487 | *hub files only* |
 | A claim file has no constrained form for a forward declaration, so the one stale declaration on the tree cannot be gated. | `M42` | 4240 | `docs/claims/lane-b.md` |
 | `scripts/next.php` takes each release's LEAD paragraph, and a lead paragraph is often a file manifest rather than the lesson. | `M42` | 4387 | `docs/claims/TEMPLATE.md` |
 | `docker compose run --rm e2e` does not work on this host as three documents prescribe it, and the most likely wrong form EXITS 0. | `M61` | 4996 | `docs/ux/design-system-reference.md` |
@@ -78,38 +78,38 @@ from it and listed separately below.
 | `public-runtime-offline.spec.ts`'s parked-conflict case is FLAKY across viewport projects, and `D2` makes that a merge-blocking property. | `M77` | 7183 | `resources/public-runtime/sw.ts` |
 | A pipeline marker placed mid-document SILENTLY INVALIDATES every `path:N` citation beneath it, and only the ones that land on a blank line are caught. | `M79` | 5981 | `docs/adr/0008-entitlement-and-metering.md` |
 | §7.1 names a `/api/v1/webhooks/endpoints` path segment that exists nowhere in the tree, and it is a floor rather than a census. | `M80` | 7600 | `tests/Feature/Webhooks/WebhookEndpointApiTest.php` |
-| `scripts/citation-liveness-lint.php` sits AT its ceiling with zero headroom, so any edit that shifts a line in `docs/data-dictionary.md` is a merge failure and… | `M83` | 8027 | `docs/adr/0008-entitlement-and-metering.md` |
-| The citation gate asserts a cited line is ALIVE, never that it still says what the citation claims — so re-pointing a shifted citation arithmetically merges gr… | `M83` | 8043 | `docs/adr/0007-async-execution-substrate.md` |
-| The triage generator harvested a row as hub-free whose repair could only be made in a hub file, and the batch it then proposed violated `D13`. | `M83` | 8163 | `tests/Feature/Migrations/DocumentedDefaultDriftTest.php` |
-| `scripts/mutate.php` cannot prove ANY gate whose truthful container answer is RED, and a shipped gate is already in that state. | `M84` | 8261 | `tests/Feature/Docs/SuiteCollectionFloorTest.php` |
-| No gate whose input is the GIT INDEX can have a Pest control, because `git` is not installed in the app container. | `M85` | 8397 | `scripts/citation-liveness-lint-controls.php` |
-| `docs/ACCESS-MATRIX.md` cites a HOSTNAME AND PORT, which the citation pattern parses as a path and line. | `M85` | 8424 | `docs/ACCESS-MATRIX.md` |
-| `scripts/tracker-lint.php` is cited by ZERO of the open rows while owning the defects of at least two of them, so no collision check can ever see it. | `M86` | 8504 | `scripts/tracker-lint.php` |
-| A `docs/feature-backlog.md` citation into the exceptions log resolves to a live line about a different subject, and the citation gate is built to pass exactly … | `M87` | 8705 | `resources/js/composables/useServerAutosave.ts` |
-| The optimistic-concurrency token §8 substituted for the draft lock is CLIENT-OPTIONAL, and a shipped test pins it that way. | `M88` | 8821 | `docs/form-versioning-schema-migration.md` |
-| Three client-side workarounds were built ON the JSON-refusal defect `M90` fixed, and all three can now be simplified — but one of them is load-bearing until it… | `M90` | 9214 | `docs/gamification-design.md` |
-| A third instance of the citation class `M83` filed in the abstract: three live lines that say nothing about what cites them. | `M91` | 9346 | `app/Services/Forms/FormBuilderService.php` |
-| `scripts/` is the one tree `test-pointer-lint` still cannot scan, and it cannot become a root while the gate's own header is written the way it is. | `M92` | 9400 | `scripts/test-pointer-lint.php` |
-| `MIRROR_DIVERGENCES` is keyed by mirror NAME alone, so two same-named mirrors in different files would silently share one exception. | `M92` | 9412 | `tests/Feature/Docs/DocumentedEnumMirrorDriftTest.php` |
-| Three comments corrected by `M92` now name an arm that asserts LESS than they claim, and the gap is different in each. | `M92` | 9468 | `app/Models/Domain.php` |
+| `scripts/citation-liveness-lint.php` sits AT its ceiling with zero headroom, so any edit that shifts a line in `docs/data-dictionary.md` is a merge failure and… | `M83` | 8033 | `docs/adr/0008-entitlement-and-metering.md` |
+| The citation gate asserts a cited line is ALIVE, never that it still says what the citation claims — so re-pointing a shifted citation arithmetically merges gr… | `M83` | 8049 | `docs/adr/0007-async-execution-substrate.md` |
+| The triage generator harvested a row as hub-free whose repair could only be made in a hub file, and the batch it then proposed violated `D13`. | `M83` | 8169 | `tests/Feature/Migrations/DocumentedDefaultDriftTest.php` |
+| `scripts/mutate.php` cannot prove ANY gate whose truthful container answer is RED, and a shipped gate is already in that state. | `M84` | 8267 | `tests/Feature/Docs/SuiteCollectionFloorTest.php` |
+| No gate whose input is the GIT INDEX can have a Pest control, because `git` is not installed in the app container. | `M85` | 8403 | `scripts/citation-liveness-lint-controls.php` |
+| `docs/ACCESS-MATRIX.md` cites a HOSTNAME AND PORT, which the citation pattern parses as a path and line. | `M85` | 8430 | `docs/ACCESS-MATRIX.md` |
+| `scripts/tracker-lint.php` is cited by ZERO of the open rows while owning the defects of at least two of them, so no collision check can ever see it. | `M86` | 8510 | `scripts/tracker-lint.php` |
+| A `docs/feature-backlog.md` citation into the exceptions log resolves to a live line about a different subject, and the citation gate is built to pass exactly … | `M87` | 8711 | `resources/js/composables/useServerAutosave.ts` |
+| The optimistic-concurrency token §8 substituted for the draft lock is CLIENT-OPTIONAL, and a shipped test pins it that way. | `M88` | 8827 | `docs/form-versioning-schema-migration.md` |
+| Three client-side workarounds were built ON the JSON-refusal defect `M90` fixed, and all three can now be simplified — but one of them is load-bearing until it… | `M90` | 9220 | `docs/gamification-design.md` |
+| A third instance of the citation class `M83` filed in the abstract: three live lines that say nothing about what cites them. | `M91` | 9352 | `app/Services/Forms/FormBuilderService.php` |
+| `scripts/` is the one tree `test-pointer-lint` still cannot scan, and it cannot become a root while the gate's own header is written the way it is. | `M92` | 9406 | `scripts/test-pointer-lint.php` |
+| `MIRROR_DIVERGENCES` is keyed by mirror NAME alone, so two same-named mirrors in different files would silently share one exception. | `M92` | 9418 | `tests/Feature/Docs/DocumentedEnumMirrorDriftTest.php` |
+| Three comments corrected by `M92` now name an arm that asserts LESS than they claim, and the gap is different in each. | `M92` | 9474 | `app/Models/Domain.php` |
 | `CLAUDE.md`'s gate table sends PHPStan to the container, one row below the rule that explains why the container is wrong. | `M76` | 6899 | `scripts/gate-baselines.php` · `database/migrations/2026_07_06_000205_create_form_fields_table.php` |
 | Two user-supplied predicates now run on the `pgsql_auth` connection, against a standing rule that says none may. | `M77` | 7025 | `docs/multi-tenancy-rbac-design.md` · `docs/adr/0002-multi-tenancy-shared-db-rls.md` |
 | §7.1's `Form draft` row pins four `/api/v1` builder endpoints registered nowhere, and the `validations` sub-resource exists on neither surface. | `M80` | 7530 | `docs/xlsform-interop-spec.md` · `app/Services/Forms/FormBuilderService.php` |
-| `promote()`'s pre-lock shape has two more instances, and one of them is 74 lines above the row that named it. | `M85` | 8341 | `resources/public-runtime/composables/useAutosave.ts` · `resources/js/composables/useServerAutosave.ts` |
-| No control harness drives the real `scripts/backlog-triage.php` or `scripts/pipeline.php`, and the one harness that looks like it does stubs the generator. | `M86` | 8567 | `tests/Feature/Docs/PipelineLintControlsTest.php` · `scripts/tracker-lint.php` |
-| `.sheets-fields` is probably the worst `MdsSegmentedControl` host in the tree and it is the one with no coverage of any kind. | `M87` | 8693 | `resources/js/components/integrations/SheetsRuleFields.vue` · `tests/e2e/responsive-axe.spec.ts` |
-| Two more TypeScript unions mirror a PHP enum and are missing the same member, and neither is declared. | `M92` | 9423 | `resources/js/Pages/webhooks/Show.vue` · `resources/js/Pages/integrations/RuleShow.vue` |
-| A `ControlKind` docblock claims it is derived exactly as the SFC's own `control` computed, the two disagree in three ways, and no gate can compare them. | `M92` | 9434 | `resources/public-runtime/lib/types.ts` · `resources/js/components/submissions/FieldInput.vue` |
+| `promote()`'s pre-lock shape has two more instances, and one of them is 74 lines above the row that named it. | `M85` | 8347 | `resources/public-runtime/composables/useAutosave.ts` · `resources/js/composables/useServerAutosave.ts` |
+| No control harness drives the real `scripts/backlog-triage.php` or `scripts/pipeline.php`, and the one harness that looks like it does stubs the generator. | `M86` | 8573 | `tests/Feature/Docs/PipelineLintControlsTest.php` · `scripts/tracker-lint.php` |
+| `.sheets-fields` is probably the worst `MdsSegmentedControl` host in the tree and it is the one with no coverage of any kind. | `M87` | 8699 | `resources/js/components/integrations/SheetsRuleFields.vue` · `tests/e2e/responsive-axe.spec.ts` |
+| Two more TypeScript unions mirror a PHP enum and are missing the same member, and neither is declared. | `M92` | 9429 | `resources/js/Pages/webhooks/Show.vue` · `resources/js/Pages/integrations/RuleShow.vue` |
+| A `ControlKind` docblock claims it is derived exactly as the SFC's own `control` computed, the two disagree in three ways, and no gate can compare them. | `M92` | 9440 | `resources/public-runtime/lib/types.ts` · `resources/js/components/submissions/FieldInput.vue` |
 | The audit spec's §1 table is asserted by nothing, and a static sweep cannot be the thing that asserts it. | `M70` | 5896 | `docs/audit-compliance-logging-spec.md` · `app/Services/Gamification/AuditReplayMap.php` · `docs/adr/0020-gamification-awarding-substrate.md` |
 | The storage-quota row's stated blocker is not real, and its re-aim needs a copy decision nobody has made. | `M77` | 7143 | `resources/public-runtime/__tests__/sync-status.test.ts` · `resources/public-runtime/__tests__/sync-outbox.test.ts` · `docs/adr/0021-respondent-scoped-device-outbox.md` |
 | `forms.allow_manual_encoding` is documented as Feature #7's capability flag and has neither a reader nor a writer — the only one of five inert `allow_*` flags … | `M80` | 7450 | `tests/Feature/Tenancy/TenantExtractColumnDriftTest.php` · `app/Policies/SubmissionPolicy.php` · `app/Services/Forms/FormService.php` |
 | The documented async export API — `POST /api/v1/forms/{form}/exports` and `GET /api/v1/exports/{export}` — has zero routes and no `exports` job row, while the … | `M80` | 7493 | `app/Enums/QueueName.php` · `app/Jobs/Submissions/GeneratePdfJob.php` · `config/queue-fairness.php` |
 | `docs/api-specification.md:63` states in the present tense that every unsafe request is deduplicated against a 24-hour Redis cache keyed on `(tenant_id, endpoi… | `M80` | 7646 | `app/Services/Submissions/SubmissionPipeline.php` · `app/Services/Webhooks/WebhookEventDispatcher.php` · `app/Services/Gamification/PointsRecorder.php` |
-| `scripts/pipeline-lint.php` P2d recognises a cast by a CLOSED VOCABULARY of cast names, so a cast this project adopts later reads as a write and silently un-do… | `M81` | 7868 | `scripts/pipeline-lint.php` · `app/Services/Sso/SsoDomainService.php` · `app/Services/Attachments/AttachmentStorageService.php` |
+| `scripts/pipeline-lint.php` P2d recognises a cast by a CLOSED VOCABULARY of cast names, so a cast this project adopts later reads as a write and silently un-do… | `M81` | 7874 | `scripts/pipeline-lint.php` · `app/Services/Sso/SsoDomainService.php` · `app/Services/Attachments/AttachmentStorageService.php` |
 | Two more scripts have `backlog-triage.php`'s destructive default, and the row that filed that defect names one of them as its harmless counter-example. | `M71` | 6041 | `scripts/gate-baselines.php` · `scripts/regenerate-brand-ramp-fixture.php` · `tests/fixtures/brand-ramp.json` · `scripts/npm-audit-judge.php` |
 | The documented `Users & roles` API resource group (`GET/POST /api/v1/users`, `/api/v1/roles`) has zero routes, and a shipped schema decision was already paid f… | `M80` | 7513 | `app/Http/Resources/Api/V1/AuditResource.php` · `docs/multi-tenancy-rbac-design.md` · `app/Models/Role.php` · `config/permission.php` |
-| `scripts/pipeline-lint.php`'s four coverage rules read the MARKDOWN half of the corpus only, and three deferral sentences live in the PHP half where nothing ca… | `M82` | 7884 | `scripts/pipeline-lint.php` · `app/Enums/AnalyticsAxis.php` · `app/Enums/FormBotChallenge.php` · `app/Services/Submissions/SubmissionInboxPresenter.php` |
-| The schedule-acceptance vocabulary has four TypeScript copies and a PHP side that is raw strings rather than an enum, so nothing can ever gate it. | `M92` | 9445 | `resources/public-runtime/lib/types.ts` · `resources/js/Pages/forms/Show.vue` · `resources/js/Pages/submissions/Encode.vue` · `resources/js/Pages/forms/show.test.ts` +2 |
+| `scripts/pipeline-lint.php`'s four coverage rules read the MARKDOWN half of the corpus only, and three deferral sentences live in the PHP half where nothing ca… | `M82` | 7890 | `scripts/pipeline-lint.php` · `app/Enums/AnalyticsAxis.php` · `app/Enums/FormBotChallenge.php` · `app/Services/Submissions/SubmissionInboxPresenter.php` |
+| The schedule-acceptance vocabulary has four TypeScript copies and a PHP side that is raw strings rather than an enum, so nothing can ever gate it. | `M92` | 9451 | `resources/public-runtime/lib/types.ts` · `resources/js/Pages/forms/Show.vue` · `resources/js/Pages/submissions/Encode.vue` · `resources/js/Pages/forms/show.test.ts` +2 |
 | `forms.single_page_mode` has no write surface outside the seeders, so single-page mode is unreachable for a real tenant — and its documented default disagrees … | `M80` | 7428 | `app/Services/Submissions/EncodeFormPresenter.php` · `app/Services/Submissions/PublicFormPresenter.php` · `database/seeders/DemoSeeder.php` · `database/seeders/E2eSeeder.php` +5 |
 | `forms.allow_offline_sync` has no reader anywhere — neither the sync manifest nor the PWA install entry honours the per-form offline gate that two documents de… | `M80` | 7472 | `tests/Feature/Tenancy/TenantExtractColumnDriftTest.php` · `docs/erd.md` · `docs/ux/form-filling-ux-flow.md` · `app/Http/Controllers/Api/V1/SyncManifestController.php` +5 |
 | NFR §8 sets a 30-day soft-delete grace period before a hard-deletion job, and for the three entities it names there is no purge job, no grace-period config val… | `M80` | 7617 | `docs/non-functional-requirements.md` · `app/Jobs/Maintenance/PruneFailedJobsJob.php` · `app/Jobs/Submissions/ReapTenantDraftsJob.php` · `app/Services/Submissions/ClientUuidResolver.php` +5 |
@@ -119,7 +119,7 @@ from it and listed separately below.
 | `M59`'s undeclared-`http-server` row undercounts on both of its numbers. | `M71` | 6134 | *hub files only* |
 | The partial-path citation row's consequences are mostly false, and the measurement that settles `D15`'s dependency is done. | `M76` | 6982 | *hub files only* |
 | PHPUnit's own collector loses 40 test files in the container, and a local run reports green without them. | `M76` | 6928 | `tests/Feature/Docs/SuiteCollectionFloorTest.php` |
-| The `docs/claims/ | `M85` | 8435 | `docs/claims/lane-b.md` · `resources/public-runtime/lib/db.ts` |
+| The `docs/claims/ | `M85` | 8441 | `docs/claims/lane-b.md` · `resources/public-runtime/lib/db.ts` |
 | A media pick made during a conflict review is protected only by the reaper's grace window. | `M22` | 1379 | `resources/public-runtime/lib/reap.ts` · `resources/public-runtime/lib/replay.ts` · `tsconfig.sw.json` |
 | `MdsSegmentedControl` spills 30px INSIDE the builder's config pane — a real horizontal scrollbar, and not the page-overflow defect it was filed as. | `M19` | 630 | `resources/js/components/builder/ConfigPanel.vue` · `packages/design-system/src/components/SegmentedControl/SegmentedControl.vue` · `resources/js/components/integrations/SheetsRuleFields.vue` · `resources/js/components/submissions/FieldInput.vue` |
 | The service worker caches a credential-bearing resume shell, and only the RENEWAL of it was closed. | `M70` | 5850 | `resources/public-runtime/sw.ts` · `resources/public-runtime/__tests__/sw.test.ts` · `docs/offline-first-sync-design.md` · `docs/non-functional-requirements.md` +1 |
@@ -140,14 +140,14 @@ from it and listed separately below.
 | `forms.timezone` is documented as defaulting to NULL and the database defaults it to `'UTC'`. | `M78` | 7315 | — *no file harvested* |
 | Two columns are documented under the wrong table in the data dictionary. | `M78` | 7322 | — *no file harvested* |
 | Nine live tables have no dictionary section, and they are not all framework scaffolding. | `M78` | 7329 | — *no file harvested* |
-| Six `Default` cells describe a column as application-supplied when the database does supply a default, and one of the two words used is factually wrong. | `M83` | 8092 | — *no file harvested* |
-| Three `tenants` cells disagree with the live schema on Type and Nullable, and no gate compares either column. | `M83` | 8104 | — *no file harvested* |
-| Four citations point into UNTRACKED trees and can never resolve, and nothing separates them from citations that are merely broken. | `M85` | 8412 | — *no file harvested* |
-| `D13` caps a batch at one row that TOUCHES a hub file; the generator implements one that CITES one. | `M86` | 8543 | — *no file harvested* |
-| Three more lock-holding transitions DELETE the child rows a concurrent builder edit is writing, and for all three the RLS backstop does not fire. | `M88` | 8831 | — *no file harvested* |
-| `FormService` has seven lock-free writers to `forms` and one locked, and six of them build their audit payload from a model nobody re-read. | `M88` | 8841 | — *no file harvested* |
-| One `forceFill` writes `closes_at` and `max_responses` together, and the acceptance guard treats one as authoritative-under-lock and the other as ignorable-pre… | `M88` | 8852 | — *no file harvested* |
-| The mirror gate's comment stripper is line-based and unscoped to `<script>`, so its property grammar on a `.vue` file is first-match-wins across the template a… | `M92` | 9456 | — *no file harvested* |
+| Six `Default` cells describe a column as application-supplied when the database does supply a default, and one of the two words used is factually wrong. | `M83` | 8098 | — *no file harvested* |
+| Three `tenants` cells disagree with the live schema on Type and Nullable, and no gate compares either column. | `M83` | 8110 | — *no file harvested* |
+| Four citations point into UNTRACKED trees and can never resolve, and nothing separates them from citations that are merely broken. | `M85` | 8418 | — *no file harvested* |
+| `D13` caps a batch at one row that TOUCHES a hub file; the generator implements one that CITES one. | `M86` | 8549 | — *no file harvested* |
+| Three more lock-holding transitions DELETE the child rows a concurrent builder edit is writing, and for all three the RLS backstop does not fire. | `M88` | 8837 | — *no file harvested* |
+| `FormService` has seven lock-free writers to `forms` and one locked, and six of them build their audit payload from a model nobody re-read. | `M88` | 8847 | — *no file harvested* |
+| One `forceFill` writes `closes_at` and `max_responses` together, and the acceptance guard treats one as authoritative-under-lock and the other as ignorable-pre… | `M88` | 8858 | — *no file harvested* |
+| The mirror gate's comment stripper is line-based and unscoped to `<script>`, so its property grammar on a `.vue` file is first-match-wins across the template a… | `M92` | 9462 | — *no file harvested* |
 
 ## Latent — real, but each needs a stated precondition first
 
@@ -156,22 +156,22 @@ Not queue work until the precondition holds. The row says what it is.
 | Row | Filed | Line | Cites (non-hub) |
 |---|---|---|---|
 | A verified SSO email domain is trusted indefinitely — there is no re-verification sweep. | `M18` | 2410 | *hub files only* |
-| Two more callers of the snapshot serializer still read a torn tree, and whether they should follow `M90`'s instrument is an open decision rather than an oversi… | `M90` | 9178 | *hub files only* |
+| Two more callers of the snapshot serializer still read a torn tree, and whether they should follow `M90`'s instrument is an open decision rather than an oversi… | `M90` | 9184 | *hub files only* |
 | The setup-time directory has no pre-flight refresh | `M1` | 910 | `app/Services/Connectors/TabularDestinationDirectory.php` |
 | `baselineOf()` turns "no checksum" into `''`, and only middleware turns it back. | `M31` | 3106 | `tests/Feature/Submissions/SubmissionEditRoutesTest.php` |
 | `gamification:backfill --sync` reports failure after it has already committed every award. | `M32` | 4047 | `app/Console/Commands/BackfillGamificationCommand.php` |
 | Route-model binding resolves BEFORE the three console gates, so a synthetic id 404s from the binding rather than from the middleware a test names. | `M67` | 3594 | `bootstrap/app.php` |
-| The documented guest per-IP rate limit of 100/min has no definition — the ceiling on the surface that row describes is 60. | `M80` | 7772 | `config/guest.php` |
-| `BlueprintValidator` enforces no key FORMAT at all, and `SchemaTreeCloner` carries keys forward verbatim — defence in depth rather than a live defect, and it s… | `M91` | 9331 | `app/Services/Forms/BlueprintValidator.php` |
+| The documented guest per-IP rate limit of 100/min has no definition — the ceiling on the surface that row describes is 60. | `M80` | 7778 | `config/guest.php` |
+| `BlueprintValidator` enforces no key FORMAT at all, and `SchemaTreeCloner` carries keys forward verbatim — defence in depth rather than a live defect, and it s… | `M91` | 9337 | `app/Services/Forms/BlueprintValidator.php` |
 | A line-splitting regex matches a byte INSIDE a UTF-8 character, and one faker name is enough to trigger it. | `M42` | 4175 | `tests/Feature/Audit/ImpersonationAttributionTest.php` · `docs/claims/lane-a.md` |
-| Structured JSON application logs are documented in the present tense and `config/logging.php` has no JSON formatter on any channel. | `M80` | 7689 | `config/logging.php` · `docs/observability-incident-response.md` |
-| The API rate-limit table promises 300 requests/minute per authenticated user and no such limiter is defined. | `M80` | 7720 | `app/Providers/FortifyServiceProvider.php` · `app/Providers/QueueServiceProvider.php` |
-| ADR-0007 §D11 describes three queue connections that `config/queue.php` does not define, and asserts they are annotated as forbidden when they were deleted. | `M80` | 7754 | `config/queue.php` · `docs/adr/0007-async-execution-substrate.md` |
+| Structured JSON application logs are documented in the present tense and `config/logging.php` has no JSON formatter on any channel. | `M80` | 7695 | `config/logging.php` · `docs/observability-incident-response.md` |
+| The API rate-limit table promises 300 requests/minute per authenticated user and no such limiter is defined. | `M80` | 7726 | `app/Providers/FortifyServiceProvider.php` · `app/Providers/QueueServiceProvider.php` |
+| ADR-0007 §D11 describes three queue connections that `config/queue.php` does not define, and asserts they are annotated as forbidden when they were deleted. | `M80` | 7760 | `config/queue.php` · `docs/adr/0007-async-execution-substrate.md` |
 | `throttle:saml-acs`'s route BINDING is asserted by nothing, while its registration is. | `M30` | 3364 | `tests/Feature/Sso/SsoLoginWebTest.php` · `tests/Feature/Sso/SsoAcsWebTest.php` · `tests/Feature/Auth/RateLimiterBindingTest.php` |
 | The per-endpoint `include_answers: true` webhook payload opt-in has no key anywhere — and four other files appear to record it as a deferral already taken. | `M80` | 7671 | `docs/data-privacy-gdpr-compliance.md` · `docs/piping-output-encoding-design.md` · `config/webhooks.php` |
-| `export_artifact` objects are documented as auto-deleted seven days after generation, and no scheduled cleanup task is declared. | `M80` | 7741 | `docs/deployment-infrastructure.md` · `app/Enums/AttachmentKind.php` · `app/Services/Submissions/SubmissionPdfStorage.php` |
-| "1 concurrent sync export per form, additional requests 429" — no concurrency guard exists on any export path. | `M80` | 7790 | `app/Jobs/Connectors/RefreshOneConnectionJob.php` · `app/Jobs/MaintenanceJob.php` · `app/Services/Submissions/FormAcceptanceGuard.php` |
-| Correlation IDs threaded through every log line — `request_id` and `job_chain_id` — have no mechanism at all. | `M80` | 7705 | `docs/observability-incident-response.md` · `app/Models/SsoAuthRequest.php` · `app/Services/Sso/SsoAuthRequestService.php` · `app/Models/SsoAuthFailure.php` |
+| `export_artifact` objects are documented as auto-deleted seven days after generation, and no scheduled cleanup task is declared. | `M80` | 7747 | `docs/deployment-infrastructure.md` · `app/Enums/AttachmentKind.php` · `app/Services/Submissions/SubmissionPdfStorage.php` |
+| "1 concurrent sync export per form, additional requests 429" — no concurrency guard exists on any export path. | `M80` | 7796 | `app/Jobs/Connectors/RefreshOneConnectionJob.php` · `app/Jobs/MaintenanceJob.php` · `app/Services/Submissions/FormAcceptanceGuard.php` |
+| Correlation IDs threaded through every log line — `request_id` and `job_chain_id` — have no mechanism at all. | `M80` | 7711 | `docs/observability-incident-response.md` · `app/Models/SsoAuthRequest.php` · `app/Services/Sso/SsoAuthRequestService.php` · `app/Models/SsoAuthFailure.php` |
 | Twelve existing tenant-context call sites restore in a `finally` INSIDE their transaction, which is the shape `TenantContext::runFor()` was deliberately built … | `M3` | 734 | `app/Listeners/Auth/SendWelcomeEmail.php` · `app/Services/Admin/ImpersonationService.php` · `app/Services/Admin/SuperAdminService.php` · `app/Services/Auth/GoogleAuthRequestService.php` +3 |
 | `lib/brand-cache.ts` is a SECOND writer to `guest-shell-html`, and it renews a mis-cased key with a response a navigation cannot use. | `M72` | 6246 | `resources/public-runtime/__tests__/brand-cache.test.ts` |
 | The framework's own mail components interpolate into attributes the same way, and the M57 gate cannot reach them. | `M57` | 4676 | `scripts/mail-attribute-lint.php` · `resources/views/mail/notification.blade.php` |
@@ -233,9 +233,9 @@ really coupled — and why excluding them is what makes the queue above separabl
 | `.github/workflows/ci.yml` | 9 |
 | `routes/api.php` | 9 |
 | `CLAUDE.md` | 8 |
+| `docs/feature-backlog.md` | 7 |
 | `PROGRESS_ARCHIVE.md` | 6 |
 | `scripts/mutate.php` | 6 |
-| `docs/feature-backlog.md` | 6 |
 | `scripts/citation-liveness-lint.php` | 6 |
 | `docs/security-threat-model.md` | 6 |
 | `docs/api-specification.md` | 6 |
@@ -271,7 +271,7 @@ A row whose files were not harvested cannot be checked for collision and is not 
 - **docs/feature-backlog.md:4252** — `M42` · *no non-hub file*
 - **docs/feature-backlog.md:6883** — `M75` · `resources/js/Pages/submissions/Encode.vue`
 - **docs/feature-backlog.md:5981** — `M79` · `docs/adr/0008-entitlement-and-metering.md`
-- **docs/feature-backlog.md:8424** — `M85` · `docs/ACCESS-MATRIX.md`
+- **docs/feature-backlog.md:8430** — `M85` · `docs/ACCESS-MATRIX.md`
 
 ## What this file cannot see
 
@@ -297,14 +297,14 @@ Rows with no harvested file:
 - `docs/feature-backlog.md:7315` — `forms.timezone` is documented as defaulting to NULL and the database defaults it to `'UTC'`.
 - `docs/feature-backlog.md:7322` — Two columns are documented under the wrong table in the data dictionary.
 - `docs/feature-backlog.md:7329` — Nine live tables have no dictionary section, and they are not all framework scaffolding.
-- `docs/feature-backlog.md:8092` — Six `Default` cells describe a column as application-supplied when the database does supply a default, and one of the two words used is factually wrong.
-- `docs/feature-backlog.md:8104` — Three `tenants` cells disagree with the live schema on Type and Nullable, and no gate compares either column.
-- `docs/feature-backlog.md:8412` — Four citations point into UNTRACKED trees and can never resolve, and nothing separates them from citations that are merely broken.
-- `docs/feature-backlog.md:8543` — `D13` caps a batch at one row that TOUCHES a hub file; the generator implements one that CITES one.
-- `docs/feature-backlog.md:8831` — Three more lock-holding transitions DELETE the child rows a concurrent builder edit is writing, and for all three the RLS backstop does not fire.
-- `docs/feature-backlog.md:8841` — `FormService` has seven lock-free writers to `forms` and one locked, and six of them build their audit payload from a model nobody re-read.
-- `docs/feature-backlog.md:8852` — One `forceFill` writes `closes_at` and `max_responses` together, and the acceptance guard treats one as authoritative-under-lock and the other as ignorable-pre…
-- `docs/feature-backlog.md:9456` — The mirror gate's comment stripper is line-based and unscoped to `<script>`, so its property grammar on a `.vue` file is first-match-wins across the template a…
+- `docs/feature-backlog.md:8098` — Six `Default` cells describe a column as application-supplied when the database does supply a default, and one of the two words used is factually wrong.
+- `docs/feature-backlog.md:8110` — Three `tenants` cells disagree with the live schema on Type and Nullable, and no gate compares either column.
+- `docs/feature-backlog.md:8418` — Four citations point into UNTRACKED trees and can never resolve, and nothing separates them from citations that are merely broken.
+- `docs/feature-backlog.md:8549` — `D13` caps a batch at one row that TOUCHES a hub file; the generator implements one that CITES one.
+- `docs/feature-backlog.md:8837` — Three more lock-holding transitions DELETE the child rows a concurrent builder edit is writing, and for all three the RLS backstop does not fire.
+- `docs/feature-backlog.md:8847` — `FormService` has seven lock-free writers to `forms` and one locked, and six of them build their audit payload from a model nobody re-read.
+- `docs/feature-backlog.md:8858` — One `forceFill` writes `closes_at` and `max_responses` together, and the acceptance guard treats one as authoritative-under-lock and the other as ignorable-pre…
+- `docs/feature-backlog.md:9462` — The mirror gate's comment stripper is line-based and unscoped to `<script>`, so its property grammar on a `.vue` file is first-match-wins across the template a…
 - `docs/feature-backlog.md:836` — M5's reconciliation asks "is this SUBMISSION in the destination", not "is THIS DELIVERY's row in the destination", so two rules writing one submission to one t…
 - `docs/feature-backlog.md:849` — A 5xx that arrives AFTER the provider committed is still re-driven.
 - `docs/feature-backlog.md:901` — A rotated token can still be lost in the one-UPDATE window M6 left.

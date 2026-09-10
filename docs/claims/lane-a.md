@@ -16,7 +16,140 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M90`, the twenty-first `D13` batch: four rows, and the fan-out broke a premise in every one of them (`m90-d13-batch`)
+## Status: NO ACTIVE CLAIM — `M90` is merged; the next increment is a fresh `D13` batch
+
+## RELEASED — `M90`, the twenty-first `D13` batch: a JSON refusal the client could not read, four stale guard sites, one snapshot, and a gate for dead test pointers (merged as PR #281, `bd64b62`, 6/6 green with real step counts — Static analysis 28 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
+
+Shipped 2026-09-10. Branch `m90-d13-batch`, cut from `origin/main` at `b4111cd`. **Four rows closed — three
+by fixing, one with a new gate — five rows filed, two decisions filed, and six positive controls run, all
+CAUGHT with disjoint red sets. ⛔ **And CI caught a 500 that my own coverage rule had passed** — the sixth
+control exists because of it.
+
+⛔ **THE HEADLINE IS `Premise verified` FOR THE SIXTH INCREMENT RUNNING, AND THIS TIME EVERY ROW ALSO
+PROPAGATED A FALSE SENTENCE IT HAD NOT MEASURED.** Three of the four premises changed what the fix is.
+
+| row | evidence | premise | remedy |
+|---|---|---|---|
+| `8919` | ⛔ the cited failure line is unreachable on this path | ⛔ false three ways — 7 routes, then 1 reachable, then 14 handler arms | ⛔ **wrong**: returns a body the client cannot read |
+| `8785` | held, all seven symbol citations | ⛔ its stated exclusion reason cannot be true | none offered; the half it deferred was right to defer |
+| `8943` | held; *"three reads"* is exactly three | ⛔ both implied instruments wrong, one dangerously | ⛔ a lock here persists an **empty blueprint**, silently |
+| `8971` | ⛔ both quantifiers false | ⛔ three inherited sentences, all false | none offered; both branches mispriced |
+
+⛔ **`8919` — THE ROW'S OWN PRESCRIBED FIX WOULD HAVE SHIPPED A SILENT HALF-REPAIR, AND A STATUS-ONLY TEST
+WOULD HAVE PASSED IT.** It says to reuse the `/api/v1` arm; `ApiErrorResponse` nests everything under
+`error` while `builderClient` reads `payload.message` at the **top level**, so that fix returns a 402 the
+client still cannot read and the user still sees a generic string. The mutation that returns the envelope
+reddens exactly the flatness assertions and nothing else. ⚠️ **The cited mechanism is also wrong**:
+`builderClient.ts:68` sits inside `if (!response.ok)`, and `fetch` follows the 302 to a referer that answers
+**200 HTML**, so `response.ok` is true and `await response.json()` throws a bare `SyntaxError` — the string
+the user sees is *"Something went wrong saving your change."* ⚠️ **And "three builder routes" is wrong in
+both directions**: only **one** was reachable in a denied state, because every sibling surface already
+carried a client gate and `ConfigPanel.vue` did not — while the HANDLER defect covered **fourteen** arms,
+five written as a ternary or an arrow fn that no `return back()` grep can see, and two taking no `Request`
+parameter at all. ⛔ **THREE CLIENT-SIDE WORKAROUNDS EXISTED FOR THIS ONE SERVER DEFECT** —
+`useMemberStreak` carries a thirteen-line docblock and a runtime guard whose only purpose is to keep a
+request off this path — which is the argument for repairing the server once rather than the client again.
+
+⛔ **`8785` — I FILED A PREMISE ERROR AS A CENSUS ERROR, AND THE ADVERSARIAL PASS CAUGHT IT.** The row does
+name the locking siblings and says why it excluded them; its **reason** is what is false. *"The locking
+siblings' exposure is bounded by their lock"* cannot be true, because `lockDraft()` re-reads under
+`FOR UPDATE` and returns a **fresh** draft — it says nothing about a `$form` that went stale at route-model
+binding. The four uncovered sites differ by symptom: the two deletes were **silent** zero-row writes
+answered `['deleted' => true]` with a 200 (`M88`'s headline symptom, verbatim, on the delete path), while
+`duplicateField()` was a **42501** escaping `respond()` as a bare 500. ⚠️ **`M89` deliberately declined to
+RELABEL 42501, and that decision stands** — the re-read makes it unreachable instead. ⚠️ **The request-layer
+half is deliberately NOT taken, and the row was right about it**: both available scopes are identical
+outside the race and both wrong inside it, so it is `D30` rather than a fix.
+
+⛔ **`8943` — BOTH INSTRUMENTS THE ROW GESTURES AT ARE WRONG, AND ONE OF THEM IS DANGEROUS.** A plain
+transaction changes nothing under READ COMMITTED. Repeating `M89`'s `lockForUpdate()` would be worse than
+useless: the `draft_child` policy filters a locking SELECT to zero rows for a non-draft parent, and **both**
+entry points admit a non-draft version, so it would persist an **EMPTY blueprint with no error**.
+⚠️ **Nothing would have caught that** — `TemplateRoundTripTest`, the file that exists to prove this
+serialize/instantiate loop, never calls `saveAsTemplate()`. Shipped at `REPEATABLE READ`. ⚠️ **The isolation
+level is not observable from the suite** (the guard correctly declines on a nested transaction), so the gate
+pins the transaction **boundary** — and that carve-out is stated rather than papered over, which is what
+`D29` is filed to settle.
+
+⛔ **`8971` — THE ROW NAMED ONE PHANTOM AND THE GATE FOUND FOUR.** `git log --all -S` sharpens it: the name
+entered the tree as a **comment** and was a file in no commit, ever. Both of the row's quantifiers are
+false, and one was falsified by `M89`'s own hand in the same increment that filed it. Two more of its
+neighbouring sentences were false — *"no test opens a second connection"* (routine) and *"this suite has no
+committing-test precedent"* (`I7a` is that precedent, with its nine-red-tests incident) — and both are
+corrected at source, pointing at `docs/testing-strategy.md` §8 rather than restating it.
+
+⛔⛔ **THE GATE RUNS ON THE HOST, AND THAT IS MEASURED RATHER THAN INHERITED FROM CLAUDE.md's TABLE.** The
+first draft was a Pest arm. It reported **fourteen violations, nine of them phantoms of the harness**: the
+container's `RecursiveDirectoryIterator` sees **410** test files against the host's **449**, so real files
+drop out of the on-disk set and every pointer to them reads as dangling. The failure mode is not a missed
+violation but a FALSE one. ⚠️ **My floor of 400 passed while the harvest was already broken** — a partial
+collapse walks under a floor set below the census, which is why the shipped floors sit near it.
+✅ It corroborates `docs/feature-backlog.md`'s *"collector loses 40 test files"* row from an entirely
+different instrument, and the local `SuiteCollectionFloorTest` red confirms both.
+
+✅ **SIX POSITIVE CONTROLS, ALL CAUGHT, EVERY RED SET DISJOINT AND PRECISE.** Reverting the `feature:` arm
+reddens the JSON arm and the coverage rule and leaves the three others green; dropping `expectsJson()`
+reddens both redirect arms and neither JSON arm; returning the envelope reddens both JSON arms via the
+flatness assertion; reverting `deleteField()` reddens **exactly one arm of twenty**; removing the template
+transaction reddens the boundary arm while the output arm correctly stays green. The new lint ships its own
+four-arm control as `--selftest`, because `mutate.php` cannot drive a gate whose truthful container answer
+is red.
+
+⛔⛔ **CI CAUGHT A 500 THAT MY OWN COVERAGE RULE PASSED, AND THAT IS THE MOST IMPORTANT THING THIS
+INCREMENT MEASURED.** The first push went **5/6**. Three `AnalyticsWebRefusalTest` cases returned **500**,
+because that arm's BODY was rewritten to call `$webJson(...)` while its `use ($isApi)` clause was not —
+an undefined-variable Error on the refusal path itself. ⛔ **The coverage rule asked whether the arm
+mentions `$webJson(`. That arm did. So the gate written to make this class of mistake impossible passed
+the first instance of it.** A rule that checks the CALL and not the BINDING is checking the half that
+cannot fail on its own. The rule now asserts capture too — and the arm that does so is scoped to
+`function` closures, because an arrow fn captures automatically and the first draft of the new check
+reddened two correct arms: a gate written to catch an over-narrow predicate, failing by being over-broad
+in the opposite direction, inside one increment.
+
+⛔ **AND THE SAME RUN REFUTED A CONCLUSION I HAD RECORDED AS MEASURED.** The claim says *"nothing in this
+repository pins the JSON-fetch case at all"*. `TabularDestinationTest` pins it — `getJson()` plus
+`assertRedirect()` — and went red. The claim was measured over the field-library denials only and then
+stated over every `feature:`-gated surface, which is the floor-versus-census error this batch spent four
+rows on. ⚠️ **A third failure was mine and cheaper**: the library-capture arm counted `field_library`
+GLOBALLY, passed locally, and failed in CI at *"6 is identical to 0"* — the table carries platform rows
+and how many depends on which seeder ran.
+
+⚠️ **`gh run watch --exit-status` EXITED 0 ON THAT FAILED RUN.** The per-job conclusions read individually
+are the authority, exactly as the merge rule says; the watch command's exit status is not.
+
+⛔ **A MUTATION CAUGHT A VACUOUS TEST OF MY OWN, WHICH IS THE FINDING I DID NOT EXPECT.** The Inertia arm
+asserted a redirect and passed — while never reaching the handler at all. Inertia's middleware compares the
+asset version on a **GET** and returns 409 + `X-Inertia-Location` **before** calling `$next`, so the visit
+never ran the route. It was exposed only because mutation 2 turned its sibling red and left it green: two
+arms claiming to test one predicate cannot disagree under a mutation of it. It is a POST now.
+⚠️ **A second vacuity, same increment**: the first `ConfigPanel` gate arms asserted against the *Basics*
+body, where the button is absent whatever the plan says — the negative arm passed for the wrong reason.
+
+⚠️ **HOW THE PREDICTION FARED — RIGHT ABOUT THE GATE I NAMED, WRONG ABOUT WHY.** I named row 1's structural
+arm as the one I most expected to be wrong, *"because a regex over PHP matches either everything or
+nothing"*. It did go wrong — but as a **census** rather than a match: it found nine of fourteen arms,
+because my own `grep 'return back()'` had already undercounted the file before the rule was written. The
+second prediction (row 3's statement-shape test could pass vacuously against an unrepaired tree) was
+**refuted** — the mutation reddens it cleanly. And the vacuity that did bite was in neither.
+✅ Pest moved as predicted; PHPStan cannot move (`bootstrap/`, `resources/` and `tests/` are outside the
+three paths it scans) and is reported that way rather than as an unchanged number; Vitest's file count is
+unchanged because row 1 added no `.test.ts`; **Static analysis went 26 → 28**, which the prediction did not
+name and should have — a new gate is two steps, not zero.
+
+⛔ **THIS BATCH BREAKS `D13`'s ONE-HUB-ROW CAP, DELIBERATELY AND ON THE RECORD.** A gate is not a gate until
+it is registered, and registering one means editing `composer.json` (3 citing rows) and
+`.github/workflows/ci.yml` (8) — both hub files by the triage's own derivation. So row 4 took two hubs and
+row 2 took `docs/claims/decisions.md`. Filed as a row and as input to **`D15`**, which is already open on
+exactly this cap, and which this is the first measured case of forbidding work rather than merely shrinking
+a batch. It is not a licence.
+
+**Namespaces spent:** nothing from either — no migration prefix, no ADR (`0023` stays free, `0010` stays
+reserved for H1d), no exceptions-log entry. Two decision ids, `D29` and `D30`.
+
+### The claim, preserved
+
+⚠️ **Kept rather than summarised, because three of its four `Remedy verdict` entries were WRONG about themselves and the correction below is the record.** The boundaries it declares between rows are also the only place the batch's file allocation is written down.
+
 
 Taken 2026-09-10. Branch `m90-d13-batch`, cut from `origin/main` at `b4111cd`, PR into `main`.
 

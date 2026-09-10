@@ -291,6 +291,15 @@ $metrics = [
         'pattern' => '/Citation liveness linter passed \((\d+) document\(s\) scanned, (\d+) citation\(s\) checked, (\d+) resolved, (\d+) unresolved; ledger tier (\d+) rotten, ceiling (\d+)/',
         'format' => static fn (array $m): string => "{$m[1]} docs, {$m[2]} citations, {$m[3]} resolved, {$m[4]} unresolved, ledger {$m[5]}/{$m[6]}",
     ],
+    // M90. ⚠️ THIS LIST IS DECLARED, NOT DERIVED, so a gate added to ci.yml is INVISIBLE here until
+    // somebody adds a row — and the file's own "NOT FOUND is a broken pattern, not a zero" warning cannot
+    // fire for a gate it was never told about. The test-pointer lint shipped one increment without a
+    // baseline for exactly that reason, and this is the correction rather than a new capability.
+    'test-pointer-lint' => [
+        'job' => 'Static analysis, style & security',
+        'pattern' => '/test-pointer-lint: passed \((\d+) test file\(s\), (\d+) `\*Test` name\(s\) mentioned, (\d+) exemption\(s\)/',
+        'format' => static fn (array $m): string => "{$m[1]} test files, {$m[2]} names, {$m[3]} exemptions",
+    ],
 ];
 
 $rows = [];

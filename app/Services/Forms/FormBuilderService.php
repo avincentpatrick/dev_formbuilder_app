@@ -322,7 +322,7 @@ final class FormBuilderService
      * BEFORE THE REQUEST DID ANYTHING. `$form->draft_version_id` is whatever it was when route-model
      * binding loaded it, so if a publish, restore, XLSForm import or archive commits between that
      * load and this write, the guard compares two stale values, agrees with itself, and lets the
-     * write through. {@see \Tests\Feature\Forms\BuilderDraftGuardTest}'s own header says that guard
+     * write through. `tests/Feature/Forms/BuilderDraftGuardTest`'s own header says that guard
      * "turns a write against a published version into a 422 instead of a silent zero-row write" —
      * true only when the version was ALREADY published at bind time, which is the case it tested.
      *

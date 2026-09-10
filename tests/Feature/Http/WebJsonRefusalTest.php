@@ -104,16 +104,24 @@ it('still redirects an INERTIA visit, because an Inertia visit does not expect J
     // An Inertia visit sends X-Inertia with `Accept: text/html, application/xhtml+xml` — NOT
     // application/json — which is exactly why keying the new arm on expectsJson() cannot disturb any
     // Inertia flow. bootstrap/app.php's shouldRenderJsonWhen() comment states the same property.
+    //
+    // ⛔ THIS IS A **POST**, AND THAT IS THE WHOLE REASON IT IS ONE. Inertia's middleware compares the
+    // asset version on a GET and returns 409 + X-Inertia-Location BEFORE calling $next, so an Inertia GET
+    // with no matching version never reaches the route, never throws, and never touches the handler under
+    // test. The first draft of this case was exactly that, and it PASSED — measuring the asset-version
+    // protocol rather than the refusal. `Inertia::getVersion()` does not rescue it either: the version is
+    // set by the middleware DURING the request, so it reads empty from a test that has not made one yet.
+    // The version check does not apply to POST, so this reaches the gate for real.
+    //
+    // ⚠️ IT WAS THE MUTATION THAT CAUGHT THIS, NOT THE READING. Dropping the expectsJson() predicate turned
+    // the browser-navigation arm red and left this one green; two arms that claim to test the same
+    // predicate cannot disagree under a mutation of it, and that disagreement is what exposed the vacuity.
     $response = $this->actingAs($admin)
         ->withHeaders(['X-Inertia' => 'true', 'Accept' => 'text/html, application/xhtml+xml'])
-        ->get("http://acme.meridian.test/forms/{$form->id}/library-items");
+        ->post("http://acme.meridian.test/forms/{$form->id}/fields/from-library", ['field_library_id' => 'x']);
 
-    // ⚠️ 409 + X-Inertia-Location IS THE REDIRECT, not a failure to redirect: Inertia converts a redirect
-    // it cannot follow in place into its own client-side redirect protocol. Asserting `assertRedirect()`
-    // here would be asserting the wrong protocol and would fail on correct behaviour. What is load-bearing
-    // is that the visit never reached $webJson — 402 is the JSON arm's status, and this is not it.
+    $response->assertRedirect();
     expect($response->status())->not->toBe(402);
-    $response->assertHeader('X-Inertia-Location');
 });
 
 it('leaves no exception renderable that redirects without a JSON sibling', function (): void {

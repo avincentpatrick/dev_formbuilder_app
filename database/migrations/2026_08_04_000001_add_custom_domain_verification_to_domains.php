@@ -39,7 +39,8 @@ use Illuminate\Support\Facades\Schema;
  *
  * NOTE for whoever adds the next column here: stancl's Domain model is `$guarded = []`, so a mass-assigned
  * create() would happily set any of these. {@see CustomDomainService} constructs its
- * arrays explicitly for that reason, and CustomDomainClaimTest pins it.
+ * arrays explicitly for that reason, and CustomDomainApiTest pins it (M92 corrected the name; the one
+ * it carried has never existed).
  */
 return new class extends Migration
 {

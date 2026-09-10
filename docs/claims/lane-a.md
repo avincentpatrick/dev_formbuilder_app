@@ -16,7 +16,87 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M88` is merged; the next increment is a fresh `D13` batch
+## Status: ACTIVE CLAIM — `M89`, the twentieth `D13` batch: an unrendered 500 on the builder's write path, a snapshot frozen without locking what it freezes, a cross-language vocabulary nothing compares, and a dormant-column skip that cannot see a table (`m89-d13-batch`)
+
+Taken 2026-09-10. Branch `m89-d13-batch`, cut from `origin/main` at `6d9ce08`, PR into `main`.
+
+⛔ **THE GENERATED PROPOSAL IS REJECTED FOR THE FIFTH INCREMENT RUNNING, FOR THE MECHANISM THE LEDGER
+ALREADY OWNS AS AN OPEN ROW.** `docs/backlog-triage.md`'s `## Suggested next batch` offers `4242` · `6873` ·
+`5971` · `8414`. Read by `D13`'s letter — *at most one row may **touch** a hub file* — three of the four
+break the cap: `4242`'s repair is in `scripts/tracker-lint.php` and its subjects are `CLAUDE.md` (8 rows)
+and `PROGRESS.md` (3); `5971`'s can only be made in `scripts/pipeline.php` (12); `8414`'s in
+`scripts/citation-liveness-lint.php` (6). ⚠️ **The generator is not malfunctioning** — it implements *cites*
+where the decision says *touches*, which is precisely what `docs/feature-backlog.md:8533` records as an open
+row. This is the fifth consecutive rejection; it is further evidence for `D15` and is recorded rather than
+re-argued. **And the fourth proposed row, `6873`, is independently unstartable**: its own body says the
+remedy needs *"a product decision nobody has taken"*, which is the `state=ready`-from-liveness-alone defect
+already open at `docs/feature-backlog.md:8267`.
+
+**The batch, chosen by hand under `D13`'s letter — one hub-touching row, no two rows sharing a non-hub file:**
+
+| # | Row | Hub? | Non-hub files it would touch |
+|---|---|---|---|
+| 1 | `docs/feature-backlog.md:8732` — a builder edit whose field was deleted mid-request returns a bare 500 when the payload carries validations | no | `app/Services/Forms/FormBuilderService.php`, `app/Exceptions/FormException.php`, `bootstrap/app.php`, a `tests/Feature/Forms/` arm |
+| 2 | `docs/feature-backlog.md:8713` — the publish transaction reads the schema snapshot without locking the child rows it is about to freeze | no | `app/Services/Forms/PublishService.php`, `app/Services/Forms/SchemaSnapshotSerializer.php`, `app/Services/Forms/SchemaTreeCloner.php`, `docs/form-versioning-schema-migration.md`, a `tests/Feature/Forms/` arm |
+| 3 | `docs/feature-backlog.md:8811` — a whole file of PHP-enum mirrors in the public runtime has no parity gate | no | `resources/public-runtime/engine/enums.ts`, `resources/js/types/inertia.d.ts`, `resources/js/components/forms/types.ts`, `app/Enums/*`, a new `tests/Feature/Docs/` arm |
+| 4 | `docs/feature-backlog.md:8799` — `P2d`'s dormant-column skip is TABLE-BLIND, and its literal-`null` sibling hides three more columns | **yes** — `scripts/pipeline-lint.php` | `scripts/pipeline-lint-controls.php`, `tests/Feature/Docs/PipelineLintControlsTest.php` |
+
+⚠️ **`docs/feature-backlog.md` is in the hub table at 4 citing rows and is deliberately not counted here**, on
+`M87`'s stated grounds: every closure and every correction edits the ledger, so counting it would make no
+batch legal at all.
+
+⚠️ **Rows 1 and 2 are both from `M88`'s builder-lock fan-out and share no file, no service and no remedy.**
+Row 1 is a post-guard constraint violation that surfaces unrendered on the *builder* path; row 2 is a
+snapshot read that takes no child lock inside *publish*. Row 1's repair is a typed catch, row 2's is a
+locking read. `M88`'s re-read guard is the thing that narrows row 1 and provably cannot reach row 2.
+
+⛔ **Row 4 is expected to close `docs/feature-backlog.md:7858` as well, and if it does not, the claim says so
+in the release.** `8799` states that one predicate change reaches both; `7858` states that both available
+repairs for its half are worse than the defect. Those two sentences cannot both be right, and settling which
+is part of taking the row.
+
+⚠️ **Row 4 is the row most likely to grow.** Un-blinding the skip makes previously-discharged columns
+undischarged, which turns a **host** gate red until each is dispositioned. Dispositioning is a ledger edit,
+which is in scope; if it turns out to need `docs/data-dictionary.md` line insertions, the citation ledger's
+zero headroom binds and the row is corrected rather than forced — the `M87` lesson, not a second attempt at it.
+
+### Evidence verified
+
+⏳ **PENDING — the read-only fan-out is running, one researcher per row over disjoint files (`D13` clause 2).**
+This heading is written before the first file is opened because the claim is a pushed commit; it is amended
+in its own pushed commit the moment the fan-out reports, and the amendment is what the gates see.
+
+### Premise verified
+
+⏳ **PENDING — same fan-out, asked separately.** What each row believes about the world *around* its defect:
+row 1 believes 422 is what *"every other refusal on that surface returns"* and that `FormException::childNotInDraft()`
+exists and renders that way; row 2 believes the `draft_child` RLS policy cannot refuse the racing write and
+that `PublishService` is the only snapshot-freezing writer; row 3 believes the four mirrored vocabularies are
+the whole population and that no test references the mirror file; row 4 believes the collector already carries
+the table at the point of the skip, so that the fix needs *"no new plumbing"*.
+
+### Remedy verdict
+
+⏳ **PENDING — measured before any test is written, per row.** Row 1 names one (a typed catch mapping 23503).
+Row 2 names one and calls it a decision rather than a sweep. Row 3 offers none — it names two instruments and
+says choosing between them *is* the work. Row 4 names one for its first half and inherits `7858`'s refusal for
+its second.
+
+Files: `docs/claims/lane-a.md`, `docs/feature-backlog.md`, `docs/backlog-triage.md`, `docs/pipeline.md`,
+`PROGRESS.md` (own block only), `docs/gate-baselines.md`, plus the per-row files in the table above.
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/backlog-triage.md`, `docs/pipeline.md`,
+`docs/form-versioning-schema-migration.md`, `PROGRESS.md` (own block only).
+Paired files taken: none identified at claim time; the fan-out is asked to name any.
+Namespaces spent: nothing from either namespace at claim time — no migration and no ADR is expected.
+Prediction: Pest gains arms and no CI job's step count moves; PHPStan CI stays at zero while the local run
+keeps its phantoms, which must be classified by MESSAGE rather than counted; Pint runs bare on the host;
+`openapi.json` stays byte-identical because no route, request or resource shape changes. **The gate I most
+expect to be wrong is `pipeline-lint` itself** — row 4 edits the gate that guards the queue, its controls
+mirror the live corpus (`docs/feature-backlog.md:7915`), and a predicate change there reddens every control
+case at once rather than the one that names the defect. Second most likely: `docs/pipeline.md`'s citation
+of `PROGRESS.md`, which every close-out drifts. ⚠️ **`PROGRESS.md` is at 119,828 bytes against R1's 130,000
+and one close-out costs ~5.5KB, so this increment fits and the next one does not** — that is a finding for
+the hand-off, not work this claim takes.
 
 ## RELEASED — `M88`, the nineteenth `D13` batch: two lock asymmetries that were not what they said, five dormant columns rather than four, and an enum catalog gated against the database and nothing else (merged as PR #279, `ee8ca26`, 6/6 green with real step counts — Static analysis 26 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

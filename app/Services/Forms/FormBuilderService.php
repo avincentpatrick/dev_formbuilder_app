@@ -18,6 +18,7 @@ use App\Models\User;
 use App\Support\Tenancy\PlatformRowCounter;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -25,7 +26,8 @@ use Illuminate\Support\Facades\DB;
  * The interactive builder's fine-grained mutation surface (Increment D4a; form-versioning-schema-migration
  * §3/§8). Every operation edits the form's CURRENT DRAFT version only — the draft_child RLS guard is the DB
  * backstop, and {@see self::assertDraftChild()} is the clean service-level guard that turns a write against a
- * published version into a 403 instead of a silent zero-row write.
+ * published version into a 422 instead of a silent zero-row write (M89: this said `403`, and the only caller
+ * has mapped it to 422 since it was written).
  *
  * Concurrency model (§8):
  *  - CONTENT edits (updateField/updateSection) are optimistic: the client echoes the `updated_at` token it
@@ -133,6 +135,21 @@ final class FormBuilderService
     }
 
     /**
+     * ⛔ THE ONLY MUTATOR HERE THAT CAN REACH A FOREIGN-KEY VIOLATION, AND THE REASON IS THE LOCK.
+     * Every deleter of a draft child — deleteField(), deleteSection(), PublishService, RestoreService,
+     * XlsformImporter, FormService::archive() — takes the same `forms`-row FOR UPDATE lock, so the
+     * structural mutators here are serialized against them and their check-then-write cannot race.
+     * updateField() and updateSection() are the two that deliberately do NOT lock (§3.4 declines to
+     * serialize content edits), and of those only this one writes foreign keys: replaceValidations()
+     * INSERTs `form_field_id` and `related_form_field_id`, both declared `cascadeOnDelete()` and both
+     * IMMEDIATE — there is no DEFERRABLE anywhere in database/migrations/.
+     *
+     * ⚠ assertStillDraftChild() narrows the window and cannot close it: it re-reads before the write,
+     * so a delete committing between that re-read and the INSERT still reaches the constraint. What
+     * escaped was SQLSTATE 23503, which no renderable claims — the builder's `fetch` got the
+     * framework's generic JSON 500 and showed "Server Error" — instead of the 422 respond() exists
+     * to produce.
+     *
      * @param  array<string, mixed>  $data
      */
     public function updateField(Form $form, FormField $field, User $user, array $data, ?string $expectedVersion): FormField
@@ -140,6 +157,33 @@ final class FormBuilderService
         $this->assertDraftChild($form, $field);
         $this->assertNoDrift($field, $expectedVersion);
 
+        try {
+            return $this->writeField($form, $field, $user, $data);
+        } catch (QueryException $e) {
+            // The CODE, never the driver's message text or the constraint name: the house rule stated in
+            // SavedReportViewService::guardName() and SubmissionPipeline, and the reason is locale
+            // independence. Anything that is not the foreign key — 23505 on the key-uniqueness race,
+            // 23514 on the rule XOR check, 42501 when RLS refuses the row outright — keeps the
+            // behaviour it has today rather than being silently relabelled.
+            if ((string) $e->getCode() !== '23503') {
+                throw $e;
+            }
+
+            // WHICH of the two foreign keys lost its target, decided by a re-read rather than by parsing
+            // the constraint name out of the driver's message. The catch sits OUTSIDE the transaction, so
+            // the violation has already rolled back and the connection is usable again; under
+            // RefreshDatabase DB::transaction() opened a SAVEPOINT, so the caller's transaction survives.
+            throw $field->newQuery()->whereKey($field->getKey())->exists()
+                ? FormException::relatedFieldRemovedDuringEdit()
+                : FormException::childRemovedDuringEdit();
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function writeField(Form $form, FormField $field, User $user, array $data): FormField
+    {
         return DB::transaction(function () use ($form, $field, $user, $data): FormField {
             $this->assertStillDraftChild($form, $field);
 
@@ -357,7 +401,9 @@ final class FormBuilderService
         $live = $child->newQuery()->whereKey($child->getKey())->first();
 
         if (! $live instanceof FormSection && ! $live instanceof FormField) {
-            throw FormException::childNotInDraft();
+            // REMOVED, not published. M88 raised childNotInDraft() here, whose message names a
+            // publication that did not happen; the two events are told apart from M89 on.
+            throw FormException::childRemovedDuringEdit();
         }
 
         if ($live->form_version_id !== $current->draft_version_id) {

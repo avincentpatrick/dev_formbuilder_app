@@ -18,11 +18,17 @@ uses(RefreshDatabase::class);
 | that list therefore appears to save, reads back NULL, and breaks every `where()` against it — with no
 | error, no warning, and a green write path the whole way.
 |
-| ⚠️ FOUR PLACES IN THIS REPO CITE A GUARD CALLED `TenantCustomColumnsTest` FOR THIS — the model itself and
-| three `Schema::table('tenants')` migrations. THAT FILE HAS NEVER EXISTED. What exists are three
-| `toContain()` assertions for columns already added (TenantMaintenanceColumnsTest, BrandingStorageTest,
-| JobContractTest), and none of them can fail for a NEW column — which is the only case that matters,
-| because the trap springs on the next author, not on the last one.
+| ⚠️ FOUR PLACES ONCE CITED A GUARD CALLED `TenantCustomColumnsTest` FOR THIS — the model itself and three
+| `Schema::table('tenants')` migrations. THAT FILE HAS NEVER EXISTED, AND ALL FOUR WERE CORRECTED AT P2a:
+| each cites this file now and keeps the dead name only as the one it used to carry. ⛔ M91: THIS PARAGRAPH
+| WENT ON CLAIMING THEM AS LIVE CITATIONS, and `scripts/test-pointer-lint.php`'s header and its exemption
+| reason both inherited that claim — three sentences describing a tree that had already been repaired,
+| while the four sites they described were correct. The name survives only as a CORRECTION NOTE, here and
+| in those four, which is why the gate still exempts it and why removing the mentions would delete the
+| finding. What none of the four may be re-pointed at is the three `Tenant::getCustomColumns()`
+| `toContain()` assertions that predate this file (`TenantMaintenanceColumnsTest`, `BrandingStorageTest`,
+| `JobContractTest`): none of them can fail for a NEW column, which is the only case that matters, because
+| the trap springs on the next author, not on the last one.
 |
 | This file is that guard, as SET EQUALITY in both directions, so it fails automatically and forever.
 */

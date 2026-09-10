@@ -55,8 +55,12 @@ class Tenant extends BaseTenant
         // point `where('status', …)` matches NOTHING and every tenant vanishes from every fan-out —
         // with no error. `JobContractTest` pins this one specifically (ADR-0007 §D3/§D13 depend on the
         // predicate being real SQL); `TenantColumnWhitelistTest` pins the whole list by set equality.
-        // ⚠️ This comment used to cite `TenantCustomColumnsTest`, and so do three migrations — that file has
-        // never existed in this repository. The claim was true; only the name was wrong.
+        // ⚠️ This comment cited `TenantCustomColumnsTest` until P2a, as did the three `Schema::table('tenants')`
+        // migrations that add columns here — a file that has never existed in this repository. All four were
+        // corrected together; the claim was true and only the name was wrong.
+        // ⛔ M91: THE PRESENT TENSE HERE ("and so do three migrations") OUTLIVED THAT REPAIR. Two sentences in
+        // `scripts/test-pointer-lint.php` and one in `TenantColumnWhitelistTest` inherited it, so a reader was
+        // told four live sites were lying while all four were already correct. Corrected in all four places.
         //
         // primary_color / brand_ramp / logo_attachment_id (H23a2, 2026_08_05_000003) are the same shape
         // again. Their failure mode is quieter than 'status' but no less real: branding would appear to

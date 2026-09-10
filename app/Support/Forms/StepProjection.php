@@ -55,10 +55,16 @@ final class StepProjection
      * The reservation is structurally safe from the two authoring paths that validate keys —
      * `UpdateSectionRequest`'s `regex:/^[a-z][a-z0-9_]*$/` rejects a leading underscore, and
      * `XlsformImportParser::sanitizeKey()` prefixes `x_` to anything not starting with a letter — but
-     * `SchemaBlueprintMaterializer` (form templates) and the field library write through `Model::create`
-     * with no FormRequest in the path. So it is a convention with two verified enforcers and two unverified
-     * writers, which is the shape Doc #26 recorded for `*_translations`. Doc #27 §2.1 owes it a test, not a
-     * migration.
+     * neither of the two writers once named here turns out to write a caller-supplied key at all.
+     * ⛔ M91 CORRECTED BOTH HALVES. The field library stores `'key' => null`, so a library item carries
+     * no key; and `form_templates.schema_blueprint` has exactly one writer, `TemplateService::
+     * saveAsTemplate()`, which SNAPSHOTS rows whose keys already came through a guarded path — no route
+     * anywhere accepts a client-supplied blueprint. So it is a convention with two verified enforcers
+     * and NO unverified writer reachable by a tenant actor, which is a different shape from the one
+     * Doc #26 recorded for `*_translations`. ✅ Doc #27 §2.1's owed test is DISCHARGED: both PATCH routes
+     * are asserted over HTTP in `tests/Feature/Forms/BuilderRoutesTest.php`. ⚠️ What is NOT enforced is
+     * the blueprint's own key FORMAT — filed as its own row, because it is defence in depth on a path no
+     * tenant can reach rather than a live defect.
      */
     public const LEAD_STEP_KEY = '__lead__';
 

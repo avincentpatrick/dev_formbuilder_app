@@ -16,7 +16,165 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M91` is merged; the next increment is a fresh `D13` batch
+## Status: ACTIVE CLAIM — `M92`, the twenty-third `D13` batch: a second deadlock cycle reached only through a cross-field rule, eight dead test-class pointers a gate cannot see, an enum-mirror row whose headline is false, and a checksum whose stated mechanism is inert (`m92-d13-batch`)
+
+Taken 2026-09-11. Branch `m92-d13-batch`, cut from `origin/main` at `34fc64d`, PR into `main`.
+
+⛔ **THE GENERATED PROPOSAL IS REJECTED FOR THE FIFTH TIME — AND FOR THE FIRST TIME IT IS THE
+BYTE-IDENTICAL SET ALREADY REJECTED BY `M91`.** `docs/backlog-triage.md`'s `## Suggested next batch`
+offers `4252` · `6883` · `5981` · `8424` again, because nothing about those rows or about the greedy
+pick changed when `M91` declined them. `4252` repairs `scripts/tracker-lint.php` and
+`scripts/tracker-lint-controls.php` (a hub at 4 citing rows); `5981` repairs `scripts/pipeline.php`
+(12); `8424` repairs `scripts/citation-liveness-lint.php` (6) — **three hub rows against a cap of one**
+— and `6883` still states its own blocker in its body, which is `8277`'s defect. ⚠️ **The recurrence is
+now five-for-five, and the new fact is that it REPEATS rather than rotates.** The first four rejections
+were four different mechanisms, so each could be read as bad luck. A proposal that is unchanged after
+being rejected cannot be: the generator has no memory of a refusal and no input that a refusal moves.
+**That is a stronger input to `D15` than any of the four before it**, and it is recorded here rather
+than argued into the decision entry.
+
+**The batch, chosen by hand under `D13`'s letter — one hub-touching row, no two rows sharing a non-hub file:**
+
+| # | Row | Hub? | Non-hub files it would touch |
+|---|---|---|---|
+| 1 | `docs/feature-backlog.md:9278` — a SECOND publisher-versus-builder deadlock cycle survives `M91`'s fix, reached only through a cross-field validation rule | no | `app/Services/Forms/PublishService.php`, `app/Services/Forms/FormBuilderService.php`, `tests/Feature/Forms/PublishLockingTest.php`, `tests/Feature/Forms/BuilderLockOrderTest.php` |
+| 2 | `docs/feature-backlog.md:9216` — dead test-class pointers live in `app/` and `database/`, and the gate built to end that species cannot see one of them | **yes** — `routes/tenant.php` | `scripts/test-pointer-lint.php` and the citing sites in `app/` and `database/` |
+| 3 | `docs/feature-backlog.md:9052` — PHP-enum mirrors the new mirror gate does not reach, one of which adds a member its enum does not have | no | `tests/Feature/Docs/DocumentedEnumMirrorDriftTest.php`, `resources/js/components/submissions/FieldInput.vue` (read), `resources/js/Pages/submissions/show.test.ts` (read) |
+| 4 | `docs/feature-backlog.md:8971` — `form_versions.checksum` cannot be re-derived from the `schema_snapshot` it is stored beside | **forced second, see below** | `app/Services/Forms/SchemaSnapshotSerializer.php`, `database/migrations/2026_07_06_000202_create_form_versions_table.php`, `docs/erd.md`, a Pest arm |
+
+⚠️ **`docs/feature-backlog.md` is in the hub table at 6 citing rows and is deliberately not counted here.**
+Every closure and every correction edits the ledger, so counting it would make no batch legal at all —
+the `D15` exemption nineteen batched increments have now relied on, recorded rather than argued.
+
+⛔ **ROW 2 IS THE DECLARED HUB ROW, AND IT BECAME ONE DURING VERIFICATION RATHER THAN AT SELECTION.**
+The row names `app/` and `database/`; the census below finds an eighth pointer in `routes/tenant.php`,
+which is a hub at 10 citing rows. **Shipping a widened gate deliberately blind to a violation it would
+otherwise catch is not an option**, so the root set includes `routes/` and the hub budget is spent here.
+
+⛔ **AND ROW 4 FORCES A SECOND HUB TOUCH THAT WAS UNKNOWABLE AT SELECTION — `M88`'s MECHANISM,
+RECURRING EXACTLY.** The row frames the migration comment as the one false statement. Verifying its
+*premise* found the same imprecision in `docs/data-dictionary.md:272` and `docs/erd.md:126`, and the
+dictionary is a hub at 13 citing rows. **Leaving a false sentence in the dictionary while closing the
+row that proved it false is strictly worse than exceeding the cap**, which is the judgement `D15`'s
+`M88` paragraph says nobody has yet written a rule for. ⚠️ **It is taken LINE-NEUTRALLY**: `:272` is a
+single markdown table row and the cell text is rewritten in place. Five line-pinned citations sit below
+it (`:542`, `:583-584`, `:630`, `:645`, `:838`), so an inserted line — a footnote, a design note, a new
+row — would silently invalidate all five. Nothing is inserted.
+
+### Evidence verified
+
+**Every citation in all four rows was opened. Two rows are wrong in ways that change what the fix is.**
+
+- **`9278` — HELD, every citation, and the mechanism is exactly as described.**
+  `app/Services/Forms/FormBuilderService.php:225` is the `whereKey($field->getKey())->lockForUpdate()`
+  that `M91` added; `:497` is `replaceValidations()`, which at `:501-511` resolves `related_field_key`
+  against a `pluck('id', 'key')` over the whole version and INSERTs `related_form_field_id` — a sibling
+  `form_fields` row the `whereKey()` lock never touched. `app/Services/Forms/PublishService.php:95-97`
+  locks sections, then fields, then validations, each in one statement with **no `ORDER BY`**.
+  `updateField()` at `:159-183` takes no `forms` lock, so §3.4 is untouched by either side of the repair.
+- **`9216` — HELD, AND THE ROW UNDERSTATES ITSELF: EIGHT NAMES ACROSS THIRTEEN SITES, NOT SEVEN ACROSS
+  TWELVE.** All seven named resolve exactly as written, and each returns **zero** mentions anywhere under
+  `tests/`. The eighth is **`AchievementsRouteGuardsTest`**, named by `routes/tenant.php:242`.
+  ⚠️ Method, so it can be re-run rather than believed: the full set of `*Test` identifiers under `app/`,
+  `database/` and `routes/` (147 distinct) differenced against the 435 `*Test.php` basenames under
+  `tests/`. `TenantCustomColumnsTest` is the ninth difference and is correctly excluded — it is the
+  declared exemption at `scripts/test-pointer-lint.php:70`.
+- ⛔ **`9052` — EVERY CITATION HOLDS AND THE ROW'S HEADLINE IS FALSE.** *"Four PHP-enum mirrors live in
+  Vue SFCs"*: **two** do. `FieldInput.vue:129` (`prefill`) and `:156` (`RequiredMarker`) are in an SFC;
+  `useFormRuntime.ts:61` (`Marker`) and `show.test.ts:43-51` (`ALL_STATUSES`) are ordinary `.ts` files,
+  and `docs/data-dictionary.md:231` is prose. **So *"the new mirror gate cannot reach any of them"* is
+  false too** — `tests/Feature/Docs/DocumentedEnumMirrorDriftTest.php` reads declared paths through
+  `file_get_contents()` (`:126-133`), is extension-blind, and its own header at `:59` names
+  `useFormRuntime.ts`. `Marker` is unreached because nobody declared it, not because of its file type.
+  ⚠️ `ENUM_MIRRORS` at `:74-95` is exactly 20 rows, 17 `.ts` + 3 `.d.ts` — that half held.
+- ⛔ **`8971` — THE HEADLINE IS TRUE AND THE MECHANISM IT OFFERS IS INERT.** The row's worked example is
+  that `snapshot()` builds `['sections' => …, 'fields' => …]` and Postgres reorders it to
+  `fields,sections`. **`snapshot()` already returns a recursively-ksorted array** —
+  `app/Services/Forms/SchemaSnapshotSerializer.php:68-71` calls `ksortRecursive()` (`:233-246`), present
+  since the column was created (`bc2941f`), and the class docblock says so at `:26`. PHP `ksort` and
+  jsonb agree at the top level (`fields` before `sections` under both byte order and length-then-bytes),
+  **so the example proves nothing.** The real divergence is one level down, where the two orders part:
+  ksort gives `config, hint, key, label`, jsonb gives `key(3), hint(4), label(5), config(6)`. Migration
+  comment held verbatim at `database/migrations/2026_07_06_000202_create_form_versions_table.php:37`;
+  column type `jsonb` at `:35`; all four named consumers held as opaque.
+
+### Premise verified
+
+⛔ **THIS FIELD CHANGED WHAT THE FIX IS IN THREE OF THE FOUR ROWS.**
+
+- **`9278` believes its own repair is blocked by a test, and THAT IS FALSE — measured, not argued.**
+  The row ends *"Do not take it as a bug fix without deciding the first half: adding `ORDER BY` to the
+  publish path changes a shipped locking statement that `tests/Feature/Forms/PublishLockingTest.php`
+  pins by shape."* All six arms were opened. They assert, through `publishLockingFirstIndex()`, that a
+  statement CONTAINS a table name and `for update`; that the `forms` lock precedes the child locks; that
+  no locking read follows the status flip; and that exactly four `for update` statements are issued.
+  **`ORDER BY id` changes none of those four properties.** The stated blocker does not exist, which
+  converts the row from decision-blocked to buildable.
+- **`9216` believes the repair is *"not simply widening the scan roots"*, and it is right for a weaker
+  reason than the real one.** Its two stated obstacles hold (`scripts/test-pointer-lint.php:165` renders
+  each site relative to its own root; `:78-79` are census-shaped floors). **But `scan()` takes ONE
+  directory and uses it both as the mention corpus and as the definition of which test files exist on
+  disk.** A second call over `app/` would find zero `*Test.php` files there and report all 147 names as
+  dangling — in fact it would bail on `FILE_FLOOR` first. **The repair is to separate the two roles**;
+  a per-root floor is a consequence of that rather than the fix.
+  ⚠️ **And the disposition premise — *"each of the seven also needs deciding individually — correct the
+  name, write the test, or exempt it"* — resolves to ONE disposition for all eight: correct the name.**
+  A real arm asserting the exact cited property exists in every case. **Two of the eight would have been
+  mis-corrected by the obvious same-name candidate**: `MemberJoinedAwardTest`'s property is in
+  `PointAwardRlsTest`, not `PointAwardTest`; `ToggleableModulesTest`'s is in `SettingsVocabularyTest`,
+  not `ModuleToggleTest` or `EntitlementEnumsTest`.
+- ⛔ **`9052` believes the divergence is one-directional, and it is two.** *"`RequiredMarker` and
+  `Marker` each carry a `none` that `RequiredMode` does not"* — true, and both also **lack
+  `conditional`** (`app/Enums/RequiredMode.php:11-15`). A `MIRROR_DIVERGENCES` entry written from the
+  row's text alone would be wrong in one of its two halves. ⚠️ **And two of the row's four items are
+  EXACT mirrors that go green on arrival** — `prefill` against `PrefillSource`, and `ALL_STATUSES`
+  against all seven `SubmissionStatus` cases — so *"each needs a decision about what the right
+  vocabulary is"* is true of **two** of four, not four.
+- ⛔ **`8971` believes the migration comment is the offending statement; there are three, and a fourth
+  document already states the correct rule.** `docs/data-dictionary.md:272` and `docs/erd.md:126` carry
+  the same imprecision. **`docs/form-versioning-schema-migration.md:89` — the governing spec — already
+  says the checksum is computed over a canonical serialization and *"never over Postgres's own internal
+  JSONB byte representation, which is not guaranteed stable"***, and
+  `app/Support/Migrations/PublishedVersionGuard.php:51-56` reasons correctly too. The tree is not
+  ignorant of this; three statements have drifted from a spec that is right. ⚠️ *"Nothing verifies it
+  today"* — **HELD**, and tightly: three call sites of `checksumOf()`, all over in-memory rows.
+  `tests/Feature/Forms/TemplateRoundTripTest.php:82` is the near-miss and compares two in-memory
+  snapshots rather than a DB read-back.
+
+### Remedy verdict
+
+- **`9278` — WORKS, AND THE HALF THE ROW ASSERTS WITHOUT MEASURING IS THE HALF MEASURED FIRST.** The
+  prescription is a stable `ORDER BY id` on both sides, which is sound only if Postgres acquires row
+  locks in sorted order rather than scan order — a planner property, not something to take on trust.
+  `EXPLAIN SELECT id FROM form_fields WHERE form_version_id = … ORDER BY id FOR UPDATE`, run against
+  this stack's own container, plans **`LockRows` ABOVE `Sort`**. The idiom holds here.
+  ⚠️ **The second half is narrowed deliberately.** The row prescribes *"a single locking re-read over
+  `[$field->id, ...$siblingIds]`"*, and `replaceValidations()` plucks EVERY sibling in the version.
+  Locking all of them would serialize every concurrent field edit in a draft — a §3.4 reversal by
+  accident. Only the siblings the payload actually references are locked.
+- **`9216` — NONE OFFERED BEYOND THE TWO OBSTACLES, and the disposition is now measured**: eight
+  corrections, no new test, no new exemption.
+- **`9052` — NONE OFFERED; the smallest honest widening is three data rows and one grammar.** Two of the
+  three declarations are free (`prefill`, and `Marker` in an already-in-scope `.ts`); `RequiredMarker`
+  and `Marker` each need a `MIRROR_DIVERGENCES` entry carrying **both** directions; `ALL_STATUSES` needs
+  a third grammar (`const NAME = [ … ] as const;`) because it matches neither existing pattern.
+  ⚠️ **One hazard found in the gate rather than in the row:** `MIRROR_DIVERGENCES` is keyed by mirror
+  NAME alone, not path plus name, so two same-named mirrors in different files would share one
+  exception. Safe here because the names differ; filed rather than fixed.
+- **`8971` — THE ROW'S THIRD OPTION IS THE RIGHT ONE AND THE OTHER TWO ARE COSTLIER THAN IT SAYS.**
+  Correcting the documented claim is three line-neutral edits. The `text` sidecar needs a migration
+  against a table guarded by the immutability trigger plus a backfill that **cannot be performed** — the
+  original canonical text was never retained. Canonicalise-on-read is ~4 lines (`ksortRecursive()` is
+  already written and merely private) but **cannot be proven byte-exact**: jsonb round-trips numerics
+  through `numeric`, and `json_encode` without `JSON_PRESERVE_ZERO_FRACTION` collapses `1.0` to `1` —
+  the class flags this at `:28-30` as *"noted, not yet load-bearing"*, and a verification path would
+  make it load-bearing. **Shipping it would convert a latent doc inaccuracy into a flaky live one.**
+
+Files: as the batch table above, plus `docs/data-dictionary.md:272` (line-neutral, row 4).
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/claims/lane-a.md`, `docs/claims/decisions.md` (if a decision is filed), `docs/backlog-triage.md`, `docs/pipeline.md`, `docs/gate-baselines.md`, `docs/data-dictionary.md`, `docs/erd.md`, `PROGRESS.md` (own block only, plus a tracker surgery into `PROGRESS_ARCHIVE.md`).
+Paired files taken: none. ⚠️ Row 2 widens a gate whose selftest fixtures are built in a temp directory by the script itself, so no 7(b-bis) pair is created by it.
+Namespaces spent: nothing from the migration or ADR namespaces.
+Prediction: **`tracker-lint` R1 is the gate I most expect to be wrong about, and I expect to be wrong in the direction of having acted too EARLY.** `PROGRESS.md` has 3,106 bytes of headroom against close-outs that have cost 1,486–5,868 bytes each across the last eleven, so a surgery is planned BEFORE the push rather than after CI says so — and `R7`'s own open row (`5983`) records that its byte threshold was calibrated on surgeries that were all left too late. **The surgery may trip the rule it is complying with.** ⚠️ Second most likely: citation-liveness, because row 2 edits thirteen comment sites across `app/`, `database/` and `routes/` and every insertion shifts the `path:N` citations beneath it — and row 4 edits the file with the least headroom in the tree, which is why it is taken line-neutrally. PHPStan cannot move on a diff of comments plus one service method plus two scripts — that will be said rather than quoted as an unchanged number. Pint on the host, bare, is expected green. E2E is not reached by any of these four rows and the specs run will be named.
 
 ## RELEASED — `M91`, the twenty-second `D13` batch: a paired fixture set with a gate, four comments that were already right, a reserved key nothing asserted, and a lock order that depended on a payload being dirty (merged as PR #282, `12b4a31`, 6/6 green with real step counts — Static analysis 28 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

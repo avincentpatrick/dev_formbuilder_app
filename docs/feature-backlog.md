@@ -7830,23 +7830,29 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   is nonetheless invisible **where it matters**, which is the same defect class `M80` itself was filed to
   correct. **Live.** Filed by `M80`.
 
-- **`minor` · Four `subscriptions` lifecycle columns are documented, exist in the schema, and have
-  literally no reader and no writer — the first thing `P2d` found on the tree it was built against.**
-  Found 2026-09-07 by `M81`'s new `scripts/pipeline-lint.php` P2d arm, and filed rather than fixed
-  because the feature that would write them is **held**. `subscriptions.current_period_starts_at`
-  (`docs/data-dictionary.md:750`), `current_period_ends_at` (`:751`), `cancels_at` (`:752`) and
-  `canceled_at` (`:753`) each occur in exactly five places and **not one of them is a use**: a
-  `@property` docblock, a `$fillable` entry and a `$casts` entry in `app/Models/Subscription.php`, the
-  `timestampTz` line in `database/migrations/2026_07_23_000002_create_subscriptions_table.php`, and the
-  space-separated column inventory in `tests/Feature/Tenancy/TenantExtractColumnDriftTest.php:84`.
-  ⚠️ **They are the Stripe subscription-lifecycle fields**, so the writer is the held `payments-checkout`
-  row — needs a Stripe account, cut from Phase 3 by the decision of 2026-07-21. ⛔ **The reason this is a
-  row and not a marker: the columns are not themselves held, the FEATURE is**, and inventing a held
-  pipeline row per dormant column would put four rows in the line whose blocker is a fifth row's
-  blocker. The honest form is one filed row naming all four, which is also what discharges P2d's ledger
-  term. ⚠️ **The remedy is a decision, not a fix** — when payments is unheld these columns get their
-  writer, and if payments is ever abandoned the columns and their documentation should go together.
-  **Live.** Filed by `M81`.
+- ~~**`minor` · Four `subscriptions` lifecycle columns are documented, exist in the schema, and have
+  literally no reader and no writer — the first thing `P2d` found on the tree it was built against.**~~
+  ✅ **CORRECTED AND CLOSED BY `M88` (2026-09-08). THE CITATIONS WERE NEAR-PERFECT AND THE FRAMING WAS
+  WRONG** — every named file:line and every non-count number resolves exactly, including the five-part
+  enumeration of non-uses.
+  ⛔ **THERE ARE FIVE, NOT FOUR, AND THE FIFTH IS ADJACENT TO THE OTHERS IN EVERY FILE THE ROW OPENS.**
+  `trial_ends_at` sits one line above the row's own dictionary citation and one line above its migration
+  citation. `P2d` structurally could not see it: `scripts/pipeline-lint.php`'s `$scheduled` term skips a
+  column by a bare `str_contains` over the backlog buffer, which is **table-blind**, so a phantom
+  `tenants.trial_ends_at` elsewhere in the ledger masked the real `subscriptions.trial_ends_at`. Filed below.
+  ⛔ **AND "NO READER AND NO WRITER" IS THE CORRECT AND EXPECTED STATE, NOT A DEFECT.** Payments were cut to
+  Phase 4 by a decision of record, reconfirmed with the user (`PROGRESS_ARCHIVE.md`, the 2026-08-06
+  `SEQUENCING LOCKED WITH THE USER` block, item 6) and ratified in `docs/adr/0008-entitlement-and-metering.md`.
+  The row's own remedy — *"the remedy is a decision, not a fix"* — deferred to a decision **already taken**,
+  which would have held it open indefinitely for no gain.
+  ✅ **THE REAL DEFECT IS A LABELLING GAP AGAINST A CONVENTION ALREADY USED THREE TIMES, ONCE ON THIS VERY
+  TABLE TEN LINES ABOVE THE BLOCK IN QUESTION** — *"present but DORMANT until Phase 4 (ADR-0008 §D1)"*.
+  §D1's enumeration named only the four Stripe-shaped columns and stopped, so the five lifecycle timestamps
+  had a disposition **nowhere**: not the ADR, not the migration comment, not the dictionary (bare em-dashes),
+  not `docs/claims/decisions.md`. All three now carry it, and `ended_at` is called out in each as the
+  exception — it is **live**, read by `Subscription::scopeActive()`, so the block is not uniformly inert.
+  ⚠️ **Both document edits are in place** — ADR 1/1, dictionary 6/6, zero line-count delta either side — and
+  `citation-liveness-lint` still reports **ledger 18/18**, so no headroom was consumed. Closed by `M88`.
 
 - **`minor` · `scripts/pipeline-lint.php` P2d recognises a cast by a CLOSED VOCABULARY of cast names, so
   a cast this project adopts later reads as a write and silently un-dormants its column.** Filed
@@ -8591,18 +8597,36 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   decision's own option 3 records that stating *"neither"* is itself a decision nobody has taken, so the
   schedule window joins `D27` as a fourth surface rather than being settled here. `D27`'s carve-out
   paragraph asserted the same false claim and was corrected in the same commit. Closed by `M88`.
-- **`minor` · `FormBuilderService::updateField()` and `updateSection()` are the only mutators in that service
+- ~~**`minor` · `FormBuilderService::updateField()` and `updateSection()` are the only mutators in that service
   that do not lock the draft, and theirs is the one instance whose consequence is DATA rather than a
-  message.** Measured by `M87`'s fan-out (2026-09-08). Every other mutator there calls `lockDraft()` INSIDE
-  its transaction — `addSection`, `deleteSection`, `addField`, `deleteField`, `duplicateField`,
-  `insertFromLibrary`, `reorder`. `updateField()` opens a transaction and takes no lock; `updateSection()`
-  opens **no transaction at all**. ⛔ **`PublishService::publish()` locks `forms`, flips the draft to
-  `Published`, freezes `schema_snapshot` and `checksum`, and clones a new draft** — so an `updateField`
-  committing inside that window writes a field row onto a now-published version whose frozen snapshot and
-  checksum no longer describe it. ⚠️ **Unlike its siblings this is not a lost refusal**: the two artefacts a
-  published version exists to guarantee are silently wrong afterwards, and nothing reads them again to
-  notice. ⚠️ Not traced to a reproduction; the window is one builder request against one publish.
-  **Live.** Filed by `M87`.
+  message.**~~
+  ✅ **CLOSED BY `M88` (2026-09-08) with `assertStillDraftChild()` — a re-read inside the write, and NO lock.**
+  The census half held exactly: seven siblings open a transaction and lock on the next line; `updateField()`
+  opens a transaction and takes none; `updateSection()` opened no transaction at all.
+  ⛔ **BUT THE GUARD THE REPOSITORY BELIEVES IT HAS IS STALE, AND THAT IS THE REAL DEFECT.**
+  `assertDraftChild()` compares `$form->draft_version_id` with `$child->form_version_id`, **both read at
+  route-model-binding time**. When a publish, restore, XLSForm import, archive or another editor's delete
+  commits after that bind, the guard compares two stale values, agrees with itself, and lets the write
+  through. `BuilderDraftGuardTest`'s own header claimed that guard *"turns a write against a published
+  version into a 422 instead of a silent zero-row write"* — true only for the case it tested, where the
+  version was already published at bind time.
+  ⛔ **AND "DATA RATHER THAN A MESSAGE" IS CONDITIONAL, NOT ABSOLUTE.** Post-commit the `draft_child` RLS
+  policy makes the UPDATE match zero rows, `save()` reports success anyway, and `updateField()` returns
+  `$field->refresh()` — so the builder received **200 OK carrying the PRE-EDIT values and the user watched
+  their edit revert with no error at all.** That lost refusal is the reachable defect and is what this
+  closes. ⚠️ **The DATA case is real but narrow**: an edit committing *inside* a publish transaction, after
+  its snapshot read and before its commit, still lands on rows the frozen `schema_snapshot` and `checksum` no
+  longer describe. Filed below rather than closed — it is lock-shaped.
+  ⛔ **THE OBVIOUS FIX IS A DOCUMENTED REVERSAL, SO IT IS NOT THE FIX TAKEN.**
+  `docs/form-versioning-schema-migration.md` §3.4 states the `forms` row lock serializes
+  create/publish/discard/restore and *"does not serialize ordinary field-level edits"* — a written decision.
+  A plain re-read is enough and costs no throughput: READ COMMITTED re-evaluates per statement, so the
+  transaction sees the new `draft_version_id` and the deleted child. **`M85` closed the promote door the same
+  way — a re-read, no lock.** The child is re-read as well as the form, because a delete, restore or import
+  removes the row while leaving `draft_version_id` untouched.
+  ✅ **Three arms, and the collaborator-delete one needs no publish at all** — it is the more reachable race.
+  **Proven by mutation**: neutering the guard turns exactly the three new arms red and leaves the ten
+  pre-existing ones green. Closed by `M88`.
 - **`minor` · Eleven value-domain `CHECK` constraints guard columns the enum catalog has no row for at all,
   and the fix cannot be made while the citation ledger is at its ceiling.** Measured by `M87` (2026-09-08)
   from `pg_constraint` while closing the census row. The catalog documents 28 vocabularies; the connector,
@@ -8618,17 +8642,42 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   headroom, so this lands either after that ceiling moves or alongside a deliberate re-pointing of the
   citations. `DocumentedCheckConstraintDriftTest` asserts only over columns the catalog names, and says so.
   **Live.** Filed by `M87`.
-- **`minor` · The enum catalog's value lists are gated against the DATABASE and against nothing else, so the
-  17 rows with no `CHECK` can still contradict their own PHP enum.** Recorded by `M87` (2026-09-08) as the
-  residue of the row it closed. `DocumentedCheckConstraintDriftTest` compares documented cases against
-  `pg_constraint`, which is the strongest available comparison — and it is silent for every vocabulary the
-  database does not constrain, which is 17 of 28. ⛔ **`ComparisonOperator` is the known live instance**:
-  `form_field_validations.operator` has no CHECK, and the catalog's list disagrees with `app/Enums/`. The
-  instrument for that half is a doc-vs-`App\Enums\*::cases()` comparison, which
-  `DocumentedSettingKeyDriftTest` already demonstrates without touching a database. ⚠️ **Filed rather than
-  built because the enum name in the catalog is prose, not a resolvable symbol** — `TenantStatus` is not
-  `App\Enums\TenantStatus` on its face — so the mapping is either a convention this repository has not
-  stated or a second list, and choosing between those is the work. **Live.** Filed by `M87`.
+- ~~**`minor` · The enum catalog's value lists are gated against the DATABASE and against nothing else, so the
+  17 rows with no `CHECK` can still contradict their own PHP enum.**~~
+  ✅ **CLOSED BY `M88` (2026-09-08) with `tests/Feature/Docs/DocumentedEnumCatalogDriftTest.php`, and the row
+  was RIGHT about its one live instance.** `ComparisonOperator` documented six values; the enum has declared
+  eight since Increment G3 (`gte`, `lte`). `form_field_validations.operator` carries no value-domain CHECK —
+  the only CHECK on that table is `form_field_validations_rule_xor_chk`, a nullability XOR, confirmed against
+  `pg_constraint` — so no database gate could ever have seen it. Corrected in place.
+  ⛔ **BUT THE ROW WAS WRONG ABOUT WHAT MADE IT HARD, AND THAT IS THE FINDING.** It recorded the difficulty as
+  *"the enum name in the catalog is prose, not a resolvable symbol"* and concluded the mapping was *"either a
+  convention this repository has not stated or a second list"*. **26 of the 28 names ARE literally the class
+  basename under `app/Enums/`.** The choice was never convention-versus-list; it is the convention plus a
+  two-entry exception map, and both entries are themselves findings: `WebhookEventType` has **no class of that
+  name** (`DomainEventType` backs the column, and the two lists agree exactly), and `NotificationChannel` has
+  **no PHP enum at all** — `in_app`/`email` are boolean columns on `notification_preferences`.
+  ⚠️ **THE REAL DIFFICULTY IS THE VALUES CELL, WHICH MIXES THE LIST WITH PROSE CONTAINING MORE BACKTICKED
+  TOKENS.** A whole-cell collector harvests `trial` and `cancelled` from `TenantStatus`'s correction note;
+  a leading-run collector silently loses two `AttachmentKind` cases and three `NotificationType` ones. Both
+  are the green-while-blind shape, and the shipped `checkDriftBacktickedRun()` is the second kind — it cuts
+  at `' — '` or `'. '`, neither of which occurs in the `ValidationRuleType` or `ComparisonOperator` cells, so
+  it would harvest `rule_types` and `rule_formulas` as enum cases. It is safe only because its own caller
+  skips both rows for an unrelated reason. **Not reused, deliberately.**
+  ✅ **So the cell has two declared grammars and a row must match exactly one**; a row matching neither fails
+  loudly rather than being skipped, and both directions are compared for set EQUALITY, never containment
+  (`M56`), which makes the parser's failure bias red-only. **27 of 28 rows are compared; one declared skip.**
+  ⛔ **AND THE ROW'S POPULATION WAS TOO SMALL — the ungated surface is the whole document, not the seventeen
+  unbacked vocabularies.** Each per-table section restates the catalog SIZE as *"See the N-value catalog
+  above"*. Seven carry a count, **two were wrong**, and nothing read any of them: `:393` was made wrong by
+  this increment's own `ComparisonOperator` fix and caught in the same pass, and `UsageMetric`'s pointer still
+  read seven after `M87` widened its catalog row to eight — a row that **has** a CHECK. A fourth arm now
+  gates them.
+  ✅ **Proven by four positive controls, all CAUGHT** (`scripts/mutate.php`): re-introduce the `gte`/`lte`
+  omission; delete `case Gte`; a catalog row naming an enum that does not exist; restore a stale pointer
+  count. ⚠️ **A fifth run was needed because the third mutant ALSO raised a PHP `Error` in the value arm** —
+  one defect reported twice, the fatal first — so that arm now defers a missing enum to the arm that owns it.
+  ⚠️ **Every edit was in place: 1/1 then 2/2 added/removed, zero line-count delta**, so the sibling row's
+  ceiling blocker was never engaged. Closed by `M88`.
 - **`minor` · `.sheets-fields` is probably the worst `MdsSegmentedControl` host in the tree and it is the one
   with no coverage of any kind.** Measured by `M87`'s fan-out (2026-09-08) while closing the census row.
   `SheetsRuleFields.vue`'s `modeOptions` are `"Create a sheet for me"` and `"Use one I already have"` — two
@@ -8659,3 +8708,114 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   lines. Repointed to the verified lines. ⚠️ **Two instances found by two accidents is not a rate**, and the
   reason it is not is the same reason the row above exists: nobody can enumerate them.
   **Live.** Filed by `M87`.
+- **`minor` · The publish transaction reads the schema snapshot without locking the child rows it is about
+  to freeze, and that window is the only one `M88`'s re-read cannot close.** Measured by `M88`'s fan-out
+  (2026-09-08) while closing the builder-lock row. `PublishService::publish()` opens its transaction, locks
+  the `forms` row, computes `schema_snapshot` and `checksum` while the version is still a draft, flips the
+  status, clones a new draft, and commits. **Nothing in that transaction locks `form_sections`, `form_fields`
+  or `form_field_validations`** — neither `SchemaSnapshotSerializer` nor `SchemaTreeCloner` contains a
+  `lockForUpdate` at all. ⛔ **So a concurrent `updateField()` that commits between the snapshot read and the
+  publish commit produces a published version whose frozen snapshot and checksum predate a field row that
+  belongs to it.** Read-committed evaluates the writer's RLS `EXISTS` subquery per statement, and the
+  committed status is still `draft` at every instant before the commit. ⚠️ **`M88` closed the post-commit
+  half — a stale-bound write is now a 422 rather than a silent 200 — but a re-read cannot close this one:
+  the other transaction has not committed yet, so there is nothing to re-read.** ⚠️ **The window is a dozen
+  statements, not microseconds**: a publish runs three validation gates, a classifier, a full snapshot walk
+  and a full subtree clone. ⛔ **The remedy is a decision, not a sweep**: locking the child rows during the
+  snapshot leaves `docs/form-versioning-schema-migration.md` §3.4 standing and costs nothing on the editor
+  path, whereas locking in the builder reverses §3.4 outright — and §3.4 is itself stale in the opposite
+  direction, naming four operations that take the `forms` lock where the tree has nine call sites.
+  ⚠️ Not traced to a reproduction; no concurrency test opens two connections against this service.
+  **Live.** Filed by `M88`.
+- **`minor` · A builder edit whose field was deleted mid-request returns a bare 500 when the payload carries
+  validations, and nothing renders the exception.** Measured by `M88`'s fan-out (2026-09-08).
+  `replaceValidations()` INSERTs against `form_field_id`, whose foreign key is declared
+  `constrained('form_fields')->cascadeOnDelete()` and is **immediate** — there is no `DEFERRABLE` anywhere in
+  `database/migrations/`. So a payload carrying validations against a row a restore, import, archive or
+  sibling delete has removed raises `SQLSTATE 23503`. ⛔ **`FormBuilderController::respond()` catches only
+  `BuilderConflictException` and `FormException`, and `bootstrap/app.php` registers no `QueryException`
+  renderable**, so it surfaces as an unrendered 500 rather than the 422 every other refusal on that surface
+  returns. ⚠️ **`M88`'s re-read guard narrows this but does not remove it** — the guard runs before the
+  write, so a delete committing between the guard and the INSERT still reaches the constraint. ⚠️ The clean
+  shape is a typed catch mapping 23503 on this path to `FormException::childNotInDraft()`.
+  **Live.** Filed by `M88`.
+- **`minor` · The stale-`$form` read `M88` fixed in two mutators is still live in three more places, and one
+  of them is not in that service at all.** Measured by `M88`'s fan-out (2026-09-08). `assertDraftChild()`
+  reads `$form->draft_version_id` off the route-bound model, and `M88` routed only `updateField()` and
+  `updateSection()` through the re-reading guard. ⛔ **`duplicateField()` KEEPS `lockDraft()`'s return value
+  and still guards with the stale `$form`**, and `saveFieldToLibrary()` does the same with no lock at all —
+  so *"they discard the locked draft"* is the wrong diagnosis, and a fix that only re-threads the return
+  value would miss both. ⚠️ **And the same stale read is in the REQUEST layer**: `UpdateFieldRequest` and
+  `UpdateSectionRequest` both scope their uniqueness rules on `$form->draft_version_id`, so a republish
+  mid-request validates uniqueness against the wrong version. ⚠️ Filed rather than swept in because the
+  locking siblings' exposure is bounded by their lock while these two are not, and the request-layer half
+  needs its own decision about which version a uniqueness rule should be scoped to.
+  **Live.** Filed by `M88`.
+- **`minor` · The optimistic-concurrency token §8 substituted for the draft lock is CLIENT-OPTIONAL, and a
+  shipped test pins it that way.** Measured by `M88`'s fan-out (2026-09-08).
+  `docs/form-versioning-schema-migration.md` §3.4 declines to serialize field-level edits and leaves drift
+  detection to the `version` token; both builder requests validate it as `['nullable', 'string']` and
+  `assertNoDrift()` short-circuits when it is null. ⛔ **So a PATCH that simply omits the token gets neither
+  a lock nor a drift check** — last-write-wins between two collaborators — and `BuilderRoutesTest`'s *"it
+  accepts an edit that carries no concurrency token (overwrite)"* asserts exactly that, which makes it a
+  **deliberate** hole rather than an oversight. ⚠️ **That is what makes it a decision and not a fix**:
+  requiring the token is a client-contract change to the builder's fetch sidecar, and the compensating
+  control §3.4 names is the thing that is optional. **Live.** Filed by `M88`.
+- **`minor` · Three more lock-holding transitions DELETE the child rows a concurrent builder edit is
+  writing, and for all three the RLS backstop does not fire.** Measured by `M88`'s fan-out (2026-09-08).
+  Publish is not the only transition a builder edit races: `RestoreService` and `XlsformImporter` each run
+  the same validations/fields/sections delete trio before re-cloning, and `FormService::archive()` deletes
+  the draft `FormVersion` outright, cascading the whole subtree away. ⛔ **These are worse than the publish
+  case rather than milder**: the draft keeps `status = 'draft'` (restore, import) or is gone entirely
+  (archive), **so the `draft_child` RLS policy the publish analysis leans on never refuses anything.**
+  ⚠️ `M88`'s re-read guard covers the two mutators it touched — the child re-read is there for exactly this
+  family — but the three siblings named in the row above are not covered, and neither is any non-builder
+  writer. **Live.** Filed by `M88`.
+- **`minor` · `FormService` has seven lock-free writers to `forms` and one locked, and six of them build
+  their audit payload from a model nobody re-read.** Measured by `M88`'s fan-out (2026-09-08) while
+  correcting the schedule-window row. `create`, `updateMetadata`, `assignScope`, `setSaveAndResume`,
+  `setShareSettings`, `setConfirmationMessage` and `setSchedule` each open a transaction and take no
+  `lockForUpdate`; only `archive()` takes one. ⛔ **`archive()`'s own comment states the hazard the other six
+  carry unstated** — *"an audit built from the stale copy would record a `status` this method never actually
+  saw"* — and six siblings build their `$old` payload from the caller's un-re-read `$form`. ⚠️ **The grouping
+  already exists in that file** for an unrelated reason (six of them are enumerated as the set that is
+  "silent"); nobody has applied it to the lock or to the audit read. ⚠️ Filed rather than fixed because
+  whether a config setter should serialize against publish is the same §3.4 question the builder rows raise.
+  **Live.** Filed by `M88`.
+- **`minor` · One `forceFill` writes `closes_at` and `max_responses` together, and the acceptance guard
+  treats one as authoritative-under-lock and the other as ignorable-pre-lock.** Measured by `M88`'s fan-out
+  (2026-09-08). `FormAcceptanceGuard::assertCapacity()` does not trust the passed-in `$form`: it re-reads
+  under the `forms` lock and explicitly handles the concurrent writer — *"the cap was cleared concurrently
+  between load and lock"*. `assertCanStart()` reads `opens_at`/`closes_at` off the caller's model before any
+  transaction. ⛔ **But both columns are written by ONE `forceFill`, in one transaction, from one HTTP
+  request** — `setSchedule()`, whose only caller validates all four fields together. **So a cap lowered by
+  that click takes effect on in-flight submits and a `closes_at` moved earlier by the same click does not.**
+  ⚠️ **This is the sharper form of what the closed schedule-window row was reaching for and got wrong**: the
+  split is not promote-door versus submit-door, it is two columns of one write inside one guard class.
+  ⚠️ Whether that asymmetry is wrong is the `D27` question rather than a separate one.
+  **Live.** Filed by `M88`.
+- **`minor` · `P2d`'s dormant-column skip is TABLE-BLIND, and a phantom in one table masked a real inert
+  column in another.** Measured by `M88` (2026-09-08) while closing the `subscriptions` row. The `$scheduled`
+  term in `scripts/pipeline-lint.php` decides a column is dispositioned with a bare `str_contains` over a
+  buffer of the backlog, the decisions file and every ADR — **the column NAME only, with no table**. So
+  `tenants.trial_ends_at` appearing anywhere in the ledger silently discharged
+  `subscriptions.trial_ends_at`, which is how the row it fed came to say four columns where there are five.
+  ⛔ **The parser already carries what the fix needs**: the dictionary collector keys each cell by table and
+  the failure message prints it, so the skip can be keyed on `table.column` with no new plumbing.
+  ⚠️ **A sibling of the same shape sits beside it**: `is_declaration_line`'s cast vocabulary lets a factory
+  write of the literal `null` count as a use, which is what hides `stripe_customer_id`,
+  `stripe_subscription_id` and `plans.stripe_price_id`. ⚠️ Filed together because one predicate change
+  reaches both. **Live.** Filed by `M88`.
+- **`minor` · A whole file of PHP-enum mirrors in the public runtime has no parity gate, and it held a third
+  copy of the vocabulary `M88` just corrected.** Measured by `M88`'s fan-out (2026-09-08).
+  `resources/public-runtime/engine/enums.ts` mirrors `ComparisonOperator`, `LogicOperator`,
+  `ValidationRuleType` and `RequiredMode` as TypeScript unions — **all four are unbacked catalog rows**, i.e.
+  precisely the population the new enum-catalog gate was built for. ⛔ **The client had `gte`/`lte` all
+  along**, so while the drift lasted the document was the only wrong copy of three; and the new gate compares
+  the document to PHP, so it would never see a TypeScript mirror go stale in the other direction.
+  ⚠️ **Four more cross-language copies exist** — `ThemeMode`, `AccentToken` and `FontSizeScale` in
+  `resources/js/types/inertia.d.ts`, plus a `bot_challenge` union in
+  `resources/js/components/forms/types.ts` — and no test or spec references the mirror file at all.
+  ⚠️ **The instrument is not obvious, which is why this is filed rather than built**: a PHP-to-TypeScript
+  comparison needs either a generator or a parser for union types, and choosing between those is the work.
+  **Live.** Filed by `M88`.

@@ -113,9 +113,21 @@ in both places.
    version columns from the same object it read. ⚠️ This is the option the existing rows lean toward and
    nobody has stated it as a decision, which is what makes it a decision rather than a backlog item.
 
-⚠️ **`assertCanStart()` is deliberately NOT part of this question.** The schedule window is re-asserted
-under the lock on promote and on no other door, and that asymmetry was created by the fix that filed the
-row — it is a defect with an obvious answer, so it is a queue row rather than a decision.
+⚠️ **AMENDED BY `M88` (2026-09-08) — `assertCanStart()` WAS CARVED OUT ON A PREMISE THAT IS FALSE, AND IS
+NOW THE FOURTH SURFACE OF THIS QUESTION.** This paragraph read that the schedule window *"is re-asserted
+under the lock on promote and on no other door"*, and that the asymmetry was *"a defect with an obvious
+answer, so it is a queue row rather than a decision"*. ⛔ **Measured against the code: `M85` re-asserted
+`assertCanPromote()` — which refuses only a draft created at or after `closes_at` — and NOT
+`assertCanStart()`, which is the `now()`-window; and it took NO LOCK, only a re-read.** So there is no
+promote-side re-assertion of the schedule window, no asymmetry to restore, and nothing obvious to do.
+⛔ **The remedy the carve-out assumed would contradict H12a rather than restore symmetry**: the grace window
+exists so a respondent who STARTED inside the window is not stranded, the promote door admits a close moved
+to `now()` by design and a shipped test says so, and a fresh submit that passed `assertCanStart()` is in
+exactly that position. ⚠️ **Option 3's warning therefore applies to this surface unchanged** — declining to
+act is a decision nobody has stated, not a backlog item — which is why the ledger row is closed as
+no-code-change and the question lives here instead. ⚠️ **The paragraph above on the submit door's conditional
+lock is NOT affected**: it says the throughput trade was declined *for promote*, which is exactly what the
+code comment says, and it applies it to `submit()`'s republish question rather than to the schedule window.
 
 ---
 
@@ -685,6 +697,20 @@ hand against this constraint and rejected the generated proposal for the third i
 third distinct mechanism — `M83`'s was a hub-free harvest of a hub-only repair, `M86`'s was a file of nil
 harvested degree, and `M87`'s was three hub-touching rows in a four-row proposal plus a fourth blocked on
 an open decision. **Three different mechanisms, one rule, no fix yet.**
+
+⛔ **`M88` ADDS A FOURTH MECHANISM, AND IT IS THE ONE NO BATCH-COMPOSITION RULE CAN PREVENT: A CORRECTION
+CAN FORCE A HUB TOUCH THAT WAS UNKNOWABLE AT CLAIM TIME.** `M88` declared one hub-touching row
+(`docs/data-dictionary.md`) and composed the rest to be pairwise disjoint. It finished having touched
+**two** hub files, because verifying row `8559`'s *premise* revealed that the false sentence the row was
+built on had also propagated into `D27` — and `docs/claims/decisions.md` is itself a hub file at 3 citing
+rows. ⚠️ **The excess was not chosen and could not have been foreseen**: you cannot know a claim has
+propagated into the decision roster until you check it, and the alternative — knowingly leaving a false
+sentence in the roster while closing the row that proved it false — is strictly worse than exceeding the
+cap. ⚠️ **This is not the ledger exemption argued above**; it is a second, independent way the cap is
+un-followable, and it applies to the *correction* half of `D13`'s own workflow rather than to selection.
+⛔ **Whichever option is taken, it should say what happens when verification itself forces the second hub
+touch**, because that is now measured rather than hypothetical, and answering only the selection half
+would leave `D13` binding on a case no selection can control.
 
 ---
 

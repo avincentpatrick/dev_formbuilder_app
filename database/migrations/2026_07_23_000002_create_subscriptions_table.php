@@ -47,6 +47,9 @@ return new class extends Migration
             $table->string('billing_interval', 10); // App\Enums\BillingInterval
             $table->integer('quantity')->default(1); // seat count, where applicable
 
+            // Subscription-lifecycle timestamps — present but DORMANT until Phase 4 (ADR-0008 §D1),
+            // on the same grounds as the Stripe identifiers above. `ended_at` is the exception: it is
+            // live, read by Subscription::scopeActive() to decide which subscription is current.
             $table->timestampTz('trial_ends_at')->nullable();
             $table->timestampTz('current_period_starts_at')->nullable();
             $table->timestampTz('current_period_ends_at')->nullable();

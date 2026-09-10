@@ -33,7 +33,7 @@ This document is the source of truth for column-level shape; it will be kept in 
 | `FieldType` | `form_fields.field_type`, `field_library.field_type` | — none | 31 values across 8 categories (carried forward from legacy's 8-category catalog as the starting set, plan §2.2, with one deliberate addition flagged here rather than silently folded in): **Text** — `short_text`, `long_text`, `email`, `phone`, `url`; **Numeric** — `integer`, `decimal`, `calculated`; **Date/Time** — `date`, `time`, `datetime`, `duration`; **Choice** — `single_select`, `multi_select`, `dropdown`, `yes_no`, `cascading_select`; **Likert** — `likert_scale`, `likert_matrix` (a Likert-scale grid — every cell is a score on the same scale); **Geographic** — `geopoint`, `geotrace`, `geoshape`; **Media** — `file_upload`, `image_capture`, `audio_capture`, `video_capture`, `signature`; **Structural** — `note`, `page_break`, `hidden`, `matrix` (a **generic** grid/table question — legacy's distinct "Matrix (grid)" type, each cell independently typed/answered, not score-only like `likert_matrix`; added as its own case here because it was missing from this document's first pass, not because it's a new capability — see plan's original 30-type legacy catalog) |
 | `RequiredMode` | `form_fields.is_required` | — none | `required`, `optional`, `conditional` (carried forward from legacy's tri-state int, now named) |
 | `ValidationRuleType` | `form_field_validations.rule_type` | — none | `min_value`, `max_value`, `min_length`, `max_length`, `pattern`, `required_if`, `required_with`, `skip_if`, `skip_with`, `greater_than_field`, `less_than_field` (11 values, mirrors legacy's 11-row `rule_types` lookup) |
-| `ComparisonOperator` | `form_field_validations.operator` | — none | `gt`, `lt`, `eq`, `neq`, `is_null`, `contains` (6 values, mirrors legacy's 6-row `rule_formulas` lookup) |
+| `ComparisonOperator` | `form_field_validations.operator` | — none | `gt`, `lt`, `gte`, `lte`, `eq`, `neq`, `is_null`, `contains` (8 values: legacy's 6-row `rule_formulas` lookup plus `gte`/`lte`, added with grammar v2.0 in Increment G3 and never carried here until `M88` — this column has no `CHECK`, so no database gate could see the omission) |
 | `LogicOperator` | `form_field_validations.logic_operator` | — none | `and`, `or` |
 | `SubmissionStatus` | `submissions.status` | — none | `draft`, `submitted`, `screened_out`, `under_review`, `approved`, `returned`, `archived` (adapted from legacy's 5-value lookup: `under_review` replaces "Pending Validation", `archived` is a new terminal state added for retention workflows — reasonable, noted extension). **`screened_out` added in I9a** (Doc #27 §4.1): the respondent finalized having been shown no questions at all, derived server-side from `StepProjection::isEmpty()`. It is the one finalized status that does **not** consume a `max_responses` slot (`Submission::scopeConsumesCapacity()`), and it is terminal — no review transition accepts it, because `archived` *does* consume and the conversion would retroactively overfill a paid cap. **No CHECK constraint exists on this column**, so adding a value is an enum change only. |
 | `SubmissionSource` | `submissions.source` | — none | `manual`, `guest`, `ocr_single`, `ocr_linelist`, `offline_sync`, `api_import` (the six channels named explicitly in plan §2.2/§2.4) |
@@ -390,7 +390,7 @@ Was `indicator_validations`. Structured rules or an expression, modeled on XLSFo
 | `form_field_id` | `uuid` | No | — | No | FK to `form_fields.id`, `ON DELETE CASCADE` — the field this rule validates. |
 | `related_form_field_id` | `uuid` | Yes | `NULL` | No | FK to `form_fields.id`, `ON DELETE CASCADE` — the cross-referenced field for comparison-style rules (`greater_than_field`, `required_if`, etc.). Replaces legacy's `related_indicator_value`, a documented "ghost column" whose meaning drifted after a data migration — this column has exactly one meaning, always. |
 | `rule_type` | `varchar(30)` — PHP enum: `ValidationRuleType` | No | — | No | See the 11-value catalog above. |
-| `operator` | `varchar(20)` — PHP enum: `ComparisonOperator` | Yes | `NULL` | No | See the 6-value catalog above; only meaningful for comparison-style `rule_type`s. |
+| `operator` | `varchar(20)` — PHP enum: `ComparisonOperator` | Yes | `NULL` | No | See the 8-value catalog above; only meaningful for comparison-style `rule_type`s. |
 | `rule_value` | `text` | Yes | `NULL` | No | Literal operand/threshold. |
 | `expression` | `text` | Yes | `NULL` | No | Full XLSForm-style expression string. When present, **supersedes** `rule_type`/`operator`/`rule_value`/`related_form_field_id` entirely — see Design Notes. |
 | `error_message` | `varchar(500)` | Yes | `NULL` | No | — |
@@ -746,12 +746,12 @@ A tenant's subscription to a plan, Cashier-backed (plan §1/§2.2).
 | `stripe_status` | `varchar(40)` | No | — | No | **Deliberately free text, not a PHP enum** — mirrors Stripe's own status vocabulary verbatim (`trialing`, `active`, `past_due`, `canceled`, `unpaid`, `incomplete`, `incomplete_expired`, `paused`) as synced by Cashier's webhook handler. See Design Notes for why this is the one flagged exception to the enum-everywhere rule. **No such handler exists (2026-07-21)** — Cashier is not installed, this table has no migration, and payments are deferred to Phase 4; the row records intended design. |
 | `billing_interval` | `varchar(10)` — PHP enum: `BillingInterval` | No | — | No | — |
 | `quantity` | `integer` | No | `1` | No | Seat count, where applicable. |
-| `trial_ends_at` | `timestamptz` | Yes | `NULL` | No | — |
-| `current_period_starts_at` | `timestamptz` | Yes | `NULL` | No | — |
-| `current_period_ends_at` | `timestamptz` | Yes | `NULL` | No | — |
-| `cancels_at` | `timestamptz` | Yes | `NULL` | No | Scheduled cancel-at-period-end date. |
-| `canceled_at` | `timestamptz` | Yes | `NULL` | No | — |
-| `ended_at` | `timestamptz` | Yes | `NULL` | No | — |
+| `trial_ends_at` | `timestamptz` | Yes | `NULL` | No | Dormant until Phase 4 (ADR-0008 §D1) — no reader and no writer in `app/`. |
+| `current_period_starts_at` | `timestamptz` | Yes | `NULL` | No | Dormant until Phase 4 (ADR-0008 §D1) — no reader and no writer in `app/`. |
+| `current_period_ends_at` | `timestamptz` | Yes | `NULL` | No | Dormant until Phase 4 (ADR-0008 §D1) — no reader and no writer in `app/`. |
+| `cancels_at` | `timestamptz` | Yes | `NULL` | No | Scheduled cancel-at-period-end date. Dormant until Phase 4 (ADR-0008 §D1) — no reader and no writer in `app/`. |
+| `canceled_at` | `timestamptz` | Yes | `NULL` | No | Dormant until Phase 4 (ADR-0008 §D1) — no reader and no writer in `app/`. |
+| `ended_at` | `timestamptz` | Yes | `NULL` | No | **Live, unlike the five timestamps above** — `Subscription::scopeActive()` reads it to decide which subscription is current. |
 | `created_at` | `timestamptz` | No | set by Eloquent | No | — |
 | `updated_at` | `timestamptz` | No | set by Eloquent | No | — |
 
@@ -770,7 +770,7 @@ Metering rows backing quota enforcement and usage-based billing (plan §2.2).
 | `id` | `bigint identity` | No | auto-increment | No | Primary key — `bigint`, per the global PK strategy note: pure internal aggregation rows, never addressed externally. |
 | `tenant_id` | `uuid` | No | — | No | FK to `tenants.id`. |
 | `subscription_id` | `uuid` | Yes | `NULL` | No | FK to `subscriptions.id`. Nullable to tolerate usage recorded before any subscription exists (e.g. a free-tier trial with no Stripe subscription yet). |
-| `metric` | `varchar(30)` — PHP enum: `UsageMetric` | No | — | No | See the 7-value catalog above. |
+| `metric` | `varchar(30)` — PHP enum: `UsageMetric` | No | — | No | See the 8-value catalog above. |
 | `period_start` | `date` | No | — | No | Start of the billing/usage period this row aggregates. |
 | `period_end` | `date` | No | — | No | — |
 | `value` | `bigint` | No | `0` | No | Running aggregate for the period (count or bytes, depending on `metric`). |

@@ -123,7 +123,7 @@ erDiagram
         integer version_number
         string status "FormVersionStatus: draft/published/superseded"
         jsonb schema_snapshot "denormalized cache, not source of truth while draft"
-        string checksum "sha256 of schema_snapshot"
+        string checksum "sha256 of the canonical serialization as hashed; not re-derivable from stored jsonb"
         timestamptz published_at "nullable"
     }
 

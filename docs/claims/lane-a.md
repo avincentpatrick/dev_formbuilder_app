@@ -16,7 +16,85 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M90` is merged; the next increment is a fresh `D13` batch
+## Status: ACTIVE CLAIM — `M91`, the twenty-second `D13` batch: a paired fixture set with no gate, four comments citing a guard that never existed, a reserved key nothing asserts, and a deadlock that lands as an unrendered 500 (`m91-d13-batch`)
+
+Taken 2026-09-11. Branch `m91-d13-batch`, cut from `origin/main` at `77f46a7`, PR into `main`.
+
+⛔ **THE GENERATED PROPOSAL IS REJECTED FOR THE FOURTH TIME, AND FOR THE FOURTH DIFFERENT REASON.**
+`docs/backlog-triage.md`'s `## Suggested next batch` offers `4252` · `6883` · `5981` · `8424`. `4252`
+repairs `scripts/tracker-lint.php` and its controls file — `scripts/tracker-lint-controls.php` is a hub
+file at 4 citing rows; `5981` repairs `scripts/pipeline.php` (12); `8424` repairs
+`scripts/citation-liveness-lint.php` (6). **Three hub rows against a cap of one.** And `6883` states its
+own blocker in its body — *"a product decision nobody has taken"* — which is `8277`'s defect exactly, the
+generator deriving `state` from liveness alone. ⚠️ **This is the same greedy-pick failure `M83`, `M86` and
+`M87` each rejected for a different mechanism**; the recurrence is now four-for-four and is further
+evidence for `D15`.
+
+**The batch, chosen by hand under `D13`'s letter — one hub-touching row, no two rows sharing a non-hub file:**
+
+| # | Row | Hub? | Non-hub files it would touch |
+|---|---|---|---|
+| 1 | `docs/feature-backlog.md:9132` — `gate-baselines.php`'s gate list and its two harness fixtures are a paired set with no gate | **yes** — `scripts/gate-baselines.php` | `tests/Feature/Docs/GateBaselinesTest.php`, `tests/fixtures/gate-baselines/ci-log.txt`, `ci-log-missing-metric.txt` |
+| 2 | `docs/feature-backlog.md:9101` — four sites cite a tenants column-whitelist guard that has never existed | no | `app/Models/Tenant.php`, three `Schema::table('tenants')` migrations, `tests/Feature/Tenancy/TenantColumnWhitelistTest.php` |
+| 3 | `docs/feature-backlog.md:9078` — the `__lead__` reservation is asserted at the route layer by nothing | no | `app/Support/Forms/StepProjection.php` (read), `tests/Unit/Forms/StepProjectionTest.php`, a new route-layer arm |
+| 4 | `docs/feature-backlog.md:9066` — `updateField()` can deadlock against a publish and lands as an unrendered JSON 500 | no | `app/Services/Forms/FormBuilderService.php`, `app/Http/Controllers/Tenant/FormBuilderController.php`, a new Pest arm |
+
+⚠️ **`docs/feature-backlog.md` is in the hub table at 5 citing rows and is deliberately not counted here.**
+Every closure and every correction edits the ledger, so counting it would make no batch legal at all —
+the `D15` exemption eighteen batched increments have relied on, recorded rather than argued.
+
+⚠️ **`9066` is the only row in this batch that is product code rather than repository hygiene**, and it is
+in deliberately: three meta rows and no user-visible defect would be a batch that cannot be wrong in an
+interesting way.
+
+### Evidence verified
+
+⏳ **FAN-OUT IN FLIGHT — this heading is populated per row as the read-only agents land, and every
+load-bearing citation is re-opened by hand before it is acted on.** What is already checked by hand at
+claim time, and is why these four rows were selected:
+
+- **`9101` — the four citing sites resolve exactly and are four.** `app/Models/Tenant.php:57` and `:71`,
+  `database/migrations/2026_07_23_000008_add_draft_ttl_days_to_tenants.php:19`,
+  `2026_08_05_000003_add_branding_to_tenants.php:41`, `2026_08_06_000004_add_maintenance_to_tenants.php:27`.
+  ⚠️ **That is five citations across four files, not four sites** — the row's own count needs settling.
+  `scripts/test-pointer-lint.php:70` carries the exemption and names the reason.
+- **`9132` — the paired set is real and is two files.** `tests/fixtures/gate-baselines/ci-log.txt` and
+  `ci-log-missing-metric.txt` both exist, both stamped `Sep 10 23:21` — the `M90` repair commit `8325de3`.
+- **`9078` — `StepProjection::LEAD_STEP_KEY` is the single definition** at
+  `app/Support/Forms/StepProjection.php:63`, and `__lead__` appears nowhere else in `app/` or `routes/`.
+- **`9066` — both `updateField()` sites resolve**: `app/Services/Forms/FormBuilderService.php:158` and
+  `app/Http/Controllers/Tenant/FormBuilderController.php:102`.
+
+### Premise verified
+
+⏳ **FAN-OUT IN FLIGHT.** ⛔ **This is the field that has changed what the fix is in three of the last six
+increments, so no row here is acted on until its premise is answered separately from its evidence.** The
+premises this batch will be judged on, named before they are checked so the answer cannot be fitted to the
+work:
+
+- **`9132`** believes the fix is *"either a control arm asserting every key in the generator's list appears
+  in both fixtures, or the pair added to 7(b-bis)"*, and that this repository *"has a stated preference
+  between those"*. Both halves are premise, not evidence.
+- **`9101`** believes the four comments can be corrected *"to name the three `toContain()` assertions that
+  actually exist"* — which presumes there are three and that they cover what the comments claim.
+- **`9078`** believes `BuilderRoutesTest` *"asserts nothing about a REJECTED key"* and that the two writers
+  it names bypass every FormRequest.
+- **`9066`** believes the deadlock is reachable *"when the same payload is resubmitted"* because Eloquent
+  skips a clean `save()`, and that `M89`'s typed catch rethrows `40P01`.
+
+### Remedy verdict
+
+⏳ **FAN-OUT IN FLIGHT — measured before a line of test is written, per `D13` clause 2.** ⛔ **`9066` is
+the one to distrust**: it offers two remedies (`DB::transaction($closure, attempts: 3)` or a stable lock
+order) and says *"choosing is the work"*, which is a row that may be decision-blocked rather than
+buildable. If it is, it is filed as a decision and a fifth row is not substituted — `D13` allows three.
+
+Files: as the batch table above; every path there is a candidate until its row's three verdicts land.
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/claims/lane-a.md`, `docs/claims/decisions.md` (if a decision is filed), `docs/backlog-triage.md`, `docs/pipeline.md`, `docs/gate-baselines.md`, `PROGRESS.md` (own block only).
+Paired files taken: `scripts/gate-baselines.php` + `tests/fixtures/gate-baselines/ci-log.txt` + `ci-log-missing-metric.txt` — **the pair row 1 exists to make explicit**, and it is not in 7(b-bis) yet, which is the defect.
+Namespaces spent: nothing from the migration or ADR namespaces. A `D31` may be spent if `9066` is decision-blocked.
+Prediction: **the citation-liveness gate is the one I most expect to be wrong about.** It sat at zero headroom before `M87` and every row here edits a file that other rows cite by `path:N` — `app/Models/Tenant.php` and `app/Services/Forms/FormBuilderService.php` both take insertions. ⚠️ **The lesson `M87` paid for is that the gate broke on a file its own warning had not named**, so this prediction is expected to be right about the gate and wrong about the file. Pint on the host is expected green; PHPStan cannot move on a diff that is tests plus comments plus one service method; E2E is not reached by any of these four rows and the specs run will be named.
+
 
 ## RELEASED — `M90`, the twenty-first `D13` batch: a JSON refusal the client could not read, four stale guard sites, one snapshot, and a gate for dead test pointers (merged as PR #281, `bd64b62`, 6/6 green with real step counts — Static analysis 28 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

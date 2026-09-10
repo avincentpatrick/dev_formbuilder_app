@@ -7853,6 +7853,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   exception — it is **live**, read by `Subscription::scopeActive()`, so the block is not uniformly inert.
   ⚠️ **Both document edits are in place** — ADR 1/1, dictionary 6/6, zero line-count delta either side — and
   `citation-liveness-lint` still reports **ledger 18/18**, so no headroom was consumed. Closed by `M88`.
+  Filed by `M81`.
 
 - **`minor` · `scripts/pipeline-lint.php` P2d recognises a cast by a CLOSED VOCABULARY of cast names, so
   a cast this project adopts later reads as a write and silently un-dormants its column.** Filed
@@ -8597,6 +8598,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   decision's own option 3 records that stating *"neither"* is itself a decision nobody has taken, so the
   schedule window joins `D27` as a fourth surface rather than being settled here. `D27`'s carve-out
   paragraph asserted the same false claim and was corrected in the same commit. Closed by `M88`.
+  Filed by `M87`.
 - ~~**`minor` · `FormBuilderService::updateField()` and `updateSection()` are the only mutators in that service
   that do not lock the draft, and theirs is the one instance whose consequence is DATA rather than a
   message.**~~
@@ -8626,7 +8628,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   removes the row while leaving `draft_version_id` untouched.
   ✅ **Three arms, and the collaborator-delete one needs no publish at all** — it is the more reachable race.
   **Proven by mutation**: neutering the guard turns exactly the three new arms red and leaves the ten
-  pre-existing ones green. Closed by `M88`.
+  pre-existing ones green. Closed by `M88`. Filed by `M87`.
 - **`minor` · Eleven value-domain `CHECK` constraints guard columns the enum catalog has no row for at all,
   and the fix cannot be made while the citation ledger is at its ceiling.** Measured by `M87` (2026-09-08)
   from `pg_constraint` while closing the census row. The catalog documents 28 vocabularies; the connector,
@@ -8677,7 +8679,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   count. ⚠️ **A fifth run was needed because the third mutant ALSO raised a PHP `Error` in the value arm** —
   one defect reported twice, the fatal first — so that arm now defers a missing enum to the arm that owns it.
   ⚠️ **Every edit was in place: 1/1 then 2/2 added/removed, zero line-count delta**, so the sibling row's
-  ceiling blocker was never engaged. Closed by `M88`.
+  ceiling blocker was never engaged. Closed by `M88`. Filed by `M87`.
 - **`minor` · `.sheets-fields` is probably the worst `MdsSegmentedControl` host in the tree and it is the one
   with no coverage of any kind.** Measured by `M87`'s fan-out (2026-09-08) while closing the census row.
   `SheetsRuleFields.vue`'s `modeOptions` are `"Create a sheet for me"` and `"Use one I already have"` — two

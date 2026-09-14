@@ -16,7 +16,169 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M95` is merged and the before-testing tier is closed; the next work is the early-testing tier, named in `docs/pipeline.md` § Next
+## Status: ACTIVE CLAIM — `M96`, the first early-testing batch: a staging-build deploy window, a rule editor that can save and pre-binds Submission ID, one name-length contract, and no sorting on the two server-paginated lists (`m96-early-testing`)
+
+Taken 2026-09-15. Branch `m96-early-testing`, cut from `origin/main` at `d9b1ac0`, PR into `main`.
+Rows: four early-testing rows in `docs/feature-backlog.md`, grouped under `D13`:
+- `R-8a4c39fb`, the deploy's code swap and asset build outside the maintenance window (the batch's one hub row: its
+  fix edits `docs/deployment-infrastructure.md`);
+- `R-d8ba9c0f`, the tabular rule editor pre-binding the Submission ID column;
+- `R-a9647971`, a 255-character name into a 150-character column;
+- `R-6254281f`, column sorting on the submissions inbox and the webhook delivery log.
+
+**`D13` reading, stated rather than assumed.** `D13`'s conflict graph draws an edge on a shared *cited* file. None of
+the four rows cites a file another cites. The line-neutral touch-ups this increment makes to `docs/TESTING-GUIDE.md`
+and the design-system reference fall in disjoint sections, on the rule and sort rows.
+
+**Deferred, and why.**
+- `R-4cd211eb` (the zero-gate sentence) is tooling text no tester sees, and it would take the hub slot.
+- `R-5ecfa6cd` and `R-e6a10f97` both cite `Welcome.vue`, which `D13` forbids in one batch, and `R-5ecfa6cd` needs the
+  hub slot. Testers are told to use workspace addresses (checklist step L1).
+- Both deferred rows are amended in place with what verification found, so the increment that takes them inherits it.
+
+### Evidence verified
+Read-only, at `d9b1ac0`, by six mappers, six adversarial skeptics and a gates mapper; the critic hit a session limit, so
+the session settled each row after its skeptic.
+- **`R-8a4c39fb`.**
+  - `deploy.ps1` resets, runs `composer install` and rebuilds assets before `artisan down`.
+  - Vite 8.1.3 empties `public/build` at `renderStart` (read from source, not documentation). A missing manifest throws
+    `ViteManifestNotFoundException`, a 500, on every Inertia and guest page.
+  - Composer's `post-autoload-dump` runs `clearCompiled`, which deletes the config, services and packages caches in
+    the live checkout mid-install.
+- **`R-d8ba9c0f`.**
+  - `__submission_id` is optional in `MappableColumnCatalog`, and both adapters return no probe when it is unbound.
+  - The two delivery suites pin the residual duplicate as a passing test.
+  - The row's location is wrong: the editors are in `resources/js/components/integrations/`, not `resources/js/Pages/`.
+- **`R-a9647971`.** `CreateNewUser` and `UpdateUserProfileInformation` validate `max:255`, the users migration declares
+  `varchar(150)` (live catalog in both databases), and `InvitationController` validates `max:150` as a bare literal.
+- **`R-6254281f`.**
+  - `webhooks/Show.vue` declares `created_at` sortable, and `submissions/Inbox.vue` declares `form_title` (global
+    route only) and `submitted_at`.
+  - `MdsDataTable` sorts only the rows it is handed and renders the header button, `aria-sort` and a sort-chip bar.
+  - Neither controller reads a sort parameter.
+
+### Premise verified
+- **`R-8a4c39fb`: there are not two options, there are three, and the row undercounts how often it bites.**
+  - Release directories plus a junction swap do not work on this stack: nginx for Windows' `ngx_realpath` is a stub,
+    PHP's realpath cache kept an old junction target in a long-lived process (measured), and php-cgi here never
+    recycles.
+  - A staging build — build in an in-tree worktree while the site stays up, then swap inside a short window — needs no
+    server change and no rewrite of a runbook step the user has performed, so it is an engineering default, not the
+    user's call.
+  - Deploy fires on every successful CI run on `main`: every merge, every close-out push (`docs/pipeline.md` is not in
+    `paths-ignore`) and every nightly scheduled run (Deploy runs followed scheduled CI runs, measured).
+  - During today's build the code is new while the schema is old, and the worker keeps taking jobs.
+- **`R-d8ba9c0f`: the editor cannot save any tabular rule at all.**
+  - `config.mapping.fingerprint` is required for Sheets and Airtable, the editor never sends one, and the server never
+    derives one. A container validator run refuses the editor-shaped payload on exactly that key, which neither editor
+    renders.
+  - Editing an Airtable rule discards its stored mapping, and editing a Sheets rule re-inspects the first tab.
+  - Sheets create already pre-binds Submission ID; the real gap is an existing sheet and every Airtable rule.
+  - Airtable field types are dropped server-side, so the typecast sub-case cannot be warned about today.
+  - **Tier stays early-testing on a stated premise:** connector client ids are optional and unset in the first-boot
+    runbook (§8.2), so the testing server as documented cannot reach the editor. The user is told.
+- **`R-a9647971`: the two rules are not the only writers.**
+  - Google sign-in writes an uncapped name (`GoogleSignInProvisioner::createUser`).
+  - The invite placeholder takes the email local part, and a 151-character local part passes `email|max:255`.
+  - `SsoIdentityResolver` truncates by display width, so 100 CJK characters are stored as 75.
+  - 150 lives in three copies, and none is compared with the schema.
+- **`R-6254281f`: the decision of 2026-08-18 covers exactly these two pages** (the five other sortable tables are
+  handed their complete set, re-measured), and the precedent it adopted has a second half: one line of prose stating
+  the fixed order.
+
+### Remedy verdict
+- **`R-8a4c39fb`: neither prescribed option; a staging build.**
+  - Build in `<AppPath>\.deploy-stage` with the live `.env` copied in, then `down --render=deploy-window`.
+  - Inside the window: reset, rename `vendor` and `public\build` in with a bounded retry (NTFS refuses a rename while a
+    handle is open, measured), clear the bootstrap caches, then `package:discover`, migrate, caches, and
+    `queue:restart` last.
+  - A no-op guard skips a redeploy of the sha already live. Partial-swap recovery and `worktree prune` keep `-Ref`
+    rollback working.
+  - The window view renders with no manifest, so a fresh-clone priming run still works.
+  - Proved by a PowerShell 5.1 harness in the scratchpad, with the trunk script as the negative control.
+- **`R-d8ba9c0f`: incomplete and unobservable as written.**
+  - The tenant-web rule requests stamp the fingerprint server-side and refuse a duplicate binding.
+  - The inspect sidecar carries the destination's fingerprint and Airtable field types, and Airtable inspect matches
+    a table by id or name.
+  - The editor restores only from the seed, and only when the fingerprints match. Every user pick builds fresh rows
+    and pre-binds a heading that normalises to "submission id". A hint explains otherwise.
+  - API v1 and `documentedShape` are untouched, so `openapi.json` does not move.
+- **`R-a9647971`: incomplete.** One `UserName` contract refuses a typed name over 150 and fits identity-provider and
+  derived names by code point at every users insert.
+- **`R-6254281f`: right in shape, half of the precedent.** Drop the three keys, add "Newest first." to both pages, and
+  add a guard that no page importing `MdsPagination` declares a sortable column.
+
+Files:
+- `deploy.ps1`, `.gitignore`, `resources/views/deploy-window.blade.php` (new), `resources/views/maintenance.blade.php`
+  and a shared partial under `resources/views/`
+- `app/Support/Connectors/SubscriptionConfigRules.php`, `app/Http/Requests/Tenant/StoreConnectionRuleRequest.php`,
+  `UpdateConnectionRuleRequest.php`, `app/Support/Connectors/TabularDestination.php`,
+  `app/Support/Connectors/Providers/AirtableDirectory.php`
+- `resources/js/components/integrations/`: `types.ts`, `mapping-model.ts`, `SheetsRuleFields.vue`,
+  `AirtableRuleFields.vue`, `RuleFormModal.vue`
+- `database/seeders/E2eSeeder.php` (fingerprints only)
+- `app/Support/Auth/UserName.php` (new), `app/Actions/Fortify/CreateNewUser.php`,
+  `UpdateUserProfileInformation.php`, `app/Http/Controllers/Tenant/InvitationController.php`,
+  `app/Services/Auth/OperatorAccounts.php`, `GoogleSignInProvisioner.php`, `app/Support/Auth/GoogleIdentity.php`,
+  `app/Services/Sso/SsoIdentityResolver.php`, `SsoUserProvisioner.php`, `app/Services/Tenancy/TenantMembershipService.php`,
+  `app/Console/Commands/CreateTenantCommand.php`
+- `resources/js/Pages/submissions/Inbox.vue`, `resources/js/Pages/webhooks/Show.vue`, `resources/js/Pages/audit/Index.vue`
+  (docblock), `packages/design-system/src/components/DataTable/DataTable.vue` (comments) and `DataTable.stories.ts`
+  (comment)
+- tests:
+  - `tests/Feature/Deploy/DeployWindowViewTest.php` (new)
+  - `tests/Feature/Connectors/SubscriptionConfigRulesTest.php`, `AirtableDestinationTest.php`, `TabularDestinationTest.php`
+  - `resources/js/components/integrations/mapping-model.test.ts`, `SheetsRuleFields.test.ts`,
+    `AirtableRuleFields.test.ts` (new)
+  - `tests/Unit/Auth/UserNameTest.php` (new), `tests/Feature/Auth/AuthenticationTest.php`,
+    `tests/Feature/Settings/FortifyErrorBagTest.php`, `tests/Feature/Tenancy/InvitationIdentityTest.php`,
+    `tests/Feature/Tenancy/MembershipRoutesTest.php`, `tests/Feature/Auth/GoogleSignInWebTest.php`,
+    `tests/Unit/Auth/GoogleIdentityTest.php`, `tests/Feature/Sso/SsoAcsWebTest.php`
+  - `resources/js/Pages/submissions/inbox.test.ts`, `resources/js/Pages/webhooks/show.test.ts` (new),
+    `resources/js/Pages/paginated-tables-sort.test.ts` (new)
+- docs, each edit in place and line-neutral above any cited line: `docs/deployment-infrastructure.md`,
+  `docs/adr/0005-hosting-self-hosted-windows-server.md`, `docs/architecture/technical-architecture.md`,
+  `docs/non-functional-requirements.md`, `docs/webhook-integration-design.md`, `docs/TESTING-GUIDE.md`,
+  `docs/ux/design-system-reference.md`
+- `docs/feature-backlog.md`: four closures, amendments to `R-4cd211eb` and `R-5ecfa6cd`, a liveness re-judgement of
+  the reconciliation sibling below `R-d8ba9c0f`, and the rows below appended at the end
+- `docs/claims/decisions.md`: one new decision, id derived at filing
+- `PROGRESS.md`: my own status bullet at close-out
+- generated: `docs/pipeline.md`, `docs/backlog-triage.md`, and `docs/gate-baselines.md` at close-out
+
+Shared artefacts taken: the `docs/**` files above and `PROGRESS.md` (my own status bullet only).
+Paired files taken: `tests/Feature/Mail/QueuedMailContractTest.php` ↔ the `--queue=` string in
+`docs/deployment-infrastructure.md` (kept byte-identical). None of Standing Rule 7(b-bis)'s five.
+Namespaces spent: no migration and no ADR; one decision id in `docs/claims/decisions.md`.
+Prediction:
+- **Citation-liveness is the gate I most expect to break.** It sits at 18 of 18, and the runbook, the design-system
+  reference, `Inbox.vue` and `webhooks/Show.vue` all carry live ledger citations.
+- **The open-handle rename is the result I can least predict.** It was measured on this Windows 11 host, not on
+  Server 2016 with Defender scanning a fresh build.
+- PHPStan moves, because `app/` changes. `openapi.json` stays byte-identical. Every listed mutation comes back CAUGHT,
+  except removing the SSO provisioner's fit, which survives because the resolver fits first.
+- E2E reached: `responsive-axe.spec.ts` and `list-layout.spec.ts` only.
+
+### Rows to file, appended at the end of the ledger
+| # | Row | Tier |
+|---|---|---|
+| N1 | JSON and bypass-cookie requests fall through the maintenance stub into `vendor/` during the deploy window | early-testing |
+| N2 | `deploy.yml` says documentation pushes produce no run, and every close-out push still redeploys | early-testing |
+| N3 | Airtable computed fields can be mapped as write targets | early-testing |
+| N4 | The Next section and the hand-off list open decisions as work to take | during-testing |
+| N5 | The central-host redirect is an absolute `app.url`, which a request from another origin cannot follow | during-testing |
+| N6 | A deploy deletes the previous build's chunks, so an open tab's lazy import can fail | during-testing |
+| N7 | A worker relaunched by NSSM inside the deploy window starts on a half-swapped tree | during-testing |
+| N8 | The Sheets adapter's first-tab fallback is `Sheet1`, and the directory's is the first tab | during-testing |
+| N9 | Offset-paginated logs order by a second-precision timestamp with no unique tie-breaker | during-testing |
+| N10 | The inbox orders a promoted draft by when it was started, not when it was submitted | during-testing |
+| N11 | API v1 must send a fingerprint in an undocumented format, and a blank heading is refused there | before-launch |
+| N12 | `TopNav.vue` says the tenant switcher is still unbuilt, and no row carries it | after-launch |
+| N13 | ADR-0007 points at the runbook by bare line numbers that have moved | after-launch |
+| N14 | `MdsDataTable`'s client-side sort has no mounted test | after-launch |
+| N15 | Six list pages hand-roll the same one-line hint | after-launch |
+| N16 | The `email` rule accepts a local part longer than 64 characters | after-launch |
+| N17 | bcrypt reads only a password's first 72 bytes | after-launch |
 
 ## RELEASED — `M95`, the before-testing tier: a fail-fast deploy script, the first super-admin and first workspace commands, a first-boot runbook, and a setup-time token hand-off (merged as PR #288, `f87b793`, 6/6 green with real step counts — Static analysis 28 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

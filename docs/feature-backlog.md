@@ -2,7 +2,7 @@
 
 **Project:** Form-Builder SaaS (`dev_formbuilder_app`, "Meridian")
 **Status:** Living backlog — the output of the Phase-0-readiness best-practices review (a multi-agent audit against 2026 competitors: Typeform, Jotform, Fillout, Google Forms, SurveyMonkey, Tally, Formstack, Cognito Forms, Paperform, KoboToolbox, ODK, SurveyCTO). Each item was verified as genuinely absent from (or under-specified in) the 26 committed docs before being listed here.
-**How to read:** Priority — **must** (launch table-stakes), **should** (important soon), **nice** (differentiator). Phase = suggested target. This backlog does **not** change the committed roadmap; items graduate into it (into the PRD/Data Dictionary/etc.) by explicit decision, the same way Features #13/#14 did.
+**How to read:** Priority — **must** (launch table-stakes), **should** (important soon), **nice** (differentiator). Phase = suggested target. This backlog does **not** change the committed roadmap; items graduate into it (into the PRD/Data Dictionary/etc.) by explicit decision, the same way Features #13/#14 did. ⛔ **Retired as a queue by `M94` (2026-09-14).** Every open table row below that carries no tag is a product idea: not planned, and it re-enters only by the user's explicit decision. A tagged row names where its work went. New work is filed as a ledger row under *Discovered defects*, never as a table row.
 
 ---
 
@@ -16,11 +16,11 @@ found one of its acceptance criteria unbuilt with no row anywhere):
 |---|---|
 | Submission & review notifications (in-app bell + email + per-user prefs) | PRD Feature #13; Data Dictionary §22–§23 (`notifications`, `notification_preferences`) |
 | Two-factor auth (TOTP + recovery codes, all roles, org policy, step-up) | PRD Feature #14; RBAC §6 (`users` Fortify columns) |
-| Sales-tax / VAT on billing (Stripe Tax) | PRD §6 (Phase 1); Pricing Matrix §5; Data Dictionary §1 (`tenants` tax fields) |
+| Sales-tax / VAT on billing (Stripe Tax) | PRD §6 (Phase 1); Pricing Matrix §5; Data Dictionary §1 (`tenants` tax fields) ⏸️ **Held (`M94`):** the build is the held `payments-checkout` item, whose title names Stripe Tax. |
 | Builder undo/redo | PRD Feature #8 (Phase 1 acceptance criteria) |
 | CI security scanning (SCA/SAST/secret) | Testing Strategy §3/§6; Deployment §4 |
 | ~~**Post-submission answer editing** (permissioned, audited) — *fast-follow*~~ ✅ **DONE — I9c (2026-08-08)**. `SubmissionPolicy::update()` finally consumes `submissions.edit.any/.own`, seeded since Phase 0 with zero code behind them (the third dormant-key occurrence, after `feedback.view` and `tenant.roles.assign`). Editable in the four finalized non-terminal states only; editing an **approved** row demotes it to `under_review` and clears the approval stamps, as one combined audit row. | RBAC §5 (`submissions.edit.any/.own`); Audit Spec §1 |
-| **Post-submission MEDIA editing** — the half I9c deliberately cut | Media and signature answers render read-only on the edit surface, and the server enforces it (`SubmissionAnswerEditService::mergeMedia()` takes media from the STORED document, so a hand-rolled PATCH body cannot re-point an attachment). Building it needs four things I9c declined to put in an increment already at L: re-pointing attachment ownership, a policy for the displaced rows (they are currently left owned by the submission rather than deleted, so a reversal restores a working reference), rewriting `attachment_refs` for ADDED media (removal is already handled), and scan-status gating mid-edit. ⚠️ It must NOT reuse `AttachmentReferenceValidator` — that asserts `attachable_type === 'form_field'`, which is false for every already-finalized submission. One live consequence to fix with it: a relevance flip that makes a previously-irrelevant REQUIRED media field relevant currently cannot be satisfied on this surface; the field renders its error and names the escape, but the escape is to undo the branch answer. | I9c as-built |
+| **Post-submission MEDIA editing** — the half I9c deliberately cut | Media and signature answers render read-only on the edit surface, and the server enforces it (`SubmissionAnswerEditService::mergeMedia()` takes media from the STORED document, so a hand-rolled PATCH body cannot re-point an attachment). Building it needs four things I9c declined to put in an increment already at L: re-pointing attachment ownership, a policy for the displaced rows (they are currently left owned by the submission rather than deleted, so a reversal restores a working reference), rewriting `attachment_refs` for ADDED media (removal is already handled), and scan-status gating mid-edit. ⚠️ It must NOT reuse `AttachmentReferenceValidator` — that asserts `attachable_type === 'form_field'`, which is false for every already-finalized submission. One live consequence to fix with it: a relevance flip that makes a previously-irrelevant REQUIRED media field relevant currently cannot be satisfied on this surface; the field renders its error and names the escape, but the escape is to undo the branch answer. | I9c as-built ⏸️ **Re-homed to `uploading-import` by `M94`:** the live consequence above re-enters with that held item. |
 | ~~**Share panel** (copy-link + QR + embed + social)~~ — **SHIPPED in I1**, narrowed to the remainder below | PRD §6 fast-follow note |
 | ~~**Per-form rate limiting / bot-challenge (CAPTCHA)** on the guest runtime~~ ✅ **DONE — I8b (2026-08-08)**. Was an unbuilt PRD Feature #3 acceptance criterion, not a backlog nicety: only the deployment-wide `throttle:guest*` limiters existed, while the criterion asked for per-form and configurable. Built as `forms.bot_challenge` (a self-hosted proof-of-work check, no npm dependency, no third-party credentials, no CSP change) plus `forms.guest_rate_limit_per_minute` (per-IP **within one form** — a form-wide bucket would be a self-DoS lever, since one attacker at one IP could lock the form for every legitimate respondent). Both default off, per the threat model's own "not enabled by default" requirement. **PRD Feature #3 is now closed end-to-end.** | PRD Feature #3 acceptance criteria; threat-model §4 bot-flooding row |
 
@@ -51,7 +51,7 @@ Several of these are **real XLSForm round-trip import failures today** — a Kob
 |---|---|---|---|
 | Quiz / scoring mode (per-choice weights, score bands, correct-answer marking, pass/fail, result screen) | should | 2 (weights) → 3 (result screens/routing) | Persona A scored health screeners (PHQ-9/GAD-7); Persona B assessments/lead scoring |
 | ~~Disqualification / screen-out (early-exit) logic + a `screened_out` submission state~~ | should | ~~3~~ — **MECHANISM shipped H21b, STATE shipped I9a. Only the event catalog remains (Phase 3).** | H21b shipped the mechanism (a specified terminal screen instead of "Step 1 of 0" over a live Submit). **I9a shipped the state**: `SubmissionStatus::ScreenedOut`, derived server-side by `FinalizedStatus` from `StepProjection::isEmpty()` — so it means "was shown no questions", NOT "was disqualified", which is narrower than this row's title implies and is documented as such. The capacity bug this row named is fixed: the guard and its two display twins moved together onto the new `Submission::scopeConsumesCapacity()`, so a screened-out respondent no longer burns a `max_responses` slot. Inbox filter and exporter needed no code (both `cases()`-derived). The webhook contract moved too, without a new event type: `SubmissionCreated::data()` already carried `status`, so `submission.created` now delivers `"status": "screened_out"` — a widened value domain on an existing field, enumerated in `openapi.json` and `docs/api-specification.md`. **Still open, and the only part: the domain-event CATALOG** — there is no `submission.screened_out` `DomainEventType`, so a tenant can *observe* a screen-out but cannot *route* on it. That is the Phase-3 remainder. |
-| Response quotas / close-form-after-N (per-form cap) | should | 3 (reserve a cheap per-form cap flag in Phase 1) | Billing `submissions_count` is deliberately never a data gate — this is a *deliberate* cap |
+| ~~Response quotas / close-form-after-N (per-form cap)~~ | should | 3 (reserve a cheap per-form cap flag in Phase 1) | Billing `submissions_count` is deliberately never a data gate — this is a *deliberate* cap ✅ **Shipped, verified by `M94`:** `forms.max_responses` and `Submission::scopeConsumesCapacity()`. |
 | Logic testing / preview / logic-map tool | nice | 2–3 — **largely discharged — SHIPPED H21d1 (read) + H21d2 (write)** | Authoring-confidence for Persona A's complex forms. **As built:** the builder's centre pane gained a `Structure ⇄ Logic` toggle; the Logic view draws the form as a vertical rail in authored order, each node showing its `relevant_expression` verbatim AND — where the shape can be expressed in full — a plain-English reading beside it, with the §6 graph notices (forward reference, cycle, empty-at-open) attached to the nodes they name and a per-node syntax error shown live. It writes nothing; selecting a node drives the existing config panel. Two residues this row keeps. **(1) A simulator** — "show me the form as a respondent who answered X" — which the rail deliberately is not: it draws AUTHORED order, not the taken path, because there are no answers while an author is editing. **H21d2 then added the WRITE half**, which this row did not ask for but which changes what is left: conditions are now built from rows and groups in the config panel (`Show this question only when…`), serialized to canonical expression text, and anything the builder cannot represent — arithmetic, `if()`, a negated chain — keeps the author's own text in an editable box that nothing rewrites. **(2) Skip rules** (`skip_if`/`skip_with`) are not rail objects; they are conditional-requiredness edited in `ValidationEditor.vue`, and although they DO participate in the cycle notice the rail shows, the rail does not draw them. |
 | Conditional routing of notification emails by answer | should | 3 | Extends Feature #13; core intake-triage for Persona B |
 
@@ -66,19 +66,19 @@ Several of these are **real XLSForm round-trip import failures today** — a Kob
 | Password / access-code protected public forms | should | 2 | Common light-security lever given the sensitive-data positioning |
 | Client-side marketing/analytics tracking (GA4, Meta Pixel, GTM, conversion-on-submit) | should | 3 | Server webhooks can't measure views/starts/drop-off; needs CSP allow-listing + consent-gating. Note there is no **first-party** measurement of those three either, and for related reasons: ADR-0011 §D1 defers the form-engagement event stream to Phase 4 rather than opening a fourth unauthenticated ingress class in Phase 3 |
 | Kiosk mode (lock to one form, auto-reset, clear PII on timeout) | nice | 3 | Shared field/event-desk devices; niche hardening on the offline story |
-| **Builder — auto-switch to the Settings pane when a field is selected at compact widths** | should | 3 | The sharpest cost of JR5's pane switcher (exceptions-log #13 §3): below 60em of the builder's container, tapping a field in the canvas highlights the row while the config panel is off-screen, so the author has to know to tap *Settings*. `watch(selection, …)` fixes it and is harmless at wide widths, but needs **`{ flush: 'post' }` plus a mounted flag** — the page auto-selects the first field in `onMounted`, so a naive watcher fires on load and overrides the default pane. Deferred out of JR5 because pane state driven by store events reorders what eight e2e sequences see, in a suite that cannot run on the dev host |
+| **Builder — auto-switch to the Settings pane when a field is selected at compact widths** | should | 3 | The sharpest cost of JR5's pane switcher (exceptions-log #13 §3): below 60em of the builder's container, tapping a field in the canvas highlights the row while the config panel is off-screen, so the author has to know to tap *Settings*. `watch(selection, …)` fixes it and is harmless at wide widths, but needs **`{ flush: 'post' }` plus a mounted flag** — the page auto-selects the first field in `onMounted`, so a naive watcher fires on load and overrides the default pane. Deferred out of JR5 because pane state driven by store events reorders what eight e2e sequences see, in a suite that cannot run on the dev host ➡️ **Filed as a ledger row by `M94` (2026-09-14):** "In the builder at compact widths, selecting a field does not bring its settings on screen." |
 | ~~**Builder — the save indicator announces "All changes saved" after a save FAILS**~~ ✅ **DONE — J7 (2026-08-18)**. Fixed in the STORE, not the template: `useBuilderStore` now carries an explicit `SaveState` and the toolbar reads it, so success is never inferred from an idle queue. ⚠️ **AND BUILDING IT FOUND THE SAME LIE TWICE MORE, NEITHER OF THEM IN THIS ROW.** (1) Two `saveError` clears sat on the SUCCESS path of `persistField`/`persistSection`, so a later write succeeding erased an EARLIER row's real failure — an indicator-only fix would have shipped it. The error now clears only on positive evidence, a burst where everything attempted landed. (2) A **409 conflict** also read as saved: it set `conflict` without setting `saveError`, so the burst drained clean while the ConflictDialog said otherwise. (3) And `ConfigPanel`'s `role="alert"` lived INSIDE its `v-else`, so it rendered only when something was selected — and selection goes null on exactly the failure-adjacent paths, meaning a failed write with nothing selected was reported **nowhere in the client**. Hoisted to a sibling of both branches. | 
-| **Builder — express the pane columns in `em` so they track the font-size axis** | nice | 3 | JR5 left `260px`/`340px` as literals, so at `extra_large` the 60em threshold is conservative relative to the columns it is derived from (1200 − 602 = 598px of canvas where 358 would do — a safe direction, but not the coherent one). `16.25em minmax(0,1fr) 21.25em` makes `16.25 + 21.25 + 22.5 = 60em` exact at every scale and un-cramps the palette at `extra_large`; out of JR5's approved scope, which held the wide layout unchanged |
-| **Builder — the save verdict is BATCH-scoped, not per-row** | nice | 3 | Filed 2026-08-18 from J7, and **deliberately not fixed there**. The verdict covers a *burst* (the run of work from the queue going non-empty to draining), so a LATER, unrelated burst that succeeds clears an EARLIER burst's failure even though that row's content still differs from the server. Exactness would mean threading a target identity through all twelve `guard()` call sites and holding a per-`uid` dirty set — a materially larger change to every action, for a case where the author **has already been shown the alert**. J7's own test suite pins the batch behaviour deliberately (`save-state.test.ts`, the recovery case), so whoever takes this changes an assertion on purpose rather than discovering it. |
-| **Builder — a repeated IDENTICAL failure does not re-announce** | nice | 3 | Filed 2026-08-18 from J7. `save.error` set to the same string is not a reactive change, so `ConfigPanel`'s `v-if` never unmounts and its `role="alert"` never re-fires: retry the same broken write twice and a screen-reader user hears the problem once. Pre-existing, unchanged by J7. The fix is a per-failure `:key` on the alert, which is a `ConfigPanel` change with its own test. |
-| **Builder — the toolbar still says "All changes saved" on a READ-ONLY form** | nice | 3 | Filed 2026-08-18 from J7. With `props.draft === null` the panes are replaced by `MdsEmptyState` and nothing can ever be written, so the string is meaningless rather than false. A `v-if="!readOnly"` on the span is the fix, but it changes the toolbar in a state `builder-axe` does not currently drive. |
-| **The builder's failed save indicator is not TONED** | nice | 3 | Filed 2026-08-18 from J7, which deliberately shipped zero CSS. `.builder__save` keeps `--mds-color-text-secondary` in every state, so "Not saved" reads with the same weight as "All changes saved". A danger tone would be a brand-new `color-contrast` surface across two themes × three type scales × three viewports, gated by suites that cannot run on the dev host — which is a real cost to schedule, not a reason never to do it. The failure already carries colour in `ConfigPanel`'s `.config__error`, which those scans have covered since D4b. |
+| **Builder — express the pane columns in `em` so they track the font-size axis** | nice | 3 | JR5 left `260px`/`340px` as literals, so at `extra_large` the 60em threshold is conservative relative to the columns it is derived from (1200 − 602 = 598px of canvas where 358 would do — a safe direction, but not the coherent one). `16.25em minmax(0,1fr) 21.25em` makes `16.25 + 21.25 + 22.5 = 60em` exact at every scale and un-cramps the palette at `extra_large`; out of JR5's approved scope, which held the wide layout unchanged ➡️ **Filed as a ledger row by `M94` (2026-09-14):** "The builder's side-pane widths are fixed pixels, so at the largest text size the pane-switch threshold no longer matches the columns it is derived from." |
+| **Builder — the save verdict is BATCH-scoped, not per-row** | nice | 3 | Filed 2026-08-18 from J7, and **deliberately not fixed there**. The verdict covers a *burst* (the run of work from the queue going non-empty to draining), so a LATER, unrelated burst that succeeds clears an EARLIER burst's failure even though that row's content still differs from the server. Exactness would mean threading a target identity through all twelve `guard()` call sites and holding a per-`uid` dirty set — a materially larger change to every action, for a case where the author **has already been shown the alert**. J7's own test suite pins the batch behaviour deliberately (`save-state.test.ts`, the recovery case), so whoever takes this changes an assertion on purpose rather than discovering it. ➡️ **Filed as a ledger row by `M94` (2026-09-14):** "A later successful builder save clears the unsaved warning for an earlier field that still failed." |
+| **Builder — a repeated IDENTICAL failure does not re-announce** | nice | 3 | Filed 2026-08-18 from J7. `save.error` set to the same string is not a reactive change, so `ConfigPanel`'s `v-if` never unmounts and its `role="alert"` never re-fires: retry the same broken write twice and a screen-reader user hears the problem once. Pre-existing, unchanged by J7. The fix is a per-failure `:key` on the alert, which is a `ConfigPanel` change with its own test. ➡️ **Filed as a ledger row by `M94` (2026-09-14):** "A repeated identical builder save failure is announced to a screen reader only once." |
+| **Builder — the toolbar still says "All changes saved" on a READ-ONLY form** | nice | 3 | Filed 2026-08-18 from J7. With `props.draft === null` the panes are replaced by `MdsEmptyState` and nothing can ever be written, so the string is meaningless rather than false. A `v-if="!readOnly"` on the span is the fix, but it changes the toolbar in a state `builder-axe` does not currently drive. ➡️ **Filed as a ledger row by `M94` (2026-09-14):** "The builder toolbar says "All changes saved" on a form that cannot be edited." |
+| **The builder's failed save indicator is not TONED** | nice | 3 | Filed 2026-08-18 from J7, which deliberately shipped zero CSS. `.builder__save` keeps `--mds-color-text-secondary` in every state, so "Not saved" reads with the same weight as "All changes saved". A danger tone would be a brand-new `color-contrast` surface across two themes × three type scales × three viewports, gated by suites that cannot run on the dev host — which is a real cost to schedule, not a reason never to do it. The failure already carries colour in `ConfigPanel`'s `.config__error`, which those scans have covered since D4b. ➡️ **Filed as a ledger row by `M94` (2026-09-14):** "The builder's "Not saved" status looks the same as "All changes saved"." |
 | ~~**TopNav — the theme-toggle labels overlap the Feedback link at 834px with `extra_large`**~~ ✅ **DONE — J8 (2026-08-18), AND THE TITLE IS WRONG IN A WAY WORTH KEEPING: IT WAS NEVER AN `extra_large` DEFECT.** Measured on the running dashboard before the fix, the labels spilled their fieldset at **every** type scale — **8.5px at 834px on the DEFAULT scale**, 4.5px of it across the Feedback trigger, rising to 40.1px at `large` and 66.8px at `extra_large`, and to 139–193px by 601px. 834px is one of the three e2e viewport projects, so this was on screen in every tablet run the suite has ever made. The mechanism: `MdsSegmentedControl` is `inline-flex` with no wrap and no overflow handling, and this instance is the **only** child of `.topnav__right` declaring `min-width: 0`, so it absorbed the entire squeeze while its content refused to reflow — with `.app-shell { overflow-x: clip }` swallowing the evidence. ⚠️ **THE ROW'S OTHER SUGGESTION, "or wrap", IS FORECLOSED**: `.topnav` is a fixed 64px with `flex-shrink: 0`, so wrapping trades a horizontal defect for a vertical one. ⚠️ **AND THE FIX IS SHELL-ONLY ON THE EVIDENCE, WHICH CONTRADICTS THIS ROW'S OWN FRAMING**: the compounding note below claimed the component was at fault for all its consumers, but measured at every width and scale, `forms/Index`'s Layout switcher and `analytics`'s Dashboard-view switcher never spill — only the topnav's instance is a flex item in a `space-between` bar competing against five siblings. Shipped as three measured states: labels where they fit, glyphs where they do not (visually hidden, **never** removed — `MdsIcon` is `aria-hidden`, so the span is each radio's only accessible name), and not rendered below the width where even glyphs stop fitting, because collapsing alone was **not** sufficient and the only remaining source of width was global search, which is a standing product principle. |
-| **Two server-paginated tables carry `sortable: true`, so the header announces an ordering that is false** | should | 3 | ⚠️ **FILED 2026-08-18 BY J7, BUT FOUND BY I2 — the second finding that lived in `PROGRESS.md` prose alone.** `MdsDataTable` sorts only the rows it was handed (`DataTable.vue`, a local `computed`), so on a server-paginated ledger a sort header reorders 25 of 4,000 and sets `aria-sort` over a dataset ordering that does not exist. Live at `resources/js/Pages/webhooks/Show.vue` (`created_at`) and `resources/js/Pages/submissions/Inbox.vue` (`form_title`, `submitted_at`); both render `MdsPagination`. I2 chose correctly for the audit ledger and said so in `audit/Index.vue`. ✅ **THE FORK IS RESOLVED — USER DECISION 2026-08-18: DROP `sortable`.** It matches the precedent I2 already argued in `audit/Index.vue:14-19` (the server orders newest-first, fixed, and the page says so in one line of prose), it removes a false accessibility claim rather than building around it, and it costs no new query params and no new e2e locators. **Server-side sorting is explicitly NOT the chosen path** — do not re-open it. ⚠️ **AND THE SCOPE IS VERIFIED EXACTLY RIGHT, WHICH IS RARE ENOUGH HERE TO STATE:** measured 2026-08-18 by J8, those two pages are the ONLY `sortable` tables that paginate. The other five — `admin/Tenants`, `admin/Users`, `forms/Index`, `members/Index`, `webhooks/Index` — are handed their complete set and render no `MdsPagination` at all, so client-side sort is honest there and **must not be swept**. Still unbuilt: this is now a mechanical row awaiting an increment. |
-| **The codebase holds TWO contradictory conventions for an unseeded plan catalog** | should | 3 | ⚠️ **REPLACES THE `DestinationCatalog::visibleTo()` ROW BELOW, WHICH WAS MISFRAMED — verified against the code 2026-08-18 by J7 and re-verified by J8.** `RequireFeature` fails **open** (`RequireFeature.php:33` — `currentPlan() !== null && ! feature($key)`) while `EntitlementService::feature()` fails **closed** (`:122` — `currentPlan()?->featureEnabled($key) ?? false`), and both readings are deliberately test-pinned WITH PROSE: `CrumbTrailGateTest` and `DashboardKpisTest` assert fail-OPEN by name, `SearchDestinationArmTest` and `Sidebar.test.ts` assert fail-CLOSED by name. `FeatureAdmission::admits()` exists as the fail-open mirror and has exactly two callers (`DashboardController.php:81`, `CrumbTrail.php:263`). So this is one decision about what a surface means when there is no catalog to gate against — **not** a sign flip in one file. Note the divergence is only reachable with an UNSEEDED `plans` table (dev/test), since `resolvePlan()` falls back to Free in production. ✅ **THE DECISION IS TAKEN — USER RULING 2026-08-18: FAIL OPEN.** "No catalog" means "nothing to gate against", so the surface admits; this is what the routes already do, so nav and search stop hiding destinations the request would have been served — J4b2's stranded-reader defect. Adopting it means widening `FeatureAdmission::admits()` from its two callers to the search/nav surfaces and re-pinning the two tests that assert fail-CLOSED by name. ⛔ **NOT BUILT BY J8, AND DELIBERATELY SO: it lands in `app/Support/Search/`, which is in NEITHER lane's column under Standing Rule 7(b) and needs its own committed claim.** It is now unambiguous and ready for whichever increment claims it. |
+| **Two server-paginated tables carry `sortable: true`, so the header announces an ordering that is false** | should | 3 | ⚠️ **FILED 2026-08-18 BY J7, BUT FOUND BY I2 — the second finding that lived in `PROGRESS.md` prose alone.** `MdsDataTable` sorts only the rows it was handed (`DataTable.vue`, a local `computed`), so on a server-paginated ledger a sort header reorders 25 of 4,000 and sets `aria-sort` over a dataset ordering that does not exist. Live at `resources/js/Pages/webhooks/Show.vue` (`created_at`) and `resources/js/Pages/submissions/Inbox.vue` (`form_title`, `submitted_at`); both render `MdsPagination`. I2 chose correctly for the audit ledger and said so in `audit/Index.vue`. ✅ **THE FORK IS RESOLVED — USER DECISION 2026-08-18: DROP `sortable`.** It matches the precedent I2 already argued in `audit/Index.vue:14-19` (the server orders newest-first, fixed, and the page says so in one line of prose), it removes a false accessibility claim rather than building around it, and it costs no new query params and no new e2e locators. **Server-side sorting is explicitly NOT the chosen path** — do not re-open it. ⚠️ **AND THE SCOPE IS VERIFIED EXACTLY RIGHT, WHICH IS RARE ENOUGH HERE TO STATE:** measured 2026-08-18 by J8, those two pages are the ONLY `sortable` tables that paginate. The other five — `admin/Tenants`, `admin/Users`, `forms/Index`, `members/Index`, `webhooks/Index` — are handed their complete set and render no `MdsPagination` at all, so client-side sort is honest there and **must not be swept**. Still unbuilt: this is now a mechanical row awaiting an increment. ➡️ **Filed as a ledger row by `M94` (2026-09-14):** "The submissions inbox and the webhook delivery log still offer column sorting that reorders only the visible page." |
+| **The codebase holds TWO contradictory conventions for an unseeded plan catalog** | should | 3 | ⚠️ **REPLACES THE `DestinationCatalog::visibleTo()` ROW BELOW, WHICH WAS MISFRAMED — verified against the code 2026-08-18 by J7 and re-verified by J8.** `RequireFeature` fails **open** (`RequireFeature.php:33` — `currentPlan() !== null && ! feature($key)`) while `EntitlementService::feature()` fails **closed** (`:122` — `currentPlan()?->featureEnabled($key) ?? false`), and both readings are deliberately test-pinned WITH PROSE: `CrumbTrailGateTest` and `DashboardKpisTest` assert fail-OPEN by name, `SearchDestinationArmTest` and `Sidebar.test.ts` assert fail-CLOSED by name. `FeatureAdmission::admits()` exists as the fail-open mirror and has exactly two callers (`DashboardController.php:81`, `CrumbTrail.php:263`). So this is one decision about what a surface means when there is no catalog to gate against — **not** a sign flip in one file. Note the divergence is only reachable with an UNSEEDED `plans` table (dev/test), since `resolvePlan()` falls back to Free in production. ✅ **THE DECISION IS TAKEN — USER RULING 2026-08-18: FAIL OPEN.** "No catalog" means "nothing to gate against", so the surface admits; this is what the routes already do, so nav and search stop hiding destinations the request would have been served — J4b2's stranded-reader defect. Adopting it means widening `FeatureAdmission::admits()` from its two callers to the search/nav surfaces and re-pinning the two tests that assert fail-CLOSED by name. ⛔ **NOT BUILT BY J8, AND DELIBERATELY SO: it lands in `app/Support/Search/`, which is in NEITHER lane's column under Standing Rule 7(b) and needs its own committed claim.** It is now unambiguous and ready for whichever increment claims it. ➡️ **Filed as a ledger row by `M94` (2026-09-14):** "Search and the sidebar hide plan-gated destinations when no plan catalog is seeded, while the routes serve them." |
 | Share panel — the remainder after I1: **branded social links** (X/LinkedIn/Facebook intent URLs) | nice | 3 | I1 shipped `navigator.share` + `mailto:` instead — native share is the real mobile path (it reaches WhatsApp/SMS, which no fixed set of buttons can) and it keeps third-party brand marks out of the builder and three vendor glyphs out of the hand-authored `icons.ts` |
 | Share panel — **script-snippet embed** with `postMessage` auto-resize | should | 3 | I1 ships the `<iframe>` only, which is exactly what the parity matrix committed ("iframe at MVP; richer embed a Phase 3 candidate"). Auto-resize needs a message protocol on both sides — a listener in the guest runtime and a loader script the platform serves and versions forever |
-| **Per-form embed-origin allowlist** — narrow the guest runtime's `frame-ancestors *` to named hosts | should | 3 | The honest narrowing of the clickjacking risk I1 explicitly ACCEPTED (threat-model §4). Not achievable by editing `PublicRuntimeSecurityHeaders`: the allowed set is per-form data, so it needs a column, a UI and a per-request policy build |
+| **Per-form embed-origin allowlist** — narrow the guest runtime's `frame-ancestors *` to named hosts | should | 3 | The honest narrowing of the clickjacking risk I1 explicitly ACCEPTED (threat-model §4). Not achievable by editing `PublicRuntimeSecurityHeaders`: the allowed set is per-form data, so it needs a column, a UI and a per-request policy build ⏸️ **Not planned (`M94`):** an accepted risk, recorded by I1 in threat-model §4; it re-enters only by the user's decision. |
 
 ## 4. Submission management, review & collaboration
 
@@ -89,7 +89,7 @@ Several of these are **real XLSForm round-trip import failures today** — a Kob
 | Saved / named views on the inbox (persistent per-user filter + column presets) | should | 3 | Planned saved-views are scoped to the Phase-3 *dashboard*, not the inbox. ADR-0011 §D8 pins that table as strict-RLS with a `user_id` (never the `belongs_to_user` isolation variant, which carries no tenant predicate) and dashboard-scoped; reusing it for the inbox is a future decision, not an implied one |
 | Duplicate / near-duplicate detection (beyond exact offline-replay idempotency) | should | 3 | Catches two records describing the same real-world entity |
 | Assignment of individual submissions to specific reviewers (caseload split) | nice | 3–4 | High-volume review only; reference products are weak here (more differentiator than gap) |
-| Notification retention / pruning sweep | should | 3–4 | Filed 2026-08-06 from I4. `notifications` has **no retention policy and no sweeper**: `app/Jobs/Maintenance/` holds seven (`PruneFailedJobs`, `ReapExpiredDrafts`, `RefreshConnectorTokens`, `RollUpUsageCounters`, `SweepScheduledForms`, `SweepWebhookRetries`, `VerifyCustomDomains`) and none touches this table, while `submission_received` fans out to owner + admin + every granted form editor on **every** submission of **every** public form. Two consequences to size the job against: the bell's unread `count(*)` runs twice a minute per open tab (index-only on `notifications_tenant_user_read_idx`, so cheap but unbounded), and "Mark all as read" is a single unbounded `UPDATE` — at a few hundred thousand rows that is a synchronous web request holding row locks. Neither is a Phase-1 problem at seeded scale; both are recorded here rather than discovered. A prune of read rows older than N days, plus a badge cap, is the likely shape |
+| Notification retention / pruning sweep | should | 3–4 | Filed 2026-08-06 from I4. `notifications` has **no retention policy and no sweeper**: `app/Jobs/Maintenance/` holds seven (`PruneFailedJobs`, `ReapExpiredDrafts`, `RefreshConnectorTokens`, `RollUpUsageCounters`, `SweepScheduledForms`, `SweepWebhookRetries`, `VerifyCustomDomains`) and none touches this table, while `submission_received` fans out to owner + admin + every granted form editor on **every** submission of **every** public form. Two consequences to size the job against: the bell's unread `count(*)` runs twice a minute per open tab (index-only on `notifications_tenant_user_read_idx`, so cheap but unbounded), and "Mark all as read" is a single unbounded `UPDATE` — at a few hundred thousand rows that is a synchronous web request holding row locks. Neither is a Phase-1 problem at seeded scale; both are recorded here rather than discovered. A prune of read rows older than N days, plus a badge cap, is the likely shape ➡️ **Filed as a ledger row by `M94` (2026-09-14):** "In-app notifications are never pruned, and "Mark all as read" is one unbounded update." |
 | ~~Respondents may always read their own submission~~ ✅ **DONE — I8a (2026-08-07)** | should | 3 | Filed 2026-08-06 from I4, which observed that `SubmissionPolicy::view()` was `submissions.view && (org-wide \|\| collaborates on the form)` with **no respondent clause**, while `submission_approved`/`submission_returned` are addressed to `respondent_user_id` and `NotificationCopy` tells them to "open it to see what they asked for" — so a form editor whose grant was later revoked kept a notification pointing at a bare 403 outside the Inertia shell. I4 made that honest (`NotificationPresenter` runs the real gate and ships `url: null`); **I8a made it work.** This row said the widening "belongs with I9's review/edit vertical"; the user decided otherwise on 2026-08-07, and the split is cleaner than the original filing suggested: **reading back what you yourself submitted is not a privilege, while EDITING it after review is a genuinely different question** and stays with I9 (`submissions.edit.any/.own`, seeded since Phase 0 with no code behind them). As built: an `isRespondent()` arm on `view()` **only** — never `review()` or `export()` — mirrored in `Submission::scopeVisibleTo()` so the single-row check and the list query still express one rule, with the OR **parenthesised** so it cannot associate against the inbox's status/date/form filters. `NotificationPresenter` needed no change at all: it runs the Gate, so its previously-dead links simply started resolving |
 
 ## 5. Analytics, reporting & exports
@@ -102,7 +102,7 @@ Several of these are **real XLSForm round-trip import failures today** — a Kob
 | Cross-tabulation / filter-results-by-answer | should | 3 | Extends the planned answer-index filtering |
 | Shareable public / read-only results report or live-dashboard link | should | 3 | Persona A donor reporting is named as a frustration; reuse the guest share-token pattern |
 | Scheduled / recurring emailed report digests | nice | 3 | **Enabling infra does NOT exist yet** (corrected 2026-07-21 — this row previously claimed it did): there is no scheduler (`routes/console.php` is stock, no `withSchedule`, no `app/Console/`), no `app/Mail`, and async export is unbuilt. The scheduler + queue substrate is specified by ADR-0007 and built in H2; this item depends on it. |
-| Decouple `openapi.json` from the PHP build's tz database | should | 3 | Filed 2026-08-03 from H24a (PR #86). `AnalyticsReportRequest:52`'s `Rule::in(DateTimeZone::listIdentifiers())` makes Scramble materialize a **419-entry IANA enum × 4 endpoints** — ~1,676 lines, ~20% of the whole spec — and `contract-tests` byte-diffs the committed file against a fresh export. The two PHPs are different builds: local is `php:8.4-fpm-alpine` (8.4.23, tzdata 2026.1), CI is `shivammathur/setup-php@v2` with a **floating** `php-version: "8.4"`. They matched at H24a, so the job is green — but any PHP patch release bumping timelib turns `contract-tests` red on a ~1,676-line diff nobody authored, on whatever PR happens to be open. Fix is ~5 lines: replace the rule with a closure so the enum cannot be statically enumerated (runtime behaviour identical — still 422, and `AnalyticsApiTest:152` asserts status, not message), then regenerate the spec. |
+| ~~Decouple `openapi.json` from the PHP build's tz database~~ | should | 3 | Filed 2026-08-03 from H24a (PR #86). `AnalyticsReportRequest:52`'s `Rule::in(DateTimeZone::listIdentifiers())` makes Scramble materialize a **419-entry IANA enum × 4 endpoints** — ~1,676 lines, ~20% of the whole spec — and `contract-tests` byte-diffs the committed file against a fresh export. The two PHPs are different builds: local is `php:8.4-fpm-alpine` (8.4.23, tzdata 2026.1), CI is `shivammathur/setup-php@v2` with a **floating** `php-version: "8.4"`. They matched at H24a, so the job is green — but any PHP patch release bumping timelib turns `contract-tests` red on a ~1,676-line diff nobody authored, on whatever PR happens to be open. Fix is ~5 lines: replace the rule with a closure so the enum cannot be statically enumerated (runtime behaviour identical — still 422, and `AnalyticsApiTest:152` asserts status, not message), then regenerate the spec. ✅ **Shipped, verified by `M94`:** `AnalyticsReportRequest` uses the framework's `timezone` rule, and `openapi.json` no longer carries the time-zone enum. |
 
 ## 6. Integrations & ecosystem
 
@@ -119,17 +119,17 @@ Several of these are **real XLSForm round-trip import failures today** — a Kob
 | ~~**`MdsModal` should mark the rest of the page `inert` while open**~~ ✅ **DONE — I10a (2026-08-08)**. Fixed in the component rather than worked around: `MdsModal` now marks every non-ancestor sibling of the dialog `inert` while it is open (`packages/design-system/src/components/Modal/inert-stack.ts`), so the background leaves both focus order and the accessibility tree. Three things the row did not anticipate, each of which had to be solved for the fix to be real: (1) the walk must be an **ancestor-sibling** walk, never “every `<body>` child except ours” — with `teleport: false` (every Storybook story, four Vitest specs) the naive rule inerts `#storybook-root` itself, and `checkA11y(page, '#storybook-root')` would then scan an EMPTY accessibility tree and pass silently, which is worse than a red; (2) `inert` must be released **before** focus returns to the opener, because `focus()` inside an inert subtree is a silent no-op — the reverse order breaks return-focus in all 29 modal consumers with nothing in the console; (3) `MdsToastHost` teleports to `<body>` DELIBERATELY so a toast is never trapped under a modal, and inerting it would have made every toast raised during a dialog unannounceable and unclickable — it opts out with `data-mds-inert-exempt`. Two latent bugs fell out on the way: the watcher had no `immediate: true`, so a modal MOUNTED already open (`forms/Index.vue`'s AssignScopeModal, `scopes/Index.vue`'s move confirm, and every Storybook story) got no scroll lock, no captured opener and no initial focus; and `document.body.style.overflow` was per-instance, so with two stacked modals the first close unlocked the page under the second — both now driven by one module-scope stack. The proof is `tests/e2e/builder-axe.spec.ts`: its two share-panel scans are **whole-page again** and `scan()`'s `within` parameter is deleted, so if the walk regresses the builder's config panel comes back through the scrim and the merge-blocking gate goes red on real product markup. Nine Vitest cases, seven mutation-checked. Original filing follows — note its “scoped the two share-panel scans to `.mds-modal`” is itself inaccurate: `.mds-modal` is not a class that exists (the element carries `.mds-modal__panel` inside `.mds-modal__backdrop`) and the shipped selector was `[role="dialog"]`, as `builder-axe.spec.ts`'s own docblock records at length. Filed 2026-08-08 from I8c. The component renders a semi-transparent scrim but leaves the background reachable: **focus order still walks it, and a screen reader still announces it**, which is the behaviour `<dialog>`'s native modal mode exists to prevent (WCAG 2.4.3). Surfaced by a merge-blocking axe failure rather than by review — when I8b's "Spam protection" block made the Share modal taller, the 375px layout shifted and axe began BLENDING the scrim into the config panel behind it, reporting a 1.82:1 contrast failure on a segmented-control label nobody can see or reach while the dialog is open. I8c scoped the two share-panel scans to `.mds-modal` (the G9b `.builder__pane--left` precedent) and filed this rather than fixing it inline: `inert` changes every modal in the product — focus restoration, the backdrop click-out, and the four specs that drive modals — so it belongs in a design-system increment with its own Storybook and axe pass, not in a security PR |
 | Item | Priority | Phase | Note |
 |---|---|---|---|
-| **A queued job born into a >6h backlog fails on its first pop, having never run** | should | 1–2 | Filed 2026-08-08 from I10b, which fixed the test-only twin of this. `TenantAwareJob::retryUntil()` returns `now()->addHours(config('queue-fairness.retry_window_hours'))` and Laravel stamps that into the job payload at DISPATCH time, where it never slides. `Worker::markJobAsFailedIfAlreadyExceedsMaxAttempts()` (Worker.php:637) compares it to wall-clock BEFORE `fire()`, so any job that sits in the queue longer than the window — a deploy freeze, a worker outage, a fan-out burst, a paused consumer — is failed with `MaxAttemptsExceededException` **without `handle()` ever being called**, and lands in `failed_jobs` looking like a code fault. `config/queue-fairness.php` and `TenantAwareJob`'s own docblock both already note the freeze; what is missing is any test, any alarm, and any decision about whether the window should be evaluated at pop time instead. Wants a deliberate call (sliding window vs. accepting the cap vs. alerting on the exception class), which is why it is a row rather than a fast-follow |
-| **`builder-axe`'s two share-panel scans went flaky after I10a widened them** | should | 1 | Filed 2026-08-09 from I10d's CI. I10a removed `scan()`'s `within` parameter and returned both share-panel cases to whole-page scanning, which is the merge-blocking PROOF that `MdsModal`'s new `inert` walk works on real markup — and they were green on I10a's own run. On the two subsequent runs (I10d's branch, which touches nothing in the builder) they failed once and passed on retry, in both runs, at different viewports each time: `Builder — share panel, live link (dark)` and `Builder — share panel, not yet shared (dark)`. Playwright reports them as FLAKY rather than failed, so the job's verdict is unaffected today — but a merge-blocking gate that recovers on retry is exactly the shape `DatabaseWorkerPipelineTest` had before I10b, and that one taught people to re-run on red. Likely a timing interaction between the dialog's open transition and the whole-page axe pass now that more of the page is evaluated; the honest first step is to capture the failing violation from the artifact rather than to guess |
-| **`App.vue`'s conflict-discard still uses `window.confirm`** | should | 1 | Filed 2026-08-09 from I10d. That increment gave the new per-submission list an INLINE two-step confirm and rejected `window.confirm` for it on specific grounds — it blocks the main thread, renders as unstyled OS chrome inside the branded offline shell the H23 brand-cache machinery exists to keep consistent, cannot be asserted by the Playwright gate without a dialog handler (and §7.3 makes the confirmation a REQUIREMENT, so the gate must be able to prove it), and cannot name WHICH response it is about to destroy. Every one of those applies equally to `onDiscard()`'s call in `App.vue`, which is the G8c resolve-mode escape hatch. It was left alone only because its trigger lives in `RuntimeSession`'s notice slot and the e2e already pins that button's visibility, so converting it is a change to that flow rather than to the list's. Two confirm idioms in one runtime is the kind of inconsistency the next review will find |
-| **The guest runtime's cross-form “Open this form” link leaves the installed PWA's scope** | nice | 2–3 | Filed 2026-08-09 from I10d. A conflict belonging to a DIFFERENT form cannot be resolved from the open one (the resolver reuses a share-token client bound to one slug), so the row offers `‹a href="/f/{slug}"› Open this form`. But `PwaManifestController` sets both `start_url` AND `scope` to the CURRENT form's `/f/{slug}` — the manifest is per-form by design — so on an installed PWA that link navigates out of scope and the OS opens it in a browser tab, ejecting the respondent from the installed window. The row is still better than the silent no-op it replaced, and the alternative (a broader manifest scope) is a real trade against the per-form install story. Wants a decision, not a patch |
-| **A conflict review re-enters the fill session without re-running the H12b schedule gate** | should | 2 | Filed 2026-08-09 from I10d's review. `beginConflictReview()` re-mints, re-fetches the schema and sets `phase = 'ready'` with no call to `scheduleState()`, so a form that has since CLOSED or hit `max_responses` still opens for review and resubmit — where a fresh load would show the unavailable screen. Pre-existing (G8c), but I10d made it reachable from more screens by promoting the surface to app level, and the resubmit is then refused by the server rather than by the runtime, which is a worse experience than the guard exists to give |
+| **A queued job born into a >6h backlog fails on its first pop, having never run** | should | 1–2 | Filed 2026-08-08 from I10b, which fixed the test-only twin of this. `TenantAwareJob::retryUntil()` returns `now()->addHours(config('queue-fairness.retry_window_hours'))` and Laravel stamps that into the job payload at DISPATCH time, where it never slides. `Worker::markJobAsFailedIfAlreadyExceedsMaxAttempts()` (Worker.php:637) compares it to wall-clock BEFORE `fire()`, so any job that sits in the queue longer than the window — a deploy freeze, a worker outage, a fan-out burst, a paused consumer — is failed with `MaxAttemptsExceededException` **without `handle()` ever being called**, and lands in `failed_jobs` looking like a code fault. `config/queue-fairness.php` and `TenantAwareJob`'s own docblock both already note the freeze; what is missing is any test, any alarm, and any decision about whether the window should be evaluated at pop time instead. Wants a deliberate call (sliding window vs. accepting the cap vs. alerting on the exception class), which is why it is a row rather than a fast-follow ➡️ **Filed as a ledger row by `M94` (2026-09-14):** "A background job that waits in the queue longer than six hours is failed without ever running." |
+| ~~**`builder-axe`'s two share-panel scans went flaky after I10a widened them**~~ | should | 1 | Filed 2026-08-09 from I10d's CI. I10a removed `scan()`'s `within` parameter and returned both share-panel cases to whole-page scanning, which is the merge-blocking PROOF that `MdsModal`'s new `inert` walk works on real markup — and they were green on I10a's own run. On the two subsequent runs (I10d's branch, which touches nothing in the builder) they failed once and passed on retry, in both runs, at different viewports each time: `Builder — share panel, live link (dark)` and `Builder — share panel, not yet shared (dark)`. Playwright reports them as FLAKY rather than failed, so the job's verdict is unaffected today — but a merge-blocking gate that recovers on retry is exactly the shape `DatabaseWorkerPipelineTest` had before I10b, and that one taught people to re-run on red. Likely a timing interaction between the dialog's open transition and the whole-page axe pass now that more of the page is evaluated; the honest first step is to capture the failing violation from the artifact rather than to guess ✅ **Fixed, verified by `M94`:** the flake was the modal's fade (closed by `M16`), and the e2e config now forces reduced motion and fails a flaky test in CI. |
+| **`App.vue`'s conflict-discard still uses `window.confirm`** | should | 1 | Filed 2026-08-09 from I10d. That increment gave the new per-submission list an INLINE two-step confirm and rejected `window.confirm` for it on specific grounds — it blocks the main thread, renders as unstyled OS chrome inside the branded offline shell the H23 brand-cache machinery exists to keep consistent, cannot be asserted by the Playwright gate without a dialog handler (and §7.3 makes the confirmation a REQUIREMENT, so the gate must be able to prove it), and cannot name WHICH response it is about to destroy. Every one of those applies equally to `onDiscard()`'s call in `App.vue`, which is the G8c resolve-mode escape hatch. It was left alone only because its trigger lives in `RuntimeSession`'s notice slot and the e2e already pins that button's visibility, so converting it is a change to that flow rather than to the list's. Two confirm idioms in one runtime is the kind of inconsistency the next review will find ➡️ **Filed as a ledger row by `M94` (2026-09-14):** "Discarding a conflicted offline response uses the browser's plain confirm box." |
+| **The guest runtime's cross-form “Open this form” link leaves the installed PWA's scope** | nice | 2–3 | Filed 2026-08-09 from I10d. A conflict belonging to a DIFFERENT form cannot be resolved from the open one (the resolver reuses a share-token client bound to one slug), so the row offers `‹a href="/f/{slug}"› Open this form`. But `PwaManifestController` sets both `start_url` AND `scope` to the CURRENT form's `/f/{slug}` — the manifest is per-form by design — so on an installed PWA that link navigates out of scope and the OS opens it in a browser tab, ejecting the respondent from the installed window. The row is still better than the silent no-op it replaced, and the alternative (a broader manifest scope) is a real trade against the per-form install story. Wants a decision, not a patch ➡️ **Filed as a ledger row by `M94` (2026-09-14):** "In an installed offline form, opening another form's queued response leaves the installed window." |
+| **A conflict review re-enters the fill session without re-running the H12b schedule gate** | should | 2 | Filed 2026-08-09 from I10d's review. `beginConflictReview()` re-mints, re-fetches the schema and sets `phase = 'ready'` with no call to `scheduleState()`, so a form that has since CLOSED or hit `max_responses` still opens for review and resubmit — where a fresh load would show the unavailable screen. Pre-existing (G8c), but I10d made it reachable from more screens by promoting the surface to app level, and the resubmit is then refused by the server rather than by the runtime, which is a worse experience than the guard exists to give ➡️ **Filed as a ledger row by `M94` (2026-09-14):** "Reviewing an offline conflict reopens a form that has since closed or filled up, and the resubmit is then refused." |
 | ~~**The mobile nav drawer's scrim has the WCAG 2.4.3 hole `MdsModal` just closed**~~ **— CLOSED IN J4b, AND THE ROW'S STATED BLOCKER WAS WRONG.** It held that `inert-stack.ts` could not be reused because "the drawer is a flyout inside `#app` rather than a body-level portal, so the ancestor-sibling walk would mark its own siblings within the shell rather than the page". Traced element by element, **both halves fail**: `.sidebar-scrim` is a CHILD of the pushed root, so it is on the path and is never visited (a test now asserts this, because a marked scrim would stop taking the clicks that dismiss the drawer), and `.app-shell`'s siblings ARE the page — the top nav, the impersonation banner and the content region. The walk was already correct for this element, unmodified; `inert-stack.ts:22-30` even documents that it exists to work for a non-portalled root. **The row was right that the drawer is not a dialog**, and J4b took that seriously: its root wraps the primary navigation landmark at all three breakpoints, so `role="dialog"` below 480px would make that landmark viewport-dependent. The fix is the seam the row's second option named — `useInertBackground`, extracted from `MdsModal` with `Modal.test.ts` passing byte-unedited as the evidence it is an extraction rather than a change. ⚠️ One of the row's four claims was also overstated: **the scroll lock was never needed on this shell**, since `.app-shell` is `100dvh` and `.app-shell__content` is the scroller, so `<body>` never scrolls. Original text follows.  | should | 1 | Filed 2026-08-08 from I10a's adversarial review. `resources/js/components/shell/Sidebar.vue`'s `.sidebar-scrim` renders a full-viewport `--mds-color-overlay-scrim` backdrop over the page at ≤480px with **no `inert`, no focus trap and no scroll lock** — exactly the defect I10a removed from `MdsModal`, on a surface DSR §3.6 explicitly forbids (“no page builds a modal-like floating panel that skips the focus-trap requirement by not technically being the shared Modal component”). It cannot simply reuse `inert-stack.ts`: the drawer is a flyout inside `#app` rather than a body-level portal, so the ancestor-sibling walk would mark its own siblings within the shell rather than the page, and the drawer is not a dialog. Wants either a shared `useInertBackground(rootRef)` seam extracted from the modal stack, or the drawer converting to a real dialog primitive — a design-system decision, which is why it is a row and not a fast-follow |
 | ~~**⌘K is a dead key while the mobile nav drawer holds the page**~~ ✅ **CLOSED IN J6.** Filed 2026-08-13 from J4b1's adversarial pass and traced-but-not-fixed there; recorded only in `PROGRESS.md` until J6, which is why it is being filed and struck in one edit — **a finding whose only home is a session tracker is a finding the next reader will not find.** The blame in the original note was on `preventDefault()` running before the `openModalCount()` guard, and that turned out to be **the wrong culprit**: swallowing the chord while declining over a real dialog is correct, because handing ⌘K back to the browser there opens its find bar on top of a modal. The defect was one level down — `openModalCount()` has documented itself as counting *blocking dialogs* since J1a, and from J4b it also counted the drawer, whose own seam argues at length that making it a dialog would be a regression. Stack entries now declare their kind. **The palette stacking over an open drawer is the intended behaviour** (user decision 2026-08-17). See DSR §3.4.1 | should | 1 | ⚠️ **This row was never in this file until the increment that closed it.** Filed 2026-08-13 from J4b1's adversarial pass into `PROGRESS.md`'s status block and nowhere else, so it was invisible to every search of the backlog — which is why J6 files and strikes it in one edit. **File a deliberately-unfixed finding here at the moment you decide not to fix it** |
 | ~~**A stacked dialog over the drawer strands focus on `<body>`**~~ ✅ **CLOSED IN J6, AND IT WAS TWO DEFECTS PLUS A THIRD UNDERNEATH.** Filed 2026-08-13 from J4b1, masked at the time by the dead-key row above, which is why the two had to ship together. (1) The palette's private visibility predicate asked `checkVisibility()`, which answers about **rendering** and knows nothing about `inert` — so with the drawer holding the page it handed back a top-nav control `.focus()` cannot move to, silently. **That is the same class of failure the selector *list* was created to fix in J1a**, blind to `inert` instead of blind to layout; the predicate now lives once in the design system and answers both. (2) `MdsModal.closePage()` **trusted** `opener.focus()` while `takePage()` twelve lines above verifies religiously; it is now tried-then-verified, with a `returnFocus` prop. (3) Strengthening the test for (2) uncovered a **pre-existing** defect neither row named: a modal mounted already-open with nothing focused captured `<body>` as its opener, and `document.body.focus()` is **not** the no-op two docblocks asserted — the body is the document's default focus target, so closing such a modal actively **took** focus, including out of an upper dialog still open. See DSR §4.5 | should | 2 | ⚠️ **This row was never in this file until the increment that closed it.** Filed 2026-08-13 from J4b1's adversarial pass into `PROGRESS.md`'s status block and nowhere else, so it was invisible to every search of the backlog — which is why J6 files and strikes it in one edit. **File a deliberately-unfixed finding here at the moment you decide not to fix it** |
 | ~~**`useInertBackground` never re-pushes if `root` changes identity**~~ ✅ **CLOSED IN J6.** Filed 2026-08-13 from J4b1. The only watcher was on `active`, and `ownedRoot` is captured once, so a root replaced while active left the stack holding the element that had gone: the `inert` walk is then computed from a node that may not be in the document, and the live surface — an off-path sibling of the stale one — can be marked inert by its own seam. **Latent rather than live**, since the sidebar's root is stable; filed and fixed anyway because this is **exported API** and the next consumer is where a `v-if`-swapped root would find it. The fix distinguishes three transitions rather than two, and its own adversarial case is that `[active, root]` fires on every patch and must not re-run initial focus on a re-render that keeps the same element | nice | 1 | ⚠️ **This row was never in this file until the increment that closed it.** Filed 2026-08-13 from J4b1's adversarial pass into `PROGRESS.md`'s status block and nowhere else, so it was invisible to every search of the backlog — which is why J6 files and strikes it in one edit. **File a deliberately-unfixed finding here at the moment you decide not to fix it** |
 | ~~**The tooltip's capture-phase Escape is page-global**~~ ✅ **CLOSED IN J6, WITH A REPRODUCTION THE FILING DID NOT PREDICT.** Filed 2026-08-13 from J4b1 as "a hovered rail tooltip can eat one Escape aimed at an unrelated open menu" — which understated it. A capture listener on `document` runs before **every** Escape claimant on the page whichever mechanism they chose, and `useDismissable` — whose consumers are **NotificationBell and FeedbackButton**, *not* the account menu, which moved to `MdsMenu` — binds Escape on `document` in the **bubble** phase, so it never ran at all. Measured in the running app at 800px against **both** shell mechanisms: pointer resting on a collapsed rail item with a popover open, Escape → tooltip hides, **popover stays open**. `MdsModal`'s panel handler loses the key the same way. **The rule now is that dismissal is unconditional and consumption is scoped** to wherever focus is; the deliberate trade for a hovered-in-dialog tooltip is recorded in DSR §3.4a, and §3.4.1's "family that must not be aligned" paragraph gains the governing priority rule, because three different binding sites are not a priority scheme | should | 1 | ⚠️ **This row was never in this file until the increment that closed it.** Filed 2026-08-13 from J4b1's adversarial pass into `PROGRESS.md`'s status block and nowhere else, so it was invisible to every search of the backlog — which is why J6 files and strikes it in one edit. **File a deliberately-unfixed finding here at the moment you decide not to fix it** |
-| **`analytics-axe` and `scopes-axe` still scope a modal scan to `[role="dialog"]`** | nice | 1–3 | Filed 2026-08-08 from I10a. I10a widened `builder-axe.spec.ts`'s two share-panel scans back to whole-page and deleted `scan()`'s `within` parameter, because `MdsModal` no longer leaks its background into axe. `analytics-axe.spec.ts:150` and `scopes-axe.spec.ts:83` are the same pattern and could now follow — but they were left alone deliberately, because those two files scope **every** scan, modal or not, for the separate G9b reason recorded in their headers (a whole-page scan there re-flags pre-existing violations elsewhere on those pages, which cost G9b three follow-up pushes). Widening only their dialog call is therefore a different change with a different risk, and worth doing only together with an audit of what those pages actually fail whole-page |
+| **`analytics-axe` and `scopes-axe` still scope a modal scan to `[role="dialog"]`** | nice | 1–3 | Filed 2026-08-08 from I10a. I10a widened `builder-axe.spec.ts`'s two share-panel scans back to whole-page and deleted `scan()`'s `within` parameter, because `MdsModal` no longer leaks its background into axe. `analytics-axe.spec.ts:150` and `scopes-axe.spec.ts:83` are the same pattern and could now follow — but they were left alone deliberately, because those two files scope **every** scan, modal or not, for the separate G9b reason recorded in their headers (a whole-page scan there re-flags pre-existing violations elsewhere on those pages, which cost G9b three follow-up pushes). Widening only their dialog call is therefore a different change with a different risk, and worth doing only together with an audit of what those pages actually fail whole-page ➡️ **Filed as a ledger row by `M94` (2026-09-14):** "Two accessibility specs still scan only the open dialog rather than the whole page." |
 | Auth/session events in the audit trail (login success/failure, logout, reset, token issue/revoke, MFA enrol/challenge) | should | 1–2 | `AuditEvent` covers business mutations only; brute-force/takeover leaves no tenant-visible trace. Laravel already fires these events |
 | ~~Breached-password (HIBP) check~~ ✅ **ALREADY SHIPPED — Phase 0 B1 (`e4253fa`)** · admin-configurable password policy still open | should | 1 | ASVS L1/L2 (NFR §4) mandates a breached-password check. ⚠️ **THIS ROW WAS STALE AND COST I8 A PLANNED WORK ITEM.** `FortifyServiceProvider:42` has carried `Password::defaults(fn () => Password::min(12)->uncompromised())` since Phase 0, inherited by registration, password reset, profile update and invitation-accept — so I8's scope listed "HIBP" as work that was already done, discovered only by reading the provider. I8a additionally **faked the live HTTPS call to `api.pwnedpasswords.com`** that `AuthenticationTest` was making on every CI run, and added a test that exercises the breach check specifically (the framework early-returns on a length failure, so the pre-existing test never reached the verifier). What genuinely remains is the **admin-configurable** half: no `SettingKey` exists for a per-workspace password policy, and PRD Feature #14 does not ask for one |
 | Session lifecycle controls (idle/absolute timeout + step-up re-auth; later: session inventory / "log out everywhere") | should | 1 (timeout+step-up) → 2 (inventory) | Enumerators share field devices; step-up partly delivered with Feature #14 |
@@ -182,7 +182,7 @@ No AI appears anywhere in the committed docs; the versioned draft/publish model 
 
   **Why it took three increments to land here.** P3a found it and could not file it — `docs/feature-backlog.md`
   was Lane A's live J4c2 claim — and K1a/K1b could not either, for J5. Filed by the first Lane B row that
-  could reach the file, which is the protocol working rather than a delay.
+  could reach the file, which is the protocol working rather than a delay. ⏸️ **Re-homed to `uploading-import` by `M94` (2026-09-14):** building resumable media handling, or narrowing the three sentences to what shipped, re-enters with that held item.
 
 - **26 foreign keys can reference across a tenant boundary, and the database will act on them
   (ADR-0002 §D5, measured by P2c).** Not a latent bug — no cross-tenant reference exists in the data,
@@ -203,7 +203,7 @@ No AI appears anywhere in the committed docs; the versioned draft/publish model 
   (`form_versions.form_id` against `forms.draft_version_id`/`current_published_version_id`), so the
   pair has to be handled together or deferred; and **`form_templates.source_form_version_id` legitimately
   points at PLATFORM rows** with a NULL `tenant_id`, so plain equality is wrong for it and it needs the
-  widened shape rather than a mechanical rewrite.
+  widened shape rather than a mechanical rewrite. ➡️ **Filed as a ledger row by `M94` (2026-09-14):** "26 foreign keys can point at another workspace's rows, and 20 of them would cascade a delete across workspaces."
 
 - **Three more cross-boundary FKs cannot be fixed this way at all**, because the SOURCE has no
   `tenant_id` column to put in a key: `role_has_permissions`'s two, and `tenants.logo_attachment_id`
@@ -341,15 +341,15 @@ No AI appears anywhere in the committed docs; the versioned draft/publish model 
 
   </details>
 
-- **SIX components hide a node with `position: absolute` + `clip: rect(0 0 0 0)` while positioning
-  nothing themselves** (was seven — see below), so that node's containing block is established outside the
+- **FIVE components hide a node with `position: absolute` + `clip: rect(0 0 0 0)` while positioning
+  nothing themselves** (was seven, then six — see below; `SyncStatus.vue` left the list in M15), so that node's containing block is established outside the
   component and no scroll container in between can clip it. This is the defect G11 fixed on `MdsDataTable`,
   JR5 fixed on `MdsSegmentedControl`, and J3b fixed on `MdsSpinner` and `MdsTimeSeriesChart` — found the
-  fourth time by scanning for the shape rather than by tripping over it. The remaining six are all in the
+  fourth time by scanning for the shape rather than by tripping over it. The remaining five are all in the
   app trees and all sr-only live regions: `Pages/scopes/Index.vue`,
   `components/builder/BuilderCanvas.vue`, `components/shell/FeedbackButton.vue`,
-  `components/submissions/GeoInput.vue`, `public-runtime/components/RuntimeShell.vue`,
-  `public-runtime/components/SyncStatus.vue`.
+  `components/submissions/GeoInput.vue`, `public-runtime/components/RuntimeShell.vue`.
+  ~~`public-runtime/components/SyncStatus.vue`~~, fixed by M15.
 
   ✅ **`components/shell/CommandPalette.vue` LEFT THE LIST IN J4c, AND IT IS THE FIRST ENTRY EVER REMOVED.**
   Not fixed in place: its two clipped nodes — the combobox's label and its polite live region — **moved into
@@ -366,8 +366,8 @@ No AI appears anywhere in the committed docs; the versioned draft/publish model 
   were latent for four increments precisely because they only bite where something finally tries to clip.
 
   They are pinned meanwhile: `packages/design-system/src/theme/__tests__/clipped-node-containment.test.ts`
-  asserts the design system has **zero** instances and that the app-tree list is **exactly** these seven,
-  so an eighth fails at the moment it is written. ⚠️ The list may only ever shrink — do not add to it.
+  asserts the design system has **zero** instances and that the app-tree list is **exactly** these five,
+  so an eighth fails at the moment it is written. ⚠️ The list may only ever shrink — do not add to it. ➡️ **Filed as a ledger row by `M94` (2026-09-14):** "Five screen-reader-only live regions have no positioned ancestor inside their component."
 
 ### Design system — the Storybook axe gate runs locally *(corrected in J4b)*
 
@@ -447,7 +447,7 @@ quote it*, now on its fourth gate.
 
   ⚠️ **MEASURED 2026-08-18 BY J8 WHILE SCOPING THIS ROW, AND THE ROW IS ~22× LARGER THAN IT READS — FILED HERE BECAUSE J8 DELIBERATELY DID NOT TAKE IT.** A sweep of `packages/design-system/src`, `resources/js` and `resources/public-runtime` for `list-style: none` in a file carrying no `role="list"` returns **22 files**, not one: `ChartLegend`, `PasswordStrength`, `AnalyticsFilterBar`, `SavedViewList`, `BuilderCanvas`, `ConditionRows`, `FieldPalette`, `LibraryPicker`, `LogicRail`, `ScopeTree`, `TwoFactorSetup`, `IdpMetadataCard`, `SsoFailuresCard`, `GeoInput`, `MediaInput`, `AuthLayout`, `scopes/Index`, `search/Index`, `Encode`, and three in `resources/public-runtime`. Seven files DO carry the attribute (`Breadcrumb`, `Checklist`, `TabNav`, `NotificationBell`, `Sidebar`, `forms/Index`, `forms/Templates`), so the convention exists and is simply unevenly applied.
 
-  ⛔ **IT IS NOT A SWEEP, AND THAT IS THE POINT OF RECORDING THE NUMBER RATHER THAN THE FIX.** The scan is FILE-level, so a file may carry `list-style: none` on a presentational wrapper and `role="list"` on the real list; and a `<ul>` used purely as a layout container should NOT be given list semantics at all. Each one needs a per-element judgement plus a look at what a screen reader actually announces — which is why `MdsPasswordStrength` is still the right FIRST row (it is a live region that re-announces while somebody types), and why the other 21 are a separate, larger piece of work. Note three of them are in `resources/public-runtime/`, which Standing Rule 7(b) does not put in Lane A's column.
+  ⛔ **IT IS NOT A SWEEP, AND THAT IS THE POINT OF RECORDING THE NUMBER RATHER THAN THE FIX.** The scan is FILE-level, so a file may carry `list-style: none` on a presentational wrapper and `role="list"` on the real list; and a `<ul>` used purely as a layout container should NOT be given list semantics at all. Each one needs a per-element judgement plus a look at what a screen reader actually announces — which is why `MdsPasswordStrength` is still the right FIRST row (it is a live region that re-announces while somebody types), and why the other 21 are a separate, larger piece of work. Note three of them are in `resources/public-runtime/`, which Standing Rule 7(b) does not put in Lane A's column. ➡️ **Filed as a ledger row by `M94` (2026-09-14):** "The password-strength requirement list loses its list semantics in Safari, and 21 more files carry the same shape."
 
 - **`MdsProgress`'s step-count variant** — DSR §3.9 specifies two variants and J4a built the percentage one. ⚠️ **J5b did NOT consume it and was right not to**, though the row that scheduled J5 named a checklist as the shape that would want it: the step-count variant is *"Step X of N"* for multi-step form **navigation**, with a current position and a visited-set rule, and a checklist has neither. `MdsChecklist` uses the percentage variant with a domain-native `valueText`. The precondition below is therefore unchanged and the first consumer is still the one named.
   ⚠️ Its reference implementation, `resources/public-runtime/components/ProgressIndicator.vue`, is **better
@@ -474,7 +474,7 @@ quote it*, now on its fourth gate.
 
 ## Notes
 
-- Free-tier / trial mechanics, self-serve signup + email verification, plan upgrade/downgrade/proration, dunning, invoices/receipts, seat-management UX, and account deletion/offboarding export are **partly covered** by the Onboarding (#25), Pricing (#24), and GDPR (#12) docs — audit those three for concrete gaps before Phase-1 billing/onboarding code, rather than treating them as wholly-missing here.
+- Free-tier / trial mechanics, self-serve signup + email verification, plan upgrade/downgrade/proration, dunning, invoices/receipts, seat-management UX, and account deletion/offboarding export are **partly covered** by the Onboarding (#25), Pricing (#24), and GDPR (#12) docs — audit those three for concrete gaps before Phase-1 billing/onboarding code, rather than treating them as wholly-missing here. ⏸️ **Held (`M94`, 2026-09-14):** part of the held `gdpr-legal-posture` item, and it re-enters with that item.
 - Items that competitor products treat as table-stakes but this product deliberately declines (self-hosting, SMS/IVR channels, general app-builder scope, real-time co-editing) are **non-goals** in `docs/PRD.md` §7 and are intentionally *not* listed here.
 
 ## ⚠️ Merge-gate review of `main` → `phase1-completion` (2026-08-18)
@@ -646,7 +646,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   honest fix is a wrap or shrink affordance on a design-system component with **nine** consumers, and
   `flex-wrap` is foreclosed for the topnav instance (`.topnav` is a fixed 64px with `flex-shrink: 0`),
   so it needs its own increment with a story, a DSR note and a re-measure of every consumer under the
-  Linux font stack. **Live**, and now reproducible locally. Filed by `M19`. **Awaits D28.**
+  Linux font stack. **Live**, and now reproducible locally. Filed by `M19`. **Awaits D28.** **Tier: early-testing.**
   ⛔ **CORRECTED BY `M87` (2026-09-08) — THE CENSUS, ONE CANDIDATE REMEDY AND THE 30px ARE ALL WRONG, AND
   THE REASON THE HONEST FIX WAS RULED OUT IS STALE.** The `M78` row that measured this is now closed and its
   findings are here rather than one document away.
@@ -749,7 +749,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   become `runFor()` calls** — `SendWelcomeEmail:109` and `ImpersonationService:119` apply a specific user
   under a switched tenant, which `runFor()` deliberately nulls, so a retrofit needs a user-carrying variant
   or must stay hand-rolled. That is why this is filed rather than swept: it is twelve tenant-boundary call
-  sites, and rewriting a working one is its own increment with its own gate run. Filed by `M3`. **Latent** — needs the enclosed work to fail at the database, and each site's work is a narrow read or write that does not today, judged by `M65`.
+  sites, and rewriting a working one is its own increment with its own gate run. Filed by `M3`. **Latent** — needs the enclosed work to fail at the database, and each site's work is a narrow read or write that does not today, judged by `M65`. **Tier: during-testing.**
 
 - ✅ **FIXED ON THIS BRANCH, recorded because it was the review's only surviving non-documentation-hygiene
   `blocker` and because it is the contract an integrator builds against.** The docs described a single
@@ -831,7 +831,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   whole projected row instead was **rejected on the merits**: two respondents answering a short form
   identically is ordinary, and a false match is a row that never arrives and nobody notices — trading a
   visible duplicate for an invisible loss. The fix is to make the editor pre-bind that column for a new
-  tabular rule (and say why), which lands in `resources/js/Pages/` — **Lane A's column**. Filed by `M5`. **Live** — reachable today: a rule mapping no Submission ID column has no dedupe key, so an unconfirmed retry appends a second row, judged by `M65`.
+  tabular rule (and say why), which lands in `resources/js/Pages/` — **Lane A's column**. Filed by `M5`. **Live** — reachable today: a rule mapping no Submission ID column has no dedupe key, so an unconfirmed retry appends a second row, judged by `M65`. **Tier: early-testing.**
 
 - **`minor` · M5's reconciliation asks "is this SUBMISSION in the destination", not "is THIS DELIVERY's row in
   the destination", so two rules writing one submission to one table can collapse to a single row.** Filed by
@@ -844,14 +844,14 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   **Narrow, and in the safe direction** — one row too few beats an unbounded ladder of duplicates — but it is
   a behaviour change beyond the one M5 exists for. The fix would be a column carrying the delivery id, which
   means writing into a column the tenant did not map, so it is a rule-editor question rather than an adapter
-  one. Revisit if a tenant reports a missing row on a table fed by two rules. Filed by `M5`. **Latent** — needs the probe to be fired from the one path that can settle a delivery on another row, judged by `M65`.
+  one. Revisit if a tenant reports a missing row on a table fed by two rules. Filed by `M5`. **Latent** — needs the probe to be fired from the one path that can settle a delivery on another row, judged by `M65`. **Tier: during-testing.**
 
 - **`minor` · A 5xx that arrives AFTER the provider committed is still re-driven.** Filed by **M5
   (2026-08-19)**. M5 treats a received HTTP status as determinate, because both providers' contracts say a
   5xx means the write was not applied, and routing the far more common arm through an extra read to guard the
   exception would cost every transient error a round trip. **Latent, and strictly narrower than what M5
   closed**: it needs the provider to commit and *then* answer 5xx. Revisit if a tenant ever reports a
-  duplicate whose delivery row carries a 5xx rather than a `[transport_error]` excerpt. Filed by `M5`. **Latent** — needs the provider to commit the write and then answer 5xx, which nothing in this tree can produce, judged by `M65`.
+  duplicate whose delivery row carries a 5xx rather than a `[transport_error]` excerpt. Filed by `M5`. **Latent** — needs the provider to commit the write and then answer 5xx, which nothing in this tree can produce, judged by `M65`. **Tier: during-testing.**
 
 - **`minor` · `SlackConnector::deliver()` has the same non-idempotent shape and is deliberately not covered.**
   Filed by **M5 (2026-08-19)**, and named in the adapter's own docblock rather than left to be discovered.
@@ -859,7 +859,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   message twice. Out of scope **on the merits**: a repeated chat message is noise a human dismisses in the
   channel it arrived in, where a repeated spreadsheet row silently biases every count taken over the tenant's
   dataset. And the fix would not be M5's — asking Slack "did my message land?" means reading channel history,
-  a scope this connector does not request and should not acquire to dedupe its own retries. Filed by `M5`. **Live** — reachable today and declined on the merits rather than absent: a lost answer followed by a retry posts the message twice, judged by `M65`.
+  a scope this connector does not request and should not acquire to dedupe its own retries. Filed by `M5`. **Live** — reachable today and declined on the merits rather than absent: a lost answer followed by a retry posts the message twice, judged by `M65`. **Tier: during-testing.**
 - ✅ **CLOSED BY `M6` (2026-08-19) — `major` · ~~AN IRREVERSIBLE PROVIDER-SIDE TOKEN ROTATION IS COMMITTED
   INSIDE A ROLLBACK-ABLE TRANSACTION~~ AND `major` · ~~`ensureFresh()` TAKES NO LOCK~~.** Taken together
   because they are **one mechanism, not two**: both are answered by making "refresh one grant" a single
@@ -905,7 +905,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   a two-phase protocol **no provider here offers** — a rotation the client can confirm, or a grace period in
   which the previous refresh token still works. **Revisit trigger: the first provider that offers either.**
   Recorded in ADR-0009 §D6's M6 amendment as well, so the residual is visible from the decision and not only
-  from the backlog. Filed by `M6`. **Latent** — needs a database failure inside the one-UPDATE window between the provider committing a rotation and us storing it, judged by `M65`.
+  from the backlog. Filed by `M6`. **Latent** — needs a database failure inside the one-UPDATE window between the provider committing a rotation and us storing it, judged by `M65`. **Tier: during-testing.**
 
 - **`minor` · The setup-time directory has no pre-flight refresh**, so an ordinary token expiry tells the
   tenant to reconnect a healthy account — `app/Services/Connectors/TabularDestinationDirectory.php:46,68`,
@@ -1223,11 +1223,11 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   ⚠️ Also unrecorded: `discardRow` → `deleteRow` deletes the row's `media_queue` entries in the same
   transaction, so a blob picked during the review dies here too, with **no** grace window — the other
   half of the media row below.
-- **`minor` · `replay.ts:223-228` hardcodes `conflict_code = 'form_updated'` on a client-side version
-  guard.** Correct today — it really is a form-version drift, decided with no request made — but M14 turned
+- ~~**`minor` · `replay.ts:223-228` hardcodes `conflict_code = 'form_updated'` on a client-side version
+  guard.**~~ Correct today — it really is a form-version drift, decided with no request made — but M14 turned
   `conflict_code` into **user-visible copy input** (`lib/conflict-notice.ts` keys the respondent's sentence
   off it), so this literal is no longer a debug tag. Nothing is wrong now; the hazard is that the next person
-  to add a client-side park has to know that. **Not live — a maintenance trap.** Filed by `M14`. **Not live** — the hardcoded literal is reached only on an actual version change, which is the one case it names correctly, judged by `M65`.
+  to add a client-side park has to know that. **Not live — a maintenance trap.** Filed by `M14`. **Not live** — the hardcoded literal is reached only on an actual version change, which is the one case it names correctly, judged by `M65`. ✅ **CLOSED BY `M94` (2026-09-14) — NOT LIVE.** The hard-coded `form_updated` in the offline replay is reached only inside its own version-mismatch guard, which is exactly what that code means, and the notice copy is keyed on it deliberately.
 - ✅ **CLOSED BY `M67` (2026-09-03) — `minor` · ~~The authenticated autosave's 409 branch tells a
   `submission_conflict` caller "already been submitted".~~** The binary split is now a keyed map over the
   three codes this channel can return, with the finalized sentence as an explicit default for a cause the
@@ -1376,7 +1376,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   Still true, and still filed separately below: `useSyncOutbox`'s quota line blames the outbox for storage
   this consumed. Filed by `M21`.
 
-- **`minor` · A media pick made during a conflict review is protected only by the reaper's grace window.**
+- ~~**`minor` · A media pick made during a conflict review is protected only by the reaper's grace window.**~~
   Filed 2026-08-26 by M22, **the moment M22 decided not to fix it.** `lib/reap.ts` spares an orphaned blob
   while some answer document still names its `local:` ref — but the conflict-review session runs
   `createAutosave` with `enabled: false` (Increment G8c, deliberately: a transient review must not clobber
@@ -1402,14 +1402,14 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   stays green under exactly that mutation. So the smaller option also edits `lib/replay.ts`, which is
   re-type-checked under `tsconfig.sw.json` — the blast radius the row assigned to its *larger* option.
   ⚠️ **And protecting the blob from the reaper does not protect it from the discard**: the conflict-review
-  row above deletes the same `media_queue` entries outright on any `ApiError`, with no grace window.
+  row above deletes the same `media_queue` entries outright on any `ApiError`, with no grace window. ✅ **CLOSED BY `M94` (2026-09-14) — RE-HOMED TO `uploading-import`.** Protecting a media pick made during conflict review changes how picked files are kept, which is the held media work; it re-enters with that item on the user's go-signal, and the text above is what that item owes.
 
 - **`minor` · The storage-quota line counts strangers' submissions.** `useSyncOutbox` computes `queued` from
   the device-wide count and renders *"N responses waiting to send"*, while `mine`, `earlierUnsent` and
   `conflictHere` beside it are all visit-scoped — so a respondent can read three consecutive sentences whose
   numbers only reconcile if they count a stranger's rows. Filed rather than fixed: it discloses a count and
   nothing else, which is exactly the shape ADR-0021 sanctioned for an earlier visit, and touching the
-  device-wide count risks the boot drain that ADR-0021 makes load-bearing. **Live.** Filed by `M21`. **Awaits D26.**
+  device-wide count risks the boot drain that ADR-0021 makes load-bearing. **Live.** Filed by `M21`. **Awaits D26.** **Tier: early-testing.**
 
 - ~~**`minor` · Resume-link shells sit in Cache Storage, and the brand refresh re-fetches them.**~~ A resume
   link is a path under `/f/`, and `sw.ts` NetworkFirst-caches every same-origin navigate under `/f/` into
@@ -1849,7 +1849,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   second enum, and **which is right is a design decision rather than a fix** — an enum would put the nine
   codes in one place but three of them are owned by an exception that computes its own `code()`.
   ⚠️ **The honest sizing is that this is worth less than it looks** — an integrator can already branch on
-  `status`, which IS now enumerated, and `error.code` only narrows the `error` case. **Live.** Filed by `M69`.
+  `status`, which IS now enumerated, and `error.code` only narrows the `error` case. **Live.** Filed by `M69`. **Tier: during-testing.**
 
 - ~~**`minor` · The `@throws` contract sweep cannot see the loss of ONE of two declared causes.**~~
   ⛔ **CLOSED — `M78` (2026-09-06), AND NOT AS SPECIFIED. THE MECHANISM IS REAL, ITS CONSEQUENCE IS ALREADY
@@ -1934,7 +1934,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   collect offline" implies. **Not a defect and deliberately not changed**: widening an ability map is an
   authorization decision, and `ApiAbilities` records four separate refusals to widen an existing ability for
   exactly this reason (a new ability cannot be held retroactively; a widened one is). Recorded so the
-  decision is taken deliberately if a Reviewer-facing encoder client is ever built. Filed by `M13`. **Not live** — a recorded authorization decision with five standing refusals to widen beside it, not a reachable defect, judged by `M65`.
+  decision is taken deliberately if a Reviewer-facing encoder client is ever built. Filed by `M13`. **Not live** — a recorded authorization decision with five standing refusals to widen beside it, not a reachable defect, judged by `M65`. **Tier: during-testing.**
 - ~~**`minor` · `promote()` re-asserts the version is published BEFORE the lock and never again under it.**~~
   ✅ **DONE — M85 (2026-09-07). THE EVIDENCE HELD; ONE CLAUSE OF THE ROW'S HESITATION IS HALF FALSE, AND
   THE ROW NAMED TWO INSTANCES OF FOUR.** Both re-assertions now run inside the transaction, under the
@@ -2001,7 +2001,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `SubmissionRefusalResponseExtension` is keyed on the exception CLASS and cannot know which of a family's
   causes a given route raises, so `M67`'s 409 honestly says an operation raises a subset. Narrowing per
   route needs a cause-level seam Scramble does not have; inventing one is a design decision, not a fix.
-  Filed by `M67`.
+  Filed by `M67`. **Tier: during-testing.**
 
 - **`minor` · Four P3a refusal cases assert the exception CLASS and never the message.**
   `tests/Feature/Submissions/SubmissionDraftServiceTest.php` — the P3a section's `toThrow(
@@ -2011,7 +2011,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   so only the message separates them on the wire. Those four cases are safe **today** for a reason that is
   not written down anywhere near them (the resolve finds the row, so `clientUuidClaimed()` is unreachable on
   that path), which is precisely the shape that stops being true after an unrelated change. Not a live
-  defect; a live blind spot. M12's own seven refusal cases all assert the message. Filed by `M12`. **Not live** — a test-coverage question rather than a defect: each fixture can raise only its intended cause in today's tree, judged by `M65`.
+  defect; a live blind spot. M12's own seven refusal cases all assert the message. Filed by `M12`. **Not live** — a test-coverage question rather than a defect: each fixture can raise only its intended cause in today's tree, judged by `M65`. **Tier: after-launch.**
 
 - ✅ **CLOSED BY `M74` (2026-09-05) — `minor` · ~~Every object-valued answer that the piping layer excludes renders as `json_encode` machine
   noise on the inbox, the export and the PDF — because those three surfaces have no exclusion and no
@@ -2105,7 +2105,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   including `BackfillTest`'s own helper, whose review fixture happened to carry `'status' => 'approved'` and
   was green before and after. Filed by `M1`.
 - **`minor` · `gamification:backfill --dry-run` cannot reveal a mis-scoring defect, by construction.**
-  Filed by `M24` rather than fixed, because it is a reporting-shape row in `BackfillTally` and the command,
+  Filed by `M24` rather than fixed, because it is a reporting-shape row in `BackfillTally` and the command, **Tier: during-testing.**
   not a scoring row. `BackfillTally` (`app/Services/Gamification/BackfillTally.php:27-36`) carries
   `scanned / created / existing / unmapped / uncredited` and **no per-rule breakdown**, so the rehearsal the
   command advertises (`BackfillGamificationCommand.php:49` — *"real numbers, no writes"*) prints a clean,
@@ -2130,7 +2130,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   outside the row's census of five, and **nothing rendered it**: `Dashboard.vue` declared `rank` and `of` and
   its card shows points, badges and streak. Both fields are deleted rather than gated. Filed by `M1`.
 - **`minor` · the dashboard card ranks the whole tenant to compute three numbers that need no ranking.**
-  Filed by `M26` rather than fixed. `DashboardController::gamificationProgress()` calls
+  Filed by `M26` rather than fixed. `DashboardController::gamificationProgress()` calls **Tier: before-launch.**
   `LeaderboardService::standingFor()`, which is a roster read plus two grouped aggregates over the whole
   workspace, and its own cost paragraph justifies that expense **because the card needed a rank**. §D13
   deleted `rank` and `of` from that payload, so the three surviving fields — points, badges, streak — are
@@ -2420,7 +2420,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   else's DNS outage into a sign-in outage for every new joiner at that workspace. `verify()` already refuses to
   demote on a `LookupFailed` (the null-versus-empty-array contract), and that is the floor rather than the whole
   answer: N consecutive definitive `NotFound`s is the shape to consider, and ADR-0012 explicitly defers the same
-  question for custom hosts. Carried as `docs/security-threat-model.md` residual 32. Filed by `M18`. **Latent** — needs control of a verified domain to change hands; nothing re-reads a verified domain on a cadence and no scheduler runs on the box, judged by `M65`.
+  question for custom hosts. Carried as `docs/security-threat-model.md` residual 32. Filed by `M18`. **Latent** — needs control of a verified domain to change hands; nothing re-reads a verified domain on a cadence and no scheduler runs on the box, judged by `M65`. **Tier: before-launch.**
 
 - **`minor` · The tenant-facing SSO domains card on `/settings/sso` does not exist, so verification is
   operator-assisted.** Filed 2026-08-26 by M18. ⚠️ **THIS IS A LANE A ROW AND THAT IS STRUCTURAL, NOT A
@@ -2435,7 +2435,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   release should each emit a `domain`-style audit row in the same increment**. `SsoConnectionPresenter::page()`
   gains a `domains` key; `SsoFailureRow` needs no change (its `reason` is a plain string with `reason_label`
   composed server-side). Note the refusal's own hint deliberately names the DNS TXT record rather than a screen,
-  precisely so it was not a lie before this row lands — update it to name the card once it does. Filed by `M18`. **Live** — the tenant-facing card is still absent, so tenant-side verification stays unreachable without an operator, judged by `M65`.
+  precisely so it was not a lie before this row lands — update it to name the card once it does. Filed by `M18`. **Live** — the tenant-facing card is still absent, so tenant-side verification stays unreachable without an operator, judged by `M65`. **Tier: during-testing.**
 
 - **`minor` · `MemberController::invite()` validates `['required', 'email', 'max:255']` and a role, with no
   domain-ownership check.** Filed 2026-08-26 by M18. The same root on the invitation door, and the first link in
@@ -2446,7 +2446,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   obvious shape to reuse (`SsoDomainService::isVerifiedFor()` is already phrased over an address), but applying
   it here is a **product decision, not a cleanup**: today any workspace may invite anyone, including
   contractors and personal addresses, and gating that on DNS would change what invitation means for every
-  workspace rather than only for SSO ones. Whoever takes it decides that first. Filed by `M18`. **Live** — reachable today: invite validates address shape only, so a workspace can send a branded invitation to an address it does not control and occupy that identity, judged by `M65`. **Awaits D33.**
+  workspace rather than only for SSO ones. Whoever takes it decides that first. Filed by `M18`. **Live** — reachable today: invite validates address shape only, so a workspace can send a branded invitation to an address it does not control and occupy that identity, judged by `M65`. **Awaits D33.** **Tier: early-testing.**
 
 - **`minor` · Self-registration remains a way to occupy an address in a domain you do not control.** Filed
   2026-08-26 by M18, recorded because §D34's *"an active membership is the grandfather"* reasoning depends on
@@ -2455,7 +2455,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   it. ⚠️ **Materially weaker than what M18 closed, and the difference is what makes it a `minor`**: the
   registrant sets their own password and **nothing forges `email_verified_at`**, so the account squats an
   address without minting a false claim about mailbox control — which is the property `identityIsEstablished()`
-  reads. Older than SSO, and any fix touches the ordinary registration path for everybody. Filed by `M18`. **Live** — reachable today by anyone who can reach the registration form, judged by `M65`. **Awaits D34.**
+  reads. Older than SSO, and any fix touches the ordinary registration path for everybody. Filed by `M18`. **Live** — reachable today by anyone who can reach the registration form, judged by `M65`. **Awaits D34.** **Tier: early-testing.**
 - ✅ **CLOSED BY `M9` (2026-08-24) — `major` · ~~SSO adopts an existing account whenever a PENDING INVITATION exists, so an SSO-entitled
   admin can be signed in as any stranger they invited — no emailed token required.** Found by M8's
   adversarial pass and **verified against the code by hand before filing**; it is the same conflation M8
@@ -2594,7 +2594,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `SsoUserProvisioner::createUser()` defends against one file away and which nobody carried across.
   ⚠️ **It bears on `D5`/`D12`**: the series-exit clause counts open `major` rows, and this one was open and
   invisible for the entire time that count read zero. Closed by `M76`. Filed by `M76`.
-- **`minor` · M8's GRANT removed an accidental backstop that a mutation argument was leaning on.**
+- ~~**`minor` · M8's GRANT removed an accidental backstop that a mutation argument was leaning on.**~~
   `meridian_auth` used to hold `SELECT, UPDATE` on `users` **and nothing else**, and both
   `MemberSearchArm`'s docblock and RBAC §9 cited that as the reason swapping the arm to `pgsql_auth`
   *"fails LOUDLY (11 cases red) instead of silently returning every tenant's members"*. Since
@@ -2602,7 +2602,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   deleted, and nothing is broken today — `SearchMemberConnectionTest`'s three STRUCTURAL pins never relied
   on the database refusing anything. Filed so that **any future proposal to weaken one of those pins is
   read against this**, not against the older belief that a wrong connection cannot execute the query.
-  Recorded as residual 31 in `docs/security-threat-model.md`. Filed by `M8`. **Not live** — a record of a decision, and its own text says nothing is broken today, judged by `M65`.
+  Recorded as residual 31 in `docs/security-threat-model.md`. Filed by `M8`. **Not live** — a record of a decision, and its own text says nothing is broken today, judged by `M65`. ✅ **CLOSED BY `M94` (2026-09-14) — NOT LIVE.** A record rather than work: both prose sites that leaned on the old backstop are corrected, in `MemberSearchArm`'s docblock and in the RBAC design's §9, and the residual is threat-model §9 item 31.
 - **`minor` · `users.last_active_tenant_id` has no writer anywhere in `app/`.** Found while surveying
   candidate signals for M8's identity predicate: the column reads exactly like *"this identity has been
   used"* and would have been a fifth arm, but its only three references in the whole application are
@@ -2610,7 +2610,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   migration calls it *"UX convenience only (default tenant on next login); NOT authoritative for any
   authorization decision"* — which is a description of a feature that was never wired. **Either wire it
   (one write at session start, and the default-workspace convenience it promises becomes real) or drop the
-  column**; leaving it is how a future increment reaches for it as a signal and gets NULL for everybody. Filed by `M8`. **Latent** — needs a future increment to reach for the column as a signal; today nothing writes it and nothing reads it meaningfully, judged by `M65`.
+  column**; leaving it is how a future increment reaches for it as a signal and gets NULL for everybody. Filed by `M8`. **Latent** — needs a future increment to reach for the column as a signal; today nothing writes it and nothing reads it meaningfully, judged by `M65`. **Tier: after-launch.**
 - ✅ **CLOSED BY `M66` (2026-09-03) — `minor` · ~~`EnforceTenantTwoFactor` is absent from the `/api/v1`
   token-mint group.~~** Mounted on Group A after `verified`, so an unenrolled member under enforcement can no
   longer mint a bearer from a session that is bounced off every page. Group B stays ungated for the reason
@@ -2707,7 +2707,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   central-host caller — or add a `#[RequiresTenantContext]`-style assertion the Fortify-group middlewares
   can carry. **Not live** — no defect is open in the tree today; both known readers are correct. Filed as a
   trap because it has now produced a wrong implementation twice and the second one was green.
-  Filed by `M68`.
+  Filed by `M68`. **Tier: after-launch.**
 
 - ✅ **CLOSED BY `M66` (2026-09-03) — `minor` · ~~Three admin POSTs bind `{tenant}` with no `whereUuid`.~~**
   `suspend`, `reactivate` and `assign-plan` now carry `->whereUuid('tenant')` like the `show` and
@@ -2988,13 +2988,13 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   ⚠️ **`WebhookFormModal.vue:110-116` WAS CHECKED INDIVIDUALLY AND IS NOT THE SAME DEFECT** — it iterates
   the unfiltered `eventTypes` prop, so rendered already equals sendable there. Filed by `M1`.
 
-- **`minor` · The delivery-rule modal's channel-refresh button is the same unguarded shape, GET-only.**
+- ~~**`minor` · The delivery-rule modal's channel-refresh button is the same unguarded shape, GET-only.**~~
   `resources/js/components/integrations/RuleFormModal.vue:350-359` — a `:loading`-bound `MdsButton` whose
   `@click` reaches a raw `fetch`, with the component's own `channelsLoaded && !force` re-entry check
   bypassed by `force = true`. `MdsButton`'s repaired guard now stops the duplicate click, so this is
   **not live**; it is filed because the row above it was closed on the argument that the *side effect* is
   what makes a button dangerous, and the next fetch-backed button written in that file should not be
-  written this way. Fix is the same one-line `if (channelsLoading.value) return;`. Filed by `M23`. **Not live** — the repaired button guard already stops the duplicate click, exactly as the row itself says, judged by `M65`.
+  written this way. Fix is the same one-line `if (channelsLoading.value) return;`. Filed by `M23`. **Not live** — the repaired button guard already stops the duplicate click, exactly as the row itself says, judged by `M65`. ✅ **CLOSED BY `M94` (2026-09-14) — NOT LIVE.** The channel-refresh button's own loading state already ignores a second click, and the call is a read with no side effect, so no defect is reachable.
 - **`minor` · Thirteen Vitest stubs across four files are silently inert.**
   `resources/js/Pages/submissions/show.test.ts:109-113,266-270` · `resources/js/components/sso/cards.test.ts:37`
   · `resources/js/components/sso/SsoPolicyCard.test.ts:84` · `resources/js/Layouts/AppLayout.test.ts:47` —
@@ -3007,7 +3007,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   case reports 1 call under the `MdsButton` key and 2 under `Button`. **Not live** — no production defect —
   but every one of those four suites is exercising more component than it says it is, and any of them could
   be silently vacuous the way M23's nearly was. ⚠️ Fixing them changes what four suites actually cover, so
-  it is its own increment, not a rename. Filed by `M23`.
+  it is its own increment, not a rename. Filed by `M23`. **Tier: after-launch.**
 - **`minor` · A semantic token is no guarantee of a visible element, and one more instance is probably out
   there.** M23 added a gate banning *primitive* ramp references in application code, then immediately found
   the identical defect wearing a *semantic* token: `LogicRail.vue`'s `.rail__dot` was
@@ -3015,7 +3015,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `--mds-neutral-50`** — 1.000:1, fixed in the same increment. The general check is "does every painted
   element differ from the ground it actually lands on, in both themes", which needs the resolved ancestor
   chain and is not a source-text scan. **Not live** as far as two hand-audits reach; filed because the gate
-  that shipped covers the cheap half only and must not be read as closing the class. Filed by `M23`.
+  that shipped covers the cheap half only and must not be read as closing the class. Filed by `M23`. **Tier: after-launch.**
 
 ### Test suite & CI gates
 
@@ -3112,7 +3112,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   path directly and would redden if the coercion started mattering. Filed because the `''` is a **cast
   artefact rather than a value anybody chose**, and a reader who assumes it is meaningful will mis-model the
   guard. **Deliberately left by M31** — changing the return type touches every case in the file, which is a
-  larger diff than the finding justifies. **Latent.** Filed by `M31`.
+  larger diff than the finding justifies. **Latent.** Filed by `M31`. **Tier: after-launch.**
 - ~~**`major` · The 16-page responsive scan asserts nothing about which page it landed on.**~~
   ✅ **DONE — M25 (2026-08-26), AND THE DEFECT WAS MEASURED LIVE RATHER THAN ARGUED.** One assertion per
   *loop* — `expect(page.url(), …).toContain(p.path)`, which is `support/console.ts:34`'s idiom rather
@@ -3370,7 +3370,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   asymmetry **inside the very test family the closed row above held up as the model**. **Latent.**
   `routesThrottledBy()` in `tests/Feature/Auth/RateLimiterBindingTest.php` is the reusable helper.
   **Deliberately left by M30** — `tests/Feature/Sso/` is Lane B's most active subsystem and that increment
-  was already crossing the boundary. Filed by `M30`.
+  was already crossing the boundary. Filed by `M30`. **Tier: after-launch.**
 - **`minor` · Two SSO test files justify a real assertion with a rationale that is false on this framework version.**
   `SsoLoginWebTest.php:286-287` and `SsoLoginCompletionWebTest.php:466-469` both say a `throttle:` alias
   naming an unregistered limiter *"resolves to an UNLIMITED PASSTHROUGH"*. **MEASURED (M30):** on
@@ -3378,7 +3378,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   instead — true on Laravel ≤ 9, false here. **The tests are still worth having; the stated reason is not
   the true one**, and this project has recorded three times that a false claim about a control is worse than
   a missing one because it stops the next reader looking. **Not live** — a comment. **Deliberately left by
-  M30** for the same lane-boundary reason as the row above, and filed so the correction is not lost. Filed by `M30`.
+  M30** for the same lane-boundary reason as the row above, and filed so the correction is not lost. Filed by `M30`. **Tier: after-launch.**
 - ~~**`major` · Every accepted write in the answer-edit concurrency suite compares `null === null`.**~~
   ✅ **DONE — M31 (2026-08-27), AND THE ROW'S OWN PRESCRIBED PROBE WAS ALREADY CAUGHT.** The headline held
   exactly: `SubmissionAnswerFactory` stamps no `answers_content_checksum`, so every fixture row is the
@@ -3604,7 +3604,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   refuses at the route constraint, and its suspend case uses a real tenant), so the precondition is *the
   next denial case written against a model-bound console route with a synthetic id*. The durable fix is
   probably naming the three console aliases in the priority array so declared order is resolved order,
-  which is a change to the console's middleware pipeline and wants its own increment. Filed by `M67`.
+  which is a change to the console's middleware pipeline and wants its own increment. Filed by `M67`. **Tier: after-launch.**
 
 
 - ✅ **CLOSED BY `M63` (2026-09-02) — `minor` · ~~The `can:` arm on `GET /api/v1/analytics/report` — the non-export twin — is asserted by nothing.~~**
@@ -3716,7 +3716,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   first place the two payload shapes Group B does not contain become live — the three-part
   `'can:create,'.Submission::class.',form'` (5 routes) and two `can:` middlewares on one route (2 routes).
   M63 measured those shape counts and reviewed none of them. **Whoever takes it should split it: land the
-  derived checks first and decide each finding on its own, then take the manifest as its own increment.** Filed by `M63`. **Not live** — a missing gate rather than a defect, which is this corpus's own not-live shape, judged by `M65`.
+  derived checks first and decide each finding on its own, then take the manifest as its own increment.** Filed by `M63`. **Not live** — a missing gate rather than a defect, which is this corpus's own not-live shape, judged by `M65`. **Tier: after-launch.**
 
 - ✅ **CLOSED BY `M64` (2026-09-02) — `minor` · ~~`D5`'s exit bar reads MET but is still not OPERABLE on its own terms, and the gap is provenance.~~** Filed by **M63 (2026-09-02)**, measured rather than asserted, and **carrying a user decision of
   record taken the same day: keep going and make the bar real first.** `state.php` counts **zero open
@@ -3803,7 +3803,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   container to resolve the trunk sha. ⚠️ **And wiring it changes what a close-out is OBLIGED to do**, since
   the file goes stale by construction on every merge that touches a row: that is a decision about protocol
   rather than a fix, which is why it is filed instead of taken. **Live** — the drift is reachable the moment
-  anyone edits the file by hand or closes a row without regenerating. Filed by `M65`.
+  anyone edits the file by hand or closes a row without regenerating. Filed by `M65`. **Tier: after-launch.**
 
 - **`minor` · `docs/backlog-triage.md` keeps a tier-1 citation exemption whose stated reason stopped being
   true in the same increment.** **`M65` falsified the reason and did not act on it.**
@@ -3814,7 +3814,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   REASON IS ARITHMETIC:** the ledger tier sits at 18 rotten against a ceiling of 18 with a strict `>`, so
   harvesting a second file's citations with zero headroom risks reddening the gate on a change that fixes
   nothing. Promoting it wants the ceiling brought down first, which is its own row's work. **Not live** — an
-  exemption kept for a superseded reason is a stale comment rather than a defect in the gate. Filed by `M65`.
+  exemption kept for a superseded reason is a stale comment rather than a defect in the gate. Filed by `M65`. **Tier: after-launch.**
 
 - **`minor` · The liveness marker is gated for presence and nothing checks that a verdict is CORRECT — and
   the error rate of judging one is now measured rather than assumed.** **`M65` produced the backfill and
@@ -3829,7 +3829,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `loop assess` then refuses that row permanently and silently. ⚠️ **So the marker is a floor for scheduling
   and must never be read as a verified fact about the code**; `scripts/mutate.php` is what settles a row,
   and settling it is the job of whichever increment takes it. **Not live** — a stated limit of the gate,
-  filed so the next reader does not have to rediscover it. Filed by `M65`.
+  filed so the next reader does not have to rediscover it. Filed by `M65`. **Tier: after-launch.**
 
 - ✅ **CLOSED BY `M67` (2026-09-03) — `minor` · ~~`routes/api.php:114-116` describes a middleware ordering the priority sorter does not produce.~~**
   The claim is struck and the real order is now asserted, by execution rather than by reading:
@@ -3994,7 +3994,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   load-bearing rather than decorative: reverting one loop to the pre-M44 single-child drain reddens
   **only** the two-tenant case. Filed by `M32`.
 
-- **`minor` · Two `WebhookRetrySweepTest` cases were passing for a reason unrelated to their names.**
+- ~~**`minor` · Two `WebhookRetrySweepTest` cases were passing for a reason unrelated to their names.**~~
   **Found and FIXED by M44 (2026-08-29) while taking the row above** — filed here because it is a
   *separate* defect from the tenant-width one and would otherwise be invisible to any later search.
   Measured, not reasoned about: replacing `SweepWebhookRetriesJob::sweep()`'s body with a comment — a
@@ -4003,7 +4003,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the sweep. ⚠️ **`mutate.php` reported `CAUGHT` throughout, which is correct and is the trap**: one case
   did redden, so the aggregate verdict is green-lit while the vacuity is visible *only* in the printed
   RED list. **Read the red set, never just the verdict.** The asserted fan-out count fixes it as a side
-  effect — the same mutation now reddens **5 of 5**. Filed by `M44`. **Not live** — the defect it records was found and fixed by the same increment, and the fix is in the tree, judged by `M65`.
+  effect — the same mutation now reddens **5 of 5**. Filed by `M44`. **Not live** — the defect it records was found and fixed by the same increment, and the fix is in the tree, judged by `M65`. ✅ **CLOSED BY `M94` (2026-09-14) — NOT LIVE.** Fixed in the increment that found it: `WebhookRetrySweepTest` asserts the fan-out count, so a sweep that sends nothing turns the file red.
 
 - **`minor` · Every `MaintenanceJob` fan-out is proved one file at a time, so a future one inherits no
   coverage.** **Deliberately not built by M44 (2026-08-29)** — filed the moment it was decided. After
@@ -4042,7 +4042,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   ➕ **A grep-visibility note worth keeping:** `SweepTenantWebhookRetriesJob` appears **nowhere** under
   `tests/` — not once, not even in a comment — and `SweepTenantScheduledFormsJob`, `ReconcileTenantUsageJob`
   and `ReapTenantDraftsJob` appear only inside comment blocks. A child job class being un-greppable is itself
-  the tell that no test names it. Filed by `M44`. **Not live** — a coverage question about how the proof is written rather than a defect in the fan-outs themselves, judged by `M65`.
+  the tell that no test names it. Filed by `M44`. **Not live** — a coverage question about how the proof is written rather than a defect in the fan-outs themselves, judged by `M65`. **Tier: after-launch.**
 
 - **`minor` · `gamification:backfill --sync` reports failure after it has already committed every award.**
   `BackfillGamificationCommand.php:179-182` returns `self::FAILURE` on a non-balancing tally, but `:224` has
@@ -4057,7 +4057,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   ⚠️ **"The job side decided the opposite for the identical invariant" overstates it.** Neither side rolls
   back and neither throws; the job logs a non-balancing tally as a field while the command reports it as a
   non-zero exit status. The divergence is in the **operator signal**, not in two opposite transaction
-  postures — worth settling deliberately rather than by drift. Filed by `M32`. **Latent** — needs a rule to fail after the command has already committed every award, judged by `M65`.
+  postures — worth settling deliberately rather than by drift. Filed by `M32`. **Latent** — needs a rule to fail after the command has already committed every award, judged by `M65`. **Tier: during-testing.**
 
 - ~~**`minor` · No gate in this repository detects a component used in a template but never imported.**~~
   ✅ **DONE — M28 (2026-08-26).** `scripts/component-import-lint.php`, registered in `composer.json`
@@ -4141,7 +4141,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   **Positive control:** with the floors in place the container run of `controller-gate` exits 1 naming
   the mechanism, while all five still pass on the host at 97 · 113 · 31 · 113/121/0 · 180. Filed by `M1`.
 
-- **`minor` · Every hand-off prescribes a Pint command that scans ~40 fewer files than CI does.**
+- ~~**`minor` · Every hand-off prescribes a Pint command that scans ~40 fewer files than CI does.**~~
   Found by M36 while adding files to `scripts/`. Both lanes' hand-offs say
   `vendor/bin/pint --test app tests database` — **1375 files**. CI runs `composer run lint`, which is a
   **bare** `pint --test` with no paths and no `pint.json` in the repository — **1414 files**. The local
@@ -4149,7 +4149,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   of them passes locally and reddens CI. **Measured, not inferred**: M36's four floor edits are all in
   `scripts/`, all four were flagged by bare Pint, and none of them would have been seen by the
   prescribed command. **Live** — the fix is one word in two hand-off lines, but it is filed here because
-  the hand-offs are rewritten every increment and a fix that is not written down does not survive one. Filed by `M36`.
+  the hand-offs are rewritten every increment and a fix that is not written down does not survive one. Filed by `M36`. ✅ **CLOSED BY `M94` (2026-09-14) — NOT LIVE.** The hand-off and `CLAUDE.md` both prescribe bare `vendor/bin/pint --test`, the whole-project form CI runs, and no tracker or template still gives the scoped one.
 
 - ~~**`minor` · `fb-lane-c` is an abandoned worktree that every numbering check must now read past.**~~
   ✅ **DONE — M50 (2026-08-31), and the row's prescribed remedy was wrong in two ways.** Closed as part
@@ -4186,7 +4186,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   **Found by M42** while writing `scripts/state.php`, whose first draft had the identical defect: it
   split `docs/claims/lane-a.md` into 2,297 lines where the file has 2,273, because that corpus is full of
   check marks (`E2 9C 85`), and every line number it reported after the first one was wrong by a growing
-  offset. **Not fixed here — `tests/` is outside this increment's claim.** **Latent.** Filed by `M42`.
+  offset. **Not fixed here — `tests/` is outside this increment's claim.** **Latent.** Filed by `M42`. **Tier: after-launch.**
 
 - ~~**`minor` · `docs/gate-baselines.md` has no staleness signal, and it is stale right now.**~~ Its
   provenance names run `33175202807` (sha `454d9ba`, `M39`'s merge) while `M40` and `M41` have both
@@ -4247,7 +4247,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   building the gate and watching it go red on its own claim, which quotes lane-b's stale sentence in
   order to file it. **The fix is to give claim files a machine-readable namespace footer** — the shape
   `M42` used for the hand-off, where the token is positional rather than prose — which belongs with the
-  Rule 7 rewrite rather than bolted on. **Found by M42 (2026-08-29).** **Live.** Filed by `M42`.
+  Rule 7 rewrite rather than bolted on. **Found by M42 (2026-08-29).** **Live.** Filed by `M42`. **Tier: after-launch.**
 
 - **`minor` · `tracker-lint` R8 guards `CLAUDE.md` and cannot reach `PROGRESS.md`, which is the half that
   actually rotted.** Standing Rule 7(g) held a stale ADR number for twenty-three increments; R8 would not
@@ -4265,7 +4265,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   form has to be positional, as `M42` established after two failed attempts at prose. (2) It must not
   be pointed at `## Next Session`, which is still 214,073 bytes of dated hand-offs — that section has
   its own `major` row and has to move first. **Filed by M42 (2026-08-29)** at the moment it decided
-  not to fake it. **Live.** Filed by `M42`.
+  not to fake it. **Live.** Filed by `M42`. **Tier: after-launch.**
   ⚠️ **PREMISE CORRECTED BY `M70` (2026-09-04) — TWO OF THIS ROW'S THREE BELIEFS ABOUT THE TRACKER ARE
   NOW FALSE, AND ONE OF THEM IS ITS STATED BLOCKER.** (1) *"It must not be pointed at `## Next Session`,
   which is still 214,073 bytes … that section has its own `major` row and has to move first"* — that
@@ -4382,7 +4382,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   amended per case. M47 built ten controls that way and threw the harness away with the worktree.
   ⚠️ **So the row's scope is right and its shape is one size too small**: `--command=` covers the five
   lint gates and `state.php`, and leaves `tracker-lint`'s only interesting rule uncovered. Worth
-  splitting into two rows before either is taken. Filed by `M42`.
+  splitting into two rows before either is taken. Filed by `M42`. **Tier: after-launch.**
 
 - **`minor` · `scripts/next.php` takes each release's LEAD paragraph, and a lead paragraph is often a
   file manifest rather than the lesson.** The generator renders the newest four `## RELEASED` sections
@@ -4413,7 +4413,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   measurement rather than an argument, and with the lesson that **a `latent` verdict is a claim about the
   world holding still**. ⚠️ **And the bigger waste is in a place the row never looks:** `next.php`
   applies `clip()` to the summary alone and renders the HEADING unbounded — filed separately.
-  **Live.** Filed by `M42`.
+  **Live.** Filed by `M42`. **Tier: after-launch.**
 
 
 
@@ -4687,7 +4687,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   against for exactly this reason — it is why only one file is published. Candidates if it ever becomes
   reachable: publish only the component that takes a free-text URL, or assert the attribute set of the
   rendered button the way `BrandedMailRenderTest` now asserts the header's. **Live, and deliberately not
-  fixed.** Filed by `M57`. **Latent** — the row's own measurement says not reachable today — every call site passes an application-built URL; it needs a component taking free text, judged by `M65`.
+  fixed.** Filed by `M57`. **Latent** — the row's own measurement says not reachable today — every call site passes an application-built URL; it needs a component taking free text, judged by `M65`. **Tier: before-launch.**
 - ~~**`major` · The data dictionary states "No CHECK pairs the two" for `audits.user_id` / `acting_as_user_id`.**~~
   ✅ **DONE — M46 (2026-08-29). THE ONLY ONE OF THE EIGHT DOCUMENTATION-TRUTH ROWS WHOSE EVERY LINE NUMBER
   WAS STILL INTACT, AND THE ONLY ONE WHOSE PRESCRIBED REMEDY NEEDED NO CORRECTION.** `docs/data-dictionary.md`,
@@ -4781,7 +4781,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   table means recovering its real semantics, its PII classification and its RLS shape, which is its own
   row's worth of work and not a line in a preamble. ⚠️ **And the count it distorts is one this increment
   just corrected**, so the deviation sentence is right about the tables it names and still not a census —
-  the same failure, one level up, as the row `M58` closed. **Live.** Filed by `M58`.
+  the same failure, one level up, as the row `M58` closed. **Live.** Filed by `M58`. **Tier: after-launch.**
 - ~~**`major` · The README prescribes a design-system command that cannot work in the service it names.**~~
   ✅ **DONE — M59 (2026-09-02). THE ROW'S EVIDENCE HELD AT ALL FIVE CITATIONS AND ITS SEVERITY ARGUMENT
   WAS FALSE.** The block now builds in `node` and scans in the `e2e` glibc image, in `ci.yml`'s shape —
@@ -4896,7 +4896,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   it through `npx`, and it appears in no `package.json` — so the merge-blocking accessibility gate has an
   undeclared, unpinned, network-fetched dependency. `concurrently` and `wait-on` are at least present in
   the root tree. **The remedy is one devDependency line**, but it belongs with a decision about which
-  package owns it, and the axe job is the wrong place to be experimenting. **Live.** Filed by `M59`.
+  package owns it, and the axe job is the wrong place to be experimenting. **Live.** Filed by `M59`. **Tier: after-launch.**
 - **`minor` · The command gate reads `README.md` only, and three other documents carry runnable command
   blocks.** Filed by M59 (2026-09-02) at the moment the gate shipped, so its scope limit is a filed
   constraint rather than a comment nobody re-reads. `docs/TESTING-GUIDE.md`, `docs/ACCESS-MATRIX.md` and
@@ -4904,7 +4904,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   a bigger change than it looks**: the `docker compose exec <musl service>` arm is meaningful only where a
   document prescribes *this* stack, and a deployment runbook naming a production host would produce false
   positives on every line. **The corpus needs choosing before the constant is widened. Not live** — a
-  stated limit, filed so it cannot be forgotten. Filed by `M59`. **Not live** — a coverage gap that finds nothing today: none of the three documents carries a command any arm of the gate would fail, judged by `M65`.
+  stated limit, filed so it cannot be forgotten. Filed by `M59`. **Not live** — a coverage gap that finds nothing today: none of the three documents carries a command any arm of the gate would fail, judged by `M65`. **Tier: after-launch.**
 - ~~**`minor` · Share-slug LOOKUP is case-sensitive while share-slug STORAGE is lowercase-only, so a
   mixed-case share URL 404s instead of resolving.**~~
   ✅ **DONE — M61 (2026-09-02), AND THE ROW'S REMEDY WAS WRONG IN A WAY THAT WOULD HAVE SHIPPED A WORSE
@@ -4949,9 +4949,9 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the migration the closed row above said this remedy did not need.** Both statements are true and worth
   keeping side by side: the fix did not need it, and the fix is what makes the case for it. Fold
   `Rule::unique` and `isTaken()` together — they are one finding seen twice. **Live as a divergence, not as
-  a reachable defect.** Filed by `M61`. **Latent** — needs a mixed-case slug to exist, and every writer in the tree emits lowercase, judged by `M65`.
-- **`minor` · A pre-existing mixed-case `public_slug` row would have been taken dark by M61, and nothing in
-  the repository can tell whether one exists.** Filed by M61 (2026-09-02). Before the change such a row was
+  a reachable defect.** Filed by `M61`. **Latent** — needs a mixed-case slug to exist, and every writer in the tree emits lowercase, judged by `M65`. **Tier: after-launch.**
+- ~~**`minor` · A pre-existing mixed-case `public_slug` row would have been taken dark by M61, and nothing in
+  the repository can tell whether one exists.**~~ Filed by M61 (2026-09-02). Before the change such a row was
   reachable at its own casing; after it, `forLookup()` lowers every request and the row matches **nothing**.
   Unlikely — the regex has refused uppercase since I1 and the XLSForm importer normalizes — but the failure
   is silent, and "unlikely" is not "checked". M61 ran the go/no-go
@@ -4961,7 +4961,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   (`group by lower(public_slug) having count(*) > 1`). ⛔ **Reject the code-level alternative** — an
   exact-match-then-lowered two-step lookup costs a second query on every 404 probe, forks the resolution
   rule permanently, and still leaves the legacy row unreachable at its lowercase spelling. **Not live here;
-  a deployment obligation.** Filed by `M61`. **Not live** — a deployment obligation rather than a defect here; every writer in the tree emits lowercase, judged by `M65`.
+  a deployment obligation.** Filed by `M61`. **Not live** — a deployment obligation rather than a defect here; every writer in the tree emits lowercase, judged by `M65`. ✅ **CLOSED BY `M94` (2026-09-14) — NOT LIVE.** No database older than the lowercase-slug change will ever be deployed: a testing or production server starts empty and every writer lowercases the slug, so no mixed-case row can exist.
 - ~~**`minor` · Nothing proves the offline path M61's redirect exists to protect.** Filed by M61~~
   ✅ **DONE — M72 (2026-09-05), AND BUILDING THE PROOF FALSIFIED WHAT WAS BEING PROTECTED.** ⛔ **MEASURED
   AT THE BROWSER: after a mis-cased entry the shell cache holds TWO keys, not one** —
@@ -5012,7 +5012,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   out on `getByLabel('Email')`, which reads as a broken login page.
   **The remedy is a `docker/e2e` entrypoint wrapper or a documented recipe, plus a non-zero exit on an
   unknown subcommand.** ⚠️ **Sized `minor` only because CI is the authority for e2e** — but (1) is the
-  kind of green that gets quoted in a claim. **Live.** Filed by `M61`.
+  kind of green that gets quoted in a claim. **Live.** Filed by `M61`. **Tier: after-launch.**
 - ~~**`minor` · The audit spec credits the `submission` scope with two events that are emitted nowhere.**~~
   Filed by M46 (2026-08-29) rather than fixed, because the correct direction is a decision this increment
   should not take alone. `docs/audit-compliance-logging-spec.md` §1 lists `deleted` and `restored` for
@@ -5055,7 +5055,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the section that carried the false `audits` negative *does* enumerate CHECKs elsewhere and *does* state
   negatives deliberately, so a missing constraint there reads as an absent one. **The value is a census, not
   a sweep**: list the 36 unnamed constraints once, and let each table's section decide whether it owes a
-  mention. **Not live** — this is a coverage question, not a false statement. Filed by `M46`.
+  mention. **Not live** — this is a coverage question, not a false statement. Filed by `M46`. **Tier: after-launch.**
 - **`minor` · The citation-liveness gate cannot see a behaviour negative, and its ledger ceiling counts
   deliberately-preserved historical filings.** Filed by M46 (2026-08-29) at the moment the gate shipped, so
   its limits are a filed constraint rather than a comment nobody re-reads. Two of them. ⛔ **(1) It checks
@@ -5069,7 +5069,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   — three rows were closed here precisely because their citations were dead, and that evidence is kept. So
   the ceiling can only ratchet down as far as the historical floor. A refinement would exempt struck-through
   rows; it needs a parser that can tell a closed row from an open one, which is more than this gate should
-  grow on its first outing. **Not live** — both are stated limits, filed so they cannot be forgotten. Filed by `M46`.
+  grow on its first outing. **Not live** — both are stated limits, filed so they cannot be forgotten. Filed by `M46`. **Tier: after-launch.**
 - ~~➡️ **MOVED TO `docs/claims/decisions.md` AS `D6` (2026-08-28) — IT IS A DECISION, NOT A DEFECT.**~~
   ✅ **ANSWERED AND DONE — `M51` (2026-08-31). `D6` is in the `ANSWERED` section of
   `docs/claims/decisions.md`; read the outcome there, not here.** The identification and the published
@@ -5171,7 +5171,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   ⚠️ **The three "undocumented STATUS" rows below are a different defect and stay open** — the sync 403s,
   `promote`'s three 409 causes and `SyncSubmissionResultResource`'s bare strings are *missing* responses,
   not misdescribed ones, and nothing here documents a status Scramble still cannot infer. Filed by `M54`.
-- **`minor` · `loop assess` can only see what a row says about ITSELF, and two blind spots are now measured.**
+- ~~**`minor` · `loop assess` can only see what a row says about ITSELF, and two blind spots are now measured.**~~
   Filed by `M55` at the moment both were confirmed, so they are a stated limit rather than a comment
   nobody re-reads. **(1) A row's REMEDY COST is invisible.** `M54` was classified mechanical and its
   evidence was — four checks — but finding a remedy CI would accept took reading three vendor classes and
@@ -5182,7 +5182,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   24 of 78 rows carry a liveness marker at all, and silence deliberately does not stop, because treating
   an absent marker as dead would stop nearly everything and make the driver useless rather than careful.
   ⚠️ **So this raised a floor rather than closing a hole**, and the eligible count is a shortlist for a
-  human, never a work queue. **Not live** — both are stated limits of a tool, not defects in it. ➕ **`M65` CLOSED THE SILENCE HALF OF (2).** Every open row now records a verdict and the marker is gated, so an unmarked row is a failing test rather than something this driver has to be careful around — and `assess` now refuses MORE rows than before, which is the stop rule finally having something to read on every row rather than the driver degrading. The remedy-cost blind spot in (1) is untouched and stands.
+  human, never a work queue. **Not live** — both are stated limits of a tool, not defects in it. ➕ **`M65` CLOSED THE SILENCE HALF OF (2).** Every open row now records a verdict and the marker is gated, so an unmarked row is a failing test rather than something this driver has to be careful around — and `assess` now refuses MORE rows than before, which is the stop rule finally having something to read on every row rather than the driver degrading. The remedy-cost blind spot in (1) is untouched and stands. ✅ **CLOSED BY `M94` (2026-09-14) — NOT LIVE.** The unmarked-row half was closed by the liveness marker (`M65`); the fix-cost half is a limit no code can remove, and `scripts/loop.php` already prints it on every assess run.
 - ✅ **CLOSED BY `M68` (2026-09-03) — `minor` · ~~§20's `settings.key` catalog omits `security.require_two_factor`.~~**
   Both §20 passages are corrected and held against the enum by
   `tests/Feature/Docs/DocumentedSettingKeyDriftTest.php`.
@@ -5236,7 +5236,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   answer to the case that keeps happening.
   ⛔ **DELIBERATELY NOT BUILT IN M7 AND FILED HERE THE MOMENT THAT WAS DECIDED**: it lands in `scripts/`,
   adds a fifth lint gate and moves a gate baseline, which is a tooling row rather than the documentation
-  row that found it. **Not live** — this is a missing gate, not a defect. Filed by `M7`.
+  row that found it. **Not live** — this is a missing gate, not a defect. Filed by `M7`. **Tier: after-launch.**
 - **`minor` · A cluster of by-line citations went stale, several of them inside this branch.** Cheap
   individually, listed together so one pass closes them: `docs/adr/0007:88,:106,:112` (six citations into
   `TenantIsolation.php`, `Tenant.php`, `migration-lint.php`, `config/queue.php` — every one lands on
@@ -5258,7 +5258,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `docs/PRD.md:13` (the ADR index stops at 0014; 0015–0020 exist); `docs/TESTING-GUIDE.md:57,:639` (three
   forms and five forms, against four and six as seeded); `README.md:169-172` (contract and e2e are real
   merge-blocking gates, not stubs; there is no `deploy` stage in `ci.yml` at all); and this file's own
-  `:105` and `:459`. **Live**, all documentary. Filed by `M1`.
+  `:105` and `:459`. **Live**, all documentary. Filed by `M1`. **Tier: during-testing.**
 
 
 - ~~**`major` · Standing Rule 7(g) contains a 163,680-byte claim ledger that duplicates
@@ -5438,7 +5438,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   explicitly. ⚠️ **The residual is unchanged and has simply grown**: `decisions.md` has no form for a
   decision with no question attached, and there are now roughly a dozen of them in the archive rather
   than four. **Still not live** — nothing is wrong today; it is still a filing question, and the second
-  form belongs with the Rule 7 rewrite. Filed by `M45`.
+  form belongs with the Rule 7 rewrite. Filed by `M45`. **Tier: after-launch.**
 
 - ~~**`major` · `## Current Status` is now 42% of the tracker and its largest section.**~~
   ✅ **DONE — `M60` (2026-09-02), merged as PR #251 (`55c6409`, 6/6 green with real step counts —
@@ -5518,7 +5518,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `PROGRESS_ARCHIVE.md` from the filter, which restores an ~18-minute pipeline on every close-out and
   is exactly the cost `M39` measured and removed; **(b)** a second, tiny workflow running only
   `tracker-lint` on `push` to `main` with no filter, ~1 minute. **Promoted to `docs/claims/decisions.md`
-  as a run-cost decision, with (b) recommended.** The row stays open until that decision is answered. Filed by `M48`.
+  as a run-cost decision, with (b) recommended.** The row stays open until that decision is answered. Filed by `M48`. **Tier: after-launch.** **Awaits D8.**
 
 - ~~**`minor` · Nothing asserts that CI's checkout is deep enough for `R7` to see the commit that
   declares a surgery, and the failure presents as a missing marker rather than as a broken gate.**~~
@@ -5697,8 +5697,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   nothing. **Twice on consecutive increments means it is not a freak**, and a taker now has two logs to
   build the fetch/judge split against.
 
-- **`minor` · `scripts/tracker-lint-controls.php` proves R7 against synthetic histories, and nothing
-  proves it against a REAL GitHub `push` or squash.** Filed by `M49` (2026-08-31) at the moment the
+- ~~**`minor` · `scripts/tracker-lint-controls.php` proves R7 against synthetic histories, and nothing
+  proves it against a REAL GitHub `push` or squash.**~~ Filed by `M49` (2026-08-31) at the moment the
   harness shipped, so its limit is a filed constraint rather than a comment nobody re-reads. The
   eleven cases construct their own commit graphs, which is the only way to exercise the `push` arm at
   all — but a real `push` run differs in one way the fixture cannot reproduce: the payload is written
@@ -5725,7 +5725,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   on a real `push` run on `main`, with the base taken from `github.event.before`. That is `M47`'s and
   `M48`'s hand-forward and it is now spent. **What remains is narrower than this row states** and
   should be re-read as: nothing proves `R7` against a multi-commit trunk push, and nothing ever will
-  without deliberately breaking the merge protocol.
+  without deliberately breaking the merge protocol. ✅ **CLOSED BY `M94` (2026-09-14) — NOT LIVE.** `M60` discharged the proof with a real squash merge, and the one unproved shape, a multi-commit push to `main`, is refused by the pre-push guard, so no compliant merge can produce it.
 
 - ✅ **DONE — M71 (2026-09-05). THE HARNESS IS COMMITTED AND IT WAS PROVEN ON A REAL FIFTH SURGERY,
   WHICH THIS INCREMENT WAS FORCED INTO RATHER THAN CHOOSING.** `scripts/tracker-surgery.php` holds the
@@ -5891,7 +5891,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
  ⚠️ **And the cheaper half of the exposure is not in `sw.ts` at all:** the resume READ
   escapes caching only because its path prefix is `drafts/` rather than `f/`; `routes/api.php` now says so
   at the site, and one route rename or a consolidation of the two public groups re-opens it. **Live.**
-  Filed by `M70`. **Awaits D20.**
+  Filed by `M70`. **Awaits D20.** **Tier: early-testing.**
 
 - **`minor` · The audit spec's §1 table is asserted by nothing, and a static sweep cannot be the thing that
   asserts it.** `docs/audit-compliance-logging-spec.md` §1 calls itself *"a definitive, checkable list"*;
@@ -5911,7 +5911,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   read the `audits` table) or a per-service registry the emitters declare; both are their own increment.
   ⚠️ **The document side needs a discriminator too** — a naive scan of backticked tokens in the events
   column harvests `owner_user_id`, `is_super_admin` and `status`, which are column names in prose. **Live.**
-  Filed by `M70`.
+  Filed by `M70`. **Tier: during-testing.**
   ⛔ **PREMISE CORRECTED BY `M85` (2026-09-07), READ-ONLY, AND THE HEADLINE IS THE PART THAT IS FALSE.**
   *"Asserted by nothing"* is wrong: **30 of §1's 41 documented (alias, event) cells are pinned by 19 test
   files.** The row's own framing — *"all twelve files in `tests/Feature/Audit/`"* — is where it went wrong
@@ -5958,8 +5958,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   half that matters, because the succeeds-on-empty-input family this project has now measured five times is
   exactly a wrong invocation that reports success. **Live.** Filed by `M70`.
 
-- **`minor` · The triage generator's collision check harvests citations from row TEXT, so it proposes
-  batches that collide.** `scripts/backlog-triage.php` builds its *"Suggested next batch"* by comparing the
+- ~~**`minor` · The triage generator's collision check harvests citations from row TEXT, so it proposes
+  batches that collide.**~~ `scripts/backlog-triage.php` builds its *"Suggested next batch"* by comparing the
   files each row **names**, and `D13`'s selection rule is *"no two rows citing the same non-hub file"* — so
   a row whose fix cannot avoid a file it never mentions is scored as touching nothing. ⛔ **Measured on the
   generator's own output at `M70`:** it proposed `M42`'s *"`tracker-lint` R8 guards `CLAUDE.md`"* and
@@ -5973,12 +5973,12 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   file already states that it cannot check a row whose files were not harvested, and the proposal is
   labelled *"a proposal to check, not a schedule"*; what is missing is that a row with **partial** harvest
   is indistinguishable from a fully-harvested one. The cheap improvement is to mark rows whose harvest is
-  incomplete rather than to guess their footprints. Filed by `M70`.
+  incomplete rather than to guess their footprints. Filed by `M70`. ✅ **CLOSED BY `M94` (2026-09-14) — NOT LIVE.** `M93` deleted the batch proposal this row describes; `docs/pipeline.md` § Next is the one picker, so the generator proposes no batch that could collide. The cite-set-versus-repair-set finding stays open in the `M83` row.
 
 
-- **`minor` · `scripts/loop.php --assess` does not read `docs/pipeline.md`, so it cannot refuse a row on its PIPELINE state.** Filed 2026-09-06 by `M79`, deliberately unfixed there. `HELD_TOPICS` refuses the five held topics by substring match on the row text, which is a coarser mechanism that happens to cover the same ground today — so this is a redundancy gap rather than a live hole. ⚠️ **The reason to wait is not effort:** making a STOP-LIST depend on a generated file means an incomplete generation makes the stop-list under-refuse, and an under-refusing stop list is unsafe where an over-refusing one is merely annoying. It belongs with the gate that guarantees the pipeline is complete, not before it. **Live.** Filed by `M79`.
+- **`minor` · `scripts/loop.php --assess` does not read `docs/pipeline.md`, so it cannot refuse a row on its PIPELINE state.** Filed 2026-09-06 by `M79`, deliberately unfixed there. `HELD_TOPICS` refuses the five held topics by substring match on the row text, which is a coarser mechanism that happens to cover the same ground today — so this is a redundancy gap rather than a live hole. ⚠️ **The reason to wait is not effort:** making a STOP-LIST depend on a generated file means an incomplete generation makes the stop-list under-refuse, and an under-refusing stop list is unsafe where an over-refusing one is merely annoying. It belongs with the gate that guarantees the pipeline is complete, not before it. **Live.** Filed by `M79`. **Tier: after-launch.** **Awaits D23.**
 
-- **`minor` · A pipeline marker placed mid-document SILENTLY INVALIDATES every `path:N` citation beneath it, and only the ones that land on a blank line are caught.** Filed 2026-09-06 by `M79`, found by its own gate going red. Markers were first placed next to the sentence they govern, as the design said. `citation-liveness-lint` then failed on two citations in `docs/adr/0009-…` pointing at `0008-entitlement-and-metering.md:8`, which a two-line insertion had pushed into a blank. ⛔ **THE CAUGHT CASE IS THE LUCKY ONE.** That gate only sees a citation landing on a blank, a rule, a fence or past EOF — a citation shifted onto a DIFFERENT REAL LINE resolves happily and is wrong, and nothing in the repository can see it. **25 line-numbered citations point into the six files that carry markers**, so the exposure was measured rather than guessed. ✅ **Fixed in the same increment by moving every marker to END OF FILE, which shifts nothing**, with the reason written beside them so the next author does not helpfully move them back. ⚠️ **What is still open, and it is the reason this is a row rather than a closed note:** end-of-file placement costs the adjacency the design wanted — `Source` now names the marker's line, not the obligation's, so a citation can point a hundred lines from the sentence it governs. Two honest repairs exist — an `anchor=` key naming the governed line, or attributing a marker to the nearest preceding heading — and neither belongs in an increment already building the spine. ⚠️ A marker also cannot sit inside a markdown table or list at all, since an HTML comment at column 0 terminates both; that is why the tracker's held-list line could take none. **Live.** Filed by `M79`.
+- **`minor` · A pipeline marker placed mid-document SILENTLY INVALIDATES every `path:N` citation beneath it, and only the ones that land on a blank line are caught.** Filed 2026-09-06 by `M79`, found by its own gate going red. Markers were first placed next to the sentence they govern, as the design said. `citation-liveness-lint` then failed on two citations in `docs/adr/0009-…` pointing at `0008-entitlement-and-metering.md:8`, which a two-line insertion had pushed into a blank. ⛔ **THE CAUGHT CASE IS THE LUCKY ONE.** That gate only sees a citation landing on a blank, a rule, a fence or past EOF — a citation shifted onto a DIFFERENT REAL LINE resolves happily and is wrong, and nothing in the repository can see it. **25 line-numbered citations point into the six files that carry markers**, so the exposure was measured rather than guessed. ✅ **Fixed in the same increment by moving every marker to END OF FILE, which shifts nothing**, with the reason written beside them so the next author does not helpfully move them back. ⚠️ **What is still open, and it is the reason this is a row rather than a closed note:** end-of-file placement costs the adjacency the design wanted — `Source` now names the marker's line, not the obligation's, so a citation can point a hundred lines from the sentence it governs. Two honest repairs exist — an `anchor=` key naming the governed line, or attributing a marker to the nearest preceding heading — and neither belongs in an increment already building the spine. ⚠️ A marker also cannot sit inside a markdown table or list at all, since an HTML comment at column 0 terminates both; that is why the tracker's held-list line could take none. **Live.** Filed by `M79`. **Tier: after-launch.**
 
 - **`minor` · `R7`'s byte threshold was calibrated on surgeries that were all left too late, so acting
   EARLY lands in its dead zone.** Measured on `M71`'s own surgery, which is the first evidence of this
@@ -5999,7 +5999,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `scripts/tracker-surgery.php` be the instrument for a deliberate move, which is what actually happened
   here. ⚠️ **Note the interaction before taking it:** the third option is already the de-facto state, and
   it means the `[tracker-surgery]` marker is currently unverifiable for any well-timed surgery — which is
-  the `M47`/`M48` hand-forward re-opening in a new form. **Live.** Filed by `M71`.
+  the `M47`/`M48` hand-forward re-opening in a new form. **Live.** Filed by `M71`. **Tier: after-launch.**
   ⚠️ **SECOND MEASURED INSTANCE, `M86` (2026-09-07), AND IT STRENGTHENS THE ROW RATHER THAN REPEATING IT.**
   `M86`'s surgery moved 6 lines and 21,415 bytes — declared, marked, and proved by
   `scripts/tracker-surgery.php` on all four assertions — and `R7` printed *"under both limits"* again. Two
@@ -6053,7 +6053,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the hook) and `regenerate-brand-ramp-fixture.php` (driven by nothing). **The class has three members
   and should be fixed as a class**, with a `--help` arm and a refusal on any unrecognised option; the
   refusal is the half that matters, and it must read `$argv`, because `getopt()` cannot report what it
-  discarded. **Live.** Filed by `M71`.
+  discarded. **Live.** Filed by `M71`. **Tier: after-launch.**
   ⚠️ **A THIRD INDEPENDENT OCCURRENCE, `M73` (2026-09-05), AND THE FIRST AGAINST `gate-baselines.php`
   RATHER THAN `backlog-triage.php`.** Closing out `M73`, `php scripts/gate-baselines.php --help` was run to
   read the usage before regenerating — there is no help arm, so it fell straight through to the write path,
@@ -6098,7 +6098,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   publishes. ⛔ **What genuinely needs deciding first** is that wiring it changes what a close-out is
   *obliged* to do, since the file goes stale by construction on every merge that touches a row — and the
   increment that closes this row would red its own new gate on its own close-out, which is the trap
-  `pre-push-guard.php` records `M52` walking into. **Live.** Filed by `M71`.
+  `pre-push-guard.php` records `M52` walking into. **Live.** Filed by `M71`. **Tier: after-launch.**
 
 - ~~**`minor` · *"`ci.yml` is the USER'S FILE"* is asserted by one backlog row and by nothing else.**~~
   ✅ **DONE — M72 (2026-09-05), BY TAKING THE ROW IT WAS BLOCKING, WHICH IS THE ONLY ONE OF ITS TWO ARMS
@@ -6144,7 +6144,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   deleting a declared devDependency would turn nothing red. The remedy is therefore not *"one
   devDependency line"* — it is two packages, two regenerated lockfiles, and a new gate. ✅ Ownership is
   settled rather than open: the axe step runs with `working-directory: packages/design-system`, so that
-  package owns them. **Live.** Filed by `M71`.
+  package owns them. **Live.** Filed by `M71`. **Tier: after-launch.**
 
 - ~~**`minor` · `M59`'s `ds:storybook` alias row rests on a false premise and the alias alone would not~~
   ✅ **DONE — M72 (2026-09-05), AND THIS ROW'S OWN MECHANISM IS FALSE IN THE HALF IT USED FOR SIZING.**
@@ -6243,8 +6243,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `$lintStatus` through `shell_out`'s existing by-ref third parameter and checks it.
   **Live.** Filed by `M72`.
 
-- **`minor` · `lib/brand-cache.ts` is a SECOND writer to `guest-shell-html`, and it renews a mis-cased
-  key with a response a navigation cannot use.** Found during `M72`'s fan-out; `M61`'s docblock
+- ~~**`minor` · `lib/brand-cache.ts` is a SECOND writer to `guest-shell-html`, and it renews a mis-cased
+  key with a response a navigation cannot use.**~~ Found during `M72`'s fan-out; `M61`'s docblock
   enumerates four storage systems and treats the service worker as the sole author of this cache's keys.
   `refreshCachedShells()` iterates `cache.keys()` and does
   `doFetch(request.url, { credentials: 'omit' })` — default `redirect: 'follow'` — then re-`put`s under
@@ -6269,7 +6269,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   behaviour — that `put` is called with the original request — and a repair that skips redirected responses
   changes that to *not called at all*. The assertion is expected to move with the fix; it is not a regression
   when it does.
-  **Latent.** Filed by `M72`.
+  **Latent.** Filed by `M72`. ✅ **CLOSED BY `M94` (2026-09-14) — NOT LIVE.** A wrongly-cased cache key can no longer be written, because the shell route caches only status-200 responses and a redirect arrives as status 0, and a device primed before `M61` cannot exist against a new server.
 
 - ✅ **CLOSED BY `M73` (2026-09-05) — `minor` · ~~A draft is pinned to TWO different form versions in two tables after a silent share-token re-mint.~~**
   `saveDraft()` now re-reads the pin from the EXISTING draft before Stage-2a, so an existing draft is saved
@@ -6318,7 +6318,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   ⚠️ **Three of these are reachable for free by the documented-LITERAL gate** already filed (they document
   a default on a column that does not exist, which that test's `$unknown` arm already catches and cannot
   reach today only because the cells are literal-shaped). The other six are not, and need the census this
-  row is for. **Live.** Filed by `M72`.
+  row is for. **Live.** Filed by `M72`. **Tier: after-launch.**
   ✅ **PARTIALLY DISCHARGED BY `M83` (2026-09-07) — THE THREE LITERAL-SHAPED COLUMNS ARE GONE, THE CENSUS IS
   NOT. THE ROW'S OWN PARTITION WAS EXACT.** Measured: the literal-shaped cells naming a non-existent column
   number **exactly three** and are exactly this row's three — `is_tax_exempt` `false`, `timezone` `'UTC'`,
@@ -6354,7 +6354,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   anyone acts. ✅ **The fractional threshold has room the absolute one does not**: ordinary drops top out
   at **4.78%** and surgeries start at **22.70%**, a **4.75×** gap against the 2.03× the row rightly calls
   too tight. A `C12` case at `keepFiller = 705` reproduces `M71`'s shape at 21.6% and needs no change to
-  `write_fixture_files()`. **Live.** Filed by `M72`.
+  `write_fixture_files()`. **Live.** Filed by `M72`. **Tier: after-launch.**
 
 - **`minor` · `scripts/next.php` never clips the release HEADING, so a third of the hand-off is
   byte-identical noise.** Measured by `M72` while verifying the lead-paragraph row above, whose stated
@@ -6371,7 +6371,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   so a fix must create its first control — and `next.php` runs top-to-bottom and shells out to
   `state.php`, so a Pest test cannot `require` it without a `PHP_SAPI`/`realpath($argv[0])` guard or a
   `--claim=` seam. Without one, the control is unfalsifiable and the increment ships a decorative gate.
-  **Live.** Filed by `M72`.
+  **Live.** Filed by `M72`. **Tier: after-launch.**
 
 - **`minor` · The `npm audit` judge makes a REQUIRED context green while nothing was measured, and that
   is a deliberate trade rather than an oversight.** Recorded by `M72` (2026-09-05) at the moment the
@@ -6386,7 +6386,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `npm install`; it was not taken because `D7` fixes the six required contexts by job name and adding one
   is a branch-protection change. ⚠️ **The honest gap is that nobody is obliged to read the annotation.**
   A stronger form would fail the step on N consecutive unreachable runs, which needs state the workflow
-  does not have today. Recorded as `D16`. **Live.** Filed by `M72`. **Awaits D16.**
+  does not have today. Recorded as `D16`. **Live.** Filed by `M72`. **Awaits D16.** **Tier: after-launch.**
 - **`minor` · What actually delivers the offline mis-cased render is unknown, and TWO confident models of
   it have now been wrong.** Measured by `M73` (2026-09-05) while closing the `/f/*` opaqueredirect row, and
   filed rather than guessed at because this exact route has already produced two wrong answers that were
@@ -6401,7 +6401,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   cache eviction, to a `Cache-Control` change on the 301, or to the seven-day expiry — and a mechanism
   nobody has named cannot be protected by a gate. The instrument already exists
   (`tests/e2e/public-runtime-offline.spec.ts` reads cached responses by `status` and `type`); what is
-  missing is a probe of the REDIRECT path with the SW's own cache emptied. **Live.** Filed by `M73`.
+  missing is a probe of the REDIRECT path with the SW's own cache emptied. **Live.** Filed by `M73`. **Tier: after-launch.**
 
 - ✅ **CLOSED BY `M77` (2026-09-06) — `minor` · ~~`guest-shell-assets` has the identical missing status filter, and no row has ever named it.~~**
   Found by `M73`'s fan-out while verifying the `/f/*` row, which framed itself as *"the one route whose
@@ -6472,7 +6472,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   one open row is in this state today. ✅ **The remedy is small and has a decision in it**: try the
   basename index as a fallback when a slashed token does not resolve, or resolve slashed tokens as a
   SUFFIX match and refuse an ambiguous one — the second is stricter and matches the file's existing
-  *"more than one file is UNRESOLVED, never resolved to the first hit"* rule. **Live.** Filed by `M73`.
+  *"more than one file is UNRESOLVED, never resolved to the first hit"* rule. **Live.** Filed by `M73`. **Tier: after-launch.**
 
 - ✅ **CLOSED BY `M74` (2026-09-05) — `minor` · ~~`brand-cache.test.ts` asserts `put` by CALL COUNT and never by key, so its central defect is
   invisible to it.~~** Found by `M73`'s fan-out. `refreshCachedShells()` re-`put`s under the ORIGINAL request
@@ -6513,7 +6513,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   reason the rejected repair was dangerous**: moving the parent forward would have made this path
   reachable and self-consistent at the same time. The row is a request for an assertion that the two
   writers cannot disagree, not for a change to either. **Latent** — it needs a promote of a diverged
-  draft, which no current path can produce. Filed by `M73`.
+  draft, which no current path can produce. Filed by `M73`. **Tier: after-launch.**
 - ✅ **CLOSED BY `M74` (2026-09-05) — `minor` · ~~`gate-baselines.php` trusts `gh run list --limit 1` to mean "newest", and it does not — the
   file written to end stale numbers was stamped from an EIGHT-DAY-OLD run, and its own guard cannot see
   it.~~** Measured by `M73` (2026-09-05) during its own close-out, which is the only reason it was caught.
@@ -6618,7 +6618,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   cost hiding in it** — a mapped column that changes identity is a broken sync, not a re-render, and that is
   why it is a row rather than a refinement. ⚠️ **Also unresolved and cheaper:** the grid arms render row and
   column VALUES, not their author-defined LABELS, because resolving those needs the field's `config` threaded
-  into `displayValue()`. **Live.** Filed by `M74`.
+  into `displayValue()`. **Live.** Filed by `M74`. **Tier: during-testing.**
 
 - ✅ **CLOSED BY `M75` (2026-09-06) — `minor` · ~~`gate-baselines.php` writes the file BEFORE it judges
   whether every metric was found, so a NOT FOUND row ships and is reported afterwards.~~** ✅ **The mechanism
@@ -6838,7 +6838,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   but rewritten bytes; it now costs it a renewed lifetime. ⚠️ **The prior state was the anomaly** — a fresh
   body with a stale timestamp is a combination Workbox's own model cannot produce — so there is no
   "restore the old ordering" option; the real choices are to narrow the sweep, to stagger deliberately, or to
-  accept it and say so. **Live.** Filed by `M75`.
+  accept it and say so. **Live.** Filed by `M75`. **Tier: during-testing.**
 
 - ✅ **CLOSED BY `M77` (2026-09-06) — `minor` · ~~The proof-of-work yield is pinned on the fallback path only, and its CADENCE is asserted
   nowhere at all.~~** Found by `M75` (2026-09-06) while replacing the vacuous assertion that preceded it, and
@@ -6894,7 +6894,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   warned rather than silently losing work, but an hour of transcription still lives only in the tab.
   👤 **The decision is the user's**: a draft-shaped side table for in-progress corrections, an explicit
   "save a working copy" action, or a documented statement that corrections are not resumable. **Live.**
-  Filed by `M75`. **Awaits D36.**
+  Filed by `M75`. **Awaits D36.** **Tier: early-testing.**
 
 - **`minor` · `CLAUDE.md`'s gate table sends PHPStan to the container, one row below the rule that explains
   why the container is wrong.** Measured by `M76` (2026-09-06) while closing the 18-phantom-errors row.
@@ -6910,7 +6910,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `D15` — which asks for exactly that cap to be relaxed — is **open**. An increment does not relax a user
   decision on its own judgement while the request to relax it is pending. ⚠️ **Whoever takes it should fix
   the generator prose in `scripts/gate-baselines.php` in the same PR**, since `docs/gate-baselines.md`
-  repeats the lint-gate-only framing and is regenerated from that script. **Live.** Filed by `M76`.
+  repeats the lint-gate-only framing and is regenerated from that script. **Live.** Filed by `M76`. **Tier: after-launch.**
   ➕ **`M77` (2026-09-06) RE-MEASURED THIS INDEPENDENTLY AND ADDS THE MECHANISM AT FILE GRANULARITY**,
   because `M76` established the cause and not the specific link, and the specific link is what makes the
   row impossible to misread. In `dev_formbuilder_app-app-1`, over `database/migrations`: the SPL iterator
@@ -6939,7 +6939,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   truncate at all; `tests/Feature` holds 41 entries and enumerates perfectly while `tests/Feature/Forms`
   holds 46 and collapses to 6. The next directory to go blind cannot be predicted, which is why this is a
   gate and not a list. 👤 **What is left for the user is `D17`**: whether that permanent local red is
-  wanted, or whether it should be softened. **Live** until `D17` is answered. Filed by `M76`. **Awaits D17.**
+  wanted, or whether it should be softened. **Live** until `D17` is answered. Filed by `M76`. **Awaits D17.** **Tier: after-launch.**
 
 - ✅ **CLOSED BY `M77` (2026-09-06) — `minor` · ~~`R7` pins the checkout depth to `PR commits + 1`, so a depth of 50 keeps every gate green
   while blinding the secret scan to 1,100 of 1,181 commits.~~** Measured by `M76`'s read-only fan-out
@@ -6993,7 +6993,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   control, not the fix**: the script has no test seam and calls `trunk_sha()` above both `--check` and
   `--dry-run`, so with git absent from the app container a Pest control exits 2 before reaching the
   resolver. ⚠️ **And it should be taken together with the two destructive-default rows**, which collide on
-  the same hub file. **Live.** Filed by `M76`.
+  the same hub file. **Live.** Filed by `M76`. **Tier: after-launch.**
 
 - ~~**`minor` · Neither Fortify form on `/settings` can render a validation error, and the mechanism is one
   missing `errorBag`.**~~
@@ -7035,7 +7035,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   exploit — the row is that the documented invariant and the tree now disagree, and three documents defend
   a property that no longer holds. ⚠️ **Whoever takes it must decide the direction**: narrow the code back
   onto the default connection, or amend all three documents to describe the rule that is actually being
-  kept. Do not amend one and not the others. **Live.** Filed by `M77`.
+  kept. Do not amend one and not the others. **Live.** Filed by `M77`. **Tier: after-launch.**
 
 - ~~**`minor` · The `@throws` sweep row's prescribed remedy is SELF-NULLIFYING, which no pass has said in
   three re-derivations.**~~
@@ -7154,7 +7154,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   (*"across all sessions on this device"*, a visit-scoped count, or no number at all), it is genuinely the
   user's, and it changes a string another increment deliberately pinned in `sync-status.test.ts`. Whoever
   takes it should render the panel before rewording it — `M15`'s note says that is what caught it last
-  time. **Live.** Filed by `M77`. **Awaits D26.**
+  time. **Live.** Filed by `M77`. **Awaits D26.** **Tier: early-testing.**
   ⛔ **EVIDENCE CORRECTED BY `M86` (2026-09-07) WITHOUT CLOSING THE ROW — THE CITATION THIS ROW MAKES ABOUT
   ITS OWN COST IS FALSE.** It says a re-aim *"changes a string another increment deliberately pinned in
   `sync-status.test.ts`"*. That file carries **no quota assertion and structurally cannot**: its fixture
@@ -7199,7 +7199,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   offline mis-cased render (two confident models of that spec have already been wrong), and the fact that
   running this spec at all needs `public/hot` moved aside — with a dev Vite running, Laravel emits
   dev-server asset URLs the e2e container cannot reach and **`global-setup` dies at the login form**,
-  which looks like a broken fixture and is not. **Live.** Filed by `M77`.
+  which looks like a broken fixture and is not. **Live.** Filed by `M77`. **Tier: after-launch.**
 
 - ~~**`minor` · `preserveReviewedAnswers()` writes a media reference it has already deleted, in seconds, with
   no grace window.** Measured by `M78`'s adversarial fan-out (2026-09-06) while attacking a different row,
@@ -7283,14 +7283,14 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   conflict-review row's cheapest remedy leans on, so a fix built on it would rest on an unpinned line.
   Two cases (one `conflict`, one `needs_attention`) close it. **Live.** Filed by `M78`.
 
-- **`minor` · The public runtime's media pick path has ZERO test coverage of any kind, and no e2e seeded
-  form has a media field at all.** Measured by `M78` (2026-09-06). `grep -rn "stashOffline|OfflineMediaKey"`
+- ~~**`minor` · The public runtime's media pick path has ZERO test coverage of any kind, and no e2e seeded
+  form has a media field at all.**~~ Measured by `M78` (2026-09-06). `grep -rn "stashOffline|OfflineMediaKey"`
   over the test trees returns **zero** hits: `stash()` is reached in tests only by direct
   `db.media_queue.put()`, never through the real provider at `App.vue`. And `E2eSeeder` publishes five
   slugs, **none with a media field** — the only media form it builds is left a DRAFT with no public slug,
   so no e2e run has ever exercised guest media end to end. ⚠️ **This is why the conflict-review media row
   has stayed theoretical through three passes**: the combination it describes cannot be reproduced by any
-  fixture in the repository. Whoever takes it needs a seeded media form first. **Live.** Filed by `M78`.
+  fixture in the repository. Whoever takes it needs a seeded media form first. **Live.** Filed by `M78`. ✅ **CLOSED BY `M94` (2026-09-14) — RE-HOMED TO `uploading-import`.** Coverage of the guest media pick path belongs with the held media work and re-enters with that item on the user's go-signal; the text above is what that item owes.
 
 - ~~**`minor` · The data dictionary documents `tenants.status` defaulting to a value that is not a legal case
   of the enum it names.**~~
@@ -7317,14 +7317,14 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   add-schedule-to-forms migration. ⚠️ **Filed separately from the `tenants.status` row because it hides in a
   different bucket**: the documented cell reads `NULL`, so a literal-vs-literal comparison skips it entirely
   and only a NULL-policy rule can see it. A gate built for the literal half alone would still miss this
-  one. **Live.** Filed by `M78`.
+  one. **Live.** Filed by `M78`. **Tier: after-launch.**
 
 - **`minor` · Two columns are documented under the wrong table in the data dictionary.** Measured by `M78`'s
   fan-out (2026-09-06). `draft_expires_at` and `draft_current_step` are documented inside the
   `submission_answers` section; **both columns exist on `submissions`**. ⚠️ Not covered by the open `M72`
   row, which is `tenants`-only, and not reachable by any default-drift gate, which compares a documented
   default to a column it looks up **by the section it is written under** — so a misplaced row is either
-  skipped as unknown or compared against the wrong table. **Live.** Filed by `M78`.
+  skipped as unknown or compared against the wrong table. **Live.** Filed by `M78`. **Tier: after-launch.**
 
 - **`minor` · Nine live tables have no dictionary section, and they are not all framework scaffolding.**
   Measured by `M78`'s fan-out (2026-09-06): 20 live base tables have no column table, of which most are
@@ -7333,7 +7333,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `global_probes`, `skeleton_probes`, and the whole spatie-permission set (`roles`, `permissions`,
   `model_has_roles`, `model_has_permissions`, `role_has_permissions`). ⚠️ `impersonation_tokens` and the
   permission tables are the ones that matter — the RBAC design document has no column table for any of them,
-  so the schema of record for this application's authorization model is undocumented. **Live.** Filed by `M78`.
+  so the schema of record for this application's authorization model is undocumented. **Live.** Filed by `M78`. **Tier: after-launch.**
 
 - ~~**`minor` · The documented-literal drift gate needs three normalizer rules, not "a normalizer per type",
   and one of the row's two justifications is fabricated.**~~
@@ -7423,7 +7423,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   not fired. ⚠️ **A real stale count exists in the other direction**: `docs/security-threat-model.md`
   residual 31 still says *"exactly one server-derived equality predicate"* while `ADR-0002` was amended
   twelve days earlier to record **two** consumers. ⚠️ The rule is restated in **13 files / 15 occurrences**,
-  not the three the open row names, so "amend all three documents" undercounts by ten. **Live.** Filed by `M78`.
+  not the three the open row names, so "amend all three documents" undercounts by ten. **Live.** Filed by `M78`. **Tier: after-launch.**
 
 - **`minor` · `forms.single_page_mode` has no write surface outside the seeders, so single-page mode is
   unreachable for a real tenant — and its documented default disagrees across four documents.** Measured by
@@ -7445,7 +7445,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `docs/data-dictionary.md:221` say `false`. `docs/ux/form-filling-ux-flow.md:337` calls `true` "the literal
   default for a new form" and `docs/PRD.md:103` agrees. So repairing one pair does not settle it. ⚠️ The
   cost is already on the record: `PROGRESS_ARCHIVE.md:297` logs an E2E timeout caused by the seeded form
-  defaulting to multi-step. **Live.** Filed by `M80`. **Awaits D35.**
+  defaulting to multi-step. **Live.** Filed by `M80`. **Awaits D35.** **Tier: early-testing.**
 
 - **`minor` · `forms.allow_manual_encoding` is documented as Feature #7's capability flag and has neither a
   reader nor a writer — the only one of five inert `allow_*` flags whose feature actually shipped.**
@@ -7467,7 +7467,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   Feature #7 and its acceptance criteria never ask for a per-form off switch, so narrowing
   `docs/data-dictionary.md:216` is as defensible as wiring the gate, and the row should be taken with both
   priced. Precedent for the shape: `users.last_active_tenant_id`, already in this file. **Live.**
-  Filed by `M80`.
+  Filed by `M80`. **Tier: during-testing.**
 
 - **`minor` · `forms.allow_offline_sync` has no reader anywhere — neither the sync manifest nor the PWA
   install entry honours the per-form offline gate that two documents describe, and it defaults to `true`.**
@@ -7488,7 +7488,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   over-filed:** it is one of the family of **five** inert flags the row above enumerates. It earns its own
   row only because offline sync **shipped** — the sync routes, the PWA manifest,
   `tests/Feature/Entitlements/OfflineSyncGateTest.php` — whereas the OCR flags are parked ahead of held
-  work. **Live.** Filed by `M80`.
+  work. **Live.** Filed by `M80`. **Tier: during-testing.**
 
 - **`minor` · The documented async export API — `POST /api/v1/forms/{form}/exports` and
   `GET /api/v1/exports/{export}` — has zero routes and no `exports` job row, while the substrate §7.3 names
@@ -7508,7 +7508,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   two endpoints and any status read. ⚠️ **It is also not specific to exports** — `PATCH /tenant`, form
   write CRUD, the draft group, `GET/PATCH/DELETE /submissions/{submission}`, attachments, `users`/`roles`
   and `subscription` are absent from `routes/api.php` the same way, and the sibling rows in this block name
-  them. **Live.** Filed by `M80`. **Awaits D38.**
+  them. **Live.** Filed by `M80`. **Awaits D38.** **Tier: early-testing.**
 
 - **`minor` · The documented `Users & roles` API resource group (`GET/POST /api/v1/users`, `/api/v1/roles`)
   has zero routes, and a shipped schema decision was already paid for it.** Measured by `M79`'s sweeps
@@ -7525,7 +7525,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   deferral**: `docs/multi-tenancy-rbac-design.md:711` defers the request/response *shapes* to Doc #14, and
   `docs/api-specification.md:13` points straight back at §7.1 as the authoritative inventory. Neither
   defers the build. This repository builds `/api/v1` twins deliberately — `routes/tenant.php:755` says
-  so — so the web surface does not discharge it. **Live.** Filed by `M80`. **Awaits D38.**
+  so — so the web surface does not discharge it. **Live.** Filed by `M80`. **Awaits D38.** **Tier: early-testing.**
 
 - **`minor` · §7.1's `Form draft` row pins four `/api/v1` builder endpoints registered nowhere, and the
   `validations` sub-resource exists on neither surface.** Measured by `M79`'s sweeps (2026-09-06), joined
@@ -7546,7 +7546,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `app/Services/Forms/FormBuilderService.php:157`, `:322` and `:331` — so nothing in the tree implements
   them as an addressable resource at all. ⚠️ Adjacent and deliberately in scope of the same repair:
   `docs/architecture/technical-architecture.md:441` also pins `POST /api/v1/forms` and
-  `PATCH/DELETE /api/v1/forms/{form}`, and only the two GETs exist. **Live.** Filed by `M80`. **Awaits D38.**
+  `PATCH/DELETE /api/v1/forms/{form}`, and only the two GETs exist. **Live.** Filed by `M80`. **Awaits D38.** **Tier: early-testing.**
 
 - **`minor` · The parity matrix scores API/programmatic import as Phase-1 shipped, and the code's own enum
   docblock calls it a later channel.** Measured by `M79`'s sweeps (2026-09-06), joined and refuted by
@@ -7571,7 +7571,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `app/Enums/SubmissionSource.php:9` lists `api_import` among "the later channels". ⚠️ **Documentary, not
   live for an integrator**: the generated contract they build a client from never serves the phantom path.
   ⚠️ Stale premise found in passing — `routes/api.php:285` asserts a bound `forms/{form}/submissions` route
-  exists in the Group-B surface, and it does not. **Live.** Filed by `M80`.
+  exists in the Group-B surface, and it does not. **Live.** Filed by `M80`. **Tier: after-launch.**
 
 - **`minor` · §7.1's flat webhook-delivery paths and §7.4's per-tenant delivery-log UI both contradict the
   same document's per-endpoint spec, and only the per-endpoint form was built.** Measured by `M79`'s sweeps
@@ -7595,7 +7595,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the row honest: `app/Enums/WebhookDeliveryStatus.php:33` is a real `dead_lettered` case and
   `resources/js/Pages/webhooks/Show.vue:266` renders delivery status generically, so the state is visible
   per endpoint — what is missing is the cross-endpoint view and any explicit dead-letter labelling.
-  **Live.** Filed by `M80`.
+  **Live.** Filed by `M80`. **Tier: during-testing.**
 
 - **`minor` · §7.1 names a `/api/v1/webhooks/endpoints` path segment that exists nowhere in the tree, and
   it is a floor rather than a census.** Measured by `M79`'s sweeps (2026-09-06), joined and refuted by
@@ -7612,7 +7612,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   against as-built at `docs/architecture/technical-architecture.md:445` and `:446`, so §7.1's paths were
   left behind by maintenance that reached their immediate neighbours. ⚠️ Severity is `minor` because
   `openapi.json` is drift-gated in CI and correct, so nobody generating a client is misled; the exposure is
-  a reader planning against §7.1. **Live.** Filed by `M80`.
+  a reader planning against §7.1. **Live.** Filed by `M80`. **Tier: during-testing.**
 
 - **`minor` · NFR §8 sets a 30-day soft-delete grace period before a hard-deletion job, and for the three
   entities it names there is no purge job, no grace-period config value, and nothing that soft-deletes.**
@@ -7641,7 +7641,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   rows. ⚠️ **Take it with `D14`, not independently**: `D14` recommends leaving the submission
   delete/restore surface unbuilt, decides the surface rather than the grace period, and says nothing about
   forms or attachments. `docs/non-functional-requirements.md:115` is §10 Out of Scope and does not list
-  this. **Live.** Filed by `M80`.
+  this. **Live.** Filed by `M80`. **Tier: before-launch.**
 
 - **`minor` · `docs/api-specification.md:63` states in the present tense that every unsafe request is
   deduplicated against a 24-hour Redis cache keyed on `(tenant_id, endpoint, Idempotency-Key)`, and no
@@ -7666,7 +7666,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   long closed — and it was never converted into a queue row, nor were its three siblings from the same
   sentence. `docs/api-specification.md:304` is §4 Out of Scope and does not carry it. That archive note is
   the record of a deferral nobody filed, which is exactly what this row corrects. **Live.**
-  Filed by `M80`. **Awaits D38.**
+  Filed by `M80`. **Awaits D38.** **Tier: early-testing.**
 
 - **`minor` · The per-endpoint `include_answers: true` webhook payload opt-in has no key anywhere — and
   four other files appear to record it as a deferral already taken.** Measured by `M79`'s sweeps
@@ -7690,7 +7690,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   presents it as an available tenant choice, which is what `docs/webhook-integration-design.md:41` does.
   The sweep's remaining evidence: `grep` over `app/`, `database/`, `config/` and `routes/` returns one
   hit — `config/webhooks.php:79`, a comment calling it forward infrastructure. No column on
-  `webhook_endpoints`, no validation rule, no branch in the payload builders. **Latent.** Filed by `M80`.
+  `webhook_endpoints`, no validation rule, no branch in the payload builders. **Latent.** Filed by `M80`. **Tier: after-launch.**
 
 - **`minor` · Structured JSON application logs are documented in the present tense and `config/logging.php`
   has no JSON formatter on any channel.** Measured by `M79`'s sweeps (2026-09-06). ⛔ **UNJUDGED — the
@@ -7706,7 +7706,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `**Status:** Draft v1.0` at `docs/observability-incident-response.md:4` and its §1 is headed "What's
   Already Decided", so it is a design artifact — yet the cited sentence is written in the present
   indicative. The repair may be a Monolog formatter or a tense correction, and which one is the actual
-  question. **Latent.** Filed by `M80`.
+  question. **Latent.** Filed by `M80`. **Tier: during-testing.**
 
 - **`minor` · Correlation IDs threaded through every log line — `request_id` and `job_chain_id` — have no
   mechanism at all.** Measured by `M79`'s sweeps (2026-09-06). ⛔ **UNJUDGED — the three-term join has not
@@ -7721,7 +7721,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `app/Models/SsoAuthFailure.php:34` on `sso_auth_failures` — an IdP-minted request identifier, not a log
   correlation id. No middleware attaches one and no job propagates one. ⚠️ Pairs with the JSON-logs row
   above: the two cite adjacent lines of the same section and share one remedy surface — a Monolog formatter
-  plus context processors — so check for overlap before taking either. **Latent.** Filed by `M80`.
+  plus context processors — so check for overlap before taking either. **Latent.** Filed by `M80`. **Tier: during-testing.**
 
 - **`minor` · The API rate-limit table promises 300 requests/minute per authenticated user and no such
   limiter is defined.** Measured by `M79`'s sweeps (2026-09-06). ⛔ **UNJUDGED — the three-term join has
@@ -7741,8 +7741,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   that as the row being overtaken. ⚠️ **Premise for whoever writes the remedy:**
   `app/Providers/AppServiceProvider.php:374` records that `throttle:api` is priority-sorted *ahead of*
   authentication, so `$request->user()` is unresolved inside that closure and it keys on the token hash — a
-  per-user 300/min limiter has to solve that ordering rather than copy the `api` shape. **Latent.**
-  Filed by `M80`. **Awaits D38.**
+  per-user 300/min limiter has to solve that ordering rather than copy the `api` shape. **Live.**
+  Filed by `M80`. **Awaits D38.** **Tier: early-testing.**
 
 - **`minor` · `export_artifact` objects are documented as auto-deleted seven days after generation, and no
   scheduled cleanup task is declared.** Measured by `M79`'s sweeps (2026-09-06). ⛔ **UNJUDGED — the
@@ -7755,7 +7755,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   artifacts. The identifier resolves only to the enum case `app/Enums/AttachmentKind.php:31` and a
   storage-key comment at `app/Services/Submissions/SubmissionPdfStorage.php:30`. There is no seven-day
   constant and no `App\Jobs\Maintenance` class for it. ⚠️ Adjacent to the NFR §8 purge row above; both are
-  unbuilt retention jobs and a single sweep design would serve them. **Latent.** Filed by `M80`.
+  unbuilt retention jobs and a single sweep design would serve them. **Latent.** Filed by `M80`. **Tier: before-launch.**
 
 - **`minor` · ADR-0007 §D11 describes three queue connections that `config/queue.php` does not define, and
   asserts they are annotated as forbidden when they were deleted.** Measured by `M79`'s sweeps
@@ -7773,7 +7773,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   an anticipated outcome delegated to H2, and H2 did exactly that. The stale present-tense assertion is
   real; the reader-harm argument is not. ⚠️ The cited line also carries its own stale citation, naming
   `config/queue.php:76-90` as where the three shipped; those lines are now the `sqs` block and the opening
-  of `redis`. **Latent.** Filed by `M80`.
+  of `redis`. **Latent.** Filed by `M80`. **Tier: after-launch.**
 
 - **`minor` · The documented guest per-IP rate limit of 100/min has no definition — the ceiling on the
   surface that row describes is 60.** Measured by `M79`'s sweeps (2026-09-06). ⛔ **UNJUDGED — the
@@ -7791,7 +7791,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   deployment gets while a deployment could set 100 with no code change. That narrows the claim from "has no
   definition" to "has no definition at the default". ⛔ **What makes this a defect rather than an
   approximation:** the per-token figure in the same table matches `config/guest.php:39` exactly, so the
-  table reads as authoritative. **Latent.** Filed by `M80`.
+  table reads as authoritative. **Latent.** Filed by `M80`. **Tier: during-testing.**
 
 - **`minor` · "1 concurrent sync export per form, additional requests 429" — no concurrency guard exists on
   any export path.** Measured by `M79`'s sweeps (2026-09-06). ⛔ **UNJUDGED — the three-term join has not
@@ -7811,7 +7811,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   its table neighbours: this is a **concurrency** promise, so a limiter audit that checks `RateLimiter::for`
   definitions passes straight over it. ⚠️ Pairs with the async-export row above —
   `docs/architecture/technical-architecture.md:469` opens §7.3 and defines both export modes, and neither
-  is built. **Latent.** Filed by `M80`. **Awaits D38.**
+  is built. **Live.** Filed by `M80`. **Awaits D38.** **Tier: early-testing.**
 
 - ~~**`minor` · `PROGRESS.md` is within roughly one status bullet of its `tracker-lint` R1 byte ceiling, and
   the two surfaces a session actually reads before pushing both stay silent about it.**~~
@@ -7885,7 +7885,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   and the column stops being reported — **failing SILENT rather than loud**, which is the direction a
   floor cannot catch. ⛔ **Not fixed here because both available repairs are worse**: parsing the model
   to find the real `$casts` array is a PHP parser this gate has no business carrying, and dropping the
-  cast arm entirely returns the ten false positives. **Live.** Filed by `M81`.
+  cast arm entirely returns the ten false positives. **Live.** Filed by `M81`. **Tier: after-launch.**
 
 - **`minor` · `scripts/pipeline-lint.php`'s four coverage rules read the MARKDOWN half of the corpus
   only, and three deferral sentences live in the PHP half where nothing can see them.** Filed
@@ -7901,7 +7901,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   and digest both have to be re-measured over 869 files rather than 55. ⛔ **And `CLAUDE.md` is outside
   the generator's corpus entirely**, so a deferral stated in the imperatives is invisible to every one
   of these rules — that one is by design (a marker there could never be read by the generator either)
-  and is recorded so the next author does not read the silence as coverage. **Live.** Filed by `M82`.
+  and is recorded so the next author does not read the silence as coverage. **Live.** Filed by `M82`. **Tier: after-launch.**
 
 - **`minor` · `scripts/pipeline.php` accepts two markers carrying the SAME id and emits two rows,
   and nothing anywhere says so.** Filed 2026-09-07 by `M82`, found while placing this increment's two
@@ -7915,7 +7915,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   "where is this feature queued?" is to copy the marker to the second document that describes it. ⛔
   **The refusal must be a `cannot_measure`, not a fail** — a duplicate id means the row set is
   ambiguous, and ruling over an ambiguous set is what the exit-2 contract exists to prevent.
-  **Live.** Filed by `M82`.
+  **Live.** Filed by `M82`. **Tier: after-launch.**
 
 - **`minor` · `scripts/pipeline.php --help` promises that "a done state must cite where it landed" and
   `parse_marker()` never asks for it.** Filed 2026-09-07 by `M82`. The `done` key is in `MARKER_KEYS`
@@ -7926,7 +7926,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   one, and an uncited `done` row is exactly the claim nobody can check — the same shape as the three
   roadmap cells that described work finished months earlier. ⚠️ **It is a documented rule with no
   enforcement, which is the weaker half of the pair this project keeps finding**: the help text is the
-  specification and the parser is the gate, and they disagree today. **Live.** Filed by `M82`.
+  specification and the parser is the gate, and they disagree today. **Live.** Filed by `M82`. **Tier: after-launch.**
 
 - **`minor` · The `pipeline-lint` controls mirror the LIVE corpus, so a defect in one of the four
   coverage predicates reddens all 38 cases and drowns the control that names it.** Filed 2026-09-07 by
@@ -7941,7 +7941,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   twice, and two caught by the digest with the count unchanged). ⛔ **The repair is not "stop mirroring
   the corpus"** — that trades a readability problem for a blind digest — but a per-case corpus subset,
   where a case publishes only the documents it needs, so a predicate defect elsewhere cannot reach it.
-  **Live.** Filed by `M82`.
+  **Live.** Filed by `M82`. **Tier: after-launch.**
 
 - ~~**`minor` · `carries_a_disposition()` reads the FIRST italic parenthetical on an acceptance bullet,
   so a bullet whose prose already contains one hides its own disposition.**~~
@@ -8010,7 +8010,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   but that makes an instrument write a second generated file, which is the coupling `state.php`
   deliberately refuses (*"`state.php` must NOT call `pipeline.php`"*). The other is a `preflight`
   arm reporting the drift before a push, which is where the equivalent tracker-byte signal was put.
-  **Live.** Filed by `M82`.
+  **Live.** Filed by `M82`. **Tier: after-launch.**
 
 - **`minor` · `pipeline.php --check` compares the file only from `## The line` onward, so the BANNER —
   the one part a human would hand-correct, and the part `state.php` reads its census from — is outside
@@ -8028,7 +8028,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   and adds a second sha-shaped regex to keep in step with the renderer; or have `derive_pipeline()`
   count the body's table rows instead of reading the banner, which removes the reason the banner has to
   be trustworthy at all and is the smaller change — but it makes `state.php` parse the row table, and
-  `loop.php`'s recorded lesson is about exactly what a second parser costs. ⚠️ `M93` moved the anchor to `## Testing gate`, which now opens the generated body; the banner is still outside the check, so the row stands as filed. **Live.** Filed by `M82`.
+  `loop.php`'s recorded lesson is about exactly what a second parser costs. ⚠️ `M93` moved the anchor to `## Testing gate`, which now opens the generated body; the banner is still outside the check, so the row stands as filed. **Live.** Filed by `M82`. **Tier: after-launch.**
 
 - **`minor` · `scripts/citation-liveness-lint.php` sits AT its ceiling with zero headroom, so any edit
   that shifts a line in `docs/data-dictionary.md` is a merge failure and nothing says so.** Measured by
@@ -8044,7 +8044,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   ceiling** — that retires the only pressure keeping the ledger's citations honest. Candidates, none
   costed: have the lint name the pinned files in its own `--report` output; or teach it to re-point a
   citation whose target moved by a computable offset within one commit, which is the harder and more
-  valuable half. **Live.** Filed by `M83`.
+  valuable half. **Live.** Filed by `M83`. **Tier: after-launch.**
 
 - **`minor` · The citation gate asserts a cited line is ALIVE, never that it still says what the citation
   claims — so re-pointing a shifted citation arithmetically merges green while being wrong.** Found by
@@ -8063,7 +8063,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   fence and not a separator, so it resolves and the zero-tolerance tier reports green over a citation
   that points at nothing like its subject. The row predicted this shape; here it is, in the tier where
   the ceiling cannot absorb it.
-  **Live.** Filed by `M83`.
+  **Live.** Filed by `M83`. **Tier: after-launch.**
 
 - ~~**`minor` · The data dictionary's enum catalog contradicts the enum for `ComparisonOperator` and
   `UsageMetric` as well, and nothing gates the catalog at all.**~~ Measured by `M83`'s fan-out (2026-09-07)
@@ -8105,7 +8105,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   vocabulary deliberately and that is the honest short-term answer**: promoting them to comparable would
   compare a documented word against `nextval('x_id_seq'::regclass)` and need a sequence rule the ablation
   shows nothing else wants. The repair is to the document — say `bigserial` and let the cells name the
-  real default — and it belongs with the `M72` census rather than beside a gate. **Live.** Filed by `M83`.
+  real default — and it belongs with the `M72` census rather than beside a gate. **Live.** Filed by `M83`. **Tier: after-launch.**
 
 - **`minor` · Three `tenants` cells disagree with the live schema on Type and Nullable, and no gate
   compares either column.** Found by `M83` (2026-09-07) by opening the citations of the rows it was
@@ -8117,7 +8117,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   writing an insert. ⚠️ **Sizing honestly: the Type cell is not mechanically comparable.** It carries
   prose and abbreviations the schema does not use, so a naive equality arm is red on arrival across the
   corpus — the shape `M40` established can never merge. **`Nullable` is a clean three-value comparison
-  and is the half worth building first.** **Live.** Filed by `M83`.
+  and is the half worth building first.** **Live.** Filed by `M83`. **Tier: after-launch.**
 
 - ~~**`minor` · `User::defaultUiTheme()` is a fourth copy of three defaults the new literal arm compares,
   and it is the one copy no gate reaches.** Found by `M83`'s fan-out (2026-09-07). `theme_mode`,
@@ -8178,7 +8178,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   a census, exactly like the row bodies it reads** — this is one measured instance, and how often the two
   sets diverge across the other open rows is unmeasured. **The honest repair is probably not in the
   generator**: a row would have to declare its repair surface, which is a change to how rows are written.
-  **Live.** Filed by `M83`.
+  **Live.** Filed by `M83`. **Tier: after-launch.**
 
 - ~~**`minor` · The literal arm's three assertions are sequenced, so a run reports only the first arm that
   fails and a reader cannot see the whole drift set.**~~
@@ -8278,7 +8278,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   test teaches a reader to skip red"*. The larger cost is that it disarms this repository's mandated
   proof device for that file. `--skip-baseline` is not a way out: the harness itself says such a run
   cannot tell a mutation-caused failure from a pre-existing one, which is no verdict.
-  **Live.** Filed by `M84`.
+  **Live.** Filed by `M84`. **Tier: after-launch.**
 
 - ~~**`minor` · `scripts/pipeline.php` derives a defect row's state from LIVENESS alone, so a row blocked
   on an open USER DECISION is published as `state=ready`.**~~ Measured by `M84`'s fan-out (2026-09-07)
@@ -8342,7 +8342,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `EXPECTED_UNDISPOSITIONED_BULLETS` and its digest, and the question of whether an indented
   continuation may carry a disposition at all is entangled with the open `D24`, whose option 2 retires
   the bullet-level arm outright. Two edits to one constant in one increment, for two different reasons,
-  is how a pinned number stops meaning anything. **Live.** Filed by `M84`.
+  is how a pinned number stops meaning anything. **Live.** Filed by `M84`. **Tier: after-launch.**
 
 - **`minor` · `promote()`'s pre-lock shape has two more instances, and one of them is 74 lines above the
   row that named it.** Measured by `M85` (2026-09-07) while closing that row, which named two instances of
@@ -8357,7 +8357,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   weaker still: no row exists to lock yet, so there is nothing to re-assert *under*. ⚠️ **Third, lower
   confidence:** `AttachmentReferenceValidator::validate()` is a DB-backed pre-lock check too, and M12's
   checksum guard covers the answer document rather than the attachments table, so an attachment deleted in
-  the window is not re-detected. Not traced to a reachable race. **Live.** Filed by `M85`.
+  the window is not re-detected. Not traced to a reachable race. **Live.** Filed by `M85`. **Tier: during-testing.** **Awaits D27.**
   ⛔ **CORRECTED BY `M87` (2026-09-08) — THE CENSUS IS FIVE, NOT TWO; ONE CITATION MOVED; AND THE ROW'S
   CENTRAL PREMISE IS HALF WRONG.** Verified by read-only fan-out against the code, then re-opened by hand.
   ⚠️ **Evidence.** `SubmissionDraftService::saveDraft()`'s pre-lock check and `updateDraft()`'s in-lock
@@ -8413,7 +8413,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   not read the release. ⚠️ **The obvious remedy — install `git` in the app image — is not obviously right**:
   it would let Pest tests shell out to git, which is a much larger surface than this one gate needs, and
   the container is deliberately not a development shell. The alternative is `mutate.php --command=`, which
-  an open row already proposes for a different reason. **Live.** Filed by `M85`.
+  an open row already proposes for a different reason. **Live.** Filed by `M85`. **Tier: after-launch.**
 
 - **`minor` · Four citations point into UNTRACKED trees and can never resolve, and nothing separates them
   from citations that are merely broken.** Measured by `M85` (2026-09-07) while widening the resolver.
@@ -8425,7 +8425,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   typo. ⛔ **The consequence is on the FLOOR, not the tier**: `MIN_EXPECTED_RESOLVED` is compared against a
   number that permanently under-counts, and a reader of `--report` cannot tell the permanent four from the
   repairable rest. A `[[unresolvable]]` marker beside the existing `ALLOW_MARKER`, or a second reported
-  bucket, would separate them. **Live.** Filed by `M85`.
+  bucket, would separate them. **Live.** Filed by `M85`. **Tier: after-launch.**
 
 - **`minor` · `docs/ACCESS-MATRIX.md` cites a HOSTNAME AND PORT, which the citation pattern parses as a
   path and line.** Measured by `M85` (2026-09-07). `acme.meridian.test:8000` matches `CITATION_PATTERN` —
@@ -8436,7 +8436,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   citation and the gate is not wrong about anything because of it**, which is exactly why it is filed
   rather than fixed: the cheap remedies (a TLD deny-list, requiring a `/` or a known extension) each trade
   a false positive for a false negative, and this gate's header states that it prefers a false negative.
-  Someone should choose deliberately rather than patch it in passing. **Live.** Filed by `M85`.
+  Someone should choose deliberately rather than patch it in passing. **Live.** Filed by `M85`. **Tier: after-launch.**
 
 - **`minor` · The `docs/claims/**` exclusion hides rot the `--report` measurement is read as covering.**
   Measured by `M85` (2026-09-07) while measuring the widening. The claims tier is excluded from tier 1 for
@@ -8445,7 +8445,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `lib/db.ts` at a line of `resources/public-runtime/lib/db.ts` that is blank. ⚠️ **Nothing is wrong with
   the exclusion.** What is wrong is that `--report` is the measurement every increment quotes, and it
   reports the excluded tiers alongside the gated ones without saying that its excluded-tier rot figure was
-  itself understated by the resolver. **Live.** Filed by `M85`.
+  itself understated by the resolver. **Live.** Filed by `M85`. **Tier: after-launch.**
 
 - **`minor` · `LEDGER_ROT_CEILING` cannot ratchet down while preserved original filings are counted, and
   `M85` has now paid that in the other direction.** Measured by `M85` (2026-09-07). The constant's own
@@ -8456,7 +8456,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   written**: exempt struck-through rows, and the ceiling can start ratcheting again on the citations that
   can actually be repaired. It needs a parser that can tell a closed row from an open one — which
   `scripts/pipeline.php` and `scripts/backlog-triage.php` both already do, so the parser exists twice and
-  neither copy is reachable from here. **Live.** Filed by `M85`.
+  neither copy is reachable from here. **Live.** Filed by `M85`. **Tier: after-launch.**
 
 - **`minor` · The generated queue's ORDER depends on which UNTRACKED directories happen to exist, and
   `docs/pipeline.md` is merge-gated on that order.** Measured by `M85` (2026-09-07) by tripping it: CI
@@ -8473,7 +8473,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   here: resolve against the tracked set the script already has every reason to read. ⚠️ **Note the
   asymmetry that hid it**: the two scripts carry the SAME partial-path blindness — one of them was fixed
   this increment — but they resolve against two DIFFERENT universes, and nothing anywhere says so.
-  **Live.** Filed by `M85`.
+  **Live.** Filed by `M85`. **Tier: after-launch.**
 
 - ~~**`minor` · Two increments' status bullets were DESTROYED by their successors' close-outs, and nothing
   in the repository could see it.**~~
@@ -8517,10 +8517,10 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   that the pairing was structural rather than an intermittent misfire. ⚠️ **The cause is not a harvesting
   bug:** a row that says only *"R7"* and *"R8"* names no path, and inferring an owning file from a rule name
   is not something a generator can do. **That is the one sense in which the sibling row's "the repair is not
-  in the generator" is right**, and it is narrower than that row states. **Live.** Filed by `M86`.
+  in the generator" is right**, and it is narrower than that row states. **Live.** Filed by `M86`. **Tier: after-launch.**
 
-- **`minor` · The triage generator PRINTS a refusal rule it does not implement, and two open rows lean on
-  that sentence.** Measured by `M86` (2026-09-07). `render_batch()` in `scripts/backlog-triage.php` emits
+- ~~**`minor` · The triage generator PRINTS a refusal rule it does not implement, and two open rows lean on
+  that sentence.**~~ Measured by `M86` (2026-09-07). `render_batch()` in `scripts/backlog-triage.php` emits
   *"A row whose files were not harvested cannot be checked for collision and is not proposed"*, and the loop
   beneath it carries **no such guard**. A zero-harvest row is skipped only *incidentally*, because the
   ranking puts it last and the batch cap is reached first; and the renderer prints the same *"no non-hub
@@ -8532,10 +8532,10 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   files, or that carries an unresolved citation. Under that rule the R8 row would not have been proposed at
   all. It already renders *"No batch could be formed"*, so a smaller batch is an existing state rather than a
   new one. **Not taken here: `scripts/backlog-triage.php` is a hub and `D13` allows one hub-touching row per
-  batch, which `M86` spent on `tracker-lint`.** **Live.** Filed by `M86`.
+  batch, which `M86` spent on `tracker-lint`.** **Live.** Filed by `M86`. ✅ **CLOSED BY `M94` (2026-09-14) — NOT LIVE.** `M93` deleted the batch proposal whose printed refusal rule was never implemented, and the triage renderer already lists rows with no harvested file apart from hub-only rows.
 
-- **`minor` · Two open rows file the same triage-generator defect with OPPOSITE liveness verdicts, and
-  neither cites the other.** Measured by `M86` (2026-09-07). The `M70` row — *"the collision check harvests
+- ~~**`minor` · Two open rows file the same triage-generator defect with OPPOSITE liveness verdicts, and
+  neither cites the other.**~~ Measured by `M86` (2026-09-07). The `M70` row — *"the collision check harvests
   citations from row TEXT, so it proposes batches that collide"* — and the `M83` row — *"the generator
   harvested a row as hub-free whose repair could only be made in a hub file"* — are the same finding in
   nearly the same words, one increment apart. ⛔ **The `M70` row is filed `not live`; the `M83` row is filed
@@ -8544,7 +8544,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   repair is probably not in the generator"*. ⚠️ **Whoever takes either must reconcile all three of those
   before writing any code**, because a row's liveness verdict is what `scripts/pipeline.php` derives its
   queue state from, so two contradictory verdicts on one defect means the queue is publishing a state for it
-  that is half wrong by construction. **Live.** Filed by `M86`.
+  that is half wrong by construction. **Live.** Filed by `M86`. ✅ **CLOSED BY `M94` (2026-09-14) — NOT LIVE.** Its only subject was two open rows filing one defect with opposite verdicts. `M94` closed the `M70` row because its batch proposal is gone, so the `M83` row now carries the finding alone.
 
 - ~~**`minor` · `D13` caps a batch at one row that TOUCHES a hub file; the generator implements one that
   CITES one.**~~ Measured by `M86` (2026-09-07). The decision's wording is *touch*; `render_batch()` derives
@@ -8568,7 +8568,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   batch**, because relocating it is a second surgery with its own proof obligation and does not belong inside
   an increment already performing one. ⚠️ **Whoever moves it should use `scripts/tracker-surgery.php` with
   its explicit before-state arguments**, since both halves of that move are inside one file and the ordinary
-  git-based before-state cannot express it. **Live.** Filed by `M86`.
+  git-based before-state cannot express it. **Live.** Filed by `M86`. **Tier: after-launch.**
 
 - **`minor` · No control harness drives the real `scripts/backlog-triage.php` or `scripts/pipeline.php`, and
   the one harness that looks like it does stubs the generator.** Measured by `M86` (2026-09-07).
@@ -8580,7 +8580,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   committed control harnesses; these two — the ones that choose what work happens next — have none.
   ⚠️ **The shape to copy exists and is proven twice over**: copy the shipped bytes into a fixture root, drive
   synthetic inputs, assert the verdict. `M86` extended one of those harnesses without altering its design, so
-  the cost here is known rather than estimated. **Live.** Filed by `M86`.
+  the cost here is known rather than estimated. **Live.** Filed by `M86`. **Tier: after-launch.**
 
 - ~~**`minor` · The schedule window is re-asserted under the lock on the promote door and on no other, and the
   asymmetry was created by the fix that filed the row above it.**~~
@@ -8659,7 +8659,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `docs/data-dictionary.md` is pinned by 24 citations (6 zero-tolerance) and the ledger tier has zero
   headroom, so this lands either after that ceiling moves or alongside a deliberate re-pointing of the
   citations. `DocumentedCheckConstraintDriftTest` asserts only over columns the catalog names, and says so.
-  **Live.** Filed by `M87`.
+  **Live.** Filed by `M87`. **Tier: after-launch.**
 - ~~**`minor` · The enum catalog's value lists are gated against the DATABASE and against nothing else, so the
   17 rows with no `CHECK` can still contradict their own PHP enum.**~~
   ✅ **CLOSED BY `M88` (2026-09-08) with `tests/Feature/Docs/DocumentedEnumCatalogDriftTest.php`, and the row
@@ -8707,7 +8707,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `responsive-axe.spec.ts` scans the Sheets rule detail PAGE, which is a different surface.
   ⚠️ **It is filed with the spill row rather than folded into it** because the remedy is the same decision:
   if the component gets a wrap or shrink affordance, all four hosts are covered at once. **Live.**
-  Filed by `M87`.
+  Filed by `M87`. **Tier: during-testing.**
 - **`minor` · A `docs/feature-backlog.md` citation into the exceptions log resolves to a live line about a
   different subject, and the citation gate is built to pass exactly that.** Found by `M87`'s fan-out
   (2026-09-08). This file cites `docs/ux/exceptions-log.md:646-651` for an `overflow-x: clip` rationale;
@@ -8725,7 +8725,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   has always been green, and it was found only because `M87` happened to edit that file and re-read the
   lines. Repointed to the verified lines. ⚠️ **Two instances found by two accidents is not a rate**, and the
   reason it is not is the same reason the row above exists: nobody can enumerate them.
-  **Live.** Filed by `M87`.
+  **Live.** Filed by `M87`. **Tier: after-launch.**
 - ~~**`minor` · The publish transaction reads the schema snapshot without locking the child rows it is about
   to freeze, and that window is the only one `M88`'s re-read cannot close.**~~
   ✅ **CLOSED BY `M89` (2026-09-10) by locking the three child tables at the TOP of the publish
@@ -8833,7 +8833,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   accepts an edit that carries no concurrency token (overwrite)"* asserts exactly that, which makes it a
   **deliberate** hole rather than an oversight. ⚠️ **That is what makes it a decision and not a fix**:
   requiring the token is a client-contract change to the builder's fetch sidecar, and the compensating
-  control §3.4 names is the thing that is optional. **Live.** Filed by `M88`.
+  control §3.4 names is the thing that is optional. **Live.** Filed by `M88`. **Tier: during-testing.**
 - **`minor` · Three more lock-holding transitions DELETE the child rows a concurrent builder edit is
   writing, and for all three the RLS backstop does not fire.** Measured by `M88`'s fan-out (2026-09-08).
   Publish is not the only transition a builder edit races: `RestoreService` and `XlsformImporter` each run
@@ -8843,7 +8843,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   (archive), **so the `draft_child` RLS policy the publish analysis leans on never refuses anything.**
   ⚠️ `M88`'s re-read guard covers the two mutators it touched — the child re-read is there for exactly this
   family — but the three siblings named in the row above are not covered, and neither is any non-builder
-  writer. **Live.** Filed by `M88`.
+  writer. **Live.** Filed by `M88`. **Tier: during-testing.**
 - **`minor` · `FormService` has seven lock-free writers to `forms` and one locked, and six of them build
   their audit payload from a model nobody re-read.** Measured by `M88`'s fan-out (2026-09-08) while
   correcting the schedule-window row. `create`, `updateMetadata`, `assignScope`, `setSaveAndResume`,
@@ -8854,7 +8854,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   already exists in that file** for an unrelated reason (six of them are enumerated as the set that is
   "silent"); nobody has applied it to the lock or to the audit read. ⚠️ Filed rather than fixed because
   whether a config setter should serialize against publish is the same §3.4 question the builder rows raise.
-  **Live.** Filed by `M88`.
+  **Live.** Filed by `M88`. **Tier: during-testing.**
 - **`minor` · One `forceFill` writes `closes_at` and `max_responses` together, and the acceptance guard
   treats one as authoritative-under-lock and the other as ignorable-pre-lock.** Measured by `M88`'s fan-out
   (2026-09-08). `FormAcceptanceGuard::assertCapacity()` does not trust the passed-in `$form`: it re-reads
@@ -8866,7 +8866,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   ⚠️ **This is the sharper form of what the closed schedule-window row was reaching for and got wrong**: the
   split is not promote-door versus submit-door, it is two columns of one write inside one guard class.
   ⚠️ Whether that asymmetry is wrong is the `D27` question rather than a separate one.
-  **Live.** Filed by `M88`. **Awaits D27.**
+  **Live.** Filed by `M88`. **Awaits D27.** **Tier: during-testing.**
 - ~~**`minor` · `P2d`'s dormant-column skip is TABLE-BLIND, and a phantom in one table masked a real inert
   column in another.**~~
   ✅ **CORRECTED AND CLOSED BY `M89` (2026-09-10). THE DEFECT IS REAL, THE PRESCRIBED FIX IS MEASURABLY
@@ -9056,7 +9056,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   radius**, but it needs `$path` threaded from `column_is_used()` into `is_declaration_line()`, i.e. a
   signature change. That is the "no new plumbing" claim failing, and it is why this is filed rather than
   taken. Read with `docs/feature-backlog.md:7858`, which owns the closed-vocabulary half.
-  **Live.** Filed by `M89`.
+  **Live.** Filed by `M89`. **Tier: after-launch.**
 - ~~**`minor` · The repository's only claimed two-connection concurrency test does not exist, and a shipped
   file cites it as the reason it does not race.**~~ Found by `M89`'s fan-out (2026-09-10).
   `tests/Feature/Scoping/ScopeNodeMoveLockingTest.php:20` explains that genuine contention "lives in
@@ -9191,7 +9191,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   cross-field validation rule resolving to a null `related_field_key` and being KEPT by the filter that
   exists to drop it. ⛔ **The blocker is the decision, not the code**: `M90` made `saveAsTemplate()` the
   FIRST request-path `set transaction isolation level` in this codebase, and whether that becomes a pattern
-  is `D29` in `docs/claims/decisions.md`. **Latent.** Filed by `M90`. **Awaits D29.**
+  is `D29` in `docs/claims/decisions.md`. **Latent.** Filed by `M90`. **Awaits D29.** **Tier: during-testing.**
 - ~~**`minor` · Four sites cite a tenants column-whitelist guard that has never existed, and the gate that
   could see them is forced to exempt it.**~~ Found by `M90` (2026-09-10). `scripts/test-pointer-lint.php`
   forbids a test file naming a `*Test` class with no file behind it; this one is EXEMPTED rather than
@@ -9228,7 +9228,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `->with('toast', …)` into the session; whether a JSON response consumes, ages or orphans that flash
   decides whether `useMemberStreak`'s guard is still doing anything. `docs/gamification-design.md:408`
   claims the orphaned toast pops "once per navigation forever", and that claim has never been measured.
-  Measure the flash before removing any of the three. **Live.** Filed by `M90`.
+  Measure the flash before removing any of the three. **Live.** Filed by `M90`. **Tier: during-testing.**
 - **`minor` · `D13`'s one-hub-row cap cannot admit a new lint gate at all, and `M90` broke it for exactly
   that reason.** Measured by `M90` (2026-09-10). A gate is not a gate until it is registered, and
   registering one means editing `composer.json` (3 citing rows) and `.github/workflows/ci.yml` (8) — both
@@ -9237,7 +9237,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `docs/claims/decisions.md` as well. ⚠️ **This is recorded rather than argued** — `D15` is already open on
   whether that cap should be relaxed to per-file or re-derived per batch, and this is the first measured
   case of it forbidding work rather than merely shrinking a batch. It is an input to `D15`, not a licence.
-  **Live.** Filed by `M90`. **Awaits D15.**
+  **Live.** Filed by `M90`. **Awaits D15.** **Tier: after-launch.**
 - ~~**`minor` · `scripts/gate-baselines.php`'s gate list and its two harness fixtures must change together,
   nothing says so, and `M90` turned `main` red by not knowing it.**~~ Measured by `M90` (2026-09-10), the
   hard way. `GateBaselinesTest` drives the REAL generator against `tests/fixtures/gate-baselines/ci-log.txt`
@@ -9333,7 +9333,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   edits only its own status block and hand-off line, so correcting another lane's structural prose is
   outside what an increment may take unilaterally. ⚠️ The honest repair is probably not a corrected
   number but a removed one — the sentence reads correctly as *"the files below"*. **Live.**
-  Filed by `M91`.
+  Filed by `M91`. **Tier: after-launch.**
 - **`minor` · `BlueprintValidator` enforces no key FORMAT at all, and `SchemaTreeCloner` carries keys
   forward verbatim — defence in depth rather than a live defect, and it should be recorded as which.**
   Found by `M91` (2026-09-11) while closing the `__lead__` reservation row.
@@ -9348,7 +9348,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   rows, so it propagates a bad key rather than originating one. ⚠️ **A full format rule is the wrong
   first move** — it would turn blueprints accepted at capture time into refusals at instantiate time,
   which is a compatibility question and not a lint. A sentinel-only refusal is the narrow version and
-  is what the `__lead__` row would have bought. **Latent.** Filed by `M91`.
+  is what the `__lead__` row would have bought. **Latent.** Filed by `M91`. **Tier: after-launch.**
 - **`minor` · A third instance of the citation class `M83` filed in the abstract: three live lines that
   say nothing about what cites them.** Found by `M91` (2026-09-11) while checking what its own edits
   would shift. `docs/feature-backlog.md:7546` cites `app/Services/Forms/FormBuilderService.php:157`,
@@ -9361,7 +9361,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   changes nothing about their correctness in either direction and is recorded so the next reader does
   not read the drift as the defect. ⚠️ The repair is to re-derive the three from the code — the real
   sites are `replaceValidations()` and its single caller — and it should be taken with `8043`, which
-  filed the class, rather than alone. **Live.** Filed by `M91`.
+  filed the class, rather than alone. **Live.** Filed by `M91`. **Tier: after-launch.**
 - ~~**`minor` · A SECOND publisher-versus-builder deadlock cycle survives `M91`'s fix, reached only through
   a cross-field validation rule, and neither side orders its lock set.**~~ Measured by `M91` (2026-09-11)
   while closing the `updateField()` row, and recorded because the closure would otherwise read as closing
@@ -9414,7 +9414,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   other harness script is free to name a test file that does not exist, and eleven of them cite tests in
   prose. ⚠️ The real remedy is probably a scoping rule — a name inside a block that is explicitly a
   historical record is not a pointer — which is the *"clever predicate"* the `EXEMPTIONS` docblock already
-  argues against once. **Live.** Filed by `M92`.
+  argues against once. **Live.** Filed by `M92`. **Tier: after-launch.**
 - **`minor` · `MIRROR_DIVERGENCES` is keyed by mirror NAME alone, so two same-named mirrors in different
   files would silently share one exception.** Found by `M92` (2026-09-11) while declaring four new mirrors
   in `tests/Feature/Docs/DocumentedEnumMirrorDriftTest.php`. `ENUM_MIRRORS` is keyed by path-plus-name and
@@ -9425,9 +9425,9 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   is the whole reason it is filed rather than fixed** — every declared name is distinct, and `M92` came
   within one naming coincidence of it, since `RequiredMarker` and `Marker` mirror the SAME enum from two
   files and are distinct only because their authors happened to name them differently. **Live.**
-  Filed by `M92`.
-- **`minor` · Two more TypeScript unions mirror a PHP enum and are missing the same member, and neither is
-  declared.** Measured by `M92`'s fan-out (2026-09-11) during the full `resources/**` census that closed
+  Filed by `M92`. **Tier: after-launch.**
+- ~~**`minor` · Two more TypeScript unions mirror a PHP enum and are missing the same member, and neither is
+  declared.**~~ Measured by `M92`'s fan-out (2026-09-11) during the full `resources/**` census that closed
   the four-mirrors row. `resources/js/Pages/webhooks/Show.vue` declares a status union of `active` and
   `paused` against `WebhookEndpointStatus`, and `resources/js/Pages/integrations/RuleShow.vue` does the
   same against `ConnectorSubscriptionStatus`. ⛔ **Both PHP enums carry a third case, `disabled`**, so each
@@ -9436,7 +9436,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   component whose type says it cannot be is either dead UI or an unhandled state, and which one it is has
   to be read off the page rather than off the type. ⚠️ They are NOT the same shape as the marker
   divergences `M92` recorded — those are a rendered vocabulary against an authored one, whereas these two
-  are the same vocabulary with a member dropped. **Live.** Filed by `M92`.
+  are the same vocabulary with a member dropped. **Live.** Filed by `M92`. ✅ **CLOSED BY `M94` (2026-09-14) — NOT LIVE.** A disabled webhook or rule already renders a neutral Disabled badge with a re-enable action; the two-value union is only the pause and resume button's input, so no member is missing and there is no mirror to declare.
 - **`minor` · A `ControlKind` docblock claims it is derived exactly as the SFC's own `control` computed,
   the two disagree in three ways, and no gate can compare them.** Measured by `M92`'s fan-out
   (2026-09-11). `resources/public-runtime/lib/types.ts`'s `ControlKind` and
@@ -9447,7 +9447,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   union to `SomeEnum::cases()`, and there is no enum here to be the authority. ⚠️ **The docblock's claim
   is the defect rather than the drift** — a reader is told the two are derived alike and will not check.
   ⚠️ A second-copy gate with no authority needs one side nominated as canonical first, which is a design
-  decision rather than a lint. **Live.** Filed by `M92`.
+  decision rather than a lint. **Live.** Filed by `M92`. **Tier: after-launch.**
 - **`minor` · The schedule-acceptance vocabulary has four TypeScript copies and a PHP side that is raw
   strings rather than an enum, so nothing can ever gate it.** Measured by `M92`'s fan-out (2026-09-11).
   `resources/public-runtime/lib/types.ts` declares `ScheduleAcceptance`, and `resources/js/Pages/forms/Show.vue`,
@@ -9458,7 +9458,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   request to introduce the enum, not to declare a mirror, and that is a production change on a shipped
   presenter rather than a test-only one. ⚠️ It is the largest uncontrolled vocabulary the `M92` census
   found and is filed at `minor` only because no divergence between the five has been measured yet.
-  **Live.** Filed by `M92`.
+  **Live.** Filed by `M92`. **Tier: during-testing.**
 - **`minor` · The mirror gate's comment stripper is line-based and unscoped to `<script>`, so its property
   grammar on a `.vue` file is first-match-wins across the template and the stylesheet.** Measured by `M92`
   (2026-09-11) while declaring the first two SFC mirrors. `enumMirrorStripComments()` cuts each line at its
@@ -9470,7 +9470,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   prose standing in for a predicate** and is exactly the arrangement this repository has measured failing
   before. ⚠️ The honest fix is to bound the search to the `<script>` block for `.vue` paths, which is
   cheap; it is filed rather than done because it needs its own control and `M92`'s budget was spent.
-  **Live.** Filed by `M92`.
+  **Live.** Filed by `M92`. **Tier: after-launch.**
 - **`minor` · Three comments corrected by `M92` now name an arm that asserts LESS than they claim, and the
   gap is different in each.** Measured by `M92` (2026-09-11) while dispositioning eight dead test-class
   pointers. Each was a wrong NAME with real coverage behind it, but three of the eight replacements are
@@ -9483,7 +9483,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   sweep arms pin it only CONSEQUENTIALLY, by acting on rows the global scope hides. ⛔ **The comments now
   say so**, so nothing is overstated; what is open is the coverage, and it is three separate small tests.
   ⚠️ Filed as one row because they share a cause — a pointer written from intent rather than from the
-  assertion — and splitting them would lose that. **Live.** Filed by `M92`.
+  assertion — and splitting them would lose that. **Live.** Filed by `M92`. **Tier: after-launch.**
 - **`minor` · `docs/data-dictionary.md` holds a fourth copy of `bot_challenge` in prose and
   `FormBotChallenge` is in no catalog row, and `M92` could not take it.** Carried forward by `M92`
   (2026-09-11) from the four-mirrors row it closed, so the finding is not lost with that closure. The
@@ -9493,7 +9493,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   INSERTION into a file that is line-pinned by the citation ledger at its ceiling**, which is the same
   blocker the eleven-CHECK-constraints row already carries, and the two should be taken together in an
   increment that spends its hub slot on the dictionary. ⚠️ `M92` scoped it out deliberately: its one hub
-  slot went to widening `test-pointer-lint` over `routes/tenant.php`. **Live.** Filed by `M92`.
+  slot went to widening `test-pointer-lint` over `routes/tenant.php`. **Live.** Filed by `M92`. **Tier: after-launch.**
 - **`minor` · A `FormRequest` class docblock is PUBLISHED API DOCUMENTATION, and nothing says so at the
   place where someone writes one.** Measured by `M92` (2026-09-11) when the Contract job went red on
   `openapi.json` drift with five of six jobs green. Scramble emits an `App\Http\Requests\Api\V1`
@@ -9509,7 +9509,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   mention root. A generated artefact carrying a dead pointer is a copy no gate owns. ⚠️ The cheap remedy
   is a lint that refuses a docblock in that namespace exceeding some size, which is a proxy; the honest
   one is a convention — contract above, maintenance notes inside the class body — with an arm that
-  checks the emitted description against it. **Live.** Filed by `M92`.
+  checks the emitted description against it. **Live.** Filed by `M92`. **Tier: during-testing.**
 - **`minor` · A gate's SUMMARY LINE is a paired artefact across three files, and nothing declares that
   pairing at the place where somebody edits one.** Measured by `M92` (2026-09-14) during its own close-out.
   Widening `scripts/test-pointer-lint.php` added two numbers to its `passed (...)` line;
@@ -9525,7 +9525,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   under the owner bypass**, which its own follow-up commit records as having turned the trunk red; `M92`
   took a PR instead. ⚠️ The cheap remedy is a `--check` arm on the scraper that runs on the HOST against
   the live gates' own output rather than against a CI log, which would move the signal from post-merge to
-  pre-push. **Live.** Filed by `M92`.
+  pre-push. **Live.** Filed by `M92`. **Tier: after-launch.**
 - **`minor` · `deploy.ps1` cycles two Windows services that cannot exist and never runs `queue:restart`, so a
   deploy leaves a running worker on the previous release's code.** Measured by `M93` (2026-09-14) against the
   script rather than its documentation. Its only service step loops over `meridian-horizon` and
@@ -9622,3 +9622,116 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   on expression limits is otherwise built: `ExpressionParser` pins `MAX_PARSE_DEPTH` at 64. The recommended
   wall-clock budget is absent. ⚠️ The parse limits bound evaluation in practice, which is why this is filed
   rather than fixed. **Latent.** Filed by `M93`. **Tier: after-launch.**
+- **`minor` · A webhook retry or redeliver is signed with the event's original time, so a receiver that enforces
+  a five-minute replay window rejects every attempt sent after it.** Carried out of `docs/security-threat-model.md`
+  §9 item 3 by `M94` (2026-09-14), whose first half is built. `DeliverWebhookJob` signs every attempt over the
+  payload's `occurred_at`, and `WebhookSigner` documents that timestamp as stable across retries, while
+  `docs/webhook-integration-design.md` tells receivers to refuse anything more than five minutes old. ⚠️ Neither
+  `docs/api-specification.md` nor the webhook settings page publishes that window, so no integrator knows to apply
+  it, which is the only reason nothing breaks today. The remedy is either signing each attempt with its own send
+  time, so the window holds, or publishing the window together with the retry behaviour. **Latent** — it needs a
+  receiver that enforces the window and a first attempt that fails. Filed by `M94`. **Tier: during-testing.**
+- **`minor` · The forms list loads every form a member can see in one request, with no pagination.** Carried out
+  of `docs/TESTING-GUIDE.md` §18 by `M94` (2026-09-14), which calls it the row to watch while no row existed.
+  `FormPresenter` loads every visible non-archived form with `get()`, and the page sorts and filters that array in
+  the browser. ⚠️ Harmless at demo scale; it matters once a workspace holds hundreds of forms. **Latent.** Filed by `M94`. **Tier: after-launch.**
+- **`minor` · The submissions inbox and the webhook delivery log still offer column sorting that reorders only
+  the visible page.** Carried out of this ledger's §3 table by `M94` (2026-09-14), where the user's decision of
+  2026-08-18 to drop `sortable` on the two server-paginated tables has stood unbuilt with no row.
+  `webhooks/Show.vue` still declares `created_at` sortable and `submissions/Inbox.vue` still declares `form_title`
+  and `submitted_at`, so a header announces an ordering the dataset does not have. ⚠️ The decision covers exactly
+  these two pages: the five other sortable tables are handed their complete set and must not be swept, and the
+  audit ledger's page is the precedent. **Live.** Filed by `M94`. **Tier: early-testing.**
+- **`minor` · Search and the sidebar hide plan-gated destinations when no plan catalog is seeded, while the routes
+  serve them.** Carried out of this ledger's §3 table by `M94` (2026-09-14), where the user's ruling of 2026-08-18
+  to fail open has stood unbuilt with no row. `DestinationCatalog` still asks `EntitlementService::feature()`, which
+  fails closed, while `RequireFeature` fails open, and `FeatureAdmission::admits()`, the fail-open mirror, still has
+  only its two callers. Adopting the ruling re-pins the tests that assert fail-closed by name. ⚠️ Reachable only
+  with an unseeded `plans` table: production falls back to Free and a testing server is seeded. **Latent.** Filed by `M94`. **Tier: after-launch.**
+- **`minor` · In the builder at compact widths, selecting a field does not bring its settings on screen.** Carried
+  out of this ledger's §3 table by `M94` (2026-09-14). Below the builder's pane-switch width, tapping a field
+  highlights it while the settings pane stays off-screen, so the author has to know to tap *Settings*, and
+  `Builder.vue` records that a selection watcher was deliberately not added. ⚠️ The recorded trap: the page selects
+  the first field on mount, so a naive watcher fires on load and overrides the default pane; it needs a post-flush
+  watcher behind a mounted flag, and it changes what the builder e2e sequences see. **Live.** Filed by `M94`. **Tier: during-testing.**
+- **`minor` · The builder's side-pane widths are fixed pixels, so at the largest text size the pane-switch
+  threshold no longer matches the columns it is derived from.** Carried out of this ledger's §3 table by `M94`
+  (2026-09-14). `Builder.vue` sets its grid to `260px minmax(0, 1fr) 340px`; in `em` the two side panes and the
+  canvas minimum add up to the 60em threshold at every scale and the palette stops being cramped. ⚠️ The current
+  direction is safe rather than wrong: it wastes canvas instead of overflowing. **Live.** Filed by `M94`. **Tier: during-testing.**
+- **`minor` · A later successful builder save clears the unsaved warning for an earlier field that still failed.**
+  Carried out of this ledger's §3 table by `M94` (2026-09-14). The save verdict covers a burst of work rather than
+  a field, so an unrelated later burst that lands clears an earlier burst's failure while that field still differs
+  from the server. ⚠️ `save-state.test.ts` pins the burst behaviour on purpose, so whoever takes this changes that
+  assertion deliberately, and exactness needs a per-field dirty set threaded through every guarded action. The
+  author has already been shown the alert once. **Live.** Filed by `M94`. **Tier: during-testing.**
+- **`minor` · A repeated identical builder save failure is announced to a screen reader only once.** Carried out
+  of this ledger's §3 table by `M94` (2026-09-14). Setting the save error to the same string is not a reactive
+  change, so the config panel's alert never re-mounts and never re-announces. The fix is a per-failure key on that
+  alert, with its own test. **Live.** Filed by `M94`. **Tier: during-testing.**
+- **`minor` · The builder toolbar says "All changes saved" on a form that cannot be edited.** Carried out of this
+  ledger's §3 table by `M94` (2026-09-14). With no draft the panes are replaced by an empty state and nothing can
+  be written, yet the save status still renders. Hiding it on a read-only form is the fix, in a state the builder
+  accessibility spec does not drive today. **Live.** Filed by `M94`. **Tier: during-testing.**
+- **`minor` · The builder's "Not saved" status looks the same as "All changes saved".** Carried out of this
+  ledger's §3 table by `M94` (2026-09-14). `.builder__save` keeps the secondary text colour in every state. ⚠️ A
+  danger tone is a new colour-contrast surface across two themes, three type scales and three viewports, and the
+  failure already carries colour in the config panel's error. **Live.** Filed by `M94`. **Tier: during-testing.**
+- **`minor` · In-app notifications are never pruned, and "Mark all as read" is one unbounded update.** Carried out
+  of this ledger's §4 table by `M94` (2026-09-14). None of the seven maintenance jobs touches `notifications`, while
+  one received submission notifies the owner, the admins and every granted form editor. The unread count runs twice
+  a minute per open tab, and marking all read is a single `UPDATE` inside a web request. ⚠️ Neither matters at
+  testing scale; a prune of read rows older than a set age, plus a badge cap, is the likely shape. **Latent.** Filed by `M94`. **Tier: before-launch.**
+- **`minor` · A background job that waits in the queue longer than six hours is failed without ever running.**
+  Carried out of this ledger's §7 table by `M94` (2026-09-14). `TenantAwareJob::retryUntil()` is stamped at dispatch
+  and never slides, and the worker compares it with the clock before calling `handle()`, so a deploy freeze, a
+  stopped worker or a long burst lands jobs in `failed_jobs` looking like code faults. Nothing tests it and nothing
+  alerts on that exception class. ⚠️ It wants a deliberate call between a sliding window, accepting the cap, and
+  alerting, which is why it was a table row rather than a fix. **Latent.** Filed by `M94`. **Tier: during-testing.**
+- **`minor` · Discarding a conflicted offline response uses the browser's plain confirm box.** Carried out of this
+  ledger's §7 table by `M94` (2026-09-14). The guest runtime's discard still calls `window.confirm`, while the
+  per-submission list beside it uses an inline two-step confirm for stated reasons: the plain box blocks the page,
+  renders unbranded inside the offline shell, cannot be asserted without a dialog handler, and cannot name which
+  response it destroys. **Live.** Filed by `M94`. **Tier: during-testing.**
+- **`minor` · In an installed offline form, opening another form's queued response leaves the installed window.**
+  Carried out of this ledger's §7 table by `M94` (2026-09-14). The outbox links such a response to that form's page,
+  but the installed app's manifest scopes itself to the current form, so the operating system opens the link in a
+  browser tab. ⚠️ A broader manifest scope trades against the per-form install, so this wants a decision rather than
+  a patch, and the link is still better than the silent no-op it replaced. **Live.** Filed by `M94`. **Tier: during-testing.**
+- **`minor` · Reviewing an offline conflict reopens a form that has since closed or filled up, and the resubmit is
+  then refused.** Carried out of this ledger's §7 table by `M94` (2026-09-14). The conflict review re-mints, fetches
+  the schema again and marks the session ready without the schedule check a fresh load runs, so the server refuses
+  what the runtime should have shown as unavailable. **Live.** Filed by `M94`. **Tier: during-testing.**
+- **`minor` · Two accessibility specs still scan only the open dialog rather than the whole page.** Carried out of
+  this ledger's §7 table by `M94` (2026-09-14). `analytics-axe.spec.ts` and `scopes-axe.spec.ts` scope their modal
+  scans to the dialog, which `builder-axe.spec.ts` stopped doing once the modal began marking its background inert.
+  ⚠️ Both files scope every scan for a separate reason, since a whole-page scan re-flags earlier violations
+  elsewhere, so widening them needs an audit of what those pages fail whole-page first. **Live.** Filed by `M94`. **Tier: after-launch.**
+- **`minor` · 26 foreign keys can point at another workspace's rows, and 20 of them would cascade a delete across
+  workspaces.** Carried out of this ledger's discovered-defects section by `M94` (2026-09-14), where it stood as a
+  bullet no parser reads while `ConstraintBoundaries` says its remediation is filed here. No cross-workspace
+  reference exists in the data, because every write path resolves its parent under row security first; what is
+  missing is the database guarantee §D5 of `docs/adr/0002-multi-tenancy-shared-db-rls.md` asks for. ⚠️ A new
+  exception is already refused by the boundary drift test and `scripts/constraint-boundary-lint.php`, so the count
+  cannot grow. **Latent.** Filed by `M94`. **Tier: before-launch.**
+- **`minor` · Five screen-reader-only live regions have no positioned ancestor inside their component.** Carried
+  out of this ledger's discovered-defects section by `M94` (2026-09-14). Each hides a node with absolute positioning
+  and a zero clip while positioning nothing itself, so its containing block is set outside the component and a
+  scroll container in between can add stray scroll: `scopes/Index.vue`, `BuilderCanvas.vue`, `FeedbackButton.vue`,
+  `GeoInput.vue` and the guest runtime's `RuntimeShell.vue`. `clipped-node-containment.test.ts` pins exactly these
+  five. ⚠️ The fix is one line each and the verification is not, since a positioned container also changes stacking,
+  so each wants a look at the running page. **Latent.** Filed by `M94`. **Tier: during-testing.**
+- **`minor` · The password-strength requirement list loses its list semantics in Safari, and 21 more files carry the
+  same shape.** Carried out of this ledger's design-system section by `M94` (2026-09-14). `MdsPasswordStrength`
+  renders its list with `list-style: none` and no `role="list"`, so VoiceOver reads the requirements with no count,
+  on a live region that re-announces while somebody types. A sweep found 22 files with the shape, and seven others
+  carry the attribute. ⚠️ Not a sweep: a list used only for layout should not gain list semantics, so each needs a
+  per-element judgement, and the password list comes first. **Live.** Filed by `M94`. **Tier: during-testing.**
+- **`minor` · Seventeen line pointers into this ledger resolve to unrelated lines, and no gate reads them.** Found by
+  `M94` (2026-09-14) while proving its own edits line-neutral. Comments in `bootstrap/app.php`, the CI workflow,
+  `scripts/test-pointer-lint.php` (twice), `scripts/citation-liveness-lint.php`, `TemplateService`, `ConfigPanel.vue`,
+  `Modal.test.ts`, `builder-axe.spec.ts` and six Pest files, plus one pointer each in the decisions log and the
+  tracker, cite this ledger by line number, and each of those lines now holds something else. Only the kiosk pointer
+  in `respondent-session.ts` still holds. ⚠️ The citation gate deliberately skips code, the claims tree and the
+  tracker, and this ledger moves with every filing, so a line number is the wrong anchor here: a row id does not
+  move. **Live.** Filed by `M94`. **Tier: after-launch.**

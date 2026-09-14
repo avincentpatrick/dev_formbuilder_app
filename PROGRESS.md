@@ -202,9 +202,9 @@ lives in [PROGRESS_ARCHIVE.md](PROGRESS_ARCHIVE.md) and in git — do **not** re
      They used to be at end-of-file so as to shift no `path:N` citation — but no citation points into
      this file, and the status bullet prepended at every close-out shifted THESE instead, which drifted
      the generated line with no run to notice (M92). Other documents keep their markers at end-of-file. -->
-<!-- pipeline: id=uploading-import title="All uploading and import features, including bulk Excel and CSV" phase=n/a state=held size=XL blocker="user: held by the explicit-signal decision of 2026-08-09; re-enters only on their go-signal" tier=before-launch -->
+<!-- pipeline: id=uploading-import title="All uploading and import features, including bulk Excel and CSV, and the ledger entries marked RE-HOMED TO uploading-import" phase=n/a state=held size=XL blocker="user: held by the explicit-signal decision of 2026-08-09; re-enters only on their go-signal" tier=before-launch -->
 <!-- pipeline: id=deferral-site-disposition title="Give every documented deferral section and deferral sentence a recorded disposition" phase=n/a state=ready size=L tier=after-launch -->
-<!-- pipeline: id=tier-verdicts title="Tier every untiered row, close the verified not-live rows, fix the stale threat-model lines, and retire the backlog tables" phase=n/a state=ready size=L tier=before-testing -->
+<!-- pipeline: id=tier-verdicts title="Tier every untiered row, close the verified not-live rows, fix the stale threat-model lines, and retire the backlog tables" phase=n/a state=done size=L tier=before-testing done="M94 — the tier verdicts, recorded in docs/claims/lane-a.md" -->
 
 ## Current Status
 

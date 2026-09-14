@@ -67,7 +67,8 @@ declare(strict_types=1);
  * Under-collecting is the BLIND direction and it reports green.
  *
  *   P7   (M93) The tier rules. The approved design pinned P7a's untiered residue as a DIGEST, like P2's;
- *        that is impossible to reproduce in a fixture of synthetic rows, so it is a one-way COUNT. And
+ *        that is impossible to reproduce in a fixture of synthetic rows, so `M93` shipped a one-way COUNT
+ *        of 158 — and `M94` tiered every one of those rows and deleted it, so no class has an allowance. And
  *        P7b parses the decisions file ITSELF: the generator's decision rows come from state.php's
  *        parse of the same file, and comparing them with the generator's own copy of that parse would
  *        compare a thing with itself and pass for free.
@@ -285,18 +286,6 @@ const STRUCK_SPAN_THRESHOLD = 3;
  * `scripts/pipeline.php` and `scripts/state.php`, in the same order.
  */
 const TIERS = ['before-testing', 'early-testing', 'during-testing', 'before-launch', 'after-launch'];
-
-/**
- * P7a's residue — defect rows that carry no tier yet.
- *
- * ⚠️ A COUNT, NOT A DIGEST, AND ONE-WAY. The P2 coverage rules pin a digest because their controls copy
- * the live corpus; a digest over live row ids cannot be reproduced in a fixture of synthetic rows. The
- * residue exists only because tiering the ledger row by row is its own increment, and that increment
- * deletes this constant and its two controls together. Plan rows and decision rows get NO allowance: a
- * marker without `tier=` is refused by the generator itself, and a decision is tiered on its heading
- * the moment it is filed.
- */
-const P7A_UNTIERED_DEFECT_CEILING = 158;
 
 $flags = ['verbose', 'help'];
 $opts = getopt('', $flags);
@@ -1294,16 +1283,19 @@ function p6_self_arming(): void
 }
 
 /**
- * P7a — every row carries a tier, and only the defect ledger has a residue, which can only fall.
+ * P7a — every row in the line carries a tier, and no class has an allowance.
  *
  * ⚠️ READS `rows` ONLY, NEVER `off_the_line`. A done or n/a row is not work, and demanding a priority of
  * finished work would be red on arrival for every row that finished before tiers existed.
+ *
+ * ✅ THE RESIDUE IS GONE (M94). `M93` let untiered DEFECT rows through up to a pinned one-way count, because
+ * tiering the ledger row by row was its own increment. `M94` tiered every one and deleted the count, so a
+ * ledger row is now refused exactly as a plan row or a decision row is.
  *
  * @param  list<array<string, mixed>>  $rows
  */
 function p7a_tiered(array $rows): void
 {
-    $untieredDefects = 0;
     $bad = 0;
 
     foreach ($rows as $row) {
@@ -1311,38 +1303,17 @@ function p7a_tiered(array $rows): void
             continue;
         }
 
-        if (($row['class'] ?? '') === 'defect') {
-            $untieredDefects++;
-
-            continue;
-        }
-
         $bad++;
         fail('P7a tiered', sprintf(
-            'the %s row `%s` carries no tier. A plan marker takes `tier=` and an open decision carries the '
-            .'token on its heading line; only the defect ledger has a residue, and it is closed to new rows.',
+            'the %s row `%s` carries no tier. A plan marker takes `tier=`, an open decision carries the token '
+            .'on its heading line, and a ledger row carries **Tier: x.** after its Filed-by clause.',
             (string) ($row['class'] ?? 'unknown'),
             (string) ($row['id'] ?? '?')
         ));
     }
 
-    if ($untieredDefects > P7A_UNTIERED_DEFECT_CEILING) {
-        fail('P7a tiered', sprintf(
-            '%d defect row(s) carry no tier, over the pinned residue of %d. A row filed from now on is '
-            .'tiered the moment it is filed, so the residue only ever falls — lower the constant when it does.',
-            $untieredDefects,
-            P7A_UNTIERED_DEFECT_CEILING
-        ));
-
-        return;
-    }
-
     if ($bad === 0) {
-        pass('P7a tiered', sprintf(
-            'every plan and decision row is tiered; %d untiered defect row(s) within the residue of %d',
-            $untieredDefects,
-            P7A_UNTIERED_DEFECT_CEILING
-        ));
+        pass('P7a tiered', sprintf('all %d row(s) in the line carry a tier', count($rows)));
     }
 }
 

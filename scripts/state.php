@@ -636,7 +636,7 @@ function finish_row(array $row): array
     //    Filed-by clause sits mid-sentence in four rows and on the id-hashed first line in two, so a
     //    rule anchored on "right after the clause" would be red on arrival. The capture is LOOSE on
     //    purpose: a malformed value comes back as itself, so `pipeline-lint` P7c can refuse it, rather
-    //    than vanishing into "untiered" where the residue ceiling would absorb it in silence.
+    //    than vanishing into "untiered", where it would read as a missing tier rather than a wrong one.
     preg_match_all('/\*\*Tier: ([^*]+?)\.\*\*/u', $prose, $tierTokens);
     preg_match_all('/\*\*Awaits D(\d+)\.\*\*/u', $prose, $awaitsTokens);
 

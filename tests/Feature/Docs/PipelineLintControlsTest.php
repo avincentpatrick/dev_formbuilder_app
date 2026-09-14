@@ -243,7 +243,7 @@ function pipelineLintDocument(array $overrides = []): string
 {
     $rows = [];
 
-    // ⚠️ EVERY ROW IS TIERED (M93). P7a gives plan and decision rows no allowance, and a base fixture
+    // ⚠️ EVERY ROW IS TIERED (M93). P7a gives no row an allowance (since M94), and a base fixture
     // that tripped it would turn all forty-odd cases into "the baseline was not green".
     foreach (['alpha', 'beta', 'gamma', 'delta', 'epsilon', 'zeta'] as $topic) {
         $rows[] = [
@@ -455,16 +455,6 @@ it('is GREEN on a well-formed fixture, which every case below is measured agains
 // P7 (M93) — the tier rules.
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
 
-/** The untiered-defect residue P7a pins, read out of the SHIPPED gate so a control cannot drift from it. */
-function pipelineLintCeiling(): int
-{
-    $found = preg_match('/const P7A_UNTIERED_DEFECT_CEILING = (\d+);/', (string) file_get_contents(base_path('scripts/pipeline-lint.php')), $m);
-
-    expect($found)->toBe(1, 'P7A_UNTIERED_DEFECT_CEILING could not be read out of scripts/pipeline-lint.php.');
-
-    return (int) $m[1];
-}
-
 /** A shipped script's TIERS constant, read by regex — every one of those scripts executes at include time. */
 function pipelineLintTiersIn(string $relative): array
 {
@@ -472,26 +462,6 @@ function pipelineLintTiersIn(string $relative): array
     preg_match_all("/'([^']+)'/", $m[1] ?? '', $found);
 
     return $found[1];
-}
-
-/** The base document's rows with `$count` untiered defect rows appended. */
-function pipelineLintWithUntieredDefects(int $count): array
-{
-    $rows = json_decode(pipelineLintDocument(), true)['rows'];
-
-    for ($i = 0; $i < $count; $i++) {
-        $rows[] = [
-            'id' => 'R-u'.$i,
-            'class' => 'defect',
-            'state' => 'ready',
-            'blocker' => '',
-            'headline' => 'Untiered defect '.$i,
-            'phase' => 'n/a',
-            'size' => '',
-        ];
-    }
-
-    return $rows;
 }
 
 it('P7 — every copy of the tier vocabulary is equal, in the same order, and none can trip the stop-list', function (): void {
@@ -516,21 +486,28 @@ it('P7a — reddens when a plan row carries no tier', function (): void {
     });
 });
 
-it('P7a — reddens when the untiered defect rows exceed the pinned residue', function (): void {
-    $rows = pipelineLintWithUntieredDefects(pipelineLintCeiling() + 1);
+// ⛔ M94 DELETED THE RESIDUE AND ITS TWO CONTROLS TOGETHER. `M93` let untiered defect rows through up to a
+// pinned count while the ledger was tiered row by row; with every row tiered, a defect row gets no allowance,
+// and these two cases are what prove the class branch that granted one is really gone.
+it('P7a — reddens when a defect row carries no tier', function (): void {
+    $rows = json_decode(pipelineLintDocument(), true)['rows'];
+    expect($rows[16]['id'])->toBe('R-0000');
+    unset($rows[16]['tier']);
 
     pipelineLintPerturb('fixture-document.json', pipelineLintDocument(['rows' => $rows]), function (int $status, string $output): void {
         expect($status)->toBe(PIPELINE_LINT_FAILED, $output);
-        expect($output)->toContain('over the pinned residue of '.pipelineLintCeiling());
+        expect($output)->toContain('the defect row `R-0000` carries no tier');
     });
 });
 
-it('P7a — does NOT fire at exactly the pinned residue', function (): void {
-    $rows = pipelineLintWithUntieredDefects(pipelineLintCeiling());
+it('P7a — reddens when a decision row carries no tier', function (): void {
+    $rows = json_decode(pipelineLintDocument(), true)['rows'];
+    expect($rows[111]['id'])->toBe('D2');
+    unset($rows[111]['tier']);
 
     pipelineLintPerturb('fixture-document.json', pipelineLintDocument(['rows' => $rows]), function (int $status, string $output): void {
-        expect($status)->toBe(PIPELINE_LINT_CLEAN, $output);
-        expect($output)->toContain(pipelineLintCeiling().' untiered defect row(s) within the residue');
+        expect($status)->toBe(PIPELINE_LINT_FAILED, $output);
+        expect($output)->toContain('the decision row `D2` carries no tier');
     });
 });
 

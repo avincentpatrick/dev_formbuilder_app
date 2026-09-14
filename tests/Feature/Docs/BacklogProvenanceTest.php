@@ -156,6 +156,33 @@ function backlogProvenanceTokens(string $body): array
 }
 
 /**
+ * `scripts/state.php` `finish_row()`'s two first-line patterns, BYTE-COPIED and pinned below (M94).
+ *
+ * ⛔ THIS FILE USED TO ASK A LOOSER QUESTION — does the first line carry a severity token and a middle dot
+ * anywhere? — and that set was a strict superset of `state.php`'s by exactly one bullet: `M79`'s DONE record,
+ * whose token sits mid-line. Harmless while the tier arm asked for at most one tier; red on arrival for the
+ * exactly-one arm, over a bullet `state.php` never counts as a row. Two readers disagreeing about what a row
+ * IS is the defect, so the copy is pinned against the script and the two cannot drift apart again.
+ */
+const BACKLOG_SEVERITY_OPEN = '/^- (?:~~)?\*\*`(major|minor|nit)` \x{00B7} (.*)$/u';
+
+const BACKLOG_SEVERITY_CLOSED_BY = '/^- .*CLOSED BY `([A-Z]\d{1,3}[a-z]?\d?)`.*`(major|minor|nit)` \x{00B7} (.*)$/u';
+
+/** The severity a bullet's first line records, read exactly as `scripts/state.php` reads it, or null. */
+function backlogProvenanceSeverity(string $first): ?string
+{
+    if (preg_match(BACKLOG_SEVERITY_OPEN, $first, $m) === 1) {
+        return $m[1];
+    }
+
+    if (preg_match(BACKLOG_SEVERITY_CLOSED_BY, $first, $m) === 1) {
+        return $m[2];
+    }
+
+    return null;
+}
+
+/**
  * A severity bullet exists in exactly three shapes, and all three carry the severity token followed
  * by the U+00B7 MIDDLE DOT on the FIRST line:
  *
@@ -223,14 +250,16 @@ function backlogProvenanceBullets(): array
     $severity = [];
 
     foreach ($bullets as $bullet) {
-        if (preg_match('/`(major|minor|nit)`\s*\x{00B7}/u', $bullet['first'], $match) !== 1) {
+        $found = backlogProvenanceSeverity($bullet['first']);
+
+        if ($found === null) {
             continue;
         }
 
         $severity[] = [
             'line' => $bullet['line'],
             'shape' => backlogProvenanceShape($bullet['first']),
-            'severity' => $match[1],
+            'severity' => $found,
             'first' => $bullet['first'],
             'body' => $bullet['body'],
         ];
@@ -407,15 +436,16 @@ it('records a liveness verdict on every open row', function (): void {
     expect($violations)->toBe([], implode("\n", $violations));
 });
 
-it('records at most one tier and one awaits token on every open row, each well-formed', function (): void {
+it('records exactly one tier and at most one awaits token on every open row, each well-formed', function (): void {
     $violations = [];
     $checked = 0;
 
     foreach (backlogProvenanceBullets() as $bullet) {
-        // ⚠️ AT MOST ONE, NOT EXACTLY ONE — YET. `M93` built the grammar; the tier verdicts for rows already
-        // in the ledger are the next increment's, and an exactly-one arm today would be red on arrival
-        // (`M40`). That increment makes this exactly-one — and must then exclude the `✅ **DONE` bullet this
-        // file's shape classifier reads as open, which `scripts/state.php` never counts as a row at all.
+        // ⛔ EXACTLY ONE, SINCE `M94` TIERED EVERY OPEN ROW. `M93` shipped this arm as at-most-one because an
+        // exactly-one arm would have been red on arrival (`M40`). It is safe now only because the bullet set
+        // is `scripts/state.php`'s own: the severity patterns above are byte-copies of `finish_row()`'s, so
+        // `M79`'s DONE bullet — a severity token mid-line, and never a row to `state.php` — is no longer read
+        // here as an untiered open row.
         if ($bullet['shape'] !== 'open') {
             continue;
         }
@@ -423,6 +453,11 @@ it('records at most one tier and one awaits token on every open row, each well-f
         $checked++;
         $where = BACKLOG_PROVENANCE_DOCUMENT.':'.$bullet['line'];
         $tokens = backlogProvenanceTokens($bullet['body']);
+
+        if (count($tokens['tier']) === 0) {
+            $violations[] = $where.' records no tier. Write **Tier: x.** after its Filed-by clause, with the full '.
+                'stop inside the bold; the vocabulary is '.implode(', ', BACKLOG_TIERS).'.';
+        }
 
         if (count($tokens['tier']) > 1) {
             $violations[] = $where.' records '.count($tokens['tier']).' tiers. Exactly one is the record; '.
@@ -504,6 +539,17 @@ it('discriminates between a record, a quotation and a legacy shape', function ()
 
     expect(preg_match(BACKLOG_PROVENANCE_CLAUSE, '**Filed by M32 (2026-08-28), which fixed the other two**'))->toBe(0);
     expect(preg_match(BACKLOG_PROVENANCE_CLAUSE, 'Found by `M32`'))->toBe(0);
+
+    // ⛔ WHAT A ROW IS (M94). The three canonical first lines are rows; a DONE record whose severity token sits
+    // mid-line is not — exactly as `scripts/state.php` reads them, and its two patterns are pinned here.
+    expect(backlogProvenanceSeverity('- **`minor` · A title.**'))->toBe('minor');
+    expect(backlogProvenanceSeverity('- ~~**`major` · A title.**~~'))->toBe('major');
+    expect(backlogProvenanceSeverity('- ✅ **CLOSED BY `M17` (2026-08-26) — `nit` · ~~A title~~**'))->toBe('nit');
+    expect(backlogProvenanceSeverity('- ✅ **DONE — M79 (2026-09-06). A record.** Its original row was `minor` · filed as live.'))->toBeNull();
+
+    foreach ([BACKLOG_SEVERITY_OPEN, BACKLOG_SEVERITY_CLOSED_BY] as $pattern) {
+        expect((string) file_get_contents(base_path('scripts/state.php')))->toContain("preg_match('".$pattern."'");
+    }
     expect(preg_match(BACKLOG_PROVENANCE_CLAUSE, 'Filed in `M5`'))->toBe(0);
     expect(preg_match(BACKLOG_PROVENANCE_CLAUSE, 'Filed by `m44`'))->toBe(0);
     expect(preg_match(BACKLOG_PROVENANCE_CLAUSE, 'Filed by `M44xyz`'))->toBe(0);

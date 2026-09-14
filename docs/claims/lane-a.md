@@ -16,7 +16,135 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M92` is merged; the next increment is a fresh `D13` batch
+## Status: ACTIVE CLAIM — `M93`, the tiered pipeline: a tier on every row and open decision, decisions as pipeline rows, a before-testing gate, and the hidden work filed (`m93-tiered-pipeline`)
+
+Taken 2026-09-14. Branch `m93-tiered-pipeline`, cut from `origin/main` at `0721814`, PR into `main`.
+Row: the mechanism increment of Realignment 6, which the user approved on 2026-09-14. **This is not a `D13`
+batch.** `D12` is recorded ANSWERED (B) here, and the tiered pipeline succeeds the series. The one ledger row
+taken is `docs/feature-backlog.md:8283` (`R-f0525946`): *"`scripts/pipeline.php` derives a defect row's state
+from LIVENESS alone, so a row blocked on an open USER DECISION is published as `state=ready`."*
+
+⛔ **`pipeline-lint` P1 IS ALREADY RED ON THE TRUNK AT `0721814`.**
+- **How it happened:** `M92`'s close-out prepended a status bullet above the two end-of-file PROGRESS.md
+  markers and did not regenerate `docs/pipeline.md`.
+- **Why nothing caught it:** the push touched only `paths-ignore`d files, so no run saw it.
+- **What this increment does:** regenerates the file, moves the markers above `## Current Status`, and writes
+  the regenerate-with-edit rule, so a close-out or a recorded answer cannot repeat it.
+
+### Evidence verified
+**`R-f0525946` — HELD, every citation, and the row UNDERSTATES itself.**
+- **The citations:**
+  - `read_defects()` (`scripts/pipeline.php:439-442`) maps liveness alone to state.
+  - `MARKER_KEYS` (`:90`) has no decision key.
+  - `compare_pipeline_rows()` (`:460-467`) knows no tier.
+  - The cited instance, `R-d261ce01` (`feature-backlog.md:6928`, "**Live** until `D17` is answered"), is
+    `ready` with blocker `—` in the generated line, and `D17` is still under `## OPEN`.
+- ⚠️ **The row names one instance. There are at least seventeen more.** All are verified open, and each names
+  an open decision (or a Board card this increment files as one), yet is published `ready` or latent:
+  - `630` → `D28`
+  - `1407` and `7143` → `D26`
+  - `5850` → `D20`
+  - `9184` → `D29`
+  - `2440` → invite domain
+  - `2451` → self-sign-up email
+  - `7428` → single-page mode
+  - `6883` → correction autosave
+  - `7493`, `7513`, `7530`, `7576`, `7600` and `7646` → the API promises
+  - also cited: `6376` → `D16`, `8267` → `D17`, `7617` → `D14`, `8858` → `D27`, `8332` → `D24`, `7726`,
+    `7778` and `7796`
+  - Those last eight are verdicted awaits or mention-only during the build, and the verdicts are recorded in
+    the release. The row is not closed while any of them still reads `ready`.
+
+**The hidden work filed as rows A–K — each premise was searched to refute it before filing:**
+- **A.** `deploy.ps1:50-54` cycles `meridian-horizon` and `meridian-reverb`, neither of which exists (no
+  package, no config). `queue:restart` appears nowhere in the tree.
+- **B.** The only writers of `is_super_admin = true` are `DemoSeeder.php:193` and `E2eSeeder.php:1527`. Both
+  `run()` methods return in production (`:149`, `:165`).
+- **C.** `deployment-infrastructure.md` §8 omits:
+  - the PostGIS binaries, the privileged superuser login, `DB_AUTH_PASSWORD` and `DB_SUPERADMIN_PASSWORD`
+  - git, composer and npm
+  - `db:seed --force`, the mail transport, `CENTRAL_DOMAIN` / `APP_URL`, and wildcard DNS plus DNS-01 TLS
+  - the exact worker and scheduler invocations
+  - the two testing-server settings
+- **D.** Nothing in `app/`, `routes/`, the migrations, the commands or `routes/api.php` creates a tenant. The
+  only writers are `DemoSeeder.php:1253` and `E2eSeeder.php:183`.
+- **D2.** A central sign-up belongs to no workspace (`RegistrationGate.php:47-50`). Fortify then redirects to
+  `/dashboard`, which exists only on tenant hosts.
+- **E–K.** These are threat-model §9 items #8, #6, #11, #12, #29, #24 and #5's evaluation-time budget. None
+  has an open `- ` row. #11 exists only as the §7 table row at `feature-backlog.md:141`.
+
+### Premise verified
+- **`R-f0525946` — HELD, and its open question is answered here.** The row asks whether a decision-blocked
+  row is `held` or a fourth state. **Neither: it is `blocked` with a `decision: Dn` blocker.**
+  - `held` would break P4's two-way stop-list coverage.
+  - `held` would also drop under `MIN_HELD_ROWS=5` (`pipeline-lint.php:107`), which has zero headroom.
+  - `scripts/loop.php` already refuses any row naming an open decision (`:370-376`), so the generator and the
+    loop agree once the token lands.
+- **The parent plan's premises, re-measured — five were wrong or partial:**
+  - *"The Filed-by anchor is in all rows"* holds 162/162. But the clause sits mid-sentence in four rows and on
+    the id-hashed first line in two (`5979`, `5981`). So the tokens are parsed position-free, and stripped
+    from the title before `sha1`.
+  - *"§8 omits three of the four DB roles"* is misframed. Two migrations create `meridian_auth` and
+    `meridian_superadmin` themselves; what §8 lacks is the superuser login and the passwords set before the
+    first migrate.
+  - *"§8 omits the worker and the scheduler"* is partly false. Steps 6 and 7 name both; what is missing is
+    the exact invocation.
+  - Threat-model #29 does not answer with a 500. `bootstrap/app.php:640-643` renders `MembershipException` as
+    a 302.
+  - *"No before-testing work waits on an answer"* holds only while row D2 stays early-testing. That rests on
+    the invite-only testing setting, which is Board card `signup-open`'s recommendation.
+- **Lane B is RETIRED and carries no forward queue.** `lane-b.md:31-48` was read. There is one writer, and
+  `git worktree list` shows a single worktree.
+
+### Remedy verdict
+- **`R-f0525946`'s cheap repair — WORKS.** A key naming a decision id, checked against `## OPEN`. Measured:
+  `derive_decisions()` anchors on the id prefix, so a tier token on a heading is safe. It needs a third row
+  class, which the row did not foresee.
+- **The parent plan's own remedies — three were WRONG as written, each measured before a line was
+  written:**
+  - **A digest-pinned P7a residue** is impossible to reproduce in the controls fixture. It becomes a one-way
+    count ceiling.
+  - **A testing-gate reader that refuses on a missing line** would deadlock the first regeneration:
+    `pipeline.php` → `backlog-triage.php` → `state.php`, each exiting 2 on the one below. It returns nulls
+    instead.
+  - **A decision row citing `decisions.md:N`** would rot silently, because that file is `paths-ignore`d and
+    `docs/pipeline.md` is citation tier 1 with zero tolerance. It cites `decisions.md#Dn`.
+
+Files:
+- **Scripts:** `scripts/state.php`, `scripts/pipeline.php`, `scripts/pipeline-lint.php`,
+  `scripts/backlog-triage.php`, `scripts/next.php`, `scripts/loop.php`.
+- **Tests:** `tests/Feature/Docs/PipelineLintControlsTest.php`, `tests/Feature/Docs/BacklogProvenanceTest.php`.
+- **Top level:** `CLAUDE.md`, `PROGRESS.md`.
+- **Queue and claims:** `docs/claims/decisions.md`, `docs/claims/lane-a.md`, `docs/feature-backlog.md`,
+  `docs/pipeline.md`, `docs/backlog-triage.md`.
+- **Documents with markers:** `docs/PRD.md`, `docs/data-privacy-gdpr-compliance.md`,
+  `docs/deployment-infrastructure.md`, `docs/form-versioning-schema-migration.md`,
+  `docs/ocr-pipeline-design.md`, `docs/adr/0008-entitlement-and-metering.md`.
+- These last six receive only a `tier=` key on their marker lines.
+
+Shared artefacts taken: `docs/**` as listed, `PROGRESS.md` (a new Standing Rule 9 and the marker relocation
+now; this lane's own status block at close), and `CLAUDE.md`.
+
+Paired files taken: two pairs.
+- `pipeline-lint.php`'s success literal ↔ the `passed (N rule groups` assertion in `PipelineLintControlsTest.php`.
+- The `TIERS` vocabulary in `pipeline.php` ↔ `pipeline-lint.php` ↔ `BacklogProvenanceTest.php`, pinned equal by
+  test.
+- `scripts/gate-baselines.php`'s scrape is unchanged, because only the number moves.
+
+Namespaces spent: nothing from the migration or ADR namespaces. Decision ids are derived at filing, expected
+`D31`–`D42`.
+
+Prediction:
+- **PipelineLintControlsTest's own green baseline is the gate I most expect to be wrong.** All 42 existing
+  cases assert a clean fixture first, and the fixture must now satisfy four rules it has never seen.
+- **Second: `citation-liveness-lint`.** Its ledger reads 18 against a ceiling of 18, so one new citation in
+  rows A–K landing on a blank line turns CI red.
+- **The other gates:**
+  - P1 is red on arrival and cleared by regeneration.
+  - `tracker-lint` R1 stays green (Rule 9 ≤1.2 KB), and R8 and `state --check` stay green.
+  - The five mutations end CAUGHT.
+- **Not reached:** PHPStan cannot move (no `app/`, `database/` or `routes/` file), and no E2E spec is
+  reached.
 
 ## RELEASED — `M92`, the twenty-third `D13` batch: a second deadlock cycle reached only through a cross-field rule, eight dead test-class pointers a gate could not see, an enum-mirror row whose headline is false, and a checksum whose stated mechanism is inert (merged as PR #283, `dd3d0ff`, 6/6 green with real step counts — Static analysis 28 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

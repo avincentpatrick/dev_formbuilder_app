@@ -16,7 +16,47 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M95`, the before-testing tier: a fail-fast deploy script, the first super-admin and first workspace commands, a first-boot runbook, and a setup-time token hand-off (`m95-before-testing`)
+## Status: NO ACTIVE CLAIM — `M95` is merged and the before-testing tier is closed; the next work is the early-testing tier, named in `docs/pipeline.md` § Next
+
+## RELEASED — `M95`, the before-testing tier: a fail-fast deploy script, the first super-admin and first workspace commands, a first-boot runbook, and a setup-time token hand-off (merged as PR #288, `f87b793`, 6/6 green with real step counts — Static analysis 28 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
+
+Shipped 2026-09-14. Branch `m95-before-testing`, cut from `origin/main` at `5ee23fc`. **The before-testing tier is closed: the gate reads before-testing — 0 open of 1, and the user was sent the push notification and the Testing Server Checklist.**
+- All five rows are closed.
+- 18 rows were filed.
+- `D31` and `D32` were answered A in chat.
+- `D43` (PostgreSQL 15 on the Windows Server 2016 testing site) was recorded as answered B.
+- `D44` (self-serve workspace creation) was filed open at before-launch.
+
+⛔ **THE HEADLINE IS THAT EVERY PRESCRIBED REMEDY WAS WRONG OR INCOMPLETE, AND VERIFICATION CAUGHT EACH ONE BEFORE ANY CODE WAS WRITTEN.**
+- **`deploy.ps1`** was fail-open. PowerShell 5.1 ignores a native exit code, so a failed migrate ended green. Adding `queue:restart` alone would have relaunched the worker onto new code over an unmigrated schema.
+- **The directory refresh's inline `ensureFresh()`** would have raced the worker and destroyed rotating Airtable grants. The row was also Live, not Latent.
+- **The seeders' zero-row guard**, the model the super-admin remedy copied, is blind to a role that does not bypass row security.
+- **"All four records"** for a workspace missed `tenants.owner_user_id` and the role row.
+- **The runbook** missed that `APP_ENV` other than `production` plus `db:seed` creates a super-admin with a published password.
+
+⚠️ **HOW THE PREDICTION FARED.**
+- **Citation-liveness, the gate I most expected to break, held at 18 of 18 on every run**, but I broke line-neutrality myself once. A workspace-row closing note written as a bulleted list added eight lines mid-ledger. I saw it on re-reading the edit, before any gate ran, and rewrote it as one line.
+- **The PostgreSQL 15 probe, the result I could least predict** (draft PR #287, closed unmerged): Pest passed 4,939. The only failure was `SearchIndexUsageTest`'s by-design guard that the server is 17 or later. E2E, contract, frontend and axe all passed. Nothing needed fixing.
+- **The feared hang in the super-admin tests** did not happen: 43 command cases passed on their first run.
+- **PHPStan moved, as predicted, and on my own code:** a `self::HANDOFF_*` return type also matched two private integer constants. The full run is otherwise only the 18 known container phantoms, classified by message.
+- **Mutations: 19 of 19 CAUGHT**, seven on the hand-off and twelve on the commands.
+- **Not predicted: gitleaks flagged a fake test token** (`generic-api-key`, entropy 3.78) on the probe run. I rewrote the unpushed commits before this branch was pushed, so only the closed probe carries it.
+- **The gate reads 0 open of 1, as predicted.** The shrinking total and the never-ending "send the notification now" sentence are filed as an early-testing row. The notification WAS sent, by this increment.
+- CI: 6/6 green on PR #288 (run 34849806889), each step count read individually — Static analysis 28 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11.
+
+✅ **HOW IT WAS BUILT.**
+- **Planning, read-only:** six mappers, six adversarial skeptics and a completeness critic.
+- **Parallel authoring:** four authors, each in an isolated worktree, owning disjoint files: the deploy script, the runbook, the two commands and the ledger. Their commits were cherry-picked and then run here in series.
+- **By hand:** the setup-time hand-off and every closure.
+
+✅ **WHAT SHIPPED.**
+- **Code.** `deploy.ps1`; `app/Console/Commands/PlatformSuperAdminCommand.php`, `CreateTenantCommand.php`, `app/Services/Admin/SuperAdminProvisioner.php`, `app/Services/Auth/OperatorAccounts.php`, `app/Rules/SubdomainLabel.php`; `ConnectionTokenRefresher`, `TabularDestinationDirectory`, `ConnectorChannelDirectory` (`ensureFresh()` deleted).
+- **Tests.** `PlatformSuperAdminCommandTest` (15) and `CreateTenantCommandTest` (21), plus new cases in `TabularDestinationTest` and `AirtableDestinationTest`.
+- **Documents.**
+  - `docs/deployment-infrastructure.md`: §8 rewritten, and a new §8.2.
+  - `.env.example`: the guest limits added, commented out.
+  - ADR-0005, 0007, 0009 and 0013; the audit spec, RBAC §7.1 and §11, the onboarding plan, the PRD, ADR-0002 and the ACCESS-MATRIX.
+  - Each corrected in place, line-neutrally above any cited line.
 
 Taken 2026-09-14. Branch `m95-before-testing`, cut from `origin/main` at `5ee23fc`, PR into `main`. A throwaway
 branch `m95-pg15-probe` runs CI once against PostgreSQL 15 as a draft PR that is closed unmerged.

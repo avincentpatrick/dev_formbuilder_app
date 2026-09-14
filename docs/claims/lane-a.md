@@ -16,7 +16,41 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M92`, the twenty-third `D13` batch: a second deadlock cycle reached only through a cross-field rule, eight dead test-class pointers a gate cannot see, an enum-mirror row whose headline is false, and a checksum whose stated mechanism is inert (`m92-d13-batch`)
+## Status: ACTIVE CLAIM — `M92`, the twenty-third `D13` batch: a second deadlock cycle reached only through a cross-field rule, eight dead test-class pointers a gate cannot see, an enum-mirror row whose headline is false, and a checksum whose stated mechanism is inert (`m92-d13-batch`, extended to `m92-baselines-pairing`)
+
+### Extension — `m92-baselines-pairing` (2026-09-14)
+
+⛔ **`M92` BROKE A PAIRING OF ITS OWN AND ITS CLOSE-OUT IS WHAT FOUND IT.** Regenerating
+`docs/gate-baselines.md` from `M92`'s own post-merge run (`34794957378`, 6/6 green at `dd3d0ff`)
+rendered the `test-pointer-lint` row as **NOT FOUND**: widening the gate to `app/`, `database/` and
+`routes/` added two numbers to its summary line, and `scripts/gate-baselines.php` scrapes that line by
+a literal pattern. ✅ **It reported the miss rather than writing a zero, which is `M91`'s missing-metric
+arm doing exactly the job it was built for** — a scrape that silently degrades to `0` is the failure
+this whole artefact exists against.
+
+⚠️ **TAKEN AS A PR RATHER THAN PUSHED TO THE TRUNK, AND `M90` IS THE REASON.** `M90` fixed the same
+class of defect with a direct commit to `main` under the owner bypass, and its own follow-up commit
+records that this *turned main red*. The bypass is for claim commits and close-outs; a change to
+`scripts/` and `tests/fixtures/` is neither.
+
+⚠️ **The files were opened BEFORE this extension was written, and that is stated rather than glossed.**
+The defect was found by running the close-out step that regenerates the baselines, so the diagnosis and
+the edit were one action. The extension is pushed before the PR, not before the first keystroke.
+
+**Evidence verified:** the row renders `**NOT FOUND** — fix the pattern in `scripts/gate-baselines.php``,
+and the old pattern's literal — `(\d+) test file\(s\), (\d+) \`\*Test\` name\(s\) mentioned` — cannot
+match the new summary, which now leads with `N file(s) over M root(s)`.
+**Premise verified:** the pairing is THREE files, not one — the pattern plus both harness fixtures under
+`tests/fixtures/gate-baselines/`, which `M90` added and `M91` gated by set equality. Changing only the
+pattern would leave `GateBaselinesTest` red. Confirmed by reading both fixtures.
+**Remedy verdict:** WORKS — pattern and both fixtures updated together; the row now reads
+`1429 files over 4 roots, 451 test files on disk, 253 names, 2 exemptions`, and `GateBaselinesTest`
+passes 12/12 at **106 assertions**, which is `M91`'s recorded floor rather than a new number.
+
+Files: `scripts/gate-baselines.php`, `tests/fixtures/gate-baselines/ci-log.txt`,
+`tests/fixtures/gate-baselines/ci-log-missing-metric.txt`, `docs/feature-backlog.md`.
+Prediction: all six green. The only gate that could plausibly move is Static analysis, and only if the
+fixtures and the pattern disagree — which is the single failure mode this edit has.
 
 Taken 2026-09-11. Branch `m92-d13-batch`, cut from `origin/main` at `34fc64d`, PR into `main`.
 

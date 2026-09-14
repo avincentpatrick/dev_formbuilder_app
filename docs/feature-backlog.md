@@ -9526,8 +9526,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   took a PR instead. ⚠️ The cheap remedy is a `--check` arm on the scraper that runs on the HOST against
   the live gates' own output rather than against a CI log, which would move the signal from post-merge to
   pre-push. **Live.** Filed by `M92`. **Tier: after-launch.**
-- **`minor` · `deploy.ps1` cycles two Windows services that cannot exist and never runs `queue:restart`, so a
-  deploy leaves a running worker on the previous release's code.** Measured by `M93` (2026-09-14) against the
+- ~~**`minor` · `deploy.ps1` cycles two Windows services that cannot exist and never runs `queue:restart`, so a
+  deploy leaves a running worker on the previous release's code.**~~ Measured by `M93` (2026-09-14) against the
   script rather than its documentation. Its only service step loops over `meridian-horizon` and
   `meridian-reverb` behind `Get-Service -ErrorAction SilentlyContinue`, a silent no-op on every host: neither
   package is in `composer.json`, and no Horizon or Reverb config file exists. The queue is the `database`
@@ -9535,9 +9535,9 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   tree**, so a worker outlives the `migrate --force` and the cache rebuild and keeps the old code until it
   dies. ⚠️ The script is dormant until a server exists, and the testing server is the next step — which is why
   this is tiered for it. The remedy sits in the same `try` block: `php artisan queue:restart`, the real worker
-  service name, and the dead loop deleted. **Live.** Filed by `M93`. **Tier: before-testing.**
-- **`minor` · No production path creates the first platform super-admin: the only writers of
-  `users.is_super_admin` are two seeders, and both return early in production.** Measured by `M93`
+  service name, and the dead loop deleted. **Live.** Filed by `M93`. **Tier: before-testing.** ✅ **CLOSED BY `M95` (2026-09-14) — THE PRESCRIBED REMEDY WAS PARTIAL.** `queue:restart` now runs last inside the maintenance window, the dead Horizon/Reverb loop is gone, and the script refuses a host without its worker service (`MERIDIAN_WORKER_SERVICE`, default `meridian-worker`) and starts a Stopped one after `up`. It never restarts the service, because Windows PHP has no pcntl and a service stop kills the job in flight. The row missed two things: the script was fail-open (PowerShell 5.1 ignores a native exit code, so a failed migrate ended green), and its documented rollback was undone by its own reset. Every native step now fails fast, a failure inside the window leaves the site down on purpose, and `-Ref` rolls back. Its "appears nowhere in the tree" was also literally false: the runbook prose already said to add it. Proven by a PowerShell 5.1 harness of twelve scenarios, with the trunk script failing open as the negative control.
+- ~~**`minor` · No production path creates the first platform super-admin: the only writers of
+  `users.is_super_admin` are two seeders, and both return early in production.**~~ Measured by `M93`
   (2026-09-14). The flag is a column, not a role, and `EnsureSuperAdmin` refuses the whole console without it.
   `DemoSeeder::ensureSuperAdmin()` and `E2eSeeder::promoteToSuperAdmin()` are its only writers of `true`, and
   both `run()` methods return on `app()->environment('production')`. None of the four artisan commands touches
@@ -9547,9 +9547,9 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   ⚠️ **The obvious manual escape is a trap:** an `UPDATE` on the application connection affects zero rows in
   silence, because `users` carries FORCE row-level security and an operator has no membership. A command must
   write over `pgsql_privileged` with a row-count check, set `email_verified_at`, and leave two-factor
-  unenrolled so the operator is sent to enrolment rather than locked out. **Live.** Filed by `M93`. **Tier: before-testing.**
-- **`minor` · `docs/deployment-infrastructure.md` §8 omits what a first `migrate --force` and a first tester
-  need, so a server stood up from it fails before anyone signs in.** Measured by `M93` (2026-09-14) against the
+  unenrolled so the operator is sent to enrolment rather than locked out. **Live.** Filed by `M93`. **Tier: before-testing.** ✅ **CLOSED BY `M95` (2026-09-14) — THE REMEDY WORKED, BUT WAS INCOMPLETE IN FIVE WAYS.** `php artisan platform:super-admin <email> --name=` creates or promotes the operator in one `pgsql_privileged` transaction: one INSERT or exactly one UPDATE, the address verified, two-factor left unenrolled, and a read-back on `pgsql_auth` after commit. Beyond the prescribed fix, it does five things. It asserts `rolsuper` or `rolbypassrls` first, because the seeders' zero-row guard is blind to a role that does not bypass row security. It lower-cases the address, because sign-in lower-cases what is typed against a case-sensitive unique index. It applies the registration password policy at a hidden prompt, with no stdin or generated password. It refuses a deleted account and one that holds a workspace membership. And its output names the console address, because a direct sign-in lands on a workspace-only page, and tells the operator to close open sign-up. No audit row is written; that gap is recorded in the audit spec and as a before-launch row. Fifteen Pest cases; six mutations, all CAUGHT.
+- ~~**`minor` · `docs/deployment-infrastructure.md` §8 omits what a first `migrate --force` and a first tester
+  need, so a server stood up from it fails before anyone signs in.**~~ Measured by `M93` (2026-09-14) against the
   migrations, the compose stack and CI rather than the runbook's prose. ⛔ **Database:** step 2 installs
   PostgreSQL and names no extension, while a migration runs `CREATE EXTENSION IF NOT EXISTS postgis` over
   `pgsql_privileged`, so the binaries must be on the host; and nothing names the superuser login behind
@@ -9563,8 +9563,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   and 7 name the worker and the `schedule:run` task; what they lack is the exact invocation. ⚠️ Two testing
   settings are named nowhere either — open sign-up defaults on, and `GUEST_MINT_PER_IP` defaults to 30 with no
   line in `.env.example` — and neither Memurai nor the `redis` extension is required, because cache and queue
-  default to `database`. **Live.** Filed by `M93`. **Tier: before-testing.**
-- **`minor` · No production path creates a workspace, so a fresh server has nowhere to build a form.**
+  default to `database`. **Live.** Filed by `M93`. **Tier: before-testing.** ✅ **CLOSED BY `M95` (2026-09-14) — THE ROW UNDERCOUNTED, AND TWO OF ITS CLAIMS WERE OVERSTATED.** §8's ten steps are rewritten in place and a new §8.2 gives the first-boot order. The additions the row did not name: a dedicated PostgreSQL 15 instance that `meridian_app` owns, `APP_ENV=production` made mandatory (in any other environment a seed creates a super-admin whose password is published), every `secret` replaced before the first migrate, the real mail symptom (`mailpit` jobs fail into `failed_jobs`), upload limits, php-cgi's `PHP_FCGI_MAX_REQUESTS=0`, exactly one worker installed Stopped, the PEM-files store for the wildcard certificate, sign-up closed before any A record, and `DEPLOY_ENABLED` set last. Overstated: step 8 did name the wildcard certificate, and §6 did give the exact `--queue=` order — what was missing was DNS-01 and the service invocations. `.env.example` now ends with the three guest limits, commented out.
+- ~~**`minor` · No production path creates a workspace, so a fresh server has nowhere to build a form.**~~
   Measured by `M93` (2026-09-14), after a search meant to refute it. The only writers of a tenant are
   `DemoSeeder` and `E2eSeeder`, both returning early in production. A central-host sign-up belongs to no
   workspace (`app/Services/Settings/RegistrationGate.php` says so in terms), a subdomain sign-up joins a
@@ -9572,7 +9572,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `routes/admin.php`, `routes/api.php` nor any artisan command creates one. ⚠️ **A workspace is more than one
   record:** the seeders also write its domain, an owner membership and a plan, and a membership needs the
   seeded role catalog. The remedy is an operator command beside the first-super-admin one, writing all four.
-  **Live.** Filed by `M93`. **Tier: before-testing.**
+  **Live.** Filed by `M93`. **Tier: before-testing.** ✅ **CLOSED BY `M95` (2026-09-14) — "ALL FOUR" WAS SIX WRITES, AND THE OWNER CANNOT BE INVITED.** `php artisan tenants:create <slug> "<name>" <owner> --plan=<tier>` writes, in one transaction on the application connection: a verified owner when the address is new; the tenant, with `tenants.owner_user_id` in the INSERT (every Owner guard keys on that pointer, and a hand-provisioned dev workspace without it lets an Admin remove its Owner); the subdomain label; the default subscription; the owner membership and its role row; and `MemberJoined`. It then checks every postcondition after commit. A new `SubdomainLabel` rule refuses a slug the runtime cannot route. An identical re-run writes nothing, and any other existing state is refused rather than repaired. An owner cannot come from an invitation (`cannotInviteAsOwner`), so an unverified, deleted or platform super-admin account is refused as owner. No audit row is written; that gap is recorded as a before-launch row. Twenty-one Pest cases, including the new owner loading the workspace dashboard; six mutations, all CAUGHT.
 - **`minor` · The central landing page offers "Create a workspace", and the account it creates has no
   workspace and lands on a 404.** Measured by `M93` (2026-09-14). While sign-up is open — the platform
   default — `resources/js/Pages/Welcome.vue` links to the registration page. A central-host registration
@@ -9799,7 +9799,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - **`minor` · No standing gate proves compatibility with the testing server's PostgreSQL 15.** Found by `M95`
   (2026-09-14) from the user's answer that the Windows Server 2016 testing site runs PostgreSQL 15. Every database
   the project runs is version 17: `docker-compose.yml` and each database service in the CI workflow use the
-  `postgis/postgis` 17-3.5 image. `M95` runs the suite on 15 once, through a throwaway probe branch closed unmerged,
+  `postgis/postgis` 17-3.5 image. `M95` ran the suite on 15 once (draft pull request #287, closed unmerged: all green except `SearchIndexUsageTest`'s guard that the server is 17 or later, which a 15 job would have to relax),
   and nothing keeps that result true: a later migration or query using a feature added in 16 or 17 (for example
   `any_value()` or the `IS JSON` predicate from 16, `JSON_TABLE` or `MERGE ... RETURNING` from 17) passes every
   gate and fails only on the testing server. ⚠️ Options: a static lint refusing SQL newer than 15 under
@@ -9878,3 +9878,10 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   refused by PHP before the app's own size rule and its message apply. The testing server's `php.ini` values come
   from `M95`'s runbook. ⚠️ Copy an ini file into the image, then try a 3 MB attachment and a 3 MB screenshot in dev.
   **Live.** Filed by `M95`. **Tier: after-launch.**
+- **`minor` · ADR-0007 points at rows of ADR-0005 by bare line number, and every pointer lands on the wrong row.**
+  Found by `M95` (2026-09-14) while annotating both ADRs. `docs/adr/0007-async-execution-substrate.md` names
+  ADR-0005's Redis/Memurai row as `:27`, its Horizon row as `:28` and its Task Scheduler row as `:30`, in the §D1
+  table row, the §D1 text, the scheduler gap and Related Decisions. Those lines of ADR-0005 are its PHP, Database
+  and Queue workers rows. A bare `:N` carries no file name, so the citation gate cannot see it. ⚠️ Name the rows
+  instead, as `M95`'s in-place annotations to ADR-0005 do; renumbering would rot again with the next edit to that
+  table. **Live.** Filed by `M95`. **Tier: after-launch.**

@@ -1481,9 +1481,11 @@ page during `M95`'s verification, not measured on the box).
 
 **Consequence, recorded so it is not rediscovered:**
 - Dev and CI stay on PostgreSQL 17.
-- `M95` runs the full CI suite once against PostgreSQL 15, on a throwaway probe branch opened as a draft pull
-  request and closed unmerged, and fixes any failure specific to 15 inside the increment, because the testing
-  server cannot run without it.
+- `M95` ran the full CI suite once against PostgreSQL 15, on a throwaway probe branch opened as draft pull request
+  #287 and closed unmerged. Pest passed 4,939 cases, and E2E, the contract tests, the frontend build and axe all
+  passed. The one Pest failure was `SearchIndexUsageTest`'s guard that the server is PostgreSQL 17 or later, which
+  fails by design on any other major; the leakproof-catalog cases it exists to protect passed on 15. Nothing
+  specific to 15 needed fixing.
 - No standing gate keeps that result true, so a during-testing row in `docs/feature-backlog.md` tracks parity.
 - `docs/deployment-infrastructure.md` §8 step 2 prescribes a dedicated PostgreSQL 15 instance for the site.
 - ADR-0005's operating-system trigger is unchanged; when the box is upgraded, moving the site to 17 retires the

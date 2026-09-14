@@ -416,16 +416,16 @@ correct behaviour, not a defect report.
 notification is identical across the three doors that go through it — the distinction belongs in the audit
 ledger, where it is, and not in a bell.
 
-⚠️ **BUT THAT IS THREE DOORS, NOT FOUR, AND THE GAP IS THE INVITATION ONE.** `attachMember()` is the only
-dispatch site for `MemberJoined` in the codebase, and `InvitationController` never calls it — an invitee
-accepting is a status transition on a row that already exists (§7 step 2), not an attach. So an Owner is
-told when somebody self-registers, is JIT-provisioned by their IdP, or signs in with Google, and is told
-**nothing** when the person they personally invited accepts — the one door where they had already
-expressed interest in that individual by name. Pre-existing rather than introduced by the fourth door, and
-recorded here because §7.1's first sentence read as though parity existed: a reader planning notification
-work would not discover the gap until testing invite acceptance by hand. Whether to close it is a product
-decision (an acceptance is arguably an answer to the Owner's own action rather than news), not an
-oversight to be quietly patched.
+⚠️ **ALL FOUR DOORS RAISE IT NOW, PLUS ONE PATH THAT IS NOT A DOOR (corrected by M95).** This paragraph
+used to say `attachMember()` was the only dispatch site for `MemberJoined` and that an invitee accepting
+raised nothing, because acceptance is a status transition on a row that already exists (§7 step 2), not an
+attach — so an Owner heard about a self-registration, a JIT provisioning or a Google sign-in, but not about
+the person they had invited by name. `f267b86` (K1c) closed that gap: the invitation-acceptance path in
+`TenantMembershipService` now raises `MemberJoined` for the accepted membership, so all four doors notify.
+M95 added a fifth dispatch site that is deliberately not a door: `tenants:create` raises it once for the
+founding Owner it writes with the workspace (§7's table, `invited_by` NULL), which awards the welcome points
+and notifies nobody, because the listener excludes the member who joined and a new workspace has no other
+member. The earlier reading of this paragraph is in git history rather than repeated here.
 
 ---
 

@@ -16,199 +16,128 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M92`, the twenty-third `D13` batch: a second deadlock cycle reached only through a cross-field rule, eight dead test-class pointers a gate cannot see, an enum-mirror row whose headline is false, and a checksum whose stated mechanism is inert (`m92-d13-batch`, extended to `m92-baselines-pairing`)
+## Status: NO ACTIVE CLAIM — `M92` is merged; the next increment is a fresh `D13` batch
 
-### Extension — `m92-baselines-pairing` (2026-09-14)
+## RELEASED — `M92`, the twenty-third `D13` batch: a second deadlock cycle reached only through a cross-field rule, eight dead test-class pointers a gate could not see, an enum-mirror row whose headline is false, and a checksum whose stated mechanism is inert (merged as PR #283, `dd3d0ff`, 6/6 green with real step counts — Static analysis 28 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 
-⛔ **`M92` BROKE A PAIRING OF ITS OWN AND ITS CLOSE-OUT IS WHAT FOUND IT.** Regenerating
-`docs/gate-baselines.md` from `M92`'s own post-merge run (`34794957378`, 6/6 green at `dd3d0ff`)
-rendered the `test-pointer-lint` row as **NOT FOUND**: widening the gate to `app/`, `database/` and
-`routes/` added two numbers to its summary line, and `scripts/gate-baselines.php` scrapes that line by
-a literal pattern. ✅ **It reported the miss rather than writing a zero, which is `M91`'s missing-metric
-arm doing exactly the job it was built for** — a scrape that silently degrades to `0` is the failure
-this whole artefact exists against.
+Shipped 2026-09-11. Branch `m92-d13-batch`, cut from `origin/main` at `34fc64d`. **Four rows closed, nine
+rows filed, eleven positive controls run — and THREE OF THE FOUR ROWS WERE WRONG IN WAYS THAT CHANGED WHAT
+THE FIX IS.** The fan-out landed before the claim was written, so all three verdict fields carried measured
+answers rather than pending markers, which is the first time this series has managed that.
 
-⚠️ **TAKEN AS A PR RATHER THAN PUSHED TO THE TRUNK, AND `M90` IS THE REASON.** `M90` fixed the same
-class of defect with a direct commit to `main` under the owner bypass, and its own follow-up commit
-records that this *turned main red*. The bypass is for claim commits and close-outs; a change to
-`scripts/` and `tests/fixtures/` is neither.
+⛔ **THE HEADLINE IS THAT `Premise verified` PAID FOR ITSELF THREE TIMES IN ONE BATCH, IN THREE DIFFERENT
+DIRECTIONS.** `9278` said *"do not take it as a bug fix without deciding the first half — `ORDER BY` changes
+a shipped locking statement that `PublishLockingTest` pins by shape"*. All six arms were opened: they assert
+table names, sequence and a count of four, and **`ORDER BY id` moves none of them.** The row was buildable
+all along and had described itself as blocked. `9052`'s headline — *"four PHP-enum mirrors live in Vue SFCs
+and the new mirror gate cannot reach any of them"* — is **false in both halves**: two are in an SFC, and the
+gate is extension-blind and names one of the other files in its own header. They were unreached because
+nobody DECLARED them, which turned a file-collection rewrite into three data rows and one grammar.
+`8971`'s worked example is **inert**: `snapshot()` already ksorts recursively, so the `sections`/`fields`
+reordering it describes cannot happen, and anyone reproducing the row as written would have found nothing.
 
-⚠️ **The files were opened BEFORE this extension was written, and that is stated rather than glossed.**
-The defect was found by running the close-out step that regenerates the baselines, so the diagnosis and
-the edit were one action. The extension is pushed before the PR, not before the first keystroke.
+⛔ **AND THE ONE ROW WHOSE PREMISE HELD UNDERSTATED ITSELF.** `9216` named seven dead test-class pointers
+across twelve sites; there are **eight across thirteen** — `AchievementsRouteGuardsTest` in
+`routes/tenant.php`, which its `app/`-and-`database/` framing could not reach. Its *"not simply widening the
+scan roots"* warning was right for a smaller reason than the real one: `scan()` used ONE directory both as
+the mention corpus and as the definition of which test files exist, so a naive second call over `app/` would
+have called all 147 mentioned names dangling.
 
-**Evidence verified:** the row renders `**NOT FOUND** — fix the pattern in `scripts/gate-baselines.php``,
-and the old pattern's literal — `(\d+) test file\(s\), (\d+) \`\*Test\` name\(s\) mentioned` — cannot
-match the new summary, which now leads with `N file(s) over M root(s)`.
-**Premise verified:** the pairing is THREE files, not one — the pattern plus both harness fixtures under
-`tests/fixtures/gate-baselines/`, which `M90` added and `M91` gated by set equality. Changing only the
-pattern would leave `GateBaselinesTest` red. Confirmed by reading both fixtures.
-**Remedy verdict:** WORKS — pattern and both fixtures updated together; the row now reads
-`1429 files over 4 roots, 451 test files on disk, 253 names, 2 exemptions`, and `GateBaselinesTest`
-passes 12/12 at **106 assertions**, which is `M91`'s recorded floor rather than a new number.
+⚠️ **HOW THE PREDICTION FARED — RIGHT ABOUT ONE GATE, WRONG ABOUT THE ONE IT NAMED FIRST, AND BLIND TO THE
+ONLY GATE THAT ACTUALLY REDDENED CI.**
 
-Files: `scripts/gate-baselines.php`, `tests/fixtures/gate-baselines/ci-log.txt`,
-`tests/fixtures/gate-baselines/ci-log-missing-metric.txt`, `docs/feature-backlog.md`.
-Prediction: all six green. The only gate that could plausibly move is Static analysis, and only if the
-fixtures and the pattern disagree — which is the single failure mode this edit has.
+- **`tracker-lint` R1/R7 was named as most likely to be wrong, in the direction of acting too EARLY** — the
+  surgery was taken before the push, and `R7`'s own open row records that its byte threshold was calibrated
+  on surgeries all left too late. **Wrong, in the safe direction**: R7 measured −12,840 bytes and passed
+  cleanly. The dead zone did not bite, and the row's concern remains open rather than disproved.
+- **Citation-liveness was named second. RIGHT, twice, for two different causes.** First it went 2 over its
+  ceiling of 18 because the `routes/tenant.php` comment correction inserted two lines above two citing rows;
+  the repair was to make that edit line-neutral rather than to re-point anything. Then it went 1 over again
+  because the surgery shifted `PROGRESS_ARCHIVE.md` by five lines — **and that one exposed a citation that
+  had been wrong before this increment touched anything**, resolving to unrelated `H23`/`H24` bullets about
+  twenty-two lines from the sentences it described. Re-derived by grepping the claim. Adding the surgery's
+  delta would have "fixed" it into a second set of live, wrong lines and merged green.
+- ⛔ **THE ONLY GATE THAT REDDENED CI WAS NOT PREDICTED AT ALL: Contract tests (OpenAPI).** Scramble emits a
+  `FormRequest`'s class docblock **verbatim** as the `description` of its schema, so three paragraphs of
+  internal notes about a lint gate — written while correcting a dead pointer — became part of the contract
+  shipped to integrators. Five of six jobs were green on that run. **The prediction named two gates and the
+  one that broke was a third**, which is the standing lesson from `M87` recurring: the gate that breaks is
+  the one whose coupling nobody had written down.
+- PHPStan: predicted immovable on a diff of comments plus one service method plus two scripts. **RIGHT** —
+  18 local errors, **all one message class** (`Access to an undefined property`), CI at zero. Classified by
+  message rather than counted, which is the `M87` rule; the count alone would have said nothing.
+- Pint bare on the host: **RIGHT**, 1,479 files, with the deliberate-probe arm proving the scan was real.
+- E2E/axe/Vitest: predicted unreached. **RIGHT, and more strongly than claimed** — the diff touches no
+  `resources/` file at all, so no spec needed naming.
 
-Taken 2026-09-11. Branch `m92-d13-batch`, cut from `origin/main` at `34fc64d`, PR into `main`.
+✅ **WHAT SHIPPED.** `9278`: both sides of the publisher/builder race now acquire `form_fields` in ascending
+id order; the builder's sibling resolution is hoisted above the lock, because you cannot order a set you
+have not computed. ⚠️ **The prescription was NARROWED against its own words** — it asked for a lock over
+every sibling in the version, which would have closed the cycle and silently serialized every concurrent
+field edit in a draft. That is a §3.4 reversal by accident, and a third arm pins that a payload naming no
+sibling still locks exactly one row. ⚠️ **The load-bearing assumption was measured, not inherited**:
+`ORDER BY` only controls lock ACQUISITION if the sort sits below the locking node, and `EXPLAIN` in this
+stack's own container plans `LockRows` above `Sort`. Recorded in the service, because no assertion can pin
+a planner property.
 
-⛔ **THE GENERATED PROPOSAL IS REJECTED FOR THE FIFTH TIME — AND FOR THE FIRST TIME IT IS THE
-BYTE-IDENTICAL SET ALREADY REJECTED BY `M91`.** `docs/backlog-triage.md`'s `## Suggested next batch`
-offers `4252` · `6883` · `5981` · `8424` again, because nothing about those rows or about the greedy
-pick changed when `M91` declined them. `4252` repairs `scripts/tracker-lint.php` and
-`scripts/tracker-lint-controls.php` (a hub at 4 citing rows); `5981` repairs `scripts/pipeline.php`
-(12); `8424` repairs `scripts/citation-liveness-lint.php` (6) — **three hub rows against a cap of one**
-— and `6883` still states its own blocker in its body, which is `8277`'s defect. ⚠️ **The recurrence is
-now five-for-five, and the new fact is that it REPEATS rather than rotates.** The first four rejections
-were four different mechanisms, so each could be read as bad luck. A proposal that is unchanged after
-being rejected cannot be: the generator has no memory of a refusal and no input that a refusal moves.
-**That is a stronger input to `D15` than any of the four before it**, and it is recorded here rather
-than argued into the decision entry.
+✅ `9216`: the gate's two roles are now separate parameters, floors are per root, and a floor breach skips
+R1 so a broken scan cannot read as a hundred violations. **All eight pointers resolved to ONE disposition —
+correct the name — which the row expected to vary.** ⚠️ Two would have been mis-corrected by the obvious
+same-name candidate (`PointAwardRlsTest` not `PointAwardTest`; `SettingsVocabularyTest` not
+`ModuleToggleTest`), and three replacements assert LESS than the comment claimed, which those comments now
+say. ⛔ **A correction note may not name the corpse**: the first draft wrote *"corrected from FooTest, which
+never existed"* at each site and the widened gate reddened on its own repair. Eight exemptions to keep that
+prose would have made the list a list of excuses.
 
-**The batch, chosen by hand under `D13`'s letter — one hub-touching row, no two rows sharing a non-hub file:**
+✅ `9052`: three data rows, one new `const` grammar, and the vocabulary question the row deferred answered
+from a sentence already in `FieldInput.vue` — `RequiredMode` is what a field IS, a marker type is what the
+badge RENDERS. ⚠️ The row understated the divergence as one-directional when it is two, so an exception
+written from its text would have been half wrong and gone green.
 
-| # | Row | Hub? | Non-hub files it would touch |
-|---|---|---|---|
-| 1 | `docs/feature-backlog.md:9278` — a SECOND publisher-versus-builder deadlock cycle survives `M91`'s fix, reached only through a cross-field validation rule | no | `app/Services/Forms/PublishService.php`, `app/Services/Forms/FormBuilderService.php`, `tests/Feature/Forms/PublishLockingTest.php`, `tests/Feature/Forms/BuilderLockOrderTest.php` |
-| 2 | `docs/feature-backlog.md:9216` — dead test-class pointers live in `app/` and `database/`, and the gate built to end that species cannot see one of them | **yes** — `routes/tenant.php` | `scripts/test-pointer-lint.php` and the citing sites in `app/` and `database/` |
-| 3 | `docs/feature-backlog.md:9052` — PHP-enum mirrors the new mirror gate does not reach, one of which adds a member its enum does not have | no | `tests/Feature/Docs/DocumentedEnumMirrorDriftTest.php`, `resources/js/components/submissions/FieldInput.vue` (read), `resources/js/Pages/submissions/show.test.ts` (read) |
-| 4 | `docs/feature-backlog.md:8971` — `form_versions.checksum` cannot be re-derived from the `schema_snapshot` it is stored beside | **forced second, see below** | `app/Services/Forms/SchemaSnapshotSerializer.php`, `database/migrations/2026_07_06_000202_create_form_versions_table.php`, `docs/erd.md`, a Pest arm |
+✅ `8971`: three documents corrected **in place, `1 1` in numstat**, because `docs/data-dictionary.md` sits
+at the citation ceiling with five line-pinned citations below the edited row. Two arms rather than one, and
+the second is the one worth having — it re-derives the stored digest EXACTLY after a recursive sort, which
+bounds the divergence to key order and would redden if the serializer's own numeric caveat ever stopped
+being hypothetical. The sort is a deliberate SECOND implementation: reusing the production canonicaliser
+would only have proved it agrees with itself.
 
-⚠️ **`docs/feature-backlog.md` is in the hub table at 6 citing rows and is deliberately not counted here.**
-Every closure and every correction edits the ledger, so counting it would make no batch legal at all —
-the `D15` exemption nineteen batched increments have now relied on, recorded rather than argued.
+✅ **Eleven positive controls, all as predicted.** The one worth naming: with a dead pointer re-introduced
+in `app/`, **narrowing the gate's roots back to `tests/` passes GREEN** — the direct measurement that the
+widening rather than the wording does the work. ⚠️ **A twelfth was written and DISCARDED as unsound**: it
+produced a PHP fatal (exit 255), which proves nothing about a gate, and is recorded rather than counted.
+⚠️ One assertion of mine was wrong on its first run and is recorded rather than tidied — the narrowing arm
+asserted `not->toContain('in (')`, which is false against a correct implementation, because `whereIn`
+renders `in (?)` for one id. The placeholder LIST is the honest witness.
 
-⛔ **ROW 2 IS THE DECLARED HUB ROW, AND IT BECAME ONE DURING VERIFICATION RATHER THAN AT SELECTION.**
-The row names `app/` and `database/`; the census below finds an eighth pointer in `routes/tenant.php`,
-which is a hub at 10 citing rows. **Shipping a widened gate deliberately blind to a violation it would
-otherwise catch is not an option**, so the root set includes `routes/` and the hub budget is spent here.
+✅ **Tracker surgery taken BEFORE the push**, not after CI said so: 3 lines / 12,840 bytes, proved a pure
+move by `scripts/tracker-surgery.php` — counted multiset, exact byte conservation at 2,774,041 with zero
+declared additions and zero residual, 2 paths touched, slice contiguous and byte-identical. Headroom
+3,106 → 15,946. The batch note went in a SECOND commit, because A1 and A4 would otherwise have required it
+declared as added bytes.
 
-⛔ **AND ROW 4 FORCES A SECOND HUB TOUCH THAT WAS UNKNOWABLE AT SELECTION — `M88`'s MECHANISM,
-RECURRING EXACTLY.** The row frames the migration comment as the one false statement. Verifying its
-*premise* found the same imprecision in `docs/data-dictionary.md:272` and `docs/erd.md:126`, and the
-dictionary is a hub at 13 citing rows. **Leaving a false sentence in the dictionary while closing the
-row that proved it false is strictly worse than exceeding the cap**, which is the judgement `D15`'s
-`M88` paragraph says nobody has yet written a rule for. ⚠️ **It is taken LINE-NEUTRALLY**: `:272` is a
-single markdown table row and the cell text is rewritten in place. Five line-pinned citations sit below
-it (`:542`, `:583-584`, `:630`, `:645`, `:838`), so an inserted line — a footnote, a design note, a new
-row — would silently invalidate all five. Nothing is inserted.
+⚠️ **The generated batch proposal was rejected for the FIFTH time, and for the first time it was the
+byte-identical set `M91` had already declined.** The first four rejections were four different mechanisms,
+so each could be read as bad luck; a proposal unchanged after being rejected cannot be. That is now the
+strongest available input to `D15`, and it is recorded rather than argued into the decision entry.
 
-### Evidence verified
-
-**Every citation in all four rows was opened. Two rows are wrong in ways that change what the fix is.**
-
-- **`9278` — HELD, every citation, and the mechanism is exactly as described.**
-  `app/Services/Forms/FormBuilderService.php:225` is the `whereKey($field->getKey())->lockForUpdate()`
-  that `M91` added; `:497` is `replaceValidations()`, which at `:501-511` resolves `related_field_key`
-  against a `pluck('id', 'key')` over the whole version and INSERTs `related_form_field_id` — a sibling
-  `form_fields` row the `whereKey()` lock never touched. `app/Services/Forms/PublishService.php:95-97`
-  locks sections, then fields, then validations, each in one statement with **no `ORDER BY`**.
-  `updateField()` at `:159-183` takes no `forms` lock, so §3.4 is untouched by either side of the repair.
-- **`9216` — HELD, AND THE ROW UNDERSTATES ITSELF: EIGHT NAMES ACROSS THIRTEEN SITES, NOT SEVEN ACROSS
-  TWELVE.** All seven named resolve exactly as written, and each returns **zero** mentions anywhere under
-  `tests/`. The eighth is **`AchievementsRouteGuardsTest`**, named by `routes/tenant.php:242`.
-  ⚠️ Method, so it can be re-run rather than believed: the full set of `*Test` identifiers under `app/`,
-  `database/` and `routes/` (147 distinct) differenced against the 435 `*Test.php` basenames under
-  `tests/`. `TenantCustomColumnsTest` is the ninth difference and is correctly excluded — it is the
-  declared exemption at `scripts/test-pointer-lint.php:70`.
-- ⛔ **`9052` — EVERY CITATION HOLDS AND THE ROW'S HEADLINE IS FALSE.** *"Four PHP-enum mirrors live in
-  Vue SFCs"*: **two** do. `FieldInput.vue:129` (`prefill`) and `:156` (`RequiredMarker`) are in an SFC;
-  `useFormRuntime.ts:61` (`Marker`) and `show.test.ts:43-51` (`ALL_STATUSES`) are ordinary `.ts` files,
-  and `docs/data-dictionary.md:231` is prose. **So *"the new mirror gate cannot reach any of them"* is
-  false too** — `tests/Feature/Docs/DocumentedEnumMirrorDriftTest.php` reads declared paths through
-  `file_get_contents()` (`:126-133`), is extension-blind, and its own header at `:59` names
-  `useFormRuntime.ts`. `Marker` is unreached because nobody declared it, not because of its file type.
-  ⚠️ `ENUM_MIRRORS` at `:74-95` is exactly 20 rows, 17 `.ts` + 3 `.d.ts` — that half held.
-- ⛔ **`8971` — THE HEADLINE IS TRUE AND THE MECHANISM IT OFFERS IS INERT.** The row's worked example is
-  that `snapshot()` builds `['sections' => …, 'fields' => …]` and Postgres reorders it to
-  `fields,sections`. **`snapshot()` already returns a recursively-ksorted array** —
-  `app/Services/Forms/SchemaSnapshotSerializer.php:68-71` calls `ksortRecursive()` (`:233-246`), present
-  since the column was created (`bc2941f`), and the class docblock says so at `:26`. PHP `ksort` and
-  jsonb agree at the top level (`fields` before `sections` under both byte order and length-then-bytes),
-  **so the example proves nothing.** The real divergence is one level down, where the two orders part:
-  ksort gives `config, hint, key, label`, jsonb gives `key(3), hint(4), label(5), config(6)`. Migration
-  comment held verbatim at `database/migrations/2026_07_06_000202_create_form_versions_table.php:37`;
-  column type `jsonb` at `:35`; all four named consumers held as opaque.
-
-### Premise verified
-
-⛔ **THIS FIELD CHANGED WHAT THE FIX IS IN THREE OF THE FOUR ROWS.**
-
-- **`9278` believes its own repair is blocked by a test, and THAT IS FALSE — measured, not argued.**
-  The row ends *"Do not take it as a bug fix without deciding the first half: adding `ORDER BY` to the
-  publish path changes a shipped locking statement that `tests/Feature/Forms/PublishLockingTest.php`
-  pins by shape."* All six arms were opened. They assert, through `publishLockingFirstIndex()`, that a
-  statement CONTAINS a table name and `for update`; that the `forms` lock precedes the child locks; that
-  no locking read follows the status flip; and that exactly four `for update` statements are issued.
-  **`ORDER BY id` changes none of those four properties.** The stated blocker does not exist, which
-  converts the row from decision-blocked to buildable.
-- **`9216` believes the repair is *"not simply widening the scan roots"*, and it is right for a weaker
-  reason than the real one.** Its two stated obstacles hold (`scripts/test-pointer-lint.php:165` renders
-  each site relative to its own root; `:78-79` are census-shaped floors). **But `scan()` takes ONE
-  directory and uses it both as the mention corpus and as the definition of which test files exist on
-  disk.** A second call over `app/` would find zero `*Test.php` files there and report all 147 names as
-  dangling — in fact it would bail on `FILE_FLOOR` first. **The repair is to separate the two roles**;
-  a per-root floor is a consequence of that rather than the fix.
-  ⚠️ **And the disposition premise — *"each of the seven also needs deciding individually — correct the
-  name, write the test, or exempt it"* — resolves to ONE disposition for all eight: correct the name.**
-  A real arm asserting the exact cited property exists in every case. **Two of the eight would have been
-  mis-corrected by the obvious same-name candidate**: `MemberJoinedAwardTest`'s property is in
-  `PointAwardRlsTest`, not `PointAwardTest`; `ToggleableModulesTest`'s is in `SettingsVocabularyTest`,
-  not `ModuleToggleTest` or `EntitlementEnumsTest`.
-- ⛔ **`9052` believes the divergence is one-directional, and it is two.** *"`RequiredMarker` and
-  `Marker` each carry a `none` that `RequiredMode` does not"* — true, and both also **lack
-  `conditional`** (`app/Enums/RequiredMode.php:11-15`). A `MIRROR_DIVERGENCES` entry written from the
-  row's text alone would be wrong in one of its two halves. ⚠️ **And two of the row's four items are
-  EXACT mirrors that go green on arrival** — `prefill` against `PrefillSource`, and `ALL_STATUSES`
-  against all seven `SubmissionStatus` cases — so *"each needs a decision about what the right
-  vocabulary is"* is true of **two** of four, not four.
-- ⛔ **`8971` believes the migration comment is the offending statement; there are three, and a fourth
-  document already states the correct rule.** `docs/data-dictionary.md:272` and `docs/erd.md:126` carry
-  the same imprecision. **`docs/form-versioning-schema-migration.md:89` — the governing spec — already
-  says the checksum is computed over a canonical serialization and *"never over Postgres's own internal
-  JSONB byte representation, which is not guaranteed stable"***, and
-  `app/Support/Migrations/PublishedVersionGuard.php:51-56` reasons correctly too. The tree is not
-  ignorant of this; three statements have drifted from a spec that is right. ⚠️ *"Nothing verifies it
-  today"* — **HELD**, and tightly: three call sites of `checksumOf()`, all over in-memory rows.
-  `tests/Feature/Forms/TemplateRoundTripTest.php:82` is the near-miss and compares two in-memory
-  snapshots rather than a DB read-back.
-
-### Remedy verdict
-
-- **`9278` — WORKS, AND THE HALF THE ROW ASSERTS WITHOUT MEASURING IS THE HALF MEASURED FIRST.** The
-  prescription is a stable `ORDER BY id` on both sides, which is sound only if Postgres acquires row
-  locks in sorted order rather than scan order — a planner property, not something to take on trust.
-  `EXPLAIN SELECT id FROM form_fields WHERE form_version_id = … ORDER BY id FOR UPDATE`, run against
-  this stack's own container, plans **`LockRows` ABOVE `Sort`**. The idiom holds here.
-  ⚠️ **The second half is narrowed deliberately.** The row prescribes *"a single locking re-read over
-  `[$field->id, ...$siblingIds]`"*, and `replaceValidations()` plucks EVERY sibling in the version.
-  Locking all of them would serialize every concurrent field edit in a draft — a §3.4 reversal by
-  accident. Only the siblings the payload actually references are locked.
-- **`9216` — NONE OFFERED BEYOND THE TWO OBSTACLES, and the disposition is now measured**: eight
-  corrections, no new test, no new exemption.
-- **`9052` — NONE OFFERED; the smallest honest widening is three data rows and one grammar.** Two of the
-  three declarations are free (`prefill`, and `Marker` in an already-in-scope `.ts`); `RequiredMarker`
-  and `Marker` each need a `MIRROR_DIVERGENCES` entry carrying **both** directions; `ALL_STATUSES` needs
-  a third grammar (`const NAME = [ … ] as const;`) because it matches neither existing pattern.
-  ⚠️ **One hazard found in the gate rather than in the row:** `MIRROR_DIVERGENCES` is keyed by mirror
-  NAME alone, not path plus name, so two same-named mirrors in different files would share one
-  exception. Safe here because the names differ; filed rather than fixed.
-- **`8971` — THE ROW'S THIRD OPTION IS THE RIGHT ONE AND THE OTHER TWO ARE COSTLIER THAN IT SAYS.**
-  Correcting the documented claim is three line-neutral edits. The `text` sidecar needs a migration
-  against a table guarded by the immutability trigger plus a backfill that **cannot be performed** — the
-  original canonical text was never retained. Canonicalise-on-read is ~4 lines (`ksortRecursive()` is
-  already written and merely private) but **cannot be proven byte-exact**: jsonb round-trips numerics
-  through `numeric`, and `json_encode` without `JSON_PRESERVE_ZERO_FRACTION` collapses `1.0` to `1` —
-  the class flags this at `:28-30` as *"noted, not yet load-bearing"*, and a verification path would
-  make it load-bearing. **Shipping it would convert a latent doc inaccuracy into a flaky live one.**
-
-Files: as the batch table above, plus `docs/data-dictionary.md:272` (line-neutral, row 4).
-Shared artefacts taken: `docs/feature-backlog.md`, `docs/claims/lane-a.md`, `docs/claims/decisions.md` (if a decision is filed), `docs/backlog-triage.md`, `docs/pipeline.md`, `docs/gate-baselines.md`, `docs/data-dictionary.md`, `docs/erd.md`, `PROGRESS.md` (own block only, plus a tracker surgery into `PROGRESS_ARCHIVE.md`).
-Paired files taken: none. ⚠️ Row 2 widens a gate whose selftest fixtures are built in a temp directory by the script itself, so no 7(b-bis) pair is created by it.
-Namespaces spent: nothing from the migration or ADR namespaces.
-Prediction: **`tracker-lint` R1 is the gate I most expect to be wrong about, and I expect to be wrong in the direction of having acted too EARLY.** `PROGRESS.md` has 3,106 bytes of headroom against close-outs that have cost 1,486–5,868 bytes each across the last eleven, so a surgery is planned BEFORE the push rather than after CI says so — and `R7`'s own open row (`5983`) records that its byte threshold was calibrated on surgeries that were all left too late. **The surgery may trip the rule it is complying with.** ⚠️ Second most likely: citation-liveness, because row 2 edits thirteen comment sites across `app/`, `database/` and `routes/` and every insertion shifts the `path:N` citations beneath it — and row 4 edits the file with the least headroom in the tree, which is why it is taken line-neutrally. PHPStan cannot move on a diff of comments plus one service method plus two scripts — that will be said rather than quoted as an unchanged number. Pint on the host, bare, is expected green. E2E is not reached by any of these four rows and the specs run will be named.
+⛔ **THE CLAIM WAS EXTENDED ONCE, AND THE CLOSE-OUT IS WHAT FORCED IT — `M92` BROKE A PAIRING OF ITS OWN.**
+Extended at `0cdf0d9`, shipped as **PR #284, `8de5151`, 6/6 green with real step counts** (Static analysis 28 ·
+E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11). Regenerating `docs/gate-baselines.md` from `M92`'s own
+post-merge run rendered the `test-pointer-lint` row as **NOT FOUND**: widening the gate added two numbers to
+its summary line, and `scripts/gate-baselines.php` scrapes that line by a literal pattern.
+✅ **IT REPORTED THE MISS RATHER THAN WRITING A ZERO, WHICH IS `M91`'s MISSING-METRIC ARM DOING PRECISELY THE
+JOB IT WAS BUILT FOR** — a scrape that silently degrades to `0` is the failure that artefact exists against.
+So this is a *pairing* defect and not a silent-degradation one, and the distinction is the finding.
+⚠️ **The pairing is THREE files, not one**: the pattern plus both harness fixtures, the set `M90` added and
+`M91` gated by set equality. Changing only the pattern would have left `GateBaselinesTest` red.
+`GateBaselinesTest` passes 12/12 at **106 assertions** — `M91`'s recorded floor rather than a new number.
+⚠️ **Taken as a PR rather than pushed to the trunk, and `M90` is the reason**: `M90` fixed this same class
+with a direct commit under the owner bypass, and its own follow-up commit records that this *turned main red*.
+The bypass is for claim commits and close-outs; `scripts/` and `tests/fixtures/` are neither.
+⚠️ **The pairing is not in Standing Rule 7(b-bis)** — the repository's declared list of paired files — and it
+predates `M92` by two increments. Filed rather than added, because 7(b-bis) lives in a hub file and `M92`'s
+budget was already spent; the row also notes that the signal arrives as late as it possibly can, since
+baselines regenerate from a POST-MERGE run.
 
 ## RELEASED — `M91`, the twenty-second `D13` batch: a paired fixture set with a gate, four comments that were already right, a reserved key nothing asserted, and a lock order that depended on a payload being dirty (merged as PR #282, `12b4a31`, 6/6 green with real step counts — Static analysis 28 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

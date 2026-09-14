@@ -71,10 +71,10 @@ Schedule::job(SweepWebhookRetriesJob::class)->everyFiveMinutes();
 
 // Native-connector OAuth token refresh (H15a / ADR-0009 §D6). Cross-tenant MaintenanceJob → one
 // RefreshTenantConnectorTokensJob per active tenant, each renewing the grants whose token_expires_at falls
-// inside connectors.refresh_lead_seconds. hourly() against a 2-hour lead, so a grant is renewed with a full
-// sweep cycle to spare and one missed sweep cannot expire a token. Refresh is deliberately never lazy: doing
-// it inside a delivery attempt would put a second outbound call in the delivery transaction and let a
-// provider outage stampede every queued delivery at once.
+// inside connectors.refresh_lead_seconds. ⚠️ hourly() against a 2-hour lead renews every ONE-HOUR token
+// (Google, Airtable) on every sweep, so one missed sweep DOES expire them (corrected in M95). Refresh is never
+// done inline: the delivery job and the setup-time directories hand the rotation to RefreshOneConnectionJob
+// rather than put a credential exchange inside a transaction or a request.
 Schedule::job(RefreshConnectorTokensJob::class)->hourly();
 
 // Custom-domain DNS verification (H22a / ADR-0012). Cross-tenant, and the FIRST MaintenanceJob here that

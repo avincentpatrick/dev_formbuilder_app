@@ -907,9 +907,9 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   Recorded in ADR-0009 §D6's M6 amendment as well, so the residual is visible from the decision and not only
   from the backlog. Filed by `M6`. **Latent** — needs a database failure inside the one-UPDATE window between the provider committing a rotation and us storing it, judged by `M65`. **Tier: during-testing.**
 
-- **`minor` · The setup-time directory has no pre-flight refresh**, so an ordinary token expiry tells the
+- ~~**`minor` · The setup-time directory has no pre-flight refresh**~~, so an ordinary token expiry tells the
   tenant to reconnect a healthy account — `app/Services/Connectors/TabularDestinationDirectory.php:46,68`,
-  the one place H16a's guard was not applied. **Latent** on a missed sweep (H16a's own premise). Filed by `M1`. **Tier: before-testing.**
+  the one place H16a's guard was not applied. **Live** — re-judged by `M95`: the 7200s sweep lead exceeds a one-hour token, so every sweep rotates every Google and Airtable grant and one missed sweep expires them all. Filed by `M1`. **Tier: before-testing.** ✅ **CLOSED BY `M95` (2026-09-14) — FIXED BY A HAND-OFF, NOT BY THE PRESCRIBED GUARD.** An inline `ensureFresh()` from a web request takes no lock and races the worker, and a double exchange destroys a rotating Airtable grant. So `TabularDestinationDirectory::run()` and `ConnectorChannelDirectory::list()` — the Airtable base picker had the same gap — now queue `RefreshOneConnectionJob` before the call and after a refusal, retry once when the stored token changed underneath the request, and deduplicate with a cache marker; a hand-off that has not taken stops promising. `ensureFresh()` is deleted. Seven mutations, all CAUGHT.
 - ✅ **CLOSED BY `M66` (2026-09-03) — `minor` · ~~`ConnectorRulePausedNotification` is the only tenant-facing
   connector email with no brand.~~** The send is at `app/Jobs/Connectors/DeliverConnectorMessageJob.php:382-383`
   and now carries `->withBrand(BrandPalette::forTenantId($this->tenantId))`, matching its branded sibling 23
@@ -5931,8 +5931,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `docs/adr/0020-gamification-awarding-substrate.md`, and never propagated back to §1. **The drift has
   survived a full increment that knew about it.** ⚠️ Runtime observation cannot prove a completeness claim
   about an event with no surface to drive, so the row's two candidate mechanisms answer a different half of
-  the problem than it thinks. `users`/`updated` is the sharpest: **nothing in `app/` writes
-  `is_super_admin` at all**, which makes it a `D14`-shaped decision rather than a repair.
+  the problem than it thinks. `users`/`updated` was the sharpest: **nothing in `app/` wrote
+  `is_super_admin` at all**, which made it a `D14`-shaped decision rather than a repair. ⚠️ **Since `M95` the artisan-only `platform:super-admin` writes the flag and deliberately emits no audit row**, on the `domain` cell's no-actor argument, which the spec's `users` cell now records; the event stays unemitted until the system-actor audit row lands.
   ⚠️ **The row's own numbers, checked.** *"34 call sites"* — exact. *"Three services absent from the
   harvest entirely"* — held, and a fourth is half-invisible (`ConnectionService` passes the event through a
   ternary). *"Ten aliases"* — the row then enumerates **eight**, and eight is the reproducible figure. Of
@@ -9526,8 +9526,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   took a PR instead. ⚠️ The cheap remedy is a `--check` arm on the scraper that runs on the HOST against
   the live gates' own output rather than against a CI log, which would move the signal from post-merge to
   pre-push. **Live.** Filed by `M92`. **Tier: after-launch.**
-- **`minor` · `deploy.ps1` cycles two Windows services that cannot exist and never runs `queue:restart`, so a
-  deploy leaves a running worker on the previous release's code.** Measured by `M93` (2026-09-14) against the
+- ~~**`minor` · `deploy.ps1` cycles two Windows services that cannot exist and never runs `queue:restart`, so a
+  deploy leaves a running worker on the previous release's code.**~~ Measured by `M93` (2026-09-14) against the
   script rather than its documentation. Its only service step loops over `meridian-horizon` and
   `meridian-reverb` behind `Get-Service -ErrorAction SilentlyContinue`, a silent no-op on every host: neither
   package is in `composer.json`, and no Horizon or Reverb config file exists. The queue is the `database`
@@ -9535,9 +9535,9 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   tree**, so a worker outlives the `migrate --force` and the cache rebuild and keeps the old code until it
   dies. ⚠️ The script is dormant until a server exists, and the testing server is the next step — which is why
   this is tiered for it. The remedy sits in the same `try` block: `php artisan queue:restart`, the real worker
-  service name, and the dead loop deleted. **Live.** Filed by `M93`. **Tier: before-testing.**
-- **`minor` · No production path creates the first platform super-admin: the only writers of
-  `users.is_super_admin` are two seeders, and both return early in production.** Measured by `M93`
+  service name, and the dead loop deleted. **Live.** Filed by `M93`. **Tier: before-testing.** ✅ **CLOSED BY `M95` (2026-09-14) — THE PRESCRIBED REMEDY WAS PARTIAL.** `queue:restart` now runs last inside the maintenance window, the dead Horizon/Reverb loop is gone, and the script refuses a host without its worker service (`MERIDIAN_WORKER_SERVICE`, default `meridian-worker`) and starts a Stopped one after `up`. It never restarts the service, because Windows PHP has no pcntl and a service stop kills the job in flight. The row missed two things: the script was fail-open (PowerShell 5.1 ignores a native exit code, so a failed migrate ended green), and its documented rollback was undone by its own reset. Every native step now fails fast, a failure inside the window leaves the site down on purpose, and `-Ref` rolls back. Its "appears nowhere in the tree" was also literally false: the runbook prose already said to add it. Proven by a PowerShell 5.1 harness of twelve scenarios, with the trunk script failing open as the negative control.
+- ~~**`minor` · No production path creates the first platform super-admin: the only writers of
+  `users.is_super_admin` are two seeders, and both return early in production.**~~ Measured by `M93`
   (2026-09-14). The flag is a column, not a role, and `EnsureSuperAdmin` refuses the whole console without it.
   `DemoSeeder::ensureSuperAdmin()` and `E2eSeeder::promoteToSuperAdmin()` are its only writers of `true`, and
   both `run()` methods return on `app()->environment('production')`. None of the four artisan commands touches
@@ -9547,9 +9547,9 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   ⚠️ **The obvious manual escape is a trap:** an `UPDATE` on the application connection affects zero rows in
   silence, because `users` carries FORCE row-level security and an operator has no membership. A command must
   write over `pgsql_privileged` with a row-count check, set `email_verified_at`, and leave two-factor
-  unenrolled so the operator is sent to enrolment rather than locked out. **Live.** Filed by `M93`. **Tier: before-testing.**
-- **`minor` · `docs/deployment-infrastructure.md` §8 omits what a first `migrate --force` and a first tester
-  need, so a server stood up from it fails before anyone signs in.** Measured by `M93` (2026-09-14) against the
+  unenrolled so the operator is sent to enrolment rather than locked out. **Live.** Filed by `M93`. **Tier: before-testing.** ✅ **CLOSED BY `M95` (2026-09-14) — THE REMEDY WORKED, BUT WAS INCOMPLETE IN FIVE WAYS.** `php artisan platform:super-admin <email> --name=` creates or promotes the operator in one `pgsql_privileged` transaction: one INSERT or exactly one UPDATE, the address verified, two-factor left unenrolled, and a read-back on `pgsql_auth` after commit. Beyond the prescribed fix, it does five things. It asserts `rolsuper` or `rolbypassrls` first, because the seeders' zero-row guard is blind to a role that does not bypass row security. It lower-cases the address, because sign-in lower-cases what is typed against a case-sensitive unique index. It applies the registration password policy at a hidden prompt, with no stdin or generated password. It refuses a deleted account and one that holds a workspace membership. And its output names the console address, because a direct sign-in lands on a workspace-only page, and tells the operator to close open sign-up. No audit row is written; that gap is recorded in the audit spec and as a before-launch row. Fifteen Pest cases; six mutations, all CAUGHT.
+- ~~**`minor` · `docs/deployment-infrastructure.md` §8 omits what a first `migrate --force` and a first tester
+  need, so a server stood up from it fails before anyone signs in.**~~ Measured by `M93` (2026-09-14) against the
   migrations, the compose stack and CI rather than the runbook's prose. ⛔ **Database:** step 2 installs
   PostgreSQL and names no extension, while a migration runs `CREATE EXTENSION IF NOT EXISTS postgis` over
   `pgsql_privileged`, so the binaries must be on the host; and nothing names the superuser login behind
@@ -9563,8 +9563,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   and 7 name the worker and the `schedule:run` task; what they lack is the exact invocation. ⚠️ Two testing
   settings are named nowhere either — open sign-up defaults on, and `GUEST_MINT_PER_IP` defaults to 30 with no
   line in `.env.example` — and neither Memurai nor the `redis` extension is required, because cache and queue
-  default to `database`. **Live.** Filed by `M93`. **Tier: before-testing.**
-- **`minor` · No production path creates a workspace, so a fresh server has nowhere to build a form.**
+  default to `database`. **Live.** Filed by `M93`. **Tier: before-testing.** ✅ **CLOSED BY `M95` (2026-09-14) — THE ROW UNDERCOUNTED, AND TWO OF ITS CLAIMS WERE OVERSTATED.** §8's ten steps are rewritten in place and a new §8.2 gives the first-boot order. The additions the row did not name: a dedicated PostgreSQL 15 instance that `meridian_app` owns, `APP_ENV=production` made mandatory (in any other environment a seed creates a super-admin whose password is published), every `secret` replaced before the first migrate, the real mail symptom (`mailpit` jobs fail into `failed_jobs`), upload limits, php-cgi's `PHP_FCGI_MAX_REQUESTS=0`, exactly one worker installed Stopped, the PEM-files store for the wildcard certificate, sign-up closed before any A record, and `DEPLOY_ENABLED` set last. Overstated: step 8 did name the wildcard certificate, and §6 did give the exact `--queue=` order — what was missing was DNS-01 and the service invocations. `.env.example` now ends with the three guest limits, commented out.
+- ~~**`minor` · No production path creates a workspace, so a fresh server has nowhere to build a form.**~~
   Measured by `M93` (2026-09-14), after a search meant to refute it. The only writers of a tenant are
   `DemoSeeder` and `E2eSeeder`, both returning early in production. A central-host sign-up belongs to no
   workspace (`app/Services/Settings/RegistrationGate.php` says so in terms), a subdomain sign-up joins a
@@ -9572,15 +9572,15 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `routes/admin.php`, `routes/api.php` nor any artisan command creates one. ⚠️ **A workspace is more than one
   record:** the seeders also write its domain, an owner membership and a plan, and a membership needs the
   seeded role catalog. The remedy is an operator command beside the first-super-admin one, writing all four.
-  **Live.** Filed by `M93`. **Tier: before-testing.**
+  **Live.** Filed by `M93`. **Tier: before-testing.** ✅ **CLOSED BY `M95` (2026-09-14) — "ALL FOUR" WAS SIX WRITES, AND THE OWNER CANNOT BE INVITED.** `php artisan tenants:create <slug> "<name>" <owner> --plan=<tier>` writes, in one transaction on the application connection: a verified owner when the address is new; the tenant, with `tenants.owner_user_id` in the INSERT (every Owner guard keys on that pointer, and a hand-provisioned dev workspace without it lets an Admin remove its Owner); the subdomain label; the default subscription; the owner membership and its role row; and `MemberJoined`. It then checks every postcondition after commit. A new `SubdomainLabel` rule refuses a slug the runtime cannot route. An identical re-run writes nothing, and any other existing state is refused rather than repaired. An owner cannot come from an invitation (`cannotInviteAsOwner`), so an unverified, deleted or platform super-admin account is refused as owner. No audit row is written; that gap is recorded as a before-launch row. Twenty-one Pest cases, including the new owner loading the workspace dashboard; six mutations, all CAUGHT.
 - **`minor` · The central landing page offers "Create a workspace", and the account it creates has no
   workspace and lands on a 404.** Measured by `M93` (2026-09-14). While sign-up is open — the platform
   default — `resources/js/Pages/Welcome.vue` links to the registration page. A central-host registration
   belongs to no workspace, Fortify then redirects to `/dashboard`, and that route exists only in
   `routes/tenant.php`, so the central host answers 404. ⚠️ **The invitation-only testing setting avoids it
-  without code**, which is the recommendation on the open sign-up decision; if that decision is answered
-  "open", this row is retiered to before-testing with that reason. The fix is to relabel or hide the button
-  until a self-serve workspace exists, or to land such an account on a page that says it has none yet.
+  without code**, and the sign-up decision was answered invitation-only in chat on 2026-09-14, so the testing
+  server avoids it and this row stays early-testing, while a default install still reaches it. The fix is to relabel or hide the button
+  until a self-serve workspace exists, which is now an open decision, or to land such an account on a page that says it has none yet.
   **Live.** Filed by `M93`. **Tier: early-testing.**
 - **`minor` · No runbook rotates `APP_KEY`; rotation is only named as a manual step.** Carried out of
   `docs/security-threat-model.md` §9 by `M93` (2026-09-14), where it sat with no row. `.env.example` declares
@@ -9735,3 +9735,153 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   in `respondent-session.ts` still holds. ⚠️ The citation gate deliberately skips code, the claims tree and the
   tracker, and this ledger moves with every filing, so a line number is the wrong anchor here: a row id does not
   move. **Live.** Filed by `M94`. **Tier: after-launch.**
+- **`minor` · The deploy's code swap and asset build happen outside the maintenance window.** Found by `M95`
+  (2026-09-14) while verifying the deploy-script row. `deploy.ps1` resets the checkout to the new commit, runs
+  `composer install` and rebuilds the front-end assets before it calls `php artisan down`, so for the length of the
+  build the web tier and the old worker serve requests and take jobs over new or half-installed classes. The asset
+  build writes `public/build` while pages are being served, so a page can also fail on a missing manifest mid-build
+  (Vite empties its output directory by default; read from its documentation, not measured on the host). `M95`'s
+  rewrite keeps that order deliberately, because moving `down` earlier makes the downtime as long as the build.
+  ⚠️ Two real options, so a choice rather than a patch: `down` before the reset, with downtime equal to the build,
+  or build into a release directory and swap. Every merge redeploys the testing site, so testers meet it on every
+  deploy. **Live.** Filed by `M95`. **Tier: early-testing.**
+- **`minor` · Registration and profile accept a 255-character name into a 150-character column.** Found by `M95`
+  (2026-09-14) while writing the first super-admin command's name rule. `CreateNewUser::create()` and
+  `UpdateUserProfileInformation::update()` both validate `name` as `max:255`, while the users-table migration
+  declares `name` as a 150-character string. A name of 151 to 255 characters therefore passes validation and then
+  fails the write with SQLSTATE 22001, which the person sees as a server error rather than a message on the field.
+  `InvitationController` already validates the same field as `max:150`. The fix is the two rules and a case for
+  each. **Live.** Filed by `M95`. **Tier: early-testing.**
+- **`minor` · The welcome email tells a central-host account to create a workspace.** Found by `M95` (2026-09-14)
+  while checking what a first tester reads. `WelcomeNotification::toMail()` sends an account that belongs to no
+  workspace the line "The next step is to create a workspace, or to accept an invitation to one." Nothing in the
+  product lets that account create one: the only path is the operator command `tenants:create`, and whether sign-up
+  should create a workspace is an open question in the decisions log. `SendWelcomeEmail` raises the email on
+  `Verified`, so every central-host registration that confirms its address receives it. The landing page's "Create a
+  workspace" row names only `Welcome.vue`, so this copy had no row. ⚠️ The testing server is invitation-only, so
+  testers do not reach it; a default install does. **Live.** Filed by `M95`. **Tier: early-testing.**
+- **`minor` · The zero-gate sentence never switches off, and the gate's total shrinks.** Found by `M95`
+  (2026-09-14) while planning the close-out that empties the before-testing tier. `render_testing_gate()` in
+  `scripts/state.php` and `render_queue()` in `scripts/next.php` each print the instruction to send the user the
+  push notification and the Testing Server Checklist whenever the gate reads zero open, and nothing records that
+  the notification was sent. Every later `state.php` run and every generated hand-off therefore tells the next
+  session to notify again, although the project rules owe it only to the session that closed the last row.
+  Separately, `testing_gate()` in `scripts/pipeline.php` counts its total over the rows it is handed, and the ledger
+  rows it receives are open ones only (`scripts/backlog-triage.php` drops the rest), so a finished tier reads "0 open
+  of 1" (one plan marker) rather than the "0 open of N" its docblock promises. ⚠️ A done marker for the notification
+  at its point of truth, with both sentences keyed on its absence and proved by a committed mutation, is the likely
+  shape. **Live.** Filed by `M95`. **Tier: early-testing.**
+- **`minor` · `queue:work --timeout` cannot fire on Windows.** Found by `M95` (2026-09-14) while verifying the
+  deploy-script row. Laravel's `Worker::daemon()` registers its per-job timeout handler only when
+  `supportsAsyncSignals()` is true, which is `extension_loaded('pcntl')`, and Windows PHP has no pcntl. On the
+  Windows testing server a job that hangs holds the worker until something outside PHP stops it, and the rule in
+  `docs/adr/0007-async-execution-substrate.md` that `TenantAwareJob::$timeout` stays below the queue's
+  `retry_after` has no force there: with more than one worker, a job still running past `retry_after` is reserved
+  again and runs twice. The single worker process `M95`'s runbook prescribes is the interim mitigation. ⚠️ It needs
+  a choice between a supervisor that enforces a wall clock, deadlines inside the long-running calls themselves, or
+  accepting the gap on one worker. **Latent.** — needs a job that hangs on the Windows worker. Filed by `M95`. **Tier: during-testing.**
+- **`minor` · The token refresh re-check cannot stop a redundant rotation.** Found by `M95` (2026-09-14) while
+  verifying the setup-time directory row. `ConnectionTokenRefresher::refreshNow()` re-checks `needsRefresh()`
+  against `connectors.refresh_lead_seconds`, which defaults to 7200 seconds, but Google and Airtable issue one-hour
+  access tokens, so a grant renewed a moment ago is still inside the lead and is renewed again. The hourly sweep
+  therefore rotates every such grant on every run, and a duplicate `RefreshOneConnectionJob` rotates it once more.
+  Airtable invalidates the previous refresh token on each renewal, so every extra rotation reopens the short window
+  in which a racing request holds a dead token, which is the outcome the method's own docblock says the re-check
+  exists to prevent. ⚠️ Options: re-check against `last_refreshed_at`, or use a lead shorter than a token's life
+  inside the job. **Live.** Filed by `M95`. **Tier: during-testing.**
+- **`minor` · A connector test send has no token pre-flight.** Found by `M95` (2026-09-14) while verifying the
+  setup-time directory row. `ConnectionRuleController::test()` checks only that the grant is active before calling
+  `ConnectorTester::send()`, which passes the stored access token straight to the provider adapter's `deliver()`.
+  A Google grant whose access token has just expired answers the test with "Google refused the write." in the result
+  modal, although the grant is healthy and the next refresh renews it. `M95` gave the destination and channel
+  directories a hand-off to `RefreshOneConnectionJob` and left this path alone, because its contract is a delivery
+  result rather than a directory payload and it wants its own copy. **Live.** Filed by `M95`. **Tier: during-testing.**
+- **`minor` · No standing gate proves compatibility with the testing server's PostgreSQL 15.** Found by `M95`
+  (2026-09-14) from the user's answer that the Windows Server 2016 testing site runs PostgreSQL 15. Every database
+  the project runs is version 17: `docker-compose.yml` and each database service in the CI workflow use the
+  `postgis/postgis` 17-3.5 image. `M95` ran the suite on 15 once (draft pull request #287, closed unmerged: all green except `SearchIndexUsageTest`'s guard that the server is 17 or later, which a 15 job would have to relax),
+  and nothing keeps that result true: a later migration or query using a feature added in 16 or 17 (for example
+  `any_value()` or the `IS JSON` predicate from 16, `JSON_TABLE` or `MERGE ... RETURNING` from 17) passes every
+  gate and fails only on the testing server. ⚠️ Options: a static lint refusing SQL newer than 15 under
+  `database/migrations` and `app/`, a second CI database job on 15, or moving the site to 17 when its host is
+  upgraded. The second changes the CI workflow, which is the user's to change. **Latent.** — needs a change that
+  uses a feature newer than 15. Filed by `M95`. **Tier: during-testing.**
+- **`minor` · Operator commands have no well-formed audit shape.** Found by `M95` (2026-09-14) while deciding
+  what the first super-admin and first workspace commands record. `AuditLogger::record()` fills `user_id` from the
+  given actor or the signed-in user and hard-codes `is_system_action` to false, so an artisan command, which has no
+  actor, can only write the row the audit spec's `domain` entry calls malformed. `domains:activate`, `sso:domains`,
+  `platform:super-admin` and `tenants:create` therefore write no audit row, and the spec's `users`, `tenant`,
+  `subscription` and `tenant_users` cells now say so. The grant of the highest-blast-radius flag in the schema, and
+  the creation of every workspace, leave no ledger entry; until this lands, a command's console output is the only
+  provisioning record. ⚠️ The likely shape is an explicit system-actor arm: `user_id` null, `is_system_action` true,
+  request fields null, written in the same transaction as the change, with the presenters that derive "System" and
+  the sentences saying the logger hard-codes false corrected beside it. **Live.** Filed by `M95`. **Tier: before-launch.**
+- **`minor` · No path revokes `is_super_admin`.** Found by `M95` (2026-09-14) while designing the grant.
+  `platform:super-admin` sets the flag, and nothing in `app/` ever sets it back to false: no route, command or
+  service does, so withdrawing an operator's platform access needs a hand-written UPDATE over a role that bypasses
+  row security, and nothing refuses removing the last operator. The same family has no answer to item 12 of
+  `docs/security-threat-model.md` §9 either: an operator whose second-factor device is lost, with no recovery codes
+  left, can be let back in only by someone with database access. ⚠️ A revoke with a last-operator refusal and a
+  second-factor reset, through the same command family and the system-actor audit arm, is the likely shape.
+  **Latent.** — needs an operator whose access must be withdrawn or whose device is lost. Filed by `M95`. **Tier: before-launch.**
+- **`minor` · The refresh job's lock is released before its write commits.** Found by `M95` (2026-09-14) while
+  verifying the setup-time directory row. `RefreshOneConnectionJob::handleForTenant()` reads the connection, then
+  takes its `connector-refresh` cache lock and releases it in a `finally`, all inside the `DB::transaction` that
+  `TenantAwareJob::handle()` opens, so the lock is released before the new tokens commit, and the row is read before
+  the lock is taken. A second worker that read the same row can take the lock the moment it is free and exchange the
+  refresh token the first has already spent; Airtable answers `invalid_grant`, which the refresher treats as a dead
+  grant. On the database cache store the lock row is part of the same uncommitted transaction, so the second worker
+  waits on it and acquires it at the first one's commit, still holding the row it read before. The class docblock
+  promises one lock holder per grant, and its only test runs on the array store, which cannot show any of this.
+  ⚠️ Take the lock and re-read the row outside the job's transaction, and test against the database store.
+  **Latent.** — needs more than one queue worker. Filed by `M95`. **Tier: before-launch.**
+- **`minor` · The seeders' zero-row guard is blind to a role that does not bypass RLS.** Found by `M95`
+  (2026-09-14) while writing the first super-admin command's precondition. `DemoSeeder::ensureSuperAdmin()` and
+  `E2eSeeder::promoteToSuperAdmin()` promote an operator over `pgsql_privileged` and throw only when the UPDATE
+  affected zero rows and the row still `exists()` on the same connection. A role that owns the table but does not
+  bypass row security sees no users under FORCE (measured during `M95`'s verification: 0 visible against 16), so
+  the existence check is false as well and the seeder reports success having promoted nobody. `E2eSeeder`'s
+  docblock says the guard covers exactly that managed-Postgres case, which it cannot. `M95`'s command asserts
+  `rolsuper` or `rolbypassrls` first instead. ⚠️ Both seeders return in production, so only a non-production seed
+  on such a role reaches it. **Latent.** — needs a privileged role that does not bypass row security. Filed by `M95`. **Tier: after-launch.**
+- **`minor` · stancl resolves a multi-level host differently from `PlatformHost`.** Found by `M95` (2026-09-14)
+  while writing the workspace command's label rule. `InitializeTenancyBySubdomain::makeSubdomain()` returns the
+  first label of any host that ends in a central domain, so `a.b.meridian.test` identifies tenant `a`, while
+  `PlatformHost::subdomainLabel()` returns null for a label containing a dot and so treats the same host as central;
+  its comment says stancl would not resolve such a host either, which is false. On that host the tenant routes run
+  as tenant `a` while the platform-host checks read it as the central host. ⚠️ A single-level wildcard certificate
+  does not cover two levels, so production over TLS cannot reach it; align the two, or refuse a multi-level host in
+  both, before anything issues a deeper certificate. **Latent.** — needs a two-level host that reaches the app. Filed by `M95`. **Tier: after-launch.**
+- **`minor` · A struck closure records no closer.** Found by `M95` (2026-09-14) while reading how
+  `scripts/state.php` counts closed rows. `finish_row()` sets the closer only when a row's first line has the
+  `CLOSED BY` shape. A struck first line matches the open pattern instead, is marked closed, and keeps a null
+  `closed_by` even when its last line carries a closing note naming the increment, so every row `M94` closed that
+  way, and the rows `M95` closes the same way, are unattributed to any machine reader. ⚠️ Either read the closing
+  note's increment from the body, with a discriminator for quoted notes, or close rows in the `CLOSED BY`
+  first-line shape. **Live.** Filed by `M95`. **Tier: after-launch.**
+- **`minor` · The pre-push guard's protocol paths omit `docs/pipeline.md`.** Found by `M95` (2026-09-14) while
+  planning its own pushes. `scripts/pre-push-guard.php` skips its claim rule only when every changed path is in
+  `PROTOCOL_PATHS`, which names the tracker, its archive, the claims tree, the baselines, the triage file and the
+  ledger, but not `docs/pipeline.md`. Every close-out and every recorded answer regenerates that file in the same
+  push, so a close-out pushed from a branch the claim did not name is refused as work, which is the trap `M94` hit.
+  ⚠️ The path is one line, but the list is the guard's whole definition of documentation-only, so the change wants a
+  control proving a pipeline-only push is admitted while a code push still is not. **Live.** Filed by `M95`. **Tier: after-launch.**
+- **`minor` · The queue enum's docblock says five names.** Found by `M95` (2026-09-14) while checking the worker's
+  `--queue=` string for the runbook. The `QueueName` enum's class docblock opens "The five queue names", and the
+  enum declares six cases. It is a docblock only, so nothing reads it, and the `--queue=` ordering string the
+  runbook and `QueuedMailContractTest` share is unaffected. **Live.** Filed by `M95`. **Tier: after-launch.**
+- **`minor` · PHP's file-size limits in the dev image reject attachments the app allows.** Found by `M95`
+  (2026-09-14) while writing the runbook's PHP settings. `docker/Dockerfile` builds on `php:8.4-fpm-alpine`, which
+  ships no `php.ini`, so the dev app container runs PHP's defaults of 2M per file and 8M per request (measured with
+  `ini_get` inside the container), while `config/attachments.php` allows a 25 MB attachment and a 4 MB feedback
+  screenshot, and `docker/nginx/default.conf` admits a 25 MB body. A file between 2 MB and 25 MB is therefore
+  refused by PHP before the app's own size rule and its message apply. The testing server's `php.ini` values come
+  from `M95`'s runbook. ⚠️ Copy an ini file into the image, then try a 3 MB attachment and a 3 MB screenshot in dev.
+  **Live.** Filed by `M95`. **Tier: after-launch.**
+- **`minor` · ADR-0007 points at rows of ADR-0005 by bare line number, and every pointer lands on the wrong row.**
+  Found by `M95` (2026-09-14) while annotating both ADRs. `docs/adr/0007-async-execution-substrate.md` names
+  ADR-0005's Redis/Memurai row as `:27`, its Horizon row as `:28` and its Task Scheduler row as `:30`, in the §D1
+  table row, the §D1 text, the scheduler gap and Related Decisions. Those lines of ADR-0005 are its PHP, Database
+  and Queue workers rows. A bare `:N` carries no file name, so the citation gate cannot see it. ⚠️ Name the rows
+  instead, as `M95`'s in-place annotations to ADR-0005 do; renumbering would rot again with the next edit to that
+  table. **Live.** Filed by `M95`. **Tier: after-launch.**

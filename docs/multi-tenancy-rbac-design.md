@@ -363,7 +363,7 @@ of a prior `declined`/`removed` row, the `suspended` refusal and the one-role-pe
 are the same problem every time, and a second implementation would be correct until the day one of them
 changed. What differs between the doors is **one string**, recorded in the audit payload as `via`,
 because "how did this person get in" is the only question they answer differently and the ledger is the
-only place the answer survives.
+only place the answer survives. ⚠️ **The founding Owner is not a door (`M95`):** `tenants:create` writes that membership in the same transaction as the tenant itself — `tenants.owner_user_id`, the Owner role row and `invited_by = NULL` — rather than through any of the four doors below, so their gates and refusals do not apply to it.
 
 | Door | `via` | Entry point | Gate on a NEW membership |
 |---|---|---|---|
@@ -416,16 +416,16 @@ correct behaviour, not a defect report.
 notification is identical across the three doors that go through it — the distinction belongs in the audit
 ledger, where it is, and not in a bell.
 
-⚠️ **BUT THAT IS THREE DOORS, NOT FOUR, AND THE GAP IS THE INVITATION ONE.** `attachMember()` is the only
-dispatch site for `MemberJoined` in the codebase, and `InvitationController` never calls it — an invitee
-accepting is a status transition on a row that already exists (§7 step 2), not an attach. So an Owner is
-told when somebody self-registers, is JIT-provisioned by their IdP, or signs in with Google, and is told
-**nothing** when the person they personally invited accepts — the one door where they had already
-expressed interest in that individual by name. Pre-existing rather than introduced by the fourth door, and
-recorded here because §7.1's first sentence read as though parity existed: a reader planning notification
-work would not discover the gap until testing invite acceptance by hand. Whether to close it is a product
-decision (an acceptance is arguably an answer to the Owner's own action rather than news), not an
-oversight to be quietly patched.
+⚠️ **ALL FOUR DOORS RAISE IT NOW, PLUS ONE PATH THAT IS NOT A DOOR (corrected by M95).** This paragraph
+used to say `attachMember()` was the only dispatch site for `MemberJoined` and that an invitee accepting
+raised nothing, because acceptance is a status transition on a row that already exists (§7 step 2), not an
+attach — so an Owner heard about a self-registration, a JIT provisioning or a Google sign-in, but not about
+the person they had invited by name. `f267b86` (K1c) closed that gap: the invitation-acceptance path in
+`TenantMembershipService` now raises `MemberJoined` for the accepted membership, so all four doors notify.
+M95 added a fifth dispatch site that is deliberately not a door: `tenants:create` raises it once for the
+founding Owner it writes with the workspace (§7's table, `invited_by` NULL), which awards the welcome points
+and notifies nobody, because the listener excludes the member who joined and a new workspace has no other
+member. The earlier reading of this paragraph is in git history rather than repeated here.
 
 ---
 
@@ -714,7 +714,7 @@ ADR-0002 §D3 documents *why* each layer is enforced (a descriptive table). This
 - GDPR subject-access/erasure mechanics for `users`/`tenant_users` rows → Doc #12 (Data Privacy & GDPR/Compliance Doc).
 - Full audit-event redaction rule detail → Doc #13 (Audit & Compliance Logging Spec) — this doc only specifies that role/permission changes emit `audits.event = 'permission_changed'` (already in the Data Dictionary's `AuditEvent` enum).
 - Plan-tier seat/role quotas (e.g., "Starter plan caps at 5 Form Editors") → Doc #24 (Pricing & Feature-Gating Matrix).
-- Tenant-creation/onboarding UX (how the very first Owner and tenant row come to exist) → Doc #25 (Onboarding & Template Content Plan).
+- Tenant-creation/onboarding UX (how the very first Owner and tenant row come to exist) → Doc #25 (Onboarding & Template Content Plan). ⚠️ **As built (`M95`), the operator path is `tenants:create`:** it writes the tenant with `owner_user_id`, its domain label, the Owner membership and role, and a default subscription in one transaction. Self-serve sign-up creates an account and no workspace; whether it should create one is an open question in `docs/claims/decisions.md`.
 - Privilege-escalation threat scenarios (this doc defines the mechanism precisely enough for that analysis to build on; it does not itself attempt an adversarial review) → Doc #11 (Security & Threat Model Doc).
 
 ---

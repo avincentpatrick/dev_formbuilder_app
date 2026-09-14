@@ -14,6 +14,7 @@ use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Spatie\Permission\PermissionRegistrar;
 
@@ -292,4 +293,188 @@ it('is gated by the plan, like every other connector surface', function (): void
         ->getJson(sheetsUrl($this->connection).'?reference=x')
         ->assertStatus(402)
         ->assertJsonPath('code', 'feature_not_available');
+});
+
+// ── M95: a token Google will refuse is handed to the refresh job, never reported as a dead grant ────────────
+
+/**
+ * The Google answers for the M95 cases, chosen by the bearer token each request presents.
+ *
+ * ⚠️ ONE CLOSURE, NOT A MAP OF STUBS. Laravel answers a request with the FIRST registered stub that matches, and a
+ * later `Http::fake()` appends rather than replaces — so a case that fakes a 401 and, after the refresh, fakes a
+ * 200 for the same URL would keep getting the 401. Keying on the token also proves a retry used the new one.
+ *
+ * @param  list<string>  $acceptedTokens  every bearer token the Sheets API accepts; any other is answered 401
+ * @param  (callable(): void)|null  $onRefusal  runs before each 401, to stage a concurrent rotation
+ */
+function m95FakeGoogle(array $acceptedTokens, ?callable $onRefusal = null): void
+{
+    Http::fake(function (Request $request) use ($acceptedTokens, $onRefusal) {
+        if (str_contains($request->url(), 'oauth2.googleapis.com/token')) {
+            return Http::response(['access_token' => 'ya29.refreshed', 'expires_in' => 3599], 200);
+        }
+
+        $token = substr($request->header('Authorization')[0] ?? '', strlen('Bearer '));
+
+        if (! in_array($token, $acceptedTokens, true)) {
+            if ($onRefusal !== null) {
+                $onRefusal();
+            }
+
+            return Http::response(['error' => ['code' => 401, 'status' => 'UNAUTHENTICATED']], 401);
+        }
+
+        if (str_contains($request->url(), '/values/')) {
+            return Http::response(['values' => [['Name', 'Notes']]], 200);
+        }
+
+        return Http::response([
+            'spreadsheetId' => 'SHEET_ID_0000000000000095',
+            'properties' => ['title' => 'Renewed'],
+            'sheets' => [['properties' => ['title' => 'Sheet1']]],
+        ], 200);
+    });
+}
+
+it('hands an expired Google token to the refresh job instead of telling the tenant to reconnect', function (): void {
+    config()->set('queue.default', 'database');
+    config()->set('connectors.providers.google_sheets.client_id', 'client-abc');
+    config()->set('connectors.providers.google_sheets.client_secret', 'secret-xyz');
+
+    $this->connection->forceFill(['token_expires_at' => now()->subMinute()])->save();
+    m95FakeGoogle(['ya29.refreshed']);
+
+    $url = sheetsUrl($this->connection).'?reference=SHEET_ID_0000000000000095';
+
+    $this->actingAs($this->admin)->getJson($url)
+        ->assertOk()
+        ->assertJsonPath('destination', null)
+        ->assertJsonPath('error', 'We’re renewing access to your Google Sheets account. Try again shortly.');
+
+    // Nothing was spent on a token Google would refuse — not the sheet, and not the token endpoint either,
+    // because the rotation belongs to the worker.
+    expect(Http::recorded()->count())->toBe(0)
+        ->and(DB::table('jobs')->count())->toBe(1)
+        ->and((string) DB::table('jobs')->value('payload'))->toContain((string) $this->connection->id);
+
+    workOneJob('scheduled-maintenance');
+    enterTenant($this->tenant->id, $this->admin->id);
+
+    expect($this->connection->fresh()->access_token)->toBe('ya29.refreshed');
+
+    $this->actingAs($this->admin)->getJson($url)
+        ->assertOk()
+        ->assertJsonPath('error', null)
+        ->assertJsonPath('destination.title', 'Renewed');
+});
+
+it('never creates a spreadsheet with an expired token, and hands the refresh off instead', function (): void {
+    config()->set('queue.default', 'database');
+    $this->connection->forceFill(['token_expires_at' => now()->subMinute()])->save();
+
+    // Every token refused, so the behaviour before M95 is the real one: a POST answered 401 and turned into
+    // "reconnect". The fix sends nothing at all.
+    m95FakeGoogle([]);
+
+    $this->actingAs($this->admin)->postJson(sheetsUrl($this->connection), ['title' => 'Intake', 'headers' => ['Name']])
+        ->assertOk()
+        ->assertJsonPath('destination', null)
+        ->assertJsonPath('error', 'We’re renewing access to your Google Sheets account. Try again shortly.');
+
+    expect(Http::recorded()->count())->toBe(0)
+        ->and(DB::table('jobs')->count())->toBe(1);
+});
+
+it('hands off a token Google refuses even though our clock says it is still fresh', function (): void {
+    config()->set('queue.default', 'database');
+    m95FakeGoogle([]);
+
+    $this->actingAs($this->admin)->getJson(sheetsUrl($this->connection).'?reference=SHEET_ID_0000000000000096')
+        ->assertOk()
+        ->assertJsonPath('error', 'We’re renewing access to your Google Sheets account. Try again shortly.');
+
+    enterTenant($this->tenant->id, $this->admin->id);
+
+    // A 401 is not a dead grant: nothing marked it so, and the worker's refresh is what decides.
+    expect(DB::table('jobs')->count())->toBe(1)
+        ->and($this->connection->fresh()->status)->toBe(ConnectionStatus::Active);
+});
+
+it('keeps the reconnect copy for a grant that can never be refreshed', function (): void {
+    config()->set('queue.default', 'database');
+    $this->connection->forceFill(['refresh_token' => null, 'token_expires_at' => null])->save();
+    m95FakeGoogle([]);
+
+    $this->actingAs($this->admin)->getJson(sheetsUrl($this->connection).'?reference=SHEET_ID_0000000000000097')
+        ->assertOk()
+        ->assertJsonPath('error', 'Google Sheets rejected our credentials. Reconnect this account, then try again.');
+
+    expect(DB::table('jobs')->count())->toBe(0);
+});
+
+it('leaves a healthy grant alone: no hand-off and no token call', function (): void {
+    config()->set('queue.default', 'database');
+    m95FakeGoogle([$this->connection->access_token]);
+
+    $this->actingAs($this->admin)->getJson(sheetsUrl($this->connection).'?reference=SHEET_ID_0000000000000098')
+        ->assertOk()
+        ->assertJsonPath('error', null);
+
+    // An hour-long token is always inside the SWEEP's 7200s lead. Were the pre-flight to read that lead rather
+    // than its own 120s one, every inspection of every healthy grant would queue a rotation.
+    expect(DB::table('jobs')->count())->toBe(0);
+    Http::assertNotSent(fn (Request $request): bool => str_contains($request->url(), 'oauth2.googleapis.com/token'));
+});
+
+it('queues one refresh however many requests arrive inside the window', function (): void {
+    config()->set('queue.default', 'database');
+    $this->connection->forceFill(['token_expires_at' => now()->subMinute()])->save();
+    m95FakeGoogle([]);
+
+    $url = sheetsUrl($this->connection).'?reference=SHEET_ID_0000000000000099';
+
+    foreach ([1, 2] as $click) {
+        $this->actingAs($this->admin)->getJson($url)
+            ->assertJsonPath('error', 'We’re renewing access to your Google Sheets account. Try again shortly.');
+    }
+
+    expect(DB::table('jobs')->count())->toBe(1);
+});
+
+it('stops promising once a renewal has not taken', function (): void {
+    config()->set('queue.default', 'database');
+    $this->connection->forceFill(['token_expires_at' => now()->subMinute()])->save();
+    m95FakeGoogle([]);
+
+    $url = sheetsUrl($this->connection).'?reference=SHEET_ID_0000000000000100';
+
+    $this->actingAs($this->admin)->getJson($url)
+        ->assertJsonPath('error', 'We’re renewing access to your Google Sheets account. Try again shortly.');
+
+    // The worker never ran. Past the two-minute window a second refresh is queued and the sentence stops
+    // promising one: a stopped worker has to end in something true, not in "shortly" forever.
+    $this->travel(3)->minutes();
+
+    $this->actingAs($this->admin)->getJson($url)
+        ->assertJsonPath('error', 'We couldn’t renew access to your Google Sheets account yet. Try again in a few minutes, or reconnect it if this keeps happening.');
+
+    expect(DB::table('jobs')->count())->toBe(2);
+});
+
+it('retries once with the stored token when the sweep rotated the grant underneath the request', function (): void {
+    config()->set('queue.default', 'database');
+    $connection = $this->connection;
+
+    // The first call presents the token the route bound. While Google refuses it, the sweep's job commits a
+    // rotation, so the stored token is already new: one retry fixes it and nothing is handed off.
+    m95FakeGoogle(['ya29.rotated'], function () use ($connection): void {
+        $connection->forceFill(['access_token' => 'ya29.rotated'])->save();
+    });
+
+    $this->actingAs($this->admin)->getJson(sheetsUrl($this->connection).'?reference=SHEET_ID_0000000000000101')
+        ->assertOk()
+        ->assertJsonPath('error', null)
+        ->assertJsonPath('destination.title', 'Renewed');
+
+    expect(DB::table('jobs')->count())->toBe(0);
 });

@@ -13,7 +13,7 @@ The Empty State component and its "get started" CTA pattern (`docs/ux/design-sys
 
 ## 2. Onboarding Flow
 
-1. **Signup → tenant creation**: a new tenant's founding Owner (`docs/multi-tenancy-rbac-design.md` §3) completes signup; `tenants`/`tenant_users` rows are created (the Owner's own `tenant_users` row has `invited_by = NULL`, per that doc's §7 lifecycle).
+1. **Signup → tenant creation**: a new tenant's founding Owner (`docs/multi-tenancy-rbac-design.md` §3) completes signup; `tenants`/`tenant_users` rows are created (the Owner's own `tenant_users` row has `invited_by = NULL`, per that doc's §7 lifecycle). ⚠️ **As built (`M95`), self-serve sign-up creates no workspace today:** a central-host registration is an account with no membership, and the operator path is `tenants:create`, which writes the tenant with its `owner_user_id`, its domain label, the Owner membership and role, and a default subscription. Whether sign-up should create a workspace is an open question in `docs/claims/decisions.md`.
 2. **First-login landing**: rather than dropping a brand-new tenant onto a literal empty dashboard, the first authenticated screen is a lightweight **"Create your first form"** moment — not a multi-step guided wizard/product tour (which this project's "intuitive by default" principle, architecture plan intro, argues against — a wizard the user must click through *before* reaching the product delays the very thing that demonstrates the product's value). Two equally-weighted choices, presented as the standard card-grid pattern:
    - **Start from a template** — opens the template gallery (§3).
    - **Start from blank** — the ordinary builder flow, for a user who already knows exactly what they want.

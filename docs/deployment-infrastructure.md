@@ -7,9 +7,9 @@
 
 ## 1. What's Already Decided (not repeated in full)
 
-Per **ADR-0005**, production runs on the owner's **Windows Server 2016**: **nginx** (web server) → PHP 8.4 FastCGI, **self-managed PostgreSQL for Windows**, **Redis via Memurai**, a `queue:work` worker as a Windows service, the scheduler via Windows Task Scheduler, TLS via win-acme, and **git-driven deploys through a self-hosted GitHub Actions runner**. ⚠️ **This sentence listed "Horizon/Reverb as Windows services" until Increment M46 (2026-08-29): neither is built.** Horizon was declined by ADR-0007 §D1 in favour of a plain worker; Reverb is Track B and ships no artisan command in this tree, so a service pointing at it cannot start. Docker Compose remains the source of truth for local-dev/CI parity regardless of the production host; the CI pipeline stages are in `docs/testing-strategy.md` §6.
+Per **ADR-0005**, production runs on the owner's **Windows Server 2016**: **nginx** (web server) → PHP 8.4 FastCGI, **self-managed PostgreSQL for Windows** (a dedicated instance per site; the testing site runs PostgreSQL 15, §8 step 2), **no Redis** (ADR-0007 moved the queue to the `database` driver and cache and sessions use it too, so ADR-0005's Memurai is not installed — it returns only with Redis + Horizon), exactly one `queue:work` worker as a Windows service, the scheduler via Windows Task Scheduler, TLS via win-acme, and **git-driven deploys through a self-hosted GitHub Actions runner**. ⚠️ **This sentence listed "Horizon/Reverb as Windows services" until Increment M46 (2026-08-29): neither is built.** Horizon was declined by ADR-0007 §D1 in favour of a plain worker; Reverb is Track B and ships no artisan command in this tree, so a service pointing at it cannot start. Docker Compose remains the source of truth for local-dev/CI parity regardless of the production host; the CI pipeline stages are in `docs/testing-strategy.md` §6.
 
-**No open hosting due-diligence item.** Because Postgres is now self-managed, Row-Level Security and PostGIS are **guaranteed** available (install the `postgis` extension when Phase 2 geo fields land) — the ADR-0003 "confirm the managed platform supports RLS/PostGIS" question is eliminated, not deferred.
+**No open hosting due-diligence item.** Because Postgres is now self-managed, Row-Level Security and PostGIS are **guaranteed** available — but the PostGIS binaries must be installed **before the first migrate**, because a migration already runs `CREATE EXTENSION postgis` (§8 step 2) — and the ADR-0003 "confirm the managed platform supports RLS/PostGIS" question is eliminated, not deferred.
 
 **Honest posture note (ADR-0005).** A single self-hosted box is a single point of failure, and the team owns all ops (patching, backups, TLS, service supervision). The 99.5% Phase-1 uptime target is self-managed; revisit redundancy before committing SLAs to paying customers, and plan a Server-OS upgrade before Windows Server 2016 end-of-support (~Jan 2027).
 
@@ -20,8 +20,8 @@ Per **ADR-0005**, production runs on the owner's **Windows Server 2016**: **ngin
 | Environment | Purpose | Infrastructure |
 |---|---|---|
 | **Local development** | Individual dev machines | Docker Compose (Laravel, Postgres, Redis, Mailpit) — the committed parity source. Native PHP + Postgres on Windows/Laragon is an accepted alternative for developers who don't run Docker. |
-| **CI** | Automated tests (`docs/testing-strategy.md`) | GitHub-hosted **Linux** runners with Postgres/Redis service containers pinned to the same majors as production. (Note the Linux-CI vs Windows-prod parity gap, ADR-0005.) |
-| **Staging** *(recommended)* | Pre-production validation | A second site on the same Windows Server (separate nginx server block + separate database, e.g. `meridian_staging`), or a separate box — isolated synthetic/seeded data, never real respondent PII (`docs/data-privacy-gdpr-compliance.md`). |
+| **CI** | Automated tests (`docs/testing-strategy.md`) | GitHub-hosted **Linux** runners with PostgreSQL 17 + PostGIS 3.5 and Redis service containers. (Note the Linux-CI vs Windows-prod parity gap, ADR-0005, and a version gap too: the testing site runs PostgreSQL 15, §8 step 2.) |
+| **Staging** *(recommended)* | Pre-production validation | A second site on the same Windows Server (separate nginx server block, **its own PostgreSQL instance**, worker service and scheduler task — §8 step 2 says why a separate database on a shared instance is not enough), or a separate box — isolated synthetic/seeded data, never real respondent PII (`docs/data-privacy-gdpr-compliance.md`). |
 | **Production** | Live tenant traffic | **Self-hosted Windows Server 2016**, per ADR-0005. |
 
 **Promotion path**: `main` is the deployable branch. A green CI run on `main` triggers the deploy workflow (self-hosted runner) → production. If a staging site is configured, validate there first and promote to production as a deliberate act, given the blast radius against live tenant data.
@@ -32,17 +32,17 @@ Per **ADR-0005**, production runs on the owner's **Windows Server 2016**: **ngin
 
 CI (test/build) is unchanged (`docs/testing-strategy.md` §6, Linux runners). **Deployment** is a separate workflow (`.github/workflows/deploy.yml`) that runs on the **self-hosted GitHub Actions runner installed on the Windows Server**:
 
-1. **Trigger**: `on: workflow_run` after the **CI** workflow completes **successfully** on `main` (nothing deploys unless every gate is green). `runs-on: [self-hosted, windows]`.
-2. **Action**: the workflow invokes **`deploy.ps1`** (committed at the repo root) against the live application directory. `deploy.ps1`:
-   - `git fetch --all --prune` and `git reset --hard origin/main` on the live checkout (deterministic — the server matches the remote exactly),
+1. **Trigger**: `on: workflow_run` after the **CI** workflow completes **successfully** on `main` (nothing deploys unless every gate is green). `runs-on: self-hosted` — the Windows Server's runner is the only self-hosted one, so the workflow deploys exactly **one** site.
+2. **Action**: the workflow invokes **`deploy.ps1`** (committed at the repo root) against the live application directory. Every native step **fails fast**: a non-zero exit stops the script and turns the run red. It first refuses a host where the worker service named by `MERIDIAN_WORKER_SERVICE` (default `meridian-worker`) is not installed, then:
+   - `git fetch` and `git reset --hard` to `-Ref`, which defaults to `origin/<branch>` (`main`), on the live checkout (deterministic — the server matches the remote exactly),
    - `composer install --no-dev --optimize-autoloader`,
    - `npm ci` + design-system deps + `npm run ds:tokens` + `npm run build` (compiled assets),
    - `php artisan down` (brief maintenance window — see §3.1),
    - `php artisan migrate --force` (backward-compatible / additive-first migrations, so old code tolerates the new schema),
    - `php artisan config:cache route:cache view:cache event:cache`,
-   - restart the worker Windows service (so workers run the new code). **Correction (2026-07-21):** this step previously claimed a `horizon:terminate` call for a graceful worker cycle. `deploy.ps1` does **not** run it — it only iterates `meridian-horizon`/`meridian-reverb` behind a `Get-Service … -ErrorAction SilentlyContinue` guard (`:49-54`), which is a silent no-op on a box that has neither service. Per **ADR-0007 §D1** there is no Horizon; the graceful equivalent for a plain `queue:work` worker is `php artisan queue:restart`, which must be added to `deploy.ps1` when the worker service is actually provisioned (§8). **Correction (Increment M46, 2026-08-29):** this step also said *"and Reverb"*. There is no Reverb service to restart and no `reverb:start` command to run one — see §8 step 6. The `meridian-reverb` name survives only inside `deploy.ps1`'s existence-guarded loop, where it is harmless precisely because the service never exists,
-   - `php artisan up`.
-3. **Rollback**: `git reset --hard <previous-good-sha>` then re-run `deploy.ps1` (rebuilds + re-caches). Because migrations are additive-first, a code rollback does not require a down-migration in the incident hot path; a schema reversal, if ever needed, is a separate deliberate step.
+   - `php artisan queue:restart`, **last inside the window** — the graceful signal for a plain `queue:work` worker, which finishes its current job and exits so NSSM relaunches it on the new code. There is no `Restart-Service`: Windows PHP has no `pcntl`, so a service stop kills the job in flight. ⛔ **A failure anywhere inside the window leaves the site DOWN on purpose** — the script warns, skips `up` and exits red, because new code over an unmigrated schema is worse than a maintenance page; fix the cause and re-run, or roll back (item 3). ⚠️ **A change to `deploy.ps1` itself takes effect one deploy late**: the runner starts the copy already on disk, and PowerShell reads a script whole before running it, so the script's own `git reset` cannot swap the body that is running. *(Until M95 this bullet described a `horizon:terminate` call and a Horizon/Reverb restart loop; neither ever ran — ADR-0007 §D1, and Increment M46 for Reverb.)*
+   - `php artisan up`, only when every step inside the window succeeded — then, if the worker service is **Stopped**, it is started. That is a Stopped-only guard: NSSM reports a crash-looping worker as Paused, which it cannot see.
+3. **Rollback**: `deploy.ps1 -AppPath <app path> -Ref <previous-good-sha>` (rebuilds + re-caches at that commit). A bare `git reset --hard <sha>` followed by a re-run does **not** roll back, because the script's own reset returns to `origin/main`; and the next green CI run on `main` redeploys `main`, so revert the bad commit there as well. Because migrations are additive-first, a code rollback does not require a down-migration in the incident hot path; a schema reversal, if ever needed, is a separate deliberate step.
 
 ### 3.1 On zero-downtime (an honest limitation)
 Single-box Windows self-hosting has **no managed zero-downtime deploy**. `deploy.ps1` uses a brief `artisan down`/`up` window around migrate + cache (typically seconds). True zero-downtime (atomic release-swap, opcache priming) is a future enhancement — or a reason to move to Forge+VPS / Laravel Cloud (ADR-0005 revisit triggers) — not something a single Windows box provides out of the box.
@@ -117,9 +117,9 @@ Operationalizes `docs/non-functional-requirements.md` §2 (RTO 4h / RPO 15min Ph
 > **Revised by [ADR-0007](adr/0007-async-execution-substrate.md) (2026-07-21).** The queue runs on the **`database` driver over PostgreSQL**, not Redis/Memurai, and is drained by a plain **`queue:work`** process, not Horizon (ADR-0005's queue rows are superseded in part). Nothing in this section is provisioned on the box today.
 
 - **Queue names — now binding on code, not just prose.** The six names are `submissions` and `webhooks` highest (user-facing / near-real-time); `mail` (transactional email — a person is waiting on an invite/reset, H3); `exports` and `ocr-processing` medium (a pending state is shown); `scheduled-maintenance` (usage rollups, retention purges) lowest. Per **ADR-0007 §D6** every job MUST declare `$queue` from this set, `default` is only the un-annotated fallback, and priority is expressed as the `--queue=` ordering string in the `queue:work` invocation until a supervisor with real per-queue weighting exists. *(Before ADR-0007 this catalog was documented as binding while `onQueue(` had zero hits repo-wide.)*
-- **Process supervision**: `php artisan queue:work --queue=submissions,webhooks,mail,exports,ocr-processing,scheduled-maintenance` as a **Windows service via NSSM**, auto-restarted on crash. Scaling is **manual** on a single box (more worker processes / a bigger box) — there is no managed autoscaling; capacity is a deliberate operational choice, and a scale-out need is one of ADR-0005's revisit triggers *and* ADR-0007 §D1's trigger for adopting Redis + Horizon.
+- **Process supervision**: `php artisan queue:work --queue=submissions,webhooks,mail,exports,ocr-processing,scheduled-maintenance` as **one** Windows service via NSSM, relaunched whenever it exits (§8 step 6). Scaling is **manual**, and on Windows it means **a bigger box, not more worker processes**: PHP there has no `pcntl`, so `--timeout` cannot stop a hung job, and a second process would run that job again once `retry_after` passes. There is no managed autoscaling; capacity is a deliberate operational choice, and a scale-out need is one of ADR-0005's revisit triggers *and* ADR-0007 §D1's trigger for adopting Redis + Horizon.
 - **Per-tenant fairness** (closes `docs/architecture/technical-architecture.md` Risk R6, **now RESOLVED**): jobs are tagged with `tenant_id` (required on every job payload, ADR-0002 §D3, asserted at runtime by ADR-0007 §D2); the per-tenant job-rate ceiling is **`RateLimited` job middleware** keyed `tenant:{id}:queue:{name}` (**ADR-0007 §D9**), counting job executions started per tenant per queue per minute, so one tenant's bulk OCR/export burst is *deferred* rather than rejected and cannot starve other tenants' queued work. Ceilings live in `config/queue-fairness.php` and are **unvalidated planning assumptions** until real traffic exists.
-- **Not provisioned.** `deploy.ps1` creates no worker service and restarts only the non-existent `meridian-horizon`/`meridian-reverb`; see §8.
+- **Not provisioned by the script.** `deploy.ps1` creates no worker service — §8 step 6 installs it by hand. The script refuses a host where the service named by `MERIDIAN_WORKER_SERVICE` (default `meridian-worker`) is missing, signals `queue:restart` last inside its maintenance window, and starts the service after `up` if it is Stopped (§3).
 
 ---
 
@@ -132,19 +132,28 @@ Operationalizes `docs/non-functional-requirements.md` §2 (RTO 4h / RPO 15min Ph
 
 ## 8. Windows Server Setup Runbook (one-time topology)
 
-The concrete pieces to stand the box up (companion to `deploy.ps1`):
+The concrete pieces to stand one site up (companion to `deploy.ps1`). Each step says what a piece is and how to configure it; **§8.2 says in what order to bring them up the first time — follow that order, not this list's.** The examples name the testing site: app path `C:\meridian\test-app`, worker service `meridian-test-worker`.
 
-1. **PHP 8.4** — install the VC++ 2015–2022 runtime; enable `pdo_pgsql`, `redis`, `intl`, `zip`, `bcmath`, `openssl`, `mbstring`, `fileinfo` in `php.ini`; production `php.ini` (opcache on, `display_errors=Off`).
-2. **PostgreSQL for Windows** (EDB) — install as a Windows service; create the `meridian` database and a **non-superuser** `meridian_app` login role. RLS does **not** apply to superusers, so the app must NOT connect as one — this is a hard requirement for the tenancy/RLS work (Increment A). Configure `archive_mode`/`archive_command` (§5).
-3. **Memurai** (Redis-compatible) — install as a Windows service; bind to localhost.
-4. **nginx for Windows** — server block: `root` → the app's `public/`; `try_files $uri $uri/ /index.php?$query_string`; `fastcgi_pass` to the php-cgi backend; run nginx as a Windows service via **NSSM**. *(A WebSocket `location` proxying to Reverb was listed here until Increment M46 (2026-08-29) measured that no Reverb service exists to proxy to — it returns with the stack, Track B.)*
-5. **php-cgi FastCGI backend** — one or more `php-cgi.exe -b 127.0.0.1:9000` instances as Windows services via NSSM (auto-restart). *If php-cgi supervision proves fragile under load, switch to **IIS + the PHP FastCGI module** — the documented fallback (ADR-0005).*
-6. **Queue worker** — `php artisan queue:work` (with the §6 `--queue=` ordering; **not** Horizon, per ADR-0007 §D1) as a Windows service via NSSM. **Gap: `deploy.ps1` does not create this worker service** — it only restarts `meridian-horizon`/`meridian-reverb` if they happen to exist, so provisioning it is a manual step of this runbook, and `php artisan queue:restart` should be added to the deploy script at the same time (§3).
+1. **PHP 8.4** x64, the Non Thread Safe build (it ships `php-cgi.exe`) — install the VC++ 2015–2022 runtime first. In `php.ini` enable `pdo_pgsql`, `zip`, `mbstring`, `openssl`, `fileinfo`, `curl` and `intl`, plus `zend_extension=opcache`, then confirm with `php -m` that `dom`, `xmlreader`, `libxml`, `iconv`, `ctype`, `filter` and `tokenizer` are listed as well. **Not `redis`** — cache, queue and sessions all use the `database` driver and no code calls Redis — and **not `gd`**, because QR codes render as SVG. Production values: `display_errors=Off`, `opcache.enable=1`, `upload_max_filesize=25M` and `post_max_size=30M`; the stock 2M/8M rejects every attachment over 2 MB, while `config/attachments.php` allows 25 MB. Leave `memory_limit` at its 128M default unless you also change step 6's `--memory`. ⚠️ Windows PHP has no `pcntl`; step 6 says why that matters.
+2. **PostgreSQL 15 for Windows (EDB), as a dedicated instance for this site**, plus **PostGIS 3.5** from Stack Builder (Spatial Extensions), or the newest 3.x Stack Builder offers for 15. Dev and CI run PostgreSQL 17 with PostGIS 3.5; the testing site runs 15 because EDB tests its 17 installer only on Windows Server 2019 and 2022, and its 15 installer on 2016 (the user's choice, recorded in `docs/claims/decisions.md`).
+   - **Dedicated** means its own Windows service, port and data directory, shared with no other site. The role names `meridian_auth` and `meridian_superadmin` are cluster-wide and hard-coded in their migrations, so on a shared instance the first site to migrate would fix their passwords for every database — and §8.2's privileged login is the instance's superuser, which reaches every database on it. A later production site gets its own instance.
+   - Bind it to this box only: `listen_addresses = 'localhost'` in `postgresql.conf`, only `127.0.0.1/32` and `::1/128` in `pg_hba.conf`, and no firewall rule for its port.
+   - A migration runs `CREATE EXTENSION IF NOT EXISTS postgis` over the privileged connection, and it fails without the PostGIS binaries.
+   - As the installer superuser: `CREATE ROLE meridian_app LOGIN PASSWORD '<new password>' NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE;` then `CREATE DATABASE meridian OWNER meridian_app;`. ⛔ **`meridian_app` must own the database.** From PostgreSQL 15 a non-owner has no `CREATE` on schema `public`, so the first `CREATE TABLE` would fail, and FORCE row-level security relies on the app role owning every table (ADR-0013's trigger function needs the same privilege).
+   - **Do not create `meridian_auth` or `meridian_superadmin` yourself, and never rename them.** The migrations create them with the passwords `.env` holds at the first migrate, then grant to the usernames `.env` names.
+   - RLS does **not** apply to superusers, so the app must NOT connect as one — this is a hard requirement for the tenancy/RLS work (Increment A). Configure `archive_mode`/`archive_command` (§5).
+3. **Redis / Memurai — not required.** *(ADR-0007 moved the queue to the `database` driver, and cache and sessions use it too, so nothing on this box needs a Redis server or the `redis` extension. Memurai returns only if ADR-0007 §D1's trigger brings Redis + Horizon.)*
+4. **nginx for Windows** — server block: `root` → the app's `public/`; `try_files $uri $uri/ /index.php?$query_string`; a PHP `location` with `fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;` and `include fastcgi_params;` that passes to step 5's `upstream` (the shape of `docker/nginx/default.conf`); run nginx as a Windows service via **NSSM**. Step 8 adds TLS, `server_name` and the body-size limit. *(A WebSocket `location` proxying to Reverb was listed here until Increment M46 (2026-08-29) measured that no Reverb service exists to proxy to — it returns with the stack, Track B.)*
+5. **php-cgi FastCGI backend** — two or more `php-cgi.exe` instances as NSSM services, **each on its own port** (`php-cgi.exe -b 127.0.0.1:9000`, `-b 127.0.0.1:9001`, …), listed as `server` lines in an nginx `upstream` block that `fastcgi_pass` names. One instance serves one request at a time, and two cannot share a port. In each service's environment set `PHP_FCGI_MAX_REQUESTS=0` (`nssm set <service> AppEnvironmentExtra PHP_FCGI_MAX_REQUESTS=0`): php-cgi otherwise exits after 500 requests, which testers see as intermittent 502s while NSSM restarts it. *If php-cgi supervision proves fragile under load, switch to **IIS + the PHP FastCGI module** — the documented fallback (ADR-0005).*
+6. **Queue worker** — exactly **one** `php artisan queue:work` process (with the §6 `--queue=` ordering; **not** Horizon, per ADR-0007 §D1) as an NSSM Windows service, **installed but left Stopped** until §8.2's priming deploy starts it:
+   `nssm install meridian-test-worker C:\php\php.exe artisan queue:work --queue=submissions,webhooks,mail,exports,ocr-processing,scheduled-maintenance --sleep=3 --max-time=3600 --memory=112`, then `nssm set meridian-test-worker AppDirectory C:\meridian\test-app`. `nssm install` does not start the service, but its start type is automatic, so do not reboot before the priming deploy. Leave `AppExit` at its `Restart` default: `--max-time` and `queue:restart` both end the process cleanly, and NSSM relaunching it is how new code loads. `--memory=112` sits below the 128M `memory_limit`, as the compose worker's does, so the graceful recycle fires before PHP's hard limit. Do **not** start it by hand: the worker reads the database cache at boot, and that table does not exist before the first migrate.
+   ⚠️ **One process, never more.** Windows PHP has no `pcntl`, so `--timeout` can never stop a hung job; a second process would take the same job again once `DB_QUEUE_RETRY_AFTER` (120 s) passes and run it twice.
+   The service name is per site. Set the machine environment variable `MERIDIAN_WORKER_SERVICE` to it (`setx /M MERIDIAN_WORKER_SERVICE meridian-test-worker`), because `deploy.ps1` reads the name from there and otherwise looks for `meridian-worker`. **`deploy.ps1` still does not create this worker service**: it refuses to deploy onto a host where the named service is not installed, runs `php artisan queue:restart` last inside its maintenance window, and starts the service after `up` if it is Stopped (§3). Mail, the upload scan that makes an attached file openable, and every scheduled sweep run only while this worker does.
    ⛔ **Correction (Increment M46, 2026-08-29) — this step previously also prescribed `php artisan reverb:start` as a second NSSM service, and that command does not exist.** Measured on this tree: `laravel/reverb` is absent from `composer.json`, `reverb` appears in no `artisan list` output, and `php artisan reverb:start --help` exits **1**. An operator following this runbook would have created a Windows service whose executable fails on every start, and NSSM's auto-restart would have retried it forever. **Reverb is Track B by explicit user decision** — see ADR-0002 §D3's Realtime row, corrected in the same increment. The realtime service returns to this step when the stack does, and not before.
-7. **Scheduler** — a Windows Task Scheduler task running `php artisan schedule:run` every minute (Windows has no cron). **The application-side half now EXISTS** (H2, 2026-07-22): `routes/console.php` declares `Schedule::job(PruneFailedJobsJob::class)->dailyAt('03:10')` per ADR-0007, and locally a `scheduler` compose service runs `schedule:work`. **Gap, narrowed to the host side: `deploy.ps1` still provisions no Task Scheduler task**, so provisioning it remains a manual step of this runbook. Until it exists, nothing periodic runs in production — the declarations are there, but nothing ticks them. *Never create `app/Console/Kernel.php`*: `Kernel::shouldDiscoverCommands()` is `get_class($this) === __CLASS__`, so any console-kernel subclass silently stops `routes/console.php` loading and every schedule disappears with no error.
-8. **TLS** — **win-acme** for a Let's Encrypt certificate (auto-renew via its scheduled task); terminate TLS at nginx. Covers the central host and the tenant-subdomain wildcard. **Tenant custom domains are NOT covered by this step and are not automated — see §8.1.**
-9. **GitHub Actions self-hosted runner** — register against the repo and install as a Windows service (`config.cmd` → run as service). It executes the deploy workflow (§3). Then set the repo **Variables** (Settings → Secrets and variables → Actions → Variables): **`MERIDIAN_APP_PATH`** (e.g. `C:\meridian\app`) and **`DEPLOY_ENABLED=true`**. Until `DEPLOY_ENABLED` is `true`, `.github/workflows/deploy.yml` stays dormant (skipped) — so it can be committed safely before the runner exists.
-10. **App directory** — a git clone at a fixed path (e.g. `C:\meridian\app`) whose `public/` is nginx's root; create the server `.env` (§4, DB host `127.0.0.1`, real secrets); run `deploy.ps1` once to prime it.
+7. **Scheduler** — a Windows Task Scheduler task running `php artisan schedule:run` every minute (Windows has no cron), one per site, registered **after** §8.2's first deploy has migrated: `schtasks /Create /TN meridian-test-scheduler /SC MINUTE /MO 1 /RU SYSTEM /TR "C:\php\php.exe C:\meridian\test-app\artisan schedule:run"`, which runs whether or not anyone is signed in. `routes/console.php` declares **seven** jobs: the failed-job prune (daily 03:10), the usage roll-up (02:40), the draft reaper (03:40), the scheduled-form and webhook-retry sweeps (every 5 minutes), the connector-token refresh (hourly) and custom-domain verification (every 15 minutes). Every entry is a queued job, so nothing happens unless step 6's worker is Running, and none is due while the site is in maintenance mode. `deploy.ps1` provisions no Task Scheduler task; until this one exists, nothing periodic runs. *Never create `app/Console/Kernel.php`*: `Kernel::shouldDiscoverCommands()` is `get_class($this) === __CLASS__`, so any console-kernel subclass silently stops `routes/console.php` loading and every schedule disappears with no error.
+8. **DNS and TLS** — DNS `A` records for `<CENTRAL_DOMAIN>` and `*.<CENTRAL_DOMAIN>` (every workspace is a subdomain), **published last**, per §8.2. The certificate covers the central host and the tenant-subdomain wildcard, and Let's Encrypt issues a wildcard only through **DNS-01** validation, which needs only a TXT record. Use **win-acme** with the DNS plugin for your DNS provider, the **PEM-files store** (nginx cannot read the Windows certificate store) and a script installation that reloads nginx — for example `wacs.exe --source manual --host <CENTRAL_DOMAIN>,*.<CENTRAL_DOMAIN> --validationmode dns-01 --validation <plugin> --store pemfiles --pemfilespath C:\nginx\certs --installation script --script <nginx reload script>`; check the argument names against `wacs.exe --help` for the version you install. win-acme registers its own renewal task. Terminate TLS at nginx: `listen 443 ssl;`, `ssl_certificate` and `ssl_certificate_key` pointing at the files it writes, `server_name <CENTRAL_DOMAIN> *.<CENTRAL_DOMAIN>;` and `client_max_body_size 30m;` (step 1's `post_max_size`). **HTTPS is required even for testing**: the form runtime's service worker, which carries offline drafts and background sync, registers only in a secure context. **Tenant custom domains are NOT covered by this step and are not automated — see §8.1.**
+9. **GitHub Actions self-hosted runner** — register against the repo and install as a Windows service (`config.cmd` → run as service), under an account that has Modify on the app path and is allowed to start step 6's service. Confirm both: a refused start turns a good deploy red after `up`. Restart the runner service after setting `MERIDIAN_WORKER_SERVICE`, so its jobs inherit the variable. It executes the deploy workflow (§3). Set the repo **Variables** (Settings → Secrets and variables → Actions → Variables): **`MERIDIAN_APP_PATH`** (e.g. `C:\meridian\test-app`) when you register it, and **`DEPLOY_ENABLED=true` only as the last step of §8.2**. Until `DEPLOY_ENABLED` is `true`, `.github/workflows/deploy.yml` stays dormant (skipped); once it is, every green CI run on `main` runs `deploy.ps1`, and a first migrate against an unfinished `.env` fixes the role passwords permanently.
+10. **App directory** — install **Git for Windows**, **Composer 2** and **Node.js 24 LTS** (CI's version; Vite needs 20.19 or later), and put them and `php` on the PATH of both your admin account and the runner's service account, because `deploy.ps1` calls `git`, `composer`, `npm` and `php` by bare name. Clone the repository at a fixed path (e.g. `C:\meridian\test-app`) whose `public/` is nginx's root. Grant the php-cgi, worker and runner service accounts Modify on `storage\` and `bootstrap\cache\`, and the runner Modify on the whole tree. Then follow **§8.2**, which creates the server `.env` (§4) and runs `deploy.ps1` once, by hand, to prime the site.
 
 ### 8.1 Custom-domain certificates — the manual runbook (H22a / ADR-0012)
 
@@ -199,6 +208,142 @@ no matter what nginx is configured to do, because tenant resolution will not mat
 **When Track B automates issuance**, this section is what gets deleted, and ADR-0012's *When to Revisit*
 records what else changes with it (the operator gate can become an API action, and an
 N-consecutive-failures demotion becomes worth building).
+
+### 8.2 First boot — before anyone signs in
+
+Steps 1–10 say what each piece is. This is the **order** for bringing a new site up the first time, and the order
+matters: until sign-up is closed (item 7) anyone who reaches the site can register, and a deploy that runs before
+`.env` is finished fixes its mistakes into the database. Run the commands in an elevated Windows PowerShell, in the
+app path, over an interactive (RDP) console: the two account commands ask for a password with hidden input, and
+refuse to create an account without a console.
+
+1. **Before you install anything.**
+   - Choose `<CENTRAL_DOMAIN>` (for example `test.example.com`) at a DNS provider that win-acme has a DNS-01
+     plugin for, and get SMTP credentials that work from this server.
+   - Allow **outbound** access from the server to:
+     - `api.pwnedpasswords.com` over HTTPS. Every password that is set or reset is checked against it; without
+       it, each one stalls for about 30 seconds and the breach check is skipped silently.
+     - your SMTP host and port;
+     - your DNS provider's API and `acme-v02.api.letsencrypt.org` (step 8);
+     - `github.com`, `api.github.com`, `codeload.github.com`, `repo.packagist.org` and `registry.npmjs.org`,
+       which `deploy.ps1` fetches from on every run, plus the hosts GitHub lists for self-hosted runners;
+     - a connector provider's API (Slack, Google, Airtable) only if you configure that connector (§4.1).
+   - The app trusts no proxy. If a proxy or tunnel ever fronts nginx, every guest shares the proxy's address in
+     the per-address limits of item 3.
+
+2. **Install steps 1–5 and 8**: PHP, the dedicated PostgreSQL 15 instance with PostGIS and the `meridian_app`
+   role and database, nginx, php-cgi and the certificate. DNS-01 needs only the TXT record, so **publish no `A`
+   record yet, and keep inbound 80 and 443 closed.**
+
+3. **Clone the app and write `.env`** (step 10). Copy `.env.example` to `.env`, then set:
+   - `APP_ENV=production` and `APP_DEBUG=false`. ⛔ **`production` is mandatory on a testing site too.**
+     `DatabaseSeeder` calls `DemoSeeder` last, and `DemoSeeder` returns early only in `production`. In any other
+     environment a seed creates `admin@meridian.test` as platform super-admin — with the demo password this
+     repository's guides publish, and no second factor — plus the demo accounts. The first stranger to sign in
+     as it enrols their own authenticator and owns the platform console. The only visible cost of `production`
+     is that Settings → About says "production", which is expected.
+   - `APP_URL=https://<CENTRAL_DOMAIN>`: the central origin, never a workspace host. `TenantUrl` takes the host
+     and scheme of every emailed link from it, and Google sign-in derives its redirect URI from it (§4.1).
+   - `CENTRAL_DOMAIN=<host, no port>`. A wrong value 404s `/admin` and every workspace.
+   - `SESSION_DOMAIN=null`. ⛔ Keep it. Host-only cookies keep one workspace's session off every other
+     workspace's host; widening the domain to fix a sign-in problem exposes every tenant's session to every
+     other tenant.
+   - `SESSION_SECURE_COOKIE=true`, since HTTPS serves from step 8.
+   - `DB_HOST=127.0.0.1`, `DB_PORT=<this instance's port>`, `DB_DATABASE=meridian`, `DB_USERNAME=meridian_app`
+     and `DB_PASSWORD=<step 2's password>`.
+   - `DB_PRIVILEGED_USERNAME` and `DB_PRIVILEGED_PASSWORD`: this instance's installer superuser (EDB names it
+     `postgres`). **It is a permanent runtime secret**, not a migrate-only one: `PlatformRowCounter` uses that
+     connection during requests, and so does every seeder.
+   - `DB_AUTH_PASSWORD` and `DB_SUPERADMIN_PASSWORD`: new, strong values. Leave `DB_AUTH_USERNAME` and
+     `DB_SUPERADMIN_USERNAME` as they are (step 2).
+   - ⛔ **Replace every `secret` in the file before the first migrate.** The role migrations create
+     `meridian_auth` and `meridian_superadmin` only if they do not exist yet, with whatever password `.env`
+     holds at that moment. The published `secret` would become permanent, because a later migrate never
+     corrects it; the only repair is `ALTER ROLE meridian_auth PASSWORD '…'` (and the same for
+     `meridian_superadmin`), run by hand as the superuser.
+   - `MAIL_MAILER=smtp` with a **real** `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`,
+     `MAIL_FROM_ADDRESS` and `MAIL_FROM_NAME`. `.env.example` points at `mailpit`, which does not exist here:
+     every verification, password-reset and invitation mail would look sent while its job failed into
+     `failed_jobs`. With sign-up closed (item 7), an emailed invitation is the **only** way a tester gets an
+     account.
+   - Leave `QUEUE_CONNECTION`, `CACHE_STORE` and `SESSION_DRIVER` at `database`, and `FILESYSTEM_DISK` at `local`.
+   - **On a testing site only** (decision D32): raise `GUEST_MINT_PER_IP` (default 30), `GUEST_SUBMIT_PER_IP`
+     (60) and `GUEST_CHALLENGE_PER_IP` (90). They are requests per minute per client address, and a room of
+     testers on one network shares one address. `.env.example` ends with them commented out. A production site
+     keeps the defaults.
+   - Optional: the Google sign-in and connector client ids (§4.1). Left empty, those features are unreachable,
+     which is a supported state.
+
+   Then run `composer install --no-dev --optimize-autoloader --no-interaction` and `php artisan key:generate`,
+   before anything caches the config.
+
+4. **Install the worker service and leave it Stopped** (step 6), and set `MERIDIAN_WORKER_SERVICE` to its name.
+
+5. **Prime the site by hand**, in the elevated console: `& C:\meridian\test-app\deploy.ps1 -AppPath C:\meridian\test-app`.
+   It refuses to start if the worker service is missing. It fetches, installs the Composer and npm dependencies
+   and builds the assets, then opens the maintenance window: `migrate --force` (which creates the PostGIS
+   extension and both roles from `.env`), the config, route, view and event caches, and `queue:restart`. Only if
+   all of that succeeds does it run `up` and start the Stopped worker. Confirm with
+   `nssm status meridian-test-worker` that the service reads `SERVICE_RUNNING`. If the run fails, the site stays
+   down on purpose (§3): fix the cause and run it again.
+
+6. **Seed the catalogs by class, never with a bare `db:seed`.** Run
+   `php artisan db:seed --class=RolePermissionSeeder --force`, then the same for `PlatformTemplateSeeder`,
+   `PlatformFieldLibrarySeeder` and `PlanSeeder`. They create the roles and permissions, the template gallery,
+   the question library and the plan catalog, and naming them means a mistyped `APP_ENV` can never reach
+   `DemoSeeder`.
+
+   ⛔ **Never run the tenancy package's `tenants:migrate`, `tenants:migrate-fresh`, `tenants:rollback`,
+   `tenants:seed` or `tenants:run`.** `artisan list` shows them because stancl/tenancy registers them, but they
+   assume a database per tenant and this app has one shared database, so none of them does here what its name
+   says. The operator's commands are `migrate --force`, inside `deploy.ps1`, and the four seeders above;
+   `tenants:create` and `tenants:extract` are this app's own.
+
+   Then register the scheduler task (step 7).
+
+7. **Create the first platform operator, while there is still no `A` record.**
+   - In the interactive console: `php artisan platform:super-admin <ops-email> --name="<your name>"`, then type
+     the password at the two hidden prompts.
+   - On the server itself, add a hosts-file entry pointing `<CENTRAL_DOMAIN>` at `127.0.0.1`. Sign in at
+     `https://<CENTRAL_DOMAIN>/login`, then go straight to `https://<CENTRAL_DOMAIN>/admin/tenants`: a direct
+     sign-in lands on `/dashboard`, which exists only on workspace hosts. The console sends you to
+     `/admin/two-factor`; enrol an authenticator app there.
+   - ⛔ **Then, immediately, open `/admin/settings` and turn off Open signup** (decision D31: invite-only). It is
+     on by default and only an enrolled super-admin can reach the switch, so until it is off anyone who reaches
+     the site can register. Invitations do not depend on the switch.
+
+8. **Create the first workspace.** Run `php artisan tenants:create <slug> "<Workspace name>" <owner-email> --plan=<tier>`,
+   adding `--owner-name="<name>"` for a new owner, who types a password at the hidden prompts.
+   - The owner must be a different address from the operator's: the command refuses a platform super-admin as
+     an owner. A plus-address is fine.
+   - Choose a tier whose seats cover every tester plus the owner: `starter` (10 seats) or above, **never
+     `free`**, which has 2 seats and no offline sync or save-and-resume.
+   - The command prints the workspace's sign-in address, `https://<slug>.<CENTRAL_DOMAIN>/login`. Testers always
+     use that address, never the central one.
+
+9. **After any later `.env` edit** (the guest limits included), run `php artisan config:cache` and then
+   `php artisan queue:restart`, or simply re-run `deploy.ps1`. A deploy caches the config and a cached config
+   ignores `.env`, so an edit without this changes nothing.
+
+10. **Expose the site.** Publish the `A` records for `<CENTRAL_DOMAIN>` and `*.<CENTRAL_DOMAIN>`, remove the
+    hosts-file entry, and open inbound 443. Testers' devices must resolve the wildcard: on a private office
+    network, check the DNS those devices use, because a hosts file cannot hold a wildcard.
+
+11. **Test mail before inviting anyone.** Sign in as the owner at the workspace address, invite a second address
+    you control from Members, and confirm that the email arrives and that `php artisan queue:failed` lists
+    nothing. Accepting an invitation verifies the address, so testers need no separate verification email, but
+    the invitation link exists only in that email. A form's share link answers 404 until the form is published
+    **and** its owner turns on guest submissions in Share, which is off by default.
+
+12. **Turn on automatic deploys, last.** Register the runner (step 9), set `MERIDIAN_APP_PATH`, and only now set
+    `DEPLOY_ENABLED=true`. From then on:
+    - **Every merge to `main` redeploys this site** once CI is green. The assets rebuild while the site is still
+      up, then there is a brief maintenance window, and testers mid-session will notice it.
+    - **A failed deploy leaves the site down on purpose**, because new code over an unmigrated schema is worse
+      than a maintenance page. It shows as a red run of the Deploy workflow, and nothing alerts anyone (§9). Fix
+      the cause and re-run `deploy.ps1`, or roll back with
+      `deploy.ps1 -AppPath C:\meridian\test-app -Ref <good-sha>` and revert the bad commit on `main` (§3).
+    - A change to `deploy.ps1` itself takes effect one deploy late (§3).
 
 ---
 

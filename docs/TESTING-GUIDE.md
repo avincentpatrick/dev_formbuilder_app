@@ -21,7 +21,7 @@ around.** Note it and move on; the guide is fixed in the same increment that bro
 ## 0. Boot, seed, and sign in
 
 Everything runs inside Docker. The Windows host cannot run the PHP or Node toolchains directly — it has no
-`pdo_pgsql` extension and no `rolldown` win32 binding — so every command below is `docker compose exec`.
+`pdo_pgsql` extension and no `rolldown` win32 binding — so every command below is `docker compose exec`. ⚠️ **This chapter is the local Docker stack only. A testing server has no demo accounts**: it runs `APP_ENV=production`, so the demo seed never runs there, and a tester signs in with the account their invitation created, at their workspace address `https://<slug>.<CENTRAL_DOMAIN>/login` — never the central host. The operator's side is `docs/deployment-infrastructure.md` §8.2.
 
 ### 0.1 Start the stack
 

@@ -96,7 +96,7 @@ There was no trigger, trigger function, `DB::unprepared` or `plpgsql` anywhere i
 - A refusal is a **thrown exception**, where every RLS refusal in this schema is a silent zero-row no-op. That difference is deliberate (§D9) but it is a difference, and any new test that trips the guard aborts its transaction — so a throwing assertion must be the last database interaction in its test.
 - `TRUNCATE`, a cascade delete, `DISABLE TRIGGER` and `session_replication_role` all bypass it. Three are recorded here; the cascade is Risk R12.
 - The migration is alter-only, so `scripts/migration-lint.php` skips it and its CI green is **vacuous**. The only things standing over this guard are `tests/Unit/PublishedVersionGuardTest.php` and the two feature packs in `tests/Feature/Forms/`.
-- **Unverified in production.** `CREATE FUNCTION` needs `CREATE` on schema `public`. `meridian_app` owns the database in the docker init and in all three CI jobs, so it succeeds there; `docs/deployment-infrastructure.md` §8 provisions `meridian_app` as a non-superuser and Track B is not stood up, so this is a deploy-time check, not a discharged one.
+- **Unverified in production.** `CREATE FUNCTION` needs `CREATE` on schema `public`. `meridian_app` owns the database in the docker init and in all three CI jobs, so it succeeds there; `docs/deployment-infrastructure.md` §8 step 2 now prescribes `CREATE DATABASE meridian OWNER meridian_app` for every deployed site, which carries that privilege, but no deployed site has run this migration yet, so this is a deploy-time check, not a discharged one.
 
 ---
 

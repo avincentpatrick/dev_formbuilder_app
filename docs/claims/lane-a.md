@@ -16,12 +16,74 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M94`, the tier verdicts: a tier on every open row, the not-live rows closed, the ledger's tables and invisible bullets dispositioned, and the stale security and architecture lines corrected (`m94-tier-verdicts`)
+## Status: NO ACTIVE CLAIM — `M94` is merged; the next work is the before-testing tier (`M95`), named in `docs/pipeline.md` § Next
 
-Taken 2026-09-14. Branch `m94-tier-verdicts`, cut from `origin/main` at `18e396f`, PR into `main`.
-Row: the pipeline marker `tier-verdicts` (before-testing) — *"Tier every untiered row, close the verified not-live
-rows, fix the stale threat-model lines, and retire the backlog tables"*. The second of Realignment 6's three
-increments; `M95`, the before-testing fixes, follows it. **Not a `D13` batch.**
+## RELEASED — `M94`, the tier verdicts: a tier on every open row, the not-live rows closed, the ledger's tables and invisible bullets dispositioned, and the stale security and architecture lines corrected (merged as PR #286, `786afd6`, 6/6 green with real step counts — Static analysis 28 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
+
+Shipped 2026-09-14. Branch `m94-tier-verdicts`, cut from `origin/main` at `18e396f`. **Every open row in the pipeline now carries a priority.** Of the 171 open ledger rows, 158 were untiered: 143 were tiered, 13 closed as not live and 2 re-homed to the held `uploading-import` item. Twenty rows were filed. The line went from 219 rows to 223, and the testing gate reads **before-testing — 5 open of 6**, which is `M95`.
+
+⛔ **THE HEADLINE IS THAT THE HIDDEN-WORK SWEEP WAS STILL NOT FINISHED.**
+- The §3–§7 tables held 14 still-true obligations with no row. Two of them are user decisions from 2026-08-18 that were taken and never built: drop `sortable` on the two paginated tables, and fail open on an unseeded plan catalog.
+- Five bullets carried no severity token, so no parser could see them.
+- 17 of 18 ungated line pointers into the ledger already pointed at unrelated lines.
+- Seventeen of the twenty rows filed here were already written down somewhere.
+
+⚠️ **THE APPROVED PLAN'S LISTS WERE A FLOOR, AND VERIFICATION OVERTURNED SEVEN CALLS.**
+- 2606, 2692, 4942 and 9337 stayed open as missing safeguards rather than closing.
+- 7551 stayed open: a documentation correction is not held work.
+- 8837 moved from early-testing to during-testing.
+- 1407 moved up to early-testing with its twin 7143, both on `D26`.
+- Six closes were added: 4144, 5174, 5700, 5961, 8522 and 9429.
+- `R-14ebb789` closed with `R-4c199f4e`, whose batch proposal `M93` deleted. `R-d8575314` stayed open, because the cite-set-versus-repair-set finding still governs grouping rows by file overlap.
+
+⚠️ **HOW THE PREDICTION FARED.**
+- **Citation-liveness was the gate I most expected to break, and it held at 18 of 18 on every run.**
+  - Every edit was applied by a script that refused if a line count moved.
+  - The ledger's diff has exactly one unequal hunk, and it is the rows appended at its end.
+- **Where I was wrong:**
+  - **The exactly-one arm was green on its first run.** I predicted at least one malformed hand-written token, but no token was written by hand: all 143 were applied by script from one verdict map. The failure mode never had a chance.
+  - **The line count was off by one**, 223 rather than about 222. Only one of the two claim-time rows closed: `R-d8575314` stayed open.
+- **P2c did not move**, because neither corrected architecture sentence was a pinned deferral site. The prediction had made that conditional.
+- **The gate reads 5 open of 6**, as predicted.
+- **All three mutations were CAUGHT**, as predicted.
+- **The local Docs run's only red was `SuiteCollectionFloorTest`**, the known collector truncation (`D17`). It is red on every local run.
+- **CI:** 6/6 green on the first run of the PR head `84e3697`, every job's steps complete.
+
+✅ **WHAT SHIPPED.**
+- **`docs/feature-backlog.md`:**
+  - 143 tier tokens and three new Awaits tokens (`D8`, `D23`, `D27`);
+  - two liveness flips from latent to live, on rows awaiting `D38`;
+  - 13 closures and 2 re-homes, written in place;
+  - 20 rows appended;
+  - the tables retired as a queue, with every non-idea row tagged;
+  - the invisible bullets dispositioned.
+- **In-place corrections:**
+  - `docs/security-threat-model.md` §9 items #3, #4, #5, #7, #9 and #11, plus the §5 and §6 recommendation cells;
+  - `docs/architecture/technical-architecture.md`'s Scheduler row and webhook-delivery note;
+  - `docs/testing-strategy.md`'s two "still owed" sentences.
+- **`scripts/pipeline-lint.php`:** P7a's residue constant and its class branch are deleted, so any untiered row fails.
+- **`tests/Feature/Docs/PipelineLintControlsTest.php`:** the two residue controls are replaced by "a defect row carries no tier" and "a decision row carries no tier".
+- **`tests/Feature/Docs/BacklogProvenanceTest.php`:**
+  - exactly one tier on every open row;
+  - severity read with `finish_row()`'s two patterns, byte-copied and pinned;
+  - the discrimination case extended with the four first-line shapes.
+- **`PROGRESS.md`:** `tier-verdicts` is `state=done`, and `uploading-import`'s title names the re-homed entries.
+
+✅ **POSITIVE CONTROLS**, via `scripts/mutate.php` and not committed, because no arm reads a diff (`M81`):
+| # | The deliberate defect | Result |
+|---|---|---|
+| MU1 | P7a exempts `class === 'defect'` again | CAUGHT — 53 → 1 failed (the new defect-row control; the decision-row control stays green) |
+| MU2 | one ledger row's Tier token removed | CAUGHT — 6 → 1 failed (the exactly-one arm) |
+| MU3 | the loose severity regex restored | CAUGHT — 6 → 2 failed (exactly-one on the M79 DONE record, and the null-shape assertion) |
+
+➡️ **FOR `M95`.**
+- The before-testing tier is five rows:
+  - the deploy script;
+  - the first super-admin;
+  - the runbook;
+  - the first workspace;
+  - the setup-time directory refresh.
+- Plus `D31` and `D32` waiting on the user. `M95` ends with the push notification and the Testing Server Checklist.
 
 ### Evidence verified
 - **The residue.** `php scripts/state.php --json` at `18e396f`: 171 open rows, 158 untiered and 13 tiered.

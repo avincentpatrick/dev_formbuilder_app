@@ -192,6 +192,24 @@ work the tiers exist to hold back.
 
 ---
 
+### D45 — Should `deploy.ps1` get a committed Windows CI job, so its proof runs on every change? **Tier: before-launch.**
+
+**Filed 2026-09-15 by `M96`, while proving the staging-build deploy.** `deploy.ps1` has no committed test. `M95`
+and `M96` each proved it with a PowerShell 5.1 harness in a session scratchpad, with the trunk script as the negative
+control, and neither committed the harness. CI runs six jobs, all on Linux, and the merge rule is six of six green, so
+a committed Windows job changes that rule.
+
+- **A — keep the scratch harness**, rebuilt and run by whichever increment changes the script, and recorded in its
+  claim.
+- **B — commit the harness and add a seventh CI job on a Windows runner.** Every change to the script is proved, and
+  every merge then needs seven checks and pays for Windows runner minutes.
+- **C — commit the harness without a CI job**, so the next author starts from it rather than from a scratchpad.
+
+**Recommendation: C until a production host exists, then B.** The harness is the expensive part to rebuild, and the
+script changes rarely; a Windows job earns its cost once a failed deploy takes down a site people rely on.
+
+---
+
 ### D28 — Should `MdsSegmentedControl` get a component-level wrap or shrink affordance, or should its four stretch-clamped hosts keep guarding themselves? **Tier: early-testing.**
 
 **Filed 2026-09-08 by `M87`, while closing the census row that measured the answer's inputs.** Recorded

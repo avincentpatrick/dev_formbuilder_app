@@ -258,12 +258,12 @@ Do this chapter in a **private/incognito window**, so you are genuinely not sign
    deliberately, because they are the reason it exists: such a response **does not consume a form's response
    cap** (§3's `max_responses`), and it still **appears in the unfiltered inbox** rather than being hidden —
    a form that screens everyone out should be loud, not silent.
-4. Filter by form, and by date range. **Expect:** both narrow the list; the counts change accordingly.
+4. Filter by form, status and source, or search by keyword. **Expect:** each narrows the list and the counts change accordingly. There is no date-range filter.
    *(J2c)* **Expect the dropdown to list every form you may open, including ones with no responses at all** —
    it was derived from submissions until then, so a newly published form was not selectable. As
    **reviewer@demo.test** the same dropdown lists only the three forms they hold grants on, which is the
    other half: the fix widened what the control can express, not who can see what.
-5. Page through the list. **Expect:** pagination works and the sort order is stable.
+5. Page through the list. **Expect:** the list says **Newest first** and keeps that order on every page, and its column headers offer no sorting, because a sort could only reorder the page you are on.
 6. Open any submission. **Expect:** the full answer document, who submitted it, when, from which channel, and
    which form version it was captured against.
 7. On a *submitted* row, **Approve** it. **Expect:** the status changes and the reviewer and timestamp are
@@ -472,7 +472,7 @@ rewriting its answers are different powers.
 
 ## 14. Integrations, webhooks and custom domains
 
-1. `/webhooks` · owner. **Expect:** the endpoint list and a delivery log.
+1. `/webhooks` · owner. **Expect:** the endpoint list and this month's delivery count. Each endpoint's delivery log is on its own page, newest first, with no sortable columns.
 2. Create an endpoint pointing at any URL you control (<https://webhook.site> works well) and subscribe it to
    *submission created*.
 3. Use **Send test**. **Expect:** an immediate pass/fail result on screen.
@@ -484,7 +484,7 @@ rewriting its answers are different powers.
    disabled Connect button and says so, which is the expected state until the operator adds them (see
    `.env.example`). Connecting needs a real account at the provider; the rule editors differ on purpose:
    Slack picks a channel, Google Sheets creates a spreadsheet for you, and Airtable lists the bases your
-   connected account can see and asks you to pick a table in one — it never alters your base structure.
+   connected account can see and asks you to pick a table in one — it never alters your base structure. Saving a Sheets or Airtable rule works from the editor, and the editor binds a column headed **Submission ID** when the sheet or table has one. Without one it says so and tells you to add it at the end, because that column is how a delivery retried after a network error avoids adding the same row twice.
 8. `/domains` · owner. **Expect:** the custom-domain surface. Claim a domain. **Expect:** a DNS TXT record to
    add and a **Verify** button. Verification will not succeed unless you actually control the domain — that is
    correct. **Do not expect to activate one**: activation is an operator command run after a certificate is

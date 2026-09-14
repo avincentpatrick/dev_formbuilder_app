@@ -22,11 +22,16 @@ use App\Services\Tenancy\TenantMembershipService;
  * post-commit, because that method is the one membership write with no ambient tenant context: it uses
  * `TenantContext::applyLocal()`, whose `SET LOCAL` GUC dies at commit, so a post-commit RLS write would be
  * refused outright. Two consequences that had to be checked rather than assumed, and are pinned by
- * `MemberJoinedAwardTest`:
+ * `PointAwardRlsTest` — M92 corrected the name, the one this carried has never existed, and the two
+ * halves are NOT pinned equally well:
  *
  *   1. **The insert is inside the caller's transaction**, so a raising duplicate would poison a real
  *      registration. It cannot raise — {@see PointsRecorder} uses `ON CONFLICT DO NOTHING` precisely so
  *      there is no exception to catch. This listener is the sharpest case for that choice in the codebase.
+ *      ⚠️ Pinned GENERICALLY rather than on this path: `PointAwardRlsTest`'s *"it leaves the caller's
+ *      transaction usable after a duplicate award"* drives `PointRule::FormCreated`, not `MemberJoined`.
+ *      It is the load-bearing half — the ON CONFLICT property this argument rests on — but a
+ *      member-joined-specific arm for it does not exist, and the sentence above implied one did.
  *   2. **The gate has to resolve a plan from inside that borrowed context.** `EntitlementService` is
  *      `scoped()` and memoizes — keyed BY TENANT (`$this->plans[$tenantId]`), so cross-tenant staleness is
  *      structurally impossible and is not the risk here. The residual one is narrower: `resolvePlan()` run

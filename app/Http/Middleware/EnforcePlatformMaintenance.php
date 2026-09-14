@@ -25,8 +25,9 @@ use Symfony\Component\HttpFoundation\Response;
  * ⚠️ EXEMPT BY PATH, NEVER BY ROUTE NAME. Global middleware runs BEFORE routing, so `$request->route()` is
  * null here and `$request->routeIs(...)` answers false for everything — a name-based exemption list would
  * be silently empty, and the first thing it would fail to exempt is the admin console, locking the
- * operator out of the only page that can switch maintenance off. `EnforcePlatformMaintenanceTest` asserts
- * the console and `/up` stay reachable precisely because that failure is invisible until it happens.
+ * operator out of the only page that can switch maintenance off. `PlatformMaintenanceTest` asserts the
+ * console and `/up` stay reachable precisely because that failure is invisible until it happens.
+ * (M92 corrected the name; the one this carried has never existed.)
  *
  * ── WHAT IS EXEMPT, AND WHAT DELIBERATELY IS NOT ───────────────────────────────────────────────────────
  *  · `admin`, `admin/*` — the console itself. Not optional; see above.

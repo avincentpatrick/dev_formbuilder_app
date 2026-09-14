@@ -7678,7 +7678,13 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   not survive re-derivation. ⛔ **AND THIS ROW LOOKS LIKE THAT LARGEST BUCKET, SO CHECK IT FIRST.** `M80`'s
   own citation pass found the deferral stated four times outside the cited design doc:
   `docs/data-privacy-gdpr-compliance.md:77` and `docs/piping-output-encoding-design.md:279` each say the
-  opt-in "stays deferred", as do `PROGRESS_ARCHIVE.md:6859`, `:6864` and `:6865`. ⚠️ **What keeps the row
+  opt-in "stays deferred", as do `PROGRESS_ARCHIVE.md:6886`, `:6891` and `:6892`. ⚠️ **M92 RE-DERIVED
+  THOSE THREE FROM THE CONTENT, AND THEY WERE ALREADY WRONG BEFORE ITS SURGERY MOVED ANYTHING.** The
+  numbers this row carried resolved to unrelated `H23`/`H24` release bullets roughly twenty-two lines
+  above the sentences it describes; the citation gate passed them because they were ALIVE, which is
+  `docs/feature-backlog.md:8043`'s class exactly, observed live. They are re-pointed by grepping for the
+  claim, never by adding the surgery's line delta to a number that was not right to begin with.
+  ⚠️ **What keeps the row
   fair rather than already-answered:** `docs/webhook-integration-design.md:171` is that document's own
   §6 Out of Scope and lists three deferrals, none of them this — so the design doc read alone genuinely
   presents it as an available tenant choice, which is what `docs/webhook-integration-design.md:41` does.
@@ -8968,8 +8974,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   grep can see. ⛔ **Three separate client-side workarounds existed for this one server defect**
   (`useMemberStreak`'s `enabled` guard, `integrationsClient`'s read-only rule, the autosave's local catch),
   which is the argument for repairing the server once. Closed by `M90`. Filed by `M89`.
-- **`minor` · `form_versions.checksum` cannot be re-derived from the `schema_snapshot` it is stored beside,
-  because `jsonb` does not preserve key order.** Measured by `M89` (2026-09-10) when a behavioural control
+- ~~**`minor` · `form_versions.checksum` cannot be re-derived from the `schema_snapshot` it is stored beside,
+  because `jsonb` does not preserve key order.**~~ Measured by `M89` (2026-09-10) when a behavioural control
   asserting exactly that failed. `SchemaSnapshotSerializer::snapshot()` builds `['sections' => …,
   'fields' => …]` and `checksumOf()` hashes `json_encode()` of it; Postgres stores the object with keys
   ordered by length then bytes, so the column reads back as `fields,sections` and re-hashing yields a
@@ -8979,7 +8985,35 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   this is latent rather than broken: every consumer (`FormVersionResource`, `SyncManifestResource`,
   `BlankFormPrintPresenter`, `submissions.answers_schema_checksum`) treats it as an opaque stamp. ⚠️ The
   remedy is a decision rather than a fix — canonicalise on read, store the canonical JSON as `text`
-  alongside, or correct the documented claim to say what the stamp actually is. **Live.** Filed by `M89`.
+  alongside, or correct the documented claim to say what the stamp actually is.
+  ✅ **CLOSED BY `M92` (2026-09-11). THE HEADLINE IS TRUE AND THE MECHANISM IT OFFERS IS INERT — ANYONE
+  REPRODUCING THE ROW AS WRITTEN WOULD HAVE FOUND NOTHING.** Its worked example is that `snapshot()` builds
+  `['sections' => …, 'fields' => …]` and Postgres reorders that to `fields,sections`. **`snapshot()` already
+  ksorts recursively before returning, and has since the column was created** — its own class docblock says
+  so — and PHP's bytewise sort agrees with jsonb's length-then-bytes at the top level (`fields` before
+  `sections` under both). The divergence is one level down, where the two genuinely part: ksort gives
+  `config, hint, key, label`; jsonb gives `key`, `hint`, `label`, `config`.
+  ⛔ **AND IT NAMED ONE OFFENDING STATEMENT WHERE THERE ARE THREE.** `docs/data-dictionary.md` and
+  `docs/erd.md` carry the same imprecision as the migration comment. Meanwhile
+  `docs/form-versioning-schema-migration.md` — the governing spec — **already states the correct rule**,
+  and `app/Support/Migrations/PublishedVersionGuard.php` reasons correctly too. The tree was not ignorant
+  of this: three statements had drifted from a spec that is right.
+  ✅ **All three corrected IN PLACE, `1 1` in numstat.** `docs/data-dictionary.md` sits at the citation
+  gate's ceiling with five line-pinned citations below the edited row, so an inserted line — a footnote, a
+  design note, a new row — would have silently invalidated all five.
+  ✅ **Two arms rather than one, and the second is the one worth having.** The first records that the stamp
+  does not re-derive, so the documents cannot drift back. The second **re-derives the stored digest EXACTLY
+  after a recursive sort**, proving the divergence is key ORDER and nothing else — no numeric widening, no
+  lost precision. If a numeric ever round-trips as `1` where `1.0` was hashed (the caveat the serializer
+  records as *"noted, not yet load-bearing"*), that arm is what goes red. The sort is a deliberate SECOND
+  implementation: reusing the production canonicaliser would only prove it agrees with itself.
+  ✅ Two positive controls, both CAUGHT. Making the serializer stop canonicalising reddens **only** the new
+  bound arm, which is the measurement that it is the only thing in the repository that would notice.
+  ⚠️ **Of the three remedies offered, the third was taken and the other two cost more than the row says.**
+  The `text` sidecar needs a migration against a table guarded by the immutability trigger PLUS a backfill
+  that **cannot be performed** — the original canonical text was never retained. Canonicalise-on-read is
+  four lines but cannot be proven byte-exact for numerics, so shipping it would convert a latent
+  documentation inaccuracy into a flaky live assertion. Closed by `M92`. Filed by `M89`.
 - ~~**`minor` · `TemplateService::saveAsTemplate()` serializes a schema snapshot with NO transaction at all,
   which is weaker than the publish window `M89` just closed.**~~ Found by `M89`'s fan-out (2026-09-10) while
   sweeping the snapshot producers. `PublishService` at least held the `forms` row; `saveAsTemplate()`
@@ -9049,8 +9083,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   reported fourteen violations, nine of them phantoms, because the container's
   `RecursiveDirectoryIterator` sees 410 test files against the host's 449. Closed by `M90`.
   Filed by `M89`.
-- **`minor` · Four PHP-enum mirrors live in Vue SFCs and one adds a member its enum does not have, and the
-  new mirror gate cannot reach any of them.** Measured by `M89` (2026-09-10) while building
+- ~~**`minor` · Four PHP-enum mirrors live in Vue SFCs and one adds a member its enum does not have, and the
+  new mirror gate cannot reach any of them.**~~ Measured by `M89` (2026-09-10) while building
   `DocumentedEnumMirrorDriftTest`. The gate declares twenty mirrors across `.ts` and `.d.ts` files; the
   census also found unions inside `.vue` files — `resources/js/components/submissions/FieldInput.vue:129`
   (`prefill`) and `:156` (`RequiredMarker`) — plus
@@ -9062,7 +9096,32 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `M88`'s catalog gate is blind to it as well. ⚠️ **And `resources/js/Pages/submissions/show.test.ts:43-52`
   pins `SubmissionStatus` as an `as const` array in a TEST file**, which its own comment at `:56-58`
   correctly calls a literal a person maintains. Filed rather than added to the gate because each needs a
-  decision about what the right vocabulary is, not a comparison. **Live.** Filed by `M89`.
+  decision about what the right vocabulary is, not a comparison.
+  ✅ **CLOSED BY `M92` (2026-09-11). EVERY CITATION HOLDS AND THE HEADLINE IS FALSE, WHICH IS WHAT MADE
+  THE REPAIR SMALL.** *"Four PHP-enum mirrors live in Vue SFCs"* — **two** do (`FieldInput.vue`'s `prefill`
+  and `RequiredMarker`); `useFormRuntime.ts` and `show.test.ts` are ordinary `.ts` files. So *"the new
+  mirror gate cannot reach any of them"* is false too: `enumMirrorRead()` is `base_path()` +
+  `file_get_contents()` on a declared path and is extension-blind, and the gate's own header names
+  `useFormRuntime.ts`. **They were unreached because nobody DECLARED them**, which made the repair three
+  data rows and one grammar rather than the file-collection rewrite the row implied.
+  ⛔ **THE VOCABULARY QUESTION IT DEFERRED WAS ALREADY ANSWERED IN THE TREE, BEFORE THE ROW WAS FILED.**
+  `resources/js/components/submissions/FieldInput.vue` states it: *"a `conditional` field shows the
+  required marker only once its condition has triggered (`none` until then)"*. `RequiredMode` is what a
+  field IS — authored requiredness. A marker type is what the badge RENDERS. `conditional` is an authoring
+  mode with no marker of its own and `none` is a rendered state with no authoring mode, so the sets are
+  correctly disjoint in exactly those two members. Both are declared divergences now.
+  ⛔ **AND THE ROW UNDERSTATED THE DIVERGENCE IN THE ONE DIRECTION THAT WOULD HAVE PRODUCED A WRONG
+  ENTRY.** *"each carry a `none` that `RequiredMode` does not"* — true, and they also **lack
+  `conditional`**. An exception written from the row's text would have been half wrong and would have gone
+  green. ⚠️ **Two of its four items are EXACT mirrors** — `prefill` against `PrefillSource`, `ALL_STATUSES`
+  against all seven `SubmissionStatus` cases — so *"each needs a decision"* was true of two, not four.
+  ✅ `ALL_STATUSES` needed the only code: `const NAME = [ … ] as const;` matches neither existing grammar.
+  Three positive controls, all CAUGHT: a member added to the `as const` mirror; the `const` grammar
+  ceasing to match; a declared divergence going stale.
+  ⚠️ The `docs/data-dictionary.md` half — a fourth `bot_challenge` copy in prose, and `FormBotChallenge`
+  absent from the enum catalog — is **deliberately NOT taken**: the dictionary is a hub file and `M92`'s
+  one hub slot went to the gate-widening row. Re-filed below so it is not lost with this closure.
+  Closed by `M92`. Filed by `M89`.
 - ~~**`minor` · `updateField()` can deadlock against a publish, and the loser surfaces as the same unrendered
   500 `M89` just fixed for the constraint case.**~~ Found by `M89`'s fan-out (2026-09-10).
   `updateField()` touches the field row, then the validation rows, then the field row again — the INSERT's
@@ -9213,8 +9272,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   a no-op for a pair one lane always owns; the generator already names its harness in its own
   `GATE_BASELINES_OUT` docblock. Closed by `M91`.
   Filed by `M90`.
-- **`minor` · Seven dead test-class pointers across twelve sites live in `app/` and `database/`, and the
-  gate built to end that species cannot see one of them.** Measured by `M91` (2026-09-11) while closing
+- ~~**`minor` · Seven dead test-class pointers across twelve sites live in `app/` and `database/`, and the
+  gate built to end that species cannot see one of them.**~~ Measured by `M91` (2026-09-11) while closing
   the tenants column-whitelist row, which is the case that proved the shape.
   `scripts/test-pointer-lint.php` forbids a test file naming a `*Test` class with no file behind it and
   scans `tests/` only; a census over `app/`, `database/` and `routes/` using the same predicate finds
@@ -9235,7 +9294,35 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   own root, so a second root reports `Models/Tenant.php` rather than `app/Models/Tenant.php`, and the
   `FILE_FLOOR`/`NAME_FLOOR` constants are census-shaped for `tests/` and would need per-root values.
   Each of the seven also needs deciding individually — correct the name, write the test, or exempt it.
-  **Live.** Filed by `M91`.
+  ✅ **CLOSED BY `M92` (2026-09-11), AND THE ROW UNDERSTATED ITSELF: EIGHT NAMES ACROSS THIRTEEN SITES.**
+  All seven named resolve exactly as written and each returns zero mentions under `tests/`. The eighth is
+  **`AchievementsRouteGuardsTest`**, named by `routes/tenant.php`, which the row's `app/`-and-`database/`
+  framing could not reach. Method, so it can be re-run: every `*Test` identifier under `app/`, `database/`
+  and `routes/` (147 distinct) differenced against the `*Test.php` basenames under `tests/`.
+  ⛔ **ITS "NOT SIMPLY WIDENING THE SCAN ROOTS" WARNING WAS RIGHT FOR A SMALLER REASON THAN THE REAL ONE.**
+  Both obstacles it named held. But `scan()` took ONE directory and used it BOTH as the mention corpus AND
+  as the definition of which test files exist, so a second call over `app/` would have found zero
+  `*Test.php` files there and called all 147 mentioned names dangling — in practice bailing on the file
+  floor first. The two roles are now separate parameters; per-root floors are a consequence of that rather
+  than the fix, and a floor breach now skips R1 so a broken scan cannot read as a hundred violations.
+  ⛔ **ALL EIGHT RESOLVED TO ONE DISPOSITION — CORRECT THE NAME — WHICH THE ROW EXPECTED TO VARY.** A real
+  arm asserting the exact cited property exists in every case, so none was missing coverage. ⚠️ **Two would
+  have been mis-corrected by the obvious same-name candidate**: the member-joined property is in
+  `PointAwardRlsTest`, not `PointAwardTest`; the toggleable-modules property is in `SettingsVocabularyTest`,
+  not `ModuleToggleTest` or `EntitlementEnumsTest`. ⚠️ **Three replacements assert LESS than the comment
+  claimed**, and those three comments now say so instead of inheriting the overstatement — see the rows
+  filed below for each.
+  ⛔ **AND A CORRECTION NOTE MAY NOT NAME THE CORPSE.** The first draft wrote *"corrected from FooTest,
+  which never existed"* at each site; the widened gate then reddened on its own repair, because it reads
+  identifiers rather than intent. Eight exemptions to keep that prose would have made `EXEMPTIONS` a list
+  of excuses, so provenance is left to git. **That is the one standing exemption's case recurring, and it
+  is now written into the gate's header.**
+  ✅ Three positive controls, hand-rolled with byte-verified restore because `scripts/mutate.php` runs Pest
+  in a container and this gate's truthful container answer is red. Re-introducing one dead pointer in
+  `app/` reddens R1; **the same defect with the roots narrowed back to `tests/` passes GREEN**, which is
+  the proof the widening rather than the wording does the work; breaking the site-path renderer reddens the
+  selftest arm written for it. ⚠️ A fourth was discarded as unsound — it produced a PHP fatal (exit 255),
+  which proves nothing about the gate. Closed by `M92`. Filed by `M91`.
 - **`minor` · Standing Rule 7(b-bis) says "Three files" against a table of five rows, inside the rule
   that exists to keep paired files in step.** Found by `M91` (2026-09-11) while deciding whether the
   gate-baselines pair belonged there. `PROGRESS.md`'s 7(b-bis) intro asserts in the present tense that
@@ -9275,8 +9362,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   not read the drift as the defect. ⚠️ The repair is to re-derive the three from the code — the real
   sites are `replaceValidations()` and its single caller — and it should be taken with `8043`, which
   filed the class, rather than alone. **Live.** Filed by `M91`.
-- **`minor` · A SECOND publisher-versus-builder deadlock cycle survives `M91`'s fix, reached only through
-  a cross-field validation rule, and neither side orders its lock set.** Measured by `M91` (2026-09-11)
+- ~~**`minor` · A SECOND publisher-versus-builder deadlock cycle survives `M91`'s fix, reached only through
+  a cross-field validation rule, and neither side orders its lock set.**~~ Measured by `M91` (2026-09-11)
   while closing the `updateField()` row, and recorded because the closure would otherwise read as closing
   more than it did. `M91` makes `writeField()` take its OWN field row before any child row, which closes
   the cycle the closed row names. ⛔ **It does not cover a SIBLING field row.**
@@ -9292,4 +9379,134 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   and a single locking re-read over `[$field->id, ...$siblingIds]` ordered the same way, which means
   hoisting the sibling resolution above the lock. ⛔ **Do not take it as a bug fix without deciding the
   first half**: adding `ORDER BY` to the publish path changes a shipped locking statement that
-  `tests/Feature/Forms/PublishLockingTest.php` pins by shape. **Live.** Filed by `M91`.
+  `tests/Feature/Forms/PublishLockingTest.php` pins by shape.
+  ✅ **CLOSED BY `M92` (2026-09-11). EVERY CITATION HELD, AND THE ROW'S OWN STATED BLOCKER DOES NOT EXIST.**
+  All six arms of `PublishLockingTest` were opened before a line was written: they assert, through
+  `publishLockingFirstIndex()`, that a statement CONTAINS a table name and `for update`, that the `forms`
+  lock precedes the child locks, that no locking read follows the status flip, and that exactly four
+  `for update` statements are issued. ⛔ **`ORDER BY id` moves none of those four properties**, so the
+  sentence that made this look decision-blocked was simply wrong, and the row was buildable all along.
+  ⛔ **AND THE PRESCRIPTION'S LOAD-BEARING ASSUMPTION WAS MEASURED RATHER THAN INHERITED.** A stable
+  `ORDER BY` only fixes anything if Postgres acquires the locks in sorted order rather than in scan order,
+  which is a planner property. `EXPLAIN SELECT id FROM form_fields WHERE form_version_id = … ORDER BY id
+  FOR UPDATE`, run against this stack's own container, plans **`LockRows` ABOVE `Sort`** — the lock is
+  applied to the sorted stream. That is recorded in `PublishService` because no assertion can pin a plan.
+  ⚠️ **The second half was NARROWED against the row's own words.** It prescribed a re-read over
+  *"[$field->id, ...$siblingIds]"*, and `replaceValidations()` resolved EVERY sibling in the version;
+  locking that set would have closed the cycle and silently serialized every concurrent field edit in a
+  draft — a §3.4 reversal by accident. Only the siblings the payload actually references are locked, and
+  a third arm pins that a payload naming none still locks exactly one row.
+  ✅ Three positive controls, all CAUGHT with disjoint red sets: dropping the publisher's `ORDER BY`
+  reddens only the new publisher arm; narrowing the builder's lock set back to `whereKey` reddens the two
+  cross-field arms; widening it to the whole version reddens those two plus the narrowing arm.
+  ⚠️ **One assertion in this work was wrong on its first run and is recorded rather than tidied**: the
+  narrowing arm asserted `not->toContain('in (')`, which is false against a correct implementation —
+  `whereIn` renders `in (?)` for one id. The placeholder LIST is the honest witness, not the presence of
+  `in (`. Closed by `M92`. Filed by `M91`.
+- **`minor` · `scripts/` is the one tree `test-pointer-lint` still cannot scan, and it cannot become a root
+  while the gate's own header is written the way it is.** Measured by `M92` (2026-09-11) while widening the
+  gate to `app/`, `database/` and `routes/`. `scripts/test-pointer-lint.php`'s header names four classes
+  that have never existed — `ScopeNodeConcurrentMoveTest`, `FormSectionRoutesTest`,
+  `ImpersonationConsumeTest` and the exempted one — because they are the FINDINGS the gate was built on
+  and each is load-bearing prose. ⛔ **Adding `scripts/` to `MENTION_ROOTS` reddens on the gate's own
+  documentation**, and the only exit is four exemptions whose stated reason is *"the gate's header says
+  so"*, which is the list becoming a list of excuses. ⚠️ **The blind spot is not hypothetical**: every
+  other harness script is free to name a test file that does not exist, and eleven of them cite tests in
+  prose. ⚠️ The real remedy is probably a scoping rule — a name inside a block that is explicitly a
+  historical record is not a pointer — which is the *"clever predicate"* the `EXEMPTIONS` docblock already
+  argues against once. **Live.** Filed by `M92`.
+- **`minor` · `MIRROR_DIVERGENCES` is keyed by mirror NAME alone, so two same-named mirrors in different
+  files would silently share one exception.** Found by `M92` (2026-09-11) while declaring four new mirrors
+  in `tests/Feature/Docs/DocumentedEnumMirrorDriftTest.php`. `ENUM_MIRRORS` is keyed by path-plus-name and
+  its uniqueness arm asserts exactly that; the divergence map beside it is keyed by name only.
+  ⛔ **The consequence is not a missed comparison but a WRONG one**: the arm that asserts a declared
+  divergence still describes a live mirror would assert it of whichever same-named row it reached first,
+  and the other would inherit an exception written about a different file. ⚠️ **It is safe today and that
+  is the whole reason it is filed rather than fixed** — every declared name is distinct, and `M92` came
+  within one naming coincidence of it, since `RequiredMarker` and `Marker` mirror the SAME enum from two
+  files and are distinct only because their authors happened to name them differently. **Live.**
+  Filed by `M92`.
+- **`minor` · Two more TypeScript unions mirror a PHP enum and are missing the same member, and neither is
+  declared.** Measured by `M92`'s fan-out (2026-09-11) during the full `resources/**` census that closed
+  the four-mirrors row. `resources/js/Pages/webhooks/Show.vue` declares a status union of `active` and
+  `paused` against `WebhookEndpointStatus`, and `resources/js/Pages/integrations/RuleShow.vue` does the
+  same against `ConnectorSubscriptionStatus`. ⛔ **Both PHP enums carry a third case, `disabled`**, so each
+  is a near-mirror that would redden a set-equality arm on arrival. ⚠️ **Whether that is a divergence to
+  record or a hole to fix is a real question and not a formality**: a `disabled` endpoint rendered by a
+  component whose type says it cannot be is either dead UI or an unhandled state, and which one it is has
+  to be read off the page rather than off the type. ⚠️ They are NOT the same shape as the marker
+  divergences `M92` recorded — those are a rendered vocabulary against an authored one, whereas these two
+  are the same vocabulary with a member dropped. **Live.** Filed by `M92`.
+- **`minor` · A `ControlKind` docblock claims it is derived exactly as the SFC's own `control` computed,
+  the two disagree in three ways, and no gate can compare them.** Measured by `M92`'s fan-out
+  (2026-09-11). `resources/public-runtime/lib/types.ts`'s `ControlKind` and
+  `resources/js/components/submissions/FieldInput.vue`'s `control` are a TS-to-TS pair with no PHP enum
+  behind them: they differ on `likert_matrix` versus `likert-matrix` — a SEPARATOR difference, which is
+  the kind that survives review — and the SFC adds `media-readonly` and `prefilled`.
+  ⛔ **`DocumentedEnumMirrorDriftTest` structurally cannot cover this**: every row it holds compares a
+  union to `SomeEnum::cases()`, and there is no enum here to be the authority. ⚠️ **The docblock's claim
+  is the defect rather than the drift** — a reader is told the two are derived alike and will not check.
+  ⚠️ A second-copy gate with no authority needs one side nominated as canonical first, which is a design
+  decision rather than a lint. **Live.** Filed by `M92`.
+- **`minor` · The schedule-acceptance vocabulary has four TypeScript copies and a PHP side that is raw
+  strings rather than an enum, so nothing can ever gate it.** Measured by `M92`'s fan-out (2026-09-11).
+  `resources/public-runtime/lib/types.ts` declares `ScheduleAcceptance`, and `resources/js/Pages/forms/Show.vue`,
+  `resources/js/Pages/submissions/Encode.vue` and `resources/js/Pages/forms/show.test.ts` each restate it.
+  The producing side is `app/Support/Forms/FormSchedule.php` and `app/Services/Forms/FormHubPresenter.php`,
+  which emit string literals directly. ⛔ **Five copies of one vocabulary and no authority among them.**
+  ⚠️ **The mirror gate cannot be widened to reach it** — it compares against `::cases()` — so this is a
+  request to introduce the enum, not to declare a mirror, and that is a production change on a shipped
+  presenter rather than a test-only one. ⚠️ It is the largest uncontrolled vocabulary the `M92` census
+  found and is filed at `minor` only because no divergence between the five has been measured yet.
+  **Live.** Filed by `M92`.
+- **`minor` · The mirror gate's comment stripper is line-based and unscoped to `<script>`, so its property
+  grammar on a `.vue` file is first-match-wins across the template and the stylesheet.** Measured by `M92`
+  (2026-09-11) while declaring the first two SFC mirrors. `enumMirrorStripComments()` cuts each line at its
+  first `//` and nothing bounds the search to the script block, so `enumMirrorBody()`'s property pattern
+  can match an attribute or a CSS declaration that precedes the real one. ⛔ **It is safe for the name
+  actually declared (`prefill`, verified as the first match) and would NOT be safe for `kind`, `status` or
+  `mode`** — and `kind` is already a declared property mirror, so the collision is one SFC declaration
+  away. ⚠️ The gate's header now warns a future author to check what precedes a generic name, **which is
+  prose standing in for a predicate** and is exactly the arrangement this repository has measured failing
+  before. ⚠️ The honest fix is to bound the search to the `<script>` block for `.vue` paths, which is
+  cheap; it is filed rather than done because it needs its own control and `M92`'s budget was spent.
+  **Live.** Filed by `M92`.
+- **`minor` · Three comments corrected by `M92` now name an arm that asserts LESS than they claim, and the
+  gap is different in each.** Measured by `M92` (2026-09-11) while dispositioning eight dead test-class
+  pointers. Each was a wrong NAME with real coverage behind it, but three of the eight replacements are
+  weaker than the sentence citing them: `FormListKeywordTest`'s parity arm compares the two id lists on a
+  **single-row** result set, so a divergence appearing at two or more rows — or in the archived-row
+  handling the very next line of `FormPresenter` describes — is uncovered; `PointAwardRlsTest` pins the
+  transaction-safety half on `PointRule::FormCreated` rather than on `MemberJoined`, which is the path the
+  listener's whole argument is about; and no arm anywhere states the `unscopedQuery()` rule that
+  `app/Models/Domain.php` calls *"the single easiest mistake to make against this model"* — the three
+  sweep arms pin it only CONSEQUENTIALLY, by acting on rows the global scope hides. ⛔ **The comments now
+  say so**, so nothing is overstated; what is open is the coverage, and it is three separate small tests.
+  ⚠️ Filed as one row because they share a cause — a pointer written from intent rather than from the
+  assertion — and splitting them would lose that. **Live.** Filed by `M92`.
+- **`minor` · `docs/data-dictionary.md` holds a fourth copy of `bot_challenge` in prose and
+  `FormBotChallenge` is in no catalog row, and `M92` could not take it.** Carried forward by `M92`
+  (2026-09-11) from the four-mirrors row it closed, so the finding is not lost with that closure. The
+  dictionary states the `bot_challenge` value domain in prose and names `App\Enums\FormBotChallenge`,
+  while the enum catalog table it sits above does not list that enum at all — so `M88`'s catalog gate is
+  blind to it even though two TypeScript copies of the same vocabulary ARE gated. ⛔ **The repair is an
+  INSERTION into a file that is line-pinned by the citation ledger at its ceiling**, which is the same
+  blocker the eleven-CHECK-constraints row already carries, and the two should be taken together in an
+  increment that spends its hub slot on the dictionary. ⚠️ `M92` scoped it out deliberately: its one hub
+  slot went to widening `test-pointer-lint` over `routes/tenant.php`. **Live.** Filed by `M92`.
+- **`minor` · A `FormRequest` class docblock is PUBLISHED API DOCUMENTATION, and nothing says so at the
+  place where someone writes one.** Measured by `M92` (2026-09-11) when the Contract job went red on
+  `openapi.json` drift with five of six jobs green. Scramble emits an `App\Http\Requests\Api\V1`
+  class docblock **verbatim** as the `description` of that request's schema, so three paragraphs of
+  internal notes about a lint gate — written into `StoreDomainRequest` while correcting a dead test-class
+  pointer — became part of the contract shipped to integrators. ⛔ **The gate that caught it is the right
+  one and it caught it LATE**: the drift check is a CI job, so the signal arrives after a push, and the
+  local `preflight --with-gates` run has no arm for it. ⚠️ **The blast radius is wider than the one
+  file**: every FormRequest under that namespace has the same property, and several carry security
+  rationale written for a maintainer rather than for an API consumer. ⚠️ **A second finding sits inside
+  this one** — the dead pointer `M92` corrected had already propagated INTO `openapi.json`, and
+  `scripts/test-pointer-lint.php` can never see it there because the file is generated and is not a
+  mention root. A generated artefact carrying a dead pointer is a copy no gate owns. ⚠️ The cheap remedy
+  is a lint that refuses a docblock in that namespace exceeding some size, which is a proxy; the honest
+  one is a convention — contract above, maintenance notes inside the class body — with an arm that
+  checks the emitted description against it. **Live.** Filed by `M92`.

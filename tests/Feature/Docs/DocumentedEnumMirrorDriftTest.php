@@ -15,6 +15,7 @@ use App\Enums\LogicOperator;
 use App\Enums\PrefillSource;
 use App\Enums\RequiredMode;
 use App\Enums\SsoConnectionStatus;
+use App\Enums\SubmissionStatus;
 use App\Enums\ThemeMode;
 use App\Enums\ValidationRuleType;
 use App\Services\Expressions\ArithmeticOperator;
@@ -68,6 +69,23 @@ use App\Services\Expressions\TokenType;
  *
  * grammar `type`     — `export type NAME = 'a' | 'b';`, including multi-line leading-pipe form.
  * grammar `property` — `NAME: 'a' | 'b';` inline in an object type or interface.
+ * grammar `const`    — `const NAME = ['a', 'b'] as const;` (M92). It matches neither of the two above:
+ *                      there is no `=` union and no `:`, which is why show.test.ts went ungated.
+ *
+ * ⛔ M92 — THE ROW THAT ASKED FOR THIS WAS WRONG ABOUT WHY THESE WERE UNREACHED, AND THE CORRECTION IS
+ * WORTH KEEPING. It said *"four PHP-enum mirrors live in Vue SFCs and the new mirror gate cannot reach
+ * any of them"*. Two of the four are in an SFC; the other two are ordinary `.ts` files, one of which
+ * (useFormRuntime.ts) this file's own header names by path. Nothing here has ever EXCLUDED `.vue`:
+ * enumMirrorRead() is base_path() + file_get_contents() on a declared path and is extension-blind. They
+ * were unreached because nobody DECLARED them — which made the repair three data rows and one grammar
+ * rather than the file-collection rewrite the row implied.
+ *
+ * ⚠️ A `.vue` DECLARATION CARRIES A HAZARD THE `.ts` ONES DO NOT, and it is bounded rather than solved.
+ * enumMirrorStripComments() cuts at the first `//` on every line and nothing scopes the search to the
+ * `<script>` block, so the `property` grammar is first-match-wins across `<template>` and `<style>` too.
+ * That is safe for a distinctive name like `prefill` (verified: the only other candidate in the file is
+ * `prefill_value?:`, which the optional-marker guard excludes) and would NOT be safe for `kind`,
+ * `status` or `mode`. Declare a generic property name in an SFC only after checking what precedes it.
  *
  * @var array<int, array{0: string, 1: string, 2: class-string, 3: string}>
  */
@@ -92,6 +110,12 @@ const ENUM_MIRRORS = [
     ['resources/public-runtime/lib/types.ts', 'bot_challenge', FormBotChallenge::class, 'property'],
     ['resources/js/components/domains/types.ts', 'failure_reason', DomainVerificationFailure::class, 'property'],
     ['resources/js/components/builder/logic-rail.ts', 'kind', GraphNoticeKind::class, 'property'],
+    // M92 — the four the census found and nobody had declared. Two are exact and go green on arrival;
+    // two are the marker vocabulary, which is a deliberate divergence recorded below.
+    ['resources/js/components/submissions/FieldInput.vue', 'prefill', PrefillSource::class, 'property'],
+    ['resources/js/components/submissions/FieldInput.vue', 'RequiredMarker', RequiredMode::class, 'type'],
+    ['resources/public-runtime/composables/useFormRuntime.ts', 'Marker', RequiredMode::class, 'type'],
+    ['resources/js/Pages/submissions/show.test.ts', 'ALL_STATUSES', SubmissionStatus::class, 'const'],
 ];
 
 /**
@@ -108,7 +132,37 @@ const MIRROR_DIVERGENCES = [
         'ts_only' => [],
         'why' => 'prefill.ts expresses "no prefill" as null rather than as a member',
     ],
+    // ⛔ M92 — THE ROW CALLED THIS AN OPEN VOCABULARY QUESTION. IT IS ANSWERED, AND THE ANSWER WAS
+    // ALREADY WRITTEN AT resources/js/components/submissions/FieldInput.vue:154-155: "a `conditional`
+    // field shows the required marker only once its condition has triggered ('none' until then)".
+    // RequiredMode is what a field IS — the authored requiredness. A marker type is what the badge
+    // RENDERS right now. `conditional` is an authoring mode with no marker of its own, and `none` is a
+    // rendered state with no authoring mode, so the two sets are correctly disjoint in exactly those
+    // two members and in no others. Declaring them with the divergence recorded is strictly better
+    // than leaving them ungated: a THIRD member appearing on either side now reddens.
+    //
+    // ⚠️ And the row understated the divergence, which matters because an entry written from its text
+    // would have been wrong in one of its two halves. It said each mirror "carries a `none` that
+    // RequiredMode does not" — true, and they also LACK `conditional`. Both directions are declared.
+    'RequiredMarker' => [
+        'php_only' => ['conditional'],
+        'ts_only' => ['none'],
+        'why' => 'a rendered marker, not an authored mode: `conditional` renders as `none` until its condition triggers',
+    ],
+    'Marker' => [
+        'php_only' => ['conditional'],
+        'ts_only' => ['none'],
+        'why' => 'the public runtime twin of RequiredMarker, and divergent from RequiredMode for the same reason',
+    ],
 ];
+
+/**
+ * ⚠️ M92 — MIRROR_DIVERGENCES IS KEYED BY NAME ALONE, NOT BY PATH PLUS NAME. Two mirrors with the same
+ * name in different files would silently share one exception, and the arm that asserts an exception is
+ * still accurate would be asserting it of whichever one it reached first. It is safe today — every
+ * declared name is distinct — so this is filed as a row rather than fixed in passing. Read it before
+ * adding a same-named mirror.
+ */
 
 /**
  * Vocabularies already gated elsewhere, so this file does not hold a second copy of the assertion.
@@ -156,9 +210,17 @@ function enumMirrorBody(string $source, string $name, string $grammar): ?string
 {
     $source = enumMirrorStripComments($source);
 
-    $pattern = $grammar === 'type'
-        ? '/export\s+type\s+'.preg_quote($name, '/').'\s*=(.*?);/s'
-        : '/(?:^|[{;\n])\s*'.preg_quote($name, '/').'\??\s*:(.*?);/s';
+    $quoted = preg_quote($name, '/');
+
+    $pattern = match ($grammar) {
+        'type' => '/export\s+type\s+'.$quoted.'\s*=(.*?);/s',
+        // M92. `as const` is the terminator rather than `;`, and that is not cosmetic: the members are
+        // what the caller wants, and stopping at the `;` would drag `] as const` into the body. The
+        // member extractor would survive that, but the anti-vacuity arm reads the body and a reader
+        // debugging a failure would be shown something that is not the declaration.
+        'const' => '/(?:export\s+)?const\s+'.$quoted.'\s*=\s*\[(.*?)\]\s*as const/s',
+        default => '/(?:^|[{;\n])\s*'.$quoted.'\??\s*:(.*?);/s',
+    };
 
     return preg_match($pattern, $source, $m) === 1 ? $m[1] : null;
 }

@@ -54,7 +54,11 @@ final class FormPresenter
             ->visibleTo($user)
             // The keyword predicate, in the SAME composition `FormSearchArm::builder()` uses (J1e), so a
             // `?q=` on this page and the same word in global search cannot return different forms.
-            // `FormListKeywordParityTest` asserts the two row sets are equal rather than trusting that.
+            // `FormListKeywordTest` asserts the two row sets are equal rather than trusting that.
+            // ⚠️ M92 — the name this carried has never existed, and the arm that DOES exist asserts LESS
+            // than the sentence above implies: it compares the two id lists on a
+            // SINGLE-row result set (with a count guard against a vacuous both-empty pass). A divergence
+            // that only appears at two or more rows, or in the archived handling below, is not covered.
             //
             // ⚠️ `KeywordFilter::apply()` emits its own closure group, and that is what makes the NEXT line
             // safe. The archived filter must AND with the keyword, never replace it or re-associate against

@@ -42,7 +42,8 @@ use App\Services\Entitlements\EntitlementService;
  * decision 2026-08-17), so this toggle — not the plan — is the only control anyone has over it.
  *
  * Adding a key here is a one-line change with no migration — `modules.<key>` is an open namespace in the
- * sparse `settings` table — but it MUST also exist in the plan catalog, which `ToggleableModulesTest` pins.
+ * sparse `settings` table — but it MUST also exist in the plan catalog, which `SettingsVocabularyTest`
+ * pins (M92 corrected the name; the one this carried has never existed).
  */
 final class ToggleableModules
 {

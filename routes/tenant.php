@@ -239,8 +239,8 @@ Route::middleware([
     | decision. The `kpis.members` posture on /dashboard, one surface over.
     |
     | NO `feature:` GATE EITHER, for the reason above: no plan withholds this key, so a plan gate here could
-    | only ever fire with the wrong message. AchievementsRouteGuardsTest pins all four absences so none of
-    | them can be "tidied" into symmetry with the neighbours.
+    | only ever fire with the wrong message. AchievementsPageTest pins all four absences so none of them
+    | can be "tidied" into symmetry with the neighbours. M92 corrected that name; it never existed.
     |
     | ⚠️ /achievements/streak IS A JSON SIDECAR, NOT A SHARED INERTIA PROP, and it is the /notifications
     | block above's mechanism for the same reason: an Inertia partial reload RE-DISPATCHES the current

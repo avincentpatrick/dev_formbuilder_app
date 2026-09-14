@@ -6,6 +6,7 @@ use App\Enums\FieldType;
 use App\Exceptions\Forms\BuilderConflictException;
 use App\Models\Form;
 use App\Models\FormField;
+use App\Models\FormFieldValidation;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Forms\FormBuilderService;
@@ -233,4 +234,186 @@ it('still writes what it was asked to write, and still refuses a stale token', f
     // ⚠️ The CONCRETE class, not `Throwable`: Pest resolves a string argument to toThrow() with
     //    class_exists(), which is FALSE for an interface, so `Throwable::class` is compared as a
     //    MESSAGE and the arm fails against a correct refusal. Measured here rather than inherited.
+});
+
+/*
+|--------------------------------------------------------------------------
+| The SET writeField() acquires, and its order within `form_fields` (M92).
+|--------------------------------------------------------------------------
+| M91's arms above prove the TABLE order: `form_fields` before `form_field_validations`, on both the
+| clean and the dirty path. That closed the cycle where the two sides disagreed about which table to
+| touch first, and left the one where they agree on the table and disagree on the ROW.
+|
+| ⛔ A CROSS-FIELD VALIDATION RULE IS THE DOOR. `related_field_key` resolves to a SIBLING field's id and
+| is INSERTed as `related_form_field_id`, whose foreign-key check takes FOR KEY SHARE on that sibling's
+| row — a row a `whereKey($field)` lock never touched. A publisher locks EVERY field of the draft in one
+| statement, so it can hold the sibling and block on this field while this transaction holds this field
+| and blocks on the sibling. 40P01 again, inside one table, and the same typed catch re-throws it as an
+| unrendered 500.
+|
+| ⚠️ THE NARROWING IS ASSERTED, NOT JUST THE ORDERING, and it is the half a later reader will undo.
+| The obvious fix — lock every field in the version, exactly as the publisher does — closes the cycle
+| and silently serializes every concurrent field edit in a draft, which is the §3.4 reversal M91's own
+| comment block spends a paragraph declining. The last arm pins that a payload naming no sibling still
+| locks exactly one row.
+*/
+
+/** A draft carrying TWO fields, so one validation rule can name the other. */
+function builderLockOrderPair(Tenant $tenant, User $user): Form
+{
+    $form = app(FormService::class)->create($tenant, $user, 'Survey');
+    app(FormBuilderService::class)->addField($form->refresh(), $user, FieldType::ShortText, null);
+    app(FormBuilderService::class)->addField($form->refresh(), $user, FieldType::ShortText, null);
+
+    return $form->refresh();
+}
+
+/**
+ * The two fields of a paired draft, ordered by id — which is the order both sides must lock them in.
+ *
+ * @return array{0: FormField, 1: FormField}
+ */
+function builderLockOrderFields(Form $form): array
+{
+    /** @var list<FormField> $fields */
+    $fields = FormField::query()
+        ->where('form_version_id', $form->draft_version_id)
+        ->orderBy('id')
+        ->get()
+        ->all();
+
+    expect($fields)->toHaveCount(2, 'the paired draft must hold exactly two fields for this to prove anything');
+
+    return [$fields[0], $fields[1]];
+}
+
+/**
+ * A writeField() payload for $field carrying one rule that names $related.
+ *
+ * @return array<string, mixed>
+ */
+function builderLockOrderCrossFieldPayload(FormField $field, FormField $related): array
+{
+    return [
+        'key' => $field->key,
+        'label' => $field->label,
+        'hint' => $field->hint,
+        'placeholder' => $field->placeholder,
+        'is_required' => $field->is_required->value,
+        'relevant_expression' => $field->relevant_expression,
+        'appearance' => $field->appearance,
+        'config' => $field->config ?? [],
+        'default_value' => $field->default_value,
+        'is_pii' => $field->is_pii,
+        'is_sensitive' => $field->is_sensitive,
+        'is_queryable' => $field->is_queryable,
+        'validations' => [
+            ['rule_type' => 'greater_than_field', 'operator' => null, 'rule_value' => null, 'expression' => null,
+                'error_message' => 'Must exceed the other answer', 'related_field_key' => $related->key],
+        ],
+    ];
+}
+
+it('locks the sibling a cross-field rule names, ascending, before it writes any validation row', function (): void {
+    $form = builderLockOrderPair($this->tenant, $this->user);
+    [$lower, $higher] = builderLockOrderFields($form);
+
+    // The HIGHER id is edited and names the LOWER one. That is the arrangement that fails without the
+    // fix: an unordered publisher can reach `lower` first while this transaction holds `higher`.
+    $payload = builderLockOrderCrossFieldPayload($higher, $lower);
+
+    $log = builderLockOrderSqlDuring(function () use ($form, $higher, $payload): void {
+        app(FormBuilderService::class)->updateField($form, $higher, $this->user, $payload, null);
+    });
+
+    $lock = builderLockOrderFirstIndex($log, 'form_fields', 'for update');
+    $childWrite = builderLockOrderFirstIndex($log, 'delete from "form_field_validations"');
+
+    // Floors first — see the null-coercion note on builderLockOrderFirstIndex().
+    expect($lock)->not->toBeNull('no locking select on `form_fields` was issued at all');
+    expect($childWrite)->not->toBeNull('no validation write was issued, so the ordering proves nothing');
+    expect($lock)->toBeLessThan($childWrite, 'the validation rows were reached before the field rows were locked');
+
+    $statement = $log[$lock];
+
+    // ⛔ THE SIBLING IS IN THE LOCK SET, AND THE PLACEHOLDER LIST IS THE ONLY HONEST WITNESS TO IT.
+    //    `whereIn` renders `in (?)` for one id and `in (?, ?)` for two, so `toContain('in (')` would
+    //    pass against a lock set that had silently dropped the sibling — which is exactly the mutant
+    //    control `m92-lock-set-narrowed` applies. Two placeholders, asserted.
+    expect($statement)->toContain('in (?, ?)');
+
+    // ⛔ AND IT IS ORDERED. Postgres locks rows as they are pulled from the plan, so without this clause
+    //    the acquisition order is the plan's scan order and the publisher — which orders — can still
+    //    interleave with it. `EXPLAIN` puts LockRows ABOVE Sort, which is what makes the clause bite.
+    //    ⚠️ ONE needle per toContain() call: a second argument is read as a second NEEDLE, not a message.
+    expect($statement)->toContain('order by "id" asc');
+
+    // Non-vacuity: the rule really did resolve to the sibling rather than to a null.
+    /** @var FormFieldValidation $stored */
+    $stored = FormFieldValidation::query()->where('form_field_id', $higher->getKey())->firstOrFail();
+    expect($stored->related_form_field_id)->toBe($lower->getKey());
+});
+
+it('locks the sibling on the CLEAN path too, which is the path that carries the defect', function (): void {
+    // The partner case, and the one that matters: M91's cycle needed a clean payload, and so does this
+    // one — Eloquent skips the UPDATE, so a lock that rode on save() would not be taken at all.
+    $form = builderLockOrderPair($this->tenant, $this->user);
+    [$lower, $higher] = builderLockOrderFields($form);
+    $payload = builderLockOrderCrossFieldPayload($higher, $lower);
+
+    app(FormBuilderService::class)->updateField($form, $higher, $this->user, $payload, null);
+
+    /** @var FormField $stored */
+    $stored = FormField::query()->whereKey($higher->getKey())->firstOrFail();
+
+    $log = builderLockOrderSqlDuring(function () use ($form, $stored, $payload): void {
+        app(FormBuilderService::class)->updateField($form, $stored, $this->user, $payload, null);
+    });
+
+    expect(builderLockOrderFirstIndex($log, 'update "form_fields"'))->toBeNull(
+        'the resubmit was DIRTY, so this case is not exercising the clean path it names'
+    );
+
+    $lock = builderLockOrderFirstIndex($log, 'form_fields', 'for update');
+    expect($lock)->not->toBeNull('the clean path took no field lock at all');
+    expect($log[$lock])->toContain('in (?, ?)');
+    expect($log[$lock])->toContain('order by "id" asc');
+});
+
+it('locks exactly ONE row when the payload names no sibling, which is §3.4 left standing', function (): void {
+    // ⛔ THE NARROWING ARM. Locking every field in the version would satisfy both arms above and would
+    //    serialize every concurrent field edit in a draft — declining to do that is what §3.4 says, and
+    //    it is the property a later "simplification" to `where('form_version_id', …)` would destroy
+    //    while keeping this file green everywhere else.
+    $form = builderLockOrderPair($this->tenant, $this->user);
+    [$lower, $higher] = builderLockOrderFields($form);
+
+    $payload = builderLockOrderCrossFieldPayload($higher, $lower);
+    $payload['validations'] = [
+        ['rule_type' => 'min_length', 'operator' => null, 'rule_value' => '2',
+            'expression' => null, 'error_message' => 'Too short', 'related_field_key' => null],
+    ];
+
+    $log = builderLockOrderSqlDuring(function () use ($form, $higher, $payload): void {
+        app(FormBuilderService::class)->updateField($form, $higher, $this->user, $payload, null);
+    });
+
+    $lock = builderLockOrderFirstIndex($log, 'form_fields', 'for update');
+    expect($lock)->not->toBeNull('no locking select on `form_fields` was issued at all');
+
+    // ⛔ THE SET SIZE IS THE PROPERTY, AND IT IS READ FROM THE PLACEHOLDER LIST. `whereIn` renders
+    //    `in (?)` for one id and `in (?, ?)` for two, so the PRESENCE of `in (` says nothing — it is
+    //    there either way. The first draft of this arm asserted `not->toContain('in (')` and went red
+    //    against a correct implementation: the cheap version of exactly the mistake this file exists to
+    //    make expensive, and it is recorded rather than quietly corrected.
+    expect($log[$lock])->toContain('in (?)');
+    expect($log[$lock])->not->toContain('in (?, ?)');
+
+    // And no whole-version sweep. That is the shape §3.4 declines, and it would satisfy both arms above.
+    expect($log[$lock])->not->toContain('form_version_id');
+
+    // The sibling resolution never ran either — no lookup by `key` was issued.
+    expect(builderLockOrderFirstIndex($log, 'from "form_fields"', '"key" in ('))->toBeNull(
+        'a sibling resolution ran for a payload that names no sibling'
+    );
 });

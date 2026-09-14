@@ -148,6 +148,37 @@ it('takes NO lock after the status flip, because a lock there would clone an emp
         ->toBe([], 'a locking read after the status flip matches zero rows and clones an empty tree');
 });
 
+it('acquires each child set in ascending id order, which is the half M91 left open', function (): void {
+    // ⛔ M92 — TABLE ORDER WAS NEVER THE WHOLE ORDER. The arms above pin WHICH TABLES this transaction
+    //    locks and in what sequence. Within `form_fields` it locks every row of the draft in ONE
+    //    statement, and without an ORDER BY the acquisition order is the plan's scan order. A builder
+    //    editing a field whose validation rule names a SIBLING takes FOR KEY SHARE on that sibling
+    //    through the foreign key, so the two can interleave: publisher holds Y and wants X, builder
+    //    holds X and wants Y. 40P01, inside one table, and the loser lands as an unrendered 500.
+    //
+    // ⚠️ THIS ARM PINS THE CLAUSE AND NOT THE PLAN, AND THE DIFFERENCE IS WORTH STATING. Postgres locks
+    //    rows as they are pulled from the plan, so ORDER BY only controls acquisition if the sort sits
+    //    BELOW the locking node. It does — `EXPLAIN` for this statement plans `LockRows` above `Sort` —
+    //    but that is a planner property no assertion in this repository can hold, so it is measured and
+    //    recorded in PublishService rather than pretended to be tested here.
+    $form = publishLockingDraft($this->tenant, $this->user);
+
+    $log = publishLockingSqlDuring(fn () => app(PublishService::class)->publish($form, $this->user));
+
+    foreach (['form_sections', 'form_fields', 'form_field_validations'] as $table) {
+        $at = publishLockingFirstIndex($log, $table, 'for update');
+
+        // The floor, before the comparison — `null` would otherwise index into the log and fatal, and a
+        // missing statement is exactly the regression the arm above this one exists to catch.
+        expect($at)->not->toBeNull("publish() must lock {$table} for the transaction's duration");
+
+        // ⚠️ ONE needle per toContain() call. A second argument is read as a second NEEDLE rather than
+        //    as a failure message — measured three times in this repository under three matcher names,
+        //    so the call shape is the rule.
+        expect($log[$at])->toContain('order by "id" asc');
+    }
+});
+
 it('locks each child table exactly once, not once per walk', function (): void {
     $form = publishLockingDraft($this->tenant, $this->user);
 

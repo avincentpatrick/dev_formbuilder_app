@@ -34,7 +34,7 @@ return new class extends Migration
             $table->text('description')->nullable();
             $table->jsonb('schema_snapshot'); // canonical, id-free flatten; '{}' until publish
             $table->text('change_summary')->nullable();
-            $table->string('checksum', 64)->nullable(); // SHA-256 of the canonical schema_snapshot
+            $table->string('checksum', 64)->nullable(); // SHA-256 of the canonical serialization AS HASHED; a version identity, not re-derivable from the stored jsonb (M92)
             $table->timestampTz('published_at')->nullable();
             $table->foreignUuid('published_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestampTz('superseded_at')->nullable();

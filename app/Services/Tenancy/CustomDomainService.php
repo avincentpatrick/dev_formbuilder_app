@@ -29,8 +29,9 @@ use Illuminate\Support\Facades\DB;
  *
  * ⚠️ ATTRIBUTE ARRAYS ARE BUILT EXPLICITLY, NEVER FROM REQUEST DATA. stancl's Domain model is
  * `$guarded = []` and H22a deliberately did not narrow that (sixty fixture sites depend on it), so
- * `create($request->validated())` would happily set `verified_at`. CustomDomainClaimTest pins that a
- * store request carrying verification fields still lands pending.
+ * `create($request->validated())` would happily set `verified_at`. CustomDomainApiTest pins that a
+ * store request carrying verification fields still lands pending (M92 corrected the name; the one it
+ * carried has never existed).
  *
  * The state machine, derived from three nullable timestamps rather than a status column:
  *

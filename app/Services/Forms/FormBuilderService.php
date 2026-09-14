@@ -222,9 +222,37 @@ final class FormBuilderService
             // ERRORING, so a row that has stopped being a draft child between the guard above and here
             // matches nothing — which is the same verdict the guard would have reached, reported through
             // the same exception rather than as a silent zero-row UPDATE.
-            $locked = $field->newQuery()->whereKey($field->getKey())->lockForUpdate()->first();
+            // ⛔ M92 — THE LOCK SET, NOT JUST THE LOCK. M91 took THIS field row and stopped there, which
+            // closed the cross-TABLE cycle and left a cross-ROW one inside `form_fields`. A validation
+            // rule naming another field resolves to a SIBLING id, and the INSERT's foreign key takes
+            // FOR KEY SHARE on that sibling's row — a row a `whereKey()` lock never touched. The
+            // publisher locks every field of the draft, so it can hold the sibling and want this one
+            // while this transaction holds this one and wants the sibling. 40P01, one table, both paths.
+            //
+            // The sibling resolution is therefore HOISTED ABOVE the lock: you cannot order a lock set you
+            // have not computed yet. Both sides now take `form_fields` in ascending id order.
+            //
+            // ⚠️ ONLY THE SIBLINGS THE PAYLOAD ACTUALLY REFERENCES. The row that filed this prescribed a
+            // re-read over "[$field->id, ...$siblingIds]", and replaceValidations() resolves EVERY
+            // sibling in the version — locking that set would serialize every concurrent field edit in a
+            // draft, which is a §3.4 reversal by accident rather than a bug fix. A payload with no
+            // cross-field rule locks exactly one row, as it did before this change.
+            $siblingIdByKey = $this->resolveValidationSiblings($field, $data['validations'] ?? []);
 
-            if (! $locked instanceof FormField) {
+            $lockIds = array_values(array_unique([$field->getKey(), ...array_values($siblingIdByKey)]));
+            sort($lockIds);
+
+            // ⚠️ A LOCKING SELECT IS FILTERED BY THE UPDATE POLICY'S USING EXPRESSION RATHER THAN
+            // ERRORING, so a row that has stopped being a draft child between the guard above and here
+            // matches nothing — which is the same verdict the guard would have reached, reported through
+            // the same exception rather than as a silent zero-row UPDATE. With a set rather than a single
+            // key that verdict is read from the RETURNED IDS: this field's own row missing is the removal
+            // the guard is for. A SIBLING missing is deliberately NOT decided here — the stale id stays in
+            // the map, the INSERT raises 23503, and updateField()'s typed catch answers
+            // relatedFieldRemovedDuringEdit(), which is a 422 a person can act on rather than a silent null.
+            $lockedIds = FormField::query()->whereIn('id', $lockIds)->orderBy('id')->lockForUpdate()->pluck('id');
+
+            if (! $lockedIds->contains($field->getKey())) {
                 throw FormException::childRemovedDuringEdit();
             }
 
@@ -245,7 +273,7 @@ final class FormBuilderService
                 'updated_by' => $user->id,
             ])->save();
 
-            $this->replaceValidations($field, $data['validations'] ?? []);
+            $this->replaceValidations($field, $data['validations'] ?? [], $siblingIdByKey);
 
             return $field->refresh();
         });
@@ -493,14 +521,55 @@ final class FormBuilderService
         }
     }
 
-    /** @param  list<array<string, mixed>>  $rows */
-    private function replaceValidations(FormField $field, array $rows): void
+    /**
+     * The sibling ids a validation payload references, keyed by the field key that named them.
+     *
+     * ⛔ M92 — SEPARATED FROM replaceValidations() SO THE LOCK SET CAN BE COMPUTED BEFORE THE LOCK.
+     * This used to be a `pluck('id', 'key')` over the whole version, run after the field row was already
+     * locked. That is the wrong order twice over: it resolves the rows whose foreign keys are about to be
+     * taken only AFTER the acquisition order is fixed, and it resolves every field in the draft when the
+     * payload names at most a handful. The narrowing is the point — see the lock in writeField().
+     *
+     * ⚠️ A key naming no live field yields NO ENTRY rather than a null one, so it contributes nothing to
+     * the lock set and reaches the INSERT as `related_form_field_id => null` exactly as it did before.
+     * The `?? null` at the call site is what preserves that; this method never invents an id.
+     *
+     * @param  list<array<string, mixed>>  $rows
+     * @return array<string, string>
+     */
+    private function resolveValidationSiblings(FormField $field, array $rows): array
+    {
+        $keys = [];
+
+        foreach ($rows as $row) {
+            $relatedKey = $row['related_field_key'] ?? null;
+
+            if (is_string($relatedKey) && $relatedKey !== '') {
+                $keys[$relatedKey] = true;
+            }
+        }
+
+        if ($keys === []) {
+            return [];
+        }
+
+        /** @var array<string, string> $resolved */
+        $resolved = FormField::query()
+            ->where('form_version_id', $field->form_version_id)
+            ->whereIn('key', array_keys($keys))
+            ->pluck('id', 'key')
+            ->all();
+
+        return $resolved;
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $rows
+     * @param  array<string, string>  $siblingIdByKey  resolved by resolveValidationSiblings() BEFORE the lock
+     */
+    private function replaceValidations(FormField $field, array $rows, array $siblingIdByKey): void
     {
         $field->validations()->delete();
-
-        $siblingIdByKey = FormField::query()
-            ->where('form_version_id', $field->form_version_id)
-            ->pluck('id', 'key');
 
         foreach ($rows as $index => $row) {
             $relatedKey = $row['related_field_key'] ?? null;

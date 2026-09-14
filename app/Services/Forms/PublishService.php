@@ -92,9 +92,30 @@ final class PublishService
             // anything that is not 23503, so it surfaced as an unrendered 500. writeField() now takes
             // its field row before it touches any child, which is what makes the clause above true
             // unconditionally; tests/Feature/Forms/BuilderLockOrderTest.php is what keeps it true.
-            FormSection::query()->where('form_version_id', $draft->id)->lockForUpdate()->pluck('id');
-            FormField::query()->where('form_version_id', $draft->id)->lockForUpdate()->pluck('id');
-            FormFieldValidation::query()->where('form_version_id', $draft->id)->lockForUpdate()->pluck('id');
+            //
+            // ⛔ M92 — TABLE ORDER WAS NEVER THE WHOLE ORDER, AND THE SECOND CYCLE RAN INSIDE ONE TABLE.
+            // M91 closed the cycle where the two sides disagreed about which TABLE to touch first. It
+            // left the one where they agree on the table and disagree on the ROW. These three statements
+            // each locked a whole child set with no ORDER BY, so the acquisition order was the plan's
+            // scan order; the builder meanwhile locks its OWN field row and then, through
+            // replaceValidations()'s `related_form_field_id` foreign key, takes FOR KEY SHARE on a
+            // SIBLING field row. Publisher grabs Y then blocks on X while the builder holds X and wants
+            // Y — 40P01, inside `form_fields` alone, reachable only through a cross-field validation
+            // rule. Both sides now acquire `form_fields` in ascending id order and cannot interleave.
+            //
+            // ⚠️ ORDER BY CONTROLS THE LOCK ORDER HERE, AND THAT IS MEASURED RATHER THAN ASSUMED.
+            // Postgres locks rows as they are pulled from the plan, so a sort that happened BELOW the
+            // locking node would order the output and not the acquisition. `EXPLAIN` for this statement
+            // plans `LockRows` ABOVE `Sort` — the lock is applied to the sorted stream. The arm in
+            // tests/Feature/Forms/PublishLockingTest.php pins the clause; nothing can pin the plan, so
+            // it is recorded here.
+            //
+            // ⚠️ All three take it, not just `form_fields`. Only the field set is in the measured cycle,
+            // but an unordered bulk lock is the shape of the defect rather than one instance of it, and
+            // a rule with an exception is the one a later reader breaks.
+            FormSection::query()->where('form_version_id', $draft->id)->orderBy('id')->lockForUpdate()->pluck('id');
+            FormField::query()->where('form_version_id', $draft->id)->orderBy('id')->lockForUpdate()->pluck('id');
+            FormFieldValidation::query()->where('form_version_id', $draft->id)->orderBy('id')->lockForUpdate()->pluck('id');
 
             // 1. Validate the draft (throws the specific §4 violation) — structure, then expressions (F3),
             //    then templates (H6a). The template gate runs HERE so step 1 stays the single validation

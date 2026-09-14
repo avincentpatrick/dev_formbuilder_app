@@ -17,6 +17,18 @@ use Illuminate\Support\Collection;
  * offline client and export tooling rely on, so it MUST be deterministic across row-id churn, DB return
  * order, and (within a serialization) key ordering:
  *
+ * ⛔ M92 — READ THE PARENTHETICAL ABOVE LITERALLY: *within a serialization*. THE CHECKSUM IS A VERSION
+ * IDENTITY, NOT A VERIFIABLE INTEGRITY HASH OF THE COLUMN IT IS STORED BESIDE, and three documents said
+ * otherwise until M92. `schema_snapshot` is `jsonb`; Postgres orders an object's keys by LENGTH and then
+ * by bytes, while ksortRecursive() below sorts bytewise only. The two agree at the top level
+ * (`fields` before `sections` either way, which is why the filing row's worked example is inert) and
+ * part one level down — ksort gives `config, hint, key, label`, jsonb gives `key`, `hint`, `label`,
+ * `config`. So re-hashing what the column returns yields a different digest, by design rather than by
+ * accident. Every consumer compares STAMPS and none re-derives, which is what makes this a documentation
+ * defect rather than a live one. tests/Feature/Forms/SchemaSnapshotSerializerTest.php pins both halves,
+ * including that the divergence is key order and NOTHING else — which is the arm that would notice if the
+ * numeric caveat below ever stopped being hypothetical.
+ *
  *   - **id-stripped**: `id`/`tenant_id`/`form_version_id`/timestamps/`created_by`/`updated_by` are dropped.
  *   - **FK-by-key**: a field references its section by the section's stable `key`, and a validation
  *     references its comparison field by that field's `key` — never by row id.

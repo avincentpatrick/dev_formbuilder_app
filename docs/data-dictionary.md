@@ -269,7 +269,7 @@ The immutable snapshot per publish — the single structural fix for legacy's co
 | `description` | `text` | Yes | `NULL` | No | — |
 | `schema_snapshot` | `jsonb` | No | — | No | Denormalized, read-optimized cache of this version's own sections/fields/validations (see Design Notes) — the shape consumed by the public runtime and the offline PWA client. |
 | `change_summary` | `text` | Yes | `NULL` | No | Optional publisher-entered changelog note for this publish. |
-| `checksum` | `varchar(64)` | Yes | `NULL` | No | SHA-256 of `schema_snapshot`; used by the offline client and export tooling to detect drift/cache-bust without re-downloading the full snapshot. |
+| `checksum` | `varchar(64)` | Yes | `NULL` | No | SHA-256 of the canonical serialization **as hashed at publish** — a version identity, **not** re-derivable from the stored `schema_snapshot`, because `jsonb` re-orders object keys by length then bytes where the serializer sorts bytewise (M92). Consumers compare stamps; the offline client and export tooling use it to detect drift/cache-bust without re-downloading the full snapshot. |
 | `published_at` | `timestamptz` | Yes | `NULL` | No | Set once, when this version transitions `draft` → `published`. |
 | `published_by` | `uuid` | Yes | `NULL` | No | FK to `users.id` (external). |
 | `superseded_at` | `timestamptz` | Yes | `NULL` | No | Set when a later version is published, transitioning this row `published` → `superseded`. |

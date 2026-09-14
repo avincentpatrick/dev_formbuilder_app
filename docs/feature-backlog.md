@@ -8292,7 +8292,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   blocked passes everything**, so this is that warning with a measured instance attached rather than a
   new claim. The cheap repair is a marker key naming a decision id, checked against the `## OPEN`
   section; the expensive half is deciding whether a decision-blocked row is `held` or a fourth state.
-  **Live.** Filed by `M84`. ✅ **DONE — `M93` (2026-09-14).** A row whose remaining work is an open decision now carries an awaits token — `decision=` on a marker — and is published `blocked` with blocker `decision: Dn`; every open decision is itself a row, and `pipeline-lint` P7b and P7e hold both. ⛔ **The row understated itself: eighteen open rows waited on a decision, not one.** Its open question is answered as well — neither `held` nor a fourth state, because `held` would break P4's two-way coverage and the held floor.
+  **Live.** Filed by `M84`. ✅ **DONE — `M93` (2026-09-14).** A row whose remaining work is an open decision now carries an awaits token — `decision=` on a marker — and is published `blocked` with blocker `decision: Dn`; every open decision is itself a row, and `pipeline-lint` P7b and P7e hold both. ⛔ **The row understated itself: nineteen open rows waited on a decision, not one.** Its open question is answered as well — neither `held` nor a fourth state, because `held` would break P4's two-way coverage and the held floor.
 
 - ~~**`minor` · `DocumentedDefaultDriftTest`'s executed assertion chain is EIGHT long, and the five that
   fire FIRST cannot be split the way the other three were.**~~

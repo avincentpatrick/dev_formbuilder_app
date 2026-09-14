@@ -9,6 +9,7 @@ use App\Enums\ConnectorProviderKey;
 use App\Exceptions\Connectors\ConnectorChannelException;
 use App\Models\Connection;
 use App\Support\Connectors\ConnectorChannel;
+use App\Support\Connectors\ConnectorChannelPage;
 use App\Support\Connectors\ConnectorRegistry;
 use App\Support\Connectors\ListsChannels;
 
@@ -39,10 +40,29 @@ use App\Support\Connectors\ListsChannels;
  * NAME THE THING, NEVER QUOTE IT: a comment that embeds the command it wants you to run booby-traps that
  * command, and a grep over first-party code can only ever report absence from first-party code.
  * The local decision is unaffected and is stated on its own terms above.
+ *
+ * ── AN EXPIRED TOKEN IS HANDED OFF, NOT REPORTED AS A DEAD GRANT (M95) ──────────────────────────────────────
+ * The Airtable rule editor asks this class for the tenant's bases before anything else, so an ordinary one-hour
+ * token expiry used to greet the tenant with "Reconnect this account" on a healthy grant. The same three steps
+ * as {@see TabularDestinationDirectory} now stand in front of that sentence: hand off a token already known to
+ * be expired, re-read the grant after a refusal in case the sweep rotated it mid-request, and hand off a
+ * refreshable grant the provider refused. The marker the hand-off keeps lives in ConnectionTokenRefresher, not
+ * here, so the no-caching decision above is unchanged for the listing itself.
  */
 final class ConnectorChannelDirectory
 {
-    public function __construct(private readonly ConnectorRegistry $registry) {}
+    /**
+     * The codes a lister reports for an access token the provider refused, and that a refresh can cure (M95).
+     * `invalid_auth` is Slack's, and the code `AirtableBaseLister` maps a 401 onto; `token_expired` is Slack's
+     * answer for a rotation-enabled workspace whose token lapsed. `token_revoked` and `account_inactive` are
+     * deliberately absent — no refresh brings those back.
+     */
+    private const REFUSED_TOKEN_CODES = ['invalid_auth', 'token_expired'];
+
+    public function __construct(
+        private readonly ConnectorRegistry $registry,
+        private readonly ConnectionTokenRefresher $refresher,
+    ) {}
 
     /**
      * @return array{channels: list<array{id: string, label: string, available: bool, unavailable_reason: ?string}>, truncated: bool, error: ?string}
@@ -63,12 +83,59 @@ final class ConnectorChannelDirectory
             return $this->failure('This integration doesn’t offer a destination list. Enter the destination id instead.');
         }
 
-        try {
-            $page = $lister->channels($connection);
-        } catch (ConnectorChannelException $e) {
-            return $this->failure($this->message($connection->provider, $e->errorCode));
+        $handOff = $this->refresher->handOffIfDue($connection, now());
+
+        if ($handOff !== null) {
+            return $this->failure($this->handOffMessage($connection->provider, $handOff));
         }
 
+        try {
+            return $this->page($lister->channels($connection));
+        } catch (ConnectorChannelException $e) {
+            return $this->afterRefusal($lister, $connection, $e->errorCode);
+        }
+    }
+
+    /**
+     * @return array{channels: list<array{id: string, label: string, available: bool, unavailable_reason: ?string}>, truncated: bool, error: ?string}
+     */
+    private function afterRefusal(ListsChannels $lister, Connection $connection, string $errorCode): array
+    {
+        if (! in_array($errorCode, self::REFUSED_TOKEN_CODES, true)) {
+            return $this->failure($this->message($connection->provider, $errorCode));
+        }
+
+        // The hourly sweep may have rotated this grant after the route bound the row; then the stored token is
+        // already new, and one retry with it is the whole fix.
+        $fresh = $connection->fresh();
+
+        if ($fresh instanceof Connection
+            && $fresh->status === ConnectionStatus::Active
+            && $fresh->access_token !== $connection->access_token) {
+            try {
+                return $this->page($lister->channels($fresh));
+            } catch (ConnectorChannelException $e) {
+                if (! in_array($e->errorCode, self::REFUSED_TOKEN_CODES, true)) {
+                    return $this->failure($this->message($fresh->provider, $e->errorCode));
+                }
+
+                $connection = $fresh;
+                $errorCode = $e->errorCode;
+            }
+        }
+
+        $handOff = $this->refresher->handOffAfterRejection($connection);
+
+        return $this->failure($handOff !== null
+            ? $this->handOffMessage($connection->provider, $handOff)
+            : $this->message($connection->provider, $errorCode));
+    }
+
+    /**
+     * @return array{channels: list<array{id: string, label: string, available: bool, unavailable_reason: ?string}>, truncated: bool, error: null}
+     */
+    private function page(ConnectorChannelPage $page): array
+    {
         return [
             'channels' => array_map(static fn (ConnectorChannel $c): array => $c->toArray(), $page->channels),
             'truncated' => $page->truncated,
@@ -103,6 +170,19 @@ final class ConnectorChannelDirectory
             'transport_error', 'provider_unavailable' => "We couldn’t reach {$label}. Check your connection and refresh the list.",
             default => "We couldn’t load destinations from {$label}. Refresh to try again, or enter a destination id.",
         };
+    }
+
+    /**
+     * A refresh handed to the worker (M95). No time promise, for the reason
+     * {@see TabularDestinationDirectory} gives: the job runs on the lowest-priority queue.
+     */
+    private function handOffMessage(ConnectorProviderKey $provider, string $handOff): string
+    {
+        $label = $provider->label();
+
+        return $handOff === ConnectionTokenRefresher::HANDOFF_STALLED
+            ? "We couldn’t renew access to your {$label} account yet. Refresh the list in a few minutes, or reconnect it if this keeps happening."
+            : "We’re renewing access to your {$label} account. Refresh the list shortly.";
     }
 
     /**

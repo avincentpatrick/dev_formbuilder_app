@@ -243,7 +243,7 @@ it('persists the ROTATED refresh token when a grant is renewed', function (): vo
         ]), 200),
     ]);
 
-    app(ConnectionTokenRefresher::class)->ensureFresh($connection, Carbon::now());
+    app(ConnectionTokenRefresher::class)->refreshNow($connection, Carbon::now());
 
     expect($connection->fresh()->refresh_token)->toBe('oarROTATED')
         ->and($connection->fresh()->access_token)->toBe('oaaSECONDACCESS');

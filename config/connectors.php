@@ -196,15 +196,15 @@ return [
     ],
 
     /*
-    | How far ahead of `connections.token_expires_at`, in SECONDS, the refresh sweep renews a grant. Must
-    | comfortably exceed the sweep interval (hourly) so a token cannot expire between two sweeps: at 7200
-    | a grant is refreshed up to two hours early, giving one full retry cycle before anything breaks.
+    | How far ahead of `connections.token_expires_at`, in SECONDS, the refresh sweep renews a grant. ⚠️ At 7200
+    | against an hourly sweep a ONE-HOUR token (Google, Airtable) is due on EVERY sweep, so one missed sweep
+    | expires it (corrected in M95) — which is why the delivery and setup-time paths hand off on a 120s lead.
     | A grant with no expiry (Slack's default bot token) or no refresh token is skipped entirely.
     */
     'refresh_lead_seconds' => (int) env('CONNECTOR_REFRESH_LEAD_SECONDS', 7200),
 
     /*
-    | H16a — the DELIVERY-TIME pre-flight lead, in SECONDS, and a deliberate amendment to ADR-0009 §D6's
+    | H16a — the pre-flight lead (delivery; setup-time too since M95), in SECONDS, amending ADR-0009 §D6's
     | "proactive, never lazy" rule. §D6 named its own revisit trigger: "a provider whose tokens expire faster
     | than the sweep interval, which would force a lazy pre-flight refresh after all." Google is that provider
     | — its access tokens live about an hour against an HOURLY sweep, so a grant minted just after one sweep

@@ -15,13 +15,16 @@ use App\Notifications\Connectors\ConnectionRevokedNotification;
 use App\Support\Branding\BrandPalette;
 use App\Support\Connectors\ConnectorRegistry;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Notification;
+use Throwable;
 
 /**
  * Renews the tenant's OAuth grants ahead of their expiry (ADR-0009 §D6, H15a). Runs from the scheduled
  * cross-tenant sweep, under one tenant's context at a time.
  *
- * PROACTIVE FIRST, WITH ONE NARROW LAZY GUARD — amended in H16a; ADR-0009 §D6 is amended with it.
+ * PROACTIVE FIRST, AND NOTHING ELSE ROTATES A GRANT INLINE — amended in H16a, M6 and M95; ADR-0009 §D6 carries
+ * all three.
  *
  * §D6 originally read "proactive, never lazy", for two good reasons that still hold: a refresh inside a
  * delivery attempt puts a second outbound call and a credential write in the delivery path, and a provider
@@ -31,10 +34,11 @@ use Illuminate\Support\Facades\Notification;
  * an hour against an hourly sweep, so a grant minted just after one sweep and delivered against before the
  * next can be dead on arrival. Retuning the sweep does not fix it — one missed run reopens the window.
  *
- * So {@see sweep()} remains the mechanism and {@see ensureFresh()} is a GUARD ON TOP OF IT, not a second
- * policy. It refreshes only a grant that is already expired or within `delivery_refresh_lead_seconds` (120s,
- * versus the sweep's 7200s), so a healthy connection never reaches it and the stampede §D6 warned about now
- * requires the sweep to have failed first rather than being one outage away permanently.
+ * So {@see sweep()} remains the mechanism, and every other caller HANDS OFF rather than refreshing. H16a's
+ * inline guard rotated a grant wherever it was called, with no lock between callers; M6 moved the delivery
+ * path onto a dispatched {@see RefreshOneConnectionJob}, and M95 deleted the guard when the setup-time
+ * directories needed the same protection. {@see handOffIfDue()} and {@see handOffAfterRejection()} dispatch
+ * that job and return, so neither a request nor a delivery ever exchanges a token itself.
  *
  * A grant with no expiry or no refresh token can never be refreshed and is skipped rather than failed —
  * that is the NORMAL case for Slack, whose bot tokens do not expire unless the workspace enables rotation.
@@ -45,6 +49,18 @@ use Illuminate\Support\Facades\Notification;
  */
 final class ConnectionTokenRefresher
 {
+    /** A hand-off was queued now, or one already is: the refresh is expected shortly. */
+    public const HANDOFF_RENEWING = 'renewing';
+
+    /** A hand-off earlier in the attempt window did not leave the grant usable, so it was queued again. */
+    public const HANDOFF_STALLED = 'stalled';
+
+    /** Seconds one hand-off suppresses another for the same grant. */
+    private const QUEUED_WINDOW_SECONDS = 120;
+
+    /** Seconds after a hand-off in which a repeat means the earlier refresh did not take. */
+    private const ATTEMPTED_WINDOW_SECONDS = 900;
+
     public function __construct(
         private readonly ConnectorRegistry $registry,
         private readonly ConnectionService $connections,
@@ -111,28 +127,86 @@ final class ConnectionTokenRefresher
     }
 
     /**
-     * The delivery path's pre-flight guard (H16a): renew this ONE grant if it is already expired or about to
-     * be, otherwise do nothing at all.
+     * Hand ONE grant to {@see RefreshOneConnectionJob} when its token is already expired or about to be (M95),
+     * so a request can answer "renewing" instead of spending a call on a token the provider will refuse.
      *
-     * Returns whether a refresh was performed — `false` covers both "not due" and "the refresh was refused",
-     * which the caller cannot conflate because a refusal also flips `$connection->status` away from Active
-     * (through the same {@see markFailed()} path the sweep uses, so the owner is notified exactly once and by
-     * one code path). Callers therefore re-read the status rather than trusting this return value.
+     * ⛔ NEVER REFRESH INLINE FROM A REQUEST. A web request runs beside the queue worker with no lock between
+     * them, and Airtable invalidates the previous refresh token on every renewal: of two concurrent exchanges
+     * the loser holds a destroyed credential, its `invalid_grant` is terminal, and the grant is marked dead
+     * with every rule paused. The job takes the per-grant lock and commits the write in a transaction of its
+     * own (M6); a request only ever queues it.
      *
-     * Deliberately reuses {@see refresh()} rather than reimplementing the grant application: a second place
-     * that writes a credential and decides when one is dead is precisely how the two would drift.
+     * The lead is the delivery pre-flight's (`connectors.delivery_refresh_lead_seconds`, 120s), never the
+     * sweep's 7200s. A one-hour token always has less than 7200s left, so that lead would hand off on every call.
+     *
+     * @return self::HANDOFF_*|null null when the grant is not due or cannot be refreshed, so the caller goes on
+     *                              to the provider — or when the hand-off itself could not be queued
      */
-    public function ensureFresh(Connection $connection, Carbon $now): bool
+    public function handOffIfDue(Connection $connection, Carbon $now): ?string
     {
         $leadSeconds = (int) config('connectors.delivery_refresh_lead_seconds', 120);
 
-        // `needsRefresh()` already encodes "no refresh token or no expiry ⇒ never due", which is what makes
-        // this a no-op for Slack rather than something Slack has to opt out of.
         if ($connection->status !== ConnectionStatus::Active || ! $connection->needsRefresh($now, $leadSeconds)) {
-            return false;
+            return null;
         }
 
-        return $this->refresh($connection);
+        return $this->handOff($connection);
+    }
+
+    /**
+     * Hand ONE grant to {@see RefreshOneConnectionJob} after the provider rejected its access token (M95).
+     *
+     * A 401 cannot tell an expired token from a revoked grant — only a refresh can, and it runs in the worker
+     * for the reason {@see handOffIfDue()} gives. A token can be refused while still outside the lead window
+     * (a revoked grant is refused at any age), so this does not re-check expiry. A grant with no refresh token
+     * or no expiry (Slack's default) can never be refreshed: it gets no hand-off, and the caller's reconnect
+     * copy stands.
+     *
+     * @return self::HANDOFF_*|null
+     */
+    public function handOffAfterRejection(Connection $connection): ?string
+    {
+        if ($connection->status !== ConnectionStatus::Active
+            || $connection->refresh_token === null
+            || $connection->token_expires_at === null) {
+            return null;
+        }
+
+        return $this->handOff($connection);
+    }
+
+    /**
+     * @return self::HANDOFF_*|null
+     */
+    private function handOff(Connection $connection): ?string
+    {
+        $connectionId = (string) $connection->getKey();
+        $stalled = false;
+
+        try {
+            // One dispatch per window however many requests arrive. The Airtable editor asks for the base list
+            // and the table inspector back to back, and every duplicate job would rotate the grant again.
+            if (! Cache::add('connector-refresh-queued:'.$connectionId, true, self::QUEUED_WINDOW_SECONDS)) {
+                return self::HANDOFF_RENEWING;
+            }
+
+            // A second hand-off after the first window lapsed means that refresh did not leave the grant
+            // usable — a stopped worker, or a transient provider failure. Queue it again, but stop promising.
+            $attemptedKey = 'connector-refresh-attempted:'.$connectionId;
+            $stalled = Cache::has($attemptedKey);
+            Cache::put($attemptedKey, true, self::ATTEMPTED_WINDOW_SECONDS);
+
+            RefreshOneConnectionJob::dispatch((string) $connection->tenant_id, $connectionId);
+        } catch (Throwable $e) {
+            // Both callers answer every outcome with a sentence rather than an exception (a throw on a
+            // tenant-web route renders as a redirect their fetch client cannot read). A hand-off that cannot
+            // be queued degrades to no hand-off, and the caller reports what the provider said.
+            report($e);
+
+            return null;
+        }
+
+        return $stalled ? self::HANDOFF_STALLED : self::HANDOFF_RENEWING;
     }
 
     private function refresh(Connection $connection): bool

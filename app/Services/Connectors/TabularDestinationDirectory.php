@@ -37,7 +37,7 @@ use App\Support\Connectors\TabularDestination;
  */
 final class TabularDestinationDirectory
 {
-    public function __construct(private readonly ConnectorRegistry $registry) {}
+    public function __construct(private readonly ConnectorRegistry $registry, private readonly ConnectionTokenRefresher $refresher) {}
 
     /**
      * @param  list<string>  $headers
@@ -59,7 +59,7 @@ final class TabularDestinationDirectory
             return $this->failure($this->cannotCreateMessage($connection->provider));
         }
 
-        return $this->run($connection, fn (): TabularDestination => $directory->create($connection, $title, $headers));
+        return $this->run($connection, fn (Connection $grant): TabularDestination => $directory->create($grant, $title, $headers));
     }
 
     /**
@@ -92,7 +92,7 @@ final class TabularDestinationDirectory
             return $this->failure($this->message($connection->provider, 'invalid_destination'));
         }
 
-        return $this->run($connection, fn (): TabularDestination => $directory->inspect($connection, $documentId, $sheetName));
+        return $this->run($connection, fn (Connection $grant): TabularDestination => $directory->inspect($grant, $documentId, $sheetName));
     }
 
     /**
@@ -161,16 +161,62 @@ final class TabularDestinationDirectory
     }
 
     /**
-     * @param  callable(): TabularDestination  $operation
+     * Ask the provider, reducing every outcome to a sentence.
+     *
+     * ── A TOKEN THE PROVIDER WILL REFUSE NEVER BECOMES "RECONNECT" (M95) ────────────────────────────────────
+     * Google's and Airtable's access tokens live about an hour, so a tenant opening the editor can hold one that
+     * has expired while the grant itself is perfectly healthy. Both providers answer that with a 401, and until
+     * M95 this method turned the 401 into "Reconnect this account", sending the tenant through OAuth for nothing.
+     * Three steps now stand in front of that sentence:
+     *   1. a token already expired, or inside the 120s pre-flight lead, is handed to the refresh job BEFORE the
+     *      call, so no request is spent on it and no spreadsheet is created with it;
+     *   2. a 401 re-reads the grant first: the hourly sweep may have rotated it after the route bound this row,
+     *      and then one retry with the stored token is the whole fix, with no second rotation;
+     *   3. otherwise a refreshable grant is handed off, and only a grant that can never be refreshed keeps the
+     *      reconnect copy.
+     * The refresh itself never runs here — {@see ConnectionTokenRefresher::handOffIfDue()} says why a request
+     * must not exchange a token.
+     *
+     * @param  callable(Connection): TabularDestination  $operation
      * @return array{destination: ?array{spreadsheet_id: string, title: string, url: string, tabs: list<string>, sheet_name: string, header_row: list<string>, sheet_id: ?string}, error: ?string}
      */
     private function run(Connection $connection, callable $operation): array
     {
-        try {
-            return ['destination' => $operation()->toArray(), 'error' => null];
-        } catch (ConnectorDestinationException $e) {
-            return $this->failure($this->message($connection->provider, $e->errorCode));
+        $handOff = $this->refresher->handOffIfDue($connection, now());
+
+        if ($handOff !== null) {
+            return $this->failure($this->handOffMessage($connection->provider, $handOff));
         }
+
+        try {
+            return ['destination' => $operation($connection)->toArray(), 'error' => null];
+        } catch (ConnectorDestinationException $e) {
+            if ($e->errorCode !== 'unauthenticated') {
+                return $this->failure($this->message($connection->provider, $e->errorCode));
+            }
+        }
+
+        $fresh = $connection->fresh();
+
+        if ($fresh instanceof Connection
+            && $fresh->status === ConnectionStatus::Active
+            && $fresh->access_token !== $connection->access_token) {
+            try {
+                return ['destination' => $operation($fresh)->toArray(), 'error' => null];
+            } catch (ConnectorDestinationException $e) {
+                if ($e->errorCode !== 'unauthenticated') {
+                    return $this->failure($this->message($fresh->provider, $e->errorCode));
+                }
+            }
+
+            $connection = $fresh;
+        }
+
+        $handOff = $this->refresher->handOffAfterRejection($connection);
+
+        return $this->failure($handOff !== null
+            ? $this->handOffMessage($connection->provider, $handOff)
+            : $this->message($connection->provider, 'unauthenticated'));
     }
 
     /**
@@ -221,6 +267,19 @@ final class TabularDestinationDirectory
     private function reconnectMessage(ConnectorProviderKey $provider): string
     {
         return 'This account needs to be reconnected before we can reach your '.($provider->containerNoun() ?? 'destination').'s.';
+    }
+
+    /**
+     * A refresh handed to the worker (M95). No time promise: the job runs on the lowest-priority queue, and a
+     * stopped worker would turn "a few seconds" into a promise broken on every click.
+     */
+    private function handOffMessage(ConnectorProviderKey $provider, string $handOff): string
+    {
+        $label = $provider->label();
+
+        return $handOff === ConnectionTokenRefresher::HANDOFF_STALLED
+            ? "We couldn’t renew access to your {$label} account yet. Try again in a few minutes, or reconnect it if this keeps happening."
+            : "We’re renewing access to your {$label} account. Try again shortly.";
     }
 
     /**

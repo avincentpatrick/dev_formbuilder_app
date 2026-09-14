@@ -907,9 +907,9 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   Recorded in ADR-0009 §D6's M6 amendment as well, so the residual is visible from the decision and not only
   from the backlog. Filed by `M6`. **Latent** — needs a database failure inside the one-UPDATE window between the provider committing a rotation and us storing it, judged by `M65`. **Tier: during-testing.**
 
-- **`minor` · The setup-time directory has no pre-flight refresh**, so an ordinary token expiry tells the
+- ~~**`minor` · The setup-time directory has no pre-flight refresh**~~, so an ordinary token expiry tells the
   tenant to reconnect a healthy account — `app/Services/Connectors/TabularDestinationDirectory.php:46,68`,
-  the one place H16a's guard was not applied. **Latent** on a missed sweep (H16a's own premise). Filed by `M1`. **Tier: before-testing.**
+  the one place H16a's guard was not applied. **Live** — re-judged by `M95`: the 7200s sweep lead exceeds a one-hour token, so every sweep rotates every Google and Airtable grant and one missed sweep expires them all. Filed by `M1`. **Tier: before-testing.** ✅ **CLOSED BY `M95` (2026-09-14) — FIXED BY A HAND-OFF, NOT BY THE PRESCRIBED GUARD.** An inline `ensureFresh()` from a web request takes no lock and races the worker, and a double exchange destroys a rotating Airtable grant. So `TabularDestinationDirectory::run()` and `ConnectorChannelDirectory::list()` — the Airtable base picker had the same gap — now queue `RefreshOneConnectionJob` before the call and after a refusal, retry once when the stored token changed underneath the request, and deduplicate with a cache marker; a hand-off that has not taken stops promising. `ensureFresh()` is deleted. Seven mutations, all CAUGHT.
 - ✅ **CLOSED BY `M66` (2026-09-03) — `minor` · ~~`ConnectorRulePausedNotification` is the only tenant-facing
   connector email with no brand.~~** The send is at `app/Jobs/Connectors/DeliverConnectorMessageJob.php:382-383`
   and now carries `->withBrand(BrandPalette::forTenantId($this->tenantId))`, matching its branded sibling 23

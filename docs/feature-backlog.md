@@ -9510,3 +9510,19 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   is a lint that refuses a docblock in that namespace exceeding some size, which is a proxy; the honest
   one is a convention — contract above, maintenance notes inside the class body — with an arm that
   checks the emitted description against it. **Live.** Filed by `M92`.
+- **`minor` · A gate's SUMMARY LINE is a paired artefact across three files, and nothing declares that
+  pairing at the place where somebody edits one.** Measured by `M92` (2026-09-14) during its own close-out.
+  Widening `scripts/test-pointer-lint.php` added two numbers to its `passed (...)` line;
+  `scripts/gate-baselines.php` scrapes that line with a literal pattern, and both harness fixtures under
+  `tests/fixtures/gate-baselines/` carry a copy of it. **One edit, three files that must move together, and
+  the only signal is a regeneration that happens at close-out.** ✅ **The miss was REPORTED rather than
+  written as a zero** — `M91`'s missing-metric arm did exactly its job — so this is a pairing defect and
+  not a silent-degradation one. ⛔ **The signal arrives as late as it possibly could**: `docs/gate-baselines.md`
+  is regenerated from a POST-MERGE run, so the gate is already on the trunk before anything says the
+  scraper stopped matching it. ⚠️ **Standing Rule 7(b-bis) is where this belongs and it is not there** —
+  that rule's table is the repository's declared list of paired files, and this pair predates `M92` by two
+  increments without ever being added. ⚠️ **`M90` hit the same class and its fix went straight to `main`
+  under the owner bypass**, which its own follow-up commit records as having turned the trunk red; `M92`
+  took a PR instead. ⚠️ The cheap remedy is a `--check` arm on the scraper that runs on the HOST against
+  the live gates' own output rather than against a CI log, which would move the signal from post-merge to
+  pre-push. **Live.** Filed by `M92`.

@@ -16,7 +16,315 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M93` is merged; the next work is the before-testing tier, named in `docs/pipeline.md` § Next
+## Status: ACTIVE CLAIM — `M94`, the tier verdicts: a tier on every open row, the not-live rows closed, the ledger's tables and invisible bullets dispositioned, and the stale security and architecture lines corrected (`m94-tier-verdicts`)
+
+Taken 2026-09-14. Branch `m94-tier-verdicts`, cut from `origin/main` at `18e396f`, PR into `main`.
+Row: the pipeline marker `tier-verdicts` (before-testing) — *"Tier every untiered row, close the verified not-live
+rows, fix the stale threat-model lines, and retire the backlog tables"*. The second of Realignment 6's three
+increments; `M95`, the before-testing fixes, follows it. **Not a `D13` batch.**
+
+### Evidence verified
+- **The residue.** `php scripts/state.php --json` at `18e396f`: 171 open rows, 158 untiered and 13 tiered.
+  `P7A_UNTIERED_DEFECT_CEILING` in `scripts/pipeline-lint.php` is 158, so the residue equals the untiered count.
+- **Every one of the 158 rows was opened against the code**, read-only, by a 12-agent pass:
+  - six classifiers, one per slice of the ledger;
+  - three skeptics, who re-checked every close, every re-home and every urgent tier. They examined 87 verdicts,
+    upheld 79 and corrected 9. All nine corrections are applied below.
+  - three sweeps, over threat-model §9 and three docs, the ledger's §0–§9 tables, and the ledger's bullets that
+    carry no severity token.
+- **Threat-model §9:**
+  - #4 is built: `AttachmentStorageService` reads the type from the file's bytes and enforces `storage_bytes`.
+  - #7 is built: `ImpersonationService` and the I11b routes, and the other two RBAC questions are decided in
+    `docs/multi-tenancy-rbac-design.md` §9.
+  - #9's "live defect today" is closed by `SpreadsheetCell` (I8c) in every export writer.
+  - #3 is half built: the delivery-time SSRF re-check and the signed timestamp are in `DeliverWebhookJob`.
+  - #5 is half built: `ExpressionParser::MAX_PARSE_DEPTH` is 64, and the lexer caps length and tokens.
+  - #11's TOTP blocker is gone, because `tests/e2e/admin-console-axe.spec.ts` scans two console pages.
+- **Stale "unbuilt" and "owed" sentences:**
+  - `technical-architecture.md`'s Scheduler row: `routes/console.php` declares seven `Schedule::job` entries.
+  - Its "outbound-delivery half is unbuilt" line: `DeliverWebhookJob` is H13a's.
+  - `testing-strategy.md`'s "Still owed" sentence: both rows shipped.
+  - Its "still owed by H24b": H24b1's chart data-table tests discharged it.
+- **The §0–§9 tables hold 78 open rows.** That is 72 in §1–§9, matching `M93`'s census, plus 6 in §0.
+  - 53 are product ideas.
+  - 14 are still-true defects or unbuilt user decisions with no row.
+  - 3 have shipped (the per-form cap, the tz-database decoupling, the flaky share-panel scans).
+  - 1 is queued already (the four admin console pages), and 1 is an accepted risk (`frame-ancestors *`).
+  - 4 are §0 records.
+  - 2 belong to held work: Stripe Tax, which `payments-checkout`'s title names, and media editing.
+- **31 bullets outside the tables carry no severity token, so no parser sees them.**
+  - 16 are finished records, 5 accepted trades, 2 ideas, 2 moved to decisions, and 1 a deliberate non-goal.
+  - **5 are open obligations with no row:** the resumable-upload promise, 26 cross-workspace foreign keys, five
+    clipped live regions, the password-strength list's semantics, and the pre-billing documents audit.
+- **Ungated line pointers into the ledger are already stale.** Of 18 `docs/feature-backlog.md:N` pointers in code
+  comments, tests, `ci.yml`, `decisions.md` and `PROGRESS.md`, 17 resolve to unrelated lines today. Only the
+  kiosk pointer in `respondent-session.ts` still holds. No gate reads any of them.
+
+### Premise verified
+- **A ledger row cannot be held.** A defect row's state comes only from its liveness and `**Awaits Dn.**`, in
+  `scripts/pipeline.php` `read_defects()`, and `STATES` are marker states.
+  - So "re-home under `uploading-import`" has no grammar. It is a closure with a pointer, and the held marker's
+    title names the entries re-homed to it.
+  - Tiering those rows before-launch instead would publish them `ready` while `scripts/loop.php`'s
+    `HELD_TOPICS` refuses them.
+- **Every edit must be line-neutral.**
+  - Two ADRs cite the ledger's table lines under zero tolerance.
+  - The ledger's eight self-citations count against `LEDGER_ROT_CEILING`, which sits at 18 of 18.
+  - The 17 stale ungated pointers above show what a shift does when nothing reads the line.
+  - `M92`'s multi-line closure paragraph got through only because it happened to shift nothing onto a blank line.
+- **The `✅ DONE` exclusion `M93` handed over is one bullet, not four.**
+  - Only `M79`'s DONE bullet has a severity token on its first line; the three `M71` ones are invisible to both
+    parsers already.
+  - `BacklogProvenanceTest`'s severity regex is a strict superset of `finish_row()`'s by exactly that bullet.
+- **The approved plan's lists were a floor, and the verification overturned seven calls.**
+  - 2606, 2692, 4942 and 9337 stay open as missing safeguards rather than closing.
+  - 7551 stays open: a documentation correction is not held work.
+  - 8837 moves from early-testing to during-testing, because it needs a concurrent builder edit.
+  - 1407 moves up to early-testing with its twin 7143, both on `D26`.
+  - Six closes were added: 4144, 5174, 5700, 5961, 8522 and 9429.
+  - The parent plan's `D24` split was already done by `M93`.
+- **Two closes carry dependent rows.**
+  - `R-14ebb789` exists only to reconcile `R-4c199f4e` with `R-d8575314`.
+  - `R-d8575314`'s stated harm is a batch proposal `M93` deleted.
+  - Both are verified before any ledger edit, and the release records the verdict.
+- **Nothing among the 158 is before-testing.** No row stops a tester using a fresh server, so the gate stays the
+  five `M95` rows.
+
+### Remedy verdict
+- **Deleting P7a's residue works once the untiered count is zero.** The rule-group count stays 15, so no success
+  literal moves.
+- **"Exactly one tier" works only once `BacklogProvenanceTest` detects severity with `finish_row()`'s own two
+  regexes.** With its loose regex, `M79`'s DONE bullet reads as an untiered open row and the arm is red on arrival.
+- **Correcting a stale sentence can move P2c's pinned count**: `EXPECTED_DEFERRAL_SITES`, its digest and a
+  control literal. It is measured with `--verbose` after the edits, and any move lands in the same commit.
+
+Files:
+- `docs/feature-backlog.md`: tier and awaits tokens, two liveness edits, closures, re-homes, the table and
+  bullet dispositions, and rows N1–N20 appended at the end
+- `docs/security-threat-model.md`, `docs/architecture/technical-architecture.md`, `docs/testing-strategy.md`
+- `scripts/pipeline-lint.php`; `scripts/state.php` (a comment only)
+- `tests/Feature/Docs/PipelineLintControlsTest.php`, `tests/Feature/Docs/BacklogProvenanceTest.php`
+- `PROGRESS.md`: the `tier-verdicts` and `uploading-import` markers, and my own status bullet at close-out
+- generated: `docs/pipeline.md`, `docs/backlog-triage.md`, and `docs/gate-baselines.md` at close-out
+
+Shared artefacts taken: the `docs/**` files above, and `PROGRESS.md` (the marker block and my own status only).
+Paired files taken:
+- `scripts/pipeline-lint.php` ↔ `PipelineLintControlsTest.php`
+- `BacklogProvenanceTest.php`'s severity constants ↔ `scripts/state.php` `finish_row()`
+- P2c's pin ↔ its control literal, if a pinned sentence moves
+
+None of Standing Rule 7(b-bis)'s five.
+Namespaces spent: nothing from either namespace.
+Prediction:
+- **Citation-liveness is the gate I most expect to break.** One wrapped cell or one inserted closure line shifts the
+  eight self-citations, so it holds at 18 of 18 only if every edit really is line-neutral.
+- `BacklogProvenanceTest`'s exactly-one arm goes red on its first run over at least one malformed hand-written token.
+- P2c moves if the Scheduler row or the outbound-delivery line is a pinned deferral site, and not otherwise.
+- The gate reads **5 open of 6**, and the line goes from 219 rows to about 222.
+- MU1–MU3 all come back CAUGHT. PHPStan is not reached (no `app/`, `database/` or `routes/` change), and no E2E
+  spec is reached.
+
+### Rows to file, appended at the end of the ledger
+| # | Row | Tier | Liveness | Carried out of |
+|---|---|---|---|---|
+| N1 | A webhook retry or redeliver is signed with the event's original time, so a receiver enforcing a 5-minute replay window rejects it; the window is published nowhere an integrator reads | during-testing | Latent | threat-model §9 #3 |
+| N2 | The forms list loads every form a member can see with no pagination | after-launch | Latent | TESTING-GUIDE §18 |
+| N3 | The inbox and the webhook delivery log still offer a sort that reorders only the visible page, against the user's 2026-08-18 decision to drop it | early-testing | Live | ledger table §3 |
+| N4 | Search and the sidebar fail closed on an unseeded plan catalog, against the user's 2026-08-18 ruling to fail open | after-launch | Latent | ledger table §3 |
+| N5 | In the builder at compact widths, selecting a field does not bring its settings on screen | during-testing | Live | ledger table §3 |
+| N6 | The builder's side-pane widths are fixed pixels, not relative to the text size | during-testing | Live | ledger table §3 |
+| N7 | A later successful builder save clears an earlier field's unsaved warning | during-testing | Live | ledger table §3 |
+| N8 | A repeated identical builder save failure is announced to a screen reader only once | during-testing | Live | ledger table §3 |
+| N9 | The builder toolbar says "All changes saved" on a form that cannot be edited | during-testing | Live | ledger table §3 |
+| N10 | The builder's "Not saved" status looks the same as "All changes saved" | during-testing | Live | ledger table §3 |
+| N11 | In-app notifications are never pruned, and "Mark all as read" is one unbounded update | before-launch | Latent | ledger table §4 |
+| N12 | A background job that waits in the queue longer than six hours is failed without running | during-testing | Latent | ledger table §7 |
+| N13 | Discarding a conflicted offline response uses the browser's plain confirm box | during-testing | Live | ledger table §7 |
+| N14 | In an installed offline form, opening another form's queued response leaves the installed window | during-testing | Live | ledger table §7 |
+| N15 | Reviewing an offline conflict reopens a form that has since closed or filled up | during-testing | Live | ledger table §7 |
+| N16 | Two accessibility specs still scan only the open dialog rather than the whole page | after-launch | Live | ledger table §7 |
+| N17 | 26 foreign keys can point at another workspace's rows, and 20 of them would cascade a delete across workspaces | before-launch | Latent | ledger bullet, discovered defects |
+| N18 | Five screen-reader-only live regions have no positioned ancestor inside their component | during-testing | Latent | ledger bullet, discovered defects |
+| N19 | The password-strength requirement list loses its list semantics in Safari | during-testing | Live | ledger bullet, design system |
+| N20 | Seventeen line pointers into this ledger from code comments, tests, `ci.yml` and two tracker documents resolve to unrelated lines, and no gate reads them | after-launch | Live | found by this claim |
+
+### Held pointers, written in place (no row, because a ledger row cannot be held)
+- The resumable-upload promise → `uploading-import`.
+- Post-submission media editing → `uploading-import`.
+- Stripe Tax → `payments-checkout`, whose title already names it.
+- The pre-billing documents audit → `gdpr-legal-posture`.
+
+### Tier verdicts, one line per row
+
+**Closed as not live:**
+- `R-453fc321` — The hard-coded 'form_updated' at replay.ts:286 is reached only on a real version mismatch (guard at :283), which is exactly what the code means, and the comment beside it already warns that conflict_code drives the notice copy; no defect exists and no work remains.
+- `R-78e4a053` — Both prose sites are corrected in the tree (MemberSearchArm.php:54-60, multi-tenancy-rbac-design.md:651), the residual is recorded (security-threat-model.md:279 item 31), and the row itself says nothing is broken; it is a record, not work.
+- `R-6438a83c` — The button's own loading guard (Button.vue:65) blocks the duplicate click, the call is a GET with no side effect, and the missing one-line guard in loadChannels is a style note with no reachable defect.
+- `R-2647643f` — The fan-out count is now asserted at WebhookRetrySweepTest.php:122, so a sweep that sends nothing turns the file red, and nothing is left to do.
+- `R-95bfb15f` — The hand-off instructions were corrected to the whole-project Pint command CI uses, and no tracker or template file still gives the scoped one.
+- `R-8d265106` — Every environment still to be deployed starts from an empty database written only by lowercasing code, so no mixed-case row can exist and no data migration is owed.
+- `R-e9ecc1eb` — M65 closed the silence half with the liveness marker. The remedy-cost half is a limit no code can remove, and scripts/loop.php already states it in its docblock and prints it on every assess run.
+- `R-c5e9530a` — M60 discharged the owed proof: a real squash merge armed R7 using GitHub's before-push commit. A multi-commit push to main is refused by the pre-push guard, and no compliant merge can produce one, so nothing remains to do.
+- `R-4c199f4e` — M93 removed the batch proposal. The file now points to docs/pipeline.md as the single work picker, and rows with partly unresolved citations are counted and ranked below fully resolved rows, so the partial-harvest confusion the row asked to flag is also addressed.
+- `R-3e8b8ee7` — New wrongly-capitalised cache keys can no longer be written: the shell route caches only status-200 responses, and a navigation's 301 arrives as status 0. Canonical keys never redirect, because slugs are stored lowercase and the only redirect is the capitalisation fix. A legacy key would need a device primed against a pre-M61 dev origin, which a fresh testing server cannot have.
+- `R-d77cd309` — M93 deleted the batch proposal whose printed refusal rule was never implemented. The renderer now tells zero-harvest rows apart from hub-only rows (backlog-triage.php:627-628) and lists them in their own section (:699-716), so nothing is left to implement.
+- `R-b8402378` — Reading the pages answers the row's open question: 'disabled' renders as a neutral Disabled badge with a Re-enable/Resume action. The narrow union is only the UI's write vocabulary, so there is no hole and no mirror to declare.
+
+**Re-homed to `uploading-import`:**
+- `R-75b864f8` — A photo or file picked while reviewing a conflicted offline response can be cleaned up after one hour and the resubmit then stops for attention, and fixing how picked media is kept belongs to the held uploading work.
+- `R-52385a55` — Guest media picking has no automated test and no published test form with a media field, and that coverage belongs with the held uploading feature.
+
+**early-testing (15):**
+- `R-45b0cf8a` (awaits D28) — The Optional/Required/Conditional switch in the builder's field settings still spills past its pane and shows a horizontal scrollbar, a visible defect a tester editing any field can meet, and the fix waits on decision D28.
+- `R-d8ba9c0f` — A Google Sheets or Airtable rule created without the Submission ID column can add a duplicate row when a delivery is retried, and the rule editor still does not add that column for new rules.
+- `R-491e4c32` (awaits D26) — The offline panel's storage warning counts other people's unsent responses on a shared device, but it only appears once the browser's storage is over 80% full, so testers are unlikely to see it in the first days even though decision D26 is marked early-testing.
+- `R-950ef5f1` (awaits D33) — A workspace admin can invite any email address, including a stranger's at a company the workspace does not control, which sends that person a real invitation, and whether to limit this waits on decision D33.
+- `R-2dc95042` (awaits D34) — Anyone who can reach an open workspace's sign-up form can register with someone else's email address and hold it until the real owner resets the password, and the fix waits on decision D34.
+- `R-68656155` (awaits D20) — A shared device keeps every opened resume link's token in the browser cache for a week, and that token both opens and can overwrite the respondent's saved answers, pending the user's choice in D20.
+- `R-5c3bc57a` (awaits D36) — Staff corrections to a submitted response are kept only when Save is pressed, so a browser crash loses them, pending the user's choice in D36.
+- `R-d6609e82` (awaits D26) — The offline panel's storage warning counts unsent responses from every visit on the device while the sentences beside it count only this visit, and the wording is waiting on the user's copy decision D26.
+- `R-f1332829` (awaits D35) — The form runtime can show a form on a single page, but authors have no setting to turn that on and the documents disagree on the default, which is waiting on the user's decision D35.
+- `R-1b966250` (awaits D38) — The API documentation promises background export endpoints that were never built, and whether to build them or trim the documentation is the user's decision D38.
+- `R-47552102` (awaits D38) — The API documentation promises endpoints for listing users and roles that do not exist, so an integrator reading the audit log gets user IDs they cannot look up, and build-or-trim is decision D38.
+- `R-9e3e417e` (awaits D38) — The API documentation lists form-builder draft, section, field and validation endpoints that exist only in the web app or not at all, and build-or-trim is decision D38.
+- `R-fcfc1f52` (awaits D38) — The API specification says in the present tense that repeated requests carrying an Idempotency-Key are deduplicated, but no such mechanism exists, and build-or-trim is decision D38.
+- `R-4328a4d9` (awaits D38; liveness latent → live) — The API specification promises a limit of 300 requests a minute per signed-in user, but no such limit exists, and build-or-trim is decision D38.
+- `R-f1312153` (awaits D38; liveness latent → live) — The API specification promises only one export per form can run at a time, with extra requests refused, but no such guard exists, and this row follows decision D38 on whether to build the unbuilt features or trim the documentation.
+
+**during-testing (32):**
+- `R-c426b1bb` — If the work inside one of twelve workspace-switching blocks ever fails at the database, the real error is hidden behind a secondary one, which only hurts diagnosis and needs a rare database failure to show.
+- `R-44406825` — When two delivery rules send the same submission to the same table and one write loses its answer, its retry can settle on the other rule's row, so the table ends up one row short, but this needs an unusual setup plus a lost network answer.
+- `R-d43d5b8d` — If Sheets or Airtable saves a row and then still answers with a server error, the retry adds a duplicate row, but this needs the provider to break its own contract and nothing in testing can produce it.
+- `R-1eaa6e8d` — A Slack notification can be posted twice when Slack's reply is lost and the delivery retries, which is rare, needs a network drop, and was knowingly accepted.
+- `R-2c27e5c7` — A database failure in a very small window right after Airtable rotates a login token can still lose the new token and break that connection, and it cannot be fully closed until a provider offers a rotation that can be confirmed.
+- `R-bee5a083` — The published API contract for offline sync still lists the per-item error code as free text, so an integrator cannot see which error codes to branch on.
+- `R-52a0357b` — Only Owners, Admins and Form Editors can run the full offline sync loop because a Reviewer can send responses but cannot fetch the form, which was a deliberate permission choice that the API documentation does not tell integrators.
+- `R-249b8bcd` — The API contract for promoting a draft still does not say it can refuse because the form is closed or full, or reject invalid answers, so an integrator cannot plan for those replies.
+- `R-50759c9f` — The gamification backfill's dry run prints only totals with no count per scoring rule, so an operator rehearsing it cannot spot a rule that awards points wrongly.
+- `R-387dd26e` — There is still no screen where a workspace can claim and verify its own single sign-on email domain, so a tester setting up SSO needs an operator to run a command for them.
+- `R-49257ac5` — The admin command that backfills gamification awards can report failure after it has already saved every award, and its error does not say which workspace caused it, so an operator could misread a completed run as failed.
+- `R-821b0a24` — Several documentation cross-references are still stale, including one API-key permission that renders outside the scope table integrators read, so part of this cluster is visible outside the team.
+- `R-570538f5` — The compliance audit specification promises events the app never records, such as member invitations and form deletion, and no test compares the specification with the code.
+- `R-c64d0afd` — Exports and spreadsheet syncs show a grid answer as internal row and column keys packed into one cell, and how media and grid cells should appear is still an open product question.
+- `R-2ea78bae` — After a brand change, a device holding more than twenty cached forms can evict a recently used offline form first, and nobody has decided whether the refresh should cover fewer pages.
+- `R-6fd624b5` — Every form carries a manual-encoding on/off flag that nothing reads or lets anyone change, so the documented per-form switch does nothing.
+- `R-3bfafa84` — The per-form offline-sync flag defaults to on and is never checked, so a form cannot actually be excluded from offline use as two documents describe.
+- `R-c8c8da76` — The API inventory documents webhook delivery paths in a flat form that was never built and promises a delivery-log screen that does not exist, even though each endpoint's own page does show delivery status.
+- `R-1d43bef5` — The API inventory an integrator is pointed to names a webhook endpoints path that does not exist, though the generated API contract is correct.
+- `R-e0867d52` — The observability plan says application logs are structured JSON, but the log channels still write plain text lines.
+- `R-73143361` — The observability plan says every log line carries a request or job-chain ID for tracing, but nothing attaches such an ID.
+- `R-63b85640` — The API specification tells integrators guests get 100 requests a minute per IP address, but the app actually allows 60.
+- `R-fdcfc40e` (now awaits D27) — Saving a draft and submitting a response check that the form is published before taking the lock, so a form republished at the exact same moment is a rare race, and the fix waits on the product decision D27.
+- `R-03715adf` — The Google Sheets rule modal's two long mode buttons might overflow on a narrow phone screen, but nobody has measured it and no browser test opens that modal.
+- `R-036f3226` — The server still accepts builder edits that carry no concurrency token, so a client that leaves it out can silently overwrite a collaborator, but the shipped builder always sends it.
+- `R-fcf291fe` — Since the row was filed, a field edit that races a restore or archive is refused with a clear message instead of being silently lost; only a narrow timing gap on section edits remains, and it needs real concurrency to hit.
+- `R-5041cc72` — Six form-settings writers still build their audit record from a copy of the form that may be stale, so under concurrent edits the audit log could record an old value that was never really there.
+- `R-e2d4a90c` (awaits D27) — A schedule change that closes a form earlier does not affect submissions already in flight, while a lowered response cap does, and deciding that is the open decision D27.
+- `R-da9dc81c` (awaits D29) — The XLSForm export and save-to-library paths can still read a form's structure halfway through a concurrent edit, and whether to fix them the way template saving was fixed is the open decision D29.
+- `R-8311c583` — Three client-side guards against a phantom toast no longer do anything, because the server stopped writing that toast for JSON requests, and their comments now describe behaviour that no longer exists.
+- `R-31bbe853` — The form open/closed/full status words are copied by hand into several screens with no single source, which is a code cleanup rather than a visible bug, since no mismatch has been found.
+- `R-e568ddd2` — Internal maintainer and security notes written on API request classes are still published word for word in the API contract that integrators read, and nothing stops more from leaking.
+
+**before-launch (5):**
+- `R-fb40c274` — The dashboard ranks the whole workspace just to show one member's points, badges and streak, which is wasted work that only matters at real customer scale.
+- `R-a9498444` — A company email domain verified for single sign-on is never checked again, so a workspace that loses the domain keeps its sign-in authority, which only matters once real customers run on a production host with a scheduler.
+- `R-91107720` — Laravel's built-in email button inserts its link into HTML without escaping quotes and our email safety check cannot see it, but every email today uses a link the app builds itself, so this is hardening to settle before real customers.
+- `R-5a704acc` — The requirements promise a 30-day grace period before deleted forms, submissions and attachments are purged, but nothing deletes those records or purges them, which is data-retention work for before real customers.
+- `R-fd084c9f` — The deployment guide promises that generated submission PDFs are deleted after seven days, but they are kept forever, which matters for storage and data retention on a production host rather than to testers.
+
+**after-launch (92):**
+- `R-ba6720fe` — Some draft-conflict tests only check the type of error and not which conflict it was, so they could keep passing after a change that raises the wrong conflict, though the product behaves correctly today.
+- `R-cec185b1` — The users table still has a 'last active workspace' column that nothing ever fills in, so it should be either wired up or removed, but no tester, integrator or workspace can see it today.
+- `R-eff1e6d8` — Nothing stops a future developer from reading workspace settings on the sign-in routes, where they silently come back as defaults; both current readers are correct, but the guard the row asks for still does not exist.
+- `R-9a9b4310` — Several front-end test files try to replace design-system components with simple stand-ins using names that never match, so those tests run the real components and may check less than they claim, though no product defect sits behind this.
+- `R-a07a7414` — The colour gate only catches raw palette colours and cannot tell whether an element using a semantic colour is actually visible against its background in both themes, so another invisible element may still exist.
+- `R-20978e53` — A test helper turns a missing checksum into an empty string that only framework middleware turns back, which could mislead a reader of the test but does not affect the product.
+- `R-61e875a9` — No test checks that the SAML sign-in callback route actually has its rate limit attached, while its four sibling routes are checked; the limit itself is in place today.
+- `R-d6768e8a` — Two SSO test comments give a wrong reason for a check that is still worth having, so only the comment wording needs fixing.
+- `R-6dd6c1f7` — On admin console routes a made-up record id is rejected before the access checks run, so a future test could pass without testing the check it names, but users get the same not-found answer either way.
+- `R-b2d5bce7` — About 95 permission checks on the web app's routes have never been checked automatically, and running that check could uncover pages that wrongly refuse every user, which testers would otherwise report as unexplained access errors.
+- `R-96967fc6` — The internal backlog-triage report can drift out of date because nothing runs its self-check, and this affects only the team's planning tooling.
+- `R-444bb89a` — An internal link-checking tool still skips the generated triage report for a reason that is no longer true, which is a stale comment in team tooling.
+- `R-4b59bac7` — The backlog tooling checks that every row has a liveness label but cannot tell whether the label is right, which is a limit of the planning tools only.
+- `R-d92dd765` — Each background maintenance job's per-workspace fan-out is tested in its own file, so a new job would get no test automatically, but the existing jobs are correct and covered.
+- `R-1afa96d4` — An audit export test can randomly fail when the generated fake name contains certain accented letters, which is test flakiness with no product defect.
+- `R-486c204b` — A team planning file still states an out-of-date next increment number and has no format a tool could check, which affects only internal bookkeeping.
+- `R-a0c60259` — The tracker lint checks CLAUDE.md for stale references but not PROGRESS.md, where they actually went stale, and this affects only internal tooling.
+- `R-eecdb678` — The internal mutation-testing script can only run PHP test suites inside Docker, so standalone lint scripts and git-history checks cannot be tested with it.
+- `R-5e911f41` — The generated session hand-off can spend its short summary on a list of files instead of the lesson learned, which affects only the team's internal workflow.
+- `R-63bf1cde` — The internal data dictionary has no entry for the table that stores map locations from responses, which is a documentation gap that changes nothing a tester sees.
+- `R-ab9553d1` — The CI accessibility check downloads an unpinned web-server package at run time instead of declaring it as a dependency, which is a build-reliability issue for the team.
+- `R-bfceaab0` — The check that documented commands actually work reads only the README, so commands in three other guides are unchecked, though none of them is currently broken in a way it would catch.
+- `R-7733e29e` — The database treats share-link names as case-sensitive while link lookup does not, but no part of the app can save a link name with capital letters, so the mismatch can never produce two clashing forms.
+- `R-b3d074f1` — The documented way to run end-to-end tests locally does not work as written, and one likely wrong form silently exits as a success, which affects developers rather than testers because CI is the authority for these tests.
+- `R-10576ccd` — The internal data dictionary names only a few of the database constraints, so a reader could assume a missing one does not exist, which is a documentation-only gap.
+- `R-0d42cae0` — The internal link checker confirms a referenced line still exists but not that it says what the citing text claims, and its failure limit also counts dead links kept on purpose in closed rows; both are limits of team tooling.
+- `R-d0b2019e` — No internal lint gate checks that a cited ADR section number actually exists, which is a missing tool rather than a product defect.
+- `R-5c9b6fa4` — About a dozen past user decisions still live only in the progress archive, because the decisions file has no format for a decision that was never a numbered question; this is an internal filing tidy-up.
+- `R-fb9f9e3e` (now awaits D8) — A merge that only reshuffles tracker files still starts no CI run on main afterwards, a CI-harness gap waiting on decision D8.
+- `R-3401f9b1` (now awaits D23) — The loop driver refuses held work by matching keywords instead of reading the pipeline file, a redundancy gap in internal tooling that is safe today.
+- `R-c9fd2b36` — Pipeline markers have to sit at the end of each document so they do not shift line citations, so a marker no longer sits beside the sentence it governs; this is an internal tooling limit.
+- `R-f90ce3d7` — The tracker gate cannot see a deliberate, early tracker cleanup because it only switches on for very large deletions, an internal tooling calibration issue.
+- `R-dfd26f5a` — Two internal scripts still overwrite tracked files when someone runs them with a help flag or a typo.
+- `R-142f5a7e` — The generated triage file can already be out of date in the commit that regenerates it, and nothing checks its content, an internal tooling gap.
+- `R-6ef8650d` — The accessibility CI job depends on two npm tools no package file declares, so a dependency update could silently break it; the product is not affected.
+- `R-bd5787be` — The internal data dictionary still lists six tenant columns that do not exist and omits two that do.
+- `R-3f07f19b` — The tracker gate's deletion threshold is a fixed byte count that becomes a larger share of the file every time the size ceiling is lowered, an internal tooling calibration issue.
+- `R-09170d55` — The session hand-off generator repeats long boilerplate in every release heading, which wastes hand-off space but changes no product behaviour.
+- `R-89cf8d29` (awaits D16) — The dependency-audit CI step shows green when the advisory service is unreachable, an accepted CI trade-off waiting on decision D16.
+- `R-eda87179` — Wrongly capitalised form links do work offline today, but nobody knows why, so no test can guard that behaviour against a future change.
+- `R-b6513ef5` — The triage generator ignores citations written as partial file paths, which skews its internal count of shared files.
+- `R-07f8c207` — Two code paths write a response's form version but cannot currently disagree, so all that remains is a defensive check that they never do.
+- `R-114f2caf` — The developer guide still tells contributors to run PHPStan inside the container, where it reports errors that are not real, which affects only the internal workflow and nothing a tester sees.
+- `R-d261ce01` (awaits D17) — A local container test run skips a folder of test files and is now deliberately shown as failing, and whether to keep that red result is an internal development-loop decision with no effect on the product.
+- `R-5f3aa4bf` — The backlog triage script fails to resolve a few partial file paths, which only affects internal batching of work and changes nothing testers or integrators see.
+- `R-67c902f1` — Three security design documents state a rule about the sign-in database connection that the registration and profile email checks do not follow, and the fix is to correct those documents because the code is right and changes no behaviour.
+- `R-6946c0ef` — One offline end-to-end test fails intermittently on different screen sizes, and because its cause is not yet known it is treated as test-harness work that would redden unrelated pull requests rather than a confirmed product defect.
+- `R-f20f07f4` — The data dictionary says a form's timezone defaults to empty when the database actually defaults it to UTC, which is an internal documentation correction.
+- `R-06644553` — The data dictionary lists two draft columns under the answers table when they belong to the submissions table, which is an internal documentation correction.
+- `R-1ab54889` — Several first-party tables, including the impersonation token table, have no data-dictionary section, which is an internal documentation gap with no behaviour change.
+- `R-a3a1f05d` — The written rule about the sign-in database connection has never matched the code, and fixing it means rewording that rule across the many documents that repeat it rather than changing any behaviour.
+- `R-827b8719` — The internal competitor comparison marks API import as fully supported when no such channel exists, and the work left is to correct that mark, not to build the held import feature.
+- `R-dc41c1b4` — The webhook design document tells tenants they can opt in to receiving answers in webhook payloads, while other documents record that option as deferred and no code supports it, so the design document needs correcting.
+- `R-18224af6` — An internal architecture decision record still says three queue connections exist and are marked forbidden, when they were deliberately deleted, and nothing a tester or integrator sees depends on it.
+- `R-f9c7a967` — An internal lint recognises data casts from a fixed list of names, so a cast type adopted later would quietly stop an unused database column being reported.
+- `R-83520a36` — The planning lint's coverage rules read only markdown files, so deferral notes written in PHP comments are invisible to it.
+- `R-964bc5a4` — The internal pipeline generator accepts two plan markers with the same id and lists the item twice, and nothing refuses it.
+- `R-974db618` — The pipeline generator's help text says a finished item must say where it landed, but the parser never checks this.
+- `R-dfe1cbdf` — The planning lint's test fixtures copy the real documents, so one broken rule can turn every test case red and hide which rule broke.
+- `R-64efffb6` — The progress file's pipeline markers no longer move when a close-out adds a status bullet, because M93 moved them above the status block.
+- `R-ed8d8b57` — The pipeline file's drift check skips the header line, yet the status script reads its row and held counts from that header, so a hand edit there would give false counts unnoticed.
+- `R-3cd751ba` — Nothing warns an author that shifting lines in the data dictionary can break citations and fail the citation lint at merge time.
+- `R-f3532c0b` — The citation lint only checks that a cited line exists and is not blank, never that it still says what the citation claims.
+- `R-c9afe028` — Six data-dictionary cells describe database-generated ids with the wrong words, which is an internal documentation correction with no behaviour change.
+- `R-dd32be17` — The data dictionary gives the wrong lengths for tenant name and slug and wrongly says the owner is required, which only affects internal documentation.
+- `R-d8575314` — The internal triage generator judges a row by the files it cites rather than the files its fix will touch, so it can propose batches that break the one-hub-file rule.
+- `R-92a54e16` — The internal mutation harness refuses to run when its baseline test is red, so it can never prove a test whose honest answer in the container is red.
+- `R-283b9c0d` — The planning lint counts two PRD acceptance criteria as undecided because their outcome is written in an indented follow-up bullet it does not read.
+- `R-a31b3e8b` — Git is not installed in the app container, so no Pest test can check a lint that reads the git index, and those controls have to be proved by hand.
+- `R-d2c1d941` — The citation lint puts citations into untracked dependency folders in the same bucket as typos, so its resolved-count floor always undercounts.
+- `R-73a16154` — The citation lint mistakes a hostname and port in the access matrix for a file path and line number, which slightly inflates its counts.
+- `R-804e6df5` — The citation lint's report does not say that rotten citations in the excluded claims folder are undercounted, so readers may think they are covered.
+- `R-3472a10f` — The citation lint's rot ceiling can never be lowered while dead citations inside closed, struck-through rows still count.
+- `R-71aa0f49` — The order of the generated work queue can depend on which untracked dependency folders exist on a machine, so the pipeline check can pass locally and fail in CI.
+- `R-a35d4daa` — Open rows about the tracker lint's rules name only the rule and never the script file, so the triage generator cannot see that they collide.
+- `R-14ebb789` — The backlog still holds two open rows that record opposite liveness verdicts for one triage-script defect, and someone has to reconcile them in the tracker.
+- `R-ba4e7188` — The archive file still keeps one batch of old status notes far away from the section that holds all the others, which only affects internal record-keeping.
+- `R-26e82af9` — The script that ranks backlog rows still has no test harness, and the queue generator is only partly exercised, which is internal tooling with no effect on testers.
+- `R-9976c6cb` — The data dictionary's enum catalog still leaves out the integration, SSO and resource-grant vocabularies, which is an internal documentation gap that changes nothing a tester sees.
+- `R-076a9cbd` — A backlog row still cites lines in the UX exceptions log that are about a different subject, which is an internal documentation error.
+- `R-d3d2b28d` — The internal dormant-column lint still counts a factory or seeder writing null as a real use, so it misses three unused columns, and the fix is inside the lint script.
+- `R-8990648c` (awaits D15) — The internal work-batching rule still counts a new lint gate as touching two hub files, and whether to relax that rule is the open decision D15.
+- `R-60850972` — A standing rule in the internal tracker still says three files where its own table lists five, which is an internal wording fix.
+- `R-7fb2a226` — The template blueprint check does not enforce a key format, but no tenant can supply a blueprint, so this is optional hardening on an unreachable path and the code already records it that way.
+- `R-6f2c0c2c` — An older backlog row still points at three code lines that have nothing to do with validations, which is an internal citation error.
+- `R-fb233cb5` — The internal lint that catches references to non-existent test classes still cannot scan the scripts folder, because its own header names such classes on purpose.
+- `R-246b24b5` — A test's list of allowed enum differences is keyed by name alone, so two same-named mirrors in different files would wrongly share one exception, though none do today.
+- `R-3bff9e29` — A code comment wrongly claims that the public form runtime and the staff encode screen name their controls the same way; both render correctly, so only the comment needs fixing.
+- `R-1dd450ba` — A test helper that reads Vue files still searches the template and styles as well as the script, so a common property name could be matched in the wrong place.
+- `R-b59d4d22` — Three code comments point at tests that check less than the comments describe, and closing that gap means writing three small tests, with no product defect involved.
+- `R-f7a909ee` — The data dictionary describes the bot-challenge values in prose but leaves that enum out of its catalog table, which is an internal documentation gap.
+- `R-bfaf7e39` — A lint gate's summary line must match a scraper pattern and two test fixtures, but nothing warns the person editing it, and the mismatch only shows up after merge.
 
 ## RELEASED — `M93`, the tiered pipeline: a tier on every row and open decision, decisions as pipeline rows, a before-testing gate, and the hidden work filed (merged as PR #285, `52bab4f`, 6/6 green with real step counts — Static analysis 28 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

@@ -56,10 +56,10 @@ final class ConnectionTokenRefresher
     public const HANDOFF_STALLED = 'stalled';
 
     /** Seconds one hand-off suppresses another for the same grant. */
-    private const HANDOFF_QUEUED_SECONDS = 120;
+    private const QUEUED_WINDOW_SECONDS = 120;
 
     /** Seconds after a hand-off in which a repeat means the earlier refresh did not take. */
-    private const HANDOFF_ATTEMPTED_SECONDS = 900;
+    private const ATTEMPTED_WINDOW_SECONDS = 900;
 
     public function __construct(
         private readonly ConnectorRegistry $registry,
@@ -186,7 +186,7 @@ final class ConnectionTokenRefresher
         try {
             // One dispatch per window however many requests arrive. The Airtable editor asks for the base list
             // and the table inspector back to back, and every duplicate job would rotate the grant again.
-            if (! Cache::add('connector-refresh-queued:'.$connectionId, true, self::HANDOFF_QUEUED_SECONDS)) {
+            if (! Cache::add('connector-refresh-queued:'.$connectionId, true, self::QUEUED_WINDOW_SECONDS)) {
                 return self::HANDOFF_RENEWING;
             }
 
@@ -194,7 +194,7 @@ final class ConnectionTokenRefresher
             // usable — a stopped worker, or a transient provider failure. Queue it again, but stop promising.
             $attemptedKey = 'connector-refresh-attempted:'.$connectionId;
             $stalled = Cache::has($attemptedKey);
-            Cache::put($attemptedKey, true, self::HANDOFF_ATTEMPTED_SECONDS);
+            Cache::put($attemptedKey, true, self::ATTEMPTED_WINDOW_SECONDS);
 
             RefreshOneConnectionJob::dispatch((string) $connection->tenant_id, $connectionId);
         } catch (Throwable $e) {

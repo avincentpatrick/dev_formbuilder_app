@@ -88,6 +88,17 @@ const LANE_A_WRITABLE = [TRACKER, IMPERATIVES, 'docs/claims/lane-a.md'];
 //     matches at that one offset.
 const HANDOFF_STATE_MARKER = '/^\*\*LANE ([AB]) NEXT PROMPT →\*\* `\[state ([^\]]*)\]/';
 
+// ⛔ THE TIER VOCABULARY (M93) — CLOSED, AND ORDERED MOST URGENT FIRST. It exists in four places on
+//    purpose: here, scripts/pipeline.php, scripts/pipeline-lint.php (whose controls run against a stub
+//    generator with no constants) and BacklogProvenanceTest. tests/Feature/Docs/PipelineLintControlsTest.php
+//    pins every copy equal and in the same order, because an unpinned copy is two facts that drift.
+//    ⚠️ No name may contain "upload": scripts/loop.php's HELD_TOPICS matches that substring and would
+//    refuse every row carrying it as held work.
+const TIERS = ['before-testing', 'early-testing', 'during-testing', 'before-launch', 'after-launch'];
+
+/** Both row tokens, as they are removed from a title before it is hashed into a row id. */
+const TOKEN_STRIP = '/\s*\*\*(?:Tier: [^*]+?|Awaits D\d+)\.\*\*/u';
+
 $root = dirname(__DIR__);
 chdir($root);
 
@@ -108,6 +119,7 @@ $state = [
     'baselines' => derive_baselines(),
     'triage' => derive_triage(),
     'pipeline' => derive_pipeline(),
+    'testing_gate' => derive_testing_gate(),
     'worktrees' => derive_worktrees(),
 ];
 
@@ -439,9 +451,33 @@ function derive_decisions(): array
     sort($open);
     sort($answered);
 
+    // ⛔ ONE ROW PER OPEN DECISION, BECAUSE A DECISION IS NOW A PIPELINE ROW (M93). The tier is read from
+    //    the HEADING LINE ONLY. A decision's body may quote the token, or record a retier reason in bold,
+    //    and a body scan would count either as a second declaration. Code spans are stripped from the
+    //    heading first, as they are from a backlog row, so a heading that NAMES the grammar does not arm it.
+    $openRows = [];
+
+    foreach (lines((string) $parts[0]) as $i => $line) {
+        if (preg_match('/^### D(\d+) — (.*)$/u', $line, $m) !== 1) {
+            continue;
+        }
+
+        preg_match_all('/\*\*Tier: ([^*]+?)\.\*\*/u', (string) preg_replace('/`[^`]*`/u', '', $m[2]), $tokens);
+
+        $openRows[] = [
+            'id' => 'D'.$m[1],
+            'title' => trim((string) preg_replace(TOKEN_STRIP, '', $m[2])),
+            'tier' => token_value($tokens[1] ?? [], ''),
+            'line' => $i + 1,
+        ];
+    }
+
+    usort($openRows, static fn (array $a, array $b): int => (int) substr($a['id'], 1) <=> (int) substr($b['id'], 1));
+
     return [
         'open' => array_map(static fn (int $n): string => 'D'.$n, $open),
         'answered' => array_map(static fn (int $n): string => 'D'.$n, $answered),
+        'open_rows' => $openRows,
         'source' => DECISIONS.', split on its ANSWERED heading',
     ];
 }
@@ -596,6 +632,18 @@ function finish_row(array $row): array
         }
     }
 
+    // ⛔ THE TIER AND AWAITS TOKENS ARE READ POSITION-FREE, FROM THE SAME STRIPPED COPY (M93). The
+    //    Filed-by clause sits mid-sentence in four rows and on the id-hashed first line in two, so a
+    //    rule anchored on "right after the clause" would be red on arrival. The capture is LOOSE on
+    //    purpose: a malformed value comes back as itself, so `pipeline-lint` P7c can refuse it, rather
+    //    than vanishing into "untiered" where the residue ceiling would absorb it in silence.
+    preg_match_all('/\*\*Tier: ([^*]+?)\.\*\*/u', $prose, $tierTokens);
+    preg_match_all('/\*\*Awaits D(\d+)\.\*\*/u', $prose, $awaitsTokens);
+
+    // ⛔ AND BOTH TOKENS ARE STRIPPED FROM THE TITLE BEFORE IT IS HASHED, so writing a tier onto a row
+    //    whose whole text is one physical line can never re-identify it.
+    $title = (string) preg_replace(TOKEN_STRIP, '', $title);
+
     return [
         'id' => 'R-'.substr(sha1(rtrim($title)), 0, 8),
         'severity' => $severity,
@@ -606,6 +654,8 @@ function finish_row(array $row): array
         'state' => $state,
         'closed_by' => $closer,
         'liveness' => $liveness,
+        'tier' => token_value($tierTokens[1] ?? [], ''),
+        'awaits' => token_value($awaitsTokens[1] ?? [], 'D'),
     ];
 }
 
@@ -960,6 +1010,90 @@ function derive_pipeline(): array
     ];
 }
 
+/**
+ * The before-testing gate, and the pointer to the next work — READ OUT OF THE GENERATED LINE (M93).
+ *
+ * ⛔ THIS NEVER REFUSES, AND THAT IS LOAD-BEARING RATHER THAN LENIENT. `scripts/pipeline.php` shells
+ * `backlog-triage.php --json`, which shells THIS FILE. A reader that exited 2 on a missing gate line
+ * would therefore stop the generator from ever writing the line it is waiting for. A document generated
+ * before the gate existed yields nulls and a reason, exactly as `derive_pipeline()` does for a missing
+ * banner, and every consumer prints the reason rather than a confident zero.
+ *
+ * ⚠️ AND IT IS NEVER A --check FAILURE. Standing Rule 5: the user's testing never gates development. The
+ * gate says when the app is ready for a testing server; it does not stop a merge.
+ *
+ * @return array<string, mixed>
+ */
+function derive_testing_gate(): array
+{
+    $body = read_tracked_file(PIPELINE);
+    $line = first_line_matching($body, '/^\*\*Testing gate:\*\* /u');
+    $out = [
+        'tiers' => TIERS,
+        'tier' => TIERS[0],
+        'open' => null,
+        'total' => null,
+        'waiting' => null,
+        'held' => null,
+        'waiting_ids' => [],
+        'next_tier' => null,
+        'next' => [],
+        'reason' => null,
+        'source' => PIPELINE.', its Testing gate and Next sections',
+    ];
+
+    if ($line === null
+        || preg_match('/^\*\*Testing gate:\*\* ([a-z-]+) — (\d+) open of (\d+) · (\d+) waiting on you · (\d+) held/u', $line, $m) !== 1) {
+        $out['reason'] = PIPELINE.' carries no parseable Testing gate line — regenerate it with scripts/pipeline.php';
+
+        return $out;
+    }
+
+    $out['tier'] = $m[1];
+    $out['open'] = (int) $m[2];
+    $out['total'] = (int) $m[3];
+    $out['waiting'] = (int) $m[4];
+    $out['held'] = (int) $m[5];
+
+    $waiting = first_line_matching($body, '/^Waiting on you: /u');
+
+    if ($waiting !== null && preg_match_all('/`(D\d+)`/', $waiting, $w) > 0) {
+        $out['waiting_ids'] = $w[1];
+    }
+
+    // The Next section has a FIXED shape, so it is read positionally: a `From **<tier>**` line, then one
+    // `- `<id>` — …` line per row, until the next level-two heading. Anything else in it is prose.
+    $inNext = false;
+
+    foreach (lines($body) as $candidate) {
+        if (str_starts_with($candidate, '## ')) {
+            if ($inNext) {
+                break;
+            }
+
+            $inNext = $candidate === '## Next';
+
+            continue;
+        }
+
+        if (! $inNext) {
+            continue;
+        }
+
+        if ($out['next_tier'] === null && preg_match('/^From \*\*([a-z-]+)\*\*/u', $candidate, $t) === 1) {
+            $out['next_tier'] = $t[1];
+
+            continue;
+        }
+
+        if (preg_match('/^- `([^`]+)` — /u', $candidate, $r) === 1) {
+            $out['next'][] = $r[1];
+        }
+    }
+
+    return $out;
+}
+
 function derive_worktrees(): array
 {
     return array_values(array_filter(array_map('trim', explode("\n", sh('git worktree list 2>&1')))));
@@ -1191,7 +1325,12 @@ function render(array $state): void
     section('Queue');
     info('open backlog rows', $state['backlog']['open'].'  ('.$state['backlog']['by_severity']['major'].' major, '.
                               $state['backlog']['by_severity']['minor'].' minor, '.$state['backlog']['by_severity']['nit'].' nit)');
-    info('open decisions', $state['decisions']['open'] === [] ? '(none)' : implode(', ', $state['decisions']['open']));
+    info('open decisions', $state['decisions']['open'] === [] ? '(none)' : count($state['decisions']['open']).', by tier');
+
+    foreach (decisions_by_tier($state['decisions']['open_rows'] ?? []) as $tier => $ids) {
+        note($tier.' — '.implode(', ', $ids));
+    }
+
     info('answered decisions', implode(', ', $state['decisions']['answered']));
 
     info('severity bullets, ever', $state['backlog']['severity_bullets'].'  ('.$state['backlog']['ever_by_severity']['major'].' major, '.
@@ -1231,6 +1370,7 @@ function render(array $state): void
              'origin/main. Regenerate it with scripts/backlog-triage.php after a fetch.');
     }
 
+    render_testing_gate($state['testing_gate']);
     render_d5($state['d5']);
 
     section('Gate baselines');
@@ -1306,6 +1446,44 @@ function section(string $title): void
 }
 
 /**
+ * ⚠️ PRINTED, NEVER GATED — Standing Rule 5. Held rows and questions waiting on the user are shown beside
+ * the count and do not block it: both are the user's to move, not work an increment can take.
+ *
+ * @param  array<string, mixed>  $gate
+ */
+function render_testing_gate(array $gate): void
+{
+    section('Testing gate');
+
+    if ($gate['open'] === null) {
+        warn('not measurable — '.(string) $gate['reason']);
+
+        return;
+    }
+
+    info((string) $gate['tier'], sprintf(
+        '%d open of %d · %d waiting on you · %d held',
+        $gate['open'],
+        $gate['total'],
+        $gate['waiting'],
+        $gate['held']
+    ));
+
+    if ($gate['waiting_ids'] !== []) {
+        info('waiting on you', implode(', ', $gate['waiting_ids']).' — answered on the Decision Board');
+    }
+
+    info('next work', $gate['next_tier'] === null
+        ? '(the pipeline lists none)'
+        : $gate['next_tier'].' — '.implode(', ', $gate['next']));
+
+    if ($gate['open'] === 0) {
+        note('ZERO open before-testing rows: the app is ready for the testing server. The session that closed');
+        note('the last one owes the user the push notification and the Testing Server Checklist (CLAUDE.md).');
+    }
+}
+
+/**
  * ⛔ THIS PRINTS THE ARITHMETIC AND NOT A VERDICT ON WHETHER TO STOP. D5's own warning is that a bar
  * which cannot be measured gets declared met by whoever wants to stop; a bar that CAN be measured is
  * still a decision to take with the user, not a thing a script announces. So the two clauses are
@@ -1316,7 +1494,7 @@ function section(string $title): void
  */
 function render_d5(array $d5): void
 {
-    section('Series exit — D5');
+    section('Series exit — D5 (ended by D12)');
 
     info('clause 1', ($d5['clause_1_met'] ? 'MET' : 'not met').' — '.$d5['clause_1'].
         ' ('.$d5['open_major'].' open)');
@@ -1351,10 +1529,11 @@ function render_d5(array $d5): void
     note('UNMARKED above is a failing test rather than a backlog item. ⛔ What is gated is that a verdict');
     note('is RECORDED, never that it is right — a row marked live whose defect is dead passes everything.');
 
-    if ($d5['met']) {
-        note('BOTH CLAUSES READ MET. That is an input to a conversation with the user, never a verdict');
-        note('this script is entitled to reach on its own — see D5 in '.DECISIONS.'.');
-    }
+    // ⛔ THE CONVERSATION THIS BLOCK EXISTED TO PROMPT HAS HAPPENED. D12 was answered B on 2026-09-14: the
+    //    series ended and the tiered pipeline succeeds it. The clauses stay printed as history, and the
+    //    queue's own exit signal is now the Testing gate above.
+    note('D12 ended the series (2026-09-14). These clauses are history; the Testing gate above is the');
+    note('signal that replaced them — see D12 in '.DECISIONS.'.');
 }
 
 function pass(string $message): void
@@ -1457,6 +1636,41 @@ function first_line(string $text): string
     $lines = explode("\n", trim($text));
 
     return trim($lines[0]);
+}
+
+/**
+ * One token's value: null when absent, the value when present once, and EVERY value joined with a pipe
+ * when present more than once. No vocabulary contains a pipe, so a doubled token reaches
+ * `scripts/pipeline-lint.php` as an unknown value and is refused there — rather than being resolved,
+ * silently, to whichever copy happened to come first.
+ *
+ * @param  list<string>  $values
+ */
+function token_value(array $values, string $prefix): ?string
+{
+    if ($values === []) {
+        return null;
+    }
+
+    return implode('|', array_map(static fn (string $value): string => $prefix.trim($value), $values));
+}
+
+/**
+ * Open decision ids grouped by tier, most urgent first, with anything outside the vocabulary last.
+ *
+ * @param  list<array<string, mixed>>  $rows
+ * @return array<string, list<string>>
+ */
+function decisions_by_tier(array $rows): array
+{
+    $out = array_fill_keys([...TIERS, 'untiered'], []);
+
+    foreach ($rows as $row) {
+        $tier = in_array($row['tier'] ?? null, TIERS, true) ? (string) $row['tier'] : 'untiered';
+        $out[$tier][] = (string) $row['id'];
+    }
+
+    return array_filter($out);
 }
 
 /**

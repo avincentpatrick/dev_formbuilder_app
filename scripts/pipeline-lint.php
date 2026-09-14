@@ -66,6 +66,12 @@ declare(strict_types=1);
  * counting only schema files as declarations found 7 dormant columns; the corrected set finds 41.
  * Under-collecting is the BLIND direction and it reports green.
  *
+ *   P7   (M93) The tier rules. The approved design pinned P7a's untiered residue as a DIGEST, like P2's;
+ *        that is impossible to reproduce in a fixture of synthetic rows, so it is a one-way COUNT. And
+ *        P7b parses the decisions file ITSELF: the generator's decision rows come from state.php's
+ *        parse of the same file, and comparing them with the generator's own copy of that parse would
+ *        compare a thing with itself and pass for free.
+ *
  * Usage:
  *   php scripts/pipeline-lint.php            # all rules, failures only
  *   php scripts/pipeline-lint.php --verbose  # print every measurement, not only the failures
@@ -266,6 +272,32 @@ const GENERATED_LINE_PREFIXES = ['**LANE A NEXT PROMPT', '**LANE B NEXT PROMPT']
  */
 const STRUCK_SPAN_THRESHOLD = 3;
 
+/**
+ * ═══ THE TIER RULES (M93) — P7a, P7b, P7c, P7e ═══════════════════════════════════════════════════
+ *
+ * The user's priority became a property of every row — a tier, written at the row's point of truth —
+ * and an open decision became a row. These rules hold that SHAPE. They prove nothing about whether a
+ * tier is RIGHT, exactly as P4 proves a held row is visible and not that it deserves to be held.
+ *
+ * ⛔ THE VOCABULARY IS A COPY, AND THE COPY IS PINNED. This gate's controls run against a STUB generator
+ * that defines no constants, so reading the list out of `scripts/pipeline.php` would refuse in every
+ * control. `tests/Feature/Docs/PipelineLintControlsTest.php` asserts this list equals the ones in
+ * `scripts/pipeline.php` and `scripts/state.php`, in the same order.
+ */
+const TIERS = ['before-testing', 'early-testing', 'during-testing', 'before-launch', 'after-launch'];
+
+/**
+ * P7a's residue — defect rows that carry no tier yet.
+ *
+ * ⚠️ A COUNT, NOT A DIGEST, AND ONE-WAY. The P2 coverage rules pin a digest because their controls copy
+ * the live corpus; a digest over live row ids cannot be reproduced in a fixture of synthetic rows. The
+ * residue exists only because tiering the ledger row by row is its own increment, and that increment
+ * deletes this constant and its two controls together. Plan rows and decision rows get NO allowance: a
+ * marker without `tier=` is refused by the generator itself, and a decision is tiered on its heading
+ * the moment it is filed.
+ */
+const P7A_UNTIERED_DEFECT_CEILING = 158;
+
 $flags = ['verbose', 'help'];
 $opts = getopt('', $flags);
 
@@ -349,6 +381,14 @@ p3c_no_second_queue();
 // ── P4. Held rows are visible, and the stop-list and the line agree in BOTH directions. ──────────
 p4_held_visibility($held);
 
+// ── P7. Every row tiered, the vocabulary closed, every open decision a row, no row awaiting a ghost. ──
+$decisionSplit = decisions_split();
+
+p7a_tiered($rows);
+p7b_decisions($rows, $decisionSplit);
+p7c_tier_vocabulary($rows);
+p7e_awaits($rows, $decisionSplit);
+
 // ── P2d. Documented artefacts that exist, are used by nothing, and are scheduled nowhere. ────────
 p2d_artefact_drift($rows);
 
@@ -375,7 +415,7 @@ if ($failures !== []) {
 }
 
 fwrite(STDOUT, sprintf(
-    "pipeline-lint: passed (11 rule groups, %d row(s), %d held, %d file(s) scanned).\n",
+    "pipeline-lint: passed (15 rule groups, %d row(s), %d held, %d file(s) scanned).\n",
     count($rows),
     count($held),
     $document['files_scanned']
@@ -1253,9 +1293,211 @@ function p6_self_arming(): void
     pass('P6 self-arming', sprintf('%s carries no line-start marker over %d line(s)', PIPELINE, count($lines)));
 }
 
+/**
+ * P7a — every row carries a tier, and only the defect ledger has a residue, which can only fall.
+ *
+ * ⚠️ READS `rows` ONLY, NEVER `off_the_line`. A done or n/a row is not work, and demanding a priority of
+ * finished work would be red on arrival for every row that finished before tiers existed.
+ *
+ * @param  list<array<string, mixed>>  $rows
+ */
+function p7a_tiered(array $rows): void
+{
+    $untieredDefects = 0;
+    $bad = 0;
+
+    foreach ($rows as $row) {
+        if ((string) ($row['tier'] ?? '') !== '') {
+            continue;
+        }
+
+        if (($row['class'] ?? '') === 'defect') {
+            $untieredDefects++;
+
+            continue;
+        }
+
+        $bad++;
+        fail('P7a tiered', sprintf(
+            'the %s row `%s` carries no tier. A plan marker takes `tier=` and an open decision carries the '
+            .'token on its heading line; only the defect ledger has a residue, and it is closed to new rows.',
+            (string) ($row['class'] ?? 'unknown'),
+            (string) ($row['id'] ?? '?')
+        ));
+    }
+
+    if ($untieredDefects > P7A_UNTIERED_DEFECT_CEILING) {
+        fail('P7a tiered', sprintf(
+            '%d defect row(s) carry no tier, over the pinned residue of %d. A row filed from now on is '
+            .'tiered the moment it is filed, so the residue only ever falls — lower the constant when it does.',
+            $untieredDefects,
+            P7A_UNTIERED_DEFECT_CEILING
+        ));
+
+        return;
+    }
+
+    if ($bad === 0) {
+        pass('P7a tiered', sprintf(
+            'every plan and decision row is tiered; %d untiered defect row(s) within the residue of %d',
+            $untieredDefects,
+            P7A_UNTIERED_DEFECT_CEILING
+        ));
+    }
+}
+
+/**
+ * P7b — every open decision is a row in the line, and every decision row has an open decision behind it.
+ *
+ * @param  list<array<string, mixed>>  $rows
+ * @param  array{open: list<string>, answered: list<string>}  $split
+ */
+function p7b_decisions(array $rows, array $split): void
+{
+    $rowIds = [];
+
+    foreach ($rows as $row) {
+        if (($row['class'] ?? '') === 'decision') {
+            $rowIds[] = (string) $row['id'];
+        }
+    }
+
+    $missing = array_values(array_diff($split['open'], $rowIds));
+    $orphans = array_values(array_diff($rowIds, $split['open']));
+
+    foreach ($missing as $id) {
+        fail('P7b decisions', sprintf(
+            '%s is open in %s and has no row in the line. A question waiting on the user is work waiting on '
+            .'the user, and a queue that cannot see it is the hidden task this project realigned six times to end.',
+            $id,
+            DECISIONS
+        ));
+    }
+
+    foreach ($orphans as $id) {
+        fail('P7b decisions', sprintf(
+            'the line carries a decision row `%s` with no open decision behind it in %s — answered, renumbered '
+            .'or never filed. Regenerate the line in the same push that records an answer.',
+            $id,
+            DECISIONS
+        ));
+    }
+
+    if ($missing === [] && $orphans === []) {
+        pass('P7b decisions', sprintf('%d open decision(s), each a row in the line', count($split['open'])));
+    }
+}
+
+/**
+ * P7c — a tier, where one is written, is in the closed vocabulary.
+ *
+ * ⚠️ A DOUBLED TOKEN ARRIVES HERE AS ONE VALUE JOINED WITH A PIPE, which no vocabulary contains — so a
+ * row carrying two tiers is refused by name rather than silently resolved to whichever came first.
+ *
+ * @param  list<array<string, mixed>>  $rows
+ */
+function p7c_tier_vocabulary(array $rows): void
+{
+    $bad = 0;
+
+    foreach ($rows as $row) {
+        $tier = (string) ($row['tier'] ?? '');
+
+        if ($tier === '' || in_array($tier, TIERS, true)) {
+            continue;
+        }
+
+        $bad++;
+        fail('P7c tier vocabulary', sprintf(
+            '`%s` declares the tier "%s"; the vocabulary is %s.',
+            (string) ($row['id'] ?? '?'),
+            $tier,
+            implode(', ', TIERS)
+        ));
+    }
+
+    if ($bad === 0) {
+        pass('P7c tier vocabulary', 'every written tier is one of '.implode(', ', TIERS));
+    }
+}
+
+/**
+ * P7e — a row that awaits a decision awaits one that is still OPEN.
+ *
+ * ⛔ AN ANSWERED ONE IS THE FAILURE THIS RULE EXISTS FOR. The generator leaves such a row's state alone,
+ * so it would sit in the line reading as startable while its text still says it is waiting — the exact
+ * shape `R-f0525946` measured, arriving from the other side. Recording an answer strips or retargets
+ * every token naming it, in the same push.
+ *
+ * @param  list<array<string, mixed>>  $rows
+ * @param  array{open: list<string>, answered: list<string>}  $split
+ */
+function p7e_awaits(array $rows, array $split): void
+{
+    $checked = 0;
+    $bad = 0;
+
+    foreach ($rows as $row) {
+        $awaits = (string) ($row['awaits'] ?? '');
+
+        if ($awaits === '') {
+            continue;
+        }
+
+        $checked++;
+
+        if (in_array($awaits, $split['open'], true)) {
+            continue;
+        }
+
+        $bad++;
+        fail('P7e awaits', in_array($awaits, $split['answered'], true)
+            ? sprintf(
+                '`%s` awaits %s, which is ANSWERED. Strip or retarget the token in the push that records the '
+                .'answer, or the row stays parked on a question nobody is asking.',
+                (string) ($row['id'] ?? '?'),
+                $awaits
+            )
+            : sprintf(
+                '`%s` awaits "%s", which is no decision in %s. A mistyped id would otherwise leave the row '
+                .'reading as ready.',
+                (string) ($row['id'] ?? '?'),
+                $awaits,
+                DECISIONS
+            ));
+    }
+
+    if ($bad === 0) {
+        pass('P7e awaits', sprintf('%d row(s) await a decision, and every one is open', $checked));
+    }
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
 // Measurement helpers
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
+
+/**
+ * The open and answered decision ids, parsed out of the decisions file BY THIS GATE.
+ *
+ * ⛔ NOT READ FROM THE GENERATOR, AND THAT IS THE WHOLE VALUE OF P7b. See the P7 note in the header.
+ * A file missing its ANSWERED heading cannot be split, and both rules that read the split would then pass
+ * over an empty set — so that refuses rather than reporting green.
+ *
+ * @return array{open: list<string>, answered: list<string>}
+ */
+function decisions_split(): array
+{
+    $parts = preg_split('/^## ANSWERED$/m', read_or_die(DECISIONS), 2);
+
+    if (! is_array($parts) || ! isset($parts[1])) {
+        cannot_measure(DECISIONS.' has no ANSWERED heading, so an open decision cannot be told from an '
+            .'answered one — and P7b and P7e would each pass over an empty set.');
+    }
+
+    $ids = static fn (string $section): array => preg_match_all('/^### (D\d+) — /mu', $section, $m) > 0 ? $m[1] : [];
+
+    return ['open' => $ids((string) $parts[0]), 'answered' => $ids((string) $parts[1])];
+}
 
 function generator(): string
 {

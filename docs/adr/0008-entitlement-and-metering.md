@@ -165,4 +165,4 @@ Phase 3's spine (`PROGRESS.md`, the H-map) lands entitlements **early** (H5), so
 <!-- The pipeline markers below are DELIBERATELY at end-of-file. A marker inserted mid-document
      shifts every line beneath it, and this repository cites documents as `path:N` — 25 such
      citations point into the files that carry markers. End-of-file shifts nothing. -->
-<!-- pipeline: id=payments-checkout title="Embedded payments and self-serve billing — Cashier, Stripe Checkout, Stripe Tax" phase=4 state=held size=XL blocker="user: needs a Stripe account; cut from Phase 3 by decision 2026-07-21" -->
+<!-- pipeline: id=payments-checkout title="Embedded payments and self-serve billing — Cashier, Stripe Checkout, Stripe Tax" phase=4 state=held size=XL blocker="user: needs a Stripe account; cut from Phase 3 by decision 2026-07-21" tier=before-launch -->

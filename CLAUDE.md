@@ -77,16 +77,37 @@ file, never copy out of it. `state.php` reports how far behind the trunk that fi
 
 ## Taking a row
 
-- **The queue is `docs/pipeline.md` — one generated, ordered line holding every remaining task.**
-  Regenerate it with `php scripts/pipeline.php`; never hand-edit it. `docs/backlog-triage.md` keeps
-  its own job — the operability ranking *within* the defect segment — and its counts are a dated
-  census rather than the tree. `state.php` counts the tree.
+- **The queue is `docs/pipeline.md` — one generated line holding every remaining task, ordered by tier
+  first and readiness second.** Regenerate it with `php scripts/pipeline.php`; never hand-edit it.
+  `docs/backlog-triage.md` keeps its own job — the operability ranking *within* the defect segment — and
+  its counts are a dated census rather than the tree. `state.php` counts the tree.
+- ⛔ **Every row and every open decision carries a tier:** `before-testing` → `early-testing` →
+  `during-testing` → `before-launch` → `after-launch`. **Take work from the most urgent tier that has open
+  work** — the line's Next section names it — and group the rows of one tier into an increment by file
+  overlap. A row is filed with `**Tier: x.**` after its Filed-by clause, a marker takes `tier=`, and an open
+  decision carries the token on its heading line. **A retier out of `before-testing` records its reason at
+  the row.**
+- **A row whose remaining work is a user decision says so by name** — `**Awaits Dn.**` on the row,
+  `decision=` on a marker — and the line shows it blocked on that decision. **Every open decision is itself
+  a row.**
+- ⛔ **An open item found in any document is filed as a row or a decision the moment it is found. No
+  document may hold an unqueued obligation.** A threat-model item, a runbook gap, a product question and a
+  stale sentence claiming something is unbuilt are all work, and the line cannot see work that lives only
+  in prose.
+- ⛔ **A push that changes `PROGRESS.md`, `docs/claims/decisions.md`, or any row's tier, awaits or liveness
+  regenerates `docs/pipeline.md` in the same push.** The first two sit in `paths-ignore`, so a stale line
+  reaches the trunk with no run to notice it. **Recording an answer also strips or retargets every Awaits
+  token that names it.**
+- ⛔ **The session that closes the last open `before-testing` row tells the user the app is ready for a
+  testing server** — a push notification, then the Testing Server Checklist page, sent to them as a file.
+  `state.php` prints the gate, and its zero is the signal. It is owed whichever session built the rest.
 - **`scripts/pipeline-lint.php` gates that line on every push, and it runs on the host.** It refuses a
   hand edit, a roadmap phase claiming work in flight without naming a row still in the line, a second
-  queue, a held row missing from either the line or `loop.php`'s stop-list, and a documented column
-  that exists, is used by nothing and is scheduled nowhere. ⛔ **It proves that what is written down is
-  queued — never that everything worth writing down has been.** An obligation living only in a document
-  no rule reads is still invisible to it.
+  queue, a held row missing from either the line or `loop.php`'s stop-list, a documented column that
+  exists, is used by nothing and is scheduled nowhere, a row or open decision with no tier or an unknown
+  one, an open decision missing from the line, and a row awaiting an answered or unknown decision.
+  ⛔ **It proves that what is written down is queued — never that everything worth writing down has
+  been.** An obligation living only in a document no rule reads is still invisible to it.
 - A plan item enters the line by a marker at its **point of truth**, never by a second list. The
   grammar is in `scripts/pipeline.php`'s header. A marker inside a table or a list breaks the render,
   so it goes at the end of the section it governs and carries its own title.
@@ -181,7 +202,8 @@ the parent commit and accidentally gives the right answer.
 2. Release your claim in `docs/claims/lane-a.md`, recording how the prediction fared — including the
    parts that were wrong.
 3. Regenerate `docs/gate-baselines.md` from your own post-merge run.
-4. Update only your own status block, then `php scripts/next.php --lane=a --write`.
+4. Update only your own status block, run `php scripts/pipeline.php` — the bullet you prepend moves the
+   markers the line cites — then `php scripts/next.php --lane=a --write`, and push them together.
 5. End with a three-to-five bullet status and the bare next-prompt line.
 
 ## Signalling

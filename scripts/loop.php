@@ -24,7 +24,7 @@ declare(strict_types=1);
  * Usage:
  *   php scripts/loop.php assess              # classify the next candidate rows; exit 3 if a human is needed
  *   php scripts/loop.php gates [--closeout]  # the gate sequence; ANY exit 2 or red stops the loop
- *   php scripts/loop.php status              # where the series stands against D5's bar
+ *   php scripts/loop.php status              # the testing gate and the next work, read from state.php
  *
  * Exit 0 = clear to proceed. Exit 1 = a gate failed. Exit 2 = could not measure. Exit 3 = STOP, a human
  * decision is required — which is a normal outcome and not an error.
@@ -38,9 +38,11 @@ const DECISIONS = 'docs/claims/decisions.md';
 //     settings · any NEW module or feature · any held row · any row whose evidence turns out not to
 //     match the code · ANY gate exiting 2 or going red."
 //
-// ⚠️ HELD ROWS ARE OUT OF SCOPE, NOT PENDING. They must never be auto-started, and the standing
-//    instruction is that they are not to be reported, counted or scheduled either. The list is closed:
-//    OCR, all uploading/import, payments, Track B, GDPR/legal/pricing.
+// ⚠️ HELD ROWS ARE UNSCHEDULED, NOT INVISIBLE (M79). They must never be auto-started — but they ARE
+//    counted, and each sits in docs/pipeline.md with its blocker named; the older instruction that they
+//    were not to be reported or counted was overridden by the user. The list is closed: OCR, all
+//    uploading/import, payments, Track B, GDPR/legal/pricing. `scripts/pipeline-lint.php` P4 checks it
+//    against the held rows in both directions.
 const HELD_TOPICS = [
     'ocr', 'upload', 'uploading', 'import', 'payment', 'payments', 'stripe',
     'billing', 'track b', 'gdpr', 'legal', 'pricing',
@@ -125,69 +127,39 @@ function usage(): never
 }
 
 /**
- * ⛔ THE TERMINAL CONDITION IS D5's BAR AND IT IS READ FROM decisions.md, NEVER RESTATED HERE.
+ * ⛔ STATUS REPORTS THE TESTING GATE (M93), BECAUSE D12 ENDED THE SERIES D5's BAR WAS WRITTEN FOR.
  *
- * ⛔ AND IT IS NOT RECOMPUTED HERE EITHER, WHICH IS THE POINT OF THIS REWRITE (M64). This function
- * used to count provenance itself and then print a hard-coded "Clause 2 UNMEASURABLE". Both were
- * defects waiting to happen: a second parser drifts from the first — the note at this file's parser
- * boundary says so in terms — and a hard-coded verdict survives the day the underlying fact changes.
- * M64 normalised provenance to one form across all 161 severity bullets and backfilled it from
- * history, so state.php now DERIVES both clauses and this reads them.
+ * The user answered D12 on 2026-09-14: the batch series ends, and the tiered pipeline succeeds it. What a
+ * driver needs to know is no longer "has the bar cleared" but "how far is the app from a testing server,
+ * and what is next" — and both are read from state.php, which read them out of docs/pipeline.md. Nothing
+ * is recomputed here; M64 recorded what a second parser costs.
  *
- * ⚠️ IT STILL DOES NOT DECIDE ANYTHING. Both clauses reading met is an input to a conversation with
- * the user, not a stop signal a driver may act on: D5's own warning is that a measurable bar is one
- * somebody will declare met, and the exit status below deliberately does not encode "stop".
+ * ⚠️ IT STILL DECIDES NOTHING. Zero open before-testing rows is the moment the USER is told the app is
+ * ready for a testing server; it is not a stop signal for this driver, which continues down the next tier.
+ * Exit 0 when the gate is measured, 2 when it is not — never a guessed zero.
  */
 function cmd_status(): never
 {
     $state = state();
-    $backlog = is_array($state['backlog'] ?? null) ? $state['backlog'] : [];
-    $d5 = is_array($state['d5'] ?? null) ? $state['d5'] : [];
-    $majors = (int) ($backlog['by_severity']['major'] ?? -1);
+    $gate = is_array($state['testing_gate'] ?? null) ? $state['testing_gate'] : [];
 
-    if ($majors < 0 || $d5 === []) {
-        cannot_measure('state.php returned no backlog severity counts or no D5 block.');
+    if ($gate === [] || ($gate['open'] ?? null) === null) {
+        cannot_measure('state.php reports no measurable testing gate — '.(string) ($gate['reason'] ?? 'the key is absent').'.');
     }
 
-    if (! is_file(DECISIONS)) {
-        cannot_measure(DECISIONS.' is missing; the terminal condition cannot be read.');
-    }
-
-    if (! str_contains((string) file_get_contents(DECISIONS), '### D5')) {
-        cannot_measure(DECISIONS.' has no D5 entry; the bar this reports against does not exist.');
-    }
-
-    line('Series status against D5, the terminal condition');
+    line('Where the pipeline stands against a testing server');
     line('');
-    line(sprintf('  open `major` rows                 %d', $majors));
-    line(sprintf('  open rows total                   %d', (int) ($backlog['open'] ?? -1)));
-    line(sprintf('  severity bullets, open + closed   %d', (int) ($backlog['severity_bullets'] ?? -1)));
-    line(sprintf('  highest released                  M%d', (int) $state['increment']['highest_released']));
-    line(sprintf('  bullets with no provenance clause %d', (int) ($d5['bullets_without_a_clause'] ?? -1)));
+    line(sprintf('  %-34s %d open of %d', (string) $gate['tier'], (int) $gate['open'], (int) $gate['total']));
+    line(sprintf('  %-34s %s', 'waiting on the user', (array) $gate['waiting_ids'] === [] ? 'none' : implode(', ', (array) $gate['waiting_ids'])));
+    line(sprintf('  %-34s %d', 'held in that tier', (int) $gate['held']));
+    line(sprintf('  %-34s %s', 'next work', $gate['next_tier'] === null ? '(none listed)' : $gate['next_tier'].' — '.implode(', ', (array) $gate['next'])));
+    line(sprintf('  %-34s %d, with %d open decision(s)', 'rows in the line', (int) ($state['pipeline']['rows'] ?? -1), count((array) ($state['decisions']['open'] ?? []))));
+    line(sprintf('  %-34s M%d', 'highest released', (int) $state['increment']['highest_released']));
     line('');
+    line('  ⛔ Zero open rows in that tier is when the user is told the app is ready for a testing server.');
+    line('     It is not a stop signal for this driver: development continues down the next tier.');
 
-    line(sprintf('  Clause 1 %s — %s (%d open).', $d5['clause_1_met'] ? 'MET' : 'NOT met', $d5['clause_1'], $majors));
-    line(sprintf('  Clause 2 %s — %s.', $d5['clause_2_met'] ? 'MET' : 'NOT met', $d5['clause_2']));
-
-    $window = [];
-
-    foreach ((array) ($d5['window'] ?? []) as $increment => $filed) {
-        $window[] = $increment.'='.$filed;
-    }
-
-    line('    majors filed in the window: '.implode('  ', $window));
-
-    if ((int) ($d5['majors_unattributed'] ?? 0) > 0) {
-        line(sprintf('  ⛔ %d `major` bullet(s) record no filer, so clause 2 has a HOLE: an unknown filer', (int) $d5['majors_unattributed']));
-        line('     cannot be shown NOT to be one of the increments in the window.');
-    }
-
-    line('');
-    line('  ⛔ A bar that CAN be measured is still not a decision this driver may take. Both clauses');
-    line('     reading met goes to the user with the numbers, and Standing Rule 5 is unchanged until');
-    line('     they answer: the next row is taken and built.');
-
-    exit($majors === 0 ? 0 : 3);
+    exit(0);
 }
 
 /**

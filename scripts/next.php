@@ -149,32 +149,13 @@ function render_line(string $lane, array $state): string
         sprintf('main IS THE TRUNK: branch from origin/main, PR into main, self-merge on 6/6 green with each'
             .' job\'s step count read individually. Your claim goes in %s and is PUSHED before you open the'
             .' first file.', $config['claim']),
-        // ⛔ M67 — THE UNIT OF WORK IS DERIVED FROM `D13`, NOT HARD-CODED, BECAUSE THE HAND-EDIT THAT
-        //    CARRIED IT BEFORE WAS INVISIBLE HERE AND THIS GENERATOR SILENTLY DROPPED IT.
-        //    `D13` answered the question "how should the remaining rows be worked" with *in batches of 3–4*,
-        //    and `M66` put that into its hand-off BY HAND — the one thing the line above forbids. So the
-        //    instruction lived only in a string this script had never heard of, and the first faithful
-        //    regeneration (M67's) reverted the queue to single rows with nothing reporting the loss.
-        //    `git log -S BATCHED -- scripts/next.php` returns nothing, which is how that was established.
-        //    ⚠️ AN ANSWERED DECISION THAT ONLY A HAND-EDIT CARRIES IS ONE REGENERATION FROM GONE.
-        in_array('D13', $state['decisions']['answered'] ?? [], true)
-            ? 'THE QUEUE IS docs/pipeline.md — one GENERATED ordered line holding every remaining task, '
-                .'plan work first and the defect ledger behind it ('.(int) $state['pipeline']['rows'].' rows, '
-                .(int) $state['pipeline']['held'].' held). A held row sits in it with its blocker named: do not '
-                .'start one and do not offer it as the next step, but it IS counted. Then: take the next BATCHED '
-                .'increment under D13 — 3-4 live rows sharing no non-hub file, at most one'
-                .' hub-touching row — from docs/feature-backlog.md ('.$state['backlog']['open'].' open, '
-                .$state['backlog']['by_severity']['major'].' major), ranked in docs/backlog-triage.md, which is'
-                .' GENERATED from the tree — regenerate it rather than reading a stale one, and treat its order'
-                .' as operability and not priority. D13\'s saving is proven and the batch size is not to be'
-                .' revisited; plan against its own ~42% model rather than any single increment\'s figure.'
-                .' Verify each row\'s evidence, its remedy AND its premise separately, and record them per row.'
-            : 'THE QUEUE IS docs/pipeline.md ('.(int) $state['pipeline']['rows'].' rows, '
-                .(int) $state['pipeline']['held'].' held, generated). Then take the next row from '
-                .'docs/feature-backlog.md — '.$state['backlog']['open'].' open ('
-                .$state['backlog']['by_severity']['major'].' major), ranked in docs/backlog-triage.md, which is'
-                .' GENERATED from the tree — regenerate it rather than reading a stale one, and treat its order'
-                .' as operability and not priority. Verify the row\'s evidence and its remedy separately.',
+        // ⛔ M93 — THE D13 HARD-WIRE IS GONE, AND WHAT REPLACED IT IS READ OUT OF THE LINE ITSELF.
+        //    `M67` derived "take the next BATCHED increment" from `D13` being answered, so that a regeneration
+        //    could not silently drop it. `D12` then ENDED the batch series (2026-09-14): the queue is ordered
+        //    by tier, and `docs/pipeline.md`'s Next section names the work. So this sentence points at that
+        //    section through state.php and restates no picker of its own. `D13` survives only as the rule for
+        //    GROUPING the rows of one tier.
+        render_queue($state),
         $decisions === []
             ? 'No open decisions.'
             : 'Open decisions: '.implode(', ', $decisions).' — do not re-ask them and do not stall; record a'
@@ -184,10 +165,65 @@ function render_line(string $lane, array $state): string
         'RECENT LESSONS, read from the newest releases in '.$config['claim'].' rather than retyped: '
             .implode(' ', recent_lessons($config['claim'])),
         sprintf('On finish: close the row, release the claim, regenerate the baselines from your own merge run,'
-            .' php scripts/next.php --lane=%s --write, then a 3-5 bullet status and the bare next prompt.', $lane),
+            .' prepend the status bullet, php scripts/pipeline.php (the bullet moves nothing it cites only if you'
+            .' regenerate), php scripts/next.php --lane=%s --write, push them together, then a 3-5 bullet status'
+            .' and the bare next prompt.', $lane),
     ];
 
     return '**LANE '.$upper.' NEXT PROMPT →** `'.strip_backticks(implode(' ', array_filter($parts))).'`';
+}
+
+/**
+ * The queue sentence: the tier order, the testing gate, and where the next work is named (M93).
+ *
+ * ⚠️ EVERY FIGURE IS state.php's, and state.php read it out of docs/pipeline.md. When the gate is not
+ * measurable the sentence says so and why, rather than printing zeros that read as "ready for testing".
+ *
+ * @param  array<string, mixed>  $state
+ */
+function render_queue(array $state): string
+{
+    $gate = is_array($state['testing_gate'] ?? null) ? $state['testing_gate'] : [];
+
+    $out = 'THE QUEUE IS docs/pipeline.md — one GENERATED line ordered by TIER first ('
+        .implode(' → ', (array) ($gate['tiers'] ?? [])).'), then readiness ('
+        .(int) ($state['pipeline']['rows'] ?? 0).' rows, '.(int) ($state['pipeline']['held'] ?? 0).' held). A held'
+        .' row sits in it with its blocker named: do not start one and do not offer it as the next step, but it IS'
+        .' counted. An open decision is a row too, blocked on the user.';
+
+    if (($gate['open'] ?? null) === null) {
+        return $out.' TESTING GATE NOT MEASURABLE — '.(string) ($gate['reason'] ?? 'state.php gave no reason').'.';
+    }
+
+    $out .= sprintf(
+        ' TESTING GATE: %s %d open of %d, %d waiting on the user, %d held.',
+        (string) $gate['tier'],
+        (int) $gate['open'],
+        (int) $gate['total'],
+        (int) $gate['waiting'],
+        (int) $gate['held']
+    );
+
+    $out .= $gate['next_tier'] === null
+        ? ' The Next section lists no work outside held rows and open questions.'
+        : ' Take work from the Next section — '.$gate['next_tier'].': '.implode(', ', (array) $gate['next'])
+            .' — and group 3-4 rows of ONE tier by D13\'s file-overlap rule (no two citing the same non-hub file,'
+            .' at most one touching a hub).';
+
+    if ((array) ($gate['waiting_ids'] ?? []) !== []) {
+        $out .= ' Waiting on the user in '.$gate['tier'].': '.implode(', ', (array) $gate['waiting_ids'])
+            .' — ask on the Decision Board and never idle on one.';
+    }
+
+    $out .= ' Any push that changes PROGRESS.md, docs/claims/decisions.md or a row\'s tier, awaits or liveness'
+        .' regenerates docs/pipeline.md in the same push.';
+
+    if ((int) $gate['open'] === 0) {
+        $out .= ' ⛔ ZERO OPEN '.strtoupper((string) $gate['tier']).' ROWS: send the user the push notification and'
+            .' the Testing Server Checklist now (CLAUDE.md).';
+    }
+
+    return $out.' Verify each row\'s evidence, its remedy AND its premise separately, and record them per row.';
 }
 
 /**

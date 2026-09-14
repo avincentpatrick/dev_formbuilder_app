@@ -210,4 +210,4 @@ The footer states, per version and re-derived from that version's own frozen byt
 <!-- The pipeline markers below are DELIBERATELY at end-of-file. A marker inserted mid-document
      shifts every line beneath it, and this repository cites documents as `path:N` — 25 such
      citations point into the files that carry markers. End-of-file shifts nothing. -->
-<!-- pipeline: id=ocr-channels title="PRD Features #1 and #2 — both OCR channels, per-form and linelist" phase=3 state=held size=XL blocker="user: needs filled paper-form samples and ground-truth data only the user can supply" -->
+<!-- pipeline: id=ocr-channels title="PRD Features #1 and #2 — both OCR channels, per-form and linelist" phase=3 state=held size=XL blocker="user: needs filled paper-form samples and ground-truth data only the user can supply" tier=before-launch -->

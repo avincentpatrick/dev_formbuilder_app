@@ -158,10 +158,10 @@ final class DeliverConnectorMessageJob extends TenantAwareJob
         // an HOURLY sweep: a grant minted just after a sweep and delivered against before the next one is
         // dead on arrival, and retuning the sweep cannot close a window that one missed run reopens.
         //
-        // It is a GUARD, not a policy: `ensureFresh()` returns immediately unless the token is already expired
-        // or inside `connectors.delivery_refresh_lead_seconds` (120s), so a healthy connection is still
-        // renewed by the sweep and never reaches this call. The stampede §D6 warns about therefore needs the
-        // sweep to have failed first, rather than being one provider outage away at all times.
+        // It is a GUARD, not a policy: the check below is false unless the token is already expired or inside
+        // `connectors.delivery_refresh_lead_seconds` (120s). It named H16a's inline `ensureFresh()` until M95
+        // deleted that; the setup-time directories now hand off through ConnectionTokenRefresher the same way.
+        // A stampede of hand-offs during a provider outage stays bounded by that 120s window, as §D6 requires.
         //
         // ⚠️⚠️ AMENDED IN M6: IT HANDS THE ROTATION OFF INSTEAD OF PERFORMING IT. H16a's reasoning above is
         // unchanged and still right — a grant minted just after a sweep IS dead on arrival without a

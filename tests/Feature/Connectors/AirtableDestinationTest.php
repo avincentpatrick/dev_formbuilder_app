@@ -11,6 +11,7 @@ use App\Services\Connectors\TabularDestinationDirectory;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Spatie\Permission\PermissionRegistrar;
 
@@ -242,4 +243,61 @@ it('follows Airtable’s offset pagination and reports a truncated list', functi
         // The budget ran out with Airtable still offering an offset — say so rather than implying the bases we
         // never asked for do not exist.
         ->and($payload['truncated'])->toBeTrue();
+});
+
+// ── M95: an expired token is handed to the refresh job, which alone rotates it ─────────────────────────────
+
+it('hands an expired Airtable token to the refresh job, and only the job rotates it', function (): void {
+    config()->set('queue.default', 'database');
+    config()->set('connectors.providers.airtable.client_id', 'test-client-id');
+    config()->set('connectors.providers.airtable.client_secret', 'test-client-secret');
+
+    $this->connection->forceFill(['token_expires_at' => now()->subMinute(), 'refresh_token' => 'oarORIGINAL'])->save();
+
+    $this->actingAs($this->admin)
+        ->getJson(airtableInspectUrl($this->connection).'?reference=appACME0000000001')
+        ->assertOk()
+        ->assertJsonPath('destination', null)
+        ->assertJsonPath('error', 'We’re renewing access to your Airtable account. Try again shortly.');
+
+    // No fake is registered yet, so under `preventStrayRequests()` any call from the request would have thrown.
+    // The request exchanged nothing — the whole point for a provider that rotates on every renewal.
+    expect(DB::table('jobs')->count())->toBe(1);
+
+    Http::fake(['airtable.com/oauth2/v1/token' => Http::response([
+        'access_token' => 'oaaROTATED',
+        'refresh_token' => 'oarROTATED',
+        'token_type' => 'Bearer',
+        'scope' => 'schema.bases:read data.records:write',
+        'expires_in' => 3600,
+    ], 200)]);
+
+    workOneJob('scheduled-maintenance');
+    enterTenant($this->tenant->id, $this->admin->id);
+
+    expect($this->connection->fresh()->refresh_token)->toBe('oarROTATED');
+    Http::assertSentCount(1);
+});
+
+it('hands an expired Airtable token off from the base picker, which the editor calls first', function (): void {
+    config()->set('queue.default', 'database');
+    $this->connection->forceFill(['token_expires_at' => now()->subMinute()])->save();
+
+    $this->actingAs($this->admin)->getJson(airtableBasesUrl($this->connection))
+        ->assertOk()
+        ->assertJsonPath('channels', [])
+        ->assertJsonPath('error', 'We’re renewing access to your Airtable account. Refresh the list shortly.');
+
+    expect(DB::table('jobs')->count())->toBe(1);
+});
+
+it('hands off a base list Airtable refuses even though the token looks fresh', function (): void {
+    config()->set('queue.default', 'database');
+    Http::fake(['api.airtable.com/v0/meta/bases' => Http::response(['error' => ['type' => 'AUTHENTICATION_REQUIRED']], 401)]);
+
+    $this->actingAs($this->admin)->getJson(airtableBasesUrl($this->connection))
+        ->assertOk()
+        ->assertJsonPath('error', 'We’re renewing access to your Airtable account. Refresh the list shortly.');
+
+    expect(DB::table('jobs')->count())->toBe(1);
 });

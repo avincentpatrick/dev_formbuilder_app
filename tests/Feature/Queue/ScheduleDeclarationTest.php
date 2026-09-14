@@ -88,8 +88,8 @@ it('registers the connector token-refresh sweep on the expected cadence', functi
         fn ($event): bool => str_contains($event->getSummaryForDisplay(), RefreshConnectorTokensJob::class),
     );
 
-    // hourly() against a 2-hour refresh lead: a grant is renewed with a full sweep cycle to spare, so one
-    // missed sweep cannot expire a token (H15a / ADR-0009 §D6).
+    // hourly() against a 2-hour refresh lead (H15a / ADR-0009 §D6). For a one-hour token that renews every grant
+    // on every sweep, so one missed sweep does expire it; the request and delivery paths hand off (M95).
     expect($match)->not->toBeNull()
         ->and($match->expression)->toBe('0 * * * *');
 });

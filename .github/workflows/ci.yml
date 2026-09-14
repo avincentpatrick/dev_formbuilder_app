@@ -378,7 +378,7 @@ jobs:
       postgres:
         # PostGIS build (Increment G5b1, ADR-0006) — superset of postgres:17 on the same PG major, so
         # every existing role/RLS/table behaves identically; adds the geometry capability geo needs.
-        image: postgis/postgis:17-3.5
+        image: postgis/postgis:15-3.5
         env:
           POSTGRES_USER: meridian
           POSTGRES_PASSWORD: secret
@@ -509,7 +509,7 @@ jobs:
       postgres:
         # PostGIS build (Increment G5b1, ADR-0006) — superset of postgres:17 on the same PG major, so
         # every existing role/RLS/table behaves identically; adds the geometry capability geo needs.
-        image: postgis/postgis:17-3.5
+        image: postgis/postgis:15-3.5
         env:
           POSTGRES_USER: meridian
           POSTGRES_PASSWORD: secret
@@ -600,7 +600,7 @@ jobs:
       postgres:
         # PostGIS build (Increment G5b1, ADR-0006) — superset of postgres:17 on the same PG major, so
         # every existing role/RLS/table behaves identically; adds the geometry capability geo needs.
-        image: postgis/postgis:17-3.5
+        image: postgis/postgis:15-3.5
         env:
           POSTGRES_USER: meridian
           POSTGRES_PASSWORD: secret

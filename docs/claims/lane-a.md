@@ -16,7 +16,188 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M94` is merged; the next work is the before-testing tier (`M95`), named in `docs/pipeline.md` § Next
+## Status: ACTIVE CLAIM — `M95`, the before-testing tier: a fail-fast deploy script, the first super-admin and first workspace commands, a first-boot runbook, and a setup-time token hand-off (`m95-before-testing`)
+
+Taken 2026-09-14. Branch `m95-before-testing`, cut from `origin/main` at `5ee23fc`, PR into `main`. A throwaway
+branch `m95-pg15-probe` runs CI once against PostgreSQL 15 as a draft PR that is closed unmerged.
+Rows: the five before-testing rows in `docs/feature-backlog.md`:
+- `R-52ae08ce`, the deploy script;
+- `R-6dc1671c`, the first super-admin;
+- `R-3a3ec5e7`, the §8 runbook;
+- `R-9a3df0c1`, the first workspace;
+- `R-5fc9afa6`, the setup-time directory refresh.
+
+This is the last of Realignment 6's three increments, and closing these rows owes the testing-server notification.
+**Not a `D13` batch.**
+
+User answers taken in chat on 2026-09-14, recorded in `docs/claims/decisions.md` by this increment:
+- `D31` = A: invite-only.
+- `D32` = A: raise the guest per-address limits on the testing server only.
+- The testing server is the user's own Windows Server 2016, as a separate site.
+- It runs PostgreSQL 15.
+
+### Evidence verified
+Read-only, at `5ee23fc`, by six mappers, six adversarial skeptics and a completeness critic.
+- **`R-52ae08ce`.**
+  - `deploy.ps1`'s only service step loops over `meridian-horizon` and `meridian-reverb` behind a
+    `Get-Service -ErrorAction SilentlyContinue` guard. Neither package is in `composer.json`.
+  - `queue:restart` is in no executable file. The row's claim that it "appears nowhere in the tree" is literally
+    false, though: `docs/deployment-infrastructure.md` §3 and §8 step 6 already say it must be added.
+  - `Worker::daemon` leaves its loop only on the restart signal, max-time or memory. The documented Windows
+    invocation sets neither of the last two, so the old worker outlives a deploy.
+- **`R-6dc1671c`.**
+  - The only writers of `is_super_admin = true` are `DemoSeeder::ensureSuperAdmin()` and
+    `E2eSeeder::promoteToSuperAdmin()`, and both return on `environment('production')`. No route, command or
+    service writes the flag.
+  - `SettingKey::RegistrationOpenSignup` defaults to true, and only the console closes it.
+- **`R-3a3ec5e7`.**
+  - §8 step 2 names no PostGIS, no database owner, no superuser login and no role password. `db:seed` is prescribed
+    nowhere, git, composer and npm are installed nowhere, and there is no `MAIL_*` and no DNS-01.
+  - Two of the row's claims are overstated. Step 8 does name the tenant-subdomain wildcard certificate, and §6 does
+    give the exact `--queue=` ordering.
+- **`R-9a3df0c1`.** Nothing in `app/` writes a tenant, both seeders return in production, neither `routes/admin.php`
+  nor `routes/api.php` creates one, and `tenants:create` is free in `artisan list`.
+- **`R-5fc9afa6`.**
+  - `TabularDestinationDirectory::create()` and `inspect()` check only `status !== Active` before calling the
+    provider with the stored token.
+  - Both provider directories map a 401 to `unauthenticated`, which renders "rejected our credentials. Reconnect
+    this account", and nothing on that path marks the grant dead.
+  - `ConnectorChannelDirectory::list()` has the same gap for the Airtable base picker.
+
+### Premise verified
+- **`R-52ae08ce`: the script around the defect is fail-open.**
+  - Windows PowerShell 5.1 does not stop on a native command's non-zero exit under
+    `$ErrorActionPreference = 'Stop'` (measured on this host), and the runner exits with the last native command's
+    code. So a failed migrate today still runs the caches and `up`, and reports green.
+  - Adding `queue:restart` alone would relaunch the worker onto new code over an unmigrated schema.
+  - `Restart-Service` is not graceful: Windows PHP has no pcntl, so NSSM's stop kills the job in flight.
+  - The documented rollback (`git reset --hard <sha>`, then re-run) is undone by the script's own
+    `reset --hard origin/$Branch`.
+  - No worker service name exists anywhere.
+- **`R-6dc1671c`: the seeders' guard is blind, and the flag has neighbours.**
+  - Their `affected === 0 && exists()` check stays silent when the privileged role does not bypass RLS, because the
+    table owner under FORCE sees no users (measured 0 against 16).
+  - Fortify lower-cases the login against a case-sensitive unique index.
+  - A super-admin is membership-less by design and is never an impersonation target.
+  - A direct central sign-in lands on the tenant-only `/dashboard`.
+  - An audit row with a null actor beside `is_system_action = false` is malformed by `AuditLogger`'s own contract,
+    which the audit spec's domain row records.
+- **`R-3a3ec5e7`: the row undercounts, and one omission is a security hole.**
+  - `DatabaseSeeder` calls `DemoSeeder` last, and `DemoSeeder` returns only on `production`. On any other
+    `APP_ENV`, `db:seed` creates `admin@meridian.test` with a password printed in the README and no second factor.
+  - `meridian_app` must own the database on PostgreSQL 15 and later.
+  - `DB_PRIVILEGED_*` is read at request time, not only at migrate.
+  - The role migrations fix the first password they read, and `.env.example` supplies `secret`.
+  - EDB tests PostgreSQL 17 only on Server 2019 and 2022, so the user chose 15.
+- **`R-9a3df0c1`: "four records" misses two.**
+  - Every Owner guard keys on `tenants.owner_user_id`. The dev tenant `j5sweep` lacks it, so its Admin could remove
+    its Owner.
+  - The role lives in `model_has_roles`.
+  - No slug rule exists anywhere.
+  - The owner cannot be invited (`cannotInviteAsOwner`).
+  - Reads of strict tables need `TenantContext::runFor`.
+- **`R-5fc9afa6`: the row is Live, not Latent, and "H16a's guard" no longer exists.**
+  - The sweep lead (7200 s) is longer than Google's and Airtable's one-hour tokens. Every sweep therefore rotates
+    every grant, and one missed sweep expires them all. With the scheduler on time, the window is seconds per grant
+    per hour.
+  - `ensureFresh()` has had no production caller since `M6` replaced it with a hand-off to `RefreshOneConnectionJob`.
+
+### Remedy verdict
+- **`R-52ae08ce`: partial.**
+  - Keep `queue:restart`, last inside the maintenance window.
+  - Replace the service restart with an existence check before any change and a start-if-Stopped after `up`.
+  - Make every native call fail fast, leave the site down on a failure inside the window, add `-Ref` so rollback
+    works, and read the service name from `MERIDIAN_WORKER_SERVICE`.
+  - Proved by a PowerShell 5.1 harness in the scratchpad, with the trunk script as the negative control.
+- **`R-6dc1671c`: works, but incomplete.** `platform:super-admin`:
+  - checks `rolsuper OR rolbypassrls` first, then writes over `pgsql_privileged` in one transaction and requires
+    exactly one affected row;
+  - lower-cases the email, and applies the registration password policy at a hidden prompt;
+  - refuses a trashed account and an account with a membership;
+  - reads the result back on `pgsql_auth`.
+
+  It writes no audit row; a before-launch row is filed for that.
+- **`R-3a3ec5e7`: necessary, not sufficient.** §8's steps are rewritten in place, plus a new §8.2 first-boot section:
+  `APP_ENV=production` is mandatory, the site gets its own PostgreSQL 15 instance, first boot is ordered, and
+  `DEPLOY_ENABLED` is set last.
+- **`R-9a3df0c1`: the right shape, but incomplete.** `tenants:create` also:
+  - writes the owner pointer and the role row;
+  - validates the slug with a new `SubdomainLabel` rule;
+  - refuses an unverified, trashed or super-admin owner;
+  - is idempotent under tenant context;
+  - checks its postconditions after commit.
+- **`R-5fc9afa6`: the prescribed remedy is unsafe.**
+  - An inline `ensureFresh()` from a web request takes no lock and races the worker.
+  - Airtable invalidates the previous refresh token on renewal, so a double exchange marks the grant dead and pauses
+    its rules. ADR-0009 already says a refresh is never lazy in the request path.
+  - The fix hands the refresh to `RefreshOneConnectionJob` before the provider call and after a 401. A short cache
+    marker deduplicates it, and the request retries once when the stored token changed underneath it.
+
+Files:
+- `deploy.ps1`
+- `app/Console/Commands/PlatformSuperAdminCommand.php`, `app/Console/Commands/CreateTenantCommand.php`,
+  `app/Services/Admin/SuperAdminProvisioner.php`, a shared account helper under `app/Services/Auth/`, and
+  `app/Rules/SubdomainLabel.php`
+- `app/Services/Connectors/ConnectionTokenRefresher.php`, `TabularDestinationDirectory.php` and
+  `ConnectorChannelDirectory.php`
+- comment lines only in `app/Jobs/Connectors/DeliverConnectorMessageJob.php`, `routes/console.php` and
+  `config/connectors.php`
+- tests:
+  - `tests/Feature/Admin/PlatformSuperAdminCommandTest.php` and `tests/Feature/Tenancy/CreateTenantCommandTest.php`
+  - `tests/Feature/Connectors/TabularDestinationTest.php`, `AirtableDestinationTest.php`,
+    `ConnectionChannelsTest.php` and `AirtableOAuthFlowTest.php`
+  - a comment in `tests/Feature/Queue/ScheduleDeclarationTest.php`
+- `.env.example`: appended lines only
+- `docs/deployment-infrastructure.md` and `docs/TESTING-GUIDE.md`
+- ADRs: `docs/adr/0002-multi-tenancy-shared-db-rls.md`, `docs/adr/0005-hosting-self-hosted-windows-server.md`,
+  `docs/adr/0007-async-execution-substrate.md`, `docs/adr/0009-oauth-connector-token-custody.md` and
+  `docs/adr/0013-published-version-immutability-trigger.md`
+- design and spec documents: `docs/architecture/technical-architecture.md`, `docs/audit-compliance-logging-spec.md`,
+  `docs/multi-tenancy-rbac-design.md`, `docs/onboarding-template-content-plan.md`, `docs/PRD.md` and
+  `docs/ACCESS-MATRIX.md`
+- `docs/feature-backlog.md`: five closures, two in-place amendments, and the rows below appended at the end
+- `docs/claims/decisions.md`:
+  - `D31` and `D32` answered;
+  - the PostgreSQL decision filed and recorded as answered;
+  - a self-serve workspace decision filed.
+- `PROGRESS.md`: my own status bullet at close-out
+- generated: `docs/pipeline.md`, `docs/backlog-triage.md`, and `docs/gate-baselines.md` at close-out
+- probe only, never merged: `.github/workflows/ci.yml` on `m95-pg15-probe`
+
+Shared artefacts taken: the `docs/**` files above, `.env.example`, and `PROGRESS.md` (my own status bullet only).
+Paired files taken: `tests/Feature/Mail/QueuedMailContractTest.php` ↔ the `--queue=` string in
+`docs/deployment-infrastructure.md`. None of Standing Rule 7(b-bis)'s five.
+Namespaces spent: nothing from either namespace.
+Prediction:
+- **Citation-liveness is the gate I most expect to break.** It sits at 18 of 18, and this increment edits more cited
+  documents than any before it. Every edit above a cited line has to replace one physical line with one.
+- The PostgreSQL 15 probe is the result I can least predict. A grep finds no SQL newer than 15, but nothing has ever
+  run this schema on 15.
+- The super-admin tests commit outside the test transaction, so a missed cleanup or a same-email write on the default
+  connection hangs the file rather than failing it.
+- PHPStan moves, because of the new `app/` classes. Every listed mutation comes back CAUGHT. No E2E spec is reached.
+- The gate reads **before-testing — 0 open of 1 · 0 waiting on you · 0 held**, and Next moves to early-testing.
+
+### Rows to file, appended at the end of the ledger
+| # | Row | Tier |
+|---|---|---|
+| N1 | The deploy's code swap and asset build happen outside the maintenance window | early-testing |
+| N2 | Registration and profile accept a 255-character name into a 150-character column | early-testing |
+| N3 | The welcome email tells a central-host account to create a workspace | early-testing |
+| N4 | The zero-gate sentence never switches off, and the gate's total shrinks | early-testing |
+| N5 | `queue:work --timeout` cannot fire on Windows | during-testing |
+| N6 | The token refresh re-check cannot stop a redundant rotation | during-testing |
+| N7 | A connector test send has no token pre-flight | during-testing |
+| N8 | No standing gate proves compatibility with the testing server's PostgreSQL 15 | during-testing |
+| N9 | Operator commands have no well-formed audit shape | before-launch |
+| N10 | No path revokes `is_super_admin` | before-launch |
+| N11 | The refresh job's lock is released before its write commits | before-launch |
+| N12 | The seeders' zero-row guard is blind to a role that does not bypass RLS | after-launch |
+| N13 | stancl resolves a multi-level host differently from `PlatformHost` | after-launch |
+| N14 | A struck closure records no closer | after-launch |
+| N15 | The pre-push guard's protocol paths omit `docs/pipeline.md` | after-launch |
+| N16 | The queue enum's docblock says five names | after-launch |
+| N17 | The dev image's upload limits reject files the app allows | after-launch |
 
 ## RELEASED — `M94`, the tier verdicts: a tier on every open row, the not-live rows closed, the ledger's tables and invisible bullets dispositioned, and the stale security and architecture lines corrected (merged as PR #286, `786afd6`, 6/6 green with real step counts — Static analysis 28 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

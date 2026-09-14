@@ -297,8 +297,15 @@ $metrics = [
     // baseline for exactly that reason, and this is the correction rather than a new capability.
     'test-pointer-lint' => [
         'job' => 'Static analysis, style & security',
-        'pattern' => '/test-pointer-lint: passed \((\d+) test file\(s\), (\d+) `\*Test` name\(s\) mentioned, (\d+) exemption\(s\)/',
-        'format' => static fn (array $m): string => "{$m[1]} test files, {$m[2]} names, {$m[3]} exemptions",
+        // ⛔ M92 — THIS PATTERN BROKE THE MOMENT THE GATE'S SUMMARY LINE CHANGED, AND THAT IS THE PAIRING
+        // THIS FILE EXISTS TO MAKE VISIBLE. Widening the lint to app/, database/ and routes/ added two
+        // numbers to its summary; the old pattern matched nothing and the row rendered NOT FOUND on the
+        // very first post-merge regeneration. ✅ It reported that rather than writing a zero, which is
+        // M91's missing-metric arm doing its job — a scrape that silently degrades to 0 is the failure
+        // this whole file is built against. Changing a gate's summary line is a PAIRED edit: the pattern
+        // here and both fixtures under tests/fixtures/gate-baselines/ move with it.
+        'pattern' => '/test-pointer-lint: passed \((\d+) file\(s\) over (\d+) root\(s\), (\d+) test file\(s\) on disk, (\d+) `\*Test` name\(s\) mentioned, (\d+) exemption\(s\)/',
+        'format' => static fn (array $m): string => "{$m[1]} files over {$m[2]} roots, {$m[3]} test files on disk, {$m[4]} names, {$m[5]} exemptions",
     ],
 ];
 

@@ -102,7 +102,7 @@ The two copies share nothing at runtime — not a port, not a database, not a fi
 > The landing page's own footer already hints at this — *"Already a member of a workspace? Go straight to
 > it at `your-workspace.localhost`"* — but its primary **Sign in** button does not, which is what makes
 > the trap easy to fall into. The central host's sign-in is correct for exactly one account:
-> `admin@meridian.test` (verified — lands on `/admin/tenants` → `/admin/two-factor`, the TOTP gate).
+> `admin@meridian.test` — but a direct sign-in there lands on `/dashboard`, a workspace-only route the central host answers with a 404, so open `/admin/tenants` directly (it sends an unenrolled operator on to `/admin/two-factor`, the TOTP gate). Only a sign-in bounced from `/admin/*` returns to the console.
 
 The app is subdomain-multitenant and the two directions are both enforced:
 `PreventAccessFromCentralDomains` rejects tenant routes on the bare central host, and

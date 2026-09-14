@@ -17,44 +17,11 @@ two server-paginated tables (2026-08-18) · fail **open** on an unseeded plan ca
 password policy min-12 + HIBP + classes (2026-08-09) · Google-only social login (2026-08-09) ·
 gamification last (2026-08-09) · the held list stays held until the user signals, and they said
 *"not yet, ask again later"* on 2026-08-18 · **a flaky e2e result fails CI** (2026-08-26, D2 below) · **the M-series ends at zero open
-`major` rows plus three consecutive increments filing none** (2026-08-28, D5 below) · **the batch series ends and the tiered pipeline succeeds it** (2026-09-14, D12 below).
+`major` rows plus three consecutive increments filing none** (2026-08-28, D5 below) · **the batch series ends and the tiered pipeline succeeds it** (2026-09-14, D12 below) · **the testing server is invitation-only** (2026-09-14, D31 below) · **the guest per-address limits are raised on the testing server only** (2026-09-14, D32 below) · **the Windows Server 2016 testing site runs PostgreSQL 15** (2026-09-14, D43 below).
 
 ---
 
 ## OPEN
-
-### D31 — On the testing server, may anyone create an account, or only people who are invited? **Tier: before-testing.**
-
-**Filed 2026-09-14 by `M93`, from Decision Board card `signup-open`.** `SettingKey::RegistrationOpenSignup`
-defaults to `true`, so a fresh install lets anyone who reaches the central host register. On a testing server
-reachable from the internet that admits strangers — and a central-host account belongs to no workspace, so it
-lands on a dead end this increment files as a row. The switch lives in the super-admin console; nothing here
-needs code.
-
-- **A — invitation-only while testing.** Turn the platform switch off; testers join by invitation to a
-  workspace the operator creates. Reversible at any time.
-- **B — open sign-up.** Anyone who finds the address can register. Useful only if outside testers should sign
-  themselves up, and it exposes the no-workspace dead end until that row is fixed.
-
-**Recommendation: A.** It keeps the server to people the user chose, invitations work normally, and it avoids
-the dead end without code. ⚠️ **It blocks no row:** the answer is applied from the Testing Server Checklist.
-
----
-
-### D32 — Will testers fill in forms together from one shared network, and should the guest per-address limit be raised for testing? **Tier: before-testing.**
-
-**Filed 2026-09-14 by `M93`, from Decision Board card `guest-ip-limit`.** A public form mints its guest token
-under `GUEST_MINT_PER_IP`, which defaults to 30 per minute and has no line in `.env.example`. A group session on
-one office network shares an address, can hit the limit, and then sees "too many requests".
-
-- **A — raise it on the testing server only.** An environment value, not a code change, and lowered again
-  before launch.
-- **B — keep the default.** Testers use their own connections, and the default stays as abuse protection.
-
-**Recommendation: A** — group testing is likely early, and the value is one line to put back. ⚠️ **It blocks no
-row:** the answer is applied from the Testing Server Checklist.
-
----
 
 ### D33 — May a workspace admin invite any email address, or only addresses at a verified company domain? **Tier: early-testing.**
 
@@ -196,6 +163,32 @@ indefinitely, and needed only for something the web app cannot do, such as backg
 - **B — plan a native app for after launch.**
 
 **Recommendation: A** — the installable web app already works offline, and no customer has asked for more.
+
+---
+
+### D44 — Should a new customer create their own workspace at sign-up, or do operators create every workspace? **Tier: before-launch.**
+
+**Filed 2026-09-14 by `M95`, while building the first-workspace command.** Two documents describe self-serve
+creation: `docs/onboarding-template-content-plan.md` §2 (step 1, *Signup → tenant creation*) has sign-up create
+the tenant and its founding Owner, and `docs/PRD.md` §4's goal G1 measures a brand-new tenant's time from signup to
+a first published form. Nothing in the product does that. A central-host registration joins no workspace, the
+landing page's "Create a workspace" button and the welcome email both offer something the product cannot do (two
+rows in `docs/feature-backlog.md`), and after `M95` the only path that creates a workspace is the operator command
+`tenants:create`. ⚠️ **It blocks nothing before launch:** the testing server is invitation-only (D31, answered).
+
+- **A — operators create every workspace.** `tenants:create` stays the only path, sign-up stays an account-only
+  door, and the landing page and welcome email stop offering creation. Cheapest; it gives up G1's self-serve
+  premise, and every new customer waits on an operator.
+- **B — self-serve creation at sign-up.** A central-host registration creates a workspace, its domain label, the
+  Owner membership and role, and a default plan, reusing `tenants:create`'s write set and its `SubdomainLabel`
+  rule. Meets G1; costs a workspace-address picker, a plan choice, abuse controls on a public door, and the
+  system-actor audit shape operator provisioning still lacks.
+- **C — operator-only now, with the write set kept in one service**, so a later self-serve door is a page rather
+  than a rewrite. A's cost today, with B's path kept open.
+
+**Recommendation: A — operator-only (`tenants:create`) until a pilot needs self-serve.** Nothing before launch
+needs a public door, the first pilot customer is itself an open question, and building one ahead of that answer is
+work the tiers exist to hold back.
 
 ---
 
@@ -1419,6 +1412,84 @@ doors; this is the builder's validation layer. They should not be answered as on
 
 
 ## ANSWERED
+
+### D31 — On the testing server, may anyone create an account, or only people who are invited? **A — invitation-only while testing.**
+
+**Answered 2026-09-14 (user decision, in chat), recorded by Lane A during `M95` — A.** It is applied, not built:
+`docs/deployment-infrastructure.md` §8.2 and the Testing Server Checklist turn Open signup off at `/admin/settings`
+right after the first super-admin (`platform:super-admin`) has enrolled two-factor, and before the host is
+published. Testers then join by invitation to a workspace the operator creates with `tenants:create`, which needs
+a working mail transport and a running worker. ⚠️ **The conditional this answer spends:** the landing-page row in
+`docs/feature-backlog.md` would have been retiered to before-testing on answer B; it stays early-testing, and its
+text was amended in place. Whether sign-up should ever create a workspace is a separate question, D44.
+
+**Filed 2026-09-14 by `M93`, from Decision Board card `signup-open`.** `SettingKey::RegistrationOpenSignup`
+defaults to `true`, so a fresh install lets anyone who reaches the central host register. On a testing server
+reachable from the internet that admits strangers — and a central-host account belongs to no workspace, so it
+lands on a dead end this increment files as a row. The switch lives in the super-admin console; nothing here
+needs code.
+
+- **A — invitation-only while testing.** Turn the platform switch off; testers join by invitation to a
+  workspace the operator creates. Reversible at any time.
+- **B — open sign-up.** Anyone who finds the address can register. Useful only if outside testers should sign
+  themselves up, and it exposes the no-workspace dead end until that row is fixed.
+
+**Recommendation: A.** It keeps the server to people the user chose, invitations work normally, and it avoids
+the dead end without code. ⚠️ **It blocks no row:** the answer is applied from the Testing Server Checklist.
+
+---
+
+### D32 — Will testers fill in forms together from one shared network, and should the guest per-address limit be raised for testing? **A — raise it on the testing server only.**
+
+**Answered 2026-09-14 (user decision, in chat), recorded by Lane A during `M95` — A.** Applied from
+`docs/deployment-infrastructure.md` §8.2 and the Testing Server Checklist: in the testing site's `.env`, raise
+`GUEST_MINT_PER_IP` and, beside it, `GUEST_SUBMIT_PER_IP` and `GUEST_CHALLENGE_PER_IP` (`config/guest.php`), which
+a group on one network exhausts in the same way; then run `php artisan config:cache`, because a cached config
+ignores `.env` edits. Dev and CI keep the defaults, and the values are lowered again before launch.
+
+**Filed 2026-09-14 by `M93`, from Decision Board card `guest-ip-limit`.** A public form mints its guest token
+under `GUEST_MINT_PER_IP`, which defaults to 30 per minute and has no line in `.env.example`. A group session on
+one office network shares an address, can hit the limit, and then sees "too many requests".
+
+- **A — raise it on the testing server only.** An environment value, not a code change, and lowered again
+  before launch.
+- **B — keep the default.** Testers use their own connections, and the default stays as abuse protection.
+
+**Recommendation: A** — group testing is likely early, and the value is one line to put back. ⚠️ **It blocks no
+row:** the answer is applied from the Testing Server Checklist.
+
+---
+
+### D43 — Which PostgreSQL does the Windows Server 2016 testing site run? **B — stay on Windows Server 2016 with PostgreSQL 15.**
+
+**Filed and answered 2026-09-14 (user decision, in chat), recorded by Lane A during `M95`. It was filed at tier
+before-testing, because the runbook's database step could not name a version without it.** The user's testing
+server is their own Windows Server 2016 box — the host `docs/adr/0005-hosting-self-hosted-windows-server.md`
+describes — run as a separate testing site. Dev and CI pin PostGIS on PostgreSQL 17, and the EDB installer lists 17
+as tested only on Windows Server 2019 and 2022, with 15 tested on 2016 (read from postgresql.org's Windows download
+page during `M95`'s verification, not measured on the box).
+
+- **A — upgrade the box to Windows Server 2022 and run PostgreSQL 17.** Parity with dev and CI, and it also
+  discharges ADR-0005's mandatory operating-system move before Windows Server 2016's support ends (~January 2027).
+  Against it: an operating-system upgrade stands between today and the first tester.
+- **B — stay on Windows Server 2016 with PostgreSQL 15.** No operating-system work before testing. Against it:
+  version parity with dev and CI is lost, and nothing gates it.
+- **C — PostgreSQL 17 on Windows Server 2016.** Parity without the upgrade, on a combination the installer's vendor
+  does not test.
+
+**The verification recommended A; the user chose B.**
+
+**Consequence, recorded so it is not rediscovered:**
+- Dev and CI stay on PostgreSQL 17.
+- `M95` runs the full CI suite once against PostgreSQL 15, on a throwaway probe branch opened as a draft pull
+  request and closed unmerged, and fixes any failure specific to 15 inside the increment, because the testing
+  server cannot run without it.
+- No standing gate keeps that result true, so a during-testing row in `docs/feature-backlog.md` tracks parity.
+- `docs/deployment-infrastructure.md` §8 step 2 prescribes a dedicated PostgreSQL 15 instance for the site.
+- ADR-0005's operating-system trigger is unchanged; when the box is upgraded, moving the site to 17 retires the
+  parity row.
+
+---
 
 ### D12 — `D5`'s bar is now measurable, and it reads MET by nine increments rather than three. End the M-series, or keep going? **B — end the series. The tiered pipeline succeeds it.**
 

@@ -363,7 +363,7 @@ of a prior `declined`/`removed` row, the `suspended` refusal and the one-role-pe
 are the same problem every time, and a second implementation would be correct until the day one of them
 changed. What differs between the doors is **one string**, recorded in the audit payload as `via`,
 because "how did this person get in" is the only question they answer differently and the ledger is the
-only place the answer survives.
+only place the answer survives. ⚠️ **The founding Owner is not a door (`M95`):** `tenants:create` writes that membership in the same transaction as the tenant itself — `tenants.owner_user_id`, the Owner role row and `invited_by = NULL` — rather than through any of the four doors below, so their gates and refusals do not apply to it.
 
 | Door | `via` | Entry point | Gate on a NEW membership |
 |---|---|---|---|
@@ -714,7 +714,7 @@ ADR-0002 §D3 documents *why* each layer is enforced (a descriptive table). This
 - GDPR subject-access/erasure mechanics for `users`/`tenant_users` rows → Doc #12 (Data Privacy & GDPR/Compliance Doc).
 - Full audit-event redaction rule detail → Doc #13 (Audit & Compliance Logging Spec) — this doc only specifies that role/permission changes emit `audits.event = 'permission_changed'` (already in the Data Dictionary's `AuditEvent` enum).
 - Plan-tier seat/role quotas (e.g., "Starter plan caps at 5 Form Editors") → Doc #24 (Pricing & Feature-Gating Matrix).
-- Tenant-creation/onboarding UX (how the very first Owner and tenant row come to exist) → Doc #25 (Onboarding & Template Content Plan).
+- Tenant-creation/onboarding UX (how the very first Owner and tenant row come to exist) → Doc #25 (Onboarding & Template Content Plan). ⚠️ **As built (`M95`), the operator path is `tenants:create`:** it writes the tenant with `owner_user_id`, its domain label, the Owner membership and role, and a default subscription in one transaction. Self-serve sign-up creates an account and no workspace; whether it should create one is an open question in `docs/claims/decisions.md`.
 - Privilege-escalation threat scenarios (this doc defines the mechanism precisely enough for that analysis to build on; it does not itself attempt an adversarial review) → Doc #11 (Security & Threat Model Doc).
 
 ---

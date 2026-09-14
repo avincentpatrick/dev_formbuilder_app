@@ -527,4 +527,4 @@ Plot any form/data-collection tool on two axes: **rigor** (repeat groups, offlin
 <!-- The pipeline markers below are DELIBERATELY at end-of-file. A marker inserted mid-document
      shifts every line beneath it, and this repository cites documents as `path:N` — 25 such
      citations point into the files that carry markers. End-of-file shifts nothing. -->
-<!-- pipeline: id=prd-feature-disposition title="Record what became of each documented product feature and acceptance criterion" phase=n/a state=ready size=XL -->
+<!-- pipeline: id=prd-feature-disposition title="Record what became of each documented product feature and acceptance criterion" phase=n/a state=ready size=XL tier=during-testing -->

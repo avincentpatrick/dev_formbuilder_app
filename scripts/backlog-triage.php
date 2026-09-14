@@ -62,9 +62,6 @@ const FROZEN = 'docs/backlog-triage-m37.md';
 /** A file cited by at least this many open rows is structural, not a row's own subject. */
 const HUB_THRESHOLD = 3;
 
-/** The batch size `D13` fixed. */
-const BATCH_MAX = 4;
-
 /** Directories that are not this repository's own source. */
 const SKIP_DIRS = ['.git', 'vendor', 'node_modules', 'storage', 'public/build', '.idea', 'coverage'];
 
@@ -190,7 +187,17 @@ if ($json) {
             'non_hub' => $row['nonHub'],
             'touches_hub' => $row['touchesHub'],
             'unresolved' => $row['unresolved'],
+            'tier' => $row['tier'] ?? null,
+            'awaits' => $row['awaits'] ?? null,
         ], $open),
+        // ⛔ PASSED THROUGH, NEVER RE-PARSED (M93). A decision is a pipeline row now, and the generator
+        //    reads nothing but this document — so the decisions ride along with the ledger they block,
+        //    from the one parser that already reads `docs/claims/decisions.md`.
+        'decisions' => [
+            'open' => $state['decisions']['open'] ?? [],
+            'answered' => $state['decisions']['answered'] ?? [],
+            'open_rows' => $state['decisions']['open_rows'] ?? [],
+        ],
     ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE).'
 ');
 
@@ -602,7 +609,7 @@ function render_body(array $open, array $hubs, array $state): string
     }
 
     $out .= render_hubs($hubs, $open);
-    $out .= render_batch($buckets['live'], $hubs);
+    $out .= render_pointer();
     $out .= render_blind($open);
 
     return $out;
@@ -670,56 +677,20 @@ function render_hubs(array $hubs, array $open): string
 }
 
 /**
- * The `D13` batch proposal — a PROPOSAL, restated with its rule, never a schedule.
+ * ⛔ THE BATCH PROPOSAL IS GONE (M93), AND THIS POINTER IS WHAT REPLACES IT.
  *
- * @param  list<array<string, mixed>>  $live
- * @param  list<string>  $hubs
+ * There is ONE picker: the Next section of `docs/pipeline.md`, ordered by tier and then by readiness.
+ * A greedy pick off this file's operability ranking was a second picker, and two pickers is the second
+ * queue this project has retired three times — `M92`'s own release records the generated proposal being
+ * rejected by hand again. `D13` survives only as the rule for GROUPING rows inside one tier, and the hub
+ * set above is still the table that rule reads.
  */
-function render_batch(array $live, array $hubs): string
+function render_pointer(): string
 {
-    $picked = [];
-    $taken = [];
-    $hubUsed = false;
-
-    foreach ($live as $row) {
-        if (count($picked) >= BATCH_MAX) {
-            break;
-        }
-
-        if (array_intersect($row['nonHub'], $taken) !== []) {
-            continue;
-        }
-
-        if ($row['touchesHub'] !== [] && $hubUsed) {
-            continue;
-        }
-
-        $picked[] = $row;
-        $taken = array_merge($taken, $row['nonHub']);
-        $hubUsed = $hubUsed || $row['touchesHub'] !== [];
-    }
-
-    $out = "\n## Suggested next batch\n\n";
-    $out .= '`D13` fixes the rule: **3–4 rows, no two citing the same non-hub file, at most one row '.
-        "touching a hub file.**\nThis is the greedy pick off the top of the queue above — a proposal to ".
-        "check, not a schedule.\nA row whose files were not harvested cannot be checked for collision and ".
-        "is not proposed.\n\n";
-
-    if ($picked === []) {
-        return $out."*No batch could be formed.*\n";
-    }
-
-    foreach ($picked as $row) {
-        $out .= sprintf(
-            "- **%s:%d** — `%s` · %s\n",
-            BACKLOG,
-            $row['line'],
-            $row['provenance'] ?? '(unattributed)',
-            $row['nonHub'] === [] ? '*no non-hub file*' : '`'.implode('` · `', $row['nonHub']).'`'
-        );
-    }
-
-    return $out;
+    return "\n## What to take next\n\n"
+        ."Not here. **`docs/pipeline.md` § Next** names the work, ordered by tier and then by readiness — one\n"
+        ."picker, not two. This file keeps its own job: the operability ranking inside the defect ledger, and\n"
+        ."the hub set above, which `D13` still uses to group the rows of one tier into an increment.\n";
 }
 
 /**

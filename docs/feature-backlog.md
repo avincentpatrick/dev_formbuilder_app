@@ -138,7 +138,7 @@ Several of these are **real XLSForm round-trip import failures today** — a Kob
 | Recurring third-party penetration test | should | 2+ | Companion to the now-adopted CI SCA/SAST |
 | Legally-defensible e-signature (signer auth, consent-to-sign, tamper-evident certificate) | nice | 3–4 | Today's signature field stores only an image; a real ESIGN/eIDAS capability is a separate product line — only on demonstrated demand |
 | Enterprise identity/network — SCIM auto-provisioning + tenant IP allowlisting | nice | 4 (with the planned SSO/SAML) | SCIM auto-deprovisioning is the standard companion to SAML for large tenants |
-| **Playwright a11y coverage for the central-domain admin console** ⚠️ **STILL OPEN — I10e (2026-08-09) DID TWO OF THE SIX PAGES** (`/admin/settings`, `/admin/feedback`), so the title is deliberately NOT struck through. **ALL FOUR BLOCKERS THIS ROW ACCUMULATED WERE FALSE, INCLUDING THE ONE I10e ITSELF FILED**, and the last one is the instructive one. **The fourth blocker was a RACE IN THE TEST SETUP, not an app fault.** Its evidence read: a central-host `POST /login` 302s, the browser stays on `/login` with no validation error and a `meridian-session` cookie present, and `GET /admin/settings` then 302s away — recorded over four CI cycles as `POST 302 /login | GET 302 /admin/settings | GET 200 /login`. Two runs settled it. (a) A Pest test (`tests/Feature/Auth/CentralHostLoginTest.php`) proved the SERVER side clean: a real `POST http://meridian.test/login` authenticates the operator, the session carries into `/admin/settings`, and the console renders once step-up is confirmed. (b) The browser half was then reproduced against the LOCAL docker stack — no CI needed, `E2E_BASE_URL=http://acme.localhost:8080` — where full response logging showed `POST 302 /login → /dashboard` (i.e. **the login had succeeded all along**) and, decisively, the `/admin/settings` document navigation firing BEFORE the login XHR had landed. **The cause: the login form is an Inertia XHR (`form.post`), so the page performs no document navigation and `waitForLoadState('networkidle')` resolves INSTANTLY against the already-idle previous load.** The setup raced ahead and read a guest session. Two fixes, both in `global-setup.ts`: visit `/admin/settings` as a guest FIRST so `redirect()->guest()` plants `url.intended` (otherwise Fortify targets `fortify.home` = `/dashboard`, a TENANT route whose `NotASubdomainException` handler redirects to the absolute `config('app.url')` — which an Inertia XHR cannot follow, since an external redirect needs `Inertia::location()`'s 409); and `waitForURL` on the post-login destination, which is both the sync point and a genuine session assertion because every candidate sits behind `auth`. **TWO REAL DEFECTS FELL OUT, NEITHER OF WHICH THE a11y SCANS WERE LOOKING FOR.** (1) **`E2eSeeder::seedSuperAdmin()` and `DemoSeeder::ensureSuperAdmin()` were promoting the operator over the app connection, affecting ZERO rows, silently.** `users` carries FORCE row-level security, its SELECT policy is join-shaped and fails closed with no context, and PostgreSQL applies SELECT policies to an UPDATE whose WHERE reads a column — and a platform operator has no tenant membership by design, so it is invisible from every context. A freshly seeded demo database had no super-admin at all and no error to say so. Fixed to `pgsql_privileged`; both arms pinned in Pest, the hazard arm included, so a revert reddens. (2) **`AdminLayout` overflows horizontally at 375px** — its first measurement at any viewport, red on both pages in both themes. Measured rather than guessed: `.admin__nav` is 369px of links from x=16, i.e. 385 against a 375px viewport; identical on both pages, which is the tell that it is the shell. `flex-wrap` on the nav inside the existing ≤900px block (where the bar is already `height: auto`) is the fix. **What remains, and why it was not swept in:** `/admin/tenants`, the tenant detail page, `/admin/users` and `/admin/audit-log`. Twelve tests is about two minutes of a ~13-minute job, and four more pages would triple that before anyone knew whether the shell was clean — which was the right call, because it was not. Now that `AdminLayout` is measured clean at all three widths, adding them is cheap. Original filing follows.  (owner: **I10e — two of six pages done**) | should | 1 | Filed by I5, which added `/admin/settings` — the console's first page with real form controls. **I8c closed the sibling half of this row and deliberately did NOT close this one; the reasoning changed, so it is restated rather than left as filed.** I8c added `tests/e2e/auth-axe.spec.ts` for the unauthenticated pages using the proven per-file `test.use({ storageState: { cookies: [], origins: [] } })` idiom — NOT the `playwright.config.ts` restructure this row assumed, because a fourth project would multiply all eight existing specs by a viewport they do not need. **The `otplib` blocker this row names has dissolved**: TOTP is HMAC-SHA1 over a time counter, ~30 lines with node's own `crypto` plus a base32 decoder, so no dependency need enter the `npm audit --omit=dev` gate. **But I8a added a NEW hop that did not exist when this was filed** — every console page now carries `step-up`, so a console `globalSetup` must log in, clear the TOTP challenge, hit a console route, follow the redirect to `/user/confirm-password`, submit, and come back. That is four sequenced redirects in a setup file that cannot be exercised outside CI (Playwright needs the full running stack), and shipping unverified E2E infrastructure into a merge-blocking gate buys CI cycles rather than confidence. Deferred on those grounds and not on effort. Until then the console's primitives stay axe-covered per-story by the Storybook job, and its behaviour by `resources/js/Pages/admin/*.test.ts` |
+| **Playwright a11y coverage for the central-domain admin console** ⚠️ **STILL OPEN — I10e (2026-08-09) DID TWO OF THE SIX PAGES** (`/admin/settings`, `/admin/feedback`), so the title is deliberately NOT struck through. ➡️ **`M93` (2026-09-14) filed the four remaining pages as a ledger row at the end of this file, so the pipeline can see them.** **ALL FOUR BLOCKERS THIS ROW ACCUMULATED WERE FALSE, INCLUDING THE ONE I10e ITSELF FILED**, and the last one is the instructive one. **The fourth blocker was a RACE IN THE TEST SETUP, not an app fault.** Its evidence read: a central-host `POST /login` 302s, the browser stays on `/login` with no validation error and a `meridian-session` cookie present, and `GET /admin/settings` then 302s away — recorded over four CI cycles as `POST 302 /login | GET 302 /admin/settings | GET 200 /login`. Two runs settled it. (a) A Pest test (`tests/Feature/Auth/CentralHostLoginTest.php`) proved the SERVER side clean: a real `POST http://meridian.test/login` authenticates the operator, the session carries into `/admin/settings`, and the console renders once step-up is confirmed. (b) The browser half was then reproduced against the LOCAL docker stack — no CI needed, `E2E_BASE_URL=http://acme.localhost:8080` — where full response logging showed `POST 302 /login → /dashboard` (i.e. **the login had succeeded all along**) and, decisively, the `/admin/settings` document navigation firing BEFORE the login XHR had landed. **The cause: the login form is an Inertia XHR (`form.post`), so the page performs no document navigation and `waitForLoadState('networkidle')` resolves INSTANTLY against the already-idle previous load.** The setup raced ahead and read a guest session. Two fixes, both in `global-setup.ts`: visit `/admin/settings` as a guest FIRST so `redirect()->guest()` plants `url.intended` (otherwise Fortify targets `fortify.home` = `/dashboard`, a TENANT route whose `NotASubdomainException` handler redirects to the absolute `config('app.url')` — which an Inertia XHR cannot follow, since an external redirect needs `Inertia::location()`'s 409); and `waitForURL` on the post-login destination, which is both the sync point and a genuine session assertion because every candidate sits behind `auth`. **TWO REAL DEFECTS FELL OUT, NEITHER OF WHICH THE a11y SCANS WERE LOOKING FOR.** (1) **`E2eSeeder::seedSuperAdmin()` and `DemoSeeder::ensureSuperAdmin()` were promoting the operator over the app connection, affecting ZERO rows, silently.** `users` carries FORCE row-level security, its SELECT policy is join-shaped and fails closed with no context, and PostgreSQL applies SELECT policies to an UPDATE whose WHERE reads a column — and a platform operator has no tenant membership by design, so it is invisible from every context. A freshly seeded demo database had no super-admin at all and no error to say so. Fixed to `pgsql_privileged`; both arms pinned in Pest, the hazard arm included, so a revert reddens. (2) **`AdminLayout` overflows horizontally at 375px** — its first measurement at any viewport, red on both pages in both themes. Measured rather than guessed: `.admin__nav` is 369px of links from x=16, i.e. 385 against a 375px viewport; identical on both pages, which is the tell that it is the shell. `flex-wrap` on the nav inside the existing ≤900px block (where the bar is already `height: auto`) is the fix. **What remains, and why it was not swept in:** `/admin/tenants`, the tenant detail page, `/admin/users` and `/admin/audit-log`. Twelve tests is about two minutes of a ~13-minute job, and four more pages would triple that before anyone knew whether the shell was clean — which was the right call, because it was not. Now that `AdminLayout` is measured clean at all three widths, adding them is cheap. Original filing follows.  (owner: **I10e — two of six pages done**) | should | 1 | Filed by I5, which added `/admin/settings` — the console's first page with real form controls. **I8c closed the sibling half of this row and deliberately did NOT close this one; the reasoning changed, so it is restated rather than left as filed.** I8c added `tests/e2e/auth-axe.spec.ts` for the unauthenticated pages using the proven per-file `test.use({ storageState: { cookies: [], origins: [] } })` idiom — NOT the `playwright.config.ts` restructure this row assumed, because a fourth project would multiply all eight existing specs by a viewport they do not need. **The `otplib` blocker this row names has dissolved**: TOTP is HMAC-SHA1 over a time counter, ~30 lines with node's own `crypto` plus a base32 decoder, so no dependency need enter the `npm audit --omit=dev` gate. **But I8a added a NEW hop that did not exist when this was filed** — every console page now carries `step-up`, so a console `globalSetup` must log in, clear the TOTP challenge, hit a console route, follow the redirect to `/user/confirm-password`, submit, and come back. That is four sequenced redirects in a setup file that cannot be exercised outside CI (Playwright needs the full running stack), and shipping unverified E2E infrastructure into a merge-blocking gate buys CI cycles rather than confidence. Deferred on those grounds and not on effort. Until then the console's primitives stay axe-covered per-story by the Storybook job, and its behaviour by `resources/js/Pages/admin/*.test.ts` |
 
 ## 8. AI & modern 2026 differentiators
 
@@ -646,7 +646,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   honest fix is a wrap or shrink affordance on a design-system component with **nine** consumers, and
   `flex-wrap` is foreclosed for the topnav instance (`.topnav` is a fixed 64px with `flex-shrink: 0`),
   so it needs its own increment with a story, a DSR note and a re-measure of every consumer under the
-  Linux font stack. **Live**, and now reproducible locally. Filed by `M19`.
+  Linux font stack. **Live**, and now reproducible locally. Filed by `M19`. **Awaits D28.**
   ⛔ **CORRECTED BY `M87` (2026-09-08) — THE CENSUS, ONE CANDIDATE REMEDY AND THE 30px ARE ALL WRONG, AND
   THE REASON THE HONEST FIX WAS RULED OUT IS STALE.** The `M78` row that measured this is now closed and its
   findings are here rather than one document away.
@@ -718,8 +718,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   Pint `passed`, `openapi.json` byte-identical, zero `.vue` / `.ts` / `packages/design-system/` / e2e movement. Filed by `M1`.
 
 - ➡️ **MOVED TO `docs/claims/decisions.md` AS `D1` (2026-08-25) — IT IS A DECISION, NOT A DEFECT, AND NO LANE SHOULD TAKE IT AS A ROW.** An audit of all 62 open merge-gate rows confirmed this as the only genuinely cross-cutting one: the fix cannot avoid `scripts/job-payload-lint.php`, whose pass-1 scan of `app/` trips R1 on any listener implementing `ShouldQueue` and whose only escape is an `EXEMPT_JOBS` entry inside that script (a listener cannot extend `TenantAwareJob` — its `handle()` is `final`), and it must re-pin `tests/Feature/Connectors/ConnectorFanOutTest.php:163`, which **hard-asserts** these listeners are not queued. Nothing has decided that they should be. Original filing follows, kept because its reasoning is intact.
-- **`minor` · All sixteen synchronous dispatch listeners could now be `ShouldQueue`, and nothing has
-  decided whether they should be.** ⚠️ **The count is SIXTEEN, not the seven this row first said** — eight
+- ~~**`minor` · All sixteen synchronous dispatch listeners could now be `ShouldQueue`, and nothing has
+  decided whether they should be.**~~ ⚠️ **The count is SIXTEEN, not the seven this row first said** — eight
   per channel, all synchronous; seven is merely how many carried the docblock sentence M3 retired. Filed by **M3 (2026-08-19)** at the moment the decision was taken, because a
   deliberately-unfixed finding that lives only in a commit message is invisible to any later backlog search.
   Until M3 the answer was forced: a queued listener found no tenant context and the fan-out silently matched
@@ -729,7 +729,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   little and keeps delivery-row creation inside the request that caused it; against that, `form.opened` and
   `form.closed` fire inside the H12a sweep's per-tenant transaction, where a slow fan-out holds row locks
   taken by `lockForUpdate()`. **Nothing is broken either way** — this is a latency/locking trade, not a
-  correctness one, which is why M3 declined to make it while fixing a correctness bug. Filed by `M3`. **Not live** — the corpus moved this out to a decision and says so in the bullet above it — an undecided question rather than a defect, judged by `M65`.
+  correctness one, which is why M3 declined to make it while fixing a correctness bug. Filed by `M3`. **Not live** — the corpus moved this out to a decision and says so in the bullet above it — an undecided question rather than a defect, judged by `M65`. ✅ **DONE — `M93` (2026-09-14): closed as a duplicate.** It moved to `D1` on 2026-08-25, and `D1` is now a row in the pipeline itself, so this bullet was the same question queued twice.
 
 - **`minor` · Twelve existing tenant-context call sites restore in a `finally` INSIDE their transaction,
   which is the shape `TenantContext::runFor()` was deliberately built to avoid.** Filed by **M3
@@ -909,7 +909,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - **`minor` · The setup-time directory has no pre-flight refresh**, so an ordinary token expiry tells the
   tenant to reconnect a healthy account — `app/Services/Connectors/TabularDestinationDirectory.php:46,68`,
-  the one place H16a's guard was not applied. **Latent** on a missed sweep (H16a's own premise). Filed by `M1`.
+  the one place H16a's guard was not applied. **Latent** on a missed sweep (H16a's own premise). Filed by `M1`. **Tier: before-testing.**
 - ✅ **CLOSED BY `M66` (2026-09-03) — `minor` · ~~`ConnectorRulePausedNotification` is the only tenant-facing
   connector email with no brand.~~** The send is at `app/Jobs/Connectors/DeliverConnectorMessageJob.php:382-383`
   and now carries `->withBrand(BrandPalette::forTenantId($this->tenantId))`, matching its branded sibling 23
@@ -1409,7 +1409,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `conflictHere` beside it are all visit-scoped — so a respondent can read three consecutive sentences whose
   numbers only reconcile if they count a stranger's rows. Filed rather than fixed: it discloses a count and
   nothing else, which is exactly the shape ADR-0021 sanctioned for an earlier visit, and touching the
-  device-wide count risks the boot drain that ADR-0021 makes load-bearing. **Live.** Filed by `M21`.
+  device-wide count risks the boot drain that ADR-0021 makes load-bearing. **Live.** Filed by `M21`. **Awaits D26.**
 
 - ~~**`minor` · Resume-link shells sit in Cache Storage, and the brand refresh re-fetches them.**~~ A resume
   link is a path under `/f/`, and `sw.ts` NetworkFirst-caches every same-origin navigate under `/f/` into
@@ -2446,7 +2446,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   obvious shape to reuse (`SsoDomainService::isVerifiedFor()` is already phrased over an address), but applying
   it here is a **product decision, not a cleanup**: today any workspace may invite anyone, including
   contractors and personal addresses, and gating that on DNS would change what invitation means for every
-  workspace rather than only for SSO ones. Whoever takes it decides that first. Filed by `M18`. **Live** — reachable today: invite validates address shape only, so a workspace can send a branded invitation to an address it does not control and occupy that identity, judged by `M65`.
+  workspace rather than only for SSO ones. Whoever takes it decides that first. Filed by `M18`. **Live** — reachable today: invite validates address shape only, so a workspace can send a branded invitation to an address it does not control and occupy that identity, judged by `M65`. **Awaits D33.**
 
 - **`minor` · Self-registration remains a way to occupy an address in a domain you do not control.** Filed
   2026-08-26 by M18, recorded because §D34's *"an active membership is the grandfather"* reasoning depends on
@@ -2455,7 +2455,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   it. ⚠️ **Materially weaker than what M18 closed, and the difference is what makes it a `minor`**: the
   registrant sets their own password and **nothing forges `email_verified_at`**, so the account squats an
   address without minting a false claim about mailbox control — which is the property `identityIsEstablished()`
-  reads. Older than SSO, and any fix touches the ordinary registration path for everybody. Filed by `M18`. **Live** — reachable today by anyone who can reach the registration form, judged by `M65`.
+  reads. Older than SSO, and any fix touches the ordinary registration path for everybody. Filed by `M18`. **Live** — reachable today by anyone who can reach the registration form, judged by `M65`. **Awaits D34.**
 - ✅ **CLOSED BY `M9` (2026-08-24) — `major` · ~~SSO adopts an existing account whenever a PENDING INVITATION exists, so an SSO-entitled
   admin can be signed in as any stranger they invited — no emailed token required.** Found by M8's
   adversarial pass and **verified against the code by hand before filing**; it is the same conflation M8
@@ -5891,7 +5891,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
  ⚠️ **And the cheaper half of the exposure is not in `sw.ts` at all:** the resume READ
   escapes caching only because its path prefix is `drafts/` rather than `f/`; `routes/api.php` now says so
   at the site, and one route rename or a consolidation of the two public groups re-opens it. **Live.**
-  Filed by `M70`.
+  Filed by `M70`. **Awaits D20.**
 
 - **`minor` · The audit spec's §1 table is asserted by nothing, and a static sweep cannot be the thing that
   asserts it.** `docs/audit-compliance-logging-spec.md` §1 calls itself *"a definitive, checkable list"*;
@@ -6386,7 +6386,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `npm install`; it was not taken because `D7` fixes the six required contexts by job name and adding one
   is a branch-protection change. ⚠️ **The honest gap is that nobody is obliged to read the annotation.**
   A stronger form would fail the step on N consecutive unreachable runs, which needs state the workflow
-  does not have today. Recorded as `D16`. **Live.** Filed by `M72`.
+  does not have today. Recorded as `D16`. **Live.** Filed by `M72`. **Awaits D16.**
 - **`minor` · What actually delivers the offline mis-cased render is unknown, and TWO confident models of
   it have now been wrong.** Measured by `M73` (2026-09-05) while closing the `/f/*` opaqueredirect row, and
   filed rather than guessed at because this exact route has already produced two wrong answers that were
@@ -6894,7 +6894,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   warned rather than silently losing work, but an hour of transcription still lives only in the tab.
   👤 **The decision is the user's**: a draft-shaped side table for in-progress corrections, an explicit
   "save a working copy" action, or a documented statement that corrections are not resumable. **Live.**
-  Filed by `M75`.
+  Filed by `M75`. **Awaits D36.**
 
 - **`minor` · `CLAUDE.md`'s gate table sends PHPStan to the container, one row below the rule that explains
   why the container is wrong.** Measured by `M76` (2026-09-06) while closing the 18-phantom-errors row.
@@ -6939,7 +6939,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   truncate at all; `tests/Feature` holds 41 entries and enumerates perfectly while `tests/Feature/Forms`
   holds 46 and collapses to 6. The next directory to go blind cannot be predicted, which is why this is a
   gate and not a list. 👤 **What is left for the user is `D17`**: whether that permanent local red is
-  wanted, or whether it should be softened. **Live** until `D17` is answered. Filed by `M76`.
+  wanted, or whether it should be softened. **Live** until `D17` is answered. Filed by `M76`. **Awaits D17.**
 
 - ✅ **CLOSED BY `M77` (2026-09-06) — `minor` · ~~`R7` pins the checkout depth to `PR commits + 1`, so a depth of 50 keeps every gate green
   while blinding the secret scan to 1,100 of 1,181 commits.~~** Measured by `M76`'s read-only fan-out
@@ -7154,7 +7154,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   (*"across all sessions on this device"*, a visit-scoped count, or no number at all), it is genuinely the
   user's, and it changes a string another increment deliberately pinned in `sync-status.test.ts`. Whoever
   takes it should render the panel before rewording it — `M15`'s note says that is what caught it last
-  time. **Live.** Filed by `M77`.
+  time. **Live.** Filed by `M77`. **Awaits D26.**
   ⛔ **EVIDENCE CORRECTED BY `M86` (2026-09-07) WITHOUT CLOSING THE ROW — THE CITATION THIS ROW MAKES ABOUT
   ITS OWN COST IS FALSE.** It says a re-aim *"changes a string another increment deliberately pinned in
   `sync-status.test.ts`"*. That file carries **no quota assertion and structurally cannot**: its fixture
@@ -7445,7 +7445,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `docs/data-dictionary.md:221` say `false`. `docs/ux/form-filling-ux-flow.md:337` calls `true` "the literal
   default for a new form" and `docs/PRD.md:103` agrees. So repairing one pair does not settle it. ⚠️ The
   cost is already on the record: `PROGRESS_ARCHIVE.md:297` logs an E2E timeout caused by the seeded form
-  defaulting to multi-step. **Live.** Filed by `M80`.
+  defaulting to multi-step. **Live.** Filed by `M80`. **Awaits D35.**
 
 - **`minor` · `forms.allow_manual_encoding` is documented as Feature #7's capability flag and has neither a
   reader nor a writer — the only one of five inert `allow_*` flags whose feature actually shipped.**
@@ -7508,7 +7508,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   two endpoints and any status read. ⚠️ **It is also not specific to exports** — `PATCH /tenant`, form
   write CRUD, the draft group, `GET/PATCH/DELETE /submissions/{submission}`, attachments, `users`/`roles`
   and `subscription` are absent from `routes/api.php` the same way, and the sibling rows in this block name
-  them. **Live.** Filed by `M80`.
+  them. **Live.** Filed by `M80`. **Awaits D38.**
 
 - **`minor` · The documented `Users & roles` API resource group (`GET/POST /api/v1/users`, `/api/v1/roles`)
   has zero routes, and a shipped schema decision was already paid for it.** Measured by `M79`'s sweeps
@@ -7525,7 +7525,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   deferral**: `docs/multi-tenancy-rbac-design.md:711` defers the request/response *shapes* to Doc #14, and
   `docs/api-specification.md:13` points straight back at §7.1 as the authoritative inventory. Neither
   defers the build. This repository builds `/api/v1` twins deliberately — `routes/tenant.php:755` says
-  so — so the web surface does not discharge it. **Live.** Filed by `M80`.
+  so — so the web surface does not discharge it. **Live.** Filed by `M80`. **Awaits D38.**
 
 - **`minor` · §7.1's `Form draft` row pins four `/api/v1` builder endpoints registered nowhere, and the
   `validations` sub-resource exists on neither surface.** Measured by `M79`'s sweeps (2026-09-06), joined
@@ -7546,7 +7546,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `app/Services/Forms/FormBuilderService.php:157`, `:322` and `:331` — so nothing in the tree implements
   them as an addressable resource at all. ⚠️ Adjacent and deliberately in scope of the same repair:
   `docs/architecture/technical-architecture.md:441` also pins `POST /api/v1/forms` and
-  `PATCH/DELETE /api/v1/forms/{form}`, and only the two GETs exist. **Live.** Filed by `M80`.
+  `PATCH/DELETE /api/v1/forms/{form}`, and only the two GETs exist. **Live.** Filed by `M80`. **Awaits D38.**
 
 - **`minor` · The parity matrix scores API/programmatic import as Phase-1 shipped, and the code's own enum
   docblock calls it a later channel.** Measured by `M79`'s sweeps (2026-09-06), joined and refuted by
@@ -7666,7 +7666,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   long closed — and it was never converted into a queue row, nor were its three siblings from the same
   sentence. `docs/api-specification.md:304` is §4 Out of Scope and does not carry it. That archive note is
   the record of a deferral nobody filed, which is exactly what this row corrects. **Live.**
-  Filed by `M80`.
+  Filed by `M80`. **Awaits D38.**
 
 - **`minor` · The per-endpoint `include_answers: true` webhook payload opt-in has no key anywhere — and
   four other files appear to record it as a deferral already taken.** Measured by `M79`'s sweeps
@@ -7742,7 +7742,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `app/Providers/AppServiceProvider.php:374` records that `throttle:api` is priority-sorted *ahead of*
   authentication, so `$request->user()` is unresolved inside that closure and it keys on the token hash — a
   per-user 300/min limiter has to solve that ordering rather than copy the `api` shape. **Latent.**
-  Filed by `M80`.
+  Filed by `M80`. **Awaits D38.**
 
 - **`minor` · `export_artifact` objects are documented as auto-deleted seven days after generation, and no
   scheduled cleanup task is declared.** Measured by `M79`'s sweeps (2026-09-06). ⛔ **UNJUDGED — the
@@ -7811,7 +7811,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   its table neighbours: this is a **concurrency** promise, so a limiter audit that checks `RateLimiter::for`
   definitions passes straight over it. ⚠️ Pairs with the async-export row above —
   `docs/architecture/technical-architecture.md:469` opens §7.3 and defines both export modes, and neither
-  is built. **Latent.** Filed by `M80`.
+  is built. **Latent.** Filed by `M80`. **Awaits D38.**
 
 - ~~**`minor` · `PROGRESS.md` is within roughly one status bullet of its `tracker-lint` R1 byte ceiling, and
   the two surfaces a session actually reads before pushing both stay silent about it.**~~
@@ -8028,7 +8028,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   and adds a second sha-shaped regex to keep in step with the renderer; or have `derive_pipeline()`
   count the body's table rows instead of reading the banner, which removes the reason the banner has to
   be trustworthy at all and is the smaller change — but it makes `state.php` parse the row table, and
-  `loop.php`'s recorded lesson is about exactly what a second parser costs. **Live.** Filed by `M82`.
+  `loop.php`'s recorded lesson is about exactly what a second parser costs. ⚠️ `M93` moved the anchor to `## Testing gate`, which now opens the generated body; the banner is still outside the check, so the row stands as filed. **Live.** Filed by `M82`.
 
 - **`minor` · `scripts/citation-liveness-lint.php` sits AT its ceiling with zero headroom, so any edit
   that shifts a line in `docs/data-dictionary.md` is a merge failure and nothing says so.** Measured by
@@ -8280,8 +8280,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   cannot tell a mutation-caused failure from a pre-existing one, which is no verdict.
   **Live.** Filed by `M84`.
 
-- **`minor` · `scripts/pipeline.php` derives a defect row's state from LIVENESS alone, so a row blocked
-  on an open USER DECISION is published as `state=ready`.** Measured by `M84`'s fan-out (2026-09-07)
+- ~~**`minor` · `scripts/pipeline.php` derives a defect row's state from LIVENESS alone, so a row blocked
+  on an open USER DECISION is published as `state=ready`.**~~ Measured by `M84`'s fan-out (2026-09-07)
   against a row it had just refused to take for exactly that reason. The generator maps a `live` marker
   to `ready` and has no way to see that a row's remaining half is a question handed to the user: the
   PHPUnit-collector row is `ready` with blocker `—` in the generated line, while its own text says it is
@@ -8292,7 +8292,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   blocked passes everything**, so this is that warning with a measured instance attached rather than a
   new claim. The cheap repair is a marker key naming a decision id, checked against the `## OPEN`
   section; the expensive half is deciding whether a decision-blocked row is `held` or a fourth state.
-  **Live.** Filed by `M84`.
+  **Live.** Filed by `M84`. ✅ **DONE — `M93` (2026-09-14).** A row whose remaining work is an open decision now carries an awaits token — `decision=` on a marker — and is published `blocked` with blocker `decision: Dn`; every open decision is itself a row, and `pipeline-lint` P7b and P7e hold both. ⛔ **The row understated itself: eighteen open rows waited on a decision, not one.** Its open question is answered as well — neither `held` nor a fourth state, because `held` would break P4's two-way coverage and the held floor.
 
 - ~~**`minor` · `DocumentedDefaultDriftTest`'s executed assertion chain is EIGHT long, and the five that
   fire FIRST cannot be split the way the other three were.**~~
@@ -8546,8 +8546,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   queue state from, so two contradictory verdicts on one defect means the queue is publishing a state for it
   that is half wrong by construction. **Live.** Filed by `M86`.
 
-- **`minor` · `D13` caps a batch at one row that TOUCHES a hub file; the generator implements one that
-  CITES one.** Measured by `M86` (2026-09-07). The decision's wording is *touch*; `render_batch()` derives
+- ~~**`minor` · `D13` caps a batch at one row that TOUCHES a hub file; the generator implements one that
+  CITES one.**~~ Measured by `M86` (2026-09-07). The decision's wording is *touch*; `render_batch()` derives
   its hub test from the harvested cite set, and a row cites where its evidence is rather than where its fix
   lands. ⛔ **Under the decision's own words the proposal `M86` was handed is a literal violation and not
   merely a violation of intent:** one of its rows cites the tracker-lint controls file directly, and a second
@@ -8555,7 +8555,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   decision is the user's and is answered — it is a defect in the thing implementing it, and it is filed apart
   from the duplicate-row problem above because repairing either leaves the other standing. ⚠️ **`D15` is
   already open on the hub cap; this is an input to it and not a substitute for answering it.** **Live.**
-  Filed by `M86`.
+  Filed by `M86`. ✅ **DONE — `M93` (2026-09-14): the code this row describes is deleted.** `render_batch()` and `BATCH_MAX` are gone and `docs/pipeline.md` § Next is the one picker, so no generator implements the cap; it lives only in `D13`'s text, which `D15` still asks about.
 
 - **`minor` · The archived status bullets live in TWO non-contiguous places, and that is what made the batch
   numbering go wrong.** Measured by `M86` (2026-09-07) while performing a surgery. `M71`'s batch was appended
@@ -8866,7 +8866,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   ⚠️ **This is the sharper form of what the closed schedule-window row was reaching for and got wrong**: the
   split is not promote-door versus submit-door, it is two columns of one write inside one guard class.
   ⚠️ Whether that asymmetry is wrong is the `D27` question rather than a separate one.
-  **Live.** Filed by `M88`.
+  **Live.** Filed by `M88`. **Awaits D27.**
 - ~~**`minor` · `P2d`'s dormant-column skip is TABLE-BLIND, and a phantom in one table masked a real inert
   column in another.**~~
   ✅ **CORRECTED AND CLOSED BY `M89` (2026-09-10). THE DEFECT IS REAL, THE PRESCRIBED FIX IS MEASURABLY
@@ -9191,7 +9191,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   cross-field validation rule resolving to a null `related_field_key` and being KEPT by the filter that
   exists to drop it. ⛔ **The blocker is the decision, not the code**: `M90` made `saveAsTemplate()` the
   FIRST request-path `set transaction isolation level` in this codebase, and whether that becomes a pattern
-  is `D29` in `docs/claims/decisions.md`. **Latent.** Filed by `M90`.
+  is `D29` in `docs/claims/decisions.md`. **Latent.** Filed by `M90`. **Awaits D29.**
 - ~~**`minor` · Four sites cite a tenants column-whitelist guard that has never existed, and the gate that
   could see them is forced to exempt it.**~~ Found by `M90` (2026-09-10). `scripts/test-pointer-lint.php`
   forbids a test file naming a `*Test` class with no file behind it; this one is EXEMPTED rather than
@@ -9237,7 +9237,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `docs/claims/decisions.md` as well. ⚠️ **This is recorded rather than argued** — `D15` is already open on
   whether that cap should be relaxed to per-file or re-derived per batch, and this is the first measured
   case of it forbidding work rather than merely shrinking a batch. It is an input to `D15`, not a licence.
-  **Live.** Filed by `M90`.
+  **Live.** Filed by `M90`. **Awaits D15.**
 - ~~**`minor` · `scripts/gate-baselines.php`'s gate list and its two harness fixtures must change together,
   nothing says so, and `M90` turned `main` red by not knowing it.**~~ Measured by `M90` (2026-09-10), the
   hard way. `GateBaselinesTest` drives the REAL generator against `tests/fixtures/gate-baselines/ci-log.txt`
@@ -9526,3 +9526,99 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   took a PR instead. ⚠️ The cheap remedy is a `--check` arm on the scraper that runs on the HOST against
   the live gates' own output rather than against a CI log, which would move the signal from post-merge to
   pre-push. **Live.** Filed by `M92`.
+- **`minor` · `deploy.ps1` cycles two Windows services that cannot exist and never runs `queue:restart`, so a
+  deploy leaves a running worker on the previous release's code.** Measured by `M93` (2026-09-14) against the
+  script rather than its documentation. Its only service step loops over `meridian-horizon` and
+  `meridian-reverb` behind `Get-Service -ErrorAction SilentlyContinue`, a silent no-op on every host: neither
+  package is in `composer.json`, and no Horizon or Reverb config file exists. The queue is the `database`
+  driver (`config/queue.php`) drained by a plain `queue:work`. ⛔ **`queue:restart` appears nowhere in the
+  tree**, so a worker outlives the `migrate --force` and the cache rebuild and keeps the old code until it
+  dies. ⚠️ The script is dormant until a server exists, and the testing server is the next step — which is why
+  this is tiered for it. The remedy sits in the same `try` block: `php artisan queue:restart`, the real worker
+  service name, and the dead loop deleted. **Live.** Filed by `M93`. **Tier: before-testing.**
+- **`minor` · No production path creates the first platform super-admin: the only writers of
+  `users.is_super_admin` are two seeders, and both return early in production.** Measured by `M93`
+  (2026-09-14). The flag is a column, not a role, and `EnsureSuperAdmin` refuses the whole console without it.
+  `DemoSeeder::ensureSuperAdmin()` and `E2eSeeder::promoteToSuperAdmin()` are its only writers of `true`, and
+  both `run()` methods return on `app()->environment('production')`. None of the four artisan commands touches
+  the flag, `routes/admin.php` has no promotion route, and `deploy.ps1` runs `migrate --force` and no seeder.
+  ⛔ **The cost is not only a missing console:** `SettingKey::RegistrationOpenSignup` defaults to `true` and the
+  console is the only place that closes it, so a fresh host opens sign-up with nobody able to reach the switch.
+  ⚠️ **The obvious manual escape is a trap:** an `UPDATE` on the application connection affects zero rows in
+  silence, because `users` carries FORCE row-level security and an operator has no membership. A command must
+  write over `pgsql_privileged` with a row-count check, set `email_verified_at`, and leave two-factor
+  unenrolled so the operator is sent to enrolment rather than locked out. **Live.** Filed by `M93`. **Tier: before-testing.**
+- **`minor` · `docs/deployment-infrastructure.md` §8 omits what a first `migrate --force` and a first tester
+  need, so a server stood up from it fails before anyone signs in.** Measured by `M93` (2026-09-14) against the
+  migrations, the compose stack and CI rather than the runbook's prose. ⛔ **Database:** step 2 installs
+  PostgreSQL and names no extension, while a migration runs `CREATE EXTENSION IF NOT EXISTS postgis` over
+  `pgsql_privileged`, so the binaries must be on the host; and nothing names the superuser login behind
+  `DB_PRIVILEGED_USERNAME`, or `DB_AUTH_PASSWORD` and `DB_SUPERADMIN_PASSWORD`, which the role-creating
+  migrations read and which must be set before the first migrate. ⛔ **Seeding:** `db:seed --force` seeds the
+  role catalog and the plans, and neither §8 nor the README says to run it. ⛔ **Tool chain:** `deploy.ps1`
+  calls `git`, `composer` and `npm`, and §8 installs none of them. ⛔ **Mail:** accounts must verify their
+  email, and invitations and resets are queued mail, yet §8 names no `MAIL_*` transport. ⛔ **Host names:**
+  `CENTRAL_DOMAIN`, `APP_URL`, a wildcard DNS record and a wildcard certificate — which needs DNS-01
+  validation — are named nowhere. ⚠️ **What §8 does NOT omit**, so this row does not overstate itself: steps 6
+  and 7 name the worker and the `schedule:run` task; what they lack is the exact invocation. ⚠️ Two testing
+  settings are named nowhere either — open sign-up defaults on, and `GUEST_MINT_PER_IP` defaults to 30 with no
+  line in `.env.example` — and neither Memurai nor the `redis` extension is required, because cache and queue
+  default to `database`. **Live.** Filed by `M93`. **Tier: before-testing.**
+- **`minor` · No production path creates a workspace, so a fresh server has nowhere to build a form.**
+  Measured by `M93` (2026-09-14), after a search meant to refute it. The only writers of a tenant are
+  `DemoSeeder` and `E2eSeeder`, both returning early in production. A central-host sign-up belongs to no
+  workspace (`app/Services/Settings/RegistrationGate.php` says so in terms), a subdomain sign-up joins a
+  workspace that must already exist (`app/Listeners/Auth/JoinTenantOnRegistration.php`), and neither
+  `routes/admin.php`, `routes/api.php` nor any artisan command creates one. ⚠️ **A workspace is more than one
+  record:** the seeders also write its domain, an owner membership and a plan, and a membership needs the
+  seeded role catalog. The remedy is an operator command beside the first-super-admin one, writing all four.
+  **Live.** Filed by `M93`. **Tier: before-testing.**
+- **`minor` · The central landing page offers "Create a workspace", and the account it creates has no
+  workspace and lands on a 404.** Measured by `M93` (2026-09-14). While sign-up is open — the platform
+  default — `resources/js/Pages/Welcome.vue` links to the registration page. A central-host registration
+  belongs to no workspace, Fortify then redirects to `/dashboard`, and that route exists only in
+  `routes/tenant.php`, so the central host answers 404. ⚠️ **The invitation-only testing setting avoids it
+  without code**, which is the recommendation on the open sign-up decision; if that decision is answered
+  "open", this row is retiered to before-testing with that reason. The fix is to relabel or hide the button
+  until a self-serve workspace exists, or to land such an account on a page that says it has none yet.
+  **Live.** Filed by `M93`. **Tier: early-testing.**
+- **`minor` · No runbook rotates `APP_KEY`; rotation is only named as a manual step.** Carried out of
+  `docs/security-threat-model.md` §9 by `M93` (2026-09-14), where it sat with no row. `.env.example` declares
+  `APP_PREVIOUS_KEYS`, and `docs/deployment-infrastructure.md` calls rotation *"a manual runbook step"* without
+  giving one. The earlier ledger row on this was struck when its first half shipped, so no open row carried the
+  rest. ⚠️ Rotating the key invalidates encrypted cookies and every value encrypted at rest under it, which is
+  exactly what the runbook has to sequence. **Latent** — it bites at the first rotation. Filed by `M93`. **Tier: before-launch.**
+- **`minor` · The super-admin console has no network-level restriction, and hardening it is recorded as
+  deferred with no row.** Carried out of `docs/security-threat-model.md` §9 by `M93` (2026-09-14). The console
+  routes sit behind the central-domain constraint, `auth`, `superadmin`, `superadmin.mfa` and `step-up`, and no
+  middleware restricts them by address. ⚠️ The tenant IP-allowlist line in this ledger's §7 table is a
+  different subject — a workspace capability — and does not cover the operator console. **Latent** — it
+  matters once a production host is reachable. Filed by `M93`. **Tier: before-launch.**
+- **`minor` · Four super-admin console pages have no axe scan: `tests/e2e/admin-console-axe.spec.ts` covers
+  only the settings and feedback pages.** Carried by `M93` (2026-09-14) out of this ledger's §7 table, where it
+  has stood open as a table row the pipeline cannot see, and out of `docs/security-threat-model.md` §9. The
+  remaining pages are the tenant index, the tenant detail page, users and the audit log. ⚠️ The table row
+  records why they were not swept in with the first two, and that `AdminLayout` has since measured clean at
+  all three widths, so adding them is now cheap. **Live.** Filed by `M93`. **Tier: after-launch.**
+- **`minor` · Nobody who loses their two-step sign-in device and their recovery codes can get back in
+  without an operator editing the database.** Carried out of `docs/security-threat-model.md` §9 by `M93`
+  (2026-09-14). Disabling two-factor sits behind `auth` and `password.confirm`, which a locked-out person
+  cannot pass, and the super-admin console offers no reset. Two smaller gaps sit beside it: nothing warns when
+  recovery codes run low, and the seeded two-factor fixture carries an empty recovery list. The shape of the
+  escape is a product call, open as a decision. **Live.** Filed by `M93`. **Tier: early-testing.** **Awaits D37.**
+- **`minor` · An SSO sign-in whose provisioning hits a missing role is answered with a redirect back towards
+  the identity provider rather than the uniform refusal.** Carried out of `docs/security-threat-model.md` §9 by
+  `M93` (2026-09-14). `SsoAcsController` catches only `SsoAuthenticationException`; a `MembershipException`
+  thrown while provisioning — an unknown role in `TenantMembershipService` — escapes to the global handler,
+  which renders it on a non-JSON request as `back()->withErrors()`, a 302. ⚠️ It is reachable only on a
+  workspace whose role catalog is missing, which the first-workspace row makes a real possibility on a fresh
+  server. **Latent.** Filed by `M93`. **Tier: during-testing.**
+- **`minor` · The SSO step-up escape link that `docs/security-threat-model.md` §9 records as owed was never
+  added.** Carried by `M93` (2026-09-14). The password-confirmation page a person reaches at step-up carries no
+  link out, so someone who signed in through their identity provider and has no local password cannot complete
+  it. ⚠️ Read from the page's source, not driven in a browser. **Latent** — it needs an SSO workspace. Filed by `M93`. **Tier: during-testing.**
+- **`minor` · The expression engine bounds parse depth, memo size, length and token count, and has no
+  evaluation-time budget.** Carried out of `docs/security-threat-model.md` §9 by `M93` (2026-09-14), whose item
+  on expression limits is otherwise built: `ExpressionParser` pins `MAX_PARSE_DEPTH` at 64. The recommended
+  wall-clock budget is absent. ⚠️ The parse limits bound evaluation in practice, which is why this is filed
+  rather than fixed. **Latent.** Filed by `M93`. **Tier: after-launch.**

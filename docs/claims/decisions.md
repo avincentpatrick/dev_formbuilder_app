@@ -17,13 +17,189 @@ two server-paginated tables (2026-08-18) · fail **open** on an unseeded plan ca
 password policy min-12 + HIBP + classes (2026-08-09) · Google-only social login (2026-08-09) ·
 gamification last (2026-08-09) · the held list stays held until the user signals, and they said
 *"not yet, ask again later"* on 2026-08-18 · **a flaky e2e result fails CI** (2026-08-26, D2 below) · **the M-series ends at zero open
-`major` rows plus three consecutive increments filing none** (2026-08-28, D5 below).
+`major` rows plus three consecutive increments filing none** (2026-08-28, D5 below) · **the batch series ends and the tiered pipeline succeeds it** (2026-09-14, D12 below).
 
 ---
 
 ## OPEN
 
-### D28 — Should `MdsSegmentedControl` get a component-level wrap or shrink affordance, or should its four stretch-clamped hosts keep guarding themselves?
+### D31 — On the testing server, may anyone create an account, or only people who are invited? **Tier: before-testing.**
+
+**Filed 2026-09-14 by `M93`, from Decision Board card `signup-open`.** `SettingKey::RegistrationOpenSignup`
+defaults to `true`, so a fresh install lets anyone who reaches the central host register. On a testing server
+reachable from the internet that admits strangers — and a central-host account belongs to no workspace, so it
+lands on a dead end this increment files as a row. The switch lives in the super-admin console; nothing here
+needs code.
+
+- **A — invitation-only while testing.** Turn the platform switch off; testers join by invitation to a
+  workspace the operator creates. Reversible at any time.
+- **B — open sign-up.** Anyone who finds the address can register. Useful only if outside testers should sign
+  themselves up, and it exposes the no-workspace dead end until that row is fixed.
+
+**Recommendation: A.** It keeps the server to people the user chose, invitations work normally, and it avoids
+the dead end without code. ⚠️ **It blocks no row:** the answer is applied from the Testing Server Checklist.
+
+---
+
+### D32 — Will testers fill in forms together from one shared network, and should the guest per-address limit be raised for testing? **Tier: before-testing.**
+
+**Filed 2026-09-14 by `M93`, from Decision Board card `guest-ip-limit`.** A public form mints its guest token
+under `GUEST_MINT_PER_IP`, which defaults to 30 per minute and has no line in `.env.example`. A group session on
+one office network shares an address, can hit the limit, and then sees "too many requests".
+
+- **A — raise it on the testing server only.** An environment value, not a code change, and lowered again
+  before launch.
+- **B — keep the default.** Testers use their own connections, and the default stays as abuse protection.
+
+**Recommendation: A** — group testing is likely early, and the value is one line to put back. ⚠️ **It blocks no
+row:** the answer is applied from the Testing Server Checklist.
+
+---
+
+### D33 — May a workspace admin invite any email address, or only addresses at a verified company domain? **Tier: early-testing.**
+
+**Filed 2026-09-14 by `M93`, from Decision Board card `invite-domain`.** The ledger row it answers says in its
+own words that applying a domain check is *"a product decision, not a cleanup"*: `MemberController::invite()`
+validates the address and a role, with no domain-ownership check. An invitation grants nothing until it is
+accepted, but it can put the product's mail in a stranger's inbox.
+
+- **A — keep inviting anyone.** Contractors and personal addresses keep working; watch invitation volume on
+  the testing server.
+- **B — only verified company domains.** Refuses outside addresses unless the domain is verified, which changes
+  what inviting means for every workspace.
+
+**Recommendation: A.** An unaccepted invitation grants no access, and B would block ordinary use such as
+contractors.
+
+---
+
+### D34 — Must a new account confirm its email address before that address counts as its own? **Tier: early-testing.**
+
+**Filed 2026-09-14 by `M93`, from Decision Board card `self-signup-email`.** Self-registration can occupy an
+address the registrant does not control until the real owner resets the password. Nothing forges
+`email_verified_at`, so the squatter takes over nothing — but any fix touches the ordinary registration path for
+everybody.
+
+- **A — confirm first.** The address is not the account's own until the emailed link is clicked. Stops the
+  squatting, at one extra step for everyone.
+- **B — keep it as it is.** No extra step; the real owner reclaims the address with a password reset.
+
+**Recommendation: A** — the standard protection, and it matters most once outsiders can reach a server.
+
+---
+
+### D35 — Should form authors get a setting to show a form on one page instead of step by step, and which is the default? **Tier: early-testing.**
+
+**Filed 2026-09-14 by `M93`, from Decision Board card `single-page-mode`.** The runtime can render a single-page
+form, but `forms.single_page_mode` has no writer outside the seeders, and its documented default disagrees across
+four documents — the PRD says single page should be the default.
+
+- **A — add the setting, default step by step.** Existing forms look exactly as they do today.
+- **B — add the setting, default one page.** Matches the PRD; new forms open as a single page.
+- **C — remove single-page mode.** Drop the unused capability and correct the documents instead.
+
+**Recommendation: A** — authors get the choice without changing what testers already see.
+
+---
+
+### D36 — When staff correct a submitted response, should their edits be kept automatically as they type? **Tier: early-testing.**
+
+**Filed 2026-09-14 by `M93`, from Decision Board card `correction-autosave`.** A correction is kept only when
+Save is pressed; the page already warns before leaving, so work is lost only to a browser crash. The ledger row
+it answers says the gap is an endpoint that does not exist plus a decision nobody has taken.
+
+- **A — keep saving on the button.** No change. Each save sends an approved response back for review and is
+  audited once.
+- **B — a working copy kept as staff type.** Review status and the audit log change only on the final save. A
+  second save path to build.
+
+**Recommendation: A** — loss is already limited to a crash, and B needs a whole second save path.
+
+---
+
+### D37 — If someone loses the device they use for two-step sign-in and has no recovery codes, how do they get back in? **Tier: early-testing.**
+
+**Filed 2026-09-14 by `M93`, from Decision Board card `twofa-recovery`, and from `docs/security-threat-model.md`
+§9.** Today there is no way back without an operator editing the database: disabling two-factor sits behind
+`auth` and `password.confirm`, and the super-admin console offers no reset. Testers who turn two-step sign-in on
+could lock themselves out.
+
+- **A — an admin reset, recorded in the audit log.** A workspace owner or the platform operator clears the
+  enrolment, and the reset is audited.
+- **B — re-verify by email.** The person proves they own the address, then enrols again. More to build.
+- **C — support only.** Keep it manual, and say so on the challenge screen.
+
+**Recommendation: A** — the simplest safe path for testing, and every reset leaves an audit record.
+
+---
+
+### D38 — The API documentation promises features that were never built. Build them, or trim the documentation? **Tier: early-testing.**
+
+**Filed 2026-09-14 by `M93`, from Decision Board card `api-promises`.** Six ledger rows describe documented,
+unbuilt API surface: the async export endpoints, the users-and-roles resource group, the form-draft builder
+endpoints, `Idempotency-Key` deduplication, the per-user 300-a-minute limiter and the one-concurrent-export
+guard. The web app works without every one of them, and nothing shipped depends on them.
+
+- **A — trim the documentation now, and build an item when an integrator needs it.** The specification then
+  describes what exists.
+- **B — build them all before launch.** Several increments of work.
+
+**Recommendation: A** — honest documentation stops testers and integrators planning against endpoints that are
+not there.
+
+---
+
+### D39 — What will the product be called? "Meridian" is a working codename. **Tier: before-launch.**
+
+**Filed 2026-09-14 by `M93`, from Decision Board card `product-name` and `docs/PRD.md` §9.4.** The name appears
+across the app, its mail and its documents, and testers will see "Meridian" until this is settled.
+
+- **A — keep Meridian as the real name**, after checking it is free to use for this kind of product.
+- **B — choose a name before launch**, then rename everywhere in one pass.
+
+**No recommendation** — a product's name is its owner's call.
+
+---
+
+### D40 — Who is the first pilot customer? **Tier: before-launch.**
+
+**Filed 2026-09-14 by `M93`, from Decision Board card `pilot-customer` and `docs/PRD.md` §9.4.** No pilot is
+named. One early real user makes testing and launch planning far more reliable, and the PRD says so.
+
+- **A — name one now**, so testing can focus on their forms and workflows.
+- **B — decide after internal testing.**
+
+**Recommendation: A**, if a candidate exists. ⛔ **Record the answer here WITHOUT the customer's name.** This
+repository is public, and `D6` already decided that a named client does not belong in it; the name stays in the
+Board's note.
+
+---
+
+### D41 — Should collecting data by text message, voice call or USSD ever be planned? **Tier: before-launch.**
+
+**Filed 2026-09-14 by `M93`, from Decision Board card `sms-channels` and `docs/PRD.md` §9.4.** A firm non-goal
+today, worth revisiting only for a customer working in very low-connectivity areas.
+
+- **A — keep it a non-goal**, and revisit if a customer asks.
+- **B — plan it for after launch.**
+
+**Recommendation: A** — no customer has asked, and it would be a large separate product.
+
+---
+
+### D42 — Should a native mobile app ever be built, instead of the installable web app? **Tier: before-launch.**
+
+**Filed 2026-09-14 by `M93`, from Decision Board card `native-app` and `docs/PRD.md` §9.4.** Deferred
+indefinitely, and needed only for something the web app cannot do, such as background location.
+
+- **A — keep the web app only**, and revisit if a customer needs what it cannot deliver.
+- **B — plan a native app for after launch.**
+
+**Recommendation: A** — the installable web app already works offline, and no customer has asked for more.
+
+---
+
+### D28 — Should `MdsSegmentedControl` get a component-level wrap or shrink affordance, or should its four stretch-clamped hosts keep guarding themselves? **Tier: early-testing.**
 
 **Filed 2026-09-08 by `M87`, while closing the census row that measured the answer's inputs.** Recorded
 here rather than taken, because the cheapest correct fix touches **13 call sites** and the only instrument
@@ -72,7 +248,7 @@ red and block an increment on a question nobody has answered. It belongs with wh
 
 ---
 
-### D27 — Should a form republishing mid-request refuse the write under the lock, on the save door, on both doors, or on neither?
+### D27 — Should a form republishing mid-request refuse the write under the lock, on the save door, on both doors, or on neither? **Tier: during-testing.**
 
 **Filed 2026-09-08 by `M87`, as the residue of the pre-lock row it corrected.** `M85` closed the promote
 door by re-reading the `FormVersion` under the existing row lock; the same shape is open on two more doors
@@ -131,7 +307,7 @@ code comment says, and it applies it to `submit()`'s republish question rather t
 
 ---
 
-### D26 — The offline panel's storage-quota line counts every visit's submissions while the three sentences beside it count only this one. Reword the line, re-scope the number, or drop the count?
+### D26 — The offline panel's storage-quota line counts every visit's submissions while the three sentences beside it count only this one. Reword the line, re-scope the number, or drop the count? **Tier: early-testing.**
 
 **Filed 2026-09-07 by Lane A, during `M85`, after a read-only fan-out found the row's stated blocker was
 false and the residue was a copy call.** Recorded here rather than left as a row because two increments
@@ -207,7 +383,7 @@ re-derivation this entry exists to prevent** — and the roster is now long enou
 not obvious. Corrected in the ledger: that row now names this entry.
 ---
 
-### D25 — `P2c`, the deferral-phrase arm, measures 5% precision and ~2% recall. Keep it, drop it, or re-aim it as a staleness lint?
+### D25 — `P2c`, the deferral-phrase arm, measures 5% precision and ~2% recall. Keep it, drop it, or re-aim it as a staleness lint? **Tier: after-launch.**
 
 **Filed 2026-09-07 by Lane A, during `M82`, at the moment the arm was written rather than after.**
 The approved design named this arm as one of the things that would make an unqueued obligation
@@ -254,7 +430,7 @@ and it pins those eight against a count and a digest, so a ninth cannot appear u
 
 **Recommendation: option 1**, with the header wording kept exactly as harsh as it is.
 
-### D24 — The coverage rules pin a residue of 134 undischarged obligation sites. Schedule the sweep, or leave the residue pinned indefinitely?
+### D24 — The coverage rules pin a residue of 134 undischarged obligation sites. Schedule the sweep, or leave the residue pinned indefinitely? **Tier: before-launch.**
 
 **Filed 2026-09-07 by Lane A, during `M82`.** This is the question `P2e` was designed to make
 answerable rather than to answer, and it is a product call rather than an engineering one.
@@ -292,7 +468,7 @@ and unscheduled; 89 acceptance criteria with no recorded outcome is that conditi
 and the one whose eight sentences are already known to be half stale.
 
 
-### D23 — `scripts/loop.php` refuses held work by a hand-written keyword list, and there is now a gate proving the pipeline holds every held row. Keep the list, derive it, or cross-check it?
+### D23 — `scripts/loop.php` refuses held work by a hand-written keyword list, and there is now a gate proving the pipeline holds every held row. Keep the list, derive it, or cross-check it? **Tier: after-launch.**
 
 **Filed 2026-09-07 by Lane A, during `M81`, at the moment `P4` was written.** The row that asks for
 this (`R-3401f9b1`, `docs/feature-backlog.md:5969`) explicitly defers itself *to this gate*, so the
@@ -332,7 +508,7 @@ with the expensive kind of failure.
 
 ---
 
-### D22 — The pipeline generator's own discovery floor is 40 against a live scan of 869. Ratchet it, leave it, or let the gate carry the only binding floor?
+### D22 — The pipeline generator's own discovery floor is 40 against a live scan of 869. Ratchet it, leave it, or let the gate carry the only binding floor? **Tier: after-launch.**
 
 **Filed 2026-09-07 by Lane A, during `M81`, while sizing `P5`.** Not fixed in the increment that found
 it, deliberately — see the last option.
@@ -361,7 +537,7 @@ at **600**, which is the one that now binds, and the gate refuses rather than ru
    numbers. ⛔ Refused unless the user prefers it: it makes a standalone generation silently
    unprotected, and `docs/pipeline.md` is regenerated by hand at every close-out.
 
-### D21 — `docs/pipeline.md` is merge-gated but sits in no `paths-ignore`, so every close-out now triggers a full CI run. Accept the cost, exempt it, or split the file?
+### D21 — `docs/pipeline.md` is merge-gated but sits in no `paths-ignore`, so every close-out now triggers a full CI run. Accept the cost, exempt it, or split the file? **Tier: after-launch.**
 
 **Filed 2026-09-06 by Lane A, during `M79`, at the moment the file was created.** Recorded here rather
 than decided in the increment because it changes what a close-out costs on every future increment, and
@@ -404,7 +580,7 @@ was not given.
 
 ---
 
-### D20 — The service worker caches a credential-bearing resume shell, where the credential IS the cache key. Purge it, keep it, or split the difference?
+### D20 — The service worker caches a credential-bearing resume shell, where the credential IS the cache key. Purge it, keep it, or split the difference? **Tier: early-testing.**
 
 **Filed 2026-09-06 by Lane A, during `M78`, at the moment the row's two stated blockers were both
 measured dead and a real trade was found underneath them.** The row (`M70`) asks to stop caching
@@ -464,7 +640,7 @@ handled as described.
 explicitly — one arm asserts the resume shell IS matched today, labelled as a pinned exposure rather than
 an endorsement, so the state cannot drift silently in either direction.
 
-### D19 — A Reviewer holds `submissions.create` and can encode on no form. `M77` made every document say so. Should the ROLE now gain encoding, or is documenting the gap the whole answer?
+### D19 — A Reviewer holds `submissions.create` and can encode on no form. `M77` made every document say so. Should the ROLE now gain encoding, or is documenting the gap the whole answer? **Tier: during-testing.**
 
 **Filed 2026-09-06 by Lane A, during `M77`, at the moment the documentation was corrected.** `M13`
 filed this as *"both readings are defensible and choosing between them is an authorization
@@ -512,7 +688,7 @@ Nothing asserted that configuration before `M77`; a case now does.
 
 ---
 
-### D18 — The proof-of-work solver yields every 5000 candidates against a 120000 search space, and nothing has ever decided that number. Keep 5000, derive it, or make it configurable?
+### D18 — The proof-of-work solver yields every 5000 candidates against a 120000 search space, and nothing has ever decided that number. Keep 5000, derive it, or make it configurable? **Tier: after-launch.**
 
 **Filed 2026-09-06 by Lane A, during `M77`, alongside the cadence gate that pins everything EXCEPT
 the value.** The row asked for the cadence; the cadence is now asserted
@@ -559,7 +735,7 @@ knob for one deployment shape, not a *fetch-starvation* knob for the outbox drai
 
 ---
 
-### D17 — A local container Pest run silently omits 40 test files. `M76` made that loud, which makes every local run RED. Keep it, soften it, or change how the suite is run?
+### D17 — A local container Pest run silently omits 40 test files. `M76` made that loud, which makes every local run RED. Keep it, soften it, or change how the suite is run? **Tier: after-launch.**
 
 **Filed 2026-09-06 by Lane A, during `M76`, at the moment the gate was written.** Recorded here rather than
 decided in the increment because it changes the user's daily development loop, which is not an increment's
@@ -610,11 +786,13 @@ go blind **cannot be predicted** — synthetic directories of up to sixty files 
 46-entry directory collapses to 6. That is why `M76` shipped a comparison rather than a documented list.
 
 ---
-### D15 — `D13`'s one-hub-row cap is now the binding constraint on batch composition, and it is stricter than its own purpose. Keep it, relax it to per-file, or re-derive the hub set per batch?
+### D15 — `D13`'s one-hub-row cap is now the binding constraint on batch composition, and it is stricter than its own purpose. Keep it, relax it to per-file, or re-derive the hub set per batch? **Tier: after-launch.**
 
 **Filed 2026-09-05 by Lane A, during `M72`, at the moment the cap decided a batch that value had not.**
 Recorded here rather than as a row because `D13` is a user decision and an increment does not re-scope
 one of those on its own judgement.
+
+⚠️ **`M93` (2026-09-14): no generator enforces the cap any more.** `render_batch()` and `BATCH_MAX` are deleted, so the one-hub-row cap lives only in `D13`'s text and in whoever groups a tier's rows. The question stands; what it governs is narrower.
 
 ⛔ **WHAT `M72` MEASURED, AND IT IS THE WHOLE QUESTION.** Fifteen rows were verified read-only before the
 branch was cut. **Five of the six highest-value live rows touch a hub file — and they touch five
@@ -714,7 +892,7 @@ would leave `D13` binding on a case no selection can control.
 
 ---
 
-### D16 — The `npm audit` judge makes a required status check green when the registry is unreachable. Accept it, isolate it, or keep the hard block?
+### D16 — The `npm audit` judge makes a required status check green when the registry is unreachable. Accept it, isolate it, or keep the hard block? **Tier: after-launch.**
 
 **Filed 2026-09-05 by Lane A, during `M72`, at the moment the trade was taken rather than after.** It is
 here and not only in the backlog because it deliberately weakens a **merge gate**, and the class it joins
@@ -753,7 +931,7 @@ is how a gate acquires a second thing to get wrong.
 
 ---
 
-### D14 — The compliance spec promised audit events for deleting and restoring a submission, and there is no delete or restore surface at all. Build it, or record it as not built?
+### D14 — The compliance spec promised audit events for deleting and restoring a submission, and there is no delete or restore surface at all. Build it, or record it as not built? **Tier: during-testing.**
 
 **Filed 2026-09-04 by Lane A, during `M70`, at the moment the row's deciding premise was falsified.**
 Promoted out of `docs/feature-backlog.md` rather than taken as a row, because the row `M46` filed asks
@@ -800,69 +978,7 @@ respondents. That belongs with the held GDPR/legal work and to a deliberate desi
 row closing a documentation over-claim. ⚠️ **If B is ever taken, the uniqueness interaction is the part
 to settle first** — it is the half that is invisible in the ticket and expensive in the code.
 
-### D12 — `D5`'s bar is now measurable, and it reads MET by nine increments rather than three. End the M-series, or keep going?
-
-**Filed 2026-09-02 by Lane A, during `M64`, at the moment the bar became computable.** This is not a
-re-ask of `D5` and it is not a re-ask of the answer given on 2026-09-02. `M63` reported the bar as
-*reading* met and the user answered **"keep going and make the bar real first"** — an answer conditional
-on the bar not yet being real. `M64` made it real. The condition is spent, so the question returns once,
-with numbers instead of a floor.
-
-⛔ **WHAT CHANGED IS THE EVIDENCE, NOT THE ARITHMETIC.** `M63`'s claim was a floor: 11 attributable
-`major` bullets plus the absence of a contrary one, with **47 of 58 recording no filer**. Every severity
-bullet now records one, resolved from the file's own history against all 135 of its versions, so the
-clause is arithmetic:
-
-| | |
-|---|---|
-| Open `major` rows | **0** — clause 1 |
-| `major` bullets ever, all shapes | **55**, every one attributed, **none `(unattributed)`** |
-| Highest increment that ever filed a `major` | **`M54`** |
-| Consecutive released increments filing none | **`M55`–`M63`, nine** — against a bar of three |
-
-⚠️ **AND THE MARGIN IS THE PART WORTH READING.** The answer to `D5` set the second clause at three
-*because* the first clause alone is satisfiable at any instant by an increment nobody has verified yet.
-Nine is not three: this is not a bar cleared on the last day, and eight of the nine increments in that
-window each closed a row and filed new ones without any of them being `major`.
-
-⛔ **WHAT THE BAR STILL DOES NOT MEASURE, SAID HERE RATHER THAN DISCOVERED AFTER STOPPING.** The gate
-checks a filer is **recorded**, never that it is **correct** — a wrong id passes. Severity is
-**self-assigned** by the increment that files the row, and no increment has assigned `major` since
-`M54`, which is consistent with the defects getting smaller *and* with the bar quietly changing what
-gets called `major`. Nothing here can tell those apart. **84 rows remain open**, and 30 of them say
-nothing about whether they are still live.
-
-- **A — keep going, and treat `D5` as satisfied-but-not-triggered.** The bar was written to stop a series
-  that had no exit criterion at all, not to force a stop the moment it clears. 84 open rows remain and the
-  recent ones are real: `M61` found a case-sensitivity defect that 404'd live share URLs, `M62` found an
-  encode page discarding typed work, `M63` found a `can:` gate naming the wrong subject. **None of those
-  was `major` and all three were user-visible.** Against it: a bar nobody acts on is `D5`'s own failure
-  mode wearing the other face — *"declared met by whoever wants to stop"* has a twin in *"never triggered
-  by whoever wants to continue."*
-- **B — end the M-series here and re-plan.** `D5` was answered to make this a decision rather than a
-  drift, and it has cleared by a factor of three. The remaining 84 rows do not disappear: they become a
-  standing backlog worked under whatever succeeds the series, and the held list re-enters as the
-  go-forward pipeline. Against it: the exit says nothing about the *shape* of what follows, and stopping
-  without that is how a queue becomes a graveyard.
-- **C — keep going, but re-cut the bar now that it can be measured.** `D5` recorded that the answer given
-  was *not* the recommendation filed — the recommendation was a **category** bar (end on correctness and
-  security, move style/docs/ergonomics to a standing backlog) and the answer was a severity bar. A
-  category bar is measurable today and was not in `M36`: `state.php` sees every bullet, its filer and its
-  liveness. Against it: re-cutting a bar at the moment it clears is exactly what it exists to prevent, and
-  it needs the liveness backfill first — 30 open rows are unjudged.
-
-**Recommendation: A, with the numbers on the record and this entry as the thing that makes B available at
-any time.** The bar's purpose was to make stopping a decision rather than a drift, and that purpose is now
-served whichever way it goes — it is measured, it is printed by `state.php` and `loop.php status` on every
-run, and it cannot be quietly declared or quietly ignored again. What argues against acting on it *today*
-is that the three most recent increments each found a live, user-visible defect while filing no `major`,
-which is evidence the queue is still productive rather than evidence it is done. ⚠️ **C should not be
-taken before the liveness backfill**, or the re-cut bar inherits 30 rows nobody has judged. ⛔ **And if B
-is taken, it needs an answer to "what replaces the series" in the same breath**, because the held list —
-OCR, uploading/import, payments, Track B, GDPR — is scheduled to re-enter at exactly that moment and that
-is a bigger conversation than an exit condition.
-
-### D11 — Two byte-serving routes gate on a subject their own comments question. Leave them, or move one?
+### D11 — Two byte-serving routes gate on a subject their own comments question. Leave them, or move one? **Tier: during-testing.**
 
 **Filed 2026-09-02 by Lane A, during `M63`, at the moment the scope was decided.** Promoted out of
 `docs/feature-backlog.md` rather than taken as a row, because both candidate fixes change **who can do
@@ -904,7 +1020,7 @@ middleware changes nobody can measure. ⚠️ If B is ever taken, it needs the V
 first: either Viewers lose the PDF, or `submissions.export` stops meaning "may move bytes off the
 platform", and those are different products.
 
-### D10 — `§9` item 9's escalation has fired. Adopt the value-object forcing device, or keep answering per surface?
+### D10 — `§9` item 9's escalation has fired. Adopt the value-object forcing device, or keep answering per surface? **Tier: after-launch.**
 
 **Filed 2026-09-01 by Lane A, during `M57`, at the moment the scope was decided.** Filed rather than
 decided because the escalation is a **repo-wide refactor of every render path**, and it was measured
@@ -954,7 +1070,7 @@ problem, not the fixing problem** — `M57` was found because a backlog row poin
 run. **That sweep is worth doing under any of the three options** and is the cheapest next step whichever
 way this is answered.
 
-### D1 — Should the sixteen synchronous dispatch listeners become `ShouldQueue`?
+### D1 — Should the sixteen synchronous dispatch listeners become `ShouldQueue`? **Tier: after-launch.**
 
 **Filed 2026-08-25.** Moved here out of `docs/feature-backlog.md` § *Connectors & webhooks*, where
 it sat as a `minor` row. It is **not** a defect with a known fix; it is an undecided question, and
@@ -990,7 +1106,7 @@ measured and found to matter, option 2 is the right shape — not option 3.
 
 ---
 
-### D3 — ADR-0020 §D7 approves *"4th of 12"* for every member. Three other surfaces withhold the twelve. Which moves?
+### D3 — ADR-0020 §D7 approves *"4th of 12"* for every member. Three other surfaces withhold the twelve. Which moves? **Tier: during-testing.**
 
 **Filed 2026-08-26 by Lane B, during `M26`.** Proceeding on the recommendation below rather than
 waiting — Standing Rule 5. If the answer comes back the other way, the revert is one commit and it
@@ -1049,7 +1165,7 @@ with no product value, so it is deleted regardless of how D3 is answered.
 `openapi.json`, and open a follow-up row to un-gate `kpis.members` and `team.active_members` — the
 dashboard deletion above still stands.
 
-### D4 — An archived webhook envelope has no form to be scoped to. Which permission reads it?
+### D4 — An archived webhook envelope has no form to be scoped to. Which permission reads it? **Tier: during-testing.**
 
 **Filed 2026-08-26 by Lane B, during `M33`.** Proceeding on the recommendation below rather than
 waiting — Standing Rule 5. The revert is one enum arm and it is named at the bottom.
@@ -1103,7 +1219,7 @@ contract: `openapi.json` is untouched by `M33`.
 
 ---
 
-### D8 — A tracker surgery triggers no post-merge run at all. Which way should `ci.yml` regain the trunk observation?
+### D8 — A tracker surgery triggers no post-merge run at all. Which way should `ci.yml` regain the trunk observation? **Tier: after-launch.**
 
 **Filed 2026-08-31 by Lane A, during `M49`.** Filed rather than decided because every option trades
 **CI minutes against gate coverage**, and `M39` removed those minutes deliberately after measuring
@@ -1165,7 +1281,7 @@ unverifiable. The recommendation stands at option 1, and the decision is still n
 
 ---
 
-### D9 — Should the legacy client's identity be rewritten out of git history as well? **RECOMMENDED AGAINST.**
+### D9 — Should the legacy client's identity be rewritten out of git history as well? **RECOMMENDED AGAINST.** **Tier: after-launch.**
 
 **Filed 2026-08-31 by Lane A during `M51`, unconditionally and without being asked**, because `D6`'s
 answer redacts the **working tree** and the repository is public. A redaction that reduces an exposure
@@ -1217,7 +1333,7 @@ an increment.
 
 ---
 
-### D29 — `M90` made `saveAsTemplate()` the FIRST request-path isolation-level change in this codebase. Should that become the pattern for the other multi-statement snapshot reads, stay a one-off, or be replaced by a different instrument?
+### D29 — `M90` made `saveAsTemplate()` the FIRST request-path isolation-level change in this codebase. Should that become the pattern for the other multi-statement snapshot reads, stay a one-off, or be replaced by a different instrument? **Tier: during-testing.**
 
 **Filed 2026-09-10 by Lane A during `M90`, while closing `docs/feature-backlog.md`'s torn-snapshot row.**
 Filed rather than decided because it sets a precedent on the request path, and the alternative to deciding
@@ -1266,7 +1382,7 @@ provable, that is a fourth piece of work (a committing harness or a read-back ma
 
 ---
 
-### D30 — Which version should the builder's request-layer uniqueness rules be scoped to, now that both available answers are wrong inside the race?
+### D30 — Which version should the builder's request-layer uniqueness rules be scoped to, now that both available answers are wrong inside the race? **Tier: during-testing.**
 
 **Filed 2026-09-10 by Lane A during `M90`.** The backlog row that prompted it said this half "needs its
 own decision", `M90`'s first pass concluded that was wrong, and **the adversarial pass restored the row's
@@ -1303,6 +1419,72 @@ doors; this is the builder's validation layer. They should not be answered as on
 
 
 ## ANSWERED
+
+### D12 — `D5`'s bar is now measurable, and it reads MET by nine increments rather than three. End the M-series, or keep going? **B — end the series. The tiered pipeline succeeds it.**
+
+**Answered 2026-09-14 (user decision), recorded by Lane A during `M93` — B, and the answer arrived together with what replaces the series.** The user approved Realignment 6: the batch series ends, and ONE pipeline succeeds it, ordered by tier (`before-testing` → `early-testing` → `during-testing` → `before-launch` → `after-launch`), with every open decision a row and every open item in any document filed. Their words: *"i want everything in a single pipeline. no hidden tasks"* — and stand up a testing server as soon as the must-do items are done, then test and develop in parallel. ⛔ **This entry's own warning is discharged, not ignored.** It said B *"needs an answer to what replaces the series in the same breath"*, and the tiers are that answer: the held rows stay in the line under `before-launch`, and `D13` survives only as the rule for grouping the rows of one tier. `scripts/state.php` keeps printing the bar's two clauses as history; the queue's signal is now its Testing gate.
+
+**Filed 2026-09-02 by Lane A, during `M64`, at the moment the bar became computable.** This is not a
+re-ask of `D5` and it is not a re-ask of the answer given on 2026-09-02. `M63` reported the bar as
+*reading* met and the user answered **"keep going and make the bar real first"** — an answer conditional
+on the bar not yet being real. `M64` made it real. The condition is spent, so the question returns once,
+with numbers instead of a floor.
+
+⛔ **WHAT CHANGED IS THE EVIDENCE, NOT THE ARITHMETIC.** `M63`'s claim was a floor: 11 attributable
+`major` bullets plus the absence of a contrary one, with **47 of 58 recording no filer**. Every severity
+bullet now records one, resolved from the file's own history against all 135 of its versions, so the
+clause is arithmetic:
+
+| | |
+|---|---|
+| Open `major` rows | **0** — clause 1 |
+| `major` bullets ever, all shapes | **55**, every one attributed, **none `(unattributed)`** |
+| Highest increment that ever filed a `major` | **`M54`** |
+| Consecutive released increments filing none | **`M55`–`M63`, nine** — against a bar of three |
+
+⚠️ **AND THE MARGIN IS THE PART WORTH READING.** The answer to `D5` set the second clause at three
+*because* the first clause alone is satisfiable at any instant by an increment nobody has verified yet.
+Nine is not three: this is not a bar cleared on the last day, and eight of the nine increments in that
+window each closed a row and filed new ones without any of them being `major`.
+
+⛔ **WHAT THE BAR STILL DOES NOT MEASURE, SAID HERE RATHER THAN DISCOVERED AFTER STOPPING.** The gate
+checks a filer is **recorded**, never that it is **correct** — a wrong id passes. Severity is
+**self-assigned** by the increment that files the row, and no increment has assigned `major` since
+`M54`, which is consistent with the defects getting smaller *and* with the bar quietly changing what
+gets called `major`. Nothing here can tell those apart. **84 rows remain open**, and 30 of them say
+nothing about whether they are still live.
+
+- **A — keep going, and treat `D5` as satisfied-but-not-triggered.** The bar was written to stop a series
+  that had no exit criterion at all, not to force a stop the moment it clears. 84 open rows remain and the
+  recent ones are real: `M61` found a case-sensitivity defect that 404'd live share URLs, `M62` found an
+  encode page discarding typed work, `M63` found a `can:` gate naming the wrong subject. **None of those
+  was `major` and all three were user-visible.** Against it: a bar nobody acts on is `D5`'s own failure
+  mode wearing the other face — *"declared met by whoever wants to stop"* has a twin in *"never triggered
+  by whoever wants to continue."*
+- **B — end the M-series here and re-plan.** `D5` was answered to make this a decision rather than a
+  drift, and it has cleared by a factor of three. The remaining 84 rows do not disappear: they become a
+  standing backlog worked under whatever succeeds the series, and the held list re-enters as the
+  go-forward pipeline. Against it: the exit says nothing about the *shape* of what follows, and stopping
+  without that is how a queue becomes a graveyard.
+- **C — keep going, but re-cut the bar now that it can be measured.** `D5` recorded that the answer given
+  was *not* the recommendation filed — the recommendation was a **category** bar (end on correctness and
+  security, move style/docs/ergonomics to a standing backlog) and the answer was a severity bar. A
+  category bar is measurable today and was not in `M36`: `state.php` sees every bullet, its filer and its
+  liveness. Against it: re-cutting a bar at the moment it clears is exactly what it exists to prevent, and
+  it needs the liveness backfill first — 30 open rows are unjudged.
+
+**Recommendation: A, with the numbers on the record and this entry as the thing that makes B available at
+any time.** The bar's purpose was to make stopping a decision rather than a drift, and that purpose is now
+served whichever way it goes — it is measured, it is printed by `state.php` and `loop.php status` on every
+run, and it cannot be quietly declared or quietly ignored again. What argues against acting on it *today*
+is that the three most recent increments each found a live, user-visible defect while filing no `major`,
+which is evidence the queue is still productive rather than evidence it is done. ⚠️ **C should not be
+taken before the liveness backfill**, or the re-cut bar inherits 30 rows nobody has judged. ⛔ **And if B
+is taken, it needs an answer to "what replaces the series" in the same breath**, because the held list —
+OCR, uploading/import, payments, Track B, GDPR — is scheduled to re-enter at exactly that moment and that
+is a bigger conversation than an exit condition.
+
+---
 
 ### D13 — How should the remaining open backlog rows be worked, now that none of them is `major`? **In batches of 3–4 rows per increment, selected by file overlap, verified by a read-only fan-out, written by one hand.**
 
@@ -1367,6 +1549,9 @@ work and release timestamps against the ~157 min/row baseline above. **If the me
 materially under 40%, the batch size is wrong** — revisit it before running twenty more increments on
 an unverified premise. Anyone promising more than ~42% is proposing to skip verification, which is the
 half that works.
+
+⚠️ **AMENDED 2026-09-14 BY THE ANSWER TO `D12`, RECORDED DURING `M93` — THIS NOW GOVERNS HOW THE ROWS OF ONE TIER ARE GROUPED, NOT WHICH ROWS COME NEXT.** The tiered pipeline decides what is next; items 1–5 above still decide how an increment groups rows taken from a single tier. `scripts/backlog-triage.php` no longer proposes a batch, and `scripts/next.php` no longer derives one from this entry.
+
 ---
 
 ### D7 — Should `main` get branch protection, with the repository owner as a bypass actor? **Yes.**

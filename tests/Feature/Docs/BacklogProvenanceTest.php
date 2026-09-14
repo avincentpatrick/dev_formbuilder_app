@@ -131,6 +131,31 @@ const BACKLOG_LIVENESS_MARKERS = [
 const BACKLOG_LIVENESS_MIN_OPEN = 50;
 
 /**
+ * The tier vocabulary (M93), in `scripts/pipeline.php`'s exact order.
+ *
+ * ⛔ A COPY, FOR THE REASON THE LIVENESS LIST ABOVE IS ONE — both scripts that carry it execute at include
+ * time — and PINNED against `scripts/pipeline.php` and `scripts/state.php` in the discrimination case
+ * below, so a divergence is a failing test rather than a drift.
+ */
+const BACKLOG_TIERS = ['before-testing', 'early-testing', 'during-testing', 'before-launch', 'after-launch'];
+
+/**
+ * The tier and awaits tokens a row RECORDS — read with code spans stripped, exactly as a liveness verdict
+ * is, so a row that quotes the grammar in backticks does not arm it.
+ *
+ * @return array{tier: list<string>, awaits: list<string>}
+ */
+function backlogProvenanceTokens(string $body): array
+{
+    $recorded = preg_replace('/`[^`]*`/u', '', $body) ?? $body;
+
+    preg_match_all('/\*\*Tier: ([^*]+?)\.\*\*/u', $recorded, $tiers);
+    preg_match_all('/\*\*Awaits ([^*]+?)\.\*\*/u', $recorded, $awaits);
+
+    return ['tier' => array_map('trim', $tiers[1]), 'awaits' => array_map('trim', $awaits[1])];
+}
+
+/**
  * A severity bullet exists in exactly three shapes, and all three carry the severity token followed
  * by the U+00B7 MIDDLE DOT on the FIRST line:
  *
@@ -380,6 +405,89 @@ it('records a liveness verdict on every open row', function (): void {
     );
 
     expect($violations)->toBe([], implode("\n", $violations));
+});
+
+it('records at most one tier and one awaits token on every open row, each well-formed', function (): void {
+    $violations = [];
+    $checked = 0;
+
+    foreach (backlogProvenanceBullets() as $bullet) {
+        // ⚠️ AT MOST ONE, NOT EXACTLY ONE — YET. `M93` built the grammar; the tier verdicts for rows already
+        // in the ledger are the next increment's, and an exactly-one arm today would be red on arrival
+        // (`M40`). That increment makes this exactly-one — and must then exclude the `✅ **DONE` bullet this
+        // file's shape classifier reads as open, which `scripts/state.php` never counts as a row at all.
+        if ($bullet['shape'] !== 'open') {
+            continue;
+        }
+
+        $checked++;
+        $where = BACKLOG_PROVENANCE_DOCUMENT.':'.$bullet['line'];
+        $tokens = backlogProvenanceTokens($bullet['body']);
+
+        if (count($tokens['tier']) > 1) {
+            $violations[] = $where.' records '.count($tokens['tier']).' tiers. Exactly one is the record; '.
+                '`scripts/state.php` joins the rest with a pipe and `pipeline-lint` P7c refuses the row.';
+        }
+
+        foreach ($tokens['tier'] as $tier) {
+            if (! in_array($tier, BACKLOG_TIERS, true)) {
+                $violations[] = $where.' records the tier "'.$tier.'". The vocabulary is '.implode(', ', BACKLOG_TIERS).'.';
+            }
+        }
+
+        if (count($tokens['awaits']) > 1) {
+            $violations[] = $where.' awaits '.count($tokens['awaits']).' decisions. A row waits on one question; '.
+                'file the second as a row of its own.';
+        }
+
+        foreach ($tokens['awaits'] as $awaits) {
+            if (preg_match('/^D\d+$/', $awaits) !== 1) {
+                $violations[] = $where.' awaits "'.$awaits.'", which is not a bare decision id.';
+            }
+        }
+
+        // A backticked id is stripped to nothing before the token is read, so it would silently VANISH rather
+        // than fail. The unstripped text is the only place that shape is visible.
+        if (preg_match('/\*\*Awaits `/u', $bullet['body']) === 1) {
+            $violations[] = $where.' writes its awaits id inside backticks, so the token reads as absent. Write the id bare.';
+        }
+    }
+
+    expect($checked)->toBeGreaterThanOrEqual(
+        BACKLOG_LIVENESS_MIN_OPEN,
+        'Discovery floor: the tier arm saw only '.$checked.' OPEN bullets, under the floor of '.BACKLOG_LIVENESS_MIN_OPEN.'.'
+    );
+
+    expect($violations)->toBe([], implode("\n", $violations));
+});
+
+it('reads a tier or awaits token only as a record, never as a mention', function (): void {
+    expect(backlogProvenanceTokens('**Live.** Filed by `M93`. **Tier: before-testing.**')['tier'])->toBe(['before-testing']);
+    expect(backlogProvenanceTokens('**Live.** Filed by `M93`. **Awaits D17.**')['awaits'])->toBe(['D17']);
+
+    // ⛔ A MENTION IS NOT A RECORD — the liveness arm's trap, one grammar later. `M93`'s `MU5` removes the
+    // strip and these two assertions are what turn red.
+    expect(backlogProvenanceTokens('the grammar is `**Tier: before-testing.**`, quoted. Filed by `M93`.')['tier'])->toBe([]);
+    expect(backlogProvenanceTokens('it quotes `**Awaits D17.**` as vocabulary.')['awaits'])->toBe([]);
+
+    // "Tier" already means other things in this corpus — pricing tiers, citation-liveness tiers.
+    expect(backlogProvenanceTokens('a tier-2 rot count, tier 1 citations and the Business tier.')['tier'])->toBe([]);
+
+    // A malformed value is CAPTURED, so the vocabulary check can refuse it instead of never seeing it.
+    expect(backlogProvenanceTokens('**Tier: before-tesing.**')['tier'])->toBe(['before-tesing']);
+    expect(in_array('before-tesing', BACKLOG_TIERS, true))->toBeFalse();
+
+    // A backticked id disappears under the strip — which is exactly why the arm also reads it unstripped.
+    expect(backlogProvenanceTokens('**Awaits `D17`.**')['awaits'])->toBe([]);
+    expect(preg_match('/\*\*Awaits `/u', '**Awaits `D17`.**'))->toBe(1);
+
+    // ⛔ THE VOCABULARY IS PINNED against both scripts that carry a copy.
+    foreach (['scripts/pipeline.php', 'scripts/state.php'] as $script) {
+        preg_match('/const TIERS = \[(.*?)\];/s', (string) file_get_contents(base_path($script)), $m);
+        preg_match_all("/'([^']+)'/", $m[1] ?? '', $found);
+
+        expect($found[1])->toBe(BACKLOG_TIERS, $script.' carries a different tier vocabulary.');
+    }
 });
 
 it('discriminates between a record, a quotation and a legacy shape', function (): void {

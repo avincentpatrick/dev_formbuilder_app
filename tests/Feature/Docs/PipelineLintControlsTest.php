@@ -80,7 +80,7 @@ function pipelineLintRoot(): string
     pipelineLintWrite('CLAUDE.md', pipelineLintFiller(120));
     pipelineLintWrite('docs/pipeline.md', "# The pipeline\n\nGenerated. Do not hand-edit.\n");
     pipelineLintWrite('docs/feature-backlog.md', "# Backlog\n\n- nothing filed.\n");
-    pipelineLintWrite('docs/claims/decisions.md', "# Decisions\n\n- nothing decided.\n");
+    pipelineLintWrite('docs/claims/decisions.md', pipelineLintDecisions());
     pipelineLintWrite('docs/adr/0001-example.md', "# ADR 1\n\nNothing rejected here.\n");
 
     // ⚠️ NAMED so they cannot collide with the REAL `docs/data-dictionary.md`, which the coverage
@@ -243,6 +243,8 @@ function pipelineLintDocument(array $overrides = []): string
 {
     $rows = [];
 
+    // ⚠️ EVERY ROW IS TIERED (M93). P7a gives plan and decision rows no allowance, and a base fixture
+    // that tripped it would turn all forty-odd cases into "the baseline was not green".
     foreach (['alpha', 'beta', 'gamma', 'delta', 'epsilon', 'zeta'] as $topic) {
         $rows[] = [
             'id' => $topic.'-work',
@@ -252,6 +254,7 @@ function pipelineLintDocument(array $overrides = []): string
             'title' => 'The '.$topic.' feature',
             'phase' => '4',
             'size' => 'L',
+            'tier' => 'before-launch',
         ];
     }
 
@@ -264,6 +267,7 @@ function pipelineLintDocument(array $overrides = []): string
             'title' => 'Plan row '.$i,
             'phase' => '4',
             'size' => 'M',
+            'tier' => 'during-testing',
         ];
     }
 
@@ -276,6 +280,21 @@ function pipelineLintDocument(array $overrides = []): string
             'headline' => 'Defect row '.$i,
             'phase' => 'n/a',
             'size' => '',
+            'tier' => 'after-launch',
+        ];
+    }
+
+    // One row per OPEN decision in pipelineLintDecisions(), which P7b checks in both directions.
+    foreach (['D2' => 'early-testing', 'D3' => 'after-launch'] as $id => $tier) {
+        $rows[] = [
+            'id' => $id,
+            'class' => 'decision',
+            'state' => 'blocked',
+            'blocker' => 'user: answer '.$id.' on the Decision Board',
+            'title' => 'Fixture question '.$id,
+            'phase' => 'n/a',
+            'size' => '',
+            'tier' => $tier,
         ];
     }
 
@@ -298,6 +317,20 @@ function pipelineLintDocument(array $overrides = []): string
     ];
 
     return (string) json_encode(array_replace($document, $overrides), JSON_PRETTY_PRINT);
+}
+
+/**
+ * A decisions file carrying the one split the gate reads — two open, one answered — whose open ids match
+ * the decision rows in pipelineLintDocument(). No paragraph names a fixture table and its column together,
+ * because this file also feeds P2d's disposition buffer and must not discharge a dormant column by accident.
+ */
+function pipelineLintDecisions(): string
+{
+    return "# Decisions\n\n## OPEN\n\n"
+        ."### D2 — A question the fixture keeps open **Tier: early-testing.**\n\nStill open.\n\n"
+        ."### D3 — Another open question **Tier: after-launch.**\n\nStill open.\n\n"
+        ."## ANSWERED\n\n"
+        ."### D1 — A question already answered **Yes.**\n\nAnswered.\n";
 }
 
 /** The stop-list, in the shape the gate parses out of the driver. */
@@ -376,6 +409,7 @@ function pipelineLintReset(): void
     pipelineLintWrite('PROGRESS.md', pipelineLintTracker());
     pipelineLintWrite('docs/pipeline.md', "# The pipeline\n\nGenerated. Do not hand-edit.\n");
     pipelineLintWrite('docs/feature-backlog.md', "# Backlog\n\n- nothing filed.\n");
+    pipelineLintWrite('docs/claims/decisions.md', pipelineLintDecisions());
 }
 
 /**
@@ -414,7 +448,169 @@ it('is GREEN on a well-formed fixture, which every case below is measured agains
     [$status, $output] = pipelineLintRun();
 
     expect($status)->toBe(PIPELINE_LINT_CLEAN, $output);
-    expect($output)->toContain('passed (11 rule groups');
+    expect($output)->toContain('passed (15 rule groups');
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// P7 (M93) — the tier rules.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+
+/** The untiered-defect residue P7a pins, read out of the SHIPPED gate so a control cannot drift from it. */
+function pipelineLintCeiling(): int
+{
+    $found = preg_match('/const P7A_UNTIERED_DEFECT_CEILING = (\d+);/', (string) file_get_contents(base_path('scripts/pipeline-lint.php')), $m);
+
+    expect($found)->toBe(1, 'P7A_UNTIERED_DEFECT_CEILING could not be read out of scripts/pipeline-lint.php.');
+
+    return (int) $m[1];
+}
+
+/** A shipped script's TIERS constant, read by regex — every one of those scripts executes at include time. */
+function pipelineLintTiersIn(string $relative): array
+{
+    preg_match('/const TIERS = \[(.*?)\];/s', (string) file_get_contents(base_path($relative)), $m);
+    preg_match_all("/'([^']+)'/", $m[1] ?? '', $found);
+
+    return $found[1];
+}
+
+/** The base document's rows with `$count` untiered defect rows appended. */
+function pipelineLintWithUntieredDefects(int $count): array
+{
+    $rows = json_decode(pipelineLintDocument(), true)['rows'];
+
+    for ($i = 0; $i < $count; $i++) {
+        $rows[] = [
+            'id' => 'R-u'.$i,
+            'class' => 'defect',
+            'state' => 'ready',
+            'blocker' => '',
+            'headline' => 'Untiered defect '.$i,
+            'phase' => 'n/a',
+            'size' => '',
+        ];
+    }
+
+    return $rows;
+}
+
+it('P7 — every copy of the tier vocabulary is equal, in the same order, and none can trip the stop-list', function (): void {
+    $gate = pipelineLintTiersIn('scripts/pipeline-lint.php');
+
+    expect($gate)->toHaveCount(5);
+    expect(pipelineLintTiersIn('scripts/pipeline.php'))->toBe($gate);
+    expect(pipelineLintTiersIn('scripts/state.php'))->toBe($gate);
+
+    foreach ($gate as $tier) {
+        expect(str_contains($tier, 'upload'))->toBeFalse('the tier "'.$tier.'" contains a scripts/loop.php HELD_TOPICS substring.');
+    }
+});
+
+it('P7a — reddens when a plan row carries no tier', function (): void {
+    $rows = json_decode(pipelineLintDocument(), true)['rows'];
+    unset($rows[6]['tier']);
+
+    pipelineLintPerturb('fixture-document.json', pipelineLintDocument(['rows' => $rows]), function (int $status, string $output): void {
+        expect($status)->toBe(PIPELINE_LINT_FAILED, $output);
+        expect($output)->toContain('the plan row `plan-row-0` carries no tier');
+    });
+});
+
+it('P7a — reddens when the untiered defect rows exceed the pinned residue', function (): void {
+    $rows = pipelineLintWithUntieredDefects(pipelineLintCeiling() + 1);
+
+    pipelineLintPerturb('fixture-document.json', pipelineLintDocument(['rows' => $rows]), function (int $status, string $output): void {
+        expect($status)->toBe(PIPELINE_LINT_FAILED, $output);
+        expect($output)->toContain('over the pinned residue of '.pipelineLintCeiling());
+    });
+});
+
+it('P7a — does NOT fire at exactly the pinned residue', function (): void {
+    $rows = pipelineLintWithUntieredDefects(pipelineLintCeiling());
+
+    pipelineLintPerturb('fixture-document.json', pipelineLintDocument(['rows' => $rows]), function (int $status, string $output): void {
+        expect($status)->toBe(PIPELINE_LINT_CLEAN, $output);
+        expect($output)->toContain(pipelineLintCeiling().' untiered defect row(s) within the residue');
+    });
+});
+
+it('P7b — reddens when an open decision has no row in the line', function (): void {
+    $decisions = str_replace(
+        '## ANSWERED',
+        "### D4 — A question nobody queued **Tier: after-launch.**\n\nOpen.\n\n## ANSWERED",
+        pipelineLintDecisions()
+    );
+
+    pipelineLintPerturb('docs/claims/decisions.md', $decisions, function (int $status, string $output): void {
+        expect($status)->toBe(PIPELINE_LINT_FAILED, $output);
+        expect($output)->toContain('D4 is open in docs/claims/decisions.md and has no row in the line');
+    });
+});
+
+it('P7b — reddens when a decision row has no open decision behind it', function (): void {
+    $rows = json_decode(pipelineLintDocument(), true)['rows'];
+    $rows[] = [
+        'id' => 'D9',
+        'class' => 'decision',
+        'state' => 'blocked',
+        'blocker' => 'user: answer D9 on the Decision Board',
+        'title' => 'A question that was never filed',
+        'phase' => 'n/a',
+        'size' => '',
+        'tier' => 'after-launch',
+    ];
+
+    pipelineLintPerturb('fixture-document.json', pipelineLintDocument(['rows' => $rows]), function (int $status, string $output): void {
+        expect($status)->toBe(PIPELINE_LINT_FAILED, $output);
+        expect($output)->toContain('decision row `D9` with no open decision behind it');
+    });
+});
+
+it('P7b — REFUSES rather than passing when the decisions file cannot be split', function (): void {
+    pipelineLintPerturb('docs/claims/decisions.md', "# Decisions\n\n- nothing decided.\n", function (int $status, string $output): void {
+        expect($status)->toBe(PIPELINE_LINT_CANNOT_MEASURE, $output);
+        expect($output)->toContain('has no ANSWERED heading');
+    });
+});
+
+it('P7c — reddens on a tier outside the vocabulary', function (): void {
+    $rows = json_decode(pipelineLintDocument(), true)['rows'];
+    $rows[20]['tier'] = 'before-tesing';
+
+    pipelineLintPerturb('fixture-document.json', pipelineLintDocument(['rows' => $rows]), function (int $status, string $output): void {
+        expect($status)->toBe(PIPELINE_LINT_FAILED, $output);
+        expect($output)->toContain('declares the tier "before-tesing"');
+    });
+});
+
+it('P7e — reddens when a row awaits a decision that is ANSWERED', function (): void {
+    $rows = json_decode(pipelineLintDocument(), true)['rows'];
+    $rows[20]['awaits'] = 'D1';
+
+    pipelineLintPerturb('fixture-document.json', pipelineLintDocument(['rows' => $rows]), function (int $status, string $output): void {
+        expect($status)->toBe(PIPELINE_LINT_FAILED, $output);
+        expect($output)->toContain('awaits D1, which is ANSWERED');
+    });
+});
+
+it('P7e — reddens when a row awaits a decision that does not exist', function (): void {
+    $rows = json_decode(pipelineLintDocument(), true)['rows'];
+    $rows[20]['awaits'] = 'D99';
+
+    pipelineLintPerturb('fixture-document.json', pipelineLintDocument(['rows' => $rows]), function (int $status, string $output): void {
+        expect($status)->toBe(PIPELINE_LINT_FAILED, $output);
+        expect($output)->toContain('awaits "D99", which is no decision');
+    });
+});
+
+it('P7e — does NOT fire when a row awaits a decision that is still open', function (): void {
+    $rows = json_decode(pipelineLintDocument(), true)['rows'];
+    $rows[20]['awaits'] = 'D2';
+
+    pipelineLintPerturb('fixture-document.json', pipelineLintDocument(['rows' => $rows]), function (int $status, string $output): void {
+        expect($status)->toBe(PIPELINE_LINT_CLEAN, $output);
+        expect($output)->toContain('1 row(s) await a decision, and every one is open');
+    });
 });
 
 it('P1 — reddens when the generator reports the committed line has drifted', function (): void {

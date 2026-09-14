@@ -257,4 +257,4 @@ under-disclose at the same time.
 <!-- The pipeline markers below are DELIBERATELY at end-of-file. A marker inserted mid-document
      shifts every line beneath it, and this repository cites documents as `path:N` — 25 such
      citations point into the files that carry markers. End-of-file shifts nothing. -->
-<!-- pipeline: id=track-b-deployment title="Track B — stand up the ADR-0005 self-hosted production host" phase=4 state=held size=XL blocker="user: deferred until app development is done, and needs the host itself" -->
+<!-- pipeline: id=track-b-deployment title="Track B — stand up the ADR-0005 self-hosted production host" phase=4 state=held size=XL blocker="user: deferred until app development is done, and needs the host itself" tier=before-launch -->

@@ -16,7 +16,47 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M96` is merged; the early-testing tier continues, named in `docs/pipeline.md` § Next
+## Status: ACTIVE CLAIM — `M97`, record the testing server's single-host layout and file what the step-by-step checklist found (m97-testing-server-layout)
+
+Taken 2026-09-15. Branch `m97-testing-server-layout`, cut from origin/main at `bd89f5d`, PR into main.
+Row: none taken from the line. The user asked for a detailed guide to the Testing Server Checklist artifact.
+Answering it put a layout decision on record and found three obligations no row or document carries, and
+CLAUDE.md files each one the moment it is found.
+
+### Evidence verified
+- `docs/deployment-infrastructure.md` §8 (steps 4 and 8) and §8.2 (items 2 and 10) prescribe nginx, a wildcard
+  DNS-01 certificate and `A` records for the central host and its wildcard. Held, read on the merged tree.
+- `vendor/stancl/tenancy/src/Middleware/InitializeTenancyBySubdomain.php` `makeSubdomain()` returns a host's first
+  label when the host ends with a central domain. Held, so `staging.pitahc.gov.ph` resolves to the workspace
+  `staging` under `CENTRAL_DOMAIN=pitahc.gov.ph`.
+- `app/Support/Tenancy/TenantUrl.php` builds workspace links from `APP_URL`'s host and port. Held.
+- `gh api` reports the repository `PUBLIC`, its fork pull request approval policy `first_time_contributors`, and
+  no registered runner. Held on 2026-09-15.
+- No document under `docs/` mentions `curl.cainfo`, `safe.directory`, a runner service right or fork approval.
+  Held, by search.
+
+### Premise verified
+- The testing server is the existing box behind `staging.pitahc.gov.ph`: Apache 2.4.66 Win64 answers on 443, port
+  80 is closed from outside, and `pitahc.gov.ph` is served by DICT's name servers. Measured by DNS lookup, TLS
+  handshake and HTTP HEAD on 2026-09-15, from outside the box; nothing was measured on the box itself.
+- The user will remove the older sites and will request no DNS records. The user's words in chat, 2026-09-15.
+- Lane B is retired (`docs/adr/0022-single-lane-development.md`); one worktree, no other session.
+
+### Remedy verdict
+None offered, because no row is taken: this increment records a decision and files rows, and fixes no defect. A
+path-prefixed deployment, the user's first request, was measured as impossible without a large code change: every
+signed-in route group identifies the workspace by subdomain, about 150 front-end URLs are root-relative, and the
+service worker's scope is `/f/`. That measurement is why the decision records the root-of-host layout.
+
+Files: `docs/claims/decisions.md`, `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/claims/lane-a.md`,
+`PROGRESS.md`, `docs/gate-baselines.md`.
+Shared artefacts taken: `docs/claims/decisions.md`, `docs/feature-backlog.md`, `docs/pipeline.md`, `PROGRESS.md`
+(own block only), `docs/gate-baselines.md`.
+Paired files taken: none.
+Namespaces spent: `D46`; nothing from the ADR or migration namespaces.
+Prediction: every CI job green, because only documentation changes, and `pipeline-lint` accepting three new rows
+and one answered decision. Most likely to be wrong: `BacklogProvenanceTest` or the citation gate refusing a new
+row's wording, such as a path it cannot resolve.
 
 ## RELEASED — `M96`, the first early-testing batch: a staging-build deploy window, a rule editor that can save and pre-binds Submission ID, one name-length contract, and no sorting on the two server-paginated lists (merged as PR #289, `1af40e6`, 6/6 green with real step counts — Static analysis 28 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

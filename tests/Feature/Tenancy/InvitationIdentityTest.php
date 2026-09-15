@@ -279,6 +279,26 @@ it('still lets a never-used placeholder set a password and join', function (): v
         ->toBe(TenantUserStatus::Active);
 });
 
+it('refuses an over-long name when a placeholder accepts, and writes nothing', function (): void {
+    // M96. This door already said `max:150`, as a bare literal no test pinned; it now reads `UserName::rules()`.
+    // So this case is GREEN on the code before M96, and it exists to hold the swap: a rule loosened past the
+    // column lets the name reach the write on `pgsql_auth`, which fails with SQLSTATE 22001 instead of a message.
+    fakeHibp();
+
+    $newcomer = m8Identity('Pending Person');
+    m8InviteInto($newcomer, 'long-name-token');
+
+    $this->from('http://acme.meridian.test/invitations/long-name-token')
+        ->post('http://acme.meridian.test/invitations/long-name-token', [
+            'name' => str_repeat('a', 151),
+            'password' => 'Correct-Horse-Battery-9',
+        ])
+        ->assertSessionHasErrors('name');
+
+    $this->assertGuest();
+    expect(m8StoredUser($newcomer)->name)->toBe('Pending Person');
+});
+
 it('still lets a placeholder invited to two workspaces register, because a pending invite is not a history', function (): void {
     // ⚠️ THE `joined_at IS NOT NULL` CONJUNCT IS A CORRECTNESS REQUIREMENT, NOT A NARROWING, AND THIS IS THE
     // CASE THAT PROVES IT. `resolveOrCreateUser()` creates exactly ONE placeholder per email address, so a

@@ -872,3 +872,24 @@ it('writes no audit row for any refusal, because that table is an amplification 
     enterTenant($this->tenant->id);
     expect(Audit::query()->count())->toBe($before);
 });
+
+it('fits an over-long Google profile name to the users column at the insert, and still signs the person in', function (): void {
+    // M96. A verified Google sign-in is never refused over a cosmetic field — the person can correct the name on
+    // their profile page afterwards — so the name is FITTED rather than validated. And it is fitted at the
+    // INSERT, not only in `GoogleIdentity::fromSocialiteUser()`: this fake builds the identity directly, exactly
+    // as the completion controller rebuilds it from the stored row, so a cap living only in the Socialite mapper
+    // never reaches this path. Before M96 the INSERT failed with SQLSTATE 22001 in the middle of a sign-in.
+    $this->google->as(googleSubject(), 'long-google-name@example.test', str_repeat('a', 151));
+
+    $this->get(googleWalkToCompletion())->assertRedirect('/dashboard');
+
+    $this->assertAuthenticated();
+    $signedInId = (string) auth()->id();
+
+    // The self arm of the `users` policy, for the reason the account-creation case gives.
+    enterTenant($this->tenant->id, $signedInId);
+    $name = (string) User::query()->whereKey($signedInId)->value('name');
+
+    expect(mb_strlen($name))->toBe(150)
+        ->and($name)->toBe(str_repeat('a', 150));
+});

@@ -92,3 +92,13 @@ it('trims a name that arrives padded', function (): void {
 
     expect($identity->name)->toBe('Greta Google');
 });
+
+it('fits a name longer than the users column, counting characters', function (): void {
+    // M96. `users.name` is `varchar(150)`, and the central callback stores this identity's name before any
+    // account exists, so the mapper is the first place a long name can be fitted.
+    $identity = GoogleIdentity::fromSocialiteUser(
+        socialiteUser(['email_verified' => true], name: str_repeat('a', 151))
+    );
+
+    expect($identity->name)->toBe(str_repeat('a', 150));
+});

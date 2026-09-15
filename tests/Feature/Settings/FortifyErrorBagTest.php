@@ -3,9 +3,11 @@
 declare(strict_types=1);
 
 use App\Models\User;
+use App\Support\Auth\UserName;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Spatie\Permission\PermissionRegistrar;
 
 uses(RefreshDatabase::class);
@@ -131,6 +133,34 @@ it('validates the profile form into the bag the settings page unwraps', function
     // unwrap it. Rename the bag on either side alone and this is red.
     expect(errorBagLiteralsFor('resources/js/Pages/Settings/Index.vue'))
         ->toContain('updateProfileInformation');
+});
+
+it('refuses an over-long name into the profile bag, instead of failing the update', function (): void {
+    // M96 — and the reason the row was live on the testing server, where registration is closed but every
+    // signed-in tester reaches this form. The rule said `max:255` over a `varchar(150)` column, so a
+    // 151-character name reached the UPDATE and failed there with SQLSTATE 22001: a 500 this page cannot render.
+    // The member's OWN address keeps the email-change arm, and its verification mail, out of the case.
+    $user = bagTestMember();
+
+    $this->actingAs($user)
+        ->from('/settings')
+        ->put('/user/profile-information', ['name' => str_repeat('a', 151), 'email' => $user->email])
+        ->assertStatus(302)
+        ->assertSessionHasErrors(['name'], null, 'updateProfileInformation');
+});
+
+it('declares the users.name limit in one constant that agrees with the schema', function (): void {
+    // M96. Every writer of `users.name` refuses or fits by `UserName::MAX`, so a migration that moves the column
+    // must turn this red: narrower reopens the 22001, wider refuses names the column could hold. It is here
+    // rather than in `UserNameTest` because that file is a pure Unit test with no database, and it reads on the
+    // privileged connection so the answer does not depend on which column grants the app role holds.
+    $column = DB::connection('pgsql_privileged')->selectOne(
+        "select character_maximum_length from information_schema.columns
+         where table_schema = 'public' and table_name = 'users' and column_name = 'name'"
+    );
+
+    expect($column)->not->toBeNull()
+        ->and((int) $column->character_maximum_length)->toBe(UserName::MAX);
 });
 
 it('validates the password form into the bag the settings page unwraps', function (): void {

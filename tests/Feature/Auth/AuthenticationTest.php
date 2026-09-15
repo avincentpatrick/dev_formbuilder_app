@@ -216,3 +216,45 @@ it('rejects a breached password when accepting an invitation', function (): void
     expect(validator(['password' => $breached], $rules)->fails())->toBeTrue();
     expect(validator(['password' => $unused], $rules)->fails())->toBeFalse();
 });
+
+it('refuses a name longer than the users column on registration, instead of failing the insert', function (): void {
+    // M96. `users.name` is `varchar(150)` and this rule used to say `max:255`, so a 151-character name passed
+    // validation and died on the INSERT with SQLSTATE 22001: a 500, with nothing on the field. `assertStatus(302)`
+    // is the half that fails on that code. The 151 is a literal on purpose — a case that read the limit from
+    // the constant under test would move with it.
+    fakeHibp([]);
+
+    $strong = 'Correct-Horse-Battery-9';
+    expectSatisfiesEveryRuleButBreach($strong);
+
+    $this->from('/register')
+        ->post('/register', [
+            'name' => str_repeat('a', 151),
+            'email' => 'long-name@authtest.local',
+            'password' => $strong,
+            'password_confirmation' => $strong,
+        ])
+        ->assertStatus(302)
+        ->assertSessionHasErrors('name');
+
+    $this->assertGuest();
+});
+
+it('registers a name exactly as long as the users column', function (): void {
+    // The boundary control: without it, a rule tightened to `max:149` would still pass the refusal above.
+    fakeHibp([]);
+
+    $strong = 'Correct-Horse-Battery-9';
+
+    $this->from('/register')
+        ->post('/register', [
+            'name' => str_repeat('a', 150),
+            'email' => 'full-name@authtest.local',
+            'password' => $strong,
+            'password_confirmation' => $strong,
+        ])
+        ->assertSessionHasNoErrors();
+
+    $this->assertAuthenticated();
+    expect(auth()->user()->name)->toBe(str_repeat('a', 150));
+});

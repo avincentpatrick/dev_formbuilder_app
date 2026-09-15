@@ -8,6 +8,7 @@ use App\Models\Connection;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Connectors\TabularDestinationDirectory;
+use App\Support\Mapping\ColumnFingerprint;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -106,6 +107,73 @@ it('reduces a base to tabs, field names and a stable table id', function (): voi
         ->and($payload['destination']['header_row'])->toBe(['Full name', 'Colour', 'Notes'])
         // Table-scoped: a base-only URL opens whichever table the viewer last had open.
         ->and($payload['destination']['url'])->toBe('https://airtable.com/appACME0000000001/tblRESPONSES00001');
+});
+
+/**
+ * One table whose fields each carry their own Airtable type (M96).
+ *
+ * {@see airtableTable()} gives every field `singleLineText`, so a case built on it could not tell a real
+ * pass-through of the type from an implementation that hard-codes that one string.
+ *
+ * @param  list<array{0: string, 1: string}>  $fields  [name, type] pairs, in Airtable's order
+ */
+function airtableTypedTable(string $id, string $name, array $fields): array
+{
+    return [
+        'id' => $id,
+        'name' => $name,
+        'fields' => array_map(static fn (array $f): array => ['id' => 'fld'.md5($f[0].$f[1]), 'name' => $f[0], 'type' => $f[1]], $fields),
+    ];
+}
+
+it('carries each field’s type, index-aligned with the field names (M96)', function (): void {
+    fakeAirtableSchema([airtableTypedTable('tblRESPONSES00001', 'Responses', [
+        ['Full name', 'singleLineText'],
+        // A field with no name is left out of the header row, so its type has to leave with it, or every type
+        // after it would describe the column one place to its left.
+        ['', 'formula'],
+        ['Submission ID', 'number'],
+    ])]);
+
+    $destination = $this->actingAs($this->admin)
+        ->getJson(airtableInspectUrl($this->connection).'?reference=appACME0000000001')
+        ->assertOk()
+        ->json('destination');
+
+    expect($destination)->toHaveKey('header_types')
+        ->and($destination['header_row'])->toBe(['Full name', 'Submission ID'])
+        ->and($destination['header_types'])->toBe(['singleLineText', 'number']);
+});
+
+it('reports the server’s fingerprint of the field row, so the editor can tell a changed table (M96)', function (): void {
+    fakeAirtableSchema([airtableTable('tblRESPONSES00001', 'Responses', ['Full name', 'Colour'])]);
+
+    $destination = $this->actingAs($this->admin)
+        ->getJson(airtableInspectUrl($this->connection).'?reference=appACME0000000001')
+        ->assertOk()
+        ->json('destination');
+
+    expect($destination)->toHaveKey('fingerprint')
+        ->and($destination['fingerprint'])->toBe(ColumnFingerprint::forHeaders(['Full name', 'Colour'])->digest);
+});
+
+it('finds a renamed table by its id, which is what a saved rule holds (M96)', function (): void {
+    // Delivery writes by `sheet_id`, so a renamed table keeps delivering. Opening the rule has to find it the
+    // same way, or the editor says the table is gone and every later save of the rule is refused.
+    fakeAirtableSchema([
+        airtableTable('tblARCHIVE0000001', 'Archive', ['Ref']),
+        airtableTable('tblRESPONSES00001', 'Responses (renamed)', ['Full name', 'Submission ID']),
+    ]);
+
+    $payload = $this->actingAs($this->admin)
+        ->getJson(airtableInspectUrl($this->connection).'?reference=appACME0000000001&sheet_name=tblRESPONSES00001')
+        ->assertOk()
+        ->json();
+
+    expect($payload['error'])->toBeNull()
+        ->and($payload['destination']['sheet_id'])->toBe('tblRESPONSES00001')
+        ->and($payload['destination']['sheet_name'])->toBe('Responses (renamed)')
+        ->and($payload['destination']['header_row'])->toBe(['Full name', 'Submission ID']);
 });
 
 it('falls back to the base id when the caption cannot be fetched', function (): void {

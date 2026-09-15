@@ -4,8 +4,14 @@ import {
     columnLabel,
     columnLetter,
     fieldOptionsFor,
+    IDENTITY_KEY,
+    identityHeading,
+    identityHint,
     mappingProblem,
     mappingSummary,
+    preBindIdentity,
+    rebindByHeading,
+    restoreRows,
     suggestedTitle,
     toPayload,
     type MappingRow,
@@ -162,5 +168,148 @@ describe('mappingSummary / suggestedTitle', () => {
     it('names a created spreadsheet after the FORM, since it lands in the tenant’s own Drive', () => {
         expect(suggestedTitle('Clinic Intake')).toBe('Clinic Intake — responses');
         expect(suggestedTitle(null)).toBe('Meridian form responses');
+    });
+});
+
+// ── M96: Submission ID, and opening a rule that was already saved ─────────────────────────────────────────
+
+const SHEET_MISSING =
+    'Add a column headed “Submission ID” at the end of this sheet, then press Check again. Without it, a delivery retried after a network error can add the same row twice.';
+const TABLE_MISSING =
+    'Add a single line text field called “Submission ID” to this table in Airtable, then press Check again. Without it, a delivery retried after a network error can add the same record twice.';
+const PAUSES = 'The rule pauses until you save it with the new column.';
+const TYPE_WARNING =
+    'Airtable may change or refuse the submission id in a field of this type, so a retried delivery may not find the record it already added. Use a single line text field.';
+
+describe('identityHeading / preBindIdentity (M96)', () => {
+    it('reads a heading through stray spaces and capitals, and nothing broader', () => {
+        // A UI match only. It is deliberately not ColumnFingerprint's normaliser, which the server owns.
+        expect(identityHeading('  submission   ID ')).toBe('submission id');
+        expect(identityHeading('Submission-ID')).toBe('submission-id');
+    });
+
+    it('binds the column headed Submission ID and leaves every other column alone', () => {
+        const built = preBindIdentity(rows(['Full name', null], ['  submission   ID ', null], ['Notes', null]));
+
+        expect(built.map((r) => r.fieldKey)).toEqual([null, IDENTITY_KEY, null]);
+    });
+
+    it('binds only the first of two matching headings', () => {
+        const built = preBindIdentity(rows(['Submission ID', null], ['submission id', null]));
+
+        expect(built.map((r) => r.fieldKey)).toEqual([IDENTITY_KEY, null]);
+    });
+
+    it('passes over a matching heading the tenant already pointed at another field', () => {
+        const built = preBindIdentity(rows(['Submission ID', 'full_name'], ['submission id', null]));
+
+        expect(built.map((r) => r.fieldKey)).toEqual(['full_name', IDENTITY_KEY]);
+    });
+
+    it('changes nothing when Submission ID is already bound somewhere', () => {
+        const built = preBindIdentity(rows(['Ref', IDENTITY_KEY], ['Submission ID', null]));
+
+        expect(built.map((r) => r.fieldKey)).toEqual([IDENTITY_KEY, null]);
+    });
+
+    it('never binds a column whose heading is not Submission ID', () => {
+        // Binding it onto another heading would write ids over the tenant's own data in that column.
+        const built = preBindIdentity(rows(['Full name', null], ['ID', null], ['', null]));
+
+        expect(built.map((r) => r.fieldKey)).toEqual([null, null, null]);
+    });
+});
+
+describe('identityHint (M96)', () => {
+    it('says how to add the column when a sheet has none', () => {
+        expect(identityHint(rows(['Full name', 'full_name']), 'sheet')).toBe(SHEET_MISSING);
+    });
+
+    it('says how to add the field when an Airtable table has none', () => {
+        expect(identityHint(rows(['Full name', 'full_name']), 'table', ['singleLineText'])).toBe(TABLE_MISSING);
+    });
+
+    it('adds, on a rule that is already saved, that adding the column pauses it until it is saved again', () => {
+        expect(identityHint(rows(['Full name', 'full_name']), 'sheet', null, true)).toBe(`${SHEET_MISSING} ${PAUSES}`);
+        expect(identityHint(rows(['Full name', 'full_name']), 'table', null, true)).toBe(`${TABLE_MISSING} ${PAUSES}`);
+    });
+
+    it('asks for the binding, not a new column, when the heading is there and unbound', () => {
+        const hint = identityHint(rows(['Full name', 'full_name'], ['Submission ID', null]), 'sheet', null, true);
+
+        expect(hint).toContain('Choose Submission ID for the “Submission ID” column.');
+        expect(hint).not.toContain('Add a column');
+        expect(hint).not.toContain(PAUSES);
+    });
+
+    it('says nothing once Submission ID is bound to a sheet column', () => {
+        expect(identityHint(rows(['Full name', 'full_name'], ['Submission ID', IDENTITY_KEY]), 'sheet')).toBeNull();
+    });
+
+    it('warns only for the Airtable field types on the denylist', () => {
+        const bound = rows(['Full name', 'full_name'], ['Submission ID', IDENTITY_KEY]);
+
+        for (const type of ['number', 'currency', 'percent', 'date', 'dateTime', 'checkbox', 'rating', 'duration']) {
+            expect(identityHint(bound, 'table', ['singleLineText', type]), type).toBe(TYPE_WARNING);
+        }
+
+        for (const type of ['singleLineText', 'multilineText', 'singleSelect']) {
+            expect(identityHint(bound, 'table', ['singleLineText', type]), type).toBeNull();
+        }
+
+        // Types are read by the BOUND row's position, not by the first row's.
+        expect(identityHint(bound, 'table', ['number', 'singleLineText'])).toBeNull();
+    });
+});
+
+describe('rebindByHeading / restoreRows (M96)', () => {
+    const stored = {
+        fingerprint: 'fp-saved',
+        columns: [
+            { header: 'full name', field_key: 'full_name' },
+            { header: 'colour', field_key: 'colour' },
+            { header: 'submission id', field_key: null },
+        ],
+    };
+
+    it('carries the stored bindings by position, untouched, when the columns have not changed', () => {
+        const restored = restoreRows({ header_row: ['Full name', 'Colour', 'Submission ID'], fingerprint: 'fp-saved' }, stored);
+
+        expect(restored.drifted).toBe(false);
+        // The stored rule left Submission ID unbound. Opening it must not quietly change that.
+        expect(restored.rows.map((r) => r.fieldKey)).toEqual(['full_name', 'colour', null]);
+    });
+
+    it('never carries a binding by position once the columns changed, and matches by heading instead', () => {
+        // A column was inserted and two were swapped. By position, `full_name` would land on "Colour".
+        const restored = restoreRows(
+            { header_row: ['Colour', 'Reviewer', 'Full name', 'Submission ID'], fingerprint: 'fp-now' },
+            stored,
+        );
+
+        expect(restored.drifted).toBe(true);
+        expect(restored.rows.map((r) => r.fieldKey)).toEqual(['colour', null, 'full_name', IDENTITY_KEY]);
+    });
+
+    it('treats a rule with no stored mapping as a fresh map', () => {
+        const restored = restoreRows({ header_row: ['Full name', 'Submission ID'], fingerprint: 'fp-now' }, null);
+
+        expect(restored.drifted).toBe(false);
+        expect(restored.rows.map((r) => r.fieldKey)).toEqual([null, IDENTITY_KEY]);
+    });
+
+    it('leaves a column with no heading unbound, because there is no text to match it by', () => {
+        const built = rebindByHeading(['', 'Notes'], [
+            { header: '', field_key: 'full_name' },
+            { header: 'notes', field_key: 'colour' },
+        ]);
+
+        expect(built.map((r) => r.fieldKey)).toEqual([null, 'colour']);
+    });
+
+    it('uses each stored binding once, on the first matching heading, and never twice', () => {
+        const built = rebindByHeading(['Name', 'Name'], [{ header: 'name', field_key: 'full_name' }]);
+
+        expect(built.map((r) => r.fieldKey)).toEqual(['full_name', null]);
     });
 });

@@ -9,6 +9,7 @@ use App\Models\Connection;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Connectors\TabularDestinationDirectory;
+use App\Support\Mapping\ColumnFingerprint;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -146,6 +147,28 @@ it('inspects an existing spreadsheet from the URL a tenant actually pastes', fun
         // engine write POSITIONALLY, so dropping it would shift every column after it one place left and file
         // every answer under the wrong heading — the exact failure ocr-pipeline-design.md:84 names.
         ->assertJsonPath('destination.header_row', ['Name', '', 'Notes']);
+});
+
+it('reports a fingerprint of the header row, and no field types, which a sheet does not have (M96)', function (): void {
+    Http::fake([
+        'sheets.googleapis.com/v4/spreadsheets/*/values/*' => Http::response(['values' => [['Name', '', 'Notes']]], 200),
+        'sheets.googleapis.com/v4/spreadsheets/*' => Http::response([
+            'spreadsheetId' => 'SHEET_ID_0000000000000003',
+            'properties' => ['title' => 'Q3 Intake'],
+            'sheets' => [['properties' => ['title' => 'Form Responses 1']]],
+        ], 200),
+    ]);
+
+    $destination = $this->actingAs($this->admin)->getJson(sheetsUrl($this->connection).'?'.http_build_query([
+        'reference' => 'SHEET_ID_0000000000000003',
+    ]))->assertOk()->json('destination');
+
+    // ⚠️ `toHaveKey` BEFORE THE VALUE, NEVER `assertJsonPath('destination.header_types', null)`. That reads the
+    // path through data_get, which answers null for a MISSING key, so it passes whether the key exists or not.
+    expect($destination)->toHaveKey('header_types')
+        ->and($destination['header_types'])->toBeNull()
+        ->and($destination)->toHaveKey('fingerprint')
+        ->and($destination['fingerprint'])->toBe(ColumnFingerprint::forHeaders(['Name', '', 'Notes'])->digest);
 });
 
 it('reads the header row of the tab that was asked for, quoted for A1', function (): void {

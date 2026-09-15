@@ -10059,3 +10059,33 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   design, which was proved against a harness with stubbed tools rather than timed on the host. ⚠️ Time one real
   deploy on the testing server and write the number where the sentence stands. **Latent.** — needs the testing
   server's first automatic deploy. Filed by `M96`. **Tier: early-testing.**
+- **`minor` · The first-boot runbook describes only nginx behind a wildcard domain, and the testing server runs
+  Apache with one workspace on an existing address.** Found by `M97` (2026-09-15) while turning the Testing Server
+  Checklist into step-by-step instructions. `docs/deployment-infrastructure.md` §8 and §8.2 prescribe nginx, a
+  wildcard DNS-01 certificate and `A` records for the central host and its wildcard. `D46` put the testing site at
+  the root of the existing `staging.pitahc.gov.ph` behind Apache, with `CENTRAL_DOMAIN=pitahc.gov.ph`, so the runbook
+  no longer describes the server it is meant to bring up, and the only description of that layout is the checklist
+  artifact, outside the repository. ⚠️ Add the single-host Apache layout to §8 as a second arm (its
+  `mod_proxy_fcgi` site, the `Require local` setup lock, and `MDMembers manual` if Apache renews the certificate),
+  or state in §8 that the checklist is the runbook for this site. **Live.** Filed by `M97`. **Tier: early-testing.**
+- **`minor` · The runbook misses four Windows host prerequisites that stop a first boot or a deploy on the testing
+  server.** Found by `M97` (2026-09-15) while writing the checklist's commands. `docs/deployment-infrastructure.md`
+  §8 does not say that: (1) PHP on Windows ships no CA bundle, so without `curl.cainfo` the breached-password check's
+  HTTPS call fails and the check is skipped without a word; (2) Windows Server 2016 ships only Internet Explorer 11,
+  which `docs/non-functional-requirements.md` does not support, while §8.2 has the operator sign in from the server;
+  (3) Git refuses a repository owned by another account, so the runner's service account needs `safe.directory` for
+  the app path and its `.deploy-stage`; (4) §8 step 9 requires the runner's account to be allowed to start the
+  worker service but not how, and the default account, NETWORK SERVICE, has no such right until the service's
+  security descriptor grants it. INFERRED from each product's documented behaviour; none was measured on the host.
+  ⚠️ Add each at the §8 step it belongs to. **Latent.** — needs the first boot on the Windows host. Filed by `M97`.
+  **Tier: early-testing.**
+- **`major` · The repository is public, and a returning outside contributor's pull request could run on the
+  self-hosted deploy runner.** Found by `M97` (2026-09-15) while writing the checklist's runner step.
+  `gh api repos/avincentpatrick/dev_formbuilder_app` reports the repository `PUBLIC`, and its fork pull request
+  approval policy reads `first_time_contributors`, so only a contributor's first pull request waits for approval. A
+  pull request's workflows run from its own head, so one can name `runs-on: self-hosted` and execute on the Windows
+  server once §8.2 registers the runner. No runner is registered today, and `docs/deployment-infrastructure.md` §8
+  step 9 says nothing about it. ⚠️ Require approval for all external contributors before registering the runner;
+  this session's attempt to change the setting was refused by its permission layer, so the user sets it. Consider
+  also a runner label that only `deploy.yml` names. **Latent.** — needs a registered runner and a pull request from
+  a returning outside contributor. Filed by `M97`. **Tier: early-testing.**

@@ -6,6 +6,7 @@ namespace App\Services\Auth;
 
 use App\Actions\Fortify\PasswordValidationRules;
 use App\Models\User;
+use App\Support\Auth\UserName;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
@@ -65,8 +66,8 @@ final class OperatorAccounts
     /** The confirmation prompt's exact text. */
     public const string CONFIRM_PROMPT = 'Confirm password';
 
-    /** `users.name` is `varchar(150)`; a longer value is a 22001 (a 500), never a validation message. */
-    public const int NAME_MAX = 150;
+    /** `users.name`'s limit: an alias of {@see UserName::MAX}, kept because `platform:super-admin` prints it. */
+    public const int NAME_MAX = UserName::MAX;
 
     /** `users.email` is `varchar(255)`. */
     public const int EMAIL_MAX = 255;
@@ -91,7 +92,7 @@ final class OperatorAccounts
     {
         return $this->messages(
             [$attribute => $name],
-            [$attribute => ['required', 'string', 'max:'.self::NAME_MAX]],
+            [$attribute => UserName::rules()],
         );
     }
 

@@ -26,6 +26,13 @@ use App\Support\Mapping\ColumnMapping;
  * An empty cell in row 1 is a real, addressable column — both consumers of this engine write positionally, so
  * dropping it would shift every column after it one place left and file every answer under the wrong heading.
  * It arrives here as `''` and the editor must render it as an unnamed column rather than skip it.
+ *
+ * ── WHY IT ALSO CARRIES A FINGERPRINT THE EDITOR NEVER COMPUTES (M96) ─────────────────────────────────────
+ * Re-opening a saved rule compares `fingerprint` with the digest stored on the rule, by plain string equality,
+ * to tell whether the columns changed since the rule was saved. Only when they did not may the stored bindings
+ * be carried over by position; otherwise every answer after an inserted column would land one column out, and a
+ * save would stamp a digest that matches the new row and hide it for good. The digest is computed here, so no
+ * TypeScript copy of {@see ColumnFingerprint}'s normalisation exists to fall out of step.
  */
 final readonly class TabularDestination
 {
@@ -33,6 +40,8 @@ final readonly class TabularDestination
      * @param  list<string>  $tabs  every tab in the document, in document order
      * @param  list<string>  $headerRow  row 1 of `$sheetName`, verbatim and positional
      * @param  ?string  $sheetId  the chosen tab's STABLE id, when the provider has one (H16c)
+     * @param  ?list<?string>  $headerTypes  the provider's field type for each entry of `$headerRow`, index-aligned,
+     *                                       when the provider has types — Airtable does, a sheet does not (M96)
      */
     public function __construct(
         public string $spreadsheetId,
@@ -42,10 +51,11 @@ final readonly class TabularDestination
         public string $sheetName,
         public array $headerRow,
         public ?string $sheetId = null,
+        public ?array $headerTypes = null,
     ) {}
 
     /**
-     * @return array{spreadsheet_id: string, title: string, url: string, tabs: list<string>, sheet_name: string, header_row: list<string>, sheet_id: ?string}
+     * @return array{spreadsheet_id: string, title: string, url: string, tabs: list<string>, sheet_name: string, header_row: list<string>, sheet_id: ?string, fingerprint: string, header_types: ?list<?string>}
      */
     public function toArray(): array
     {
@@ -57,6 +67,8 @@ final readonly class TabularDestination
             'sheet_name' => $this->sheetName,
             'header_row' => $this->headerRow,
             'sheet_id' => $this->sheetId,
+            'fingerprint' => ColumnFingerprint::forHeaders($this->headerRow)->digest,
+            'header_types' => $this->headerTypes,
         ];
     }
 }

@@ -359,3 +359,96 @@ describe('submissions inbox — one form’s responses', () => {
         wrapper.unmount();
     });
 });
+
+/*
+ * M96 — BOTH ROUTES RENDER ONE SERVER-PAGINATED TABLE, SO NEITHER MAY OFFER A SORT.
+ *
+ * `SubmissionInboxPresenter::list()` pages this list on the server in a fixed order, and `MdsDataTable` sorts
+ * only the rows it was handed. A sortable header here therefore reordered ONE page and announced, through
+ * `aria-sort`, an order over the whole inbox that did not exist. The user's decision of 2026-08-18 drops the
+ * sort on this table and on the webhook delivery log, following `audit/Index.vue`: no sortable column, and one
+ * line of prose stating the fixed order instead. Server-side sorting was explicitly NOT the chosen path.
+ *
+ * ⚠️ BOTH MODES, BECAUSE THEY DECLARE DIFFERENT COLUMNS. The Form column exists only on the global route, so a
+ * per-form case alone cannot see a sortable Form header come back.
+ *
+ * ⚠️ AND A FLOOR BEFORE EVERY ABSENCE. Zero sort buttons is also what a table that never rendered its header
+ * looks like; the header texts prove the columns the sort used to live on are really there.
+ */
+const ORDER_LINE = 'Newest first.';
+const DRAFTS_HINT = 'In-progress drafts are hidden';
+
+/** Every surface `MdsDataTable` renders for a sortable column: `aria-sort`, the header button, the chip bar. */
+function sortAffordances(wrapper: VueWrapper): { ariaSort: number; headerButtons: number; sortBar: boolean } {
+    return {
+        ariaSort: wrapper.findAll('th[aria-sort]').length,
+        headerButtons: wrapper.findAll('th button').length,
+        // A `v-if` in the component, so it is absent from the DOM rather than merely hidden by CSS.
+        sortBar: wrapper.find('[role="group"][aria-label^="Sort"]').exists(),
+    };
+}
+
+function headerTexts(wrapper: VueWrapper): string[] {
+    return wrapper.findAll('th').map((th) => th.text());
+}
+
+describe('submissions inbox — a server-paginated list offers no sort', () => {
+    it('declares no sortable column on the global inbox', () => {
+        const wrapper = render(globalProps());
+
+        expect(headerTexts(wrapper)).toEqual(expect.arrayContaining(['Form', 'Submitted']));
+        expect(sortAffordances(wrapper)).toEqual({ ariaSort: 0, headerButtons: 0, sortBar: false });
+
+        wrapper.unmount();
+    });
+
+    it('declares no sortable column on one form’s responses', () => {
+        const wrapper = render(perFormProps());
+
+        expect(headerTexts(wrapper)).toContain('Submitted');
+        expect(sortAffordances(wrapper)).toEqual({ ariaSort: 0, headerButtons: 0, sortBar: false });
+
+        wrapper.unmount();
+    });
+
+    /*
+     * ⚠️ THE DRAFT ARM IS THE ONE THAT MATTERS. The page already had one conditional hint above the table, and
+     * an order line written inside its `v-if` passes the other two arms while vanishing exactly when a keyer
+     * filters to drafts. Each arm floors its own state first — the drafts hint's presence or absence — so an
+     * arm whose fixture silently failed to reach that state cannot pass for the wrong reason.
+     */
+    it.each<[string, () => Props, boolean]>([
+        ['the global inbox', () => globalProps(), true],
+        ['one form’s responses', () => perFormProps(), true],
+        [
+            'the Draft-filtered list, where the drafts hint is gone',
+            () =>
+                globalProps({
+                    filters: {
+                        ...(globalProps().filters as Record<string, unknown>),
+                        statuses: [
+                            { value: 'submitted', label: 'Submitted' },
+                            { value: 'draft', label: 'Draft' },
+                        ],
+                        applied: { form_id: null, status: 'draft', source: null, q: null },
+                    },
+                }),
+            false,
+        ],
+    ])('states its fixed order in one line, before the table — %s', (_mode, props, draftsHintShown) => {
+        const wrapper = render(props());
+
+        expect(wrapper.text().includes(DRAFTS_HINT), 'the fixture did not reach the state this arm names').toBe(
+            draftsHintShown,
+        );
+
+        const lines = wrapper.findAll('p').filter((p) => p.text() === ORDER_LINE);
+        expect(lines, 'exactly one order line').toHaveLength(1);
+
+        // Placement, not just presence: a sentence in the page header's actions slot would pass a text check.
+        const position = lines[0]!.element.compareDocumentPosition(wrapper.get('table').element);
+        expect(position & Node.DOCUMENT_POSITION_FOLLOWING, 'the order line must come BEFORE the table').not.toBe(0);
+
+        wrapper.unmount();
+    });
+});

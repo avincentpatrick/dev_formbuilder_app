@@ -130,3 +130,34 @@ it('accepts an invitation end-to-end through the no-auth invitation route', func
         ->and($membership->joined_at)->not->toBeNull();
     expect(User::find($invitee->id)->hasRole('form_editor'))->toBeTrue();
 });
+
+it('fits an invited placeholder’s name to the users column when the address has a very long local part', function (): void {
+    // M96. A placeholder is named after the part of its address before the `@`, and this form validates
+    // `email|max:255`, which accepts a 151-character local part: the validator only WARNS past RFC 5321's 64.
+    // So the placeholder INSERT failed with SQLSTATE 22001 and the inviting Admin got a 500. The derived name
+    // is now fitted; whether such an address should be refused at all is a separate question about this form.
+    //
+    // ⚠️ THE STORED NAME IS READ BACK, NOT INFERRED FROM THE REDIRECT. A fit that returned '' or a short prefix
+    // would pass a status-only case. The placeholder was written inside this transaction, so `pgsql_auth` cannot
+    // see it; entering the tenant AS the placeholder admits the row through the self arm of the `users`
+    // visibility policy (`id = app.current_user_id`).
+    $tenant = Tenant::create(['name' => 'Acme', 'slug' => 'acme']);
+    $tenant->domains()->create(['domain' => 'acme']);
+    $admin = User::factory()->create();
+    enterTenant($tenant->id, $admin->id);
+    makeActiveMember($admin, 'admin');
+
+    $this->actingAs($admin)
+        ->post('http://acme.meridian.test/members/invitations', [
+            'email' => str_repeat('a', 151).'@membertest.local',
+            'role' => 'form_editor',
+        ])
+        ->assertRedirect()
+        ->assertSessionHasNoErrors();
+
+    enterTenant($tenant->id, $admin->id);
+    $invite = TenantUser::where('status', TenantUserStatus::Invited)->sole();
+
+    enterTenant($tenant->id, (string) $invite->user_id);
+    expect(User::query()->whereKey($invite->user_id)->value('name'))->toBe(str_repeat('a', 150));
+});

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Sso;
 
 use App\Models\SsoConnection;
+use App\Support\Auth\UserName;
 use Illuminate\Support\Str;
 
 /**
@@ -36,9 +37,6 @@ use Illuminate\Support\Str;
  */
 final class SsoIdentityResolver
 {
-    /** `users.name` is `varchar(150)`; a directory display name can legitimately be longer. */
-    private const MAX_NAME_LENGTH = 150;
-
     /**
      * @throws SsoAuthenticationException when the assertion carries no email this connection can use
      */
@@ -93,8 +91,8 @@ final class SsoIdentityResolver
         }
 
         // The local part, which is what `TenantMembershipService::resolveOrCreateUser()` uses for an
-        // invited placeholder. Same fallback, so a member who arrives by invitation and one who arrives by
-        // SSO are not distinguishable by the shape of their name.
+        // invited placeholder. Same fallback, fitted by the same `UserName::fit()`, so a member who arrives by
+        // invitation and one who arrives by SSO are not distinguishable by the shape of their name.
         return $this->trimToColumn(Str::before($email, '@'));
     }
 
@@ -119,8 +117,14 @@ final class SsoIdentityResolver
         return filter_var($email, FILTER_VALIDATE_EMAIL) === false ? null : $email;
     }
 
+    /**
+     * A directory display name can legitimately be longer than `users.name`, so it is fitted, never refused.
+     *
+     * ⚠️ In code points, by {@see UserName::fit()} (M96). This used `Str::limit()`, which measures DISPLAY WIDTH,
+     * so a name of more than 75 CJK characters or emoji — one the column holds — was stored as its first 75.
+     */
     private function trimToColumn(string $value): string
     {
-        return Str::limit(trim($value), self::MAX_NAME_LENGTH, '');
+        return UserName::fit($value);
     }
 }

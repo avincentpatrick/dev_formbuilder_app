@@ -134,3 +134,206 @@ describe('SheetsRuleFields — creating a spreadsheet is not repeatable by doubl
         wrapper.unmount();
     });
 });
+
+// ── M96: Submission ID, and opening a rule that was already saved ─────────────────────────────────────────
+
+type Change = { spreadsheet_id: string; sheet_name: string; columns: { header: string; field_key: string | null }[] } | null;
+
+/** A pasted sheet as the inspect sidecar returns it. `fingerprint` is the server's digest of `header_row`. */
+function sheet(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+    return {
+        spreadsheet_id: 'SHEET_A',
+        title: 'Q3 Intake',
+        url: 'https://docs.google.com/spreadsheets/d/SHEET_A/edit',
+        tabs: ['Responses'],
+        sheet_name: 'Responses',
+        header_row: ['Full name', 'Submission ID'],
+        sheet_id: null,
+        fingerprint: 'fp-a',
+        header_types: null,
+        ...overrides,
+    };
+}
+
+/** A saved Sheets rule as ConnectionPresenter projects it. */
+function savedRule(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+    return {
+        id: 'rule-1',
+        connection_id: 'conn-1',
+        name: 'Submissions → Q3 Intake',
+        event_types: ['submission.created'],
+        form_id: null,
+        form_title: null,
+        form_url: null,
+        channel_id: null,
+        channel_name: null,
+        spreadsheet_id: 'SHEET_A',
+        sheet_name: 'Responses',
+        sheet_id: null,
+        spreadsheet_url: null,
+        mapping: {
+            fingerprint: 'fp-a',
+            columns: [
+                { header: 'Full name', field_key: 'full_name' },
+                { header: 'Submission ID', field_key: '__submission_id' },
+            ],
+        },
+        destination_label: 'Q3 Intake · Responses',
+        paused_reason: null,
+        status: 'active',
+        consecutive_failure_count: 0,
+        last_success_at: null,
+        last_failure_at: null,
+        created_at: '2026-09-01T00:00:00Z',
+        ...overrides,
+    };
+}
+
+function renderRule(rule: Record<string, unknown>): VueWrapper {
+    return mount(SheetsRuleFields, {
+        props: { connectionId: 'conn-1', formId: '', formTitle: 'Q3 Intake', rule: rule as never, errors: {} },
+        global: { stubs: { Button: ButtonPassthrough } },
+    });
+}
+
+function lastChange(wrapper: VueWrapper): Change {
+    const events = wrapper.emitted('change') ?? [];
+
+    return (events.at(-1)?.[0] ?? null) as Change;
+}
+
+function checkButton(wrapper: VueWrapper): DOMWrapper<Element> {
+    const button = wrapper.findAll('button').find((candidate) => candidate.text().trim() === 'Check');
+    expect(button, 'the Check button should be rendered in existing-sheet mode').toBeTruthy();
+
+    return button!;
+}
+
+/** Switch a new rule to "Use one I already have", paste a reference and press Check. */
+async function pasteAndCheck(wrapper: VueWrapper, reference: string): Promise<void> {
+    await wrapper.find('input[type="radio"][value="existing"]').setValue(true);
+    await wrapper.find('input[placeholder^="https://docs.google.com"]').setValue(reference);
+    await checkButton(wrapper).trigger('click');
+    await flushPromises();
+}
+
+describe('SheetsRuleFields — Submission ID and saved rules (M96)', () => {
+    beforeEach(() => {
+        // `clearAllMocks` keeps queued once-values and implementations, which would leak between these cases.
+        mocks.inspectDestination.mockReset();
+        mocks.createDestination.mockReset();
+    });
+
+    it('arrives with Submission ID bound on a pasted sheet whose heading reads it', async () => {
+        mocks.inspectDestination.mockResolvedValue({ destination: sheet({ header_row: ['Full name', '  submission   ID '] }), error: null });
+
+        const wrapper = render();
+        await flushPromises();
+        await pasteAndCheck(wrapper, 'SHEET_A');
+
+        const change = lastChange(wrapper);
+        expect(change, 'a map with Submission ID bound is saveable, so it must be published').not.toBeNull();
+        expect(change!.columns).toEqual([
+            { header: 'Full name', field_key: null },
+            { header: '  submission   ID ', field_key: '__submission_id' },
+        ]);
+        expect(wrapper.text()).toContain('Lets us spot a row we already added, so a retried delivery does not add it twice.');
+        wrapper.unmount();
+    });
+
+    it('explains how to add the column when a pasted sheet has none', async () => {
+        mocks.inspectDestination.mockResolvedValue({ destination: sheet({ header_row: ['Full name', 'Notes'] }), error: null });
+
+        const wrapper = render();
+        await flushPromises();
+        await pasteAndCheck(wrapper, 'SHEET_A');
+
+        expect(wrapper.text()).toContain('Add a column headed “Submission ID” at the end of this sheet, then press Check again.');
+        wrapper.unmount();
+    });
+
+    it('re-inspects the tab an existing rule writes to, not the first tab', async () => {
+        mocks.inspectDestination.mockResolvedValue({
+            destination: sheet({ tabs: ['Responses', 'Tab 2'], sheet_name: 'Tab 2' }),
+            error: null,
+        });
+
+        const wrapper = renderRule(savedRule({ sheet_name: 'Tab 2' }));
+        await flushPromises();
+
+        expect(mocks.inspectDestination).toHaveBeenCalledTimes(1);
+        expect(mocks.inspectDestination).toHaveBeenCalledWith('conn-1', 'SHEET_A', 'Tab 2');
+        expect(lastChange(wrapper)?.sheet_name).toBe('Tab 2');
+        wrapper.unmount();
+    });
+
+    it('restores an existing rule exactly as stored, leaving an unbound Submission ID unbound', async () => {
+        // The heading row DOES read "Submission ID", so a restore that pre-binds would bind it here.
+        mocks.inspectDestination.mockResolvedValue({ destination: sheet(), error: null });
+
+        const wrapper = renderRule(savedRule({
+            mapping: {
+                fingerprint: 'fp-a',
+                columns: [
+                    { header: 'Full name', field_key: 'full_name' },
+                    { header: 'Submission ID', field_key: null },
+                ],
+            },
+        }));
+        await flushPromises();
+
+        expect(lastChange(wrapper)!.columns).toEqual([
+            { header: 'Full name', field_key: 'full_name' },
+            { header: 'Submission ID', field_key: null },
+        ]);
+        expect(wrapper.text()).not.toContain('changed since the rule was saved');
+        wrapper.unmount();
+    });
+
+    it('builds a fresh map when Check is pressed on an existing rule, never carrying the old bindings over', async () => {
+        mocks.inspectDestination
+            .mockResolvedValueOnce({ destination: sheet(), error: null })
+            .mockResolvedValueOnce({
+                destination: sheet({ spreadsheet_id: 'SHEET_B', header_row: ['Reviewer', 'Submission ID'], fingerprint: 'fp-b' }),
+                error: null,
+            });
+
+        const wrapper = renderRule(savedRule());
+        await flushPromises();
+
+        await wrapper.find('input[placeholder^="https://docs.google.com"]').setValue('SHEET_B');
+        await checkButton(wrapper).trigger('click');
+        await flushPromises();
+
+        expect(lastChange(wrapper)!.columns).toEqual([
+            { header: 'Reviewer', field_key: null },
+            { header: 'Submission ID', field_key: '__submission_id' },
+        ]);
+        wrapper.unmount();
+    });
+
+    it('binds every catalog column of a sheet it creates, Submission ID included', async () => {
+        // The shared beforeEach answers an EMPTY catalog, under which this path binds nothing at all.
+        mocks.fetchMappableColumns.mockResolvedValue({
+            columns: [
+                { key: 'full_name', label: 'Full name', group: 'Form fields' },
+                { key: '__submission_id', label: 'Submission ID', group: 'Submission details' },
+            ],
+            scoped: true,
+            error: null,
+        });
+        mocks.createDestination.mockResolvedValue({ destination: sheet(), error: null });
+
+        const wrapper = render();
+        await flushPromises();
+        await createButton(wrapper).trigger('click');
+        await flushPromises();
+
+        expect(mocks.createDestination).toHaveBeenCalledWith('conn-1', 'Q3 Intake — responses', ['Full name', 'Submission ID']);
+        expect(lastChange(wrapper)!.columns).toEqual([
+            { header: 'Full name', field_key: 'full_name' },
+            { header: 'Submission ID', field_key: '__submission_id' },
+        ]);
+        wrapper.unmount();
+    });
+});

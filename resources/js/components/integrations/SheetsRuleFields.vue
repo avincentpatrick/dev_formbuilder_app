@@ -14,9 +14,16 @@
  * header row is ours, so the first drift the tenant ever sees is a real edit of theirs.
  *
  * ── NO FINGERPRINT IS COMPUTED HERE ────────────────────────────────────────────────────────────────────────
- * See `mapping-model.ts`: the server re-derives it from the header row through `ColumnMapping::author()`. A
+ * See `mapping-model.ts`: the tenant rule requests derive it from the posted headers on every save (M96). A
  * TypeScript reimplementation of `ColumnFingerprint`'s normalisation would be a second thing to keep in step
  * with a digest the delivery path compares byte for byte.
+ *
+ * ── RESTORING A SAVED RULE, AND SUBMISSION ID (M96) ────────────────────────────────────────────────────────
+ * Only the seed watcher restores, and it re-inspects the rule's OWN tab: asked for no tab, the server answers the
+ * first one, and a save would quietly retarget the rule there. The stored bindings are carried over only while the
+ * sheet's fingerprint still equals the rule's (`restoreRows()`). Every map built from a pick — Check, a tab — is
+ * fresh and pre-binds a column headed "Submission ID"; Check may be a different sheet entirely, so the old rule's
+ * bindings would otherwise land on its columns by position.
  */
 import { computed, ref, watch } from 'vue';
 import {
@@ -33,8 +40,13 @@ import {
     buildRows,
     columnLabel,
     fieldOptionsFor,
+    IDENTITY_KEY,
+    IDENTITY_ROW_HELP,
+    identityHint,
     mappingProblem,
     mappingSummary,
+    preBindIdentity,
+    restoreRows,
     suggestedTitle,
     toPayload,
     UNBOUND_LABEL,
@@ -67,6 +79,8 @@ const catalog = ref<MappableColumn[]>([]);
 const scoped = ref(false);
 const busy = ref(false);
 const problem = ref<string | null>(null);
+/** The restored rule's columns changed since it was saved, so its bindings were matched by heading (M96). */
+const drifted = ref(false);
 
 const modeOptions: Option[] = [
     { value: 'create', label: 'Create a sheet for me' },
@@ -84,6 +98,11 @@ const tabOptions = computed<Option[]>(
 
 const localProblem = computed<string | null>(() => (destination.value ? mappingProblem(rows.value) : null));
 const summary = computed<string>(() => (destination.value ? mappingSummary(rows.value) : ''));
+
+/** Why Submission ID is not doing its job on this map, or null (M96). A plain paragraph: `status` is the live region. */
+const identityHintText = computed<string | null>(() =>
+    destination.value ? identityHint(rows.value, 'sheet', destination.value.header_types, Boolean(props.rule)) : null,
+);
 
 /**
  * The status line's text. Always rendered (never `v-if`'d away) so the live region exists in the DOM before
@@ -103,6 +122,7 @@ function reset(): void {
     destination.value = null;
     rows.value = [];
     problem.value = null;
+    drifted.value = false;
 }
 
 /** Push the current draft up, or null while it is not yet saveable. */
@@ -140,7 +160,30 @@ async function connectExisting(): Promise<void> {
 
     destination.value = payload.destination;
     problem.value = payload.error;
-    rows.value = payload.destination ? buildRows(payload.destination.header_row, props.rule?.mapping) : [];
+    // A pick, never a restore (M96): the link may be a different sheet, and a saved rule's bindings would land on
+    // its columns by position.
+    rows.value = payload.destination ? preBindIdentity(buildRows(payload.destination.header_row)) : [];
+    drifted.value = false;
+    busy.value = false;
+    publish();
+}
+
+/**
+ * Re-open a saved rule on ITS tab (M96). Only the seed watcher calls this; see the file docblock.
+ */
+async function restore(rule: RuleRow): Promise<void> {
+    if (!props.connectionId || !rule.spreadsheet_id) return;
+
+    busy.value = true;
+    problem.value = null;
+
+    const payload = await inspectDestination(props.connectionId, rule.spreadsheet_id, rule.sheet_name);
+    const restored = payload.destination ? restoreRows(payload.destination, rule.mapping) : null;
+
+    destination.value = payload.destination;
+    problem.value = payload.error;
+    rows.value = restored?.rows ?? [];
+    drifted.value = restored?.drifted ?? false;
     busy.value = false;
     publish();
 }
@@ -157,7 +200,8 @@ async function changeTab(tab: string): Promise<void> {
 
     if (payload.destination) {
         destination.value = payload.destination;
-        rows.value = buildRows(payload.destination.header_row);
+        rows.value = preBindIdentity(buildRows(payload.destination.header_row));
+        drifted.value = false;
     }
 
     problem.value = payload.error;
@@ -224,7 +268,7 @@ watch(
         if (props.rule?.spreadsheet_id && props.connectionId) {
             mode.value = 'existing';
             reference.value = props.rule.spreadsheet_id;
-            await connectExisting();
+            await restore(props.rule);
         }
     },
     { immediate: true },
@@ -354,12 +398,20 @@ watch(
                 This rule isn’t scoped to one form, so only submission details can be mapped — pick a form
                 above to map its answers.
             </p>
+            <!-- Plain paragraphs, not live regions (M96): the status line below is this editor's one live region,
+                 and both of these are present from the moment the map renders. -->
+            <p v-if="drifted" class="sheets-fields__help">
+                The columns in this sheet changed since the rule was saved. We matched each field to the column
+                with the same heading, so check every column before you save.
+            </p>
+            <p v-if="identityHintText" class="sheets-fields__help">{{ identityHintText }}</p>
             <div class="sheets-fields__map">
                 <MdsFormField
                     v-for="row in rows"
                     :key="row.index"
                     v-slot="{ id, describedby }"
                     :label="columnLabel(row)"
+                    :help="row.fieldKey === IDENTITY_KEY ? IDENTITY_ROW_HELP : undefined"
                 >
                     <MdsSelect
                         :id="id"

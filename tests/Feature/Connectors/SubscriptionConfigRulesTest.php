@@ -11,6 +11,7 @@ use App\Models\Tenant;
 use App\Models\User;
 use App\Support\Api\ApiAbilities;
 use App\Support\Connectors\SubscriptionConfigRules;
+use App\Support\Mapping\ColumnFingerprint;
 use App\Support\Mapping\ColumnMapping;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
@@ -224,4 +225,159 @@ it('narrows the deliverable catalog for a tabular provider and nothing else', fu
         // An unresolved provider must not narrow anything — the request is being rejected on other grounds
         // anyway, and guessing would reject a Slack rule the resolver simply failed to type.
         ->and(SubscriptionConfigRules::deliverableEventTypes(null))->toBe(DomainEventType::values());
+});
+
+// ── M96: the rule editor's own payload saves, and the tenant rule requests stamp the fingerprint ───────────
+//
+// Every case above builds its mapping with ColumnMapping::author(), which already carries a fingerprint, so
+// none of them sends what RuleFormModal actually sends: `mapping: { columns }` and nothing else. That shape
+// was refused on `config.mapping.fingerprint`, a key neither editor renders, so no Sheets or Airtable rule
+// could be saved from the UI and the modal simply stayed open.
+
+function webRulesUrl(Connection $connection): string
+{
+    return 'http://acme.meridian.test/integrations/connections/'.$connection->id.'/rules';
+}
+
+/**
+ * The `config` RuleFormModal posts for a Google Sheets rule — no fingerprint, and a null `sheet_id`.
+ *
+ * @param  list<array{header: string, field_key: string|null}>  $columns
+ */
+function editorSheetsConfig(array $columns): array
+{
+    return [
+        'spreadsheet_id' => 'SHEET123',
+        'spreadsheet_title' => 'Q3 Intake',
+        'sheet_name' => 'Responses',
+        'sheet_id' => null,
+        'mapping' => ['columns' => $columns],
+    ];
+}
+
+/** Post one rule through the tenant-web store route, the way the Integrations page does. */
+function postWebRule(Connection $connection, string $name, array $config): TestResponse
+{
+    return test()->actingAs(test()->admin)
+        ->from('http://acme.meridian.test/integrations')
+        ->post(webRulesUrl($connection), [
+            'name' => $name,
+            'event_types' => [DomainEventType::SubmissionCreated->value],
+            'config' => $config,
+        ]);
+}
+
+/** The stored rule named `$name`, read back under the tenant's own context. */
+function storedRule(string $name): ConnectionSubscription
+{
+    enterTenant(test()->tenant->id);
+
+    return ConnectionSubscription::query()->where('name', $name)->firstOrFail();
+}
+
+it('saves a Sheets rule from the editor’s payload, which carries no fingerprint (M96)', function (): void {
+    postWebRule($this->sheets, 'From the editor', editorSheetsConfig([
+        ['header' => 'Full name', 'field_key' => 'full_name'],
+        ['header' => 'Submission ID', 'field_key' => '__submission_id'],
+    ]))->assertSessionHasNoErrors();
+
+    // The digest delivery compares against, taken from the headers in column order.
+    expect(storedRule('From the editor')->config['mapping']['fingerprint'])
+        ->toBe(ColumnFingerprint::forHeaders(['Full name', 'Submission ID'])->digest);
+});
+
+it('saves an Airtable rule from the editor’s payload, which carries no fingerprint (M96)', function (): void {
+    $airtable = Connection::factory()->airtable()->create();
+
+    postWebRule($airtable, 'Into Airtable', [
+        'spreadsheet_id' => 'appACME0000000001',
+        'spreadsheet_title' => 'Client Intake CRM',
+        'sheet_name' => 'Responses',
+        'sheet_id' => 'tblRESPONSES00001',
+        'mapping' => ['columns' => [
+            ['header' => 'Full name', 'field_key' => 'full_name'],
+            ['header' => 'Submission ID', 'field_key' => '__submission_id'],
+        ]],
+    ])->assertSessionHasNoErrors();
+
+    expect(storedRule('Into Airtable')->config['mapping']['fingerprint'])
+        ->toBe(ColumnFingerprint::forHeaders(['Full name', 'Submission ID'])->digest);
+});
+
+it('saves a sheet whose heading row has a blank cell, which the middleware turns into null (M96)', function (): void {
+    // TrimStrings and ConvertEmptyStringsToNull run before validation, so the blank heading reaches the rules
+    // as null and `'string'` refuses it. The editor renders that column as "Column B (no heading)", a real
+    // column, so the save has to accept it and store it as the empty string it was.
+    postWebRule($this->sheets, 'Blank heading', editorSheetsConfig([
+        ['header' => 'Name', 'field_key' => 'full_name'],
+        ['header' => '', 'field_key' => null],
+        ['header' => 'Notes', 'field_key' => null],
+    ]))->assertSessionHasNoErrors();
+
+    $mapping = storedRule('Blank heading')->config['mapping'];
+
+    expect(array_column($mapping['columns'], 'header'))->toBe(['Name', '', 'Notes'])
+        ->and($mapping['fingerprint'])->toBe(ColumnFingerprint::forHeaders(['Name', '', 'Notes'])->digest);
+});
+
+it('overwrites a fingerprint the browser sent with the one the server derives (M96)', function (): void {
+    // A digest the client made up would make every delivery block as drift, or hide a real change.
+    $config = editorSheetsConfig([['header' => 'Full name', 'field_key' => 'full_name']]);
+    $config['mapping']['fingerprint'] = 'not-the-digest';
+
+    postWebRule($this->sheets, 'Sent its own', $config)->assertSessionHasNoErrors();
+
+    expect(storedRule('Sent its own')->config['mapping']['fingerprint'])
+        ->toBe(ColumnFingerprint::forHeaders(['Full name'])->digest);
+});
+
+it('stamps the fingerprint when an edit sends a new mapping (M96)', function (): void {
+    $rule = ConnectionSubscription::factory()->forConnection($this->sheets)->create(['config' => validSheetsConfig()]);
+
+    $this->actingAs($this->admin)
+        ->from('http://acme.meridian.test/integrations')
+        ->patch('http://acme.meridian.test/integrations/rules/'.$rule->id, [
+            'config' => editorSheetsConfig([
+                ['header' => 'Full name', 'field_key' => 'full_name'],
+                ['header' => 'Colour', 'field_key' => null],
+            ]),
+        ])
+        ->assertSessionHasNoErrors();
+
+    enterTenant($this->tenant->id);
+
+    expect($rule->fresh()->config['mapping']['fingerprint'])
+        ->toBe(ColumnFingerprint::forHeaders(['Full name', 'Colour'])->digest);
+});
+
+it('refuses one form field bound to two columns when a rule is created (M96)', function (): void {
+    // A fingerprint is sent so that the only thing wrong with this payload is the repeated field.
+    $config = editorSheetsConfig([
+        ['header' => 'Name', 'field_key' => 'full_name'],
+        ['header' => 'Also name', 'field_key' => 'full_name'],
+    ]);
+    $config['mapping']['fingerprint'] = str_repeat('a', 64);
+
+    // Keyed to `config.mapping.columns`, which both editors render under their column map.
+    postWebRule($this->sheets, 'Twice', $config)
+        ->assertSessionHasErrors(['config.mapping.columns' => 'Each form field can fill only one column.']);
+
+    enterTenant($this->tenant->id);
+
+    expect(ConnectionSubscription::query()->where('name', 'Twice')->exists())->toBeFalse();
+});
+
+it('refuses one form field bound to two columns when a rule is edited (M96)', function (): void {
+    $rule = ConnectionSubscription::factory()->forConnection($this->sheets)->create(['config' => validSheetsConfig()]);
+
+    $config = editorSheetsConfig([
+        ['header' => 'Name', 'field_key' => 'full_name'],
+        ['header' => 'Also name', 'field_key' => 'full_name'],
+    ]);
+    $config['mapping']['fingerprint'] = str_repeat('a', 64);
+
+    $this->actingAs($this->admin)
+        ->from('http://acme.meridian.test/integrations')
+        ->patch('http://acme.meridian.test/integrations/rules/'.$rule->id, ['config' => $config])
+        ->assertSessionHasErrors(['config.mapping.columns' => 'Each form field can fill only one column.']);
 });

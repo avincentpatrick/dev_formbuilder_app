@@ -1214,3 +1214,30 @@ it('does not let one workspace ride on another workspace’s verified domain', f
 
     $this->assertGuest();
 });
+
+it('keeps a wide-character display name whole when it fits the column, rather than cutting it by width', function (): void {
+    // M96. The resolver used to cut with `Str::limit()`, which measures DISPLAY WIDTH: a CJK character is two
+    // columns wide, so this 100-character name, which `varchar(150)` holds, was stored as its first 75 characters.
+    // Built from its code point so no editor or file encoding can change what the case sends.
+    $wide = str_repeat(mb_chr(0x4E2D, 'UTF-8'), 100);
+
+    enterTenant($this->tenant->id, $this->admin->id);
+    SsoConnection::query()->update([
+        'attribute_map' => json_encode(['name' => 'displayName']),
+    ]);
+
+    $request = startLogin($this->tenant, $this->admin);
+
+    $response = answering($request)
+        ->as('grace@acme.test')
+        ->withAttributes(['displayName' => $wide])
+        ->response();
+
+    completeSamlLogin($request, $response)->assertRedirect('/dashboard');
+
+    enterTenant($this->tenant->id, $this->admin->id);
+    $stored = (string) User::query()->where('email', 'grace@acme.test')->value('name');
+
+    expect(mb_strlen($stored))->toBe(100)
+        ->and($stored)->toBe($wide);
+});

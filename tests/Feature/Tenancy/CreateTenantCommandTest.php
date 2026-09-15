@@ -498,3 +498,44 @@ it('writes no audit row, the deliberate gap its docblock records', function (): 
 
     expect(DB::table('audits')->where('tenant_id', $tenant->id)->count())->toBe(0);
 });
+
+it('fits a default owner name derived from a long address to the users column', function (): void {
+    // Nobody typed this name: it is the address's local part, so it is fitted rather than refused (M96).
+    fakeHibp();
+    createTenantCommandSeedPlans();
+    $email = createTenantCommandEmail(str_repeat('a', 151));
+
+    $this->artisan('tenants:create', [
+        'slug' => 'pilot',
+        'name' => 'Pilot Workspace',
+        'owner' => $email,
+        '--plan' => 'starter',
+    ])
+        ->expectsQuestion(OperatorAccounts::PASSWORD_PROMPT, CREATE_TENANT_COMMAND_PASSWORD)
+        ->expectsQuestion(OperatorAccounts::CONFIRM_PROMPT, CREATE_TENANT_COMMAND_PASSWORD)
+        ->assertExitCode(0);
+
+    TenantContext::flush();
+    app(PermissionRegistrar::class)->setPermissionsTeamId(null);
+
+    $tenant = Tenant::query()->where('slug', 'pilot')->sole();
+    enterTenant((string) $tenant->id, (string) $tenant->owner_user_id);
+
+    expect(User::query()->findOrFail((string) $tenant->owner_user_id)->name)->toBe(str_repeat('a', 150));
+});
+
+it('refuses a typed owner name longer than the users column, writing nothing', function (): void {
+    createTenantCommandSeedPlans();
+
+    $this->artisan('tenants:create', [
+        'slug' => 'pilot',
+        'name' => 'Pilot Workspace',
+        'owner' => createTenantCommandEmail('founder'),
+        '--plan' => 'starter',
+        '--owner-name' => str_repeat('b', 151),
+    ])
+        ->expectsOutputToContain('owner name')
+        ->assertExitCode(2);
+
+    expect(Tenant::query()->where('slug', 'pilot')->exists())->toBeFalse();
+});

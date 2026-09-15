@@ -55,6 +55,7 @@ use App\Services\Webhooks\WebhookEndpointService;
 use App\Support\Analytics\AnalyticsQuery;
 use App\Support\Audit\AuditLogger;
 use App\Support\Audit\AuditRedactor;
+use App\Support\Mapping\ColumnFingerprint;
 use App\Support\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
 use Database\Seeders\Concerns\DeterministicIds;
@@ -105,10 +106,9 @@ class E2eSeeder extends Seeder
     private const PENDING_EMAIL = 'pending@meridian.test';
 
     /**
-     * A KNOWN password for the unverified placeholder (J3b). It previously carried `Str::random(48)`,
-     * which is right for a placeholder nobody signs in as — but the verify-email accessibility scan has
-     * to actually BE that person, and `/email/verify` sits behind `auth`. Signing in is the only way to
-     * reach the page a locked-out member sees.
+     * A KNOWN password for the unverified placeholder (J3b). It previously carried `Str::random(48)`, which is right
+     * for a placeholder nobody signs in as — but the verify-email accessibility scan has to actually BE that person,
+     * and `/email/verify` sits behind `auth`. Signing in is the only way to reach the page a locked-out member sees.
      */
     private const PENDING_PASSWORD = 'meridian-e2e-2026';
 
@@ -880,7 +880,7 @@ class E2eSeeder extends Seeder
         ]);
 
         $sheetsMapping = [
-            'fingerprint' => hash('sha256', 'full name|colour|submission id'),
+            'fingerprint' => ColumnFingerprint::forHeaders(['full name', 'colour', 'submission id'])->digest,
             'columns' => [
                 ['header' => 'full name', 'field_key' => 'full_name'],
                 ['header' => 'colour', 'field_key' => 'colour'],
@@ -953,7 +953,7 @@ class E2eSeeder extends Seeder
                 'sheet_id' => 'tblE2E00000000001',
                 'sheet_name' => 'Applicants',
                 'mapping' => [
-                    'fingerprint' => hash('sha256', 'full name|colour|submission id'),
+                    'fingerprint' => ColumnFingerprint::forHeaders(['full name', 'colour', 'submission id'])->digest,
                     'columns' => [
                         ['header' => 'full name', 'field_key' => 'full_name'],
                         ['header' => 'colour', 'field_key' => 'colour'],

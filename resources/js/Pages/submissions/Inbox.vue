@@ -129,11 +129,11 @@ const columns = computed<DataTableColumn[]>(() => [
     // J2e the only way in was the `View submission` row-action icon, which is the dead-end shape J2 exists
     // to remove. DSR §3.3 already makes `#cell-<key>` where a row's first cell is linked.
     { key: 'reference', header: 'Reference' },
-    ...(props.form ? [] : [{ key: 'form_title', header: 'Form', sortable: true }]),
+    ...(props.form ? [] : [{ key: 'form_title', header: 'Form' }]),
     { key: 'status', header: 'Status' },
     { key: 'source_label', header: 'Source' },
     { key: 'respondent', header: 'Respondent' },
-    { key: 'submitted_at', header: 'Submitted', sortable: true },
+    { key: 'submitted_at', header: 'Submitted' },
 ]);
 
 // Local filter state, seeded from what the server applied. Each change re-queries (page resets to 1).
@@ -302,6 +302,11 @@ function formatDate(iso: string | null): string {
             </MdsFormField>
         </MdsFilterBar>
 
+        <!-- M96 — the fixed order, stated in one line: the other half of dropping `sortable` from this table
+             (user decision 2026-08-18, after `audit/Index.vue`). The server pages this list newest first, so
+             no header may offer a sort over one page of it. UNCONDITIONAL, unlike the drafts hint beside it:
+             the order holds under every filter, and `inbox.test.ts` pins the Draft arm that tells them apart. -->
+        <p class="inbox__hint">Newest first.</p>
         <p v-if="!selected.status" class="inbox__hint">
             In-progress drafts are hidden. Choose the <strong>Draft</strong> status to see them.
         </p>

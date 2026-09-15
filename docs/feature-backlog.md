@@ -74,7 +74,7 @@ Several of these are **real XLSForm round-trip import failures today** — a Kob
 | **Builder — the toolbar still says "All changes saved" on a READ-ONLY form** | nice | 3 | Filed 2026-08-18 from J7. With `props.draft === null` the panes are replaced by `MdsEmptyState` and nothing can ever be written, so the string is meaningless rather than false. A `v-if="!readOnly"` on the span is the fix, but it changes the toolbar in a state `builder-axe` does not currently drive. ➡️ **Filed as a ledger row by `M94` (2026-09-14):** "The builder toolbar says "All changes saved" on a form that cannot be edited." |
 | **The builder's failed save indicator is not TONED** | nice | 3 | Filed 2026-08-18 from J7, which deliberately shipped zero CSS. `.builder__save` keeps `--mds-color-text-secondary` in every state, so "Not saved" reads with the same weight as "All changes saved". A danger tone would be a brand-new `color-contrast` surface across two themes × three type scales × three viewports, gated by suites that cannot run on the dev host — which is a real cost to schedule, not a reason never to do it. The failure already carries colour in `ConfigPanel`'s `.config__error`, which those scans have covered since D4b. ➡️ **Filed as a ledger row by `M94` (2026-09-14):** "The builder's "Not saved" status looks the same as "All changes saved"." |
 | ~~**TopNav — the theme-toggle labels overlap the Feedback link at 834px with `extra_large`**~~ ✅ **DONE — J8 (2026-08-18), AND THE TITLE IS WRONG IN A WAY WORTH KEEPING: IT WAS NEVER AN `extra_large` DEFECT.** Measured on the running dashboard before the fix, the labels spilled their fieldset at **every** type scale — **8.5px at 834px on the DEFAULT scale**, 4.5px of it across the Feedback trigger, rising to 40.1px at `large` and 66.8px at `extra_large`, and to 139–193px by 601px. 834px is one of the three e2e viewport projects, so this was on screen in every tablet run the suite has ever made. The mechanism: `MdsSegmentedControl` is `inline-flex` with no wrap and no overflow handling, and this instance is the **only** child of `.topnav__right` declaring `min-width: 0`, so it absorbed the entire squeeze while its content refused to reflow — with `.app-shell { overflow-x: clip }` swallowing the evidence. ⚠️ **THE ROW'S OTHER SUGGESTION, "or wrap", IS FORECLOSED**: `.topnav` is a fixed 64px with `flex-shrink: 0`, so wrapping trades a horizontal defect for a vertical one. ⚠️ **AND THE FIX IS SHELL-ONLY ON THE EVIDENCE, WHICH CONTRADICTS THIS ROW'S OWN FRAMING**: the compounding note below claimed the component was at fault for all its consumers, but measured at every width and scale, `forms/Index`'s Layout switcher and `analytics`'s Dashboard-view switcher never spill — only the topnav's instance is a flex item in a `space-between` bar competing against five siblings. Shipped as three measured states: labels where they fit, glyphs where they do not (visually hidden, **never** removed — `MdsIcon` is `aria-hidden`, so the span is each radio's only accessible name), and not rendered below the width where even glyphs stop fitting, because collapsing alone was **not** sufficient and the only remaining source of width was global search, which is a standing product principle. |
-| **Two server-paginated tables carry `sortable: true`, so the header announces an ordering that is false** | should | 3 | ⚠️ **FILED 2026-08-18 BY J7, BUT FOUND BY I2 — the second finding that lived in `PROGRESS.md` prose alone.** `MdsDataTable` sorts only the rows it was handed (`DataTable.vue`, a local `computed`), so on a server-paginated ledger a sort header reorders 25 of 4,000 and sets `aria-sort` over a dataset ordering that does not exist. Live at `resources/js/Pages/webhooks/Show.vue` (`created_at`) and `resources/js/Pages/submissions/Inbox.vue` (`form_title`, `submitted_at`); both render `MdsPagination`. I2 chose correctly for the audit ledger and said so in `audit/Index.vue`. ✅ **THE FORK IS RESOLVED — USER DECISION 2026-08-18: DROP `sortable`.** It matches the precedent I2 already argued in `audit/Index.vue:14-19` (the server orders newest-first, fixed, and the page says so in one line of prose), it removes a false accessibility claim rather than building around it, and it costs no new query params and no new e2e locators. **Server-side sorting is explicitly NOT the chosen path** — do not re-open it. ⚠️ **AND THE SCOPE IS VERIFIED EXACTLY RIGHT, WHICH IS RARE ENOUGH HERE TO STATE:** measured 2026-08-18 by J8, those two pages are the ONLY `sortable` tables that paginate. The other five — `admin/Tenants`, `admin/Users`, `forms/Index`, `members/Index`, `webhooks/Index` — are handed their complete set and render no `MdsPagination` at all, so client-side sort is honest there and **must not be swept**. Still unbuilt: this is now a mechanical row awaiting an increment. ➡️ **Filed as a ledger row by `M94` (2026-09-14):** "The submissions inbox and the webhook delivery log still offer column sorting that reorders only the visible page." |
+| **Two server-paginated tables carry `sortable: true`, so the header announces an ordering that is false** | should | 3 | ⚠️ **FILED 2026-08-18 BY J7, BUT FOUND BY I2 — the second finding that lived in `PROGRESS.md` prose alone.** `MdsDataTable` sorts only the rows it was handed (`DataTable.vue`, a local `computed`), so on a server-paginated ledger a sort header reorders 25 of 4,000 and sets `aria-sort` over a dataset ordering that does not exist. Live at `resources/js/Pages/webhooks/Show.vue` (`created_at`) and `resources/js/Pages/submissions/Inbox.vue` (`form_title`, `submitted_at`); both render `MdsPagination`. I2 chose correctly for the audit ledger and said so in `audit/Index.vue`. ✅ **THE FORK IS RESOLVED — USER DECISION 2026-08-18: DROP `sortable`.** It matches the precedent I2 already argued in `audit/Index.vue:14-19` (the server orders newest-first, fixed, and the page says so in one line of prose), it removes a false accessibility claim rather than building around it, and it costs no new query params and no new e2e locators. **Server-side sorting is explicitly NOT the chosen path** — do not re-open it. ⚠️ **AND THE SCOPE IS VERIFIED EXACTLY RIGHT, WHICH IS RARE ENOUGH HERE TO STATE:** measured 2026-08-18 by J8, those two pages are the ONLY `sortable` tables that paginate. The other five — `admin/Tenants`, `admin/Users`, `forms/Index`, `members/Index`, `webhooks/Index` — are handed their complete set and render no `MdsPagination` at all, so client-side sort is honest there and **must not be swept**. ✅ **Built by `M96` (2026-09-15):** both keys are dropped and both pages state their order in one line; the closed ledger row below records how. ➡️ **Filed as a ledger row by `M94` (2026-09-14):** "The submissions inbox and the webhook delivery log still offer column sorting that reorders only the visible page." |
 | **The codebase holds TWO contradictory conventions for an unseeded plan catalog** | should | 3 | ⚠️ **REPLACES THE `DestinationCatalog::visibleTo()` ROW BELOW, WHICH WAS MISFRAMED — verified against the code 2026-08-18 by J7 and re-verified by J8.** `RequireFeature` fails **open** (`RequireFeature.php:33` — `currentPlan() !== null && ! feature($key)`) while `EntitlementService::feature()` fails **closed** (`:122` — `currentPlan()?->featureEnabled($key) ?? false`), and both readings are deliberately test-pinned WITH PROSE: `CrumbTrailGateTest` and `DashboardKpisTest` assert fail-OPEN by name, `SearchDestinationArmTest` and `Sidebar.test.ts` assert fail-CLOSED by name. `FeatureAdmission::admits()` exists as the fail-open mirror and has exactly two callers (`DashboardController.php:81`, `CrumbTrail.php:263`). So this is one decision about what a surface means when there is no catalog to gate against — **not** a sign flip in one file. Note the divergence is only reachable with an UNSEEDED `plans` table (dev/test), since `resolvePlan()` falls back to Free in production. ✅ **THE DECISION IS TAKEN — USER RULING 2026-08-18: FAIL OPEN.** "No catalog" means "nothing to gate against", so the surface admits; this is what the routes already do, so nav and search stop hiding destinations the request would have been served — J4b2's stranded-reader defect. Adopting it means widening `FeatureAdmission::admits()` from its two callers to the search/nav surfaces and re-pinning the two tests that assert fail-CLOSED by name. ⛔ **NOT BUILT BY J8, AND DELIBERATELY SO: it lands in `app/Support/Search/`, which is in NEITHER lane's column under Standing Rule 7(b) and needs its own committed claim.** It is now unambiguous and ready for whichever increment claims it. ➡️ **Filed as a ledger row by `M94` (2026-09-14):** "Search and the sidebar hide plan-gated destinations when no plan catalog is seeded, while the routes serve them." |
 | Share panel — the remainder after I1: **branded social links** (X/LinkedIn/Facebook intent URLs) | nice | 3 | I1 shipped `navigator.share` + `mailto:` instead — native share is the real mobile path (it reaches WhatsApp/SMS, which no fixed set of buttons can) and it keeps third-party brand marks out of the builder and three vendor glyphs out of the hand-authored `icons.ts` |
 | Share panel — **script-snippet embed** with `postMessage` auto-resize | should | 3 | I1 ships the `<iframe>` only, which is exactly what the parity matrix committed ("iframe at MVP; richer embed a Phase 3 candidate"). Auto-resize needs a message protocol on both sides — a listener in the guest runtime and a loader script the platform serves and versions forever |
@@ -818,8 +818,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   **Gates:** migration lint **108 → 109** (`2026_08_17_000106`), the other three unchanged at **97 / 30 /
   119**, `openapi.json` byte-identical, zero `.vue` / `.ts` / e2e movement. Filed by `M1`.
 
-- **`minor` · A tabular rule that maps no Submission ID column still duplicates on an unconfirmed retry, and
-  the durable fix is in the rule EDITOR rather than the adapter.** Filed by **M5 (2026-08-19)** at the moment
+- ~~**`minor` · A tabular rule that maps no Submission ID column still duplicates on an unconfirmed retry, and
+  the durable fix is in the rule EDITOR rather than the adapter.**~~ Filed by **M5 (2026-08-19)** at the moment
   the decision was taken. `__submission_id` is offered by `MappableColumnCatalog` and is **optional**, so a
   rule that does not bind it writes nothing identifying the submission and there is nothing for M5's probe to
   search for; the write proceeds and can duplicate exactly as before. ⚠️ **AND ONE SUB-CASE THE
@@ -831,7 +831,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   whole projected row instead was **rejected on the merits**: two respondents answering a short form
   identically is ordinary, and a false match is a row that never arrives and nobody notices — trading a
   visible duplicate for an invisible loss. The fix is to make the editor pre-bind that column for a new
-  tabular rule (and say why), which lands in `resources/js/Pages/` — **Lane A's column**. Filed by `M5`. **Live** — reachable today: a rule mapping no Submission ID column has no dedupe key, so an unconfirmed retry appends a second row, judged by `M65`. **Tier: early-testing.**
+  tabular rule (and say why), which lands in `resources/js/Pages/` — **Lane A's column**. Filed by `M5`. **Live** — reachable today: a rule mapping no Submission ID column has no dedupe key, so an unconfirmed retry appends a second row, judged by `M65`. **Tier: early-testing.** ✅ **CLOSED BY `M96` (2026-09-15) — THE EDITOR COULD NOT SAVE A RULE, AND NOW PRE-BINDS THE COLUMN.** Verification found that no Sheets or Airtable rule could be saved from the editor at all: `config.mapping.fingerprint` was required, the editor never sent it, the server never derived it, and the refusal rendered nowhere. The tenant rule requests now stamp it from the posted headings, a blank heading included, and refuse one field bound to two columns; API v1, its documented shape and `openapi.json` are unchanged, and that twin is filed as its own row. The inspect sidecar carries the destination's fingerprint and Airtable field types, and Airtable finds a table by id as well as by name. Only the seed restores a saved rule, a sheet on its own tab and an Airtable table by id, and it carries stored bindings by position only while the fingerprints match; otherwise it says the columns changed and matches by heading. Every other pick builds a fresh map and binds a heading that reads Submission ID; without one a hint says to add it at the end, and an Airtable field type on the denylist draws a warning. The two delivery suites' residual tests are unchanged, because an unbound rule stays reachable through API v1, older rules and a tenant who unbinds the column. Eleven new Pest cases were red against the parent's PHP and twenty-nine new Vitest cases were red on the parent; all passed after the fix, with the neighbouring integration suites green. Twelve Pest mutations through `scripts/mutate.php` and sixteen hand-run Vitest mutations were all caught, each by the case it names.
 
 - **`minor` · M5's reconciliation asks "is this SUBMISSION in the destination", not "is THIS DELIVERY's row in
   the destination", so two rules writing one submission to one table can collapse to a single row.** Filed by
@@ -844,7 +844,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   **Narrow, and in the safe direction** — one row too few beats an unbounded ladder of duplicates — but it is
   a behaviour change beyond the one M5 exists for. The fix would be a column carrying the delivery id, which
   means writing into a column the tenant did not map, so it is a rule-editor question rather than an adapter
-  one. Revisit if a tenant reports a missing row on a table fed by two rules. Filed by `M5`. **Latent** — needs the probe to be fired from the one path that can settle a delivery on another row, judged by `M65`. **Tier: during-testing.**
+  one. Revisit if a tenant reports a missing row on a table fed by two rules. Filed by `M5`. **Latent** — needs the probe to be fired from the one path that can settle a delivery on another row, judged by `M65`. **Tier: during-testing.** ⚠️ **Re-judged by `M96` (2026-09-15):** the precondition is now the ordinary case, because `M96`'s editor binds a column headed Submission ID on every new rule whose destination has one, so two rules writing one table are far likelier to have it mapped. The verdict above stands, because a collapse still needs a second rule on the same table and a write whose answer is lost.
 
 - **`minor` · A 5xx that arrives AFTER the provider committed is still re-driven.** Filed by **M5
   (2026-08-19)**. M5 treats a received HTTP status as determinate, because both providers' contracts say a
@@ -7593,7 +7593,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `Index.vue` and `Show.vue`, and `resources/js/Pages/webhooks/Index.vue:125` surfaces a delivery **count**
   as a stat tile, not a log. ⚠️ **The gap is narrower than "the DLQ is unsurfaced"**, and saying so keeps
   the row honest: `app/Enums/WebhookDeliveryStatus.php:33` is a real `dead_lettered` case and
-  `resources/js/Pages/webhooks/Show.vue:266` renders delivery status generically, so the state is visible
+  `resources/js/Pages/webhooks/Show.vue:267` renders delivery status generically, so the state is visible
   per endpoint — what is missing is the cross-endpoint view and any explicit dead-letter labelling.
   **Live.** Filed by `M80`. **Tier: during-testing.**
 
@@ -9581,7 +9581,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   without code**, and the sign-up decision was answered invitation-only in chat on 2026-09-14, so the testing
   server avoids it and this row stays early-testing, while a default install still reaches it. The fix is to relabel or hide the button
   until a self-serve workspace exists, which is now an open decision, or to land such an account on a page that says it has none yet.
-  **Live.** Filed by `M93`. **Tier: early-testing.**
+  **Live.** Filed by `M93`. **Tier: early-testing.** ⚠️ **Corrected by `M96` (2026-09-15), which verified the row without taking it:** the symptom is not a 404. The central host renders the tenant route's `NotASubdomainException` as a redirect to `APP_URL`, so a signed-in account lands back on the guest landing page, whose Sign in and Create links send it round again, with no message and no way to sign out; `CentralHostFallbackTest` pins the redirect. The loop follows every central sign-in, including a member of one or several workspaces and a super-admin, not only a new registration, so relabelling the button fixes nothing, and the testing server reaches it whenever a tester signs in at the central address (checklist step L1 tells testers not to). The last line of `docs/ACCESS-MATRIX.md`'s central-host warning block, written by `M95`, repeats the false 404, and `tests/e2e/auth-axe.spec.ts` cites `config/fortify.php` two lines above its `home` key. The remedy that holds under every answer to D44 is an authenticated central page listing the account's workspaces, each linked to its own sign-in address, with a super-admin sent to the console and an unverified account to the verification notice.
 - **`minor` · No runbook rotates `APP_KEY`; rotation is only named as a manual step.** Carried out of
   `docs/security-threat-model.md` §9 by `M93` (2026-09-14), where it sat with no row. `.env.example` declares
   `APP_PREVIOUS_KEYS`, and `docs/deployment-infrastructure.md` calls rotation *"a manual runbook step"* without
@@ -9635,13 +9635,13 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   of `docs/TESTING-GUIDE.md` §18 by `M94` (2026-09-14), which calls it the row to watch while no row existed.
   `FormPresenter` loads every visible non-archived form with `get()`, and the page sorts and filters that array in
   the browser. ⚠️ Harmless at demo scale; it matters once a workspace holds hundreds of forms. **Latent.** Filed by `M94`. **Tier: after-launch.**
-- **`minor` · The submissions inbox and the webhook delivery log still offer column sorting that reorders only
-  the visible page.** Carried out of this ledger's §3 table by `M94` (2026-09-14), where the user's decision of
+- ~~**`minor` · The submissions inbox and the webhook delivery log still offer column sorting that reorders only
+  the visible page.**~~ Carried out of this ledger's §3 table by `M94` (2026-09-14), where the user's decision of
   2026-08-18 to drop `sortable` on the two server-paginated tables has stood unbuilt with no row.
   `webhooks/Show.vue` still declares `created_at` sortable and `submissions/Inbox.vue` still declares `form_title`
   and `submitted_at`, so a header announces an ordering the dataset does not have. ⚠️ The decision covers exactly
   these two pages: the five other sortable tables are handed their complete set and must not be swept, and the
-  audit ledger's page is the precedent. **Live.** Filed by `M94`. **Tier: early-testing.**
+  audit ledger's page is the precedent. **Live.** Filed by `M94`. **Tier: early-testing.** ✅ **CLOSED BY `M96` (2026-09-15) — THE KEYS ARE GONE AND THE ORDER IS STATED.** `sortable` is dropped in place from `submissions/Inbox.vue` (`form_title`, `submitted_at`) and `webhooks/Show.vue` (`created_at`), which removes the header button, `aria-sort` and the sort-chip bar together. Both pages now say "Newest first." in one line before the table, the half of the `audit/Index.vue` precedent the row did not name; "started first" was rejected because every response but a promoted draft is created and submitted in one step, and the draft exception is filed as its own row. `inbox.test.ts` and a new `webhooks/show.test.ts` pin both halves in every mode, the Draft filter included, and a new `paginated-tables-sort.test.ts` refuses any page that pairs `MdsPagination` with a sortable column. Nine new cases were red on the parent; nine hand-run mutations were caught, each by its named case, and one control stayed green. The stale counts in `DataTable.vue`, its story and `audit/Index.vue`, and design-system reference §3.3, are corrected in place.
 - **`minor` · Search and the sidebar hide plan-gated destinations when no plan catalog is seeded, while the routes
   serve them.** Carried out of this ledger's §3 table by `M94` (2026-09-14), where the user's ruling of 2026-08-18
   to fail open has stood unbuilt with no row. `DestinationCatalog` still asks `EntitlementService::feature()`, which
@@ -9735,7 +9735,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   in `respondent-session.ts` still holds. ⚠️ The citation gate deliberately skips code, the claims tree and the
   tracker, and this ledger moves with every filing, so a line number is the wrong anchor here: a row id does not
   move. **Live.** Filed by `M94`. **Tier: after-launch.**
-- **`minor` · The deploy's code swap and asset build happen outside the maintenance window.** Found by `M95`
+- ~~**`minor` · The deploy's code swap and asset build happen outside the maintenance window.**~~ Found by `M95`
   (2026-09-14) while verifying the deploy-script row. `deploy.ps1` resets the checkout to the new commit, runs
   `composer install` and rebuilds the front-end assets before it calls `php artisan down`, so for the length of the
   build the web tier and the old worker serve requests and take jobs over new or half-installed classes. The asset
@@ -9744,14 +9744,14 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   rewrite keeps that order deliberately, because moving `down` earlier makes the downtime as long as the build.
   ⚠️ Two real options, so a choice rather than a patch: `down` before the reset, with downtime equal to the build,
   or build into a release directory and swap. Every merge redeploys the testing site, so testers meet it on every
-  deploy. **Live.** Filed by `M95`. **Tier: early-testing.**
-- **`minor` · Registration and profile accept a 255-character name into a 150-character column.** Found by `M95`
+  deploy. **Live.** Filed by `M95`. **Tier: early-testing.** ✅ **CLOSED BY `M96` (2026-09-15) — NEITHER OPTION; A STAGING BUILD.** `deploy.ps1` now builds each release in a `.deploy-stage` worktree of the live checkout, with the live `.env` copied in, while the site stays up. Inside a `php artisan down --render=deploy-window` window it only resets the checkout, renames `vendor` and `public/build` in with a bounded retry, clears the old bootstrap caches, and runs `package:discover`, migrate, the four caches and `queue:restart` last. The window page is pre-rendered, needs no build and shares its card with the maintenance page. A half-done swap is moved back before the next window, a deleted stage is pruned rather than blocking, and a commit already live and finished opens no window. `down` first was rejected because nightly and close-out runs would each hold the site down for a whole build; release directories behind a junction were rejected because nginx for Windows never resolves `$realpath_root` and PHP's realpath cache kept an old target (measured). Proved by a scratch PowerShell 5.1 harness of 28 scenarios with real git and stubbed tools, run by its author and re-run by the lead: every scenario green on the new script, the `d9b1ac0` script red on the window invariant and every failure scenario, and 16 script mutants each red on its named scenario. `DeployWindowViewTest` pins the window page rendering with no build, inlining a built stylesheet, surviving a half-written build and leaving the maintenance page's stylesheet link and escaping as they were; its new cases were red on the parent and green after, beside the maintenance suite, and four view mutations through `scripts/mutate.php` were all caught. The first deploy after the merge still runs the previous script, and the new one's first run redeploys in full because no marker exists yet.
+- ~~**`minor` · Registration and profile accept a 255-character name into a 150-character column.**~~ Found by `M95`
   (2026-09-14) while writing the first super-admin command's name rule. `CreateNewUser::create()` and
   `UpdateUserProfileInformation::update()` both validate `name` as `max:255`, while the users-table migration
   declares `name` as a 150-character string. A name of 151 to 255 characters therefore passes validation and then
   fails the write with SQLSTATE 22001, which the person sees as a server error rather than a message on the field.
   `InvitationController` already validates the same field as `max:150`. The fix is the two rules and a case for
-  each. **Live.** Filed by `M95`. **Tier: early-testing.**
+  each. **Live.** Filed by `M95`. **Tier: early-testing.** ✅ **CLOSED BY `M96` (2026-09-15) — ONE CONTRACT FOR EVERY WRITER OF THE NAME.** `app/Support/Auth/UserName` states the limit once. `rules()` refuses a typed name over 150 in registration, the profile form, invitation accept and the operator commands; `fit()` cuts a derived or identity-provider name by code point at every users insert: Google sign-in and the invitation placeholder, which the row did not name and which both answered a long name with a 500, the SSO provisioner, and `tenants:create`'s default owner name. `SsoIdentityResolver` no longer cuts by display width, which had stored a 100-character CJK name as 75. `FortifyErrorBagTest` compares the constant with the live column. Fourteen new cases were red on the parent, seven of them only because the class did not exist yet, and every one passed after the fix, alongside the neighbouring command and invitation suites. Fourteen mutations ran through `scripts/mutate.php` with baselines: thirteen were caught, and removing the SSO provisioner's own fit survived, because the resolver fits every name before it reaches the provisioner, so that fit is kept as defence in depth that no test can reach.
 - **`minor` · The welcome email tells a central-host account to create a workspace.** Found by `M95` (2026-09-14)
   while checking what a first tester reads. `WelcomeNotification::toMail()` sends an account that belongs to no
   workspace the line "The next step is to create a workspace, or to accept an invitation to one." Nothing in the
@@ -9770,7 +9770,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   rows it receives are open ones only (`scripts/backlog-triage.php` drops the rest), so a finished tier reads "0 open
   of 1" (one plan marker) rather than the "0 open of N" its docblock promises. ⚠️ A done marker for the notification
   at its point of truth, with both sentences keyed on its absence and proved by a committed mutation, is the likely
-  shape. **Live.** Filed by `M95`. **Tier: early-testing.**
+  shape. **Live.** Filed by `M95`. **Tier: early-testing.** ⚠️ **Verified by `M96` (2026-09-15), which did not take the row:** the total is fixed by passing closed rows through `scripts/backlog-triage.php --json`, after which the finished tier reads 0 open of 6 (five closed ledger rows and the done marker). The notice is best an ordinary done marker, with `done=` and unique ids enforced for every marker, since both checks are green on arrival. `scripts/loop.php`'s status line and the generator's own closing sentence are further copies of the zero sentence. `scripts/state.php` cannot be driven by `scripts/mutate.php` without stub git and gh. And the Next section silently cuts its tier to five ready and eight blocked rows (`NEXT_READY` and `NEXT_BLOCKED` in `scripts/pipeline.php`), so two ready early-testing rows were missing from it, and the testing gate's next-work line and the hand-off inherit the cut.
 - **`minor` · `queue:work --timeout` cannot fire on Windows.** Found by `M95` (2026-09-14) while verifying the
   deploy-script row. Laravel's `Worker::daemon()` registers its per-job timeout handler only when
   `supportsAsyncSignals()` is true, which is `extension_loaded('pcntl')`, and Windows PHP has no pcntl. On the
@@ -9885,3 +9885,177 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   and Queue workers rows. A bare `:N` carries no file name, so the citation gate cannot see it. ⚠️ Name the rows
   instead, as `M95`'s in-place annotations to ADR-0005 do; renumbering would rot again with the next edit to that
   table. **Live.** Filed by `M95`. **Tier: after-launch.**
+- **`minor` · JSON and bypass-cookie requests fall through the maintenance stub into `vendor/` during the
+  deploy window.** Found by `M96` (2026-09-15) while verifying the deploy-window row. With `artisan down
+  --render`, `public/index.php` answers a browser request from the pre-rendered page before it loads
+  `vendor/autoload.php`, but the framework's maintenance stub returns early for a request that expects JSON
+  or carries the bypass cookie, so such a request boots the framework while the window resets the checkout
+  and renames `vendor/` and `public/build`. In that moment an `/api/v1` client, or an operator using the bypass,
+  can get a PHP fatal error rather than the `maintenance_mode` envelope. The exposure lasts seconds, against
+  the minutes the build used to hold the site open. ⚠️ Answer JSON from the stub, or hold those requests at
+  nginx while the window is open. **Latent.** — needs a JSON or bypass request inside the renames.
+  Filed by `M96`. **Tier: early-testing.**
+- **`minor` · `deploy.yml` says a documentation push produces no run, and every close-out push still redeploys
+  the testing site.** Found by `M96` (2026-09-15) while measuring how often the deploy window opens.
+  `.github/workflows/deploy.yml` runs after every successful CI run on `main`, and its header says a
+  documentation-only close-out produces no run. `docs/pipeline.md` is not in `ci.yml`'s `paths-ignore` and
+  every close-out regenerates it, so the `M95` close-out produced CI run 34853662052 and Deploy run
+  34855820955, skipped only because `DEPLOY_ENABLED` is unset. The nightly scheduled CI run fires Deploy the
+  same way. `M96`'s deploy skips a sha that is already live, which covers the nightly run, but a close-out is
+  a new sha and still opens a window. ⚠️ Correct the header, and skip the window when nothing the site runs
+  changed since the deployed sha. **Live.** Filed by `M96`. **Tier: early-testing.**
+- **`minor` · Airtable computed fields can be mapped as columns a rule writes.** Found by `M96` (2026-09-15)
+  while carrying Airtable field types to the rule editor. The editor offers every field of the chosen table,
+  including formula, rollup, lookup, count, autonumber, created-time and last-modified-time fields, which
+  Airtable computes itself. A rule that maps an answer onto one is refused on its first delivery, and
+  `AirtableConnector` classifies that refusal as blocking and pauses the rule (INFERRED from the error
+  classifier; not measured against the live API). Now that the field type reaches the editor, it can mark
+  those fields as not writable. **Latent.** — needs a tenant to map an answer onto a computed field.
+  Filed by `M96`. **Tier: early-testing.**
+- **`minor` · The Next section and the hand-off list open decisions as work to take.** Found by `M96`
+  (2026-09-15) while verifying the zero-gate row. `scripts/state.php` reads every bullet of
+  `docs/pipeline.md`'s Next section into its next-work list, including the bullets waiting on the user, so
+  `scripts/next.php`'s "Take work from the Next section" sentence names the open decisions beside the rows,
+  and `scripts/loop.php status` prints the same list. A decision is the user's to move, not work an
+  increment can take. ⚠️ Carry each bullet's class through, or stop reading at the decisions. **Live.**
+  Filed by `M96`. **Tier: during-testing.**
+- **`minor` · The central-host redirect is an absolute `APP_URL`, which a request from another origin cannot
+  follow.** Found by `M96` (2026-09-15) while verifying the central landing row. `bootstrap/app.php` renders
+  `NotASubdomainException` as a redirect to `config('app.url')`. When a request's own origin is not `APP_URL`
+  (a local visit on 127.0.0.1 against `APP_URL=http://localhost:8080`, or a mistyped `APP_URL`), an Inertia
+  request cannot follow the cross-origin redirect, so a central sign-in dies with no message. The first-boot
+  runbook requires `APP_URL` to be the central origin, which is why a correctly configured server does not
+  reach it. CI's E2E job has set it to the central origin since `I11b`, and the comment in
+  `tests/e2e/global-setup.ts` saying otherwise is stale. **Latent.** — needs `APP_URL` to differ from the
+  request's origin. Filed by `M96`. **Tier: during-testing.**
+- **`minor` · A deploy deletes the previous build's chunks, so an open tab can fail to load a script it needs.**
+  Found by `M96` (2026-09-15) while verifying the deploy-window row. Every build empties `public/build`, so the
+  hashed chunks the previous release served are gone once a deploy swaps the new build in. Inertia's version
+  check reloads a tab on its next navigation, but a page that fetches a chunk on demand without navigating,
+  such as a lazily loaded component, asks for a file that no longer exists (INFERRED; the on-demand sites were
+  counted, not exercised). ⚠️ Keep the previous release's chunks for a grace period, or catch a failed chunk
+  load and reload the page. **Latent.** — needs a tab left open across a deploy that then fetches a chunk.
+  Filed by `M96`. **Tier: during-testing.**
+- **`minor` · A worker relaunched by NSSM inside the deploy window starts on a half-swapped checkout.** Found
+  by `M96` (2026-09-15) while verifying the deploy-window row. The runbook's worker runs `queue:work
+  --max-time=3600`, and NSSM relaunches it whenever it exits. If its hour ends inside the window, it boots
+  against a checkout whose `vendor/` or `public/build` is mid-rename and can crash-loop, which NSSM reports as
+  Paused and `deploy.ps1`'s Stopped-only guard cannot see. `M96` shortens the window from the length of the
+  build to seconds, which narrows this rather than closing it. ⚠️ Suspend relaunching during the window, or
+  confirm the worker is running after `up`. **Latent.** — needs the worker's hour to end inside a window.
+  Filed by `M96`. **Tier: during-testing.**
+- **`minor` · The Sheets adapter's first-tab fallback is `Sheet1`, and the directory's is the first tab.**
+  Found by `M96` (2026-09-15) while verifying the rule editor row. The rule requests document an omitted
+  `sheet_name` as the destination's own first tab, and `GoogleSheetsDirectory` inspects the first tab, but
+  `GoogleSheetsConnector` writes to the literal `Sheet1` when `sheet_name` is null. A rule stored with no
+  `sheet_name`, which only API v1 can create, writes to `Sheet1` while the editor shows, and would re-save,
+  the first tab's name. **Latent.** — needs an API v1 rule with no `sheet_name` on a spreadsheet whose first
+  tab is not `Sheet1`. Filed by `M96`. **Tier: during-testing.**
+- **`minor` · Offset-paginated logs order by a second-precision timestamp with no unique tie-breaker.** Found
+  by `M96` (2026-09-15) while verifying the inbox sorting row. The webhook delivery log
+  (`WebhookEndpointPresenter`), an integration rule's delivery log (`ConnectionPresenter`) and both feedback
+  lists (`FeedbackPresenter`) order by `created_at` or `submitted_at` and paginate by offset. Both columns
+  have second precision (catalog query), and nothing breaks a tie, so tied rows may come back in a different
+  order for each page and a row on a page boundary can repeat or go missing (INFERRED from PostgreSQL's
+  ordering guarantees; not reproduced). The audit log and the inbox order by a unique id and are unaffected.
+  ⚠️ Add the primary key as a second sort key. **Latent.** — needs two rows in the same second across a page
+  boundary. Filed by `M96`. **Tier: during-testing.**
+- **`minor` · The inbox orders a promoted draft by when it was started, not when it was submitted.** Found by
+  `M96` (2026-09-15) while choosing the inbox's order line. `SubmissionInboxPresenter` orders by `id`, a
+  UUIDv7 minted when the row is created. A response submitted in one step gets its row and `submitted_at`
+  together, but `SubmissionDraftService` promotes a saved draft in place, so a response resumed from a draft
+  keeps the id of its first save and sits in the list by when it was started, while its Submitted column
+  shows when it was sent. `M96`'s "Newest first." line is true for every other response. ⚠️ Order by
+  `submitted_at` with `id` as the tie-breaker, and check the index. **Live.** Filed by `M96`.
+  **Tier: during-testing.**
+- **`minor` · API v1 must send a mapping fingerprint in an undocumented format, and a blank heading is refused
+  there.** Found by `M96` (2026-09-15) while stamping the fingerprint server-side for the tenant rule requests.
+  The API v1 subscription requests share `SubscriptionConfigRules`, so an integrator creating a Sheets or
+  Airtable rule must send `config.mapping.fingerprint` in `ColumnFingerprint`'s private digest format, which
+  `openapi.json` documents only as an optional string, and a wrong value blocks every delivery as column
+  drift. A heading cell left blank arrives as null after the framework's input middleware and is refused as
+  not a string. `M96` fixed both for the tenant web requests only, to keep API behaviour and the published
+  contract unchanged. ⚠️ Stamp it for API v1 as well and say so in the contract, or document the digest.
+  **Latent.** — needs an API v1 client creating a tabular rule. Filed by `M96`. **Tier: before-launch.**
+- **`minor` · `TopNav.vue` says the tenant switcher does not exist yet, and nothing queues it.** Found by `M96`
+  (2026-09-15) while tracing the central host for signed-in accounts. The docblock of
+  `resources/js/components/shell/TopNav.vue` records that the in-app tenant switcher was never made, and no
+  row, marker or decision carries it. A member of several workspaces reaches each only through its own
+  address. ⚠️ Decide whether a switcher is wanted; if it is not, delete the sentence. **Live.** Filed by `M96`.
+  **Tier: after-launch.**
+- **`minor` · ADR-0007 points at the runbook by bare line numbers that have moved.** Found by `M96`
+  (2026-09-15) while listing every document that describes the deploy.
+  `docs/adr/0007-async-execution-substrate.md` points at `docs/deployment-infrastructure.md`'s §6 and §8 by
+  bare line numbers, and both sections now start far lower in that file. A bare line number names no file, so
+  the citation gate cannot see it. It is the same shape as the ADR-0005 pointer row above, in another pair of
+  documents. ⚠️ Name the sections instead. **Live.** Filed by `M96`. **Tier: after-launch.**
+- **`minor` · `MdsDataTable`'s client-side sort has no mounted test.** Found by `M96` (2026-09-15) while
+  removing sorting from the two paginated lists. `MdsDataTable` renders a header button, `aria-sort` and a
+  sort-chip bar for every sortable column and reorders the rows it was handed, and five pages still use it.
+  `DataTable.test.ts` checks the sort's styles by reading the source and never mounts a sortable table, so a
+  regression in the button, the `aria-sort` toggle or the chips' pressed state reaches those pages
+  unobserved. ⚠️ Mount a sortable table and drive a header click and a chip. **Latent.** — needs a change to
+  the component's sort. Filed by `M96`. **Tier: after-launch.**
+- **`minor` · Seven list pages hand-roll the same one-line hint above a table.** Found by `M96` (2026-09-15)
+  while adding an order line to two lists. `audit/Index.vue`, `admin/AuditLog.vue`, `admin/Feedback.vue`,
+  `feedback/Index.vue`, `submissions/Inbox.vue` and `webhooks/Index.vue` each declare their own rule for it,
+  with identical tokens in five, and `M96` adds one more on `webhooks/Show.vue`. The design system has no
+  component for it, and one shared design system is the project's rule. ⚠️ Add a caption slot or component
+  for lists and move the copies onto it. **Live.** Filed by `M96`. **Tier: after-launch.**
+- **`minor` · The `email` rule accepts a local part longer than 64 characters.** Found by `M96` (2026-09-15)
+  while capping the invite placeholder's name. Laravel's `email` rule treats a local part over 64 octets as a
+  warning, not an error, so registration, the profile form, invitations and the operator commands accept an
+  address a standards-compliant mail server will not deliver to, and the invitation or verification mail
+  then fails when it is sent. RFC 5321 caps the local part at 64 octets. The member invitation rule is left
+  alone while its own row waits on decision D33. ⚠️ Add a local-part length check to every address rule.
+  **Live.** Filed by `M96`. **Tier: after-launch.**
+- **`minor` · bcrypt reads only a password's first 72 bytes.** Found by `M96` (2026-09-15) while comparing the
+  registration rules with their columns. Passwords are hashed with bcrypt and `hashing.bcrypt.limit` is null
+  (measured), so two passwords that share their first 72 bytes verify as each other, and the password rules
+  set a minimum length with no maximum. The breached-password and character-class checks make such a
+  collision unlikely in practice, which is why this is not higher. ⚠️ Set a maximum length, or pre-hash before
+  bcrypt. **Latent.** — needs a password longer than 72 bytes. Filed by `M96`. **Tier: after-launch.**
+- **`minor` · The design-system reference describes filter chips, a clear-all action and width-matched skeleton cells
+  that no list renders.** Found by `M96` (2026-09-15) while correcting §3.3's pagination sentences.
+  `docs/ux/design-system-reference.md` §3.3 says a list's filter bar shows chips for active filters with a clear-all
+  action, and that its loading skeleton matches each cell's content width. `MdsFilterBar` renders a heading and a
+  slot, no page renders active-filter chips, a clear action appears only inside the no-matches empty state, and
+  `MdsDataTable`'s skeleton gives every cell one fixed width. **Live.** Filed by `M96`. **Tier: after-launch.**
+- **`minor` · Two delivery logs page with no loading state.** Found by `M96` (2026-09-15) while removing sorting
+  from the webhook delivery log. `webhooks/Show.vue` and `integrations/RuleShow.vue` pass no `loading` to
+  `MdsDataTable` and set no busy state while a page of deliveries loads, so paging shows neither a skeleton nor
+  `aria-busy`, unlike the inbox, both audit logs and the feedback console. ⚠️ Pass the paging request's progress
+  through, as those pages do. **Live.** Filed by `M96`. **Tier: after-launch.**
+- **`minor` · Pressing Check on a Sheets rule whose tab is not the first re-reads the first tab and drops the rule's
+  bindings.** Found by `M96` (2026-09-15) while building the rule editor's Submission ID hint. The hint tells a
+  tenant to add the column and press Check again, but Check inspects the spreadsheet with no tab, so the server
+  answers its first tab. A rule writing to another tab then has to pick its tab again, which is a fresh pick and
+  loses the rule's bindings. Nothing is saved wrongly, because the loss is visible before saving. ⚠️ Give Sheets the
+  Check again control Airtable has, re-reading the current tab. **Live.** Filed by `M96`. **Tier: during-testing.**
+- **`minor` · `buildRows`'s docblock argues against the heading match, and one test title gives a reason that no
+  longer holds.** Found by `M96` (2026-09-15) while adding a heading-based restore beside `buildRows`. In
+  `resources/js/components/integrations/mapping-model.ts`, the docblock says re-binding by name would follow a moved
+  column and put every answer one cell out, which is backwards: following a moved column by heading keeps answers in
+  place, and position is what shifts them. `mapping-model.test.ts` still titles a case with "because the server
+  throws on a duplicate", while the rule requests now refuse a duplicate with a validation error. Both are
+  comments, and `rebindByHeading`'s docblock states the reasoning correctly. **Live.** Filed by `M96`. **Tier: after-launch.**
+- **`minor` · A deploy that fails before the site comes back up leaves a copy of the server's `.env` in the staging
+  worktree.** Found by `M96` (2026-09-15) while building the staging deploy. `deploy.ps1` copies the live `.env` into
+  `.deploy-stage` so the build reads the same settings, and deletes the copy only after `up`, as a warning-only step.
+  A run that fails earlier leaves a second copy of every secret inside the app folder, and
+  `docs/deployment-infrastructure.md` §4, which says the script never overwrites `.env`, does not mention it. The
+  folder carries the same permissions and is not under `public/`. ⚠️ Delete the copy in a `finally`, or record it in
+  §4. **Latent.** — needs a deploy that fails before `up`. Filed by `M96`. **Tier: before-launch.**
+- **`minor` · A previous release's `vendor` that cannot be deleted stops every later deploy before its window.**
+  Found by `M96` (2026-09-15) while building the staging deploy. The script deletes a stale `vendor.prev` with
+  `[IO.Directory]::Delete`, which refuses read-only files, such as a package composer installed from source with its
+  `.git` folder. Every later run then fails before `artisan down`, so the site stays up on the old release until
+  someone removes the folder by hand. The runbook installs with `--prefer-dist`, which is why this is latent.
+  ⚠️ Clear read-only attributes before deleting, or rename the stale folder aside. **Latent.** — needs a read-only
+  file inside a previous release's `vendor`. Filed by `M96`. **Tier: during-testing.**
+- **`minor` · The deploy window's length on the Windows testing server has never been measured.** Found by `M96`
+  (2026-09-15) while rewriting the runbook's window sentences. `M96` moved the build out of the maintenance window,
+  and the runbook and the non-functional requirements now describe the window as seconds to tens of seconds by
+  design, which was proved against a harness with stubbed tools rather than timed on the host. ⚠️ Time one real
+  deploy on the testing server and write the number where the sentence stands. **Latent.** — needs the testing
+  server's first automatic deploy. Filed by `M96`. **Tier: early-testing.**

@@ -95,7 +95,7 @@ const columns: DataTableColumn[] = [
     { key: 'attempt_count', header: 'Attempts' },
     { key: 'response_status_code', header: 'Code' },
     { key: 'response_time_ms', header: 'Latency' },
-    { key: 'created_at', header: 'Created', sortable: true },
+    { key: 'created_at', header: 'Created' },
 ];
 
 // ── Modals ───────────────────────────────────────────────────────────────────
@@ -258,6 +258,7 @@ function formatDate(iso: string | null): string {
 
         <section class="detail__log">
             <h2 class="detail__card-title detail__log-title">Delivery log</h2>
+            <p class="detail__hint">Newest first.</p>
             <MdsDataTable :columns="columns" :rows="deliveries.data" caption="Webhook deliveries" row-key="id">
                 <template #cell-event_type="{ row }">
                     <span class="detail__mono">{{ (row as DeliveryRow).event_type }}</span>
@@ -383,6 +384,15 @@ function formatDate(iso: string | null): string {
 
 .detail__log-title {
     margin-bottom: var(--mds-space-4);
+}
+
+/* M96 — the log's fixed order in one line, on the tokens every list page's hint uses (`inbox__hint`,
+   `audit__hint`). The server pages this log newest first, so its Created header offers no sort: over one
+   page of many, a client-side sort announces an order the log does not have (user decision 2026-08-18). */
+.detail__hint {
+    margin: 0 0 var(--mds-space-3);
+    font-size: var(--mds-type-body-sm-font-size);
+    color: var(--mds-color-text-secondary);
 }
 
 .detail__log {

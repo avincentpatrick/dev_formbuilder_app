@@ -17,7 +17,7 @@ two server-paginated tables (2026-08-18) · fail **open** on an unseeded plan ca
 password policy min-12 + HIBP + classes (2026-08-09) · Google-only social login (2026-08-09) ·
 gamification last (2026-08-09) · the held list stays held until the user signals, and they said
 *"not yet, ask again later"* on 2026-08-18 · **a flaky e2e result fails CI** (2026-08-26, D2 below) · **the M-series ends at zero open
-`major` rows plus three consecutive increments filing none** (2026-08-28, D5 below) · **the batch series ends and the tiered pipeline succeeds it** (2026-09-14, D12 below) · **the testing server is invitation-only** (2026-09-14, D31 below) · **the guest per-address limits are raised on the testing server only** (2026-09-14, D32 below) · **the Windows Server 2016 testing site runs PostgreSQL 15** (2026-09-14, D43 below).
+`major` rows plus three consecutive increments filing none** (2026-08-28, D5 below) · **the batch series ends and the tiered pipeline succeeds it** (2026-09-14, D12 below) · **the testing server is invitation-only** (2026-09-14, D31 below) · **the guest per-address limits are raised on the testing server only** (2026-09-14, D32 below) · **the Windows Server 2016 testing site runs PostgreSQL 15** (2026-09-14, D43 below) · **the testing site is one workspace at the root of `staging.pitahc.gov.ph`, served by Apache** (2026-09-15, D46 below).
 
 ---
 
@@ -1430,6 +1430,42 @@ doors; this is the builder's validation layer. They should not be answered as on
 
 
 ## ANSWERED
+
+### D46 — The testing server is the existing box behind `staging.pitahc.gov.ph`. How is the site laid out, with no new DNS records? **C — one workspace at the root of `staging.pitahc.gov.ph`, served by Apache, with the older sites removed.**
+
+**Filed and answered 2026-09-15 (user decision, in chat), recorded by Lane A during `M97`.** The user's testing
+server is the Windows Server 2016 box that already serves older sites at `staging.pitahc.gov.ph`, through Apache on
+port 443, with port 80 closed from outside (measured from outside the box by DNS lookup, TLS handshake and HTTP
+HEAD, not on the box). DICT's name servers answer for `pitahc.gov.ph`, with no API, and the user will request no new
+records. `docs/deployment-infrastructure.md` §8 assumes nginx, a wildcard DNS-01 certificate and wildcard `A`
+records, so none of its address or certificate steps could be followed as written.
+
+- **A — request two records from DICT**, a central host and one workspace host, and follow §8. No limits, but it
+  needs a DICT request and a new certificate.
+- **B — serve the app under a path**, such as `staging.pitahc.gov.ph/meridian`. Measured as impossible without a
+  large code change: every signed-in route group identifies the workspace by subdomain, about 150 front-end URLs
+  are root-relative, and the service worker's scope is `/f/`.
+- **C — serve the app at the root of `staging.pitahc.gov.ph`** with `CENTRAL_DOMAIN=pitahc.gov.ph` and
+  `APP_URL=https://pitahc.gov.ph`, so the address becomes the one workspace, `staging`. No DNS change, and the
+  existing certificate already covers the name.
+
+**The verification recommended A, the only layout without limits. The user asked first for B, and chose C once B
+was measured; they also chose Apache, already on the box, over nginx.**
+
+**Consequences, recorded so they are not rediscovered:**
+- There is exactly one workspace, and its slug must be `staging`. A second workspace needs its own DNS name.
+- The operator console answers at `pitahc.gov.ph`, the agency's main website, so it opens only on the server
+  itself, through a hosts-file entry, with a certificate-name warning.
+- Links built from `APP_URL` rather than from a workspace host point at the agency's main website: a welcome email
+  to someone outside the workspace, the redirect for an unidentifiable host, and the logo link in branded email
+  (`app/Support/Branding/BrandPalette.php`). Invitation, password-reset, verification and share links carry the
+  request's or the workspace's host, and are unaffected.
+- The Testing Server Checklist artifact carries this layout step by step. A row in `docs/feature-backlog.md` tracks
+  bringing §8 in line, because the runbook in the repository still describes only nginx.
+- The certificate served on 2026-09-15 expires 2026-10-13, and what renews it is not known. The checklist's
+  certificate step covers both an existing renewal tool and Apache's own `mod_md`.
+
+---
 
 ### D31 — On the testing server, may anyone create an account, or only people who are invited? **A — invitation-only while testing.**
 

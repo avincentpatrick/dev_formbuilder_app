@@ -11,6 +11,7 @@ use App\Models\TenantUser;
 use App\Models\User;
 use App\Services\Tenancy\TenantMembershipService;
 use App\Support\Auth\PasswordPolicy;
+use App\Support\Auth\UserName;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -221,7 +222,7 @@ final class InvitationController extends Controller
     private function registerInvitedPlaceholder(Request $request, User $user): void
     {
         $validated = $request->validate([
-            'name' => ['required', 'string', 'max:150'],
+            'name' => UserName::rules(),
             // Single-field on the minimal accept page, so `'confirmed'` cannot be inherited — which is the
             // WHOLE of this surface's divergence, and J3a moved it from an inline copy of the rules into a
             // named method on the shared trait. Everything else (min length, the four character classes, the

@@ -12,6 +12,7 @@ use App\Models\Tenant;
 use App\Models\TenantUser;
 use App\Models\User;
 use App\Services\Tenancy\TenantMembershipService;
+use App\Support\Auth\UserName;
 use App\Support\Authorization\AssignableRoles;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -24,10 +25,9 @@ use Illuminate\Support\Str;
  * The reasoning that reached for an elevated connection was "`users` is FORCE RLS, so an insert with no
  * user context must be refused". The premise is real and the conclusion is not: `users_app_insert` is
  * `WITH CHECK (true)`, precisely so registration and invite-placeholder creation — which also run with no
- * authenticated user — can write. {@see CreateNewUser} and
- * {@see TenantMembershipService::resolveOrCreateUser()} are the live precedents. Reaching for
- * `pgsql_privileged` here would have been a permanent privilege escalation of the SSO path, bought to solve
- * a problem that does not exist.
+ * authenticated user — can write. {@see CreateNewUser} and {@see TenantMembershipService::resolveOrCreateUser()}
+ * are the live precedents. Reaching for `pgsql_privileged` here would have been a permanent privilege
+ * escalation of the SSO path, bought to solve a problem that does not exist.
  *
  * Resolution goes the other way: an EXISTING identity is found on `pgsql_auth`, where the join-shape
  * visibility policy is OR'd away and a person who is not yet a member of this tenant is therefore visible.
@@ -252,7 +252,9 @@ final class SsoUserProvisioner
         // `forceFill` on a new model is what carries the non-fillable column into the INSERT itself.
         $user = new User;
         $user->forceFill([
-            'name' => $identity->name,
+            // Already fitted by `SsoIdentityResolver`, and fitted again here because `SsoIdentity` is a public
+            // constructor and this INSERT is where every path meets (M96 — {@see UserName}).
+            'name' => UserName::fit($identity->name),
             'email' => $identity->email,
             // Random and immediately discarded: the column is NOT NULL and nobody, including this process,
             // can present it. Password reset stays available as the escape hatch if a tenant turns SSO off.

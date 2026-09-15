@@ -16,6 +16,7 @@ use App\Services\Tenancy\TenantMembershipService;
 use App\Support\Auth\GoogleIdentity;
 use App\Support\Auth\GoogleSignInOutcome;
 use App\Support\Auth\GoogleSignInRefusedException;
+use App\Support\Auth\UserName;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -304,7 +305,11 @@ final class GoogleSignInProvisioner
     {
         $user = new User;
         $user->forceFill([
-            'name' => $identity->name,
+            // ⚠️ FITTED HERE, AT THE INSERT, EVEN THOUGH `GoogleIdentity::fromSocialiteUser()` FITS TOO (M96). An
+            // identity is also built directly — `GoogleCompleteController` rebuilds one from the stored request
+            // row — so the write is the one place every path meets. {@see UserName} says why a verified sign-in is
+            // fitted rather than refused.
+            'name' => UserName::fit($identity->name),
             'email' => $identity->email,
             'google_id' => $identity->subject,
             // Random and immediately discarded: the column is NOT NULL and nobody, including this process,

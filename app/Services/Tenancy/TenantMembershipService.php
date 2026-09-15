@@ -21,6 +21,7 @@ use App\Services\Admin\SuperAdminService;
 use App\Services\Auth\GoogleSignInProvisioner;
 use App\Services\Entitlements\QuotaGuard;
 use App\Support\Audit\AuditLogger;
+use App\Support\Auth\UserName;
 use App\Support\Branding\BrandPalette;
 use App\Support\Search\SearchTerms;
 use App\Support\Tenancy\TenantContext;
@@ -208,10 +209,9 @@ final class TenantMembershipService
     /**
      * The workspace a membership belongs to, for an event payload that wants the model.
      *
-     * `tenant_id` is on the row and `tenants` is RLS-exempt, so this needs no context and cannot be
-     * mis-scoped. Read rather than taken from {@see TenantContext} for the same reason
-     * `PointsRecorder::emailSubject()` takes an explicit tenant: an ambient read would make the payload
-     * depend on when it was assembled.
+     * `tenant_id` is on the row and `tenants` is RLS-exempt, so this needs no context and cannot be mis-scoped.
+     * Read rather than taken from {@see TenantContext} for the same reason `PointsRecorder::emailSubject()` takes
+     * an explicit tenant: an ambient read would make the payload depend on when it was assembled.
      */
     private function tenantOf(TenantUser $membership): Tenant
     {
@@ -766,7 +766,10 @@ final class TenantMembershipService
         }
 
         return User::create([
-            'name' => Str::before($email, '@'),
+            // ⚠️ FITTED, NOT VALIDATED (M96). The name is derived from the address, and the member-invite form's
+            // `email|max:255` accepts a local part far longer than `users.name` holds — the validator only warns
+            // past 64 — so an unfitted placeholder failed the INSERT with SQLSTATE 22001 and the Admin saw a 500.
+            'name' => UserName::fit(Str::before($email, '@')),
             'email' => $email,
             'password' => Hash::make(Str::random(48)), // unusable until they set one on accept
         ]);

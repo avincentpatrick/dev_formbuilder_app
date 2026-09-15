@@ -21,6 +21,7 @@ use App\Services\Admin\SuperAdminService;
 use App\Services\Auth\OperatorAccounts;
 use App\Services\Entitlements\EntitlementService;
 use App\Services\Tenancy\TenantMembershipService;
+use App\Support\Auth\UserName;
 use App\Support\Tenancy\PlatformHost;
 use App\Support\Tenancy\TenantContext;
 use App\Support\Tenancy\TenantUrl;
@@ -131,10 +132,13 @@ final class CreateTenantCommand extends Command
         $planInput = is_string($planOption) ? Str::lower(trim($planOption)) : '';
         $tier = PlanTier::tryFrom($planInput);
 
+        // A typed `--owner-name` is REFUSED past the column by `nameErrors()` below, because the operator can shorten
+        // it. The DEFAULT is derived from the address, which nobody typed as a name, so it is FITTED instead —
+        // refusing it would blame an "owner name" on an operator who never passed one (M96, {@see UserName}).
         $ownerNameOption = $this->option('owner-name');
         $ownerName = is_string($ownerNameOption) && trim($ownerNameOption) !== ''
             ? trim($ownerNameOption)
-            : Str::before($ownerEmail, '@');
+            : UserName::fit(Str::before($ownerEmail, '@'));
 
         $errors = [
             ...array_values(Validator::make(

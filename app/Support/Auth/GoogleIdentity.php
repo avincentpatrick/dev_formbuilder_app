@@ -55,19 +55,23 @@ final readonly class GoogleIdentity
      *
      * The name falls back to the local part of the address rather than to an empty string: `users.name` is
      * NOT NULL and is rendered in the members roster, and Google can legitimately withhold a profile name.
+     *
+     * ⚠️ AND WHICHEVER IT IS, IT IS FITTED TO `users.name` BY {@see UserName::fit()} (M96): Google's profile name
+     * has no limit this product controls. Fitting at the first place the name arrives also keeps the central
+     * callback's copy, `google_auth_requests.google_name`, inside its column. It is fitted AGAIN at the INSERT in
+     * `GoogleSignInProvisioner::createUser()`, because this mapper is not the only thing that builds an identity.
      */
     public static function fromSocialiteUser(SocialiteUser $user): self
     {
         $raw = $user->getRaw();
         $email = Str::lower((string) $user->getEmail());
+        $name = trim((string) $user->getName());
 
         return new self(
             subject: (string) $user->getId(),
             email: $email,
             emailVerified: ($raw['email_verified'] ?? null) === true,
-            name: trim((string) $user->getName()) !== ''
-                ? trim((string) $user->getName())
-                : Str::before($email, '@'),
+            name: UserName::fit($name !== '' ? $name : Str::before($email, '@')),
         );
     }
 }

@@ -10015,3 +10015,47 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   set a minimum length with no maximum. The breached-password and character-class checks make such a
   collision unlikely in practice, which is why this is not higher. ⚠️ Set a maximum length, or pre-hash before
   bcrypt. **Latent.** — needs a password longer than 72 bytes. Filed by `M96`. **Tier: after-launch.**
+- **`minor` · The design-system reference describes filter chips, a clear-all action and width-matched skeleton cells
+  that no list renders.** Found by `M96` (2026-09-15) while correcting §3.3's pagination sentences.
+  `docs/ux/design-system-reference.md` §3.3 says a list's filter bar shows chips for active filters with a clear-all
+  action, and that its loading skeleton matches each cell's content width. `MdsFilterBar` renders a heading and a
+  slot, no page renders active-filter chips, a clear action appears only inside the no-matches empty state, and
+  `MdsDataTable`'s skeleton gives every cell one fixed width. **Live.** Filed by `M96`. **Tier: after-launch.**
+- **`minor` · Two delivery logs page with no loading state.** Found by `M96` (2026-09-15) while removing sorting
+  from the webhook delivery log. `webhooks/Show.vue` and `integrations/RuleShow.vue` pass no `loading` to
+  `MdsDataTable` and set no busy state while a page of deliveries loads, so paging shows neither a skeleton nor
+  `aria-busy`, unlike the inbox, both audit logs and the feedback console. ⚠️ Pass the paging request's progress
+  through, as those pages do. **Live.** Filed by `M96`. **Tier: after-launch.**
+- **`minor` · Pressing Check on a Sheets rule whose tab is not the first re-reads the first tab and drops the rule's
+  bindings.** Found by `M96` (2026-09-15) while building the rule editor's Submission ID hint. The hint tells a
+  tenant to add the column and press Check again, but Check inspects the spreadsheet with no tab, so the server
+  answers its first tab. A rule writing to another tab then has to pick its tab again, which is a fresh pick and
+  loses the rule's bindings. Nothing is saved wrongly, because the loss is visible before saving. ⚠️ Give Sheets the
+  Check again control Airtable has, re-reading the current tab. **Live.** Filed by `M96`. **Tier: during-testing.**
+- **`minor` · `buildRows`'s docblock argues against the heading match, and one test title gives a reason that no
+  longer holds.** Found by `M96` (2026-09-15) while adding a heading-based restore beside `buildRows`. In
+  `resources/js/components/integrations/mapping-model.ts`, the docblock says re-binding by name would follow a moved
+  column and put every answer one cell out, which is backwards: following a moved column by heading keeps answers in
+  place, and position is what shifts them. `mapping-model.test.ts` still titles a case with "because the server
+  throws on a duplicate", while the rule requests now refuse a duplicate with a validation error. Both are
+  comments, and `rebindByHeading`'s docblock states the reasoning correctly. **Live.** Filed by `M96`. **Tier: after-launch.**
+- **`minor` · A deploy that fails before the site comes back up leaves a copy of the server's `.env` in the staging
+  worktree.** Found by `M96` (2026-09-15) while building the staging deploy. `deploy.ps1` copies the live `.env` into
+  `.deploy-stage` so the build reads the same settings, and deletes the copy only after `up`, as a warning-only step.
+  A run that fails earlier leaves a second copy of every secret inside the app folder, and
+  `docs/deployment-infrastructure.md` §4, which says the script never overwrites `.env`, does not mention it. The
+  folder carries the same permissions and is not under `public/`. ⚠️ Delete the copy in a `finally`, or record it in
+  §4. **Latent.** — needs a deploy that fails before `up`. Filed by `M96`. **Tier: before-launch.**
+- **`minor` · A previous release's `vendor` that cannot be deleted stops every later deploy before its window.**
+  Found by `M96` (2026-09-15) while building the staging deploy. The script deletes a stale `vendor.prev` with
+  `[IO.Directory]::Delete`, which refuses read-only files, such as a package composer installed from source with its
+  `.git` folder. Every later run then fails before `artisan down`, so the site stays up on the old release until
+  someone removes the folder by hand. The runbook installs with `--prefer-dist`, which is why this is latent.
+  ⚠️ Clear read-only attributes before deleting, or rename the stale folder aside. **Latent.** — needs a read-only
+  file inside a previous release's `vendor`. Filed by `M96`. **Tier: during-testing.**
+- **`minor` · The deploy window's length on the Windows testing server has never been measured.** Found by `M96`
+  (2026-09-15) while rewriting the runbook's window sentences. `M96` moved the build out of the maintenance window,
+  and the runbook and the non-functional requirements now describe the window as seconds to tens of seconds by
+  design, which was proved against a harness with stubbed tools rather than timed on the host. ⚠️ Time one real
+  deploy on the testing server and write the number where the sentence stands. **Latent.** — needs the testing
+  server's first automatic deploy. Filed by `M96`. **Tier: early-testing.**

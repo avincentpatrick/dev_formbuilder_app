@@ -16,7 +16,45 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M96`, the first early-testing batch: a staging-build deploy window, a rule editor that can save and pre-binds Submission ID, one name-length contract, and no sorting on the two server-paginated lists (`m96-early-testing`)
+## Status: NO ACTIVE CLAIM — `M96` is merged; the early-testing tier continues, named in `docs/pipeline.md` § Next
+
+## RELEASED — `M96`, the first early-testing batch: a staging-build deploy window, a rule editor that can save and pre-binds Submission ID, one name-length contract, and no sorting on the two server-paginated lists (merged as PR #289, `1af40e6`, 6/6 green with real step counts — Static analysis 28 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
+
+Shipped 2026-09-15. Branch `m96-early-testing`, cut from `origin/main` at `d9b1ac0`.
+- Four early-testing rows are closed: `R-8a4c39fb`, `R-d8ba9c0f`, `R-a9647971` and `R-6254281f`.
+- Twenty-four rows were filed. `R-4cd211eb` and `R-5ecfa6cd` were amended with what verification found, and the reconciliation sibling below `R-d8ba9c0f` was re-judged.
+- `D45` (a committed Windows CI job for `deploy.ps1`) was filed open at before-launch, and the Decision Board gained cards for `D44` and `D45`.
+
+⛔ **THE HEADLINE: TWO ROWS UNDERSTATED A BIGGER LIVE DEFECT, AND EVERY PRESCRIBED REMEDY WAS WRONG OR INCOMPLETE.**
+- **The rule editor could not save any Sheets or Airtable rule at all.** The fingerprint was required, never sent and never derived, and its refusal rendered nowhere. Pre-binding a column, the row's remedy, would have changed nothing that reached the database.
+- **The deploy row offered two options and neither works here.** `down` first holds the site down for a whole build on every merge, every close-out push and every nightly run. Junction swaps fail on nginx for Windows with long-lived php-cgi. A third option, a staging build, needs no server change.
+- **The name row named two writers of four.** Google sign-in and the invitation placeholder also answered a long name with a 500, and SSO cut wide names by display width.
+- **The sorting row described half of its precedent.** The order line was the other half, and "started first" was false for every response but a promoted draft.
+- **The central-host row (deferred) is a redirect loop, not a 404.** It follows every central sign-in, and M95's `ACCESS-MATRIX` line repeats the false 404.
+
+⚠️ **HOW THE PREDICTION FARED.**
+- **Citation-liveness, the gate I most expected to break, held at 18 of 18 on every run.** Every edit above a cited line was made one-for-one, including two docblock re-wraps an author made to keep cited lines in place.
+- **The open-handle rename, the result I could least predict, behaved as measured** in the harness: a transient handle was absorbed by the retry, and a persistent one left the site down with the handle named. It has not been measured on Server 2016 with Defender, and the window's real length is filed as a row.
+- **PHPStan moved as predicted**, in that `app/` changed. The local run shows only the 18 known container phantoms, none in an M96 file, and CI's static-analysis job is green.
+- **`openapi.json` stayed byte-identical to a fresh export**, as predicted, and the contract job is green.
+- **Mutations: every listed one was CAUGHT except the predicted survivor.** Sort: 9 Vitest, and 1 control stayed green. Name: 13 of 14, where removing the SSO provisioner's fit survives because the resolver fits first. Rule editor: 12 Pest and 16 Vitest. Deploy view: 4. Deploy script: 16 harness mutants.
+- **Not predicted: PowerShell stripped inner quotes three times on the way to `docker exec`.** The first E2E attempt ran nothing and exited 0. The fix was to run from script files inside the bind mount.
+- **Not predicted: removing the author worktrees changed the generated line** (filed row `R-71aa0f49`), so preflight's P1 drift reddened after a clean regeneration.
+- **E2E:** CI's E2E job passed the full suite twice on this tree: on PR #289 (run 34918066450) and on `main` after the merge (run 34919222141), each on a freshly seeded database. The two specs this diff reaches, `responsive-axe.spec.ts` and `list-layout.spec.ts`, were also run locally in the Linux E2E container against the long-lived dev database, started while the Pest mutation loops and PHPStan were running. In its first 141 of 243 tests that run timed out six times on three tests: the builder logic view (waiting for its logic text), the drift-paused Sheets rule detail (waiting for **Review columns**) and the audit change detail. None of the three renders a file M96 changed before its wait; M96's only nearby edit is a two-line `audit/Index.vue` docblock. The audit case is measured as data: 73 newer audit rows push its permission-change fixture off page 1 of a newest-first, 25-row log. The local run was still in progress at close-out.
+- CI: 6/6 green on PR #289 (run 34918066450), each job's step count read individually — Static analysis 28 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11.
+
+✅ **HOW IT WAS BUILT.**
+- **Planning, read-only:** six mappers, a gates mapper and six adversarial skeptics. The critic hit a session limit, so the lead settled each row.
+- **Authoring:** four authors in isolated worktrees, owning disjoint files. Each made a tests-only commit, then an implementation commit.
+- **Proving, in this checkout:** each tests commit was cherry-picked and seen red before its fix was applied. The rule editor's Pest half was proved red by checking the parent's PHP out over the fix. The deploy harness was re-run independently by the lead: the candidate green on all 28 scenarios, and the trunk script red on the window invariant and every failure scenario.
+- **By hand:** every ledger closure, filing and amendment, `D45`, the TESTING-GUIDE corrections, the two `tenants:create` owner-name cases, and the `deployed-sha` ignore entry.
+- **Extended beyond the claim's file list without a separate pushed claim commit, all inside the claimed rows:** `resources/views/partials/maintenance-page.blade.php`, `tests/Feature/Tenancy/CreateTenantCommandTest.php`, `storage/framework/.gitignore`, and an Airtable **Check again** button with a third hint branch. The button makes the no-field hint actionable.
+
+✅ **WHAT SHIPPED.**
+- **Deploy.** `deploy.ps1` (staging worktree, `--render` window, bounded-retry swap, recovery, no-op guard); `resources/views/deploy-window.blade.php` and a shared maintenance partial; `DeployWindowViewTest`; runbook §3, §8 and §8.2, ADR-0005, the architecture hosting row and the NFR row, each in place.
+- **Rule editor.** A server-stamped fingerprint and duplicate guard in the tenant rule requests; `TabularDestination` fingerprint and field types; Airtable inspect by id; `mapping-model.ts` pre-bind, hint and heading restore; both editors; `E2eSeeder` fingerprints; the design sentence in `webhook-integration-design.md`.
+- **Name.** `app/Support/Auth/UserName` and its eleven call sites; tests in `AuthenticationTest`, `FortifyErrorBagTest`, `InvitationIdentityTest`, `MembershipRoutesTest`, `GoogleSignInWebTest`, `GoogleIdentityTest`, `SsoAcsWebTest`, `CreateTenantCommandTest` and `UserNameTest`.
+- **Sort.** `Inbox.vue`, `webhooks/Show.vue`, the `audit/Index.vue` docblock, the `DataTable` comments and story, DSR §3.3, and three Vitest files including the paginated-table guard.
 
 Taken 2026-09-15. Branch `m96-early-testing`, cut from `origin/main` at `d9b1ac0`, PR into `main`.
 Rows: four early-testing rows in `docs/feature-backlog.md`, grouped under `D13`:

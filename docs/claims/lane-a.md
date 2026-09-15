@@ -16,47 +16,39 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M97`, record the testing server's single-host layout and file what the step-by-step checklist found (m97-testing-server-layout)
+## Status: NO ACTIVE CLAIM — `M97` is merged; the early-testing tier continues, named in `docs/pipeline.md` § Next
 
-Taken 2026-09-15. Branch `m97-testing-server-layout`, cut from origin/main at `bd89f5d`, PR into main.
-Row: none taken from the line. The user asked for a detailed guide to the Testing Server Checklist artifact.
-Answering it put a layout decision on record and found three obligations no row or document carries, and
-CLAUDE.md files each one the moment it is found.
+## RELEASED — `M97`, the testing server's layout: `D46` recorded, and three rows filed from turning the Testing Server Checklist into step-by-step instructions (merged as PR #290, `e853b79`, 6/6 green with real step counts — Static analysis 28 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 
-### Evidence verified
-- `docs/deployment-infrastructure.md` §8 (steps 4 and 8) and §8.2 (items 2 and 10) prescribe nginx, a wildcard
-  DNS-01 certificate and `A` records for the central host and its wildcard. Held, read on the merged tree.
-- `vendor/stancl/tenancy/src/Middleware/InitializeTenancyBySubdomain.php` `makeSubdomain()` returns a host's first
-  label when the host ends with a central domain. Held, so `staging.pitahc.gov.ph` resolves to the workspace
-  `staging` under `CENTRAL_DOMAIN=pitahc.gov.ph`.
-- `app/Support/Tenancy/TenantUrl.php` builds workspace links from `APP_URL`'s host and port. Held.
-- `gh api` reports the repository `PUBLIC`, its fork pull request approval policy `first_time_contributors`, and
-  no registered runner. Held on 2026-09-15.
-- No document under `docs/` mentions `curl.cainfo`, `safe.directory`, a runner service right or fork approval.
-  Held, by search.
+Shipped 2026-09-15. Branch `m97-testing-server-layout`, cut from `origin/main` at `bd89f5d`.
+- `D46` is answered C and recorded under ANSWERED: the testing site is one workspace, `staging`, at the root of the
+  existing `staging.pitahc.gov.ph`, served by Apache with `CENTRAL_DOMAIN=pitahc.gov.ph`.
+- Three early-testing rows were filed: the runbook describes only nginx behind a wildcard domain; it misses four
+  Windows host prerequisites; and, as a `major`, the public repository lets a returning outside contributor's pull
+  request run on a self-hosted runner.
+- No row was closed and no code changed. Every claimed file was edited.
+- Outside the repository, the Testing Server Checklist artifact was expanded in place: 34 steps for this server,
+  each with a "How to do it" panel of commands and a check.
 
-### Premise verified
-- The testing server is the existing box behind `staging.pitahc.gov.ph`: Apache 2.4.66 Win64 answers on 443, port
-  80 is closed from outside, and `pitahc.gov.ph` is served by DICT's name servers. Measured by DNS lookup, TLS
-  handshake and HTTP HEAD on 2026-09-15, from outside the box; nothing was measured on the box itself.
-- The user will remove the older sites and will request no DNS records. The user's words in chat, 2026-09-15.
-- Lane B is retired (`docs/adr/0022-single-lane-development.md`); one worktree, no other session.
+⛔ **THE HEADLINE: THE USER'S FIRST LAYOUT WAS STRUCTURALLY IMPOSSIBLE, AND THE RUNBOOK DID NOT DESCRIBE THE SERVER
+IT EXISTS FOR.**
+- **A path prefix cannot work.** The user asked for the app under a path on the existing host. Every signed-in route
+  group identifies the workspace by subdomain, about 150 front-end URLs are root-relative, and the service worker's
+  scope is `/f/`. The root-of-host layout with the apex as `CENTRAL_DOMAIN` needs no code change, checked against
+  `makeSubdomain()`, `RequirePlatformHost`, `TenantUrl` and the in-request reset and verification URL builders.
+- **§8 could not be followed on the real box.** It already ran Apache on 443 for older sites, and DICT runs its DNS
+  with no API, so §8's nginx, wildcard certificate and wildcard `A` records were all unavailable.
+- **A repository setting could not be changed from here.** The fork pull request approval policy is
+  `first_time_contributors` on a public repository. This session's attempt to require approval for all external
+  contributors was refused by its permission layer, so the user sets it; the checklist makes that its own step.
 
-### Remedy verdict
-None offered, because no row is taken: this increment records a decision and files rows, and fixes no defect. A
-path-prefixed deployment, the user's first request, was measured as impossible without a large code change: every
-signed-in route group identifies the workspace by subdomain, about 150 front-end URLs are root-relative, and the
-service worker's scope is `/f/`. That measurement is why the decision records the root-of-host layout.
-
-Files: `docs/claims/decisions.md`, `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/claims/lane-a.md`,
-`PROGRESS.md`, `docs/gate-baselines.md`.
-Shared artefacts taken: `docs/claims/decisions.md`, `docs/feature-backlog.md`, `docs/pipeline.md`, `PROGRESS.md`
-(own block only), `docs/gate-baselines.md`.
-Paired files taken: none.
-Namespaces spent: `D46`; nothing from the ADR or migration namespaces.
-Prediction: every CI job green, because only documentation changes, and `pipeline-lint` accepting three new rows
-and one answered decision. Most likely to be wrong: `BacklogProvenanceTest` or the citation gate refusing a new
-row's wording, such as a path it cannot resolve.
+⚠️ **HOW THE PREDICTION FARED.**
+- Every CI job green, as predicted, with the same step counts as `M96`.
+- `pipeline-lint` accepted the three rows and the answered decision, as predicted.
+- The gate I named as most likely to be wrong, `BacklogProvenanceTest`, passed 6 of 6 locally and in CI, so that
+  part of the prediction was wrong in the safe direction.
+- Not predicted: `php scripts/gate-baselines.php --help` is not a help flag. It regenerated the baselines from the
+  previous trunk run, and the close-out overwrote them from this merge's own run.
 
 ## RELEASED — `M96`, the first early-testing batch: a staging-build deploy window, a rule editor that can save and pre-binds Submission ID, one name-length contract, and no sorting on the two server-paginated lists (merged as PR #289, `1af40e6`, 6/6 green with real step counts — Static analysis 28 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

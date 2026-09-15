@@ -103,9 +103,9 @@ export const StackedDark: Story = { decorators: [narrow, dark] };
    be 8px away from, and never had a short header to overhang. A fixture that cannot reach the defect is
    a gate reporting zero and telling you nothing.
 
-   20em (320px) with five sortable columns is the phone shape rather than a contrivance — the stacked
-   layout applies from 56em all the way down, and `docs/ACCESS-MATRIX.md`'s list pages carry four and
-   five sortable columns, and the five chips here measure 282px against a 320px box, so they WRAP.
+   20em (320px) with five sortable columns is the phone shape with more chips than one row holds — the stacked
+   layout applies from 56em all the way down, and a list page may declare several sortable columns;
+   the five chips here measure 282px against a 320px box, so they WRAP.
    `ID` is deliberately two characters: it is the header that would render a
    ~38px chip and push a 44px hit area past the frame's left edge on every wrapped row. */
 const wrappingColumns: DataTableColumn[] = [

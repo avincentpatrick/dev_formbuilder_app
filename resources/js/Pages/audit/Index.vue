@@ -15,8 +15,8 @@
  * `MdsDataTable` sorts the rows it was handed — the CURRENT PAGE, client-side. Over a server-paginated
  * ledger a "Sort by When" header that reorders 25 of 4,000 rows is a lie, and this is the page where a lie
  * is least acceptable. The server orders newest-first, fixed, and the page says so in one line of prose.
- * (`webhooks/Show.vue` and `submissions/Inbox.vue` both carry this defect; fixing them is not this
- * increment's business, but do not copy it here.)
+ * (`webhooks/Show.vue` and `submissions/Inbox.vue` follow this precedent by the user's decision of 2026-08-18,
+ * and `paginated-tables-sort.test.ts` fails any page that pairs `MdsPagination` with a sortable column.)
  */
 import { reactive, ref } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';

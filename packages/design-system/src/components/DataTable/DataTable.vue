@@ -90,7 +90,7 @@ function ariaSort(key: string): 'ascending' | 'descending' | 'none' {
 
 /*
  * The stacked layout hides the header row, and the sort toggles live inside it (see the `thead` rule at
- * the foot of this file). Thirteen `sortable` columns across seven pages would simply lose their control
+ * the foot of this file). Every `sortable` column on any page would simply lose its control
  * below the collapse threshold — and "sixty forms sorted by response count" is the whole reason the
  * dense view exists — so the same toggles are rendered a second time as a chip row above the cards.
  * Exactly one of the two is ever in the accessibility tree: both sides use `display: none`.
@@ -664,7 +664,7 @@ watch(() => [props.rows, props.columns, props.loading], () => queueMicrotask(mea
 
     /* ⚠️ `display: none`, NOT THE VISUALLY-HIDDEN CLIP THIS BLOCK USED TO CARRY, AND THE REASON IS THE
        SORT BUTTONS. `clip: rect(0 0 0 0)` hides a control; it does not remove it from the tab order.
-       Thirteen columns across seven pages are `sortable`, and each one's toggle lives inside this
+       Every `sortable` column on any page has its toggle inside this
        `thead` — so a keyboard user on `/members` at 834px would land on two focus stops with no visible
        ring anywhere on screen (WCAG 2.4.7, and 2.4.11 in 2.2). That was already true below 480px and
        nothing in this repo could see it — axe has no rule for a focusable-but-invisible control — but

@@ -159,8 +159,8 @@ land?* is a read of the destination.
 - **It does not match on anything but `__submission_id`.** Comparing the whole projected row would cover the
   rules that map no identity column, at the price of a false match whenever two respondents answer a short
   form identically — and a false match is a row that never arrives. **A rule that maps no Submission ID
-  column therefore still duplicates**, exactly as it did before; the durable fix is the rule editor binding
-  that column by default, filed in `docs/feature-backlog.md`.
+  column therefore still duplicates on a retry.** The rule editor pre-binds a column or field whose heading
+  reads "Submission ID" and otherwise says how to add one, but a rule saved without it can still duplicate.
 - **It does not cover Slack.** `chat.postMessage` is equally non-idempotent, but a repeated chat message is
   noise a human dismisses in the channel it arrived in, and asking Slack "did my message land?" means reading
   channel history — a scope this connector does not request and should not acquire to dedupe its own retries.

@@ -232,9 +232,9 @@ function submit(): void {
                   // Null rather than absent for a provider without one, so a PATCH cannot leave a stale id
                   // behind: `config` is replaced WHOLESALE, and an omitted key would simply vanish.
                   sheet_id: sheetsDraft.value?.sheet_id ?? null,
-                  // No `fingerprint` — the server derives it from these headers through
-                  // `ColumnMapping::author()`. Sending one from here would be a second implementation of
-                  // `ColumnFingerprint`'s normalisation, kept in step by nothing.
+                  // No `fingerprint`: the tenant rule requests derive it from these headers on every save
+                  // (M96). Sending one would need a second implementation of `ColumnFingerprint`'s
+                  // normalisation, kept in step by nothing, and the server overwrites it anyway.
                   mapping: sheetsDraft.value ? { columns: sheetsDraft.value.columns } : null,
               }
             : {

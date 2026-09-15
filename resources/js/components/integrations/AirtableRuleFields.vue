@@ -15,19 +15,33 @@
  * control at all. Two selects instead of a mode switch.
  *
  * ── NO FINGERPRINT IS COMPUTED HERE ───────────────────────────────────────────────────────────────────────
- * See `mapping-model.ts`: the server re-derives it from the field row through `ColumnMapping::author()`. A
+ * See `mapping-model.ts`: the tenant rule requests derive it from the posted field row on every save (M96). A
  * TypeScript reimplementation of `ColumnFingerprint`'s normalisation would be a second thing to keep in step
  * with a digest the delivery path compares byte for byte.
+ *
+ * ── RESTORING A SAVED RULE, AND SUBMISSION ID (M96) ───────────────────────────────────────────────────────
+ * Only the seed watcher restores, and it finds the table by `sheet_id`: delivery writes by the id, so a renamed
+ * table still delivers, and looking it up by its old name reported it gone. The stored bindings are carried over
+ * only while the table's fingerprint still equals the rule's (`restoreRows()`). Until M96 the restore threw the
+ * stored mapping away whenever a table was passed — which was always — and choosing a base on a saved rule applied
+ * its bindings, by position, to the new base's first table. Every pick now builds a fresh map, pre-binding a field
+ * named "Submission ID"; Check again re-reads the same table and keeps bindings by field name.
  */
 import { computed, ref, watch } from 'vue';
-import { MdsFormField, MdsIcon, MdsSelect, MdsSpinner } from '@meridian/design-system';
+import { MdsButton, MdsFormField, MdsIcon, MdsSelect, MdsSpinner } from '@meridian/design-system';
 import { fetchChannels, fetchMappableColumns, inspectDestination } from './integrationsClient';
 import {
     buildRows,
     columnLabel,
     fieldOptionsFor,
+    IDENTITY_KEY,
+    IDENTITY_ROW_HELP,
+    identityHint,
     mappingProblem,
     mappingSummary,
+    preBindIdentity,
+    rebindByHeading,
+    restoreRows,
     toPayload,
     UNBOUND_LABEL,
     type MappingRow,
@@ -64,6 +78,8 @@ const catalog = ref<MappableColumn[]>([]);
 const scoped = ref(false);
 const busy = ref(false);
 const problem = ref<string | null>(null);
+/** The restored rule's fields changed since it was saved, so its bindings were matched by name (M96). */
+const drifted = ref(false);
 
 const destinationError = computed<string | undefined>(() => props.errors['config.spreadsheet_id']);
 const tableError = computed<string | undefined>(() => props.errors['config.sheet_id']);
@@ -90,6 +106,11 @@ const tableOptions = computed<Option[]>(
 const localProblem = computed<string | null>(() => (destination.value ? mappingProblem(rows.value) : null));
 const summary = computed<string>(() => (destination.value ? mappingSummary(rows.value) : ''));
 
+/** Why Submission ID is not doing its job on this map, or null (M96). A plain paragraph: `status` is the live region. */
+const identityHintText = computed<string | null>(() =>
+    destination.value ? identityHint(rows.value, 'table', destination.value.header_types, Boolean(props.rule)) : null,
+);
+
 /**
  * The status line's text. Always rendered (never `v-if`'d away) so the live region exists in the DOM before it
  * has anything to say — an `aria-live` region inserted at the same moment as its text is not reliably
@@ -107,6 +128,7 @@ function reset(): void {
     destination.value = null;
     rows.value = [];
     problem.value = null;
+    drifted.value = false;
 }
 
 /** Push the current draft up, or null while it is not yet saveable. */
@@ -142,8 +164,12 @@ async function loadCatalog(): Promise<void> {
 }
 
 /**
- * Read a base's tables. `table` re-inspects rather than reusing the previous payload, because a different
- * table has a different field row and carrying the old one would bind every column to a name that is not there.
+ * Read a base's tables, as the tenant's own pick of a base or a table. `table` re-inspects rather than reusing the
+ * previous payload, because a different table has a different field row and carrying the old one would bind every
+ * column to a name that is not there.
+ *
+ * ⚠️ ALWAYS A FRESH MAP (M96). A saved rule's bindings belong to the table it was saved on; applied here they would
+ * land, by position, on whatever table was just chosen.
  */
 async function inspect(base: string, table?: string | null): Promise<void> {
     if (!props.connectionId || base === '') return;
@@ -154,9 +180,53 @@ async function inspect(base: string, table?: string | null): Promise<void> {
 
     destination.value = payload.destination;
     problem.value = payload.error;
-    rows.value = payload.destination
-        ? buildRows(payload.destination.header_row, table ? undefined : props.rule?.mapping)
-        : [];
+    rows.value = payload.destination ? preBindIdentity(buildRows(payload.destination.header_row)) : [];
+    drifted.value = false;
+    busy.value = false;
+    publish();
+}
+
+/**
+ * Re-open a saved rule (M96). Only the seed watcher calls this; see the file docblock for why by `sheet_id`.
+ */
+async function restore(rule: RuleRow): Promise<void> {
+    if (!props.connectionId || !rule.spreadsheet_id) return;
+    busy.value = true;
+    problem.value = null;
+
+    const payload = await inspectDestination(props.connectionId, rule.spreadsheet_id, rule.sheet_id ?? rule.sheet_name);
+    const restored = payload.destination ? restoreRows(payload.destination, rule.mapping) : null;
+
+    destination.value = payload.destination;
+    problem.value = payload.error;
+    rows.value = restored?.rows ?? [];
+    drifted.value = restored?.drifted ?? false;
+    busy.value = false;
+    publish();
+}
+
+/**
+ * Read the SAME table again, typically after the tenant adds a Submission ID field in Airtable (M96).
+ *
+ * ⚠️ WHY A BUTTON. A native select fires no change when the option already chosen is picked again, so "choose the
+ * table again" was not something a tenant could actually do. The bindings already made are carried to the fields
+ * with the same name, never by position, because a new field is not necessarily at the end.
+ */
+async function recheck(): Promise<void> {
+    const current = destination.value;
+    if (!props.connectionId || !current || busy.value) return;
+    busy.value = true;
+    problem.value = null;
+
+    const carried = toPayload(rows.value);
+    const payload = await inspectDestination(props.connectionId, current.spreadsheet_id, current.sheet_id ?? current.sheet_name);
+
+    if (payload.destination) {
+        destination.value = payload.destination;
+        rows.value = preBindIdentity(rebindByHeading(payload.destination.header_row, carried));
+    }
+
+    problem.value = payload.error;
     busy.value = false;
     publish();
 }
@@ -184,7 +254,7 @@ watch(
 
         if (props.rule?.spreadsheet_id && props.connectionId) {
             baseId.value = props.rule.spreadsheet_id;
-            await inspect(props.rule.spreadsheet_id, props.rule.sheet_name);
+            await restore(props.rule);
         }
     },
     { immediate: true },
@@ -238,15 +308,30 @@ watch(
             label="Table"
             :error="tableError"
         >
-            <MdsSelect
-                :id="id"
-                :model-value="destination.sheet_name"
-                :options="tableOptions"
-                :disabled="busy"
-                :describedby="describedby"
-                :invalid="invalid"
-                @update:model-value="inspect(baseId, $event)"
-            />
+            <div class="airtable-fields__row">
+                <MdsSelect
+                    :id="id"
+                    :model-value="destination.sheet_name"
+                    :options="tableOptions"
+                    :disabled="busy"
+                    :describedby="describedby"
+                    :invalid="invalid"
+                    @update:model-value="inspect(baseId, $event)"
+                />
+                <!-- `loading`, not `disabled`, while a read is in flight: MdsButton keeps a loading button
+                     focusable, where natively disabling it would drop the focus of the keyboard user who pressed
+                     it. The RuleFormModal Refresh button makes the same choice. -->
+                <MdsButton
+                    type="button"
+                    variant="tertiary"
+                    size="sm"
+                    icon-left="redo"
+                    :loading="busy"
+                    @click="recheck"
+                >
+                    Check again
+                </MdsButton>
+            </div>
         </MdsFormField>
 
         <p v-if="destination" class="airtable-fields__found">
@@ -267,12 +352,20 @@ watch(
                 This rule isn’t scoped to one form, so only submission details can be mapped — pick a form
                 above to map its answers.
             </p>
+            <!-- Plain paragraphs, not live regions (M96): the status line below is this editor's one live region,
+                 and both of these are present from the moment the map renders. -->
+            <p v-if="drifted" class="airtable-fields__help">
+                The fields in this table changed since the rule was saved. We matched each answer to the field
+                with the same name, so check every field before you save.
+            </p>
+            <p v-if="identityHintText" class="airtable-fields__help">{{ identityHintText }}</p>
             <div class="airtable-fields__map">
                 <MdsFormField
                     v-for="row in rows"
                     :key="row.index"
                     v-slot="{ id, describedby }"
                     :label="columnLabel(row)"
+                    :help="row.fieldKey === IDENTITY_KEY ? IDENTITY_ROW_HELP : undefined"
                 >
                     <MdsSelect
                         :id="id"
@@ -347,6 +440,18 @@ watch(
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+/* Wrap rather than overflow — the standing 375px rule for any row of controls, as in SheetsRuleFields. */
+.airtable-fields__row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--mds-space-2);
+}
+
+.airtable-fields__row > :first-child {
+    flex: 1 1 14rem;
 }
 
 /* The map can be long, so it scrolls inside the modal rather than pushing the actions off-screen. */

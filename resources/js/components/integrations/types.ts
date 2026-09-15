@@ -76,6 +76,11 @@ export type RuleRow = {
     /** Google Sheets (H16b). Projected key by key, like the Slack pair above — never the whole config blob. */
     spreadsheet_id: string | null;
     sheet_name: string | null;
+    /**
+     * Airtable's stable table id (H16c), and what a saved rule is re-opened by (M96): delivery writes by it, so a
+     * renamed table still delivers and must still be found. Null for Google Sheets.
+     */
+    sheet_id: string | null;
     spreadsheet_url: string | null;
     mapping: SheetMapping | null;
     /**
@@ -100,13 +105,16 @@ export type RuleDetail = RuleRow & { updated_at: string | null };
 export type ConnectionWithRules = ConnectionCard & { rules: RuleRow[] };
 
 /**
- * One spreadsheet column and what fills it. `header` is stored NORMALIZED by `ColumnMapping::author()` — the
- * editor renders the RAW header from `SheetInspection` instead, or it would show the tenant a column name
- * their sheet does not contain.
+ * One spreadsheet column and what fills it. A stored `header` is whatever the rule was saved with — the RAW
+ * heading when the editor saved it, the normalised one when a mapping was built with `ColumnMapping::author()` —
+ * so the editor renders headings from `TabularDestination` instead, never from here.
  */
 export type MappingColumn = { header: string; field_key: string | null };
 
-/** The stored `config.mapping`. The fingerprint is the server's; the client never computes one (H16b). */
+/**
+ * The stored `config.mapping`. The fingerprint is the server's: the tenant rule requests derive it from the
+ * posted headers on every save (M96), and the client never computes one.
+ */
 export type SheetMapping = { fingerprint: string; columns: MappingColumn[] };
 
 /**
@@ -130,6 +138,13 @@ export type TabularDestination = {
      * a tenant renaming their table is invisible rather than a 404. Null for Google Sheets.
      */
     sheet_id: string | null;
+    /**
+     * The server's digest of `header_row` (M96). Re-opening a saved rule compares it with `mapping.fingerprint`, by
+     * plain equality, to tell whether the columns changed since the rule was saved.
+     */
+    fingerprint: string;
+    /** Each heading's field type, index-aligned with `header_row` (M96). Airtable only; null for Google Sheets. */
+    header_types: (string | null)[] | null;
 };
 
 /** The always-200 payload from both destination sidecars: exactly one of the two is non-null. */

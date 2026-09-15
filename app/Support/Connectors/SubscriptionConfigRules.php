@@ -9,6 +9,7 @@ use App\Enums\DomainEventType;
 use App\Models\Connection;
 use App\Models\ConnectionSubscription;
 use App\Support\Connectors\Providers\GoogleSheetsConnector;
+use App\Support\Mapping\ColumnFingerprint;
 use App\Support\Mapping\ColumnMapping;
 use Closure;
 use Illuminate\Http\Request;
@@ -245,6 +246,107 @@ final class SubscriptionConfigRules
                         "A {$provider->containerNoun()} can only receive submission events — a row is a submission’s answers, and the other events have none.",
                     );
                 }
+            }
+        };
+    }
+
+    /**
+     * The request input with `config.mapping.fingerprint` derived from the posted headers (M96).
+     *
+     * ── WHY THE TENANT-WEB REQUESTS DERIVE IT, AND THE BROWSER DOES NOT ───────────────────────────────────────
+     * {@see requiredFor()} makes the fingerprint required for a tabular rule, and the rule editor has never sent
+     * one: a TypeScript copy of {@see ColumnFingerprint}'s normalisation would be a second thing to keep in step
+     * with a digest delivery compares byte for byte. Nothing on the server derived it either, so until M96 every
+     * Google Sheets and Airtable save from the Integrations page was refused on a key neither editor renders,
+     * and the modal simply stayed open. The two tenant-web rule requests call this from `prepareForValidation()`.
+     *
+     * It ALWAYS overwrites. A digest the client made up would either block every delivery as column drift or
+     * hide a real change, and the headers in this request are the ones the editor just read from the destination.
+     *
+     * POSITIONAL, FROM THE RAW HEADERS, NEVER THROUGH {@see ColumnMapping::author()}. Drift detection compares the
+     * stored digest with `forHeaders()` of the live header row, column by column. `author()` keys its bindings by
+     * header, so a sheet with two blank or two identical headings cannot even be expressed through it.
+     *
+     * A null header becomes `''` first. TrimStrings and ConvertEmptyStringsToNull turn a blank heading into null
+     * before validation, and `'string'` refuses null — but a blank cell in row 1 is a real, addressable column
+     * ({@see TabularDestination}). The rule stays `'string'` rather than becoming `'nullable'` because
+     * {@see documentedShape()} is read statically into `openapi.json`.
+     *
+     * ⚠️ THE /api/v1 REQUESTS DO NOT CALL THIS. An API caller still sends its own fingerprint, and a blank heading
+     * still arrives there as null; changing either is a change to API behaviour, which this method does not make.
+     *
+     * @param  array<string, mixed>  $input
+     * @return array<string, mixed>
+     */
+    public static function withStampedFingerprint(array $input): array
+    {
+        $config = $input['config'] ?? null;
+        $mapping = is_array($config) ? ($config['mapping'] ?? null) : null;
+        $columns = is_array($mapping) ? ($mapping['columns'] ?? null) : null;
+
+        if (! is_array($config) || ! is_array($mapping) || ! is_array($columns)) {
+            return $input;
+        }
+
+        $headers = [];
+
+        foreach ($columns as $index => $column) {
+            if (is_array($column) && array_key_exists('header', $column) && $column['header'] === null) {
+                $column['header'] = '';
+                $columns[$index] = $column;
+            }
+
+            $headers[] = is_array($column) && is_string($column['header'] ?? null) ? $column['header'] : '';
+        }
+
+        $mapping['columns'] = $columns;
+        $mapping['fingerprint'] = ColumnFingerprint::forHeaders($headers)->digest;
+        $config['mapping'] = $mapping;
+        $input['config'] = $config;
+
+        return $input;
+    }
+
+    /**
+     * A validator hook refusing one form field bound to two columns (M96).
+     *
+     * The editor disables a field another column already holds, and until M96 its comment claimed the server
+     * agreed because `ColumnMapping::author()` throws on a duplicate. Nothing on the save path calls `author()`,
+     * and {@see ColumnMapping::fromArray()} accepts the duplicate, so a hand-made request stored a mapping the
+     * editor can never produce. In `after()` rather than `rules()`, like {@see eventTypeGuard()}, so the shape
+     * Scramble reads statically stays exactly as it is.
+     *
+     * @return Closure(Validator): void
+     */
+    public static function duplicateBindingGuard(): Closure
+    {
+        return static function (Validator $validator): void {
+            $config = $validator->getData()['config'] ?? null;
+            $mapping = is_array($config) ? ($config['mapping'] ?? null) : null;
+            $columns = is_array($mapping) ? ($mapping['columns'] ?? null) : null;
+
+            if (! is_array($columns)) {
+                return;
+            }
+
+            $seen = [];
+
+            foreach ($columns as $column) {
+                $key = is_array($column) ? ($column['field_key'] ?? null) : null;
+
+                if (! is_string($key) || $key === '') {
+                    continue;
+                }
+
+                if (isset($seen[$key])) {
+                    // Keyed to the column list rather than to one index: both editors render this key under their
+                    // column map, and neither renders a per-column error.
+                    $validator->errors()->add('config.mapping.columns', 'Each form field can fill only one column.');
+
+                    return;
+                }
+
+                $seen[$key] = true;
             }
         };
     }

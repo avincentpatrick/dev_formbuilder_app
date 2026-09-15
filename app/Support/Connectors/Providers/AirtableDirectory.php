@@ -57,6 +57,14 @@ final class AirtableDirectory implements InspectsTabularDestinations
         private readonly AirtableBaseLister $bases,
     ) {}
 
+    /**
+     * `$sheetName` is a table NAME or a table ID (M96).
+     *
+     * A saved rule holds the id, because delivery writes by it and a renamed table therefore keeps delivering. So
+     * re-opening that rule has to find the table the way {@see AirtableConnector::readFieldNames()} does, by id or
+     * by name. Matching the name alone reported a renamed table as gone, and every later save of a rule that was
+     * still delivering was refused.
+     */
     public function inspect(Connection $connection, string $spreadsheetId, ?string $sheetName = null): TabularDestination
     {
         $tables = $this->tablesOf($this->send(fn (): Response => $this->request($connection)->get(
@@ -69,15 +77,23 @@ final class AirtableDirectory implements InspectsTabularDestinations
 
         $names = array_map(static fn (array $table): string => $table['name'], $tables);
 
-        // An explicitly named table that is gone is a different fact from "no table was named", and the tenant
-        // can act on it. Falling through to the first table would silently retarget a rule at the wrong data.
-        if ($sheetName !== null && ! in_array($sheetName, $names, true)) {
-            throw ConnectorDestinationException::failed('unknown_tab');
+        $chosen = $sheetName === null ? $tables[0] : null;
+
+        if ($sheetName !== null) {
+            foreach ($tables as $table) {
+                if ($table['id'] === $sheetName || $table['name'] === $sheetName) {
+                    $chosen = $table;
+
+                    break;
+                }
+            }
         }
 
-        $chosen = $sheetName === null
-            ? $tables[0]
-            : $tables[array_search($sheetName, $names, true)];
+        // An explicitly named table that is gone is a different fact from "no table was named", and the tenant
+        // can act on it. Falling through to the first table would silently retarget a rule at the wrong data.
+        if ($chosen === null) {
+            throw ConnectorDestinationException::failed('unknown_tab');
+        }
 
         return new TabularDestination(
             spreadsheetId: $spreadsheetId,
@@ -89,6 +105,7 @@ final class AirtableDirectory implements InspectsTabularDestinations
             sheetName: $chosen['name'],
             headerRow: $chosen['fields'],
             sheetId: $chosen['id'],
+            headerTypes: $chosen['types'],
         );
     }
 
@@ -123,8 +140,12 @@ final class AirtableDirectory implements InspectsTabularDestinations
      * the tenant can see, and hiding it would read as the platform losing their data. It cannot be mapped, and
      * `ColumnMapping` refusing an empty column list is what says so.
      *
+     * Each field keeps its TYPE (M96), in a list index-aligned with the names, so the editor can warn when
+     * Submission ID is bound to a field type Airtable may change the id in. A field with no name leaves both lists
+     * together, or every type after it would describe the field to its left.
+     *
      * @param  array<string, mixed>  $body
-     * @return list<array{id: string, name: string, fields: list<string>}>
+     * @return list<array{id: string, name: string, fields: list<string>, types: list<?string>}>
      */
     private function tablesOf(array $body): array
     {
@@ -143,13 +164,19 @@ final class AirtableDirectory implements InspectsTabularDestinations
 
             $fields = is_array($row['fields'] ?? null) ? $row['fields'] : [];
 
+            $named = array_values(array_filter(array_map(
+                static fn (mixed $field): array => [
+                    'name' => is_array($field) && is_string($field['name'] ?? null) ? $field['name'] : '',
+                    'type' => is_array($field) && is_string($field['type'] ?? null) ? $field['type'] : null,
+                ],
+                $fields,
+            ), static fn (array $field): bool => $field['name'] !== ''));
+
             $tables[] = [
                 'id' => $row['id'],
                 'name' => $row['name'],
-                'fields' => array_values(array_filter(array_map(
-                    static fn (mixed $field): string => is_array($field) && is_string($field['name'] ?? null) ? $field['name'] : '',
-                    $fields,
-                ), static fn (string $name): bool => $name !== '')),
+                'fields' => array_map(static fn (array $field): string => $field['name'], $named),
+                'types' => array_map(static fn (array $field): ?string => $field['type'], $named),
             ];
         }
 

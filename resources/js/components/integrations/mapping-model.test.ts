@@ -96,9 +96,9 @@ describe('columnLabel / columnLetter', () => {
 
 describe('fieldOptionsFor', () => {
     it('disables a key already bound to another column, because the server throws on a duplicate', () => {
-        // ColumnMapping::author() raises InvalidArgumentException on a duplicate binding — a 500, not a 422
-        // naming a field. Disabling here is the difference between a form that explains itself and one that
-        // fails with a stack trace.
+        // Since M96 the tenant rule requests refuse a duplicate binding under config.mapping.columns; before that
+        // nothing on the save path did. Disabling here is still what keeps the tenant from meeting the refusal
+        // at all — a form that stops the choice explains itself.
         const all = rows(['A', 'full_name'], ['B', null]);
         const { groups } = fieldOptionsFor(all[1], catalog, all);
         const formFields = groups.find((g) => g.label === 'Form fields');

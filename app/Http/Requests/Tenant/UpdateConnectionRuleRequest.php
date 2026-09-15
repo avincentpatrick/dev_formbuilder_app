@@ -14,8 +14,13 @@ use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
 /**
- * Partially update a delivery rule from the session-authed Integrations UI (H15b). A byte-for-byte mirror of
- * {@see UpdateConnectionSubscriptionRequest}, delegating to the same {@see ConnectionSubscriptionService}.
+ * Partially update a delivery rule from the session-authed Integrations UI (H15b). Its rules come from the same
+ * {@see SubscriptionConfigRules} as {@see UpdateConnectionSubscriptionRequest}'s, delegating to the same
+ * {@see ConnectionSubscriptionService}.
+ *
+ * ⚠️ NO LONGER A BYTE-FOR-BYTE MIRROR (M96). Like {@see StoreConnectionRuleRequest}, it derives
+ * `config.mapping.fingerprint` from the posted headers whenever `config` is sent — the rule editor never sends one
+ * — and refuses one form field bound to two columns. The /api/v1 twin does neither.
  *
  * EVERY field is `sometimes`, which is what makes the pause/resume control possible: it PATCHes `status` alone,
  * and a `required` rule anywhere here would 422 a request that is not trying to change those fields at all.
@@ -70,7 +75,19 @@ final class UpdateConnectionRuleRequest extends FormRequest
     }
 
     /**
-     * H16b — narrow `event_types` to what the bound connection's provider can actually deliver.
+     * M96 — derive the fingerprint only when `config` is sent. A PATCH of `status` alone (pause, resume) carries
+     * no mapping and has nothing to derive one from.
+     */
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('config')) {
+            $this->merge(SubscriptionConfigRules::withStampedFingerprint($this->only('config')));
+        }
+    }
+
+    /**
+     * H16b — narrow `event_types` to what the bound connection's provider can actually deliver. M96 — and refuse
+     * one form field bound to two columns.
      *
      * In `after()` rather than `rules()` so Scramble's STATIC read of the full-catalog `Rule::in` above stays
      * intact; see {@see SubscriptionConfigRules::eventTypeGuard()} for why that matters to `openapi.json`.
@@ -79,6 +96,9 @@ final class UpdateConnectionRuleRequest extends FormRequest
      */
     public function after(): array
     {
-        return [SubscriptionConfigRules::eventTypeGuard(SubscriptionConfigRules::providerFor($this))];
+        return [
+            SubscriptionConfigRules::eventTypeGuard(SubscriptionConfigRules::providerFor($this)),
+            SubscriptionConfigRules::duplicateBindingGuard(),
+        ];
     }
 }

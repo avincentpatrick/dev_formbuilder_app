@@ -13,10 +13,16 @@ use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
 /**
- * Create a delivery rule from the session-authed Integrations UI (H15b). A byte-for-byte mirror of the
- * {@see StoreConnectionSubscriptionRequest} rules — the web surface and the /api/v1 surface accept exactly the
- * same shape and delegate to the same {@see ConnectionSubscriptionService} — so validation can never drift
- * between them (the {@see StoreWebhookRequest} convention).
+ * Create a delivery rule from the session-authed Integrations UI (H15b). Its rules come from the same
+ * {@see SubscriptionConfigRules} as {@see StoreConnectionSubscriptionRequest}'s, and both delegate to the same
+ * {@see ConnectionSubscriptionService}, so the two surfaces accept the same `config` shape.
+ *
+ * ⚠️ NO LONGER A BYTE-FOR-BYTE MIRROR (M96), AND THE TWO DIFFERENCES ARE BOTH FOR THE RULE EDITOR:
+ *   • `prepareForValidation()` derives `config.mapping.fingerprint` from the posted headers. The editor never
+ *     sends one, so until M96 no Google Sheets or Airtable rule could be saved from this page. An API caller
+ *     still sends its own — see {@see SubscriptionConfigRules::withStampedFingerprint()} for why.
+ *   • `after()` refuses one form field bound to two columns
+ *     ({@see SubscriptionConfigRules::duplicateBindingGuard()}).
  *
  * The `config.*` shape is per-provider and comes from {@see SubscriptionConfigRules} (H16a) — this file used
  * to hard-code Slack's `config.channel_id`, which is what made a Google Sheets rule unvalidatable. It is still
@@ -74,7 +80,17 @@ final class StoreConnectionRuleRequest extends FormRequest
     }
 
     /**
-     * H16b — narrow `event_types` to what the bound connection's provider can actually deliver.
+     * M96 — the editor posts `config.mapping.columns` and no fingerprint, so the server derives it here, from
+     * those headers, before the rules that require it run.
+     */
+    protected function prepareForValidation(): void
+    {
+        $this->merge(SubscriptionConfigRules::withStampedFingerprint($this->only('config')));
+    }
+
+    /**
+     * H16b — narrow `event_types` to what the bound connection's provider can actually deliver. M96 — and refuse
+     * one form field bound to two columns.
      *
      * In `after()` rather than `rules()` so Scramble's STATIC read of the full-catalog `Rule::in` above stays
      * intact; see {@see SubscriptionConfigRules::eventTypeGuard()} for why that matters to `openapi.json`.
@@ -83,6 +99,9 @@ final class StoreConnectionRuleRequest extends FormRequest
      */
     public function after(): array
     {
-        return [SubscriptionConfigRules::eventTypeGuard(SubscriptionConfigRules::providerFor($this))];
+        return [
+            SubscriptionConfigRules::eventTypeGuard(SubscriptionConfigRules::providerFor($this)),
+            SubscriptionConfigRules::duplicateBindingGuard(),
+        ];
     }
 }

@@ -37,7 +37,7 @@ its hubs as *meta-files, not product code*, and that is the reading used. A row 
 
 `docs/feature-backlog.md:9763`. Filed by `M95`, amended by `M96`, corrected by `M98`; neither took it.
 
-#### Evidence verified
+### Evidence verified
 Every named symbol resolves. `render_testing_gate()` `scripts/state.php:1454`, its sentence at `:1481-1482`
 guarded by `if ($gate['open'] === 0)` at `:1479`. `render_queue()` `scripts/next.php:184`, sentence at `:222-223`
 guarded at `:221`. `testing_gate()` `scripts/pipeline.php:647`, its docblock promise of `0 open of N` at
@@ -51,7 +51,7 @@ generated LANE A NEXT PROMPT for this very increment — still carries the imper
 notification and the Testing Server Checklist now, although `docs/claims/lane-a.md:320` and `PROGRESS.md:214`
 both record that `M95` already sent it. Four increments have been told to re-notify the user.
 
-#### Premise verified
+### Premise verified
 The mechanism holds; the surroundings have rotted in four ways.
 **The division is rule-text versus imperative, not conditional versus unconditional.** `M98` names only
 `scripts/pipeline.php:841-843` as unconditional. `scripts/loop.php:158-159` is a **second unconditional copy**,
@@ -68,7 +68,7 @@ remove the committed copy — only `php scripts/next.php --lane=a --write` in th
 `lane-a.md:320` and `PROGRESS.md:214` both record it, but `docs/claims` is an excluded directory for the marker
 walk (`pipeline.php:91`), so no generator can see it.
 
-#### Remedy verdict
+### Remedy verdict
 **Works with changes; `M96`'s prescription breaks in three places and `M98`'s figure is a choice, not a fact.**
 (1) Passing closed rows through `backlog-triage.php --json` **cannot mean extending the `open` key**:
 `derive_hubs()` (`:462-476`) derives the hub set from open rows and `compare_rows` ranks from it. There are 123
@@ -93,7 +93,7 @@ only, and `state.php` shells `gh` (`:261`) and `git`.
 
 `docs/feature-backlog.md:10374`. Filed by `M98`. No amendment.
 
-#### Evidence verified
+### Evidence verified
 **Every citation resolves; nothing has moved and nothing is gone.** `RequireRecentPassword.php` extends the
 framework's `RequirePassword` (`:76`), reads `auth.step_up_timeout` at `:115` and delegates at `:130`.
 `config/auth.php:144` confirms 900 seconds. The `step-up` alias is registered at `bootstrap/app.php:164` and
@@ -103,7 +103,7 @@ tenant writes resolve at the lines the row gives. `Redirector::guest` behaves ex
 non-GET request. `FortifyServiceProvider.php:150-157` writes that same-host previous URL into the intended-URL
 session key, and its docblock at `:139-148` says so.
 
-#### Premise verified
+### Premise verified
 **Partly holds. The row understates its own defect, and misses the population that matters most.**
 ⛔ **The tenant trigger is not "more than fifteen minutes".** The password-confirmation timestamp has exactly one
 non-SSO writer — Fortify's `ConfirmablePasswordController:58`. Login never stamps it, and
@@ -122,7 +122,7 @@ stranding the operator on the enrolment page).
 **Batching premise confirmed:** `docs/feature-backlog.md:10354` names this lapse as path (1) of its own symptom.
 That row is `during-testing` and is not taken here.
 
-#### Remedy verdict
+### Remedy verdict
 **Works with changes. Of the row's three options, one cannot render, one is not viable, and one is unreachable.**
 (1) Flashing a warning **cannot render as written.** The app's only flash-to-UI bridge is the toast key
 (`HandleInertiaRequests.php:98-101`), rendered by `MdsToastHost`, mounted only in `AppLayout.vue:118` and
@@ -147,7 +147,7 @@ PUT, PATCH and DELETE, so there is no 405. The obvious fix of returning a non-In
 
 `docs/feature-backlog.md:10440`. Filed by `M98`. No amendment.
 
-#### Evidence verified
+### Evidence verified
 **Every code citation resolves exactly as described.** `BrandPalette.php:159-166` — the product palette sets its
 url from the app url. `:182-192` — the identity palette builds its url with `TenantUrl::to`, so branded mail
 genuinely uses the workspace host, which is the half `D46` had backwards.
@@ -163,7 +163,7 @@ workspace host" path is live.
 `docs/claims/decisions.md:1651-1656` already carries a dated correction written during `M98`. The row prescribes
 work its own increment had already done.
 
-#### Premise verified
+### Premise verified
 **Partly holds. The row understates its own blast radius by two-thirds.**
 ⛔ **Seven NON-AUTH dispatch sites hit the same fallback**, every one returning the product palette for an
 unbranded tenant (`BrandPalette.php:107-109`): `NotificationMailer.php:56` — the highest-volume path, every
@@ -188,7 +188,7 @@ workspace-host reading to be true, so those two docblocks are part of the repair
 **Unverifiable from the tree, stated rather than guessed:** whether the staging workspace has a brand ramp,
 which plan tier the workspace was created with, and the live app url on the box.
 
-#### Remedy verdict
+### Remedy verdict
 **Works with changes. Of three clauses, one is already done, one cannot work, and one cannot be implemented
 where the row points.**
 (1) Correcting `D46`'s consequence line is **already done** at `decisions.md:1651-1656`. Doing it again writes a
@@ -219,7 +219,7 @@ correct central URL, and an unlinked logo is the only honest answer.
 
 `docs/feature-backlog.md:9888`. Filed by `M96`, corrected by `M98`; neither took it.
 
-#### Evidence verified
+### Evidence verified
 The JSON half resolves and `M98`'s correction holds. `public/index.php` answers a browser request from the
 pre-rendered page before loading the autoloader; the framework's stub returns early for a request that expects
 JSON or carries the bypass cookie. `deploy.ps1:409` runs the down command with **no** secret, so the bypass half
@@ -228,7 +228,7 @@ and carries the front-controller rules. `bootstrap/app.php`'s catch-all arm retu
 not the maintenance-mode envelope, so the documented contract is broken for the whole window and not only in the
 fatal case. The down command always writes an except key.
 
-#### Premise verified
+### Premise verified
 **Partly holds, and the window is more hostile than either the row or its correction says.**
 ⛔ **`deploy.ps1:412` resets the checkout hard FIRST, before any rename**, so a fall-through request can boot
 against half-rewritten `app/` PHP; and the forced migration runs at `:433`, **still inside the window**, so a
@@ -250,7 +250,7 @@ which is why `D13`'s grouping could not see the `R-62aff714` collision.
 **Minor, unnamed:** the health route (`bootstrap/app.php:76`) falls through the same way for any probe sending a
 JSON Accept header.
 
-#### Remedy verdict
+### Remedy verdict
 **Works with changes.** Answering JSON from the stub **cannot work at all** — the stub is vendor code that
 `artisan down` copies fresh on every run — so the guard belongs in the app-owned `public/index.php`, before the
 autoloader. ⛔ **It must be written as a dependency-free include** (`public/maintenance-guard.php`): nothing in

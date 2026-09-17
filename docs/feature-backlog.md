@@ -10053,12 +10053,12 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   someone removes the folder by hand. The runbook installs with `--prefer-dist`, which is why this is latent.
   ⚠️ Clear read-only attributes before deleting, or rename the stale folder aside. **Latent.** — needs a read-only
   file inside a previous release's `vendor`. Filed by `M96`. **Tier: during-testing.**
-- **`minor` · The deploy window's length on the Windows testing server has never been measured.** Found by `M96`
+- ~~**`minor` · The deploy window's length on the Windows testing server has never been measured.**~~ Found by `M96`
   (2026-09-15) while rewriting the runbook's window sentences. `M96` moved the build out of the maintenance window,
   and the runbook and the non-functional requirements now describe the window as seconds to tens of seconds by
   design, which was proved against a harness with stubbed tools rather than timed on the host. ⚠️ Time one real
   deploy on the testing server and write the number where the sentence stands. **Latent.** — needs the testing
-  server's first automatic deploy. Filed by `M96`. **Tier: early-testing.**
+  server's first automatic deploy. Filed by `M96`. **Tier: early-testing.** ✅ **CLOSED BY `M98` (2026-09-18) — 7.9 SECONDS, AND THE RUN THAT MEASURED IT WAS THIS INCREMENT'S OWN MERGE.** The testing server's first automatic deploy ran at 2026-09-17T22:45:40Z and finished 4 min 43 s later; its window is the 7.9 s between `artisan down --retry=15 --render=deploy-window` at 22:50:09.57Z and `artisan up` returning at 22:50:17.48Z. Nothing was pending to migrate, no directory move was refused, and the composer and npm work — about four minutes of it, on cold caches, as the runner's account for the first time — sat outside the window as designed. The number is written at both sentences that carried the estimate. ⚠️ **What this measurement does NOT cover**, and the row is closed knowing it: a run with migrations to apply, a rename refused while a handle is open (the retry budget is about ten seconds), and a window under real tester traffic, which is the condition the Inertia and JSON fall-through rows describe.
 - **`minor` · The first-boot runbook describes only nginx behind a wildcard domain, and the testing server runs
   Apache with one workspace on an existing address.** Found by `M97` (2026-09-15) while turning the Testing Server
   Checklist into step-by-step instructions. `docs/deployment-infrastructure.md` §8 and §8.2 prescribe nginx, a

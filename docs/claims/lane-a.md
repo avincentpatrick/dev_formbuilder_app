@@ -16,118 +16,69 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M98`, what the testing-server build found: the session timezone, the typed 2FA key, and the deploy window a documentation push opens (`m98-testing-server-findings`)
+## Status: NO ACTIVE CLAIM — `M98` is merged; the early-testing tier continues, named in `docs/pipeline.md` § Next
 
-Taken 2026-09-18. Branch `m98-testing-server-findings`, cut from `origin/main` at `ce89b98`, PR into `main`.
+## RELEASED — `M98`, what the testing-server build found: the session time zone, the typed 2FA key, a documentation push that no longer takes the site down, and twenty-five rows that existed only in session memory (merged as PR #291, `64242df`, 6/6 green with real step counts — Static analysis 28 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 
-**Three rows are TAKEN, and the increment's larger half is FILING.** The testing server behind
-`staging.pitahc.gov.ph` was built step by step on 2026-09-17 (32 of 34 checklist steps). That build produced
-seventeen findings, two answered decisions and two unasked questions that existed **only in session memory** —
-no row, no decision, no runbook line. `CLAUDE.md` forbids an unqueued obligation, so this increment files
-them, plus about thirty further items a read-only verification pass found beside them.
+Shipped 2026-09-18. Branch `m98-testing-server-findings`, cut from `origin/main` at `ce89b98`.
+- **Three rows taken.** The four `pgsql` connections now carry `'timezone' => 'UTC'`; the two-factor setup panel
+  shows a typed key; and `deploy.ps1` step 2b fast-forwards the checkout with no maintenance window when every
+  path changed since the recorded `deployed-sha` is one the site does not load.
+- **Twenty-five rows filed, one `major` closed, fifteen amended, `D47`–`D50` written.** Two findings were refuted
+  and filed as nothing.
+- Every claimed file was edited. The claim was extended to none.
+- Outside the repository, the Testing Server Checklist artifact was corrected in sixteen places and re-ticked to
+  32 of 34.
 
-Rows taken:
-1. **NEW, filed and closed here — the four `pgsql` connections set no session timezone.** `config/database.php`
-   `pgsql` (`:89`), `pgsql_auth` (`:117`), `pgsql_privileged` (`:142`) and `pgsql_superadmin` (`:164`) carry
-   `search_path` but no `timezone`, so under a server zone of `Asia/Manila` every PHP-bound timestamp landed
-   eight hours early on the testing box until the operator ran `ALTER DATABASE meridian SET timezone TO 'UTC'`.
-2. **NEW, filed and closed here — the two-factor setup page shows no typed key.**
-   `resources/js/components/settings/TwoFactorSetup.vue:48-61` fetches the QR code and the recovery codes and
-   never `/user/two-factor-secret-key`, which Fortify serves at `vendor/laravel/fortify/routes/routes.php:162`.
-3. **`R-b234f16d`** (`docs/feature-backlog.md:9898`) — "`deploy.yml` says a documentation push produces no run,
-   and every close-out push still redeploys the testing site."
+⛔ **THE HEADLINE: THE FINDING THAT LOOKED LIKE A CLOCK SETTING WAS EXPIRING EVERY PASSWORD-RESET LINK, AND THE
+ONE THAT LOOKED LIKE A COSMETIC CHECKLIST NOTE WOULD HAVE LEFT THE SITE WITH NO CERTIFICATE.**
+- **The time zone was not a display problem.** Laravel binds every `DateTimeInterface` with no offset, so
+  PostgreSQL resolved it in the session zone. Under `Asia/Manila` the password-reset repository wrote
+  `created_at` from PHP and compared it in PHP, so a link was expired the moment it was issued and its
+  60-second resend throttle never tripped. ⚠️ **The skew is per COLUMN, not per row** — a column written by SQL
+  `now()` was always correct, and `SuperAdminProvisioner` writes both kinds in one `UPDATE` — so the row
+  refuses a blanket interval repair, which is what anyone would have reached for.
+- **The certificate step was worse than the defect it was meant to fix.** The checklist's `mod_md` arm put
+  `MDCertificateFile` inside `<MDomain>` and told the operator to delete the vhost's `SSLCertificateFile` lines.
+  In httpd 2.4.66 that makes Apache serve the static file for ever, measure renewal against it and — with
+  `MDRenewMode always` — re-request a certificate on every check; deleting the vhost lines as well would have
+  left the site with nothing to serve, because `mod_md` declines until it has its own certificate.
+- **`R-e783a335` closed with the runner already online.** `gh api` reads `approval_policy` as
+  `all_external_contributors` and runner `DGF97HY2` as online. Its second suggestion — a runner label only
+  `deploy.yml` names — was DROPPED on a false premise: in a public repository that file is readable, so a fork
+  can name any label it sees.
 
-### Evidence verified
-
-- **Row 1 — held, and it understates itself.** The connector honours the key that is missing:
-  `vendor/laravel/framework/src/Illuminate/Database/Connectors/PostgresConnector.php` calls
-  `configureTimezone()` from `connect()`, which issues `set time zone '<tz>'` only `if (isset($config['timezone']))`.
-  `Grammar::getDateFormat()` returns `'Y-m-d H:i:s'` with no offset, and `Connection::prepareBindings()` formats
-  every `DateTimeInterface` binding with it, so PostgreSQL resolves each write in the session zone. **Beyond the
-  finding:** columns written by SQL `now()` were correct all along, so the skew is per column, not per row, and
-  `SuperAdminProvisioner` writes both kinds in one `UPDATE` — no blanket `+ 8 hours` repair is safe. It also
-  expired every password-reset link on arrival and disabled the reset throttle, because
-  `DatabaseTokenRepository` writes `created_at` from PHP and compares it in PHP.
-- **Row 2 — held.** `loadSetup()` destructures exactly two responses; the secret key appears nowhere in
-  `resources/js`. The same component serves Settings → Security, the tenant 2FA gate and the console gate, so one
-  fix covers three surfaces.
-- **Row 3 — held.** `.github/workflows/deploy.yml:29-33` triggers on every completed `CI` run on `main` and
-  `:45` gates only on `conclusion == 'success' && vars.DEPLOY_ENABLED == 'true'`; its header at `:20-28` and
-  `:43-44` still says the workflow "stays dormant". `docs/pipeline.md` is not in `ci.yml`'s `paths-ignore`, and
-  every close-out regenerates it. `gh variable list` reads `DEPLOY_ENABLED=true` (set 2026-09-17T14:49:23Z), so
-  the row's redeploy half is now armed.
-
-### Premise verified
-
-- **Row 1 — the finding's premise is overstated in one direction and understated in another** (see above), and
-  the durable half is what the finding missed: the box fix is not durable. `docs/deployment-infrastructure.md`
-  requires a quarterly full restore to a fresh instance, a restore without `--create` drops a database-level
-  `SET`, and a fresh EDB `initdb` on a Philippine-zoned host picks up the OS zone. The connection-level `SET`
-  beats both the database and the role default, which is why the config key is the real guard.
-- **Row 2 — held, and its scope is wider than "a page".** The people it blocks are those enrolling on the phone
-  that holds their authenticator, and it blocks sign-in outright once a workspace sets
-  `security.require_two_factor`, because that gate offers this component or sign-out.
-- **Row 3 — one premise of the ROW was wrong when it was filed, in the safe direction.** It was marked `Live`
-  while `DEPLOY_ENABLED` was unset, so only its stale header was live then; the redeploy half became live on
-  2026-09-17 and has still not fired, because nothing has been pushed to `main` since. **The fix's premise
-  needed correcting too:** the comparison must be against the recorded `deployed-sha`, not against the push's own
-  diff, or a documentation close-out following a merge whose deploy failed before its window would skip and that
-  merge's code would never go live.
-- **Measured while clearing the ground, and it belongs to `R-71aa0f49`:** a full second checkout at
-  `.kilo/worktrees/universal-forest` inside the repository root reordered the generated queue.
-  `php scripts/pipeline.php --check` reported DRIFT with the tree unchanged, and reported `current` the moment
-  the worktree was removed — so a local regeneration from such a checkout would have failed CI's `P1`.
-
-### Remedy verdict
-
-- **Row 1 — implementable, and measured before the test was written.** `'timezone' => 'UTC'` on all four
-  connections is honoured on every new PDO, including reconnects. Hard-coded, not `env()`: writing offset-less
-  times is correct only while the session zone equals `config('app.timezone')`. The test must force a non-UTC
-  startup zone (`PGTZ`) on a probe connection, because CI's PostgreSQL already reports UTC and would otherwise
-  pass before the fix.
-- **Row 2 — implementable.** The endpoint is registered and behind the same `password.confirm` middleware as the
-  QR route, so a third `fetch` inside the existing `Promise.all` and `!ok` path keeps the 423 behaviour. It must
-  be fetched only when `!props.confirmed`, because `regenerate()` reuses `loadSetup()`.
-- **Row 3 — the row's own remedy is half wrong.** "Correct the header" holds. "Skip the window when nothing the
-  site runs changed" cannot go in `paths-ignore` (`pipeline-lint` gates `docs/pipeline.md`), and it cannot use
-  porcelain `git diff --name-only`, which prints only a rename's new path — **measured** on `e502f7a`, where it
-  printed one file and `git diff-tree -r --name-only` printed two. So: `diff-tree --no-renames`, a deny-by-default
-  allowlist, and the skip only when `deployed-sha` is valid, equals live `HEAD`, the site is up and the live build
-  is present.
-
-Files: `config/database.php`, `tests/Feature/Tenancy/ConnectionTopologyTest.php`,
-`app/Support/Analytics/AnalyticsQuery.php`, `app/Services/Analytics/AnalyticsMetricsService.php`,
-`resources/js/components/settings/TwoFactorSetup.vue`,
-`resources/js/components/settings/TwoFactorSetup.test.ts`, `deploy.ps1`, `.github/workflows/deploy.yml`,
-`.github/workflows/ci.yml`, `tests/Feature/Deploy/` (a new static guard), `docs/feature-backlog.md`,
-`docs/claims/decisions.md`, `docs/pipeline.md` (generated), `docs/deployment-infrastructure.md`,
-`docs/non-functional-requirements.md`, `docs/piping-output-encoding-design.md`, `docs/TESTING-GUIDE.md`,
-`PROGRESS.md` and `docs/gate-baselines.md` (close-out only), and this file.
-
-Shared artefacts taken: `docs/feature-backlog.md`, `docs/claims/decisions.md`, `docs/pipeline.md`,
-`docs/deployment-infrastructure.md`, `docs/non-functional-requirements.md`, `docs/piping-output-encoding-design.md`,
-`docs/TESTING-GUIDE.md`, `PROGRESS.md` (own block only). Outside the repository: the Testing Server Checklist
-artifact.
-
-Paired files taken: `docs/deployment-infrastructure.md` with `tests/Feature/Mail/QueuedMailContractTest.php`,
-which asserts the runbook still contains the worker command's `--queue={$order}` string byte for byte. The
-runbook edits here are in §8 and §4 and leave that string untouched.
-
-Namespaces spent: `D47`, `D48` (answered, recorded here), `D49`, `D50` (opened here). No ADR, no migration
-prefix, no exceptions entry. `0010` stays reserved for H1d.
-
-**D13:** `R-b234f16d` is this batch's ONE hub row (`.github/workflows/ci.yml` and
-`docs/deployment-infrastructure.md`). Rows 1 and 2 touch no hub file and share no cited file with it or with each
-other. `R-9021b313`'s remedy is a measurement written at the close-out from this increment's own Deploy run, not
-a fourth batch row.
-
-Prediction: 6/6 green, with the step counts recorded in `docs/gate-baselines.md` — this diff adds one Pest file
-and touches no CI step. **PHPStan cannot move**: it scans `app`, `database` and `routes`, and the two analytics
-comments are the only `app/` edits. Bare `vendor/bin/pint --test` on the host is the only gate that sees
-`config/`. `BacklogProvenanceTest` is the gate I most expect to be wrong, because this increment writes about
-twenty-five rows by hand and its Filed-by match is on raw text, so a closing note quoting another increment's
-`Filed by` would read as a second filer. Second most likely: `citation-liveness-lint`, whose allowance is at its
-ceiling, which is why the new rows cite files and § names rather than line numbers.
+⚠️ **HOW THE PREDICTION FARED.**
+- **The gate I named as most likely to be wrong was right, and for the reason I named it.** `BacklogProvenanceTest`
+  passed on every one of the twenty-five rows, because the drafting pass was told the Filed-by trap up front and
+  no row quotes another increment's filer text. It was run after every batch rather than once at the end.
+- **PHPStan could not move, as predicted** — and proving that took two wrong theories. The local container reports
+  **18 errors** on a tree whose only `app/` changes are two comments. My first explanation, that Larastan was
+  reading a database mid-`RefreshDatabase`, was refuted by a migrated, idle database reporting the same 18. The
+  decisive measurement was running it against `origin/main` in the same container: **identical 18**, so the diff
+  moves it by zero. The cause is already written down in `tests/Feature/Docs/SuiteCollectionFloorTest.php`'s own
+  header — the Windows bind-mount SPL truncation reaches Larastan, and those 18 are its phantoms. The same header
+  predicts that test's single local failure, which is also the only red in a 4,660-test local run.
+- **`citation-liveness-lint` stayed at 18 of 18 with no headroom**, as predicted, because every new row cites
+  files and § names rather than line numbers.
+- **Not predicted: the local Pest suite exhausts 128M in one process.** `php artisan test` dies with two fatal
+  memory errors mid-run, and `-d memory_limit` does not reach the child process it spawns; only
+  `php -d memory_limit=2G vendor/bin/pest` completes. CI splits the suite across jobs and never meets this.
+- **Not predicted, and it cost the first CI run: `R-71aa0f49` for the fourth time.** The first merge attempt went
+  **5 of 6**, failing `pipeline-lint` P1 with `docs/pipeline.md` DRIFTED while `pipeline.php --check` was green on
+  this host, on the same commit. Four citations this increment introduced resolve only here: a gitignored log
+  path, two dot-directory worktree paths, and — the one worth remembering — **a case-wrong path**,
+  `resources/js/Pages/settings/Index.vue`, where the tracked path capitalises `Settings` and Windows resolved it
+  anyway. Each was reworded to name no such path, which is exactly the immediate fix `M85` applied and exactly
+  what that row calls "not a fix".
+- ✅ **AND THE INSTRUMENT THAT SETTLES IT IS ONE COMMAND.** `git clone --no-hardlinks --branch <branch> . <scratch>`
+  gives a tree containing exactly the tracked set — the universe CI has — and adding an empty `vendor/autoload.php`
+  and `vendor/bin/pest` completes the impersonation, because that CI job installs composer dependencies and
+  nothing else. `php scripts/pipeline.php --check` inside that clone was RED for the bad commit and GREEN for the
+  fix, before either was pushed. `--check` on the host cannot answer this question and said so twice.
+- **Not predicted: the Kilo worktree inside the repository root reordered the queue too**, which is the same row's
+  second variant: `--check` reported DRIFT with the tree unchanged and `current` the moment the worktree was
+  removed. Measured rather than inferred for the first time, and it was found before the first push rather than by CI.
 
 ## RELEASED — `M97`, the testing server's layout: `D46` recorded, and three rows filed from turning the Testing Server Checklist into step-by-step instructions (merged as PR #290, `e853b79`, 6/6 green with real step counts — Static analysis 28 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

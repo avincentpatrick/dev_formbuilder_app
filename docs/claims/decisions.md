@@ -17,11 +17,71 @@ two server-paginated tables (2026-08-18) · fail **open** on an unseeded plan ca
 password policy min-12 + HIBP + classes (2026-08-09) · Google-only social login (2026-08-09) ·
 gamification last (2026-08-09) · the held list stays held until the user signals, and they said
 *"not yet, ask again later"* on 2026-08-18 · **a flaky e2e result fails CI** (2026-08-26, D2 below) · **the M-series ends at zero open
-`major` rows plus three consecutive increments filing none** (2026-08-28, D5 below) · **the batch series ends and the tiered pipeline succeeds it** (2026-09-14, D12 below) · **the testing server is invitation-only** (2026-09-14, D31 below) · **the guest per-address limits are raised on the testing server only** (2026-09-14, D32 below) · **the Windows Server 2016 testing site runs PostgreSQL 15** (2026-09-14, D43 below) · **the testing site is one workspace at the root of `staging.pitahc.gov.ph`, served by Apache** (2026-09-15, D46 below).
+`major` rows plus three consecutive increments filing none** (2026-08-28, D5 below) · **the batch series ends and the tiered pipeline succeeds it** (2026-09-14, D12 below) · **the testing server is invitation-only** (2026-09-14, D31 below) · **the guest per-address limits are raised on the testing server only** (2026-09-14, D32 below) · **the Windows Server 2016 testing site runs PostgreSQL 15** (2026-09-14, D43 below) · **the testing site is one workspace at the root of `staging.pitahc.gov.ph`, served by Apache** (2026-09-15, D46 below) · **automatic deploys to the testing server are on** (2026-09-17, D47 below) · **the repository stays public with fake data only through testing, and goes private before any real data** (2026-09-17, D48 below).
 
 ---
 
 ## OPEN
+
+### D49 — The testing site's certificate expires 2026-10-13, and no renewal path in the checklist can validate while inbound 443 stays shut. What renews it? **Tier: early-testing.**
+
+**Filed 2026-09-17 by `M98`, while measuring the checklist's certificate step against what the network actually
+allows.** Three renewal routes are written down — two in the checklist, and DNS-01 as the wildcard-certificate
+assumption D46 records in `docs/deployment-infrastructure.md` §8 — and each needs something this network does not
+give. Port 80 is closed from outside (D46), so win-acme's `http-01` could never have worked, yet the checklist's
+*keep the existing renewer* path counts a win-acme installation as a working renewal. `mod_md`'s `tls-alpn-01`, the
+checklist's other path, needs Let's Encrypt's validators to reach port 443 from the internet, and inbound 443 to
+the server's public address was measured **dropped** on 2026-09-17 — which sits badly with D46's recorded TLS
+handshake on 2026-09-15, although D46 says only that the handshake was made *outside the box*: a different front
+address then, a firewall change since, or a 2026-09-15 handshake made from inside the office network would each
+explain it, and none is measured. DNS-01 would validate, but DICT runs the name servers for `pitahc.gov.ph` and
+offers no API, so it cannot be automated. The certificate served on 2026-09-15 expires **2026-10-13**, and the
+weekly blind Apache restart the checklist records on the box — unmeasured from here — is not a renewal of anything.
+
+- **A — ask the network team to open inbound TCP 443** to the server's public address. It is also the only thing
+  that lets testers off the office network reach the site at all, and it makes `tls-alpn-01` work, so the
+  certificate then renews itself. Costs a request to the network team and one confirmation from mobile data.
+- **B — renew by hand with a DNS-01 TXT record**, requested from DICT at each renewal. No network change, and
+  every renewal becomes a request to another agency, ninety days apart, with the site's certificate resting on
+  someone remembering.
+- **C — install an agency-issued certificate** — commercial or DICT-provided, typically a year long, with no ACME
+  at all. Costs money or an agency process, and the file is still installed and replaced by hand.
+
+**Recommendation: A, with B as the fallback** if 443 cannot be opened before the expiry. ⚠️ **An answer is needed
+well before 2026-10-13; the 2026-10-01 bound below is this entry's own, not one anybody has agreed:** both routes
+depend on another team acting, and B needs a TXT record published while the challenge is live. If nothing is
+decided, the certificate lapses on 2026-10-13 and every tester meets a browser warning on a `.gov.ph` address,
+which is the worst possible thing for them to be taught to click through.
+
+### D50 — Should DICT be asked to publish DKIM and DMARC records for `pitahc.gov.ph`? **Tier: before-launch.**
+
+**Filed 2026-09-17 by `M98`, while checking why an invitation was spam-foldered.** An emailed invitation is the only
+door to an account while the testing server is invitation-only (D31), and the operator reports invitations arriving
+in the spam folder. What is measured, read with `nslookup`: `pitahc.gov.ph` publishes an SPF record ending `~all`
+and **no `_dmarc` record at all**, so there is no DMARC policy and no aligned DKIM signature for one to point at.
+The same gap lets anyone send invitation-looking mail *"from"* the domain without it being rejected. What is not
+measured: which `From` address the invitation actually used, and what the receiving side's own authentication
+results said. D46 records that the user will request no new records from DICT; INFERRED from its context, that was
+said about the site's address records, so this is a separate question rather than one already refused. The tier is
+before-launch because what this decision buys is a DICT request and a Google Workspace change rather than anything
+a tester touches — the tester-facing half is a checklist line, and it needs no answer.
+
+- **A — ask now.** Turn DKIM on in Google Admin for `pitahc.gov.ph` and have DICT publish the `google._domainkey`
+  TXT record, plus `_dmarc.pitahc.gov.ph` as `v=DMARC1; p=none; rua=mailto:<agency mailbox>`, tightening to
+  quarantine later. It is the durable fix and it also ends the spoofing exposure; it costs a DICT request and a
+  Workspace change before anyone knows whether authentication is what moved the mail.
+- **B — read one spam-foldered invitation's headers first.** Open the message, use Show original, and read
+  `Authentication-Results` for spf, dkim and dmarc together with the real `From` and the envelope sender. Free, and
+  it separates a checklist problem — sending from a personal Gmail address, or a `From` that differs from the
+  authenticated account — from a DNS problem, before anyone asks DICT for anything.
+- **C — no, not through testing.** Accept spam placement, tell testers in the checklist to look in spam and mark
+  the invitation *Not spam*, and revisit the question before launch.
+
+**Recommendation: B, then A if the headers show that alignment is the cause.** One header read costs nothing and
+decides which of the other two options is right. INFERRED, from mail-standards knowledge rather than a tested
+receiver: Google's sender rules make DMARC mandatory only for bulk senders, so a missing DMARC record alone may not
+be what moved a low-volume invitation to spam — which is precisely why the free measurement comes first. Either way
+the checklist should already tell testers to look in the spam folder, and that does not wait on this answer.
 
 ### D33 — May a workspace admin invite any email address, or only addresses at a verified company domain? **Tier: early-testing.**
 
@@ -139,6 +199,9 @@ named. One early real user makes testing and launch planning far more reliable, 
 **Recommendation: A**, if a candidate exists. ⛔ **Record the answer here WITHOUT the customer's name.** This
 repository is public, and `D6` already decided that a named client does not belong in it; the name stays in the
 Board's note.
+⚠️ **Annotated 2026-09-17 during `M98`, after D48.** The no-name rule holds and now has an end condition rather
+than an open end: the repository stays public with fake data only through testing and goes private before any real
+data, so the customer's name may be written here only after that flip, and not one commit before it.
 
 ---
 
@@ -207,6 +270,13 @@ a committed Windows job changes that rule.
 
 **Recommendation: C until a production host exists, then B.** The harness is the expensive part to rebuild, and the
 script changes rarely; a Windows job earns its cost once a failed deploy takes down a site people rely on.
+⚠️ **Annotated 2026-09-17 during `M98`, after D47 and D48.** Two premises here have moved. Option B's Windows
+runner costs no money today, because standard runners are free on a public repository, but it bills $0.010 a
+minute against the Linux job's $0.006 once D48's flip happens, so its cost is deferred rather than absent. And
+automatic deploys have been on since 2026-09-17, so a `deploy.ps1` regression now takes down the site the testers
+use: not the production host this recommendation named, but the closest thing to it that exists. The scratch
+harness also still exists, pinned to a worktree that no longer does. The tier and the recommendation remain the
+user's to move.
 
 ---
 
@@ -588,6 +658,11 @@ tracker surgery loses, and it is adjacent enough to look like the same question.
 about a *diff shape* that produces no run, this is about *one file's* membership. Answering this one
 does not answer that one, and an increment that quietly did both would be spending a user decision it
 was not given.
+⚠️ **Annotated 2026-09-17 during `M98`, after D48.** The eighteen minutes above reads as wall clock rather than as
+billed time — INFERRED, since this entry calls it runner time and a full run measures 19 minutes of wall clock —
+and the billable figure is larger: about 38 minutes, six jobs each rounded up to the minute. It is free only while
+the repository is public, so option 1's price becomes about $0.23 a close-out run at the 2-core Linux rate of
+$0.006 a minute once D48's flip happens — which is the moment to re-read this question.
 
 ---
 
@@ -1339,6 +1414,11 @@ rewritten and nothing further is redacted until this is answered. ⚠️ **The h
 is a cost/benefit call, not a security emergency.** If the answer is option 2, it should be taken as a
 deliberate, scheduled operation with the three keyed mechanisms re-derived afterwards — not folded into
 an increment.
+⚠️ **Annotated 2026-09-17 during `M98`, after D48.** Option 3 is no longer a refusal: the user answered that the
+repository stays public with fake data only through testing and goes private before any real data, so the exposure
+weighed here stops growing at that flip while every commit that ever carried the redacted strings stays readable in
+the history behind it. That sharpens the trade rather than settling it — a rewrite would close a window that is
+closing anyway — so this stays open and recommended against.
 
 ---
 
@@ -1431,6 +1511,114 @@ doors; this is the builder's validation layer. They should not be answered as on
 
 ## ANSWERED
 
+### D48 — Should the repository stay public? **Public with fake data only through testing; private before any real data.**
+
+**Filed and answered 2026-09-17 (user decision, in chat), recorded by Lane A during `M98`.** Visibility had never
+been asked as its own question. `D6` redacted a named client from the working tree and left the history alone, and
+`D9`, which asks whether that history should be rewritten too, is open and recommended against; both say in terms
+that the exposure is reduced rather than closed *because* the repository is public. `D9`'s third option, going
+private, was refused there in passing as *"a much larger decision about the project"* that would *"silently remove
+the free-Actions-minutes premise several CI decisions rest on"*. This answer takes that option and gives it a
+trigger instead of a refusal.
+
+- **A — stay public indefinitely.** Standard runners stay free; `D6`'s and `D9`'s residual exposure stays
+  open-ended.
+- **B — public with fake data only through testing, private before any real data.** Nothing real is ever exposed,
+  and the runner minutes stay free for the whole of testing.
+- **C — go private now.** Closes `D9`'s forward exposure today and starts billing every CI minute today.
+
+**The user chose B.**
+
+**What the minutes cost, measured with `gh`:** 418 CI runs in the 30 days to 2026-09-17, of which **85 were
+cancelled**, so 418 is an upper bound on full runs — a re-count on 2026-09-18 over a window one day later reads 393
+(295 green, 23 failed, 75 cancelled), so the figure moves with the window. One full run bills about **38 minutes**:
+six Ubuntu jobs measured at about 2, 3, 2, 1, 19 and 11 minutes, each rounded up to the minute, against 19 minutes
+of wall clock. The run's own billable reading is zero, because a public repository's standard-runner minutes are not
+billed. Once private, GitHub's plans page lists **2,000** free minutes a month on Free and **3,000** on Pro, and the
+published rates are **$0.006 a minute** for a 2-core Linux runner and **$0.010 a minute** for a 2-core Windows
+runner. At the 418-run volume that is roughly 15,900 minutes a month, about **$83 a month** on Free — about $64 if
+the cancelled runs are left out, and about $78 at the 393-run re-count — before any Windows job exists. The nightly
+schedule alone is about 1,140 minutes a month, more than half the Free allowance, and `ci.yml`'s comment that the
+schedule is free because the repository is public becomes wrong at the flip.
+
+**The obligations this answer creates:**
+- **While public, fake data only.** No real respondent data, no real client name, no live credential in the tree, in
+  a fixture or in a screenshot. Invitation-only sign-up (D31) keeps strangers out of the site; it says nothing
+  about what is in the repository.
+- **Before the flip, in this order.** (1) Read the account plan: GitHub's plans page puts protected branches for
+  private repositories under Pro, and `gh api user` returns a null plan, so whether `D7`'s six-required-check
+  ruleset keeps enforcing after the flip is INFERRED and unmeasured — upgrade, or accept losing the enforced merge
+  gate. (2) Give the server a credential: `deploy.ps1` fetches over anonymous HTTPS today, so it needs either a
+  read-only deploy key (an SSH remote, the key and `known_hosts` in NETWORK SERVICE's profile, and outbound port
+  22, or port 443 on `ssh.github.com`, which the checklist's outbound list does not allow) or `deploy.yml` handing
+  git the job's short-lived `GITHUB_TOKEN` through `http.extraheader`, which leaves no long-lived secret on the
+  server but leaves a hand run — priming, or a rollback with `-Ref` — without one, so that account needs a
+  documented credential of its own; set `GIT_TERMINAL_PROMPT=0` in `deploy.ps1` either way, because an auth prompt
+  under a service account may hang rather than fail (INFERRED, not measured). Prove it while the repository is
+  still public by switching the remote first. (3) Trim CI to a minutes budget — the nightly schedule, the six jobs
+  every pull request runs, and `D21`'s `paths-ignore`; CI runs only on `main` pushes, pull requests targeting
+  `main`, the schedule and a dispatch, so there is no per-branch job to drop. A before-launch row in
+  `docs/feature-backlog.md` is owed for all three and is not filed yet; the flip itself is the user's action.
+- **Five decisions now need annotating rather than reopening**, because the repository stays public through
+  testing: `D9` (its refused third option is scheduled, not refused), `D21` (its close-out cost becomes billable),
+  `D40` (the pilot customer's name stays out only until the flip), `D6` (the public-history limit gains an end
+  condition) and `D45` (a Windows job is free today and $0.010 a minute afterwards).
+
+---
+
+### D47 — Should automatic deploys to the testing server be turned on now, or stay dormant until the deploy window is proved? **B — turn them on now.**
+
+**Filed and answered 2026-09-17 (user decision, in chat), recorded by Lane A during `M98`.** `deploy.yml` was
+committed dormant: every run of it skipped while the `DEPLOY_ENABLED` repository variable was unset, so the deploy
+half of the testing-server build had never run by itself. The user set the variable in the GitHub UI rather than
+waiting for the close-out redeploy row to be fixed first.
+
+- **A — leave it dormant** until the same-sha skip ships and the window's length has been measured, deploying from
+  the server by hand in the meantime. INFERRED wording: option A was never written down anywhere in the
+  repository, and this is what the alternative amounted to.
+- **B — turn them on now**, and take the first automatic window on the next push to `main`.
+
+**What is measured**, read with `gh` on 2026-09-17: `DEPLOY_ENABLED=true`, set at 14:49Z that day, with
+`MERIDIAN_APP_PATH` set beside it; the fork pull-request approval policy reads `all_external_contributors`; and the
+self-hosted runner is registered and online, labelled self-hosted, Windows, X64.
+
+**No recommendation was filed before the answer — the user turned deploys on, and this entry records it.**
+
+**Consequences, recorded so they are not rediscovered:**
+- Every green CI run on `main` now runs `deploy.ps1` on the server: a merge push, a close-out push that touches
+  `docs/pipeline.md` or `docs/feature-backlog.md`, a direct fix push, the nightly schedule and a manual dispatch.
+  A claim-only push still produces no run, because `docs/claims/**` sits in `ci.yml`'s `paths-ignore`, and neither
+  does a push touching only `docs/backlog-triage.md` or `docs/gate-baselines.md`, which are in that list too. One
+  thing only holds a pull-request run off: `deploy.yml` fires on a `workflow_run` whose head branch is named
+  `main`, and its `if` reads the conclusion and the variable but never `workflow_run.event`, so an approved green
+  pull request from a fork's own `main` branch is not excluded by it. INFERRED from `deploy.yml`; no fork run has
+  been approved.
+- A documentation close-out therefore deploys the site, which is what the close-out redeploy row in
+  `docs/feature-backlog.md` describes. Its fix belongs in `deploy.ps1` rather than in `paths-ignore`, because
+  `docs/pipeline.md`'s freshness is merge-gated (D21), and it has to compare against the recorded deployed sha
+  rather than the push's own diff.
+- The nightly run does not run at 03:00. `ci.yml` asks for `cron: "0 3 * * *"`, but the last six scheduled runs
+  started between 07:49Z and 08:45Z — the most recent three at 08:27Z, 08:32Z and 08:32Z — and their Deploy runs
+  followed at 08:46Z, 08:48Z and 08:51Z, measured with `gh run list` on 2026-09-18. That is about **16:50
+  Philippine time**, the middle of the testers' afternoon, every day.
+- A run on a sha that is already live opens no window: `deploy.ps1` compares the fetched sha with the recorded
+  deployed sha and stops at `==> Nothing deployed`, so a nightly run on an unchanged tip is a no-op, and the
+  checklist's expected `==> Deploy complete` line will not match it.
+- Rows this makes live rather than latent, all in `docs/feature-backlog.md`: the close-out redeploy (only its
+  stale header wording was live while the variable was unset), and the two window rows whose preconditions — a tab
+  held open across a deploy, a worker restarted inside the window — are ordinary tester traffic from now on. Two
+  others stay latent and are merely reachable without an operator now: the second `.env` copy left in
+  `.deploy-stage` needs a deploy that fails before `up`, and the JSON request that falls through the window needs
+  one in flight while the renames run.
+- The window's measured length is owed by the next merge's Deploy run. No CI run, and so no Deploy run, has
+  happened since the variable was set: the newest Deploy run is 2026-09-17T08:51Z and it skipped, and the one push
+  to `main` since — a claim commit touching `docs/claims/lane-a.md` and nothing else — is inside `paths-ignore`
+  and produced no run at all.
+- It is new input to D45 and does not close it, and it does not make the deploy's unverified sha safe: the job
+  fetches `origin/main` rather than the triggering run's sha, and no row covers that yet.
+
+---
+
 ### D46 — The testing server is the existing box behind `staging.pitahc.gov.ph`. How is the site laid out, with no new DNS records? **C — one workspace at the root of `staging.pitahc.gov.ph`, served by Apache, with the older sites removed.**
 
 **Filed and answered 2026-09-15 (user decision, in chat), recorded by Lane A during `M97`.** The user's testing
@@ -1460,10 +1648,27 @@ was measured; they also chose Apache, already on the box, over nginx.**
   to someone outside the workspace, the redirect for an unidentifiable host, and the logo link in branded email
   (`app/Support/Branding/BrandPalette.php`). Invitation, password-reset, verification and share links carry the
   request's or the workspace's host, and are unaffected.
+- ⚠️ **Corrected 2026-09-17 during `M98`: the branded and unbranded halves of the bullet above are the wrong way
+  round.** Tenant-branded mail builds its header link from the workspace's own host, and it is **unbranded** mail
+  that takes `config('app.url')` — password reset, address verification and the welcome email
+  (`app/Support/Branding/BrandPalette.php`, `app/Notifications/Concerns/CarriesTenantBrand.php`). So a tester's
+  reset and verification mail carries a header link to the agency's website, while an invitation, which is
+  branded, does not.
+- ⚠️ **Added 2026-09-17 during `M98`: Google sign-in cannot work on this layout.** The OAuth redirect is built from
+  `APP_URL` (`config/services.php`), so it resolves to `https://pitahc.gov.ph/auth/google/callback` on the agency's
+  website, and a failed sign-in whose state named no workspace is sent to `APP_URL/login` for the same reason. It
+  is latent: the checklist never configures Google, so nothing exercises it yet.
 - The Testing Server Checklist artifact carries this layout step by step. A row in `docs/feature-backlog.md` tracks
   bringing §8 in line, because the runbook in the repository still describes only nginx.
 - The certificate served on 2026-09-15 expires 2026-10-13, and what renews it is not known. The checklist's
   certificate step covers both an existing renewal tool and Apache's own `mod_md`.
+- ⚠️ **Corrected 2026-09-17 during `M98`: inbound 443 from outside was measured DROPPED**, which sits badly with
+  this entry's own TLS handshake recorded on 2026-09-15 — though that one is recorded as made *outside the box*,
+  not outside the network. The name may have resolved to a different front address then, the firewall may have
+  changed since, or the handshake may have been made from inside the office network; none of the three is
+  measured. While 443 stays shut, testers off the office network cannot reach the site at all, and no renewal path
+  in the checklist can validate — port 80 is closed, so `http-01` cannot work, and `tls-alpn-01` needs inbound
+  443. What renews the certificate before it expires on 2026-10-13 is therefore its own open question, D49.
 
 ---
 
@@ -1500,6 +1705,12 @@ the dead end without code. ⚠️ **It blocks no row:** the answer is applied fr
 `GUEST_MINT_PER_IP` and, beside it, `GUEST_SUBMIT_PER_IP` and `GUEST_CHALLENGE_PER_IP` (`config/guest.php`), which
 a group on one network exhausts in the same way; then run `php artisan config:cache`, because a cached config
 ignores `.env` edits. Dev and CI keep the defaults, and the values are lowered again before launch.
+⚠️ **Annotated 2026-09-17 during `M98`.** Do not lower them on the schedule this sentence implies. The testing
+server sits behind source NAT, measured as one client address for everything arriving from the internet, so at the
+default limits every public respondent would share a single bucket rather than one office sharing one. The raised
+values must stay until the real client address reaches the app; the network fix belongs in a before-launch row in
+`docs/feature-backlog.md`, which is not filed yet, and `docs/deployment-infrastructure.md` carries a second copy of
+this instruction that needs the same qualification.
 
 **Filed 2026-09-14 by `M93`, from Decision Board card `guest-ip-limit`.** A public form mints its guest token
 under `GUEST_MINT_PER_IP`, which defaults to 30 per minute and has no line in `.env.example`. A group session on
@@ -1734,6 +1945,11 @@ reachable by anyone who clones. What changed is what a reader, a search engine a
 **Whether to rewrite history is filed as its own decision, `D9`, unconditionally and recommended
 against.** This row's original defect was a deadline that passed and let the default win by silence;
 recording it as *"the material is gone"* would be that same defect pointing the other way.
+⚠️ **Annotated 2026-09-17 during `M98`, after D48.** *"The repository is public"* now has a term: the user answered
+that it stays public with fake data only through testing and goes private before any real data. Nothing here
+changes for the past — whatever was cloned while it was public stays cloned, and the history stays readable to
+anyone who took a copy — so this entry's stated limit holds; what changes is that new commits stop being public at
+the flip.
 
 **The count was re-derived and disagreed with all three prior figures — and the unit turned out to be
 the finding.**

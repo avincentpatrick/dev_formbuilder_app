@@ -28,16 +28,24 @@ use DateTimeZone;
  *
  * ── Dates, not instants ─────────────────────────────────────────────────────────────────────────────────
  * `from` and `to` are LOCAL DATES in `$timezone`, converted to a half-open `[fromUtc, toUtcExclusive)`
- * instant pair exactly once, here. Two reasons this is not incidental. A `BETWEEN … '23:59:59'` upper bound
- * silently loses sub-second rows in the final second — the bug already live in `ReconcileTenantUsageJob:59`
- * — and mixing dates with instants is how the last bucket of a range comes back a day short.
+ * instant pair exactly once, here, because mixing dates with instants is how the last bucket of a range
+ * comes back a day short.
+ *
+ * ⚠️ **CORRECTED BY `M98`: this paragraph used to claim that a `BETWEEN … '23:59:59'` upper bound loses
+ * sub-second rows in the final second, and named the monthly reconciliation job as a live instance of that
+ * bug. It does not. `submissions.submitted_at` is `timestamptz(0)` — Laravel's schema builder defaults time
+ * precision to 0, and `pg_attribute.atttypmod` reads 0 on the live table — so a second-precision bound loses
+ * nothing. What IS wrong with that job is a different thing, and it is filed: its month bounds are naive
+ * strings, so they are resolved in the session zone rather than in any stated zone.
  *
  * ── Why a timezone at all, when there is no tenant timezone column ──────────────────────────────────────
- * Because `date_trunc('day', <timestamptz>)` silently uses the session `TimeZone` GUC, and `config/database.php`
- * sets no `timezone` key on the `pgsql` connection — so Laravel never issues `SET TIME ZONE` and the GUC is
- * whatever `postgresql.conf` says. That is UTC in the container and unknown on the self-hosted box of
- * ADR-0005: the same data would bucket differently on different hosts, and a saved view would not be
- * reproducible. Carrying an explicit IANA zone and binding it into `date_trunc`'s three-argument form
+ * Because `date_trunc('day', <timestamptz>)` silently uses the session `TimeZone` GUC, and a reporting day is
+ * a LOCAL day that has nothing to do with whatever zone the connection happens to run in. Since `M98` that
+ * zone is at least knowable — `config/database.php` now carries `'timezone' => 'UTC'` on all four
+ * connections, after the self-hosted box of ADR-0005 was measured writing every PHP-bound timestamp eight
+ * hours early — but pinning it to UTC settles only the STORAGE question. A tenant reading a daily series
+ * still wants its own days, and a saved view must answer the same way on every host. Carrying an explicit
+ * IANA zone and binding it into `date_trunc`'s three-argument form
  * (PG 16+) fixes the answer to the declaration rather than to the server. Per-view is also the more useful
  * granularity than per-tenant, which is why §D6's "no new schema" holds here too.
  *

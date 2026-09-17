@@ -98,6 +98,22 @@ return [
             'prefix' => '',
             'prefix_indexes' => true,
             'search_path' => 'public',
+            // ⛔ ON ALL FOUR CONNECTIONS, AND HARD-CODED RATHER THAN `env()`, BECAUSE IT IS NOT A
+            //    PREFERENCE — IT IS THE OTHER HALF OF HOW THIS APPLICATION WRITES A TIMESTAMP.
+            //    `Grammar::getDateFormat()` is 'Y-m-d H:i:s', so every value bound from PHP arrives with NO
+            //    OFFSET and PostgreSQL resolves it in the SESSION time zone. Where that zone is not
+            //    `config('app.timezone')`, every write lands shifted while every read looks fine — measured
+            //    on the Windows testing server, whose server zone was Asia/Manila: eight hours early, and
+            //    password-reset links therefore expired the moment they were issued.
+            //    `PostgresConnector::configureTimezone()` issues `set time zone` only when this key is
+            //    present, and a session setting beats both the database and the role default. Those two
+            //    defaults are NOT a substitute: `pg_dump` carries `ALTER DATABASE … SET` only with
+            //    `--create`, and a fresh `initdb` takes the host's zone — so the quarterly restore §5
+            //    requires would silently bring the skew back. An `env()` here would let the two zones drift
+            //    apart, which is the one thing that must not happen.
+            //    Pinned by tests/Feature/Tenancy/ConnectionTopologyTest.php, which manufactures a non-UTC
+            //    server with PGTZ because CI's PostgreSQL already reports UTC.
+            'timezone' => 'UTC',
             'sslmode' => env('DB_SSLMODE', 'prefer'),
         ],
 
@@ -126,6 +142,7 @@ return [
             'prefix' => '',
             'prefix_indexes' => true,
             'search_path' => 'public',
+            'timezone' => 'UTC',
             'sslmode' => env('DB_SSLMODE', 'prefer'),
         ],
 
@@ -151,6 +168,7 @@ return [
             'prefix' => '',
             'prefix_indexes' => true,
             'search_path' => 'public',
+            'timezone' => 'UTC',
             'sslmode' => env('DB_SSLMODE', 'prefer'),
         ],
 
@@ -173,6 +191,7 @@ return [
             'prefix' => '',
             'prefix_indexes' => true,
             'search_path' => 'public',
+            'timezone' => 'UTC',
             'sslmode' => env('DB_SSLMODE', 'prefer'),
         ],
 

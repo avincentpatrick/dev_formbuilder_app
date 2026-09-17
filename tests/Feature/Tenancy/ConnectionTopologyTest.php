@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 
@@ -73,6 +74,54 @@ it('uses four distinct roles, which is what the separation actually is', functio
 
     expect(array_unique($users))->toHaveCount(4);
 });
+
+it('pins the session time zone on every live connection, whatever the server default', function (string $name): void {
+    // WHY THIS IS A BEHAVIOUR TEST AND NOT A CONFIG ASSERTION. The application writes timestamps with no
+    // offset — `Grammar::getDateFormat()` is 'Y-m-d H:i:s' and `Connection::prepareBindings()` formats every
+    // DateTimeInterface binding with it — so PostgreSQL resolves each write in the SESSION time zone. On the
+    // Windows testing server that zone was Asia/Manila, and every value bound from PHP landed eight hours
+    // early: password-reset links were expired on arrival, and their 60-second throttle never tripped.
+    // `PostgresConnector::configureTimezone()` issues `set time zone` only when the connection config carries
+    // a `timezone` key, so the key is what makes the write zone and the read zone the same thing.
+    //
+    // ⚠️ THIS TEST HAS TO MANUFACTURE A NON-UTC SERVER, or it proves nothing: CI's PostgreSQL already reports
+    // UTC, so a bare assertion passes with or without the fix. `PGTZ` is libpq's startup time zone, which
+    // beats the database and role defaults and is beaten in turn by the connector's own `set time zone` —
+    // exactly the precedence this test is about. It is set around a PROBE COPY of the connection so that
+    // RefreshDatabase's open transaction on `pgsql` is never touched, and so nothing on the server changes.
+    $probe = "tz_probe_{$name}";
+    $previous = getenv('PGTZ');
+
+    config(["database.connections.{$probe}" => config("database.connections.{$name}")]);
+    putenv('PGTZ=Asia/Manila');
+
+    try {
+        $instant = CarbonImmutable::parse('2026-09-18 02:00:00', 'UTC');
+
+        $row = DB::connection($probe)->selectOne(
+            'select current_setting(?) as zone, extract(epoch from ?::timestamptz)::bigint as epoch',
+            ['TimeZone', $instant],
+        );
+
+        expect((string) $row->zone)->toBe(config('app.timezone'), sprintf(
+            'Connection `%s` opened in the server\'s own time zone (%s) rather than the application\'s. Add '
+            ."'timezone' => 'UTC' to it in config/database.php: a database-level or role-level default is not "
+            .'enough, because a restore without --create drops it and a fresh initdb takes the host zone.',
+            $name,
+            (string) $row->zone,
+        ));
+
+        expect((int) $row->epoch)->toBe($instant->getTimestamp(), sprintf(
+            'Connection `%s` stored an offset-less UTC timestamp as a different instant — the eight-hour skew '
+            .'measured on the testing server. What is written and what is read back must be the same moment.',
+            $name,
+        ));
+    } finally {
+        DB::purge($probe);
+        putenv($previous === false ? 'PGTZ' : "PGTZ={$previous}");
+        config(["database.connections.{$probe}" => null]);
+    }
+})->with(liveConnectionNames());
 
 it('keeps the application connection subject to row-level security', function (): void {
     // The load-bearing half of the role separation. RLS is ignored for a superuser or a BYPASSRLS role, so

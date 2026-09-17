@@ -45,7 +45,7 @@ function render(props: Partial<Props> = {}): VueWrapper {
     });
 }
 
-/** Stub both sidecars with one status; `ok` is derived exactly as the browser derives it. */
+/** Stub every sidecar with one status; `ok` is derived exactly as the browser derives it. */
 function stubSidecars(status: number, body: unknown = {}): void {
     vi.stubGlobal(
         'fetch',
@@ -55,6 +55,38 @@ function stubSidecars(status: number, body: unknown = {}): void {
             json: async () => body,
         })),
     );
+}
+
+/**
+ * The three setup reads, answered per URL, with one status each. The QR, the recovery codes AND the typed
+ * secret key — `/user/two-factor-secret-key` was added to the panel in `M98`, because a QR code is no use to
+ * anyone enrolling on the phone that holds their authenticator app: a phone cannot scan its own screen.
+ */
+function stubSetupSidecars(overrides: Partial<Record<'qr' | 'codes' | 'secret', number>> = {}): void {
+    const status = { qr: 200, codes: 200, secret: 200, ...overrides };
+
+    vi.stubGlobal(
+        'fetch',
+        vi.fn(async (url: string) => {
+            const which = url.includes('qr-code') ? 'qr' : url.includes('secret-key') ? 'secret' : 'codes';
+            const bodies = {
+                qr: { svg: '<svg id="qr" />' },
+                codes: ['code-aaa', 'code-bbb'],
+                secret: { secretKey: 'ABCDEFGHIJKLMNOP' },
+            } as const;
+
+            return {
+                ok: status[which] >= 200 && status[which] < 300,
+                status: status[which],
+                json: async () => bodies[which],
+            };
+        }),
+    );
+}
+
+/** Which URLs the component actually asked for, in the order it asked. */
+function fetchedUrls(): string[] {
+    return (fetch as unknown as { mock: { calls: [string][] } }).mock.calls.map(([url]) => url);
 }
 
 beforeEach(() => {
@@ -85,21 +117,13 @@ describe('the stale-password-confirmation panel', () => {
         await flushPromises();
 
         // The prop said "fresh", so the fetch WAS made — and the response is what has to save us.
-        expect(fetch).toHaveBeenCalledTimes(2);
+        expect(fetch).toHaveBeenCalledTimes(3);
         expect(panel.find('a[href="/user/confirm-password"]').exists()).toBe(true);
         expect(panel.text()).not.toContain('Scan this QR code');
     });
 
     it('renders the QR and the recovery codes when the sidecars succeed', async () => {
-        vi.stubGlobal(
-            'fetch',
-            vi.fn(async (url: string) => ({
-                ok: true,
-                status: 200,
-                json: async () =>
-                    url.includes('qr-code') ? { svg: '<svg id="qr" />' } : ['code-aaa', 'code-bbb'],
-            })),
-        );
+        stubSetupSidecars();
 
         const panel = render({ enabled: true, confirmed: false, needsPasswordConfirmation: false });
         await flushPromises();
@@ -108,6 +132,64 @@ describe('the stale-password-confirmation panel', () => {
         expect(panel.html()).toContain('<svg id="qr"');
         expect(panel.text()).toContain('code-aaa');
         expect(panel.find('a[href="/user/confirm-password"]').exists()).toBe(false);
+    });
+
+    it('raises the panel when only the secret-key sidecar is refused', async () => {
+        // The third read is behind the same `password.confirm` middleware as the other two, so it can be the
+        // one that comes back 423. Rendering a QR with a blank key beside it would be the same class of
+        // defect the rest of this suite exists for.
+        stubSetupSidecars({ secret: 423 });
+
+        const panel = render({ enabled: true, confirmed: false, needsPasswordConfirmation: false });
+        await flushPromises();
+
+        expect(panel.find('a[href="/user/confirm-password"]').exists()).toBe(true);
+        expect(panel.text()).not.toContain('Scan this QR code');
+    });
+});
+
+describe('the typed setup key (M98)', () => {
+    it('⛔ shows a key that can be typed, because a phone cannot scan its own screen', async () => {
+        // Found on the live testing server while enrolling the operator's own account: the panel offered a
+        // QR code and nothing else, although Fortify has served `/user/two-factor-secret-key` all along.
+        // Anyone whose authenticator app is ON the device they are enrolling from, or who uses a desktop
+        // authenticator, cannot finish enrolment — and in a workspace that requires two-factor sign-in, the
+        // enforcement gate offers this component or sign out, so it is a lockout rather than a nuisance.
+        stubSetupSidecars();
+
+        const panel = render({ enabled: true, confirmed: false, needsPasswordConfirmation: false });
+        await flushPromises();
+
+        expect(fetchedUrls()).toContain('/user/two-factor-secret-key');
+        // Grouped in fours: sixteen unbroken characters typed by hand on a phone keyboard is how a
+        // transcription error happens, and the groups are cosmetic — the key itself must survive a copy.
+        expect(panel.find('[data-testid="tfa-secret-key"]').text()).toBe('ABCD EFGH IJKL MNOP');
+        // The groups are for the human. Authenticator apps strip the spaces, and the element carries the
+        // unbroken key for anyone pasting it somewhere that does not.
+        expect(panel.find('[data-testid="tfa-secret-key"]').attributes('data-key')).toBe(
+            'ABCDEFGHIJKLMNOP',
+        );
+    });
+
+    it('never asks for the key once two-factor is confirmed, not even while regenerating codes', async () => {
+        // `regenerate()` reuses `loadSetup()`, so a third fetch added carelessly would pull the plaintext
+        // secret into the page on every recovery-code regeneration, long after enrolment is over. The
+        // confirmed panel has no use for it and must not hold it.
+        stubSetupSidecars();
+
+        const panel = render({ enabled: true, confirmed: true, needsPasswordConfirmation: false });
+        await flushPromises();
+        expect(fetch).not.toHaveBeenCalled();
+
+        await panel.findAll('button')[0].trigger('click');
+        const options = mocks.post.mock.calls[0][2] as { onSuccess?: () => void };
+        options.onSuccess?.();
+        await flushPromises();
+
+        expect(fetchedUrls()).not.toContain('/user/two-factor-secret-key');
+        expect(panel.text()).not.toContain('ABCD EFGH IJKL MNOP');
+        // And the reads it DOES make still work, so the new recovery codes render.
+        expect(panel.text()).toContain('code-aaa');
     });
 });
 

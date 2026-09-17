@@ -6082,7 +6082,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   a naive `in_array($argument, …)` refuses a correct invocation.
   ⚠️ **`regenerate-brand-ramp-fixture.php` needs more than the others and it is worth pricing before starting**:
   its write target is hard-coded, so it cannot be driven by a control at all without an `--out=` seam, and a
-  `--help`-only fix leaves a bare accidental invocation still overwriting the fixture.
+  `--help`-only fix leaves a bare accidental invocation still overwriting the fixture.  ➕ **A FOURTH OCCURRENCE, TALLIED BY `M98` (2026-09-18), AND THE SECOND AGAINST `gate-baselines.php`.** Closing out `M97`, `php scripts/gate-baselines.php --help` was run again to read the usage before regenerating; there being still no help arm, it fell through to the write path and rewrote `docs/gate-baselines.md`. The occurrence is recorded in that increment's own release notes in `docs/claims/lane-a.md` and was never brought back here, which is the second time this row's census has gone stale without anyone editing it. Four occurrences now, in four separate increments, and every one of them an operator asking a script how to run it — none a typo — which is the argument for the remedy's refusal half over its `--help` half, because a refusal that reads `$argv` would have stopped all four while a help arm alone would have stopped none of the bare invocations.
 
 - **`minor` · `docs/backlog-triage.md` is generated stale by its own close-out, and the drift is on the
   trunk now.** Measured during `M71`'s fan-out: `69eaaf2` added 13 lines to `docs/feature-backlog.md` in
@@ -8473,7 +8473,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   here: resolve against the tracked set the script already has every reason to read. ⚠️ **Note the
   asymmetry that hid it**: the two scripts carry the SAME partial-path blindness — one of them was fixed
   this increment — but they resolve against two DIFFERENT universes, and nothing anywhere says so.
-  **Live.** Filed by `M85`. **Tier: after-launch.**
+  **Live.** Filed by `M85`. **Tier: after-launch.**  ⚠️ **A SECOND VARIANT, MEASURED BY `M98` (2026-09-18), AND IT IS NOT A CITATION SHAPE BUT A SECOND CHECKOUT.** The mechanism this row names — resolution against the WORKING TREE — also sees any full checkout that happens to sit inside the repository root, because `scripts/backlog-triage.php`'s `SKIP_DIRS` does not skip one. A detached agent worktree in a dot-directory of the repository root made about 67 open rows' bare-basename citations ambiguous on this host (emulated from the basename index, not counted through the generator), and on 2026-09-18, with the tree otherwise unchanged, `php scripts/pipeline.php --check` reported `docs/pipeline.md` as DRIFTED and then reported it current the moment that checkout was removed. That was one measurement on one tree, not a standing reading: `--check` drifts again for ordinary reasons whenever the queue is behind the ledger. So the ORDER of operations is part of the remedy and not only the one-line fix: remove or move any second checkout outside the repository root before regenerating, and ask whoever owns it first, because another session may be working in it. The same asymmetry the row records applies, since `scripts/citation-liveness-lint.php` asks `git ls-files` and never sees the intruder.
 
 - ~~**`minor` · Two increments' status bullets were DESTROYED by their successors' close-outs, and nothing
   in the repository could see it.**~~
@@ -9581,7 +9581,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   without code**, and the sign-up decision was answered invitation-only in chat on 2026-09-14, so the testing
   server avoids it and this row stays early-testing, while a default install still reaches it. The fix is to relabel or hide the button
   until a self-serve workspace exists, which is now an open decision, or to land such an account on a page that says it has none yet.
-  **Live.** Filed by `M93`. **Tier: early-testing.** ⚠️ **Corrected by `M96` (2026-09-15), which verified the row without taking it:** the symptom is not a 404. The central host renders the tenant route's `NotASubdomainException` as a redirect to `APP_URL`, so a signed-in account lands back on the guest landing page, whose Sign in and Create links send it round again, with no message and no way to sign out; `CentralHostFallbackTest` pins the redirect. The loop follows every central sign-in, including a member of one or several workspaces and a super-admin, not only a new registration, so relabelling the button fixes nothing, and the testing server reaches it whenever a tester signs in at the central address (checklist step L1 tells testers not to). The last line of `docs/ACCESS-MATRIX.md`'s central-host warning block, written by `M95`, repeats the false 404, and `tests/e2e/auth-axe.spec.ts` cites `config/fortify.php` two lines above its `home` key. The remedy that holds under every answer to D44 is an authenticated central page listing the account's workspaces, each linked to its own sign-in address, with a super-admin sent to the console and an unverified account to the verification notice.
+  **Live.** Filed by `M93`. **Tier: early-testing.** ⚠️ **Corrected by `M96` (2026-09-15), which verified the row without taking it:** the symptom is not a 404. The central host renders the tenant route's `NotASubdomainException` as a redirect to `APP_URL`, so a signed-in account lands back on the guest landing page, whose Sign in and Create links send it round again, with no message and no way to sign out; `CentralHostFallbackTest` pins the redirect. The loop follows every central sign-in, including a member of one or several workspaces and a super-admin, not only a new registration, so relabelling the button fixes nothing, and the testing server reaches it whenever a tester signs in at the central address (checklist step L1 tells testers not to). The last line of `docs/ACCESS-MATRIX.md`'s central-host warning block, written by `M95`, repeats the false 404, and `tests/e2e/auth-axe.spec.ts` cites `config/fortify.php` two lines above its `home` key. The remedy that holds under every answer to D44 is an authenticated central page listing the account's workspaces, each linked to its own sign-in address, with a super-admin sent to the console and an unverified account to the verification notice.  ⚠️ **Corrected again by `M98` (2026-09-18), which verified the row without taking it:** two premises of the amendment above do not hold on this server, and the tier follows from them. `resources/js/Pages/Welcome.vue` already hides "Create a workspace" while sign-up is closed — a `v-if` on `registrationOpen`, fed by `PlatformLandingController` — so once the checklist turns the switch off, the row's headline symptom is simply absent there and only the sign-in loop is left. The checklist step cited as telling testers not to sign in at the central address DOES NOT EXIST in the checklist artifact as built on 2026-09-17; it is a stale reference, with a second copy in `docs/claims/lane-a.md`, and being off-repo it is the one half of this note that cannot be re-checked from the tree. And under `D46` a tester cannot reach the central host at all: `CENTRAL_DOMAIN=pitahc.gov.ph` resolves to the agency's own website on another machine, so only the operator, on the box, through the `hosts` line the checklist adds, reaches the app there. The row therefore bites the operator once per console sign-in, with a documented workaround, and every customer on a public central host later — `before-launch` fits the tier definitions better than the `early-testing` above, and that change is the user's to make. One ordering note for whoever takes it: branching inside the `NotASubdomainException` renderer in `bootstrap/app.php` does NOT remove the ERROR-level report, because `Routing/Pipeline` calls `report()` before `render()`; only host-aware Fortify response bindings, plus the framework's own guest-redirect hook `redirectUsersTo()` in `bootstrap/app.php`, so that `/dashboard` is never requested on the central host, remove the trigger, and otherwise the log-level fix is still needed on top. The browser-level "redirected too many times" the checklist warns of still has no code path — the traced hops are the sign-in, one redirect to `APP_URL` and a rendered page — and its cause was not measured on the server.
 - **`minor` · No runbook rotates `APP_KEY`; rotation is only named as a manual step.** Carried out of
   `docs/security-threat-model.md` §9 by `M93` (2026-09-14), where it sat with no row. `.env.example` declares
   `APP_PREVIOUS_KEYS`, and `docs/deployment-infrastructure.md` calls rotation *"a manual runbook step"* without
@@ -9759,7 +9759,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   should create a workspace is an open question in the decisions log. `SendWelcomeEmail` raises the email on
   `Verified`, so every central-host registration that confirms its address receives it. The landing page's "Create a
   workspace" row names only `Welcome.vue`, so this copy had no row. ⚠️ The testing server is invitation-only, so
-  testers do not reach it; a default install does. **Live.** Filed by `M95`. **Tier: early-testing.**
+  testers do not reach it; a default install does. **Live.** Filed by `M95`. **Tier: early-testing.**  ⚠️ **Corrected by `M98` (2026-09-18), which verified the row without taking it:** the row's caveat that testers do not reach it is too strong, and the tier hangs on that caveat. Invitation-only sign-up does stop a tester registering, but there is a tester-reachable path to the same central copy: an invitation creates a placeholder user with a random password, and nothing in `app/Actions/Fortify`, the auth requests or `FortifyServiceProvider` guards a placeholder against "Forgot password", so an invited tester who resets that password, signs in and verifies the address BEFORE accepting the invitation fires `Verified` while the membership is still Invited — and `SendWelcomeEmail` then sends precisely the no-workspace copy. INFERRED from the code and from `tests/Feature/Auth/WelcomeEmailTest.php`, which already pins that Invited branch; the path was not run. Under `D46` the copy is worse than the row says: its "Get started" button opens `APP_URL`, which is the agency's public website, and dropping the button does not cure it, because the welcome email is unbranded and its header logo links to the same place — as do every tester's password-reset and verification emails. So on the testing server the defect is latent behind that reset-and-verify path rather than unreachable, while the marker above stays right for a default install, and `during-testing` or `before-launch` fits the tier definitions better than the `early-testing` above; the wording also depends on `D44`, and both calls are the user's. The remedy's "the action is optional" is now verified rather than remembered: `resources/views/mail/notification.blade.php` wraps the button in `@isset($actionText)`.
 - **`minor` · The zero-gate sentence never switches off, and the gate's total shrinks.** Found by `M95`
   (2026-09-14) while planning the close-out that empties the before-testing tier. `render_testing_gate()` in
   `scripts/state.php` and `render_queue()` in `scripts/next.php` each print the instruction to send the user the
@@ -9770,7 +9770,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   rows it receives are open ones only (`scripts/backlog-triage.php` drops the rest), so a finished tier reads "0 open
   of 1" (one plan marker) rather than the "0 open of N" its docblock promises. ⚠️ A done marker for the notification
   at its point of truth, with both sentences keyed on its absence and proved by a committed mutation, is the likely
-  shape. **Live.** Filed by `M95`. **Tier: early-testing.** ⚠️ **Verified by `M96` (2026-09-15), which did not take the row:** the total is fixed by passing closed rows through `scripts/backlog-triage.php --json`, after which the finished tier reads 0 open of 6 (five closed ledger rows and the done marker). The notice is best an ordinary done marker, with `done=` and unique ids enforced for every marker, since both checks are green on arrival. `scripts/loop.php`'s status line and the generator's own closing sentence are further copies of the zero sentence. `scripts/state.php` cannot be driven by `scripts/mutate.php` without stub git and gh. And the Next section silently cuts its tier to five ready and eight blocked rows (`NEXT_READY` and `NEXT_BLOCKED` in `scripts/pipeline.php`), so two ready early-testing rows were missing from it, and the testing gate's next-work line and the hand-off inherit the cut.
+  shape. **Live.** Filed by `M95`. **Tier: early-testing.** ⚠️ **Verified by `M96` (2026-09-15), which did not take the row:** the total is fixed by passing closed rows through `scripts/backlog-triage.php --json`, after which the finished tier reads 0 open of 6 (five closed ledger rows and the done marker). The notice is best an ordinary done marker, with `done=` and unique ids enforced for every marker, since both checks are green on arrival. `scripts/loop.php`'s status line and the generator's own closing sentence are further copies of the zero sentence. `scripts/state.php` cannot be driven by `scripts/mutate.php` without stub git and gh. And the Next section silently cuts its tier to five ready and eight blocked rows (`NEXT_READY` and `NEXT_BLOCKED` in `scripts/pipeline.php`), so two ready early-testing rows were missing from it, and the testing gate's next-work line and the hand-off inherit the cut.  ⚠️ **Corrected by `M98` (2026-09-18), which verified the row without taking it:** three refinements to the amendment above. The generator's own closing sentence in `scripts/pipeline.php` is UNCONDITIONAL — it prints on every run whatever the count — so keying the copies in `scripts/state.php`, `scripts/next.php` and `scripts/loop.php` on a done marker still leaves that one telling the next session to notify; the fix must either key it too or keep it deliberately as rule text and record which. The expected figure is one higher than the amendment records: a done marker for the notification carries the before-testing tier itself, so once it exists the finished tier reads 0 open of 7 rather than 0 open of 6, and a fix that hard-codes the earlier number goes red on arrival. `CLAUDE.md` also treats the zero sentence as the signal, so keying on a marker edits that hub file as well as the five scripts. Two smaller corrections: `R-98b2d568`'s files are a SUBSET of this row's rather than the same set (`state.php`, `next.php`, `loop.php`), which is what makes taking the two as one hub row possible; and no tester sees any of this, the live harm being a duplicate push notification to the user and noise in the hand-off, so `during-testing` fits the project's tier definitions better than the `early-testing` above — keeping `early-testing` is defensible only if a duplicate notification counts as affecting the user now, and the tier verdict is the user's.
 - **`minor` · `queue:work --timeout` cannot fire on Windows.** Found by `M95` (2026-09-14) while verifying the
   deploy-script row. Laravel's `Worker::daemon()` registers its per-job timeout handler only when
   `supportsAsyncSignals()` is true, which is `extension_loaded('pcntl')`, and Windows PHP has no pcntl. On the
@@ -9805,7 +9805,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   gate and fails only on the testing server. ⚠️ Options: a static lint refusing SQL newer than 15 under
   `database/migrations` and `app/`, a second CI database job on 15, or moving the site to 17 when its host is
   upgraded. The second changes the CI workflow, which is the user's to change. **Latent.** — needs a change that
-  uses a feature newer than 15. Filed by `M95`. **Tier: during-testing.**
+  uses a feature newer than 15. Filed by `M95`. **Tier: during-testing.**  ⚠️ **Noted by `M98` (2026-09-18), which did not take the row:** the tree already carries a comment asserting exactly what this row exists to catch. `app/Support/Analytics/AnalyticsQuery.php` and `app/Services/Analytics/AnalyticsMetricsService.php` both describe their three-argument `date_trunc` call as PostgreSQL 16 or newer, and under `D43` that is the analytics code the testing server runs on PostgreSQL 15. Either the comment is wrong — which is what the one green run of the suite on 15 (draft pull request #287) suggests, since nothing in it failed but the version guard — or those queries fail on the box and nothing would say so until a tester opens analytics. That the three-argument form predates 16 is INFERRED and was not checked against PostgreSQL's own documentation or against the server. Whichever it is, it is cheap to settle: read the two comments against the release that added the form, or add a `date_trunc` case to the 15 job this row proposes, which is the instrument that would have caught it.
 - **`minor` · Operator commands have no well-formed audit shape.** Found by `M95` (2026-09-14) while deciding
   what the first super-admin and first workspace commands record. `AuditLogger::record()` fills `user_id` from the
   given actor or the signed-in user and hard-codes `is_system_action` to false, so an artisan command, which has no
@@ -9893,17 +9893,17 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   and renames `vendor/` and `public/build`. In that moment an `/api/v1` client, or an operator using the bypass,
   can get a PHP fatal error rather than the `maintenance_mode` envelope. The exposure lasts seconds, against
   the minutes the build used to hold the site open. ⚠️ Answer JSON from the stub, or hold those requests at
-  nginx while the window is open. **Latent.** — needs a JSON or bypass request inside the renames.
-  Filed by `M96`. **Tier: early-testing.**
-- **`minor` · `deploy.yml` says a documentation push produces no run, and every close-out push still redeploys
-  the testing site.** Found by `M96` (2026-09-15) while measuring how often the deploy window opens.
+  nginx while the window is open. **Live.**
+  Filed by `M96`. **Tier: early-testing.**  ⚠️ **Corrected by `M98` (2026-09-18), which verified the row without taking it:** the JSON half holds; three other sentences do not, and the marker is now live. Liveness: `DEPLOY_ENABLED` was set on 2026-09-17, so a window opens on every merge and close-out push, and the requests that fall through are ordinary tester traffic — the builder's autosave and the guest-form runtime — rather than an operator's `curl`, which is why the marker above is corrected from latent to live; the exposure is seconds, plus up to about ten more if a rename retries, and it was not measured on the host. The severity on that surface is milder than the row says: `useServerAutosave` treats any non-4xx or network failure as recoverable and tells the author "Couldn't save your draft — we'll keep trying", so the fatal error is invisible there even while the contract is broken. The web server: "hold those requests at nginx" must read "hold them at the web server, Apache here" (`D46`), and that arm need not be off-repo configuration, because `public/.htaccess` is tracked, already carries the front-controller rules and runs under the checklist's `AllowOverride All`, so a `RewriteCond` on the down file can be committed — at the price of applying to local development too. "Answer JSON from the stub" cannot work at all: the stub is vendor code that `artisan down` copies fresh on every run, so the fix belongs in the app-owned `public/index.php`, before `vendor/autoload.php`. The bypass half is refuted for this window: `deploy.ps1` runs `down` with no `--secret`, so no bypass cookie exists, and that half applies only to a hand-run `artisan down --secret`; a second copy of the same refuted claim sits in `resources/views/deploy-window.blade.php` ("one carrying the bypass cookie, still falls through"), whose neighbouring "Only browser navigations get this page" is wrong as well, because an Inertia visit sends `Accept: text/html` with `X-Requested-With`, is not treated as JSON, and lands the 503 body inside Inertia's error dialog — INFERRED from the client bundle and the maintenance stub, not exercised. The envelope claim is wrong in the row's favour and against it: even when the fall-through boots cleanly, an `/api/v1` request gets a 503 `server_error` from `bootstrap/app.php`'s `Throwable` arm, not the `maintenance_mode` envelope, so the documented contract is broken for the whole window and not only in the fatal case. One trap for whoever writes the guard: `DownCommand` always writes an `except` key, so the payload must be tested with `empty()` rather than `isset()`.
+- ~~**`minor` · `deploy.yml` says a documentation push produces no run, and every close-out push still redeploys
+  the testing site.**~~ Found by `M96` (2026-09-15) while measuring how often the deploy window opens.
   `.github/workflows/deploy.yml` runs after every successful CI run on `main`, and its header says a
   documentation-only close-out produces no run. `docs/pipeline.md` is not in `ci.yml`'s `paths-ignore` and
   every close-out regenerates it, so the `M95` close-out produced CI run 34853662052 and Deploy run
   34855820955, skipped only because `DEPLOY_ENABLED` is unset. The nightly scheduled CI run fires Deploy the
   same way. `M96`'s deploy skips a sha that is already live, which covers the nightly run, but a close-out is
   a new sha and still opens a window. ⚠️ Correct the header, and skip the window when nothing the site runs
-  changed since the deployed sha. **Live.** Filed by `M96`. **Tier: early-testing.**
+  changed since the deployed sha. **Live.** Filed by `M96`. **Tier: early-testing.** ✅ **CLOSED BY `M98` (2026-09-18) — THE ROW UNDERCOUNTED WHICH PUSHES OPEN A WINDOW, AND ITS OWN LIVENESS WAS ONLY HALF TRUE WHEN IT WAS WRITTEN.** It said `Live` while `DEPLOY_ENABLED` was unset, so until 2026-09-17T14:49:23Z only the wrong header was live; the redeploy half armed itself the moment the variable was set, and this increment's merge is the first push to reach it. The row named merges and close-outs; documentation follow-ups that touch `docs/feature-backlog.md` or `docs/backlog-triage.md`, and direct fix pushes to `main`, run CI too — measured across the last five close-outs, all five of which produced a Deploy run. `deploy.ps1` step 2b now compares the target with the RECORDED `deployed-sha` (never with the push's own diff, which would skip over a merge whose deploy failed before its window) and fast-forwards the checkout when every changed path is one the site does not load, denying by default on one unrecognised path, an unreadable diff, a missing live build, a site already down, or a checkout that is not where `deployed-sha` says. ⛔ **`diff-tree --no-renames`, not `git diff --name-only`**, which prints only a rename's new path — measured on this repository, where a two-file commit printed one — so moving `app/Foo.php` into `docs/` would have read as documentation-only. `tests/Feature/Deploy/DeploySkipAllowlistTest.php` pins the list from both sides and both arms were proved with committed mutations; the behaviour was proved by the repaired PowerShell harness, 11 scenarios green with the trunk script red on the documentation-only case. ⚠️ **One thing a skip leaves stale, deliberately:** `__APP_VERSION__` keeps the last BUILT commit, because `vite.config.ts` stamps it in the stage. The header sentences in `deploy.yml`, `ci.yml`, the runbook and the non-functional requirements are corrected too, and the on-host confirmation is this increment's own close-out Deploy run.  ✅ **CLOSED BY `M98` (2026-09-18) — THE HEADER WAS HALF RIGHT AND THE SKIP BELONGED IN THE SCRIPT, NOT IN `paths-ignore`.** `deploy.ps1` gains a step 2b that opens NO maintenance window when the live checkout is exactly the recorded `deployed-sha`, the site is up, the live build is present, and every path changed since is one the site does not load — a deny-by-default allowlist of `docs/`, `tests/`, `scripts/` and `.github/` plus four top-level markdown files, so one unrecognised path deploys in full. The comparison is against the recorded sha and never against the push's own diff, because a documentation close-out following a merge whose deploy failed before its window would otherwise skip and leave that merge's code unpublished. The plumbing is `git diff-tree -r --name-only --no-renames`: MEASURED on `e502f7a`, where porcelain `git diff --name-only` prints 43 paths and `diff-tree` prints 44, so a file moved out of `app/` into `docs/` would otherwise read as documentation-only. `scripts/` is safe alongside `tests/` because every `scripts/` mention under `app/`, `database/` and `resources/views` is a comment. The header is corrected in both workflows rather than deleted, and the correction is larger than the row said: `ci.yml`'s `paths-ignore` exempts PROGRESS.md, PROGRESS_ARCHIVE.md, `docs/claims/**`, `docs/gate-baselines.md` and `docs/backlog-triage.md` — not claim pushes alone — while `docs/pipeline.md` is deliberately NOT in it, because `pipeline-lint` has to see it, which is why all five of the last five close-outs produced a run. Three things the row did not name. Its own redeploy half was only armed on 2026-09-17, when `DEPLOY_ENABLED` was set to true at 14:49Z; until then every `deploy.yml` run in the repository's history ended skipped, the newest at 08:51Z the same morning, so what was live before was the stale header alone. Documentation follow-ups open a window too, not only merges and close-outs — `77f46a7`, `6c0a483` and `bed4222` each touched only `docs/feature-backlog.md`, `docs/pipeline.md` and `docs/backlog-triage.md`, and each produced a run, so one increment can open several windows rather than the one its close-out accounts for; a pull-request run never reaches Deploy, because of the `workflow_run` `branches: [main]` filter. And `__APP_VERSION__` — which `vite.config.ts` stamps from `git rev-parse --short HEAD` in the stage and every submission records — keeps the last built sha after a skip, which is harmless but is said where the skip is written, because "nothing the site runs changed" is then not quite true.
 - **`minor` · Airtable computed fields can be mapped as columns a rule writes.** Found by `M96` (2026-09-15)
   while carrying Airtable field types to the rule editor. The editor offers every field of the chosen table,
   including formula, rollup, lookup, count, autonumber, created-time and last-modified-time fields, which
@@ -9918,7 +9918,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `scripts/next.php`'s "Take work from the Next section" sentence names the open decisions beside the rows,
   and `scripts/loop.php status` prints the same list. A decision is the user's to move, not work an
   increment can take. ⚠️ Carry each bullet's class through, or stop reading at the decisions. **Live.**
-  Filed by `M96`. **Tier: during-testing.**
+  Filed by `M96`. **Tier: during-testing.**  ⚠️ **Corrected by `M98` (2026-09-18), which verified the row without taking it:** the row is under-scoped, one of its cautions is unnecessary, and the fix is on the reading side rather than the writing side. The hand-off does not merely offer the open decisions as work — it offers the eight BLOCKED rows in the same breath, each blocked on a decision nobody can start, so the row's second option, stopping at the decisions, would still put unstartable rows under "Take work from". And the class is not missing from the document: `docs/pipeline.md` already prints `· ready`, `· blocked (decision: Dnn)` and `· waiting on you` on every Next bullet, and `scripts/state.php` discards that suffix when it reads them. So the fix is to make the READER carry each bullet's class through — ready, blocked or waiting — with only the ready ids named as work and the blocked rows and the decisions listed separately, rather than cutting the list at one boundary. The caution about keeping the ids that feed the waiting sentence can go: `scripts/state.php` reads those from the testing gate's "Waiting on you:" line, not from the Next bullets, so reclassifying the bullets cannot disturb them.
 - **`minor` · The central-host redirect is an absolute `APP_URL`, which a request from another origin cannot
   follow.** Found by `M96` (2026-09-15) while verifying the central landing row. `bootstrap/app.php` renders
   `NotASubdomainException` as a redirect to `config('app.url')`. When a request's own origin is not `APP_URL`
@@ -9934,8 +9934,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   check reloads a tab on its next navigation, but a page that fetches a chunk on demand without navigating,
   such as a lazily loaded component, asks for a file that no longer exists (INFERRED; the on-demand sites were
   counted, not exercised). ⚠️ Keep the previous release's chunks for a grace period, or catch a failed chunk
-  load and reload the page. **Latent.** — needs a tab left open across a deploy that then fetches a chunk.
-  Filed by `M96`. **Tier: during-testing.**
+  load and reload the page. **Live.**
+  Filed by `M96`. **Tier: during-testing.**  ⚠️ **Re-judged by `M98` (2026-09-18), which did not take the row:** the precondition has become ordinary traffic. `DEPLOY_ENABLED` was set on 2026-09-17, so a build swap happens on every merge and every close-out push, and the nightly schedule's Deploy fires at about 08:50Z — 16:50 Philippine time, inside the testers' working day, since the scheduled CI runs were measured starting 08:27-08:33Z rather than at the 03:00Z its cron reads. A tester with the builder open across one of those is unremarkable, which is why the marker above is corrected from latent to live. What remains INFERRED is the other half: which sites fetch a chunk on demand without navigating was counted and never exercised, so a user who wants that measured first may prefer to leave the row latent. Two consequences either way: on this evidence the tier wants re-reading as early-testing, which is the user's call; and the documentation skip that `M98` added to `deploy.ps1` takes close-out pushes back out of the exposure, because a documentation-only push now fast-forwards the checkout and rebuilds nothing, leaving merge pushes and the nightly run on a moved tip as the whole of it.
 - **`minor` · A worker relaunched by NSSM inside the deploy window starts on a half-swapped checkout.** Found
   by `M96` (2026-09-15) while verifying the deploy-window row. The runbook's worker runs `queue:work
   --max-time=3600`, and NSSM relaunches it whenever it exits. If its hour ends inside the window, it boots
@@ -9943,7 +9943,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   Paused and `deploy.ps1`'s Stopped-only guard cannot see. `M96` shortens the window from the length of the
   build to seconds, which narrows this rather than closing it. ⚠️ Suspend relaunching during the window, or
   confirm the worker is running after `up`. **Latent.** — needs the worker's hour to end inside a window.
-  Filed by `M96`. **Tier: during-testing.**
+  Filed by `M96`. **Tier: during-testing.**  ⚠️ **Re-judged by `M98` (2026-09-18), which did not take the row:** the marker stands, and the reason it stands has changed. The precondition is no longer an event an operator schedules: with `DEPLOY_ENABLED` set on 2026-09-17 a window opens on every merge and close-out push, and the nightly run's Deploy opens one whenever main's tip is not already live, so the worker's `--max-time=3600` hour is sampled against a window several times a day instead of whenever someone deploys by hand. It stays latent on the arithmetic rather than on the opportunity — the odds per window are the window's length over the worker's hour, seconds against 3,600 — but two things about it are worse than when it was filed: every automatic window is unattended, and a crash-looping worker shows in NSSM as Paused, which `deploy.ps1`'s Stopped-only guard cannot see, so it would sit there until somebody looked. Tester traffic may nudge the odds up as well: the runbook documents only that a rename is retried for about ten seconds while some process holds a file open inside, and that the holder is a JSON request falling through into `vendor/` is INFERRED from `R-4ff3e848` rather than measured — but if it is, a refused move lengthens the window the worker has to miss.
 - **`minor` · The Sheets adapter's first-tab fallback is `Sheet1`, and the directory's is the first tab.**
   Found by `M96` (2026-09-15) while verifying the rule editor row. The rule requests document an omitted
   `sheet_name` as the destination's own first tab, and `GoogleSheetsDirectory` inspects the first tab, but
@@ -10045,7 +10045,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   A run that fails earlier leaves a second copy of every secret inside the app folder, and
   `docs/deployment-infrastructure.md` §4, which says the script never overwrites `.env`, does not mention it. The
   folder carries the same permissions and is not under `public/`. ⚠️ Delete the copy in a `finally`, or record it in
-  §4. **Latent.** — needs a deploy that fails before `up`. Filed by `M96`. **Tier: before-launch.**
+  §4. **Latent.** — needs a deploy that fails before `up`. Filed by `M96`. **Tier: before-launch.**  ⚠️ **Amended by `M98` (2026-09-18), which did not take the row:** three corrections. The precondition no longer needs an operator at the keyboard — with `DEPLOY_ENABLED` set on 2026-09-17, a deploy that fails before `up` can happen on any automatic run, and the likeliest first case is the merge run itself, the first to execute as NETWORK SERVICE with empty `npm` and `composer` caches; that run executes the OLD script, so a fix landing in the same merge does not protect it. The runbook DOES mention the stage copy, in §3, and the gap is §4, where the sentence that the script never overwrites `.env` sits, so §4 is where the sentence has to go. And "the folder carries the same permissions" is right for the wrong reason: `[IO.File]::Copy` does not carry the source's ACL, so the copy inherits `.deploy-stage`'s, and the two agree only because the checklist's single `icacls` grant of Modify to NETWORK SERVICE was applied folder-wide with `/T` and nothing narrows `.env` afterwards — break that inheritance on `.env`, as the host hardening should, and the copy becomes readable where the original is not.
 - **`minor` · A previous release's `vendor` that cannot be deleted stops every later deploy before its window.**
   Found by `M96` (2026-09-15) while building the staging deploy. The script deletes a stale `vendor.prev` with
   `[IO.Directory]::Delete`, which refuses read-only files, such as a package composer installed from source with its
@@ -10067,7 +10067,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   no longer describes the server it is meant to bring up, and the only description of that layout is the checklist
   artifact, outside the repository. ⚠️ Add the single-host Apache layout to §8 as a second arm (its
   `mod_proxy_fcgi` site, the `Require local` setup lock, and `MDMembers manual` if Apache renews the certificate),
-  or state in §8 that the checklist is the runbook for this site. **Live.** Filed by `M97`. **Tier: early-testing.**
+  or state in §8 that the checklist is the runbook for this site. **Live.** Filed by `M97`. **Tier: early-testing.**  ⚠️ **Amended by `M98` (2026-09-18), which verified the row without taking it:** the remedy above is incomplete or wrong in five places, each read out of the Apache sources rather than off the box, and its cited scope is too narrow. (1) The `mod_proxy_fcgi` site needs `ProxyFCGISetEnvIf "true" SCRIPT_FILENAME "%{DOCUMENT_ROOT}%{reqenv:SCRIPT_NAME}"` inside the vhost: on Windows a balancer handler hands `php-cgi` a path whose drive prefix has been stripped to a bare leading slash, and every PHP request then answers "No input file specified", which is a 404 for the whole site; the strip and the order of `fix_cgivars` after `ap_add_cgi_vars` were confirmed in `mod_proxy_fcgi.c` on the 2.4.x branch, and switching to a direct `fcgi://` handler does not avoid it. (2) `MDMembers manual` is not the certificate story. `MDCertificateFile` and `MDCertificateKeyFile` must NOT be pinned inside `<MDomain>`: in httpd 2.4.66 `mod_md`'s `get_certificates` serves `md->cert_files` whenever they are set and `md_reg_renew_at` computes renewal from that static pair, so a renewed certificate lands in the store, is never served, and renewal re-triggers on every check, which walks into Let's Encrypt's duplicate-certificate limit. Keep `SSLCertificateFile` in the vhost instead: `md_add_cert_files` declines while the domain has no certificate of its own, so `mod_ssl` goes on serving the old pair until the first real renewal. (3) `tls-alpn-01` needs Let's Encrypt to reach port 443 from the internet, and inbound 443 to the server's address was measured dropped on 2026-09-17, which also refutes the "already open" sentence the Testing Server Checklist artifact carries; with port 80 closed under `D46`, no renewal path in either document can currently succeed, and the certificate expires 2026-10-13. (4) The `md-status` handler that the same checklist artifact tells the operator to read is swallowed by the front-controller rewrite in `public/.htaccess`, whose `RewriteCond %{REQUEST_FILENAME} !-f` sends the request to `index.php`; `mod_rewrite.c` at 2.4.66 has no handler exemption, so that check returns a Laravel page rather than mod_md's status, and neither runbook may lean on it. (5) The on-box `hosts` entries must STAY if the network has no hairpin NAT — `Require local` admits 127.0.0.1, and the expiry check, the `/up` check and the operator's console all arrive through them — so an instruction to remove them breaks the checks it is meant to protect; whether this network hairpins was NOT measured, and the instruction is unsafe until it is. Scope: the nginx claims are not confined to §8 and §8.2. §1, §2 and §3.1 describe the same stack, §8.1's custom-domain recipe still prescribes an nginx server block, `wacs.exe --installation iis` and an HTTP-01 challenge on a port this box has closed, and `docs/architecture/technical-architecture.md`'s hosting row reads "nginx + PHP 8.4 FastCGI", so a rewrite that touches only §8 leaves four more copies. Whatever §8 becomes, the `--queue=` string that `tests/Feature/Mail/QueuedMailContractTest.php` asserts byte-for-byte has to survive it.
 - **`minor` · The runbook misses four Windows host prerequisites that stop a first boot or a deploy on the testing
   server.** Found by `M97` (2026-09-15) while writing the checklist's commands. `docs/deployment-infrastructure.md`
   §8 does not say that: (1) PHP on Windows ships no CA bundle, so without `curl.cainfo` the breached-password check's
@@ -10077,10 +10077,10 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the app path and its `.deploy-stage`; (4) §8 step 9 requires the runner's account to be allowed to start the
   worker service but not how, and the default account, NETWORK SERVICE, has no such right until the service's
   security descriptor grants it. INFERRED from each product's documented behaviour; none was measured on the host.
-  ⚠️ Add each at the §8 step it belongs to. **Latent.** — needs the first boot on the Windows host. Filed by `M97`.
-  **Tier: early-testing.**
-- **`major` · The repository is public, and a returning outside contributor's pull request could run on the
-  self-hosted deploy runner.** Found by `M97` (2026-09-15) while writing the checklist's runner step.
+  ⚠️ Add each at the §8 step it belongs to. **Live.** Filed by `M97`.
+  **Tier: early-testing.**  ⚠️ **Re-measured by `M98` (2026-09-18), which did not take the row:** the precondition is met — the Windows host was built and `deploy.ps1` was run on it by hand on 2026-09-17 (checklist step D2) — so the marker above is corrected from latent to live and the row's published `blocked` state is stale until `docs/pipeline.md` is regenerated. The four items are a floor, not the set: six more host prerequisites belong at the same §8 steps. (1) `php -v` must be checked to name 8.4, NTS and **x64**, because an x86 build earlier on the machine PATH passes every other check in the runbook and then cannot load the x64 extensions; §8 states x64 but gives the operator no check (the banner's shape was measured locally on a Windows x64 build; the box's parked x86 PHP is the caller's measurement). (2) Windows Server 2016's PowerShell 5.1 does not offer TLS 1.2 by default, so `[Net.ServicePointManager]::SecurityProtocol` has to be set in EVERY window that downloads, not once at the top of the phase, and the certificate-expiry snippet must pass the protocol explicitly — `$ssl.AuthenticateAsClient('staging.pitahc.gov.ph', $null, [Security.Authentication.SslProtocols]::Tls12, $false)` — because the parameterless overload negotiates the host's defaults; the overload was read in the reference source, the box's default protocol set was not measured. (3) Long paths must be enabled before `composer install` and `npm ci`, or a deep dependency path fails the build. (4) The checklist installs the NSSM pre-release rather than the stable 2.24 release, and §8 should say which build and why; what the stable release lacks was not checked against NSSM's own source. (5) `-WorkerService meridian-test-worker` should be passed explicitly in §8.2 item 5 and in both rollback examples, because a console opened before `setx`, or launched from a stale parent, carries no `MERIDIAN_WORKER_SERVICE`, and step 0 then refuses against the default name — loud and safe, but it stops a rollback. (6) For the automatic deploy the same name must be written into the runner's own `C:\actions-runner\.env` and the runner restarted, which is the route verified in the actions/runner source; how the service control manager refreshes a service's environment after `setx` is closed source and was not measured, and `deploy.yml` must not pass an empty repository variable, which would override that file and send step 0 back to the default name. (2), (3) and (4) are INFERRED from each product's documented behaviour; none of the six was measured on the host from here.
+- ~~**`major` · The repository is public, and a returning outside contributor's pull request could run on the
+  self-hosted deploy runner.**~~ Found by `M97` (2026-09-15) while writing the checklist's runner step.
   `gh api repos/avincentpatrick/dev_formbuilder_app` reports the repository `PUBLIC`, and its fork pull request
   approval policy reads `first_time_contributors`, so only a contributor's first pull request waits for approval. A
   pull request's workflows run from its own head, so one can name `runs-on: self-hosted` and execute on the Windows
@@ -10088,4 +10088,393 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   step 9 says nothing about it. ⚠️ Require approval for all external contributors before registering the runner;
   this session's attempt to change the setting was refused by its permission layer, so the user sets it. Consider
   also a runner label that only `deploy.yml` names. **Latent.** — needs a registered runner and a pull request from
-  a returning outside contributor. Filed by `M97`. **Tier: early-testing.**
+  a returning outside contributor. Filed by `M97`. **Tier: early-testing.**  ✅ **CLOSED BY `M98` (2026-09-18) — THE APPROVAL POLICY NOW COVERS EVERY OUTSIDE CONTRIBUTOR, AND THE RUNNER LABEL WOULD HAVE ADDED NOTHING.** The user changed the setting in the GitHub UI on 2026-09-17, and both readings were re-measured here on 2026-09-18: `gh api repos/avincentpatrick/dev_formbuilder_app/actions/permissions/fork-pr-contributor-approval` returns `{"approval_policy":"all_external_contributors"}`, so a fork pull request now runs only after the owner approves it, whether or not its author has contributed before; and `gh api repos/avincentpatrick/dev_formbuilder_app/actions/runners` returns `"total_count":1` — runner `DGF97HY2`, `"os":"Windows"`, `"status":"online"`, `"busy":false`, version 2.337.0, labels `self-hosted`, `Windows`, `X64` — so the row's "No runner is registered today" is spent as well, and both halves of the premise have been overtaken in opposite directions. GitHub's own Actions settings page, read on 2026-09-18 rather than measured through the API, states the policy's scope — that every user who is neither a member nor an owner of the repository requires approval to run workflows — and warns in the same place that potentially malicious user-controlled workflow code executes automatically on a self-hosted runner once the pull request is approved. The row's second suggestion is DROPPED rather than done, because it rests on a false premise: in a public repository `.github/workflows/deploy.yml` is readable, so a fork can name whatever label it reads there, and a dedicated label prevents only accidental routing — `ci.yml` targets no self-hosted runner, so no job needed relabelling. What is left is procedural and not a defect a ledger row can close: an approval puts that run's code on the Windows box, where the runner's account holds Modify on the app tree, so the owner must never approve an unknown contributor's run. That one sentence belongs in `docs/deployment-infrastructure.md` §8 step 9 and rides on `R-2344803c` or `R-5e4af12b`, which already rewrite §8; the move to a private repository before any real data, answered on 2026-09-17 and recorded as `D48` in `docs/claims/decisions.md` by this increment, removes public forks altogether.
+- ~~**`major` · The four `pgsql` connections set no session time zone, so a server whose zone is not UTC stores every PHP-written timestamp shifted.**~~
+  Found by `M98` (2026-09-17) while building the testing server step by step, and confirmed against the
+  framework rather than guessed. `config/database.php` gave `pgsql`, `pgsql_auth`, `pgsql_privileged` and
+  `pgsql_superadmin` a `search_path` and no `timezone`, and `PostgresConnector::configureTimezone()` issues
+  `set time zone` only when that key is present. Laravel's query grammar formats every bound
+  `DateTimeInterface` as `Y-m-d H:i:s` with NO OFFSET, so PostgreSQL resolved each write in whatever the
+  session zone happened to be — `Asia/Manila` on the Windows box, eight hours out. ⛔ **The consequence was
+  not cosmetic:** Laravel's password-reset repository writes `created_at` from PHP and compares it in PHP, so
+  every reset link was expired the moment it was issued and the 60-second resend throttle never tripped.
+  ⚠️ **The skew is per COLUMN, not per row** — columns written by SQL `now()` were correct all along, and
+  `SuperAdminProvisioner` writes both kinds in a single `UPDATE` — so no blanket interval repair is safe.
+  ⚠️ The operator's `ALTER DATABASE … SET timezone` fixed the box but is not durable: a restore without
+  `--create` drops it, a fresh `initdb` takes the host zone, and §5 requires a quarterly restore to a fresh
+  instance. **Live.** Filed by `M98`. **Tier: early-testing.** ✅ **FILED AND CLOSED BY `M98` (2026-09-18) — THE FINDING SAID "EVERY WRITE" AND THE GATE HAD TO MANUFACTURE A NON-UTC SERVER TO SEE IT.** All four connections now carry `'timezone' => 'UTC'`, hard-coded rather than `env()`, because offset-less writes are correct only while the session zone equals `config('app.timezone')`. The proof is behavioural, in `tests/Feature/Tenancy/ConnectionTopologyTest.php`: CI's PostgreSQL already reports UTC, so a bare assertion would have passed before the fix — the test therefore sets `PGTZ=Asia/Manila` around a probe COPY of each connection (libpq's startup zone beats the database and role defaults and is itself beaten by the connector's `set time zone`, which is the precedence being asserted), then checks both the reported zone and that a bound instant round-trips to the same epoch. Measured: four dataset rows red before the key, eight tests green after; `RefreshDatabase`'s open transaction is never touched and nothing on the server is changed. The runbook's database step now also runs `ALTER DATABASE meridian SET timezone TO 'UTC'` and says why that is belt-and-braces rather than the guard, and two analytics comments that asserted no timezone key was set are corrected. Still open, and deliberately not repaired: the rows written on the testing box before the operator's `ALTER`.
+- ~~**`minor` · The two-factor setup page shows a QR code and no key anyone can type, which is a lockout for anybody enrolling on the device that holds their authenticator.**~~
+  Found by `M98` (2026-09-17) while enrolling the operator's own account on the testing server.
+  `resources/js/components/settings/TwoFactorSetup.vue` fetched the QR code and the recovery codes and never
+  `/user/two-factor-secret-key`, which Fortify has registered all along (`Features::twoFactorAuthentication`
+  is on with `confirmPassword`). A phone cannot scan its own screen, and a desktop authenticator has nothing
+  to scan, so enrolment simply cannot be completed. ⛔ **It is not one page:** the same component drives
+  Settings → Security, the super-admin console gate and the tenant enforcement gate, and on the last two the
+  only other affordance is signing out. ⚠️ The QR response already carries the secret inside its `url`, but
+  fetching Fortify's endpoint is the explicit contract. **Live.** Filed by `M98`. **Tier: early-testing.** ✅ **FILED AND CLOSED BY `M98` (2026-09-18) — THE CONDITION ON THE NEW READ IS THE PART WORTH REMEMBERING.** The panel now fetches the key inside the existing `Promise.all` and the existing `!ok` arm, so a 423 from a lapsed password confirmation still raises the confirm-password panel rather than rendering a blank key, and shows it under the QR grouped in fours with the unbroken key on the element for anyone pasting it. ⛔ **It is read only while enrolment is unfinished**, because `regenerate()` reuses the same loader in the CONFIRMED state, where a careless third read would pull the plaintext secret into the page on every recovery-code regeneration. Measured: three Vitest arms red before, nine green after, including one that drives `regenerate()`'s success callback and asserts the secret endpoint is never asked for. `docs/piping-output-encoding-design.md`'s citation of this file's one permitted `v-html` sink is corrected in the same change: it named a line number that had already moved twice, and now names the element.
+- **`minor` · Inertia navigations during a deploy window get the deploy-window page inside Inertia's error dialog.**
+  Found by `M98` (2026-09-17) while re-measuring the deploy rows after automatic deploys were turned on.
+  `@inertiajs/core` 3.6.0 sends `Accept: text/html, application/xhtml+xml` together with
+  `X-Requested-With: XMLHttpRequest`, and the framework's `maintenance-mode.stub` counts an `XMLHttpRequest` as
+  expecting JSON only when the first acceptable type is empty, `*/*` or `*`, so an Inertia visit inside
+  `deploy.ps1`'s `artisan down --render=deploy-window` window is served the prerendered template at 503.
+  `handleNonInertiaResponse` then shows that HTML inside its `inertia-error-dialog` modal, and `resources/js`
+  registers no `httpException` listener to stop it. `app/Support/Http/MaintenanceResponse.php` already avoids
+  exactly this for platform and tenant maintenance by answering `Inertia::location`, and
+  `resources/views/deploy-window.blade.php`'s header still says only browser navigations reach the page. A tester
+  following a builder or admin link inside a window would get the deploy page as a modal over the app. That
+  outcome is INFERRED from the client code, because no window has opened since deploys were enabled: every
+  `Deploy` run to date is skipped. ⚠️ Give the guard `R-4ff3e848` puts in `public/index.php` an arm for the
+  `X-Inertia` header, ahead of its expects-JSON test, which an Inertia visit fails: answer 409 with
+  `X-Inertia-Location` set to the request's URL, so the client hard-navigates and lands on the page itself.
+  Correct the view's header comment in the same edit. **Latent.** — needs an Inertia visit inside a deploy
+  window on the testing server. Filed by `M98`. **Tier: early-testing.**
+- **`minor` · The deploy workflow ships `origin/main`, not the commit whose CI run triggered it.**
+  Found by `M98` (2026-09-17) while reading the deploy trigger against `deploy.ps1`'s fetch.
+  `.github/workflows/deploy.yml` calls the script with `-AppPath` alone, and `deploy.ps1` defaults `-Ref` to
+  `origin/<Branch>` and fetches before it pins a sha, so a push that lands after the triggering run's CI
+  succeeded, but before that Deploy fetches or while it waits behind another run in the `production-deploy`
+  group, is the commit that goes live even though its own CI is still running or has failed.
+  `docs/deployment-infrastructure.md` §3, the git-driven deploy pipeline, and the workflow's own header both say
+  nothing deploys unless every gate is green. A single lane, and close-outs pushed after their merge run
+  finishes, keep the window narrow; its width is not measured. ⚠️ Pass
+  `-Ref ${{ github.event.workflow_run.head_sha }}`, whose payload field is INFERRED from GitHub's
+  documentation rather than measured here, and pair it with a forward-only guard that only automatic runs use,
+  because a slower CI run for an older commit finishing after a newer commit's Deploy would otherwise roll the
+  site back. `git merge-base --is-ancestor X X` exits 0 (INFERRED from git's documented exit status), so that
+  guard must run after step 2's already-live check and only when the target differs from `deployed-sha`, or a
+  run meant to bring the site back up at its deployed commit would be skipped; a rollback by hand through
+  `-Ref` must bypass it. **Latent.** — needs a push to `main` between one CI run's success and that run's
+  Deploy fetch. Filed by `M98`. **Tier: before-launch.**
+- **`major` · Every visitor reaches the testing server as one private address, so the per-address limits, the login lockout and every audit IP lose their meaning.**
+  Found by `M98` (2026-09-17) while measuring which client address the testing server actually sees. Source NAT on
+  the agency's inbound rule rewrites every request to 192.168.50.1, so every per-address arm is one bucket for the
+  whole internet: `config/guest.php`'s `mint_per_ip`, `submit_per_ip` and `challenge_per_ip`, whose per-token
+  siblings still discriminate; the hourly password-reset and registration arms in
+  `app/Providers/FortifyServiceProvider.php`; the author-set per-form limit in
+  `app/Http/Middleware/EnforceGuestFormRateLimit.php`; and the address stored in every audit row by
+  `app/Support/Audit/AuditLogger.php` and in each guest submission's `guest_ip`. Login is the exception, and a
+  worse one: its key is the email and the address joined, so anyone who knows a tester's email shares that tester's
+  bucket and can hold the account out a minute at a time, while `docs/security-threat-model.md` records that key
+  without the effect. `docs/deployment-infrastructure.md` §8.2 states the collapse for guests behind nginx only,
+  and three places still instruct someone to lower the guest limits again — §8.2's own sentence that a production
+  site keeps the defaults, `D32`'s sentence in `docs/claims/decisions.md` that the values are lowered again before
+  launch, and the Testing Server Checklist's LATER item — each of which would throttle the whole internet as one
+  address. ⚠️ The fix is on the network side: drop source NAT on the inbound 443 rule, which needs the server's
+  return route through the same device and changes nothing in Apache or Laravel, or, if the upstream is an L4 proxy
+  that can emit PROXY protocol, load `mod_remoteip` with `RemoteIPProxyProtocol On` on the 443 vhost and
+  `RemoteIPProxyProtocolExceptions 127.0.0.1 ::1` so the on-box health check and the `Require local` setup lock keep
+  working, cutting over together with the upstream because a connection without the header is aborted. Never trust
+  `X-Forwarded-For` or set `trustProxies` while the upstream is a NAT: every client arrives from that one address
+  and could then choose its own bucket and audit IP. What the upstream device is, and whether it can skip NAT or
+  speak PROXY protocol, is unmeasured. **Live.** Filed by `M98`. **Tier: before-launch.**
+- **`minor` · The invitation's sending domain publishes no DMARC and no aligned DKIM, and an emailed invitation is the only way a tester gets an account.**
+  Found by `M98` (2026-09-17) while tracing why the first invitation reached a tester's spam folder. `nslookup`
+  shows pitahc.gov.ph publishing SPF with a `~all` soft fail, no `_dmarc` record, and no `google._domainkey` TXT,
+  so mail sent through Google carries no DKIM signature aligned to that domain, and anyone can send
+  invitation-looking mail apparently from the agency without it being rejected. `D31` and §8.2 of
+  `docs/deployment-infrastructure.md` together make an emailed invitation the only door into the app, and nothing
+  in that runbook, `docs/claims/decisions.md` or `docs/security-threat-model.md` mentions mail authentication.
+  Which From address the invitation used, and why this one was filtered, are unmeasured, and that a missing DMARC
+  record alone moves a low-volume invitation to spam is INFERRED from the published sender rules rather than
+  measured. ⚠️ Start with the free check, which decides where the fix belongs: open the spam-foldered invitation,
+  use Show original, and read `Authentication-Results` for spf, dkim and dmarc beside the real From and envelope
+  sender — a personal Gmail sender, or a From that differs from the authenticated `MAIL_USERNAME`, is a checklist
+  fix rather than a DNS one. The durable fix is DKIM turned on in Google Admin for the domain and a `_dmarc` TXT at
+  `p=none` with a reporting mailbox, both of which DICT must publish as the name-server operator, so the request to
+  DICT is a question for the user; record the outcome in §8.2 beside the SMTP settings. The wording that helps
+  testers today — send from a Workspace account, tell testers to look in spam — is a checklist edit and not this
+  row, which is why this one waits for launch. **Live.** Filed by `M98`. **Tier: before-launch.**
+- **`minor` · The checklist creates the app, PHP, NSSM and runner folders directly under `C:\` and never restricts their permissions.**
+  Found by `M98` (2026-09-17) while reading the checklist's folder steps against the Windows defaults. The Testing
+  Server Checklist creates `C:\meridian`, `C:\php` and `C:\nssm` at the drive root, puts two of them on the machine
+  PATH, and installs the runner in `C:\actions-runner`. `docs/deployment-infrastructure.md` §8 step 10 only grants
+  rights — Modify on `storage\` and `bootstrap\cache\` to the service accounts and the whole tree to the runner —
+  and neither it, nor §4, nor the checklist breaks inheritance anywhere. Under the default `C:\` permissions
+  `BUILTIN\Users` inherits read and file-create rights, so any account that can log on could read `.env` — the
+  database password, `APP_KEY` and the SMTP secret — and write into those folders: `deploy.ps1` calls `git`,
+  `composer`, `npm` and `php` by bare name, so a planted `C:\php\git.bat` would shadow the real tool, and the vhost
+  sets `AllowOverride All` on the document root, so a dropped `.htaccess` takes effect as well as a dropped `.php`
+  file. All INFERRED from Windows defaults: the host's ACLs, and who is in `Users` on a possibly domain-joined box,
+  were never measured. ⚠️ Measure first with `icacls` on each folder and on `.env`, then break inheritance and
+  re-grant only Administrators, SYSTEM and the accounts the Apache, php-cgi, worker and runner services actually
+  use, covering Apache's own installation folder as well, and re-check `.env` and `.deploy-stage` afterwards; add
+  the step to the checklist where the folders are created and to §8. **Latent.** — needs a non-administrator
+  account able to log on to the box, or a compromised non-SYSTEM service. Filed by `M98`. **Tier: before-launch.**
+- **`minor` · The deploy runner holds Modify on the tree that SYSTEM services execute, and any NETWORK SERVICE process can control the queue worker.**
+  Found by `M98` (2026-09-17) while reading the service registrations. `docs/deployment-infrastructure.md` §8 step
+  10 grants the runner Modify on the whole app tree, and §8 step 7 registers the scheduler with `/RU SYSTEM`, while
+  the Testing Server Checklist installs the runner under its default account, NETWORK SERVICE, notes in its own
+  words that the php-cgi services and the queue worker run as Local System, and widens the worker service's
+  security descriptor with `sc.exe sdset` so NETWORK SERVICE may start, stop and pause it — a right that belongs to
+  every process running as that account, not to the runner alone. §8 step 6's `nssm install` line sets no account,
+  and §8 step 10 speaks of php-cgi, worker and runner service accounts as if they were three distinct identities.
+  Anything that can write as the runner — an approved malicious pull request, or another NETWORK SERVICE process —
+  therefore edits code that SYSTEM executes. What each service runs as on the host was not measured. ⚠️ Give the
+  runner and php-cgi a dedicated low-privilege account each, grant Modify to that account instead of NETWORK
+  SERVICE, and scope the worker's descriptor to it; `R-5e4af12b` item (4) asks only how the runner gets the right
+  to start the worker, not who else the grant covers. **Latent.** — needs write access as the runner's account or
+  as another process running as NETWORK SERVICE. Filed by `M98`. **Tier: before-launch.**
+- **`minor` · The runbook's custom-domain arm prescribes nginx, IIS and an HTTP-01 challenge on a box that runs Apache with port 80 closed.**
+  Found by `M98` (2026-09-17) while checking the runbook against the testing server as built.
+  `docs/deployment-infrastructure.md` §8.1 tells the operator to add the hostname to an nginx server block, to issue
+  the certificate with `wacs.exe --target manual --host forms.acme.com --installation iis`, and to reload nginx,
+  and it warns that the tenant's DNS must already point here for the HTTP-01 challenge to succeed. `D46` put the
+  site on Apache behind port 443 with inbound 80 closed, so the vhost, the installer and the challenge type are all
+  wrong for this host, and §8.1 sits outside the scope `R-2344803c` cites, which is §8 and §8.2, so that row does
+  not reach it. ⚠️ Give §8.1 the same Apache arm as §8: the `server_name` equivalent on the existing vhost, a
+  certificate issued through `mod_md` or a DNS-01 challenge because 80 is closed, and an Apache reload — or say in
+  §8.1 which layout it describes. **Latent.** — needs a tenant holding a custom domain on the Business tier, which
+  ADR-0008 §D6 seeds `is_active = false` and holds from sale. Filed by `M98`. **Tier: before-launch.**
+- **`minor` · Google sign-in cannot work on the testing layout, because its redirect URI is built from `APP_URL`, which is the agency's website.**
+  Found by `M98` (2026-09-17) while checking which features the `D46` layout leaves reachable. `config/services.php`
+  derives the Google redirect as `APP_URL` plus `/auth/google/callback`, deliberately, so that the authorize step
+  and the token exchange match byte for byte, and `GoogleCallbackController`'s `bounceTarget` sends a failed
+  sign-in to `APP_URL` plus `/login?google=failed` whenever the signed state names no resolvable tenant. Under
+  `D46` `APP_URL` is the agency's public site on another machine, so the callback never returns to the app and such
+  a failure strands the visitor off-site. §4.1 of `docs/deployment-infrastructure.md` already records that the URI
+  is derived from `APP_URL` and that a mismatch fails with `redirect_uri_mismatch`, but its rule — `APP_URL` must
+  be the central host — is satisfied here and still wrong, because on this layout the central host is not the app;
+  §4.1 also forbids per-tenant redirect URIs, since Google rejects wildcards and the workspace travels in the
+  signed state. `D46`'s consequences name three `APP_URL`-derived links and not this one, and no row covers it.
+  ⚠️ Derive the redirect and the failure bounce from the host that actually serves the app rather than from
+  `APP_URL`, register that one URI in the Google client, and say in §4.1 that sign-in is unavailable wherever
+  `APP_URL` is not the app's own host. **Latent.** — needs the Google client id and secret to be configured, which
+  the checklist leaves empty. Filed by `M98`. **Tier: before-launch.**
+- **`minor` · Making the repository private breaks the server's fetch, starts billing the CI minutes and may silently disarm the merge gate.**
+  Found by `M98` (2026-09-17) while recording `D48`, which keeps the repository public with fake data through
+  testing and private before any real data. Four obligations fall due before the flip. (1) The server has no
+  credential: `deploy.ps1` runs a bare `git fetch --all --prune` with no credential handling, against the anonymous
+  HTTPS remote the checklist clones, so it needs either a read-only deploy key with an SSH remote — key and
+  `known_hosts` in the runner account's profile, and outbound port 22, or 443 to `ssh.github.com`, neither of which
+  the checklist's outbound list nor §8.2 of `docs/deployment-infrastructure.md` allows — or the job's own
+  short-lived token handed to git through an `http.extraheader`, which leaves no long-lived secret on the box; an
+  administrator running `deploy.ps1` by hand for priming or rollback needs a credential too. (2) `deploy.ps1` sets
+  no `GIT_TERMINAL_PROMPT=0`, so an unauthenticated fetch under a service account may hang the Deploy job instead
+  of failing it, which is INFERRED from Git Credential Manager's behaviour and unmeasured. (3) CI needs trimming to
+  a minutes budget: the nightly schedule alone is about 1,140 minutes a month, and `.github/workflows/ci.yml`'s
+  comment that the schedule is free because the repository is public becomes false. (4) The account plan must be
+  checked: the API returns a null plan for this account, and GitHub's plans page lists protected branches for
+  private repositories under Pro, so on Free the flip may silently stop enforcing `D7`'s six-check merge gate —
+  INFERRED, because nothing GitHub publishes about rulesets states the plan a private repository needs. ⚠️ Check
+  the plan, then fit the credential and prove it with one deploy while the repository is still public by moving the
+  remote first, then trim CI, then change visibility. **Not live** — the repository stays public by decision until
+  real data is imminent. Filed by `M98`. **Tier: before-launch.**
+- **`minor` · `deploy.yml`'s `workflow_run` filter matches a fork pull request whose head branch is named `main`.**
+  Found by `M98` (2026-09-18) while re-reading the deploy trigger now that `DEPLOY_ENABLED` is set. In
+  `.github/workflows/deploy.yml` the `on: workflow_run` block filters on `branches: [main]`, which matches the
+  triggering run's head branch and not the trunk, while the job's `if:` tests only that run's conclusion and
+  `DEPLOY_ENABLED` — neither `workflow_run.event` nor the head repository. `ci.yml` also runs on `pull_request`
+  against `main`, so an outside contributor whose fork branch is called `main` produces a CI run that reaches this
+  workflow once a maintainer approves it, and the approval policy was moved to all external contributors on
+  2026-09-17. The code deployed is still the trunk's: `deploy.ps1` defaults `$Branch` to `main` and `$Ref` to
+  empty, resolving the deploy to `origin/main`, and `deploy.yml` passes no ref. So the worst case is an unscheduled
+  maintenance window on the testing site whenever the trunk tip is not already deployed, and a no-op when it is —
+  bounded, which is why this is after-launch. That the triggering run's head branch is reported as the fork's
+  branch name is INFERRED from GitHub's documented `workflow_run` payload; it was not measured. ⚠️ Add
+  `github.event.workflow_run.event == 'push'` to the job's `if:`, and say in the trigger comment what the
+  `branches` filter actually matches, which its rewrite in this increment still does not. **Latent.** — needs an
+  approved pull request from a fork whose head branch is named `main`. Filed by `M98`. **Tier: after-launch.**
+- **`minor` · The pre-push guard's claim rule is a substring test, so a push from a detached HEAD passes it.**
+  Found by `M98` (2026-09-18) while working out this increment's push order. In `scripts/pre-push-guard.php` rule A
+  reads `docs/claims/lane-a.md` from `origin/main` and accepts the push when the claim merely CONTAINS the branch
+  name, while the branch is taken from the pushed local ref and falls back to `git rev-parse --abbrev-ref HEAD`,
+  which prints `HEAD` on a detached checkout. Measured today against `origin/main`: `HEAD` occurs 105 times in
+  `docs/claims/lane-a.md`, across 90 lines, so the test cannot fail and a work push from a detached worktree is
+  accepted with no claim naming it. Any branch name that is a substring of the claim's prose passes the same way;
+  a push to the trunk still meets rule B's one-commit limit, and a push to any other branch meets nothing.
+  `.githooks/pre-push` runs the script on every push in this clone, where `core.hooksPath` is set — it is local
+  configuration the repository cannot enable for anyone else — and that agent directory holds no checkout today, so no detached
+  checkout exists. ⚠️ Match the branch name as a delimited or backticked token rather than a bare substring, and
+  refuse outright when the branch resolves to `HEAD`. **Latent.** — needs a push from a detached HEAD, or a branch
+  name that is a substring of the claim. Filed by `M98`. **Tier: after-launch.**
+- **`minor` · `backlog-triage.php` harvests no `.ps1` path, so `deploy.ps1` has no edge in the `D13` graph.**
+  Found by `M98` (2026-09-18) while checking this increment's rows against `D13`. `candidate_tokens()` in
+  `scripts/backlog-triage.php` matches file tokens against a fixed extension list
+  (`php|ts|tsx|js|jsx|vue|json|yml|yaml|md|css|scss|sh|blade.php|sql|env|example`), which has no `ps1`, so the
+  deploy script never enters a row's harvested path set, never appears in a *Cites (non-hub)* column, and adds no
+  degree in `derive_hubs()`, whose threshold is three open rows. Measured: two open rows name `deploy.ps1` in their
+  text — the worker relaunched by NSSM inside the window, and the staging `.env` copy left behind by a failed
+  deploy — and the committed `docs/backlog-triage.md` gives the first *no file harvested* and the second *hub files
+  only*, so the pair reads as independent. A third open row, the one on the documentation push that still redeploys
+  the site, cites only the workflow yet can be repaired only in the deploy script, which no harvest of citations
+  could see. This is the consequence the open partial-path row already records for `resolve_token()`, reached
+  through a different arm: the extension list, before resolution. ⚠️ Add `ps1` to the harvest list and regenerate
+  the triage file, or record the blind spot under its *What this file cannot see* heading. **Live.**
+  Filed by `M98`. **Tier: after-launch.**
+- **`minor` · The ledger's header sends new work to a section no row has been filed under since `M93`.**
+  Found by `M98` (2026-09-18) while working out where this increment's rows belong. The *How to read* paragraph at
+  the top of `docs/feature-backlog.md` says new work is filed as a ledger row under *Discovered defects*, never as
+  a table row, and that section does exist mid-file. In practice every row is appended after the current last line,
+  which sits under a *Documentation & specs* heading inside the *Merge-gate review of `main` →
+  `phase1-completion`* section, a heading that describes none of them; measured, not one row filed since `M93` sits
+  in the *Discovered defects* section at all. The placement is deliberate and right: all 212
+  `docs/feature-backlog.md` source citations in `docs/pipeline.md` point below that section, so an insertion there
+  shifts every one of them until the file is regenerated, and the citation-liveness gate's ledger ceiling of 18 has
+  no headroom to absorb a miss (INFERRED — the gate was not run in this read-only pass). Only the header sentence
+  is wrong, so this is cosmetic, but it misdescribes the file to every reader who follows it. ⚠️ Correct the *How
+  to read* sentence to say that rows are appended at the end of the file, and why, or move the *Discovered defects*
+  heading to the end. **Live.** Filed by `M98`. **Tier: after-launch.**
+- **`minor` · The monthly usage reconciliation dates its period with naive strings and no stated zone.**
+  Found by `M98` (2026-09-18) while checking the timezone findings against the analytics code.
+  `app/Jobs/Entitlements/ReconcileTenantUsageJob.php` takes `Carbon::now()`, cuts `startOfMonth()` and
+  `endOfMonth()` to date strings, and passes `'… 00:00:00'` and `'… 23:59:59'` to
+  `whereBetween('submitted_at', …)`. Those literals carry no offset, so PostgreSQL resolves them in the session
+  `TimeZone` while the dates were cut in `config('app.timezone')`: the count is right only while the two zones
+  agree, and the period is a UTC month for every tenant rather than a month in any zone the job names. Both zones
+  are pinned today — `config/database.php` hard-codes `'timezone' => 'UTC'` on all four connections, gated by
+  `tests/Feature/Tenancy/ConnectionTopologyTest.php`, and `config/app.php` sets `'UTC'` — which is why this is
+  latent. The final-second loss once alleged of this job is not real:
+  `database/migrations/2026_07_09_000301_create_submissions_table.php` declares `timestampTz('submitted_at')` with
+  no precision, `Schema\Builder::$defaultTimePrecision` is `0` and this repository never overrides it, so an
+  inclusive `'23:59:59'` bound loses nothing; the § *Dates, not instants* block in
+  `app/Support/Analytics/AnalyticsQuery.php` said otherwise and was corrected in this increment. ⚠️ Give the job a
+  half-open `[start, nextStart)` pair converted from an explicit zone, the way `AnalyticsQuery` already does.
+  **Latent.** — needs the application and connection zones to differ, or a tenant whose reporting month is not
+  UTC. Filed by `M98`. **Tier: after-launch.**
+- **`minor` · Every handled tenancy-identification failure is logged at ERROR with a full stack trace.**
+  Found by `M98` (2026-09-17) while tracing the central-host sign-in path for the testing server.
+  `bootstrap/app.php` renders `NotASubdomainException` and `TenantCouldNotBeIdentifiedOnDomainException` as a
+  redirect to `APP_URL` for a web request and as a 404 envelope on `/api/v1`, but registers no reporting rule for
+  either, and the framework's handler maps an unlisted exception to `LogLevel::ERROR` before the renderer runs:
+  `Illuminate\Routing\Pipeline` calls `report()` and then `render()`, so a branch inside the renderer cannot stop
+  the entry. The operator's own sign-in at the central host is one trigger — `config/fortify.php` sends a fresh
+  session to `/dashboard`, a tenant route with no workspace subdomain — and the host table in
+  `app/Http/Middleware/InitializeTenancyByPublicHost.php` gives the rest: the apex, `localhost`, a bare IP and any
+  unknown host, on anonymous requests to the invitation, impersonation and public-form routes as well. The code
+  path is measured; the server's own log was not read, so the entries in it are INFERRED. ⚠️ Stop reporting
+  `NotASubdomainException` with `$exceptions->dontReport()` and keep the sibling exception reported, lowered to
+  WARNING at most with `$exceptions->level()`: it is the fail-closed signal for a workspace `domains` row that is
+  missing or unusable (`app/Models/Domain.php`'s `resolvable` global scope, the same middleware's docblock), and
+  silencing it would send every tester to the agency's website with nothing in the log. Lowering the level alone
+  would clear nothing while the server runs at `LOG_LEVEL=debug`. Pin both halves in
+  `tests/Feature/Tenancy/CentralHostFallbackTest.php`: `Exceptions::assertNotReported()` for the central host, and
+  a `Log` spy for the lowered sibling, because a lowered exception is still reported.
+  **Live.** Filed by `M98`. **Tier: during-testing.**
+- **`minor` · The platform console's Save reports success identically whether or not anything changed.**
+  Found by `M98` (2026-09-17) while checking that open signup is off on the testing server.
+  `app/Http/Controllers/Admin/PlatformSettingsController.php` answers every valid PATCH with `back()` and a fixed
+  'Platform settings saved' toast, `resources/js/Pages/admin/Settings.vue` shows 'Saved' on `recentlySuccessful`,
+  and Inertia turns that redirect into a 303; the label in
+  `packages/design-system/src/components/Switch/Switch.vue` is a fixed string, so Open signup's state is shown
+  only by the thumb's position. Two paths leave it ON with no user error: (1) a Save more than fifteen minutes
+  after the page loaded is redirected to password confirmation, which stores nothing at all, so the switch the
+  operator just turned off is still on when they return — the step-up lapse this increment files beside it; (2)
+  both switches are `required` in `app/Http/Requests/Admin/UpdatePlatformSettingsRequest.php` and the form posts
+  all three fields on every Save, so a Save from any console tab loaded before signup was turned off — to edit
+  the maintenance notice, say — silently writes the old value back with the same toast and the same 303. The
+  exposure is narrower than the symptom: `staging.pitahc.gov.ph/register` stays a 404 while the workspace's own
+  `registration.invite_only` keeps its default of true (`app/Enums/SettingKey.php`,
+  `app/Services/Settings/RegistrationGate.php`), so a switch left ON opens the central `/register` only, and only
+  for a request carrying the central Host header once the checklist's `Require local` lock is lifted. ⚠️ Build the
+  toast from the values actually stored, show one state line beside the switch computed from the submitted value,
+  and warn or refuse when `signup_open` flips to true — an `isDirty` guard alone does not catch the stale-tab
+  path — then add a check to both copies of the checklist step that the central `/register` answers 404 after
+  saving. **Live.** Filed by `M98`. **Tier: during-testing.**
+- **`minor` · A step-up-protected write is discarded when the confirmation window has lapsed.**
+  Found by `M98` (2026-09-17) while reading the console's Save path. Every write inside the `step-up` group in
+  `routes/admin.php` — suspend, reactivate, plan assignment, the impersonation start, the feedback update and
+  `PATCH /admin/settings` — and the member role, member removal, ownership-transfer and SSO metadata writes in
+  `routes/tenant.php` pass through `app/Http/Middleware/RequireRecentPassword.php`, which delegates to the
+  framework's `RequirePassword` redirect once `auth.step_up_timeout` (900 seconds in `config/auth.php`) has
+  passed. For a non-GET request `Redirector::guest` records `previous()` rather than the request as the intended
+  URL, and `app/Providers/FortifyServiceProvider.php`'s confirm-password view then writes the same-host previous
+  URL into `url.intended` itself, so after confirming the password the member lands on a GET of the page they
+  came from, re-rendered from the database, with nothing submitted and no message saying the write was dropped.
+  It fires whenever more than fifteen minutes pass between opening the page and pressing Save, which is ordinary
+  behaviour both for an operator in the console and for a workspace Owner changing a member's role; the payload's
+  loss is INFERRED from those two redirect paths rather than measured in a browser. ⚠️ Carry the pending payload
+  across the confirmation (a flashed intent replayed after `password.confirm`, or a client-side re-submit) or, at
+  the least, flash a warning on the confirm page and after it saying the change was not saved and must be made
+  again. Pin it with a feature test that ages the session's `auth.password_confirmed_at` past the window and
+  asserts the setting is unchanged and a warning is flashed. **Live.** Filed by `M98`. **Tier: early-testing.**
+- **`minor` · The runbook and checklist steer the testing workspace onto Starter, whose caps bind with no billing.**
+  Found by `M98` (2026-09-17) while checking the create-tenant step against the plan catalogue.
+  `docs/deployment-infrastructure.md` §8.2 tells the operator to choose "`starter` (10 seats) or above", and the
+  Testing Server Checklist's create-tenant step, outside the repository, passes `--plan=starter`; the command
+  requires the option and has no default, so those two texts decide the tier.
+  `database/seeders/Data/PlanCatalog.php` caps Starter at 10 active seats, 20 forms and 2,000 submissions and
+  withholds `advanced_analytics`, both OCR keys, `sso_saml` and `custom_domain`, and
+  `app/Services/Entitlements/QuotaGuard.php` hard-blocks at those numbers with nothing billing behind them. Seats
+  are not only the people who joined: the gauge in `app/Services/Entitlements/EntitlementService.php` counts
+  `Invited` alongside `Active`, and `app/Services/Tenancy/TenantMembershipService.php` reserves a seat on
+  invitation, so the owner plus nine unaccepted invitations fills a Starter workspace. Business and Enterprise are
+  the two tiers seeded with unlimited quotas, and both grant `embedded_payments`, one of the three keys
+  `app/Services/Admin/TenantDetailPresenter.php` marks `not_provisioned`; Enterprise adds the other two,
+  `dedicated_db` and `data_residency`. So either choice makes the console report a granted entitlement with no
+  mechanism behind it — whether a workspace member ever sees those keys was not measured, and
+  `app/Support/Entitlements/ToggleableModules.php` keeps all four out of the tenant's own Modules surface. The
+  live workspace has since been moved to Enterprise in the console by the user, which the repository cannot
+  confirm, so what is wrong today is the instruction text. ⚠️ Correct §8.2 and both copies of the checklist step
+  to an unlimited, non-billing tier, restate the seat sentence for it, name the `not_provisioned` rows the choice
+  brings with it, and record that an existing workspace changes tier only in the console, because a re-run with a
+  different plan is refused. **Live.** Filed by `M98`. **Tier: during-testing.**
+- **`minor` · The first-boot runbook and the checklist set up none of the database backup §5 prescribes.**
+  Found by `M98` (2026-09-17) while reading the database steps against the backup runbook.
+  `docs/deployment-infrastructure.md` §5 prescribes a daily `pg_dump` in custom format written to a backup volume
+  and copied off-box, continuous WAL archiving with `archive_mode = on` and an `archive_command` for point-in-time
+  recovery, 30-day retention and a quarterly restore to a fresh instance. §8's PostgreSQL step closes one
+  sub-bullet with "Configure `archive_mode`/`archive_command` (§5)" and carries nothing else — no setting, no
+  target path, no Task Scheduler job — and the Testing Server Checklist's database step, outside the repository,
+  sets up neither the archiving nor the dump. The box therefore holds the only copy of every tester's account,
+  form and submission, and the four-hour RTO and fifteen-minute RPO that §5 operationalises from
+  `docs/non-functional-requirements.md` §2 cannot be met from the first day of testing. Only the two documents and
+  the checklist were read, so the absence of a hand-rolled job on the box is INFERRED. ⚠️ Add a step that turns
+  `archive_mode`/`archive_command` on to an off-box target and registers the daily dump and its prune as a Task
+  Scheduler job, then prove one restore on the box; if losing the testing data is acceptable instead, record that
+  as a decision and say in §8 that §5 does not bind this site. **Live.** Filed by `M98`. **Tier: during-testing.**
+- **`minor` · The first-boot steps leave `LOG_LEVEL=debug` and one unrotated log file in place.**
+  Found by `M98` (2026-09-17) while reading where the server's `.env` values come from.
+  `docs/deployment-infrastructure.md` §8.2 has the operator copy `.env.example` to `.env` and then set a named
+  list of keys under `APP_ENV=production`; no `LOG_` key is on that list, and the Testing Server Checklist copies
+  the file unchanged, so `LOG_CHANNEL=stack`, `LOG_STACK=single` and `LOG_LEVEL=debug` are inherited from
+  `.env.example`. `config/logging.php` resolves that to the `single` driver at debug into one
+  the single `laravel.log` under the app's log directory; the `daily` channel, the only rotating one configured, is not selected, Windows has
+  no logrotate, and nothing in §5, §6, §8 or the checklist prunes the file. Every debug line the app writes
+  accumulates there for the whole testing period, the ERROR stack traces of the handled tenancy redirects among
+  them. That the operator left those keys untouched, the file's size on the box and which volume it shares are all
+  INFERRED from the two texts rather than measured. ⚠️ Put `LOG_STACK=daily` and `LOG_LEVEL=info` in §8.2's key
+  list and in both copies of the checklist's `.env` step, keeping `LOG_DAILY_DAYS` at its 14-day default; if debug
+  output is wanted while testers are on the site, say so there and cap the retention rather than the level.
+  **Live.** Filed by `M98`. **Tier: during-testing.**
+- **`minor` · Unbranded mail links its header logo to the agency's own website, while tenant-branded mail does not.**
+  Found by `M98` (2026-09-17) while reading where the links in testers' email go.
+  `app/Support/Branding/BrandPalette.php`'s `product()` palette sets its `url` to `config('app.url')`,
+  `app/Notifications/Concerns/CarriesTenantBrand.php` falls back to that palette whenever a notification sets no
+  brand, and `resources/views/mail/notification.blade.php` hands it to the header partial
+  (`resources/views/vendor/mail/html/header.blade.php`), which wraps the product name or logo in a link to it.
+  `app/Notifications/Auth/QueuedResetPassword.php` and `app/Notifications/Auth/QueuedVerifyEmail.php`, dispatched
+  from `app/Models/User.php`, and the welcome email from `app/Listeners/Auth/SendWelcomeEmail.php` set no brand,
+  so their header link resolves to `APP_URL`, which D46 put at the agency's live website; a tester who uses
+  "Forgot password" on the workspace host receives one of them today. The invitation is the only auth mail that
+  asks for a palette at all (`app/Services/Tenancy/TenantMembershipService.php`), and even it reaches the
+  workspace host only where that workspace's branding is active — `BrandPalette::forTenant()` returns the same
+  product palette for an unbranded tenant, and whether the staging workspace is branded was not measured. D46's
+  recorded consequences state this the wrong way round: they name the logo link in branded email as the `APP_URL`
+  case, when branded mail is precisely the arm that uses the workspace host. ⚠️ Give the unbranded palette a link
+  a recipient can use — the central sign-in page, or the request's workspace host when there is one — rather than
+  bare `APP_URL`, pin it in the mail tests, and correct D46's consequence line with a dated note.
+  **Live.** Filed by `M98`. **Tier: early-testing.**
+- **`minor` · The welcome email is sent again after every verified address change.**
+  Found by `M98` (2026-09-17) while reading what fires the welcome email.
+  `app/Listeners/Auth/SendWelcomeEmail.php` handles Fortify's `Verified` event with no guard against a second
+  one, although its docblock says it says hello once; `app/Actions/Fortify/UpdateUserProfileInformation.php` nulls
+  `email_verified_at` and re-sends verification whenever a member changes their address — the tenant Settings page
+  (`resources/js/Pages/Settings/Index.vue`) puts that field in front of every member — and Fortify's
+  `VerifyEmailController` fires `Verified` again when they click the new link. A tester who corrects a typo in
+  their address therefore gets the welcome a second time, in the workspace copy on the tenant host. Nothing pins
+  it: `tests/Feature/Auth/WelcomeEmailTest.php` asserts one welcome per verification event rather than one per
+  person, and has no address-change case. ⚠️ Give the listener a once-guard — a `welcomed_at` column on `users`,
+  or a notification-log key — so the docblock's claim holds, and add the address-change case to the test.
+  **Live.** Filed by `M98`. **Tier: during-testing.**
+- **`minor` · PROGRESS.md is within about five close-outs of the tracker-lint byte ceiling.**
+  Found by `M98` (2026-09-18) while measuring this increment's own close-out against the tracker gates.
+  `PROGRESS.md` is 124,804 bytes against the 130,000-byte R1 ceiling in `scripts/tracker-lint.php`, measured today
+  read-only, which leaves 5,196 bytes; the recent close-out bullets measured about a kilobyte each, so roughly five
+  more fit before R1 fails and takes CI with it. `scripts/next.php` prints its headroom warning only below 4,000
+  bytes, so the hand-off stays silent through the next close-out and first speaks when two or three are left — and
+  that warning's own text estimates two to three kilobytes a bullet, larger than the bullets measured here, so it
+  understates the room that is left at the moment it finally appears. The earlier byte-ceiling row is closed, so
+  nothing open tracks the next surgery. ⚠️ Plan the next `## Current Status` move into `PROGRESS_ARCHIVE.md` before
+  the ceiling forces it, and raise `next.php`'s threshold to about 8,000 bytes so the warning arrives with room to
+  make the move deliberately rather than under a red gate. **Live.** Filed by `M98`. **Tier: during-testing.**

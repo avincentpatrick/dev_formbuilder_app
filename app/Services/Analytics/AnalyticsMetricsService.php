@@ -38,10 +38,10 @@ use Illuminate\Database\Query\JoinClause;
  * result.
  *
  * ── The bucketing rule, and why the obvious spelling is wrong ───────────────────────────────────────────
- * `date_trunc('day', submitted_at)` silently uses the session `TimeZone` GUC, and `config/database.php` sets
- * no `timezone` key on the `pgsql` connection — so it is whatever `postgresql.conf` says, UTC in the
- * container and unknown on ADR-0005's self-hosted box. The same data would bucket differently on different
- * hosts. Every bucket below therefore uses the THREE-argument form, `date_trunc(field, source, zone)`
+ * `date_trunc('day', submitted_at)` silently uses the session `TimeZone` GUC. Since `M98` that GUC is pinned
+ * to UTC by `config/database.php` on all four connections, so it is no longer "whatever `postgresql.conf`
+ * says" — but UTC days are not a tenant's days, and a saved view must bucket the same way wherever it runs.
+ * Every bucket below therefore uses the THREE-argument form, `date_trunc(field, source, zone)`
  * (PG 16+), with the zone bound from the query.
  *
  * And the range predicate stays on the RAW column: `date_trunc` appears only in SELECT/GROUP BY, because

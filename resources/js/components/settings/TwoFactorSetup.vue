@@ -4,13 +4,14 @@
  * endpoints — this owns only the presentation. Three states, from the `enabled`/`confirmed` props the
  * host page passes (read from the user each load):
  *   - off              → "Enable" (POST /user/two-factor-authentication)
- *   - enabled, unconfirmed → show the QR + recovery codes (fetched from Fortify's JSON endpoints), then
- *                            confirm with a TOTP code (POST /user/confirmed-two-factor-authentication)
+ *   - enabled, unconfirmed → show the QR, the TYPED KEY and the recovery codes (fetched from Fortify's JSON
+ *                            endpoints), then confirm with a TOTP code
+ *                            (POST /user/confirmed-two-factor-authentication)
  *   - confirmed        → on; regenerate recovery codes / turn off
  * Fortify's `confirmPassword` feature interposes a password-confirmation step on every one of those
  * endpoints, and how it does so is load-bearing here — see `needsPasswordConfirmation` below.
  *
- * ⚠️ THE TWO SETUP READS ARE JSON SIDECARS, AND A STALE PASSWORD CONFIRMATION DOES NOT REDIRECT THEM.
+ * ⚠️ THE THREE SETUP READS ARE JSON SIDECARS, AND A STALE PASSWORD CONFIRMATION DOES NOT REDIRECT THEM.
  * Laravel's RequirePassword forks on `expectsJson()`: a navigation gets a 302 to the ConfirmPassword page,
  * but a `fetch` sent with `Accept: application/json` gets a bare **423 with a JSON body**. The first
  * draft of this file read `res.json()` unconditionally, so that 423 landed as `qrSvg = undefined` and a
@@ -33,8 +34,12 @@ const props = defineProps<{
 
 const qrSvg = ref<string>('');
 const recoveryCodes = ref<string[]>([]);
+const secretKey = ref<string>('');
 const loading = ref(false);
 const staleConfirmation = ref(false);
+
+/** The key as a person types it: groups of four, which is how every authenticator app shows one. */
+const groupedSecretKey = computed(() => (secretKey.value.match(/.{1,4}/gu) ?? []).join(' '));
 
 const confirmForm = useForm({ code: '' });
 const busy = ref(false);
@@ -45,14 +50,23 @@ const mustConfirmPassword = computed(() => props.needsPasswordConfirmation || st
 async function loadSetup(): Promise<void> {
     loading.value = true;
     try {
-        const [qrRes, rcRes] = await Promise.all([
+        // ⚠️ THE KEY IS READ ONLY WHILE ENROLMENT IS UNFINISHED, AND THAT IS A CONDITION, NOT A TIDINESS
+        // PREFERENCE: `regenerate()` below reuses this function in the CONFIRMED state, where the panel has
+        // no use for the secret and should not be holding the plaintext of it.
+        const wantsSecretKey = !props.confirmed;
+
+        const [qrRes, rcRes, secretRes] = await Promise.all([
             fetch('/user/two-factor-qr-code', { headers: { Accept: 'application/json' } }),
             fetch('/user/two-factor-recovery-codes', { headers: { Accept: 'application/json' } }),
+            wantsSecretKey
+                ? fetch('/user/two-factor-secret-key', { headers: { Accept: 'application/json' } })
+                : Promise.resolve(null),
         ]);
 
         // 423 is RequirePassword refusing a JSON request. Anything else non-OK is a real failure, but the
         // remedy a respondent can act on is the same panel, so both raise it rather than rendering blanks.
-        if (!qrRes.ok || !rcRes.ok) {
+        // The third read sits behind the same middleware as the first two, so it can be the one refused.
+        if (!qrRes.ok || !rcRes.ok || (secretRes !== null && !secretRes.ok)) {
             staleConfirmation.value = true;
 
             return;
@@ -60,6 +74,10 @@ async function loadSetup(): Promise<void> {
 
         qrSvg.value = ((await qrRes.json()) as { svg: string }).svg;
         recoveryCodes.value = (await rcRes.json()) as string[];
+
+        if (secretRes !== null) {
+            secretKey.value = ((await secretRes.json()) as { secretKey: string }).secretKey;
+        }
     } finally {
         loading.value = false;
     }
@@ -152,13 +170,24 @@ function regenerate(): void {
         <!-- Enabled, awaiting confirmation -->
         <template v-else-if="!confirmed">
             <p class="tfa__prose">
-                Scan this QR code with your authenticator app, then enter the 6-digit code it shows to
-                finish. Save your recovery codes somewhere safe — they let you sign in if you lose your
-                device.
+                Scan this QR code with your authenticator app — or type the key beside it, if the app is on
+                this device — then enter the 6-digit code it shows to finish. Save your recovery codes
+                somewhere safe: they let you sign in if you lose your device.
             </p>
 
             <div class="tfa__setup">
-                <div class="tfa__qr" v-html="qrSvg" />
+                <div class="tfa__scan">
+                    <div class="tfa__qr" v-html="qrSvg" />
+                    <div v-if="secretKey" class="tfa__key">
+                        <p class="tfa__key-label">Can’t scan it? Type this key instead</p>
+                        <code
+                            class="tfa__key-value"
+                            data-testid="tfa-secret-key"
+                            :data-key="secretKey"
+                        >{{ groupedSecretKey }}</code>
+                        <p class="tfa__key-hint">Spaces are for reading — leave them out, or keep them.</p>
+                    </div>
+                </div>
                 <div class="tfa__codes" aria-label="Recovery codes">
                     <p class="tfa__codes-label">Recovery codes</p>
                     <ul class="tfa__codes-list">
@@ -240,6 +269,43 @@ function regenerate(): void {
     display: flex;
     flex-wrap: wrap;
     gap: var(--mds-space-6);
+}
+
+.tfa__scan {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mds-space-3);
+}
+
+.tfa__key {
+    max-width: 22ch;
+}
+
+.tfa__key-label {
+    margin: 0 0 var(--mds-space-2);
+    font-size: var(--mds-type-label-font-size);
+    font-weight: var(--mds-font-weight-semibold);
+    color: var(--mds-color-text-body);
+}
+
+.tfa__key-value {
+    display: block;
+    padding: var(--mds-space-2) var(--mds-space-3);
+    background-color: var(--mds-color-bg-sunken);
+    border: 1px solid var(--mds-color-border-default);
+    border-radius: var(--mds-radius-md);
+    font-family: var(--mds-font-family-mono);
+    font-size: var(--mds-type-body-sm-font-size);
+    letter-spacing: 0.06em;
+    /* Typed or copied by hand, so it must be selectable as one run and must never be clipped. */
+    overflow-wrap: anywhere;
+    user-select: all;
+}
+
+.tfa__key-hint {
+    margin: var(--mds-space-1) 0 0;
+    font-size: var(--mds-type-body-sm-font-size);
+    color: var(--mds-color-text-secondary);
 }
 
 .tfa__qr {

@@ -8473,7 +8473,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   here: resolve against the tracked set the script already has every reason to read. ⚠️ **Note the
   asymmetry that hid it**: the two scripts carry the SAME partial-path blindness — one of them was fixed
   this increment — but they resolve against two DIFFERENT universes, and nothing anywhere says so.
-  **Live.** Filed by `M85`. **Tier: after-launch.**  ⚠️ **A SECOND VARIANT, MEASURED BY `M98` (2026-09-18), AND IT IS NOT A CITATION SHAPE BUT A SECOND CHECKOUT.** The mechanism this row names — resolution against the WORKING TREE — also sees any full checkout that happens to sit inside the repository root, because `scripts/backlog-triage.php`'s `SKIP_DIRS` does not skip one. A detached agent worktree under `.kilo/worktrees/` made about 67 open rows' bare-basename citations ambiguous on this host (emulated from the basename index, not counted through the generator), and on 2026-09-18, with the tree otherwise unchanged, `php scripts/pipeline.php --check` reported `docs/pipeline.md` as DRIFTED and then reported it current the moment that checkout was removed. That was one measurement on one tree, not a standing reading: `--check` drifts again for ordinary reasons whenever the queue is behind the ledger. So the ORDER of operations is part of the remedy and not only the one-line fix: remove or move any second checkout outside the repository root before regenerating, and ask whoever owns it first, because another session may be working in it. The same asymmetry the row records applies, since `scripts/citation-liveness-lint.php` asks `git ls-files` and never sees the intruder.
+  **Live.** Filed by `M85`. **Tier: after-launch.**  ⚠️ **A SECOND VARIANT, MEASURED BY `M98` (2026-09-18), AND IT IS NOT A CITATION SHAPE BUT A SECOND CHECKOUT.** The mechanism this row names — resolution against the WORKING TREE — also sees any full checkout that happens to sit inside the repository root, because `scripts/backlog-triage.php`'s `SKIP_DIRS` does not skip one. A detached agent worktree in a dot-directory of the repository root made about 67 open rows' bare-basename citations ambiguous on this host (emulated from the basename index, not counted through the generator), and on 2026-09-18, with the tree otherwise unchanged, `php scripts/pipeline.php --check` reported `docs/pipeline.md` as DRIFTED and then reported it current the moment that checkout was removed. That was one measurement on one tree, not a standing reading: `--check` drifts again for ordinary reasons whenever the queue is behind the ledger. So the ORDER of operations is part of the remedy and not only the one-line fix: remove or move any second checkout outside the repository root before regenerating, and ask whoever owns it first, because another session may be working in it. The same asymmetry the row records applies, since `scripts/citation-liveness-lint.php` asks `git ls-files` and never sees the intruder.
 
 - ~~**`minor` · Two increments' status bullets were DESTROYED by their successors' close-outs, and nothing
   in the repository could see it.**~~
@@ -10284,7 +10284,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   accepted with no claim naming it. Any branch name that is a substring of the claim's prose passes the same way;
   a push to the trunk still meets rule B's one-commit limit, and a push to any other branch meets nothing.
   `.githooks/pre-push` runs the script on every push in this clone, where `core.hooksPath` is set — it is local
-  configuration the repository cannot enable for anyone else — and `.kilo/worktrees` is empty today, so no detached
+  configuration the repository cannot enable for anyone else — and that agent directory holds no checkout today, so no detached
   checkout exists. ⚠️ Match the branch name as a delimited or backticked token rather than a bare substring, and
   refuse outright when the branch resolves to `HEAD`. **Latent.** — needs a push from a detached HEAD, or a branch
   name that is a substring of the claim. Filed by `M98`. **Tier: after-launch.**
@@ -10429,7 +10429,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   list of keys under `APP_ENV=production`; no `LOG_` key is on that list, and the Testing Server Checklist copies
   the file unchanged, so `LOG_CHANNEL=stack`, `LOG_STACK=single` and `LOG_LEVEL=debug` are inherited from
   `.env.example`. `config/logging.php` resolves that to the `single` driver at debug into one
-  `storage/logs/laravel.log`; the `daily` channel, the only rotating one configured, is not selected, Windows has
+  the single `laravel.log` under the app's log directory; the `daily` channel, the only rotating one configured, is not selected, Windows has
   no logrotate, and nothing in §5, §6, §8 or the checklist prunes the file. Every debug line the app writes
   accumulates there for the whole testing period, the ERROR stack traces of the handled tenancy redirects among
   them. That the operator left those keys untouched, the file's size on the box and which volume it shares are all
@@ -10460,7 +10460,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `app/Listeners/Auth/SendWelcomeEmail.php` handles Fortify's `Verified` event with no guard against a second
   one, although its docblock says it says hello once; `app/Actions/Fortify/UpdateUserProfileInformation.php` nulls
   `email_verified_at` and re-sends verification whenever a member changes their address — the tenant Settings page
-  (`resources/js/Pages/settings/Index.vue`) puts that field in front of every member — and Fortify's
+  (`resources/js/Pages/Settings/Index.vue`) puts that field in front of every member — and Fortify's
   `VerifyEmailController` fires `Verified` again when they click the new link. A tester who corrects a typo in
   their address therefore gets the welcome a second time, in the workspace copy on the tenant host. Nothing pins
   it: `tests/Feature/Auth/WelcomeEmailTest.php` asserts one welcome per verification event rather than one per

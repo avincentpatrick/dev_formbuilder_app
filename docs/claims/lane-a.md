@@ -16,7 +16,282 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M98` is merged; the early-testing tier continues, named in `docs/pipeline.md` § Next
+## Status: ACTIVE CLAIM — `M99`, the queue's own instrument and three tester-facing defects (`m99-queue-instrument-and-three`)
+
+Taken 2026-09-18. Branch `m99-queue-instrument-and-three`, cut from `origin/main` at `d1aa677`, PR into main.
+
+**Four rows from `early-testing`, grouped under `D13`'s file-overlap rule.** Verified by a read-only fan-out of
+nine agents, evidence / premise / remedy answered separately per row and never merged. **No two of the four share
+a single file**; `R-4cd211eb` is the one row touching `D13`'s meta-hubs.
+
+⚠️ **`D13`'s hub clause is read against `D13`'s own meta-file set, not against the generated one, and the
+divergence is recorded here rather than assumed away.** `scripts/backlog-triage.php --json` derives a 52-file hub
+set at `hub_threshold: 3`, and it now contains ordinary product code — `bootstrap/app.php`, `config/fortify.php`,
+`routes/tenant.php`, `public/index.php`, `resources/views/mail/notification.blade.php`. Under that set **no pair
+of rows in this tier is legal**, so the clause would forbid every batch it exists to permit. `D13`'s prose names
+its hubs as *meta-files, not product code*, and that is the reading used. A row is filed for the divergence.
+
+---
+
+### Row 1 — `R-4cd211eb`, the zero-gate sentence never switches off, and the gate's total shrinks
+
+`docs/feature-backlog.md:9763`. Filed by `M95`, amended by `M96`, corrected by `M98`; neither took it.
+
+#### Evidence verified
+Every named symbol resolves. `render_testing_gate()` `scripts/state.php:1454`, its sentence at `:1481-1482`
+guarded by `if ($gate['open'] === 0)` at `:1479`. `render_queue()` `scripts/next.php:184`, sentence at `:222-223`
+guarded at `:221`. `testing_gate()` `scripts/pipeline.php:647`, its docblock promise of `0 open of N` at
+`:640-642`, `total` counted over the rows handed in at `:657`. `scripts/backlog-triage.php:134` drops every
+non-open row. `NEXT_READY = 5` and `NEXT_BLOCKED = 8` at `scripts/pipeline.php:111-112`, applied at `:685-686`.
+`CLAUDE.md:101-103` carries the rule.
+**Two figures have MOVED.** `M96` recorded that the Next cut hid *two* ready `early-testing` rows; today it hides
+**three** of eight, and the blocked cut hides **19 of 27** — which no amendment records.
+⛔ **The strongest evidence is cited by nobody, and it is committed on the trunk.** `PROGRESS.md:236` — the
+generated LANE A NEXT PROMPT for this very increment — still carries the imperative to send the user the push
+notification and the Testing Server Checklist now, although `docs/claims/lane-a.md:320` and `PROGRESS.md:214`
+both record that `M95` already sent it. Four increments have been told to re-notify the user.
+
+#### Premise verified
+The mechanism holds; the surroundings have rotted in four ways.
+**The division is rule-text versus imperative, not conditional versus unconditional.** `M98` names only
+`scripts/pipeline.php:841-843` as unconditional. `scripts/loop.php:158-159` is a **second unconditional copy**,
+outside any count test. But both are *rule-phrased*, while `state.php`'s and `next.php`'s are *imperative*. That
+is the real division, and it decides which copies get keyed.
+**A sixth surface nobody names:** the hand-off is written *into* `PROGRESS.md`, so keying `next.php` does not
+remove the committed copy — only `php scripts/next.php --lane=a --write` in the same push does.
+**Three second copies, all already filed and all tiered `after-launch` while this row is `early-testing`:**
+`R-964bc5a4` (`:7906`, two markers may carry the same id) **is** `M96`'s "unique ids enforced";
+`R-974db618` (`:7920`, the help text promises a `done` citation and `parse_marker()` never asks) **is** `M96`'s
+"`done=` enforced"; `R-eecdb678` (`:4367`) **is** `M96`'s harness note. `M96`'s amendment silently scheduled two
+`after-launch` rows inside an `early-testing` one.
+**The row's "nothing records that the notification was sent" is prose-false and mechanism-true** —
+`lane-a.md:320` and `PROGRESS.md:214` both record it, but `docs/claims` is an excluded directory for the marker
+walk (`pipeline.php:91`), so no generator can see it.
+
+#### Remedy verdict
+**Works with changes; `M96`'s prescription breaks in three places and `M98`'s figure is a choice, not a fact.**
+(1) Passing closed rows through `backlog-triage.php --json` **cannot mean extending the `open` key**:
+`derive_hubs()` (`:462-476`) derives the hub set from open rows and `compare_rows` ranks from it. There are 123
+closed rows; merging them rewrites the hub set, the ranking and `D13`'s own grouping input. It must be a separate
+`closed` key. (2) Even then, `read_defects()` (`pipeline.php:491-518`) maps live to ready and everything else to
+blocked, with no `done` branch, so closed rows passed through unchanged would publish as **ready work**. Key on
+the closed state instead. (3) ⛔ **The number must be computed, never pinned.** `M96` says the finished tier then
+reads 6, `M98` says 7; each is right under its own assumption about the new marker's own tier. A test
+hard-coding either goes red the moment another `before-testing` marker or closed row appears.
+(4) **Plumbing neither amendment names:** `derive_testing_gate()` (`state.php:1027-1093`) derives the gate by
+regex over `docs/pipeline.md`; it never walks the corpus and never reads the generator's JSON, and `next.php:99`
+and `loop.php:144` consume `state.php`'s JSON. So `pipeline.php` must publish the notified fact into the gate
+block and `state.php` must parse it. (5) **The marker's only possible home is `PROGRESS.md`** — `CLAUDE.md` is
+deliberately outside the corpus walk (`pipeline.php:245-248`) and four more paths are excluded (`:82-91`).
+`done` and `done=` already exist in `MARKER_KEYS` and `STATES` (`:93,95`), so the grammar needs no change.
+(6) `M96`'s "cannot be driven by `mutate.php`" is **confirmed** — `mutate.php:305-311` runs Pest in a container
+only, and `state.php` shells `gh` (`:261`) and `git`.
+
+---
+
+### Row 2 — `R-43bdc36b`, a step-up-protected write is discarded when the confirmation window has lapsed
+
+`docs/feature-backlog.md:10374`. Filed by `M98`. No amendment.
+
+#### Evidence verified
+**Every citation resolves; nothing has moved and nothing is gone.** `RequireRecentPassword.php` extends the
+framework's `RequirePassword` (`:76`), reads `auth.step_up_timeout` at `:115` and delegates at `:130`.
+`config/auth.php:144` confirms 900 seconds. The `step-up` alias is registered at `bootstrap/app.php:164` and
+mounted at `routes/admin.php:50` and `routes/tenant.php:348,418,420,422`. All six admin writes and all four
+tenant writes resolve at the lines the row gives. `Redirector::guest` behaves exactly as described —
+`vendor/laravel/framework/src/Illuminate/Routing/Redirector.php:75-77` takes the previous-URL arm for every
+non-GET request. `FortifyServiceProvider.php:150-157` writes that same-host previous URL into the intended-URL
+session key, and its docblock at `:139-148` says so.
+
+#### Premise verified
+**Partly holds. The row understates its own defect, and misses the population that matters most.**
+⛔ **The tenant trigger is not "more than fifteen minutes".** The password-confirmation timestamp has exactly one
+non-SSO writer — Fortify's `ConfirmablePasswordController:58`. Login never stamps it, and
+`PasswordConfirmation.php:66` defaults the missing key to 0. The roster GET is deliberately ungated
+(`routes/tenant.php:416-417`). So **a workspace Owner who has just signed in loses the payload on their very
+first role change, every session.** The console is different — its GETs sit inside the same gate
+(`routes/admin.php:50`) — so the row states one mechanism for two surfaces that behave differently.
+⛔ **The SSO arm is the single biggest gap, and the row does not name it.** `RequireRecentPassword.php:120-127`
+forks **before** delegating: an SSO-established session is redirected to the SSO step-up at `:126` with the
+identical drop, and then leaves the confirm-password flow entirely — `SsoStepUpController:72` reads the intended
+URL and `SsoStepUpCompletionController:76` redirects to a GET. **A fix landed only in `FortifyServiceProvider`
+covers zero of the SSO population.**
+**Two second copies outside the subject:** `EnsureVerifiedEmail.php:117` (the same guest-redirect drop) and
+`EnsureSuperAdminMfa.php:29` (a plain redirect, so the payload is dropped **and** no intended URL is recorded,
+stranding the operator on the enrolment page).
+**Batching premise confirmed:** `docs/feature-backlog.md:10354` names this lapse as path (1) of its own symptom.
+That row is `during-testing` and is not taken here.
+
+#### Remedy verdict
+**Works with changes. Of the row's three options, one cannot render, one is not viable, and one is unreachable.**
+(1) Flashing a warning **cannot render as written.** The app's only flash-to-UI bridge is the toast key
+(`HandleInertiaRequests.php:98-101`), rendered by `MdsToastHost`, mounted only in `AppLayout.vue:118` and
+`AdminLayout.vue:84`. `ConfirmPassword.vue` renders inside `AuthLayout`, which takes a title and a variant only
+and reads no flash anywhere. And "after it" is two request hops away, so a plain flash dies before the
+destination; it needs a reflash or a non-flash key consumed there, and the row prescribes neither.
+(2) Replaying the pending payload **is not viable** — the ten routes carry permission gates, a feature gate,
+FormRequest validation and route-model binding. Laravel has no primitive for it, and a replay that skips any of
+them converts a security gate into a confused deputy.
+(3) A client-side re-submit **is not reachable** — Inertia's axios follows the redirect transparently, and
+`RequireRecentPassword.php:37-43` is a standing warning against forking on a JSON Accept header here.
+**The shape that fits is one the row never names:** `App\Support\Auth\PasswordConfirmation::isStale()`
+(`app/Support/Auth/PasswordConfirmation.php:52`) already exists and is already shipped to Vue by three
+controllers — but it is a render-time snapshot, so it catches "stale at load" and not "lapsed while the page sat
+open", which is this row's exact case. Pre-emptive prop **plus** a surviving server-side warning.
+**One non-problem worth recording:** `inertia-laravel/src/Middleware.php:157-158` rewrites 302 to 303 for
+PUT, PATCH and DELETE, so there is no 405. The obvious fix of returning a non-Inertia response would reopen it.
+
+---
+
+### Row 3 — `R-62fb2e05`, unbranded mail links its header logo to the agency's own website
+
+`docs/feature-backlog.md:10440`. Filed by `M98`. No amendment.
+
+#### Evidence verified
+**Every code citation resolves exactly as described.** `BrandPalette.php:159-166` — the product palette sets its
+url from the app url. `:182-192` — the identity palette builds its url with `TenantUrl::to`, so branded mail
+genuinely uses the workspace host, which is the half `D46` had backwards.
+`CarriesTenantBrand.php:84` substitutes the product palette whenever a notification set no brand.
+`resources/views/mail/notification.blade.php:28` passes that url to the header partial, and
+`resources/views/vendor/mail/html/header.blade.php:36` wraps the logo (`:38`) or the name (`:46`) in a link to
+it. `QueuedResetPassword.php:58-61`, `QueuedVerifyEmail.php:64-67`, `User.php:168-170` and `:186-189`, and
+`SendWelcomeEmail.php:80-92` all set no brand. `TenantMembershipService.php:132` is the one auth mail that asks
+for a palette, and `BrandPalette.php:101-115` returns the product palette for an unbranded tenant anyway.
+`config/fortify.php:97` with the comment at `:111-115` confirms the "tester uses Forgot password on the
+workspace host" path is live.
+**One citation is STALE:** the row asks for `D46`'s consequence line to be corrected;
+`docs/claims/decisions.md:1651-1656` already carries a dated correction written during `M98`. The row prescribes
+work its own increment had already done.
+
+#### Premise verified
+**Partly holds. The row understates its own blast radius by two-thirds.**
+⛔ **Seven NON-AUTH dispatch sites hit the same fallback**, every one returning the product palette for an
+unbranded tenant (`BrandPalette.php:107-109`): `NotificationMailer.php:56` — the highest-volume path, every
+in-app event email to every member; `GuestDraftController.php:122` — the resume link, which its own comment at
+`:119` calls "the only branded email a RESPONDENT receives", so **an anonymous member of the public receives
+mail whose header links to the agency website**; `DeliverWebhookJob.php:246`;
+`DeliverConnectorMessageJob.php:359` and `:388`; `ConnectionTokenRefresher.php:279`;
+`ReconcileTenantUsageJob.php:157`; `GeneratePdfJob.php:163`.
+The row hedges with "whether the staging workspace is branded was not measured", but
+`TenantBrandingService.php:65` requires **both** a brand ramp and the Starter-and-above branding feature, a ramp
+exists only after someone sets a brand colour, and `docs/deployment-infrastructure.md:317`'s workspace-creation
+step sets none. So on the testing server the blast radius is almost certainly **every outbound email, the
+invitation included** — and fixing the unbranded palette becomes the whole fix rather than an edge case.
+**A second copy in code:** `User.php:164` asserts that the two Fortify emails are deliberately the only
+unbranded ones. That is false today, and any fix leaving it standing ships a third contradictory claim.
+**A second copy in the tracker:** `R-e6a10f97` (`:9755`) states this defect almost verbatim in its `M98` clause
+and outranks this row in the queue. It is **not** taken here — it awaits `D44` — so it is amended in place to
+record that this row carries its header-logo half.
+**Its own evidence contradicts two docblocks:** `QueuedVerifyEmail.php:52-53` and `User.php:165` both say
+Fortify's routes run on the central host; `config/fortify.php:97,111-115` says otherwise. The row needs the
+workspace-host reading to be true, so those two docblocks are part of the repair surface.
+**Unverifiable from the tree, stated rather than guessed:** whether the staging workspace has a brand ramp,
+which plan tier the workspace was created with, and the live app url on the box.
+
+#### Remedy verdict
+**Works with changes. Of three clauses, one is already done, one cannot work, and one cannot be implemented
+where the row points.**
+(1) Correcting `D46`'s consequence line is **already done** at `decisions.md:1651-1656`. Doing it again writes a
+duplicate; what is left there is a *closing* note once the link changes. **This removes `decisions.md` from the
+row's edit set, and with it the row's only claim on a meta-hub.**
+(2) Linking to the central sign-in page **does not cure the defect under the layout the row is filed against.**
+`D46` puts the app url at the agency's own website, so a central sign-in link is the same wrong host, now a 404
+on it. There is no central-URL helper to build from either: `TenantUrl` exposes only tenant-scoped methods and
+`PlatformHost` only predicates.
+(3) Using the request's workspace host is the **correct target, impossible at the site named.**
+`CarriesTenantBrand.php:84` substitutes at **render**, inside the queued-notification job on the worker, where
+the request helper answers from the console kernel and would stamp a local host into live mail
+non-deterministically — and the suite would stay green, because `BrandedMailRenderTest` builds the message
+in-process. **The url must be resolved at DISPATCH and ride the payload.**
+**Where a naive fix silently no-ops:** `SendWelcomeEmail` has the tenant in hand at `:76-91`, but the
+per-tenant palette returns the product palette there — `BrandPalette.php:103` requires the tenant to match the
+current tenant context, and that listener runs on Fortify's verification route with no tenancy middleware. It
+must build from `TenantUrl::to($tenant, ...)`, the value it already computes at `:91`.
+**Shape hazard:** prefer a url-bearing variant over mutating the constant palette — the product palette also
+feeds `SubmissionPdfRenderer.php:104` and `BlankFormPrintRenderer.php:80`.
+**The decision the row leaves open is taken here rather than re-asked:** link to the workspace host when the
+notification knows one, and render the logo or name **unlinked** when it does not. Under `D46` there is no
+correct central URL, and an unlinked logo is the only honest answer.
+
+---
+
+### Row 4 — `R-4ff3e848`, JSON requests fall through the maintenance stub into `vendor/` during the deploy window
+
+`docs/feature-backlog.md:9888`. Filed by `M96`, corrected by `M98`; neither took it.
+
+#### Evidence verified
+The JSON half resolves and `M98`'s correction holds. `public/index.php` answers a browser request from the
+pre-rendered page before loading the autoloader; the framework's stub returns early for a request that expects
+JSON or carries the bypass cookie. `deploy.ps1:409` runs the down command with **no** secret, so the bypass half
+is dead for this window and applies only to a hand-run `artisan down --secret`. `public/.htaccess` is tracked
+and carries the front-controller rules. `bootstrap/app.php`'s catch-all arm returns a 503 server-error envelope,
+not the maintenance-mode envelope, so the documented contract is broken for the whole window and not only in the
+fatal case. The down command always writes an except key.
+
+#### Premise verified
+**Partly holds, and the window is more hostile than either the row or its correction says.**
+⛔ **`deploy.ps1:412` resets the checkout hard FIRST, before any rename**, so a fall-through request can boot
+against half-rewritten `app/` PHP; and the forced migration runs at `:433`, **still inside the window**, so a
+request that boots cleanly can read or write a half-migrated schema. Neither failure mode is named anywhere.
+**The envelope must be duplicated pre-autoload, and the app warned about this a year ago:**
+`app/Support/Http/MaintenanceResponse.php:15-17` claims to be the single place a 503 is shaped, and `:33-36`
+warns in advance that a thrown HTTP exception becomes a server error — this exact bug. The row does not budget
+for the duplication.
+⛔ **A second row prescribes an arm INSIDE this row's guard.** `R-62aff714` (`:10115`) asks for an
+`X-Inertia` arm in the guard this row puts in `public/index.php`, ahead of its expects-JSON test, and for the
+same correction to the deploy-window view's header comment. Both rows cite `public/index.php` **and**
+`resources/views/deploy-window.blade.php`, which `D13` forbids batching — but taking this row without that arm
+leaves a known defect in a file being edited for it. Its arm is taken here and the row amended.
+**A contradicting liveness record:** `decisions.md:1611-1613` (`D47`) still lists this row among those that stay
+latent, while the backlog marker now reads Live. Only one of the two was amended.
+**The scheduler is working from an undercount:** `docs/backlog-triage.md:215` harvests only `public/index.php`
+and the autoloader for this row, missing `deploy.ps1`, `bootstrap/app.php`, the blade and `public/.htaccess` —
+which is why `D13`'s grouping could not see the `R-62aff714` collision.
+**Minor, unnamed:** the health route (`bootstrap/app.php:76`) falls through the same way for any probe sending a
+JSON Accept header.
+
+#### Remedy verdict
+**Works with changes.** Answering JSON from the stub **cannot work at all** — the stub is vendor code that
+`artisan down` copies fresh on every run — so the guard belongs in the app-owned `public/index.php`, before the
+autoloader. ⛔ **It must be written as a dependency-free include** (`public/maintenance-guard.php`): nothing in
+the existing harness can execute code that runs before the autoloader otherwise, and that is what makes the row
+gateable at all. Holding the requests at nginx must read "at the web server, Apache here" (`D46`), and that arm
+need not be off-repo — `public/.htaccess` is tracked and runs under the checklist's `AllowOverride All` — at the
+price of applying to local development too; it is **not** gateable in CI, and that is said rather than papered
+over. The except payload must be tested with an emptiness check, never an isset.
+
+---
+
+Files: `scripts/state.php`, `scripts/next.php`, `scripts/loop.php`, `scripts/pipeline.php`,
+`scripts/backlog-triage.php`, `app/Http/Middleware/RequireRecentPassword.php`,
+`app/Providers/FortifyServiceProvider.php`, `app/Http/Controllers/Tenant/Sso/SsoStepUpController.php`,
+`resources/js/pages/auth/ConfirmPassword.vue`, `app/Support/Branding/BrandPalette.php`, `app/Models/User.php`,
+`app/Listeners/Auth/SendWelcomeEmail.php`, `app/Notifications/Auth/QueuedResetPassword.php`,
+`app/Notifications/Auth/QueuedVerifyEmail.php`, `app/Notifications/WelcomeNotification.php`,
+`app/Notifications/Concerns/CarriesTenantBrand.php`, `public/index.php`, `public/maintenance-guard.php` (new),
+`resources/views/deploy-window.blade.php`, `tests/Feature/Auth/StepUpReauthenticationTest.php`,
+`tests/Feature/Admin/PlatformSettingsConsoleTest.php`, `tests/Feature/Sso/SsoStepUpWebTest.php`,
+`tests/Feature/Mail/BrandedMailRenderTest.php`, `tests/Feature/Mail/BrandedMailDispatchTest.php`,
+`tests/Feature/Deploy/DeployMaintenanceGuardTest.php` (new).
+
+Shared artefacts taken: `CLAUDE.md`, `PROGRESS.md` (own block only), `docs/feature-backlog.md`,
+`docs/claims/decisions.md`, `docs/pipeline.md`, `docs/backlog-triage.md`, `docs/gate-baselines.md`,
+`docs/deployment-infrastructure.md` (one sentence at `:41` only).
+Paired files taken: none.
+Namespaces spent: **`D51` to `D55` in `docs/claims/decisions.md`** — `D1` to `D50` exist, 50 headings counted.
+No migration prefix, no ADR number, no sub-decision id.
+
+Prediction, written before the run:
+- **Pint will be the one that bites**, because the bare host form covers `scripts/`, which the scoped form
+  misses and which this increment edits heavily.
+- PHPStan will not move: it scans `app`, `database` and `routes`, and the largest half of this diff is
+  `scripts/` and tests. Where `app/` is touched the risk is the palette's new optional parameter.
+- `pipeline-lint` P1 will go red at least once — this increment regenerates `docs/pipeline.md` twice, and a
+  citation that resolves only on this host reorders the queue.
+- **The one I most expect to be wrong:** that the `before-testing` total lands on 7. Both `M96` and `M98`
+  computed it from an assumption about the new marker's own tier, and the computed answer may be neither 6 nor 7.
+- `tracker-lint` R1 will warn but not fail on the first push, and a tracker surgery will be needed before the
+  close-out bullet lands.
 
 ## RELEASED — `M98`, what the testing-server build found: the session time zone, the typed 2FA key, a documentation push that no longer takes the site down, and twenty-five rows that existed only in session memory (merged as PR #291, `64242df`, 6/6 green with real step counts — Static analysis 28 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

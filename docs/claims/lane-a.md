@@ -29,6 +29,9 @@ Shipped 2026-09-18. Branch `m98-testing-server-findings`, cut from `origin/main`
 - Every claimed file was edited. The claim was extended to none.
 - Outside the repository, the Testing Server Checklist artifact was corrected in sixteen places and re-ticked to
   32 of 34.
+- **Both halves of the deploy change were then measured on the host, twenty minutes apart.** The merge opened a
+  7.9-second window (its first automatic deploy, 4 min 43 s end to end); the close-out, seven documentation files,
+  answered `Only paths the site does not run changed` and fast-forwarded with no window in two seconds.
 
 ⛔ **THE HEADLINE: THE FINDING THAT LOOKED LIKE A CLOCK SETTING WAS EXPIRING EVERY PASSWORD-RESET LINK, AND THE
 ONE THAT LOOKED LIKE A COSMETIC CHECKLIST NOTE WOULD HAVE LEFT THE SITE WITH NO CERTIFICATE.**

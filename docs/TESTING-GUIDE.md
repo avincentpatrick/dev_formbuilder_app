@@ -434,7 +434,10 @@ rewriting its answers are different powers.
 ## 12. Security and two-factor — Feature #14
 
 1. `/settings` · owner → the **Security** card. Enable 2FA. **Expect:** a QR code you can scan with any TOTP
-   app, and a set of recovery codes.
+   app, the same secret written out as a key you can type beside it — for enrolling on the device that holds
+   the authenticator, which cannot scan its own screen — and a set of recovery codes. The typed key is shown
+   only while enrolment is unfinished; once 2FA is confirmed it is gone, and regenerating recovery codes does
+   not bring it back.
 2. Confirm enrolment with a code from the app. **Expect:** it is accepted.
 3. Sign out and sign back in. **Expect:** you are challenged for a 6-digit code.
 4. Sign out again and sign in using a **recovery code** instead. **Expect:** it works, and that code is spent.

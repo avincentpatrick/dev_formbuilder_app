@@ -16,7 +16,118 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M97` is merged; the early-testing tier continues, named in `docs/pipeline.md` § Next
+## Status: ACTIVE CLAIM — `M98`, what the testing-server build found: the session timezone, the typed 2FA key, and the deploy window a documentation push opens (`m98-testing-server-findings`)
+
+Taken 2026-09-18. Branch `m98-testing-server-findings`, cut from `origin/main` at `ce89b98`, PR into `main`.
+
+**Three rows are TAKEN, and the increment's larger half is FILING.** The testing server behind
+`staging.pitahc.gov.ph` was built step by step on 2026-09-17 (32 of 34 checklist steps). That build produced
+seventeen findings, two answered decisions and two unasked questions that existed **only in session memory** —
+no row, no decision, no runbook line. `CLAUDE.md` forbids an unqueued obligation, so this increment files
+them, plus about thirty further items a read-only verification pass found beside them.
+
+Rows taken:
+1. **NEW, filed and closed here — the four `pgsql` connections set no session timezone.** `config/database.php`
+   `pgsql` (`:89`), `pgsql_auth` (`:117`), `pgsql_privileged` (`:142`) and `pgsql_superadmin` (`:164`) carry
+   `search_path` but no `timezone`, so under a server zone of `Asia/Manila` every PHP-bound timestamp landed
+   eight hours early on the testing box until the operator ran `ALTER DATABASE meridian SET timezone TO 'UTC'`.
+2. **NEW, filed and closed here — the two-factor setup page shows no typed key.**
+   `resources/js/components/settings/TwoFactorSetup.vue:48-61` fetches the QR code and the recovery codes and
+   never `/user/two-factor-secret-key`, which Fortify serves at `vendor/laravel/fortify/routes/routes.php:162`.
+3. **`R-b234f16d`** (`docs/feature-backlog.md:9898`) — "`deploy.yml` says a documentation push produces no run,
+   and every close-out push still redeploys the testing site."
+
+### Evidence verified
+
+- **Row 1 — held, and it understates itself.** The connector honours the key that is missing:
+  `vendor/laravel/framework/src/Illuminate/Database/Connectors/PostgresConnector.php` calls
+  `configureTimezone()` from `connect()`, which issues `set time zone '<tz>'` only `if (isset($config['timezone']))`.
+  `Grammar::getDateFormat()` returns `'Y-m-d H:i:s'` with no offset, and `Connection::prepareBindings()` formats
+  every `DateTimeInterface` binding with it, so PostgreSQL resolves each write in the session zone. **Beyond the
+  finding:** columns written by SQL `now()` were correct all along, so the skew is per column, not per row, and
+  `SuperAdminProvisioner` writes both kinds in one `UPDATE` — no blanket `+ 8 hours` repair is safe. It also
+  expired every password-reset link on arrival and disabled the reset throttle, because
+  `DatabaseTokenRepository` writes `created_at` from PHP and compares it in PHP.
+- **Row 2 — held.** `loadSetup()` destructures exactly two responses; the secret key appears nowhere in
+  `resources/js`. The same component serves Settings → Security, the tenant 2FA gate and the console gate, so one
+  fix covers three surfaces.
+- **Row 3 — held.** `.github/workflows/deploy.yml:29-33` triggers on every completed `CI` run on `main` and
+  `:45` gates only on `conclusion == 'success' && vars.DEPLOY_ENABLED == 'true'`; its header at `:20-28` and
+  `:43-44` still says the workflow "stays dormant". `docs/pipeline.md` is not in `ci.yml`'s `paths-ignore`, and
+  every close-out regenerates it. `gh variable list` reads `DEPLOY_ENABLED=true` (set 2026-09-17T14:49:23Z), so
+  the row's redeploy half is now armed.
+
+### Premise verified
+
+- **Row 1 — the finding's premise is overstated in one direction and understated in another** (see above), and
+  the durable half is what the finding missed: the box fix is not durable. `docs/deployment-infrastructure.md`
+  requires a quarterly full restore to a fresh instance, a restore without `--create` drops a database-level
+  `SET`, and a fresh EDB `initdb` on a Philippine-zoned host picks up the OS zone. The connection-level `SET`
+  beats both the database and the role default, which is why the config key is the real guard.
+- **Row 2 — held, and its scope is wider than "a page".** The people it blocks are those enrolling on the phone
+  that holds their authenticator, and it blocks sign-in outright once a workspace sets
+  `security.require_two_factor`, because that gate offers this component or sign-out.
+- **Row 3 — one premise of the ROW was wrong when it was filed, in the safe direction.** It was marked `Live`
+  while `DEPLOY_ENABLED` was unset, so only its stale header was live then; the redeploy half became live on
+  2026-09-17 and has still not fired, because nothing has been pushed to `main` since. **The fix's premise
+  needed correcting too:** the comparison must be against the recorded `deployed-sha`, not against the push's own
+  diff, or a documentation close-out following a merge whose deploy failed before its window would skip and that
+  merge's code would never go live.
+- **Measured while clearing the ground, and it belongs to `R-71aa0f49`:** a full second checkout at
+  `.kilo/worktrees/universal-forest` inside the repository root reordered the generated queue.
+  `php scripts/pipeline.php --check` reported DRIFT with the tree unchanged, and reported `current` the moment
+  the worktree was removed — so a local regeneration from such a checkout would have failed CI's `P1`.
+
+### Remedy verdict
+
+- **Row 1 — implementable, and measured before the test was written.** `'timezone' => 'UTC'` on all four
+  connections is honoured on every new PDO, including reconnects. Hard-coded, not `env()`: writing offset-less
+  times is correct only while the session zone equals `config('app.timezone')`. The test must force a non-UTC
+  startup zone (`PGTZ`) on a probe connection, because CI's PostgreSQL already reports UTC and would otherwise
+  pass before the fix.
+- **Row 2 — implementable.** The endpoint is registered and behind the same `password.confirm` middleware as the
+  QR route, so a third `fetch` inside the existing `Promise.all` and `!ok` path keeps the 423 behaviour. It must
+  be fetched only when `!props.confirmed`, because `regenerate()` reuses `loadSetup()`.
+- **Row 3 — the row's own remedy is half wrong.** "Correct the header" holds. "Skip the window when nothing the
+  site runs changed" cannot go in `paths-ignore` (`pipeline-lint` gates `docs/pipeline.md`), and it cannot use
+  porcelain `git diff --name-only`, which prints only a rename's new path — **measured** on `e502f7a`, where it
+  printed one file and `git diff-tree -r --name-only` printed two. So: `diff-tree --no-renames`, a deny-by-default
+  allowlist, and the skip only when `deployed-sha` is valid, equals live `HEAD`, the site is up and the live build
+  is present.
+
+Files: `config/database.php`, `tests/Feature/Tenancy/ConnectionTopologyTest.php`,
+`app/Support/Analytics/AnalyticsQuery.php`, `app/Services/Analytics/AnalyticsMetricsService.php`,
+`resources/js/components/settings/TwoFactorSetup.vue`,
+`resources/js/components/settings/TwoFactorSetup.test.ts`, `deploy.ps1`, `.github/workflows/deploy.yml`,
+`.github/workflows/ci.yml`, `tests/Feature/Deploy/` (a new static guard), `docs/feature-backlog.md`,
+`docs/claims/decisions.md`, `docs/pipeline.md` (generated), `docs/deployment-infrastructure.md`,
+`docs/non-functional-requirements.md`, `docs/piping-output-encoding-design.md`, `docs/TESTING-GUIDE.md`,
+`PROGRESS.md` and `docs/gate-baselines.md` (close-out only), and this file.
+
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/claims/decisions.md`, `docs/pipeline.md`,
+`docs/deployment-infrastructure.md`, `docs/non-functional-requirements.md`, `docs/piping-output-encoding-design.md`,
+`docs/TESTING-GUIDE.md`, `PROGRESS.md` (own block only). Outside the repository: the Testing Server Checklist
+artifact.
+
+Paired files taken: `docs/deployment-infrastructure.md` with `tests/Feature/Mail/QueuedMailContractTest.php`,
+which asserts the runbook still contains the worker command's `--queue={$order}` string byte for byte. The
+runbook edits here are in §8 and §4 and leave that string untouched.
+
+Namespaces spent: `D47`, `D48` (answered, recorded here), `D49`, `D50` (opened here). No ADR, no migration
+prefix, no exceptions entry. `0010` stays reserved for H1d.
+
+**D13:** `R-b234f16d` is this batch's ONE hub row (`.github/workflows/ci.yml` and
+`docs/deployment-infrastructure.md`). Rows 1 and 2 touch no hub file and share no cited file with it or with each
+other. `R-9021b313`'s remedy is a measurement written at the close-out from this increment's own Deploy run, not
+a fourth batch row.
+
+Prediction: 6/6 green, with the step counts recorded in `docs/gate-baselines.md` — this diff adds one Pest file
+and touches no CI step. **PHPStan cannot move**: it scans `app`, `database` and `routes`, and the two analytics
+comments are the only `app/` edits. Bare `vendor/bin/pint --test` on the host is the only gate that sees
+`config/`. `BacklogProvenanceTest` is the gate I most expect to be wrong, because this increment writes about
+twenty-five rows by hand and its Filed-by match is on raw text, so a closing note quoting another increment's
+`Filed by` would read as a second filer. Second most likely: `citation-liveness-lint`, whose allowance is at its
+ceiling, which is why the new rows cite files and § names rather than line numbers.
 
 ## RELEASED — `M97`, the testing server's layout: `D46` recorded, and three rows filed from turning the Testing Server Checklist into step-by-step instructions (merged as PR #290, `e853b79`, 6/6 green with real step counts — Static analysis 28 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

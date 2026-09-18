@@ -16,7 +16,108 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M100`, the mod_md activation task and the inbound-443 premise refresh (`m100-modmd-activation-and-443-premise`)
+## Status: NO ACTIVE CLAIM — `M100` is merged; the early-testing tier continues, named in `docs/pipeline.md` § Next
+
+## RELEASED — `M100`, the mod_md activation task and the inbound-443 premise refresh (merged as PR #293, `f181efb`, 6/6 green with real step counts — Static analysis 28 · E2E 20 · Contract 16 · Frontend 12 · axe 11 · Pest 11)
+
+Shipped 2026-09-19. Branch `m100-modmd-activation-and-443-premise`, cut from `origin/main` at `0972ec6`.
+- **One piece of infrastructure built and proved on the testing server before the claim was written**, then
+  committed as its own source: `scripts/activate-staged-cert.ps1`, registered as
+  `meridian-certificate-activate`, daily 03:20 as SYSTEM at `runlevel=Highest`.
+- **Five rows closed, four filed, one decision recorded.** `D49 = A`; the open-decision count went 41 → 40.
+- ✅ **The ledger has NO open `major` row for the first time in the series** — `R-df305332` was the last one,
+  and `D5`'s clause 1 now reads MET.
+- **A tracker surgery**: `M92`…`M84`, 9 lines, 29,883 bytes, `PROGRESS.md` 129,102 → 99,219, headroom
+  898 → 30,781. Proved by `scripts/tracker-surgery.php` A1–A4 against an uncommitted tree.
+- **Outside the repository**, the Testing Server Checklist artifact was corrected in thirteen places and
+  re-ticked to 33 of 34 (version 23); `I3`, inviting the testers, is the one left and is the user's.
+
+⛔ **THE HEADLINE: THE THING THAT WAS SUPPOSED TO INSTALL A RENEWED CERTIFICATE HAD BEEN DEAD CODE SINCE THE
+DAY THE RENEWAL WAS FIXED, AND EVERY SIGNAL SAID IT WAS WORKING.** `C:\meridian\check-certificate.ps1` ran
+daily with `-RestartIfReady` and tested `Test-Path "$stage\pubcert.pem"`. The 2026-09-18 fix for the
+EC-versus-RSA challenge mismatch — `MDPrivateKeys secp256r1` — changes the filename mod_md writes to
+`pubcert.secp256r1.pem`, so that branch could never be true again. The task still ran, still exited 0, still
+wrote a success line to its log, and `LastTaskResult` read `0` every day. **The fix for one defect silently
+disarmed the mitigation for another**, and nothing in the repository could have seen it because none of it was
+in the repository. The replacement globs `pubcert*.pem`, and the comment saying so is the most load-bearing
+line in the file.
+
+⛔ **AND THE SECOND HEADLINE IS THAT THREE OF THIS LEDGER'S OWN CITATIONS WERE ALREADY WRONG, AND AN EDIT THAT
+WAS NOT TRYING TO FIX ANYTHING FIXED TWO OF THEM.** Measured against `git show HEAD`: the claim *"24
+`data-dictionary.md:N` citations"* sat at line 8037 while two sentences cited `:8043`, and *"it does not check
+the id it just"* sat at 7909 while a sentence cited `:7915`. Both were off by exactly six lines and both were
+**alive**, so the gate passed them. A six-line note added far above them, for an unrelated re-point, moved both
+claims onto the very lines their citations already named. **Two defects repaired by accident, and a third
+(`:7858`) still wrong** — filed rather than guessed at, because the number was never right and a delta would
+produce a second live, wrong line.
+
+**How the prediction fared — four right, one right for the wrong reason, one refuted before the fact, and the
+one named as most likely wrong was wrong in the opposite direction.**
+- ✅ **`tracker-lint` R1 was predicted to fail without a surgery and pass after it, and that is what happened.**
+  898 bytes of headroom against a 3,460-byte mean close-out is arithmetic, not judgement. R7 correctly did not
+  arm at this size (9 lines against 200, 29,883 bytes against 50,000); the marker was landed anyway, because
+  `CLAUDE.md` requires it of the move rather than of the gate's opinion of the move.
+- ✅ **`pipeline-lint` P7b changed exactly as predicted** — `D49` to `ANSWERED`, 41 open decisions → 40, one
+  `early-testing` row removed, nothing to strip because no `Awaits D49` token existed anywhere.
+- ✅ **PHPStan did not move, and the reasoning was the right one**: it scans `app`, `database` and `routes`, and
+  this diff is documentation plus one `.ps1`. Said rather than quoted.
+- ✅ **Pint passed**, having no changed PHP to read.
+- ⚠️ **`BacklogProvenanceTest` was named as the real Pest risk and it DID go red — for a reason the prediction
+  had backwards.** The prediction said five closures each have to keep their `Filed by` and *lose* their
+  liveness marker, "both, not either". **That is wrong**: the gate's liveness arm is open rows only, by its own
+  comment — `⛔ OPEN ROWS ONLY, AND NOT AS A CONVENIENCE` — so a closed row's marker is never read, and every
+  closed row in this file keeps one. The bodies were left verbatim instead. What actually reddened it was a
+  **new** row: the `nit` was written `**Live, and deliberately not fixed.**`, which is outside the vocabulary,
+  so the row recorded no verdict at all. Right gate, right increment, wrong half of the file.
+- ❌ ⚠️ **The one named as most likely wrong — `citation-liveness-lint` — was wrong in the opposite direction
+  from the one predicted.** The prediction expected to have *missed* a citation and rotted a nineteenth. The
+  ledger never moved off 18 of 18 at any point. The archive trio (`PROGRESS_ARCHIVE.md:6886/:6891/:6892`) did
+  shift by the surgery's eleven lines and was re-derived by grepping `include_answers` rather than by adding
+  the delta — the cross-check that it equalled old+11 was recorded as a cross-check and not as the derivation.
+  The surprise was the second headline above: the rot was already there, and an accident repaired it.
+- ❌ **The second-most-likely failure was REFUTED BEFORE IT COULD HAPPEN, by measuring instead of assuming.**
+  The prediction feared `pipeline-lint` P2b/P2c/P2e: `PROGRESS_ARCHIVE.md` is outside the generator's corpus,
+  so moving a status bullet carrying disposition or deferral vocabulary would drop a counted site. Running
+  `pipeline-lint --verbose` before touching anything showed **zero P2 sites in `PROGRESS.md`** — they are
+  headings in `docs/PRD.md`, the ADRs and the specs, and deferral sentences in six other documents. The
+  surgery could not have moved a digest. Worth more than a lucky pass: the constraint it *did* impose was
+  real and was designed around — `docs/deployment-infrastructure.md` holds one P2b site,
+  `#out of scope / deferred`, harvested by heading text, so §9's heading was not touched; and no new prose
+  anywhere may contain the four deferral phrases, which is why none of it does.
+
+**What was found that no row and no prediction named.**
+- ⛔ **The premise the work was authorised on was wrong in two ways at once.** There is no *blind weekly* Apache
+  restart on that box. There is a **daily** task, at 03:00, already conditional on `-RestartIfReady` — so the
+  decision to "retire the blind weekly restart" was taken against something that does not exist, and the real
+  defect was that the conditional was broken. Both halves of `D49`'s sentence about it are corrected in place.
+- ⛔ **`docs/claims/` is EXCLUDED from the citation linter entirely**, and reading that out of
+  `citation-liveness-lint.php` rather than assuming it relaxed the whole shape of the documentation rewrite.
+  The claim had committed to line-neutral edits above `:317` to protect four citations; three of those four
+  live in `lane-a.md` and are in neither tier. What actually binds is `:39` and `:129`, cited from
+  `feature-backlog.md`, which is tier 2 at its ceiling — both below line 130, so §8 onward could be
+  restructured freely and only lines 1–129 had to be one-line-for-one-right. The refinement was recorded
+  before the first edit, not discovered after a red gate.
+- ⚠️ **The approved plan's placement for the script was wrong, and the reason is measured rather than
+  aesthetic.** It was to live only at the deployed path. `deploy.ps1` hard-resets the app checkout, so between
+  the build and the merge any deploy would have deleted it and silently disarmed the task — and a `-Ref`
+  rollback to a pre-`M100` sha would do it again, permanently. The operational copy sits at `C:\meridian\`,
+  outside the app tree, with the repository as its source and the install command in §8.3. The deviation was
+  stated to the user before it was made.
+- ⚠️ **The artifact's renderer has no bold support, and 21 `**…**` pairs would have shipped as literal
+  asterisks.** `fmt()` converts backticks to `<code>` and nothing else; the data model contained exactly one
+  pre-existing pair. Caught by reading the regenerated HTML rather than by trusting the edit, stripped, and the
+  original pair restored with the count asserted back to 2. ✅ **The control run is what made the rebuild
+  safe**: node requiring the page's own script and re-rendering from unmodified data reproduced the live body
+  **byte for byte**, 83,344 bytes, before anything was changed.
+- ⚠️ **The saved artifact source carries the viewer's own wrapper** — line 1 opens a document and line 1930
+  closes it — so the publishable document is lines 2–1929. Publishing the file as read would have nested one
+  document inside another.
+- ✅ **`httpd -t` on that host prints `AH00558` about a missing global `ServerName` before `Syntax OK`.** Benign
+  — the vhost carries its own — but the activation script captures `httpd -t`'s output into an operator-facing
+  log, so it will sit beside every real certificate event for ever. Written into §8.3 as expected, and filed as
+  a `nit` that is deliberately not fixed: there was no restart left in this increment to fold it into.
+
+**The per-row record of what was claimed, kept because the three verdicts are the point.**
 
 Taken 2026-09-19. Branch `m100-modmd-activation-and-443-premise`, cut from `origin/main` at `0972ec6`, PR into main.
 

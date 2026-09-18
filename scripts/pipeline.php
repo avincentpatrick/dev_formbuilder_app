@@ -198,6 +198,33 @@ $corpusOnly = isset($opts['corpus']);
 $scan = scan_markers();
 $markers = $scan['markers'];
 
+// ⛔ TWO MARKERS MAY NOT CARRY ONE ID (M99, closing R-964bc5a4). An id is what every consumer joins
+//    on — `pipeline-lint`'s stop-list, the roadmap cross-check, `loop.php`'s held-topic refusal — and
+//    a duplicate produced two rows in the line that no reader could tell apart, with the second
+//    silently deciding what the first meant wherever a lookup took the last match. The scan reports
+//    every offender and the files they sit in rather than the first, because a copy-paste of a marker
+//    block makes several at once.
+$seen = [];
+
+foreach ($markers as $marker) {
+    $seen[(string) $marker['id']][] = $marker['source'] ?? '(unknown)';
+}
+
+$duplicates = array_filter($seen, static fn (array $where): bool => count($where) > 1);
+
+if ($duplicates !== []) {
+    cannot_measure(sprintf(
+        'the marker scan found %d id(s) declared more than once: %s. An id is what every consumer '
+        .'joins on, so a duplicate puts two rows in the line that no reader can tell apart.',
+        count($duplicates),
+        implode('; ', array_map(
+            static fn (string $id, array $where): string => $id.' at '.implode(' and ', $where),
+            array_keys($duplicates),
+            $duplicates
+        ))
+    ));
+}
+
 if ($scan['files'] < MIN_SCANNED_FILES) {
     cannot_measure(sprintf(
         'the marker scan reached only %d file(s), under the floor of %d. A directory walk that has '
@@ -456,6 +483,23 @@ function parse_marker(string $line, string $path, int $lineNo): array
             $lineNo,
             $fields['size'],
             implode(', ', SIZES)
+        ));
+    }
+
+    // ⛔ A `done` MARKER MUST CITE WHERE IT LANDED (M99, closing R-974db618). `--help` has promised
+    //    this since the key existed — "a done state must cite where it landed" — and nothing asked for
+    //    it, so the promise was documentation of a rule that was never enforced. A done row with no
+    //    citation is the shape that lets a marker claim work is finished with nothing to check it
+    //    against, and the testing-server notification marker this increment adds is exactly the kind
+    //    of claim that must never be unattributable: it is what stops the notification being sent
+    //    twice, so "who did it and when" is the whole of its value.
+    if ($fields['state'] === 'done' && trim((string) ($fields['done'] ?? '')) === '') {
+        cannot_measure(sprintf(
+            'the marker at %s:%d is state "done" and cites nothing in `done=`. --help has promised '
+            .'that a done state cites where it landed since the key existed; an unattributable done '
+            .'row asserts that work is finished and offers nothing to check it against.',
+            $path,
+            $lineNo
         ));
     }
 

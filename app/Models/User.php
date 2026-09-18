@@ -10,6 +10,8 @@ use App\Enums\ThemeMode;
 use App\Models\Concerns\HasUuidv7;
 use App\Notifications\Auth\QueuedResetPassword;
 use App\Notifications\Auth\QueuedVerifyEmail;
+use App\Notifications\Concerns\CarriesTenantBrand;
+use App\Support\Branding\BrandPalette;
 use Database\Factories\UserFactory;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Auth\Notifications\VerifyEmail;
@@ -161,12 +163,14 @@ class User extends Authenticatable implements MustVerifyEmail
             ['id' => $this->getKey(), 'hash' => sha1($this->getEmailForVerification())],
         );
 
-        // No ->withBrand(): the two Fortify emails are deliberately the only unbranded ones (H23a4).
-        // config/fortify.php carries no tenancy middleware, so there is no resolved tenant here — and a
-        // User may be a member of several, so "whose brand" has no correct answer either. They still
-        // render through the Meridian template; see QueuedVerifyEmail::buildMailMessage().
+        // Still unbranded — no COLOUR, for the reasons H23a4 gives and QueuedVerifyEmail restates: there
+        // is no resolved tenant here, and a User may belong to several, so "whose brand" has no correct
+        // answer. The HOME LINK is a different question with a correct answer, and M99 (R-62fb2e05)
+        // measured what happens when the two are conflated: the header fell back to `config('app.url')`,
+        // which under D46 is the agency's own public website, so every tester's verification mail linked
+        // its header off this application entirely. {@see brandLinkedTo()}.
         Notification::route('mail', $this->getEmailForVerification())
-            ->notify(new QueuedVerifyEmail($url));
+            ->notify((new QueuedVerifyEmail($url))->withBrand(self::brandLinkedTo($url)));
     }
 
     /**
@@ -184,9 +188,43 @@ class User extends Authenticatable implements MustVerifyEmail
             'email' => $this->getEmailForPasswordReset(),
         ], false));
 
-        // Unbranded for the same two reasons as the verification email above (H23a4).
+        // Unbranded for the same two reasons as the verification email above (H23a4), and linked to the
+        // same origin as its own action URL for the reason given there.
         Notification::route('mail', $this->getEmailForPasswordReset())
-            ->notify(new QueuedResetPassword($url));
+            ->notify((new QueuedResetPassword($url))->withBrand(self::brandLinkedTo($url)));
+    }
+
+    /**
+     * An unbranded palette whose home link is the origin of the message's own action URL.
+     *
+     * ⛔ THE ORIGIN IS TAKEN FROM THE ACTION URL, NOT FROM THE REQUEST AND NOT FROM CONFIG, AND EACH OF
+     * THE THREE IS A DIFFERENT ANSWER. Both callers build their URL with `route()`/`temporarySignedRoute()`
+     * against the host the member is actually on — `config/fortify.php` sets `domain => null` precisely so
+     * these forms answer on a workspace host — so the action URL already carries the one destination this
+     * message is known to be about. `config('app.url')` is the central address, which under D46 is the
+     * agency's public website on another machine. And `request()` cannot be used at all: {@see CarriesTenantBrand}
+     * substitutes the palette at RENDER, on the queue worker, where there is no request and the host would
+     * resolve from the console kernel — stamping a local hostname into live mail, non-deterministically,
+     * while every in-process test stayed green. Resolving at DISPATCH is what makes it provable.
+     *
+     * ⚠️ A URL THIS CANNOT PARSE YIELDS NO LINK RATHER THAN A GUESS. An unparseable action URL means the
+     * message is already broken in a larger way; adding a fabricated destination to it helps nobody.
+     *
+     * @return array<string, string>
+     */
+    private static function brandLinkedTo(string $actionUrl): array
+    {
+        $parts = parse_url($actionUrl);
+        $scheme = $parts['scheme'] ?? null;
+        $host = $parts['host'] ?? null;
+
+        if ($scheme === null || $host === null) {
+            return BrandPalette::product('');
+        }
+
+        $port = isset($parts['port']) ? ':'.$parts['port'] : '';
+
+        return BrandPalette::product($scheme.'://'.$host.$port);
     }
 
     /**

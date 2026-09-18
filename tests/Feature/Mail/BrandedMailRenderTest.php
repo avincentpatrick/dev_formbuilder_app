@@ -233,3 +233,48 @@ it('resolves the meridian theme and not the framework default', function (): voi
     expect($html)->not->toContain('#18181b')
         ->and($html)->not->toContain('#52525b');
 });
+
+/*
+|--------------------------------------------------------------------------
+| Where the header logo points (M99, R-62fb2e05).
+|--------------------------------------------------------------------------
+| The header partial wraps the product name, or the tenant logo, in a link to `$brand['url']`, and the
+| unbranded palette took that value from `config('app.url')`. Under D46 `APP_URL` is the agency's own
+| public website on a different machine, so every message an unbranded workspace sends — which, since
+| `tenants:create` sets no brand colour, is essentially every message on the testing server — linked its
+| header off this application entirely.
+|
+| ⛔ THE CASE ABOVE COULD NOT HAVE CAUGHT IT. "Falls back to the product palette" asserts the fill
+| colour, the app name, the absence of a logo and the absence of an attribution — four things, none of
+| them the destination. A gate that checks everything about a link except where it goes is the shape
+| this row was.
+*/
+
+it('links the unbranded header at the url the palette was given, not at APP_URL', function (): void {
+    config(['app.url' => 'https://central.example']);
+
+    $html = renderStubMail(BrandPalette::product('https://acme.meridian.test'));
+
+    expect($html)->toContain('href="https://acme.meridian.test"')
+        ->and($html)->not->toContain('href="https://central.example"');
+});
+
+it('renders the header unlinked when the palette carries no url at all', function (): void {
+    // ⛔ NOT `href=""`. An empty href resolves to the CURRENT document, which in an email client is
+    //    whatever that client happens to be showing — so "we have no home page for you" would become a
+    //    link that does something arbitrary. A recipient who belongs to no workspace has no honest
+    //    destination, and under D46 the central address is somebody else's website.
+    $html = renderStubMail(BrandPalette::product(''));
+
+    expect($html)->not->toContain('href=""')
+        ->and($html)->toContain((string) config('app.name'));
+});
+
+it('still defaults to APP_URL when no url is passed, so an ordinary deployment is unchanged', function (): void {
+    // The default is deliberately kept: on a deployment where APP_URL really is the product's home, it
+    // is the right answer, and the two PDF renderers that call product() read no url at all. What M99
+    // changed is that every caller which KNOWS a workspace now says so.
+    config(['app.url' => 'https://central.example']);
+
+    expect(renderStubMail(BrandPalette::product()))->toContain('href="https://central.example"');
+});

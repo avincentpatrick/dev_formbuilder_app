@@ -163,11 +163,18 @@ it('keeps a probe list that spans the mechanisms it is there to tell apart', fun
     // 2026-09-19: `/up`, `/robots.txt` and `/favicon.ico` carry `X-Robots-Tag` and carry none of the
     // four headers that middleware sets — which is the evidence that no middleware can replace the
     // vhost line, and this list is what keeps that evidence under a gate.
-    expect($probes)->toContain('/robots.txt');
-    expect($probes)->toContain('/favicon.ico');
-    expect($probes)->toContain('/up');
-    expect($probes)->toContain('/nonexistent-static.txt');
+    expect($probes)->toContain('https://staging.pitahc.gov.ph/robots.txt');
+    expect($probes)->toContain('https://staging.pitahc.gov.ph/favicon.ico');
+    expect($probes)->toContain('https://staging.pitahc.gov.ph/up');
+    expect($probes)->toContain('https://staging.pitahc.gov.ph/nonexistent-static.txt');
     expect(count($probes))->toBeGreaterThanOrEqual(4);
+
+    // ⛔ AND THEY ARE ABSOLUTE. `ci.yml` fetches exactly what this prints, so a bare path would oblige
+    // the workflow to carry its own copy of the host. Asserting the scheme here is what stops that
+    // second copy being reintroduced by someone tidying the output.
+    foreach ($probes as $probe) {
+        expect($probe)->toStartWith('https://');
+    }
 });
 
 it('never probes a content-hashed build path', function (): void {
@@ -176,7 +183,7 @@ it('never probes a content-hashed build path', function (): void {
     // file on every build. A false red on a merge gate is the thing this repository least wants, so
     // the trap is pinned here rather than left as a comment nobody re-reads.
     foreach (stagingHeadersProbes() as $probe) {
-        expect($probe)->not->toStartWith('/build/');
+        expect($probe)->not->toContain('/build/');
     }
 });
 

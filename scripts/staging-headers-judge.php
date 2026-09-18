@@ -151,8 +151,12 @@ if (in_array('--help', $arguments, true)) {
 }
 
 if ($wantProbes) {
+    // ⛔ FULL URLs, NOT PATHS, AND THE HOST IS THE REASON. The CI fetch step consumes this output
+    // verbatim, so emitting bare paths would oblige `ci.yml` to carry its own copy of STAGING_HOST —
+    // two copies of one fact, free to drift, which is the defect `docs/gate-baselines.md` exists to
+    // end for gate numbers and `docs/claims/TEMPLATE.md` for the claim template.
     foreach (STAGING_PROBES as $probe) {
-        fwrite(STDOUT, $probe."\n");
+        fwrite(STDOUT, 'https://'.STAGING_HOST.$probe."\n");
     }
 
     exit(STAGING_EXIT_OK);
@@ -391,10 +395,10 @@ function staging_usage(): string
 
     return "Usage: php scripts/staging-headers-judge.php --probes\n".
         "       php scripts/staging-headers-judge.php --captures=<dir>\n\n".
-        "Judges responses already captured from ".STAGING_HOST.". It does NOT fetch: fetching and\n".
+        'Judges responses already captured from '.STAGING_HOST.". It does NOT fetch: fetching and\n".
         "judging are separate steps precisely because an unreachable box and a missing header must\n".
         "not be the same red.\n\n".
-        "  --probes           print the paths to fetch, one per line, in capture order\n".
+        "  --probes           print the URLs to fetch, one per line, in capture order\n".
         "  --captures=<dir>   judge <dir>/<n>.headers and <dir>/<n>.body for the n-th probe\n\n".
         "  0  judged, and every required header is present on every probe ({$headers})\n".
         "  1  a required header is missing or weakened — the merge is blocked\n".

@@ -527,17 +527,55 @@ openssl s_client -connect <ip>:443 -servername <domain> -alpn acme-tls/1 -sigalg
 two-second challenge window. If the default run returns the ordinary certificate while the RSA-restricted
 run returns `CN=tls-alpn-01-challenge`, the mismatch is proven.
 
-⚠️ **One check the Testing Server Checklist tells an operator to read does not work:** `md-status` is
-swallowed by `public/.htaccess`'s front-controller rewrite (`RewriteCond %{REQUEST_FILENAME} !-f` sends it
-to `index.php`, and `mod_rewrite` has no handler exemption), so it returns a Laravel page rather than
-`mod_md`'s status. **No step in this runbook may lean on it.** The activation log above is the substitute
-until that is fixed.
+⛔ **`md-status` IS NOT THE CERTIFICATE CHECK AND NO STEP MAY LEAN ON IT.** It is swallowed by
+`public/.htaccess`'s front-controller rewrite (`RewriteCond %{REQUEST_FILENAME} !-f` sends it to
+`index.php`, and `mod_rewrite` has no handler exemption), so it returns a Laravel page rather than
+`mod_md`'s status — measured from outside on 2026-09-19, `/md-status` answers a Laravel **404** carrying
+`X-Powered-By: PHP`. ✅ **The activation task's read-back is the check, and it is the design rather than a
+stopgap**: `LastTaskResult` plus `C:\meridian\certificate-activation.log` report what Apache is *serving*,
+read over the loopback with SNI, which is a stronger fact than `mod_md`'s own opinion of its store.
+⚠️ **The `md-status` step is therefore removed from the Testing Server Checklist rather than repaired.**
+`public/.htaccess` is the **stock, unmodified Laravel file** — routing unknown paths to the front
+controller is its purpose, not a defect — and it is **inert in every environment except this box**, since
+the local stack is nginx and there is no Apache in CI. An exemption added there could not be proved by any
+gate this repository has, which is the same reason `R-4ff3e848` declined its own `.htaccess` arm.
 
 ⚠️ **Also on the box, unfiled against any step here:** a leftover `*:80` vhost for
-`staging.pitahc.gov.ph` in `conf\extra\httpd-vhosts.conf`, harmless while 80 is blocked from outside, and
-an `X-Robots-Tag: noindex, nofollow, noarchive` header set in the vhost — which is the **only** thing
-keeping this site out of search results, since `public/robots.txt` ships from the repository with an empty
-`Disallow:` and must stay that way so production is not blocked.
+`staging.pitahc.gov.ph` in `conf\extra\httpd-vhosts.conf` — harmless, and confirmed harmless on
+2026-09-19, when a connection to port 80 from outside the agency network timed out after 21 s with no
+listener answering.
+
+#### The crawl protection, and which copy is authoritative
+
+⛔ **ONE LINE OF CONFIGURATION ON THIS BOX IS THE ONLY THING KEEPING THIS SITE OUT OF SEARCH RESULTS.**
+
+```apache
+Header always set X-Robots-Tag "noindex, nofollow, noarchive"
+```
+
+Measured from outside on 2026-09-19, it is served on **every** response — `/`, `/login`, `/up`,
+`/robots.txt`, `/favicon.ico`, a hashed build asset and a 404 alike. `public/robots.txt` ships from the
+repository with an empty `Disallow:`, which permits everything, and **must stay that way so production is
+not blocked**; crawlers do fetch it, Googlebot included.
+
+- **The vhost is authoritative for SERVING the header.** It cannot move into the application, and that is
+  measured rather than preferred: `/robots.txt` and `/favicon.ico` are static files Apache serves
+  **without invoking PHP at all**, and `/up` is a PHP route outside every group `AppSecurityHeaders` is
+  mounted on. All three carry `X-Robots-Tag` and none of them carries the four headers that middleware
+  sets. Moving it would lose the header on the one URL crawlers actually fetch.
+- **`scripts/staging-headers-judge.php` is authoritative for its SURVIVAL.** It runs nightly on `main`
+  from `.github/workflows/ci.yml`, probes six paths spanning both mechanisms, and blocks the merge if the
+  header is absent or its directives are weakened. An unreachable box, or a response it cannot attribute
+  to this site, is **exit 2 — not measured** — and renders as a warning rather than a red, so an outage
+  and a deleted vhost line are never the same signal.
+- ⚠️ **Its floor is the Pest control, `tests/Feature/Docs/StagingHeadersJudgeTest.php`, and deliberately
+  NOT `docs/gate-baselines.md`.** `scripts/gate-baselines.php`'s metric list is *declared, not derived*,
+  and a metric whose pattern is absent writes `NOT FOUND` **and exits 1** — so declaring a `schedule`-only
+  gate there would fail every close-out regeneration, which runs from a `push`.
+- ⚠️ **Which file on the box holds the directive is not settled here.** `docs/feature-backlog.md:10621`
+  records it in `conf\extra\meridian.conf`; the paragraph above it names `conf\extra\httpd-vhosts.conf`
+  for the `*:80` vhost, and this file's own enumeration of `meridian.conf` by line number does not list
+  it. A row is open to confirm it on the box, and **no step here may name the file until it is**.
 
 ---
 

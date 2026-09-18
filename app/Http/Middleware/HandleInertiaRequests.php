@@ -42,6 +42,13 @@ class HandleInertiaRequests extends Middleware
     {
         $user = $request->user();
 
+        // ⛔ DELIVERED HERE BECAUSE THE CONFIRMATION PAGE IS NOT WHERE IT MATTERS. `RequireRecentPassword`
+        //    puts `step_up.discarded` when it bounces a write; `auth/ConfirmPassword` shows it as an
+        //    inline notice, and THEN the member confirms and is redirected to `url.intended` — a GET of
+        //    the page they came from, re-rendered from the database with their change absent. That page
+        //    is the one that has to say so, and it is two requests further on than any flash survives.
+        $discardedToast = $this->consumeDiscardedStepUpWrite($request);
+
         return [
             ...parent::share($request),
             'auth' => [
@@ -99,7 +106,9 @@ class HandleInertiaRequests extends Middleware
             // ->with('toast', ['type' => 'success'|'error'|'info', 'message' => '…']); the app shell's
             // ToastHost raises it once, then the session flash is gone.
             'flash' => [
-                'toast' => $request->session()->get('toast'),
+                // A controller's own toast always wins: it describes what THIS request did, which is more
+                // specific than a standing notice about a request two hops ago.
+                'toast' => $request->session()->get('toast') ?? $discardedToast,
                 // Non-fatal XLSForm-import warnings (Increment G7b) — the builder renders these as a
                 // dismissible banner after a destructive import so the author reviews lossy coercions
                 // (dynamic repeat_count, downgraded grids, sanitized keys) before publishing (§6).
@@ -123,6 +132,43 @@ class HandleInertiaRequests extends Middleware
                 'newSecret' => $request->session()->get('newSecret'),
                 'testResult' => $request->session()->get('testResult'),
             ],
+        ];
+    }
+
+    /**
+     * Turn a step-up-discarded write into a toast, once, on the first page that is not the prompt.
+     *
+     * ⛔ THE KEY IS FORGOTTEN HERE AND NOWHERE ELSE, AND THE EXCLUSION IS THE POINT. `auth/ConfirmPassword`
+     * reads the same key to render its inline notice and deliberately does not clear it, because a member
+     * who reloads that page would otherwise lose the only explanation they were ever given. Clearing on the
+     * first OTHER page is what makes it exactly-once: the confirmation prompt can be shown any number of
+     * times, and the destination is told precisely once.
+     *
+     * ⚠️ THE PROMPT IS IDENTIFIED BY ROUTE, NOT BY REFERER OR BY URL SHAPE. Fortify registers
+     * `password.confirm` for the GET and `password.confirm.store` for the POST, and both must be excluded
+     * — clearing on the POST would consume the notice on the very request that makes the destination
+     * reachable, which is the one hop where losing it is guaranteed.
+     *
+     * @return array{type: string, message: string}|null
+     */
+    protected function consumeDiscardedStepUpWrite(Request $request): ?array
+    {
+        $discarded = $request->session()->get('step_up.discarded');
+
+        if (! is_array($discarded)) {
+            return null;
+        }
+
+        if (in_array($request->route()?->getName(), ['password.confirm', 'password.confirm.store'], true)) {
+            return null;
+        }
+
+        $request->session()->forget('step_up.discarded');
+
+        return [
+            'type' => 'error',
+            'message' => 'Your change was not saved. You were asked to confirm your password first, '
+                .'and the change was discarded — please make it again.',
         ];
     }
 }

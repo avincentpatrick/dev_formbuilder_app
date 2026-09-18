@@ -117,7 +117,25 @@ final class RequireRecentPassword extends RequirePassword
         // An explicit `$redirectToRoute` is a caller overriding the destination; honour it rather than
         // silently sending them somewhere else. `expectsJson()` is excluded because the parent answers those
         // with a 423 and no redirect at all — there is nothing to fork.
-        if ($redirectToRoute === null && ! $request->expectsJson() && $this->shouldConfirmPassword($request, $timeout)) {
+        // ⛔ THE PAYLOAD IS ABOUT TO BE DROPPED, AND UNTIL NOW NOTHING SAID SO. `Redirector::guest()`
+        //    records `previous()` rather than the request for any NON-GET, so the ten writes behind this
+        //    gate bounce to a GET of the page they came from, re-rendered from the database, with the
+        //    body gone and no message. On the tenant side it is worse than a lapse: `password_confirmed_at`
+        //    has one non-SSO writer — Fortify's own controller — and signing in never stamps it, while
+        //    `GET /members` is deliberately ungated, so a workspace Owner loses their FIRST role change of
+        //    every session, not merely one made fifteen minutes after opening the page.
+        //
+        // ⚠️ NON-GET ONLY, AND THE TEST IS NOT DECORATION. A gated GET is recorded as its own intended URL
+        //    and loses nothing, so announcing a discarded write there would be a lie on every console page
+        //    load. `expectsJson()` is excluded for the same reason the fork below is: the parent answers
+        //    those with a 423 and no redirect, so there is no bounce to explain.
+        $confirming = ! $request->expectsJson() && $this->shouldConfirmPassword($request, $timeout);
+
+        if ($confirming && ! $request->isMethod('GET')) {
+            $this->rememberDiscardedWrite($request);
+        }
+
+        if ($redirectToRoute === null && $confirming) {
             $ssoStepUp = $this->ssoStepUpUrl($request);
 
             if ($ssoStepUp !== null) {
@@ -157,5 +175,30 @@ final class RequireRecentPassword extends RequirePassword
         }
 
         return $request->getSchemeAndHttpHost().'/sso/saml/step-up';
+    }
+
+    /**
+     * Record that a write was discarded by this gate, so the member can be told.
+     *
+     * ⛔ `put()`, NEVER `flash()`, AND THAT IS THE WHOLE DESIGN. Delivering this costs FOUR requests —
+     * the bounced write, the GET of the confirmation page, the POST that confirms, then the redirect to
+     * `url.intended` — and a flash is aged out after the second. The row's own remedy said "flash a
+     * warning on the confirm page and after it" and could not have worked: it would have rendered on the
+     * confirm page and then vanished before the page the member actually came from. This key is put, read
+     * twice, and forgotten by {@see HandleInertiaRequests} once it has been shown somewhere other than
+     * the confirmation page itself.
+     *
+     * ⚠️ WHAT IS STORED IS A DESCRIPTION, NEVER THE PAYLOAD. Replaying the request is not on the table —
+     * these ten routes carry `can:` gates, a `feature:sso_saml` gate, FormRequest validation and
+     * route-model binding, and a replay that skipped any of them would turn a security gate into a
+     * confused deputy — so storing the body would be keeping credentials-adjacent form data in the
+     * session for no reachable purpose. The method and the URL are what a human needs to redo it.
+     */
+    protected function rememberDiscardedWrite(Request $request): void
+    {
+        $request->session()->put('step_up.discarded', [
+            'method' => $request->method(),
+            'url' => $request->fullUrl(),
+        ]);
     }
 }

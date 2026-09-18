@@ -6,6 +6,8 @@ use App\Enums\PlanTier;
 use App\Enums\QueueName;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Notifications\Auth\QueuedResetPassword;
+use App\Notifications\Auth\QueuedVerifyEmail;
 use App\Notifications\TenantInvitationNotification;
 use App\Services\Branding\TenantBrandingService;
 use App\Services\Tenancy\TenantMembershipService;
@@ -16,6 +18,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\URL;
 use Spatie\Permission\PermissionRegistrar;
 
 uses(RefreshDatabase::class);
@@ -100,7 +103,19 @@ it('sends the product palette for a tenant whose plan does not include branding'
     Notification::assertSentOnDemand(
         TenantInvitationNotification::class,
         function (TenantInvitationNotification $notification): bool {
-            expect($notification->brand)->toBe(BrandPalette::product());
+            // ⛔ AMENDED BY M99 (R-62fb2e05), AND THE OLD FORM IS WHY THE DEFECT SURVIVED. It read
+            //    `->toBe(BrandPalette::product())` — a function compared against its own output, which
+            //    is green whatever that function returns and could not have failed if `product()` had
+            //    started returning an empty array. What is asserted now is the CONTRACT: no tenant
+            //    colours, no tenant logo, but the workspace's OWN host as the header link, because the
+            //    tenant is known here and only its branding is missing. Before this, an unbranded
+            //    workspace's invitation linked at `config('app.url')` — the agency's public website
+            //    under D46 — and so did the other six non-auth dispatch sites.
+            expect($notification->brand['bg'])->toBe(BrandPalette::PRODUCT['bg'])
+                ->and($notification->brand['name'])->toBe((string) config('app.name'))
+                ->and($notification->brand['logo_url'])->toBe('')
+                ->and($notification->brand['url'])->toStartWith('https://acme.meridian.test')
+                ->and($notification->brand['url'])->not->toBe((string) config('app.url'));
 
             return true;
         }
@@ -184,4 +199,81 @@ it('renders the branded message end to end through a real worker', function (): 
         // is its own `{{ $slot }}: {{ $url }}` — the tenant's name and its app host, as words.
         ->and($text)->toContain('Acme')
         ->and($text)->toContain('acme.meridian.test');
+});
+
+/*
+|--------------------------------------------------------------------------
+| The two Fortify mails, and where their header points (M99, R-62fb2e05).
+|--------------------------------------------------------------------------
+| ⛔ THESE ARE THE ONES A TESTER ACTUALLY RECEIVES. `config/fortify.php` sets `domain => null` and its
+| own comment records that tenant users legitimately sign in at a workspace address, so "Forgot
+| password" on `acme.meridian.test` sends a reset mail whose header linked at `config('app.url')` — the
+| agency's own public website under D46. The origin is taken from the message's OWN action URL, which
+| both dispatch sites already build against the current host, so the link and the button agree by
+| construction rather than by two readings of the same config.
+|
+| ⚠️ AND IT CANNOT BE DONE AT RENDER. `CarriesTenantBrand` substitutes the palette on the queue worker,
+| where `request()` answers from the console kernel — a request-reading palette would stamp a local
+| hostname into live mail, non-deterministically, while every in-process test here stayed green.
+*/
+
+it('links the password-reset header at the host the reset URL itself points to', function (): void {
+    Notification::fake();
+
+    // ⚠️ DRIVEN THROUGH THE URL GENERATOR RATHER THAN THROUGH `POST /forgot-password`, AND THE REASON IS
+    //    STATED BECAUSE IT IS A REAL LIMIT. A guest POST on the workspace host is the true path, but the
+    //    broker's lookup cannot find a factory user in this fixture — with the tenant GUC set or flushed
+    //    it answers "We can't find a user with that email address" — so that form would assert the
+    //    fixture rather than the code. `forceRootUrl()` is exactly what a request on that host does to
+    //    the generator, which is the one thing the dispatch site reads.
+    //
+    // ⛔ WHAT THIS DOES NOT PROVE, said rather than papered over: that the broker reaches this dispatch
+    //    site on a workspace host. The VERIFICATION case below runs the full request and does prove it,
+    //    and both dispatch sites take their origin from the same helper — so the untested half is the
+    //    routing, not the linking. The sibling case is what makes that argument available.
+    config(['app.url' => 'https://central.example']);
+    URL::forceRootUrl('https://acme.meridian.test');
+
+    User::factory()->create()->sendPasswordResetNotification('a-token');
+
+    Notification::assertSentOnDemand(
+        QueuedResetPassword::class,
+        function (QueuedResetPassword $notification): bool {
+            // ⚠️ THE HOST, NOT THE WHOLE URL. `forceRootUrl()` sets the root but not the scheme, so the
+            //    generator answers http here while a real request would answer https — an artifact of the
+            //    harness, not of the code. Asserting the host states what this case is about; asserting
+            //    the string would pin a detail of the test double and fail on the day it changed.
+            expect(parse_url((string) $notification->brand['url'], PHP_URL_HOST))->toBe('acme.meridian.test')
+                ->and($notification->brand['url'])->not->toContain('central.example');
+
+            return true;
+        }
+    );
+});
+
+it('links the verification header the same way', function (): void {
+    Notification::fake();
+
+    config(['app.url' => 'https://central.example']);
+
+    [$tenant, $admin] = brandedMailTenant();
+    $admin->forceFill(['email_verified_at' => null])->save();
+
+    $this->actingAs($admin)->post('https://acme.meridian.test/email/verification-notification');
+
+    Notification::assertSentOnDemand(
+        QueuedVerifyEmail::class,
+        function (QueuedVerifyEmail $notification): bool {
+            expect($notification->brand['url'])->toBe('https://acme.meridian.test');
+
+            return true;
+        }
+    );
+});
+
+it('gives an account with no honest destination no link rather than the wrong one', function (): void {
+    // `BrandPalette::product('')` is what the welcome listener passes for an account that belongs to no
+    // workspace. Asserting the EMPTY STRING rather than "not the central url" is deliberate: the two
+    // differ exactly when someone reintroduces a fallback, which is the shape being prevented.
+    expect(BrandPalette::product('')['url'])->toBe('');
 });

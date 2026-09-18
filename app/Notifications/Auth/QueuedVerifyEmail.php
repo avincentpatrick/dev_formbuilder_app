@@ -53,6 +53,16 @@ final class QueuedVerifyEmail extends VerifyEmail implements ShouldQueue
      *      host — so there is no resolved tenant at send time to take a brand from.
      *   2. A `User` may be a member of several tenants, so "which brand does this person's verification
      *      email wear" has no correct answer even if a tenant were resolvable.
+     *
+     * AMENDED BY M99 (R-62fb2e05): BOTH REASONS ARE ABOUT COLOUR, AND ONE SENTENCE ABOVE IS WRONG.
+     * Reason 1 says these routes "run on the central host"; `config/fortify.php` sets `domain => null`
+     * and its own comment records that tenant users legitimately sign in at a workspace address, so they
+     * answer on whichever host the member is on. That matters because the palette also carries the
+     * header's HOME LINK, which is not a branding question and does have a correct answer: the dispatch
+     * site now passes the origin of this message's own action URL. Previously it fell back to
+     * `config('app.url')`, which D46 puts at the agency's public website, so every tester's verification
+     * mail linked its header off this application. The palette is still the PRODUCT's — no tenant
+     * colours, no tenant logo — and that half stands unchanged.
      * It still renders through the Meridian template rather than stock Laravel, which is the whole reason
      * for the override: an account-level email should look like the product, not like the framework.
      *

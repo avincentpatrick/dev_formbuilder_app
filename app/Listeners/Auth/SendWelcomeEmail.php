@@ -9,6 +9,7 @@ use App\Models\Tenant;
 use App\Models\TenantUser;
 use App\Models\User;
 use App\Notifications\Auth\WelcomeNotification;
+use App\Support\Branding\BrandPalette;
 use App\Support\Tenancy\PlatformHost;
 use App\Support\Tenancy\TenantContext;
 use App\Support\Tenancy\TenantUrl;
@@ -77,7 +78,18 @@ final class SendWelcomeEmail
             $tenant = null;
         }
 
-        Notification::route('mail', $email)->notify(new WelcomeNotification(
+        // The header logo's destination, resolved HERE (M99, R-62fb2e05). Without it the palette fell
+        // back to `config('app.url')`, which D46 puts at the agency's own public website — so the one
+        // non-transactional email the product sends linked its header off this application. Note this is
+        // NOT `BrandPalette::forTenant($tenant)`: that requires the tenant to match the current tenant
+        // context, and this listener runs on Fortify's verification route with no tenancy middleware and
+        // no ambient GUC (see isMemberOf() below), so it would silently return the product palette and
+        // change nothing. The value is the one already computed for `actionUrl`.
+        //
+        // ⚠️ An account that belongs to no workspace gets NO LINK rather than the central address. There
+        // is no page there for it — that absence is R-e6a10f97's subject, and its copy awaits D44 — and
+        // under D46 the central address is somebody else's website.
+        Notification::route('mail', $email)->notify((new WelcomeNotification(
             name: (string) $user->name,
             // An explicit null check rather than `$tenant?->name ?? ''`: PHPStan flags a nullsafe on the
             // left of `??` as redundant (the `??` already swallows the null), and this reads the same way as
@@ -89,7 +101,9 @@ final class SendWelcomeEmail
             actionUrl: $tenant === null
                 ? rtrim((string) config('app.url'), '/').'/'
                 : TenantUrl::to($tenant, 'dashboard'),
-        ));
+        ))->withBrand(BrandPalette::product(
+            $tenant === null ? '' : TenantUrl::to($tenant, 'dashboard')
+        )));
     }
 
     /**

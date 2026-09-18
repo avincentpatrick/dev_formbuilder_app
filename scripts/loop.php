@@ -156,6 +156,14 @@ function cmd_status(): never
     line(sprintf('  %-34s %d, with %d open decision(s)', 'rows in the line', (int) ($state['pipeline']['rows'] ?? -1), count((array) ($state['decisions']['open'] ?? []))));
     line(sprintf('  %-34s M%d', 'highest released', (int) $state['increment']['highest_released']));
     line('');
+    // ⚠️ DELIBERATELY UNCONDITIONAL, AND THAT IS THE RECORDED CHOICE (M99). M98 asked whether the
+    //    rule-phrased copies of the zero sentence should be keyed on the new done marker or kept as
+    //    rule text, and said the answer had to be written down rather than left implicit. This one and
+    //    `render_testing_gate()`'s in scripts/pipeline.php are RULE TEXT: they say WHEN the obligation
+    //    falls due, which is true on every run whatever the count, so keying them would delete the
+    //    rule instead of silencing an order. The two IMPERATIVE copies — scripts/state.php's and
+    //    scripts/next.php's, the ones that say *send it now* — are the ones keyed, because those are
+    //    the ones that told four consecutive sessions to send the user a duplicate.
     line('  ⛔ Zero open rows in that tier is when the user is told the app is ready for a testing server.');
     line('     It is not a stop signal for this driver: development continues down the next tier.');
 

@@ -39,7 +39,7 @@ declare(strict_types=1);
 |   php scripts/backlog-triage.php              # regenerate docs/backlog-triage.md
 |   php scripts/backlog-triage.php --dry-run    # print it, write nothing
 |   php scripts/backlog-triage.php --check      # exit 1 if the file on disk has drifted from the tree
-|   php scripts/backlog-triage.php --json       # the ORDERED open rows + the hub set, for pipeline.php
+|   php scripts/backlog-triage.php --json       # the ORDERED open rows + the hub set + a closed-row census
 |
 | ⛔ AN UNRECOGNISED FLAG IS REFUSED, NOT IGNORED. getopt() discards what it does not know and the
 | no-flag action rewrites a committed file, so a typo used to regenerate the document silently.
@@ -98,7 +98,7 @@ if (isset($opts['help'])) {
         '  php scripts/backlog-triage.php              rewrite '.TRIAGE,
         '  php scripts/backlog-triage.php --dry-run    print it, write nothing',
         '  php scripts/backlog-triage.php --check      exit 1 if the file on disk has drifted',
-        '  php scripts/backlog-triage.php --json       the ordered open rows + hub set, for pipeline.php',
+        '  php scripts/backlog-triage.php --json       the ordered open rows + hub set + closed-row census',
         '  php scripts/backlog-triage.php --help       this text',
         '',
         'Exit 0 = written, clean, or printed. 1 = drift or a refused argument. 2 = could not measure.',
@@ -151,6 +151,35 @@ if ($open === []) {
         'would read as a finished queue rather than as a broken parser.');
 }
 
+// ⛔ THE CLOSED ROWS ARE COLLECTED SEPARATELY AND NEVER MERGED INTO `$open`, AND THE SEPARATION IS THE
+//    WHOLE POINT (M99). `scripts/pipeline.php`'s testing gate promises "0 open of N" and delivered
+//    "0 open of 1", because it can only count what it is handed and it was handed open rows alone —
+//    so a tier that finishes reads as a tier that was never populated. The fix is to hand it the
+//    closed rows too.
+//
+// ⚠️ BUT NOT THROUGH `open`. `derive_hubs($open)` derives the hub set at HUB_THRESHOLD from the OPEN
+//    rows, `compare_rows` ranks from it, and `render_body` prints docs/backlog-triage.md from it.
+//    There are 204 closed rows against 237 open ones; folding them in would rewrite the hub set, the
+//    ranking, and D13's own file-overlap grouping input — a scheduling change smuggled in behind a
+//    counting fix. So this key carries NO paths and never reaches `derive_hubs`: it is a census, not
+//    a work list, and it exists to be counted rather than ranked.
+$closed = [];
+
+foreach ($rows as $row) {
+    if ($row['state'] === 'open') {
+        continue;
+    }
+
+    $closed[] = [
+        'id' => $row['id'],
+        'line' => $row['line'],
+        'severity' => $row['severity'],
+        'provenance' => $row['provenance'],
+        'closed_by' => $row['closed_by'] ?? null,
+        'tier' => $row['tier'] ?? null,
+    ];
+}
+
 $hubs = derive_hubs($open);
 
 foreach ($open as $i => $row) {
@@ -190,6 +219,11 @@ if ($json) {
             'tier' => $row['tier'] ?? null,
             'awaits' => $row['awaits'] ?? null,
         ], $open),
+        // ⛔ A CENSUS, NOT A WORK LIST. Carries no paths, never reached `derive_hubs()`, and is here so
+        //    that a consumer counting a tier's TOTAL can see the rows that tier has already finished.
+        //    A consumer that treats these as work is the defect this key was added to end, not to
+        //    create: `scripts/pipeline.php` maps them to the `done` state on arrival.
+        'closed' => $closed,
         // ⛔ PASSED THROUGH, NEVER RE-PARSED (M93). A decision is a pipeline row now, and the generator
         //    reads nothing but this document — so the decisions ride along with the ledger they block,
         //    from the one parser that already reads `docs/claims/decisions.md`.
@@ -438,6 +472,25 @@ function build_basename_index(): array
             }
 
             if (is_dir($path)) {
+                // ⛔ A NESTED CHECKOUT MAKES EVERY BASENAME AMBIGUOUS, AND THE COST IS PAID BY CI (M99).
+                //    A second working tree parked inside this one — a git worktree, an agent tool's
+                //    scratch clone, a vendored copy — duplicates every filename in the repository. An
+                //    ambiguous basename is written UNRESOLVED (correctly: guessing is the worse
+                //    failure), so those rows lose their paths, `derive_hubs()` sees different degrees,
+                //    `compare_rows` ranks differently, and `docs/pipeline.md` is generated in a
+                //    DIFFERENT ORDER than CI computes from the tracked set. The committed line then
+                //    fails `pipeline-lint` P1 on a machine that never saw the extra checkout.
+                //
+                // ⚠️ MEASURED, not guessed: `.kilo/worktrees/<name>/` on this host put a second
+                //    `scripts/state.php` and a second `.github/workflows/ci.yml` in the index, which
+                //    took the hub set from 49 files to 37 and moved 69 rows' path lists. `SKIP_DIRS`
+                //    could not have caught it — the directory is named by whichever tool created it.
+                //    The invariant that CAN be tested is that a directory carrying its own `.git` is
+                //    not part of this repository's source.
+                if (file_exists($path.'/.git')) {
+                    continue;
+                }
+
                 $stack[] = $path;
 
                 continue;

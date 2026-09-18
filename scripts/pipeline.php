@@ -96,6 +96,22 @@ const STATES = ['ready', 'blocked', 'held', 'done', 'n/a'];
 const SIZES = ['S', 'M', 'L', 'XL'];
 
 /**
+ * The marker id that records that the user has been told the app is ready for a testing server (M99).
+ *
+ * ⛔ IT IS AN ORDINARY `done` MARKER AT ITS POINT OF TRUTH, not a new mechanism — the grammar already
+ * had `done` and `done=`. What it buys is that the zero-gate EVENT leaves a record: `testing_gate()`
+ * finds it by this id, `render_testing_gate()` publishes the answer on the `Notified:` line, and the
+ * two imperative copies in `scripts/state.php` and `scripts/next.php` key on that line.
+ *
+ * ⚠️ ITS HOME IS `PROGRESS.md` AND IT CANNOT BE ANYWHERE ELSE. `CLAUDE.md` sits outside the corpus
+ * walk (measured at 56 files against this walk's 55, the extra being CLAUDE.md), and `docs/claims`,
+ * `docs/pipeline.md`, `docs/feature-backlog.md` and `PROGRESS_ARCHIVE.md` are all EXCLUDED above —
+ * which is exactly why lane-a.md's and PROGRESS.md's prose records of the M95 notification were
+ * invisible to every generator for four increments.
+ */
+const NOTIFIED_MARKER_ID = 'testing-server-notified';
+
+/**
  * The tier vocabulary (M93) — closed, and ordered most urgent first. The same list lives in
  * `scripts/state.php`, `scripts/pipeline-lint.php` and BacklogProvenanceTest, and
  * PipelineLintControlsTest pins every copy equal and in the same order.
@@ -107,9 +123,18 @@ const SIZES = ['S', 'M', 'L', 'XL'];
  */
 const TIERS = ['before-testing', 'early-testing', 'during-testing', 'before-launch', 'after-launch'];
 
-/** How many ready rows, then blocked rows, the Next section names from its tier. */
-const NEXT_READY = 5;
-const NEXT_BLOCKED = 8;
+/**
+ * How many ready rows, then blocked rows, the Next section names from its tier.
+ *
+ * ⛔ THE DEFECT WAS THE WORD *SILENTLY*, NOT THE NUMBER (M99). At 5 and 8 this section hid three of
+ * eight ready `early-testing` rows and 19 of 27 blocked ones, and said nothing — so `CLAUDE.md` and
+ * the generated hand-off both point every session at a list that is a strict subset of its own tier,
+ * and two of the three hidden rows were the cleanest in it. `render_next()` now states what it left
+ * out, so a raised cap is a comfort rather than the correctness argument: **a cut that announces
+ * itself cannot mislead, and a cut that does not cannot be trusted at any size.**
+ */
+const NEXT_READY = 12;
+const NEXT_BLOCKED = 12;
 
 /**
  * Floors. Each fails as CANNOT MEASURE rather than as a short list.
@@ -173,6 +198,33 @@ $corpusOnly = isset($opts['corpus']);
 $scan = scan_markers();
 $markers = $scan['markers'];
 
+// ⛔ TWO MARKERS MAY NOT CARRY ONE ID (M99, closing R-964bc5a4). An id is what every consumer joins
+//    on — `pipeline-lint`'s stop-list, the roadmap cross-check, `loop.php`'s held-topic refusal — and
+//    a duplicate produced two rows in the line that no reader could tell apart, with the second
+//    silently deciding what the first meant wherever a lookup took the last match. The scan reports
+//    every offender and the files they sit in rather than the first, because a copy-paste of a marker
+//    block makes several at once.
+$seen = [];
+
+foreach ($markers as $marker) {
+    $seen[(string) $marker['id']][] = $marker['source'] ?? '(unknown)';
+}
+
+$duplicates = array_filter($seen, static fn (array $where): bool => count($where) > 1);
+
+if ($duplicates !== []) {
+    cannot_measure(sprintf(
+        'the marker scan found %d id(s) declared more than once: %s. An id is what every consumer '
+        .'joins on, so a duplicate puts two rows in the line that no reader can tell apart.',
+        count($duplicates),
+        implode('; ', array_map(
+            static fn (string $id, array $where): string => $id.' at '.implode(' and ', $where),
+            array_keys($duplicates),
+            $duplicates
+        ))
+    ));
+}
+
 if ($scan['files'] < MIN_SCANNED_FILES) {
     cannot_measure(sprintf(
         'the marker scan reached only %d file(s), under the floor of %d. A directory walk that has '
@@ -223,8 +275,15 @@ usort($rows, 'compare_pipeline_rows');
 
 $open = array_values(array_filter($rows, static fn (array $r): bool => ! in_array($r['state'], ['done', 'n/a'], true)));
 
+// ⛔ THE GATE COUNTS OVER A WIDER SET THAN THE LINE DOES, AND THE TWO ARE KEPT APART ON PURPOSE (M99).
+//    `testing_gate()`'s docblock promises "0 open of N" where N is every row the tier has ever held.
+//    It was handed open rows alone, so a finished tier read "0 open of 1" — the arithmetic was right
+//    and the input was a third of the question. The closed rows join HERE, for the denominator, and
+//    never join `$rows`, which is what the line and the "Off the line" table are rendered from.
+$gate = testing_gate(array_merge($rows, read_closed_defects($triage)));
+
 $sha = trunk_sha();
-$body = render_body($open, $rows, $scan);
+$body = render_body($open, $rows, $scan, $gate);
 $document = render_banner($sha, $open).$body;
 
 assert_not_self_arming($document);
@@ -252,7 +311,7 @@ if ($json) {
         'files_scanned' => $scan['files'],
         'corpus' => $scan['paths'],
         'counts' => census($open),
-        'testing_gate' => testing_gate($rows),
+        'testing_gate' => $gate,
         'rows' => $open,
         'off_the_line' => array_values(array_filter(
             $rows,
@@ -427,6 +486,23 @@ function parse_marker(string $line, string $path, int $lineNo): array
         ));
     }
 
+    // ⛔ A `done` MARKER MUST CITE WHERE IT LANDED (M99, closing R-974db618). `--help` has promised
+    //    this since the key existed — "a done state must cite where it landed" — and nothing asked for
+    //    it, so the promise was documentation of a rule that was never enforced. A done row with no
+    //    citation is the shape that lets a marker claim work is finished with nothing to check it
+    //    against, and the testing-server notification marker this increment adds is exactly the kind
+    //    of claim that must never be unattributable: it is what stops the notification being sent
+    //    twice, so "who did it and when" is the whole of its value.
+    if ($fields['state'] === 'done' && trim((string) ($fields['done'] ?? '')) === '') {
+        cannot_measure(sprintf(
+            'the marker at %s:%d is state "done" and cites nothing in `done=`. --help has promised '
+            .'that a done state cites where it landed since the key existed; an unattributable done '
+            .'row asserts that work is finished and offers nothing to check it against.',
+            $path,
+            $lineNo
+        ));
+    }
+
     // A non-ready row that does not say WHY is the invisibility this file exists to end.
     if (! in_array($fields['state'], ['ready', 'done'], true) && ($fields['blocker'] ?? '') === '') {
         cannot_measure(sprintf(
@@ -511,6 +587,47 @@ function read_defects(array $triage): array
             'headline' => $row['headline'] ?? '',
             'source' => BACKLOG.':'.$row['line'],
             'rank' => $index,
+        ];
+    }
+
+    return $out;
+}
+
+/**
+ * The CLOSED ledger rows, as `done` rows — for the testing gate's denominator and for nothing else (M99).
+ *
+ * ⛔ THESE NEVER JOIN `$rows`, AND THAT IS DELIBERATE. `render_body()` prints every `done` row into the
+ * "Off the line" table, so merging 204 closed ledger rows into the line would add 204 rows to a document
+ * whose job is to show what is LEFT. They are handed to `testing_gate()` alone, which counts a tier's
+ * total and needs to see the rows that tier has already finished.
+ *
+ * ⚠️ AND THEY ARE MAPPED TO `done` HERE RATHER THAN INHERITED. `read_defects()` above maps liveness to
+ * state — live to ready, anything else to blocked — and a closed row still carries a liveness marker
+ * (a struck row can read "Live"), so a closed row passed through THAT mapping would publish as READY
+ * WORK. The state comes from being closed, never from the marker.
+ *
+ * @param  array<string, mixed>  $triage
+ * @return list<array<string, mixed>>
+ */
+function read_closed_defects(array $triage): array
+{
+    $out = [];
+
+    foreach ((array) ($triage['closed'] ?? []) as $row) {
+        $out[] = [
+            'id' => $row['id'],
+            'class' => 'defect',
+            'state' => 'done',
+            'blocker' => '',
+            'phase' => 'n/a',
+            'size' => '',
+            'done' => (string) ($row['closed_by'] ?? ''),
+            'tier' => $row['tier'] ?? null,
+            'awaits' => null,
+            'decision' => '',
+            'headline' => '',
+            'source' => BACKLOG.':'.$row['line'],
+            'rank' => PHP_INT_MAX,
         ];
     }
 
@@ -651,12 +768,27 @@ function testing_gate(array $all): array
     $work = array_values(array_filter($inTier, static fn (array $r): bool => $r['class'] !== 'decision'));
     $ids = static fn (array $rows): array => array_values(array_map(static fn (array $r): string => (string) $r['id'], $rows));
 
+    // ⛔ WHETHER THE USER HAS ALREADY BEEN TOLD IS A FACT IN THE TREE, NOT A MEMORY (M99). The zero
+    //    is an EVENT, and an event that leaves no record fires forever: every `state.php` run and
+    //    every generated hand-off went on ordering the next session to send a notification that M95
+    //    sent on 2026-09-14, and PROGRESS.md carried that order on the trunk for four increments.
+    //    The record is an ordinary `done` marker at its point of truth, found here by id.
+    $notified = array_values(array_filter(
+        $all,
+        static fn (array $r): bool => (string) $r['id'] === NOTIFIED_MARKER_ID && $r['state'] === 'done'
+    ));
+
     return [
         'tier' => $tier,
         'open' => count(array_filter($work, static fn (array $r): bool => in_array($r['state'], ['ready', 'blocked'], true))),
         'total' => count($work),
         'waiting' => $ids(array_filter($inTier, static fn (array $r): bool => $r['class'] === 'decision' && in_array($r['state'], ['ready', 'blocked'], true))),
         'held' => $ids(array_filter($work, static fn (array $r): bool => $r['state'] === 'held')),
+        'notified' => $notified !== [],
+        // ⚠️ THE CLAUSE, NOT THE WHOLE `done=` VALUE. A marker's `done=` carries the full reasoning —
+        //    this one runs to several sentences — and the gate line is a one-line fact, so only the
+        //    first clause is published. The rest stays at the marker, which is where it belongs.
+        'notified_by' => $notified === [] ? '' : trim((string) strtok((string) ($notified[0]['done'] ?? ''), ';')),
     ];
 }
 
@@ -680,10 +812,18 @@ function next_work(array $open): array
     $rank = min(array_map('tier_rank', $work));
     $inTier = static fn (array $r): bool => tier_rank($r) === $rank;
 
+    $ready = array_values(array_filter($work, static fn (array $r): bool => $inTier($r) && $r['state'] === 'ready'));
+    $blocked = array_values(array_filter($work, static fn (array $r): bool => $inTier($r) && $r['state'] === 'blocked'));
+
     return [
         'tier' => $rank < count(TIERS) ? TIERS[$rank] : 'untiered',
-        'ready' => array_slice(array_values(array_filter($work, static fn (array $r): bool => $inTier($r) && $r['state'] === 'ready')), 0, NEXT_READY),
-        'blocked' => array_slice(array_values(array_filter($work, static fn (array $r): bool => $inTier($r) && $r['state'] === 'blocked')), 0, NEXT_BLOCKED),
+        'ready' => array_slice($ready, 0, NEXT_READY),
+        'blocked' => array_slice($blocked, 0, NEXT_BLOCKED),
+        // ⛔ THE UNTRUNCATED COUNTS RIDE ALONG SO THE CUT CAN BE STATED (M99). Without them
+        //    `render_next()` cannot tell "this tier has five ready rows" from "this tier has five of
+        //    eight ready rows", and neither could any reader of the document.
+        'ready_total' => count($ready),
+        'blocked_total' => count($blocked),
         'decisions' => array_values(array_filter($open, static fn (array $r): bool => $inTier($r) && $r['class'] === 'decision')),
     ];
 }
@@ -763,9 +903,9 @@ function render_banner(string $sha, array $open): string
     ]);
 }
 
-function render_body(array $open, array $all, array $scan): string
+function render_body(array $open, array $all, array $scan, array $gate): string
 {
-    $out = render_testing_gate(testing_gate($all));
+    $out = render_testing_gate($gate);
     $out .= render_next(next_work($open));
     $out .= "\n## The line\n\n";
     $out .= "| # | id | Task | Tier | Source | Phase | State | Blocker | Size |\n";
@@ -837,7 +977,22 @@ function render_testing_gate(array $gate): string
         )
         .'Waiting on you: '.$ids($gate['waiting'])." — questions answered on the Decision Board. Shown, and never\n"
         ."blocking this count.\n"
-        .'Held: '.$ids($gate['held'])." — unscheduled until the user signals, and never blocking this count either.\n\n"
+        .'Held: '.$ids($gate['held'])." — unscheduled until the user signals, and never blocking this count either.\n"
+        // ⛔ THIS LINE IS THE MACHINE-READABLE HALF, AND `scripts/state.php` PARSES IT (M99). The gate
+        //    block is the only thing state.php reads to derive the gate — it never walks the corpus —
+        //    so the notified fact has to be PUBLISHED here or no consumer can key on it.
+        .sprintf(
+            "Notified: %s\n\n",
+            $gate['notified'] ?? false
+                ? 'yes'.(($gate['notified_by'] ?? '') === '' ? '' : ', by '.$gate['notified_by'])
+                    .'. Owed once, and already sent — no later session sends it again.'
+                : 'no — owed by the session that closes the last open row in this tier, and by no other.'
+        )
+        // ⚠️ DELIBERATELY UNCONDITIONAL, AND RECORDED AS SUCH (M99, and the choice D52 asked for).
+        //    This sentence and `scripts/loop.php`'s are RULE TEXT: they state when the obligation
+        //    falls due, which is true on every run whatever the count. The IMPERATIVE copies — the
+        //    ones that say *send it now* — are in `scripts/state.php` and `scripts/next.php`, and
+        //    those are keyed on the Notified line above. Keying rule text would delete the rule.
         .'⛔ The session that closes the last open `'.$gate['tier']."` row tells the user the app is ready for a\n"
         ."testing server — a push notification and the Testing Server Checklist (`CLAUDE.md`).\n";
 }
@@ -872,6 +1027,23 @@ function render_next(array $next): string
 
     foreach ($next['decisions'] as $row) {
         $out .= sprintf("- `%s` — %s · waiting on you\n", $row['id'], cell((string) ($row['title'] ?? '')));
+    }
+
+    // ⛔ A CUT THAT DOES NOT ANNOUNCE ITSELF IS THE DEFECT (M99). This section is what CLAUDE.md and
+    //    the generated hand-off both point a session at, so a silent subset of a tier reads as the
+    //    tier. Say what was left out, and say where the rest of it is.
+    $hiddenReady = max(0, (int) ($next['ready_total'] ?? 0) - count($next['ready']));
+    $hiddenBlocked = max(0, (int) ($next['blocked_total'] ?? 0) - count($next['blocked']));
+
+    if ($hiddenReady > 0 || $hiddenBlocked > 0) {
+        $out .= sprintf(
+            "\n⚠️ **This section is CUT, and the rest of the tier is not shown here.** %d more ready and %d more\n"
+            ."blocked `%s` row(s) are in **The line** below — read it rather than this section before\n"
+            ."grouping a batch.\n",
+            $hiddenReady,
+            $hiddenBlocked,
+            $next['tier']
+        );
     }
 
     return $out;

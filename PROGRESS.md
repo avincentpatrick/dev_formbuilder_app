@@ -205,6 +205,7 @@ lives in [PROGRESS_ARCHIVE.md](PROGRESS_ARCHIVE.md) and in git — do **not** re
 <!-- pipeline: id=uploading-import title="All uploading and import features, including bulk Excel and CSV, and the ledger entries marked RE-HOMED TO uploading-import" phase=n/a state=held size=XL blocker="user: held by the explicit-signal decision of 2026-08-09; re-enters only on their go-signal" tier=before-launch -->
 <!-- pipeline: id=deferral-site-disposition title="Give every documented deferral section and deferral sentence a recorded disposition" phase=n/a state=ready size=L tier=after-launch -->
 <!-- pipeline: id=tier-verdicts title="Tier every untiered row, close the verified not-live rows, fix the stale threat-model lines, and retire the backlog tables" phase=n/a state=done size=L tier=before-testing done="M94 — the tier verdicts, recorded in docs/claims/lane-a.md" -->
+<!-- pipeline: id=testing-server-notified title="Tell the user the app is ready for a testing server — the push notification and the Testing Server Checklist" phase=n/a state=done size=S tier=before-testing done="M95 — sent 2026-09-14 when the before-testing tier reached zero; recorded in docs/claims/lane-a.md's M95 release and in the M95 bullet below. This marker exists so the zero-gate EVENT leaves a record a generator can read: docs/claims is excluded from the marker walk and CLAUDE.md sits outside it, so both prose records were invisible and every hand-off went on ordering the notification again." -->
 
 ## Current Status
 

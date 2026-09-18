@@ -100,7 +100,10 @@ file, never copy out of it. `state.php` reports how far behind the trunk that fi
   token that names it.**
 - ⛔ **The session that closes the last open `before-testing` row tells the user the app is ready for a
   testing server** — a push notification, then the Testing Server Checklist page, sent to them as a file.
-  `state.php` prints the gate, and its zero is the signal. It is owed whichever session built the rest.
+  **It is owed ONCE, by that session, and the gate records that it was sent.** The zero is not the signal
+  on its own: `docs/pipeline.md`'s `Notified:` line is, and a `done` marker at its point of truth is what
+  sets it. `state.php` and the generated hand-off say *send it* only while that line reads `no`.
+  ⛔ **Never send it because a tier reads zero.** Read the `Notified:` line first.
 - **`scripts/pipeline-lint.php` gates that line on every push, and it runs on the host.** It refuses a
   hand edit, a roadmap phase claiming work in flight without naming a row still in the line, a second
   queue, a held row missing from either the line or `loop.php`'s stop-list, a documented column that

@@ -1038,6 +1038,13 @@ function derive_testing_gate(): array
         'waiting_ids' => [],
         'next_tier' => null,
         'next' => [],
+        // ⛔ NULL, NOT FALSE, AND THE DIFFERENCE IS THE WHOLE GUARD (M99). `false` would mean "measured,
+        //    and not yet sent"; `null` means "could not measure", which happens against a pipeline
+        //    document written before this line existed. The imperative below fires only on an explicit
+        //    `false`, so an unmeasurable gate is silent rather than ordering a duplicate notification —
+        //    which is the defect being fixed, and it would be absurd to reintroduce it as the fallback.
+        'notified' => null,
+        'notified_by' => null,
         'reason' => null,
         'source' => PIPELINE.', its Testing gate and Next sections',
     ];
@@ -1059,6 +1066,20 @@ function derive_testing_gate(): array
 
     if ($waiting !== null && preg_match_all('/`(D\d+)`/', $waiting, $w) > 0) {
         $out['waiting_ids'] = $w[1];
+    }
+
+    // ⛔ THE ONE FACT THAT STOPS THE ZERO SENTENCE FIRING FOREVER (M99). The gate's zero is an EVENT,
+    //    and this function is the only place a consumer could learn that the event has already been
+    //    handled — it derives the whole gate by regex over this document and never walks the corpus,
+    //    so `scripts/pipeline.php` publishes the answer and this reads it back. An unrecognised or
+    //    absent line leaves `notified` null, and a null never orders anything.
+    $notified = first_line_matching($body, '/^Notified: /u');
+
+    if ($notified !== null && preg_match('/^Notified: (yes|no)\b/u', $notified, $n) === 1) {
+        $out['notified'] = $n[1] === 'yes';
+        $out['notified_by'] = $n[1] === 'yes' && preg_match('/^Notified: yes, by (.+?)\. Owed once/u', $notified, $b) === 1
+            ? $b[1]
+            : null;
     }
 
     // The Next section has a FIXED shape, so it is read positionally: a `From **<tier>**` line, then one
@@ -1477,9 +1498,21 @@ function render_testing_gate(array $gate): void
         ? '(the pipeline lists none)'
         : $gate['next_tier'].' — '.implode(', ', $gate['next']));
 
-    if ($gate['open'] === 0) {
+    // ⛔ KEYED ON THE NOTIFIED FACT, NOT ON THE ZERO ALONE (M99). This is an IMPERATIVE — it tells the
+    //    reader to send something now — and it used to fire on every run from the moment the tier
+    //    emptied, four increments and counting after M95 actually sent it. The obligation is owed once,
+    //    by one session; a sentence that repeats it is not a reminder, it is an instruction to send the
+    //    user a duplicate. `$gate['notified']` is null when it could not be measured, and a null is
+    //    deliberately silent here: see derive_testing_gate().
+    if ($gate['open'] === 0 && ($gate['notified'] ?? null) === false) {
         note('ZERO open before-testing rows: the app is ready for the testing server. The session that closed');
         note('the last one owes the user the push notification and the Testing Server Checklist (CLAUDE.md).');
+    }
+
+    if ($gate['open'] === 0 && ($gate['notified'] ?? null) === true) {
+        info('testing-server notice', 'already sent'
+            .(($gate['notified_by'] ?? null) === null ? '' : ' — '.$gate['notified_by'])
+            .'. Owed once; do not send it again.');
     }
 }
 

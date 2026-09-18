@@ -15,8 +15,15 @@
         and the page falls back to a minimal style in the browser's own system colours rather than a
         second copy of the design tokens.
 
-     ⚠️ Only browser navigations get this page. A request that expects JSON, or one carrying the bypass
-     cookie, still falls through the maintenance stub into the framework during the window.
+     ⚠️ Only browser navigations get this page, and BOTH halves of what that used to say were wrong
+     (corrected M99, R-4ff3e848). The bypass-cookie clause was never live for this window at all:
+     deploy.ps1 runs `down` with no --secret, so no bypass cookie exists, and that arm applies only to a
+     hand-run `artisan down --secret`. And "only browser navigations" was not the same as "everything
+     else falls through": an Inertia visit sends `Accept: text/html` with `X-Requested-With`, so it is
+     neither a navigation nor JSON, and the 503 body landed inside Inertia's error dialog rather than
+     replacing the page. Both are now answered ABOVE the autoloader by public/maintenance-guard.php —
+     JSON gets an envelope, Inertia gets a 409 with X-Inertia-Location — so what still reaches this page
+     is exactly what should: a plain browser navigation.
 
      tests/Feature/Deploy/DeployWindowViewTest.php renders it with an empty public path and with a fixture
      build, and deliberately without withoutVite(), which would make Vite::content() return ''. --}}

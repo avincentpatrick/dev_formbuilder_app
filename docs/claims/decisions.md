@@ -23,6 +23,72 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
+### D51 — `R-5ecfa6cd`, the central-host sign-in loop, is tiered `early-testing`; `M98` measured it as unreachable by any tester. Which tier? **Tier: early-testing.**
+
+**Filed 2026-09-18 by `M99`, which verified the row without taking it.** The row's own `M98` clause ends *"`before-launch`
+fits the tier definitions better than the `early-testing` above, and that change is the user's to make"*, and nothing
+filed it, so the row goes on publishing `early-testing · ready` in `docs/pipeline.md` and goes on being named in the
+Next section that tells each session what to take. Two premises were re-measured for this entry.
+`resources/js/Pages/Welcome.vue` already hides *Create a workspace* behind a `registrationOpen` guard, so once the
+checklist closes sign-up the headline symptom is simply absent and only the sign-in loop is left. And under `D46`,
+`CENTRAL_DOMAIN=pitahc.gov.ph` resolves to the agency's own website on another machine, so **no tester can reach the
+central host at all** — only the operator, on the box, through the `hosts` line the checklist adds.
+
+- **A — `before-launch`.** It bites the operator once per console sign-in, with a documented workaround, and every
+  customer on a public central host later. Nothing a tester meets, so it leaves the tier that exists for what testers
+  meet. ⚠️ The remedy is blocked under `D44` in any case, and a grant gap sits under it (`pgsql_auth` can read
+  `users` and `tenant_users` and has nothing on `tenants` or `domains`), so `early-testing` buys no earliness.
+- **B — keep `early-testing`.** The operator is a real person hitting a loop with no message and no way out, and the
+  console is used throughout testing. Defensible if "affects the operator now" counts as early-testing.
+- **C — `during-testing`.** A middle reading: not a blocker for standing the server up, but wanted before testers are
+  running in volume and the operator is in the console daily.
+
+**Recommendation: A.** The tier that exists for what a tester meets should not hold a row no tester can reach.
+
+### D52 — `R-e6a10f97`, the welcome email telling a central-host account to create a workspace, is tiered `early-testing`; `M98` found it latent behind a reset-and-verify path. Which tier? **Tier: early-testing.**
+
+**Filed 2026-09-18 by `M99`, which verified the row without taking it.** The row's `M98` clause ends *"`during-testing`
+or `before-launch` fits the tier definitions better than the `early-testing` above; the wording also depends on `D44`,
+and both calls are the user's"*. The wording half is `D44`, which is open and is now named on the row by an
+`Awaits` token so the line can publish the row as blocked rather than ready. The tier half was filed nowhere.
+What `M98` established is that invitation-only sign-up does **not** make the copy unreachable: an invitation creates a
+placeholder user with a random password, nothing guards a placeholder against *Forgot password*, and an invited tester
+who resets, signs in and verifies **before** accepting the invitation fires `Verified` while still Invited — which is
+exactly the branch `tests/Feature/Auth/WelcomeEmailTest.php` already pins. That path was inferred from the code and
+never run.
+
+- **A — `during-testing`.** Reachable by a tester, but only down a path nobody walks on purpose, and the harm is
+  confusing copy rather than a blocked task. It wants fixing while testers are running, not before they start.
+- **B — `before-launch`.** The wording cannot be settled until `D44` is answered, and a default install is the
+  population that really meets it. Tying it to the `D44` answer avoids writing the copy twice.
+- **C — keep `early-testing`.** Every tester who is invited can reach it, and first-contact copy that tells someone to
+  do something the product does not allow is worth fixing before testers arrive.
+
+**Recommendation: A**, with the wording written only once `D44` is answered. ⚠️ Note that the header-logo half of this
+row — the unbranded logo linking to the agency website — is **not** waiting on any of this: `M99` takes it under
+`R-62fb2e05`, and this row is amended to say so.
+
+### D53 — `R-e7d6f223`, the deploy that deletes the previous build's chunks, is tiered `during-testing`; `M98` re-judged its precondition as ordinary traffic. Which tier? **Tier: early-testing.**
+
+**Filed 2026-09-18 by `M99`.** This is the one pending tier verdict that would **add** a row to `early-testing` rather
+than remove one, and it was invisible to a per-row pass because no row in the Next section names it. The row's `M98`
+clause says *"on this evidence the tier wants re-reading as early-testing, which is the user's call"*, and nothing
+filed it. What changed under it: `DEPLOY_ENABLED` was set on 2026-09-17, so a build swap now happens on every merge,
+and the nightly schedule's deploy fires around 08:50Z — **16:50 Philippine time, inside the testers' working day**.
+`M98`'s own documentation skip took close-out pushes back out of the exposure, leaving merge pushes and the nightly
+run on a moved tip as the whole of it. What remains inferred is the other half: which sites fetch a chunk on demand
+without navigating was counted and never exercised.
+
+- **A — `early-testing`.** A tester with the builder open across a nightly deploy is unremarkable, and it lands inside
+  their working day. Moving it up puts it in front of the tier the testing server is being stood up for.
+- **B — keep `during-testing`.** The unexercised half is the half that decides how often anyone actually sees it; a
+  user who wants it measured before it is re-ranked would leave it where it is and mark it latent again.
+- **C — `early-testing`, but only after the on-demand-chunk half is exercised.** Measure first, then re-rank, which
+  costs one increment and answers the question rather than judging it.
+
+**Recommendation: A.** The precondition is now ordinary traffic in the testers' own working hours, and the unexercised
+half changes the frequency rather than whether it happens.
+
 ### D49 — The testing site's certificate expires 2026-10-13, and no renewal path in the checklist can validate while inbound 443 stays shut. What renews it? **Tier: early-testing.**
 
 **Filed 2026-09-17 by `M98`, while measuring the checklist's certificate step against what the network actually
@@ -1610,6 +1676,13 @@ self-hosted runner is registered and online, labelled self-hosted, Windows, X64.
   others stay latent and are merely reachable without an operator now: the second `.env` copy left in
   `.deploy-stage` needs a deploy that fails before `up`, and the JSON request that falls through the window needs
   one in flight while the renames run.
+  ⚠️ **Corrected 2026-09-18 during `M99`: the second of those was only half latent, and the half that was live
+  was the more important one.** A request in flight while the renames run is what the *fatal error* needs; the
+  broken CONTRACT needed nothing — even a fall-through that booted cleanly answered `/api/v1` with a 503
+  `server_error` from the framework's `Throwable` arm rather than the documented `maintenance_mode` envelope, for
+  the whole window, every window. `R-4ff3e848`'s own marker had already been corrected to `Live` and this bullet
+  was not, which is the two-copies-of-a-fact shape: the ledger and this entry disagreed and only one was amended.
+  Both are now moot — `public/maintenance-guard.php` answers those requests above the autoloader.
 - The window's measured length is owed by the next merge's Deploy run. No CI run, and so no Deploy run, has
   happened since the variable was set: the newest Deploy run is 2026-09-17T08:51Z and it skipped, and the one push
   to `main` since — a claim commit touching `docs/claims/lane-a.md` and nothing else — is inside `paths-ignore`

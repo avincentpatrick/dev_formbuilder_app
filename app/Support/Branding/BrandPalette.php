@@ -104,14 +104,23 @@ final class BrandPalette
             return self::product();
         }
 
+        // ⛔ THE FALLBACK KEEPS THE WORKSPACE'S OWN HOST (M99, R-62fb2e05). Below this line the tenant is
+        //    known and is the current one — only its BRANDING is absent — so returning the bare product
+        //    palette threw away a fact we already hold and linked the message at `APP_URL` instead. That
+        //    is the whole defect on seven non-auth dispatch sites at once, including every in-app event
+        //    email and the guest resume link a member of the public receives; `tenants:create` sets no
+        //    brand colour, so on the testing server this fallback is the path essentially every message
+        //    takes. Branding and destination are separate questions, and only the first one is missing.
+        $unbranded = self::product(TenantUrl::to($tenant, 'dashboard'));
+
         if (! app(TenantBrandingService::class)->isActive($tenant)) {
-            return self::product();
+            return $unbranded;
         }
 
         $ramp = $tenant->brandRamp();
 
         if ($ramp === null) {
-            return self::product();
+            return $unbranded;
         }
 
         return self::identity($tenant) + [
@@ -154,13 +163,27 @@ final class BrandPalette
     /**
      * The unbranded palette: Blueprint, the platform's own name, and no logo.
      *
+     * ⛔ `$url` EXISTS BECAUSE `config('app.url')` IS NOT ALWAYS THE PRODUCT (M99, R-62fb2e05). The header
+     * partial wraps the product name, or the logo, in a link to this value, and on the `D46` testing
+     * layout `APP_URL` is the agency's own public website on a different machine — so every unbranded
+     * message, which is every message an unbranded workspace sends, linked its header at a site that is
+     * not this application. Callers that know which workspace a message belongs to pass that workspace's
+     * host; `forTenant()` below does it for all of them at once.
+     *
+     * ⚠️ AN EMPTY STRING MEANS *NO LINK*, AND IS NOT THE SAME AS OMITTING THE ARGUMENT. Omitting it keeps
+     * `config('app.url')`, which is correct on an ordinary deployment and is what the two PDF renderers
+     * get (neither reads `url`). Passing `''` is for the case with no honest destination at all — an
+     * account that belongs to no workspace — and the header then renders the name unlinked rather than
+     * sending the reader somewhere wrong. There is no third option here worth having: a link to the wrong
+     * host is worse than no link, and under `D46` there is no central URL that is right.
+     *
      * @return array<string, string>
      */
-    public static function product(): array
+    public static function product(?string $url = null): array
     {
         return [
             'name' => (string) config('app.name'),
-            'url' => (string) config('app.url'),
+            'url' => $url ?? (string) config('app.url'),
             'logo_url' => '',
         ] + self::PRODUCT;
     }

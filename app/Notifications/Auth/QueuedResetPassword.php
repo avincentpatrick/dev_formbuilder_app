@@ -49,7 +49,9 @@ final class QueuedResetPassword extends ResetPassword implements ShouldQueue
      * Render the framework's own reset wording through the Meridian mail template.
      *
      * **Always the product palette** — see {@see QueuedVerifyEmail::buildMailMessage()} for the two reasons
-     * (Fortify resolves no tenant, and a user may belong to several). Overriding here rather than at
+     * (Fortify resolves no tenant, and a user may belong to several), and for M99's amendment to them:
+     * both are about COLOUR, while the header's home LINK is a separate question that does have a correct
+     * answer, and this mail now carries the origin of its own reset URL rather than `config('app.url')`. Overriding here rather than at
      * `toMail()` keeps `parent::`'s `Lang::get()` strings and the expiry line it composes from
      * `config('auth.passwords')`, which is what this subclass exists to reuse.
      *

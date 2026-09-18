@@ -33,7 +33,17 @@
 @props(['url', 'logo' => ''])
 <tr>
 <td class="header">
+{{--
+    ⛔ AN EMPTY `$url` RENDERS THE HEADER UNLINKED, AND THAT IS A DELIBERATE DESTINATION RATHER THAN A
+    MISSING ONE (M99, R-62fb2e05). `<a href="">` resolves to the CURRENT document, which in an email
+    client is whatever that client happens to be showing — so the previous unconditional anchor turned
+    "we have no home page to send you to" into a link that does something arbitrary. A recipient with no
+    workspace has no honest destination, and under `D46` the central address is the agency's own public
+    website; rendering the name as plain text is the only answer that is not wrong.
+--}}
+@if ($url !== '')
 <a href="{!! \App\Support\Mail\MailAttribute::escape($url) !!}" style="display: inline-block;">
+@endif
 @if ($logo !== '')
 <img src="{!! \App\Support\Mail\MailAttribute::escape($logo) !!}" class="logo" alt="{!! \App\Support\Mail\MailAttribute::escape(trim($slot)) !!}">
 @else
@@ -45,6 +55,8 @@
 --}}
 {!! $slot !!}
 @endif
+@if ($url !== '')
 </a>
+@endif
 </td>
 </tr>

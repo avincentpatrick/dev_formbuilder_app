@@ -406,6 +406,15 @@ if ([IO.Directory]::Exists($LiveBuild)) {
 #    storage\framework\down, and public\index.php serves that page to a browser without loading
 #    vendor\, which the moves below replace. A worker started without --force pauses while the
 #    site is down, and still reads the restart signal while paused.
+#
+#    ⛔ A BROWSER IS NOT THE WHOLE OF IT, AND THE SENTENCE ABOVE USED TO BE THE WHOLE COMMENT (M99,
+#    R-4ff3e848). The framework's stub returns early for anything expecting JSON, so the builder's
+#    autosave and the guest-form runtime fell THROUGH it and booted the framework while the lines
+#    below reset the checkout hard, renamed vendor\ and public\build, and ran migrate --force. That
+#    is answered above the autoloader now by public/maintenance-guard.php. Note what the window
+#    really contains: the reset comes FIRST, so a fall-through could boot against half-rewritten
+#    app\ PHP, and migrate --force runs inside it too, so a clean boot could read a half-migrated
+#    schema. Neither is a browser's problem and neither was written down before.
 Invoke-Native php @('artisan', 'down', '--retry=15', '--render=deploy-window')
 $windowCompleted = $false
 try {

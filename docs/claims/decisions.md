@@ -1676,6 +1676,13 @@ self-hosted runner is registered and online, labelled self-hosted, Windows, X64.
   others stay latent and are merely reachable without an operator now: the second `.env` copy left in
   `.deploy-stage` needs a deploy that fails before `up`, and the JSON request that falls through the window needs
   one in flight while the renames run.
+  ⚠️ **Corrected 2026-09-18 during `M99`: the second of those was only half latent, and the half that was live
+  was the more important one.** A request in flight while the renames run is what the *fatal error* needs; the
+  broken CONTRACT needed nothing — even a fall-through that booted cleanly answered `/api/v1` with a 503
+  `server_error` from the framework's `Throwable` arm rather than the documented `maintenance_mode` envelope, for
+  the whole window, every window. `R-4ff3e848`'s own marker had already been corrected to `Live` and this bullet
+  was not, which is the two-copies-of-a-fact shape: the ledger and this entry disagreed and only one was amended.
+  Both are now moot — `public/maintenance-guard.php` answers those requests above the autoloader.
 - The window's measured length is owed by the next merge's Deploy run. No CI run, and so no Deploy run, has
   happened since the variable was set: the newest Deploy run is 2026-09-17T08:51Z and it skipped, and the one push
   to `main` since — a claim commit touching `docs/claims/lane-a.md` and nothing else — is inside `paths-ignore`

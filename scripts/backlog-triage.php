@@ -472,6 +472,25 @@ function build_basename_index(): array
             }
 
             if (is_dir($path)) {
+                // ⛔ A NESTED CHECKOUT MAKES EVERY BASENAME AMBIGUOUS, AND THE COST IS PAID BY CI (M99).
+                //    A second working tree parked inside this one — a git worktree, an agent tool's
+                //    scratch clone, a vendored copy — duplicates every filename in the repository. An
+                //    ambiguous basename is written UNRESOLVED (correctly: guessing is the worse
+                //    failure), so those rows lose their paths, `derive_hubs()` sees different degrees,
+                //    `compare_rows` ranks differently, and `docs/pipeline.md` is generated in a
+                //    DIFFERENT ORDER than CI computes from the tracked set. The committed line then
+                //    fails `pipeline-lint` P1 on a machine that never saw the extra checkout.
+                //
+                // ⚠️ MEASURED, not guessed: `.kilo/worktrees/<name>/` on this host put a second
+                //    `scripts/state.php` and a second `.github/workflows/ci.yml` in the index, which
+                //    took the hub set from 49 files to 37 and moved 69 rows' path lists. `SKIP_DIRS`
+                //    could not have caught it — the directory is named by whichever tool created it.
+                //    The invariant that CAN be tested is that a directory carrying its own `.git` is
+                //    not part of this repository's source.
+                if (file_exists($path.'/.git')) {
+                    continue;
+                }
+
                 $stack[] = $path;
 
                 continue;

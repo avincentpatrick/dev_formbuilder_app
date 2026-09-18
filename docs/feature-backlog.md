@@ -10568,3 +10568,22 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   unresolved, which is the right doctrine; what is missing is a floor or a report on how much of a row's
   cited text it accounted for, so a row whose paths were mostly missed is visible as such. **Live** — every
   increment under `D13` groups against it. Filed by `M99`. **Tier: during-testing.**
+- ~~**`minor` · A second checkout parked inside the tree makes every basename ambiguous, and CI pays for
+  it.**~~ Found by `M99` (2026-09-18) when `pipeline-lint` P1 went red on a line this host said was current.
+  `build_basename_index()` in `scripts/backlog-triage.php` walks from the repository root and skips only the
+  seven names in `SKIP_DIRS`, so a nested working tree — a `git worktree`, an agent tool's scratch clone, a
+  vendored copy — contributes a second file for every basename in the repository. An ambiguous basename is
+  written **unresolved**, which is the right doctrine and is exactly what makes this invisible: the rows do
+  not error, they quietly lose their paths, `derive_hubs()` sees different degrees, `compare_rows` ranks
+  differently, and `docs/pipeline.md` is generated in a **different order** than CI computes from the tracked
+  set. ⛔ **MEASURED on this host:** `.kilo/worktrees/obsidian-dogwood/` put a second `scripts/state.php` and a
+  second `.github/workflows/ci.yml` into the index; the hub set read **37 files against the tracked set's 49**,
+  and **69 rows** had different path lists. `SKIP_DIRS` could never have caught it, because the directory is
+  named by whichever tool created it. ✅ **CLOSED BY `M99` (2026-09-18) — THE TESTABLE INVARIANT IS THAT A
+  DIRECTORY CARRYING ITS OWN `.git` IS NOT THIS REPOSITORY'S SOURCE**, so the walk skips it. Verified the way
+  `M98` prescribes rather than by regenerating and hoping: with the guard in place the host's generated body
+  is **byte-identical** to one produced in a `git clone --no-hardlinks` of the same branch, and
+  `php scripts/pipeline.php --check` reports `is current` inside that clone. ⚠️ **What is NOT fixed:** the
+  generator still cannot tell a blind walk from a small repository, so a future exclusion that goes too far
+  would shrink the index silently — `MIN_SCANNED_FILES` guards `pipeline.php`'s corpus walk and there is no
+  equivalent floor on this index. Filed by `M99`. **Tier: during-testing.**

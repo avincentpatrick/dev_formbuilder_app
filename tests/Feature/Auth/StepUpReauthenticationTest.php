@@ -292,8 +292,14 @@ it('shows the notice on the confirmation page without consuming it', function ()
     $this->actingAs($this->owner)
         ->get(tenantUrl('/user/confirm-password'))
         ->assertOk()
+        // ⛔ THE `false` DISABLES INERTIA'S PAGE-FILE EXISTENCE CHECK, AND IT IS NOT OPTIONAL HERE.
+        //    inertia-laravel defaults its page path to `resource_path('js/pages')`, lowercase, while this
+        //    repository's directory is `resources/js/Pages` — so the lookup succeeds on a case-insensitive
+        //    dev filesystem and fails on Linux. Every other `->component()` call in the suite passes it,
+        //    and SearchPageTest's header records the reason alongside the withoutVite() one; this case
+        //    hit both traps in sequence, one CI run apart.
         ->assertInertia(fn ($page) => $page
-            ->component('auth/ConfirmPassword')
+            ->component('auth/ConfirmPassword', false)
             ->where('discardedWrite.method', 'PATCH'));
 
     // ⛔ NOT CONSUMED. The member may reload the prompt, and clearing it here would leave them with no

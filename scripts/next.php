@@ -218,7 +218,12 @@ function render_queue(array $state): string
     $out .= ' Any push that changes PROGRESS.md, docs/claims/decisions.md or a row\'s tier, awaits or liveness'
         .' regenerates docs/pipeline.md in the same push.';
 
-    if ((int) $gate['open'] === 0) {
+    // ⛔ THE COPY THAT GETS COMMITTED, AND THEREFORE THE WORST ONE (M99). This sentence is written INTO
+    //    PROGRESS.md by `--write`, so a stale imperative does not merely reprint on each run — it sits
+    //    on the trunk ordering every future session to send the user a notification that M95 sent on
+    //    2026-09-14. It did exactly that for four increments. Keyed on the notified fact now, and a
+    //    null (gate not measurable) prints nothing rather than guessing.
+    if ((int) $gate['open'] === 0 && ($gate['notified'] ?? null) === false) {
         $out .= ' ⛔ ZERO OPEN '.strtoupper((string) $gate['tier']).' ROWS: send the user the push notification and'
             .' the Testing Server Checklist now (CLAUDE.md).';
     }

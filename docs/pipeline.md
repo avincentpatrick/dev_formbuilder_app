@@ -22,11 +22,12 @@ is the mechanism that produced five separate realignments.
 ---
 ## Testing gate
 
-**Testing gate:** before-testing — 0 open of 1 · 0 waiting on you · 0 held
+**Testing gate:** before-testing — 0 open of 7 · 0 waiting on you · 0 held
 
 Waiting on you: none — questions answered on the Decision Board. Shown, and never
 blocking this count.
 Held: none — unscheduled until the user signals, and never blocking this count either.
+Notified: yes, by M95 — sent 2026-09-14 when the before-testing tier reached zero. Owed once, and already sent — no later session sends it again.
 
 ⛔ The session that closes the last open `before-testing` row tells the user the app is ready for a
 testing server — a push notification and the Testing Server Checklist (`CLAUDE.md`).
@@ -42,6 +43,9 @@ one touching a hub.
 - `R-0855052e` — The `md-status` check the operator is told to read returns a Laravel page, because the front-controller rewrite swallows it. · ready
 - `R-2344803c` — The first-boot runbook describes only nginx behind a wildcard domain, and the testing server runs Apache with one workspace on an existing address. · ready
 - `R-4ff3e848` — JSON and bypass-cookie requests fall through the maintenance stub into `vendor/` during the deploy window. · ready
+- `R-43bdc36b` — A step-up-protected write is discarded when the confirmation window has lapsed. · ready
+- `R-62fb2e05` — Unbranded mail links its header logo to the agency's own website, while tenant-branded mail does not. · ready
+- `R-5e4af12b` — The runbook misses four Windows host prerequisites that stop a first boot or a deploy on the testing server. · ready
 - `R-1ad2304d` — Nobody who loses their two-step sign-in device and their recovery codes can get back in without an operator editing the database. · blocked (decision: D37)
 - `R-5c3bc57a` — A correction still cannot be autosaved, and the reason is an endpoint that does not exist plus a product decision nobody has taken. · blocked (decision: D36)
 - `R-4328a4d9` — The API rate-limit table promises 300 requests/minute per authenticated user and no such limiter is defined. · blocked (decision: D38)
@@ -50,6 +54,10 @@ one touching a hub.
 - `R-e6a10f97` — The welcome email tells a central-host account to create a workspace. · blocked (decision: D44)
 - `R-d6609e82` — The storage-quota row's stated blocker is not real, and its re-aim needs a copy decision nobody has made. · blocked (decision: D26)
 - `R-1b966250` — The documented async export API — `POST /api/v1/forms/{form}/exports` and `GET /api/v1/exports/{export}` — has zero routes and no `exports` job row, … · blocked (decision: D38)
+- `R-fcfc1f52` — `docs/api-specification.md:63` states in the present tense that every unsafe request is deduplicated against a 24-hour Redis cache keyed on `(tenant_… · blocked (decision: D38)
+- `R-f1312153` — "1 concurrent sync export per form, additional requests 429" — no concurrency guard exists on any export path. · blocked (decision: D38)
+- `R-47552102` — The documented `Users & roles` API resource group (`GET/POST /api/v1/users`, `/api/v1/roles`) has zero routes, and a shipped schema decision was alre… · blocked (decision: D38)
+- `R-f1332829` — `forms.single_page_mode` has no write surface outside the seeders, so single-page mode is unreachable for a real tenant — and its documented default … · blocked (decision: D35)
 - `D20` — The service worker caches a credential-bearing resume shell, where the credential IS the cache key. Purge it, keep it, or split the difference? · waiting on you
 - `D26` — The offline panel's storage-quota line counts every visit's submissions while the three sentences beside it count only this one. Reword the line, re-… · waiting on you
 - `D28` — Should `MdsSegmentedControl` get a component-level wrap or shrink affordance, or should its four stretch-clamped hosts keep guarding themselves? · waiting on you
@@ -63,6 +71,10 @@ one touching a hub.
 - `D51` — `R-5ecfa6cd`, the central-host sign-in loop, is tiered `early-testing`; `M98` measured it as unreachable by any tester. Which tier? · waiting on you
 - `D52` — `R-e6a10f97`, the welcome email telling a central-host account to create a workspace, is tiered `early-testing`; `M98` found it latent behind a reset… · waiting on you
 - `D53` — `R-e7d6f223`, the deploy that deletes the previous build's chunks, is tiered `during-testing`; `M98` re-judged its precondition as ordinary traffic. … · waiting on you
+
+⚠️ **This section is CUT, and the rest of the tier is not shown here.** 0 more ready and 8 more
+blocked `early-testing` row(s) are in **The line** below — read it rather than this section before
+grouping a batch.
 
 ## The line
 
@@ -360,9 +372,10 @@ one touching a hub.
 
 ## Off the line
 
-1 row(s) recorded `done` and 0 dispositioned `n/a`. They are not work and are listed here
+2 row(s) recorded `done` and 0 dispositioned `n/a`. They are not work and are listed here
 rather than dropped, so that this file and its sources cannot disagree about what was decided.
 
+- `testing-server-notified` — done (`PROGRESS.md:208`)
 - `tier-verdicts` — done (`PROGRESS.md:207`)
 
 ## What this file cannot see

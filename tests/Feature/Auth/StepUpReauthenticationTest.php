@@ -230,6 +230,11 @@ it('bounces an un-enrolled super-admin to enrollment rather than to a password p
 */
 
 it('discards the payload of a gated write, and says so', function (): void {
+    // ⛔ REQUIRED, AND IT PASSES LOCALLY WITHOUT IT — WHICH IS THE TRAP. These cases render real Inertia
+    //    pages, and CI builds no `public/build`, so `Vite::manifest()` throws and every assertOk() below
+    //    answers 500. A developer checkout HAS a build, so the omission is invisible until CI says so.
+    $this->withoutVite();
+
     confirmPasswordNow(20 * 60);
 
     // The roster GET first, so StartSession writes `_previous.url` — it stores one only for GETs, which
@@ -274,6 +279,11 @@ it('does not claim a write was discarded when a gated GET is bounced', function 
 });
 
 it('shows the notice on the confirmation page without consuming it', function (): void {
+    // ⛔ REQUIRED, AND IT PASSES LOCALLY WITHOUT IT — WHICH IS THE TRAP. These cases render real Inertia
+    //    pages, and CI builds no `public/build`, so `Vite::manifest()` throws and every assertOk() below
+    //    answers 500. A developer checkout HAS a build, so the omission is invisible until CI says so.
+    $this->withoutVite();
+
     confirmPasswordNow(20 * 60);
 
     $this->actingAs($this->owner)->get(tenantUrl('/dashboard'))->assertOk();
@@ -292,6 +302,11 @@ it('shows the notice on the confirmation page without consuming it', function ()
 });
 
 it('raises the notice as a toast on the page the member is returned to, exactly once', function (): void {
+    // ⛔ REQUIRED, AND IT PASSES LOCALLY WITHOUT IT — WHICH IS THE TRAP. These cases render real Inertia
+    //    pages, and CI builds no `public/build`, so `Vite::manifest()` throws and every assertOk() below
+    //    answers 500. A developer checkout HAS a build, so the omission is invisible until CI says so.
+    $this->withoutVite();
+
     confirmPasswordNow(20 * 60);
 
     $this->actingAs($this->owner)->get(tenantUrl('/dashboard'))->assertOk();

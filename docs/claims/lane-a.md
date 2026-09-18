@@ -16,7 +16,156 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M100` is merged; the early-testing tier continues, named in `docs/pipeline.md` § Next
+## Status: ACTIVE CLAIM — `M101`, the un-versioned crawl protection given a gate that can go red (`m101-crawl-protection-gate`)
+
+Taken 2026-09-19. Branch `m101-crawl-protection-gate`, cut from `origin/main` at `827274c`, PR into `main`.
+Rows: `R-562bcc2a` (`docs/feature-backlog.md:10615`) — *"The only thing keeping the testing site out of
+search results is one vhost line that no document records and no gate would notice losing."* — and
+`R-0855052e` (`docs/feature-backlog.md:10509`) — *"The `md-status` check the operator is told to read
+returns a Laravel page, because the front-controller rewrite swallows it."* Both **Tier: early-testing**,
+both `minor`, both **Live**.
+
+⛔ **THE BATCH DEVIATES FROM `D13`, DELIBERATELY AND ON `M100`'S PRECEDENT.** Both rows land in
+`docs/deployment-infrastructure.md` §8.3. The generated hub set ranks that document **first at 18 open
+rows** (`docs/backlog-triage.md:302`), so *"at most one row may touch a hub"* forbids the pair; under
+`D13`'s own seven-file meta-hub list the document is a **non-hub**, so *"no two rows may cite the same
+non-hub file"* forbids it too. **Either reading forbids this pair**, which is exactly the open row
+`R-f8bcf113` (`docs/feature-backlog.md:10528`): *"`D13`'s file-overlap rule cannot be satisfied by any
+pair of rows."* `M100` took the same deviation and argued it (`docs/claims/lane-a.md:128-133`). The
+argument here: both remedies edit **one section of one document**, and splitting them means editing §8.3
+in two increments and touching `docs/feature-backlog.md` twice — doubling the line-citation shift that
+`R-d285b9a3` exists to record. One pass is the lower-risk option, not the looser one.
+
+⚠️ **EVERY PREMISE BELOW WAS MEASURED AGAINST THE RUNNING BOX BEFORE THIS CLAIM WAS WRITTEN, FROM
+OUTSIDE.** `curl -w '%{remote_ip}'` reports `121.58.210.237:443` and this machine's `hosts` file carries
+no `pitahc` entry, so the probes crossed the public internet rather than a local override — the same
+address `M100` proved the box itself cannot reach.
+
+| Path | CSP/XFO/XCTO/Referrer | `X-Robots-Tag` | HSTS | Served by |
+|---|---|---|---|---|
+| `/` → 302 | present | present | **ABSENT** | PHP |
+| `/login` 200 | present | present | **ABSENT** | PHP |
+| `/up` 200 | **ABSENT** | present | **ABSENT** | PHP |
+| `/robots.txt` 200 | **ABSENT** | present | **ABSENT** | Apache, static |
+| `/favicon.ico` 200 | **ABSENT** | present | **ABSENT** | Apache, static |
+| `/build/assets/app-CF1wJdpl.css` 200 | **ABSENT** | present | **ABSENT** | Apache, static |
+| `/nonexistent-static.txt` 404 | **ABSENT** | present | **ABSENT** | PHP |
+
+Port 80 has **no listener** — connect fails after 21 s, a DROP rather than a refusal. `/md-status` and
+`/server-status` both return a **Laravel 404 page**. `/robots.txt` is `Content-Length: 24` and
+byte-identical to the tracked `public/robots.txt`.
+
+---
+
+### Row 1 — `R-562bcc2a`, the un-versioned `X-Robots-Tag`
+
+`docs/feature-backlog.md:10615`. Filed by `M100`. **Tier: early-testing.** **Live.**
+
+### Evidence verified
+**Held, and the row's own correction of the project record is confirmed.** `X-Robots-Tag: noindex,
+nofollow, noarchive` is served on every one of the seven paths above, measured 2026-09-19 — so the
+earlier record claiming *"the site is open to search engines"* is as dead as the row says.
+`public/robots.txt` is the Laravel default, `User-agent: *` with an empty `Disallow:`, 24 bytes,
+untouched since the Phase 0 walking skeleton (`git log -- public/robots.txt` returns one commit).
+`docs/deployment-infrastructure.md:536-540` is the §8.3 mention the row credits. ⚠️ **One citation
+could NOT be verified and is filed rather than assumed**: the row attributes the header to
+`Header always set X-Robots-Tag` in `conf\extra\meridian.conf`, while §8.3 `:536-537` says only *"the
+vhost"* immediately beside `conf\extra\httpd-vhosts.conf`, and `docs/claims/lane-a.md:201-203`
+enumerates `meridian.conf` by on-box line number **without** this directive among them. The two
+documents disagree about which file holds it and no console session was available this increment.
+
+### Premise verified
+**Holds, and is now stronger than when filed.** The row believes the protection is a single
+un-versioned line whose loss nothing would notice: `git grep` finds **no tracked Apache config of any
+kind** — zero `VirtualHost` hits in the whole tree — and `git ls-files` returns exactly two web-server
+files, `docker/nginx/default.conf` and `public/.htaccess`, neither of which sets any header. No test or
+lint reads the header. ⛔ **And the premise behind its *prohibition* is confirmed too**: editing
+`public/robots.txt` would ship to production, so that arm stays forbidden.
+
+### Remedy verdict
+⛔ **HALF THE PRESCRIBED REMEDY IS REFUTED, BY MEASUREMENT RATHER THAN ARGUMENT.** The row offers
+*"assert the header in a test against the deployed site, **or** move it into the application's
+security-header middleware conditioned on the environment."* The second arm cannot work.
+`AppSecurityHeaders` is mounted **per route group at 10 sites and never globally**, and a global mount
+on `web` is forbidden for a stated reason — it would set `frame-ancestors 'none'` on the guest runtime
+and break every embed (`app/Http/Middleware/AppSecurityHeaders.php:25-29`). `/robots.txt` and
+`/favicon.ico` are **static files Apache serves without invoking PHP at all**, so no middleware can ever
+carry a header on them — and `/robots.txt` is the one URL crawlers actually fetch. Moving the header
+would **lose it on 5 of the 7 paths above**, a strict regression. There is also **no precedent anywhere
+in this repository for an environment-conditioned response header** — zero instances across `app/`,
+`config/`, `bootstrap/` and `routes/`. ✅ **The first arm works and is what is built.**
+✅ **And the same measurement answers the row's sentence *"record which, because the two have different
+failure modes"*, which is the half it could not resolve for itself:** `X-Robots-Tag` is **response**-scoped,
+so per-URL coverage is the entire point and the vhost is the only complete site; HSTS is **host**-scoped,
+so one response carrying it covers the origin and a middleware would suffice. Different answers for the
+two headers, which is why `R-06228b4f` is filed as `D54` rather than folded in here.
+
+---
+
+### Row 2 — `R-0855052e`, the `md-status` check that returns a Laravel page
+
+`docs/feature-backlog.md:10509`. Filed by `M99`. **Tier: early-testing.** **Live.**
+
+### Evidence verified
+**Held.** `public/.htaccess:22-24` carries the front-controller block exactly as quoted — `RewriteCond
+%{REQUEST_FILENAME} !-d`, `RewriteCond %{REQUEST_FILENAME} !-f`, `RewriteRule ^ index.php [L]` — with no
+handler exemption anywhere in the file. Measured from outside, `/md-status` returns a **Laravel 404
+page** carrying `X-Powered-By: PHP/8.4.25` and Laravel's error template, so PHP did serve it and the
+rewrite did win; `/server-status` behaves identically. `R-2344803c`'s closure does name this only as a
+caution and prescribe no fix (`docs/feature-backlog.md:10076`), and `R-4ff3e848`'s `M98` correction does
+want to edit the same file, neither naming the other — both confirmed.
+
+### Premise verified
+⚠️ **Held on the part that matters and UNDER-DETERMINED on the part the row asserts.** An outside probe
+cannot distinguish *"the `md-status` handler is configured and the rewrite swallows it"* from *"the
+handler was never configured at all"* — both produce exactly this Laravel 404. `/server-status`
+answering the same way is weak evidence for the second. ✅ **The remedy chosen below makes the question
+moot**, which is why the row can close without a console session. ⛔ **A second premise is refuted
+outright:** the row frames this as *"a defect in a TRACKED file"*. `public/.htaccess` is the **stock,
+unmodified Laravel file**, and routing unknown paths to the front controller is its purpose. It is also
+**inert in every environment except that one box** — the local stack is nginx
+(`docker/nginx/default.conf`), there is no Apache in `docker-compose.yml` or `docker/`, and
+`tests/Feature/Deploy/DeployMaintenanceGuardTest.php:25` already records *"there is no Apache in CI"*.
+
+### Remedy verdict
+**The row offers two arms; the first is structurally unprovable and the second works.** *"Exempt the
+status path in `public/.htaccess`"* cannot be reddened by any gate this repository has — there is no
+Apache in CI and no vhost in the repository to assert against, which is the stated reason `R-4ff3e848`
+declined its own `.htaccess` arm. Adding an unverifiable exemption to a file only one box reads, for a
+check being deleted, is net negative. *"Delete the check from the checklist and say what replaces it"*
+works, and **the replacement already exists and is strictly better**:
+`scripts/activate-staged-cert.ps1` proves the **served** certificate by re-reading it over loopback with
+SNI, and §8.3 `:497-499` already documents `LastTaskResult`'s four codes as *"the monitoring surface"*.
+The residual — that nothing exercises `public/.htaccess` in any environment — is filed rather than
+carried.
+
+---
+
+Files: `scripts/staging-headers-judge.php` (new), `tests/Feature/Docs/StagingHeadersJudgeTest.php` (new),
+`tests/fixtures/staging-headers/**` (new), `.github/workflows/ci.yml`,
+`docs/deployment-infrastructure.md`, `docs/feature-backlog.md`, `docs/claims/decisions.md`,
+`docs/claims/lane-a.md`, `docs/pipeline.md`, `docs/backlog-triage.md`, `PROGRESS.md`,
+`docs/gate-baselines.md`.
+Shared artefacts taken: `docs/**`, `PROGRESS.md` (own block only), `.github/workflows/ci.yml`.
+Paired files taken: none.
+Namespaces spent: **nothing from either namespace** — no migration and no ADR. `D54` is a decision
+number, not an ADR, and `0023`/`2026_08_17_000112` stay unspent.
+Prediction: `pipeline-lint` **P7b changes by construction** — `D54` opens, the open-decision count goes
+40 → 41, and `R-06228b4f` moves from `ready` to `blocked (decision: D54)`; **P7e** is the arm most likely
+to catch a mistake, because the `Awaits D54` token and the regenerated line must land in the same push.
+PHPStan **cannot move**: it scans `app`, `database` and `routes`, and this diff is one `scripts/` file,
+one test, fixtures, CI and documentation — said rather than quoted. Pint must be run **bare**, because
+the scoped form misses `scripts/` entirely and that is where the new file is. `tracker-lint` R1 passes
+with roughly 30,781 bytes of headroom, so **no surgery is owed**. `citation-liveness-lint` should hold:
+both closures append to an existing `**Tier:**` line and add **zero** lines, and the five filed rows land
+at the end of the ledger below every citation.
+**The one I most expect to be wrong: the `ci.yml` step wiring, not the judge.** The judge is
+mutation-provable and the fixtures are real captures; the two new steps are `schedule`-gated, so no push
+or pull-request run exercises them at all and a `workflow_dispatch` is the only pre-merge proof. I expect
+the `if:` condition or the exit-2 fence to be wrong on the first dispatch — most likely the `set +e`
+fence, since GitHub's default `bash -e` has already produced that exact defect once in this file.
+**Second most likely: `BacklogProvenanceTest`**, because five newly filed rows each need a `Filed by` and
+a liveness marker and it gates the presence of both.
 
 ## RELEASED — `M100`, the mod_md activation task and the inbound-443 premise refresh (merged as PR #293, `f181efb`, 6/6 green with real step counts — Static analysis 28 · E2E 20 · Contract 16 · Frontend 12 · axe 11 · Pest 11)
 

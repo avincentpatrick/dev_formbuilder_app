@@ -563,11 +563,13 @@ not blocked**; crawlers do fetch it, Googlebot included.
   **without invoking PHP at all**, and `/up` is a PHP route outside every group `AppSecurityHeaders` is
   mounted on. All three carry `X-Robots-Tag` and none of them carries the four headers that middleware
   sets. Moving it would lose the header on the one URL crawlers actually fetch.
-- **`scripts/staging-headers-judge.php` is authoritative for its SURVIVAL.** It runs nightly on `main`
-  from `.github/workflows/ci.yml`, probes six paths spanning both mechanisms, and blocks the merge if the
-  header is absent or its directives are weakened. An unreachable box, or a response it cannot attribute
-  to this site, is **exit 2 — not measured** — and renders as a warning rather than a red, so an outage
-  and a deleted vhost line are never the same signal.
+- **`scripts/staging-headers-judge.php` is authoritative for its SURVIVAL.** It runs from
+  `.github/workflows/ci.yml` on the **nightly schedule** and on any **manual re-verification** run,
+  probes six paths spanning both mechanisms, and blocks if the header is absent or its directives are
+  weakened. An unreachable box, or a response it cannot attribute to this site, is **exit 2 — not
+  measured** — and renders as a warning rather than a red, so an outage and a deleted vhost line are
+  never the same signal. ⚠️ **It deliberately does NOT run per-push**: a vhost edit is not a deploy, so
+  a push adds nothing but the chance of a pull request going amber because this box happened to be down.
 - ⚠️ **Its floor is the Pest control, `tests/Feature/Docs/StagingHeadersJudgeTest.php`, and deliberately
   NOT `docs/gate-baselines.md`.** `scripts/gate-baselines.php`'s metric list is *declared, not derived*,
   and a metric whose pattern is absent writes `NOT FOUND` **and exits 1** — so declaring a `schedule`-only

@@ -346,7 +346,14 @@ jobs:
         # Running it per-push would also annotate every unrelated pull request whenever the box is
         # down, which is the false-red habit this repository spends three gates trying not to teach.
         # It is free while the repository is public (D48) — see that entry before flipping it private.
-        if: github.event_name == 'schedule'
+        #
+        # ⚠️ `workflow_dispatch` IS INCLUDED, AND NOT FOR CONVENIENCE. A `schedule`-only condition cannot
+        # be exercised before it merges — the first run would be the night after, on the trunk, which is
+        # the one place a wrong `if:` or a broken fence must not be discovered. A manual re-verification
+        # run is also a run that SHOULD check the site: that trigger exists here because four jobs once
+        # never acquired a runner during an Actions outage (I5), and `scripts/gate-baselines.php` accepts
+        # it on `main` for the same reason.
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
         # continue-on-error is load-bearing, exactly as it is for npm audit above: without it curl's
         # own non-zero kills the job before the judge runs, and "the box is unreachable" and "the
         # protection is gone" collapse back into the same red.
@@ -370,7 +377,7 @@ jobs:
         # anywhere in this repository, and moving it into the app is refuted by measurement — Apache
         # serves /robots.txt and /favicon.ico without invoking PHP at all, so no middleware can carry
         # a header on the one URL crawlers actually fetch. docs/deployment-infrastructure.md §8.3.
-        if: github.event_name == 'schedule'
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
         run: |
           set +e
           php scripts/staging-headers-judge.php --captures=staging-captures

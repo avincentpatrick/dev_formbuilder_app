@@ -154,7 +154,18 @@ class FortifyServiceProvider extends ServiceProvider
                 $request->session()->put('url.intended', $previous);
             }
 
-            return Inertia::render('auth/ConfirmPassword');
+            // ⛔ THE HALF THAT SAYS A WRITE WAS DROPPED. `RequireRecentPassword` puts `step_up.discarded`
+            //    when it bounces a non-GET, and this is the first surface that can tell the member. It is
+            //    READ here and deliberately NOT forgotten: the member may reload this page, and
+            //    {@see HandleInertiaRequests} clears the key only once it has been shown somewhere other
+            //    than this one — otherwise a refresh would silently drop the only notice there is.
+            //
+            // ⚠️ AN EXPLICIT PROP, NOT A TOAST. `MdsToastHost` is mounted in `AppLayout` and `AdminLayout`
+            //    only; this page renders inside `AuthLayout`, which mounts none and reads no flash, so a
+            //    toast raised here would render exactly nothing.
+            return Inertia::render('auth/ConfirmPassword', [
+                'discardedWrite' => $request->session()->get('step_up.discarded'),
+            ]);
         });
 
         RateLimiter::for('login', function (Request $request) {

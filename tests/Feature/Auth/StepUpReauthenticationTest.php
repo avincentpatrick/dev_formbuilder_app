@@ -215,3 +215,100 @@ it('bounces an un-enrolled super-admin to enrollment rather than to a password p
         ->get('http://meridian.test/admin/tenants')
         ->assertRedirect('http://meridian.test/admin/two-factor');
 });
+
+/*
+|--------------------------------------------------------------------------
+| The write the gate throws away, and the member being told (M99, R-43bdc36b).
+|--------------------------------------------------------------------------
+| Every route above is a non-GET, and `Redirector::guest` records `previous()` rather than the request
+| for those, so the payload is gone by the time anyone reaches the confirmation page. The cases above
+| assert the REDIRECT and stop there — which is exactly how a silently discarded write passed a fully
+| green suite for as long as the gate has existed.
+|
+| ⛔ EACH CASE ASSERTS THE WRITE DID NOT LAND, NEVER ONLY THE REDIRECT. A redirect to the prompt is
+| compatible with the change having been made; asserting the database is what tells the two apart.
+*/
+
+it('discards the payload of a gated write, and says so', function (): void {
+    confirmPasswordNow(20 * 60);
+
+    // The roster GET first, so StartSession writes `_previous.url` — it stores one only for GETs, which
+    // is what makes `url()->previous()` resolve without a hand-set Referer. It is also the real
+    // sequence: nobody PATCHes a role without having opened the roster.
+    $this->actingAs($this->owner)->get(tenantUrl('/dashboard'))->assertOk();
+
+    $this->actingAs($this->owner)
+        ->patch(tenantUrl("/members/{$this->member->id}/role"), ['role' => 'reviewer'])
+        ->assertRedirect(tenantUrl('/user/confirm-password'))
+        ->assertSessionHas('step_up.discarded');
+
+    // The half the suite never asserted: the role is UNCHANGED. Without this the case passes against a
+    // gate that redirects and applies the change anyway, and against one that discards it silently.
+    enterTenant($this->tenant->id, $this->owner->id);
+    expect($this->member->fresh()->getRoleNames()->first())->toBe('viewer');
+
+    expect(session('step_up.discarded'))
+        ->toMatchArray(['method' => 'PATCH'])
+        ->and(session('step_up.discarded')['url'])->toContain('/members/');
+});
+
+it('does not claim a write was discarded when a gated GET is bounced', function (): void {
+    $this->withoutVite();
+
+    // ⛔ THE CONSOLE IS WHERE THIS CASE HAS TO LIVE, AND THE FIRST DRAFT PUT IT ON THE TENANT SIDE AND
+    //    PASSED FOR THE WRONG REASON. Tenant reads are deliberately OUTSIDE the gate — the file's own
+    //    header says so of `GET /members`, and `GET /settings/sso` answers 200 for the same reason —
+    //    so a tenant GET never bounces and the assertion below would hold against a middleware that
+    //    announced a discarded write on every single page load. `routes/admin.php` mounts `step-up` on
+    //    the whole console group, so its READS bounce too, and that is the only place the distinction
+    //    between a bounced GET and a bounced write is observable.
+    $superAdmin = User::factory()->confirmedTwoFactor()->create(['is_super_admin' => true]);
+
+    $this->actingAs($superAdmin)
+        ->get('http://meridian.test/admin/tenants')
+        ->assertRedirect('http://meridian.test/user/confirm-password');
+
+    // A gated GET is recorded as its own intended URL and loses nothing. Claiming otherwise would put
+    // "your change was not saved" in front of an operator who had merely opened a page.
+    expect(session()->has('step_up.discarded'))->toBeFalse();
+});
+
+it('shows the notice on the confirmation page without consuming it', function (): void {
+    confirmPasswordNow(20 * 60);
+
+    $this->actingAs($this->owner)->get(tenantUrl('/dashboard'))->assertOk();
+    $this->actingAs($this->owner)->patch(tenantUrl("/members/{$this->member->id}/role"), ['role' => 'reviewer']);
+
+    $this->actingAs($this->owner)
+        ->get(tenantUrl('/user/confirm-password'))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('auth/ConfirmPassword')
+            ->where('discardedWrite.method', 'PATCH'));
+
+    // ⛔ NOT CONSUMED. The member may reload the prompt, and clearing it here would leave them with no
+    // explanation at all on the page that actually matters — the one they are sent back to.
+    expect(session()->has('step_up.discarded'))->toBeTrue();
+});
+
+it('raises the notice as a toast on the page the member is returned to, exactly once', function (): void {
+    confirmPasswordNow(20 * 60);
+
+    $this->actingAs($this->owner)->get(tenantUrl('/dashboard'))->assertOk();
+    $this->actingAs($this->owner)->patch(tenantUrl("/members/{$this->member->id}/role"), ['role' => 'reviewer']);
+    $this->actingAs($this->owner)->get(tenantUrl('/user/confirm-password'))->assertOk();
+
+    $this->actingAs($this->owner)
+        ->get(tenantUrl('/dashboard'))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->where('flash.toast.type', 'error'));
+
+    // Exactly once: a standing notice that reappeared on every page would be worse than none, because
+    // the member would stop reading it before the one time it was true.
+    expect(session()->has('step_up.discarded'))->toBeFalse();
+
+    $this->actingAs($this->owner)
+        ->get(tenantUrl('/dashboard'))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->where('flash.toast', null));
+});

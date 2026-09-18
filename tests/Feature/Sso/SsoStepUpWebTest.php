@@ -544,3 +544,44 @@ it('never leaves this origin, whatever the intended url held', function (string 
     // so the path itself starts `/\` — which the shape check refuses outright, dropping the destination.
     'backslash authority' => ['/\\evil.test/steal', '/dashboard'],
 ]);
+
+/*
+|--------------------------------------------------------------------------
+| The write this fork throws away (M99, R-43bdc36b).
+|--------------------------------------------------------------------------
+| ⛔ THIS IS THE ARM THE ROW THAT FILED THE DEFECT NEVER NAMED, and it is the one that matters most
+| for an Enterprise tenant. `RequireRecentPassword` forks to the identity provider BEFORE delegating to
+| the framework's `RequirePassword`, with the identical `Redirect::guest()` and the identical loss of a
+| non-GET body — and then leaves the confirm-password flow entirely, so anything landed only in
+| `Fortify::confirmPasswordView()` covers exactly none of this population. The notice therefore has to
+| be recorded in the middleware, above the fork, and these cases are what hold it there.
+*/
+
+it('records the discarded write before forking to the identity provider', function (): void {
+    asSsoSession($this->admin);
+
+    $this->put(STEP_UP_GATED, ['metadata_xml' => idpMetadataXml()])
+        ->assertRedirect(STEP_UP_HOST.'/sso/saml/step-up')
+        ->assertSessionHas('step_up.discarded');
+
+    expect(session('step_up.discarded'))->toMatchArray(['method' => 'PUT']);
+});
+
+it('records it on the password arm of the same fork too', function (): void {
+    $this->actingAs($this->admin);
+
+    $this->put(STEP_UP_GATED, ['metadata_xml' => idpMetadataXml()])
+        ->assertRedirect(route('password.confirm'))
+        ->assertSessionHas('step_up.discarded');
+});
+
+it('does not record one when the step-up clock is already fresh', function (): void {
+    asSsoSession($this->admin);
+    confirmPasswordNow(0);
+
+    // Nothing is bounced, so nothing was discarded. Without this case the notice could be written on
+    // every gated request and the two cases above would still pass.
+    $this->put(STEP_UP_GATED, ['metadata_xml' => idpMetadataXml()]);
+
+    expect(session()->has('step_up.discarded'))->toBeFalse();
+});

@@ -7,7 +7,7 @@
 
 ## 1. What's Already Decided (not repeated in full)
 
-Per **ADR-0005**, production runs on the owner's **Windows Server 2016**: **nginx** (web server) → PHP 8.4 FastCGI, **self-managed PostgreSQL for Windows** (a dedicated instance per site; the testing site runs PostgreSQL 15, §8 step 2), **no Redis** (ADR-0007 moved the queue to the `database` driver and cache and sessions use it too, so ADR-0005's Memurai is not installed — it returns only with Redis + Horizon), exactly one `queue:work` worker as a Windows service, the scheduler via Windows Task Scheduler, TLS via win-acme, and **git-driven deploys through a self-hosted GitHub Actions runner**. ⚠️ **This sentence listed "Horizon/Reverb as Windows services" until Increment M46 (2026-08-29): neither is built.** Horizon was declined by ADR-0007 §D1 in favour of a plain worker; Reverb is Track B and ships no artisan command in this tree, so a service pointing at it cannot start. Docker Compose remains the source of truth for local-dev/CI parity regardless of the production host; the CI pipeline stages are in `docs/testing-strategy.md` §6.
+Per **ADR-0005**, production runs on the owner's **Windows Server 2016**: a **web server** — ADR-0005 decided **nginx**, and the testing site behind `staging.pitahc.gov.ph` runs **Apache 2.4 with `mod_proxy_fcgi`** under `D46` (§8.3) — → PHP 8.4 FastCGI, **self-managed PostgreSQL for Windows** (a dedicated instance per site; the testing site runs PostgreSQL 15, §8 step 2), **no Redis** (ADR-0007 moved the queue to the `database` driver and cache and sessions use it too, so ADR-0005's Memurai is not installed — it returns only with Redis + Horizon), exactly one `queue:work` worker as a Windows service, the scheduler via Windows Task Scheduler, TLS by **ACME** (win-acme on an nginx host, Apache's own `mod_md` on the testing site — §8 step 8), and **git-driven deploys through a self-hosted GitHub Actions runner**. ⚠️ **This sentence listed "Horizon/Reverb as Windows services" until Increment M46 (2026-08-29): neither is built.** Horizon was declined by ADR-0007 §D1 in favour of a plain worker; Reverb is Track B and ships no artisan command in this tree, so a service pointing at it cannot start. ⚠️ **And it said "TLS via win-acme" without qualification until `M100` (2026-09-19), which is the web-server half of the same defect.** Docker Compose remains the source of truth for local-dev/CI parity regardless of the production host; the CI pipeline stages are in `docs/testing-strategy.md` §6.
 
 **No open hosting due-diligence item.** Because Postgres is now self-managed, Row-Level Security and PostGIS are **guaranteed** available — but the PostGIS binaries must be installed **before the first migrate**, because a migration already runs `CREATE EXTENSION postgis` (§8 step 2) — and the ADR-0003 "confirm the managed platform supports RLS/PostGIS" question is eliminated, not deferred.
 
@@ -21,7 +21,7 @@ Per **ADR-0005**, production runs on the owner's **Windows Server 2016**: **ngin
 |---|---|---|
 | **Local development** | Individual dev machines | Docker Compose (Laravel, Postgres, Redis, Mailpit) — the committed parity source. Native PHP + Postgres on Windows/Laragon is an accepted alternative for developers who don't run Docker. |
 | **CI** | Automated tests (`docs/testing-strategy.md`) | GitHub-hosted **Linux** runners with PostgreSQL 17 + PostGIS 3.5 and Redis service containers. (Note the Linux-CI vs Windows-prod parity gap, ADR-0005, and a version gap too: the testing site runs PostgreSQL 15, §8 step 2.) |
-| **Staging** *(recommended)* | Pre-production validation | A second site on the same Windows Server (separate nginx server block, **its own PostgreSQL instance**, worker service and scheduler task — §8 step 2 says why a separate database on a shared instance is not enough), or a separate box — isolated synthetic/seeded data, never real respondent PII (`docs/data-privacy-gdpr-compliance.md`). |
+| **Staging** — **built, and it is the testing site** | Pre-production validation and tester access | **`staging.pitahc.gov.ph` on the owner's Windows Server 2016, built 2026-09-17 under `D46`** — one workspace at the root, served by **Apache** (not a second nginx server block), its own **PostgreSQL 15** instance, worker service `meridian-test-worker` and scheduler task, app at `C:\meridian\test-app`. Isolated synthetic/seeded data, never real respondent PII (`docs/data-privacy-gdpr-compliance.md`). §8.3 is its runbook; §8 step 2 says why a separate database on a shared instance is not enough. |
 | **Production** | Live tenant traffic | **Self-hosted Windows Server 2016**, per ADR-0005. |
 
 **Promotion path**: `main` is the deployable branch. A green CI run on `main` triggers the deploy workflow (self-hosted runner) → production. If a staging site is configured, validate there first and promote to production as a deliberate act, given the blast radius against live tenant data.
@@ -46,7 +46,7 @@ CI (test/build) is unchanged (`docs/testing-strategy.md` §6, Linux runners). **
 3. **Rollback**: `deploy.ps1 -AppPath <app path> -Ref <previous-good-sha>` (stages, swaps and re-caches that commit like any other deploy). A bare `git reset --hard <sha>` followed by a re-run does **not** roll back, because the script's own reset returns to `origin/main`; and the next green CI run on `main` redeploys `main`, so revert the bad commit there as well. Because migrations are additive-first, a code rollback does not require a down-migration in the incident hot path; a schema reversal, if ever needed, is a separate deliberate step.
 
 ### 3.1 On zero-downtime (an honest limitation)
-Single-box Windows self-hosting has **no managed zero-downtime deploy**. `deploy.ps1` builds each release in `.deploy-stage` while the site stays up, then uses a short `artisan down`/`up` window around the code reset, two directory renames, `package:discover`, migrate and the caches (**measured at 7.9 seconds** on the Windows testing server on 2026-09-17, in that site's first automatic deploy: `artisan down` at 22:50:09.57Z, `artisan up` returning at 22:50:17.48Z, with nothing to migrate and no refused directory move. The whole run took 4 min 43 s, so the build and the npm install sat outside the window where they belong. A run with migrations to apply, or one whose renames are refused while a handle is open, is longer). A junction-swapped release directory does not rescue this: nginx for Windows does not resolve `$realpath_root`, and a long-lived php-cgi keeps a junction's old target in its realpath cache. True zero-downtime (atomic release-swap, opcache priming) is a future enhancement — or a reason to move to Forge+VPS / Laravel Cloud (ADR-0005 revisit triggers) — not something a single Windows box provides out of the box.
+Single-box Windows self-hosting has **no managed zero-downtime deploy**. `deploy.ps1` builds each release in `.deploy-stage` while the site stays up, then uses a short `artisan down`/`up` window around the code reset, two directory renames, `package:discover`, migrate and the caches (**measured at 7.9 seconds** on the Windows testing server on 2026-09-17, in that site's first automatic deploy: `artisan down` at 22:50:09.57Z, `artisan up` returning at 22:50:17.48Z, with nothing to migrate and no refused directory move. The whole run took 4 min 43 s, so the build and the npm install sat outside the window where they belong. A run with migrations to apply, or one whose renames are refused while a handle is open, is longer). A junction-swapped release directory does not rescue this on either web server: nginx for Windows does not resolve `$realpath_root`, Apache needs the `ProxyFCGISetEnvIf` form in §8.3 for the same class of reason, and a long-lived php-cgi keeps a junction's old target in its realpath cache. True zero-downtime (atomic release-swap, opcache priming) is a future enhancement — or a reason to move to Forge+VPS / Laravel Cloud (ADR-0005 revisit triggers) — not something a single Windows box provides out of the box.
 
 ---
 
@@ -145,7 +145,22 @@ The concrete pieces to stand one site up (companion to `deploy.ps1`). Each step 
    - ⚠️ **The `ALTER DATABASE … SET timezone` above is belt-and-braces, not the guard.** The guard is `'timezone' => 'UTC'` on all four connections in `config/database.php`, which makes each session set its own zone. The `ALTER` is worth running anyway, for `psql` and for `pg_dump`/restore work done by hand — but it survives a restore only with `--create`, and a fresh `initdb` takes this box's zone (Asia/Manila here), which is how every PHP-bound timestamp landed eight hours early on the testing server until `M98`. If you are rebuilding a database that already holds data written under a non-UTC session, the skew is per COLUMN, not per row: values written by SQL `now()` are correct and values bound from PHP are not, and both kinds appear in one row — so never repair it with a blanket interval shift.
    - RLS does **not** apply to superusers, so the app must NOT connect as one — this is a hard requirement for the tenancy/RLS work (Increment A). Configure `archive_mode`/`archive_command` (§5).
 3. **Redis / Memurai — not required.** *(ADR-0007 moved the queue to the `database` driver, and cache and sessions use it too, so nothing on this box needs a Redis server or the `redis` extension. Memurai returns only if ADR-0007 §D1's trigger brings Redis + Horizon.)*
-4. **nginx for Windows** — server block: `root` → the app's `public/`; `try_files $uri $uri/ /index.php?$query_string`; a PHP `location` with `fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;` and `include fastcgi_params;` that passes to step 5's `upstream` (the shape of `docker/nginx/default.conf`); run nginx as a Windows service via **NSSM**. Step 8 adds TLS, `server_name` and the body-size limit. *(A WebSocket `location` proxying to Reverb was listed here until Increment M46 (2026-08-29) measured that no Reverb service exists to proxy to — it returns with the stack, Track B.)*
+4. **The web server** — **two arms, and the testing site uses the second.**
+   - **nginx for Windows** (ADR-0005's decision, and what a wildcard-subdomain production host should use) —
+     server block: `root` → the app's `public/`; `try_files $uri $uri/ /index.php?$query_string`; a PHP
+     `location` with `fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;` and
+     `include fastcgi_params;` that passes to step 5's `upstream` (the shape of `docker/nginx/default.conf`);
+     run nginx as a Windows service via **NSSM**. *(A WebSocket `location` proxying to Reverb was listed here
+     until Increment M46 (2026-08-29) measured that no Reverb service exists to proxy to — it returns with
+     the stack, Track B.)*
+   - **Apache 2.4 with `mod_proxy_fcgi`** — what the testing site actually runs, already on the box when
+     `D46` chose it. ⛔ **The vhost MUST carry
+     `ProxyFCGISetEnvIf "true" SCRIPT_FILENAME "%{DOCUMENT_ROOT}%{reqenv:SCRIPT_NAME}"`.** On Windows a
+     balancer handler hands `php-cgi` a path whose drive prefix has been stripped to a bare leading slash, and
+     every PHP request then answers *"No input file specified"* — a 404 for the whole site. Switching to a
+     direct `fcgi://` handler does not avoid it. Full vhost shape, the setup lock and the certificate
+     arrangement are in **§8.3**.
+   Step 8 adds TLS, the host name and the body-size limit.
 5. **php-cgi FastCGI backend** — two or more `php-cgi.exe` instances as NSSM services, **each on its own port** (`php-cgi.exe -b 127.0.0.1:9000`, `-b 127.0.0.1:9001`, …), listed as `server` lines in an nginx `upstream` block that `fastcgi_pass` names. One instance serves one request at a time, and two cannot share a port. In each service's environment set `PHP_FCGI_MAX_REQUESTS=0` (`nssm set <service> AppEnvironmentExtra PHP_FCGI_MAX_REQUESTS=0`): php-cgi otherwise exits after 500 requests, which testers see as intermittent 502s while NSSM restarts it. *If php-cgi supervision proves fragile under load, switch to **IIS + the PHP FastCGI module** — the documented fallback (ADR-0005).*
 6. **Queue worker** — exactly **one** `php artisan queue:work` process (with the §6 `--queue=` ordering; **not** Horizon, per ADR-0007 §D1) as an NSSM Windows service, **installed but left Stopped** until §8.2's priming deploy starts it:
    `nssm install meridian-test-worker C:\php\php.exe artisan queue:work --queue=submissions,webhooks,mail,exports,ocr-processing,scheduled-maintenance --sleep=3 --max-time=3600 --memory=112`, then `nssm set meridian-test-worker AppDirectory C:\meridian\test-app`. `nssm install` does not start the service, but its start type is automatic, so do not reboot before the priming deploy. Leave `AppExit` at its `Restart` default: `--max-time` and `queue:restart` both end the process cleanly, and NSSM relaunching it is how new code loads. `--memory=112` sits below the 128M `memory_limit`, as the compose worker's does, so the graceful recycle fires before PHP's hard limit. Do **not** start it by hand: the worker reads the database cache at boot, and that table does not exist before the first migrate.
@@ -153,8 +168,30 @@ The concrete pieces to stand one site up (companion to `deploy.ps1`). Each step 
    The service name is per site. Set the machine environment variable `MERIDIAN_WORKER_SERVICE` to it (`setx /M MERIDIAN_WORKER_SERVICE meridian-test-worker`), because `deploy.ps1` reads the name from there and otherwise looks for `meridian-worker`. **`deploy.ps1` still does not create this worker service**: it refuses to deploy onto a host where the named service is not installed, runs `php artisan queue:restart` last inside its maintenance window, and starts the service after `up` if it is Stopped (§3). Mail, the upload scan that makes an attached file openable, and every scheduled sweep run only while this worker does.
    ⛔ **Correction (Increment M46, 2026-08-29) — this step previously also prescribed `php artisan reverb:start` as a second NSSM service, and that command does not exist.** Measured on this tree: `laravel/reverb` is absent from `composer.json`, `reverb` appears in no `artisan list` output, and `php artisan reverb:start --help` exits **1**. An operator following this runbook would have created a Windows service whose executable fails on every start, and NSSM's auto-restart would have retried it forever. **Reverb is Track B by explicit user decision** — see ADR-0002 §D3's Realtime row, corrected in the same increment. The realtime service returns to this step when the stack does, and not before.
 7. **Scheduler** — a Windows Task Scheduler task running `php artisan schedule:run` every minute (Windows has no cron), one per site, registered **after** §8.2's first deploy has migrated: `schtasks /Create /TN meridian-test-scheduler /SC MINUTE /MO 1 /RU SYSTEM /TR "C:\php\php.exe C:\meridian\test-app\artisan schedule:run"`, which runs whether or not anyone is signed in. `routes/console.php` declares **seven** jobs: the failed-job prune (daily 03:10), the usage roll-up (02:40), the draft reaper (03:40), the scheduled-form and webhook-retry sweeps (every 5 minutes), the connector-token refresh (hourly) and custom-domain verification (every 15 minutes). Every entry is a queued job, so nothing happens unless step 6's worker is Running, and none is due while the site is in maintenance mode. `deploy.ps1` provisions no Task Scheduler task; until this one exists, nothing periodic runs. *Never create `app/Console/Kernel.php`*: `Kernel::shouldDiscoverCommands()` is `get_class($this) === __CLASS__`, so any console-kernel subclass silently stops `routes/console.php` loading and every schedule disappears with no error.
-8. **DNS and TLS** — DNS `A` records for `<CENTRAL_DOMAIN>` and `*.<CENTRAL_DOMAIN>` (every workspace is a subdomain), **published last**, per §8.2. The certificate covers the central host and the tenant-subdomain wildcard, and Let's Encrypt issues a wildcard only through **DNS-01** validation, which needs only a TXT record. Use **win-acme** with the DNS plugin for your DNS provider, the **PEM-files store** (nginx cannot read the Windows certificate store) and a script installation that reloads nginx — for example `wacs.exe --source manual --host <CENTRAL_DOMAIN>,*.<CENTRAL_DOMAIN> --validationmode dns-01 --validation <plugin> --store pemfiles --pemfilespath C:\nginx\certs --installation script --script <nginx reload script>`; check the argument names against `wacs.exe --help` for the version you install. win-acme registers its own renewal task. Terminate TLS at nginx: `listen 443 ssl;`, `ssl_certificate` and `ssl_certificate_key` pointing at the files it writes, `server_name <CENTRAL_DOMAIN> *.<CENTRAL_DOMAIN>;` and `client_max_body_size 30m;` (step 1's `post_max_size`). **HTTPS is required even for testing**: the form runtime's service worker, which carries offline drafts and background sync, registers only in a secure context. **Tenant custom domains are NOT covered by this step and are not automated — see §8.1.**
-9. **GitHub Actions self-hosted runner** — register against the repo and install as a Windows service (`config.cmd` → run as service), under an account that has Modify on the app path and is allowed to start step 6's service. Confirm both: a refused start turns a good deploy red after `up`. Restart the runner service after setting `MERIDIAN_WORKER_SERVICE`, so its jobs inherit the variable. It executes the deploy workflow (§3). Set the repo **Variables** (Settings → Secrets and variables → Actions → Variables): **`MERIDIAN_APP_PATH`** (e.g. `C:\meridian\test-app`) when you register it, and **`DEPLOY_ENABLED=true` only as the last step of §8.2**. Until `DEPLOY_ENABLED` is `true`, `.github/workflows/deploy.yml` stays dormant (skipped); once it is, every green CI run on `main` runs `deploy.ps1` — a scheduled run included, although a run whose commit is already live opens no maintenance window — and a first migrate against an unfinished `.env` fixes the role passwords permanently.
+8. **DNS and TLS** — **two arms, because the challenge type follows from which ports are open.**
+   - **A wildcard host (ADR-0005's production shape).** DNS `A` records for `<CENTRAL_DOMAIN>` and
+     `*.<CENTRAL_DOMAIN>` (every workspace is a subdomain), **published last**, per §8.2. Let's Encrypt issues a
+     wildcard only through **DNS-01** validation, which needs only a TXT record. Use **win-acme** with the DNS
+     plugin for your provider, the **PEM-files store** (nginx cannot read the Windows certificate store) and a
+     script installation that reloads nginx — for example `wacs.exe --source manual --host
+     <CENTRAL_DOMAIN>,*.<CENTRAL_DOMAIN> --validationmode dns-01 --validation <plugin> --store pemfiles
+     --pemfilespath C:\nginx\certs --installation script --script <nginx reload script>`; check the argument
+     names against `wacs.exe --help` for the version you install. win-acme registers its own renewal task.
+     Terminate TLS at nginx: `listen 443 ssl;`, `ssl_certificate` and `ssl_certificate_key` pointing at the files
+     it writes, `server_name <CENTRAL_DOMAIN> *.<CENTRAL_DOMAIN>;` and `client_max_body_size 30m;`
+     (step 1's `post_max_size`).
+   - **A single named host on Apache (the testing site, `D46`/`D49`).** One `A` record, no wildcard, and the
+     certificate is issued and renewed by Apache's own **`mod_md`** over **`tls-alpn-01`** on port 443. There is
+     no DNS plugin for this zone — DICT runs the name servers for `pitahc.gov.ph` and offers no API — and
+     **inbound 80 is closed**, so `http-01` is unavailable and DNS-01 cannot be automated. `D49` answered this:
+     inbound **443 is open**, measured from outside the agency network, and `tls-alpn-01` is the challenge.
+     ⛔ **Do not count a win-acme installation on this box as a working renewal** — its `http-01` could
+     never validate through a closed port 80. The directives, the three traps and the **activation task Windows
+     requires** are in **§8.3**; read it before touching the certificate.
+   **HTTPS is required even for testing**: the form runtime's service worker, which carries offline drafts and
+   background sync, registers only in a secure context. **Tenant custom domains are NOT covered by this step and
+   are not automated — see §8.1.**
+9. **GitHub Actions self-hosted runner** — register against the repo and install as a Windows service (`config.cmd` → run as service), under an account that has Modify on the app path and is allowed to start step 6's service. Confirm both: a refused start turns a good deploy red after `up`. Restart the runner service after setting `MERIDIAN_WORKER_SERVICE`, so its jobs inherit the variable. It executes the deploy workflow (§3). Set the repo **Variables** (Settings → Secrets and variables → Actions → Variables): **`MERIDIAN_APP_PATH`** (e.g. `C:\meridian\test-app`) when you register it, and **`DEPLOY_ENABLED=true` only as the last step of §8.2**. Until `DEPLOY_ENABLED` is `true`, `.github/workflows/deploy.yml` stays dormant (skipped); once it is, every green CI run on `main` runs `deploy.ps1` — a scheduled run included, although a run whose commit is already live opens no maintenance window — and a first migrate against an unfinished `.env` fixes the role passwords permanently. ⛔ **Never approve an unknown contributor's run.** The repository is public through testing (`D48`), a fork's workflows run from its own head and can name `runs-on: self-hosted`, and an approval puts that run's code on this box where the runner's account holds Modify on the app tree. The approval policy is set to `all_external_contributors`, so every user who is neither a member nor an owner waits for the owner — and the owner is the whole control. This sentence was assigned disjunctively by a struck ledger row and carried by neither of its named rows until `M100` wrote it here (`R-ceb66cb8`).
 10. **App directory** — install **Git for Windows** (2.31 or later, for `git rev-parse --path-format`), **Composer 2** and **Node.js 24 LTS** (CI's version; Vite needs 20.19 or later), and put them and `php` on the PATH of both your admin account and the runner's service account, because `deploy.ps1` calls `git`, `composer`, `npm` and `php` by bare name. Clone the repository at a fixed path (e.g. `C:\meridian\test-app`) whose `public/` is nginx's root. Grant the php-cgi, worker and runner service accounts Modify on `storage\` and `bootstrap\cache\`, and the runner Modify on the whole tree, which is where `deploy.ps1` builds each release (`.deploy-stage`) and renames `vendor\` and `public\build` in from, so it needs no other directory. Then follow **§8.2**, which creates the server `.env` (§4) and runs `deploy.ps1` once, by hand, to prime the site.
 
 ### 8.1 Custom-domain certificates — the manual runbook (H22a / ADR-0012)
@@ -179,15 +216,22 @@ live traffic **last** — so there is no window in which their traffic arrives h
    domain is invisible to tenant resolution. The page labels this state **"Awaiting setup"** rather than
    "Verified", and says in words that the next step is ours — so a tenant does not repoint live traffic
    here on the strength of a green tick.
-3. **Add the hostname to the nginx server block** for the app's `public/` root. It must be a `server_name`
-   on the same block that serves tenant subdomains — the application distinguishes hosts, nginx does not
-   need to.
-4. **Issue the certificate by hand**, for that hostname only:
-   `wacs.exe --target manual --host forms.acme.com --installation iis` (or the nginx/script installer this
-   box uses). win-acme will register its own renewal task for it. **The tenant's DNS must already point
-   here for the HTTP-01 challenge to succeed** — so in practice steps 3-4 are done together with the
-   tenant, in a scheduled window.
-5. **Reload nginx** and confirm the certificate serves: `curl -sSI https://forms.acme.com/` .
+3. **Add the hostname to the web server**, for the app's `public/` root.
+   - **nginx:** a `server_name` on the same block that serves tenant subdomains — the application
+     distinguishes hosts, nginx does not need to.
+   - **Apache (this box):** a `ServerAlias` on the existing vhost, which already carries the
+     `ProxyFCGISetEnvIf` line §8 step 4 requires. Do not add a second vhost.
+4. **Issue the certificate by hand**, for that hostname only.
+   - **nginx / win-acme:** `wacs.exe --target manual --host forms.acme.com --installation iis` (or the
+     nginx/script installer this box uses). win-acme registers its own renewal task for it. **The tenant's
+     DNS must already point here for the HTTP-01 challenge to succeed** — so in practice steps 3-4 are
+     done together with the tenant, in a scheduled window.
+   - ⛔ **Apache (this box): `http-01` CANNOT WORK HERE, because inbound 80 is closed.** Add the host to
+     `MDomain` as a further member and let `mod_md` take it over `tls-alpn-01` on 443, or obtain it out of
+     band and install it as a static pair. Either way **the tenant's DNS must already point here** before the
+     challenge can validate, and ⚠️ **a renewal still needs §8.3's activation task to be served**, so
+     do not treat issuance as the end of the job.
+5. **Reload the web server** and confirm the certificate serves: `curl -sSI https://forms.acme.com/` .
 6. **Only now, activate:** `php artisan domains:activate forms.acme.com`. The command refuses a domain
    that is not verified, and prints the TXT record still needed if so. `--deactivate` takes a host back
    out of service without losing its verification, so re-activating later needs no new DNS record.
@@ -235,7 +279,12 @@ refuse to create an account without a console.
 
 2. **Install steps 1–5 and 8**: PHP, the dedicated PostgreSQL 15 instance with PostGIS and the `meridian_app`
    role and database, nginx, php-cgi and the certificate. DNS-01 needs only the TXT record, so **publish no `A`
-   record yet, and keep inbound 80 and 443 closed.**
+   record yet, and keep inbound 80 and 443 closed until step 10.** ⚠️ **On an Apache host renewing through
+   `mod_md`/`tls-alpn-01` this ordering is different and matters:** that challenge needs inbound 443 reachable from
+   the internet, so the certificate cannot be issued during this step at all. Install the web server here, publish
+   the `A` record and open 443 at step 10, and let `mod_md` obtain the certificate on the restart after that —
+   §8.3 gives the order. The testing site's first eleven renewal attempts all failed for exactly this reason,
+   and the cause was the firewall rather than the configuration.
 
 3. **Clone the app and write `.env`** (step 10). Copy `.env.example` to `.env`, then set:
    - `APP_ENV=production` and `APP_DEBUG=false`. ⛔ **`production` is mandatory on a testing site too.**
@@ -327,9 +376,22 @@ refuse to create an account without a console.
    `php artisan queue:restart`, or simply re-run `deploy.ps1`. A deploy caches the config and a cached config
    ignores `.env`, so an edit without this changes nothing.
 
-10. **Expose the site.** Publish the `A` records for `<CENTRAL_DOMAIN>` and `*.<CENTRAL_DOMAIN>`, remove the
-    hosts-file entry, and open inbound 443. Testers' devices must resolve the wildcard: on a private office
-    network, check the DNS those devices use, because a hosts file cannot hold a wildcard.
+10. **Expose the site.** Publish the `A` record for the site's host name — and `*.<CENTRAL_DOMAIN>` too **only**
+    if the site serves workspaces as subdomains. **Open inbound 443.**
+    - ✅ **On the testing site this is DONE, and it is what `D49` answered.** Inbound 443 to `121.58.210.237`
+      is open, measured from **outside the agency network** on 2026-09-18 and again on 2026-09-19: TLS 1.3
+      completes, `/up` and `/login` answer 200. **It must stay open**, because `mod_md` renews over it
+      (§8 step 8, §8.3). **Inbound 80 stays closed.**
+    - ⛔ **DO NOT remove the on-box `hosts` entries.** `M100` measured it: a TCP connect from the server to
+      its own public address `121.58.210.237:443` gets **no connection within 8 seconds**, so **this network
+      does not hairpin**. The two entries — `127.0.0.1 pitahc.gov.ph` and `127.0.0.1 staging.pitahc.gov.ph`
+      — are the only route by which the certificate check, the `/up` check, `Require local` and the
+      operator's own browser reach the site from the box. Removing them breaks every check they protect.
+      *(This was a conditional instruction resting on an unmeasured fact until `R-98682188` was closed on the
+      measurement above; the Testing Server Checklist's "remove the hosts entry" step is wrong and is
+      corrected there too.)*
+    - Testers' devices must resolve the name themselves: on a private office network, check the DNS those
+      devices use, because a hosts file cannot hold a wildcard.
 
 11. **Test mail before inviting anyone.** Sign in as the owner at the workspace address, invite a second address
     you control from Members, and confirm that the email arrives and that `php artisan queue:failed` lists
@@ -346,6 +408,136 @@ refuse to create an account without a console.
       and nothing alerts anyone (§9). Fix the cause and re-run `deploy.ps1`, or roll back with
       `deploy.ps1 -AppPath C:\meridian\test-app -Ref <good-sha>` and revert the bad commit on `main` (§3).
     - A change to `deploy.ps1` itself takes effect one deploy late (§3).
+
+### 8.3 The testing site as built — Apache, `mod_md`, and the activation task Windows requires
+
+**This is the runbook for `staging.pitahc.gov.ph` (`D46`, `D49`), and until `M100` none of it was written
+down anywhere in this repository.** It lived as configuration on the box and as chat history, which is why
+`§8` described a server that does not exist for four increments. Everything below was read off the box or
+measured against it, and the measurement is named wherever one was taken.
+
+**The layout.** One workspace at the root of `staging.pitahc.gov.ph` (121.58.210.237), served by
+**Apache 2.4.66 (Win64)**, service name **`Apache2.4`**, root `C:\Apache24`, site config
+`conf\extra\meridian.conf`. `CENTRAL_DOMAIN=pitahc.gov.ph`, and `pitahc.gov.ph` itself is the agency
+website on a different machine — so **no wildcard, no subdomain workspaces, and no path-prefixed deploy**.
+App at `C:\meridian\test-app`, PHP 8.4.25 x64 NTS at `C:\php` behind `php-cgi-9000`/`9001`, PostgreSQL 15
++ PostGIS, worker `meridian-test-worker`, scheduler `meridian-test-scheduler` (every minute).
+Main `ErrorLog` is `logs\error_log` — **no extension** — and the vhost writes
+`logs\meridian-{access,error}.log`. `openssl.exe` ships at `C:\Apache24\bin\`.
+
+**The certificate directives, as they stand and as they must stay.** In `conf\extra\meridian.conf`:
+
+```apache
+MDContactEmail        <operator address>
+MDCertificateAgreement accepted
+MDCAChallenges        tls-alpn-01
+MDPrivateKeys         secp256r1
+<MDomain staging.pitahc.gov.ph>
+    MDMembers  manual
+    MDRenewMode always
+</MDomain>
+...
+SSLCertificateFile    "C:/Apache24/conf/certs/staging.pitahc.gov.ph-chain.pem"
+SSLCertificateKeyFile "C:/Apache24/conf/certs/staging.pitahc.gov.ph-key.pem"
+```
+
+⛔ **Four traps govern this arrangement. Three of them take the site down or silently stop renewing, and
+each was paid for once already.**
+
+1. ⛔ **`MDPrivateKeys secp256r1` is load-bearing, and its absence cost a day.** The served leaf is
+   **EC P-256**; `mod_md`'s default challenge certificate is **RSA**. Apache holds **one certificate slot
+   per key type**, and `mod_md`'s `tls-alpn-01` swap replaces **only the RSA slot** — so Let's Encrypt,
+   which resolves to ECDSA, is handed the untouched ordinary certificate and answers *"Received
+   certificate which is not self-signed."* `mod_md`'s own source comment predicts it: *"we cannot override
+   all fallback certificates present, just a single one … Bit of a mess."* The `.secp256r1` filename suffix
+   `mod_md` then writes is harmless; it finds its own files.
+2. ⛔ **Never pin `MDCertificateFile`/`MDCertificateKeyFile` inside `<MDomain>`.** In httpd 2.4.66
+   `get_certificates()` takes the static branch *unconditionally* whenever they are set, and
+   `md_reg_renew_at` computes renewal from that static pair — so a certificate `mod_md` renews is **never
+   served**, and renewal re-triggers on every check into Let's Encrypt's duplicate-certificate limit.
+   Nothing in the module ever clears `md->cert_files`.
+3. ⛔ **Keep the vhost `SSLCertificateFile` pair permanently, and never remove it to "let `mod_md` take
+   over".** With no certificate in the vhost, `mod_ssl`'s list goes empty, the fallback hook installs a
+   self-signed *"Apache Managed Domain Fallback"* certificate and `mod_ssl` sets `service_unavailable`
+   (`AH10085`) — **503 on every request, behind a browser trust error, until a human notices.**
+   `md_add_cert_files` *appends* `mod_md`'s files after yours (`AH10084` warns and proceeds), so the
+   managed certificate still wins and `pks->cert_files` can never be empty at a future restart.
+4. ⛔ **ON WINDOWS `mod_md` CAN NEVER ACTIVATE A RENEWED CERTIFICATE BY ITSELF.**
+   `md_server_graceful()` is `APR_ENOTIMPL` on WIN32 and **has no caller anywhere in the module**.
+   Staged-to-live promotion happens only in `md_reg_load_stagings()`, called from exactly one place,
+   `md_post_config_before_ssl()` — **an Apache restart**. A renewed certificate therefore sits in
+   `md\staging\<domain>\` for ever while the served one expires.
+
+**The activation task, which is the answer to trap 4.**
+`scripts/activate-staged-cert.ps1` in this repository is the source of truth; it is installed on the box at
+`C:\meridian\activate-staged-cert.ps1` and registered as the scheduled task **`meridian-certificate-activate`**,
+daily at **03:20**, as **SYSTEM** at `runlevel=Highest`, `StartWhenAvailable`, ten-minute limit.
+
+```powershell
+# install/refresh the operational copy from the repository, then re-register if the task is absent
+Copy-Item C:\meridian\test-app\scripts\activate-staged-cert.ps1 C:\meridian\activate-staged-cert.ps1 -Force
+```
+
+⚠️ **The operational copy deliberately sits OUTSIDE the app directory.** `deploy.ps1` hard-resets the app
+checkout, and a rollback with `-Ref <older-sha>` would take the script with it — certificate activation must
+not depend on the app tree's state. The repository copy is the source; this is the one place that says so.
+
+It restarts Apache **only** when a certificate is actually staged, **refuses** when `httpd -t` does not
+exit 0, and **proves** the activation by re-reading the served certificate rather than trusting the
+restart's exit code. Its log is `C:\meridian\certificate-activation.log`.
+
+⛔ **The glob `pubcert*.pem` in that script is load-bearing — do not narrow it to an exact filename.** Its
+predecessor, `check-certificate.ps1`, tested `Test-Path "$stage\pubcert.pem"`; with `MDPrivateKeys
+secp256r1` in force `mod_md` writes **`pubcert.secp256r1.pem`**, so that arm became unreachable the moment
+trap 1's fix landed — **while the daily task still exited 0 and logged success every day.** The fix for one
+defect silently disarmed the mitigation for another and every signal stayed green. It is now unregistered,
+its definition backed up to `C:\meridian\meridian-certificate-check.task.xml`, and the script parked as
+`check-certificate.ps1.superseded`.
+
+**Read the task's `LastTaskResult`, which is the monitoring surface:** `0` nothing staged or activation
+proved · `1` unexpected error · `2` a certificate was staged but `httpd -t` failed, so the restart was
+refused · `3` Apache restarted but the activation could not be proved — **check the site immediately.**
+
+**What a renewal looks like when it works.** `mod_md` renews at roughly 30 days before expiry. The staged
+certificate lands in `md\staging\<domain>\`, the error log records
+`AH10059 … activated on next (graceful) server restart`, and the **next 03:20 task run** performs that
+restart and logs the new serial and expiry. The served leaf as of 2026-09-19 is serial `05F10E…53AE`, valid
+**2026-09-18 → 2026-12-17**, so the next renewal falls due around **2026-11-17**.
+
+⚠️ **`httpd -t` on this box prints `AH00558: Could not reliably determine the server's fully qualified
+domain name, using fe80::…` before `Syntax OK`, because there is no *global* `ServerName`.** It is benign —
+the vhost carries its own — but it appears in every `CONFIG` line of the activation log for ever. **Do not
+chase it during an incident.**
+
+**Recovering a failed renewal by hand.** Delete `md\staging\<domain>\job.json`, `order.json` and
+`md\challenges\<domain>\*` so the retry backoff is skipped and the challenge certificate is regenerated
+with the right key type, then restart Apache **twice**: the first restart obtains and stages, the second
+activates. ⚠️ **Rate limit to respect: five failed validations per account per hostname per hour**, resetting
+on the hour. Failed orders issue nothing, so the five-per-week duplicate-certificate limit stays untouched.
+
+✅ **The free diagnostic for a key-type mismatch — reuse it, it needs no CA and burns no rate limit.**
+While challenge files exist in `md\challenges\<domain>\`, probe from anywhere:
+
+```
+openssl s_client -connect <ip>:443 -servername <domain> -alpn acme-tls/1
+openssl s_client -connect <ip>:443 -servername <domain> -alpn acme-tls/1 -sigalgs rsa_pss_rsae_sha256:rsa_pkcs1_sha256
+```
+
+**Interleave the two over at least five rounds** — a single pass cannot distinguish a sigalg effect from the
+two-second challenge window. If the default run returns the ordinary certificate while the RSA-restricted
+run returns `CN=tls-alpn-01-challenge`, the mismatch is proven.
+
+⚠️ **One check the Testing Server Checklist tells an operator to read does not work:** `md-status` is
+swallowed by `public/.htaccess`'s front-controller rewrite (`RewriteCond %{REQUEST_FILENAME} !-f` sends it
+to `index.php`, and `mod_rewrite` has no handler exemption), so it returns a Laravel page rather than
+`mod_md`'s status. **No step in this runbook may lean on it.** The activation log above is the substitute
+until that is fixed.
+
+⚠️ **Also on the box, unfiled against any step here:** a leftover `*:80` vhost for
+`staging.pitahc.gov.ph` in `conf\extra\httpd-vhosts.conf`, harmless while 80 is blocked from outside, and
+an `X-Robots-Tag: noindex, nofollow, noarchive` header set in the vhost — which is the **only** thing
+keeping this site out of search results, since `public/robots.txt` ships from the repository with an empty
+`Disallow:` and must stay that way so production is not blocked.
 
 ---
 

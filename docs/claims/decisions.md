@@ -17,7 +17,7 @@ two server-paginated tables (2026-08-18) · fail **open** on an unseeded plan ca
 password policy min-12 + HIBP + classes (2026-08-09) · Google-only social login (2026-08-09) ·
 gamification last (2026-08-09) · the held list stays held until the user signals, and they said
 *"not yet, ask again later"* on 2026-08-18 · **a flaky e2e result fails CI** (2026-08-26, D2 below) · **the M-series ends at zero open
-`major` rows plus three consecutive increments filing none** (2026-08-28, D5 below) · **the batch series ends and the tiered pipeline succeeds it** (2026-09-14, D12 below) · **the testing server is invitation-only** (2026-09-14, D31 below) · **the guest per-address limits are raised on the testing server only** (2026-09-14, D32 below) · **the Windows Server 2016 testing site runs PostgreSQL 15** (2026-09-14, D43 below) · **the testing site is one workspace at the root of `staging.pitahc.gov.ph`, served by Apache** (2026-09-15, D46 below) · **automatic deploys to the testing server are on** (2026-09-17, D47 below) · **the repository stays public with fake data only through testing, and goes private before any real data** (2026-09-17, D48 below).
+`major` rows plus three consecutive increments filing none** (2026-08-28, D5 below) · **the batch series ends and the tiered pipeline succeeds it** (2026-09-14, D12 below) · **the testing server is invitation-only** (2026-09-14, D31 below) · **the guest per-address limits are raised on the testing server only** (2026-09-14, D32 below) · **the Windows Server 2016 testing site runs PostgreSQL 15** (2026-09-14, D43 below) · **the testing site is one workspace at the root of `staging.pitahc.gov.ph`, served by Apache** (2026-09-15, D46 below) · **automatic deploys to the testing server are on** (2026-09-17, D47 below) · **the repository stays public with fake data only through testing, and goes private before any real data** (2026-09-17, D48 below) · **inbound TCP 443 is open and `mod_md` renews the testing site's certificate over `tls-alpn-01`, with a scheduled task to activate it** (2026-09-18, D49 below).
 
 ---
 
@@ -88,36 +88,6 @@ without navigating was counted and never exercised.
 
 **Recommendation: A.** The precondition is now ordinary traffic in the testers' own working hours, and the unexercised
 half changes the frequency rather than whether it happens.
-
-### D49 — The testing site's certificate expires 2026-10-13, and no renewal path in the checklist can validate while inbound 443 stays shut. What renews it? **Tier: early-testing.**
-
-**Filed 2026-09-17 by `M98`, while measuring the checklist's certificate step against what the network actually
-allows.** Three renewal routes are written down — two in the checklist, and DNS-01 as the wildcard-certificate
-assumption D46 records in `docs/deployment-infrastructure.md` §8 — and each needs something this network does not
-give. Port 80 is closed from outside (D46), so win-acme's `http-01` could never have worked, yet the checklist's
-*keep the existing renewer* path counts a win-acme installation as a working renewal. `mod_md`'s `tls-alpn-01`, the
-checklist's other path, needs Let's Encrypt's validators to reach port 443 from the internet, and inbound 443 to
-the server's public address was measured **dropped** on 2026-09-17 — which sits badly with D46's recorded TLS
-handshake on 2026-09-15, although D46 says only that the handshake was made *outside the box*: a different front
-address then, a firewall change since, or a 2026-09-15 handshake made from inside the office network would each
-explain it, and none is measured. DNS-01 would validate, but DICT runs the name servers for `pitahc.gov.ph` and
-offers no API, so it cannot be automated. The certificate served on 2026-09-15 expires **2026-10-13**, and the
-weekly blind Apache restart the checklist records on the box — unmeasured from here — is not a renewal of anything.
-
-- **A — ask the network team to open inbound TCP 443** to the server's public address. It is also the only thing
-  that lets testers off the office network reach the site at all, and it makes `tls-alpn-01` work, so the
-  certificate then renews itself. Costs a request to the network team and one confirmation from mobile data.
-- **B — renew by hand with a DNS-01 TXT record**, requested from DICT at each renewal. No network change, and
-  every renewal becomes a request to another agency, ninety days apart, with the site's certificate resting on
-  someone remembering.
-- **C — install an agency-issued certificate** — commercial or DICT-provided, typically a year long, with no ACME
-  at all. Costs money or an agency process, and the file is still installed and replaced by hand.
-
-**Recommendation: A, with B as the fallback** if 443 cannot be opened before the expiry. ⚠️ **An answer is needed
-well before 2026-10-13; the 2026-10-01 bound below is this entry's own, not one anybody has agreed:** both routes
-depend on another team acting, and B needs a TXT record published while the challenge is live. If nothing is
-decided, the certificate lapses on 2026-10-13 and every tester meets a browser warning on a `.gov.ph` address,
-which is the worst possible thing for them to be taught to click through.
 
 ### D50 — Should DICT be asked to publish DKIM and DMARC records for `pitahc.gov.ph`? **Tier: before-launch.**
 
@@ -1576,6 +1546,79 @@ doors; this is the builder's validation layer. They should not be answered as on
 
 
 ## ANSWERED
+### D49 — The testing site's certificate expires 2026-10-13, and no renewal path in the checklist can validate while inbound 443 stays shut. What renews it? **A — open inbound 443, and `tls-alpn-01` renews it.**
+
+**Answered 2026-09-18 (user decision, in chat), recorded by Lane A during `M100` — A.**
+
+**Filed 2026-09-17 by `M98`, while measuring the checklist's certificate step against what the network actually
+allows.** Three renewal routes are written down — two in the checklist, and DNS-01 as the wildcard-certificate
+assumption D46 records in `docs/deployment-infrastructure.md` §8 — and each needs something this network does not
+give. Port 80 is closed from outside (D46), so win-acme's `http-01` could never have worked, yet the checklist's
+*keep the existing renewer* path counts a win-acme installation as a working renewal. `mod_md`'s `tls-alpn-01`, the
+checklist's other path, needs Let's Encrypt's validators to reach port 443 from the internet, and inbound 443 to
+the server's public address was measured **dropped** on 2026-09-17 — which sits badly with D46's recorded TLS
+handshake on 2026-09-15, although D46 says only that the handshake was made *outside the box*: a different front
+address then, a firewall change since, or a 2026-09-15 handshake made from inside the office network would each
+explain it, and none is measured. DNS-01 would validate, but DICT runs the name servers for `pitahc.gov.ph` and
+offers no API, so it cannot be automated. The certificate served on 2026-09-15 expires **2026-10-13**, and the
+weekly blind Apache restart the checklist records on the box — unmeasured from here — is not a renewal of anything.
+
+- **A — ask the network team to open inbound TCP 443** to the server's public address. It is also the only thing
+  that lets testers off the office network reach the site at all, and it makes `tls-alpn-01` work, so the
+  certificate then renews itself. Costs a request to the network team and one confirmation from mobile data.
+- **B — renew by hand with a DNS-01 TXT record**, requested from DICT at each renewal. No network change, and
+  every renewal becomes a request to another agency, ninety days apart, with the site's certificate resting on
+  someone remembering.
+- **C — install an agency-issued certificate** — commercial or DICT-provided, typically a year long, with no ACME
+  at all. Costs money or an agency process, and the file is still installed and replaced by hand.
+
+**Recommendation: A, with B as the fallback** if 443 cannot be opened before the expiry. ⚠️ **An answer is needed
+well before 2026-10-13; the 2026-10-01 bound below is this entry's own, not one anybody has agreed:** both routes
+depend on another team acting, and B needs a TXT record published while the challenge is live. If nothing is
+decided, the certificate lapses on 2026-10-13 and every tester meets a browser warning on a `.gov.ph` address,
+which is the worst possible thing for them to be taught to click through.
+
+**The verification recommended A; the network team opened inbound 443 and the user chose A.**
+
+⚠️ **The question's own dates are superseded, and are kept as asked rather than rewritten.** The 2026-10-13 expiry
+and the 2026-10-01 bound were both real when this was filed. The certificate they refer to has since been
+replaced: the served leaf is now valid **2026-09-18 → 2026-12-17**, so the deadline this entry was racing no
+longer exists and the next renewal falls due around 2026-11-17.
+
+**Consequences, recorded so they are not rediscovered:**
+
+- **Inbound 443 is open and was measured from outside the agency network**, on 2026-09-18 and again on 2026-09-19
+  during `M100`: DNS resolves to `121.58.210.237`, TLS 1.3 completes, `/up` and `/login` both answer 200, and the
+  served leaf is `CN=staging.pitahc.gov.ph` issued by `CN=YE2, O=Let's Encrypt`, serial `05F10E…53AE`, valid to
+  2026-12-17. **Port 80 stays closed**, which is why `tls-alpn-01` rather than `http-01` is the challenge.
+- ⛔ **Opening 443 was necessary and was not sufficient. The renewal then failed for a second, unrelated reason,
+  and it cost a day to find: an EC-versus-RSA key-type mismatch.** The served leaf is EC P-256, while mod_md's
+  default challenge certificate is RSA. Apache holds one certificate slot per key type and mod_md's `tls-alpn-01`
+  swap replaces only the RSA slot, so Let's Encrypt — which resolves to ECDSA — was handed the ordinary
+  certificate and answered *"Received certificate which is not self-signed."* **The fix is one directive,
+  `MDPrivateKeys secp256r1`**, and it is in `conf\extra\meridian.conf`.
+- ⛔ **ON WINDOWS mod_md CAN NEVER ACTIVATE A RENEWED CERTIFICATE BY ITSELF, so "the certificate then renews
+  itself" in option A above is true only of the issuance, never of the installation.** `md_server_graceful()` is
+  `APR_ENOTIMPL` on WIN32 and has no caller anywhere in the module; staged-to-live promotion happens only in
+  `md_reg_load_stagings()`, called from exactly one place, `md_post_config_before_ssl()` — an Apache restart. A
+  renewed certificate otherwise sits in `md\staging\<domain>\` while the served one expires.
+  **`M100` built the scheduled task that performs that restart**: `scripts/activate-staged-cert.ps1`, registered as
+  `meridian-certificate-activate`, daily at 03:20 as SYSTEM. It restarts only when a certificate is actually
+  staged, refuses when `httpd -t` fails, and proves the activation by re-reading the served certificate. It was
+  proved by deliberate defect on all four arms. `docs/deployment-infrastructure.md` §8.3 is the runbook for it.
+- ⚠️ **The predecessor of that task looked like it already did this job and could not have.**
+  `C:\meridian\check-certificate.ps1`, run daily with `-RestartIfReady`, tested for the exact filename
+  `pubcert.pem`. With `MDPrivateKeys secp256r1` in force mod_md writes `pubcert.secp256r1.pem`, so its activation
+  arm was unreachable from the moment the key-type fix landed — while the task still exited 0 and logged success
+  every day. **The fix for one defect silently disarmed the mitigation for another, and every signal stayed
+  green.** It is now unregistered, its definition backed up, and the script parked as `.superseded`.
+- **The rate limit to respect if a renewal is ever forced by hand:** five failed validations per account per
+  hostname per hour, resetting on the hour. Failed orders issue nothing, so the five-per-week duplicate-certificate
+  limit stays untouched — the eleven failures of 2026-09-17 consumed none of it.
+- **B and C are not needed and should not be built.** DNS-01 through DICT and an agency-issued certificate both
+  stay available as fallbacks if 443 is ever closed again, and neither has any standing work attached.
+
+---
 
 ### D48 — Should the repository stay public? **Public with fake data only through testing; private before any real data.**
 
@@ -1781,9 +1824,11 @@ ignores `.env` edits. Dev and CI keep the defaults, and the values are lowered a
 ⚠️ **Annotated 2026-09-17 during `M98`.** Do not lower them on the schedule this sentence implies. The testing
 server sits behind source NAT, measured as one client address for everything arriving from the internet, so at the
 default limits every public respondent would share a single bucket rather than one office sharing one. The raised
-values must stay until the real client address reaches the app; the network fix belongs in a before-launch row in
-`docs/feature-backlog.md`, which is not filed yet, and `docs/deployment-infrastructure.md` carries a second copy of
-this instruction that needs the same qualification.
+values must stay until the real client address reaches the app; the network fix was made on the network side and is
+recorded in `R-df305332`, closed by `M100` on measurement: source NAT is gone, and real client addresses
+reach the app. ⚠️ **The raised values still stay**, for this entry's ORIGINAL reason rather than the
+source-NAT one — a room of testers behind one office NAT shares that NAT's public address — and
+`docs/deployment-infrastructure.md` carries a second copy of this instruction that says so too.
 
 **Filed 2026-09-14 by `M93`, from Decision Board card `guest-ip-limit`.** A public form mints its guest token
 under `GUEST_MINT_PER_IP`, which defaults to 30 per minute and has no line in `.env.example`. A group session on

@@ -16,7 +16,214 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M99` is merged; the early-testing tier continues, named in `docs/pipeline.md` § Next
+## Status: ACTIVE CLAIM — `M100`, the mod_md activation task and the inbound-443 premise refresh (`m100-modmd-activation-and-443-premise`)
+
+Taken 2026-09-19. Branch `m100-modmd-activation-and-443-premise`, cut from `origin/main` at `0972ec6`, PR into main.
+
+**Five rows, one answered decision, and one piece of infrastructure built on the box before this claim was
+written.** The activation task mod_md cannot perform on Windows now exists, is registered, and was proved by
+deliberate defect — all four arms, recorded per row below.
+
+⚠️ **THE FOUR RUNBOOK ROWS ALL CITE `docs/deployment-infrastructure.md`, AND THAT IS THE REASON THEY ARE ONE
+BATCH RATHER THAN THE REASON THEY CANNOT BE.** `D13`'s clause forbids two rows in one increment citing one
+non-hub file, to stop two increments colliding on it. Here one increment rewrites one file once, which is the
+outcome the clause exists to produce. `M99` already recorded that the generated hub set forbids every batch the
+clause exists to permit; this is the same divergence seen from the other side, and it is stated rather than
+assumed away.
+
+⛔ **TWO CEILINGS ARE AT ZERO BEFORE THIS INCREMENT STARTS, AND BOTH ARE LOAD-BEARING ON WHAT IT MAY DO.**
+`PROGRESS.md` stands at **129,102 bytes against `tracker-lint` R1's 130,000** — 898 free, against a measured mean
+close-out growth of 3,460 — so a tracker surgery is owed *by this increment* and is not optional.
+`citation-liveness-lint` reports **ledger tier 18 rotten against a ceiling of 18**, and **four live line-pinned
+citations point into the file this increment rewrites** (`:39` twice, `:129`, `:317`). One newly rotted citation
+takes it to 19 and reddens CI. The rewrite is therefore shaped by that: **line-neutral in place above `:317`**,
+with the substantive Apache/mod_md content appended at the `§8.2`/`§8b` boundary, where nothing cites.
+
+---
+
+### Row 1 — `R-df305332`, every visitor reaching the testing server as one private address
+
+`docs/feature-backlog.md:10149`. The only open `major` row in the ledger. Filed by `M98`. **Tier: before-launch.**
+
+### Evidence verified
+Every citation resolves and every mechanism is where the row says it is. `config/guest.php:40-41,49` carries
+`submit_per_ip`, `mint_per_ip` and `challenge_per_ip`. `app/Providers/FortifyServiceProvider.php:171-172` keys the
+login limiter on `Str::lower(username) . '|' . $request->ip()`, and `:202`/`:207` do the same for the
+password-reset arms. `app/Http/Middleware/EnforceGuestFormRateLimit.php`,
+`app/Support/Audit/AuditLogger.php:94,105` (`ip_address => requestIp()`) and `guest_ip` on
+`app/Models/Submission.php:124` all exist as described. `docs/deployment-infrastructure.md:272-275` carries the
+second copy of the `D32` instruction.
+⚠️ **One sub-claim is narrower than the row implies, and it is worth stating.** The row says
+`docs/security-threat-model.md` *"records that key without the effect"*. The threat model does in fact state the
+key **and** a detailed effect — *"5 attempts per email+IP per minute counted on SUCCESS AS WELL AS FAILURE, never
+cleared"*. What it does not record is the **NAT-specific** effect the row is about: that with the address half
+constant, the key collapses to the email alone. The row is right in context and imprecise out of it.
+
+### Premise verified
+⛔ **THE PREMISE IS DEAD, AND THAT IS WHY THE ROW CLOSES.** The row believes every visitor arrives as
+`192.168.50.1`. Re-measured **myself** on 2026-09-19 01:21 in `C:\Apache24\logs\meridian-access.log` rather than
+inherited from a hand-off: 2187 lines carry that address all-time, its **last occurrence ever** is
+`192.168.50.1 - - [18/Sep/2026:09:10:03 +0800] "GET /login HTTP/1.1" 200 1990`, and it appears **zero** times in
+the last 2000 requests. Real addresses now arrive — `34.79.149.251`, `94.154.46.245`, Googlebot `66.249.75.3/4`,
+this workstation's `180.195.67.134` — alongside office-LAN clients carrying their own `192.168.1.x`, which is how
+the once-a-minute `GET /` mystery resolves: it is `192.168.1.21`, which the NAT had been hiding.
+⚠️ **A second premise of the row's SURROUNDINGS also moved, and closing on the first without the second would
+leave a false sentence behind.** The row says the network fix *"belongs in a before-launch row … which is not
+filed yet"* — and `D32`'s annotation in `docs/claims/decisions.md:1785` still says exactly that, although
+`R-df305332` **is** that row. Both must be corrected in the same push.
+
+### Remedy verdict
+**The row's first prescribed remedy is the one that was applied, by the network team rather than by this
+repository: drop source NAT on the inbound 443 rule.** It works, measured above. The `mod_remoteip` /
+PROXY-protocol alternative is therefore moot and must not be built — and the row's standing warning never to
+trust `X-Forwarded-For` or set `trustProxies` while a NAT is upstream stays correct and stays unimplemented, which
+is the right state. ⚠️ **What the closure must NOT claim:** that `D32`'s raised guest limits can now be lowered.
+They stay raised for `D32`'s *original* reason — a room of testers behind one office NAT still shares that NAT's
+public address — and not for the source-NAT reason, which is gone.
+
+---
+
+### Row 2 — `R-2344803c`, the first-boot runbook describing only nginx behind a wildcard domain
+
+`docs/feature-backlog.md:10062`. Filed by `M97`, amended by `M98`. **Tier: early-testing.** **Live.**
+
+### Evidence verified
+Held, and the row understates its own scope in the direction it warns about. `docs/deployment-infrastructure.md`
+mentions `mod_md` **nowhere**: `§8` step 8 (`:156`) prescribes nginx, win-acme, `wacs.exe`, a wildcard `A` record
+and DNS-01, and states *"win-acme registers its own renewal task"*. `§8.1` (`:160-212`) prescribes an nginx
+server block, `wacs.exe --installation iis` and an HTTP-01 challenge on a port this box has closed. `§1`, `§2`
+(`:24`, whose Staging row still reads *"(recommended)"*), `§3.1` and `§8` step 4 carry the same stack.
+Outside the file, `docs/architecture/technical-architecture.md:509` reads *"nginx + PHP 8.4 FastCGI"* and
+`docs/adr/0005-hosting-self-hosted-windows-server.md:26,33` name nginx and win-acme.
+✅ **All five of `M98`'s amendment findings verified on the box today, and all five are in place and correct** —
+which is evidence for the row, not against it: they are in place in the *configuration* and recorded in *no
+document*. `conf\extra\meridian.conf` carries `ProxyFCGISetEnvIf` at `:41`, `MDPrivateKeys secp256r1` at `:7`,
+`MDCAChallenges tls-alpn-01` at `:6`, a `<MDomain>` block at `:8-11` with **no** `MDCertificateFile` pinning, and
+the vhost `SSLCertificateFile` floor at `:18-19`.
+
+### Premise verified
+The premise holds and has grown. ⛔ **The row's claim that "the only description of that layout is the checklist
+artifact, outside the repository" is still true, and is now worse than when it was written**, because the
+certificate arrangement the box depends on — the key-type fix, the absent pinning, the permanent vhost floor and
+the activation task — exists only as configuration and chat history. `MDPrivateKeys` appears nowhere in the repo;
+`mod_md` appears only in five prose mentions.
+⚠️ **One premise inside the row is now false and must be corrected rather than carried:** amendment item (3) says
+*"inbound 443 to the server's address was measured dropped on 2026-09-17"*. It is **open**, measured from outside
+the agency network on 2026-09-18 and again by me on 2026-09-19 (TLS 1.3, `/up` 200, `/login` 200). Port 80 stays
+closed.
+
+### Remedy verdict
+**The row's remedy works but is insufficient, and its own scope note says why.** *"Add the single-host Apache
+layout to §8 as a second arm"* leaves the four other copies it names. Taken as written it would close the row and
+leave `§1`, `§2`, `§3.1`, `§8.1`, `technical-architecture.md` and `ADR-0005` describing a server that does not
+exist. The user's decision is to rewrite the runbook fully and annotate the other two documents with dated notes
+rather than rewrite an ADR's decided record.
+⛔ **And the remedy is constrained in a way the row could not know:** with `citation-liveness-lint`'s ledger tier
+at 18 of 18 and `:39`, `:129` and `:317` cited from `docs/feature-backlog.md` and `docs/claims/lane-a.md`, a
+free-hand rewrite reddens CI. The shape that works is line-neutral edits above `:317` plus an appended
+subsection. ⚠️ The `--queue=` string that `tests/Feature/Mail/QueuedMailContractTest.php` asserts byte-for-byte
+has to survive it.
+
+---
+
+### Row 3 — `R-5e4af12b`, the runbook missing Windows host prerequisites
+
+`docs/feature-backlog.md:10071`. Filed by `M97`, re-measured by `M98`. **Tier: early-testing.** **Live.**
+
+### Evidence verified
+Held. The row names four prerequisites and `M98`'s amendment adds six more, none of them in `§8`. Two are
+confirmed on the box by this increment rather than inferred: item (2) of the amendment — that PowerShell 5.1
+needs `[Net.ServicePointManager]::SecurityProtocol` set in **every** scope that opens TLS and that the
+parameterless `AuthenticateAsClient` overload negotiates host defaults — is exactly why
+`scripts/activate-staged-cert.ps1` pins `Tls12` explicitly inside its read-back function; and the runner account
+fact in item (6) is visible in the task principals (`meridian-test-scheduler` runs SYSTEM at `runlevel=Limited`).
+
+### Premise verified
+The precondition the row was filed behind is met — the host was built and `deploy.ps1` has run on it — so
+`M98`'s correction of the marker from latent to live holds. ⚠️ **One item's premise is now stale in the other
+direction:** the amendment's item (4) says the checklist *"installs the NSSM pre-release rather than the stable
+2.24 release"*; the box runs nssm 2.24, so that item is a checklist defect and not a host defect, and the runbook
+sentence should say which build is installed rather than warn about a pre-release nobody used.
+
+### Remedy verdict
+**Works exactly as prescribed** — *"add each at the §8 step it belongs to"* — and the row correctly labels which
+items were inferred rather than measured. ⚠️ Two must be labelled honestly when written, because this increment
+did not measure them either: long-path enablement before `composer install`/`npm ci`, and how the service control
+manager refreshes a service's environment after `setx`. They go in as documented-behaviour claims, marked as such.
+✅ **One item this increment can now write as a measured fact rather than an inference:** `httpd -t` on this box
+emits `AH00558 … using fe80::19d0:6cc5:1ee9:9145` before `Syntax OK`, because there is no **global**
+`ServerName`. It is benign — the vhost carries its own — but it appears in every activation-log line for ever,
+so the runbook says so and a future operator does not chase it mid-incident.
+
+---
+
+### Row 4 — `R-98682188`, whether the testing network hairpins
+
+`docs/feature-backlog.md:10493`. Filed by `M99`. **Tier: early-testing.** **Latent** — *"it bites when §8's
+Apache arm is written, which is `R-2344803c`"*.
+
+### Evidence verified
+Held precisely. The row says the measurement was never made and that `hairpin` appears nowhere else in `docs/`;
+both were true on arrival. Its precondition is met by this increment, because `R-2344803c` is in the same batch —
+which is exactly the coupling the row predicted.
+
+### Premise verified
+Holds. The row believes an unmeasured host fact gates a runbook instruction and that the fact lives only inside
+another row's amendment where nothing schedules it. Both true, and the second is why it was filed at all.
+
+### Remedy verdict
+**Works, and was performed: one request to the public address from the box itself.** Measured 2026-09-19 —
+`TcpClient.BeginConnect('121.58.210.237', 443)` from the server returned **no connection within 8000 ms**. The
+network does **not** hairpin. Both hosts-file entries are present and confirmed. So `§8`'s instruction becomes a
+**fact** — keep these two entries, because the network does not hairpin and `Require local`, the expiry check,
+`/up` and the operator console all arrive through them — rather than the conditional the row objects to. The
+checklist's instruction to remove them is refuted and must be corrected there too.
+
+---
+
+### Row 5 — `R-ceb66cb8`, the sentence a struck row left behind
+
+`docs/feature-backlog.md:10481`. Filed by `M99`. **Tier: early-testing.** **Live.**
+
+### Evidence verified
+Held. The closed fork-pull-request row assigns *"never approve an unknown contributor's run"* to `R-2344803c`
+**or** `R-5e4af12b` disjunctively, and neither row mentions it. `scripts/backlog-triage.php` drops every non-open
+row before `scripts/pipeline.php` sees it, so the obligation is prose no gate reads.
+
+### Premise verified
+⛔ **The premise is not merely held, it is being exercised right now, which is why this row cannot be left
+open.** It predicted that *"if both rows are taken in different increments each can assume the other carried
+it"*. This increment takes **both**. Closing them and leaving this row open would strand the sentence with both
+of its named carriers gone — the permanent version of the defect it describes.
+
+### Remedy verdict
+**Works as written:** put the sentence at `§8` step 9 as part of whichever row lands first, and strike the
+assignment from the closed row so it cannot read as pending. Both halves are done here, and the "whichever lands
+first" wording is satisfied by their landing together.
+
+---
+
+Files: `docs/claims/lane-a.md`, `docs/claims/decisions.md`, `docs/feature-backlog.md`,
+`docs/deployment-infrastructure.md`, `docs/architecture/technical-architecture.md`,
+`docs/adr/0005-hosting-self-hosted-windows-server.md`, `scripts/activate-staged-cert.ps1` (new),
+`PROGRESS.md`, `PROGRESS_ARCHIVE.md`, `docs/pipeline.md`, `docs/gate-baselines.md`.
+Shared artefacts taken: `docs/**`, `PROGRESS.md` (own block only), `PROGRESS_ARCHIVE.md`.
+Paired files taken: none.
+Namespaces spent: **nothing from either namespace** — no migration, and no ADR, because the user's decision is a
+dated amendment note on `ADR-0005` rather than a superseding record.
+Prediction: `tracker-lint` R1 **fails** without a surgery and passes after it — 898 bytes of headroom against a
+3,460-byte mean close-out is not a judgement call. `pipeline-lint` P7b changes by construction as `D49` moves to
+`ANSWERED`, dropping the open-decision count from 41 to 40 and removing one `early-testing` row. PHPStan cannot
+move: it scans `app`, `database` and `routes`, and this diff is documentation plus one `.ps1`. Pint should pass,
+having no PHP to read. `BacklogProvenanceTest` is the real Pest risk, because five closures each have to keep
+their original `Filed by` and lose their liveness marker — both, not either.
+**The one I most expect to be wrong: `citation-liveness-lint`.** I have designed the rewrite around a ledger tier
+at 18 of 18, and I expect to have missed a citation — most likely one inside `PROGRESS_ARCHIVE.md`, whose seven
+pointers into this file I have read but not individually re-derived, or one shifted by the tracker surgery rather
+than by the rewrite, which is `M92`'s exact finding and a class this repository has been bitten by before.
+**Second most likely: `pipeline-lint` P2b/P2c/P2e.** `PROGRESS_ARCHIVE.md` is excluded from the generator corpus,
+so if any status bullet I move carries disposition or deferral vocabulary the digest changes while the count does
+not, and the failure text will say so.
 
 ## RELEASED — `M99`, the queue’s own instrument and three tester-facing defects (merged as PR #292, `93b8dae`, 6/6 green with real step counts — Static analysis 28 · E2E 20 · Contract 16 · Frontend 12 · axe 11 · Pest 11)
 

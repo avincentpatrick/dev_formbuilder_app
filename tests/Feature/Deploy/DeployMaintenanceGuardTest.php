@@ -143,10 +143,12 @@ it('lets everything through when no window is open', function (): void {
 });
 
 it('honours an except path, and the empty except every deploy writes exempts nothing', function (): void {
-    // ⛔ THE `empty()` VERSUS `isset()` TRAP, PINNED FROM BOTH SIDES. `DownCommand` ALWAYS writes an
-    //    `except` key — an empty array when no --except was passed — so an isset-guarded loop is entered
-    //    on every single deploy and matches nothing while looking correct. The first half proves the
-    //    exemption works at all; the second proves the ordinary payload does not exempt everything.
+    // ⚠️ THIS DOES NOT PIN THE ROW'S `empty()` VERSUS `isset()` TRAP, AND SAYING SO IS THE POINT. That
+    //    swap was driven through scripts/mutate.php against this file and SURVIVED: the guard only
+    //    iterates the list, so an empty `except` runs zero iterations either way. The trap is real for a
+    //    shape that reads the key's PRESENCE as "skip the guard", and the guard is not written that way.
+    //    What these two halves do pin is the exemption's behaviour — that it works at all, and that the
+    //    ordinary deploy payload does not accidentally exempt everything — and a mutation catches both.
     $exempt = runMaintenanceGuard(['except' => ['api/v1/health'], 'retry' => 15], [
         'REQUEST_URI' => '/api/v1/health',
         'HTTP_ACCEPT' => 'application/json',

@@ -47,10 +47,15 @@ return (static function (): void {
         return;
     }
 
-    // ⛔ `empty()`, NEVER `isset()`. `DownCommand` ALWAYS writes an `except` key — an empty array when no
-    //    `--except` was passed — so `isset($payload['except'])` is true on every single deploy and an
-    //    isset-guarded loop would silently do nothing at all. This is the one trap the row named, and it
-    //    is the kind that leaves a guard looking correct and behaving like it is absent.
+    // ⚠️ THE ROW'S `empty()`-NOT-`isset()` TRAP DOES NOT APPLY TO THIS SHAPE, AND A MUTATION IS WHAT SAID
+    //    SO. `DownCommand` ALWAYS writes an `except` key — an empty array when no `--except` was passed —
+    //    so `isset()` is true on every deploy, which is the row's point. But the branch below only
+    //    ITERATES: an empty list runs zero iterations and falls through to the answer either way.
+    //    Swapping `empty()` for `isset()` here was driven through `scripts/mutate.php` and SURVIVED,
+    //    changing nothing. The trap is real for the shape the row was imagining — one that treats the
+    //    key's PRESENCE as "there are exemptions, skip the guard" — and this is not that shape. `empty()`
+    //    is kept as a cheap short-circuit and claims nothing more than that. What the tests below
+    //    actually pin is the exemption's behaviour, which a mutation does catch.
     if (! empty($payload['except']) && is_array($payload['except'])) {
         $path = '/'.trim((string) parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH), '/');
 

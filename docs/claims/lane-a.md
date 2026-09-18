@@ -16,7 +16,96 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M99`, the queue's own instrument and three tester-facing defects (`m99-queue-instrument-and-three`)
+## Status: NO ACTIVE CLAIM — `M99` is merged; the early-testing tier continues, named in `docs/pipeline.md` § Next
+
+## RELEASED — `M99`, the queue’s own instrument and three tester-facing defects (merged as PR #292, `93b8dae`, 6/6 green with real step counts — Static analysis 28 · E2E 20 · Contract 16 · Frontend 12 · axe 11 · Pest 11)
+
+Shipped 2026-09-18. Branch `m99-queue-instrument-and-three`, cut from `origin/main` at `d1aa677`.
+- **Four rows taken, four more closed with them.** The queue's own instrument (`R-4cd211eb`, with
+  `R-964bc5a4` and `R-974db618` folded in as the same work), the step-up write that vanished
+  (`R-43bdc36b`), unbranded mail's header link (`R-62fb2e05`), and the deploy-window fall-through
+  (`R-4ff3e848`, with `R-62aff714`'s Inertia arm folded in).
+- **Nine rows filed and three decisions written**, every one of them an obligation that had been living
+  in prose no gate reads.
+- Every claimed file was edited. The claim was extended to `resources/views/vendor/mail/html/header.blade.php`,
+  `app/Http/Middleware/HandleInertiaRequests.php`, `deploy.ps1` and `docs/deployment-infrastructure.md`,
+  each in its own pushed commit before the file was opened.
+- **Thirteen mutations driven through `scripts/mutate.php`, twelve caught.** Two generator refusals are
+  hand-run controls against a committed tree with the restore proved by sha256, because `mutate.php`
+  drives Pest in a container and those are host scripts — `R-eecdb678` stays open as that gap.
+
+⛔ **THE HEADLINE: THE QUEUE HAD BEEN TELLING FOUR CONSECUTIVE SESSIONS TO SEND THE USER A NOTIFICATION
+THAT `M95` ALREADY SENT, AND IT WAS COMMITTED ON THE TRUNK.** `PROGRESS.md`'s generated hand-off for this
+increment carried the order in full. Both prose records of the send — `docs/claims/lane-a.md` and
+`PROGRESS.md` itself — were invisible to every generator, because `docs/claims` is excluded from the
+marker walk and `CLAUDE.md` sits outside it. The same row's Next-section cut was hiding three of the eight
+ready `early-testing` rows from the very increment deciding what to take, and two of the three were the
+cleanest in the tier: **the defect was steering the increment that fixed it.**
+
+⛔ **AND THE SECOND HEADLINE IS THAT CI FOUND TWO DEFECTS THIS HOST IS STRUCTURALLY INCAPABLE OF SEEING.**
+Both were caught by a red gate rather than by reading, and neither would have survived a merge — but
+neither would have been found locally either.
+- **Three new tests rendered Inertia pages without `withoutVite()`.** CI builds no `public/build`, so
+  they answered 500 there while green here; a developer checkout HAS a build. 5,042 passed and 3 failed,
+  and all three were this increment's. `M61` already recorded this as "required on every blade-rendering
+  test" — the note reads narrower than it is, and an Inertia page renders through `app.blade.php`.
+- ⛔ **A nested checkout inside the tree was making every basename ambiguous.**
+  `.kilo/worktrees/obsidian-dogwood/` put a second `scripts/state.php` and a second `ci.yml` into
+  `build_basename_index()`, so the hub set read **37 files against the tracked set's 49** and **69 rows**
+  lost paths — which reorders `docs/pipeline.md` and fails `pipeline-lint` P1 on any machine that never
+  saw the extra checkout. `SKIP_DIRS` could not have caught it: the directory is named by whichever tool
+  created it. The testable invariant is that a directory carrying its own `.git` is not this repository's
+  source, and the fix is verified byte-identical against a `git clone --no-hardlinks` of the same branch.
+
+**How the prediction fared — three of five right, and the one flagged as most likely wrong was wrong.**
+- ✅ **`pipeline-lint` P1 was predicted to go red at least once, and it did** — but for a cause the
+  prediction did not contain. It named "a citation that resolves only on this host", `M98`'s shape; what
+  actually happened was the harvester's own WALK diverging. Right gate, right class, wrong mechanism.
+- ✅ **PHPStan was predicted not to move, and did not.** The reasoning was tested rather than lucky: the
+  one `app/` risk named in advance — the palette's new optional parameter — is the only signature this
+  increment changed.
+- ✅ **`tracker-lint` R1 was predicted to warn but not fail, and no surgery was needed.** It did not even
+  warn: the `done` marker cost 617 bytes against 4,157 of headroom. The surgery is still owed before the
+  next close-out bullet lands, and is not owed by this increment.
+- ❌ **Pint was predicted to bite and never did.** It passed on every run, including after the `scripts/`
+  edits. Sound reasoning about the wrong increment: this diff adds comments and guards rather than
+  reformatting anything.
+- ❌ ⚠️ **The one named as most likely wrong — that the `before-testing` total would not land on 7 — was
+  itself wrong. It lands on exactly 7**, and the reason is worth more than the number: `M96` computed 6
+  and `M98` computed 7, and **each was right about its own tree**. Six is what the tier reads before a
+  notification marker exists; seven is what it reads after, because the marker carries the tier it
+  records. Neither increment was mistaken, and a test hard-coding either would still go red the day
+  another `before-testing` row is closed — so it is computed and not pinned.
+- ⚠️ **What no prediction named:** `citation-liveness-lint` went red on a citation this increment
+  introduced — a closing clause cited a `PROGRESS.md` line that existed only while the duplicate-id
+  control was applied, taking the ledger tier to 19 against its ceiling of 18. That is `CLAUDE.md`'s "do
+  not cite line numbers in a file you are editing" arriving by the front door.
+
+**What was found that no row predicted.**
+- **A mutation refuted one of this increment's own comments.** The `empty()`-versus-`isset()` trap
+  `R-4ff3e848` prescribes does not apply to the shape the guard uses — the branch only iterates, and an
+  empty list runs zero iterations either way. The swap SURVIVED, and the comment claiming otherwise was
+  corrected in its own commit rather than quietly deleted.
+- **Two tests found their own bugs by failing for the wrong reason.** The step-up negative case was first
+  written against a tenant GET, which is deliberately ungated, so it would have passed against a
+  middleware announcing a discarded write on every page load. And the `Notified:` contract test hit
+  `toContain`'s variadic needles — the exact trap `ClaimTemplateFieldsTest` records `M30` hitting, and in
+  the direction that hides a defect.
+- **`D13`'s file-overlap rule cannot be satisfied by any pair of rows in this tier.** Its prose names
+  seven meta-files as hubs; `backlog-triage.php` generates dozens at `HUB_THRESHOLD = 3`, including
+  `bootstrap/app.php`, `config/fortify.php` and `routes/tenant.php`. Under the generated set the clause
+  forbids every batch it exists to permit, so the batch was grouped against `D13`'s own list and the
+  divergence filed.
+- **Two of the five decisions planned for filing were not the user's at all** — one was spent by taking
+  the row, the other is an implementation choice to record in code — so three were written rather than
+  five.
+- **Three rows understated themselves, and the corrections are the useful half.** The step-up write is
+  lost on a workspace Owner's FIRST gated write of every session rather than after fifteen minutes, and
+  the SSO arm no Fortify-side fix could reach was never named. Unbranded mail reaches seven non-auth
+  dispatch sites including the resume link an anonymous member of the public receives. And the deploy
+  window contains a hard reset and a forced migration that nothing had written down.
+
+**The per-row record of what was claimed, kept because the three verdicts are the point.**
 
 Taken 2026-09-18. Branch `m99-queue-instrument-and-three`, cut from `origin/main` at `d1aa677`, PR into main.
 

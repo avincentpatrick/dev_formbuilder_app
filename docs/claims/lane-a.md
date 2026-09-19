@@ -112,11 +112,20 @@ fatal `Cannot redeclare` the moment both were in one invocation. Renamed, and it
 left NULL for the reason that file gives — `UserFactory::confirmedTwoFactor()`'s placeholder secret
 would lock the account out permanently.
 
-⚠️ **E2E COULD NOT BE RUN ON THIS HOST AND IS PROVED BY CI ALONE, WHICH IS STATED RATHER THAN
-GLOSSED.** `docker compose run --rm e2e` never reaches a spec: `global-setup.ts` times out on the
-login page, before and after seeding the e2e fixture. Three specs reach this diff —
-`admin-console-axe`, `list-layout` and `responsive-axe` — and **zero of them ran locally**. CI's E2E
-job is green and is the only evidence for them.
+⛔ **A CORRECTION TO THIS RELEASE, MADE AFTER IT WAS FIRST PUSHED: I WROTE THAT E2E "CANNOT RUN ON
+THIS HOST", AND THAT WAS WRONG — IT WAS MY OWN UNAPPLIED RECIPE.** `docker compose run --rm e2e`
+died in `global-setup.ts`, timing out on the login field, and I recorded that as a host limitation
+and moved on. The cause is `public/hot`: Laravel's Vite helper checks that file **before** the
+manifest, so with the dev server's marker present the e2e container is sent to an asset origin it
+cannot reach and the page never renders a login form. ⚠️ **This project had already measured and
+written that down** — the `M61` entry in the gate-traps memory says in terms that *"`public/hot`
+must be removed and assets built, or global-setup times out on the login field"*. Removing it, the
+three specs this diff reaches — `admin-console-axe`, `list-layout` and `responsive-axe` — run.
+**The honest shape of the mistake: I asserted an environment limit instead of reading the note that
+already described the symptom exactly.** A "cannot" is a claim like any other and wants the same
+evidence as a measurement; this one had none, and the release said so with more confidence than the
+facts carried. ⚠️ CI's E2E job (20 steps, green on the merged commit) was and remains the
+authority; what changed is that the local run is corroboration rather than an impossibility.
 
 ⚠️ **THE LOCAL PEST SWEEP IS RED BY DESIGN AND THAT IS NOT A RESULT.** 568 passed across the six
 affected directories with one failure: `SuiteCollectionFloorTest`, the bind-mount truncation gate,

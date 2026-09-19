@@ -16,13 +16,92 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — the two testing-server config-truth rows, `R-4b5bc076` and `R-1563096a` (`m102-testing-server-config-truth`)
+## Status: NO ACTIVE CLAIM — `M102` is merged; the `early-testing` tier has no startable row left and every one of its twenty remaining rows waits on a decision, named in `docs/pipeline.md` § Next
 
-Taken 2026-09-19. Branch `m102-testing-server-config-truth`, cut from `origin/main` at `c709fce`, PR into main.
-Rows: `R-4b5bc076` (`docs/feature-backlog.md:10690`) and `R-1563096a` (`docs/feature-backlog.md:10634`) —
-**the only two `ready` rows in the `early-testing` tier.** The other nineteen are blocked on open decisions.
-Both are settled by one console session on `staging.pitahc.gov.ph`, which is why they are taken together;
-the `D13` deviation that requires is argued below rather than left implicit.
+## RELEASED — `M102`, the two testing-server config-truth rows settled on the box, both headlines refuted (merged as PR #295, `f39854a`, 6/6 green with real step counts — Static analysis 30 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
+
+Shipped 2026-09-19. Branch `m102-testing-server-config-truth`, cut from `origin/main` at `c709fce`.
+- **Two rows closed, three filed, one decision input corrected, one row amended.** Open rows went
+  236 → 237; open decisions unchanged at **41**, as predicted. `early-testing` now holds **zero**
+  startable rows.
+- **No gate built, and that is argued rather than assumed** — see the `staging-config-probe` note below.
+- **No tracker surgery, no migration, no ADR, no new decision.** `PROGRESS.md` moved +0 lines and
+  +0 bytes during the build. The diff was five markdown files and zero `.php`.
+- **One change made to a live server:** a global `ServerName` in `httpd.conf`, with `httpd -t` re-run
+  and Apache deliberately **not** restarted.
+
+⛔ **THE HEADLINE: THE INCREMENT'S MOST VALUABLE FINDING IS IN NEITHER ROW, AND IT FALSIFIES A SENTENCE
+IN TWO PLACES AT ONCE.** §8.3 recorded the leftover `*:80` vhost as *"harmless, and confirmed harmless
+on 2026-09-19, when a connection to port 80 from outside the agency network timed out after 21 s with
+**no listener answering**"*, and `D54` reproduced that as a measured input — *"Port 80 has no listener …
+so there is no plaintext downgrade path on this box for HSTS to protect against"* — and rested part of
+its HSTS recommendation on it. The box says otherwise: `httpd.conf` carries an uncommented `Listen 80`,
+and `httpd -S` maps a **live** `*:80` vhost to `conf\extra\httpd-vhosts.conf` at `:47`, serving a
+`Redirect permanent` to the `https://` origin. **The 21-second timeout measured the agency firewall, not
+the server.** An outside probe cannot tell *"nothing is listening"* from *"something is listening and I
+cannot reach it"*, and one increment's convenience measurement became two documents' stated fact. The
+`*:80` vhost also carries **no `Header` directive**, so its 301 goes out without `X-Robots-Tag` and
+`scripts/staging-headers-judge.php` — which probes only `https://` URLs — cannot see it. Filed.
+
+⛔ **AND BOTH ROWS' HEADLINES WERE WRONG, IN OPPOSITE DIRECTIONS.** `R-4b5bc076` said *"two documents
+disagree about which file holds the directive."* They never disagreed: §8.3 names **no** file for the
+header at all, and the filename a reader sees belongs to an adjacent paragraph about a different vhost.
+The defect was **proximity**, so the fix was to kill the adjacency rather than pick a winner. Its third
+clause — *"the only line-by-line enumeration does not list the directive"* — proved nothing either:
+there are **two** listings and both are **excerpts**, one of them eliding in its own source. An absence
+in an excerpt is not an absence. Meanwhile `R-1563096a` declined its own one-line fix for a reason that
+was simply false — *"there was no restart left in this increment to fold it into"*. **`httpd -t` reads
+the configuration from disk, not from the running server**, so no restart was ever involved, and the
+interlock the row wished for already existed in `scripts/activate-staged-cert.ps1`. That premise cost
+the row a whole increment.
+
+⚠️ **THE VALUE DEVIATES FROM THE ROW'S PRESCRIPTION, AND THE REASON IS A LIMIT OF THE ONLY AVAILABLE
+CHECK.** The row prescribes `ServerName staging.pitahc.gov.ph`. That name is this box's `<MDomain>`, and
+`httpd -t` runs post-config but **never starts `mod_md`'s ACME watchdog** — so the single difference
+between the prescribed value and a neutral one sits exactly in the part `httpd -t` cannot exercise, and
+the prescribed name could only have been proved by a supervised Apache restart on a box testers were
+invited onto that same day. `localhost` cannot match the managed domain under any rule, which makes
+`httpd -t` a complete proof. **The user took this call explicitly**, and a six-line comment on the box
+records it so the next operator does not "correct" the value and silently re-open the untested case.
+
+⚠️ **WHY NO GATE WAS BUILT, SAID RATHER THAN IMPLIED.** The obvious remedy for the class both rows
+expose is `scripts/staging-config-probe.ps1`. It was declined and filed instead: a probe nobody diffs is
+a nicer way to do what one paste already does, the half that can go red is a **judge** over the pasted
+report rather than the probe, and `scripts/mutate.php` drives Pest and nothing else — so a `.ps1` alone
+could never be proved. There is also no credentialed path from CI to that box's filesystem, which makes
+the fetch half *human transport* and a design decision of its own. The shape it would take is recorded
+at the filed row so the next session does not re-derive it.
+
+**How the prediction fared — the one named most likely wrong was green, the one named second was exactly
+right, and the real defect was in a mechanism the prediction named but mis-described.**
+- ❌ **The one I named as most likely wrong — E2E — passed in 19m42s.** The reasoning was that a
+  markdown-only diff determines nothing about that job and `R-6946c0ef` records a flaky offline spec. The
+  named trap (*"I will go looking for the cause in my own markdown"*) never fired because nothing reddened.
+  The prediction was defensible and simply did not happen.
+- ✅ **The one I named second — the console's answer — was exactly right.** `X-Robots-Tag` in
+  `conf\extra\meridian.conf` alone, one hit across the whole `conf` tree, no second copy, and no real
+  contradiction between the two documents.
+- ⚠️ **`BacklogProvenanceTest` was correctly named as the real Pest risk, and I described the mechanism
+  wrongly.** I predicted a *vocabulary* failure — `M100`'s `**Live, and deliberately not fixed.**`. The
+  vocabulary was right; the **wrapping** was not. A filed row's `Filed by` ended one line and its
+  `` `M102` `` began the next, so the anchored clause regex could not match and the gate would have gone
+  red. ⛔ **It was caught only because Docker Desktop was down, so the arm was re-implemented by hand
+  against the ledger instead of being taken on trust from a green suite that could not run.** A working
+  container would have found it too — in CI, after the push.
+- ✅ **PHPStan could not move, and it was proved rather than quoted**: `git diff origin/main --name-only`
+  returns five paths, all `.md`, and **zero** under `app/`, `database/` or `routes/`.
+- ✅ **`pipeline-lint` P1 did not bite, because the edit was built so it could not.** All three §8.3
+  replacements were line-for-line, and the edit script refused to write unless the `track-b-deployment`
+  marker was still at the same line number afterwards. The risk was designed out rather than survived.
+- ✅ **`citation-liveness-lint` held at `ledger tier 18 rotten, ceiling 18`** — no headroom consumed, as
+  required, because every edit to an existing row was line-neutral and all three new rows landed at EOF.
+- ⚠️ **P7b was quiet as predicted, but the arithmetic was wrong in detail:** I predicted *two* rows
+  entering `during-testing` and **three** entered, because the `*:80` finding produced a row the plan did
+  not anticipate. Open decisions stayed at 41 exactly as predicted.
+- ⚠️ **One line-index assertion fired during the build and is the reason nothing was corrupted.**
+  `R-f8bcf113`'s tier line was taken as 10541 and is 10540; the edit script asserted the expected content
+  at every index before writing and refused. The wrong index came from counting a `sed` window by eye —
+  the failure `CLAUDE.md` forbids searching for anchors to avoid, arriving through the other door.
 
 ### Row 1 — `R-4b5bc076`, which file on the box holds `X-Robots-Tag`
 

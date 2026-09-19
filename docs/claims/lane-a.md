@@ -16,7 +16,203 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M102` is merged; the `early-testing` tier has no startable row left and every one of its twenty remaining rows waits on a decision, named in `docs/pipeline.md` § Next
+## Status: ACTIVE CLAIM — four `during-testing` rows a tester meets in week one (`m103-tester-facing-defects`)
+
+Taken 2026-09-19. Branch `m103-tester-facing-defects`, cut from `origin/main` at `daa4e5f`, PR into main.
+Rows, by **id and headline rather than by line**: `R-945ccc3c` (*"`Permissions-Policy` is set on the guest
+runtime and asserted by no test anywhere"*), `R-17238a20` (*"The member roster 500s when a membership names
+a user the query cannot return"*), `R-4f23d9c7` (*"The welcome email is sent again after every verified
+address change"*) and `R-2173fe28` (*"The platform console's Save reports success identically whether or not
+anything changed"*).
+
+⛔ **THE CITATION FORM IS DELIBERATE AND IS THIS INCREMENT'S FIRST APPLICATION OF AN OPEN ROW.**
+`R-a53755f5`, filed by `M102` and **not taken here**, measured that all three line citations in `M101`'s
+evidence paragraph were wrong on the tree the day they were pushed — because a claim file displaces its own
+contents at every release, and because a citation into a file the same push edits is wrong on arrival. Its
+prescription is *"stop citing a claim file, or a document the same push edits, by line at all."* This
+increment edits `docs/feature-backlog.md` to close all four rows, so every row citation above is by id.
+
+⛔ **`early-testing` HAS ZERO STARTABLE ROWS, AND THAT IS WHY THIS BATCH IS `during-testing`.** All
+nineteen of its rows are blocked on thirteen open decisions that are the user's to answer. `CLAUDE.md`
+forbids re-asking an open decision, so the next tier with open work is taken instead.
+
+✅ **`D13` IS SATISFIED WITHOUT A DEVIATION, WHICH BREAKS A RUN OF THREE.** `M100`, `M101` and `M102` each
+deviated from `D13` and recorded it. These four rows touch **no hub file** — the derived set at
+`HUB_THRESHOLD = 3` holds 47 files and none of the four rows' work files is in it — and they share no
+non-hub file with one another. The hub slot is left **unspent**. ⚠️ Measured with
+`scripts/backlog-triage.php --json`, not by eye.
+
+### Row 1 — `R-945ccc3c`, `Permissions-Policy` asserted by no test
+
+### Evidence verified
+**Holds, measured rather than read.** `app/Http/Middleware/PublicRuntimeSecurityHeaders.php` sets
+`Permissions-Policy: camera=(self), microphone=(self)` behind a `has()` guard. A tree-wide search for the
+header name returns that middleware, this ledger's own row, `docs/backlog-triage.md` and `docs/pipeline.md`
+— and **no test anywhere**. `tests/Feature/Http/PublicRuntimeSecurityHeadersTest.php` exists and asserts the
+CSP directives and the no-clobber contract, so the row is not *"no test file"* but *"a test file that never
+asserts this header"*, which is the harder case to notice.
+
+### Premise verified
+**Holds, and the row understates the reason it matters.** The middleware's own docblock argues the
+Permissions-Policy grant is load-bearing — it *"grants `camera`/`microphone` to `self` so the native
+`<input capture>` … keeps working when the form is embedded in an iframe"*. So the header is not hardening
+that could be dropped silently; it is what makes media capture work inside an embed, and nothing would
+report its removal. ⚠️ The sibling assertion style is already established in the same file: it asserts the
+**absence** of `default-src` as a deliberate tripwire, so adding a positive assertion beside it is the
+file's own idiom rather than a new convention.
+
+### Remedy verdict
+**None prescribed by the row beyond "assert it", and that is sufficient — but it is not provable by itself.**
+⛔ A green new assertion proves nothing about the assertion. `scripts/mutate.php` drives Pest, which this
+is, so the positive control is available and will be used and **committed** — left in the working tree, a
+diff-based check reads the unmutated parent and accidentally gives the right answer.
+
+### Row 2 — `R-17238a20`, the member roster 500
+
+### Evidence verified
+⛔ **THE CAUSAL HALF IS REFUTED AND THE CODE QUOTE IS NOT IN THE TREE.** The row quotes
+`User::query()->whereIn('id', $userIds)`. `TenantMembershipService::listMembers()` reads
+`User::on('pgsql_auth')->withTrashed()->whereIn('id', $userIds)`, and `git log -S withTrashed` on that file
+returns **only** the commit that introduced the method — so the quoted form was never there. Both named
+causes are closed by construction: soft delete by the explicit `withTrashed()`; RLS because the read runs on
+`pgsql_auth`, whose `users` SELECT policy is `TO meridian_auth … USING (true)`. A third the row does not
+name is closed too — `tenant_users.user_id` is `constrained('users')->cascadeOnDelete()`, so a hard delete
+takes the membership with it. **The defensive half holds:** the unguarded `$users[$m->user_id]` read is
+still there.
+
+### Premise verified
+⛔ **WHAT `M99` REPRODUCED WAS ITS OWN FIXTURE, AND THIS REPOSITORY ALREADY SAID SO IN ADVANCE.**
+`tests/Pest.php` warns, in terms, that *"ANY TEST THAT RENDERS `/members` NEEDS THIS, and the failure
+without it looks like a product bug rather than a fixture one … `pgsql_auth` is a separate SESSION and
+cannot see `RefreshDatabase`'s uncommitted rows … and the page 500s on an undefined array key."* The same
+warning is repeated in three further test files — including `StepUpReauthenticationTest.php`, **the file the
+row says `M99` was writing when it found this**. The row itself concedes the repro was *"in a test fixture
+rather than against the running site, and which of the two causes produced it there was not isolated."* It
+was neither: it was the missing committed-identity fixture. ✅ The remaining premise — that the unguarded
+index is worth closing — holds, because it is an **outlier**: `SuperAdminService` writes the identical
+lookup as `$names[$a->user_id] ?? 'Unknown user'`, and `AttachmentReferenceValidator` is the explicitly
+guarded counter-example.
+
+### Remedy verdict
+**Two offered; one works and one is wrong.** *"Resolve the identity as unknown"* works and matches an
+established literal. ⛔ *"Skip the membership and count it"* **does not**: the count has no prop to land in
+on the Inertia page, and a roster whose rows were all skipped renders `ListEmptyReason`'s "No members yet",
+which is a lie in the one state where the operator most needs the truth. Measured before writing the test.
+
+### Row 3 — `R-4f23d9c7`, the welcome email sent again after an address change
+
+### Evidence verified
+**Holds in every clause; nothing stale.** The listener's docblock says *"Say hello, once"* and its only
+early exits are a type check and an empty-address check — no per-person guard of any kind.
+`UpdateUserProfileInformation::updateVerifiedUser()` nulls `email_verified_at` and re-sends verification on
+any address change; `resources/js/Pages/Settings/Index.vue` puts that field in front of **every** member
+(the Profile card carries no `can_manage` gate, unlike the Access, Maintenance and Modules cards on the same
+page); Fortify's `VerifyEmailController` fires `Verified` again because `hasVerifiedEmail()` is false once
+more. `WelcomeEmailTest` asserts one send per `event()` call — one per **event**, never one per **person**.
+
+### Premise verified
+⛔ **THE ROW UNDERSTATES ITSELF TWICE, AND BOTH CHANGE THE FIX.** First: this exact hazard was **already
+recognised and fixed at the other dispatch site**. `GoogleSessionStarter` guards it as
+`if ($outcome->created)`, commented *"⚠️ `Verified`, NOT `Registered`, AND ONLY FOR A NEW ACCOUNT"*, and
+pinned by `GoogleSignInWebTest` — *"firing it every time would welcome the same person weekly."* The
+codebase solved this **per dispatch site**, which is precisely why the Fortify re-verification path slipped
+through, and is the argument for the guard living in the listener instead. Second: `SendWelcomeEmail` is the
+**only** listener on `Verified` in the application, and the notification is constructed in exactly one
+place, so the listener is a complete chokepoint. ⚠️ **One premise of my own is recorded as a risk rather
+than a fact:** the listener performs no `users` write today, so stamping from it is new territory for that
+class.
+
+### Remedy verdict
+**Option (a) `welcomed_at` works; option (b) the notification-log key is structurally impossible here.**
+The `notifications` table is the in-app centre, is **tenant-mandatory** and strict-RLS, and the central-host
+welcome has no tenant at all — so (b) additionally needs a new `NotificationType` case (case order is
+load-bearing), a CHECK-constraint recreate migration, and a write into a strict-RLS table from a listener
+with no tenant GUC. Four moving parts against one column. ⛔ **But (a) as literally prescribed would ship a
+half-working guard.** A plain `$user->save()` from this listener writes **zero rows** on the Google door:
+`config/fortify.php` records that *"a write issued AFTER `Auth::login()` in the same request still has no
+user GUC"*, and Postgres applies the SELECT policy to an UPDATE whose WHERE reads a column — invisible row,
+**no exception raised**. The stamp goes through `pgsql_auth`, as `resolveUserByEmail()` does.
+⚠️ **And the prescription omits the backfill, which is where this increment deviates from its own
+precedent.** `2026_08_17_000111_add_password_set_at_to_users_table.php` shipped with no backfill and argued
+monotonicity. Here a backfill is the honest choice: `email_verified_at` **is** the signal the welcome
+already fired, and without it an invitee — force-verified by `InvitationController`, deliberately never
+welcomed — would receive on their first address change the very email that listener's docblock says they
+must never get.
+
+### Row 4 — `R-2173fe28`, the console's Save writes back a stale Open-signup value
+
+### Evidence verified
+**Holds end to end, with one wording correction.** The row says *"both switches are `required`"* — true —
+but `maintenance_message` is `present|nullable`, not `required`, and the row's phrasing invites the
+misreading that all three are. The controller answers every valid PATCH with `back()` and one fixed toast;
+`Settings.vue`'s `useForm` posts all three fields with no `only` or dirty filtering;
+`SuperAdminService::updatePlatformSettings()` does an unconditional `updateOrCreate` per key whose only
+early return is a condition `toSettings()` can never produce. No optimistic-concurrency check exists
+anywhere on the path.
+
+### Premise verified
+⛔ **THE ROW DOES NOT SAY THE THING THAT MAKES IT URGENT: IT SILENTLY REVERTS AN ANSWERED DECISION.** `D31`
+— *"the testing server is invitation-only"* — is recorded as **applied, not built**: *"`SettingKey::RegistrationOpenSignup`
+defaults to `true` … The switch lives in the super-admin console; nothing here needs
+code."* So D31's entire enforcement is one runtime toggle, and any console tab opened before that toggle was
+turned off re-opens public signup on its next Save, with a success toast, on a box testers were invited onto
+today. ⚠️ **Severity is bounded in the other direction, and the closure will say so:** the audit log does
+record the write-back as an ordinary `false → true` change, because `AuditLogger::record()` has no equality
+short-circuit. Forensics exist after the fact; the operator gets no signal at the moment.
+⚠️ **The same shape sits on two tenant-scoped cards** — `MaintenanceCard.vue` and `SsoPolicyCard.vue` — found
+while checking what sits beside this row. Filed, not fixed.
+
+### Remedy verdict
+⛔ **THE OBVIOUS CHEAP FIX DOES NOT WORK, AND MEASURING THAT FIRST IS THE POINT.** `form.isDirty` looks
+sufficient and is not: Inertia's dirty check compares against **the page's own initial props**, so a stale
+tab that edited only the maintenance notice is legitimately dirty and still writes `signup_open: true`.
+A server-side per-field no-op skip fails for the same reason — the stale value genuinely differs from the
+stored one, so it is not a no-op, it is a revert. ✅ **No migration is needed:** `settings` already carries
+`timestampsTz()` and `updated_by`, so a concurrency token is buildable today — but `PlatformSettings` plucks
+only `value, key`, so the fingerprint read is new. ⚠️ The store is **sparse**: a platform key with no row has
+no `updated_at`, so the token must tolerate `null` on a fresh install, and the compare-and-swap must sit
+**inside** the existing elevated transaction or it races the thing it exists to prevent.
+⚠️ **Scoped out deliberately:** a state word on `MdsSwitch`. No `onLabel`/`offLabel` prop exists, fifteen
+call sites share the component, and its docblock records the visible "On"/"Off" string as **declined**, with
+DSR §3.2 amended in the same PR to match. Re-opening that is a design-system change, not this row.
+
+### What this claim is extended to, said up front
+
+**Both halves of Row 4 are taken — the concurrency token and the honest toast — on the user's explicit
+call**, asked before any file was opened. The token alone would leave the row's literal headline open; the
+toast alone would leave `D31` revertible.
+
+Files: `app/Http/Middleware/PublicRuntimeSecurityHeaders.php` (docblock only, if at all),
+`tests/Feature/Http/PublicRuntimeSecurityHeadersTest.php`, `app/Services/Tenancy/TenantMembershipService.php`,
+`app/Listeners/Auth/SendWelcomeEmail.php`, `tests/Feature/Auth/WelcomeEmailTest.php`,
+`database/migrations/2026_08_17_000112_add_welcomed_at_to_users_table.php`,
+`app/Http/Controllers/Admin/PlatformSettingsController.php`, `app/Services/Settings/PlatformSettings.php`,
+`app/Http/Requests/Admin/UpdatePlatformSettingsRequest.php`, `app/Services/Admin/SuperAdminService.php`,
+`resources/js/Pages/admin/Settings.vue`, `tests/Feature/Admin/PlatformSettingsConsoleTest.php`,
+`docs/claims/lane-a.md`, `docs/feature-backlog.md`, `docs/claims/decisions.md`, `docs/pipeline.md`,
+`docs/backlog-triage.md`, `PROGRESS.md`, `docs/gate-baselines.md`.
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/claims/decisions.md`, `docs/pipeline.md`,
+`docs/backlog-triage.md`, `PROGRESS.md` (own status block and own hand-off line only), `docs/gate-baselines.md`.
+Paired files taken: none.
+Namespaces spent: migration prefix **`2026_08_17_000112`**, claimed here before use — reading the current
+maximum is not a reservation. **No ADR** (`0023` stays free, `0010` stays reserved for H1d). **One new
+decision** is appended for the config-lock question Row 4 raises, so the open-decision count moves by +1 and
+`docs/pipeline.md` must regenerate in the same push.
+
+Prediction: written before the run so it can be measured rather than explained afterwards.
+**PHPStan can move on this diff** — it scans `app`, `database` and `routes`, and this touches six files
+under `app/` plus a migration; I will say what it does rather than quote an unchanged number, which is the
+failure mode the hand-off names. **Pint is the one I most expect to be wrong**, on the migration docblock's
+long comment lines rather than on any code — the two `users`-column precedents wrap their argument prose
+hard, and I am writing more of it than either. Second most likely wrong: **`BacklogProvenanceTest`** on four
+closure bullets at once, since `M100` went red on closure vocabulary alone.
+⚠️ **I predict Row 2's mutation is the interesting one**: a positive control on the roster guard should be
+impossible to write honestly, because the guarded branch is unreachable in production by FK — so I expect to
+prove Row 1's header assertion by mutation and to state plainly that Row 2's guard is proved by a
+**fixture-path** test rather than a production-reachable one, instead of pretending otherwise.
+⚠️ **E2E is the job this diff least determines.** `admin/Settings.vue` is the only changed surface a spec
+could reach; I will measure which specs the diff touches and say which were run, never "the ones I thought
+were relevant".
 
 ## RELEASED — `M102`, the two testing-server config-truth rows settled on the box, both headlines refuted (merged as PR #295, `f39854a`, 6/6 green with real step counts — Static analysis 30 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

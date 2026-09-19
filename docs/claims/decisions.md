@@ -17,7 +17,7 @@ two server-paginated tables (2026-08-18) · fail **open** on an unseeded plan ca
 password policy min-12 + HIBP + classes (2026-08-09) · Google-only social login (2026-08-09) ·
 gamification last (2026-08-09) · the held list stays held until the user signals, and they said
 *"not yet, ask again later"* on 2026-08-18 · **a flaky e2e result fails CI** (2026-08-26, D2 below) · **the M-series ends at zero open
-`major` rows plus three consecutive increments filing none** (2026-08-28, D5 below) · **the batch series ends and the tiered pipeline succeeds it** (2026-09-14, D12 below) · **the testing server is invitation-only** (2026-09-14, D31 below) · **the guest per-address limits are raised on the testing server only** (2026-09-14, D32 below) · **the Windows Server 2016 testing site runs PostgreSQL 15** (2026-09-14, D43 below) · **the testing site is one workspace at the root of `staging.pitahc.gov.ph`, served by Apache** (2026-09-15, D46 below) · **automatic deploys to the testing server are on** (2026-09-17, D47 below) · **the repository stays public with fake data only through testing, and goes private before any real data** (2026-09-17, D48 below) · **inbound TCP 443 is open and `mod_md` renews the testing site's certificate over `tls-alpn-01`, with a scheduled task to activate it** (2026-09-18, D49 below).
+`major` rows plus three consecutive increments filing none** (2026-08-28, D5 below) · **the batch series ends and the tiered pipeline succeeds it** (2026-09-14, D12 below) · **the testing server is invitation-only** (2026-09-14, D31 below) · **the guest per-address limits are raised on the testing server only** (2026-09-14, D32 below) · **the Windows Server 2016 testing site runs PostgreSQL 15** (2026-09-14, D43 below) · **the testing site is one workspace at the root of `staging.pitahc.gov.ph`, served by Apache** (2026-09-15, D46 below) · **automatic deploys to the testing server are on** (2026-09-17, D47 below) · **the repository stays public with fake data only through testing, and goes private before any real data** (2026-09-17, D48 below) · **inbound TCP 443 is open and `mod_md` renews the testing site's certificate over `tls-alpn-01`, with a scheduled task to activate it** (2026-09-18, D49 below) · **the API documentation marks its six unbuilt promises as not built, in place, rather than deleting them** (2026-09-20, D38 below) · **operators create every workspace, and `tenants:create` stays the only path** (2026-09-20, D44 below) · **the central-host sign-in loop is retiered `before-launch`** (2026-09-20, D51 below) · **the central-host welcome-email copy stays `early-testing`** (2026-09-20, D52 below) · **the deploy that deletes the previous build's chunks is retiered `early-testing`** (2026-09-20, D53 below) · **the offline panel's quota line says what it counts — *"across all sessions on this device"*** (2026-09-20, D26 below) · **the resume shell is cached under a token-free key, closing the enumeration primitive** (2026-09-20, D20 below) · **`MdsSegmentedControl` is left alone and its four stretch-clamped hosts guard themselves** (2026-09-20, D28 below) · **a workspace admin may invite any address** (2026-09-20, D33 below) · **a new account confirms its email address before that address counts as its own** (2026-09-20, D34 below) · **single-page mode becomes an author setting, defaulting to step by step** (2026-09-20, D35 below) · **corrections save on the button, and the documents say they are not resumable** (2026-09-20, D36 below) · **a lost second factor is cleared by an audited admin reset** (2026-09-20, D37 below) · **the testing site sends `Strict-Transport-Security: max-age=300` from the vhost** (2026-09-20, D54 below).
 
 ---
 
@@ -58,119 +58,6 @@ advisory on that host — a disabled control with no stated reason is worse than
 
 ---
 
-### D54 — The testing site sends no `Strict-Transport-Security` header. What `max-age` should it commit to, and does the vhost or the application send it? **Tier: early-testing.**
-
-**Filed 2026-09-19 by `M101`, which took the sibling `X-Robots-Tag` row and would not guess this one.** `R-06228b4f`
-says in terms that *"the remedy is a decision before it is a header"* and then carried no `Awaits` token, so
-`docs/pipeline.md` published it as **ready** and any session could have taken it and chosen a number on the user's
-behalf. On a `.gov.ph` host HSTS is a commitment made to the **browser**, not to us: once sent, a failed renewal
-becomes a hard block with no click-through for as long as the `max-age` says, and this box's renewal has already
-failed eleven times in one day (`D49`) and rests on a scheduled task that is about 59 days from its first real
-exercise. `preload` must not be sent at all while the name is a staging host, and that is not in question here.
-
-**What was measured for this entry, on 2026-09-19, from outside the agency network:**
-
-- `Strict-Transport-Security` is **absent** from `/`, `/login`, `/up`, `/robots.txt`, `/favicon.ico` and a 404 —
-  and the strings `Strict-Transport-Security` and `HSTS` appear **nowhere in the tracked tree**.
-- ⚠️ **Port 80 has no listener.** A connection from outside times out after 21 seconds. So there is no plaintext
-  downgrade path on this box for HSTS to protect against, except an active attacker who opens one. **That narrows
-  the benefit; it does not narrow the cost**, which is unchanged. ⛔ **CORRECTED BY `M102` (2026-09-19), WHICH READ THE BOX INSTEAD OF PROBING IT FROM OUTSIDE: THE FIRST SENTENCE OF THIS BULLET IS FALSE.** `httpd.conf` carries an uncommented `Listen 80`, and `httpd -S` maps a live `*:80` vhost for `staging.pitahc.gov.ph` to `confxtra\httpd-vhosts.conf` at `:47`, serving a `Redirect permanent` to the `https://` origin. **There IS a listener and there IS a plaintext request**; the 21-second timeout measured the agency firewall, not the server. So an internal tester who types the bare hostname makes exactly the cleartext round-trip HSTS exists to remove, and the benefit is wider than this bullet says — narrower than a public host, but not nil. ⚠️ **This corrects an input, not the recommendation: `A` still stands**, and if anything it stands more firmly, because there is now a real downgrade path for a short `max-age` to close.
-- ✅ **HSTS is HOST-scoped, and this is what separates it from the sibling row.** One response carrying it covers
-  the whole origin, so the application is an adequate home for it — the exact opposite of `X-Robots-Tag`, which is
-  response-scoped and had to stay in the vhost because Apache serves `/robots.txt` without invoking PHP at all.
-- ⚠️ **But there is no precedent in this tree for an environment-conditioned response header** — zero instances
-  across `app/`, `config/`, `bootstrap/` and `routes/` — and `AppSecurityHeaders` is mounted per route group at ten
-  sites, never globally, because a global mount would break every embed. So the application arm means a **new,
-  separate, globally-appended middleware**, not a line added to the existing one.
-
-- **A — a deliberately short `max-age`, in the vhost beside the existing `X-Robots-Tag` line.** `max-age=300`, no
-  `includeSubDomains`, no `preload`. A lapsed certificate then hard-blocks a tester for five minutes rather than a
-  year, the mechanism is exercised before production ever needs it, and it needs no new pattern. It also arms for
-  free under the gate `M101` just built: adding it is one entry in `STAGING_REQUIRED_HEADERS`. Cost: the value
-  lives on the box, un-versioned, which is the very thing `R-562bcc2a` was about — mitigated by that gate, not
-  removed by it.
-- **B — a conventional `max-age=31536000`, in the vhost.** The strongest posture and the one a scanner expects. It
-  is also the most damaging thing on this list if a renewal ever lapses mid-testing: a year of un-clickable-through
-  failure on a `.gov.ph` address, for every tester who ever visited.
-- **C — send nothing on staging; build a global middleware enabled for production only.** Production inherits a
-  versioned, tested header and the testing site keeps its click-through. Costs a middleware, a registration in
-  `bootstrap/app.php`, and the first environment-conditioned header in this repository — and leaves the testing
-  site with no HSTS at all, which a security review will ask about.
-
-**Recommendation: A.** The measured inputs push the same way. The benefit here is narrower than the row assumes,
-because there is no port 80 to downgrade from; the cost of getting it wrong is a hard block on the exact people the
-site exists for; and a five-minute commitment buys the posture while bounding the blast radius to minutes. ⚠️ **A
-and C are not exclusive** — A is the right answer for *this box now*, and C is the right answer for production
-later, which is a separate row rather than a second option here. ⛔ **Whatever is chosen, it must not be `preload`.**
-
----
-
-### D51 — `R-5ecfa6cd`, the central-host sign-in loop, is tiered `early-testing`; `M98` measured it as unreachable by any tester. Which tier? **Tier: early-testing.**
-
-**Filed 2026-09-18 by `M99`, which verified the row without taking it.** The row's own `M98` clause ends *"`before-launch`
-fits the tier definitions better than the `early-testing` above, and that change is the user's to make"*, and nothing
-filed it, so the row goes on publishing `early-testing · ready` in `docs/pipeline.md` and goes on being named in the
-Next section that tells each session what to take. Two premises were re-measured for this entry.
-`resources/js/Pages/Welcome.vue` already hides *Create a workspace* behind a `registrationOpen` guard, so once the
-checklist closes sign-up the headline symptom is simply absent and only the sign-in loop is left. And under `D46`,
-`CENTRAL_DOMAIN=pitahc.gov.ph` resolves to the agency's own website on another machine, so **no tester can reach the
-central host at all** — only the operator, on the box, through the `hosts` line the checklist adds.
-
-- **A — `before-launch`.** It bites the operator once per console sign-in, with a documented workaround, and every
-  customer on a public central host later. Nothing a tester meets, so it leaves the tier that exists for what testers
-  meet. ⚠️ The remedy is blocked under `D44` in any case, and a grant gap sits under it (`pgsql_auth` can read
-  `users` and `tenant_users` and has nothing on `tenants` or `domains`), so `early-testing` buys no earliness.
-- **B — keep `early-testing`.** The operator is a real person hitting a loop with no message and no way out, and the
-  console is used throughout testing. Defensible if "affects the operator now" counts as early-testing.
-- **C — `during-testing`.** A middle reading: not a blocker for standing the server up, but wanted before testers are
-  running in volume and the operator is in the console daily.
-
-**Recommendation: A.** The tier that exists for what a tester meets should not hold a row no tester can reach.
-
-### D52 — `R-e6a10f97`, the welcome email telling a central-host account to create a workspace, is tiered `early-testing`; `M98` found it latent behind a reset-and-verify path. Which tier? **Tier: early-testing.**
-
-**Filed 2026-09-18 by `M99`, which verified the row without taking it.** The row's `M98` clause ends *"`during-testing`
-or `before-launch` fits the tier definitions better than the `early-testing` above; the wording also depends on `D44`,
-and both calls are the user's"*. The wording half is `D44`, which is open and is now named on the row by an
-`Awaits` token so the line can publish the row as blocked rather than ready. The tier half was filed nowhere.
-What `M98` established is that invitation-only sign-up does **not** make the copy unreachable: an invitation creates a
-placeholder user with a random password, nothing guards a placeholder against *Forgot password*, and an invited tester
-who resets, signs in and verifies **before** accepting the invitation fires `Verified` while still Invited — which is
-exactly the branch `tests/Feature/Auth/WelcomeEmailTest.php` already pins. That path was inferred from the code and
-never run.
-
-- **A — `during-testing`.** Reachable by a tester, but only down a path nobody walks on purpose, and the harm is
-  confusing copy rather than a blocked task. It wants fixing while testers are running, not before they start.
-- **B — `before-launch`.** The wording cannot be settled until `D44` is answered, and a default install is the
-  population that really meets it. Tying it to the `D44` answer avoids writing the copy twice.
-- **C — keep `early-testing`.** Every tester who is invited can reach it, and first-contact copy that tells someone to
-  do something the product does not allow is worth fixing before testers arrive.
-
-**Recommendation: A**, with the wording written only once `D44` is answered. ⚠️ Note that the header-logo half of this
-row — the unbranded logo linking to the agency website — is **not** waiting on any of this: `M99` takes it under
-`R-62fb2e05`, and this row is amended to say so.
-
-### D53 — `R-e7d6f223`, the deploy that deletes the previous build's chunks, is tiered `during-testing`; `M98` re-judged its precondition as ordinary traffic. Which tier? **Tier: early-testing.**
-
-**Filed 2026-09-18 by `M99`.** This is the one pending tier verdict that would **add** a row to `early-testing` rather
-than remove one, and it was invisible to a per-row pass because no row in the Next section names it. The row's `M98`
-clause says *"on this evidence the tier wants re-reading as early-testing, which is the user's call"*, and nothing
-filed it. What changed under it: `DEPLOY_ENABLED` was set on 2026-09-17, so a build swap now happens on every merge,
-and the nightly schedule's deploy fires around 08:50Z — **16:50 Philippine time, inside the testers' working day**.
-`M98`'s own documentation skip took close-out pushes back out of the exposure, leaving merge pushes and the nightly
-run on a moved tip as the whole of it. What remains inferred is the other half: which sites fetch a chunk on demand
-without navigating was counted and never exercised.
-
-- **A — `early-testing`.** A tester with the builder open across a nightly deploy is unremarkable, and it lands inside
-  their working day. Moving it up puts it in front of the tier the testing server is being stood up for.
-- **B — keep `during-testing`.** The unexercised half is the half that decides how often anyone actually sees it; a
-  user who wants it measured before it is re-ranked would leave it where it is and mark it latent again.
-- **C — `early-testing`, but only after the on-demand-chunk half is exercised.** Measure first, then re-rank, which
-  costs one increment and answers the question rather than judging it.
-
-**Recommendation: A.** The precondition is now ordinary traffic in the testers' own working hours, and the unexercised
-half changes the frequency rather than whether it happens.
-
 ### D50 — Should DICT be asked to publish DKIM and DMARC records for `pitahc.gov.ph`? **Tier: before-launch.**
 
 **Filed 2026-09-17 by `M98`, while checking why an invitation was spam-foldered.** An emailed invitation is the only
@@ -200,99 +87,6 @@ decides which of the other two options is right. INFERRED, from mail-standards k
 receiver: Google's sender rules make DMARC mandatory only for bulk senders, so a missing DMARC record alone may not
 be what moved a low-volume invitation to spam — which is precisely why the free measurement comes first. Either way
 the checklist should already tell testers to look in the spam folder, and that does not wait on this answer.
-
-### D33 — May a workspace admin invite any email address, or only addresses at a verified company domain? **Tier: early-testing.**
-
-**Filed 2026-09-14 by `M93`, from Decision Board card `invite-domain`.** The ledger row it answers says in its
-own words that applying a domain check is *"a product decision, not a cleanup"*: `MemberController::invite()`
-validates the address and a role, with no domain-ownership check. An invitation grants nothing until it is
-accepted, but it can put the product's mail in a stranger's inbox.
-
-- **A — keep inviting anyone.** Contractors and personal addresses keep working; watch invitation volume on
-  the testing server.
-- **B — only verified company domains.** Refuses outside addresses unless the domain is verified, which changes
-  what inviting means for every workspace.
-
-**Recommendation: A.** An unaccepted invitation grants no access, and B would block ordinary use such as
-contractors.
-
----
-
-### D34 — Must a new account confirm its email address before that address counts as its own? **Tier: early-testing.**
-
-**Filed 2026-09-14 by `M93`, from Decision Board card `self-signup-email`.** Self-registration can occupy an
-address the registrant does not control until the real owner resets the password. Nothing forges
-`email_verified_at`, so the squatter takes over nothing — but any fix touches the ordinary registration path for
-everybody.
-
-- **A — confirm first.** The address is not the account's own until the emailed link is clicked. Stops the
-  squatting, at one extra step for everyone.
-- **B — keep it as it is.** No extra step; the real owner reclaims the address with a password reset.
-
-**Recommendation: A** — the standard protection, and it matters most once outsiders can reach a server.
-
----
-
-### D35 — Should form authors get a setting to show a form on one page instead of step by step, and which is the default? **Tier: early-testing.**
-
-**Filed 2026-09-14 by `M93`, from Decision Board card `single-page-mode`.** The runtime can render a single-page
-form, but `forms.single_page_mode` has no writer outside the seeders, and its documented default disagrees across
-four documents — the PRD says single page should be the default.
-
-- **A — add the setting, default step by step.** Existing forms look exactly as they do today.
-- **B — add the setting, default one page.** Matches the PRD; new forms open as a single page.
-- **C — remove single-page mode.** Drop the unused capability and correct the documents instead.
-
-**Recommendation: A** — authors get the choice without changing what testers already see.
-
----
-
-### D36 — When staff correct a submitted response, should their edits be kept automatically as they type? **Tier: early-testing.**
-
-**Filed 2026-09-14 by `M93`, from Decision Board card `correction-autosave`.** A correction is kept only when
-Save is pressed; the page already warns before leaving, so work is lost only to a browser crash. The ledger row
-it answers says the gap is an endpoint that does not exist plus a decision nobody has taken.
-
-- **A — keep saving on the button.** No change. Each save sends an approved response back for review and is
-  audited once.
-- **B — a working copy kept as staff type.** Review status and the audit log change only on the final save. A
-  second save path to build.
-
-**Recommendation: A** — loss is already limited to a crash, and B needs a whole second save path.
-
----
-
-### D37 — If someone loses the device they use for two-step sign-in and has no recovery codes, how do they get back in? **Tier: early-testing.**
-
-**Filed 2026-09-14 by `M93`, from Decision Board card `twofa-recovery`, and from `docs/security-threat-model.md`
-§9.** Today there is no way back without an operator editing the database: disabling two-factor sits behind
-`auth` and `password.confirm`, and the super-admin console offers no reset. Testers who turn two-step sign-in on
-could lock themselves out.
-
-- **A — an admin reset, recorded in the audit log.** A workspace owner or the platform operator clears the
-  enrolment, and the reset is audited.
-- **B — re-verify by email.** The person proves they own the address, then enrols again. More to build.
-- **C — support only.** Keep it manual, and say so on the challenge screen.
-
-**Recommendation: A** — the simplest safe path for testing, and every reset leaves an audit record.
-
----
-
-### D38 — The API documentation promises features that were never built. Build them, or trim the documentation? **Tier: early-testing.**
-
-**Filed 2026-09-14 by `M93`, from Decision Board card `api-promises`.** Six ledger rows describe documented,
-unbuilt API surface: the async export endpoints, the users-and-roles resource group, the form-draft builder
-endpoints, `Idempotency-Key` deduplication, the per-user 300-a-minute limiter and the one-concurrent-export
-guard. The web app works without every one of them, and nothing shipped depends on them.
-
-- **A — trim the documentation now, and build an item when an integrator needs it.** The specification then
-  describes what exists.
-- **B — build them all before launch.** Several increments of work.
-
-**Recommendation: A** — honest documentation stops testers and integrators planning against endpoints that are
-not there.
-
----
 
 ### D39 — What will the product be called? "Meridian" is a working codename. **Tier: before-launch.**
 
@@ -347,32 +141,6 @@ indefinitely, and needed only for something the web app cannot do, such as backg
 
 ---
 
-### D44 — Should a new customer create their own workspace at sign-up, or do operators create every workspace? **Tier: before-launch.**
-
-**Filed 2026-09-14 by `M95`, while building the first-workspace command.** Two documents describe self-serve
-creation: `docs/onboarding-template-content-plan.md` §2 (step 1, *Signup → tenant creation*) has sign-up create
-the tenant and its founding Owner, and `docs/PRD.md` §4's goal G1 measures a brand-new tenant's time from signup to
-a first published form. Nothing in the product does that. A central-host registration joins no workspace, the
-landing page's "Create a workspace" button and the welcome email both offer something the product cannot do (two
-rows in `docs/feature-backlog.md`), and after `M95` the only path that creates a workspace is the operator command
-`tenants:create`. ⚠️ **It blocks nothing before launch:** the testing server is invitation-only (D31, answered).
-
-- **A — operators create every workspace.** `tenants:create` stays the only path, sign-up stays an account-only
-  door, and the landing page and welcome email stop offering creation. Cheapest; it gives up G1's self-serve
-  premise, and every new customer waits on an operator.
-- **B — self-serve creation at sign-up.** A central-host registration creates a workspace, its domain label, the
-  Owner membership and role, and a default plan, reusing `tenants:create`'s write set and its `SubdomainLabel`
-  rule. Meets G1; costs a workspace-address picker, a plan choice, abuse controls on a public door, and the
-  system-actor audit shape operator provisioning still lacks.
-- **C — operator-only now, with the write set kept in one service**, so a later self-serve door is a page rather
-  than a rewrite. A's cost today, with B's path kept open.
-
-**Recommendation: A — operator-only (`tenants:create`) until a pilot needs self-serve.** Nothing before launch
-needs a public door, the first pilot customer is itself an open question, and building one ahead of that answer is
-work the tiers exist to hold back.
-
----
-
 ### D45 — Should `deploy.ps1` get a committed Windows CI job, so its proof runs on every change? **Tier: before-launch.**
 
 **Filed 2026-09-15 by `M96`, while proving the staging-build deploy.** `deploy.ps1` has no committed test. `M95`
@@ -395,55 +163,6 @@ automatic deploys have been on since 2026-09-17, so a `deploy.ps1` regression no
 use: not the production host this recommendation named, but the closest thing to it that exists. The scratch
 harness also still exists, pinned to a worktree that no longer does. The tier and the recommendation remain the
 user's to move.
-
----
-
-### D28 — Should `MdsSegmentedControl` get a component-level wrap or shrink affordance, or should its four stretch-clamped hosts keep guarding themselves? **Tier: early-testing.**
-
-**Filed 2026-09-08 by `M87`, while closing the census row that measured the answer's inputs.** Recorded
-here rather than taken, because the cheapest correct fix touches **13 call sites** and the only instrument
-that can verify it is an e2e run in the container — so this is a change whose blast radius exceeds what the
-increment that found it can honestly validate.
-
-**What is now measured, and it is why the row can be closed while this stays open:**
-
-| | |
-|---|---|
-| Call sites | 13, across 9 files |
-| Stretch-clamped hosts | **4** — `.config__group`, `.mds-field` (members ×2), `.sheets-fields`, `.encode-field` |
-| …of those, inside an `overflow-y: auto` box | **4 of 4** — `.config` for the first, `.mds-modal__body` for the other three |
-| …with any e2e coverage | **1** (the builder pane, and only through a document-level assertion that cannot see it) |
-| `flex-shrink: 1` on `__seg` | a **no-op** — the initial value, and absent from the tree |
-| The 30px | **unprovenanced** — no test, fixture or snapshot records it |
-
-⛔ **EVERY ONE OF THE FOUR ABSORBS ITS SPILL INTO A SCROLLBAR NOBODY LOOKS FOR**, which is why no gate has
-ever reported this and why "is it real today" cannot be answered from the tree. `.app-shell__content`
-measures 0 everywhere — the wrong box.
-
-**The options:**
-
-1. **`flex-wrap: wrap` on `.mds-segmented`.** Covers all four hosts at once and every call site with them.
-   ⚠️ The stated reason this was ruled out — *"`.topnav` is a fixed 64px with `flex-shrink: 0`"* — is
-   **stale**: that instance collapses to glyphs at ≤1024 and is `display: none` at ≤899, so it never
-   reaches a width where a wrap could grow the bar. Cost: a 13-call-site visual re-measure.
-2. **`min-width: 0` plus an `overflow` escape on `.mds-segmented__seg`.** Also component-level. ⚠️
-   `min-width: 0` **alone is incomplete**, not merely conservative: `__seg` carries no `overflow` and its
-   span no `text-overflow`, so it converts a fieldset-level spill into a text-level one that still extends
-   the container's scrollWidth. Adding `white-space: nowrap` to make an ellipsis work would change wrapping
-   at all 13 sites, which is the same blast radius as option 1 with less of the benefit.
-3. ✅ **Leave the component alone and guard at the host, as one host already does. Recommended.**
-   `resources/js/Pages/Settings/Index.vue` solves this exact problem with `align-items: center` plus a
-   `min-width: 0; max-width: 100%` rule on its non-text children, **with a comment saying so**, and three
-   call sites are protected by it today. It is the smallest change, it needs no re-measure of the nine
-   unaffected sites, and it is already proven in this codebase. ⚠️ Its honest cost: four hosts must each
-   remember, and the fifth one written next year will not — which is the argument for 1 or 2, and it is a
-   real one.
-
-⚠️ **Whichever is chosen, the instrument comes first.** A ~6-line element-level Playwright assertion on
-`.config`, in the shape `personalization-axe.spec.ts` already uses twice, decides whether the spill exists
-at CI's font stack — and it is the only thing that can, because the dev host never loads the dyslexia face.
-**It is not shipped here deliberately**: added blind it would either merge green and prove nothing or go
-red and block an increment on a question nobody has answered. It belongs with whichever option is taken.
 
 ---
 
@@ -504,82 +223,6 @@ no-code-change and the question lives here instead. ⚠️ **The paragraph above
 lock is NOT affected**: it says the throughput trade was declined *for promote*, which is exactly what the
 code comment says, and it applies it to `submit()`'s republish question rather than to the schedule window.
 
----
-
-### D26 — The offline panel's storage-quota line counts every visit's submissions while the three sentences beside it count only this one. Reword the line, re-scope the number, or drop the count? **Tier: early-testing.**
-
-**Filed 2026-09-07 by Lane A, during `M85`, after a read-only fan-out found the row's stated blocker was
-false and the residue was a copy call.** Recorded here rather than left as a row because two increments
-have now looked at it, and both stopped at the same place: **what remains is what the sentence should
-say, and that is the user's.**
-
-⛔ **THE ROW'S STATED BLOCKER IS MEASURABLY FALSE, WHICH IS WHY THIS IS A DECISION AND NOT A HOLD.** The
-row (`docs/feature-backlog.md`, filed `M21`) says touching the device-wide count *"risks the boot drain
-that ADR-0021 makes load-bearing"*. It does not. The boot trigger reads `pending` alone; `queued` is a
-local `const` whose only consumer is the warning string, and it escapes nowhere. `M77` reached the same
-conclusion independently and filed a second row saying so, which is itself a signal.
-
-**What a respondent actually reads**, three consecutive `<p>` elements under a heading that already says
-*"My submissions on this device"*: a visit-scoped summary, a visit-scoped *"responses from earlier
-sessions on this device"* note, and then a device-wide *"N responses waiting to send"*. ⚠️ **The quota
-line therefore discloses nothing the panel does not already state deliberately, in plainer words** —
-which deflates the row's own harm claim, and neither row says so. It renders only above 80% of quota, so
-it is rare rather than hypothetical.
-
-**The options, all one line of code:**
-
-1. ✅ **Say what it counts: *"N responses across all sessions on this device"*.** Honest, matches the
-   heading's own location framing, and leaves the megabytes and the count measuring the same population.
-   Wordier, and it is the only option that needs no other number to move. **Recommended.**
-2. **Re-scope the count to the visit** — the value `SyncStatus.vue` already computes as `unsent`. Then
-   the count is visit-scoped and the megabytes are still device-wide, which is the same mismatch
-   inverted and harder to notice.
-3. **Drop the count, keep MB and percentage.** Contradicts `docs/offline-first-sync-design.md`, which
-   specifies *"you have N submissions queued and using X MB"* — so it also owes a document edit.
-
-⚠️ **WHICHEVER IS CHOSEN, RENDER THE PANEL BEFORE SHIPPING IT.** `M15`'s note on this component records
-that no unit test could see the defect it introduced and that it took rendering the hand-over to catch —
-and `M77` repeated the instruction. ⚠️ **And the gate here is weaker than it looks**: the existing case
-asserts `toContain('1 response')` with a single enqueued row, so it cannot tell device-wide from
-visit-scoped at all. A two-visit case in the same `describe` block reddens under option 2 and should be
-written whichever option is taken, because otherwise the scope is enforced by nothing.
-
-⚠️ **Three stale citations sit in the exact files a repair opens**, and they are free to fix in the same
-pass: two cite `docs/offline-first-sync-design.md:93` for a spec that is now at `:192`, and one cites
-`:103` for a *"Sync now"* rule that has also moved. They resolve to live lines, so the citation gate is
-blind to them by design.
-
-
----
-
-⚠️ **`M86` ADDENDUM (2026-09-07) — THREE MEASUREMENTS THIS ENTRY DID NOT HAVE, AND ONE OF THEM IS A
-STRONGER ARGUMENT AGAINST OPTION 2 THAN THE ONE RECORDED ABOVE.**
-
-⛔ **(1) THE STRONGEST OBJECTION TO OPTION 2 IS ADJACENCY, NOT THE INVERTED MISMATCH.** `SyncStatus.vue`
-already renders, for the **visit-scoped** number, the sentence *"N responses on this device have not been
-sent yet"* — pinned verbatim in `sync-status.test.ts`. Re-scoping the quota line to the visit would print
-**the same phrase with a different number two paragraphs apart**. That is worse for a reader than the
-imprecision it fixes, and it is a reason to reject option 2 outright rather than to rank it second.
-
-⛔ **(2) OPTION 2 ALSO CONTRADICTS A WRITTEN DECISION, WHICH NOTHING ABOVE NOTES.**
-`docs/adr/0021-respondent-scoped-device-outbox.md`'s scoping table states that the device-wide `counts`
-*"drives the boot drain and the storage-quota estimate"* — the estimate, not only the drain — and two test
-rationales restate it as the reason the count is device-wide. So option 2 owes an ADR amendment, which
-moves it out of *one line of code* and into a decision about a shipped ADR. Option 1 owes nothing.
-
-⛔ **(3) THE `M77` ROW PRICES ITS OWN REMAINING WORK AGAINST THE WRONG FILE.** It says a re-aim *"changes
-a string another increment deliberately pinned in `sync-status.test.ts`"*. That file carries **no quota
-assertion and structurally cannot** — its fixture holds a null `quotaWarning`, so the paragraph never
-renders in that suite. The only pin is a `90%` assertion in `sync-outbox.test.ts`, which no re-wording of
-the count clause would break. ⚠️ **And the triage has already harvested that wrong file into the collision
-graph**, so `D13` has been batching the row against a file its repair never opens.
-
-✅ **NONE OF THIS CHANGES THE RECOMMENDATION — OPTION 1 — IT STRENGTHENS IT**, and it removes option 2
-from contention on two independent grounds rather than one. ⚠️ **`M86` NEARLY FILED THIS A SECOND TIME AS
-A NEW DECISION**, because the `M77` row says *"a product decision nobody has taken"* and cites nothing.
-**A row that names a decision without naming WHICH one costs the next increment exactly the
-re-derivation this entry exists to prevent** — and the roster is now long enough that the collision is
-not obvious. Corrected in the ledger: that row now names this entry.
 ---
 
 ### D25 — `P2c`, the deferral-phrase arm, measures 5% precision and ~2% recall. Keep it, drop it, or re-aim it as a staleness lint? **Tier: after-launch.**
@@ -783,66 +426,6 @@ the repository is public, so option 1's price becomes about $0.23 a close-out ru
 $0.006 a minute once D48's flip happens — which is the moment to re-read this question.
 
 ---
-
-### D20 — The service worker caches a credential-bearing resume shell, where the credential IS the cache key. Purge it, keep it, or split the difference? **Tier: early-testing.**
-
-**Filed 2026-09-06 by Lane A, during `M78`, at the moment the row's two stated blockers were both
-measured dead and a real trade was found underneath them.** The row (`M70`) asks to stop caching
-`/f/resume/{token}`. Its two reasons for not doing so are now known to be false, and what replaced them
-is a genuine product question rather than an engineering one — which is why this is here and not in the
-diff.
-
-**The exposure, measured.** `GET /api/v1/public/drafts/{resumeToken}` carries **no auth middleware**; the
-token in the path is the whole credential, and the response is the respondent's full answer map **plus a
-freshly minted share token**, so it is a write credential too. The resume navigation is cached under
-`guest-shell-html` on a seven-day clock. ⛔ **Cache Storage is ORIGIN-scoped, not per-document, and the
-token is the cache KEY** — so any same-origin script can run
-`caches.open('guest-shell-html').keys()` and enumerate every resume token on the device **without reading
-a single response body**. Stripping `data-resume-token` from the HTML would therefore not close it.
-
-**What purging actually costs, measured — and it is not what the row says.** *"It costs offline resume
-access outright"* is **false**: `App.vue`'s `loadResume()` opens with a bare fetch to a path no
-service-worker route matches, so offline it rejects and the IndexedDB read two calls downstream is
-unreachable. **A cached resume shell has never rendered the form offline.** What it does carry is the app
-shell, the offline indicator and the always-render sync surface — including the *"Sync now"* action
-`docs/non-functional-requirements.md` §7 makes the iOS Background-Sync fallback. ⚠️ **For a respondent who
-only ever opened an emailed link, that entry is their ONLY cached navigation**, so purging it costs them
-the entire offline surface, not the form.
-
-**Three real options.**
-
-1. ⭐ **Purge the resume shell from the cache, and accept that a resume-link-only respondent has no offline
-   surface.** One predicate on the shell route. ⚠️ It is **not** a two-line change: it makes
-   `isResumeShell()` in `lib/brand-cache.ts` guard a condition that can no longer arise, turning its three
-   dedicated cases **vacuously green** — the succeeds-on-empty-input shape this repository gates against
-   everywhere, and the exact predicate `M75` worked to make load-bearing. Those cases must be deleted or
-   explicitly re-labelled as unreachable in the same PR. ⚠️ And resolving them makes the row cite
-   `brand-cache.test.ts`, the one non-hub file the open second-writer row already cites, so under `D13` the
-   two rows can no longer share a batch — the situation `M74` deliberately refused to create.
-2. **Keep the write and close the enumeration instead** — cache the resume navigation under a
-   **token-free key** (rewrite the cache key to a constant like `/f/resume/`, serving the shell from a
-   single entry) so `keys()` leaks nothing and the offline surface survives. Costs: one shell serves every
-   resume session on the device, so the brand-refresh sweep and the seven-day clock both become per-device
-   rather than per-link, and `isResumeShell()` stays meaningful. This is the option the row never
-   considered, and it is the only one that keeps both properties.
-3. **Do nothing and record the exposure as accepted**, on the grounds that reading it already requires
-   same-origin script execution on the tenant origin — i.e. an XSS or a compromised bundle, at which point
-   the attacker can read the live token from the page anyway. ⚠️ The counter-argument is durability: the
-   cache holds **every** resume token the device has seen for seven days, where the page holds one.
-
-**Recommendation: option 2, and it is not close.** Option 1 trades a real, documented accessibility
-fallback for a threat that requires same-origin code execution, and it does so while manufacturing three
-vacuous tests and a batching conflict. Option 3 leaves a seven-day, device-wide credential store in place
-for no benefit once option 2 is known to exist. Option 2 removes the enumeration primitive — which is the
-part that turns one compromised session into every resume link on the device — while keeping the offline
-surface the requirements commit to. ⚠️ **It needs its own measurement before being taken**: whether a
-constant-key shell breaks the resume boot's own `data-resume-token` read, since the served HTML would then
-be some *other* session's. If it does, option 1 becomes the fallback and its three vacuous tests must be
-handled as described.
-
-**Until this is answered**, `resources/public-runtime/__tests__/sw.test.ts` pins the current behaviour
-explicitly — one arm asserts the resume shell IS matched today, labelled as a pinned exposure rather than
-an endorsement, so the state cannot drift silently in either direction.
 
 ### D19 — A Reviewer holds `submissions.create` and can encode on no form. `M77` made every document say so. Should the ROLE now gain encoding, or is documenting the gap the whole answer? **Tier: during-testing.**
 
@@ -1628,6 +1211,521 @@ doors; this is the builder's validation layer. They should not be answered as on
 
 
 ## ANSWERED
+### D38 — The API documentation promises features that were never built. Build them, or trim the documentation? **C — mark the six as not built, in place, the way §7.1 already annotates.**
+
+**Answered 2026-09-20 (user decision, in chat), recorded by Lane A during `M105` — C.**
+
+**Filed 2026-09-14 by `M93`, from Decision Board card `api-promises`.** Six ledger rows describe documented,
+unbuilt API surface: the async export endpoints, the users-and-roles resource group, the form-draft builder
+endpoints, `Idempotency-Key` deduplication, the per-user 300-a-minute limiter and the one-concurrent-export
+guard. The web app works without every one of them, and nothing shipped depends on them.
+
+- **A — trim the documentation now, and build an item when an integrator needs it.** The specification then
+  describes what exists.
+- **B — build them all before launch.** Several increments of work.
+
+**Recommendation: A** — honest documentation stops testers and integrators planning against endpoints that are
+not there.
+
+⛔ **CORRECTED BY `M105` (2026-09-20) BEFORE THE ANSWER WAS TAKEN — THE PREMISE SENTENCE ABOVE IS FALSE FOR ONE OF
+THE SIX, AND THE OPTION SET WAS MISSING THE ONE THIS REPOSITORY ALREADY PRACTISES.**
+
+- ⛔ **The sentence *"nothing shipped depends on them"* is FALSE for `R-47552102`.** The documented
+  `GET /api/v1/roles` is the stated reason roles use UUIDv7 primary keys rather than Spatie's bigints —
+  `docs/multi-tenancy-rbac-design.md:56`, `app/Models/Role.php:13` and `config/permission.php:20-21` each cite it
+  as the justification. **That schema shipped.** Option A as worded deletes the rationale for a decision already
+  paid for.
+- ⚠️ **The phrase *"never built"* is imprecise for `R-fcfc1f52`.** `PROGRESS_ARCHIVE.md:322` records
+  `Idempotency-Key (§2.4) deferred` in Increment E's documented-not-fixed list — a **lapsed deferral**, not an
+  unbacked promise.
+- ✅ **What the entry got right, and it is the load-bearing half:** all six are genuinely unbuilt on `/api/v1`
+  (`routes/api.php` registers 68 routes carrying none of them), and the **generated** `openapi.json` — 51 paths,
+  produced from the routes by Scramble — independently corroborates every absence. **There is no hand-maintained
+  second copy of the API documentation**, which is the rot this kind of row usually dies of.
+
+- **C — mark the six as NOT BUILT, in place. Added by `M105`.** §7.1 already carries an in-place annotation
+  convention: `docs/architecture/technical-architecture.md:445-446` read *"**implemented (Increment F5)**"*.
+  Marking these six the same way makes the documentation honest, preserves `R-47552102`'s shipped rationale, and
+  costs a line-length change rather than six deletions.
+
+⚠️ **THE REASON `C` BEATS `A` IS A CASCADE NEITHER `A` NOR `B` MENTIONS.** `docs/api-specification.md` and
+`docs/architecture/technical-architecture.md` are citation **tier 1 with zero tolerance**
+(`scripts/citation-liveness-lint.php:77-78`, run at `.github/workflows/ci.yml:242`), and `docs/pipeline.md:50` —
+itself tier 1 — cites `docs/api-specification.md:63` **by line**. Deleting lines shifts every citation below them,
+so option A owes a re-point of every affected citation in the same commit. Annotating in place shifts nothing.
+
+**Consequences, recorded so they are not rediscovered:**
+
+- The six rows are **not** taken here. They become `ready` and belong to `M106` or later.
+- ⛔ **They cannot be grouped under `D13` as it stands.** Three edit one table
+  (`docs/architecture/technical-architecture.md` §7.1, lines 443 / 449 / 454) and three edit
+  `docs/api-specification.md` lines 63 / 73 / 75, two of those in one table. `D13` forbids grouping rows citing the
+  same non-hub file, while the citation cascade **requires** moving them together. Filed as its own row: the
+  exception must be recorded or the six cannot be taken at all.
+- ⚠️ **The real code-facing risk is section RENUMBERING, not line-trimming.** Fourteen first-party sites cite
+  `docs/api-specification.md` by section number, including `app/Providers/AppServiceProvider.php:374`,
+  `app/Support/Api/ApiErrorResponse.php:10`, `routes/api.php:66` and `config/scramble.php:24`. Option C moves no
+  section number.
+- ✅ **No contract gate can break on this.** `.github/workflows/ci.yml:581-666` runs `scramble:export` and diffs
+  against `openapi.json`; it reads routes and models only, and `tests/Feature/Api/OpenApiContractTest.php` names
+  `api-specification.md` in a failure *message* only.
+
+---
+
+### D44 — Should a new customer create their own workspace at sign-up, or do operators create every workspace? **A — operators create every workspace; `tenants:create` stays the only path.**
+
+**Answered 2026-09-20 (user decision, in chat), recorded by Lane A during `M105` — A.**
+
+**Filed 2026-09-14 by `M95`, while building the first-workspace command.** Two documents describe self-serve
+creation: `docs/onboarding-template-content-plan.md` §2 (step 1, *Signup → tenant creation*) has sign-up create
+the tenant and its founding Owner, and `docs/PRD.md` §4's goal G1 measures a brand-new tenant's time from signup to
+a first published form. Nothing in the product does that. A central-host registration joins no workspace, the
+landing page's "Create a workspace" button and the welcome email both offer something the product cannot do (two
+rows in `docs/feature-backlog.md`), and after `M95` the only path that creates a workspace is the operator command
+`tenants:create`. ⚠️ **It blocks nothing before launch:** the testing server is invitation-only (D31, answered).
+
+- **A — operators create every workspace.** `tenants:create` stays the only path, sign-up stays an account-only
+  door, and the landing page and welcome email stop offering creation. Cheapest; it gives up G1's self-serve
+  premise, and every new customer waits on an operator.
+- **B — self-serve creation at sign-up.** A central-host registration creates a workspace, its domain label, the
+  Owner membership and role, and a default plan, reusing `tenants:create`'s write set and its `SubdomainLabel`
+  rule. Meets G1; costs a workspace-address picker, a plan choice, abuse controls on a public door, and the
+  system-actor audit shape operator provisioning still lacks.
+- **C — operator-only now, with the write set kept in one service**, so a later self-serve door is a page rather
+  than a rewrite. A's cost today, with B's path kept open.
+
+**Recommendation: A — operator-only (`tenants:create`) until a pilot needs self-serve.** Nothing before launch
+needs a public door, the first pilot customer is itself an open question, and building one ahead of that answer is
+work the tiers exist to hold back.
+
+---
+
+### D51 — `R-5ecfa6cd`, the central-host sign-in loop, is tiered `early-testing`; `M98` measured it as unreachable by any tester. Which tier? **A — `before-launch`.**
+
+**Answered 2026-09-20 (user decision, in chat), recorded by Lane A during `M105` — A.**
+
+**Filed 2026-09-18 by `M99`, which verified the row without taking it.** The row's own `M98` clause ends *"`before-launch`
+fits the tier definitions better than the `early-testing` above, and that change is the user's to make"*, and nothing
+filed it, so the row goes on publishing `early-testing · ready` in `docs/pipeline.md` and goes on being named in the
+Next section that tells each session what to take. Two premises were re-measured for this entry.
+`resources/js/Pages/Welcome.vue` already hides *Create a workspace* behind a `registrationOpen` guard, so once the
+checklist closes sign-up the headline symptom is simply absent and only the sign-in loop is left. And under `D46`,
+`CENTRAL_DOMAIN=pitahc.gov.ph` resolves to the agency's own website on another machine, so **no tester can reach the
+central host at all** — only the operator, on the box, through the `hosts` line the checklist adds.
+
+- **A — `before-launch`.** It bites the operator once per console sign-in, with a documented workaround, and every
+  customer on a public central host later. Nothing a tester meets, so it leaves the tier that exists for what testers
+  meet. ⚠️ The remedy is blocked under `D44` in any case, and a grant gap sits under it (`pgsql_auth` can read
+  `users` and `tenant_users` and has nothing on `tenants` or `domains`), so `early-testing` buys no earliness.
+- **B — keep `early-testing`.** The operator is a real person hitting a loop with no message and no way out, and the
+  console is used throughout testing. Defensible if "affects the operator now" counts as early-testing.
+- **C — `during-testing`.** A middle reading: not a blocker for standing the server up, but wanted before testers are
+  running in volume and the operator is in the console daily.
+
+**Recommendation: A.** The tier that exists for what a tester meets should not hold a row no tester can reach.
+
+---
+
+### D52 — `R-e6a10f97`, the welcome email telling a central-host account to create a workspace, is tiered `early-testing`; `M98` found it latent behind a reset-and-verify path. Which tier? **C — keep `early-testing`.**
+
+**Answered 2026-09-20 (user decision, in chat), recorded by Lane A during `M105` — C.**
+
+**Filed 2026-09-18 by `M99`, which verified the row without taking it.** The row's `M98` clause ends *"`during-testing`
+or `before-launch` fits the tier definitions better than the `early-testing` above; the wording also depends on `D44`,
+and both calls are the user's"*. The wording half is `D44`, which is open and is now named on the row by an
+`Awaits` token so the line can publish the row as blocked rather than ready. The tier half was filed nowhere.
+What `M98` established is that invitation-only sign-up does **not** make the copy unreachable: an invitation creates a
+placeholder user with a random password, nothing guards a placeholder against *Forgot password*, and an invited tester
+who resets, signs in and verifies **before** accepting the invitation fires `Verified` while still Invited — which is
+exactly the branch `tests/Feature/Auth/WelcomeEmailTest.php` already pins. That path was inferred from the code and
+never run.
+
+- **A — `during-testing`.** Reachable by a tester, but only down a path nobody walks on purpose, and the harm is
+  confusing copy rather than a blocked task. It wants fixing while testers are running, not before they start.
+- **B — `before-launch`.** The wording cannot be settled until `D44` is answered, and a default install is the
+  population that really meets it. Tying it to the `D44` answer avoids writing the copy twice.
+- **C — keep `early-testing`.** Every tester who is invited can reach it, and first-contact copy that tells someone to
+  do something the product does not allow is worth fixing before testers arrive.
+
+**Recommendation: A**, with the wording written only once `D44` is answered. ⚠️ Note that the header-logo half of this
+row — the unbranded logo linking to the agency website — is **not** waiting on any of this: `M99` takes it under
+`R-62fb2e05`, and this row is amended to say so.
+
+⛔ **RE-PRICED BY `M105` (2026-09-20) BEFORE THE ANSWER WAS TAKEN — THIS ENTRY PRE-DATES `M103` BY ONE DAY, AND
+`M103` CHANGED WHAT THE DEFECT COSTS.** `M103` (`77a268d`, 2026-09-19) added a `welcomed_at` once-per-person guard
+(`app/Listeners/Auth/SendWelcomeEmail.php:60-67` and `:153-172`, backed by migrations `2026_08_17_000112` and
+`…000113`).
+
+- ✅ **It does NOT close the path this entry describes.** A placeholder is written with `email_verified_at` NULL
+  (`app/Services/Tenancy/TenantMembershipService.php:794-801`), so the backfill skips it, `welcomed_at` stays NULL
+  and `claimWelcome()` wins. The reset-and-verify branch still fires, and
+  `tests/Feature/Auth/WelcomeEmailTest.php:145-171` still pins it.
+- ⛔ **But it makes the bad copy the person's ONLY welcome.** Accepting the invitation fires no `Verified`
+  (`SendWelcomeEmail.php:29-33`), so no second, correct email is ever sent. **Option A's pricing — *"confusing copy
+  rather than a blocked task"* — is therefore wrong:** the copy is now one-shot and unrepeatable, and that is what
+  moved the answer from `A` to `C`.
+- ⚠️ **Option B's own rationale expired in this same push.** It says *"the wording cannot be settled until `D44` is
+  answered"*. `D44` is answered above, in this increment — **A**, operators create every workspace — so the wording
+  is settled: the email stops offering workspace creation. It is one string at
+  `app/Notifications/Auth/WelcomeNotification.php:88`.
+
+---
+
+### D53 — `R-e7d6f223`, the deploy that deletes the previous build's chunks, is tiered `during-testing`; `M98` re-judged its precondition as ordinary traffic. Which tier? **A — `early-testing`.**
+
+**Answered 2026-09-20 (user decision, in chat), recorded by Lane A during `M105` — A.**
+
+**Filed 2026-09-18 by `M99`.** This is the one pending tier verdict that would **add** a row to `early-testing` rather
+than remove one, and it was invisible to a per-row pass because no row in the Next section names it. The row's `M98`
+clause says *"on this evidence the tier wants re-reading as early-testing, which is the user's call"*, and nothing
+filed it. What changed under it: `DEPLOY_ENABLED` was set on 2026-09-17, so a build swap now happens on every merge,
+and the nightly schedule's deploy fires around 08:50Z — **16:50 Philippine time, inside the testers' working day**.
+`M98`'s own documentation skip took close-out pushes back out of the exposure, leaving merge pushes and the nightly
+run on a moved tip as the whole of it. What remains inferred is the other half: which sites fetch a chunk on demand
+without navigating was counted and never exercised.
+
+- **A — `early-testing`.** A tester with the builder open across a nightly deploy is unremarkable, and it lands inside
+  their working day. Moving it up puts it in front of the tier the testing server is being stood up for.
+- **B — keep `during-testing`.** The unexercised half is the half that decides how often anyone actually sees it; a
+  user who wants it measured before it is re-ranked would leave it where it is and mark it latent again.
+- **C — `early-testing`, but only after the on-demand-chunk half is exercised.** Measure first, then re-rank, which
+  costs one increment and answers the question rather than judging it.
+
+**Recommendation: A.** The precondition is now ordinary traffic in the testers' own working hours, and the unexercised
+half changes the frequency rather than whether it happens.
+
+---
+
+### D26 — The offline panel's storage-quota line counts every visit's submissions while the three sentences beside it count only this one. Reword the line, re-scope the number, or drop the count? **1 — say what it counts: *"N responses across all sessions on this device"*.**
+
+**Answered 2026-09-20 (user decision, in chat), recorded by Lane A during `M105` — 1.**
+
+**Filed 2026-09-07 by Lane A, during `M85`, after a read-only fan-out found the row's stated blocker was
+false and the residue was a copy call.** Recorded here rather than left as a row because two increments
+have now looked at it, and both stopped at the same place: **what remains is what the sentence should
+say, and that is the user's.**
+
+⛔ **THE ROW'S STATED BLOCKER IS MEASURABLY FALSE, WHICH IS WHY THIS IS A DECISION AND NOT A HOLD.** The
+row (`docs/feature-backlog.md`, filed `M21`) says touching the device-wide count *"risks the boot drain
+that ADR-0021 makes load-bearing"*. It does not. The boot trigger reads `pending` alone; `queued` is a
+local `const` whose only consumer is the warning string, and it escapes nowhere. `M77` reached the same
+conclusion independently and filed a second row saying so, which is itself a signal.
+
+**What a respondent actually reads**, three consecutive `<p>` elements under a heading that already says
+*"My submissions on this device"*: a visit-scoped summary, a visit-scoped *"responses from earlier
+sessions on this device"* note, and then a device-wide *"N responses waiting to send"*. ⚠️ **The quota
+line therefore discloses nothing the panel does not already state deliberately, in plainer words** —
+which deflates the row's own harm claim, and neither row says so. It renders only above 80% of quota, so
+it is rare rather than hypothetical.
+
+**The options, all one line of code:**
+
+1. ✅ **Say what it counts: *"N responses across all sessions on this device"*.** Honest, matches the
+   heading's own location framing, and leaves the megabytes and the count measuring the same population.
+   Wordier, and it is the only option that needs no other number to move. **Recommended.**
+2. **Re-scope the count to the visit** — the value `SyncStatus.vue` already computes as `unsent`. Then
+   the count is visit-scoped and the megabytes are still device-wide, which is the same mismatch
+   inverted and harder to notice.
+3. **Drop the count, keep MB and percentage.** Contradicts `docs/offline-first-sync-design.md`, which
+   specifies *"you have N submissions queued and using X MB"* — so it also owes a document edit.
+
+⚠️ **WHICHEVER IS CHOSEN, RENDER THE PANEL BEFORE SHIPPING IT.** `M15`'s note on this component records
+that no unit test could see the defect it introduced and that it took rendering the hand-over to catch —
+and `M77` repeated the instruction. ⚠️ **And the gate here is weaker than it looks**: the existing case
+asserts `toContain('1 response')` with a single enqueued row, so it cannot tell device-wide from
+visit-scoped at all. A two-visit case in the same `describe` block reddens under option 2 and should be
+written whichever option is taken, because otherwise the scope is enforced by nothing.
+
+⚠️ **Three stale citations sit in the exact files a repair opens**, and they are free to fix in the same
+pass: two cite `docs/offline-first-sync-design.md:93` for a spec that is now at `:192`, and one cites
+`:103` for a *"Sync now"* rule that has also moved. They resolve to live lines, so the citation gate is
+blind to them by design.
+
+
+---
+
+⚠️ **`M86` ADDENDUM (2026-09-07) — THREE MEASUREMENTS THIS ENTRY DID NOT HAVE, AND ONE OF THEM IS A
+STRONGER ARGUMENT AGAINST OPTION 2 THAN THE ONE RECORDED ABOVE.**
+
+⛔ **(1) THE STRONGEST OBJECTION TO OPTION 2 IS ADJACENCY, NOT THE INVERTED MISMATCH.** `SyncStatus.vue`
+already renders, for the **visit-scoped** number, the sentence *"N responses on this device have not been
+sent yet"* — pinned verbatim in `sync-status.test.ts`. Re-scoping the quota line to the visit would print
+**the same phrase with a different number two paragraphs apart**. That is worse for a reader than the
+imprecision it fixes, and it is a reason to reject option 2 outright rather than to rank it second.
+
+⛔ **(2) OPTION 2 ALSO CONTRADICTS A WRITTEN DECISION, WHICH NOTHING ABOVE NOTES.**
+`docs/adr/0021-respondent-scoped-device-outbox.md`'s scoping table states that the device-wide `counts`
+*"drives the boot drain and the storage-quota estimate"* — the estimate, not only the drain — and two test
+rationales restate it as the reason the count is device-wide. So option 2 owes an ADR amendment, which
+moves it out of *one line of code* and into a decision about a shipped ADR. Option 1 owes nothing.
+
+⛔ **(3) THE `M77` ROW PRICES ITS OWN REMAINING WORK AGAINST THE WRONG FILE.** It says a re-aim *"changes
+a string another increment deliberately pinned in `sync-status.test.ts`"*. That file carries **no quota
+assertion and structurally cannot** — its fixture holds a null `quotaWarning`, so the paragraph never
+renders in that suite. The only pin is a `90%` assertion in `sync-outbox.test.ts`, which no re-wording of
+the count clause would break. ⚠️ **And the triage has already harvested that wrong file into the collision
+graph**, so `D13` has been batching the row against a file its repair never opens.
+
+✅ **NONE OF THIS CHANGES THE RECOMMENDATION — OPTION 1 — IT STRENGTHENS IT**, and it removes option 2
+from contention on two independent grounds rather than one. ⚠️ **`M86` NEARLY FILED THIS A SECOND TIME AS
+A NEW DECISION**, because the `M77` row says *"a product decision nobody has taken"* and cites nothing.
+**A row that names a decision without naming WHICH one costs the next increment exactly the
+re-derivation this entry exists to prevent** — and the roster is now long enough that the collision is
+not obvious. Corrected in the ledger: that row now names this entry.
+
+---
+
+### D20 — The service worker caches a credential-bearing resume shell, where the credential IS the cache key. Purge it, keep it, or split the difference? **2 — cache the resume shell under a token-free key.**
+
+**Answered 2026-09-20 (user decision, in chat), recorded by Lane A during `M105` — 2.**
+
+**Filed 2026-09-06 by Lane A, during `M78`, at the moment the row's two stated blockers were both
+measured dead and a real trade was found underneath them.** The row (`M70`) asks to stop caching
+`/f/resume/{token}`. Its two reasons for not doing so are now known to be false, and what replaced them
+is a genuine product question rather than an engineering one — which is why this is here and not in the
+diff.
+
+**The exposure, measured.** `GET /api/v1/public/drafts/{resumeToken}` carries **no auth middleware**; the
+token in the path is the whole credential, and the response is the respondent's full answer map **plus a
+freshly minted share token**, so it is a write credential too. The resume navigation is cached under
+`guest-shell-html` on a seven-day clock. ⛔ **Cache Storage is ORIGIN-scoped, not per-document, and the
+token is the cache KEY** — so any same-origin script can run
+`caches.open('guest-shell-html').keys()` and enumerate every resume token on the device **without reading
+a single response body**. Stripping `data-resume-token` from the HTML would therefore not close it.
+
+**What purging actually costs, measured — and it is not what the row says.** *"It costs offline resume
+access outright"* is **false**: `App.vue`'s `loadResume()` opens with a bare fetch to a path no
+service-worker route matches, so offline it rejects and the IndexedDB read two calls downstream is
+unreachable. **A cached resume shell has never rendered the form offline.** What it does carry is the app
+shell, the offline indicator and the always-render sync surface — including the *"Sync now"* action
+`docs/non-functional-requirements.md` §7 makes the iOS Background-Sync fallback. ⚠️ **For a respondent who
+only ever opened an emailed link, that entry is their ONLY cached navigation**, so purging it costs them
+the entire offline surface, not the form.
+
+**Three real options.**
+
+1. ⭐ **Purge the resume shell from the cache, and accept that a resume-link-only respondent has no offline
+   surface.** One predicate on the shell route. ⚠️ It is **not** a two-line change: it makes
+   `isResumeShell()` in `lib/brand-cache.ts` guard a condition that can no longer arise, turning its three
+   dedicated cases **vacuously green** — the succeeds-on-empty-input shape this repository gates against
+   everywhere, and the exact predicate `M75` worked to make load-bearing. Those cases must be deleted or
+   explicitly re-labelled as unreachable in the same PR. ⚠️ And resolving them makes the row cite
+   `brand-cache.test.ts`, the one non-hub file the open second-writer row already cites, so under `D13` the
+   two rows can no longer share a batch — the situation `M74` deliberately refused to create.
+2. **Keep the write and close the enumeration instead** — cache the resume navigation under a
+   **token-free key** (rewrite the cache key to a constant like `/f/resume/`, serving the shell from a
+   single entry) so `keys()` leaks nothing and the offline surface survives. Costs: one shell serves every
+   resume session on the device, so the brand-refresh sweep and the seven-day clock both become per-device
+   rather than per-link, and `isResumeShell()` stays meaningful. This is the option the row never
+   considered, and it is the only one that keeps both properties.
+3. **Do nothing and record the exposure as accepted**, on the grounds that reading it already requires
+   same-origin script execution on the tenant origin — i.e. an XSS or a compromised bundle, at which point
+   the attacker can read the live token from the page anyway. ⚠️ The counter-argument is durability: the
+   cache holds **every** resume token the device has seen for seven days, where the page holds one.
+
+**Recommendation: option 2, and it is not close.** Option 1 trades a real, documented accessibility
+fallback for a threat that requires same-origin code execution, and it does so while manufacturing three
+vacuous tests and a batching conflict. Option 3 leaves a seven-day, device-wide credential store in place
+for no benefit once option 2 is known to exist. Option 2 removes the enumeration primitive — which is the
+part that turns one compromised session into every resume link on the device — while keeping the offline
+surface the requirements commit to. ⚠️ **It needs its own measurement before being taken**: whether a
+constant-key shell breaks the resume boot's own `data-resume-token` read, since the served HTML would then
+be some *other* session's. If it does, option 1 becomes the fallback and its three vacuous tests must be
+handled as described.
+
+**Until this is answered**, `resources/public-runtime/__tests__/sw.test.ts` pins the current behaviour
+explicitly — one arm asserts the resume shell IS matched today, labelled as a pinned exposure rather than
+an endorsement, so the state cannot drift silently in either direction.
+
+---
+
+### D28 — Should `MdsSegmentedControl` get a component-level wrap or shrink affordance, or should its four stretch-clamped hosts keep guarding themselves? **3 — leave the component alone and guard at the host.**
+
+**Answered 2026-09-20 (user decision, in chat), recorded by Lane A during `M105` — 3.**
+
+**Filed 2026-09-08 by `M87`, while closing the census row that measured the answer's inputs.** Recorded
+here rather than taken, because the cheapest correct fix touches **13 call sites** and the only instrument
+that can verify it is an e2e run in the container — so this is a change whose blast radius exceeds what the
+increment that found it can honestly validate.
+
+**What is now measured, and it is why the row can be closed while this stays open:**
+
+| | |
+|---|---|
+| Call sites | 13, across 9 files |
+| Stretch-clamped hosts | **4** — `.config__group`, `.mds-field` (members ×2), `.sheets-fields`, `.encode-field` |
+| …of those, inside an `overflow-y: auto` box | **4 of 4** — `.config` for the first, `.mds-modal__body` for the other three |
+| …with any e2e coverage | **1** (the builder pane, and only through a document-level assertion that cannot see it) |
+| `flex-shrink: 1` on `__seg` | a **no-op** — the initial value, and absent from the tree |
+| The 30px | **unprovenanced** — no test, fixture or snapshot records it |
+
+⛔ **EVERY ONE OF THE FOUR ABSORBS ITS SPILL INTO A SCROLLBAR NOBODY LOOKS FOR**, which is why no gate has
+ever reported this and why "is it real today" cannot be answered from the tree. `.app-shell__content`
+measures 0 everywhere — the wrong box.
+
+**The options:**
+
+1. **`flex-wrap: wrap` on `.mds-segmented`.** Covers all four hosts at once and every call site with them.
+   ⚠️ The stated reason this was ruled out — *"`.topnav` is a fixed 64px with `flex-shrink: 0`"* — is
+   **stale**: that instance collapses to glyphs at ≤1024 and is `display: none` at ≤899, so it never
+   reaches a width where a wrap could grow the bar. Cost: a 13-call-site visual re-measure.
+2. **`min-width: 0` plus an `overflow` escape on `.mds-segmented__seg`.** Also component-level. ⚠️
+   `min-width: 0` **alone is incomplete**, not merely conservative: `__seg` carries no `overflow` and its
+   span no `text-overflow`, so it converts a fieldset-level spill into a text-level one that still extends
+   the container's scrollWidth. Adding `white-space: nowrap` to make an ellipsis work would change wrapping
+   at all 13 sites, which is the same blast radius as option 1 with less of the benefit.
+3. ✅ **Leave the component alone and guard at the host, as one host already does. Recommended.**
+   `resources/js/Pages/Settings/Index.vue` solves this exact problem with `align-items: center` plus a
+   `min-width: 0; max-width: 100%` rule on its non-text children, **with a comment saying so**, and three
+   call sites are protected by it today. It is the smallest change, it needs no re-measure of the nine
+   unaffected sites, and it is already proven in this codebase. ⚠️ Its honest cost: four hosts must each
+   remember, and the fifth one written next year will not — which is the argument for 1 or 2, and it is a
+   real one.
+
+⚠️ **Whichever is chosen, the instrument comes first.** A ~6-line element-level Playwright assertion on
+`.config`, in the shape `personalization-axe.spec.ts` already uses twice, decides whether the spill exists
+at CI's font stack — and it is the only thing that can, because the dev host never loads the dyslexia face.
+**It is not shipped here deliberately**: added blind it would either merge green and prove nothing or go
+red and block an increment on a question nobody has answered. It belongs with whichever option is taken.
+
+---
+
+### D33 — May a workspace admin invite any email address, or only addresses at a verified company domain? **A — keep inviting anyone.**
+
+**Answered 2026-09-20 (user decision, in chat), recorded by Lane A during `M105` — A.**
+
+**Filed 2026-09-14 by `M93`, from Decision Board card `invite-domain`.** The ledger row it answers says in its
+own words that applying a domain check is *"a product decision, not a cleanup"*: `MemberController::invite()`
+validates the address and a role, with no domain-ownership check. An invitation grants nothing until it is
+accepted, but it can put the product's mail in a stranger's inbox.
+
+- **A — keep inviting anyone.** Contractors and personal addresses keep working; watch invitation volume on
+  the testing server.
+- **B — only verified company domains.** Refuses outside addresses unless the domain is verified, which changes
+  what inviting means for every workspace.
+
+**Recommendation: A.** An unaccepted invitation grants no access, and B would block ordinary use such as
+contractors.
+
+---
+
+### D34 — Must a new account confirm its email address before that address counts as its own? **A — confirm first.**
+
+**Answered 2026-09-20 (user decision, in chat), recorded by Lane A during `M105` — A.**
+
+**Filed 2026-09-14 by `M93`, from Decision Board card `self-signup-email`.** Self-registration can occupy an
+address the registrant does not control until the real owner resets the password. Nothing forges
+`email_verified_at`, so the squatter takes over nothing — but any fix touches the ordinary registration path for
+everybody.
+
+- **A — confirm first.** The address is not the account's own until the emailed link is clicked. Stops the
+  squatting, at one extra step for everyone.
+- **B — keep it as it is.** No extra step; the real owner reclaims the address with a password reset.
+
+**Recommendation: A** — the standard protection, and it matters most once outsiders can reach a server.
+
+---
+
+### D35 — Should form authors get a setting to show a form on one page instead of step by step, and which is the default? **A — add the setting, default step by step.**
+
+**Answered 2026-09-20 (user decision, in chat), recorded by Lane A during `M105` — A.**
+
+**Filed 2026-09-14 by `M93`, from Decision Board card `single-page-mode`.** The runtime can render a single-page
+form, but `forms.single_page_mode` has no writer outside the seeders, and its documented default disagrees across
+four documents — the PRD says single page should be the default.
+
+- **A — add the setting, default step by step.** Existing forms look exactly as they do today.
+- **B — add the setting, default one page.** Matches the PRD; new forms open as a single page.
+- **C — remove single-page mode.** Drop the unused capability and correct the documents instead.
+
+**Recommendation: A** — authors get the choice without changing what testers already see.
+
+---
+
+### D36 — When staff correct a submitted response, should their edits be kept automatically as they type? **A — keep saving on the button, and document that corrections are not resumable.**
+
+**Answered 2026-09-20 (user decision, in chat), recorded by Lane A during `M105` — A.**
+
+**Filed 2026-09-14 by `M93`, from Decision Board card `correction-autosave`.** A correction is kept only when
+Save is pressed; the page already warns before leaving, so work is lost only to a browser crash. The ledger row
+it answers says the gap is an endpoint that does not exist plus a decision nobody has taken.
+
+- **A — keep saving on the button.** No change. Each save sends an approved response back for review and is
+  audited once.
+- **B — a working copy kept as staff type.** Review status and the audit log change only on the final save. A
+  second save path to build.
+
+**Recommendation: A** — loss is already limited to a crash, and B needs a whole second save path.
+
+---
+
+### D37 — If someone loses the device they use for two-step sign-in and has no recovery codes, how do they get back in? **A — an admin reset, recorded in the audit log.**
+
+**Answered 2026-09-20 (user decision, in chat), recorded by Lane A during `M105` — A.**
+
+**Filed 2026-09-14 by `M93`, from Decision Board card `twofa-recovery`, and from `docs/security-threat-model.md`
+§9.** Today there is no way back without an operator editing the database: disabling two-factor sits behind
+`auth` and `password.confirm`, and the super-admin console offers no reset. Testers who turn two-step sign-in on
+could lock themselves out.
+
+- **A — an admin reset, recorded in the audit log.** A workspace owner or the platform operator clears the
+  enrolment, and the reset is audited.
+- **B — re-verify by email.** The person proves they own the address, then enrols again. More to build.
+- **C — support only.** Keep it manual, and say so on the challenge screen.
+
+**Recommendation: A** — the simplest safe path for testing, and every reset leaves an audit record.
+
+---
+
+### D54 — The testing site sends no `Strict-Transport-Security` header. What `max-age` should it commit to, and does the vhost or the application send it? **A — `max-age=300`, in the vhost, no `includeSubDomains`, no `preload`.**
+
+**Answered 2026-09-20 (user decision, in chat), recorded by Lane A during `M105` — A.**
+
+**Filed 2026-09-19 by `M101`, which took the sibling `X-Robots-Tag` row and would not guess this one.** `R-06228b4f`
+says in terms that *"the remedy is a decision before it is a header"* and then carried no `Awaits` token, so
+`docs/pipeline.md` published it as **ready** and any session could have taken it and chosen a number on the user's
+behalf. On a `.gov.ph` host HSTS is a commitment made to the **browser**, not to us: once sent, a failed renewal
+becomes a hard block with no click-through for as long as the `max-age` says, and this box's renewal has already
+failed eleven times in one day (`D49`) and rests on a scheduled task that is about 59 days from its first real
+exercise. `preload` must not be sent at all while the name is a staging host, and that is not in question here.
+
+**What was measured for this entry, on 2026-09-19, from outside the agency network:**
+
+- `Strict-Transport-Security` is **absent** from `/`, `/login`, `/up`, `/robots.txt`, `/favicon.ico` and a 404 —
+  and the strings `Strict-Transport-Security` and `HSTS` appear **nowhere in the tracked tree**.
+- ⚠️ **Port 80 has no listener.** A connection from outside times out after 21 seconds. So there is no plaintext
+  downgrade path on this box for HSTS to protect against, except an active attacker who opens one. **That narrows
+  the benefit; it does not narrow the cost**, which is unchanged. ⛔ **CORRECTED BY `M102` (2026-09-19), WHICH READ THE BOX INSTEAD OF PROBING IT FROM OUTSIDE: THE FIRST SENTENCE OF THIS BULLET IS FALSE.** `httpd.conf` carries an uncommented `Listen 80`, and `httpd -S` maps a live `*:80` vhost for `staging.pitahc.gov.ph` to `confxtra\httpd-vhosts.conf` at `:47`, serving a `Redirect permanent` to the `https://` origin. **There IS a listener and there IS a plaintext request**; the 21-second timeout measured the agency firewall, not the server. So an internal tester who types the bare hostname makes exactly the cleartext round-trip HSTS exists to remove, and the benefit is wider than this bullet says — narrower than a public host, but not nil. ⚠️ **This corrects an input, not the recommendation: `A` still stands**, and if anything it stands more firmly, because there is now a real downgrade path for a short `max-age` to close.
+- ✅ **HSTS is HOST-scoped, and this is what separates it from the sibling row.** One response carrying it covers
+  the whole origin, so the application is an adequate home for it — the exact opposite of `X-Robots-Tag`, which is
+  response-scoped and had to stay in the vhost because Apache serves `/robots.txt` without invoking PHP at all.
+- ⚠️ **But there is no precedent in this tree for an environment-conditioned response header** — zero instances
+  across `app/`, `config/`, `bootstrap/` and `routes/` — and `AppSecurityHeaders` is mounted per route group at ten
+  sites, never globally, because a global mount would break every embed. So the application arm means a **new,
+  separate, globally-appended middleware**, not a line added to the existing one.
+
+- **A — a deliberately short `max-age`, in the vhost beside the existing `X-Robots-Tag` line.** `max-age=300`, no
+  `includeSubDomains`, no `preload`. A lapsed certificate then hard-blocks a tester for five minutes rather than a
+  year, the mechanism is exercised before production ever needs it, and it needs no new pattern. It also arms for
+  free under the gate `M101` just built: adding it is one entry in `STAGING_REQUIRED_HEADERS`. Cost: the value
+  lives on the box, un-versioned, which is the very thing `R-562bcc2a` was about — mitigated by that gate, not
+  removed by it.
+- **B — a conventional `max-age=31536000`, in the vhost.** The strongest posture and the one a scanner expects. It
+  is also the most damaging thing on this list if a renewal ever lapses mid-testing: a year of un-clickable-through
+  failure on a `.gov.ph` address, for every tester who ever visited.
+- **C — send nothing on staging; build a global middleware enabled for production only.** Production inherits a
+  versioned, tested header and the testing site keeps its click-through. Costs a middleware, a registration in
+  `bootstrap/app.php`, and the first environment-conditioned header in this repository — and leaves the testing
+  site with no HSTS at all, which a security review will ask about.
+
+**Recommendation: A.** The measured inputs push the same way. The benefit here is narrower than the row assumes,
+because there is no port 80 to downgrade from; the cost of getting it wrong is a hard block on the exact people the
+site exists for; and a five-minute commitment buys the posture while bounding the blast radius to minutes. ⚠️ **A
+and C are not exclusive** — A is the right answer for *this box now*, and C is the right answer for production
+later, which is a separate row rather than a second option here. ⛔ **Whatever is chosen, it must not be `preload`.**
+
+---
+
 ### D49 — The testing site's certificate expires 2026-10-13, and no renewal path in the checklist can validate while inbound 443 stays shut. What renews it? **A — open inbound 443, and `tls-alpn-01` renews it.**
 
 **Answered 2026-09-18 (user decision, in chat), recorded by Lane A during `M100` — A.**

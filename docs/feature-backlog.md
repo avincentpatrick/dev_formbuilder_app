@@ -646,7 +646,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   honest fix is a wrap or shrink affordance on a design-system component with **nine** consumers, and
   `flex-wrap` is foreclosed for the topnav instance (`.topnav` is a fixed 64px with `flex-shrink: 0`),
   so it needs its own increment with a story, a DSR note and a re-measure of every consumer under the
-  Linux font stack. **Live**, and now reproducible locally. Filed by `M19`. **Awaits D28.** **Tier: early-testing.**
+  Linux font stack. **Live**, and now reproducible locally. Filed by `M19`. **Tier: early-testing.** ⚠️ **`D28` ANSWERED 2026-09-20 (`M105`) — leave the component alone; the four stretch-clamped hosts guard themselves.**
   ⛔ **CORRECTED BY `M87` (2026-09-08) — THE CENSUS, ONE CANDIDATE REMEDY AND THE 30px ARE ALL WRONG, AND
   THE REASON THE HONEST FIX WAS RULED OUT IS STALE.** The `M78` row that measured this is now closed and its
   findings are here rather than one document away.
@@ -1409,7 +1409,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `conflictHere` beside it are all visit-scoped — so a respondent can read three consecutive sentences whose
   numbers only reconcile if they count a stranger's rows. Filed rather than fixed: it discloses a count and
   nothing else, which is exactly the shape ADR-0021 sanctioned for an earlier visit, and touching the
-  device-wide count risks the boot drain that ADR-0021 makes load-bearing. **Live.** Filed by `M21`. **Awaits D26.** **Tier: early-testing.**
+  device-wide count risks the boot drain that ADR-0021 makes load-bearing. **Live.** Filed by `M21`. **Tier: early-testing.** ⚠️ **`D26` ANSWERED 2026-09-20 (`M105`) — say what the line counts — *"N responses across all sessions on this device"*.** ⛔ **AND THIS ROW'S STATED BLOCKER IS FALSE, WHICH `M105` RECORDS HERE BECAUSE NOTHING EVER DID.** *"Touching the device-wide count risks the boot drain that `ADR-0021` makes load-bearing"* is refuted: the boot trigger reads `pending.value` alone, `queued` is a local `const` whose only consumer is the warning string, and no candidate remedy goes near `listPending`/`retryAll`. `M77` reached that independently and filed `R-d6609e82` to say so; `D26` escalates it to ⛔. This row went on publishing the refuted blocker as its whole rationale for four increments.
 
 - ~~**`minor` · Resume-link shells sit in Cache Storage, and the brand refresh re-fetches them.**~~ A resume
   link is a path under `/f/`, and `sw.ts` NetworkFirst-caches every same-origin navigate under `/f/` into
@@ -2446,7 +2446,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   obvious shape to reuse (`SsoDomainService::isVerifiedFor()` is already phrased over an address), but applying
   it here is a **product decision, not a cleanup**: today any workspace may invite anyone, including
   contractors and personal addresses, and gating that on DNS would change what invitation means for every
-  workspace rather than only for SSO ones. Whoever takes it decides that first. Filed by `M18`. **Live** — reachable today: invite validates address shape only, so a workspace can send a branded invitation to an address it does not control and occupy that identity, judged by `M65`. **Awaits D33.** **Tier: early-testing.**
+  workspace rather than only for SSO ones. Whoever takes it decides that first. Filed by `M18`. **Live** — reachable today: invite validates address shape only, so a workspace can send a branded invitation to an address it does not control and occupy that identity, judged by `M65`. **Tier: early-testing.** ⚠️ **`D33` ANSWERED 2026-09-20 (`M105`) — keep inviting anyone.**
 
 - **`minor` · Self-registration remains a way to occupy an address in a domain you do not control.** Filed
   2026-08-26 by M18, recorded because §D34's *"an active membership is the grandfather"* reasoning depends on
@@ -2455,7 +2455,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   it. ⚠️ **Materially weaker than what M18 closed, and the difference is what makes it a `minor`**: the
   registrant sets their own password and **nothing forges `email_verified_at`**, so the account squats an
   address without minting a false claim about mailbox control — which is the property `identityIsEstablished()`
-  reads. Older than SSO, and any fix touches the ordinary registration path for everybody. Filed by `M18`. **Live** — reachable today by anyone who can reach the registration form, judged by `M65`. **Awaits D34.** **Tier: early-testing.**
+  reads. Older than SSO, and any fix touches the ordinary registration path for everybody. Filed by `M18`. **Live** — reachable today by anyone who can reach the registration form, judged by `M65`. **Tier: early-testing.** ⚠️ **`D34` ANSWERED 2026-09-20 (`M105`) — confirm the address first.**
 - ✅ **CLOSED BY `M9` (2026-08-24) — `major` · ~~SSO adopts an existing account whenever a PENDING INVITATION exists, so an SSO-entitled
   admin can be signed in as any stranger they invited — no emailed token required.** Found by M8's
   adversarial pass and **verified against the code by hand before filing**; it is the same conflation M8
@@ -5891,7 +5891,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
  ⚠️ **And the cheaper half of the exposure is not in `sw.ts` at all:** the resume READ
   escapes caching only because its path prefix is `drafts/` rather than `f/`; `routes/api.php` now says so
   at the site, and one route rename or a consolidation of the two public groups re-opens it. **Live.**
-  Filed by `M70`. **Awaits D20.** **Tier: early-testing.**
+  Filed by `M70`. **Tier: early-testing.** ⚠️ **`D20` ANSWERED 2026-09-20 (`M105`) — cache the resume shell under a token-free key.** ⚠️ **Two things the answer does NOT settle, both filed by `M105`:** option 2 needs its own measurement first — whether a constant-key shell breaks the resume boot's own `data-resume-token` read, since the served HTML would then be some *other* session's; and the cheaper half of the exposure is untouched, because the resume READ escapes caching only by its `drafts/` path prefix, so one route rename re-opens it.
 
 - **`minor` · The audit spec's §1 table is asserted by nothing, and a static sweep cannot be the thing that
   asserts it.** `docs/audit-compliance-logging-spec.md` §1 calls itself *"a definitive, checkable list"*;
@@ -6894,7 +6894,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   warned rather than silently losing work, but an hour of transcription still lives only in the tab.
   👤 **The decision is the user's**: a draft-shaped side table for in-progress corrections, an explicit
   "save a working copy" action, or a documented statement that corrections are not resumable. **Live.**
-  Filed by `M75`. **Awaits D36.** **Tier: early-testing.**
+  Filed by `M75`. **Tier: early-testing.** ⚠️ **`D36` ANSWERED 2026-09-20 (`M105`) — keep saving on the button, and document that corrections are not resumable.**
 
 - **`minor` · `CLAUDE.md`'s gate table sends PHPStan to the container, one row below the rule that explains
   why the container is wrong.** Measured by `M76` (2026-09-06) while closing the 18-phantom-errors row.
@@ -7154,7 +7154,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   (*"across all sessions on this device"*, a visit-scoped count, or no number at all), it is genuinely the
   user's, and it changes a string another increment deliberately pinned in `sync-status.test.ts`. Whoever
   takes it should render the panel before rewording it — `M15`'s note says that is what caught it last
-  time. **Live.** Filed by `M77`. **Awaits D26.** **Tier: early-testing.**
+  time. **Live.** Filed by `M77`. **Tier: early-testing.** ⚠️ **`D26` ANSWERED 2026-09-20 (`M105`) — say what the line counts — *"N responses across all sessions on this device"*.**
   ⛔ **EVIDENCE CORRECTED BY `M86` (2026-09-07) WITHOUT CLOSING THE ROW — THE CITATION THIS ROW MAKES ABOUT
   ITS OWN COST IS FALSE.** It says a re-aim *"changes a string another increment deliberately pinned in
   `sync-status.test.ts`"*. That file carries **no quota assertion and structurally cannot**: its fixture
@@ -7445,7 +7445,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `docs/data-dictionary.md:221` say `false`. `docs/ux/form-filling-ux-flow.md:337` calls `true` "the literal
   default for a new form" and `docs/PRD.md:103` agrees. So repairing one pair does not settle it. ⚠️ The
   cost is already on the record: `PROGRESS_ARCHIVE.md:297` logs an E2E timeout caused by the seeded form
-  defaulting to multi-step. **Live.** Filed by `M80`. **Awaits D35.** **Tier: early-testing.**
+  defaulting to multi-step. **Live.** Filed by `M80`. **Tier: early-testing.** ⚠️ **`D35` ANSWERED 2026-09-20 (`M105`) — add the setting, default step by step.** ⚠️ **The answer settles the setting, not the documents.** Four of them hold two incompatible defaults — the migration and `docs/data-dictionary.md:221` say `false`; `docs/ux/form-filling-ux-flow.md:337` and `docs/PRD.md:103` say `true` — and whoever takes this row reconciles all four. Measured by `M105`.
 
 - **`minor` · `forms.allow_manual_encoding` is documented as Feature #7's capability flag and has neither a
   reader nor a writer — the only one of five inert `allow_*` flags whose feature actually shipped.**
@@ -7508,7 +7508,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   two endpoints and any status read. ⚠️ **It is also not specific to exports** — `PATCH /tenant`, form
   write CRUD, the draft group, `GET/PATCH/DELETE /submissions/{submission}`, attachments, `users`/`roles`
   and `subscription` are absent from `routes/api.php` the same way, and the sibling rows in this block name
-  them. **Live.** Filed by `M80`. **Awaits D38.** **Tier: early-testing.**
+  them. **Live.** Filed by `M80`. **Tier: early-testing.** ⚠️ **`D38` ANSWERED 2026-09-20 (`M105`) — mark the six as not built, in place, rather than trimming the documentation.**
 
 - **`minor` · The documented `Users & roles` API resource group (`GET/POST /api/v1/users`, `/api/v1/roles`)
   has zero routes, and a shipped schema decision was already paid for it.** Measured by `M79`'s sweeps
@@ -7525,7 +7525,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   deferral**: `docs/multi-tenancy-rbac-design.md:712` defers the request/response *shapes* to Doc #14, and
   `docs/api-specification.md:13` points straight back at §7.1 as the authoritative inventory. Neither
   defers the build. This repository builds `/api/v1` twins deliberately — `routes/tenant.php:755` says
-  so — so the web surface does not discharge it. **Live.** Filed by `M80`. **Awaits D38.** **Tier: early-testing.**
+  so — so the web surface does not discharge it. **Live.** Filed by `M80`. **Tier: early-testing.** ⚠️ **`D38` ANSWERED 2026-09-20 (`M105`) — mark the six as not built, in place, rather than trimming the documentation.** ⛔ **THIS IS THE ROW THAT MADE THE ANSWER `C` RATHER THAN `A`.** `D38`'s premise sentence *"nothing shipped depends on them"* is false here: the documented `GET /api/v1/roles` is the stated reason roles use UUIDv7 primary keys rather than Spatie's bigints, cited at `docs/multi-tenancy-rbac-design.md:56`, `app/Models/Role.php:13` and `config/permission.php:20-21`. **That schema shipped**, so a plain trim orphans the rationale for a decision already paid for.
 
 - **`minor` · §7.1's `Form draft` row pins four `/api/v1` builder endpoints registered nowhere, and the
   `validations` sub-resource exists on neither surface.** Measured by `M79`'s sweeps (2026-09-06), joined
@@ -7543,10 +7543,10 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `routes/tenant.php:552` with **no** PATCH-the-draft twin anywhere in that block, and:
   ⛔ **THE SHARPER FINDING THE SWEEP MISSED:** `.../fields/{field}/validations` exists on **neither**
   surface. Validations are written inline from the field payload —
-  `app/Services/Forms/FormBuilderService.php:157`, `:322` and `:331` — so nothing in the tree implements
+  `app/Services/Forms/FormBuilderService.php:240`, `:276`, `:316-318` and `:572` — so nothing in the tree implements
   them as an addressable resource at all. ⚠️ Adjacent and deliberately in scope of the same repair:
   `docs/architecture/technical-architecture.md:441` also pins `POST /api/v1/forms` and
-  `PATCH/DELETE /api/v1/forms/{form}`, and only the two GETs exist. **Live.** Filed by `M80`. **Awaits D38.** **Tier: early-testing.**
+  `PATCH/DELETE /api/v1/forms/{form}`, and only the two GETs exist. **Live.** Filed by `M80`. **Tier: early-testing.** ⚠️ **`D38` ANSWERED 2026-09-20 (`M105`) — mark the six as not built, in place, rather than trimming the documentation.**
 
 - **`minor` · The parity matrix scores API/programmatic import as Phase-1 shipped, and the code's own enum
   docblock calls it a later channel.** Measured by `M79`'s sweeps (2026-09-06), joined and refuted by
@@ -7666,7 +7666,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   long closed — and it was never converted into a queue row, nor were its three siblings from the same
   sentence. `docs/api-specification.md:304` is §4 Out of Scope and does not carry it. That archive note is
   the record of a deferral nobody filed, which is exactly what this row corrects. **Live.**
-  Filed by `M80`. **Awaits D38.** **Tier: early-testing.**
+  Filed by `M80`. **Tier: early-testing.** ⚠️ **`D38` ANSWERED 2026-09-20 (`M105`) — mark the six as not built, in place, rather than trimming the documentation.** ⚠️ **`M105` re-measured one clause:** *"exactly two hits repository-wide"* now returns six, because the ledger rows quoting the sentence are themselves hits. The two substantive hits are unchanged. Note also that `PROGRESS_ARCHIVE.md:322` records `Idempotency-Key (§2.4) deferred` — this is a **lapsed deferral**, not an unbacked promise.
 
 - **`minor` · The per-endpoint `include_answers: true` webhook payload opt-in has no key anywhere — and
   four other files appear to record it as a deferral already taken.** Measured by `M79`'s sweeps
@@ -7735,8 +7735,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   **Prior: 73% of the judged cohort from these same sweeps was rejected**, so verify before taking. The
   sweep's evidence: `docs/api-specification.md:73` pins the figure, and the literal returns one hit — that
   row. ⛔ **THE ENUMERATION MUST NOT BE READ AS A CENSUS, AND `M80` CORRECTED IT BEFORE FILING:** the sweep
-  named eight limiter sites; the tree actually holds **24** `RateLimiter::for()` registrations across three
-  providers — 14 in `app/Providers/AppServiceProvider.php`, 9 in `app/Providers/FortifyServiceProvider.php`
+  named eight limiter sites; the tree actually holds **26** `RateLimiter::for()` registrations across three
+  providers — 14 in `app/Providers/AppServiceProvider.php`, 10 in `app/Providers/FortifyServiceProvider.php`
   and one job limiter at `app/Providers/QueueServiceProvider.php:64` that the sweep never named. The
   representative case is `app/Providers/AppServiceProvider.php:377` (`api`, 600/min); every other
   registration was read for its per-minute value and none is 300, none is user-keyed at that figure.
@@ -7748,7 +7748,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `app/Providers/AppServiceProvider.php:374` records that `throttle:api` is priority-sorted *ahead of*
   authentication, so `$request->user()` is unresolved inside that closure and it keys on the token hash — a
   per-user 300/min limiter has to solve that ordering rather than copy the `api` shape. **Live.**
-  Filed by `M80`. **Awaits D38.** **Tier: early-testing.**
+  Filed by `M80`. **Tier: early-testing.** ⚠️ **`D38` ANSWERED 2026-09-20 (`M105`) — mark the six as not built, in place, rather than trimming the documentation.**
 
 - **`minor` · `export_artifact` objects are documented as auto-deleted seven days after generation, and no
   scheduled cleanup task is declared.** Measured by `M79`'s sweeps (2026-09-06). ⛔ **UNJUDGED — the
@@ -7817,7 +7817,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   its table neighbours: this is a **concurrency** promise, so a limiter audit that checks `RateLimiter::for`
   definitions passes straight over it. ⚠️ Pairs with the async-export row above —
   `docs/architecture/technical-architecture.md:469` opens §7.3 and defines both export modes, and neither
-  is built. **Live.** Filed by `M80`. **Awaits D38.** **Tier: early-testing.**
+  is built. **Live.** Filed by `M80`. **Tier: early-testing.** ⚠️ **`D38` ANSWERED 2026-09-20 (`M105`) — mark the six as not built, in place, rather than trimming the documentation.**
 
 - ~~**`minor` · `PROGRESS.md` is within roughly one status bullet of its `tracker-lint` R1 byte ceiling, and
   the two surfaces a session actually reads before pushing both stay silent about it.**~~
@@ -9580,14 +9580,14 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   seeded role catalog. The remedy is an operator command beside the first-super-admin one, writing all four.
   **Live.** Filed by `M93`. **Tier: before-testing.** ✅ **CLOSED BY `M95` (2026-09-14) — "ALL FOUR" WAS SIX WRITES, AND THE OWNER CANNOT BE INVITED.** `php artisan tenants:create <slug> "<name>" <owner> --plan=<tier>` writes, in one transaction on the application connection: a verified owner when the address is new; the tenant, with `tenants.owner_user_id` in the INSERT (every Owner guard keys on that pointer, and a hand-provisioned dev workspace without it lets an Admin remove its Owner); the subdomain label; the default subscription; the owner membership and its role row; and `MemberJoined`. It then checks every postcondition after commit. A new `SubdomainLabel` rule refuses a slug the runtime cannot route. An identical re-run writes nothing, and any other existing state is refused rather than repaired. An owner cannot come from an invitation (`cannotInviteAsOwner`), so an unverified, deleted or platform super-admin account is refused as owner. No audit row is written; that gap is recorded as a before-launch row. Twenty-one Pest cases, including the new owner loading the workspace dashboard; six mutations, all CAUGHT.
 - **`minor` · The central landing page offers "Create a workspace", and the account it creates has no
-  workspace and lands on a 404.** Measured by `M93` (2026-09-14). While sign-up is open — the platform
+  workspace and is redirected straight back to the central host it just came from.** Measured by `M93` (2026-09-14). While sign-up is open — the platform
   default — `resources/js/Pages/Welcome.vue` links to the registration page. A central-host registration
   belongs to no workspace, Fortify then redirects to `/dashboard`, and that route exists only in
   `routes/tenant.php`, so the central host answers 404. ⚠️ **The invitation-only testing setting avoids it
   without code**, and the sign-up decision was answered invitation-only in chat on 2026-09-14, so the testing
   server avoids it and this row stays early-testing, while a default install still reaches it. The fix is to relabel or hide the button
   until a self-serve workspace exists, which is now an open decision, or to land such an account on a page that says it has none yet.
-  **Live.** Filed by `M93`. **Awaits D44.** **Tier: early-testing.** ⚠️ **Corrected by `M96` (2026-09-15), which verified the row without taking it:** the symptom is not a 404. The central host renders the tenant route's `NotASubdomainException` as a redirect to `APP_URL`, so a signed-in account lands back on the guest landing page, whose Sign in and Create links send it round again, with no message and no way to sign out; `CentralHostFallbackTest` pins the redirect. The loop follows every central sign-in, including a member of one or several workspaces and a super-admin, not only a new registration, so relabelling the button fixes nothing, and the testing server reaches it whenever a tester signs in at the central address (checklist step L1 tells testers not to). The last line of `docs/ACCESS-MATRIX.md`'s central-host warning block, written by `M95`, repeats the false 404, and `tests/e2e/auth-axe.spec.ts` cites `config/fortify.php` two lines above its `home` key. The remedy that holds under every answer to D44 is an authenticated central page listing the account's workspaces, each linked to its own sign-in address, with a super-admin sent to the console and an unverified account to the verification notice.  ⚠️ **Corrected again by `M98` (2026-09-18), which verified the row without taking it:** two premises of the amendment above do not hold on this server, and the tier follows from them. `resources/js/Pages/Welcome.vue` already hides "Create a workspace" while sign-up is closed — a `v-if` on `registrationOpen`, fed by `PlatformLandingController` — so once the checklist turns the switch off, the row's headline symptom is simply absent there and only the sign-in loop is left. The checklist step cited as telling testers not to sign in at the central address DOES NOT EXIST in the checklist artifact as built on 2026-09-17; it is a stale reference, with a second copy in `docs/claims/lane-a.md`, and being off-repo it is the one half of this note that cannot be re-checked from the tree. And under `D46` a tester cannot reach the central host at all: `CENTRAL_DOMAIN=pitahc.gov.ph` resolves to the agency's own website on another machine, so only the operator, on the box, through the `hosts` line the checklist adds, reaches the app there. The row therefore bites the operator once per console sign-in, with a documented workaround, and every customer on a public central host later — `before-launch` fits the tier definitions better than the `early-testing` above, and that change is the user's to make. One ordering note for whoever takes it: branching inside the `NotASubdomainException` renderer in `bootstrap/app.php` does NOT remove the ERROR-level report, because `Routing/Pipeline` calls `report()` before `render()`; only host-aware Fortify response bindings, plus the framework's own guest-redirect hook `redirectUsersTo()` in `bootstrap/app.php`, so that `/dashboard` is never requested on the central host, remove the trigger, and otherwise the log-level fix is still needed on top. The browser-level "redirected too many times" the checklist warns of still has no code path — the traced hops are the sign-in, one redirect to `APP_URL` and a rendered page — and its cause was not measured on the server.
+  **Live.** Filed by `M93`. **Tier: before-launch.** ⚠️ **Corrected by `M96` (2026-09-15), which verified the row without taking it:** the symptom is not a 404. The central host renders the tenant route's `NotASubdomainException` as a redirect to `APP_URL`, so a signed-in account lands back on the guest landing page, whose Sign in and Create links send it round again, with no message and no way to sign out; `CentralHostFallbackTest` pins the redirect. The loop follows every central sign-in, including a member of one or several workspaces and a super-admin, not only a new registration, so relabelling the button fixes nothing, and the testing server reaches it whenever a tester signs in at the central address (checklist step L1 tells testers not to). The last line of `docs/ACCESS-MATRIX.md`'s central-host warning block, written by `M95`, repeats the false 404, and `tests/e2e/auth-axe.spec.ts` cites `config/fortify.php` two lines above its `home` key. The remedy that holds under every answer to D44 is an authenticated central page listing the account's workspaces, each linked to its own sign-in address, with a super-admin sent to the console and an unverified account to the verification notice.  ⚠️ **Corrected again by `M98` (2026-09-18), which verified the row without taking it:** two premises of the amendment above do not hold on this server, and the tier follows from them. `resources/js/Pages/Welcome.vue` already hides "Create a workspace" while sign-up is closed — a `v-if` on `registrationOpen`, fed by `PlatformLandingController` — so once the checklist turns the switch off, the row's headline symptom is simply absent there and only the sign-in loop is left. The checklist step cited as telling testers not to sign in at the central address DOES NOT EXIST in the checklist artifact as built on 2026-09-17; it is a stale reference, with a second copy in `docs/claims/lane-a.md`, and being off-repo it is the one half of this note that cannot be re-checked from the tree. And under `D46` a tester cannot reach the central host at all: `CENTRAL_DOMAIN=pitahc.gov.ph` resolves to the agency's own website on another machine, so only the operator, on the box, through the `hosts` line the checklist adds, reaches the app there. The row therefore bites the operator once per console sign-in, with a documented workaround, and every customer on a public central host later — `before-launch` fits the tier definitions better than the `early-testing` above, and that change is the user's to make. One ordering note for whoever takes it: branching inside the `NotASubdomainException` renderer in `bootstrap/app.php` does NOT remove the ERROR-level report, because `Routing/Pipeline` calls `report()` before `render()`; only host-aware Fortify response bindings, plus the framework's own guest-redirect hook `redirectUsersTo()` in `bootstrap/app.php`, so that `/dashboard` is never requested on the central host, remove the trigger, and otherwise the log-level fix is still needed on top. The browser-level "redirected too many times" the checklist warns of still has no code path — the traced hops are the sign-in, one redirect to `APP_URL` and a rendered page — and its cause was not measured on the server. ⚠️ **`D44` ANSWERED 2026-09-20 (`M105`) — operators create every workspace, and `tenants:create` stays the only path.** ⛔ **RETIERED `early-testing` → `before-launch` BY `M105` (2026-09-20), ON `D51` ANSWERED `A`.** Under `D46`, `CENTRAL_DOMAIN=pitahc.gov.ph` resolves to the agency's own website on another machine, so **no tester can reach the central host at all** — only the operator, on the box, through the `hosts` line the checklist adds. The tier that exists for what a tester meets should not hold a row no tester can reach.
 - **`minor` · No runbook rotates `APP_KEY`; rotation is only named as a manual step.** Carried out of
   `docs/security-threat-model.md` §9 by `M93` (2026-09-14), where it sat with no row. `.env.example` declares
   `APP_PREVIOUS_KEYS`, and `docs/deployment-infrastructure.md` calls rotation *"a manual runbook step"* without
@@ -9611,7 +9611,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   (2026-09-14). Disabling two-factor sits behind `auth` and `password.confirm`, which a locked-out person
   cannot pass, and the super-admin console offers no reset. Two smaller gaps sit beside it: nothing warns when
   recovery codes run low, and the seeded two-factor fixture carries an empty recovery list. The shape of the
-  escape is a product call, open as a decision. **Live.** Filed by `M93`. **Tier: early-testing.** **Awaits D37.**
+  escape is a product call, open as a decision. **Live.** Filed by `M93`. **Tier: early-testing.** ⚠️ **`D37` ANSWERED 2026-09-20 (`M105`) — an admin reset, recorded in the audit log.** ⚠️ **Two gaps this row names are NOT covered by the answer and are filed separately by `M105`:** nothing warns when recovery codes run low, and the seeded two-factor fixture carries an empty recovery list.
 - **`minor` · An SSO sign-in whose provisioning hits a missing role is answered with a redirect back towards
   the identity provider rather than the uniform refusal.** Carried out of `docs/security-threat-model.md` §9 by
   `M93` (2026-09-14). `SsoAcsController` catches only `SsoAuthenticationException`; a `MembershipException`
@@ -9765,7 +9765,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   should create a workspace is an open question in the decisions log. `SendWelcomeEmail` raises the email on
   `Verified`, so every central-host registration that confirms its address receives it. The landing page's "Create a
   workspace" row names only `Welcome.vue`, so this copy had no row. ⚠️ The testing server is invitation-only, so
-  testers do not reach it; a default install does. **Live.** Filed by `M95`. **Awaits D44.** **Tier: early-testing.**  ⚠️ **Corrected by `M98` (2026-09-18), which verified the row without taking it:** the row's caveat that testers do not reach it is too strong, and the tier hangs on that caveat. Invitation-only sign-up does stop a tester registering, but there is a tester-reachable path to the same central copy: an invitation creates a placeholder user with a random password, and nothing in `app/Actions/Fortify`, the auth requests or `FortifyServiceProvider` guards a placeholder against "Forgot password", so an invited tester who resets that password, signs in and verifies the address BEFORE accepting the invitation fires `Verified` while the membership is still Invited — and `SendWelcomeEmail` then sends precisely the no-workspace copy. INFERRED from the code and from `tests/Feature/Auth/WelcomeEmailTest.php`, which already pins that Invited branch; the path was not run. Under `D46` the copy is worse than the row says: its "Get started" button opens `APP_URL`, which is the agency's public website, and dropping the button does not cure it, because the welcome email is unbranded and its header logo links to the same place — as do every tester's password-reset and verification emails. So on the testing server the defect is latent behind that reset-and-verify path rather than unreachable, while the marker above stays right for a default install, and `during-testing` or `before-launch` fits the tier definitions better than the `early-testing` above; the wording also depends on `D44`, and both calls are the user's. The remedy's "the action is optional" is now verified rather than remembered: `resources/views/mail/notification.blade.php` wraps the button in `@isset($actionText)`.  ⚠️ **Amended by `M99` (2026-09-18), which did not take this row:** its header-logo half is **carried by `R-62fb2e05` and is done** — the welcome email's palette now takes the workspace host, and an account with no workspace gets an unlinked header rather than one pointing at the central address. What is left here is the row's own subject, the COPY: an account belonging to no workspace is told to create one, and its "Get started" button still opens the central address. Both depend on `D44`, which this row now names with an Awaits token so the line publishes it blocked rather than ready, and the tier question `M98` raised is filed as `D52`. ⚠️ The logo fix could **not** use the per-tenant palette here: that requires the tenant to match the current tenant context, and `SendWelcomeEmail` runs on Fortify's verification route with no tenancy middleware and no ambient GUC, so it would have returned the product palette and changed nothing — it builds from `TenantUrl::to()` instead, the value the listener already computes for its action URL.
+  testers do not reach it; a default install does. **Live.** Filed by `M95`. **Tier: early-testing.**  ⚠️ **Corrected by `M98` (2026-09-18), which verified the row without taking it:** the row's caveat that testers do not reach it is too strong, and the tier hangs on that caveat. Invitation-only sign-up does stop a tester registering, but there is a tester-reachable path to the same central copy: an invitation creates a placeholder user with a random password, and nothing in `app/Actions/Fortify`, the auth requests or `FortifyServiceProvider` guards a placeholder against "Forgot password", so an invited tester who resets that password, signs in and verifies the address BEFORE accepting the invitation fires `Verified` while the membership is still Invited — and `SendWelcomeEmail` then sends precisely the no-workspace copy. INFERRED from the code and from `tests/Feature/Auth/WelcomeEmailTest.php`, which already pins that Invited branch; the path was not run. Under `D46` the copy is worse than the row says: its "Get started" button opens `APP_URL`, which is the agency's public website, and dropping the button does not cure it, because the welcome email is unbranded and its header logo links to the same place — as do every tester's password-reset and verification emails. So on the testing server the defect is latent behind that reset-and-verify path rather than unreachable, while the marker above stays right for a default install, and `during-testing` or `before-launch` fits the tier definitions better than the `early-testing` above; the wording also depends on `D44`, and both calls are the user's. The remedy's "the action is optional" is now verified rather than remembered: `resources/views/mail/notification.blade.php` wraps the button in `@isset($actionText)`.  ⚠️ **Amended by `M99` (2026-09-18), which did not take this row:** its header-logo half is **carried by `R-62fb2e05` and is done** — the welcome email's palette now takes the workspace host, and an account with no workspace gets an unlinked header rather than one pointing at the central address. What is left here is the row's own subject, the COPY: an account belonging to no workspace is told to create one, and its "Get started" button still opens the central address. Both depend on `D44`, which this row now names with an Awaits token so the line publishes it blocked rather than ready, and the tier question `M98` raised is filed as `D52`. ⚠️ The logo fix could **not** use the per-tenant palette here: that requires the tenant to match the current tenant context, and `SendWelcomeEmail` runs on Fortify's verification route with no tenancy middleware and no ambient GUC, so it would have returned the product palette and changed nothing — it builds from `TenantUrl::to()` instead, the value the listener already computes for its action URL. ⚠️ **`D44` ANSWERED 2026-09-20 (`M105`) — operators create every workspace, and `tenants:create` stays the only path.** ⚠️ **The copy is settled by that answer and by `D52 = C`:** the welcome email stops offering workspace creation, and the row keeps `early-testing`. ⛔ **`M103` re-priced the harm after this row was last amended** — its `welcomed_at` once-per-person guard does not close the path (a placeholder has `email_verified_at` NULL, so the backfill skips it), but it makes the bad copy the person's **only** welcome, because accepting the invitation fires no `Verified`.
 - ~~**`minor` · The zero-gate sentence never switches off, and the gate's total shrinks.**~~ Found by `M95`
   (2026-09-14) while planning the close-out that empties the before-testing tier. `render_testing_gate()` in
   `scripts/state.php` and `render_queue()` in `scripts/next.php` each print the instruction to send the user the
@@ -9941,7 +9941,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   such as a lazily loaded component, asks for a file that no longer exists (INFERRED; the on-demand sites were
   counted, not exercised). ⚠️ Keep the previous release's chunks for a grace period, or catch a failed chunk
   load and reload the page. **Live.**
-  Filed by `M96`. **Tier: during-testing.**  ⚠️ **Re-judged by `M98` (2026-09-18), which did not take the row:** the precondition has become ordinary traffic. `DEPLOY_ENABLED` was set on 2026-09-17, so a build swap happens on every merge and every close-out push, and the nightly schedule's Deploy fires at about 08:50Z — 16:50 Philippine time, inside the testers' working day, since the scheduled CI runs were measured starting 08:27-08:33Z rather than at the 03:00Z its cron reads. A tester with the builder open across one of those is unremarkable, which is why the marker above is corrected from latent to live. What remains INFERRED is the other half: which sites fetch a chunk on demand without navigating was counted and never exercised, so a user who wants that measured first may prefer to leave the row latent. Two consequences either way: on this evidence the tier wants re-reading as early-testing, which is the user's call; and the documentation skip that `M98` added to `deploy.ps1` takes close-out pushes back out of the exposure, because a documentation-only push now fast-forwards the checkout and rebuilds nothing, leaving merge pushes and the nightly run on a moved tip as the whole of it.
+  Filed by `M96`. **Tier: early-testing.**  ⚠️ **Re-judged by `M98` (2026-09-18), which did not take the row:** the precondition has become ordinary traffic. `DEPLOY_ENABLED` was set on 2026-09-17, so a build swap happens on every merge and every close-out push, and the nightly schedule's Deploy fires at about 08:50Z — 16:50 Philippine time, inside the testers' working day, since the scheduled CI runs were measured starting 08:27-08:33Z rather than at the 03:00Z its cron reads. A tester with the builder open across one of those is unremarkable, which is why the marker above is corrected from latent to live. What remains INFERRED is the other half: which sites fetch a chunk on demand without navigating was counted and never exercised, so a user who wants that measured first may prefer to leave the row latent. Two consequences either way: on this evidence the tier wants re-reading as early-testing, which is the user's call; and the documentation skip that `M98` added to `deploy.ps1` takes close-out pushes back out of the exposure, because a documentation-only push now fast-forwards the checkout and rebuilds nothing, leaving merge pushes and the nightly run on a moved tip as the whole of it. ⛔ **RETIERED `during-testing` → `early-testing` BY `M105` (2026-09-20), ON `D53` ANSWERED `A`.** Automatic deploys have been on since 2026-09-17 (`D47`), so a build swap happens on every merge, and the nightly deploy fires around 16:50 Philippine time — **inside the testers' working day**. The precondition is ordinary traffic, and the unexercised half changes the frequency rather than whether it happens.
 - **`minor` · A worker relaunched by NSSM inside the deploy window starts on a half-swapped checkout.** Found
   by `M96` (2026-09-15) while verifying the deploy-window row. The runbook's worker runs `queue:work
   --max-time=3600`, and NSSM relaunches it whenever it exits. If its hour ends inside the window, it boots
@@ -10611,7 +10611,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   application's security-header middleware so production inherits it — and record which, because the two have
   different failure modes on a box where the certificate is renewed by `mod_md`. **Live** — every response
   served today omits it, and the app is reachable from the public internet under `D49`. Filed by `M100`.
-  **Tier: early-testing.** **Awaits D54.** ⚠️ **AMENDED BY `M101` (2026-09-19), WHICH FILED THE DECISION THE ROW ITSELF SAYS IT NEEDS AND MOVED TWO OF ITS INPUTS.** The row says in terms that *"the remedy is a decision before it is a header"* and then carried no `Awaits` token, so the line published it as **ready** and three sessions could have taken it and guessed. It is `D54`. ⚠️ **Two inputs measured on 2026-09-19 change the arithmetic the row offers.** (1) **Port 80 has no listener** — a connection from outside times out after 21 s — so there is no plaintext downgrade path on this box for HSTS to protect, and its marginal benefit here is narrower than the row assumes while the downside is unchanged. (2) **HSTS is HOST-scoped, unlike `X-Robots-Tag`**, so one response carrying it covers the whole origin and the application IS an adequate home for it — which is the opposite of the answer the sibling row got, and is what the row's own sentence *"record which, because the two have different failure modes"* was reaching for. ⚠️ **A third input is a cost rather than a benefit:** there is **no precedent anywhere in this tree for an environment-conditioned response header**, so the middleware arm is a new pattern rather than a reuse.
+  **Tier: early-testing.** ⚠️ **AMENDED BY `M101` (2026-09-19), WHICH FILED THE DECISION THE ROW ITSELF SAYS IT NEEDS AND MOVED TWO OF ITS INPUTS.** The row says in terms that *"the remedy is a decision before it is a header"* and then carried no `Awaits` token, so the line published it as **ready** and three sessions could have taken it and guessed. It is `D54`. ⚠️ **Two inputs measured on 2026-09-19 change the arithmetic the row offers.** (1) **Port 80 has no listener** — a connection from outside times out after 21 s — so there is no plaintext downgrade path on this box for HSTS to protect, and its marginal benefit here is narrower than the row assumes while the downside is unchanged. (2) **HSTS is HOST-scoped, unlike `X-Robots-Tag`**, so one response carrying it covers the whole origin and the application IS an adequate home for it — which is the opposite of the answer the sibling row got, and is what the row's own sentence *"record which, because the two have different failure modes"* was reaching for. ⚠️ **A third input is a cost rather than a benefit:** there is **no precedent anywhere in this tree for an environment-conditioned response header**, so the middleware arm is a new pattern rather than a reuse. ⚠️ **`D54` ANSWERED 2026-09-20 (`M105`) — `max-age=300`, in the vhost, no `includeSubDomains`, no `preload`.** ⛔ **AND THE `M101` AMENDMENT ABOVE IS WRONG IN ITS FIRST INPUT, CORRECTED HERE BY `M105`.** *"Port 80 has no listener"* is **false**: `M102` read the box and found an uncommented `Listen 80`, with `httpd -S` mapping a live `*:80` vhost serving a `Redirect permanent` to the `https://` origin. The 21-second timeout measured the **agency firewall**, not the server. So an internal tester who types the bare hostname makes exactly the cleartext round-trip HSTS removes, and the benefit is wider than that amendment says. `D54`'s own entry was corrected on 2026-09-19; this row was not, and went on publishing the refuted input.
 - ~~**`minor` · The only thing keeping the testing site out of search results is one vhost line that no document
   records and no gate would notice losing.**~~ Found by `M100` (2026-09-19) while checking whether the crawl
   exposure recorded against this server was still real. ⚠️ **It is not the defect the project record describes,
@@ -10814,3 +10814,85 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the rule into a place an author reads before writing. The lint arm is preferable: a rule in prose is
   what failed here. **Live** — nothing prevents the next author repeating it.
   Filed by `M103`. **Tier: after-launch.**
+- **`minor` · `pipeline-lint` has no rule relating a row's tier to the tier of the decision it awaits, so an
+  `early-testing` row can be parked behind a `before-launch` question and every gate passes.** Filed 2026-09-20 by
+  `M105`, which met the shape three times in one sweep. `p7e_awaits()` (`scripts/pipeline-lint.php:1406-1444`) tests
+  exactly one thing — that the awaited id is in the open set — so an open decision at *any* tier passes. The rule
+  roster at `scripts/pipeline-lint.php:352-392` is P1, P3, P3c, P4, P7a, P7b, P7c, P7e, P2a-e and P6: **there is no
+  P7d.** The tier-rules docblock at `:277-281` says so in terms — *"These rules hold that SHAPE. They prove nothing
+  about whether a tier is RIGHT."* ⚠️ **What it cost, measured:** `R-5ecfa6cd` and `R-e6a10f97` sat at ranks 6 and 7
+  of `early-testing`, published in the Next section every session is pointed at, while the only thing that could
+  unblock them — `D44` — sat at rank 151 in `before-launch`. `scripts/pipeline.php:687-699` sets `blocked` from
+  `awaits` without reading `tier`, and `:711-726` sorts on the row's own tier without reading the decision's, so the
+  two facts never meet. ⛔ **The inverse shape is the more dangerous one and it is also unguarded:** `R-e7d6f223` is
+  `ready` at rank 82 while `D53` — the question of what tier it should have — sat at rank 31, with nothing in either
+  script connecting a decision row to the row it re-tiers. A new rule must be proved red by `scripts/mutate.php`
+  before it is trusted. **Live.** Filed by `M105`. **Tier: early-testing.**
+- **`minor` · `docs/ACCESS-MATRIX.md:105` tells its reader the central host answers a workspace route with a 404,
+  and it does not — it redirects.** Filed 2026-09-20 by `M105`, which found the same false symptom in two places
+  while verifying `D51`. The sentence reads *"a direct sign-in there lands on `/dashboard`, a workspace-only route
+  the central host answers with a 404"*. `bootstrap/app.php:613-621` renders `NotASubdomainException` for a **web**
+  request as `redirect(config('app.url'))`; only the `/api/v1` arm returns 404, and
+  `tests/Feature/Tenancy/CentralHostFallbackTest.php:25` and `:32` both pin `assertRedirect`. ⚠️ **`M98` named this
+  exact sentence on 2026-09-18 and it is untouched four increments later**, which is the reason it is a row rather
+  than a note: naming a defect in a release paragraph does not queue it. `M105` corrected the sibling copy in
+  `R-5ecfa6cd`'s own headline; this one lives in the canonical access document and is a separate edit. **Live** —
+  `docs/ACCESS-MATRIX.md` is the document an operator reads to learn what the hosts do. Filed by `M105`.
+  **Tier: early-testing.**
+- **`minor` · `.github/workflows/ci.yml:84` asserts in the present tense that `DEPLOY_ENABLED` is unset, which `D47`
+  made false three days before `D53` was decided on the opposite premise.** Filed 2026-09-20 by `M105` while
+  verifying `D53`. The comment reads *"`DEPLOY_ENABLED` is unset, so that was latent rather than live"* and dates
+  from `454d9ba` (`M39`, 2026-08-28), well before `D47` turned automatic deploys on. ⛔ **It is the only in-tree
+  statement on the subject**, so a reader auditing `D53` from the repository alone finds the repository denying
+  `D53`'s central premise — and `DEPLOY_ENABLED` is a GitHub environment variable that no gate here can read, so
+  nothing can ever contradict the comment mechanically. The fix is to correct or delete the sentence; the durable
+  fix is to stop asserting environment state in a comment no gate can check. **Live.** Filed by `M105`.
+  **Tier: during-testing.**
+- **`minor` · The six `D38` rows cannot be grouped into one increment under `D13`, and they cannot safely be taken
+  apart either.** Filed 2026-09-20 by `M105` on answering `D38`. Three of them edit a single table —
+  `docs/architecture/technical-architecture.md` §7.1, lines 443 (Form draft), 449 (Exports) and 454 (Users & roles)
+  — and the other three edit `docs/api-specification.md` lines 63, 73 and 75, two of those inside one markdown table
+  at `:69-75`. ⛔ **`D13`'s file-overlap rule forbids grouping rows that cite the same non-hub file, while the
+  citation cascade requires moving them together:** both documents are citation tier 1 with zero tolerance
+  (`scripts/citation-liveness-lint.php:77-78`, run at `.github/workflows/ci.yml:242`), and `docs/pipeline.md:50` —
+  itself tier 1 — cites `docs/api-specification.md:63` by line. ⚠️ `D38`'s answer (`C`, annotate in place) makes
+  this far cheaper than a trim would have, because an in-place annotation shifts no line; but it does not dissolve
+  the grouping question, and the next taker needs a recorded `D13` exception rather than a judgement call.
+  **Live** — the six are `ready` and nothing currently says how they may be batched. Filed by `M105`.
+  **Tier: early-testing.**
+- **`minor` · Nothing warns a person that their two-factor recovery codes are running low, and the seeded
+  two-factor fixture carries an empty recovery list.** Filed 2026-09-20 by `M105` while answering `D37`. Both gaps
+  are named inside `R-1ad2304d`'s own prose and neither is covered by that row's headline or by `D37`'s answer,
+  which settles only the escape route — an admin reset, recorded in the audit log. ⚠️ **The fixture half has a
+  second-order cost:** a seeded account with no recovery codes is the exact state `D37` exists to rescue, so every
+  tester who enables two-step sign-in from the seed data starts one device-loss away from needing an operator.
+  **Live.** Filed by `M105`. **Tier: early-testing.**
+- **`minor` · The resume READ escapes service-worker caching only because its path prefix is `drafts/` rather than
+  `f/`, so one route rename re-opens the exposure `D20` was answered to close.** Filed 2026-09-20 by `M105` while
+  answering `D20`. `D20 = 2` caches the resume shell under a token-free key, which removes the enumeration
+  primitive; it does **not** touch this. `R-68656155`'s own text records the hazard — *"one route rename or a
+  consolidation of the two public groups re-opens it"* — and `routes/api.php` now says so at the site, but a comment
+  is not a guard. ⚠️ **And `D20`'s chosen option owes a measurement before it is built:** whether a constant-key
+  shell breaks the resume boot's own `data-resume-token` read, since the served HTML would then belong to some
+  *other* session. If it does, option 1 becomes the fallback and its three vacuous test cases must be deleted or
+  re-labelled in the same PR. **Live.** Filed by `M105`. **Tier: early-testing.**
+- **`minor` · The offline outbox's only scope assertion cannot tell device-wide from visit-scoped, and three
+  citations in the files a `D26` repair opens point at moved lines.** Filed 2026-09-20 by `M105` while answering
+  `D26`, which names all four in its own entry. `resources/public-runtime/__tests__/sync-outbox.test.ts:239` asserts
+  `toContain('1 response')` with a single enqueued row, so it passes under either scope — **the property `D26`
+  settles is enforced by nothing**, and a two-visit case in the same `describe` block is what would enforce it.
+  ⚠️ The stale citations resolve to live lines and are therefore invisible to the citation gate by design: two cite
+  `docs/offline-first-sync-design.md:93` for a spec now at `:192`, and one cites `:103` for a *"Sync now"* rule that
+  has also moved. ⛔ **Whoever takes this opens a paired file:** `lane-b.md:25-27` records that
+  `packages/design-system/src/theme/__tests__/clipped-node-containment.test.ts` lists `SyncStatus.vue` in an
+  exact-equality `KNOWN_UNGUARDED` assertion, so that list shrinks in the same PR as the fix. **Live.**
+  Filed by `M105`. **Tier: during-testing.**
+- **`minor` · `.kilo/worktrees/obsidian-dogwood` is a full second checkout of this repository that is untracked and
+  absent from `.gitignore`, so every host-side sweep double-counts it.** Filed 2026-09-20 by `M105`, which found it
+  while censusing the API documentation for a second copy. It is a real `git worktree` at `c709fce` (detached HEAD)
+  carrying its own `docs/api-specification.md`, `openapi.json` and `docs/pipeline.md`; `git ls-files .kilo` returns
+  0, so nothing is committed, but nothing ignores it either. ⚠️ **The failure mode is a wrong measurement rather
+  than a wrong build:** any `grep -rn` over the repository root reports each hit twice, and a census that concludes
+  *"a second copy of this document exists"* from it would be false. It also violates `CLAUDE.md`'s one-worktree-per-agent
+  rule while sitting inside the primary checkout, where `git worktree list` shows it but a directory listing reads it
+  as ordinary project files. **Live.** Filed by `M105`. **Tier: after-launch.**

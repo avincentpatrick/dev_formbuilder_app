@@ -63,6 +63,16 @@ const RECENT_RELEASES = 4;
 
 // A lead paragraph is a headline here, not the record. The claim file holds the whole thing and this
 // line names it, so clipping costs nothing and keeps the hand-off readable in one screen.
+
+// ⛔ EIGHT THOUSAND, NOT FOUR, AND THE FOUR IS WHY THIS WARNING ARRIVED TOO LATE TO BE ACTED ON. At
+// 4,000 the hand-off first spoke with roughly one close-out left, which is not room to plan a tracker
+// surgery — it is room to discover one is overdue. R-93610c49 asked for about 8,000, and at the growth
+// rate tracker-lint measures beside its own ceiling that is about two close-outs: enough to make the
+// move deliberately rather than under a red gate. ⚠️ The old message also RESTATED that rate as "two
+// to three KB", which was already below the measured mean by the time anyone read it, so the sentence
+// understated the pressure at the exact moment it finally appeared. It now points at the gate that
+// measures the rate instead of carrying a copy that can only rot. Raised by M104.
+const HEADROOM_WARNING_BYTES = 8000;
 const LESSON_CHARS = 220;
 
 $root = dirname(__DIR__);
@@ -255,14 +265,15 @@ function tracker_headroom_warning(): string
 
     $headroom = (int) $m[1] - strlen($tracker);
 
-    if ($headroom >= 4000) {
+    if ($headroom >= HEADROOM_WARNING_BYTES) {
         return '';
     }
 
     return sprintf(
-        '⚠️ PROGRESS.md has %s bytes of headroom under the tracker-lint R1 ceiling — under one status '
-        .'bullet, which has cost two to three KB in each of the last several increments. Plan a tracker '
-        .'surgery BEFORE you push: run php scripts/tracker-lint.php yourself, and prove the move with '
+        '⚠️ PROGRESS.md has %s bytes of headroom under the tracker-lint R1 ceiling — roughly two '
+        .'close-outs at the growth rate scripts/tracker-lint.php measures beside the ceiling itself. '
+        .'Plan a tracker surgery BEFORE you push: run php scripts/tracker-lint.php yourself and read '
+        .'the rate THERE rather than from this sentence, then prove the move with '
         .'scripts/tracker-surgery.php while both files are still uncommitted.',
         number_format($headroom)
     );

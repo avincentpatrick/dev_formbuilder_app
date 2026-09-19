@@ -253,6 +253,23 @@ jobs:
       - name: Citation liveness controls (the partial-path resolver, both ways)
         run: composer run citation-liveness-lint-controls
 
+      # M104. `scripts/pre-push-guard.php` had NO coverage of any kind until this step, and M104
+      # widened its documentation exemption by one path so a close-out that regenerates
+      # docs/pipeline.md stops being reclassified as work. The list it widened IS the guard's whole
+      # definition of documentation-only, so the change wants a control — R-c24216c5 said so before
+      # it landed.
+      #
+      # ⛔ THE HAZARD IS A WIDENED EXEMPTION THAT QUIETLY STOPS REFUSING, NOT THE ADDED PATH. C1
+      # alone cannot tell "pipeline.md is exempt" from "nothing is checked any more", so C2, C3 and
+      # C5 exist to catch the second. Both mutations were run by hand before shipping: reverting the
+      # path reddens C1 ALONE, and widening the exemption to app/ reddens C2, C3 and C5.
+      #
+      # ⛔ IT IS A HOST SCRIPT RATHER THAN A PEST FILE BECAUSE THE GUARD'S INPUT IS THE COMMIT GRAPH,
+      # and `git` is not installed in the app container — the same trade citation-liveness-lint-controls
+      # and tracker-lint-controls already refused, for the same reason.
+      - name: Pre-push guard controls (the documentation exemption, both ways)
+        run: composer run pre-push-guard-controls
+
       # M81. The gate over `docs/pipeline.md`, the one ordered line of remaining work. Five separate
       # realignments have found work that was documented and unscheduled at the same time, and every
       # one was caught by a human audit rather than by a gate. Registered as its own step for the

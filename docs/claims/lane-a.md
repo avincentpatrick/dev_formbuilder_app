@@ -16,7 +16,91 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M101`, the un-versioned crawl protection given a gate that can go red (`m101-crawl-protection-gate`)
+## Status: NO ACTIVE CLAIM — `M101` is merged; the early-testing tier continues, named in `docs/pipeline.md` § Next
+
+## RELEASED — `M101`, the un-versioned crawl protection given a gate that can go red (merged as PR #294, `a1951c4`, 6/6 green with real step counts — Static analysis 30 · E2E 20 · Contract 16 · Frontend 12 · axe 11 · Pest 11)
+
+Shipped 2026-09-19. Branch `m101-crawl-protection-gate`, cut from `origin/main` at `827274c`.
+- **Two rows closed, six filed, one decision filed, one row amended.** `D54` opens; the open-decision
+  count went 40 → 41 and open rows 232 → 236.
+- **One gate built and proved by three deliberate defects**, each CAUGHT: `scripts/staging-headers-judge.php`,
+  its nine-test control at 40 assertions, and real-capture fixtures.
+- **No tracker surgery, no migration, no ADR.** `PROGRESS.md` moved +0 lines and +0 bytes during the build.
+- **Static analysis went 28 steps → 30**, which is the whole of this increment's CI surface.
+
+⛔ **THE HEADLINE: THE OBVIOUS REMEDY WAS REFUTED BY SEVEN GET REQUESTS, AND THE ROW HAD OFFERED IT AS THE
+TIDIER OF ITS TWO OPTIONS.** `R-562bcc2a` said to assert the header against the deployed site **or** *"move
+it into the application's security-header middleware conditioned on the environment"*. Moving it is what a
+reviewer would ask for — it is versioned, testable and inherited by production. It is also impossible.
+`/robots.txt` and `/favicon.ico` are **static files Apache serves without invoking PHP at all**, and `/up` is
+a PHP route outside every group `AppSecurityHeaders` is mounted on; all three carry `X-Robots-Tag` and none
+carries any of the four headers that middleware sets. The header would have been **lost on five of seven
+paths, including the one URL crawlers actually fetch**. Nothing in the tree says this, and no reasoning would
+have produced it — only asking the running server.
+
+⛔ **AND THE SECOND HEADLINE IS THAT `R-0855052e`'s REMEDY HAD NOTHING TO ACT ON.** Its fix was *"delete the
+check from the checklist"*. Read against the live Testing Server Checklist (version `1789767880-491b`, 34 of
+34): `md-status`, `md_status` and `server-status` occur **zero** times, **none** of the twelve
+`pitahc.gov.ph` URLs it opens is a status handler, and step `B6` already prescribes `LastTaskResult` and
+`certificate-activation.log -Tail 5` — the exact substitute. **So the row, and §8.3's own sentence, both
+described a checklist that does not exist.** `M100` corrected that artifact in thirteen places and nothing
+re-derived the sentences here that describe it. The whole defect lived in this repository's description of a
+file no gate, lint or test can read, and that class is now its own row.
+
+**How the prediction fared — four right, one right for a reason I had inverted, and the one named as most
+likely wrong was wrong in a third direction entirely.**
+- ✅ **`pipeline-lint` P7b changed exactly as predicted** — `D54` opened, 40 → 41 open decisions, and
+  `R-06228b4f` moved from `ready` to `blocked (decision: D54)`.
+- ✅ **PHPStan could not move, and it was verified rather than asserted**: `git diff origin/main --name-only`
+  returns **zero** files under `app/`, `database/` or `routes/`. Said rather than quoted.
+- ✅ **Pint had to be bare, and it mattered this time.** The bare run found three fixers in
+  `scripts/staging-headers-judge.php` — `single_quote`, `unary_operator_spaces`,
+  `not_operator_with_successor_space`. The scoped form every old hand-off prescribed does not read
+  `scripts/` at all, so it would have passed a file it never opened.
+- ✅ **`tracker-lint` R1 passed with room to spare** — `+0 lines, +0 bytes`, no surgery owed.
+- ✅ **`citation-liveness-lint` held at exactly its ceiling**, and the mechanism was the reason: both closures
+  append to an existing `**Tier:**` line and add **zero** lines, and all 61 added lines landed at the end of
+  the ledger below every citation. 925 → 926 citations checked, rotten tier steady at **18 of 18**.
+- ⚠️ **`P7e` was named as the arm most likely to catch a mistake. It never fired — `P1` did, and the cause
+  was one I had not considered at all.** I predicted the same-push rule would bite through the `decisions.md`
+  edit. It bit two commits later through a **documentation** edit: a held plan marker, `track-b-deployment`,
+  lives inside `docs/deployment-infrastructure.md`, so inserting §8.3's new paragraphs moved its cited line
+  from `:637` to `:646` and the committed `docs/pipeline.md` went stale. ⛔ **The rule is not "regenerate when
+  you touch the tracker or the decisions file" — it is "regenerate when you move a line a marker sits on",
+  and any prose edit to a document that hosts a marker does that.**
+- ⚠️❌ **"The one I most expect to be wrong: the `ci.yml` step wiring." Right about the file and wrong about
+  the mechanism twice over.** (1) The first draft was `schedule`-only, which **cannot be exercised before it
+  merges at all** — the first run would have been the following night, on the trunk. Caught before pushing and
+  widened to `workflow_dispatch`. (2) On the first dispatch both steps still reported **`skipped`**, which
+  reads exactly like a wrong `if:` — and the `if:` was correct. An earlier step, `pipeline-lint`, had failed,
+  and Actions skips every later step in a failed job. ⛔ **A SKIPPED STEP IN A FAILED JOB IS
+  INDISTINGUISHABLE AT A GLANCE FROM A STEP WHOSE CONDITION DID NOT MATCH**, and reading it the obvious way
+  would have sent me to rewrite a condition that was already right. The fence and the condition were both
+  correct on their first run; nothing about them was ever the defect.
+- ✅ `BacklogProvenanceTest` was named as the second risk and passed: all six filed rows carry a `Filed by`
+  and a liveness marker.
+
+**What was found that no row and no prediction named.**
+- ⛔ **A content-hashed path was in the first probe list and would have reddened this gate on every deploy.**
+  `/build/assets/app-CF1wJdpl.css` is renamed by Vite on every build. It is removed, and a test pins the rule
+  so it cannot come back — a false red on a merge gate being the habit this repository spends three gates
+  trying not to teach.
+- ⛔ **Declaring the gate in `scripts/gate-baselines.php` would have failed every future close-out.** That
+  metric list is *declared, not derived*, and a metric whose log pattern is absent writes `NOT FOUND` **and
+  exits 1**. A `schedule`-only gate is absent from every `push` run — and a close-out regeneration runs from a
+  push. The floor lives in the Pest control instead, and §8.3 records why.
+- ⚠️ **The real captures carried two `Set-Cookie` lines with live encrypted session payloads**, and this
+  repository is public under `D48`. They are stripped from every fixture.
+- ✅ **`scripts/mutate.php`'s `php -l` arm earned its place on my own mistake.** Mutation 3's token was written
+  through a double-quoted `printf` and reached the file as `\&\&` — `CLAUDE.md`'s doubled-backslash trap. The
+  harness **aborted rather than reporting a red**, which is the difference between a control and a decoration.
+- ⚠️ **`SuiteCollectionFloorTest` fails locally and is not this increment's doing**: PHPUnit's collector sees
+  403 of 443 files, and all 40 missing are a contiguous `tests/Feature/Forms/` block — the documented Windows
+  bind-mount truncation. CI is the authority and CI is green.
+- ⚠️ **The `X-Robots-Tag`'s file on the box is contradicted across two documents**, so §8.3 deliberately names
+  neither. Filed.
+
+**The per-row record of what was claimed, verified and built, kept verbatim as the claim stood at the push.**
 
 Taken 2026-09-19. Branch `m101-crawl-protection-gate`, cut from `origin/main` at `827274c`, PR into `main`.
 Rows: `R-562bcc2a` (`docs/feature-backlog.md:10615`) — *"The only thing keeping the testing site out of

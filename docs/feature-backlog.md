@@ -7522,7 +7522,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   SCHEMA.** `docs/multi-tenancy-rbac-design.md:56` gives the forward reference to `GET /api/v1/roles` as
   the reason roles use UUIDv7 rather than Spatie's bigint PKs, echoed at `app/Models/Role.php:13` and in
   the comment opening at `config/permission.php:20`. ⚠️ **The one near-miss is a circular pointer, not a
-  deferral**: `docs/multi-tenancy-rbac-design.md:711` defers the request/response *shapes* to Doc #14, and
+  deferral**: `docs/multi-tenancy-rbac-design.md:712` defers the request/response *shapes* to Doc #14, and
   `docs/api-specification.md:13` points straight back at §7.1 as the authoritative inventory. Neither
   defers the build. This repository builds `/api/v1` twins deliberately — `routes/tenant.php:755` says
   so — so the web surface does not discharge it. **Live.** Filed by `M80`. **Awaits D38.** **Tier: early-testing.**

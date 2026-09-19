@@ -10774,7 +10774,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   probe asserting a 301 and recording that the redirect target is what carries the header. §8.3 is corrected by
   this increment to describe the vhost that exists. **Live** — the vhost is serving on the box today.
   Filed by `M102`. **Tier: during-testing.**
-- **`minor` · `'Unknown user'` is a literal duplicated at five call sites and owned by nothing.**
+- **`minor` · `'Unknown user'` is a literal duplicated at six call sites and owned by nothing.**
   Found by `M103` (2026-09-19) while closing the member-roster row, which needed a sixth copy.
   `AuditLogPresenter` uses it twice, `SuperAdminService` twice, `AuditExporter` once, and
   `TenantMembershipService` now once more. `resources/js/components/audit/types.ts` documents the

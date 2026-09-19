@@ -57,6 +57,15 @@ final class SendWelcomeEmail
             return;
         }
 
+        // ⛔ ONCE PER PERSON, NOT ONCE PER EVENT (M103, R-4f23d9c7). The docblock above has always said
+        // "once"; nothing enforced it. `Verified` repeats for a real, ordinary reason —
+        // `UpdateUserProfileInformation::updateVerifiedUser()` nulls `email_verified_at` and re-sends
+        // verification on every address change, and the tenant Settings page offers that field to every
+        // member — so a tester fixing a typo in their own address was welcomed to the product twice.
+        if (! $this->claimWelcome($user)) {
+            return;
+        }
+
         // `tenants`/`domains` are RLS-exempt central tables, so this answers under any context — the same
         // call `JoinTenantOnRegistration` makes to decide whether a registration joins a workspace at all.
         // Null is the CENTRAL host: a real, documented state (an account belonging to no workspace yet),
@@ -82,7 +91,7 @@ final class SendWelcomeEmail
         // back to `config('app.url')`, which D46 puts at the agency's own public website — so the one
         // non-transactional email the product sends linked its header off this application. Note this is
         // NOT `BrandPalette::forTenant($tenant)`: that requires the tenant to match the current tenant
-        // context, and this listener runs on Fortify's verification route with no tenancy middleware and
+        // context, and this listener runs on Fortify's verification route with no TENANT identification and
         // no ambient GUC (see isMemberOf() below), so it would silently return the product palette and
         // change nothing. The value is the one already computed for `actionUrl`.
         //
@@ -107,11 +116,75 @@ final class SendWelcomeEmail
     }
 
     /**
+     * Claim the one welcome this person is owed, atomically. True if this call won it.
+     *
+     * ── A CONDITIONAL UPDATE, NOT read-then-write ─────────────────────────────────────────────────────
+     * `WHERE welcomed_at IS NULL` inside the UPDATE makes the claim and the test one statement, so two
+     * concurrent `Verified` events for the same account cannot both see null and both send. The affected
+     * row count IS the answer. This is the shape `PointsRecorder` uses for "award exactly once", in the
+     * only form available here — `users` is a central table with no tenant to hang a ledger row on.
+     *
+     * ⛔ THE USER GUC IS SET EXPLICITLY, BECAUSE AN UNQUALIFIED UPDATE HERE WRITES NOTHING ON ONE OF THE
+     * TWO DOORS. `users` carries FORCE RLS, and PostgreSQL applies SELECT policies to an UPDATE whose
+     * WHERE reads a column — so with no `app.current_user_id` the row is invisible to its own update,
+     * which affects ZERO rows and raises nothing. That GUC happens to be set on the Fortify verification
+     * door, where `config/fortify.php` mounts `EstablishTenantDatabaseContext` ahead of the controller.
+     * It is NOT set on the other door: `GoogleSessionStarter` fires `Verified` immediately after
+     * `Auth::login()`, and that same config file records in terms that "a write issued AFTER
+     * Auth::login() in the same request still has no user GUC". Relying on the ambient value would have
+     * produced a guard that passed every test and silently failed for Google sign-ups.
+     *
+     * So the context is BORROWED for the write, the shape {@see isMemberOf()} below already uses — and
+     * the arm it satisfies is `users_users_visibility`'s first disjunct, `id = app.current_user_id`.
+     * Setting a person's own id to read their own row is the narrowest possible use of it. The tenant
+     * half is left exactly as found, because this policy's self arm does not consult it.
+     *
+     * ⚠️ NOT `pgsql_auth`, THOUGH ITS `USING (true)` CARVE-OUT WOULD ALSO HAVE WORKED. That connection is
+     * a separate SESSION, so under `RefreshDatabase` it cannot see an uncommitted fixture — every
+     * existing test in `WelcomeEmailTest` builds its user with `User::factory()`, and routing this write
+     * there would have made the guard refuse them all and silently suppressed the very email those tests
+     * assert. Same trap as `/members`, reached from the other side: the connection that is right for a
+     * pre-auth READ is wrong for a write the request's own session must see.
+     *
+     * ⚠️ SOFT-DELETED ACCOUNTS CLAIM NOTHING, which is the wanted answer rather than an oversight: the
+     * model's `SoftDeletes` scope excludes them, the update matches no row, and a deleted account is not
+     * someone to welcome to the product.
+     */
+    private function claimWelcome(User $user): bool
+    {
+        $userId = (string) $user->getKey();
+        $savedTenant = TenantContext::currentTenantId();
+        $savedUser = TenantContext::currentUserId();
+
+        // `applyLocal()` is `SET LOCAL`, a silent no-op outside a transaction — hence the wrapper.
+        return DB::transaction(function () use ($userId, $savedTenant, $savedUser): bool {
+            TenantContext::applyLocal($savedTenant, $userId);
+
+            try {
+                return User::query()
+                    ->whereKey($userId)
+                    ->whereNull('welcomed_at')
+                    ->update(['welcomed_at' => now()]) === 1;
+            } finally {
+                TenantContext::applyLocal($savedTenant, $savedUser);
+            }
+        });
+    }
+
+    /**
      * Is this user an ACTIVE member of `$tenant`?
      *
      * Borrows the tenant's RLS context for the read and restores whatever was there, the
      * `TenantMembershipService::joinOpenTenant()` shape — this listener runs on Fortify's verification route,
-     * which carries no tenancy middleware, so there is no ambient GUC to rely on.
+     * which carries no TENANT identification, so there is no ambient tenant GUC to rely on.
+     *
+     * ⚠️ PRECISION CORRECTED IN M103, BECAUSE A WRITE NOW SITS BESIDE IT. Both of this file's notes used
+     * to say the route "carries no tenancy middleware" and "no ambient GUC" flat. `config/fortify.php`
+     * DOES mount `EstablishTenantDatabaseContext` on that group, so `app.current_user_id` is set here;
+     * what is absent is stancl's tenant IDENTIFICATION, so `app.current_tenant_id` is null on every
+     * Fortify route, subdomain or not. Both conclusions below are unaffected — this method still has to
+     * borrow the tenant's context — but the flat version would have told the next reader that `users`
+     * writes from here are impossible, which is the opposite of what {@see claimWelcome()} relies on.
      *
      * `Invited` and `Removed` are deliberately NOT members: an unaccepted invitation grants nothing (§7), and
      * telling someone they are a member of a workspace they have not joined is the same lie in a different

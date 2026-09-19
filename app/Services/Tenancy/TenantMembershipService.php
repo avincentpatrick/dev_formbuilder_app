@@ -674,7 +674,20 @@ final class TenantMembershipService
         $userIds = $memberships->pluck('user_id')->all();
 
         // withTrashed so every membership's user resolves (a soft-deleted account still has a row) —
-        // the FK then guarantees the keyed map contains every id below, so no null-identity branch.
+        // the FK then guarantees the keyed map contains every id below.
+        //
+        // ⛔ THAT GUARANTEE IS REAL AND IT IS NOT A LICENCE TO INDEX UNGUARDED (M103, R-17238a20).
+        // The original clause ended "…so no null-identity branch", and the branch it talked itself out
+        // of is the difference between a degraded row and a page that cannot load. The guarantee holds
+        // in production on three independent legs — `withTrashed()` here, `users_auth_select`'s
+        // `TO meridian_auth … USING (true)` carve-out, and `tenant_users.user_id`'s
+        // `constrained('users')->cascadeOnDelete()` — and it is FALSE inside a test session, because
+        // `pgsql_auth` is a separate connection that cannot see `RefreshDatabase`'s uncommitted rows.
+        // {@see tests/Pest.php}'s `committedTenantIdentity()` exists for exactly that, and warns that
+        // the resulting 500 "looks like a product bug rather than a fixture one" — which is precisely
+        // how it was filed. ⚠️ So the row's two stated causes (soft delete, RLS) are both refuted, and
+        // the guard below is kept anyway: an unguarded index on a cross-source map is one schema change
+        // away from fatal, and `SuperAdminService` already writes this same lookup the guarded way.
         $users = User::on('pgsql_auth')
             ->withTrashed()
             ->whereIn('id', $userIds)
@@ -692,11 +705,24 @@ final class TenantMembershipService
 
         $rows = [];
         foreach ($memberships as $m) {
-            $user = $users[$m->user_id];
+            $user = $users[$m->user_id] ?? null;
+
+            // An identity the `pgsql_auth` read could not return. `'Unknown user'` is this repository's
+            // established literal for it — `SuperAdminService` and `AuditLogPresenter` both use it, and
+            // `resources/js/components/audit/types.ts` documents it client-side as "an actor whose row is
+            // no longer visible". The empty address is deliberate: inventing one would put a string that
+            // looks like an inbox in front of an operator deciding whether to remove the membership.
+            //
+            // ⚠️ NOT "skip the membership and count it", which this row also offered. There is no count
+            // prop on the roster page to land it in, and a roster whose rows were ALL skipped renders
+            // `ListEmptyReason`'s "No members yet" — a lie in the one state where the operator most needs
+            // the truth. A visible row with an unresolved name is the honest degradation.
+            $name = $user === null ? 'Unknown user' : (string) $user->name;
+            $email = $user === null ? '' : (string) $user->email;
 
             // The keyword gate — see the ⚠️ block on this method. Applied HERE rather than in a `->where()`
             // above, and applied to the SAME two fields the roster renders and `MemberSearchArm` matches.
-            if ($terms !== null && ! $terms->matchesAny((string) $user->name, (string) $user->email)) {
+            if ($terms !== null && ! $terms->matchesAny($name, $email)) {
                 continue;
             }
 
@@ -708,8 +734,8 @@ final class TenantMembershipService
 
             $rows[] = [
                 'user_id' => (string) $m->user_id,
-                'name' => $user->name,
-                'email' => $user->email,
+                'name' => $name,
+                'email' => $email,
                 'status' => $m->status->value,
                 'role' => $roleValue !== null ? Str::headline((string) $roleValue) : '—',
                 'is_owner' => $tenant->owner_user_id === $m->user_id,

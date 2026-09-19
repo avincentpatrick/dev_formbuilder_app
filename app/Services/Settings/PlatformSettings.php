@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Settings;
 
 use App\Enums\SettingKey;
+use App\Enums\SettingScope;
 use App\Http\Middleware\EnforcePlatformMaintenance;
 use App\Models\Setting;
 use App\Models\Tenant;
@@ -61,7 +62,19 @@ final class PlatformSettings
     /** The resolved value of a platform key — the stored row, or {@see SettingKey::default()}. */
     public function get(SettingKey $key): bool|string
     {
-        $value = $this->all()[$key->value] ?? null;
+        return self::resolve($key, $this->all()[$key->value] ?? null);
+    }
+
+    /**
+     * One raw stored value resolved against its default — the sparse-table rule in one place.
+     *
+     * Static and separate from {@see get()} so {@see fingerprintFor()} can resolve the same way without a
+     * container instance: the fingerprint is computed once in a web request and once inside the elevated
+     * write transaction, and two resolutions that could drift apart would make the conflict check fire on
+     * equal states or stay silent on unequal ones.
+     */
+    public static function resolve(SettingKey $key, mixed $value): bool|string
+    {
         $default = $key->default();
 
         if (is_bool($default)) {
@@ -69,6 +82,47 @@ final class PlatformSettings
         }
 
         return is_string($value) ? $value : $default;
+    }
+
+    /** A token for the platform settings as this request read them. {@see fingerprintFor()}. */
+    public function fingerprint(): string
+    {
+        return self::fingerprintFor($this->all());
+    }
+
+    /**
+     * The optimistic-concurrency token for the super-admin console (M103, R-2173fe28).
+     *
+     * ── WHY A VALUE HASH AND NOT `max(updated_at)` ─────────────────────────────────────────────────────
+     * The store is SPARSE, so a platform key nobody has ever written has no row and therefore no
+     * `updated_at` at all — a timestamp token would be `null` on a fresh install, which is precisely the
+     * state where "has this changed since I loaded it?" still has to have an answer. Hashing the RESOLVED
+     * values gives one for every state, including the all-defaults one, with no clock and no timezone in
+     * the comparison. It also asks the right question: a write that stores the value already present is
+     * not a change the operator needs to be warned about, and a timestamp token would raise a conflict on
+     * it.
+     *
+     * ⛔ THE ORDER IS {@see SettingKey}'s CASE ORDER, NOT THE ARRAY'S. `$stored` arrives from a `pluck()`
+     * in row order, which is not stable across inserts — hashing it directly would produce a different
+     * token for identical settings and refuse every second save. Iterating the enum fixes the order to
+     * one that only a code change can move.
+     *
+     * @param  array<string, mixed>  $stored  raw decoded platform rows — {@see all()}, or
+     *                                        `SuperAdminService::platformValues()` inside the write.
+     */
+    public static function fingerprintFor(array $stored): string
+    {
+        $resolved = [];
+
+        foreach (SettingKey::cases() as $key) {
+            if ($key->scope() !== SettingScope::Platform) {
+                continue;
+            }
+
+            $resolved[$key->value] = self::resolve($key, $stored[$key->value] ?? null);
+        }
+
+        return hash('sha256', json_encode($resolved, JSON_THROW_ON_ERROR));
     }
 
     public function signupOpen(): bool

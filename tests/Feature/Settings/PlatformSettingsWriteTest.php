@@ -52,7 +52,7 @@ it('persists a platform setting written through the elevated service', function 
     app(SuperAdminService::class)->updatePlatformSettings([
         SettingKey::MaintenanceEnabled->value => true,
         SettingKey::MaintenanceMessage->value => 'Back at 03:00 UTC.',
-    ], $actor);
+    ], $actor, null);
 
     $rows = DB::connection('pgsql_privileged')->table('settings')->whereNull('tenant_id')->pluck('value', 'key');
 
@@ -71,7 +71,7 @@ it('writes a NULL-tenant audit row for the platform change', function (): void {
 
     app(SuperAdminService::class)->updatePlatformSettings([
         SettingKey::RegistrationOpenSignup->value => false,
-    ], $actor);
+    ], $actor, null);
 
     $audit = DB::connection('pgsql_privileged')->table('audits')
         ->whereNull('tenant_id')->where('auditable_type', 'settings')->first();

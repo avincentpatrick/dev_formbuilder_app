@@ -38,7 +38,17 @@ final class UpdatePlatformSettingsRequest extends FormRequest
             'signup_open' => ['required', 'boolean'],
             'maintenance_enabled' => ['required', 'boolean'],
             'maintenance_message' => ['present', 'nullable', 'string', 'max:500'],
+            // ⛔ `required`, so an omitted token is a 422 rather than an unchecked write (M103,
+            // R-2173fe28). The token itself is compared inside the elevated write transaction — see
+            // SuperAdminService::updatePlatformSettings() for why it cannot be compared here.
+            'fingerprint' => ['required', 'string'],
         ];
+    }
+
+    /** The {@see PlatformSettings::fingerprint()} the console page this Save came from was rendered with. */
+    public function fingerprint(): string
+    {
+        return (string) $this->input('fingerprint');
     }
 
     /**

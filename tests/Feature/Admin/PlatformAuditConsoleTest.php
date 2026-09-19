@@ -127,7 +127,9 @@ it('closes the loop: a real platform settings write appears on the console', fun
 
     app(SuperAdminService::class)->updatePlatformSettings([
         SettingKey::RegistrationOpenSignup->value => false,
-    ], $operator);
+        // null: an unconditional write. The token guard (M103) is for the console form, not for a
+        // fixture establishing a starting state — and it is a required argument so the choice is stated.
+    ], $operator, null);
 
     $admin = User::factory()->superAdmin()->confirmedTwoFactor()->create();
 

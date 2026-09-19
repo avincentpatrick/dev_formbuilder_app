@@ -1,0 +1,15 @@
+HTTP/1.1 302 Found
+Date: Fri, 18 Sep 2026 23:38:54 GMT
+Server: Apache/2.4.66 (Win64) OpenSSL/3.6.0
+X-Powered-By: PHP/8.4.25
+Cache-Control: no-cache, private
+Content-Security-Policy: frame-ancestors 'none'
+X-Frame-Options: DENY
+X-Content-Type-Options: nosniff
+Referrer-Policy: strict-origin-when-cross-origin
+Vary: X-Inertia
+X-Robots-Tag: noindex, nofollow, noarchive
+Location: https://staging.pitahc.gov.ph/login
+Transfer-Encoding: chunked
+Content-Type: text/html; charset=utf-8
+

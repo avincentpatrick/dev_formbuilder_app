@@ -10506,8 +10506,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   itself — and then write §8's `hosts` instruction as a fact rather than a conditional; until then any §8 rewrite must
   keep the entries and say why. **Latent** — it bites when §8's Apache arm is written, which is `R-2344803c`.
   Filed by `M99`. **Tier: early-testing.** ✅ **CLOSED BY `M100` (2026-09-19) — MEASURED FROM THE BOX: THE NETWORK DOES NOT HAIRPIN, SO THE HOSTS ENTRIES ARE NOW A FACT AND NOT A CONDITIONAL.** The measurement the row asked for, taken exactly as it prescribed — one request to the public address from the box itself. `TcpClient.BeginConnect('121.58.210.237', 443)` run on the server returned **no connection within 8000 ms**, so **this network does not hairpin**. Both entries are present and confirmed: `127.0.0.1 pitahc.gov.ph` and `127.0.0.1 staging.pitahc.gov.ph`. §8.2 item 10 and the new §8.3 therefore state it as a fact — keep the two entries, because they are the only route by which the certificate check, the `/up` check, `Require local` and the operator's own browser reach the site from the box — rather than as the conditional the row objected to. ⚠️ **The Testing Server Checklist's "remove the hosts-file entry" step is refuted by this measurement and is corrected there too.** ✅ **The row's coupling prediction was exactly right**: it said the measurement bites when §8's Apache arm is written, which is `R-2344803c` — and that row is in this same batch, which is why the measurement was taken now rather than deferred again.
-- **`minor` · The `md-status` check the operator is told to read returns a Laravel page, because the front-controller
-  rewrite swallows it.** Found by `M99` (2026-09-18) while verifying `R-2344803c`. `public/.htaccess`'s
+- ~~**`minor` · The `md-status` check the operator is told to read returns a Laravel page, because the front-controller
+  rewrite swallows it.**~~ Found by `M99` (2026-09-18) while verifying `R-2344803c`. `public/.htaccess`'s
   `RewriteCond %{REQUEST_FILENAME} !-f` sends any path that is not a real file to `index.php`, and `mod_rewrite` has
   no handler exemption, so the `md-status` handler the Testing Server Checklist tells the operator to read never runs.
   `R-2344803c` names this as a caution and prescribes no fix — its remedy says only that *"neither runbook may lean on
@@ -10515,7 +10515,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   a TRACKED file**, not only a runbook caution, and `public/.htaccess` is the same file `R-4ff3e848`'s web-server arm
   wants to edit; neither row names the other. ⚠️ Either exempt the status path in `public/.htaccess` ahead of the
   front-controller rule, or delete the check from the checklist and say what replaces it. **Live** — the certificate
-  expiry under `D49` is exactly what that check exists to watch. Filed by `M99`. **Tier: early-testing.**
+  expiry under `D49` is exactly what that check exists to watch. Filed by `M99`. **Tier: early-testing.** ✅ **CLOSED BY `M101` (2026-09-19) — THE CHECK IS DELETED RATHER THAN REPAIRED, BECAUSE THE REWRITE IS NOT THE DEFECT.** The row offers two arms and the second is taken. ⛔ **Its framing is refuted:** `public/.htaccess` is the **stock, unmodified Laravel file** — routing a path that is not a real file to the front controller is its purpose, not a defect — and it becomes one only because a runbook named a path Apache was never configured to expose. ⛔ **And the exemption arm is structurally unprovable here:** the local stack is nginx (`docker/nginx/default.conf`), there is no Apache in `docker-compose.yml` or `docker/`, and `tests/Feature/Deploy/DeployMaintenanceGuardTest.php` already records that there is none in CI — so no gate in this repository could redden a wrong exemption. That is the same reason `R-4ff3e848` declined its own `.htaccess` arm, and the residual is filed rather than carried. ✅ **The replacement already existed and is strictly better:** `scripts/activate-staged-cert.ps1` re-reads the certificate Apache is **serving**, over the loopback with SNI, and §8.3 already documents `LastTaskResult`'s four codes as the monitoring surface — a stronger fact than `mod_md`'s opinion of its own store. §8.3 now says the substitute is the design rather than a stopgap. ⛔ **AND THE ROW'S CHECKLIST PREMISE IS REFUTED, WHICH IS THE FINDING WORTH MORE THAN THE CLOSURE.** The row — and §8.3's own sentence before this increment — assert that the Testing Server Checklist *tells the operator to read* `md-status`. It does not. Measured against the live artifact on 2026-09-19 (version `1789767880-491b`, 34 of 34 ticked): `md-status`, `md_status` and `server-status` occur **zero** times, **none** of the twelve `pitahc.gov.ph` URLs it opens is a status handler, and step `B6` already prescribes `LastTaskResult` and `certificate-activation.log -Tail 5` — the exact substitute this closure recommends. **So no checklist edit was owed at all**, and the whole defect lived in the repository's description of an artifact that no gate, lint or test can read. `M100` corrected that artifact in thirteen places and the sentences describing it here were not re-derived afterwards. That class is filed as its own row. ⚠️ **One thing this closure does NOT establish, said rather than implied:** measured from outside, `/md-status` returns a Laravel **404**, which cannot distinguish *a handler that is configured and swallowed* from *a handler that was never configured*. Deleting the check makes the question moot, which is why the row closes without a console session — but nobody should later read this row as having proved the handler exists.
 - **`minor` · The workspaces page prescribed for the central-host loop cannot be built: `pgsql_auth` has no grant on
   `tenants` or `domains`.** Found by `M99` (2026-09-18) while verifying `R-5ecfa6cd`. That row's `M96` amendment
   prescribes an authenticated central page listing the account's workspaces, each linked to its own sign-in address,
@@ -10611,9 +10611,9 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   application's security-header middleware so production inherits it — and record which, because the two have
   different failure modes on a box where the certificate is renewed by `mod_md`. **Live** — every response
   served today omits it, and the app is reachable from the public internet under `D49`. Filed by `M100`.
-  **Tier: early-testing.**
-- **`minor` · The only thing keeping the testing site out of search results is one vhost line that no document
-  records and no gate would notice losing.** Found by `M100` (2026-09-19) while checking whether the crawl
+  **Tier: early-testing.** **Awaits D54.** ⚠️ **AMENDED BY `M101` (2026-09-19), WHICH FILED THE DECISION THE ROW ITSELF SAYS IT NEEDS AND MOVED TWO OF ITS INPUTS.** The row says in terms that *"the remedy is a decision before it is a header"* and then carried no `Awaits` token, so the line published it as **ready** and three sessions could have taken it and guessed. It is `D54`. ⚠️ **Two inputs measured on 2026-09-19 change the arithmetic the row offers.** (1) **Port 80 has no listener** — a connection from outside times out after 21 s — so there is no plaintext downgrade path on this box for HSTS to protect, and its marginal benefit here is narrower than the row assumes while the downside is unchanged. (2) **HSTS is HOST-scoped, unlike `X-Robots-Tag`**, so one response carrying it covers the whole origin and the application IS an adequate home for it — which is the opposite of the answer the sibling row got, and is what the row's own sentence *"record which, because the two have different failure modes"* was reaching for. ⚠️ **A third input is a cost rather than a benefit:** there is **no precedent anywhere in this tree for an environment-conditioned response header**, so the middleware arm is a new pattern rather than a reuse.
+- ~~**`minor` · The only thing keeping the testing site out of search results is one vhost line that no document
+  records and no gate would notice losing.**~~ Found by `M100` (2026-09-19) while checking whether the crawl
   exposure recorded against this server was still real. ⚠️ **It is not the defect the project record describes,
   and the correction is the useful half.** That record says the site *"is open to search engines"* and that
   *"there is no `X-Robots-Tag`"*, and prescribes adding one. Measured from outside on 2026-09-19,
@@ -10630,7 +10630,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   production too. ⚠️ The fix is to make the server-side protection survivable: assert the header in a test
   against the deployed site, or move it into the application's security-header middleware conditioned on the
   environment, and say in §8.3 which one is authoritative. **Live** — the header is real today and its only
-  copy is un-versioned. Filed by `M100`. **Tier: early-testing.**
+  copy is un-versioned. Filed by `M100`. **Tier: early-testing.** ✅ **CLOSED BY `M101` (2026-09-19) — THE LINE IS STILL THE ONLY COPY, AND A NIGHTLY GATE NOW GOES RED WHEN IT DISAPPEARS.** ⛔ **HALF THE PRESCRIBED REMEDY IS REFUTED BY MEASUREMENT, AND THAT IS THE USEFUL HALF OF THIS CLOSURE.** The row offers *"assert the header in a test against the deployed site, or move it into the application's security-header middleware conditioned on the environment"*. **The middleware arm cannot work.** Measured from outside on 2026-09-19 across seven paths: `/robots.txt` and `/favicon.ico` are **static files Apache serves without invoking PHP at all**, and `/up` is a PHP route outside every group `AppSecurityHeaders` is mounted on — all three carry `X-Robots-Tag` and **none** of them carries any of the four headers that middleware sets, which only `/` and `/login` do. Moving the header would lose it on **five of seven paths, including the one URL crawlers actually fetch**. `AppSecurityHeaders` is also mounted per group at ten sites and a global mount is forbidden for a stated reason — it would set `frame-ancestors 'none'` on the guest runtime and break every embed. And there is no precedent in this tree for an environment-conditioned response header. ✅ **As built:** `scripts/staging-headers-judge.php`, modelled on `scripts/npm-audit-judge.php` — fetching is separate from judging, the contract is `0` present · `1` missing or weakened · `2` **CANNOT MEASURE**, and recognition keys **positively**: the served `/robots.txt` must be byte-identical to the tracked `public/robots.txt`, so a captive portal answering 200 with no header is *not measured* rather than *the protection is gone*. It probes six paths spanning both mechanisms, reports a floor, and takes its host and URL list from constants a mutation can drive. Two `schedule`-only steps in `.github/workflows/ci.yml` run it nightly on `main`, because a vhost edit is not a deploy and `deploy.yml` would never see one. ✅ **Proved by three deliberate defects, each CAUGHT**: mis-spelling the header name, dropping a static probe, and disarming the identity test — the last reddening only the discriminator case. ⚠️ **What is NOT proved, said rather than implied:** `scripts/mutate.php` drives Pest and nothing else, so the mutations redden the **judge**; the two CI steps are `schedule`-gated and were verified by simulating them under `bash -e` and by a `workflow_dispatch` run, not by mutation. ⚠️ **And the gate is deliberately NOT declared in `scripts/gate-baselines.php`**: that metric list is declared rather than derived and an absent pattern writes `NOT FOUND` **and exits 1**, so a `schedule`-only gate would fail every close-out regeneration, which runs from a `push`. Its floor lives in `tests/Feature/Docs/StagingHeadersJudgeTest.php` instead, and §8.3 says so. §8.3 now quotes the directive and names both authorities — the vhost for serving it, the nightly judge for its survival. ⚠️ **One citation could not be verified and is filed instead:** which file on the box actually holds the directive is contradicted across two documents, so §8.3 names neither. `public/robots.txt` is untouched, as the row demands.
 - **`nit` · `httpd -t` on the testing server warns about a missing global `ServerName` on every run, and the
   warning is now in a log an operator reads during incidents.** Found by `M100` (2026-09-19) while proving the
   certificate activation task. `httpd -t` prints `AH00558: Could not reliably determine the server's fully
@@ -10666,4 +10666,65 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   ⛔ **The general lesson is the gate's, not this row's: at `ledger tier 18 rotten, ceiling 18` the gate defends
   the COUNT of dead citations and says nothing about whether a live one points at its claim.** A census of the
   ledger's self-citations, re-derived from content, is the only thing that would find the rest. **Live** — the
-  citations are in the tree today and one of them is wrong. Filed by `M100`. **Tier: during-testing.**
+  citations are in the tree today and one of them is wrong. Filed by `M100`. **Tier: during-testing.** ⚠️ **AMENDED BY `M101` (2026-09-19), WHICH FOUND TWO MORE INSTANCES OF THIS ROW'S OWN CLASS IN A FILE THE ROW DOES NOT NAME.** `docs/claims/lane-a.md` cites `R-2344803c` at `docs/feature-backlog.md:10062` and `:10071`; that row's bullet begins at **10068**. The same file cites `R-98682188` at `:10493`; it begins at **10499**. Both citations are ALIVE and both are wrong, which is this row's class exactly — and they extend it past this ledger into the claim file, where `citation-liveness-lint` never looks, because `docs/claims/` is excluded from its corpus outright. So the re-derivation this row prescribes is the only thing that would ever find them, and its scope is wider than the ledger.
+- **`minor` · The `AppSecurityHeaders` mount census says four and the tree has ten, and the wrong number is written
+  in the code as well as in the threat model.** Found by `M101` (2026-09-19) while measuring which surfaces a
+  response header can reach. `app/Http/Middleware/AppSecurityHeaders.php:27` says it is *"named on four groups
+  explicitly"* and names four; `docs/security-threat-model.md:72` repeats the same four. Counting
+  `AppSecurityHeaders::class` across `routes/` and `config/` returns **10** — `routes/web.php`, seven groups in
+  `routes/tenant.php`, `routes/google-auth.php` and `config/fortify.php`. ⛔ **The docblock's next sentence is what
+  makes this worth filing rather than tidying:** it prices *"adding a fifth surface"* as an edit there plus an edit
+  at the route, so the sentence stating the intended cost has been six surfaces behind while six surfaces were
+  added — and neither copy moved. ⚠️ Re-derive the number in both copies, or say in one place that the list is not
+  a census and point at the count. **Live** — both sentences are in the tree today. Filed by `M101`.
+  **Tier: during-testing.**
+- **`minor` · Five of seven paths on the testing site carry none of the four app security headers, and nothing
+  anywhere says whether that is intended.** Found by `M101` (2026-09-19) while measuring header coverage from
+  outside. `/` and `/login` carry `Content-Security-Policy`, `X-Frame-Options`, `X-Content-Type-Options` and
+  `Referrer-Policy`; `/up`, `/robots.txt`, `/favicon.ico`, a hashed build asset and a 404 carry **none** of them.
+  That follows from `AppSecurityHeaders` being mounted per route group rather than globally, which is deliberate
+  and documented — but the CONSEQUENCE is written nowhere, so a reader cannot tell an intended scope from a gap.
+  ⚠️ Decide whether `X-Content-Type-Options: nosniff` in particular belongs on static responses, where it is the
+  one of the four that actually applies to a file download, and record the answer beside the middleware rather
+  than in a row. **Live** — measured on every response served today. Filed by `M101`. **Tier: during-testing.**
+- **`minor` · Two documents disagree about which file on the box holds the `X-Robots-Tag` directive, and a runbook
+  that names the wrong one sends an operator to the wrong place during an incident.** Found by `M101` (2026-09-19)
+  while writing §8.3's authority statement for `R-562bcc2a`. This ledger records it as `Header always set
+  X-Robots-Tag` in `conf\extra\meridian.conf`; `docs/deployment-infrastructure.md` §8.3 names
+  `conf\extra\httpd-vhosts.conf` in the adjacent clause for the leftover `*:80` vhost, and this
+  repository's only line-by-line enumeration of `meridian.conf`'s contents does not list the directive at all.
+  ⚠️ **One read-only command on the box settles it** — search both files for the directive — and §8.3 deliberately
+  names neither until it is taken. **Live** — the ambiguity is in the tree today, and the gate `M101` built cannot
+  resolve it, because it measures the response rather than the file that produced it. Filed by `M101`.
+  **Tier: early-testing.**
+- **`minor` · `Permissions-Policy` is set on the guest runtime and asserted by no test anywhere.** Found by `M101`
+  (2026-09-19) while cataloguing this repository's header assertions. `PublicRuntimeSecurityHeaders` sets
+  `camera=(self), microphone=(self)` at `app/Http/Middleware/PublicRuntimeSecurityHeaders.php:68`, and a search of
+  `tests/` for that header name returns nothing — while the `Content-Security-Policy` it sets a few lines above
+  has a test asserting the ABSENCE of four directives as a deliberate tripwire. ⚠️ The grant is what lets a
+  respondent's `<input capture>` reach the camera, so silently losing it degrades a feature rather than announcing
+  itself, and the fix is one line in the unit test that already exists beside the CSP assertions. **Live** — the
+  header is unasserted today. Filed by `M101`. **Tier: during-testing.**
+- **`minor` · `public/.htaccess` is tracked, is read by exactly one deployment, and is exercised by no gate in any
+  environment.** Found by `M101` (2026-09-19) while declining to edit it for `R-0855052e`. The local stack is nginx
+  (`docker/nginx/default.conf`), there is no Apache in `docker-compose.yml` or anywhere under `docker/`, and
+  `tests/Feature/Deploy/DeployMaintenanceGuardTest.php` already records that there is none in CI either — so the
+  front-controller rule at `public/.htaccess:24` is inert everywhere except `staging.pitahc.gov.ph`.
+  ⛔ **Two rows have now each declined an arm because of it** — `R-4ff3e848`'s web-server arm and `R-0855052e`'s
+  exemption arm — so the cost has been paid twice and is no longer hypothetical. ⚠️ Either give CI an Apache
+  container that actually serves this file, or say in the file's own header that it is unexercised and that any
+  change to it ships unproved. **Live** — the next handler path added to that box is swallowed the same way.
+  Filed by `M101`. **Tier: during-testing.**
+- **`minor` · This repository asserts what the off-repo Testing Server Checklist says, in prose no gate can
+  check, and one such assertion was false for at least one increment.** Found by `M101` (2026-09-19) while
+  taking `R-0855052e`, whose remedy was *"delete the check from the checklist"* — and there was nothing there to
+  delete. `R-0855052e` and `docs/deployment-infrastructure.md` §8.3 both stated that the checklist *tells the
+  operator to read* `md-status`. Measured against the live artifact: **zero** occurrences of `md-status`,
+  `md_status` or `server-status`, and none of the twelve `pitahc.gov.ph` URLs it opens is a status handler.
+  ⛔ **The mechanism is the point, not the one wrong sentence.** The artifact lives outside the repository, so
+  `citation-liveness-lint` cannot resolve a claim about it, no test reads it, and `M100` corrected it in
+  thirteen places without anything re-deriving the sentences here that describe it. Thirty tracked prose
+  references to it exist. ⚠️ Either record the artifact's version beside every claim about it — `M100` and
+  `M101` both had one to hand — so a reader can tell a live claim from a dated one, or stop asserting its
+  contents and cite it only as the operator's surface. **Live** — the references are in the tree today and
+  nothing re-derives them. Filed by `M101`. **Tier: during-testing.**

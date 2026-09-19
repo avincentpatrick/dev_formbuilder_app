@@ -1,0 +1,15 @@
+HTTP/1.1 200 OK
+Date: Fri, 18 Sep 2026 23:38:55 GMT
+Server: Apache/2.4.66 (Win64) OpenSSL/3.6.0
+X-Powered-By: PHP/8.4.25
+Cache-Control: no-cache, private
+Content-Security-Policy: frame-ancestors 'none'
+X-Frame-Options: DENY
+X-Content-Type-Options: nosniff
+Referrer-Policy: strict-origin-when-cross-origin
+Link: <https://staging.pitahc.gov.ph/build/assets/app-CF1wJdpl.css>; rel="preload"; as="style", <https://staging.pitahc.gov.ph/build/assets/src-BYGSW_WW.css>; rel="preload"; as="style", <https://staging.pitahc.gov.ph/build/assets/app-1SseTGGR.css>; rel="preload"; as="style", <https://staging.pitahc.gov.ph/build/assets/app-CXiw310r.js>; rel="modulepreload"; as="script", <https://staging.pitahc.gov.ph/build/assets/src-BRn8Bk8w.js>; rel="modulepreload"; as="script"
+Vary: X-Inertia
+X-Robots-Tag: noindex, nofollow, noarchive
+Transfer-Encoding: chunked
+Content-Type: text/html; charset=utf-8
+

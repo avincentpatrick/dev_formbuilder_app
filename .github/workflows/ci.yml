@@ -338,6 +338,60 @@ jobs:
           fi
           exit $code
 
+      - name: Staging crawl protection — fetch (reachability is NOT a merge signal)
+        # ⛔ NIGHTLY ON `main` ONLY, AND THE TRIGGER IS THE DESIGN RATHER THAN A COST SAVING. What this
+        # gate watches is a line of Apache configuration on a box — `Header always set X-Robots-Tag` —
+        # which no push and no deploy touches. `deploy.yml` fires on a `workflow_run` and would miss a
+        # vhost edit or an Apache reinstall entirely; the schedule is what notices one, within a day.
+        # Running it per-push would also annotate every unrelated pull request whenever the box is
+        # down, which is the false-red habit this repository spends three gates trying not to teach.
+        # It is free while the repository is public (D48) — see that entry before flipping it private.
+        #
+        # ⚠️ `workflow_dispatch` IS INCLUDED, AND NOT FOR CONVENIENCE. A `schedule`-only condition cannot
+        # be exercised before it merges — the first run would be the night after, on the trunk, which is
+        # the one place a wrong `if:` or a broken fence must not be discovered. A manual re-verification
+        # run is also a run that SHOULD check the site: that trigger exists here because four jobs once
+        # never acquired a runner during an Actions outage (I5), and `scripts/gate-baselines.php` accepts
+        # it on `main` for the same reason.
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        # continue-on-error is load-bearing, exactly as it is for npm audit above: without it curl's
+        # own non-zero kills the job before the judge runs, and "the box is unreachable" and "the
+        # protection is gone" collapse back into the same red.
+        continue-on-error: true
+        run: |
+          mkdir -p staging-captures
+          # ⛔ THE URL LIST COMES FROM THE JUDGE, NEVER FROM THIS FILE. A host spelled here would be a
+          # second copy of scripts/staging-headers-judge.php's STAGING_HOST, free to drift from it.
+          php scripts/staging-headers-judge.php --probes > staging-captures/urls.txt
+          n=0
+          while IFS= read -r url; do
+            n=$((n + 1))
+            curl -sS --max-time 25 \
+              -D "staging-captures/$n.headers" \
+              -o "staging-captures/$n.body" \
+              "$url"
+          done < staging-captures/urls.txt
+
+      - name: Staging crawl protection — judge (the X-Robots-Tag must survive)
+        # The protection exists ONLY as vhost configuration on the box: there is no VirtualHost
+        # anywhere in this repository, and moving it into the app is refuted by measurement — Apache
+        # serves /robots.txt and /favicon.ico without invoking PHP at all, so no middleware can carry
+        # a header on the one URL crawlers actually fetch. docs/deployment-infrastructure.md §8.3.
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        run: |
+          set +e
+          php scripts/staging-headers-judge.php --captures=staging-captures
+          code=$?
+          set -e
+          # ⚠️ GitHub's default shell is `bash -e`. Without the fence above, the judge's non-zero
+          # aborts this step before code=$? is read and the design silently reverts to a hard block.
+          if [ "$code" = "2" ]; then
+            echo "::warning title=Staging headers NOT MEASURED::the testing site was unreachable or answered something that is not ours; no header was judged"
+            echo "⚠️ **The staging crawl protection was not measured.** The box was unreachable, or what answered could not be attributed to our own site, so **nothing was judged** about the \`X-Robots-Tag\` header. This is a green gate that judged nothing — the same family as D16." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          exit $code
+
       - name: Secret scan (gitleaks)
         run: |
           # ⛔ THE CLONE-SHAPE FENCE, AND IT IS NOT REDUNDANT WITH R7 (M77, closing M49's row and

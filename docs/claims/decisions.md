@@ -23,6 +23,53 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
+### D54 — The testing site sends no `Strict-Transport-Security` header. What `max-age` should it commit to, and does the vhost or the application send it? **Tier: early-testing.**
+
+**Filed 2026-09-19 by `M101`, which took the sibling `X-Robots-Tag` row and would not guess this one.** `R-06228b4f`
+says in terms that *"the remedy is a decision before it is a header"* and then carried no `Awaits` token, so
+`docs/pipeline.md` published it as **ready** and any session could have taken it and chosen a number on the user's
+behalf. On a `.gov.ph` host HSTS is a commitment made to the **browser**, not to us: once sent, a failed renewal
+becomes a hard block with no click-through for as long as the `max-age` says, and this box's renewal has already
+failed eleven times in one day (`D49`) and rests on a scheduled task that is about 59 days from its first real
+exercise. `preload` must not be sent at all while the name is a staging host, and that is not in question here.
+
+**What was measured for this entry, on 2026-09-19, from outside the agency network:**
+
+- `Strict-Transport-Security` is **absent** from `/`, `/login`, `/up`, `/robots.txt`, `/favicon.ico` and a 404 —
+  and the strings `Strict-Transport-Security` and `HSTS` appear **nowhere in the tracked tree**.
+- ⚠️ **Port 80 has no listener.** A connection from outside times out after 21 seconds. So there is no plaintext
+  downgrade path on this box for HSTS to protect against, except an active attacker who opens one. **That narrows
+  the benefit; it does not narrow the cost**, which is unchanged.
+- ✅ **HSTS is HOST-scoped, and this is what separates it from the sibling row.** One response carrying it covers
+  the whole origin, so the application is an adequate home for it — the exact opposite of `X-Robots-Tag`, which is
+  response-scoped and had to stay in the vhost because Apache serves `/robots.txt` without invoking PHP at all.
+- ⚠️ **But there is no precedent in this tree for an environment-conditioned response header** — zero instances
+  across `app/`, `config/`, `bootstrap/` and `routes/` — and `AppSecurityHeaders` is mounted per route group at ten
+  sites, never globally, because a global mount would break every embed. So the application arm means a **new,
+  separate, globally-appended middleware**, not a line added to the existing one.
+
+- **A — a deliberately short `max-age`, in the vhost beside the existing `X-Robots-Tag` line.** `max-age=300`, no
+  `includeSubDomains`, no `preload`. A lapsed certificate then hard-blocks a tester for five minutes rather than a
+  year, the mechanism is exercised before production ever needs it, and it needs no new pattern. It also arms for
+  free under the gate `M101` just built: adding it is one entry in `STAGING_REQUIRED_HEADERS`. Cost: the value
+  lives on the box, un-versioned, which is the very thing `R-562bcc2a` was about — mitigated by that gate, not
+  removed by it.
+- **B — a conventional `max-age=31536000`, in the vhost.** The strongest posture and the one a scanner expects. It
+  is also the most damaging thing on this list if a renewal ever lapses mid-testing: a year of un-clickable-through
+  failure on a `.gov.ph` address, for every tester who ever visited.
+- **C — send nothing on staging; build a global middleware enabled for production only.** Production inherits a
+  versioned, tested header and the testing site keeps its click-through. Costs a middleware, a registration in
+  `bootstrap/app.php`, and the first environment-conditioned header in this repository — and leaves the testing
+  site with no HSTS at all, which a security review will ask about.
+
+**Recommendation: A.** The measured inputs push the same way. The benefit here is narrower than the row assumes,
+because there is no port 80 to downgrade from; the cost of getting it wrong is a hard block on the exact people the
+site exists for; and a five-minute commitment buys the posture while bounding the blast radius to minutes. ⚠️ **A
+and C are not exclusive** — A is the right answer for *this box now*, and C is the right answer for production
+later, which is a separate row rather than a second option here. ⛔ **Whatever is chosen, it must not be `preload`.**
+
+---
+
 ### D51 — `R-5ecfa6cd`, the central-host sign-in loop, is tiered `early-testing`; `M98` measured it as unreachable by any tester. Which tier? **Tier: early-testing.**
 
 **Filed 2026-09-18 by `M99`, which verified the row without taking it.** The row's own `M98` clause ends *"`before-launch`

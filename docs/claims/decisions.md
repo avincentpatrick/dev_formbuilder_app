@@ -23,6 +23,41 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
+### D55 — `D31`'s invitation-only stance is enforced by one runtime toggle. Should it also be lockable from configuration? **Tier: during-testing.**
+
+**Filed 2026-09-19 by `M103`, which closed the accidental path and will not decide the deliberate one.**
+`D31` is recorded as **applied, not built** — *"`SettingKey::RegistrationOpenSignup` defaults to `true` …
+The switch lives in the super-admin console; nothing here needs code."* So the whole of invitation-only is
+one row in `settings`, and `M103` found that a console tab opened before that row existed silently wrote the
+default back, re-opening public registration with a success toast. ⚠️ **That accidental path is now closed**
+by an optimistic-concurrency token, so this decision blocks nothing and is not urgent. What remains is the
+deliberate path and the fresh-install path: the key still defaults to `true`, so any new deployment is open
+until somebody remembers, and any operator can still turn it on in two clicks with no second factor beyond
+the console's own.
+
+- **A — leave it as a runtime toggle, now that the accidental revert is fixed.** The token makes a stale tab
+  refuse rather than overwrite, the audit log records every deliberate change, and `staging.pitahc.gov.ph`
+  keeps one source of truth for the setting. Costs nothing and adds no second place to look.
+- **B — add a configuration lock for the testing site.** An env key that makes Open signup un-settable, with
+  the console rendering the switch disabled and explaining why. Genuinely closes the deliberate path, but it
+  is a SECOND source of truth for one setting — the shape `docs/gate-baselines.md` exists to prevent
+  elsewhere in this repository — and an operator who needs it off in a hurry now has to edit `.env` and
+  `config:cache` on the box.
+- **C — invert the default.** Ship `RegistrationOpenSignup` defaulting to `false`, so a fresh install is
+  closed until somebody opens it. ⚠️ This is the one option with a blast radius beyond the testing server:
+  the table is SPARSE, so "absent" is the state of every existing deployment, and flipping the default
+  changes their behaviour on deploy — precisely the argument `SettingKey::default()`'s own docblock makes
+  for why `SecurityRequireTwoFactor` must NOT default true.
+
+**Recommendation: A, and file nothing further.** The measured defect was the accidental revert, and it is
+fixed; B trades a real single source of truth for a hypothetical operator error that the audit log already
+attributes; C is the fail-safe reading in the abstract but the enum's own docblock argues persuasively
+against changing a sparse-table default under existing installs. ⚠️ If the answer is B, scope it to a
+deployment-level lock and say in `docs/deployment-infrastructure.md` §8.2 that the console switch is
+advisory on that host — a disabled control with no stated reason is worse than no control.
+
+---
+
 ### D54 — The testing site sends no `Strict-Transport-Security` header. What `max-age` should it commit to, and does the vhost or the application send it? **Tier: early-testing.**
 
 **Filed 2026-09-19 by `M101`, which took the sibling `X-Robots-Tag` row and would not guess this one.** `R-06228b4f`

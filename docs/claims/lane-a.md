@@ -194,8 +194,17 @@ Files: `app/Http/Middleware/PublicRuntimeSecurityHeaders.php` (docblock only, if
 Shared artefacts taken: `docs/feature-backlog.md`, `docs/claims/decisions.md`, `docs/pipeline.md`,
 `docs/backlog-triage.md`, `PROGRESS.md` (own status block and own hand-off line only), `docs/gate-baselines.md`.
 Paired files taken: none.
-Namespaces spent: migration prefix **`2026_08_17_000112`**, claimed here before use — reading the current
-maximum is not a reservation. **No ADR** (`0023` stays free, `0010` stays reserved for H1d). **One new
+Namespaces spent: migration prefixes **`2026_08_17_000112`** AND **`2026_08_17_000113`**, both claimed
+before use — reading the current maximum is not a reservation.
+⚠️ **THE SECOND PREFIX IS AN AMENDMENT, PUSHED BEFORE THE FILE IT NAMES WAS OPENED.** The claim asked for
+one. Written as a single migration — `Schema::table()` on the default connection, then the backfill UPDATE
+on `pgsql_privileged` — it **self-deadlocks and hangs forever**: Laravel wraps each migration in a
+transaction on `pgsql`, so the `ALTER` holds `ACCESS EXCLUSIVE` on `users` while the separate privileged
+SESSION waits for that same lock. Measured with `pg_blocking_pids()`, which named the migration process's
+own two backends, rather than inferred from the hang. The repository had already written this down one
+directory over: `2026_07_20_000004_backfill_resource_grants_from_form_collaborators.php` calls the split
+**"the binding constraint, not operator convenience"**. So the backfill becomes its own migration with
+`$withinTransaction = false`, which is the established shape, and the cost is one more prefix. **No ADR** (`0023` stays free, `0010` stays reserved for H1d). **One new
 decision** is appended for the config-lock question Row 4 raises, so the open-decision count moves by +1 and
 `docs/pipeline.md` must regenerate in the same push.
 

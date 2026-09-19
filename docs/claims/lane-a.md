@@ -16,7 +16,76 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M103` is merged; `early-testing` still has no startable row (nineteen rows on thirteen decisions), and `during-testing` is where work is being taken from
+## Status: ACTIVE CLAIM — the decision-push path and the tracker headroom warning (m104-push-path-and-headroom)
+
+Taken 2026-09-20. Branch `m104-push-path-and-headroom`, cut from origin/main at `c0e1638`, PR into main.
+Rows: `R-c24216c5` — *"The pre-push guard's protocol paths omit `docs/pipeline.md`."* — and `R-93610c49` —
+*"PROGRESS.md is within about five close-outs of the tracker-lint byte ceiling."* Both live in
+`docs/feature-backlog.md`, and both are cited by id rather than by line because this increment edits that file.
+
+### Evidence verified
+
+**`R-c24216c5` — HELD, in both halves.** `PROTOCOL_PATHS` in `scripts/pre-push-guard.php` lists exactly six
+entries — `PROGRESS.md`, `PROGRESS_ARCHIVE.md`, `docs/claims/**`, `docs/gate-baselines.md`,
+`docs/backlog-triage.md`, `docs/feature-backlog.md` — and `docs/pipeline.md` is not among them. Rule A's
+exemption is gated on `$docOnly`, which requires **every** changed path to be in that set, so a single
+unlisted path is enough to reclassify a documentation-only push as work.
+
+**`R-93610c49` — MOVED, and in the favourable direction.** The row states 124,804 bytes against the 130,000
+ceiling with 5,196 left. The tree at `c0e1638` reads **112,009 bytes, 17,991 of headroom**. The row's second
+citation holds exactly: `scripts/next.php` still gates its headroom warning at 4,000 bytes.
+
+### Premise verified
+
+**`R-c24216c5` — HOLDS, and the load-bearing sentence was re-measured rather than trusted.** The row's premise
+is that every close-out regenerates `docs/pipeline.md` in the same push. `.github/workflows/ci.yml` deliberately
+keeps that file **out** of `paths-ignore` so `pipeline-lint` can see it, and `scripts/next.php` generates the
+instruction requiring it in the same push as a `decisions.md` change. The guard's own cross-check asserts
+`PROTOCOL_PATHS` is a **superset** of `paths-ignore` — one-directional — so widening it cannot break that
+assertion. Read out of the parser, not inferred from the comment above it.
+
+**`R-93610c49` — EXPIRED, and that is the finding this claim exists to record.** The row says *"The earlier
+byte-ceiling row is closed, so nothing open tracks the next surgery"*, filed by `M98` on 2026-09-18.
+**`M100` performed that surgery two days later.** Commit `f181efb` carries `[tracker-surgery]` at line start:
+9 lines and 29,883 bytes moved, `PROGRESS.md` 129,102 -> 99,219, headroom 898 -> 30,781, proved A1-A4, slice
+sha256 `44fabf4f`, with `PROGRESS_ARCHIVE.md` growing to match. The row was never amended, so a discharged
+obligation has read as an imminent one for four close-outs, and `state.php`'s own headroom line could not
+contradict it because the row states a date-stamped measurement rather than a forward claim.
+**Evidence held, remedy was sound, only the premise rotted — and no gate in this repository can see that.**
+
+### Remedy verdict
+
+**`R-c24216c5` — WORKS, and the row prescribes its own control.** One entry added to `PROTOCOL_PATHS`. The row
+asks for *"a control proving a pipeline-only push is admitted while a code push still is not"*, which is the
+correct shape: the hazard is not the added path, it is a widened exemption that quietly stops refusing.
+⚠️ **It cannot be a Pest control.** `git` is not installed in the app container — measured here, `command -v git`
+returns nothing — which is `R-a31b3e8b` exactly, and this guard shells to `git show origin/main:…`. Following
+`M85`'s precedent it will be a **host** script, `scripts/pre-push-guard-controls.php`, registered beside
+`tracker-lint-controls` and `citation-liveness-lint-controls`.
+
+**`R-93610c49` — HALF ALREADY EXECUTED, HALF UNDONE.** The surgery half was performed by `M100` and needs
+recording, not repeating: at 17,991 bytes of headroom and a measured +3,198 bytes per close-out since that
+surgery, the next one is roughly five or six close-outs away. The threshold half is untouched and is a
+one-constant change. **Performing a surgery this increment would move bytes that do not need moving**, so the
+row is amended and left open against the next one rather than closed.
+
+Files: `scripts/pre-push-guard.php`, `scripts/pre-push-guard-controls.php` (new), `scripts/next.php`,
+`composer.json`, `.github/workflows/ci.yml`, `docs/feature-backlog.md`, `docs/pipeline.md`, `PROGRESS.md`,
+`docs/claims/lane-a.md`.
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/claims/lane-a.md`, `composer.json`,
+`.github/workflows/ci.yml`, `PROGRESS.md` (own status block and hand-off line only).
+Paired files taken: none — 7(b-bis) governs gates that read the other lane's tree, and Lane B is retired.
+Namespaces spent: nothing from either namespace — no migration prefix, no ADR, no sub-decision id.
+Prediction: `pipeline-lint` P1 goes RED the moment `R-c24216c5` is retiered and stays red until
+`docs/pipeline.md` is regenerated in the same push — expected, and not a defect. PHPStan will not move at all:
+it scans `app`, `database` and `routes`, and nothing here touches them, so the number will be quoted as
+unchanged rather than re-measured. Pint must be run bare, because the scoped form every hand-off used to
+prescribe does not reach `scripts/`. **The new CI step changes the Static analysis job's step count, so
+`docs/gate-baselines.md` must be regenerated from this increment's own post-merge run** — and that is the one I
+most expect to get wrong, because `M73` proved `gh run list --limit 1` is not "newest" and stamped a baseline
+from an eight-day-old run that satisfied every guard it had. I will pass `--run=<id>` explicitly and read the
+provenance line back. Second most likely wrong: the control's **refusal** arm passing vacuously — the M69 shape,
+where every control exercises the arm that fires and none exercises the arm that must not.
 
 ## RELEASED — `M103`, four `during-testing` rows a tester meets in week one, with two headlines corrected (merged as PR #296, `77a268d`, 6/6 green with real step counts — Static analysis 30 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

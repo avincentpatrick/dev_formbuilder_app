@@ -51,11 +51,22 @@ afterEach(function (): void {
  * invisible there — so the FK turns that invisibility into a 23503 rather than into a null, exactly as
  * tests/Pest.php's `committedSuperAdmin()` docblock warns.
  *
+ * ⚠️ NAMED `committedPlatformOperator`, NOT `committedConsoleOperator`. That name is already taken by
+ * `tests/Feature/Auth/CentralHostLoginTest.php`, and because a fixture declared in a test file resolves
+ * only when THAT file is loaded, the clash is invisible in a single-file run and a fatal
+ * "Cannot redeclare" the moment both are in one Pest invocation — which is how M103 found it.
+ *
+ * ⚠️ `two_factor_secret` IS NULL ON PURPOSE, COPIED FROM THAT FILE'S REASONING RATHER THAN FROM ITS
+ * NAME. Fortify's `hasEnabledTwoFactorAuthentication()` needs BOTH columns, so a null secret means no
+ * TOTP challenge is ever issued, while `EnsureSuperAdminMfa` reads only the timestamp and lets the
+ * console through. `UserFactory::confirmedTwoFactor()` writes a placeholder secret instead and, as that
+ * docblock warns, would lock the account out permanently.
+ *
  * ⚠️ RANDOM ADDRESS, AND DELIBERATELY NEVER DELETED. These rows are committed, so they outlive the
  * transaction; a fixed address would collide on `users.email` on the second run, and an afterEach DELETE
  * deadlocks against the locks the suite still holds. `migrate:fresh` is the cleaner.
  */
-function committedConsoleOperator(): User
+function committedPlatformOperator(): User
 {
     $operator = committedSuperAdmin(Str::lower(Str::random(12)).'@platformconsoletest.local');
 
@@ -64,7 +75,7 @@ function committedConsoleOperator(): User
     // redirects to enrollment — a 302 with no session errors and no toast, which reads as "the save did
     // nothing" rather than as a fixture fault.
     $operator->forceFill([
-        'two_factor_secret' => encrypt('PLACEHOLDERSECRET'),
+        'two_factor_secret' => null,
         'two_factor_confirmed_at' => now(),
     ])->save();
 
@@ -184,7 +195,7 @@ it('requires the concurrency token, so an omitted one is refused rather than unc
 });
 
 it('saves when the token matches, and the toast names what actually changed', function () use ($adminUrl): void {
-    $admin = committedConsoleOperator();
+    $admin = committedPlatformOperator();
 
     app(PlatformSettings::class)->forget();
     $token = app(PlatformSettings::class)->fingerprint();
@@ -223,7 +234,7 @@ it('tells the operator when a save changed nothing, and files no audit for it', 
 
 it('ships a token with the page that the very next save accepts', function () use ($adminUrl): void {
     $this->withoutVite();
-    $admin = committedConsoleOperator();
+    $admin = committedPlatformOperator();
 
     // A round trip rather than two calls to fingerprint(): this is what proves the token the BROWSER is
     // given is the one the server will accept, which is the only claim worth making about it.

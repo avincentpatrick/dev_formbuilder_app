@@ -16,76 +16,90 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — the decision-push path and the tracker headroom warning (m104-push-path-and-headroom)
+## Status: NO ACTIVE CLAIM — `M104` is merged; the decision-push path is open at last, so the thirteen `early-testing` decisions can now be recorded, and that sweep is the next increment
 
-Taken 2026-09-20. Branch `m104-push-path-and-headroom`, cut from origin/main at `c0e1638`, PR into main.
-Rows: `R-c24216c5` — *"The pre-push guard's protocol paths omit `docs/pipeline.md`."* — and `R-93610c49` —
-*"PROGRESS.md is within about five close-outs of the tracker-lint byte ceiling."* Both live in
-`docs/feature-backlog.md`, and both are cited by id rather than by line because this increment edits that file.
+## RELEASED — `M104`, the decision-push path, its first controls, and a headroom warning that arrives in time (merged as PR #297, `916011e`, 6/6 green with real step counts — Static analysis 31 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 
-### Evidence verified
+Shipped 2026-09-20. Branch `m104-push-path-and-headroom`, cut from `origin/main` at `c0e1638`.
 
-**`R-c24216c5` — HELD, in both halves.** `PROTOCOL_PATHS` in `scripts/pre-push-guard.php` lists exactly six
-entries — `PROGRESS.md`, `PROGRESS_ARCHIVE.md`, `docs/claims/**`, `docs/gate-baselines.md`,
-`docs/backlog-triage.md`, `docs/feature-backlog.md` — and `docs/pipeline.md` is not among them. Rule A's
-exemption is gated on `$docOnly`, which requires **every** changed path to be in that set, so a single
-unlisted path is enough to reclassify a documentation-only push as work.
+**One row closed, one amended and left open, and the increment is not the one that was planned.**
+`R-c24216c5` is closed: `docs/pipeline.md` joins `PROTOCOL_PATHS`, so a close-out or a recorded
+decision answer — both of which MUST regenerate that file in the same push — stops being
+reclassified as work by rule A. That was the prerequisite blocking the whole `early-testing`
+decision sweep. Every claimed file was edited, and the claim was extended to nothing mid-build.
 
-**`R-93610c49` — MOVED, and in the favourable direction.** The row states 124,804 bytes against the 130,000
-ceiling with 5,196 left. The tree at `c0e1638` reads **112,009 bytes, 17,991 of headroom**. The row's second
-citation holds exactly: `scripts/next.php` still gates its headroom warning at 4,000 bytes.
+⛔ **THE PLANNED INCREMENT WAS A `PROGRESS.md` SURGERY, AND VERIFYING THE PREMISE BEFORE STARTING
+KILLED IT.** `R-93610c49` was filed by `M98` on 2026-09-18 saying `PROGRESS.md` stood at 124,804
+bytes with 5,196 of headroom and that *"nothing open tracks the next surgery"*. **`M100` performed
+that surgery two days later** — `f181efb`, `[tracker-surgery]` at line start, 9 lines and 29,883
+bytes moved, 129,102 -> 99,219, headroom 898 -> 30,781, proved A1-A4, slice sha256 `44fabf4f`. The
+row was never amended, so a discharged obligation read as imminent for four close-outs, and the
+approved plan for this increment was built on it. The tree reads **112,009 bytes with 17,991 of
+headroom** and grows **+3,198 bytes per close-out** since that surgery, so the next move is five or
+six close-outs out. ⚠️ **EVIDENCE HELD AND THE REMEDY WAS SOUND; ONLY THE PREMISE ROTTED** — which
+is the third claim field earning its place for the fifth recorded time, and the one thing no gate
+in this repository can see. The row is amended and **left open** against the next surgery rather
+than closed: performing one now would move bytes that do not need moving.
 
-### Premise verified
+**The second remedy shipped.** `scripts/next.php` warns at `HEADROOM_WARNING_BYTES = 8000` instead
+of a bare 4,000, which is what the row asked for — at 4,000 the hand-off first spoke with about one
+close-out left, which is room to discover a surgery is overdue rather than room to plan one. ⚠️ Its
+message also **restated the growth rate** as "two to three KB", already below the measured mean when
+anyone read it, so the sentence understated the pressure at the exact moment it appeared; it now
+points at the gate that measures the rate instead of carrying a copy that can only rot. Proved by
+deliberate defect — raising the constant makes the warning fire — and the file restored by sha256.
 
-**`R-c24216c5` — HOLDS, and the load-bearing sentence was re-measured rather than trusted.** The row's premise
-is that every close-out regenerates `docs/pipeline.md` in the same push. `.github/workflows/ci.yml` deliberately
-keeps that file **out** of `paths-ignore` so `pipeline-lint` can see it, and `scripts/next.php` generates the
-instruction requiring it in the same push as a `decisions.md` change. The guard's own cross-check asserts
-`PROTOCOL_PATHS` is a **superset** of `paths-ignore` — one-directional — so widening it cannot break that
-assertion. Read out of the parser, not inferred from the comment above it.
+⛔ **`scripts/pre-push-guard.php` HAD NO COVERAGE OF ANY KIND**, which is the finding worth more
+than the one-line fix. It is the thing that decides what may reach the trunk, and this increment
+widened the one list that IS its whole definition of documentation-only. `R-c24216c5` said so before
+it landed — *"the change wants a control proving a pipeline-only push is admitted while a code push
+still is not"*. Six cases now run over a throwaway synthetic repository. ⚠️ **A HOST SCRIPT, NOT
+PEST:** the guard's input is the commit graph and `git` is not installed in the app container
+(`R-a31b3e8b`, measured again here — `command -v git` returns nothing), so a Pest control would be
+permanently red locally and green in CI. That is the third time this trade has been refused for the
+same reason, after `tracker-lint-controls` and `citation-liveness-lint-controls`.
 
-**`R-93610c49` — EXPIRED, and that is the finding this claim exists to record.** The row says *"The earlier
-byte-ceiling row is closed, so nothing open tracks the next surgery"*, filed by `M98` on 2026-09-18.
-**`M100` performed that surgery two days later.** Commit `f181efb` carries `[tracker-surgery]` at line start:
-9 lines and 29,883 bytes moved, `PROGRESS.md` 129,102 -> 99,219, headroom 898 -> 30,781, proved A1-A4, slice
-sha256 `44fabf4f`, with `PROGRESS_ARCHIVE.md` growing to match. The row was never amended, so a discharged
-obligation has read as an imminent one for four close-outs, and `state.php`'s own headroom line could not
-contradict it because the row states a date-stamped measurement rather than a forward claim.
-**Evidence held, remedy was sound, only the premise rotted — and no gate in this repository can see that.**
+⛔ **TAKEN OUT OF TIER ORDER DELIBERATELY, AND THE REASON IS RECORDED AT THE ROW.** `R-c24216c5` is
+tiered `after-launch` while blocking `early-testing` work. The tier was wrong rather than the
+choice; it was simply never revisited after `M95` filed it.
 
-### Remedy verdict
+### How the prediction fared
 
-**`R-c24216c5` — WORKS, and the row prescribes its own control.** One entry added to `PROTOCOL_PATHS`. The row
-asks for *"a control proving a pipeline-only push is admitted while a code push still is not"*, which is the
-correct shape: the hazard is not the added path, it is a widened exemption that quietly stops refusing.
-⚠️ **It cannot be a Pest control.** `git` is not installed in the app container — measured here, `command -v git`
-returns nothing — which is `R-a31b3e8b` exactly, and this guard shells to `git show origin/main:…`. Following
-`M85`'s precedent it will be a **host** script, `scripts/pre-push-guard-controls.php`, registered beside
-`tracker-lint-controls` and `citation-liveness-lint-controls`.
+| Predicted | Outcome |
+|---|---|
+| `pipeline-lint` P1 red until `docs/pipeline.md` is regenerated | **Never observed.** The prediction assumed a retier; the row was CLOSED instead, and the regeneration happened before any gate ran. The sequence predicted was never executed. |
+| PHPStan will not move | **Held, by construction and stated as such** — it scans `app`, `database` and `routes`; this diff touches none of them. Not re-measured, deliberately. |
+| Pint must be run bare | **Held.** Passed on the host over `scripts/`, which the scoped form does not reach. |
+| The new CI step moves the Static analysis step count, so baselines must be regenerated — **named as most likely wrong** | **Right, and it was the safe prediction rather than the brave one.** 30 -> 31, confirmed against the job API rather than the checks summary. |
+| The control's refusal arm would pass vacuously — **named second most likely wrong** | **WRONG, and wrong in the useful direction.** Widening the exemption to `app/` reddened **C2, C3 AND C5**. |
 
-**`R-93610c49` — HALF ALREADY EXECUTED, HALF UNDONE.** The surgery half was performed by `M100` and needs
-recording, not repeating: at 17,991 bytes of headroom and a measured +3,198 bytes per close-out since that
-surgery, the next one is roughly five or six close-outs away. The threshold half is untouched and is a
-one-constant change. **Performing a surgery this increment would move bytes that do not need moving**, so the
-row is amended and left open against the next one rather than closed.
+⛔ **THE THING THE PREDICTION DID NOT ANTICIPATE, AND THE REASON THE MUTATION WAS WORTH RUNNING:**
+under that second mutation **C5 kept the correct exit code and failed on its PHRASE.** A control
+asserting only a status would have stayed green while the guard had stopped refusing anything at
+all. Three of the six cases share exit 1 for three different reasons, so each one asserts a
+distinguishing sentence as well as a code — and that design was justified by running the mutation,
+not by reasoning about it beforehand.
 
-Files: `scripts/pre-push-guard.php`, `scripts/pre-push-guard-controls.php` (new), `scripts/next.php`,
-`composer.json`, `.github/workflows/ci.yml`, `docs/feature-backlog.md`, `docs/pipeline.md`, `PROGRESS.md`,
-`docs/claims/lane-a.md`.
-Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/claims/lane-a.md`, `composer.json`,
-`.github/workflows/ci.yml`, `PROGRESS.md` (own status block and hand-off line only).
-Paired files taken: none — 7(b-bis) governs gates that read the other lane's tree, and Lane B is retired.
-Namespaces spent: nothing from either namespace — no migration prefix, no ADR, no sub-decision id.
-Prediction: `pipeline-lint` P1 goes RED the moment `R-c24216c5` is retiered and stays red until
-`docs/pipeline.md` is regenerated in the same push — expected, and not a defect. PHPStan will not move at all:
-it scans `app`, `database` and `routes`, and nothing here touches them, so the number will be quoted as
-unchanged rather than re-measured. Pint must be run bare, because the scoped form every hand-off used to
-prescribe does not reach `scripts/`. **The new CI step changes the Static analysis job's step count, so
-`docs/gate-baselines.md` must be regenerated from this increment's own post-merge run** — and that is the one I
-most expect to get wrong, because `M73` proved `gh run list --limit 1` is not "newest" and stamped a baseline
-from an eight-day-old run that satisfied every guard it had. I will pass `--run=<id>` explicitly and read the
-provenance line back. Second most likely wrong: the control's **refusal** arm passing vacuously — the M69 shape,
-where every control exercises the arm that fires and none exercises the arm that must not.
+⚠️ **AND A TRAP THIS REPOSITORY HAD ALREADY WRITTEN DOWN WAS WALKED INTO LIVE.** Mutation 1 was
+restored with `git checkout -- <path>`, which reverted to HEAD and **took the increment's own
+uncommitted edit with it** — the file went back to its pre-`M104` state while the harness reported
+a clean restore was intended. `scripts/mutate.php`'s header states that it restores **by byte
+comparison rather than `git checkout --`** for exactly this reason. The sha256 comparison caught it
+in the same breath, which is the entire argument for comparing rather than assuming; every later
+restore came from a scratchpad copy and was verified against the original digest.
+
+**THE FILE RECORD.** New: `scripts/pre-push-guard-controls.php`. Amended: `scripts/pre-push-guard.php`
+· `scripts/next.php` · `composer.json` · `.github/workflows/ci.yml`. Shared:
+`docs/feature-backlog.md` · `docs/pipeline.md` · `docs/claims/lane-a.md` · `PROGRESS.md` (own block
+and hand-off line only). ⚠️ **`docs/feature-backlog.md` WAS EDITED UNDER THE `M64`/`M65` INVARIANT
+BECAUSE 381 CITATIONS POINT INTO IT** — `3 3` in numstat, every hunk `@@ -N +N @@`, line count
+identical, so nothing shifted and citation-liveness held at 18 of 18 with its ceiling untouched.
+➕ **FILED RATHER THAN FIXED, THE MOMENT EACH WAS DECIDED:** `docs/backlog-triage.md` is drifted from
+the tree and its `--check` is wired into nothing, so no gate says so; `docs/claims/lane-a.md` has no
+size ceiling, no archive target and no surgery precedent while being the largest ungated file in the
+repository; and `R-ed8d8b57` is stale in its cited mechanism — `pipeline.php --check` anchors on
+`## Testing gate`, not `## The line`, since `M93` moved it, so the uncompared region is 1,364 bytes
+of banner rather than what the row implies.
 
 ## RELEASED — `M103`, four `during-testing` rows a tester meets in week one, with two headlines corrected (merged as PR #296, `77a268d`, 6/6 green with real step counts — Static analysis 30 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

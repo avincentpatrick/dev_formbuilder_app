@@ -63,6 +63,14 @@ const MAX_DIRECT_TRUNK_COMMITS = 1;
 //    a file that is on the stop list. The relation between the two lists is instead ASSERTED below:
 //    this set must be a SUPERSET of paths-ignore, checked on every run, failing closed if ci.yml ever
 //    grows an entry this guard does not know about.
+//
+// ⛔ AND docs/pipeline.md IS HERE FOR THE OPPOSITE REASON TO THE BACKLOG, WHICH IS WHY IT WAS MISSED.
+//    It is deliberately NOT in paths-ignore — pipeline-lint has to see it — so the superset assertion
+//    below could never have pulled it into this list the way it would catch a new ignore entry. But
+//    CLAUDE.md requires it regenerated in the SAME push as any change to a row's tier, awaits or
+//    liveness, and as any recorded decision answer. Every close-out and every answered decision
+//    therefore carries it, and without this entry that push holds one unlisted path, so rule A
+//    reclassifies the whole thing as work. M94 hit exactly that. Filed as R-c24216c5, closed by M104.
 const PROTOCOL_PATHS = [
     'PROGRESS.md',
     'PROGRESS_ARCHIVE.md',
@@ -70,6 +78,7 @@ const PROTOCOL_PATHS = [
     'docs/gate-baselines.md',
     'docs/backlog-triage.md',
     'docs/feature-backlog.md',
+    'docs/pipeline.md',
 ];
 
 $root = dirname(__DIR__);

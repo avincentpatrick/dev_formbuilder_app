@@ -83,6 +83,7 @@
         "tracker-surgery": "@php scripts/tracker-surgery.php",
         "citation-liveness-lint": "@php scripts/citation-liveness-lint.php",
         "citation-liveness-lint-controls": "@php scripts/citation-liveness-lint-controls.php",
+        "pre-push-guard-controls": "@php scripts/pre-push-guard-controls.php",
         "pipeline-lint": "@php scripts/pipeline-lint.php",
         "test-pointer-lint": "@php scripts/test-pointer-lint.php",
         "test-pointer-lint-selftest": "@php scripts/test-pointer-lint.php --selftest",
@@ -104,6 +105,7 @@
             "@tracker-lint-controls",
             "@citation-liveness-lint",
             "@citation-liveness-lint-controls",
+            "@pre-push-guard-controls",
             "@pipeline-lint",
             "@test-pointer-lint",
             "@test-pointer-lint-selftest"

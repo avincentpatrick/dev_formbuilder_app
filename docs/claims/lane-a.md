@@ -16,7 +16,135 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M104` is merged; the decision-push path is open at last, so the thirteen `early-testing` decisions can now be recorded, and that sweep is the next increment
+## Status: ACTIVE CLAIM — `M105`, the fourteen `early-testing` decisions recorded (`m105-early-testing-decision-sweep`)
+
+Taken 2026-09-20. Branch `m105-early-testing-decision-sweep`, cut from `origin/main` at `69bc737`, PR into `main`.
+Rows: the thirteen open decisions tiered `early-testing` — `D20`, `D26`, `D28`, `D33`, `D34`, `D35`, `D36`, `D37`,
+`D38`, `D51`, `D52`, `D53`, `D54` — **plus `D44`, which is tiered `before-launch` and is taken deliberately out of
+tier order.** Between them they block **eighteen** rows: `D38` six, `D44` and `D26` two each, the other eight one
+each. ⛔ **THIS INCREMENT RECORDS ANSWERS AND REPAIRS WHAT VERIFYING THEM FOUND. It does not build the unblocked
+work** — the eighteen rows become `ready` for `M106` and later. Confirmed with the user before the branch was cut.
+
+⚠️ **The brief's enumeration was wrong in both directions and was corrected before starting.** It named `D44` as
+one of the thirteen and omitted `D53`. `D44` is `before-launch`; `D53` is the thirteenth `early-testing` decision
+and blocks no row at all.
+
+### Evidence verified
+
+**Per decision and per blocked row, against the merged tree.** The `**Awaits D<n>.**` tokens are all present and
+all parse: 26 in `docs/feature-backlog.md`, of which **18 name these fourteen** (`scripts/state.php:641`).
+
+- ✅ **`D38`'s six rows — every premise holds.** `routes/api.php` registers 68 routes with no `draft`, `sections`,
+  `fields`, `validations`, `exports`, `users` or `roles`, and the generated `openapi.json` (51 paths, produced from
+  the routes by Scramble) independently corroborates every absence. **There is no hand-maintained second copy of
+  the API documentation** — the classic rot is absent here.
+- ⛔ **`R-9e3e417e` carries three DEAD-IN-MEANING citations.** `FormBuilderService.php:157`, `:322` and `:331` now
+  land on a `@param` docblock, a bare `}` and an unrelated field-library docblock; the real sites are `:240`,
+  `:276`, `:316-318` and `:572`. The file moved in four commits after `M80` filed. **They pass the citation gate
+  precisely because they resolve** — the blind spot `scripts/citation-liveness-lint.php:15-21` documents about
+  itself.
+- ⚠️ **`R-4328a4d9`'s census drifted** — the row says 24 throttle registrations (14 / 9 / one); the tree holds
+  **26** (14 `AppServiceProvider`, **10** `FortifyServiceProvider`, 2 `QueueServiceProvider`). The conclusion
+  survives: no `perMinute(300)` anywhere.
+- ⚠️ **`R-fcfc1f52`'s "exactly two hits repository-wide" is now six**, because the ledger rows quoting it are
+  themselves hits. The two substantive hits are unchanged.
+- ✅ **`D26` verified precise and fully current.** `useSyncOutbox.ts:261` sums three device-wide refs; `:234-236`
+  scopes only `mine` and `earlierUnsentCount` to the session; the 80% threshold is `:257`. All three of its
+  supporting sub-claims were re-measured and hold.
+- ✅ `D51`'s affordance is where `M98` said it is (`Welcome.vue:70-78`, guarded `v-if="registrationOpen"`), and
+  nothing has merged since `M98` touching `Welcome.vue`, `PlatformLandingController.php` or `bootstrap/app.php`.
+- ✅ `D52`'s copy is verbatim at `WelcomeNotification.php:88`, and its reset-and-verify path still reaches it: the
+  placeholder is written with **no** `email_verified_at` (`TenantMembershipService.php:794-801`), which is set only
+  at accept (`InvitationController.php:268-272`).
+
+### Premise verified
+
+⛔ **SIX PREMISES HAVE ROTTED, AND FIVE OF THEM ARE STILL PUBLISHED.** This is the third claim field earning its
+place for the sixth recorded time.
+
+1. ⛔ **`R-5ecfa6cd`'s HEADLINE IS FALSE, and has been since `M96` (2026-09-15).** It says *"…lands on a 404"*, but
+   `bootstrap/app.php:613-621` renders `NotASubdomainException` for a **web** request as
+   `redirect(config('app.url'))`; only the `/api/v1` arm 404s. Pinned by `CentralHostFallbackTest.php:25` and
+   `:32`. `M96` corrected the row's BODY and `M98` repeated it; **neither rewrote the headline**, and
+   `pipeline.php` takes the headline as the Task text — so the false symptom is published in `docs/pipeline.md` at
+   `:46`, the Next section every session is pointed at, and again at `:80`. The real symptom is a redirect loop.
+2. ⛔ **A second copy of the same false 404 sits in `docs/ACCESS-MATRIX.md:105`**, which `M98` named by sentence.
+   Four increments have merged since and it is untouched.
+3. ⛔ **`R-06228b4f`'s `M101` amendment asserts *"Port 80 has no listener"*** (`docs/feature-backlog.md:10614`).
+   `M102` refuted exactly that sentence by reading the box — an uncommented `Listen 80`, and `httpd -S` mapping a
+   live `*:80` vhost serving a permanent redirect; the 21-second timeout measured the agency firewall. **`D54`'s
+   entry carries the correction; the row does not.**
+4. ⛔ **`R-491e4c32` still publishes a blocker that two increments and one decision have measured false.** Its
+   whole stated rationale is *"touching the device-wide count risks the boot drain that ADR-0021 makes
+   load-bearing"* (`:1412`); `R-d6609e82` refutes it, `M77` reached the same conclusion independently, and `D26`
+   escalates it to ⛔. The row carries no correction token and sits in the line at rank 18.
+5. ⛔ **`D38`'s own premise sentence is FALSE for one of its six.** *"Nothing shipped depends on them"* — but the
+   documented `GET /api/v1/roles` is the stated reason roles use UUIDv7 primary keys rather than Spatie's bigints,
+   cited at `docs/multi-tenancy-rbac-design.md:56`, `app/Models/Role.php:13` and `config/permission.php:20-21`.
+   **That schema shipped.** A plain trim orphans the rationale for a decision already paid for.
+6. ⛔ **`D52` PRE-DATES `M103` BY ONE DAY.** `M103` (`77a268d`, 2026-09-19) added a `welcomed_at` once-per-person
+   guard (`SendWelcomeEmail.php:60-67`, `:153-172`). It does **not** close `D52`'s path — a placeholder has
+   `email_verified_at` NULL, so the backfill skips it and `claimWelcome()` wins — but it makes the bad copy the
+   person's **only** welcome, because accepting the invitation fires no `Verified`. `D52` option A prices the harm
+   as *"confusing copy rather than a blocked task"*, and that pricing is now wrong.
+
+⛔ **AND THE INTERLOCK THAT JUSTIFIES TAKING `D44` OUT OF TIER ORDER.** `D51` and `D52` are *tier* questions about
+two rows whose *content* question is `D44`. `D51`'s own option A concedes *"the remedy is blocked under `D44` in
+any case… so `early-testing` buys no earliness"*. Answering the retiers alone changes the sort and nothing else:
+`scripts/pipeline.php:687-699` sets `blocked` from `awaits` without reading `tier`, and `:711-726` sorts on the
+row's own tier without reading the decision's. **This is the `M104` precedent** — a decision blocking two
+`early-testing` rows while tiered `before-launch` means the tier was wrong rather than the choice.
+
+⚠️ **NO GATE CAN SEE ANY OF IT.** `scripts/pipeline-lint.php` has P7a/b/c/e and **no P7d**; `p7e_awaits()`
+(`:1406-1444`) tests only that the awaited decision is open. A row tiered `early-testing` awaiting a
+`before-launch` decision passes silently, by construction — and `docs/pipeline.md:19-20` says so in its own header.
+Filed rather than built, on the user's explicit call.
+
+### Remedy verdict
+
+**The prescribed remedy is the choreography itself, and it holds** — derived empirically from `e853b79` (`M97`,
+`D46`), `64242df` (`M98`, `D47`+`D48`) and `f181efb` (`M100`, `D49`) rather than from prose.
+
+- ✅ **Works:** cut the entry from `## OPEN`; rewrite the heading's trailing `**Tier: x.**` token to
+  `**<LETTER> — <answer>.**`; insert the `**Answered …**` paragraph; paste at the top of `## ANSWERED`; strip the
+  `**Awaits D<n>.**` tokens; regenerate `docs/pipeline.md` in the same push.
+- ✅ **Row ids are stable.** `TOKEN_STRIP` (`scripts/state.php:100`) strips the `Tier:` and `Awaits` tokens
+  **before** hashing, so stripping 18 tokens renumbers no `R-…`. Measured, not assumed.
+- ⚠️ **NEVER EXERCISED BEFORE.** `git log -S` over every answered decision returns **zero** commits touching an
+  `**Awaits D<n>.**` token — no row in this repository's history has ever awaited a decision that was later
+  answered. P7e's strip-or-retarget path is specified (`scripts/pipeline-lint.php:1396-1400`) and has never run.
+  This increment runs it eighteen times at once.
+- ⛔ **`D26`'s entry contains an INTERNAL `---` fence at `decisions.md:553`**, with an `M86` addendum after it. A
+  cut that searches for the closing fence truncates it. Cutting is by **pre-measured line index to the next
+  `^### D` heading** — `CLAUDE.md`'s own rule, and `D26` is the worked example.
+- ⛔ **`docs/feature-backlog.md` is edited under the `M64`/`M65` invariant.** 381 citations point into it by line
+  number, so every mid-file hunk must read `@@ -N +N @@` with symmetric numstat. All 18 tokens sit mid-line or at
+  line end, so stripping is already line-count preserving; amendments append to the **existing** line, never as a
+  new one; new rows go at the file's end, where they shift nothing.
+- ⛔ **The `D38` six cannot be trimmed here, and the reason is not scope.** `docs/api-specification.md` and
+  `docs/architecture/technical-architecture.md` are tier-1 with **zero tolerance** for dead citations
+  (`scripts/citation-liveness-lint.php:77-78`, run at `ci.yml:242`), and **`docs/pipeline.md:50` — itself tier-1 —
+  cites `docs/api-specification.md:63` by line.** Trimming shifts every line below it and must re-point citations
+  in the same commit. That is row work, not answer work.
+
+Files: `docs/claims/decisions.md` · `docs/feature-backlog.md` · `docs/pipeline.md` · `docs/claims/lane-a.md` ·
+`PROGRESS.md` (own status block and hand-off line only).
+Shared artefacts taken: all five above; `docs/**` is claimed and never owned.
+Paired files taken: **none.** ⚠️ Recorded for whoever takes `D26`'s row work: `lane-b.md:25-27` names
+`packages/design-system/src/theme/__tests__/clipped-node-containment.test.ts` as `SyncStatus.vue`'s pair, in an
+exact-equality `KNOWN_UNGUARDED` assertion that must shrink in the same PR as the fix. This increment does not open
+`SyncStatus.vue`.
+Namespaces spent: **nothing from either namespace** — no migration, no ADR. Fourteen `D<n>` ids are *retired* from
+`## OPEN` rather than allocated.
+Prediction: `pipeline-lint` P7b goes red if `docs/pipeline.md` is regenerated before every entry has moved — it
+refuses an orphan decision row and a missing open decision independently, from its own re-parse. `tracker-lint` R8
+holds, since no number enters `CLAUDE.md`. PHPStan will not move: it scans `app`, `database` and `routes`, and this
+diff touches none of them — stated rather than re-measured. Pint must be run **bare**; the scoped form misses
+`scripts/`. CI produces a real run because `docs/feature-backlog.md` and `docs/pipeline.md` are **not** in
+`paths-ignore`, unlike `docs/claims/**`. ⚠️ **MOST LIKELY WRONG: that the eighteen strips are clean.** P7e has
+never run here; I expect its first real exercise to find something the specification does not say. **Second most
+likely wrong:** that `docs/feature-backlog.md`'s numstat comes out symmetric on the first attempt — five of the six
+premise repairs want more words than the sentence they replace.
 
 ## RELEASED — `M104`, the decision-push path, its first controls, and a headroom warning that arrives in time (merged as PR #297, `916011e`, 6/6 green with real step counts — Static analysis 31 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

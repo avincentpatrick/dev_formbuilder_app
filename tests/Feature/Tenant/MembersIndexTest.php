@@ -106,3 +106,86 @@ it('lists active members and pending invites with resolved identities', function
             ->where('members.1.email', $pending->email)
             ->where('assignableRoles.0.value', 'admin'));
 });
+
+/*
+|--------------------------------------------------------------------------
+| Increment M103 — R-17238a20, and the row's HEADLINE IS REFUTED rather than confirmed.
+|
+| The row said the roster 500s because `listMembers()` builds its identity map from
+| `User::query()->whereIn('id', ...)`, and named a soft-deleted user or RLS as the two ways in. Neither
+| is reachable: the read is `User::on('pgsql_auth')->withTrashed()`, whose `users_auth_select` policy is
+| `USING (true)`, and `tenant_users.user_id` is `constrained('users')->cascadeOnDelete()` so a hard
+| delete takes the membership with it. All three legs of the map's totality hold in production.
+|
+| ⛔ WHAT `M99` ACTUALLY REPRODUCED WAS ITS OWN FIXTURE, AND tests/Pest.php SAYS SO IN ADVANCE: a
+| `User::factory()` member is invisible to the separate `pgsql_auth` session under `RefreshDatabase`,
+| "and the page 500s on an undefined array key" — warned about in terms, four times, including in the
+| very file M99 was writing when it filed this.
+|
+| ⚠️ SO THIS TEST DRIVES THE DEFECT THROUGH THAT SAME FIXTURE PATH ON PURPOSE, AND THE LIMIT IS STATED
+| RATHER THAN PAPERED OVER: it is not a production-reachable state today. The guard is kept because an
+| unguarded index into a cross-source map is one schema change from fatal, and because this call site
+| was the only one in `app/` written that way — `SuperAdminService` and `AttachmentReferenceValidator`
+| both guard the identical lookup. A degraded row is the right answer to "I cannot resolve this
+| identity"; a page that will not load is not.
+*/
+
+it('renders an identity it cannot resolve rather than failing the whole roster', function (): void {
+    $tenant = Tenant::create(['name' => 'Acme', 'slug' => 'acme']);
+    $tenant->domains()->create(['domain' => 'acme']);
+
+    $owner = committedMemberUser('Roster Owner');
+    enterTenant($tenant->id, $owner->id);
+    makeActiveMember($owner, 'owner');
+
+    // Deliberately NOT committed, so the `pgsql_auth` session cannot see it — the one construction that
+    // produces a membership whose identity the roster's own read cannot return.
+    $ghost = User::factory()->create(['name' => 'Invisible Member']);
+    makeActiveMember($ghost, 'form_editor');
+
+    $response = $this->actingAs($owner)->withoutVite()
+        ->get('http://acme.meridian.test/members')
+        ->assertOk();
+
+    $response->assertInertia(fn (Assert $page) => $page
+        ->component('members/Index')
+        ->has('members', 2)
+        // The membership is still SHOWN — an operator deciding whether to remove it needs to see that it
+        // exists. Skipping it silently would have been the row's other suggestion, and it would make a
+        // roster of only-unresolvable members render "No members yet".
+        ->where('members.1.user_id', (string) $ghost->id)
+        ->where('members.1.name', 'Unknown user')
+        ->where('members.1.email', '')
+        // The membership's own facts still resolve: they come from `tenant_users`, not from the identity.
+        ->where('members.1.status', TenantUserStatus::Active->value)
+        ->where('members.1.role', 'Form Editor')
+    );
+});
+
+it('keeps the keyword filter honest about a row it cannot resolve', function (): void {
+    $tenant = Tenant::create(['name' => 'Acme', 'slug' => 'acme']);
+    $tenant->domains()->create(['domain' => 'acme']);
+
+    $owner = committedMemberUser('Nadia Owner');
+    enterTenant($tenant->id, $owner->id);
+    makeActiveMember($owner, 'owner');
+
+    $ghost = User::factory()->create(['name' => 'Invisible Member']);
+    makeActiveMember($ghost, 'form_editor');
+
+    // ⚠️ The filter matches the strings the roster RENDERS, which for an unresolved row are the
+    // placeholders — not the name nobody can read. Pinned because the alternative (filtering on an
+    // identity the page cannot show) would silently hide the row from every search including its own.
+    $this->actingAs($owner)->withoutVite()
+        ->get('http://acme.meridian.test/members?q=Invisible')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->has('members', 0));
+
+    $this->actingAs($owner)->withoutVite()
+        ->get('http://acme.meridian.test/members?q=Unknown')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('members', 1)
+            ->where('members.0.name', 'Unknown user')
+        );
+});

@@ -67,3 +67,43 @@ it('does not clobber a Content-Security-Policy another layer already set', funct
 
     expect($response->headers->get('Content-Security-Policy'))->toBe("default-src 'none'");
 });
+
+/*
+|--------------------------------------------------------------------------
+| Increment M103 — R-945ccc3c. The Permissions-Policy half of this middleware
+| shipped in G6 and was asserted by NOTHING anywhere in the tree: a search for
+| the header name returned the middleware, the defect ledger and the generated
+| queue, and no test. It is not hardening that could be quietly dropped — the
+| middleware's own docblock records that the camera/microphone grant is what
+| keeps the native `<input capture>` working when the form is embedded in a
+| third-party iframe, so deleting it breaks media capture on every embed and
+| the only signal would have been a tester's bug report.
+|--------------------------------------------------------------------------
+*/
+
+it('grants camera and microphone to self so capture survives being embedded', function (): void {
+    $middleware = new PublicRuntimeSecurityHeaders;
+
+    $response = $middleware->handle(
+        Request::create('/f/demo'),
+        fn (): Response => new Response('ok'),
+    );
+
+    expect($response->headers->get('Permissions-Policy'))->toBe('camera=(self), microphone=(self)');
+});
+
+it('does not clobber a Permissions-Policy another layer already set', function (): void {
+    $middleware = new PublicRuntimeSecurityHeaders;
+
+    $response = $middleware->handle(
+        Request::create('/f/demo'),
+        function (): Response {
+            $response = new Response('ok');
+            $response->headers->set('Permissions-Policy', 'camera=()');
+
+            return $response;
+        },
+    );
+
+    expect($response->headers->get('Permissions-Policy'))->toBe('camera=()');
+});

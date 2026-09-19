@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Admin;
 
+use App\Enums\SettingKey;
+use App\Exceptions\Settings\PlatformSettingsConflictException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\UpdatePlatformSettingsRequest;
 use App\Models\User;
@@ -46,6 +48,9 @@ final class PlatformSettingsController extends Controller
                 // operator never wrote the moment they press Save.
                 'maintenance_message' => $this->rawMaintenanceMessage(),
             ],
+            // The optimistic-concurrency token for the Save below (M103, R-2173fe28). It travels with the
+            // page rather than with the settings object so the form posts it back untouched.
+            'fingerprint' => $this->settings->fingerprint(),
             'about' => $this->build->toArray(),
         ]);
     }
@@ -55,11 +60,65 @@ final class PlatformSettingsController extends Controller
         /** @var User $actor */
         $actor = $request->user();
 
-        $this->superAdmin->updatePlatformSettings($request->toSettings(), $actor);
+        try {
+            $changed = $this->superAdmin->updatePlatformSettings(
+                $request->toSettings(),
+                $actor,
+                $request->fingerprint(),
+            );
+        } catch (PlatformSettingsConflictException $e) {
+            // `back()` re-runs index(), so the page re-renders from the CURRENT settings with a fresh
+            // token — the operator sees what the values actually are instead of their stale copy. The
+            // error rides on the `fingerprint` field because that is the input that was stale, and it is
+            // what Settings.vue keys its conflict banner off.
+            return back()->withErrors(['fingerprint' => $e->getMessage()]);
+        }
 
         return back()
             ->with('status', 'platform-settings-updated')
-            ->with('toast', ['type' => 'success', 'message' => 'Platform settings saved']);
+            ->with('toast', ['type' => 'success', 'message' => $this->savedMessage($changed)]);
+    }
+
+    /**
+     * Say what the Save actually did (M103, R-2173fe28).
+     *
+     * The fixed 'Platform settings saved' this replaces was true of a no-op and of turning public signup
+     * on, which is the row's literal complaint: an operator could not tell from the console whether the
+     * thing they meant to change had changed, or whether anything had.
+     *
+     * @param  list<string>  $changed  setting keys whose stored value moved
+     */
+    private function savedMessage(array $changed): string
+    {
+        if ($changed === []) {
+            return 'No changes to save';
+        }
+
+        $labels = array_values(array_filter(array_map(
+            static fn (string $key): ?string => match (SettingKey::tryFrom($key)) {
+                SettingKey::RegistrationOpenSignup => 'open signup',
+                SettingKey::MaintenanceEnabled => 'platform maintenance',
+                SettingKey::MaintenanceMessage => 'the maintenance notice',
+                default => null,
+            },
+            $changed,
+        )));
+
+        return $labels === []
+            ? 'Platform settings saved'
+            : 'Saved — updated '.$this->sentenceList($labels);
+    }
+
+    /** @param  list<string>  $items */
+    private function sentenceList(array $items): string
+    {
+        if (count($items) === 1) {
+            return $items[0];
+        }
+
+        $last = array_pop($items);
+
+        return implode(', ', $items).' and '.$last;
     }
 
     private function rawMaintenanceMessage(): string

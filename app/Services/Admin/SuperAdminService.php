@@ -8,8 +8,10 @@ use App\Enums\AuditEvent;
 use App\Enums\BillingInterval;
 use App\Enums\FeedbackStatus;
 use App\Enums\SettingKey;
+use App\Enums\SettingScope;
 use App\Enums\TenantStatus;
 use App\Exceptions\Admin\SuperAdminException;
+use App\Exceptions\Settings\PlatformSettingsConflictException;
 use App\Models\Attachment;
 use App\Models\Audit;
 use App\Models\Concerns\BelongsToTenant;
@@ -317,21 +319,61 @@ final class SuperAdminService
      * `updateOrCreate` needs the SELECT grant as well as INSERT/UPDATE — it reads before it writes, and
      * without it every save would insert a duplicate and hit `settings_platform_key_unique`.
      *
+     * ── THE CONCURRENCY TOKEN, AND WHY IT HAS NO DEFAULT (M103, R-2173fe28) ────────────────────────────
+     * `$expectedFingerprint` is the {@see PlatformSettings::fingerprint()} the caller's page was rendered
+     * with. A mismatch means somebody else changed these settings in between, and the whole write is
+     * refused with {@see PlatformSettingsConflictException} rather than partly applied.
+     *
+     * ⛔ IT IS DELIBERATELY NOT OPTIONAL, AND `null` IS DELIBERATELY STILL LEGAL. An omitted parameter
+     * defaulting to "no check" is the shape this repository keeps paying for — a gate that reports
+     * `passed` because nothing asked it anything. Requiring the argument makes every caller state which
+     * it wants, and a `null` at a call site is greppable evidence that an unconditional write was chosen
+     * on purpose (a seeder, a console command, a fixture) rather than forgotten.
+     *
+     * ⛔ THE COMPARISON RUNS INSIDE {@see elevated()}, NOT IN THE FORM REQUEST. Validating the token
+     * where the request is validated would read the settings in one transaction and write them in
+     * another, which is a race against exactly the event it exists to catch. The read that produces
+     * `$before` and the writes below are the same transaction on the same connection.
+     *
+     * ── UNCHANGED KEYS ARE NOT WRITTEN, AND NOTHING IS AUDITED WHEN NOTHING MOVED ──────────────────────
+     * The console posts all three fields on every Save whatever the operator touched. Writing a value
+     * back over itself would churn `updated_by`/`updated_at` and file an audit row saying nothing
+     * happened, which is noise in the ledger a reader consults precisely to find what did. A key whose
+     * posted value equals its RESOLVED current value is skipped, so the table also stays sparse — which
+     * {@see SettingKey} documents as the design rather than an accident.
+     *
      * @param  array<string, bool|string>  $values  key ⇒ new value, already validated by the caller
+     * @param  ?string  $expectedFingerprint  the token the caller read, or null to write unconditionally
+     * @return list<string> the setting keys whose stored value actually moved — `[]` when nothing did
      */
-    public function updatePlatformSettings(array $values, User $actor): void
+    public function updatePlatformSettings(array $values, User $actor, ?string $expectedFingerprint): array
     {
         if ($values === []) {
-            return;
+            return [];
         }
 
-        $this->elevated(function () use ($values, $actor): void {
+        $changed = $this->elevated(function () use ($values, $actor, $expectedFingerprint): array {
             $before = $this->platformValues();
+
+            if ($expectedFingerprint !== null && PlatformSettings::fingerprintFor($before) !== $expectedFingerprint) {
+                throw new PlatformSettingsConflictException($this->resolvedPlatformValues($before));
+            }
+
             $old = [];
+            $new = [];
 
             foreach ($values as $key => $value) {
                 $known = SettingKey::tryFrom($key);
-                $old[$key] = array_key_exists($key, $before) ? $before[$key] : $known?->default();
+                $current = $known !== null
+                    ? PlatformSettings::resolve($known, $before[$key] ?? null)
+                    : ($before[$key] ?? null);
+
+                if ($current === $value) {
+                    continue;
+                }
+
+                $old[$key] = $current;
+                $new[$key] = $value;
 
                 Setting::on(SuperAdminContext::CONNECTION)->updateOrCreate(
                     ['tenant_id' => null, 'key' => $key],
@@ -339,20 +381,47 @@ final class SuperAdminService
                 );
             }
 
+            if ($new === []) {
+                return [];
+            }
+
             $this->audit->record(
                 AuditEvent::Updated,
                 'settings',
                 (string) $actor->getKey(),
                 old: $old,
-                new: $values,
+                new: $new,
                 actorId: (string) $actor->getKey(),
                 connection: SuperAdminContext::CONNECTION,
             );
+
+            return array_keys($new);
         });
 
         // The read side is memoized per request; without this the console's own redirect would re-render
         // the page it just changed from a stale map.
         app(PlatformSettings::class)->forget();
+
+        return $changed;
+    }
+
+    /**
+     * The platform keys resolved against their defaults — what the operator would see on the page.
+     *
+     * @param  array<string, mixed>  $stored
+     * @return array<string, bool|string>
+     */
+    private function resolvedPlatformValues(array $stored): array
+    {
+        $resolved = [];
+
+        foreach (SettingKey::cases() as $key) {
+            if ($key->scope() === SettingScope::Platform) {
+                $resolved[$key->value] = PlatformSettings::resolve($key, $stored[$key->value] ?? null);
+            }
+        }
+
+        return $resolved;
     }
 
     /**

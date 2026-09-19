@@ -14,11 +14,13 @@
  * Self-lays-out with AdminLayout: central admin pages are excluded from app.ts's resolver.
  */
 import { useForm } from '@inertiajs/vue3';
-import { MdsButton, MdsCard, MdsFormField, MdsIcon, MdsSwitch, MdsTextarea } from '@meridian/design-system';
+import { MdsAlert, MdsButton, MdsCard, MdsFormField, MdsIcon, MdsSwitch, MdsTextarea } from '@meridian/design-system';
+import { watch } from 'vue';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 
 const props = defineProps<{
     settings: { signup_open: boolean; maintenance_enabled: boolean; maintenance_message: string };
+    fingerprint: string;
     about: { version: string; commit: string | null; built_at: string | null; environment: string };
 }>();
 
@@ -26,7 +28,37 @@ const form = useForm({
     signup_open: props.settings.signup_open,
     maintenance_enabled: props.settings.maintenance_enabled,
     maintenance_message: props.settings.maintenance_message,
+    // The optimistic-concurrency token (M103, R-2173fe28). Posted back untouched; the server refuses the
+    // whole write if the stored settings have moved since this page was rendered.
+    fingerprint: props.fingerprint,
 });
+
+/**
+ * Re-seed from the server whenever the stored settings change, the `SsoPolicyCard` shape.
+ *
+ * ⛔ WATCHING THE TOKEN IS WATCHING THE SETTINGS, AND IT IS THE PRECISE TEST. The fingerprint is a hash of
+ * the resolved platform values, so it moves if and only if those values did — including the case where
+ * another operator changed something and changed it back, which correctly does NOT re-seed. Watching
+ * `props.settings` instead would fire on every server response, because Inertia hands back a fresh object
+ * each time.
+ *
+ * On a refused save this is what replaces the stale copy with what the settings ACTUALLY are, so the
+ * operator decides against the truth rather than re-submitting their own stale view. `form.reset()` does
+ * not clear errors — Inertia has a separate `resetAndClearErrors()` for that — so the conflict banner
+ * below survives the re-seed, which is the whole reason this is safe to do here.
+ */
+watch(
+    () => props.fingerprint,
+    (fingerprint): void => {
+        form.defaults({
+            signup_open: props.settings.signup_open,
+            maintenance_enabled: props.settings.maintenance_enabled,
+            maintenance_message: props.settings.maintenance_message,
+            fingerprint,
+        });
+        form.reset();
+    },
+);
 
 function save(): void {
     form.patch('/admin/settings', { preserveScroll: true });
@@ -36,6 +68,21 @@ function save(): void {
 <template>
     <AdminLayout title="Platform" icon="settings">
         <form class="platform" @submit.prevent="save">
+            <!--
+                `MdsAlert`, not `MdsBanner`: this is an EVENT that just happened (a Save was refused), not
+                a standing condition of the page — the boundary Alert's own docblock draws. `assertive`
+                for the same reason, and because the operator is about to act on values that just changed
+                underneath them.
+            -->
+            <MdsAlert
+                v-if="form.errors.fingerprint"
+                tone="danger"
+                assertive
+                title="Not saved — these settings changed elsewhere"
+                :message="form.errors.fingerprint"
+                class="platform__conflict"
+            />
+
             <MdsCard class="platform__card">
                 <template #header>
                     <div class="platform__head">
@@ -155,6 +202,10 @@ function save(): void {
     line-height: var(--mds-type-heading-3-line-height);
     font-weight: var(--mds-type-heading-3-font-weight);
     color: var(--mds-color-text-heading);
+}
+
+.platform__conflict {
+    margin: 0 0 var(--mds-space-4);
 }
 
 .platform__notice {

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Actions\Fortify\UpdateUserProfileInformation;
 use App\Enums\TenantUserStatus;
 use App\Models\TenantUser;
 use App\Models\User;
@@ -185,4 +186,91 @@ it('sends the verification link at REGISTRATION and no welcome alongside it', fu
 
     Notification::assertSentOnDemand(QueuedVerifyEmail::class);
     Notification::assertNotSentTo(new AnonymousNotifiable, WelcomeNotification::class);
+});
+
+/*
+|--------------------------------------------------------------------------
+| Increment M103 — R-4f23d9c7. "Say hello, once" was the docblock's opening line and nothing enforced it.
+|
+| `Verified` is not a once-per-person event. `UpdateUserProfileInformation::updateVerifiedUser()` nulls
+| `email_verified_at` and re-sends verification on EVERY address change, the tenant Settings page puts
+| that field in front of every member with no `can_manage` gate, and Fortify's `VerifyEmailController`
+| fires `Verified` again when the new link is clicked — so a tester who corrected a typo in their own
+| address was welcomed to the product a second time.
+|
+| ⚠️ THE CASE ABOVE — "sends exactly one welcome when an address is verified" — COULD NOT HAVE CAUGHT IT.
+| It fires the event once and asserts one send, which is one per EVENT. These fire it twice, and the
+| difference between the two shapes is the whole defect.
+|
+| ⚠️ THE GUARD WAS ALREADY PRESENT AT THE OTHER DISPATCH SITE, which is why this one was missed:
+| `GoogleSessionStarter` refuses to re-fire with `if ($outcome->created)`, pinned by GoogleSignInWebTest
+| ("firing it every time would welcome the same person weekly"). Solving it per dispatch site left
+| Fortify's re-verification path open; the guard now lives in the listener, which is the chokepoint —
+| it is the only `Verified` listener in the application.
+*/
+
+it('welcomes a person once however many times Verified fires', function (): void {
+    $user = User::factory()->unverified()->create();
+
+    event(new Verified($user));
+    event(new Verified($user));
+    event(new Verified($user));
+
+    Notification::assertSentOnDemandTimes(WelcomeNotification::class, 1);
+});
+
+it('sends no second welcome after a verified address change', function (): void {
+    $user = User::factory()->unverified()->create();
+
+    // ⚠️ THE USER GUC IS PART OF THE FIXTURE, NOT NOISE. `users` carries FORCE RLS and its visibility
+    // policy is `id = app.current_user_id OR <co-tenant>`, so without this both the profile action's
+    // own save and every `fresh()` below read or write ZERO rows and raise nothing. In production this
+    // is set by `EstablishTenantDatabaseContext`, which `config/fortify.php` mounts on the group.
+    TenantContext::applyLocal(null, (string) $user->id);
+
+    // First verification — the welcome this person is owed.
+    event(new Verified($user));
+    Notification::assertSentOnDemandTimes(WelcomeNotification::class, 1);
+
+    // The real address-change action, not a hand-rolled imitation of it: it nulls `email_verified_at`
+    // and re-sends verification, which is what makes the second `Verified` reachable at all.
+    app(UpdateUserProfileInformation::class)->update($user, [
+        'name' => $user->name,
+        'email' => 'corrected@welcometest.local',
+    ]);
+
+    expect($user->fresh()->email_verified_at)->toBeNull();
+
+    // Clicking the new link — what Fortify's VerifyEmailController does once `hasVerifiedEmail()` is
+    // false again.
+    event(new Verified($user->fresh()));
+
+    // STILL one. Before M103 this was two.
+    Notification::assertSentOnDemandTimes(WelcomeNotification::class, 1);
+});
+
+it('records the welcome on the person, so the guard survives the request that sent it', function (): void {
+    $user = User::factory()->unverified()->create();
+    TenantContext::applyLocal(null, (string) $user->id);
+
+    expect($user->welcomed_at)->toBeNull();
+
+    event(new Verified($user));
+
+    // ⚠️ The stamp is what makes this a once-per-PERSON guard rather than a once-per-request one. It is
+    // written under a BORROWED user GUC — `users` carries FORCE RLS and PostgreSQL applies the SELECT
+    // policy to an UPDATE whose WHERE reads a column, so without `app.current_user_id` this write would
+    // affect zero rows and raise nothing, and this assertion is what would catch that.
+    expect($user->fresh()->welcomed_at)->not->toBeNull();
+});
+
+it('does not welcome an account that was verified before the guard existed', function (): void {
+    // The backfill's population: already verified, therefore already welcomed, therefore stamped by
+    // 2026_08_17_000113. An invitee is in here too — force-verified by InvitationController, which fires
+    // no event and deliberately sends no welcome — and this is the case that decided the backfill.
+    $user = User::factory()->create(['welcomed_at' => now()->subMonth()]);
+
+    event(new Verified($user));
+
+    Notification::assertNothingSent();
 });

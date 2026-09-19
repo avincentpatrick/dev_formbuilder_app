@@ -16,7 +16,145 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M101` is merged; the early-testing tier continues, named in `docs/pipeline.md` § Next
+## Status: ACTIVE CLAIM — the two testing-server config-truth rows, `R-4b5bc076` and `R-1563096a` (`m102-testing-server-config-truth`)
+
+Taken 2026-09-19. Branch `m102-testing-server-config-truth`, cut from `origin/main` at `c709fce`, PR into main.
+Rows: `R-4b5bc076` (`docs/feature-backlog.md:10690`) and `R-1563096a` (`docs/feature-backlog.md:10634`) —
+**the only two `ready` rows in the `early-testing` tier.** The other nineteen are blocked on open decisions.
+Both are settled by one console session on `staging.pitahc.gov.ph`, which is why they are taken together;
+the `D13` deviation that requires is argued below rather than left implicit.
+
+### Row 1 — `R-4b5bc076`, which file on the box holds `X-Robots-Tag`
+
+### Evidence verified
+**Two of three citations hold; the third holds in substance and is wrong in every pointer that supports it.**
+- ✅ *"This ledger records it as `Header always set X-Robots-Tag` in `conf\extra\meridian.conf`"* — **held**,
+  `docs/feature-backlog.md:10621`, inside `R-562bcc2a`'s `M100` body.
+- ✅ *"`docs/deployment-infrastructure.md` §8.3 names `conf\extra\httpd-vhosts.conf` in the adjacent clause
+  for the leftover `*:80` vhost"* — **held**, at §8.3's `*:80` paragraph. ⚠️ **But read the whole paragraph
+  and the clause is about the vhost, not about the header.** §8.3 nowhere names a file *for the header*; its
+  crawl-protection bullet says only *"the vhost is authoritative"*. That is the premise field, below.
+- ⚠️ *"this repository's only line-by-line enumeration of `meridian.conf`'s contents does not list the
+  directive at all"* — **the content holds and the word `only` is false.** There are **two** listings and
+  **both are excerpts**: this file's, under the `### Row 2 — R-2344803c` heading of the `M101` release, is
+  the five directives `M98` flagged and `M99` verified; and §8.3's certificate code block elides with a
+  literal ellipsis of its own.
+⛔ **THREE CITATIONS IN ONE PARAGRAPH OF THIS FILE ARE WRONG ON THE TREE, AND THAT IS THIS ROW'S EVIDENCE
+BASE.** `M101`'s `### Row 1 — R-562bcc2a` evidence paragraph offers lines 201-203 of this file as the
+`meridian.conf` enumeration — those lines are a blank line, a `### Premise verified` heading and a sentence
+about `md-status`, because the same push **prepended** a release block above the enumeration. The same
+paragraph cites `docs/deployment-infrastructure.md:536-540` and `:536-537` for §8.3's `X-Robots-Tag`
+mention; **both land on the `md-status` paragraph**, because the same push edited §8.3 below where it
+measured, and the crawl-protection subsection begins well past them. Two mechanisms, one consequence.
+`scripts/citation-liveness-lint.php` excludes `docs/claims/` from its corpus outright, so nothing here can
+ever be reported. **Filed, not repaired** — the reason is recorded at the row.
+
+### Premise verified
+⛔ **THE ROW'S HEADLINE PREMISE IS REFUTED: THE TWO DOCUMENTS DO NOT DISAGREE, THEY ARE ADJACENT.** The row
+says *"two documents disagree about which file on the box holds the directive, and a runbook that names the
+wrong one sends an operator to the wrong place."* §8.3 **names no file for the header at all.** It names
+`conf\extra\httpd-vhosts.conf` in a separate paragraph about a leftover `*:80` vhost, and says *"the vhost
+is authoritative for SERVING the header"* in the crawl-protection bullet without naming one. A reader is
+misled by **proximity**, not by a contradicting claim — so the remedy is to kill the adjacency, not to pick
+a winner between two assertions, and the closure must say which of those two things was wrong.
+⚠️ **A second premise proves much less than the row spends it on.** *"The only line-by-line enumeration does
+not list the directive at all"* is offered as evidence that the directive may not be in `meridian.conf`. An
+absence in an **excerpt** is not an absence, and both listings in this repository are excerpts — one of them
+visibly so, eliding in its own source. The row's third clause is therefore not evidence for either file.
+✅ **The premise that does hold, and holds harder than when filed:** nothing in this repository can settle
+it. `git ls-files` returns exactly two web-server files, `docker/nginx/default.conf` and `public/.htaccess`,
+neither of them that box's configuration; `scripts/staging-headers-judge.php` deliberately measures the
+**response** rather than the file that produced it. A console session is the only instrument.
+
+### Remedy verdict
+**The prescribed remedy works and is too narrow, measured before the block was written.** The row says *"one
+read-only command on the box settles it — search both files for the directive."* Searching **both files**
+cannot settle it: a third included file, a backup left inside an include root, or an extensionless copy
+would all answer *"not in either"* while the header is being served, and this box is known to have had its
+configuration edited in place during the 2026-09-19 certificate restart. The command actually run is a
+**recursive search of every file under the Apache `conf` tree**, corroborated independently by `httpd -S`,
+which maps each vhost to *file and line* from the server's own parse rather than from a grep. The row's own
+answer is recorded after the session, not here.
+
+### Row 2 — `R-1563096a`, the `AH00558` warning in the activation log
+
+### Evidence verified
+- ✅ *"`scripts/activate-staged-cert.ps1` captures `httpd -t`'s output into the certificate activation log
+  on every staged-certificate run"* — **held, and it is the load-bearing citation.** The script builds one
+  string from the process's stdout **and** stderr and writes it at the `CONFIG` level; `AH00558` is printed
+  on stderr, so it lands in the log verbatim. Verified by reading the redirection and the log call, not
+  inferred from the script's purpose.
+- ✅ *"§8.3 already says in terms that it is expected and must not be chased during an incident"* — **held.**
+  ⚠️ **And that same paragraph says the warning appears in every `CONFIG` line of the activation log *for
+  ever*.** This increment falsifies that sentence, so §8.3 is an edit this row owes rather than a citation
+  it merely leans on.
+- The `AH00558` text itself is confirmed on the box by the read-only block before anything is written.
+
+### Premise verified
+⛔ **THE ROW'S REASON FOR NOT TAKING ITS OWN FIX IS REFUTED, AND THAT IS THE USEFUL HALF.** `M100` declined
+it as *"an untested edit to the configuration of a box whose certificate depends on that file and there was
+no restart left in this increment to fold it into."* **`httpd -t` reads the configuration from disk, not
+from the running server**, so the warning the row is about stops the moment the file changes and **no
+restart is involved at all**. The premise that a restart was the gating resource was simply wrong, and it
+cost the row an increment. ✅ **The interlock that premise wished for already existed:** the activation
+script refuses to restart on a non-zero `httpd -t` and exits 2, so a bad edit cannot reach a running server
+even unattended.
+⚠️ **A premise the row does not state, and the one that decides the value:** the prescribed
+`ServerName staging.pitahc.gov.ph` is this box's managed-domain name. `httpd -t` runs post-config but
+**never starts `mod_md`'s ACME watchdog**, which lives only in a real server — so the single difference
+between the prescribed value and a neutral one sits exactly in the part `httpd -t` cannot exercise.
+`MDMembers manual` and the `off` default of `MDBaseServer` both argue it would be inert; both are arguments,
+not measurements, and this box's renewal has already failed eleven times in one day (`D49`).
+
+### Remedy verdict
+**The remedy works; its prescribed *value* is the part that cannot be proved by the only check available.**
+A global `ServerName` suppresses `AH00558` whatever the value, so the row's defect is fixed either way. The
+value taken is **`localhost`**, on the user's explicit decision this session, because it cannot match this
+box's managed domain under any matching rule and therefore makes `httpd -t` a *complete* proof, where the
+prescribed fully-qualified name could only have been proved by a supervised Apache restart on a box testers
+were invited onto today. The deviation, and the reason, are recorded in the closure, in §8.3, and in a
+comment beside the directive on the box — the last of these because without it the next operator "corrects"
+the value and silently re-opens the untested case.
+
+### The `D13` deviation, made explicit
+
+⛔ **BOTH ROWS CITE `docs/deployment-infrastructure.md`, AND EITHER READING OF `D13` FORBIDS THE PAIR.**
+Under `D13`'s own prose hub list — seven meta-files, *"not product code"* — that document is a **non-hub**,
+so *"no two rows in a batch may cite the same non-hub file"* forbids it. Under the set
+`scripts/backlog-triage.php` derives at `HUB_THRESHOLD = 3` it ranks **first**, so *"at most one row may
+touch a hub file"* forbids it too. `M100` and `M101` each deviated on this same ground and recorded it; this
+is the **third consecutive** increment to do so, and `R-f8bcf113` is amended to say that, because a rule
+broken three times running is a rule that has stopped being applied rather than a series of exceptions.
+⚠️ **The justification here is stronger than a scheduling convenience:** the two rows are one read-only
+console session on one machine, and splitting them means asking a human to go to the box twice for answers
+a single command returns together. ⚠️ **And the generator could not have caught the collision anyway** —
+`docs/backlog-triage.md` harvested *"hub files only"* from both rows, capturing no paths at all.
+
+Files: `docs/claims/lane-a.md`, `docs/feature-backlog.md`, `docs/deployment-infrastructure.md`,
+`docs/pipeline.md`, `docs/backlog-triage.md`, `PROGRESS.md`, `docs/gate-baselines.md`.
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/deployment-infrastructure.md`, `docs/pipeline.md`,
+`docs/backlog-triage.md`, `PROGRESS.md` (own status block and own hand-off line only), `docs/gate-baselines.md`.
+Paired files taken: none.
+Namespaces spent: **nothing from either namespace** — no migration, no ADR, no sub-decision, no new decision.
+The open-decision count must be unchanged at the close.
+Prediction: the diff is **pure markdown**, so Pint is green trivially and PHPStan **cannot move** — to be
+proved by `git diff origin/main --name-only` returning zero paths under `app/`, `database/` or `routes/`
+rather than by quoting an unchanged number. `pipeline-lint` P1 is the arm most likely to bite, because
+`docs/deployment-infrastructure.md` hosts the `track-b-deployment` marker at end of file and the §8.3
+rewrite moves it — `pipeline.php` must therefore be the last thing run before the push, which is exactly
+what `M101` got wrong. P7b should be quiet: two rows leave `early-testing`, two enter `during-testing`, no
+`Awaits` token is created or answered, and the open-decision count does not move. `citation-liveness-lint`
+holds only if every edit to an existing row is **line-neutral** and both new rows land at end of file,
+because the ledger tier sits at its ceiling with no headroom. `BacklogProvenanceTest` is the real Pest risk,
+on the two new rows' liveness and filer vocabulary — `M100` went red writing
+`**Live, and deliberately not fixed.**`.
+⚠️ **The one I most expect to be wrong is E2E** — not because of the diff, which reaches no spec, but
+because it is the only job this diff does not determine, `R-6946c0ef` records a flaky offline spec across
+viewport projects, and `D2` makes flakiness merge-blocking. **The trap is that I will go looking for the
+cause in my own markdown.** Second most likely wrong: the console's answer itself. I predict
+`X-Robots-Tag` in `conf\extra\meridian.conf` alone, with no second copy and no real contradiction between
+the two documents — if the read-only block returns two files, this row's headline is replaced by a worse
+fact and both closures change shape.
 
 ## RELEASED — `M101`, the un-versioned crawl protection given a gate that can go red (merged as PR #294, `a1951c4`, 6/6 green with real step counts — Static analysis 30 · E2E 20 · Contract 16 · Frontend 12 · axe 11 · Pest 11)
 

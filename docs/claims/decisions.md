@@ -39,7 +39,7 @@ exercise. `preload` must not be sent at all while the name is a staging host, an
   and the strings `Strict-Transport-Security` and `HSTS` appear **nowhere in the tracked tree**.
 - ⚠️ **Port 80 has no listener.** A connection from outside times out after 21 seconds. So there is no plaintext
   downgrade path on this box for HSTS to protect against, except an active attacker who opens one. **That narrows
-  the benefit; it does not narrow the cost**, which is unchanged.
+  the benefit; it does not narrow the cost**, which is unchanged. ⛔ **CORRECTED BY `M102` (2026-09-19), WHICH READ THE BOX INSTEAD OF PROBING IT FROM OUTSIDE: THE FIRST SENTENCE OF THIS BULLET IS FALSE.** `httpd.conf` carries an uncommented `Listen 80`, and `httpd -S` maps a live `*:80` vhost for `staging.pitahc.gov.ph` to `confxtra\httpd-vhosts.conf` at `:47`, serving a `Redirect permanent` to the `https://` origin. **There IS a listener and there IS a plaintext request**; the 21-second timeout measured the agency firewall, not the server. So an internal tester who types the bare hostname makes exactly the cleartext round-trip HSTS exists to remove, and the benefit is wider than this bullet says — narrower than a public host, but not nil. ⚠️ **This corrects an input, not the recommendation: `A` still stands**, and if anything it stands more firmly, because there is now a real downgrade path for a short `max-age` to close.
 - ✅ **HSTS is HOST-scoped, and this is what separates it from the sibling row.** One response carrying it covers
   the whole origin, so the application is an adequate home for it — the exact opposite of `X-Robots-Tag`, which is
   response-scoped and had to stay in the vhost because Apache serves `/robots.txt` without invoking PHP at all.

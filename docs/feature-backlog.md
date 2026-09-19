@@ -10537,7 +10537,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `D13` the generated set and rewrite the clause as a per-file rule (no two rows share a file, meta-files excepted up
   to one row), or give `backlog-triage.php` a second, smaller meta-hub set for grouping and leave the citation-count
   hubs for ranking. **Live** — every increment under `D13` groups against a rule that no longer describes the tree.
-  Filed by `M99`. **Tier: during-testing.**
+  Filed by `M99`. **Tier: during-testing.** ⚠️ **AMENDED BY `M102` (2026-09-19): THIS IS NOW THE THIRD CONSECUTIVE INCREMENT TO DEVIATE, WHICH MAKES IT A RULE THAT HAS STOPPED BEING APPLIED RATHER THAN A SERIES OF EXCEPTIONS.** `M100`, `M101` and `M102` each grouped a batch that `D13` forbids under **both** readings of its hub clause, and each recorded the deviation in its own claim rather than in one place a reader would find. `M102`'s pair cites `docs/deployment-infrastructure.md`, which is a **non-hub** under `D13`'s seven meta-files and ranks **first** under the generated set — so *"no two rows may cite the same non-hub file"* and *"at most one row may touch a hub file"* forbid it respectively, and there is no reading that permits it. ⚠️ **The generator could not have caught it either:** `docs/backlog-triage.md` harvested *"hub files only"* from both rows, capturing no paths at all, so the collision graph was blind to a pair that collides on the document both rows exist to correct.
 - **`minor` · Two more middlewares drop a non-GET payload through `Redirector::guest`, and one of them
   records no intended URL at all.** Found by `M99` (2026-09-18) while closing the step-up row. That row's
   subject is `RequireRecentPassword`, but the mechanism is `Redirector::guest`'s, which records `previous()`
@@ -10631,8 +10631,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   against the deployed site, or move it into the application's security-header middleware conditioned on the
   environment, and say in §8.3 which one is authoritative. **Live** — the header is real today and its only
   copy is un-versioned. Filed by `M100`. **Tier: early-testing.** ✅ **CLOSED BY `M101` (2026-09-19) — THE LINE IS STILL THE ONLY COPY, AND A NIGHTLY GATE NOW GOES RED WHEN IT DISAPPEARS.** ⛔ **HALF THE PRESCRIBED REMEDY IS REFUTED BY MEASUREMENT, AND THAT IS THE USEFUL HALF OF THIS CLOSURE.** The row offers *"assert the header in a test against the deployed site, or move it into the application's security-header middleware conditioned on the environment"*. **The middleware arm cannot work.** Measured from outside on 2026-09-19 across seven paths: `/robots.txt` and `/favicon.ico` are **static files Apache serves without invoking PHP at all**, and `/up` is a PHP route outside every group `AppSecurityHeaders` is mounted on — all three carry `X-Robots-Tag` and **none** of them carries any of the four headers that middleware sets, which only `/` and `/login` do. Moving the header would lose it on **five of seven paths, including the one URL crawlers actually fetch**. `AppSecurityHeaders` is also mounted per group at ten sites and a global mount is forbidden for a stated reason — it would set `frame-ancestors 'none'` on the guest runtime and break every embed. And there is no precedent in this tree for an environment-conditioned response header. ✅ **As built:** `scripts/staging-headers-judge.php`, modelled on `scripts/npm-audit-judge.php` — fetching is separate from judging, the contract is `0` present · `1` missing or weakened · `2` **CANNOT MEASURE**, and recognition keys **positively**: the served `/robots.txt` must be byte-identical to the tracked `public/robots.txt`, so a captive portal answering 200 with no header is *not measured* rather than *the protection is gone*. It probes six paths spanning both mechanisms, reports a floor, and takes its host and URL list from constants a mutation can drive. Two `schedule`-only steps in `.github/workflows/ci.yml` run it nightly on `main`, because a vhost edit is not a deploy and `deploy.yml` would never see one. ✅ **Proved by three deliberate defects, each CAUGHT**: mis-spelling the header name, dropping a static probe, and disarming the identity test — the last reddening only the discriminator case. ⚠️ **What is NOT proved, said rather than implied:** `scripts/mutate.php` drives Pest and nothing else, so the mutations redden the **judge**; the two CI steps are `schedule`-gated and were verified by simulating them under `bash -e` and by a `workflow_dispatch` run, not by mutation. ⚠️ **And the gate is deliberately NOT declared in `scripts/gate-baselines.php`**: that metric list is declared rather than derived and an absent pattern writes `NOT FOUND` **and exits 1**, so a `schedule`-only gate would fail every close-out regeneration, which runs from a `push`. Its floor lives in `tests/Feature/Docs/StagingHeadersJudgeTest.php` instead, and §8.3 says so. §8.3 now quotes the directive and names both authorities — the vhost for serving it, the nightly judge for its survival. ⚠️ **One citation could not be verified and is filed instead:** which file on the box actually holds the directive is contradicted across two documents, so §8.3 names neither. `public/robots.txt` is untouched, as the row demands.
-- **`nit` · `httpd -t` on the testing server warns about a missing global `ServerName` on every run, and the
-  warning is now in a log an operator reads during incidents.** Found by `M100` (2026-09-19) while proving the
+- ~~**`nit` · `httpd -t` on the testing server warns about a missing global `ServerName` on every run, and the
+  warning is now in a log an operator reads during incidents.**~~ Found by `M100` (2026-09-19) while proving the
   certificate activation task. `httpd -t` prints `AH00558: Could not reliably determine the server's fully
   qualified domain name, using fe80::19d0:6cc5:1ee9:9145. Set the 'ServerName' directive globally to suppress
   this message` and then `Syntax OK`. It is benign: the vhost carries its own `ServerName`, which is why the
@@ -10645,7 +10645,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   is an untested edit to the configuration of a box whose certificate depends on that file and there was no
   restart left in this increment to fold it into. **Live** — the warning is printed on every `httpd -t` today, and is deliberately left unfixed for the
   reason above. Filed by `M100`.
-  **Tier: early-testing.**
+  **Tier: early-testing.** ✅ **CLOSED BY `M102` (2026-09-19) — THE STATED BLOCKER WAS REFUTED, AND THAT IS THE USEFUL HALF.** The row declined its own one-line fix as *"an untested edit to the configuration of a box whose certificate depends on that file and there was no restart left in this increment to fold it into."* ⛔ **`httpd -t` READS THE CONFIGURATION FROM DISK, NOT FROM THE RUNNING SERVER**, so the warning this row is about stops the moment the file changes and **no restart is involved at all** — the premise that a restart was the gating resource was simply wrong, and it cost the row an increment. The interlock that premise wished for already existed: `scripts/activate-staged-cert.ps1` refuses to restart on a non-zero `httpd -t` and exits 2, so even an unattended activation cannot carry a bad edit into a running server. ✅ **As done, on the box, 2026-09-19:** `httpd.conf` backed up outside the Apache tree — all four of this box's includes are explicit filenames rather than a glob, so a backup could not be loaded as configuration wherever it sat, and it was put outside anyway — a global `ServerName` appended with its reason in a six-line comment beside it, and `httpd -t` re-run: exit 0, `Syntax OK`, **`AH00558` absent**, sha256 moved, Apache **not restarted**. ⚠️ **THE VALUE IS `localhost`, NOT THE PRESCRIBED `staging.pitahc.gov.ph`, AND THE DEVIATION IS THE MEASUREMENT.** That name is this box's managed domain — `<MDomain staging.pitahc.gov.ph>` in `conf\extra\meridian.conf` at `:8`, with `MDMembers manual` at `:9` — and `httpd -t` runs post-config but **never starts `mod_md`'s ACME watchdog**, which lives only in a real server. So the single difference between the two values sits exactly in the part `httpd -t` cannot exercise, and the prescribed name could only have been proved by a supervised restart on a box testers were invited onto that same day. `localhost` cannot match the managed domain under any rule, which makes `httpd -t` a complete proof rather than a partial one. The user took this call explicitly, and the on-box comment records it so the next operator does not "correct" the value and silently re-open the untested case. ⚠️ **What is NOT fixed:** the edit is one more un-versioned line on one box, exactly like the `X-Robots-Tag` line beside it — filed.
 - **`minor` · Three of this ledger's own line citations were wrong before `M100` started, and an unrelated
   six-line insertion silently corrected two of them.** Found by `M100` (2026-09-19) while checking, as
   `CLAUDE.md` requires, which citations its own edits would shift. Measured against `git show HEAD` rather than
@@ -10687,8 +10687,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   ⚠️ Decide whether `X-Content-Type-Options: nosniff` in particular belongs on static responses, where it is the
   one of the four that actually applies to a file download, and record the answer beside the middleware rather
   than in a row. **Live** — measured on every response served today. Filed by `M101`. **Tier: during-testing.**
-- **`minor` · Two documents disagree about which file on the box holds the `X-Robots-Tag` directive, and a runbook
-  that names the wrong one sends an operator to the wrong place during an incident.** Found by `M101` (2026-09-19)
+- ~~**`minor` · Two documents disagree about which file on the box holds the `X-Robots-Tag` directive, and a runbook
+  that names the wrong one sends an operator to the wrong place during an incident.**~~ Found by `M101` (2026-09-19)
   while writing §8.3's authority statement for `R-562bcc2a`. This ledger records it as `Header always set
   X-Robots-Tag` in `conf\extra\meridian.conf`; `docs/deployment-infrastructure.md` §8.3 names
   `conf\extra\httpd-vhosts.conf` in the adjacent clause for the leftover `*:80` vhost, and this
@@ -10696,7 +10696,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   ⚠️ **One read-only command on the box settles it** — search both files for the directive — and §8.3 deliberately
   names neither until it is taken. **Live** — the ambiguity is in the tree today, and the gate `M101` built cannot
   resolve it, because it measures the response rather than the file that produced it. Filed by `M101`.
-  **Tier: early-testing.**
+  **Tier: early-testing.** ✅ **CLOSED BY `M102` (2026-09-19) — MEASURED ON THE BOX, AND THE TWO DOCUMENTS NEVER DISAGREED.** A recursive search of **every file** under the box's Apache `conf` tree — not the two files the row names — returns exactly **one** hit: `Header always set X-Robots-Tag "noindex, nofollow, noarchive"` in `conf\extra\meridian.conf` at `:22`, inside the `*:443` vhost that opens at `:13`. `httpd -S` corroborates it independently, from the server's own parse rather than from a grep, mapping that vhost to the same file and line. So the `M100` sentence inside `R-562bcc2a` was right all along, and §8.3 was never wrong. ⛔ **THE HEADLINE IS REFUTED: THE TWO DOCUMENTS ARE ADJACENT, NOT CONTRADICTORY.** §8.3 names no file for the header at all — it names `conf\extra\httpd-vhosts.conf` in a *separate* paragraph about the leftover `*:80` vhost, which `httpd -S` confirms is genuinely there at `:47`. A reader is misled by **proximity**, not by a competing claim, so the fix is to kill the adjacency rather than pick a winner: §8.3 now names the file for the header and says in the same clause that the `*:80` vhost carries no `Header` directive of its own. ⛔ **AND THE ROW'S THIRD CLAUSE PROVED NOTHING AT ALL.** *"This repository's only line-by-line enumeration of `meridian.conf`'s contents does not list the directive"* — there are **two** listings and **both are excerpts**: the claim file's is the five directives `M98` flagged and `M99` verified, and §8.3's certificate block elides in its own source. An absence in an excerpt is not an absence, and the clause was never evidence for either file. ⚠️ **The prescribed remedy — *"search both files for the directive"* — would have reached the right answer for the wrong reason.** This box carries four `meridian.conf` backups and a second copy of `httpd.conf` inside the same `conf` tree; any of them could have held a stale duplicate, and only a recursive search over every file could show that none does. ⚠️ **Two findings are filed rather than fixed:** the three citations supporting this row in the claim file are all wrong on the tree, and the `*:80` vhost is outside the crawl-protection gate's reach entirely.
 - **`minor` · `Permissions-Policy` is set on the guest runtime and asserted by no test anywhere.** Found by `M101`
   (2026-09-19) while cataloguing this repository's header assertions. `PublicRuntimeSecurityHeaders` sets
   `camera=(self), microphone=(self)` at `app/Http/Middleware/PublicRuntimeSecurityHeaders.php:68`, and a search of
@@ -10728,3 +10728,49 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `M101` both had one to hand — so a reader can tell a live claim from a dated one, or stop asserting its
   contents and cite it only as the operator's surface. **Live** — the references are in the tree today and
   nothing re-derives them. Filed by `M101`. **Tier: during-testing.**
+- **`minor` · A claim file's line citations are wrong the moment they are pushed, and three of them in one
+  paragraph show the mechanism rather than a mistake.** Found by `M102` (2026-09-19) while verifying
+  `R-4b5bc076`'s evidence before taking it. `M101`'s `### Row 1 — R-562bcc2a` evidence paragraph in
+  `docs/claims/lane-a.md` carries three line citations and **all three are wrong on the tree today**. It offers
+  lines 201-203 of that same file as the enumeration of `meridian.conf`; those lines are a blank line, a
+  `### Premise verified` heading and a sentence about `md-status`, because the same push **prepended** a release
+  block above the enumeration it was pointing at. It cites `docs/deployment-infrastructure.md` twice more for
+  §8.3's `X-Robots-Tag` mention, and both land on the `md-status` paragraph, because the same push edited §8.3
+  below where it had measured. ⛔ **Two mechanisms, one consequence: a citation into a file the same push moves
+  is wrong on arrival, and a claim file moves its own contents at every release.**
+  `scripts/citation-liveness-lint.php` excludes `docs/claims/` from its corpus outright, so nothing can ever
+  report them — and this was the evidence base an open row was taken on. ⚠️ **Do not repair them by adding the
+  delta**: the next release displaces the target again, and a live wrong line merges green. The fix is to stop
+  citing a claim file, or a document the same push edits, by line at all — cite the `### Row n —` heading, which
+  is stable across releases. **Live** — the three citations are on the tree today. Filed by `M102`.
+  **Tier: during-testing.**
+- **`minor` · Everything this repository knows about the testing box's Apache configuration is prose no gate can
+  read, and `M102` added four more sentences of it.** Found by `M102` (2026-09-19) while settling `R-4b5bc076`
+  with a console session. §8.3 now asserts which file holds `Header always set X-Robots-Tag`, that `httpd.conf`
+  carries a global `ServerName`, that the `*:80` vhost is a permanent redirect carrying no `Header` of its own,
+  and that all four Apache includes are explicit filenames rather than globs. **Each is a claim about one machine
+  that nothing checks:** `git ls-files` returns exactly two web-server files, `docker/nginx/default.conf` and
+  `public/.htaccess`, neither of them that box's configuration, and `scripts/staging-headers-judge.php`
+  deliberately measures the RESPONSE rather than the file that produced it — which is the stated reason the gate
+  `M101` built could not settle `R-4b5bc076` itself. ⛔ **This increment is the proof of the gap rather than an
+  argument for it: two rows sat open for an increment each because the only instrument was a human pasting
+  console output.** ⚠️ **The remedy is a probe whose output is JUDGED, not a probe.** A read-only
+  `scripts/staging-config-probe.ps1` would be the fetch half only; the half that can go red is a PHP judge over
+  the pasted report, modelled on the headers judge — the same present · drifted · CANNOT MEASURE contract,
+  positive recognition, and fixtures a mutation can drive — because `scripts/mutate.php` drives Pest and nothing
+  else, so a `.ps1` alone can never be proved. **Live** — the assertions are in the tree today, and the increment
+  that added them could verify them only by asking a human. Filed by `M102`. **Tier: during-testing.**
+- **`nit` · The testing site's port-80 vhost is outside the crawl-protection gate's reach entirely, and this
+  repository recorded it as having no listener at all.** Found by `M102` (2026-09-19) while settling
+  `R-4b5bc076` on the box. `httpd.conf` carries an uncommented `Listen 80`, and `httpd -S` maps a live `*:80`
+  vhost for `staging.pitahc.gov.ph` to `conf\extra\httpd-vhosts.conf` at `:47` — so the earlier record that a
+  connection to port 80 *"timed out after 21 s with no listener answering"* measured the agency firewall, not
+  the server. The vhost is a bare `Redirect permanent` to the `https://` origin with **no `Header` directive**,
+  so its 301 carries no `X-Robots-Tag`, and `scripts/staging-headers-judge.php` probes only `https://` URLs and
+  cannot see it. ⚠️ The exposure is small — a 301 is followed rather than indexed, and the port is firewalled
+  from outside — but it is **unmeasured rather than absent**, and it becomes real the day the firewall opens or
+  a tester inside the agency network shares an `http://` link. ⚠️ Either add the `Header always set
+  X-Robots-Tag` line to the `*:80` vhost so both are protected identically, or give the judge one `http://`
+  probe asserting a 301 and recording that the redirect target is what carries the header. §8.3 is corrected by
+  this increment to describe the vhost that exists. **Live** — the vhost is serving on the box today.
+  Filed by `M102`. **Tier: during-testing.**

@@ -504,10 +504,10 @@ certificate lands in `md\staging\<domain>\`, the error log records
 restart and logs the new serial and expiry. The served leaf as of 2026-09-19 is serial `05F10E…53AE`, valid
 **2026-09-18 → 2026-12-17**, so the next renewal falls due around **2026-11-17**.
 
-⚠️ **`httpd -t` on this box prints `AH00558: Could not reliably determine the server's fully qualified
-domain name, using fe80::…` before `Syntax OK`, because there is no *global* `ServerName`.** It is benign —
-the vhost carries its own — but it appears in every `CONFIG` line of the activation log for ever. **Do not
-chase it during an incident.**
+⚠️ **`httpd -t` on this box no longer prints `AH00558`, and that is a change `M102` made rather than a fact
+it found.** `httpd.conf` now carries a global `ServerName localhost`, appended with a six-line comment giving
+its reason. ⛔ **Do not change that value to this site's own name without a supervised Apache restart** — that
+name is the `<MDomain>` above, and `httpd -t` never starts `mod_md`'s watchdog. An Apache reinstall brings it back.
 
 **Recovering a failed renewal by hand.** Delete `md\staging\<domain>\job.json`, `order.json` and
 `md\challenges\<domain>\*` so the retry backoff is skipped and the challenge certificate is regenerated
@@ -547,10 +547,10 @@ controller is its purpose, not a defect — and it is **inert in every environme
 the local stack is nginx and there is no Apache in CI. An exemption added there could not be proved by any
 gate this repository has, which is the same reason `R-4ff3e848` declined its own `.htaccess` arm.
 
-⚠️ **Also on the box, unfiled against any step here:** a leftover `*:80` vhost for
-`staging.pitahc.gov.ph` in `conf\extra\httpd-vhosts.conf` — harmless, and confirmed harmless on
-2026-09-19, when a connection to port 80 from outside the agency network timed out after 21 s with no
-listener answering.
+⚠️ **Also on the box, unfiled against any step here:** a `*:80` vhost for `staging.pitahc.gov.ph` in
+`conf\extra\httpd-vhosts.conf`, carrying a bare `Redirect permanent` to the `https://` origin and **no
+`Header` directive of its own**. `httpd.conf` carries an uncommented `Listen 80`, so there *is* a listener —
+the 21-second timeout measured from outside on 2026-09-19 was the agency firewall, not an absent server.
 
 #### The crawl protection, and which copy is authoritative
 
@@ -581,10 +581,10 @@ not blocked**; crawlers do fetch it, Googlebot included.
   NOT `docs/gate-baselines.md`.** `scripts/gate-baselines.php`'s metric list is *declared, not derived*,
   and a metric whose pattern is absent writes `NOT FOUND` **and exits 1** — so declaring a `schedule`-only
   gate there would fail every close-out regeneration, which runs from a `push`.
-- ⚠️ **Which file on the box holds the directive is not settled here.** `docs/feature-backlog.md:10621`
-  records it in `conf\extra\meridian.conf`; the paragraph above it names `conf\extra\httpd-vhosts.conf`
-  for the `*:80` vhost, and this file's own enumeration of `meridian.conf` by line number does not list
-  it. A row is open to confirm it on the box, and **no step here may name the file until it is**.
+- ✅ **The directive lives in `conf\extra\meridian.conf` at `:22`, measured on the box by `M102`.** A recursive
+  search of every file under the Apache `conf` tree returns exactly one hit, inside the `*:443` vhost that opens
+  at `:13`, and `httpd -S` maps that vhost to the same file and line from the server's own parse. The `*:80`
+  paragraph above names a different file for a different vhost; both listings of `meridian.conf` here are excerpts.
 
 ---
 

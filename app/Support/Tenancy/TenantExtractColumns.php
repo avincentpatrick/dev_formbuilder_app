@@ -150,6 +150,14 @@ final class TenantExtractColumns
                 .'`email` and the membership roster; it does not need the platform-wide handle.',
             'tos_accepted_at' => 'The person\'s contractual relationship with the platform operator, not with '
                 .'this tenant.',
+            'welcomed_at' => 'WHEN THE PLATFORM GREETED THIS PERSON, once, ever (M103) — `tos_accepted_at`\'s '
+                .'class exactly: a fact about the person\'s relationship with the PLATFORM, not about their '
+                .'membership of this workspace. The identity is CENTRAL, so the stamp belongs to whichever '
+                .'workspace they first verified into, which may not be this one — extracting it would hand a '
+                .'tenant a timestamp that is evidence about somebody else\'s onboarding. ⛔ And the NULL is the '
+                .'informative half, the same shape `password_set_at` argues above: NULL means an account that '
+                .'has never completed a verification, so a column of them is a shortlist of invite '
+                .'placeholders and dormant self-registrations.',
             'privacy_policy_accepted_at' => 'As `tos_accepted_at`: the timestamp records acceptance of THIS '
                 .'INSTALLATION\'S privacy policy, which is an agreement between the person and the platform '
                 .'operator. A tenant is not a party to it and cannot rely on it for their own consent record.',

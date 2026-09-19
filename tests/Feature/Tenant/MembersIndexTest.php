@@ -148,7 +148,7 @@ it('renders an identity it cannot resolve rather than failing the whole roster',
         ->assertOk();
 
     $response->assertInertia(fn (Assert $page) => $page
-        ->component('members/Index')
+        ->component('members/Index', false)
         ->has('members', 2)
         // The membership is still SHOWN — an operator deciding whether to remove it needs to see that it
         // exists. Skipping it silently would have been the row's other suggestion, and it would make a

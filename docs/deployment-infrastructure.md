@@ -534,7 +534,14 @@ run returns `CN=tls-alpn-01-challenge`, the mismatch is proven.
 `X-Powered-By: PHP`. ✅ **The activation task's read-back is the check, and it is the design rather than a
 stopgap**: `LastTaskResult` plus `C:\meridian\certificate-activation.log` report what Apache is *serving*,
 read over the loopback with SNI, which is a stronger fact than `mod_md`'s own opinion of its store.
-⚠️ **The `md-status` step is therefore removed from the Testing Server Checklist rather than repaired.**
+⛔ **AND THE CLAIM THIS RUNBOOK USED TO MAKE ABOUT THE CHECKLIST WAS ITSELF FALSE — MEASURED, NOT ASSUMED.**
+The sentence here said an operator *is told to read* `md-status`. The live Testing Server Checklist artifact
+contains **no reference to it**: `md-status`, `md_status` and `server-status` each occur **zero** times, none of
+the twelve URLs it tells an operator to open is a status handler, and it already prescribes
+`(Get-ScheduledTask …).LastTaskResult` and `Get-Content …\certificate-activation.log -Tail 5` — the very
+substitute this section recommends. So no checklist edit was owed, and the defect was entirely in the
+repository's description of an artifact no gate can read. ⚠️ **Nothing here may assert what the checklist says
+without opening it**, and a row is open for the fact that such assertions are ungated.
 `public/.htaccess` is the **stock, unmodified Laravel file** — routing unknown paths to the front
 controller is its purpose, not a defect — and it is **inert in every environment except this box**, since
 the local stack is nginx and there is no Apache in CI. An exemption added there could not be proved by any

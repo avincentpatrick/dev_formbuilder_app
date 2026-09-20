@@ -2,7 +2,6 @@ HTTP/1.1 200 OK
 Date: Sun, 20 Sep 2026 10:21:52 GMT
 Server: Apache/2.4.66 (Win64) OpenSSL/3.6.0
 X-Robots-Tag: noindex, nofollow, noarchive
-Strict-Transport-Security: max-age=300
 Last-Modified: Wed, 16 Sep 2026 06:56:29 GMT
 ETag: "18-65b942ab15a8d"
 Accept-Ranges: bytes

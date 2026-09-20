@@ -10,7 +10,7 @@ Referrer-Policy: strict-origin-when-cross-origin
 Link: <https://staging.pitahc.gov.ph/build/assets/app-CF1wJdpl.css>; rel="preload"; as="style", <https://staging.pitahc.gov.ph/build/assets/src-BYGSW_WW.css>; rel="preload"; as="style", <https://staging.pitahc.gov.ph/build/assets/app-1SseTGGR.css>; rel="preload"; as="style", <https://staging.pitahc.gov.ph/build/assets/app-C3WM65mM.js>; rel="modulepreload"; as="script", <https://staging.pitahc.gov.ph/build/assets/src-BRn8Bk8w.js>; rel="modulepreload"; as="script"
 Vary: X-Inertia
 X-Robots-Tag: noindex, nofollow, noarchive
-Strict-Transport-Security: max-age=300
+Strict-Transport-Security: max-age=60
 Transfer-Encoding: chunked
 Content-Type: text/html; charset=utf-8
 

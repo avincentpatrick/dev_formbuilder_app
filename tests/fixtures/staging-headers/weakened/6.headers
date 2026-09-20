@@ -1,9 +1,10 @@
 HTTP/1.1 404 Not Found
-Date: Fri, 18 Sep 2026 23:38:55 GMT
+Date: Sun, 20 Sep 2026 10:21:52 GMT
 Server: Apache/2.4.66 (Win64) OpenSSL/3.6.0
 X-Powered-By: PHP/8.4.25
 Cache-Control: no-cache, private
 X-Robots-Tag: noindex, nofollow, noarchive
+Strict-Transport-Security: max-age=300
 Transfer-Encoding: chunked
 Content-Type: text/html; charset=utf-8
 

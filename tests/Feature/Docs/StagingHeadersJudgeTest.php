@@ -101,6 +101,11 @@ it('judges a real capture of the live site as present, and reports a floor', fun
     // files. A judge that measured two probes and said only "present" is that defect again.
     expect($output)->toContain('6 probe(s) declared, 6 measured');
     expect($output)->toContain('noindex, nofollow, noarchive');
+
+    // M106 — the floor counts the POLICY, not just the probes. A header dropped from
+    // STAGING_REQUIRED_HEADERS would leave every probe measured and this number one lower.
+    expect($output)->toContain('2 required header(s)');
+    expect($output)->toContain('Strict-Transport-Security: max-age=300');
 });
 
 it('blocks when the header is absent from the one URL crawlers actually fetch', function (): void {
@@ -113,6 +118,12 @@ it('blocks when the header is absent from the one URL crawlers actually fetch', 
     // what turns a mutation of the failure reporting red rather than leaving it silently cosmetic.
     expect($output)->toContain('/robots.txt');
     expect($output)->toContain('ABSENT');
+
+    // ⛔ M106 — NAMING THE HEADER IS WHAT STOPS THIS ARM PASSING FOR THE WRONG REASON. Once a second
+    // required header existed, "BLOCKED ... ABSENT" was satisfiable by EITHER of them, and this fixture
+    // would have gone on reporting green about a crawl header it was no longer measuring.
+    expect($output)->toContain('X-Robots-Tag is ABSENT');
+    expect($output)->not->toContain('Strict-Transport-Security is ABSENT');
 });
 
 it('blocks when the directives are WEAKENED rather than absent', function (): void {
@@ -122,6 +133,53 @@ it('blocks when the directives are WEAKENED rather than absent', function (): vo
 
     expect($status)->toBe(STAGING_HEADERS_JUDGE_BLOCKED, $output);
     expect($output)->toContain('noarchive');
+    expect($output)->toContain('X-Robots-Tag');
+    expect($output)->not->toContain('Strict-Transport-Security is');
+});
+
+/*
+|--------------------------------------------------------------------------
+| M106 — the transport header, and the two things the old policy shape could not say.
+|--------------------------------------------------------------------------
+|
+| ⛔ `D54` OPTION A AND THIS JUDGE'S OWN DOCBLOCK BOTH PRICED ARMING HSTS AT "ONE ENTRY IN
+| STAGING_REQUIRED_HEADERS", AND BOTH WERE WRONG. The map modelled REQUIRED tokens only, so
+| "no `includeSubDomains`, no `preload`" — half of what `D54` decided — had nowhere to live; and the
+| tokeniser split on `,` while HSTS is SEMICOLON-delimited, so `max-age=300; includeSubDomains` was
+| reported as MISSING `max-age=300` while plainly carrying it. A true red for a false reason is worse
+| than a miss, because it sends the reader to the wrong line. The three cases below are the two new
+| powers and the ordinary absence.
+*/
+
+it('blocks when the transport header is absent, and says so about the RIGHT header', function (): void {
+    [$status, $output] = stagingHeadersJudge('hsts-missing');
+
+    expect($status)->toBe(STAGING_HEADERS_JUDGE_BLOCKED, $output);
+    expect($output)->toContain('Strict-Transport-Security is ABSENT');
+    // The crawl header is intact in this fixture, so a judge that conflated the two would name it here.
+    expect($output)->not->toContain('X-Robots-Tag is ABSENT');
+});
+
+it('blocks on a max-age that is not the one D54 chose', function (): void {
+    // `max-age=60` is still HSTS and still "present". The value is the control, so presence is not enough.
+    [$status, $output] = stagingHeadersJudge('hsts-weakened');
+
+    expect($status)->toBe(STAGING_HEADERS_JUDGE_BLOCKED, $output);
+    expect($output)->toContain("Strict-Transport-Security is 'max-age=60', missing max-age=300");
+});
+
+it('blocks on includeSubDomains and preload, which a required-token model could not express', function (): void {
+    // ⛔ THE CASE THE OLD SHAPE COULD NOT HAVE FAILED, AND THE ONE WITH THE WORST BLAST RADIUS. A preload
+    // submission is effectively irreversible on browser timescales and would outlive this staging host.
+    [$status, $output] = stagingHeadersJudge('hsts-forbidden');
+
+    expect($status)->toBe(STAGING_HEADERS_JUDGE_BLOCKED, $output);
+    expect($output)->toContain('FORBIDDEN directive(s) present: includesubdomains, preload');
+
+    // ⚠️ AND IT MUST NOT ALSO CLAIM `max-age=300` IS MISSING. It is right there in the value. That
+    // false second line is exactly what the comma tokeniser produced, and asserting its ABSENCE is what
+    // pins the per-header separator rather than leaving it a cosmetic detail.
+    expect($output)->not->toContain('missing max-age=300');
 });
 
 it('reports an unreachable box as CANNOT MEASURE rather than as a missing header', function (): void {

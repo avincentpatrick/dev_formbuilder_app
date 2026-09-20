@@ -10956,7 +10956,15 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   Filed by `M107`. **Tier: after-launch.**
 
 - **`minor` · PHPStan is GREEN in CI and reports 18 errors in the app container on the same commit, so the
-  gate cannot be used locally at all.** Measured by `M107` (2026-09-20) while running its own gates. A
+  gate cannot be used locally at all — and this has been true and UNQUEUED since `M1`.** Re-measured by
+  `M107` (2026-09-20) while running its own gates. ⛔ **The condition is not new and that is the finding.**
+  `M1` recorded *"PHPStan 18 = baseline with zero delta by file list"* (`:1069`) and `M2` recorded *"all 18
+  are pre-existing `property.notFound` phantoms"* (`:2181-2182`); `M74`'s own harness notes carry the same
+  sentence. **A hundred increments have worked around it in release prose and none of them filed it**, which
+  is exactly the shape `CLAUDE.md` names: an obligation living only in a document no rule reads is invisible
+  to the line. ⚠️ **`M107` re-derived it from scratch** — running a pristine branch point to establish
+  whether its own diff had caused 19 errors — because prose in a closed row is not somewhere the next
+  session looks. That re-derivation is the cost, and it recurs every time. A
   **pristine** `3c57291` — the branch point, a documentation-only commit — gives `Found 18 errors` under
   `docker compose exec app ./vendor/bin/phpstan analyse`, while CI's *Static analysis, style & security* job
   passes on the same tree running `composer run analyse`, which is **the same command**

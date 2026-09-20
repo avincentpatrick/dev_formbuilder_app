@@ -16,108 +16,82 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M107`, the two-factor lockout escape, its two sibling gaps, and the fifth tracker surgery (`m107-two-factor-recovery`)
+## Status: NO ACTIVE CLAIM — `M107` is merged; `early-testing` remains the most urgent tier with open work, and no decision in it is open
 
-Taken 2026-09-20. Branch `m107-two-factor-recovery`, cut from `origin/main` at `3c57291`, PR into `main`.
+## RELEASED — `M107`, the audited two-factor lockout escape, its two sibling gaps, and the fifth tracker surgery (merged as PR #300, `a0132f8`, 6/6 green with real step counts — Static analysis 31 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 
-**Three `early-testing` rows, taken as one batch under `D13` with one recorded exception (below).**
+Shipped 2026-09-20. Branch `m107-two-factor-recovery`, cut from `origin/main` at `3c57291`.
 
-- `R-1ad2304d` — *"Nobody who loses their two-step sign-in device and their recovery codes can get back in without an operator editing the database."* — `docs/feature-backlog.md:9609`. **`D37` answered `A`** (2026-09-20): an admin reset, recorded in the audit log, by a workspace owner **or** the platform operator.
-- `R-0f8b73f9` — *"Nothing warns a person that their two-factor recovery codes are running low, and the seeded two-factor fixture carries an empty recovery list."* — `docs/feature-backlog.md:10863`.
-- `R-5c3bc57a` — *"A correction still cannot be autosaved, and the reason is an endpoint that does not exist plus a product decision nobody has taken."* — `docs/feature-backlog.md:6883`. **`D36` answered `A`** (2026-09-20): keep saving on the button, and document that corrections are not resumable.
+**Three rows closed, three filed, one decision appended, one tracker surgery.** Open rows 243 → **243** — the close and the filing cancelled exactly, which is a coincidence and not a policy; open decisions 28 → **29** (`D56`). **Two migration prefixes spent**, no ADR — `0023` is still free.
 
-### ⛔ THE `D13` EXCEPTION THIS BATCH RECORDS, RATHER THAN A PASS IT DID NOT EARN
+Every claimed file was edited except `resources/js/Pages/submissions/Encode.vue`, which the claim said would move *"only if a comment proves stale"* and it did not: its null-in-edit-mode comments are correct, so `R-5c3bc57a` is a documentation-only close. **Four files were taken that the claim did not name**, and one claimed path was wrong. Taken: `app/Services/Admin/SuperAdminService.php` (the console roster needed a `two_factor_enrolled` flag, so the new action can be hidden for an account with nothing to reset); `tests/Feature/Auth/StepUpReauthenticationTest.php` (the new route belongs in the manifest that owns the `step-up` alias, not in a second list); `docs/TESTING-GUIDE.md` (it states the permission count, which the new key moved); and `docs/backlog-triage.md` (generated beside the line). ⚠️ **The claim named `app/Exceptions/MembershipException.php`; the file is `app/Exceptions/Tenancy/MembershipException.php`** — written from memory rather than from the tree, which is the habit this project files rows about when a document does it.
 
-`R-1ad2304d` and `R-0f8b73f9` are **one subject and genuinely share files** — `E2eSeeder.php`, `UserFactory.php`, `TwoFactorSetup.vue`. They pass `D13`'s overlap check only because `R-0f8b73f9` harvests **zero file paths**, so the collision graph cannot see the overlap. That blindness is `R-7849e303`'s own open row and is **not** fixed here. They are batched deliberately: splitting them ships the reset while leaving in place the seeded fixture state — an encrypted **empty** recovery array — which is precisely the state the reset exists to rescue. `R-4346557c` says the next taker is owed a recorded exception rather than a judgement call; this is it.
+### ⛔ THE REMEDY I PLANNED WAS WRONG, AND MEASURING IT BEFORE WRITING A LINE IS THE ONLY REASON IT DID NOT SHIP
 
-Hub accounting, measured from `php scripts/backlog-triage.php --json` against this tree (**49 hub files at `HUB_THRESHOLD = 3`**, read from `docs/backlog-triage.md`'s *Hub files* table and never from `D13`'s seven-file prose illustration):
-
-| Row | Touches a hub? |
-|---|---|
-| `R-1ad2304d` | **yes** — the one permitted hub row (`docs/security-threat-model.md`, and in build also `docs/data-dictionary.md`, `docs/ACCESS-MATRIX.md`, `routes/tenant.php`, `routes/admin.php`) |
-| `R-0f8b73f9` | no |
-| `R-5c3bc57a` | no — **and `docs/PRD.md` is deliberately NOT touched**, because it is a hub and would put a second hub row in the batch |
-
-⚠️ **The next-prompt line's claim that `R-b6a4ea79` is "the only zero-hub candidate left" is FALSE**, measured: it touches **three** hubs (`scripts/pipeline-lint.php`, `scripts/pipeline.php`, `scripts/mutate.php`) and cannot share a batch with a hub row. The sentence is not in `scripts/next.php`'s generated output either. Filed below.
-
-### Evidence verified
-
-**`R-1ad2304d`** — **held, in full.**
-
-- `docs/security-threat-model.md` §9 item 12 resolves and still reads as filed: *"`two-factor.disable` sits behind `auth` + `password.confirm` — both of which are past the challenge"*, and it names the same two sibling gaps.
-- The middleware claim is exact. Fortify's seven management routes carry `auth:web` + `password.confirm` (`vendor/laravel/fortify/routes/routes.php:146-172`), and the `password.confirm` comes from `config/fortify.php:240-244`'s `Features::twoFactorAuthentication(['confirm' => true, 'confirmPassword' => true])`.
-- *"the super-admin console offers no reset"* — held. `resources/js/Pages/admin/Users.vue` is 22 lines, two columns, no row actions, and its own docblock says *"Read-only for now (per-user platform actions are a later increment)."* `routes/admin.php` has no such route. **No code anywhere in `app/` nulls the 2FA columns administratively** — the only disable path is Fortify's self-service `DELETE /user/two-factor-authentication`.
-
-**`R-0f8b73f9`** — **held, and it understates itself by one.**
-
-- `database/seeders/E2eSeeder.php:1593` writes `Fortify::currentEncrypter()->encrypt(json_encode([]))` — verified verbatim. An encrypted **empty** array.
-- ⚠️ **A second instance the row does not name:** `database/factories/UserFactory.php:56-66` `confirmedTwoFactor()` sets the secret and the timestamp and **never touches `two_factor_recovery_codes` at all**, leaving it `NULL` — so `recoveryCodes()` would `decrypt(null)`. No test reaches it today. The row is a floor, not a census; both are closed here.
-
-**`R-5c3bc57a`** — **held.**
-
-- `resources/js/Pages/submissions/Encode.vue:133-134` — *"The autosave endpoint. NULL IN EDIT MODE"*; `:522` reads `props.draft_url ?? ''` and `:538` gates `enabled` on `!isEditing.value`.
-- `tests/Feature/Submissions/SubmissionEditRoutesTest.php:120-121` pins `draft` and `draft_url` null in edit mode, as the row says.
-
-### Premise verified
-
-**`R-1ad2304d` — the premise ROTTED, and in the direction that matters.** The row frames the remedy as *"a new trust boundary rather than a UI addition"* and leaves the shape open. `D37`'s recorded answer is **wider than the row's own headline**: it names **two** actors — *"A workspace owner or the platform operator clears the enrolment"* — so `routes/tenant.php` and the member roster are in scope alongside `routes/admin.php`, and the row's framing as an operator-console gap alone would have shipped half of it.
-
-⛔ **And `D37` itself has a premise it did not consider: the 2FA columns are on the GLOBAL `users` table.** An owner's reset clears that person's second factor in **every workspace they belong to**, not just the acting one. That is a cross-tenant consequence of a tenant-scoped action. Per the user's instruction today: build it, document it in the threat model, and file the narrowing as its own decision rather than blocking on it.
-
-**Three further premises checked because they change the build, not the description:**
-
-1. ⛔ **`deploy.ps1` never seeds, and no migration has ever inserted a permission row.** `grep -n seed deploy.ps1` returns nothing; `grep -rn "table('permissions')" database/migrations/` returns nothing. `RolePermissionSeeder` writes the catalog **once, at tenant creation** (`CreateTenantCommand.php:102`). So a permission added to the seeder alone **would not exist in the staging database**, and `can:` would deny the owner with nothing in any log to explain it. This is the `audits_event_check` trap — *"adding a case to the PHP enum does nothing to a database that already exists"* — reaching permissions for the first time. A backfill migration is therefore part of this row, not a nicety.
-2. **`AuditEvent` is CHECK-pinned.** `2026_07_22_000001_create_audits_table.php:86` generates `audits_event_check` from `AuditEvent::values()` once, at creation. An eleventh case needs its own migration, exactly as `2026_08_10_000002_recreate_audits_event_check_for_impersonation.php` did for the two impersonation boundaries.
-3. **The permission catalog is "closed by design"** (`routes/tenant.php:413-416`) — I8a reused the dormant `tenant.roles.assign` rather than minting `tenant.members.role`. Checked: **no dormant key fits this action.** `tenant.members.remove` is seeded to Owner **and Admin**, which is wider than `D37`'s words; `tenant.ownership.transfer` is owner-only but is a semantic overload. Minting is correct here, and it is the repository's first post-Phase-0 permission.
-
-**`R-0f8b73f9`** — **held.** Nothing in `TwoFactorSetup.vue` counts remaining codes today; the component already fetches `/user/two-factor-recovery-codes` (`:59-63`) with a `423` guard, so the count is in hand and no endpoint is owed.
-
-**`R-5c3bc57a` — the premise is now SPENT.** The row's *"a product decision nobody has taken"* was taken: `D36 = A`. Its *"endpoint that does not exist"* is therefore **no longer owed** — the remaining work is documentation only. Checked separately: `Encode.vue`'s own comments are **correct and not stale** (they describe the deliberate null-in-edit-mode design), so nothing there needs correcting.
-
-### Remedy verdict
-
-**`R-1ad2304d` — the prescribed remedy WORKS, but my planned mechanism was WRONG and was corrected by measurement before a line was written.**
-
-The plan said the write *"must not go through the ordinary connection"*, reasoning from `users_users_visibility` being keyed on `app.current_user_id`. Measured against the running stack instead — a no-op self-assignment `UPDATE`, counting affected rows:
+The approved plan said the write *"must not go through the ordinary connection"*, reasoned from `users_users_visibility` being keyed on `app.current_user_id`. A probe against the live stack — a no-op self-assignment `UPDATE`, counting affected rows — inverted it:
 
 | Path | Connection | Rows |
 |---|---|---|
-| Tenant context set, actor is a **different** user, target is an **active member** | `pgsql` (app) | **1** |
-| **No** tenant context — the console's situation | `pgsql` (app) | **0, silently** |
-| Either | `pgsql_auth` | **1** |
-| Either | `pgsql_superadmin` | ⛔ **`SQLSTATE[42501]` permission denied for table `users`** |
+| tenant context set, actor ≠ target, target an **active member** | `pgsql` | **1** |
+| **no** tenant context — the console's situation | `pgsql` | **0, silently** |
+| either | `pgsql_auth` | **1** |
+| either | `pgsql_superadmin` | ⛔ `SQLSTATE 42501`, permission denied |
 
-⚠️ **Two corrections fall out of that table.**
+⚠️ **The policy's membership arm means the Owner path never needed elevation at all** — my reading of it as own-row-only was simply wrong. ⛔ **And `pgsql_superadmin` holds `SELECT` ONLY on `users`** (confirmed from `information_schema.role_table_grants`), so the console's usual `SuperAdminService::elevated()` shape is **structurally unavailable** for this write. One path on `pgsql_auth` serves both surfaces.
 
-- The policy's **membership arm** (`EXISTS (SELECT 1 FROM tenant_users … status = 'active')`) does make another member's row writable from the app connection, so the owner path did **not** need elevation at all. My reading of it as own-row-only was wrong.
-- ⛔ **`pgsql_superadmin` cannot write `users` — it holds `SELECT` only**, confirmed from `information_schema.role_table_grants` (`meridian_auth`: SELECT + UPDATE; `meridian_superadmin`: SELECT). So the console's usual `elevated()` shape is **structurally unavailable** for this write. It fails loudly rather than silently, which is the one mercy.
+⛔ **THE FIRST PROBE SAID 0 ROWS ON EVERY ARM AND WOULD HAVE "CONFIRMED" THE WRONG DESIGN.** `TenantContext::applyLocal()` is `SET LOCAL`, a silent no-op outside a transaction, so it was measuring nothing. `TenantContext.php:125` says so in terms. Re-run with `apply()`, every answer inverted. **A measurement that agrees with your prior is the one to re-run.**
 
-**Settled design: one write path on `pgsql_auth` for BOTH surfaces**, switch-call-restore in a `finally`, exactly the shape `app/Models/User.php:125-137` already uses for `replaceRecoveryCode()`. A zero-row guard ships anyway: eligibility and the policy agreeing today is not a reason to report success if they ever stop.
+### ⚠️ THE THIRD FACT AROSE ONLY BECAUSE THE FIRST TEST RUN FAILED
 
-⚠️ **A constraint that shape carries, recorded because it binds the code I am about to write:** `meridian_auth` holds grants on `users` plus a read-only `SELECT` on `tenant_users` **and nothing else**, so the audit write must happen **outside** the elevated window, on the default connection.
+The platform-ledger write needs the `app.is_superadmin_context` **GUC**, not merely the elevated connection: `audits_superadmin_insert` is gated on the setting, so `connection: SuperAdminContext::CONNECTION` alone raises `SQLSTATE 42501 — new row violates row-level security policy`. Three console cases went red on it. The test then failed a second time on the same fact from the READ side, which is why the assertion now reads the row inside the elevated context rather than over `pgsql_privileged` — so the case proves the platform audit page can actually see what was written.
 
-⛔ **A measurement artefact worth keeping:** the first probe reported **0 rows on every app-connection arm** and would have "confirmed" the wrong design. `TenantContext::applyLocal()` is `SET LOCAL`, which is a **silent no-op outside a transaction** — the probe was measuring nothing. `TenantContext.php:125` says so in terms. Re-run with `apply()` (session scope), the answers inverted.
+### ⛔ THE FIRST POST-PHASE-0 PERMISSION, AND THE MIGRATION NOBODY HAD EVER NEEDED
 
-**`R-0f8b73f9` — remedy sound, and one shape rejected on measurement.** The fixture half is a one-line seeder change (kept as a single `forceFill()->save()` INSERT — `E2eSeeder.php:1576-1581` warns that create-then-save matches no `users` UPDATE policy during seeding). ⛔ **The warning must NOT be built as a `NotificationType`:** that enum's CHECK constraints are generated from `values()` on **two** tables, its TypeScript union is **order**-pinned by `NotificationTypeParityTest`, and the whole cascade buys nothing over a banner on the page the person is already looking at.
+`RolePermissionSeeder` writes the RBAC catalog **once**, at `CreateTenantCommand`. Nothing re-runs it, and `deploy.ps1` has no `db:seed` step — both verified, not assumed. So `tenant.members.two_factor_reset` added to the seeder alone would exist in a fresh test database and **nowhere else**: every local suite green, and on the testing server a `can:` denying the Owner against a `permissions` table that had never heard of the key, with nothing in any log naming the cause. This is `audits_event_check`'s lesson — *adding a case to the PHP enum does nothing to a database that already exists* — reaching the RBAC catalog for the first time, and it is recorded as a Design Note beside I8a's.
 
-**`R-5c3bc57a` — no remedy was offered, and `D36` supplies one.** Documentation only, in `docs/ux/form-filling-ux-flow.md` §5.1 beside its I9b amendment, which today documents durable autosave for *encoding* and is silent on *correcting* an already-submitted response.
+### ⛔ APPENDING "CLOSED BY M107" TO A ROW'S BODY CLOSES NOTHING
 
-Files: `app/Enums/AuditEvent.php`, `app/Services/Auth/TwoFactorResetService.php` (new), `app/Http/Controllers/Tenant/MemberController.php`, `app/Http/Controllers/Admin/TwoFactorResetController.php` (new), `app/Services/Tenancy/TenantMembershipService.php`, `app/Support/Authorization/ShellAbilities.php`, `app/Exceptions/MembershipException.php`, `routes/tenant.php`, `routes/admin.php`, two new files under `database/migrations/`, `database/seeders/RolePermissionSeeder.php`, `database/seeders/DemoSeeder.php`, `database/seeders/E2eSeeder.php`, `database/factories/UserFactory.php`, `resources/js/types/inertia.d.ts`, `resources/js/components/audit/event-variant.ts`, `resources/js/components/settings/TwoFactorSetup.vue`, `resources/js/Pages/members/Index.vue`, `resources/js/Pages/admin/Users.vue`, `resources/js/Pages/submissions/Encode.vue` (only if a comment proves stale), `docs/security-threat-model.md`, `docs/data-dictionary.md`, `docs/ACCESS-MATRIX.md`, `docs/multi-tenancy-rbac-design.md`, `docs/ux/form-filling-ux-flow.md`, `docs/feature-backlog.md`, `docs/claims/decisions.md`, `docs/pipeline.md`, `docs/gate-baselines.md`, `PROGRESS.md`, `PROGRESS_ARCHIVE.md`, plus new tests under `tests/Feature/`, `tests/Unit/` and the matching `.test.ts` files.
+All three rows were still counted **open** after I had written their closing paragraphs. `state.php:567-585` recognises exactly three first-line shapes, and the closed-by one needs the marker, the severity token and a **struck title on the FIRST LINE**. ⚠️ **What surfaced it was the count going the wrong way** — the triage read 245 open after a three-row close that should have read 242 — and nothing else would have: the prose was correct, the rows read as closed to a human, and every gate stayed green. The pipeline would have published three finished rows as available work.
 
-Shared artefacts taken: `docs/security-threat-model.md`, `docs/data-dictionary.md`, `docs/ACCESS-MATRIX.md`, `docs/multi-tenancy-rbac-design.md`, `docs/ux/form-filling-ux-flow.md`, `docs/feature-backlog.md`, `docs/claims/decisions.md`, `docs/pipeline.md`, `docs/gate-baselines.md`, `PROGRESS.md` (own block only), `PROGRESS_ARCHIVE.md`.
+### How the prediction fared
 
-Paired files taken: **`app/Support/Authorization/ShellAbilities.php` + `resources/js/types/inertia.d.ts`** — Standing Rule 7(b-bis), asserted for set equality by `tests/Unit/Navigation/ShellAbilityParityTest.php`. Both halves move in this PR. (`resources/js/components/notifications/types.ts` is deliberately **not** taken — see the remedy verdict.)
+| Predicted | Actual |
+|---|---|
+| Pint green | ✅ green |
+| PHPStan **will move**; no new errors | ⚠️ **Half right, and the interesting half is the other one.** It moved — but it was never at zero: a **pristine branch point measures 18 errors in this container**, against a baseline recording CI as "OK, no errors". My diff added exactly one (`countRecoveryCodes()` reading an undeclared column); declaring the two Fortify columns on `User` took the branch to 15. **Zero new, three pre-existing fixed** — and a host/CI divergence I did not chase, because CI is the gate. |
+| Three Pest failures on the first run | ❌ **One, not three.** `event-variant.test.ts` fired as predicted (Vitest, not Pest). `DemoSeederIdempotencyTest` never failed because I shaped the seeder before running it, and **`AdminConsoleGateTest`'s route count is a FLOOR, not an equality** — I predicted a failure the gate is deliberately built not to produce. |
+| **Most likely to be wrong: `ShellAbilityParityTest`** | ❌ **Passed first time.** The named risk did not materialise; the real failures came from RLS context, which I had not listed at all. |
+| `auth-axe.spec.ts` the E2E I expect to argue with | ✅ **42 passed locally, no argument** — the spec drives both states of the two-factor challenge including the recovery-code branch, which is exactly where the fixture change lands. ⚠️ **`public/hot` was present and would have defeated the run**, the `M103` trap; moved aside first. CI's full E2E job is green at 20 steps. ⚠️ **`responsive-axe` and `list-layout` were started locally and ABANDONED at 23 minutes**, unfinished — two specs at one worker on this host is not a cheap confirmation of a job CI had already run green, and reporting them as "run" would have been false. |
+| `tracker-surgery.php` passes first run | ✅ **All four proofs, first run** — A1 multiset, A2 exact bytes with 762 added stated, A3 two paths, A4 slice `8e5237ae538b58f5`. |
 
-Namespaces spent: **two migration prefixes** — the `audits_event_check` widening and the permission backfill — re-derived with `php scripts/state.php` immediately before each file is written. **No ADR.** `0023` stays unspent: the RBAC design document already carries the *"Design Note (I8a, 2026-08-07)"* idiom for exactly this kind of catalog change, and a second home for the same fact is the defect this repository files elsewhere. No sub-decision id. **One new decision appended** (the owner-surface narrowing).
+### The five controls, via `scripts/mutate.php`
 
-Prediction: written before the run.
+| # | The deliberate defect | Result |
+|---|---|---|
+| MU1 | `WRITE_CONNECTION` moves off `pgsql_auth` to the app connection | **CAUGHT** — 5 failed |
+| MU2 | the `is_super_admin` carve-out removed, so platform staff become resettable from a workspace | **CAUGHT** — 1 failed, precisely the case that names it |
+| MU3 | the reset is logged as `AuditEvent::Updated` | **CAUGHT** — 2 failed |
+| MU4 | the zero-row guard can never fire | ⛔ **SURVIVED** — all 11 green. **Filed.** |
+| MU5 | the platform-ledger write keeps the connection but loses `applyLocal()` | **CAUGHT** — 3 failed |
 
-- **Pint** — green. Nothing here is formatting-novel.
-- **PHPStan** — will **move**, and the count must be reported rather than restated: this diff touches `app`, `database` and `routes`, which is exactly the scope it scans. I expect no new errors; a new service with typed properties is its comfortable case.
-- **Pest** — I expect **three** failures on the first run, all of them mine and all expected: the `event-variant.test.ts` ten-key equality, `DemoSeederIdempotencyTest`'s distinct-events assertion, and `AdminConsoleGateTest`'s route-count floor. Each is a gate doing its job; each moves in this PR.
-- **The one I most expect to be wrong: `ShellAbilityParityTest`.** Not because the pairing is unknown — it is documented and I have named both halves — but because the ability key's **name** has to be identical in two languages and I will be adding it to the Vue predicate at the same time, which gives three places to spell it and a test that only checks two of them. If something goes red unexpectedly, I expect it there.
-- **E2E** — `auth-axe.spec.ts` is the spec the fixture change lands in and the one I expect to argue with, since it drives the recovery-code state of the challenge page.
-- **The tracker surgery** — I expect `tracker-surgery.php` to **pass on its first run**, and I am recording that expectation precisely because the harness's own docblock says three of the four hand-rolled checks before it were wrong on their first run against a correct tree. If it exits `2`, that is the harness refusing to measure, not a pass.
+⛔ **MU2's first form was too blunt and I re-ran it.** Replacing the clause with a never-matching comparison broke the query and reddened five cases with a `QueryException` — which "catches" the mutant while proving nothing about the carve-out. Replaced with an always-true clause that removes the carve-out and nothing else: exactly one case red, the one whose name is the property.
+
+⛔ **MU4 IS THE FINDING, AND IT IS FILED RATHER THAN EXPLAINED AWAY.** The guard is unreachable by construction — `clearEnrolmentAndRecord()` asks `$wasEnrolled` first, so by the time the `UPDATE` runs the same connection has just seen the row, and only a delete racing between the two statements reaches zero. *Kept* and *covered* are different words, and the class docblock's "ships anyway" must not be read as "is tested". What does protect the connection choice is MU1.
+
+### Also filed
+
+- **`D56`** — the 2FA columns are on the global `users` table, so an Owner's reset clears that person's second factor in **every** workspace they belong to. It grants the Owner no access; what it does is lower another workspace's authentication assurance without that workspace being told, and the audit row lands in the acting tenant's ledger rather than theirs. Recommendation `A` (leave it, revisit `C` at launch): the confirm dialog states it, and the testing site is one workspace so nobody can meet it yet.
+- **The missing `key`/`lock` glyph**, which sends two security controls to `undo` — `shield` is this product's security icon everywhere else but is already spent on "Make owner" one button up.
+
+### ⚠️ TWO OF THE "FINDINGS" WERE ALREADY WRITTEN DOWN, AND I RE-DERIVED BOTH FROM SCRATCH
+
+**The closure shape.** The session memory already carried it verbatim — *"`state.php` counts a backlog row CLOSED only when its first line opens with a dash and two tildes; closure prose alone leaves the row open and the count unmoved"* — and I wrote three closing paragraphs the parser could not read anyway. Knowing a trap and applying it are different acts, and the gap between them is not closed by writing the trap down again.
+
+**The PHPStan phantoms.** `M1` recorded *"PHPStan 18 = baseline with zero delta by file list"* and `M2` recorded *"all 18 are pre-existing `property.notFound` phantoms"*. I spent a pristine-checkout comparison rediscovering that, having treated `docs/gate-baselines.md`'s *"OK, no errors"* as the tree's own claim about the local gate. ⛔ **Neither fact was ever a ROW**, which is exactly why neither reached me: both lived in the prose of closed increments, and prose in a closed row is not somewhere the next session looks. It is filed now — not as a discovery, but as an obligation that has been visible and unqueued for a hundred increments.
+
+### Two citations this branch broke and repaired
+
+The route insertion moved `routes/tenant.php` and the surgery moved `PROGRESS_ARCHIVE.md`, so two ledger citations went dead — **the M83 lesson exactly: a host citation run that passes BEFORE the ledger edits has measured nothing.** The ledger tier finished at **17 rotten against a ceiling of 18**, two better than this branch found it. ⚠️ **The ceiling was deliberately NOT lowered**: the close-out regenerates the line again after the status bullet is prepended, which moves cited lines once more, and tightening a ratchet in the same push as the thing that can break it buys nothing.
 
 ## RELEASED — `M106`, three tester-facing `early-testing` rows: HSTS armed at a judge that could not express it, the welcome email's three wrong places, and a quota line that counted strangers (merged as PR #299, `429857d`, 6/6 green with real step counts — Static analysis 31 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

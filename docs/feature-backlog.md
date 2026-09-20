@@ -7524,7 +7524,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the comment opening at `config/permission.php:20`. ⚠️ **The one near-miss is a circular pointer, not a
   deferral**: `docs/multi-tenancy-rbac-design.md:742` defers the request/response *shapes* to Doc #14, and
   `docs/api-specification.md:13` points straight back at §7.1 as the authoritative inventory. Neither
-  defers the build. This repository builds `/api/v1` twins deliberately — `routes/tenant.php:755` says
+  defers the build. This repository builds `/api/v1` twins deliberately — `routes/tenant.php:767` says
   so — so the web surface does not discharge it. **Live.** Filed by `M80`. **Tier: early-testing.** ⚠️ **`D38` ANSWERED 2026-09-20 (`M105`) — mark the six as not built, in place, rather than trimming the documentation.** ⛔ **THIS IS THE ROW THAT MADE THE ANSWER `C` RATHER THAN `A`.** `D38`'s premise sentence *"nothing shipped depends on them"* is false here: the documented `GET /api/v1/roles` is the stated reason roles use UUIDv7 primary keys rather than Spatie's bigints, cited at `docs/multi-tenancy-rbac-design.md:56`, `app/Models/Role.php:13` and `config/permission.php:20-21`. **That schema shipped**, so a plain trim orphans the rationale for a decision already paid for.
 
 - **`minor` · §7.1's `Form draft` row pins four `/api/v1` builder endpoints registered nowhere, and the
@@ -7678,7 +7678,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   not survive re-derivation. ⛔ **AND THIS ROW LOOKS LIKE THAT LARGEST BUCKET, SO CHECK IT FIRST.** `M80`'s
   own citation pass found the deferral stated four times outside the cited design doc:
   `docs/data-privacy-gdpr-compliance.md:77` and `docs/piping-output-encoding-design.md:279` each say the
-  opt-in "stays deferred", as do `PROGRESS_ARCHIVE.md:6897`, `:6902` and `:6903`. ⚠️ **M92 RE-DERIVED
+  opt-in "stays deferred", as do `PROGRESS_ARCHIVE.md:6908`, `:6902` and `:6903`. ⚠️ **M92 RE-DERIVED
   THOSE THREE FROM THE CONTENT, AND THEY WERE ALREADY WRONG BEFORE ITS SURGERY MOVED ANYTHING.** The
   numbers this row carried resolved to unrelated `H23`/`H24` release bullets roughly twenty-two lines
   above the sentences it describes; the citation gate passed them because they were ALIVE, which is

@@ -6894,7 +6894,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   warned rather than silently losing work, but an hour of transcription still lives only in the tab.
   👤 **The decision is the user's**: a draft-shaped side table for in-progress corrections, an explicit
   "save a working copy" action, or a documented statement that corrections are not resumable. **Live.**
-  Filed by `M75`. **Tier: early-testing.** ⚠️ **`D36` ANSWERED 2026-09-20 (`M105`) — keep saving on the button, and document that corrections are not resumable.**
+  Filed by `M75`. **Tier: early-testing.** ⚠️ **`D36` ANSWERED 2026-09-20 (`M105`) — keep saving on the button, and document that corrections are not resumable.** ✅ **CLOSED BY `M107` (2026-09-20) — DOCUMENTATION ONLY, BECAUSE THE ANSWER SPENT THE ROW'S PREMISE.** `D36 = A` means the *"endpoint that does not exist"* is no longer owed, so the remaining work was to stop the documents implying otherwise. `docs/ux/form-filling-ux-flow.md` §5.1 now carries an M107 amendment beside its I9b one — which documented durable autosave for ENCODING and was silent on CORRECTING — stating that a correction is kept when Save is pressed and not before, and why: the only write path a correction has demotes an Approved response to UnderReview and writes an audit row on every call, so a debounced autosave there would be one demotion and one ledger row per tick. The ratified-decisions list carries it too. ⚠️ **`Encode.vue` was checked and NOT edited:** its comments describe the deliberate null-in-edit-mode design and are correct, so there was nothing stale to repair. ⚠️ **`docs/PRD.md` was deliberately left alone** — it is a hub file, and touching it would have put a second hub-touching row in this batch and broken `D13` outright.
 
 - **`minor` · `CLAUDE.md`'s gate table sends PHPStan to the container, one row below the rule that explains
   why the container is wrong.** Measured by `M76` (2026-09-06) while closing the 18-phantom-errors row.
@@ -9611,7 +9611,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   (2026-09-14). Disabling two-factor sits behind `auth` and `password.confirm`, which a locked-out person
   cannot pass, and the super-admin console offers no reset. Two smaller gaps sit beside it: nothing warns when
   recovery codes run low, and the seeded two-factor fixture carries an empty recovery list. The shape of the
-  escape is a product call, open as a decision. **Live.** Filed by `M93`. **Tier: early-testing.** ⚠️ **`D37` ANSWERED 2026-09-20 (`M105`) — an admin reset, recorded in the audit log.** ⚠️ **Two gaps this row names are NOT covered by the answer and are filed separately by `M105`:** nothing warns when recovery codes run low, and the seeded two-factor fixture carries an empty recovery list.
+  escape is a product call, open as a decision. **Live.** Filed by `M93`. **Tier: early-testing.** ⚠️ **`D37` ANSWERED 2026-09-20 (`M105`) — an admin reset, recorded in the audit log.** ⚠️ **Two gaps this row names are NOT covered by the answer and are filed separately by `M105`:** nothing warns when recovery codes run low, and the seeded two-factor fixture carries an empty recovery list. ✅ **CLOSED BY `M107` (2026-09-20) — BOTH ACTORS `D37` NAMES ARE BUILT, AND THE MECHANISM WAS MEASURED RATHER THAN REASONED.** A workspace Owner at `POST /members/{user}/two-factor-reset` (`can:tenant.members.two_factor_reset` — Owner-only, newly minted — plus `step-up`, joining the three mutations `StepUpReauthenticationTest` already gates) and the platform operator at `POST /admin/users/two-factor-reset`, both landing in one `TwoFactorResetService`. It nulls all three columns — the enforcement middleware reads only the timestamp while Fortify reads the secret, so clearing one leaves the two halves disagreeing — and writes an `AuditEvent::TwoFactorReset` row into the tenant ledger for the Owner path and the platform ledger for the console. ⛔ **Two facts the schema does not carry, both found by probing a live stack:** the app connection CAN write another member's row when tenant context is set (the visibility policy's membership arm), so the Owner path never needed elevation — but it writes **0 rows silently** with no tenant context, which is the console's situation; and **`pgsql_superadmin` holds `SELECT` only on `users`**, so the console's usual `elevated()` shape is structurally unavailable. One write path on `pgsql_auth` serves both. ⚠️ **A third, found only because the first test run failed:** the `audits` superadmin INSERT bypass is gated on the `app.is_superadmin_context` GUC rather than on the role, so the platform-ledger write needs `applyLocal()` inside a transaction on that connection — passing `connection:` alone raises `SQLSTATE 42501`. ⚠️ **The row's premise had rotted in the direction that matters:** it frames the remedy as an operator-console gap, and `D37`'s recorded answer is wider — *"a workspace owner **or** the platform operator"* — so a build against the headline alone would have shipped half of it. Refusals are fail-closed and asserted: self (so it cannot become a way around `password.confirm`), a super-admin target from a workspace, a non-member, and an account that was never enrolled. Eleven Pest cases, five `scripts/mutate.php` controls — **four caught, one survived and is filed below.** ⛔ **`D56` FILED:** the 2FA columns are on the global `users` table, so an Owner's reset clears that person's second factor in every workspace they belong to; `D37` did not consider it, the confirm dialog says so, and `docs/security-threat-model.md` §9 item 12 records what remains.
 - **`minor` · An SSO sign-in whose provisioning hits a missing role is answered with a redirect back towards
   the identity provider rather than the uniform refusal.** Carried out of `docs/security-threat-model.md` §9 by
   `M93` (2026-09-14). `SsoAcsController` catches only `SsoAuthenticationException`; a `MembershipException`
@@ -10866,7 +10866,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   which settles only the escape route — an admin reset, recorded in the audit log. ⚠️ **The fixture half has a
   second-order cost:** a seeded account with no recovery codes is the exact state `D37` exists to rescue, so every
   tester who enables two-step sign-in from the seed data starts one device-loss away from needing an operator.
-  **Live.** Filed by `M105`. **Tier: early-testing.**
+  **Live.** Filed by `M105`. **Tier: early-testing.** ✅ **CLOSED BY `M107` (2026-09-20), BESIDE `R-1ad2304d` UNDER A RECORDED `D13` EXCEPTION** — the two are one subject and share three files, and they pass the overlap check only because this row harvests no paths at all, which is `R-7849e303`'s blindness rather than a clean separation. Splitting them would have shipped the reset while leaving in place the state the reset exists to rescue. **The warning** is an `MdsAlert` on the enrolment panel at three remaining codes or fewer, fed by a server-supplied **count**: the panel cannot ask Fortify itself, because `/user/two-factor-recovery-codes` sits behind `password.confirm` and answers a JSON read with a bare `423` that this component turns into the confirm-password panel — a passive warning must not be able to do that. Three of eight, so it fires while there is still a working code to sign in WITH; a warning that arrives at zero leaves only the admin reset, which is the outcome it exists to make rarer. ⛔ **Built as a banner and NOT a `NotificationType`**, deliberately: that enum's CHECK constraints are generated from `values()` on two tables and its TypeScript union is order-pinned, and the whole cascade buys nothing over a line on the page the person is already looking at. **The fixture** carries eight real codes. ⚠️ **AND THE ROW UNDERSTATED ITSELF BY ONE:** `UserFactory::confirmedTwoFactor()` set the secret and the timestamp and never touched `two_factor_recovery_codes` at all, leaving it **NULL** — a state where Fortify's `recoveryCodes()` calls `decrypt(null)` and throws. Nothing reached it, so it was a trap set for the next caller, and the next caller was this increment's own tests. Both are closed. Six Vitest cases.
 - **`minor` · The resume READ escapes service-worker caching only because its path prefix is `drafts/` rather than
   `f/`, so one route rename re-opens the exposure `D20` was answered to close.** Filed 2026-09-20 by `M105` while
   answering `D20`. `D20 = 2` caches the resume shell under a token-free key, which removes the enumeration
@@ -10927,6 +10927,33 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   measured against `docs/backlog-triage.md`'s own harvested set for that row. ⚠️ **A PHP class name is mechanically
   resolvable** (PSR-4 root plus the namespace), so this is a widening of the harvester rather than a request for rows to
   be rewritten. Filed by `M106`. **Tier: early-testing.**
+
+- **`minor` · `TwoFactorResetService`'s zero-row guard is UNREACHABLE by construction, so no test can see it —
+  `scripts/mutate.php` proved it by surviving.** Found by `M107` (2026-09-20) in its own controls. `MU4` replaced
+  `if ($affected === 0)` with `if ($affected === -1)` — a guard that can never fire — and **all eleven cases in
+  `tests/Feature/Auth/TwoFactorResetTest.php` stayed green**. ⛔ **The reason is the order of the two statements, not a
+  missing case.** `clearEnrolmentAndRecord()` asks `$wasEnrolled` first and refuses if the row is not there and
+  enrolled; so by the time the `UPDATE` runs, the same connection has just seen the row, and the only way to reach zero
+  is a delete racing between the two statements. There is no fixture for that, and contriving one through a mock would
+  test the mock. ⚠️ **The guard is kept deliberately** — this repository has met the silent-zero-row family on six
+  Fortify endpoints, one recovery-code rotation and one `users` backfill, and the audience for THIS write is somebody
+  already locked out. But *kept* and *covered* are different words, and the class docblock's claim that it "ships
+  anyway" should not be read as "is tested". ⚠️ **What DOES protect the connection choice is `MU1`**, which moves
+  `WRITE_CONNECTION` off `pgsql_auth` and turns five cases red — so the property that matters is guarded; it is the
+  guard's own branch that is not. **The remedy is either a reachable ordering** (drop the pre-check and distinguish
+  "not enrolled" from "no rows" by the affected count alone, which changes a refusal message) **or a recorded decision
+  that this branch is deliberately uncovered.** **Live** — the branch exists and no case enters it.
+  Filed by `M107`. **Tier: after-launch.**
+
+- **`nit` · The design system has no `key` or `lock` glyph, so two security controls borrow `undo`.** Found by `M107`
+  (2026-09-20) while building `D37`'s two reset surfaces. `packages/design-system/src/components/Icon/icons.ts` ships
+  57 names; `shield` is this product's security glyph everywhere else — Settings' own two-factor section, both audit
+  pages, the impersonation banner — but on `resources/js/Pages/members/Index.vue` it is already spent one button up on
+  "Make owner", and two identical icons in one row-action group reads worse than a weaker metaphor. Both reset buttons
+  (the roster and `resources/js/Pages/admin/Users.vue`) therefore use `undo`. ⚠️ **The label carries the meaning and
+  nothing is ambiguous to a reader**, which is why this is a `nit` and not a defect: WCAG 1.4.1 is satisfied by the
+  text, not the glyph. The remedy is to add a `key` glyph and point both buttons at it. **Live.**
+  Filed by `M107`. **Tier: after-launch.**
 
 - **`nit` · `PROGRESS.md`'s `M101` bullet records a state of the tree that does not exist.** Found by `M106`
   (2026-09-20) while verifying `R-06228b4f`'s premise. That bullet ends *"`R-06228b4f` now says `Awaits D54` instead of

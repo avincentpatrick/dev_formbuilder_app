@@ -102,8 +102,8 @@ it('names the workspace and points at ITS dashboard for an ACTUAL member', funct
 
 it('names no workspace on the central host, which is a real state and not a lookup failure', function (): void {
     // `RegistrationGate` documents it: an account created centrally belongs to no workspace yet. The email
-    // says so rather than inventing one, and points at the platform front door instead of a dashboard that
-    // would 404 for them.
+    // says so rather than inventing one, and — since `M106` — carries NO action at all rather than a button
+    // to `config('app.url')`, which under `D46` is the agency's own public website and not this product.
     $user = User::factory()->unverified()->create();
 
     $this->app['request']->headers->set('host', 'meridian.test');
@@ -114,7 +114,7 @@ it('names no workspace on the central host, which is a real state and not a look
     Notification::assertSentOnDemand(
         WelcomeNotification::class,
         fn (WelcomeNotification $notification): bool => $notification->tenantName === ''
-            && ! str_contains($notification->actionUrl, '/dashboard'),
+            && $notification->actionUrl === null,
     );
 });
 
@@ -139,7 +139,7 @@ it('claims no workspace for someone the seat quota refused, even on that workspa
     Notification::assertSentOnDemand(
         WelcomeNotification::class,
         fn (WelcomeNotification $notification): bool => $notification->tenantName === ''
-            && ! str_contains($notification->actionUrl, '/dashboard'),
+            && $notification->actionUrl === null,
     );
 });
 
@@ -273,4 +273,47 @@ it('does not welcome an account that was verified before the guard existed', fun
     event(new Verified($user));
 
     Notification::assertNothingSent();
+});
+
+/*
+|--------------------------------------------------------------------------
+| M106 — what the workspace-less account actually READS.
+|--------------------------------------------------------------------------
+|
+| The three cases above assert the PAYLOAD the listener builds. These assert the RENDERED mail, because
+| `D52` priced this defect as "one string at WelcomeNotification.php:88" and it was three places — the
+| copy, the button label, and the listener's `config('app.url')` fallback. A test that only checked the
+| payload would have passed a mail that no longer offers workspace creation while still putting a
+| "Get started" button on the agency's public website.
+*/
+
+it('offers no workspace creation to an account that belongs to none', function (): void {
+    $mail = (new WelcomeNotification('Ada', '', null))->toMail(new AnonymousNotifiable);
+
+    // The old line was "The next step is to create a workspace, or to accept an invitation to one." Nothing
+    // in this product lets an account create a workspace; provisioning is an operator action.
+    expect($mail->introLines)->not->toContain('The next step is to create a workspace, or to accept an invitation to one.');
+
+    foreach ($mail->introLines as $line) {
+        expect($line)->not->toContain('create a workspace');
+    }
+});
+
+it('renders no action button at all when there is nowhere honest to send them', function (): void {
+    // ⛔ THE HALF `D52` OMITTED. `resources/views/mail/notification.blade.php` guards both the button and
+    // the subcopy on `@isset($actionText)`, so a null action removes both — which is why this row needed
+    // no template edit, and why asserting the payload alone would not have caught the button.
+    $mail = (new WelcomeNotification('Ada', '', null))->toMail(new AnonymousNotifiable);
+
+    expect($mail->actionText)->toBeNull();
+    expect($mail->actionUrl)->toBeNull();
+});
+
+it('still renders the dashboard button for someone who DID land in a workspace', function (): void {
+    // The guard must not cost the case that was always correct.
+    $mail = (new WelcomeNotification('Ada', 'Acme', 'https://acme.meridian.test/dashboard'))
+        ->toMail(new AnonymousNotifiable);
+
+    expect($mail->actionText)->toBe('Go to your dashboard');
+    expect($mail->actionUrl)->toBe('https://acme.meridian.test/dashboard');
 });

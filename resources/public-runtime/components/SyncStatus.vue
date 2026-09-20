@@ -9,7 +9,7 @@
  * Three things changed in I10d, each because the old shape stated or implied something untrue:
  *
  *  1. **It always renders.** The old `v-if` hid the whole surface on an empty queue, which took "Sync now"
- *     with it — and `docs/offline-first-sync-design.md:184` requires that action to be ALWAYS VISIBLE,
+ *     with it — and `docs/offline-first-sync-design.md:202` requires that action to be ALWAYS VISIBLE,
  *     because it is the documented fallback on platforms with weak Background Sync (notably iOS Safari),
  *     i.e. exactly the platforms where a row can be stuck with the queue looking idle. (The citation read
  *     `:103` until M15 and had drifted; `:103` is now an unrelated paragraph about `openapi.json`.)
@@ -190,7 +190,7 @@ function onDiscard(uuid: string): void {
         <p v-if="quotaWarning" class="sync-status__quota">{{ quotaWarning }}</p>
 
         <!--
-            The LIST is conditional; the BAR above is not. `offline-first-sync-design.md:103` requires the
+            The LIST is conditional; the BAR above is not. `offline-first-sync-design.md:202` requires the
             manual "Sync now" to be always visible — it says nothing about the list, and rendering "Nothing
             waiting" above every screen of a first online visit is noise the respondent has to read past
             before reaching the form. The summary line already states the empty case in one sentence.

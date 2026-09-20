@@ -51,7 +51,7 @@ describe('SyncStatus', () => {
 
     it('renders the Sync now action even when the queue is EMPTY', () => {
         // ⚠️ THIS CASE IS THE INVERSE OF WHAT IT USED TO ASSERT ("renders nothing when the queue is empty"),
-        // and the inversion is the point. `docs/offline-first-sync-design.md:103` requires a manual "Sync
+        // and the inversion is the point. `docs/offline-first-sync-design.md:202` requires a manual "Sync
         // now" that is ALWAYS VISIBLE, because it is the documented fallback on platforms with weak
         // Background Sync — i.e. exactly the platforms where a row can be stuck while the queue looks idle.
         // The old assertion locked in the behaviour that doc forbids. Do not "restore" it.

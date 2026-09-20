@@ -452,7 +452,7 @@ final class SuperAdminService
      * carve-out. The join-shape `users` RLS hides users from non-co-tenants; this reads them through the
      * `superadmin_bypass` policy, visible only while the elevated context is open.
      *
-     * @return list<array{id: string, name: string, email: string}>
+     * @return list<array{id: string, name: string, email: string, two_factor_enrolled: bool}>
      */
     public function listAllUsers(): array
     {
@@ -464,6 +464,11 @@ final class SuperAdminService
                 'id' => (string) $u->getKey(),
                 'name' => $u->name,
                 'email' => $u->email,
+                // M107 — WHETHER they are enrolled, never what they enrolled with. The console offers a
+                // two-factor reset per row and must not offer one for an account that has nothing to
+                // reset; the secret and the recovery codes stay out of the payload entirely (the model
+                // hides them, and not shipping them is the stronger statement).
+                'two_factor_enrolled' => $u->two_factor_confirmed_at !== null,
             ])->all());
         });
     }

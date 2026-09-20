@@ -32,6 +32,7 @@ type Member = {
     status: string;
     role: string;
     is_owner: boolean;
+    two_factor_enrolled: boolean;
     joined_at: string | null;
     invited_at: string | null;
 };
@@ -137,6 +138,32 @@ function submitTransfer(): void {
     );
 }
 
+// ── Reset two-step sign-in (M107, `D37`) ────────────────────────────────
+// A MODAL for the same two reasons the role change is one — the route carries `step-up`, so a click may
+// bounce the page to the confirm-password screen — plus a third that is specific to this action: it is
+// irreversible from here. The member cannot be given their old enrolment back, only asked to set up a new
+// one, and the copy says so before the button rather than in a toast afterwards.
+const twoFactorTarget = ref<Member | null>(null);
+const resettingTwoFactor = reactive({ busy: false });
+
+function submitTwoFactorReset(): void {
+    if (!twoFactorTarget.value) return;
+    resettingTwoFactor.busy = true;
+    router.post(
+        `/members/${twoFactorTarget.value.user_id}/two-factor-reset`,
+        {},
+        {
+            preserveScroll: true,
+            onFinish: () => {
+                resettingTwoFactor.busy = false;
+            },
+            onSuccess: () => {
+                twoFactorTarget.value = null;
+            },
+        },
+    );
+}
+
 // ── Change role (I8a, PRD Feature #14) ──────────────────────────────────
 // A MODAL rather than an inline select, unlike the autosave switches in Settings. Two reasons: the
 // route carries `step-up`, so a change may bounce the whole page to the confirm-password screen — that
@@ -176,6 +203,23 @@ function canChangeRole(row: Member): boolean {
         can.assignRoles &&
         row.status === 'active' &&
         !row.is_owner &&
+        row.user_id !== page.props.auth.user?.id
+    );
+}
+// Mirrors TwoFactorResetService::resetForMember()'s refusals, same posture as the three above: absent
+// rather than present-and-rejected. `resetMemberTwoFactor` is OWNER-ONLY where `assignRoles` is
+// Owner/Admin, so this is a distinct ability key and not a reuse. `two_factor_enrolled` is what keeps the
+// control off a row that has nothing to reset — the service refuses that case, and offering it anyway
+// would promise a locked-out colleague a rescue that does not apply to them.
+//
+// ⚠️ The super-admin refusal is deliberately NOT mirrored here. The roster has no `is_super_admin` field
+// and must not grow one: whether an account is platform staff is not a fact a workspace page may state.
+// That refusal stays server-side, where it can be made without disclosing anything.
+function canResetTwoFactor(row: Member): boolean {
+    return (
+        can.resetMemberTwoFactor &&
+        row.status === 'active' &&
+        row.two_factor_enrolled &&
         row.user_id !== page.props.auth.user?.id
     );
 }
@@ -225,7 +269,10 @@ function canChangeRole(row: Member): boolean {
                      became a blank 50px strip at the foot of the Owner's card. Pre-existing (the same
                      strip was there below 480px), but JR4 brings that layout to every tablet and most
                      laptops, so it stopped being invisible. -->
-                <div v-if="canChangeRole(row) || canTransfer(row) || canRemove(row)" class="members__actions">
+                <div
+                    v-if="canChangeRole(row) || canTransfer(row) || canResetTwoFactor(row) || canRemove(row)"
+                    class="members__actions"
+                >
                     <MdsButton
                         v-if="canChangeRole(row)"
                         variant="tertiary"
@@ -243,6 +290,20 @@ function canChangeRole(row: Member): boolean {
                         @click="transferTarget = row"
                     >
                         Make owner
+                    </MdsButton>
+                    <!-- `undo` rather than `shield`, which is this app's security icon everywhere else
+                         (Settings' own 2FA section, the audit pages, the impersonation banner). It is
+                         already spent one button up on "Make owner", and two identical icons in one row
+                         group is worse than a slightly weaker metaphor. The design system has no `key` or
+                         `lock` glyph; adding one is a design-system change and not this increment's. -->
+                    <MdsButton
+                        v-if="canResetTwoFactor(row)"
+                        variant="tertiary"
+                        size="sm"
+                        icon-left="undo"
+                        @click="twoFactorTarget = row"
+                    >
+                        Reset two-step
                     </MdsButton>
                     <MdsButton
                         v-if="canRemove(row)"
@@ -327,6 +388,39 @@ function canChangeRole(row: Member): boolean {
                 <MdsButton variant="tertiary" @click="removeTarget = null">Cancel</MdsButton>
                 <MdsButton variant="destructive" icon-left="trash" :loading="removing.busy" @click="submitRemove">
                     Remove member
+                </MdsButton>
+            </template>
+        </MdsModal>
+
+        <!-- Reset two-step sign-in (M107, `D37`) -->
+        <MdsModal
+            :open="twoFactorTarget !== null"
+            title="Reset two-step sign-in"
+            @close="twoFactorTarget = null"
+        >
+            <p class="members__prose">
+                Turn off two-step sign-in for <strong>{{ twoFactorTarget?.name }}</strong>
+                ({{ twoFactorTarget?.email }})? They will sign in with their password alone until they set
+                it up again, and their existing recovery codes stop working.
+            </p>
+            <!-- ⚠️ THE SECOND PARAGRAPH IS THE CROSS-TENANT CONSEQUENCE, SAID BEFORE THE BUTTON RATHER
+                 THAN DISCOVERED AFTERWARDS. Two-step sign-in is a property of the ACCOUNT, not of this
+                 workspace — the columns live on the global `users` table — so this reaches every workspace
+                 the person belongs to. `D37` did not consider that; the threat model records it and an open
+                 decision asks whether the Owner surface should be narrowed. Until it is, the honest place
+                 to put the fact is in front of the person about to do it. -->
+            <p class="members__prose">
+                This applies to their account everywhere, including any other workspace they belong to.
+            </p>
+            <template #actions>
+                <MdsButton variant="tertiary" @click="twoFactorTarget = null">Cancel</MdsButton>
+                <MdsButton
+                    variant="destructive"
+                    icon-left="undo"
+                    :loading="resettingTwoFactor.busy"
+                    @click="submitTwoFactorReset"
+                >
+                    Reset two-step sign-in
                 </MdsButton>
             </template>
         </MdsModal>

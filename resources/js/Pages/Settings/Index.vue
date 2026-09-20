@@ -43,7 +43,14 @@ import { useAppearancePreference } from '@/composables/useTheme';
 const props = defineProps<{
     // `needs_password_confirmation` is what stops the enrolment panel rendering a blank QR when the
     // session's password confirmation has lapsed — see TwoFactorSetup.vue's docblock (I8a).
-    twoFactor: { enabled: boolean; confirmed: boolean; needs_password_confirmation: boolean };
+    // `recovery_codes_remaining` is a COUNT and never the codes (M107) — the panel warns when it runs
+    // low, and cannot ask Fortify itself without tripping `password.confirm`.
+    twoFactor: {
+        enabled: boolean;
+        confirmed: boolean;
+        needs_password_confirmation: boolean;
+        recovery_codes_remaining: number | null;
+    };
     passwordPolicy: PasswordRequirement[];
     // Increment H10 — tenant-level draft settings. `can_manage` is Owner/Admin (tenant.settings.manage); the
     // card is hidden otherwise. `is_default` means the effective value is the 30-day fallback (column unset).
@@ -453,6 +460,7 @@ function savePassword(): void {
                     :enabled="twoFactor.enabled"
                     :confirmed="twoFactor.confirmed"
                     :needs-password-confirmation="twoFactor.needs_password_confirmation"
+                    :recovery-codes-remaining="twoFactor.recovery_codes_remaining"
                 />
             </section>
         </MdsCard>

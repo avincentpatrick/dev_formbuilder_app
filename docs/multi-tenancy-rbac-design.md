@@ -74,7 +74,7 @@ A **fixed, platform-defined catalog of five roles** — tenants cannot define cu
 
 **Permission-string catalog** (each a `permissions.name` row, dot-namespaced by domain):
 
-`tenant.settings.manage`, `tenant.billing.manage`, `tenant.billing.view`, `tenant.members.invite`, `tenant.members.remove`, `tenant.roles.assign`, `tenant.ownership.transfer`, `forms.create`, `forms.edit.any`, `forms.edit.own`, `forms.publish.any`, `forms.publish.own`, `forms.delete`, `forms.collaborators.manage`, `submissions.create`, `submissions.edit.any`, `submissions.edit.own`, `submissions.review.any`, `submissions.review.own`, `submissions.export`, `submissions.view`, `dashboard.org.view`, `dashboard.form.view`, `webhooks.manage`, `integrations.manage`, `audit_log.view`, `feedback.submit`, `feedback.view`, `scopes.manage`
+`tenant.settings.manage`, `tenant.billing.manage`, `tenant.billing.view`, `tenant.members.invite`, `tenant.members.remove`, `tenant.roles.assign`, `tenant.ownership.transfer`, `tenant.members.two_factor_reset`, `forms.create`, `forms.edit.any`, `forms.edit.own`, `forms.publish.any`, `forms.publish.own`, `forms.delete`, `forms.collaborators.manage`, `submissions.create`, `submissions.edit.any`, `submissions.edit.own`, `submissions.review.any`, `submissions.review.own`, `submissions.export`, `submissions.view`, `dashboard.org.view`, `dashboard.form.view`, `webhooks.manage`, `integrations.manage`, `audit_log.view`, `feedback.submit`, `feedback.view`, `scopes.manage`
 
 The `.any` / `.own` suffix pattern is how tenant-wide administrative access (Owner/Admin) and per-form collaborator-scoped access (Form Editor/Reviewer) coexist as two distinct, independently grantable permissions rather than one permission with an implicit, code-only scoping rule — `.any` is a pure Spatie role check; `.own` additionally requires the Policy-layer grant lookup described in §8 (`resource_grants`, resolved through `ResourceGrantResolver`).
 
@@ -87,6 +87,7 @@ The `.any` / `.own` suffix pattern is how tenant-wide administrative access (Own
 | `tenant.members.remove` | ✓ | ✓ | | | |
 | `tenant.roles.assign` | ✓ | ✓ | | | |
 | `tenant.ownership.transfer` | ✓ | | | | |
+| `tenant.members.two_factor_reset` *(M107 — clear a member's two-factor enrolment; `D37`)* | ✓ | | | | |
 | `forms.create` | ✓ | ✓ | ✓ | | |
 | `forms.edit.any` | ✓ | ✓ | | | |
 | `forms.edit.own` | | | ✓ | | |
@@ -109,6 +110,35 @@ The `.any` / `.own` suffix pattern is how tenant-wide administrative access (Own
 | `feedback.submit` | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `feedback.view` | ✓ | ✓ | | | |
 | `scopes.manage` *(G10a — author the tenant's `scope_nodes` hierarchy)* | ✓ | ✓ | | | |
+
+> **Design Note (M107, 2026-09-20) — the first permission MINTED since Phase 0, and the migration that
+> had to come with it.** `tenant.members.two_factor_reset` answers `D37`: a workspace Owner may clear a
+> member's two-factor enrolment so somebody who has lost their device can sign in again.
+>
+> **It is Owner-only, and Admin's absence from the row above is the decision rather than an oversight.**
+> `D37` says *"a workspace owner or the platform operator"*. Reuse was considered twice and rejected
+> twice: `tenant.members.remove` is seeded to Owner **and** Admin, which is wider than the answer;
+> `tenant.ownership.transfer` is already Owner-only but means something else, and overloading it would
+> make the next reader's model wrong rather than merely incomplete. I8a's precedent above — consume a
+> dormant key rather than mint one — does not reach here, because no dormant key describes this act.
+>
+> ⛔ **AND IT NEEDED A MIGRATION, WHICH NO PERMISSION BEFORE IT EVER DID.** `RolePermissionSeeder` writes
+> this catalog exactly ONCE per database, at `CreateTenantCommand`. **Nothing re-runs it** — `deploy.ps1`
+> runs `migrate --force` and has no `db:seed` step — and no migration in this tree had ever inserted a
+> permission row, because the catalog had never grown after Phase 0. A key added to the seeder alone would
+> therefore exist in a fresh test database and **nowhere else**: every local suite green, and on the
+> testing server a `can:` middleware denying the Owner against a `permissions` table that has never heard
+> of the key, with nothing in any log naming the cause. `2026_08_17_000115_backfill_two_factor_reset_permission.php`
+> inserts it and attaches it to `owner`, idempotently, on the privileged connection.
+>
+> ⚠️ **This is the `audits_event_check` lesson arriving in a second place.** *Adding a case to the PHP
+> enum does nothing to a database that already exists* had been learned for CHECK constraints and written
+> down twice; it had not been learned for the RBAC catalog. **A 31st permission needs a migration too.**
+>
+> ⚠️ **One consequence of this key that the matrix cannot express:** the two-factor columns live on the
+> GLOBAL `users` table, so an Owner's reset clears that person's second factor in **every** workspace they
+> belong to. `docs/security-threat-model.md` §9 records it and an open decision asks whether the Owner
+> surface should be narrowed.
 
 > **Design Note (I8a, 2026-08-07) — `tenant.roles.assign` finally has code behind it, and the respondent
 > clause is the matrix's one row-level exception.** Two corrections to how this table should be read.

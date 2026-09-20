@@ -143,6 +143,33 @@ class E2eSeeder extends Seeder
     private const TWO_FACTOR_SECRET = 'ABCDEFGHIJKLMNOP';
 
     /**
+     * Eight recovery codes, in Fortify's own `Str::random(10).'-'.Str::random(10)` shape.
+     *
+     * ⛔ THIS COLUMN USED TO HOLD AN ENCRYPTED EMPTY ARRAY, AND THAT WAS A DEFECT RATHER THAN A SHORTCUT
+     * (`M107`, `R-0f8b73f9`). The fixture's own note said the codes were never exercised — true of the axe
+     * scan, which renders the recovery-code field and stops — but the state it left behind is exactly the
+     * one `D37` exists to rescue: an account enrolled in two-step sign-in with NO way back if the device
+     * is lost. Every tester who copied this fixture's shape started one device-loss from needing an
+     * operator, and the scan that made the field visible was the thing arguing it did not matter.
+     *
+     * FIXED, not random, because a seeder that generates credentials cannot be re-run to the same state
+     * and a test that needs a known code has nowhere to read one from. They are fixtures in a public
+     * repository and protect nothing; that is the point of writing them down rather than minting them.
+     *
+     * @var list<string>
+     */
+    private const TWO_FACTOR_RECOVERY_CODES = [
+        'e2eAAAAAAA-AAAAAAAAAA',
+        'e2eBBBBBBB-BBBBBBBBBB',
+        'e2eCCCCCCC-CCCCCCCCCC',
+        'e2eDDDDDDD-DDDDDDDDDD',
+        'e2eEEEEEEE-EEEEEEEEEE',
+        'e2eFFFFFFF-FFFFFFFFFF',
+        'e2eGGGGGGG-GGGGGGGGGG',
+        'e2eHHHHHHH-HHHHHHHHHH',
+    ];
+
+    /**
      * The password-reset fixture (J3b). Plaintext here, `Hash::make()`d into `password_reset_tokens`,
      * because Laravel's DatabaseTokenRepository stores a hash and compares with `Hash::check()`.
      *
@@ -1590,7 +1617,9 @@ class E2eSeeder extends Seeder
                 'password' => Hash::make(self::TWO_FACTOR_PASSWORD),
                 'email_verified_at' => now(),
                 'two_factor_secret' => Fortify::currentEncrypter()->encrypt(self::TWO_FACTOR_SECRET),
-                'two_factor_recovery_codes' => Fortify::currentEncrypter()->encrypt(json_encode([])),
+                'two_factor_recovery_codes' => Fortify::currentEncrypter()->encrypt(
+                    (string) json_encode(self::TWO_FACTOR_RECOVERY_CODES)
+                ),
                 'two_factor_confirmed_at' => now(),
             ])->save();
         }

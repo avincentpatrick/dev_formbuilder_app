@@ -71,6 +71,12 @@ final class PreferencesController extends Controller
                 'enabled' => $user->two_factor_secret !== null,
                 'confirmed' => $user->two_factor_confirmed_at !== null,
                 'needs_password_confirmation' => PasswordConfirmation::isStale($request),
+                // M107 (`R-0f8b73f9`) — a COUNT, never the codes. The panel warns when this runs low, and
+                // it cannot ask Fortify itself: `/user/two-factor-recovery-codes` sits behind
+                // `password.confirm`, which answers a JSON read with a bare 423 and would raise the
+                // confirm-password panel on every Settings visit with a lapsed confirmation.
+                // Null when it is not knowable — see {@see User::countRecoveryCodes()}.
+                'recovery_codes_remaining' => $user->countRecoveryCodes(),
             ],
             // J3b: the password card on this page changes a password through the same
             // `Password::defaults()` chain registration and reset use, so it renders the same checklist.

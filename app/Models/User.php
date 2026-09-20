@@ -27,9 +27,11 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\URL;
+use Laravel\Fortify\Fortify;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
+use Throwable;
 
 /**
  * The global user identity (multi-tenancy-rbac-design.md §6). One row per person across every tenant.
@@ -45,6 +47,8 @@ use Spatie\Permission\Traits\HasRoles;
  * @property ?string $google_id Google's `sub` (J3c2 / ADR-0019 §D1). Unique; NULL on almost every row.
  * @property bool $is_super_admin Global platform-staff flag (RBAC §9); never a Spatie role.
  * @property ?Carbon $two_factor_confirmed_at Set once 2FA enrollment is confirmed.
+ * @property ?string $two_factor_secret Fortify's encrypted TOTP secret. Hidden below; never rendered.
+ * @property ?string $two_factor_recovery_codes Fortify's encrypted JSON list. Hidden below; never rendered.
  * @property ?Carbon $password_set_at When a HUMAN last chose this password (M76). NULL on an invitation
  *                                    placeholder and on an SSO/Google-provisioned account, both of which
  *                                    hold a random hash nobody chose.
@@ -132,6 +136,40 @@ class User extends Authenticatable implements MustVerifyEmail
         } finally {
             $this->setConnection($original ?? (string) Config::get('database.default'));
         }
+    }
+
+    /**
+     * How many recovery codes are left, or null when the answer is not knowable (Increment M107).
+     *
+     * Feeds the low-recovery-code warning on the enrolment panel (`R-0f8b73f9`). It returns a COUNT and
+     * never the codes: the panel's warning is a number, and a settings page that shipped the plaintext
+     * list on every render — to a session whose password confirmation may have lapsed hours ago — would
+     * undo the reason those reads sit behind `password.confirm` at all.
+     *
+     * ⚠️ NULL IS A REAL ANSWER AND NOT AN ERROR. Two states produce it and both exist in this tree:
+     * a NULL column (the shape `UserFactory::confirmedTwoFactor()` carried until M107, where the vendor's
+     * `recoveryCodes()` would `decrypt(null)` and throw), and a payload this application key cannot
+     * decrypt — an account enrolled before an `APP_KEY` rotation. Neither is worth a 500 on the settings
+     * page: the caller renders nothing, which is what it would have done for a healthy count above the
+     * threshold anyway.
+     */
+    public function countRecoveryCodes(): ?int
+    {
+        if ($this->two_factor_recovery_codes === null) {
+            return null;
+        }
+
+        try {
+            $codes = json_decode(
+                Fortify::currentEncrypter()->decrypt($this->two_factor_recovery_codes),
+                true,
+                flags: JSON_THROW_ON_ERROR,
+            );
+        } catch (Throwable) {
+            return null;
+        }
+
+        return is_array($codes) ? count($codes) : null;
     }
 
     /**

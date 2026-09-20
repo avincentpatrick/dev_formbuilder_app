@@ -2262,7 +2262,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `PROGRESS_ARCHIVE.md` keeps what was believed at the time.
   ⚠️⚠️ **AND THIS INCREMENT REPRODUCED THE VERY DEFECT CLASS IT CLOSES — FOUR TIMES, IN ITS OWN PROSE.**
   A +59-line §D32 and a +10-line middleware docblock invalidated M7's own `0016:238`, its `0019:37` /
-  `ACCESS-MATRIX.md:397` evidence list, **and two LIVE rows in this file that M7 never read** — one of
+  `ACCESS-MATRIX.md:407` evidence list, **and two LIVE rows in this file that M7 never read** — one of
   them `EnforceTenantTwoFactor.php:33-52`, the sole evidence for the *enrolment-nudge* argument §D32
   leans on twice. M7 had explicitly checked which citations its insertion would move and answered
   *"nothing else moves"* — true of the citations that already existed, and silent about the ones the same
@@ -6880,8 +6880,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   deliberate — pinning the value would be a gate asserting this repository's own open question — and it
   means these cases see a mis-COUNTING, never a re-tuning.
 
-- **`minor` · A correction still cannot be autosaved, and the reason is an endpoint that does not exist plus
-  a product decision nobody has taken.** Split out by `M75` (2026-09-06) from the leave-prompt row it closed,
+- ✅ **CLOSED BY `M107` (2026-09-20) — `minor` · ~~A correction still cannot be autosaved, and the reason is an endpoint that does not exist plus
+  a product decision nobody has taken.~~** Split out by `M75` (2026-09-06) from the leave-prompt row it closed,
   which named both halves and could only build one. `Encode.vue`'s autosave is off in edit mode by design and
   the presenter sends a null `draft_url` there, both deliberately: an edit autosaved down the DRAFT channel
   overwrites a respondent's answers with no `update` policy check and no audit row, and
@@ -6894,7 +6894,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   warned rather than silently losing work, but an hour of transcription still lives only in the tab.
   👤 **The decision is the user's**: a draft-shaped side table for in-progress corrections, an explicit
   "save a working copy" action, or a documented statement that corrections are not resumable. **Live.**
-  Filed by `M75`. **Tier: early-testing.** ⚠️ **`D36` ANSWERED 2026-09-20 (`M105`) — keep saving on the button, and document that corrections are not resumable.**
+  Filed by `M75`. **Tier: early-testing.** ⚠️ **`D36` ANSWERED 2026-09-20 (`M105`) — keep saving on the button, and document that corrections are not resumable.** ✅ **CLOSED BY `M107` (2026-09-20) — DOCUMENTATION ONLY, BECAUSE THE ANSWER SPENT THE ROW'S PREMISE.** `D36 = A` means the *"endpoint that does not exist"* is no longer owed, so the remaining work was to stop the documents implying otherwise. `docs/ux/form-filling-ux-flow.md` §5.1 now carries an M107 amendment beside its I9b one — which documented durable autosave for ENCODING and was silent on CORRECTING — stating that a correction is kept when Save is pressed and not before, and why: the only write path a correction has demotes an Approved response to UnderReview and writes an audit row on every call, so a debounced autosave there would be one demotion and one ledger row per tick. The ratified-decisions list carries it too. ⚠️ **`Encode.vue` was checked and NOT edited:** its comments describe the deliberate null-in-edit-mode design and are correct, so there was nothing stale to repair. ⚠️ **`docs/PRD.md` was deliberately left alone** — it is a hub file, and touching it would have put a second hub-touching row in this batch and broken `D13` outright.
 
 - **`minor` · `CLAUDE.md`'s gate table sends PHPStan to the container, one row below the rule that explains
   why the container is wrong.** Measured by `M76` (2026-09-06) while closing the 18-phantom-errors row.
@@ -7522,9 +7522,9 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   SCHEMA.** `docs/multi-tenancy-rbac-design.md:56` gives the forward reference to `GET /api/v1/roles` as
   the reason roles use UUIDv7 rather than Spatie's bigint PKs, echoed at `app/Models/Role.php:13` and in
   the comment opening at `config/permission.php:20`. ⚠️ **The one near-miss is a circular pointer, not a
-  deferral**: `docs/multi-tenancy-rbac-design.md:712` defers the request/response *shapes* to Doc #14, and
+  deferral**: `docs/multi-tenancy-rbac-design.md:742` defers the request/response *shapes* to Doc #14, and
   `docs/api-specification.md:13` points straight back at §7.1 as the authoritative inventory. Neither
-  defers the build. This repository builds `/api/v1` twins deliberately — `routes/tenant.php:755` says
+  defers the build. This repository builds `/api/v1` twins deliberately — `routes/tenant.php:767` says
   so — so the web surface does not discharge it. **Live.** Filed by `M80`. **Tier: early-testing.** ⚠️ **`D38` ANSWERED 2026-09-20 (`M105`) — mark the six as not built, in place, rather than trimming the documentation.** ⛔ **THIS IS THE ROW THAT MADE THE ANSWER `C` RATHER THAN `A`.** `D38`'s premise sentence *"nothing shipped depends on them"* is false here: the documented `GET /api/v1/roles` is the stated reason roles use UUIDv7 primary keys rather than Spatie's bigints, cited at `docs/multi-tenancy-rbac-design.md:56`, `app/Models/Role.php:13` and `config/permission.php:20-21`. **That schema shipped**, so a plain trim orphans the rationale for a decision already paid for.
 
 - **`minor` · §7.1's `Form draft` row pins four `/api/v1` builder endpoints registered nowhere, and the
@@ -7678,7 +7678,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   not survive re-derivation. ⛔ **AND THIS ROW LOOKS LIKE THAT LARGEST BUCKET, SO CHECK IT FIRST.** `M80`'s
   own citation pass found the deferral stated four times outside the cited design doc:
   `docs/data-privacy-gdpr-compliance.md:77` and `docs/piping-output-encoding-design.md:279` each say the
-  opt-in "stays deferred", as do `PROGRESS_ARCHIVE.md:6897`, `:6902` and `:6903`. ⚠️ **M92 RE-DERIVED
+  opt-in "stays deferred", as do `PROGRESS_ARCHIVE.md:6908`, `:6902` and `:6903`. ⚠️ **M92 RE-DERIVED
   THOSE THREE FROM THE CONTENT, AND THEY WERE ALREADY WRONG BEFORE ITS SURGERY MOVED ANYTHING.** The
   numbers this row carried resolved to unrelated `H23`/`H24` release bullets roughly twenty-two lines
   above the sentences it describes; the citation gate passed them because they were ALIVE, which is
@@ -9606,12 +9606,12 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   remaining pages are the tenant index, the tenant detail page, users and the audit log. ⚠️ The table row
   records why they were not swept in with the first two, and that `AdminLayout` has since measured clean at
   all three widths, so adding them is now cheap. **Live.** Filed by `M93`. **Tier: after-launch.**
-- **`minor` · Nobody who loses their two-step sign-in device and their recovery codes can get back in
-  without an operator editing the database.** Carried out of `docs/security-threat-model.md` §9 by `M93`
+- ✅ **CLOSED BY `M107` (2026-09-20) — `minor` · ~~Nobody who loses their two-step sign-in device and their recovery codes can get back in
+  without an operator editing the database.~~** Carried out of `docs/security-threat-model.md` §9 by `M93`
   (2026-09-14). Disabling two-factor sits behind `auth` and `password.confirm`, which a locked-out person
   cannot pass, and the super-admin console offers no reset. Two smaller gaps sit beside it: nothing warns when
   recovery codes run low, and the seeded two-factor fixture carries an empty recovery list. The shape of the
-  escape is a product call, open as a decision. **Live.** Filed by `M93`. **Tier: early-testing.** ⚠️ **`D37` ANSWERED 2026-09-20 (`M105`) — an admin reset, recorded in the audit log.** ⚠️ **Two gaps this row names are NOT covered by the answer and are filed separately by `M105`:** nothing warns when recovery codes run low, and the seeded two-factor fixture carries an empty recovery list.
+  escape is a product call, open as a decision. **Live.** Filed by `M93`. **Tier: early-testing.** ⚠️ **`D37` ANSWERED 2026-09-20 (`M105`) — an admin reset, recorded in the audit log.** ⚠️ **Two gaps this row names are NOT covered by the answer and are filed separately by `M105`:** nothing warns when recovery codes run low, and the seeded two-factor fixture carries an empty recovery list. ✅ **CLOSED BY `M107` (2026-09-20) — BOTH ACTORS `D37` NAMES ARE BUILT, AND THE MECHANISM WAS MEASURED RATHER THAN REASONED.** A workspace Owner at `POST /members/{user}/two-factor-reset` (`can:tenant.members.two_factor_reset` — Owner-only, newly minted — plus `step-up`, joining the three mutations `StepUpReauthenticationTest` already gates) and the platform operator at `POST /admin/users/two-factor-reset`, both landing in one `TwoFactorResetService`. It nulls all three columns — the enforcement middleware reads only the timestamp while Fortify reads the secret, so clearing one leaves the two halves disagreeing — and writes an `AuditEvent::TwoFactorReset` row into the tenant ledger for the Owner path and the platform ledger for the console. ⛔ **Two facts the schema does not carry, both found by probing a live stack:** the app connection CAN write another member's row when tenant context is set (the visibility policy's membership arm), so the Owner path never needed elevation — but it writes **0 rows silently** with no tenant context, which is the console's situation; and **`pgsql_superadmin` holds `SELECT` only on `users`**, so the console's usual `elevated()` shape is structurally unavailable. One write path on `pgsql_auth` serves both. ⚠️ **A third, found only because the first test run failed:** the `audits` superadmin INSERT bypass is gated on the `app.is_superadmin_context` GUC rather than on the role, so the platform-ledger write needs `applyLocal()` inside a transaction on that connection — passing `connection:` alone raises `SQLSTATE 42501`. ⚠️ **The row's premise had rotted in the direction that matters:** it frames the remedy as an operator-console gap, and `D37`'s recorded answer is wider — *"a workspace owner **or** the platform operator"* — so a build against the headline alone would have shipped half of it. Refusals are fail-closed and asserted: self (so it cannot become a way around `password.confirm`), a super-admin target from a workspace, a non-member, and an account that was never enrolled. Eleven Pest cases, five `scripts/mutate.php` controls — **four caught, one survived and is filed below.** ⛔ **`D56` FILED:** the 2FA columns are on the global `users` table, so an Owner's reset clears that person's second factor in every workspace they belong to; `D37` did not consider it, the confirm dialog says so, and `docs/security-threat-model.md` §9 item 12 records what remains.
 - **`minor` · An SSO sign-in whose provisioning hits a missing role is answered with a redirect back towards
   the identity provider rather than the uniform refusal.** Carried out of `docs/security-threat-model.md` §9 by
   `M93` (2026-09-14). `SsoAcsController` catches only `SsoAuthenticationException`; a `MembershipException`
@@ -10860,13 +10860,13 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the grouping question, and the next taker needs a recorded `D13` exception rather than a judgement call.
   **Live** — the six are `ready` and nothing currently says how they may be batched. Filed by `M105`.
   **Tier: early-testing.**
-- **`minor` · Nothing warns a person that their two-factor recovery codes are running low, and the seeded
-  two-factor fixture carries an empty recovery list.** Filed 2026-09-20 by `M105` while answering `D37`. Both gaps
+- ✅ **CLOSED BY `M107` (2026-09-20) — `minor` · ~~Nothing warns a person that their two-factor recovery codes are running low, and the seeded
+  two-factor fixture carries an empty recovery list.~~** Filed 2026-09-20 by `M105` while answering `D37`. Both gaps
   are named inside `R-1ad2304d`'s own prose and neither is covered by that row's headline or by `D37`'s answer,
   which settles only the escape route — an admin reset, recorded in the audit log. ⚠️ **The fixture half has a
   second-order cost:** a seeded account with no recovery codes is the exact state `D37` exists to rescue, so every
   tester who enables two-step sign-in from the seed data starts one device-loss away from needing an operator.
-  **Live.** Filed by `M105`. **Tier: early-testing.**
+  **Live.** Filed by `M105`. **Tier: early-testing.** ✅ **CLOSED BY `M107` (2026-09-20), BESIDE `R-1ad2304d` UNDER A RECORDED `D13` EXCEPTION** — the two are one subject and share three files, and they pass the overlap check only because this row harvests no paths at all, which is `R-7849e303`'s blindness rather than a clean separation. Splitting them would have shipped the reset while leaving in place the state the reset exists to rescue. **The warning** is an `MdsAlert` on the enrolment panel at three remaining codes or fewer, fed by a server-supplied **count**: the panel cannot ask Fortify itself, because `/user/two-factor-recovery-codes` sits behind `password.confirm` and answers a JSON read with a bare `423` that this component turns into the confirm-password panel — a passive warning must not be able to do that. Three of eight, so it fires while there is still a working code to sign in WITH; a warning that arrives at zero leaves only the admin reset, which is the outcome it exists to make rarer. ⛔ **Built as a banner and NOT a `NotificationType`**, deliberately: that enum's CHECK constraints are generated from `values()` on two tables and its TypeScript union is order-pinned, and the whole cascade buys nothing over a line on the page the person is already looking at. **The fixture** carries eight real codes. ⚠️ **AND THE ROW UNDERSTATED ITSELF BY ONE:** `UserFactory::confirmedTwoFactor()` set the secret and the timestamp and never touched `two_factor_recovery_codes` at all, leaving it **NULL** — a state where Fortify's `recoveryCodes()` calls `decrypt(null)` and throws. Nothing reached it, so it was a trap set for the next caller, and the next caller was this increment's own tests. Both are closed. Six Vitest cases.
 - **`minor` · The resume READ escapes service-worker caching only because its path prefix is `drafts/` rather than
   `f/`, so one route rename re-opens the exposure `D20` was answered to close.** Filed 2026-09-20 by `M105` while
   answering `D20`. `D20 = 2` caches the resume shell under a token-free key, which removes the enumeration
@@ -10927,6 +10927,56 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   measured against `docs/backlog-triage.md`'s own harvested set for that row. ⚠️ **A PHP class name is mechanically
   resolvable** (PSR-4 root plus the namespace), so this is a widening of the harvester rather than a request for rows to
   be rewritten. Filed by `M106`. **Tier: early-testing.**
+
+- **`minor` · `TwoFactorResetService`'s zero-row guard is UNREACHABLE by construction, so no test can see it —
+  `scripts/mutate.php` proved it by surviving.** Found by `M107` (2026-09-20) in its own controls. `MU4` replaced
+  `if ($affected === 0)` with `if ($affected === -1)` — a guard that can never fire — and **all eleven cases in
+  `tests/Feature/Auth/TwoFactorResetTest.php` stayed green**. ⛔ **The reason is the order of the two statements, not a
+  missing case.** `clearEnrolmentAndRecord()` asks `$wasEnrolled` first and refuses if the row is not there and
+  enrolled; so by the time the `UPDATE` runs, the same connection has just seen the row, and the only way to reach zero
+  is a delete racing between the two statements. There is no fixture for that, and contriving one through a mock would
+  test the mock. ⚠️ **The guard is kept deliberately** — this repository has met the silent-zero-row family on six
+  Fortify endpoints, one recovery-code rotation and one `users` backfill, and the audience for THIS write is somebody
+  already locked out. But *kept* and *covered* are different words, and the class docblock's claim that it "ships
+  anyway" should not be read as "is tested". ⚠️ **What DOES protect the connection choice is `MU1`**, which moves
+  `WRITE_CONNECTION` off `pgsql_auth` and turns five cases red — so the property that matters is guarded; it is the
+  guard's own branch that is not. **The remedy is either a reachable ordering** (drop the pre-check and distinguish
+  "not enrolled" from "no rows" by the affected count alone, which changes a refusal message) **or a recorded decision
+  that this branch is deliberately uncovered.** **Live** — the branch exists and no case enters it.
+  Filed by `M107`. **Tier: after-launch.**
+
+- **`nit` · The design system has no `key` or `lock` glyph, so two security controls borrow `undo`.** Found by `M107`
+  (2026-09-20) while building `D37`'s two reset surfaces. `packages/design-system/src/components/Icon/icons.ts` ships
+  57 names; `shield` is this product's security glyph everywhere else — Settings' own two-factor section, both audit
+  pages, the impersonation banner — but on `resources/js/Pages/members/Index.vue` it is already spent one button up on
+  "Make owner", and two identical icons in one row-action group reads worse than a weaker metaphor. Both reset buttons
+  (the roster and `resources/js/Pages/admin/Users.vue`) therefore use `undo`. ⚠️ **The label carries the meaning and
+  nothing is ambiguous to a reader**, which is why this is a `nit` and not a defect: WCAG 1.4.1 is satisfied by the
+  text, not the glyph. The remedy is to add a `key` glyph and point both buttons at it. **Live.**
+  Filed by `M107`. **Tier: after-launch.**
+
+- **`minor` · PHPStan is GREEN in CI and reports 18 errors in the app container on the same commit, so the
+  gate cannot be used locally at all.** Measured by `M107` (2026-09-20) while running its own gates. A
+  **pristine** `3c57291` — the branch point, a documentation-only commit — gives `Found 18 errors` under
+  `docker compose exec app ./vendor/bin/phpstan analyse`, while CI's *Static analysis, style & security* job
+  passes on the same tree running `composer run analyse`, which is **the same command**
+  (`composer.json:74`, `.github/workflows/ci.yml:145`). ⚠️ **Every error is the same shape:** *"Access to an
+  undefined property"* on a column-backed model attribute — `FormField::$default_value`,
+  `User::$two_factor_secret`, and similar across `BuilderPresenter`, `PublishService`,
+  `SchemaSnapshotSerializer`, `FormVersionResource` and `StructuralAnswerNormalizer`. That is Larastan's
+  schema resolution failing to see columns that exist, not a type error. ⛔ **THE COST IS THAT A REAL NEW
+  ERROR IS INVISIBLE IN THE NOISE** — `M107` found its own single new error only by diffing a count against a
+  pristine checkout, which is not a workflow anyone will repeat. ⚠️ **`docs/gate-baselines.md` records
+  PHPStan as "OK, no errors"**, which is true of CI and has never been true here, so the baseline reads as a
+  contradiction of the local run rather than as a statement about a different environment. ⚠️ **The likely
+  mechanism is the one `CLAUDE.md` already records for the lint gates** — `RecursiveDirectoryIterator`
+  descending the Windows bind mount only partially, so Larastan's migration scan sees a short list — but
+  that is INFERRED and was not proved: clearing the result cache changed nothing, and removing `M107`'s own
+  two migrations changed nothing. ⛔ **Cleaning it is not a matter of adding `@property` lines one at a
+  time** — `M107` added two and cleared three errors, which is a symptom, not a remedy. The remedy is to
+  establish why the container's schema resolution differs from CI's, and then either fix it or record in the
+  gate table that PHPStan is CI-only on this host, the way Storybook axe and Vitest already are. **Live** —
+  it is the state of the gate today. Filed by `M107`. **Tier: after-launch.**
 
 - **`nit` · `PROGRESS.md`'s `M101` bullet records a state of the tree that does not exist.** Found by `M106`
   (2026-09-20) while verifying `R-06228b4f`'s premise. That bullet ends *"`R-06228b4f` now says `Awaits D54` instead of

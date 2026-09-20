@@ -71,7 +71,7 @@ Every account below uses the same password: **`meridian-demo-2026`**
 a pending row to show. That is intended.
 
 > **For the authorization detail behind these accounts, see [`ACCESS-MATRIX.md`](ACCESS-MATRIX.md)** — the
-> full 5-role × 29-permission grid, which destination each role can reach (and where the tenant's *plan*
+> full 5-role × 30-permission grid, which destination each role can reach (and where the tenant's *plan*
 > hides a destination the role grants), the API token abilities, and the second stack on port 8081. This
 > guide stays the walkthrough; that document is the reference behind it.
 

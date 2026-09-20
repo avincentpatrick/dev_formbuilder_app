@@ -50,6 +50,12 @@ final class ShellAbilities
             // Both land on Owner/Admin today, but collapsing them here would quietly decide that
             // they must always agree.
             'assignRoles' => (bool) $user?->can('tenant.roles.assign'),
+            // M107 (`D37`) — gates the Members page's per-row "Reset two-step sign-in" control. A THIRD
+            // members key rather than a reuse of either neighbour, and the reason is the grant, not the UI:
+            // `tenant.members.two_factor_reset` is seeded to Owner ALONE, while both keys above land on
+            // Owner AND Admin. Folding it into `assignRoles` would show an Admin a control the route then
+            // refuses — the shape the Owner-row ⚠️ in `members/Index.vue` already exists to prevent.
+            'resetMemberTwoFactor' => (bool) $user?->can('tenant.members.two_factor_reset'),
             // Gates the Forms nav item + the list page (viewAny composes forms.create/.edit.* — FormPolicy).
             'manageForms' => (bool) $user?->can('viewAny', Form::class),
             // Gates the Submissions inbox nav item + list page (F7). All five roles that hold

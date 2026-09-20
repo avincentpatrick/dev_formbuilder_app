@@ -94,4 +94,36 @@ final class MembershipException extends RuntimeException
     {
         return new self("That member already holds the {$role} role.");
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Two-factor reset (Increment M107, `D37`) — the four refusals TwoFactorResetService can make.
+    |--------------------------------------------------------------------------
+    | Like the role-change block above, these are DOMAIN invariants rather than permission checks: an Owner
+    | holding `tenant.members.two_factor_reset` legitimately reaches the route and is then told no.
+    |
+    | ⚠️ `cannotResetSuperAdminTwoFactor()` is the one that is a security boundary rather than a courtesy,
+    | and the service asks for it FAIL-CLOSED — `where('is_super_admin', false)->exists()`, the shape
+    | ImpersonationService already uses — so a row it cannot read refuses instead of permitting.
+    */
+
+    public static function cannotResetOwnTwoFactor(): self
+    {
+        return new self('Turn off two-step sign-in from your own settings page instead.');
+    }
+
+    public static function cannotResetSuperAdminTwoFactor(): self
+    {
+        return new self('That account is not resettable from a workspace.');
+    }
+
+    public static function twoFactorNotEnrolled(): self
+    {
+        return new self('That member has not set up two-step sign-in.');
+    }
+
+    public static function twoFactorResetAffectedNoRows(): self
+    {
+        return new self('The reset could not be applied. Nothing was changed.');
+    }
 }

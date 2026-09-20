@@ -420,6 +420,18 @@ Route::middleware([
         ->middleware(['can:tenant.members.remove', 'step-up'])->name('members.remove');
     Route::post('/members/ownership', [MemberController::class, 'transferOwnership'])
         ->middleware(['can:tenant.ownership.transfer', 'step-up'])->name('members.ownership');
+    // ⚠️ A FOURTH MUTATION, AND THE COMMENT ABOVE NOW UNDERSTATES ITSELF BY ONE (M107, `D37`). Clearing
+    // somebody's two-factor enrolment carries `step-up` for the same reason the other three do, and one
+    // sharper: it is the only member action whose effect reaches OUTSIDE this workspace, because the 2FA
+    // columns live on the global `users` table.
+    //
+    // `tenant.members.two_factor_reset` is a NEW key rather than a reuse. I8a's precedent — consume the
+    // dormant `tenant.roles.assign` rather than mint one — does not reach here: `tenant.members.remove` is
+    // seeded to Owner AND Admin, which is wider than `D37`'s "a workspace owner", and nothing else in the
+    // closed catalog describes this act. It is the first permission minted since Phase 0, which is why it
+    // needed a backfill migration as well as a seeder line.
+    Route::post('/members/{user}/two-factor-reset', [MemberController::class, 'resetTwoFactor'])
+        ->middleware(['can:tenant.members.two_factor_reset', 'step-up'])->name('members.two-factor-reset');
 
     // In-app feedback (Feature #11). Every role may SUBMIT (can:feedback.submit); Owner/Admin may VIEW
     // the workspace's own reports (can:feedback.view — seeded since Phase 0, first consumed in I7a). The

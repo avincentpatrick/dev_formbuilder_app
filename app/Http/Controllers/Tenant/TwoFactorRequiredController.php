@@ -43,6 +43,10 @@ final class TwoFactorRequiredController extends Controller
             'enabled' => $user->two_factor_secret !== null,
             'confirmed' => false,
             'needsPasswordConfirmation' => PasswordConfirmation::isStale($request),
+            // No `recoveryCodesRemaining`, deliberately (M107). This page redirects a confirmed user to
+            // the dashboard four lines up, so the low-code warning — which renders only when `confirmed`
+            // — could never show here. The prop defaults to null; sending a count nobody can see would be
+            // the kind of symmetry that reads as a requirement to the next person.
         ]);
     }
 }

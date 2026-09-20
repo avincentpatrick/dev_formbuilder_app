@@ -47,6 +47,8 @@ use Throwable;
  * @property ?string $google_id Google's `sub` (J3c2 / ADR-0019 §D1). Unique; NULL on almost every row.
  * @property bool $is_super_admin Global platform-staff flag (RBAC §9); never a Spatie role.
  * @property ?Carbon $two_factor_confirmed_at Set once 2FA enrollment is confirmed.
+ * @property ?string $two_factor_secret Fortify's encrypted TOTP secret. Hidden below; never rendered.
+ * @property ?string $two_factor_recovery_codes Fortify's encrypted JSON list. Hidden below; never rendered.
  * @property ?Carbon $password_set_at When a HUMAN last chose this password (M76). NULL on an invitation
  *                                    placeholder and on an SSO/Google-provisioned account, both of which
  *                                    hold a random hash nobody chose.

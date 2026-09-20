@@ -10955,6 +10955,29 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   text, not the glyph. The remedy is to add a `key` glyph and point both buttons at it. **Live.**
   Filed by `M107`. **Tier: after-launch.**
 
+- **`minor` · PHPStan is GREEN in CI and reports 18 errors in the app container on the same commit, so the
+  gate cannot be used locally at all.** Measured by `M107` (2026-09-20) while running its own gates. A
+  **pristine** `3c57291` — the branch point, a documentation-only commit — gives `Found 18 errors` under
+  `docker compose exec app ./vendor/bin/phpstan analyse`, while CI's *Static analysis, style & security* job
+  passes on the same tree running `composer run analyse`, which is **the same command**
+  (`composer.json:74`, `.github/workflows/ci.yml:145`). ⚠️ **Every error is the same shape:** *"Access to an
+  undefined property"* on a column-backed model attribute — `FormField::$default_value`,
+  `User::$two_factor_secret`, and similar across `BuilderPresenter`, `PublishService`,
+  `SchemaSnapshotSerializer`, `FormVersionResource` and `StructuralAnswerNormalizer`. That is Larastan's
+  schema resolution failing to see columns that exist, not a type error. ⛔ **THE COST IS THAT A REAL NEW
+  ERROR IS INVISIBLE IN THE NOISE** — `M107` found its own single new error only by diffing a count against a
+  pristine checkout, which is not a workflow anyone will repeat. ⚠️ **`docs/gate-baselines.md` records
+  PHPStan as "OK, no errors"**, which is true of CI and has never been true here, so the baseline reads as a
+  contradiction of the local run rather than as a statement about a different environment. ⚠️ **The likely
+  mechanism is the one `CLAUDE.md` already records for the lint gates** — `RecursiveDirectoryIterator`
+  descending the Windows bind mount only partially, so Larastan's migration scan sees a short list — but
+  that is INFERRED and was not proved: clearing the result cache changed nothing, and removing `M107`'s own
+  two migrations changed nothing. ⛔ **Cleaning it is not a matter of adding `@property` lines one at a
+  time** — `M107` added two and cleared three errors, which is a symptom, not a remedy. The remedy is to
+  establish why the container's schema resolution differs from CI's, and then either fix it or record in the
+  gate table that PHPStan is CI-only on this host, the way Storybook axe and Vitest already are. **Live** —
+  it is the state of the gate today. Filed by `M107`. **Tier: after-launch.**
+
 - **`nit` · `PROGRESS.md`'s `M101` bullet records a state of the tree that does not exist.** Found by `M106`
   (2026-09-20) while verifying `R-06228b4f`'s premise. That bullet ends *"`R-06228b4f` now says `Awaits D54` instead of
   publishing as ready"*. **There is no `Awaits` token in that row** — its only occurrence of the word is narration

@@ -6880,8 +6880,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   deliberate — pinning the value would be a gate asserting this repository's own open question — and it
   means these cases see a mis-COUNTING, never a re-tuning.
 
-- **`minor` · A correction still cannot be autosaved, and the reason is an endpoint that does not exist plus
-  a product decision nobody has taken.** Split out by `M75` (2026-09-06) from the leave-prompt row it closed,
+- ✅ **CLOSED BY `M107` (2026-09-20) — `minor` · ~~A correction still cannot be autosaved, and the reason is an endpoint that does not exist plus
+  a product decision nobody has taken.~~** Split out by `M75` (2026-09-06) from the leave-prompt row it closed,
   which named both halves and could only build one. `Encode.vue`'s autosave is off in edit mode by design and
   the presenter sends a null `draft_url` there, both deliberately: an edit autosaved down the DRAFT channel
   overwrites a respondent's answers with no `update` policy check and no audit row, and
@@ -9606,8 +9606,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   remaining pages are the tenant index, the tenant detail page, users and the audit log. ⚠️ The table row
   records why they were not swept in with the first two, and that `AdminLayout` has since measured clean at
   all three widths, so adding them is now cheap. **Live.** Filed by `M93`. **Tier: after-launch.**
-- **`minor` · Nobody who loses their two-step sign-in device and their recovery codes can get back in
-  without an operator editing the database.** Carried out of `docs/security-threat-model.md` §9 by `M93`
+- ✅ **CLOSED BY `M107` (2026-09-20) — `minor` · ~~Nobody who loses their two-step sign-in device and their recovery codes can get back in
+  without an operator editing the database.~~** Carried out of `docs/security-threat-model.md` §9 by `M93`
   (2026-09-14). Disabling two-factor sits behind `auth` and `password.confirm`, which a locked-out person
   cannot pass, and the super-admin console offers no reset. Two smaller gaps sit beside it: nothing warns when
   recovery codes run low, and the seeded two-factor fixture carries an empty recovery list. The shape of the
@@ -10860,8 +10860,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the grouping question, and the next taker needs a recorded `D13` exception rather than a judgement call.
   **Live** — the six are `ready` and nothing currently says how they may be batched. Filed by `M105`.
   **Tier: early-testing.**
-- **`minor` · Nothing warns a person that their two-factor recovery codes are running low, and the seeded
-  two-factor fixture carries an empty recovery list.** Filed 2026-09-20 by `M105` while answering `D37`. Both gaps
+- ✅ **CLOSED BY `M107` (2026-09-20) — `minor` · ~~Nothing warns a person that their two-factor recovery codes are running low, and the seeded
+  two-factor fixture carries an empty recovery list.~~** Filed 2026-09-20 by `M105` while answering `D37`. Both gaps
   are named inside `R-1ad2304d`'s own prose and neither is covered by that row's headline or by `D37`'s answer,
   which settles only the escape route — an admin reset, recorded in the audit log. ⚠️ **The fixture half has a
   second-order cost:** a seeded account with no recovery codes is the exact state `D37` exists to rescue, so every

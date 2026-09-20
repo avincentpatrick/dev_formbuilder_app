@@ -586,6 +586,42 @@ not blocked**; crawlers do fetch it, Googlebot included.
   at `:13`, and `httpd -S` maps that vhost to the same file and line from the server's own parse. The `*:80`
   paragraph above names a different file for a different vhost; both listings of `meridian.conf` here are excerpts.
 
+#### HSTS, and why the number is deliberately small
+
+```apache
+Header always set Strict-Transport-Security "max-age=300"
+```
+
+**`D54` decided this: `max-age=300`, in the vhost, no `includeSubDomains`, no `preload`.** It sits beside
+the `X-Robots-Tag` line in the same `*:443` vhost, and it is served on every response because HSTS is
+**host**-scoped rather than response-scoped — one response carrying it covers the origin, which is the
+property that separates it from the crawl header above and the reason it needed no per-path argument.
+
+⚠️ **THE SHORT `max-age` IS THE WHOLE POINT AND IS NOT A PLACEHOLDER TO BE TIDIED UP LATER.** On a
+`.gov.ph` name HSTS is a promise made to the **browser**, not to us: once sent, a failed certificate
+renewal becomes a hard block with **no click-through**, for as long as the `max-age` says. This box's
+renewal has already failed eleven times in one day (`D49`) and rests on a scheduled task that has still
+never activated a genuinely renewed certificate. Five minutes buys the posture while bounding the blast
+radius to five minutes. **A future session that "upgrades" this to `31536000` is trading a five-minute
+outage for a year-long one on the exact address the testers use.**
+
+⛔ **`preload` MUST NEVER BE SENT WHILE THIS NAME IS A STAGING HOST.** A preload submission is effectively
+irreversible on browser timescales, and it would outlive the testing server itself.
+
+**There IS a plaintext request for it to close, which an earlier record denied.** `httpd.conf` carries an
+uncommented `Listen 80` and a `*:80` vhost answers with a `Redirect permanent`, so an internal tester who
+types the bare hostname makes exactly the cleartext round-trip HSTS removes. The 21-second timeout measured
+from outside on 2026-09-19 was the **agency firewall**, not an absent listener.
+
+- **`scripts/staging-headers-judge.php` is authoritative for its survival**, on the same `schedule` and
+  `workflow_dispatch` triggers as the crawl header, and for the same reason: a vhost edit is not a deploy.
+- ⛔ **ARMING IT WAS NOT "ONE ENTRY", WHICH `D54` AND THE JUDGE'S OWN DOCBLOCK BOTH PREDICTED IT WOULD BE.**
+  The policy map modelled **required** tokens only, so *"no `includeSubDomains`, no `preload`"* — half of
+  what `D54` decided — could not be expressed at all; and the tokeniser split on `,`, while HSTS is
+  **semicolon**-delimited, so `max-age=300; includeSubDomains` was reported as *missing* `max-age=300`
+  while carrying it. `M106` replaced the map's values with a `separator` / `require` / `forbid` policy.
+  **Read this before pricing any future header as one line.**
+
 ---
 
 ## 8b. Per-Tenant Extract Runbook (P2b — ADR-0018)

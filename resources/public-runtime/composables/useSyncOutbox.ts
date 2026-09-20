@@ -255,9 +255,17 @@ export function createSyncOutbox(db: MeridianDb, options: SyncOutboxOptions = {}
         try {
             const { usage, quota } = await storage.estimate();
             if (usage !== undefined && quota !== undefined && quota > 0 && usage / quota > 0.8) {
-                // `docs/offline-first-sync-design.md:93` asks for the COUNT and the SIZE, not a bare
+                // `docs/offline-first-sync-design.md:192` asks for the COUNT and the SIZE, not a bare
                 // percentage: "you have N submissions queued and using X MB". A percentage alone tells the
                 // respondent something is wrong without telling them what syncing would buy back.
+                // ⛔ THIS COUNT IS DEVICE-WIDE ON PURPOSE AND MUST NOT BE RE-SCOPED TO THE VISIT. Browser
+                // storage is a property of the ORIGIN, so what a respondent can free is everything queued on
+                // the device — `docs/adr/0021-respondent-scoped-device-outbox.md:72` says so in writing, and
+                // re-scoping the number would make the sentence untrue about the quota it is warning over.
+                // What was wrong was the WORDING, not the arithmetic: it sat under "My submissions on this
+                // device" saying only "N responses waiting to send", so a respondent read a stranger's queued
+                // submissions as their own. `D26` option 1 names the scope in the sentence instead, matching
+                // the phrasing `SyncStatus.vue` already uses for its earlier-session line.
                 const queued = pending.value + needsAttention.value + conflict.value;
                 const used = Math.round(usage / MB);
                 // `usage` is the ORIGIN's total, not the queue's — it includes cached shells, schemas and
@@ -265,7 +273,8 @@ export function createSyncOutbox(db: MeridianDb, options: SyncOutboxOptions = {}
                 // are reported side by side instead.
                 quotaWarning.value =
                     `This site is using about ${used} MB, ${Math.round((usage / quota) * 100)}% of what the browser allows. ` +
-                    `${queued} response${queued === 1 ? '' : 's'} waiting to send — sync soon to free space.`;
+                    `${queued} response${queued === 1 ? '' : 's'} across all sessions on this device ` +
+                    'waiting to send — sync soon to free space.';
             } else {
                 quotaWarning.value = null;
             }

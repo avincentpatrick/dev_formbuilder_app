@@ -230,7 +230,7 @@ describe('createSyncOutbox (I10d)', () => {
     });
 
     it('names the queued COUNT and the megabytes in the quota warning, not just a percentage', async () => {
-        // docs/offline-first-sync-design.md:93 asks for "you have N submissions queued and using X MB".
+        // docs/offline-first-sync-design.md:192 asks for "you have N submissions queued and using X MB".
         // A bare percentage tells the respondent something is wrong without telling them what syncing buys.
         await enqueue(db, input('u1'));
         const driver = makeDriver(fakeEnv({ online: false, usage: 900 * 1024 * 1024, quota: 1024 * 1024 * 1024 }), okFetch());
@@ -265,6 +265,28 @@ describe('createSyncOutbox — respondent scope (Increment M15)', () => {
         // leave the previous respondent's queue undrained and their storage pressure unreported.
         expect(driver.pending.value).toBe(2);
         expect(driver.mine.value.pending).toBe(1);
+    });
+
+    it('says the quota line counts every visit on the device, not just this one (D26)', async () => {
+        // ⛔ THE DEFECT WAS THE SENTENCE, NOT THE NUMBER. The count is device-wide by design
+        // (`docs/adr/0021-respondent-scoped-device-outbox.md:72`) because storage is a property of the
+        // ORIGIN — but it rendered as a bare "N responses waiting to send" beneath the "My submissions on
+        // this device" region, so a respondent read the PREVIOUS visitor's queued submissions as their own.
+        // This case is the discriminator: `mine.pending` is 1 while the warning must account for 2.
+        await enqueue(db, input('mine'));
+        await enqueue(db, input('theirs', { respondent_session_id: THEIRS }));
+
+        // `online: false` is load-bearing — an online driver drains on refresh and the count collapses to 0.
+        const driver = makeDriver(
+            fakeEnv({ online: false, usage: 900 * 1024 * 1024, quota: 1024 * 1024 * 1024 }),
+            okFetch(),
+            's',
+            MINE,
+        );
+        await driver.refresh();
+
+        expect(driver.mine.value.pending).toBe(1);
+        expect(driver.quotaWarning.value).toContain('2 responses across all sessions on this device');
     });
 
     it("refuses to open another visit's conflict, at both entry points into the review flow", async () => {

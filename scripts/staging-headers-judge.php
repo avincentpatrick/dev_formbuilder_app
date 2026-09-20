@@ -24,9 +24,24 @@ declare(strict_types=1);
  *
  * ⚠️ THE HEADER IS RESPONSE-SCOPED, WHICH IS THE WHOLE REASON COVERAGE IS PROBED PER-PATH RATHER THAN
  * ONCE. An `X-Robots-Tag` on `/login` says nothing about `/robots.txt`. (HSTS, by contrast, is
- * HOST-scoped — one response carrying it covers the origin — which is why that question is `D54` and
- * not folded in here. If `D54` puts HSTS in the vhost, arming it is one entry in
- * STAGING_REQUIRED_HEADERS rather than a second gate.)
+ * HOST-scoped — one response carrying it covers the origin — which is why that question was `D54`.)
+ *
+ * ⛔ AND THIS FILE'S OWN ESTIMATE OF WHAT ARMING HSTS WOULD COST WAS WRONG, CORRECTED HERE BY `M106`.
+ * The sentence deleted from the paragraph above said arming it *"is one entry in
+ * STAGING_REQUIRED_HEADERS rather than a second gate"*, and `D54` option A repeats that pricing. Both
+ * are refuted by this file's own code as it stood:
+ *
+ *   1. The map modelled REQUIRED TOKENS ONLY — the judging loop computed `array_diff($directives,
+ *      $present)` and reported only what was MISSING. `D54` also forbids `includeSubDomains` and
+ *      `preload`, and HALF OF WHAT WAS DECIDED COULD NOT BE WRITTEN HERE AT ALL.
+ *   2. The tokeniser was `explode(',', $value)`. `X-Robots-Tag` is comma-delimited; **HSTS is
+ *      SEMICOLON-delimited** (RFC 6797). Measured before it was changed: `max-age=300;
+ *      includeSubDomains` split to the single token `max-age=300; includesubdomains`, so the judge
+ *      reported `missing max-age=300` WHILE `max-age=300` WAS PRESENT — a true red for a false reason,
+ *      which is worse than a miss because it sends the reader to the wrong line.
+ *
+ * So the policy below carries a SEPARATOR, a REQUIRE list and a FORBID list per header. A one-token
+ * mutation still moves exactly one directive, which is what kept the old shape honest and is preserved.
  *
  * THE THREE-WAY EXIT CONTRACT, reused rather than invented — `scripts/npm-audit-judge.php`,
  * `scripts/tracker-surgery.php` and `scripts/pre-push-guard.php` already publish it:
@@ -73,14 +88,35 @@ const STAGING_EXIT_CANNOT_MEASURE = 2;
 const STAGING_HOST = 'staging.pitahc.gov.ph';
 
 /**
- * Header => the directives every probe's response must carry, lower-cased.
+ * Header => the policy every probe's response must satisfy. All tokens lower-cased.
  *
- * A map rather than a single header name, because `D54` may add `Strict-Transport-Security` beside it;
- * arming that is then one entry here rather than a second gate. Kept as an explicit list rather than a
- * substring match so that a mutation of one directive is a one-token change.
+ *   separator  the character the header's own grammar delimits directives with. `X-Robots-Tag` is
+ *              comma-delimited; `Strict-Transport-Security` is semicolon-delimited (RFC 6797). ⛔ ONE
+ *              SEPARATOR FOR BOTH IS WHAT MADE THE OLD SHAPE MIS-REPORT — see the header docblock.
+ *   require    directives that must be present. Never empty: a header whose presence alone passes is a
+ *              header nobody is judging.
+ *   forbid     directives that must be ABSENT. `D54` decided `max-age=300` with no `includeSubDomains`
+ *              and no `preload`, and a required-only model cannot express the second half of that.
+ *
+ * Kept as explicit lists rather than a substring match so that a mutation of one directive is a
+ * one-token change, which is what makes this gate drivable by `scripts/mutate.php`.
+ *
+ * ⚠️ `preload` IS FORBIDDEN HERE ON PURPOSE AND IS NOT A STYLE CHOICE. `D54`: it must not be sent at
+ * all while the name is a staging host — a preload submission is effectively irreversible on browser
+ * timescales, and `max-age=300` exists precisely so a lapsed renewal blocks a tester for five minutes
+ * rather than a year.
  */
 const STAGING_REQUIRED_HEADERS = [
-    'X-Robots-Tag' => ['noindex', 'nofollow', 'noarchive'],
+    'X-Robots-Tag' => [
+        'separator' => ',',
+        'require' => ['noindex', 'nofollow', 'noarchive'],
+        'forbid' => [],
+    ],
+    'Strict-Transport-Security' => [
+        'separator' => ';',
+        'require' => ['max-age=300'],
+        'forbid' => ['includesubdomains', 'preload'],
+    ],
 ];
 
 /**
@@ -204,6 +240,39 @@ function staging_judge(string $dir): int
         return staging_cannot_measure('no header is required, so this judge would pass on anything.');
     }
 
+    // ── The POLICY floor. A malformed or self-contradicting policy must REFUSE rather than judge: a
+    //    missing `forbid` key would otherwise be a PHP warning and an empty intersection, which reads
+    //    as "nothing forbidden was found" — a green that measured nothing, the D16 family exactly.
+    foreach (STAGING_REQUIRED_HEADERS as $header => $policy) {
+        if (! isset($policy['separator'], $policy['require'], $policy['forbid'])
+            || ! is_string($policy['separator'])
+            || $policy['separator'] === ''
+            || ! is_array($policy['require'])
+            || ! is_array($policy['forbid'])) {
+            return staging_cannot_measure(
+                "the policy for {$header} is malformed: it needs a non-empty string 'separator' and "
+                ."array 'require' and 'forbid' keys. Nothing was judged."
+            );
+        }
+
+        if ($policy['require'] === []) {
+            return staging_cannot_measure(
+                "the policy for {$header} requires no directive, so the header's mere presence would "
+                .'pass. That is a gate judging nothing.'
+            );
+        }
+
+        $contradiction = array_intersect($policy['require'], $policy['forbid']);
+
+        if ($contradiction !== []) {
+            return staging_cannot_measure(sprintf(
+                'the policy for %s both requires and forbids %s, which no response can satisfy.',
+                $header,
+                implode(', ', $contradiction),
+            ));
+        }
+    }
+
     $identity = staging_identity_body();
 
     if ($identity === null) {
@@ -265,7 +334,7 @@ function staging_judge(string $dir): int
         $headers = staging_headers_of($raw);
         $measured++;
 
-        foreach (STAGING_REQUIRED_HEADERS as $header => $directives) {
+        foreach (STAGING_REQUIRED_HEADERS as $header => $policy) {
             $value = $headers[strtolower($header)] ?? null;
 
             if ($value === null) {
@@ -276,18 +345,27 @@ function staging_judge(string $dir): int
 
             $present = array_map(
                 static fn (string $part): string => strtolower(trim($part)),
-                explode(',', $value),
+                explode($policy['separator'], $value),
             );
 
-            $missing = array_values(array_diff($directives, $present));
+            $missing = array_values(array_diff($policy['require'], $present));
+            $forbidden = array_values(array_intersect($policy['forbid'], $present));
 
+            // ⛔ MISSING AND FORBIDDEN ARE REPORTED SEPARATELY AND NEITHER SHORT-CIRCUITS THE OTHER. A
+            //    response carrying `max-age=60; preload` is wrong twice, for two unrelated reasons, and
+            //    collapsing them into one line sends the reader to fix one and re-run into the other.
             if ($missing !== []) {
                 $failures[] = "{$probe} — {$header} is '{$value}', missing ".implode(', ', $missing);
-
-                continue;
             }
 
-            $report[] = "{$probe} — {$header}: {$value}";
+            if ($forbidden !== []) {
+                $failures[] = "{$probe} — {$header} is '{$value}', FORBIDDEN directive(s) present: "
+                    .implode(', ', $forbidden);
+            }
+
+            if ($missing === [] && $forbidden === []) {
+                $report[] = "{$probe} — {$header}: {$value}";
+            }
         }
     }
 

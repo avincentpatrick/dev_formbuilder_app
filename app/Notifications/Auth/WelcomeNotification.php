@@ -46,10 +46,16 @@ use Illuminate\Queue\Attributes\Queue;
  * no workspace yet, which is a real and pre-existing state of this product (`RegistrationGate` documents it).
  *
  * ── PAYLOAD ────────────────────────────────────────────────────────────────────────────────────────────
- * Three builtin scalars, satisfying `QueuedMailContractTest`'s reflection rule and R3 of
- * `scripts/job-payload-lint.php`. The action URL is pre-built IN-REQUEST for the reason every sibling here
- * does it: a worker has no tenant context and no request host from which to resolve one. Same shape as
- * {@see EventNotification}.
+ * Three builtin scalars, one of them NULLABLE, satisfying `QueuedMailContractTest`'s reflection rule and R3
+ * of `scripts/job-payload-lint.php` — that gate unwraps a `NullableType` at `:439`, so `?string` is read as
+ * `string` and the whitelist is not widened. The action URL is pre-built IN-REQUEST for the reason every
+ * sibling here does it: a worker has no tenant context and no request host from which to resolve one. Same
+ * shape as {@see EventNotification}.
+ *
+ * ⛔ `$actionUrl` IS NULL FOR AN ACCOUNT THAT BELONGS TO NO WORKSPACE, AND THAT IS THE FIX (`M106`). It
+ * used to fall back to `config('app.url')` — the agency's public website — so the one email a brand-new
+ * central-host account receives told them to create a workspace they cannot create, over a button that
+ * left the product entirely. `D52` priced this as one string; it was three places, and this is the third.
  */
 #[Queue(QueueName::Mail)]
 final class WelcomeNotification extends Notification implements ShouldQueue
@@ -61,8 +67,15 @@ final class WelcomeNotification extends Notification implements ShouldQueue
         public readonly string $name,
         /** The workspace they landed in, or '' on the central host — see the class docblock. */
         public readonly string $tenantName,
-        /** Absolute, pre-built in-request on the host they actually registered on. */
-        public readonly string $actionUrl,
+        /**
+         * Absolute, pre-built in-request on the host they actually registered on — or NULL when this
+         * person has no honest destination yet, which is the central-host case. ⛔ NULL IS NOT AN
+         * OVERSIGHT AND MUST NOT BE COLLAPSED BACK TO A STRING: the previous fallback was
+         * `config('app.url')`, the agency's public website, so the button sent a brand-new account
+         * somewhere it could do nothing. `?string` is safe for the payload gate —
+         * `scripts/job-payload-lint.php:439` unwraps a `NullableType`, so R3 still reads `string`.
+         */
+        public readonly ?string $actionUrl,
     ) {}
 
     /**
@@ -83,10 +96,23 @@ final class WelcomeNotification extends Notification implements ShouldQueue
             ->line($joinedAWorkspace
                 ? "Your email address is confirmed and you're a member of {$this->tenantName}."
                 : 'Your email address is confirmed and your account is ready.')
+            // ⛔ THE CENTRAL-HOST LINE MUST NOT OFFER WORKSPACE CREATION. Nothing on this product lets an
+            // account make its own workspace — provisioning is an operator action — so the previous copy
+            // ("The next step is to create a workspace, or to accept an invitation to one") named a task
+            // the reader cannot perform and then linked them away to find it. A workspace reaches THEM.
             ->line($joinedAWorkspace
                 ? 'Start by opening a form someone has already built, or create your own — the dashboard has both.'
-                : 'The next step is to create a workspace, or to accept an invitation to one.')
-            ->action($joinedAWorkspace ? 'Go to your dashboard' : 'Get started', $this->actionUrl)
+                : 'A workspace administrator will add you, or send you an invitation by email. Nothing else is needed from you today.');
+
+        // ⛔ NO ACTION AT ALL WHEN THERE IS NOWHERE HONEST TO SEND THEM — and this is the half `D52`
+        // omitted when it priced the fix as "one string". `resources/views/mail/notification.blade.php`
+        // guards BOTH the button and the subcopy on `@isset($actionText)`, so declining to call
+        // `->action()` removes both cleanly and needs no change to the template.
+        if ($this->actionUrl !== null) {
+            $mail->action($joinedAWorkspace ? 'Go to your dashboard' : 'Get started', $this->actionUrl);
+        }
+
+        $mail
             // No "if you did not create this account" line: they just clicked a signed link in that mailbox,
             // which is the strongest evidence available that the address is theirs. A security disclaimer
             // here would undercut the one thing this email is for.

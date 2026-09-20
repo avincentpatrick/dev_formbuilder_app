@@ -355,7 +355,7 @@ jobs:
           fi
           exit $code
 
-      - name: Staging crawl protection — fetch (reachability is NOT a merge signal)
+      - name: Staging response headers — fetch (reachability is NOT a merge signal)
         # ⛔ NIGHTLY ON `main` ONLY, AND THE TRIGGER IS THE DESIGN RATHER THAN A COST SAVING. What this
         # gate watches is a line of Apache configuration on a box — `Header always set X-Robots-Tag` —
         # which no push and no deploy touches. `deploy.yml` fires on a `workflow_run` and would miss a
@@ -389,7 +389,7 @@ jobs:
               "$url"
           done < staging-captures/urls.txt
 
-      - name: Staging crawl protection — judge (the X-Robots-Tag must survive)
+      - name: Staging response headers — judge (the crawl and transport headers must survive)
         # The protection exists ONLY as vhost configuration on the box: there is no VirtualHost
         # anywhere in this repository, and moving it into the app is refuted by measurement — Apache
         # serves /robots.txt and /favicon.ico without invoking PHP at all, so no middleware can carry
@@ -404,7 +404,7 @@ jobs:
           # aborts this step before code=$? is read and the design silently reverts to a hard block.
           if [ "$code" = "2" ]; then
             echo "::warning title=Staging headers NOT MEASURED::the testing site was unreachable or answered something that is not ours; no header was judged"
-            echo "⚠️ **The staging crawl protection was not measured.** The box was unreachable, or what answered could not be attributed to our own site, so **nothing was judged** about the \`X-Robots-Tag\` header. This is a green gate that judged nothing — the same family as D16." >> "$GITHUB_STEP_SUMMARY"
+            echo "⚠️ **The staging response headers were not measured.** The box was unreachable, or what answered could not be attributed to our own site, so **nothing was judged** about the headers the judge requires (\`X-Robots-Tag\`, and \`Strict-Transport-Security\` since \`D54\`). This is a green gate that judged nothing — the same family as D16." >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
           exit $code

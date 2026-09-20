@@ -107,8 +107,13 @@ final class SendWelcomeEmail
             // Built here because a worker can resolve neither the tenant's app host nor the central one.
             // `TenantUrl::to()` is the APP arm, never `toPublic()` — a welcome points at the workspace, not
             // at a guest form runtime.
+            // ⛔ NULL, NOT `config('app.url')`, WHEN THERE IS NO WORKSPACE (`M106`). This comment's own
+            // paragraph above already says that "under D46 the central address is somebody else's
+            // website" — and this line then sent every workspace-less account to exactly that address.
+            // There is no honest destination for such a person yet, so the notification renders no
+            // button at all rather than a button to somewhere they cannot act.
             actionUrl: $tenant === null
-                ? rtrim((string) config('app.url'), '/').'/'
+                ? null
                 : TenantUrl::to($tenant, 'dashboard'),
         ))->withBrand(BrandPalette::product(
             $tenant === null ? '' : TenantUrl::to($tenant, 'dashboard')

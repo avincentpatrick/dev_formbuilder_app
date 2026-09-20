@@ -16,45 +16,108 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M106`, three tester-facing `early-testing` rows: HSTS armed at a judge that could not express it, the welcome email's three wrong places, and a quota line that counts strangers (`m106-hsts-welcome-and-quota-scope`)
+## Status: NO ACTIVE CLAIM — `M106` is merged; `early-testing` remains the most urgent tier with open work, and no decision in it is open
 
-Taken 2026-09-20. Branch `m106-hsts-welcome-and-quota-scope`, cut from `origin/main` at `3c4fece`, PR into `main`.
+## RELEASED — `M106`, three tester-facing `early-testing` rows: HSTS armed at a judge that could not express it, the welcome email's three wrong places, and a quota line that counted strangers (merged as PR #299, `429857d`, 6/6 green with real step counts — Static analysis 31 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 
-Rows, all `early-testing`, grouped under `D13`:
+Shipped 2026-09-20. Branch `m106-hsts-welcome-and-quota-scope`, cut from `origin/main` at `3c4fece`.
 
-- `R-06228b4f` — *"The testing site sends no `Strict-Transport-Security` header, and the repository has no HSTS policy at all."* `docs/feature-backlog.md:10596`. **The one hub row.**
-- `R-e6a10f97` — *"The welcome email tells a central-host account to create a workspace."* `docs/feature-backlog.md:9761`.
-- `R-491e4c32` — *"The storage-quota line counts strangers' submissions."* `docs/feature-backlog.md:1407`.
+**Four rows closed, four filed, one server changed.** Open rows 243 → **243**; open decisions **28**, unchanged — none was answered here and none was asked. No migration, no ADR, no tracker surgery. Every claimed file was edited except `resources/public-runtime/components/SyncStatus.vue`'s product code — that file moved for **citation repairs only**, which the claim said it would.
 
-⛔ **THE GROUPING RULE IS NOT THE ONE `CLAUDE.md` IMPLIES, AND MY FIRST BATCH WAS WRONG BECAUSE OF IT.** I composed four rows against `D13`'s prose hub list — `ci.yml`, `PROGRESS.md`, `CLAUDE.md`, `decisions.md`, `state.php`, `PROGRESS_ARCHIVE.md`, `README.md`. **That list is `D13`'s 2026-09-02 illustration, not the operative set.** The operative set is *derived*: `scripts/backlog-triage.php:63` holds `HUB_THRESHOLD = 3`, `derive_hubs()` counts path degree over the open rows, and `docs/backlog-triage.md` publishes the result under *"Hub files — a batch may touch at most one"* — **47 files** — saying in terms that it is *"the hub set above, which `D13` still uses to group the rows of one tier into an increment."* Against it my batch touched **four** hubs where the cap is one. Three rows rather than four is the consequence, not a preference: **no fourth tester-facing row in this tier is hub-free.** Filed as a row.
+### ⛔ THE FINDING WORTH MORE THAN THE THREE ROWS, AND I WALKED INTO IT BEFORE THE CLAIM WAS WRITTEN
 
-### Evidence verified
+**`D13`'s hub list is an ILLUSTRATION, and `CLAUDE.md` points nowhere else.** I composed a four-row
+batch against the seven files `D13`'s prose names — *"which are meta-files, not product code"* — and it
+was wrong. The operative set is **derived**: `scripts/backlog-triage.php:63` holds `HUB_THRESHOLD = 3`,
+`derive_hubs()` counts path degree over the open rows, and `docs/backlog-triage.md` publishes the result
+under *"Hub files — a batch may touch at most one"*, stating in terms that it is *"the hub set above,
+which `D13` still uses to group the rows of one tier into an increment."* It holds **49 files**, not 7.
 
-- **`R-06228b4f`** — fourteen citations opened. **HELD:** `D54` at `docs/claims/decisions.md:1680` (the heading itself, answered 2026-09-20, option A); `STAGING_REQUIRED_HEADERS` at `scripts/staging-headers-judge.php:82`; *"no middleware"* — `AppSecurityHeaders` sets exactly four headers and none is STS; *"no line in `docs/security-threat-model.md`"* — zero hits today; `docs/deployment-infrastructure.md` §8.3 at `:412`; the eleven failed renewals (`D49`); the vhost line, now located precisely to `meridian.conf:22` inside the `*:443` vhost opening at `:13`; and the *"no precedent for an environment-conditioned response header"* input, re-measured rather than taken on faith — the only `environment()`/`env('APP_ENV')` hit across `app/`, `config/`, `bootstrap/` and `routes/` is `SsoMetadataParser.php:218`, which conditions a URL *validation*. **FALSE:** *"`Strict-Transport-Security` and `HSTS` appear nowhere in the tracked tree"* — the strings now sit in `D54`, in this row's own amendments, in `lane-a.md`, `PROGRESS.md`, `docs/pipeline.md` and in the judge's reserved slot. The operative half — nothing *serves* it, no code sets it — still holds. **CONFIRMED-DEAD:** `M101`'s *"port 80 has no listener"*, already refuted in the row's own last clause.
-- **`R-e6a10f97`** — citations hold. The `M98` amendment's `resources/views/mail/notification.blade.php` reference resolves and is accurate: `@isset($actionText)` guards **both** the button and the subcopy.
-- **`R-491e4c32`** — citations hold at `useSyncOutbox.ts:261` and `:266-268`. ⚠️ **Four citations in the blast radius are dead-in-meaning but alive** — `sync-outbox.test.ts:233` and the comment at `useSyncOutbox.ts:258` point at `docs/offline-first-sync-design.md:93` where the subject is now `:192`; `SyncStatus.vue:12`/`:193` and `sync-status.test.ts:54` point at `:103`/`:184` where it is now `:202`. **They pass the citation gate precisely because they resolve.**
+⚠️ **The two answers are not close.** `docs/security-threat-model.md` is cited by **17** open rows and
+`docs/deployment-infrastructure.md` by **19**; neither is in the prose list. My batch touched **four**
+hubs where the cap is one, and it collided with itself on the threat model.
 
-### Premise verified
+⛔ **Nothing would have caught it.** `pipeline-lint` does not read the hub set and `D13` is not a gate,
+so a wrongly-grouped increment merges green — which is what every batched increment since `M65` has
+relied on a human getting right from the wrong list. **And `CLAUDE.md` actively points away from it**,
+saying only that `docs/backlog-triage.md` *"keeps its own job — the operability ranking within the
+defect segment"*. Filed. **The batch became three rows, which is not a preference: no fourth
+tester-facing row in this tier is hub-free.**
 
-- **`R-06228b4f`** — ⛔ **ROTTED, AND IT IS THE WHOLE PLAN.** `D54` option A asserts *"adding it is one entry in `STAGING_REQUIRED_HEADERS`"* and the judge's own docblock at `:28` repeats it. **Both are wrong, measured against the code.** (1) That constant models **required tokens only** — `:82-84` is `header => must-be-present`, and the loop at `:268-291` computes `array_diff($directives, $present)` and reports only what is *missing*. `D54` also forbids `includeSubDomains` and `preload`; **half of what was decided cannot be expressed at all.** (2) The tokeniser at `:279` is `explode(',', $value)`, and **HSTS is semicolon-delimited** — reproduced by running it, `max-age=300; includeSubDomains` yields one token, so the judge reports `missing max-age=300` *while `max-age=300` is present*. "One entry" is in fact a forbidden-token model, a per-header separator, re-captured fixtures and new controls. ⚠️ **Also rotted:** `PROGRESS.md:216` records that this row *"now says `Awaits D54`"* — **no such token exists on the tree**; the row is correctly `ready`, and the release note describes a tree that does not exist. **STILL TRUE, and not to be re-litigated:** the vhost is authoritative for serving; the judge is deliberately absent from `scripts/gate-baselines.php`; the fixtures are real captures with `Set-Cookie` stripped under `D48`.
-- **`R-e6a10f97`** — ⛔ **`D52` COMPRESSES THE FIX, AND THE COMPRESSION IS THE TRAP.** `decisions.md:1370` says it *"is one string at `WelcomeNotification.php:88`"*. **It is three places** — the copy at `:88`, the button at `:89`, and the listener's `config('app.url')` fallback at `SendWelcomeEmail.php:110-111`. A writer who trusts the decision ships a mail that no longer offers workspace creation but still puts a **"Get started"** button on the agency's public website. ⚠️ **And the collision graph is wrong for this row in both directions:** `docs/backlog-triage.md:124` harvests it as `resources/js/Pages/Welcome.vue` plus the test, because the row names its real subjects as *class names* rather than paths. That would block batching over a file this fix must not touch, while the two files I will edit are invisible to the graph. Filed.
-- **`R-491e4c32`** — the row's stated blocker was already measured false by `M77`, `D26` and `M105`. What remains is a copy call, and `D26` answered it 2026-09-20. ⚠️ **`R-d6609e82` is a pure meta-row over this same edit**: once this ships, nothing of it requires a further code edit. Leaving it open would keep publishing *"needs a copy decision nobody has made"* while `D26` is answered — the liveness defect its own final paragraph complains about, reproducing on itself. It closes here as a ledger edit, stated rather than quiet.
+### Two premises priced the same row at a third of its size, and both were this repository's own words
 
-### Remedy verdict
+⛔ **`D54` option A and `scripts/staging-headers-judge.php`'s own docblock both said arming HSTS was
+*"one entry in `STAGING_REQUIRED_HEADERS`"*. Both were refuted by running the code:**
 
-- **`R-06228b4f`** — **WRONG, and incomplete in the half that matters.** The row prescribes *"set it in one place"* and prices arming it at one entry. Measured: the judge cannot express a forbidden directive, and its comma tokeniser mis-reports a semicolon-delimited header. What is actually owed is a per-header `separator`/`require`/`forbid` model with its own failure line, plus controls, plus fixtures re-captured **after** the box change.
-- **`R-e6a10f97`** — **WORKS, once widened to the three places above.** `?string $actionUrl` is safe for the payload gate, measured rather than assumed: `scripts/job-payload-lint.php:439` unwraps `NullableType`, so R3 still sees `string`. **No blade edit** — the existing `@isset($actionText)` drops button and subcopy together, which is what keeps this row hub-free.
-- **`R-491e4c32`** — **NONE OFFERED by the row**; `D26` option 1 supplies it and it works. One string, the number unchanged, so `ADR-0021:72` stays true and owes no amendment. Its two rejected options are rejected on measured grounds and are not to be revisited.
+1. The map modelled **required tokens only** — `array_diff($directives, $present)`, reporting only what
+   is *missing*. `D54` also forbids `includeSubDomains` and `preload`, so **half of what was decided
+   had nowhere to live.**
+2. The tokeniser was `explode(',', $value)`, and **HSTS is semicolon-delimited**. Measured before
+   changing it: `max-age=300; includeSubDomains` yields the single token `max-age=300;
+   includesubdomains`, so the judge reported **`missing max-age=300` while the response carried it** —
+   a true red for a false reason, which is worse than a miss because it sends the reader to the wrong
+   line.
 
-Files: `scripts/staging-headers-judge.php`, `tests/Feature/Docs/StagingHeadersJudgeTest.php`, `tests/fixtures/staging-headers/`, `.github/workflows/ci.yml`, `docs/deployment-infrastructure.md`, `docs/security-threat-model.md`, `app/Notifications/Auth/WelcomeNotification.php`, `app/Listeners/Auth/SendWelcomeEmail.php`, `tests/Feature/Auth/WelcomeEmailTest.php`, `resources/public-runtime/composables/useSyncOutbox.ts`, `resources/public-runtime/__tests__/sync-outbox.test.ts`, `resources/public-runtime/components/SyncStatus.vue`, `resources/public-runtime/__tests__/sync-status.test.ts`, `docs/feature-backlog.md`, plus the close-out set.
+⛔ **`D52` did the same to the welcome email**, pricing it at *"one string at
+`WelcomeNotification.php:88`"*. It was **three places**, and the two it omitted are the ones a tester
+clicks: the button label, and `SendWelcomeEmail.php`'s `config('app.url')` fallback — which the same
+listener's own comment four lines above already calls *"somebody else's website"* under `D46`. A writer
+trusting the decision ships a mail that no longer offers workspace creation and still buttons through to
+the agency's public site.
 
-Shared artefacts taken: `.github/workflows/ci.yml`, `docs/deployment-infrastructure.md`, `docs/security-threat-model.md`, `docs/feature-backlog.md`, `docs/backlog-triage.md` (regenerated), `docs/pipeline.md` (regenerated), `PROGRESS.md` (own block only). **`docs/claims/decisions.md` is NOT taken** — no decision is answered here, and `D28` needs no annotation for a row I am not taking.
+### The fixture half was the real work, and not for the reason predicted
 
-Paired files taken: **none move.** Named rather than assumed: `scripts/job-payload-lint.php`'s queued-mail census at `:133` is paired with `tests/Feature/Mail/QueuedMailContractTest.php:50`, and the `WelcomeNotification` signature change keeps both green because `NullableType` unwraps — re-run both rather than trust this sentence. Three `7(b-bis)` gates read `resources/public-runtime` from Lane A's own tree (`clipped-node-containment.test.ts`, `token-references.test.ts`, `component-import-lint.php`); a string edit moves none of them, but a red gate naming a file this diff does not touch is a paired-file symptom, not a flake.
+⚠️ **Once a second header was required, `BLOCKED … ABSENT` became satisfiable by EITHER of them.** The
+four derived defect fixtures carried no HSTS, so `missing-header` and `weakened` would have gone on
+passing while measuring nothing about the crawl header they exist for. All six `measured` captures were
+**re-taken from the live box** — the control file's doctrine is that they are real captures, and
+fabricating the header in would have made the gate pass for a reason that was not true — and the four
+defect fixtures were rebuilt from them so each isolates its own defect. Both arms now **name their
+header** and assert the other is not the reason.
 
-Namespaces spent: **nothing from either namespace** — no migration, no ADR, no `§D<n>`.
+### How the prediction fared
 
-Prediction: **the one I most expect to be wrong is the fixture story for the staging judge.** I expect the box step to be clean, the judge rework and its controls to be red-then-green under `mutate.php`, and the six re-captured fixtures to drop straight in — and I expect that to be where it actually bites, because the captures carry live `Set-Cookie` payloads `M101` already had to strip once, and because a re-capture taken before Apache has fully reloaded would bake an absent header into a fixture that then passes for the wrong reason. Second most likely: `pipeline-lint` P1, because `docs/deployment-infrastructure.md` carries a held plan marker at `:646` and an §8.3 insertion shifts it — `M101`'s exact failure, on this exact file. I expect PHPStan unmoved (no `app/` type surface change beyond a nullable promotion), Pint clean, and the six push jobs green; the staging job will report `skipped` on the PR, which is **correctly skipped and not pending**, and is proved instead by a `workflow_dispatch` run after merge.
+| Predicted | Outcome |
+|---|---|
+| *"The one I most expect to be wrong is the fixture story"* | **Right area, wrong mechanism.** I named `Set-Cookie` payloads and a re-capture taken before Apache reloaded. Neither happened — stripping was one `grep -v`, and the restart was complete before the capture. What actually bit was the **derived** fixtures passing for the wrong reason, which the claim never considered. |
+| `pipeline-lint` P1 red, because §8.3's insertion shifts the held marker at `:646` | **Foreseen and prevented, never observed.** The marker did move — `646 → 682` — and P1 stayed green because the plan already prescribed regenerating `docs/pipeline.md` in the same push. The same shape as `M104`'s and `M105`'s first rows: a prediction about a mistake then not made. ⚠️ The insertion points in **both** documents were chosen by first censusing every line-numbered citation into them (`deployment-infrastructure.md` stops at `:536`, `security-threat-model.md` at `:279`), so nothing below either point could break. |
+| PHPStan unmoved | **Correct**, and measured rather than asserted: 18 local errors, intersected against the diff — **empty intersection**. ⚠️ It also OOMs at the container's 128M default; `--memory-limit=1G` is needed locally. |
+| Pint clean; six push jobs green | **Correct.** Pint proved-scanned at 1499 files. |
+| The staging job reports `skipped` on the PR, *correctly skipped and not pending* | **Correct**, and verified in the job payload rather than eyeballed: both steps `skipped`, under their new names. |
+
+### Measured, and worth keeping
+
+- ✅ **Five deliberate defects, five CAUGHT**, each restored to its exact sha256: the welcome button
+  reinstated; the welcome copy reverted; the quota string unscoped (a manual Vitest mutation, since
+  `mutate.php` drives Pest only); `preload` dropped from the forbid list; and **the separator reverted
+  to `,`**, which reproduces the original defect exactly and is caught by the assertion that the output
+  must *not* say `missing max-age=300`.
+- ✅ **The box step behaved exactly as written** — inserted at `meridian.conf:22`, `httpd -t` `Syntax
+  OK`, graceful restart — and all six probes verified from outside: `max-age=300`, no
+  `includeSubDomains`, no `preload`.
+- ✅ **`?string` was checked against the payload gate rather than assumed**:
+  `scripts/job-payload-lint.php:439` unwraps a `NullableType`, so R3 still reads `string` and the paired
+  `QueuedMailContractTest` census needed no edit. Both re-run green. **`EventNotification.php:51` had
+  already shipped this exact nullable-action pattern**, so the fix is reuse rather than invention.
+- ✅ **Nothing was added to `scripts/gate-baselines.php`** — the staging steps are
+  `schedule`/`workflow_dispatch` only, so a declared metric writes `NOT FOUND` and exits 1 on every
+  close-out, which runs from a push. `M101`'s recorded trap, avoided rather than rediscovered.
+- ⚠️ **Docker Desktop died mid-increment** and had to be restarted; the daemon being absent is
+  indistinguishable at a glance from a test failure in the tool output. The host-side gates and the
+  judge itself are unaffected, which is why all eight fixtures were exercised through
+  `php scripts/staging-headers-judge.php` directly before the Pest wrapper ever ran.
+- ⚠️ **`R-d6609e82` was CLOSED rather than left open, and the distinction matters**: it is a pure
+  meta-row over `R-491e4c32`'s edit, needing zero further lines, and leaving it would keep publishing
+  *"needs a copy decision nobody has made"* while `D26` is answered. It was **not** taken as a fourth
+  row — under `D13` it cites the same non-hub file, so it could not be.
+
+➕ **FILED RATHER THAN FIXED:** the derived-versus-prose hub set that `CLAUDE.md` does not point at;
+`scripts/backlog-triage.php` harvesting **paths only**, so a row citing its subject by class name is
+invisible to the very graph `D13` consumes — wrong in both directions, and under-collection is the blind
+one; `PROGRESS.md`'s `M101` bullet recording an `Awaits D54` token that does not exist on the tree; and
+**`D28`'s chosen option 3 being a no-op as written** — its worked example is a flex *row* while all four
+defective hosts are flex *columns*, so `min-width: 0; max-width: 100%` measures identically and the next
+taker of `R-45b0cf8a` would implement the illustration.
 
 ## RELEASED — `M105`, the fourteen `early-testing` decisions recorded, and six rotted premises repaired at their rows (merged as PR #298, `7b45369`, 6/6 green with real step counts — Static analysis 31 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

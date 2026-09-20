@@ -1011,6 +1011,38 @@ class DemoSeeder extends Seeder
                     continue;
                 }
 
+                // ⚠️ M107 — THE SAME ARGUMENT, ONE CASE LATER. Left to the generic branch below, an
+                // administrative two-factor reset would read as "two-step sign-in reset… a form", which is
+                // the same fiction the boundaries above are shaped to avoid. It is a `users` row: the
+                // AUDITABLE is the person whose enrolment was cleared, and `user_id` is the Owner who
+                // cleared it.
+                //
+                // `acting_as_user_id` is NULL, and that is the difference from the pair above rather than
+                // an omission — a reset is an act by a member of this workspace in their own name, not a
+                // platform operator borrowing somebody's session. A demo row that set it would teach the
+                // viewer to render "Platform operator" beside an action no operator took.
+                if ($event === AuditEvent::TwoFactorReset) {
+                    Audit::query()->forceCreate([
+                        'id' => $id,
+                        'tenant_id' => $tenantId,
+                        'auditable_type' => 'users',
+                        'auditable_id' => (string) $editor->getKey(),
+                        'event' => $event->value,
+                        // No old/new: the only values that changed are a TOTP secret and a recovery-code
+                        // list, and neither belongs in a compliance ledger. The service takes the same
+                        // posture, so the demo row is shaped like the real one.
+                        'old_values' => null,
+                        'new_values' => null,
+                        'redacted_fields' => null,
+                        'user_id' => $owner->getKey(),
+                        'acting_as_user_id' => null,
+                        'is_system_action' => false,
+                        'created_at' => $at,
+                    ]);
+
+                    continue;
+                }
+
                 // Every third row describes a SUBMISSION rather than a form, and carries the two keys
                 // `AuditRedactor::PII['submission']` names — so the back-dated tail contains genuinely
                 // redacted rows too, rather than only the two live ones below.

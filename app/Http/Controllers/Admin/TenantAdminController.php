@@ -142,6 +142,10 @@ final class TenantAdminController extends Controller
             'enabled' => $user->two_factor_secret !== null,
             'confirmed' => $user->two_factor_confirmed_at !== null,
             'needsPasswordConfirmation' => PasswordConfirmation::isStale($request),
+            // M107 — a count, never the codes. An operator who reaches this page while already confirmed
+            // (it sits outside `superadmin.mfa`, so they can) gets the same low-code warning a tenant
+            // member does, and platform staff are the population that can least afford a silent lockout.
+            'recoveryCodesRemaining' => $user->countRecoveryCodes(),
         ]);
     }
 }

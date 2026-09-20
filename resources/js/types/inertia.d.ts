@@ -44,6 +44,10 @@ export interface AppAbilities {
     // I8a — `tenant.roles.assign`, the Members page's per-row role control. Distinct from manageMembers
     // on purpose: who is here vs what they may do are two grants in the RBAC §5 catalog.
     assignRoles: boolean;
+    // M107 — `tenant.members.two_factor_reset`, the Members page's per-row two-factor reset. OWNER ONLY,
+    // unlike its two neighbours above, which is exactly why it is its own key: an Admin must not be shown a
+    // control the route refuses.
+    resetMemberTwoFactor: boolean;
     manageForms: boolean;
     viewSubmissions: boolean;
     manageScopes: boolean;

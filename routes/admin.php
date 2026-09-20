@@ -7,6 +7,7 @@ use App\Http\Controllers\Admin\ImpersonationController;
 use App\Http\Controllers\Admin\PlatformAuditController;
 use App\Http\Controllers\Admin\PlatformSettingsController;
 use App\Http\Controllers\Admin\TenantAdminController;
+use App\Http\Controllers\Admin\TwoFactorResetController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -83,6 +84,17 @@ Route::domain((string) config('tenancy.central_domain'))
 
             // Cross-tenant user list — exercises the `superadmin_bypass` RLS carve-out via SuperAdminService.
             Route::get('/users', [TenantAdminController::class, 'users'])->name('admin.users.index');
+            // The first per-user platform ACTION (M107, `D37`) — `Users.vue`'s docblock called this "a
+            // later increment" and this is it. It clears a two-factor enrolment for somebody who has lost
+            // their device, and it is the half `/members` cannot serve: an account belonging to no
+            // workspace, or the sole Owner of one, has nobody else to ask.
+            //
+            // ⚠️ NO `{user}` SEGMENT, AND THAT IS DELIBERATE. The target arrives as a raw uuid in the BODY
+            // for the reason `{feedback}` above records — binding resolves on the app connection, which has
+            // no tenant context here, so RLS would 404 every valid id. A `whereUuid` on a segment that does
+            // not exist would be decoration; the validator carries that job instead.
+            Route::post('/users/two-factor-reset', [TwoFactorResetController::class, 'store'])
+                ->name('admin.users.two-factor-reset');
 
             // Feedback support console (I7a, PRD Feature #11 / RBAC §9 review queue). The `{feedback}`
             // parameter is a RAW UUID, never a bound model: binding resolves on the app connection, which

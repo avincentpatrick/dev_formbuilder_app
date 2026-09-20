@@ -8,7 +8,13 @@ import { MdsCard } from '@meridian/design-system';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import TwoFactorSetup from '@/components/settings/TwoFactorSetup.vue';
 
-defineProps<{ enabled: boolean; confirmed: boolean; needsPasswordConfirmation: boolean }>();
+defineProps<{
+    enabled: boolean;
+    confirmed: boolean;
+    needsPasswordConfirmation: boolean;
+    // M107 — a count, never the codes. See TwoFactorSetup.vue's prop docblock for why it is not fetched.
+    recoveryCodesRemaining: number | null;
+}>();
 </script>
 
 <template>
@@ -22,6 +28,7 @@ defineProps<{ enabled: boolean; confirmed: boolean; needsPasswordConfirmation: b
                 :enabled="enabled"
                 :confirmed="confirmed"
                 :needs-password-confirmation="needsPasswordConfirmation"
+                :recovery-codes-remaining="recoveryCodesRemaining"
             />
         </MdsCard>
     </AdminLayout>

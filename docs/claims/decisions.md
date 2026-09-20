@@ -1210,6 +1210,41 @@ user sees** — a uniqueness complaint about the wrong version, or the draft-gua
 doors; this is the builder's validation layer. They should not be answered as one.
 
 
+### D56 — A workspace Owner's two-factor reset clears the member's second factor in EVERY workspace they belong to. Should the Owner surface be narrowed? **Tier: during-testing.**
+
+**Filed 2026-09-20 by `M107` while building `D37`'s answer, which did not consider this.** `D37` chose an
+admin reset performed by *"a workspace owner or the platform operator"*, and `M107` built both. The fact
+neither the decision nor the row it came from noticed is that **`two_factor_secret`,
+`two_factor_recovery_codes` and `two_factor_confirmed_at` live on the global `users` table**, which has no
+tenant column. There is no per-workspace second factor to clear, so there is no narrower act available: an
+Owner clearing Alice's enrolment clears it for every workspace Alice is in.
+
+**What it does and does not grant.** It grants the Owner **no access** — Alice keeps her password and they
+never learn it. What it does is lower another workspace's authentication assurance without that workspace
+being told, and the audit row lands in the acting tenant's ledger rather than theirs. It is the only place
+in this product where an Owner's authority leaves their own boundary.
+
+**Shipped in the meantime, and deliberately the honest rather than the safe default:** the Owner surface is
+live, its confirm dialog says *"This applies to their account everywhere, including any other workspace they
+belong to"*, and `docs/security-threat-model.md` §9 item 12 records the gap. A tester locked out of their
+account is a problem today; a multi-workspace tester is not, because the testing site is one workspace
+(`D46`).
+
+- **A — leave it as built, and revisit before launch.** The dialog states the consequence and the act is
+  audited. Costs nothing now; the exposure arrives with the first person who belongs to two workspaces.
+- **B — operator-only.** Remove the Owner route and leave the console path. Narrower than `D37`'s own
+  answer, and it puts every locked-out tester in a queue behind one operator — which is the support burden
+  `D37` was answered to remove.
+- **C — refuse a target who belongs to a second workspace.** Closes the cross-tenant effect exactly. ⚠️ **The
+  refusal itself discloses that the person is a member somewhere else**, which is a fact this product is
+  otherwise careful never to state — `ImpersonationController` collapses all its refusals into one message
+  for precisely that reason. It also sends the hardest cases to the operator anyway.
+
+**Recommendation: A, with C revisited at launch.** The effect is real but grants nothing, the dialog is
+honest about it, and the testing site is a single workspace so nobody can meet it yet. `C` is the right
+end state and needs a disclosure-safe refusal designed first, which is a decision rather than a patch.
+
+
 ## ANSWERED
 ### D38 — The API documentation promises features that were never built. Build them, or trim the documentation? **C — mark the six as not built, in place, the way §7.1 already annotates.**
 

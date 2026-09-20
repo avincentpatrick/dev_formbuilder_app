@@ -56,11 +56,31 @@ class UserFactory extends Factory
     /**
      * A user who has completed two-factor enrollment (B2c). `two_factor_confirmed_at` is what the
      * `superadmin.mfa` middleware checks; the secret is a placeholder (never challenged in tests).
+     *
+     * ⛔ THE RECOVERY CODES USED TO BE ABSENT ENTIRELY, WHICH IS NOT THE SAME AS EMPTY (`M107`,
+     * `R-0f8b73f9`). A NULL column makes Fortify's `recoveryCodes()` call `decrypt(null)` and throw, so
+     * this state produced a user who LOOKED fully enrolled and fatally errored on the one path that
+     * matters when somebody is locked out. Nothing reached it — `TwoFactorChallengeTest` builds its own
+     * identity rather than using this state — so it was a trap set for the next caller rather than a live
+     * defect, and the next caller is any test of the reset this increment adds.
+     *
+     * Deliberately a real, decodable list rather than `[]`: an empty list is itself the state `D37` exists
+     * to rescue, and a factory that hands it out by default seeds the defect into every future test.
      */
     public function confirmedTwoFactor(): static
     {
         return $this->state(fn (array $attributes) => [
             'two_factor_secret' => encrypt('PLACEHOLDERSECRET'),
+            'two_factor_recovery_codes' => encrypt((string) json_encode([
+                'factoryAAA-AAAAAAAAAA',
+                'factoryBBB-BBBBBBBBBB',
+                'factoryCCC-CCCCCCCCCC',
+                'factoryDDD-DDDDDDDDDD',
+                'factoryEEE-EEEEEEEEEE',
+                'factoryFFF-FFFFFFFFFF',
+                'factoryGGG-GGGGGGGGGG',
+                'factoryHHH-HHHHHHHHHH',
+            ])),
             'two_factor_confirmed_at' => now(),
         ]);
     }

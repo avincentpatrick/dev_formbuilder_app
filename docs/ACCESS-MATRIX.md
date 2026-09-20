@@ -171,7 +171,7 @@ The grants on `owner@demo.test` exist so the *Collaborators* surface has rows to
 
 ## 4. Role → permission grid
 
-The catalog is **closed**: five roles, twenty-nine permissions, defined once in
+The catalog is **closed**: five roles, thirty permissions, defined once in
 [`RolePermissionSeeder::MATRIX`](../database/seeders/RolePermissionSeeder.php) as global rows
 (`tenant_id IS NULL`) shared by every tenant. No UI ever inserts a sixth role.
 
@@ -188,6 +188,7 @@ The catalog is **closed**: five roles, twenty-nine permissions, defined once in
 | `tenant.members.remove` | ✅ | ✅ | — | — | — |
 | `tenant.roles.assign` | ✅ | ✅ | — | — | — |
 | `tenant.ownership.transfer` | ✅ | — | — | — | — |
+| `tenant.members.two_factor_reset` | ✅ | — | — | — | — |
 | `scopes.manage` | ✅ | ✅ | — | — | — |
 
 ### Forms
@@ -265,9 +266,18 @@ All URLs are relative to a workspace host, e.g. `http://demo.localhost:8080/form
 | `/settings` | — | (authenticated; panels gate on `tenant.settings.manage`) | — | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `/search`, `/notifications` | — | (authenticated) | — | ✅ | ✅ | ✅ | ✅ | ✅ |
 
-Two ability keys have no nav item of their own and gate in-page controls instead:
-`assignRoles` (`tenant.roles.assign` — the Members page's per-row role control) and
-`transferOwnership` (`tenant.ownership.transfer` — **Owner only**).
+Three ability keys have no nav item of their own and gate in-page controls instead:
+`assignRoles` (`tenant.roles.assign` — the Members page's per-row role control),
+`transferOwnership` (`tenant.ownership.transfer` — **Owner only**) and
+`resetMemberTwoFactor` (`tenant.members.two_factor_reset` — **Owner only**, the Members page's per-row
+two-factor reset, M107/`D37`).
+
+⚠️ **The operator has a second door to that last one**, and it is not a role at all:
+`POST /admin/users/two-factor-reset` in the super-admin console, behind `superadmin` +`superadmin.mfa` +
+`step-up`. It exists because `/members` only ever sees active members of one workspace and so cannot reach
+an account that belongs to no workspace, or rescue a workspace's sole Owner. ⛔ **Either door clears the
+enrolment on the GLOBAL `users` row**, so the effect reaches every workspace that person belongs to —
+see `docs/security-threat-model.md` §9.
 
 ### 5.1 Plan features gate the same nav as the role does
 

@@ -8,6 +8,7 @@ use App\Http\Controllers\Concerns\ReadsKeywordFilter;
 use App\Http\Controllers\Concerns\ResolvesTenant;
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\Auth\TwoFactorResetService;
 use App\Services\Tenancy\TenantMembershipService;
 use App\Support\Authorization\AssignableRoles;
 use App\Support\Search\ListEmptyReason;
@@ -27,7 +28,10 @@ final class MemberController extends Controller
     use ReadsKeywordFilter;
     use ResolvesTenant;
 
-    public function __construct(private readonly TenantMembershipService $memberships) {}
+    public function __construct(
+        private readonly TenantMembershipService $memberships,
+        private readonly TwoFactorResetService $twoFactorResets,
+    ) {}
 
     /**
      * The roster, optionally narrowed by a keyword (J1e).
@@ -102,6 +106,26 @@ final class MemberController extends Controller
         return back()
             ->with('status', 'member-removed')
             ->with('toast', ['type' => 'success', 'message' => 'Member removed']);
+    }
+
+    /**
+     * Clear a member's two-factor enrolment so somebody who has lost their device can sign in again
+     * (Increment M107, answering `D37`).
+     *
+     * Thin, like its siblings. All four refusals — self, a super-admin target, a non-member, an account
+     * that was never enrolled — live in {@see TwoFactorResetService::resetForMember()}, because a request
+     * cannot know any of them. The route carries `can:tenant.members.two_factor_reset` (Owner only) and
+     * `step-up`, matching the three other member mutations.
+     */
+    public function resetTwoFactor(Request $request, User $user): RedirectResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        $this->twoFactorResets->resetForMember($this->currentTenant(), $user, $actor);
+
+        return back()
+            ->with('status', 'member-two-factor-reset')
+            ->with('toast', ['type' => 'success', 'message' => 'Two-step sign-in reset']);
     }
 
     public function transferOwnership(Request $request): RedirectResponse

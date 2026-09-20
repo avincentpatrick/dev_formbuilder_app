@@ -42,7 +42,7 @@ describe('auditEventVariant', () => {
         expect(auditEventVariant('')).toBe('neutral');
     });
 
-    it('covers exactly the ten AuditEvent values', () => {
+    it('covers exactly the eleven AuditEvent values', () => {
         // The other half of this pair lives in PHP: nothing here can see a new enum case, so a Pest test
         // asserting AuditEvent::cases() reaches the filter catalog is what catches the addition itself.
         expect(Object.keys(EVENT_VARIANT).sort()).toEqual([
@@ -57,6 +57,8 @@ describe('auditEventVariant', () => {
             'permission_changed',
             'published',
             'restored',
+            // M107 — the administrative two-factor reset, sorted into place for the reason above.
+            'two_factor_reset',
             'updated',
         ]);
     });

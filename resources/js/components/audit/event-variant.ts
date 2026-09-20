@@ -22,7 +22,7 @@ import type { BadgeVariant } from '@meridian/design-system';
  * CSV/XLSX export must all print one string. Colour is presentation the export has no opinion about.
  *
  * ── The colour is a coarse consequence band, not an identity ───────────────────────────────────────────
- * Eight events do not fit five variants and are not meant to: the LABEL identifies the event, so colour is
+ * Eleven events do not fit five variants and are not meant to: the LABEL identifies the event, so colour is
  * never the sole channel (WCAG 1.4.1). The bands are: neutral = routine, success/info = additive and
  * benign, warning = consequential and worth a compliance reader's eye. Do not "fix" the collisions by
  * inventing new variants.
@@ -59,6 +59,19 @@ export const EVENT_VARIANT: Record<string, BadgeVariant> = {
      */
     impersonation_started: 'warning',
     impersonation_ended: 'warning',
+    /*
+     * M107 (`D37`) — an administrative two-factor reset.
+     *
+     * `warning`, on the same reasoning as the two above and not by symmetry with them. It is the band for
+     * a lawful act with real consequence: somebody's second factor was removed by a person who is not
+     * them, and until they enrol again their account is protected by a password alone. A compliance reader
+     * scanning for "who weakened an authentication boundary, and when" is scanning for exactly this row.
+     *
+     * NOT `danger`: red would state that rescuing a locked-out colleague is a breach, and §9's posture is
+     * transparency rather than accusation. NOT `neutral`: this is not routine administration, and the one
+     * thing that must not happen is a reset blending into the wall of `updated` rows around it.
+     */
+    two_factor_reset: 'warning',
 };
 
 /** Never throws; an unrecognised event falls back to the routine band. */

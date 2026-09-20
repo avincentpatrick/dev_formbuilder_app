@@ -256,3 +256,77 @@ describe('the confirmation error bag (M78)', () => {
         );
     });
 });
+
+describe('the low-recovery-code warning (M107, R-0f8b73f9)', () => {
+    /*
+     * ⛔ WHAT THIS EXISTS TO PREVENT, STATED AS THE THING THAT ALREADY HAPPENED. `E2eSeeder`'s two-factor
+     * fixture shipped an encrypted EMPTY recovery array, so the seeded identity was enrolled with no way
+     * back — the exact state `D37`'s admin reset exists to rescue. Nothing warned, because nothing counted.
+     *
+     * ⚠️ THE COUNT IS A PROP, NOT A FETCH, and these cases pin that: a confirmed panel must reach the
+     * warning WITHOUT calling `fetch`. `/user/two-factor-recovery-codes` sits behind `password.confirm`
+     * and answers a JSON read with a bare 423, which this component turns into the confirm-password panel.
+     * A passive warning that could do that would be worse than no warning.
+     */
+    it('warns at or below three remaining, without fetching anything', async () => {
+        stubSidecars(200);
+
+        const panel = render({ enabled: true, confirmed: true, recoveryCodesRemaining: 2 });
+        await flushPromises();
+
+        expect(fetch).not.toHaveBeenCalled();
+        expect(panel.find('[data-testid="tfa-recovery-low"]').exists()).toBe(true);
+        expect(panel.text()).toContain('2 recovery codes left');
+    });
+
+    it('says it in the singular at one, because "1 recovery codes" reads as a bug', async () => {
+        stubSidecars(200);
+
+        const panel = render({ enabled: true, confirmed: true, recoveryCodesRemaining: 1 });
+        await flushPromises();
+
+        expect(panel.text()).toContain('1 recovery code left');
+        expect(panel.text()).not.toContain('1 recovery codes left');
+    });
+
+    it('does not say "0 recovery codes left" — at zero the sentence changes', async () => {
+        stubSidecars(200);
+
+        const panel = render({ enabled: true, confirmed: true, recoveryCodesRemaining: 0 });
+        await flushPromises();
+
+        expect(panel.find('[data-testid="tfa-recovery-low"]').exists()).toBe(true);
+        expect(panel.text()).toContain('You have no recovery codes left');
+    });
+
+    it('stays quiet above the threshold, so a fresh enrolment is not nagged', async () => {
+        stubSidecars(200);
+
+        const panel = render({ enabled: true, confirmed: true, recoveryCodesRemaining: 4 });
+        await flushPromises();
+
+        expect(panel.find('[data-testid="tfa-recovery-low"]').exists()).toBe(false);
+    });
+
+    it('renders nothing when the count is not supplied, rather than guessing', async () => {
+        // `null` is the enrolment interstitial's value — it is only ever reached by somebody who has not
+        // finished enrolling, so there is no count to send and none to invent.
+        stubSidecars(200);
+
+        const panel = render({ enabled: true, confirmed: true, recoveryCodesRemaining: null });
+        await flushPromises();
+
+        expect(panel.find('[data-testid="tfa-recovery-low"]').exists()).toBe(false);
+    });
+
+    it('never warns while enrolment is unfinished, however low the count', async () => {
+        // ⚠️ THE GUARD IS `confirmed`, NOT THE NUMBER. Mid-enrolment the panel is SHOWING the codes on
+        // screen; a banner saying they are running out, beside the list of them, is nonsense.
+        stubSidecars(200, { svg: '<svg/>', secretKey: 'ABCD' });
+
+        const panel = render({ enabled: true, confirmed: false, recoveryCodesRemaining: 0 });
+        await flushPromises();
+
+        expect(panel.find('[data-testid="tfa-recovery-low"]').exists()).toBe(false);
+    });
+});

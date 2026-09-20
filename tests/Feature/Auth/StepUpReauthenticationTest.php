@@ -77,6 +77,10 @@ it('refuses every gated tenant mutation with a stale confirmation', function (st
     'ownership transfer' => ['post', '/members/ownership', ['user' => '00000000-0000-7000-8000-000000000000']],
     'role change' => ['patch', '/members/{member}/role', ['role' => 'reviewer']],
     'member removal' => ['delete', '/members/{member}', []],
+    // M107 (`D37`) — the fourth gated tenant mutation. It carries `step-up` for the same reason the three
+    // above do, and one sharper: it is the only member action whose effect leaves this workspace, because
+    // the two-factor columns live on the global `users` table.
+    'two-factor reset' => ['post', '/members/{member}/two-factor-reset', []],
 ]);
 
 it('allows the same mutations once the password is freshly confirmed', function (): void {
@@ -132,11 +136,13 @@ it('gates exactly the intended routes and no others', function (): void {
         strict: true,
     );
 
-    // Gated: the three tenant mutations PRD #14 names, the SSO metadata import, and — below, and by
+    // Gated: the tenant mutations PRD #14 names plus M107's two-factor reset, the SSO metadata import,
+    // and — below, and by
     // enumeration rather than by name — every page of the super-admin console.
     expect($gated('members.role'))->toBeTrue();
     expect($gated('members.remove'))->toBeTrue();
     expect($gated('members.ownership'))->toBeTrue();
+    expect($gated('members.two-factor-reset'))->toBeTrue();
     // P1a — rewriting a tenant's IdP signing certificates is a COMPLETE authentication takeover for that
     // tenant (the create_sso_connections_table docblock says so in as many words), which is a larger blast
     // radius than any of the three above. Only the import is gated: not the read, and not the status

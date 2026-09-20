@@ -659,7 +659,7 @@ final class TenantMembershipService
      * `$terms` is OPTIONAL so `MembersIndexTest` passes unedited, for the reason J1b records about
      * `FormListScopingTest`.
      *
-     * @return list<array{user_id: string, name: string, email: string, status: string, role: string, is_owner: bool, joined_at: ?string, invited_at: ?string}>
+     * @return list<array{user_id: string, name: string, email: string, status: string, role: string, is_owner: bool, two_factor_enrolled: bool, joined_at: ?string, invited_at: ?string}>
      */
     public function listMembers(Tenant $tenant, ?SearchTerms $terms = null): array
     {
@@ -691,7 +691,12 @@ final class TenantMembershipService
         $users = User::on('pgsql_auth')
             ->withTrashed()
             ->whereIn('id', $userIds)
-            ->get(['id', 'name', 'email'])
+            // ⚠️ `two_factor_confirmed_at` IS SELECTED, THE SECRET AND THE CODES ARE NOT (M107). The roster
+            // needs to know WHETHER somebody is enrolled, so the Owner is not offered a reset for an
+            // account that has nothing to reset; it has no business knowing what they enrolled WITH. The
+            // model hides both credential columns (`#[Hidden]`), but not selecting them at all is the
+            // stronger statement and costs nothing.
+            ->get(['id', 'name', 'email', 'two_factor_confirmed_at'])
             ->keyBy('id')
             ->all();
 
@@ -739,6 +744,10 @@ final class TenantMembershipService
                 'status' => $m->status->value,
                 'role' => $roleValue !== null ? Str::headline((string) $roleValue) : '—',
                 'is_owner' => $tenant->owner_user_id === $m->user_id,
+                // False for an identity the `pgsql_auth` read could not return — the degraded row above.
+                // That is the right default: it HIDES the reset control rather than offering one that
+                // would then refuse, which is the same posture the `canRemove` predicates take.
+                'two_factor_enrolled' => $user !== null && $user->two_factor_confirmed_at !== null,
                 'joined_at' => $m->joined_at?->toIso8601String(),
                 'invited_at' => $m->invited_at?->toIso8601String(),
             ];

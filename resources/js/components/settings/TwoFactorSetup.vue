@@ -24,13 +24,49 @@
  */
 import { computed, ref, watch } from 'vue';
 import { Link, router, useForm } from '@inertiajs/vue3';
-import { MdsButton, MdsFormField, MdsTextInput } from '@meridian/design-system';
+import { MdsAlert, MdsButton, MdsFormField, MdsTextInput } from '@meridian/design-system';
 
-const props = defineProps<{
-    enabled: boolean;
-    confirmed: boolean;
-    needsPasswordConfirmation: boolean;
-}>();
+const props = withDefaults(
+    defineProps<{
+        enabled: boolean;
+        confirmed: boolean;
+        needsPasswordConfirmation: boolean;
+        /**
+         * How many recovery codes are left, counted SERVER-SIDE (M107, `R-0f8b73f9`).
+         *
+         * ⚠️ IT IS A PROP RATHER THAN A FETCH, AND THAT IS THE WHOLE DESIGN. This panel only pulls
+         * `/user/two-factor-recovery-codes` while enrolment is UNFINISHED; for a confirmed user it never
+         * calls it, so the count is not otherwise in hand. Fetching it on mount would mean asking a route
+         * behind `password.confirm` on every visit to Settings — a 423 for anyone whose confirmation has
+         * lapsed, which this component answers by raising the whole confirm-password panel. A passive
+         * warning must not be able to do that, so the server counts and sends a NUMBER. The codes
+         * themselves never move.
+         *
+         * `null` means "not supplied" and renders nothing — the honest value for the enrolment
+         * interstitial, which is only ever reached by somebody who has not finished enrolling.
+         */
+        recoveryCodesRemaining?: number | null;
+    }>(),
+    { recoveryCodesRemaining: null },
+);
+
+/**
+ * The threshold at which the banner appears.
+ *
+ * Three of eight. Fortify issues eight and replaces each as it is spent, so this fires once someone is
+ * five codes down — late enough that it is not noise on a fresh enrolment, early enough that there is
+ * still a working code in hand to sign in WITH while they regenerate. A warning that arrives at zero is
+ * a warning nobody can act on: at that point the only remedy left is the admin reset `D37` added, which
+ * is precisely the outcome this is meant to make rarer.
+ */
+const LOW_RECOVERY_CODE_THRESHOLD = 3;
+
+const recoveryCodesLow = computed(
+    () =>
+        props.confirmed &&
+        props.recoveryCodesRemaining !== null &&
+        props.recoveryCodesRemaining <= LOW_RECOVERY_CODE_THRESHOLD,
+);
 
 const qrSvg = ref<string>('');
 const recoveryCodes = ref<string[]>([]);
@@ -228,6 +264,25 @@ function regenerate(): void {
             <p class="tfa__prose">
                 You'll be asked for a code from your authenticator app when you sign in.
             </p>
+            <!-- M107 (`R-0f8b73f9`) — the low-recovery-code warning.
+                 `MdsAlert` rather than a styled paragraph, so it carries the role and the tone from the
+                 shared design system rather than re-deciding either here. NOT `assertive`: this is a
+                 standing condition the person can act on whenever they like, not an error that just
+                 happened, and an assertive live region interrupts a screen reader mid-sentence to say so.
+                 The regenerate button it points at is already the next thing in the DOM. -->
+            <MdsAlert
+                v-if="recoveryCodesLow"
+                tone="warning"
+                data-testid="tfa-recovery-low"
+                :title="
+                    recoveryCodesRemaining === 0
+                        ? 'You have no recovery codes left'
+                        : `You have ${recoveryCodesRemaining} recovery code${recoveryCodesRemaining === 1 ? '' : 's'} left`
+                "
+            >
+                Recovery codes are how you sign in if you lose your device. Regenerate them below to get a
+                fresh set — the old ones stop working straight away.
+            </MdsAlert>
             <div class="tfa__actions">
                 <MdsButton variant="secondary" :loading="busy" @click="regenerate">
                     Regenerate recovery codes

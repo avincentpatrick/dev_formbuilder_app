@@ -12,7 +12,9 @@ use Spatie\Permission\PermissionRegistrar;
 
 /**
  * Seeds the fixed, platform-defined RBAC catalog (multi-tenancy-rbac-design.md §3, §5): five roles and
- * twenty-nine permissions (the 28th, `scopes.manage`, added in Increment G10a; the 29th, `integrations.manage`, in H15a), plus the
+ * thirty permissions (the 28th, `scopes.manage`, added in Increment G10a; the 29th, `integrations.manage`, in H15a; the 30th,
+ * `tenant.members.two_factor_reset`, in M107 — the first minted since Phase 0, and the first to need a backfill
+ * migration because nothing re-runs this seeder), plus the
  * role×permission grant matrix. These are GLOBAL rows (tenant_id IS
  * NULL) shared by every tenant — the catalog is closed (no UI ever inserts a sixth role).
  *
@@ -34,7 +36,7 @@ class RolePermissionSeeder extends Seeder
     public const ROLES = ['owner', 'admin', 'form_editor', 'reviewer', 'viewer'];
 
     /**
-     * The 29-permission catalog (§5), dot-namespaced by domain.
+     * The 30-permission catalog (§5), dot-namespaced by domain.
      *
      * `scopes.manage` is the Increment-G10a addition — authoring the tenant's scoping hierarchy. It is a
      * genuinely new capability rather than a reuse of `tenant.settings.manage`: `ApiAbilities` maps the
@@ -45,11 +47,30 @@ class RolePermissionSeeder extends Seeder
      * act inside a tenant's third-party workspace. New for the same reason, one step sharper: reusing
      * `webhooks.manage` would hand every already-minted `manage:webhooks` token authority over those
      * credentials, and the blast radius of that authority reaches outside this platform entirely.
+     *
+     * `tenant.members.two_factor_reset` is the `M107` addition (`D37`) — clearing somebody else's two-factor
+     * enrolment so a tester who has lost their device and their recovery codes can sign in again. It is
+     * **Owner only**, and Admin's omission is the decision rather than an oversight: `D37` says "a workspace
+     * owner or the platform operator", and this matrix already expresses owner-only by leaving a key out of
+     * `admin`, as `tenant.ownership.transfer` does.
+     *
+     * ⚠️ IT IS THE FIRST PERMISSION MINTED SINCE PHASE 0, AND THAT IS WHY IT NEEDED A MIGRATION. Every key
+     * above reached an existing database only because it was already in this list when
+     * `CreateTenantCommand` first ran the seeder. Nothing re-runs seeders afterwards — `deploy.ps1` runs
+     * `migrate --force` and never `db:seed` — so a key added here alone exists in a fresh test database and
+     * NOWHERE ELSE, and the `can:` middleware in front of it would deny the Owner on the testing server with
+     * nothing in any log to explain the refusal. See the backfill migration named in §5's design note.
+     *
+     * ⛔ Reuse was considered and rejected twice. `tenant.members.remove` is seeded to Owner AND Admin,
+     * which is wider than `D37`'s words; `tenant.ownership.transfer` is already owner-only but means
+     * something else entirely, and overloading it would make the next reader's mental model wrong rather
+     * than merely incomplete. I8a's precedent — reuse the dormant `tenant.roles.assign` rather than mint
+     * `tenant.members.role` — does not reach here, because no dormant key describes this act.
      */
     public const PERMISSIONS = [
         'tenant.settings.manage', 'tenant.billing.manage', 'tenant.billing.view',
         'tenant.members.invite', 'tenant.members.remove', 'tenant.roles.assign',
-        'tenant.ownership.transfer',
+        'tenant.ownership.transfer', 'tenant.members.two_factor_reset',
         'forms.create', 'forms.edit.any', 'forms.edit.own', 'forms.publish.any',
         'forms.publish.own', 'forms.delete', 'forms.collaborators.manage',
         'submissions.create', 'submissions.edit.any', 'submissions.edit.own',
@@ -73,7 +94,7 @@ class RolePermissionSeeder extends Seeder
         'owner' => [
             'tenant.settings.manage', 'tenant.billing.manage', 'tenant.billing.view',
             'tenant.members.invite', 'tenant.members.remove', 'tenant.roles.assign',
-            'tenant.ownership.transfer',
+            'tenant.ownership.transfer', 'tenant.members.two_factor_reset',
             'forms.create', 'forms.edit.any', 'forms.publish.any', 'forms.delete',
             'forms.collaborators.manage', 'scopes.manage',
             'submissions.create', 'submissions.edit.any', 'submissions.review.any',

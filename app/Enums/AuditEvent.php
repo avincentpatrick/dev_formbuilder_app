@@ -47,6 +47,20 @@ enum AuditEvent: string
     case ImpersonationEnded = 'impersonation_ended';
 
     /**
+     * An administrative clearing of somebody's two-factor enrolment (`M107`, `D37`).
+     *
+     * Like the two impersonation boundaries above, this records an ACCESS decision rather than a change a
+     * model would otherwise report, and it carries no `old_values`/`new_values`: the interesting fact is
+     * *that the enrolment was cleared and by whom*, and the secret it cleared must never reach the ledger.
+     *
+     * ⚠️ IT IS WRITTEN FROM TWO SURFACES WITH THE SAME SHAPE — a workspace owner on the tenant host and the
+     * platform operator in the console — because `D37` answered both. The `auditable` is the TARGET user
+     * under the target tenant's context, so an owner reading their own `/audit-log` sees the reset whoever
+     * performed it, which is the same transparency posture rbac §9 takes for impersonation.
+     */
+    case TwoFactorReset = 'two_factor_reset';
+
+    /**
      * Human label for the audit-log filter catalog, the viewer's event badge, and the CSV/XLSX export
      * column — one string, three surfaces (I2). Mirrors {@see SubmissionStatus::label()}.
      *
@@ -72,6 +86,9 @@ enum AuditEvent: string
             // "Impersonation started" is the operator's word for it.
             self::ImpersonationStarted => 'Platform access started',
             self::ImpersonationEnded => 'Platform access ended',
+            // "Two-step sign-in reset" rather than "2FA reset": the same words the settings panel and the
+            // challenge page use with the person whose account it is.
+            self::TwoFactorReset => 'Two-step sign-in reset',
         };
     }
 

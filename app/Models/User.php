@@ -27,9 +27,11 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\URL;
+use Laravel\Fortify\Fortify;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
+use Throwable;
 
 /**
  * The global user identity (multi-tenancy-rbac-design.md §6). One row per person across every tenant.
@@ -132,6 +134,40 @@ class User extends Authenticatable implements MustVerifyEmail
         } finally {
             $this->setConnection($original ?? (string) Config::get('database.default'));
         }
+    }
+
+    /**
+     * How many recovery codes are left, or null when the answer is not knowable (Increment M107).
+     *
+     * Feeds the low-recovery-code warning on the enrolment panel (`R-0f8b73f9`). It returns a COUNT and
+     * never the codes: the panel's warning is a number, and a settings page that shipped the plaintext
+     * list on every render — to a session whose password confirmation may have lapsed hours ago — would
+     * undo the reason those reads sit behind `password.confirm` at all.
+     *
+     * ⚠️ NULL IS A REAL ANSWER AND NOT AN ERROR. Two states produce it and both exist in this tree:
+     * a NULL column (the shape `UserFactory::confirmedTwoFactor()` carried until M107, where the vendor's
+     * `recoveryCodes()` would `decrypt(null)` and throw), and a payload this application key cannot
+     * decrypt — an account enrolled before an `APP_KEY` rotation. Neither is worth a 500 on the settings
+     * page: the caller renders nothing, which is what it would have done for a healthy count above the
+     * threshold anyway.
+     */
+    public function countRecoveryCodes(): ?int
+    {
+        if ($this->two_factor_recovery_codes === null) {
+            return null;
+        }
+
+        try {
+            $codes = json_decode(
+                Fortify::currentEncrypter()->decrypt($this->two_factor_recovery_codes),
+                true,
+                flags: JSON_THROW_ON_ERROR,
+            );
+        } catch (Throwable) {
+            return null;
+        }
+
+        return is_array($codes) ? count($codes) : null;
     }
 
     /**

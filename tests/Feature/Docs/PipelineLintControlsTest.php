@@ -448,7 +448,31 @@ it('is GREEN on a well-formed fixture, which every case below is measured agains
     [$status, $output] = pipelineLintRun();
 
     expect($status)->toBe(PIPELINE_LINT_CLEAN, $output);
-    expect($output)->toContain('passed (15 rule groups');
+    expect($output)->toContain('rule groups');
+});
+
+/*
+ * ⛔ THE COUNT IS COMPARED AGAINST THE GROUPS THAT ACTUALLY REPORTED, NEVER AGAINST A LITERAL (M108).
+ * This case used to assert `passed (15 rule groups` — and that number was WRONG BEFORE P7d WAS
+ * ADDED: the shipped gate ran FOURTEEN groups while its own pass line claimed fifteen, so this
+ * control was asserting the gate's own mistake back at it, and `docs/gate-baselines.md` published
+ * the same wrong figure because it parses that line. A literal on both sides of a measurement is not
+ * a control; it is two copies of one claim agreeing with each other.
+ *
+ * ⚠️ It is a WEAKER assertion about the number and a STRONGER one about the gate: it now fails if any
+ * rule silently stops reporting, which the literal could never see.
+ */
+it('reports a rule-group count DERIVED from the groups that actually ran', function (): void {
+    pipelineLintReset();
+
+    [$status, $output] = pipelineLintRun();
+
+    expect($status)->toBe(PIPELINE_LINT_CLEAN, $output);
+    expect(preg_match_all('/^pipeline-lint: \[ok\]\s+(\S+)/mu', $output, $matches))->toBeGreaterThan(0);
+
+    $reported = count(array_unique($matches[1]));
+
+    expect($output)->toContain("passed ({$reported} rule groups");
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
@@ -558,6 +582,98 @@ it('P7c — reddens on a tier outside the vocabulary', function (): void {
         expect($status)->toBe(PIPELINE_LINT_FAILED, $output);
         expect($output)->toContain('declares the tier "before-tesing"');
     });
+});
+
+/*
+ * P7d (M108) — a row may not await a decision LESS URGENT than itself.
+ *
+ * The fixture already ships exactly what these need: `pipelineLintDecisions()` opens `D2` at
+ * `early-testing` and `D3` at `after-launch`, and `pipelineLintDocument()` gives row 20 the tier
+ * `after-launch`. So the red cases and both green cases are settings of two fields.
+ *
+ * ⛔ THE TWO GREEN CASES ARE NOT PADDING. A rule written with `!==` instead of a direction would pass
+ * the red cases and fail them, and that is the single most likely way to get this rule wrong. It is
+ * also a LIVE shape rather than a hypothetical: retiering `D15` to `early-testing` leaves
+ * `R-8990648c` (`after-launch`) awaiting it on the real tree, and a symmetric rule would redden the
+ * trunk on the first run.
+ */
+it('P7d — reddens when an early-testing row awaits an after-launch decision', function (): void {
+    $rows = json_decode(pipelineLintDocument(), true)['rows'];
+    $rows[20]['tier'] = 'early-testing';
+    $rows[20]['awaits'] = 'D3';
+
+    pipelineLintPerturb('fixture-document.json', pipelineLintDocument(['rows' => $rows]), function (int $status, string $output): void {
+        expect($status)->toBe(PIPELINE_LINT_FAILED, $output);
+        expect($output)->toContain('is tiered early-testing and awaits D3, which is tiered after-launch');
+    });
+});
+
+it('P7d — reddens for a during-testing row too, so the rule is not pinned to one tier', function (): void {
+    $rows = json_decode(pipelineLintDocument(), true)['rows'];
+    $rows[20]['tier'] = 'during-testing';
+    $rows[20]['awaits'] = 'D3';
+
+    pipelineLintPerturb('fixture-document.json', pipelineLintDocument(['rows' => $rows]), function (int $status, string $output): void {
+        expect($status)->toBe(PIPELINE_LINT_FAILED, $output);
+        expect($output)->toContain('is tiered during-testing and awaits D3, which is tiered after-launch');
+    });
+});
+
+it('P7d — does NOT fire when the row and its decision share a tier', function (): void {
+    $rows = json_decode(pipelineLintDocument(), true)['rows'];
+    $rows[20]['awaits'] = 'D3';
+
+    pipelineLintPerturb('fixture-document.json', pipelineLintDocument(['rows' => $rows]), function (int $status, string $output): void {
+        expect($status)->toBe(PIPELINE_LINT_CLEAN, $output);
+        expect($output)->toContain('none awaits one less urgent than itself');
+    });
+});
+
+it('P7d — does NOT fire on the INVERSE, which is correct ordering rather than a defect', function (): void {
+    $rows = json_decode(pipelineLintDocument(), true)['rows'];
+    $rows[20]['awaits'] = 'D2';
+
+    pipelineLintPerturb('fixture-document.json', pipelineLintDocument(['rows' => $rows]), function (int $status, string $output): void {
+        expect($status)->toBe(PIPELINE_LINT_CLEAN, $output);
+        expect($output)->toContain('1 row(s) await an open decision whose tier could be read');
+    });
+});
+
+/*
+ * ⚠️ THIS ONE CANNOT USE `pipelineLintPerturb()`, AND THE REASON IS WORTH THE LINES. That helper
+ * resets the fixture and then writes ONE file, and this case needs two to disagree: a row that
+ * awaits `D3`, and a `D3` whose heading has lost its tier. So the baseline-green and
+ * restored-green assertions the helper makes are made here by hand rather than skipped — a case
+ * that reddens a gate which was already red has measured nothing.
+ */
+it('P7d — REFUSES rather than passing when the awaited decision carries no tier', function (): void {
+    pipelineLintReset();
+
+    $rows = json_decode(pipelineLintDocument(), true)['rows'];
+    $rows[20]['awaits'] = 'D3';
+    pipelineLintWrite('fixture-document.json', pipelineLintDocument(['rows' => $rows]));
+
+    [$baseline, $baselineOutput] = pipelineLintRun();
+    expect($baseline)->toBe(PIPELINE_LINT_CLEAN, "the baseline was not green before the perturbation:\n".$baselineOutput);
+
+    try {
+        // `D3` keeps its heading and its id, so P7b still sees it open — only the tier token goes.
+        pipelineLintWrite('docs/claims/decisions.md', str_replace(
+            '### D3 — Another open question **Tier: after-launch.**',
+            '### D3 — Another open question',
+            pipelineLintDecisions()
+        ));
+
+        [$status, $output] = pipelineLintRun();
+
+        expect($status)->toBe(PIPELINE_LINT_CANNOT_MEASURE, $output);
+        expect($output)->toContain('carries no `**Tier: x.**` token');
+    } finally {
+        pipelineLintReset();
+    }
+
+    [$restored, $restoredOutput] = pipelineLintRun();
+    expect($restored)->toBe(PIPELINE_LINT_CLEAN, "the fixture did not return to green after the restore:\n".$restoredOutput);
 });
 
 it('P7e — reddens when a row awaits a decision that is ANSWERED', function (): void {

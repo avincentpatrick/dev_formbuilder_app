@@ -10814,8 +10814,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the rule into a place an author reads before writing. The lint arm is preferable: a rule in prose is
   what failed here. **Live** — nothing prevents the next author repeating it.
   Filed by `M103`. **Tier: after-launch.**
-- **`minor` · `pipeline-lint` has no rule relating a row's tier to the tier of the decision it awaits, so an
-  `early-testing` row can be parked behind a `before-launch` question and every gate passes.** Filed 2026-09-20 by
+- ✅ **CLOSED BY `M108` (2026-09-24) — `minor` · ~~`pipeline-lint` has no rule relating a row's tier to the tier of the decision it awaits, so an
+  `early-testing` row can be parked behind a `before-launch` question and every gate passes.~~** Filed 2026-09-20 by
   `M105`, which met the shape three times in one sweep. `p7e_awaits()` (`scripts/pipeline-lint.php:1406-1444`) tests
   exactly one thing — that the awaited id is in the open set — so an open decision at *any* tier passes. The rule
   roster at `scripts/pipeline-lint.php:352-392` is P1, P3, P3c, P4, P7a, P7b, P7c, P7e, P2a-e and P6: **there is no
@@ -10828,6 +10828,32 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `ready` at rank 82 while `D53` — the question of what tier it should have — sat at rank 31, with nothing in either
   script connecting a decision row to the row it re-tiers. A new rule must be proved red by `scripts/mutate.php`
   before it is trusted. **Live.** Filed by `M105`. **Tier: early-testing.**
+  ✅ **CLOSED BY `M108` (2026-09-24), **UNDER A RECORDED `D13` EXCEPTION** (#1, at `D13` in `docs/claims/decisions.md`): every one of the
+  three rows in this batch touches a hub, and so would a batch of one — `M108` measured 7 of 7 candidate rows
+  in breach, with five hub files touched by close-out procedure alone. The cap admitted nothing, which is why
+  the exception exists and why the same increment gave it a written form.
+  ⛔ **THE ROW'S EVIDENCE HELD AND ITS PREMISE HAD ENTIRELY ROTTED, INSIDE THE INCREMENT THAT FILED IT.** All four
+  measured-cost artefacts have resolved: `D44` is answered and carries no row at all; `R-e6a10f97` was closed by
+  `M106`; `R-5ecfa6cd` was retiered to `before-launch` by `D51` and sits at rank 115; `D53` is answered. And no row
+  on the line exhibited the shape — all eight rows carrying an awaits token sat at exactly their decision's tier.
+  **So `P7d` was GREEN ON ARRIVAL, deliberately** (`M40`: a rule red on arrival can never merge), and
+  `scripts/mutate.php` is the only thing that proves it.
+  ⚠️ **ONLY HALF THE ROW WAS BUILT, AND THE OTHER HALF IS FILED RATHER THAN FUDGED.** The inverse shape — a decision
+  that re-tiers a row — has **no join key**: `R-e7d6f223` never carried an awaits token, and the only link is a row
+  id inside a decision heading. Row ids are content-derived (`scripts/pipeline.php:341`), so such an id rots the
+  moment the row's text is edited; it is a citation rule, not a tier rule, and zero open decisions name a row today.
+  Filed as its own row below.
+  ⛔ **AND THE RULE-GROUP COUNT IN THE GATE'S PASS LINE WAS A LITERAL THAT WAS ALREADY WRONG.** The shipped gate ran
+  **fourteen** groups while its own pass line claimed **fifteen**, and `scripts/gate-baselines.php:286` parses that
+  figure out of that line — so the baseline published the gate's own mistake, and its control asserted the mistake
+  back at it. Bumping one stale copy to another would have repeated it, so the count is now DERIVED from the groups
+  that actually reported, and the control compares against that instead of a literal. `P7d` makes the true count
+  fifteen, which is why `docs/gate-baselines.md` does not move this increment.
+  **Two mutants through `scripts/mutate.php`, both CAUGHT:** neutering the comparison reddens the two red cases, and
+  flipping `>=` to `<=` reddens four — including *does NOT fire on the INVERSE*, which is what proves the rule is
+  directional rather than merely present. Five control cases, and the gate states its own limit in its docblock:
+  **it proves a DECLARED await is tier-consistent and nothing about a dependency nobody declared** — `R-b6b9bfa4`
+  needs `D15` and says so nowhere, so `P7d` passes straight over it.
 - **`minor` · `docs/ACCESS-MATRIX.md:105` tells its reader the central host answers a workspace route with a 404,
   and it does not — it redirects.** Filed 2026-09-20 by `M105`, which found the same false symptom in two places
   while verifying `D51`. The sentence reads *"a direct sign-in there lands on `/dashboard`, a workspace-only route
@@ -10848,8 +10874,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   nothing can ever contradict the comment mechanically. The fix is to correct or delete the sentence; the durable
   fix is to stop asserting environment state in a comment no gate can check. **Live.** Filed by `M105`.
   **Tier: during-testing.**
-- **`minor` · The six `D38` rows cannot be grouped into one increment under `D13`, and they cannot safely be taken
-  apart either.** Filed 2026-09-20 by `M105` on answering `D38`. Three of them edit a single table —
+- ✅ **CLOSED BY `M108` (2026-09-24) — `minor` · ~~The six `D38` rows cannot be grouped into one increment under `D13`, and they cannot safely be taken
+  apart either.~~** Filed 2026-09-20 by `M105` on answering `D38`. Three of them edit a single table —
   `docs/architecture/technical-architecture.md` §7.1, lines 443 (Form draft), 449 (Exports) and 454 (Users & roles)
   — and the other three edit `docs/api-specification.md` lines 63, 73 and 75, two of those inside one markdown table
   at `:69-75`. ⛔ **`D13`'s file-overlap rule forbids grouping rows that cite the same non-hub file, while the
@@ -10860,6 +10886,30 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the grouping question, and the next taker needs a recorded `D13` exception rather than a judgement call.
   **Live** — the six are `ready` and nothing currently says how they may be batched. Filed by `M105`.
   **Tier: early-testing.**
+  ✅ **CLOSED BY `M108` (2026-09-24), **UNDER A RECORDED `D13` EXCEPTION** (#1, at `D13` in `docs/claims/decisions.md`): every one of the
+  three rows in this batch touches a hub, and so would a batch of one — `M108` measured 7 of 7 candidate rows
+  in breach, with five hub files touched by close-out procedure alone. The cap admitted nothing, which is why
+  the exception exists and why the same increment gave it a written form.
+  **Taken as the row asked and no wider:** a numbered `D13` exceptions subsection now sits at `D13` itself, on
+  `docs/ux/exceptions-log.md`'s proven shape — *what was not satisfied · why · disposition* — carrying that log's
+  escalation rule, that **three exceptions for the same reason mean the rule is wrong, not the batch**. Exception #1
+  is `M108` itself. ⛔ **The rule was NOT amended, because `D15` is open and asks exactly that question**, and `D15`
+  opens by saying an increment does not re-scope a user decision on its own judgement. A recommendation was recorded
+  there instead, with the measurement behind it.
+  ⛔ **TWO THINGS THE ROW ASSERTED THAT DO NOT SURVIVE, AND THE SECOND CHANGES WHAT THE NEXT TAKER SHOULD DO.**
+  (a) *"Nothing currently says how they may be batched"* is false as worded: `D38`'s own Consequences block already
+  states the problem nearly verbatim. What was missing was the exception, not a record of the question.
+  (b) ⛔ **The cascade does not exist for half the six.** **Zero** files cite
+  `docs/architecture/technical-architecture.md:449` or `:454` by line, and `:443` is cited only from the row's own
+  backlog entry — so the three §7.1 rows carry **no cascade at all** and can be split freely. Of the other three,
+  `:73` and `:75` have exactly one citer each (their own rows), and only `:63` has external citers — both of which
+  live in `docs/pipeline.md`, which is GENERATED, so the repair there is `php scripts/pipeline.php` and not an edit.
+  ⚠️ **And the gate the row leans on is weaker than it treats it:** `.github/workflows/ci.yml:238` states the
+  citation lint *"checks that a cited line is ALIVE, never that it says what the citing sentence claims"* — so a
+  one-line shift leaves a citation green and silently wrong. ⚠️ The row's `docs/pipeline.md:50` citation had itself
+  already moved to `:48`, with a second citer at `:70` it never named; that shape is filed below.
+  **The six `D38` rows are pre-cleared to be batched together under exception #1's reasoning**, which is what the row
+  existed to obtain.
 - ✅ **CLOSED BY `M107` (2026-09-20) — `minor` · ~~Nothing warns a person that their two-factor recovery codes are running low, and the seeded
   two-factor fixture carries an empty recovery list.~~** Filed 2026-09-20 by `M105` while answering `D37`. Both gaps
   are named inside `R-1ad2304d`'s own prose and neither is covered by that row's headline or by `D37`'s answer,
@@ -10912,10 +10962,22 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   points the reader AWAY from the one thing in it the grouping rule depends on. **Live** — every session that groups a
   batch reads the wrong list. ⚠️ **The remedy is a pointer, not a second copy:** `CLAUDE.md` must name where the set is
   derived, and must not restate its members, which would be the two-copies defect this repository gates elsewhere.
-  Filed by `M106`. **Tier: early-testing.**
+  Filed by `M106`. **Tier: early-testing.** **Awaits D15.**
+  ⛔ **`M108` (2026-09-24) EXAMINED THIS ROW AND DID NOT TAKE IT, BECAUSE ITS REMEDY PRESUPPOSES AN ANSWER `D15` HAS
+  NOT GIVEN.** Pointing `CLAUDE.md` at the derived set hard-codes one of `D15`'s three candidate answers into the
+  file every session auto-loads, and `D15` opens by recording that an increment does not re-scope a user decision on
+  its own judgement. `D15` was retiered `after-launch` → `early-testing` in the same push so this row is not parked
+  behind a later question — which is the shape `P7d`, added by the same increment, exists to refuse.
+  ⚠️ **THE COMPLAINT ITSELF STILL HOLDS EXACTLY AS WRITTEN** — `CLAUDE.md` names no hub source, and a grep for
+  *hub* across it returns nothing. ⚠️ **But three things in the row need re-deriving before it is taken.** Its
+  *"forty-seven"* was stale on arrival — the table held 49, and after `M108`'s harvester widening it holds **60**.
+  Its *"points the reader AWAY"* overstates: `docs/pipeline.md` carries the rule verbatim to every reader, so the
+  gap is the SET'S LOCATION rather than the rule. And ⛔ **it is the fourth filing of one problem** — `R-f8bcf113`
+  (`M99`, two days earlier) asserts the same divergence, `R-d8575314` and `R-8990648c` orbit it, and `D15` governs
+  it. Whoever takes it should close the cluster rather than this row alone.
 
-- **`minor` · The collision graph harvests PATHS, so a row that cites its subject by class name is invisible to the
-  rule that depends on it.** Found by `M106` (2026-09-20) while checking a batch against `D13`. `scripts/backlog-triage.php`
+- ✅ **CLOSED BY `M108` (2026-09-24) — `minor` · ~~The collision graph harvests PATHS, so a row that cites its subject by class name is invisible to the
+  rule that depends on it.~~** Found by `M106` (2026-09-20) while checking a batch against `D13`. `scripts/backlog-triage.php`
   resolves file citations by path shape, so `R-e6a10f97` — which names `WelcomeNotification::toMail()` and
   `SendWelcomeEmail` as **classes** — harvests as `resources/js/Pages/Welcome.vue` plus its test, and
   `app/Notifications/Auth/WelcomeNotification.php` and `app/Listeners/Auth/SendWelcomeEmail.php` appear in its file set
@@ -10927,6 +10989,34 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   measured against `docs/backlog-triage.md`'s own harvested set for that row. ⚠️ **A PHP class name is mechanically
   resolvable** (PSR-4 root plus the namespace), so this is a widening of the harvester rather than a request for rows to
   be rewritten. Filed by `M106`. **Tier: early-testing.**
+  ✅ **CLOSED BY `M108` (2026-09-24), **UNDER A RECORDED `D13` EXCEPTION** (#1, at `D13` in `docs/claims/decisions.md`): every one of the
+  three rows in this batch touches a hub, and so would a batch of one — `M108` measured 7 of 7 candidate rows
+  in breach, with five hub files touched by close-out procedure alone. The cap admitted nothing, which is why
+  the exception exists and why the same increment gave it a written form.
+  **Measured either side of the change:** **65** open rows gain at least one path, rows harvesting nothing fall
+  from **59 to 30**, 139 new row-path pairs, **no row loses a path**, and the unresolved list is unchanged at 19.
+  The derived hub set moves **49 → 60**. ⚠️ The row's own worked example was dead — `R-e6a10f97` was closed by
+  `M106`, so the harvester no longer sees it — and the row had harvested its own counterexample into existence,
+  because its prose writes the two class files as full paths in backticks.
+  ⛔ **THE PREDICATE HAS THREE CONJUNCTS AND THE THIRD IS THE ONE THAT MAKES IT SAFE.** `Form`, `Button`, `User`,
+  `Tenant` and `Audit` are unique class basenames AND ordinary English, and `app/Models/Form.php` is itself a hub —
+  crediting a row that merely says *"`Form`"* in passing would make it touch a hub and become unbatchable. Requiring
+  a capital AFTER the first lowercase run refuses every one of them. A fourth guard reads the FILE rather than the
+  token and confirms it declares that name, so the two fail independently.
+  ⚠️ **AND THE ARM WRITES ONLY TO `resolved`, NEVER TO `unresolved`** — `citation_health()` ranks on both, so a
+  class-shaped word naming no file would otherwise re-order the queue for a word nobody cited. That is what keeps
+  this a counting fix rather than a scheduling change in disguise.
+  ⛔ **THE PROOF HAD TO BE RE-PLANNED, AND THE REASON IS WORTH KEEPING.** A Pest control CANNOT drive this: the
+  script resolves `git rev-parse origin/main` unconditionally before its `--json` branch, and git is not installed
+  in the app container. `scripts/backlog-triage-controls.php` is therefore a HOST harness — the fourth to make that
+  trade after `citation-liveness-lint-controls`, `tracker-lint-controls` and `pre-push-guard-controls` — and it is
+  **the first coverage of any kind over `scripts/backlog-triage.php`**, which was the only one of its siblings
+  without a control. Eight cases; `scripts/mutate.php` cannot drive it, so five deliberate defects were applied by
+  hand and **every one was CAUGHT**: widening the predicate, neutering the declaration check, guessing on an
+  ambiguous basename, deleting the nested-checkout guard, and letting the arm pollute the unresolved list.
+  ⚠️ **What it does NOT cover, filed below:** a bare Vue single-file component name is not PSR-4 and is still
+  invisible. ⚠️ **And it retroactively unmakes a shipped exception:** `M107`'s batch passed the overlap check only
+  because one of its rows harvested no paths at all — under this harvester it would not have.
 
 - **`minor` · `TwoFactorResetService`'s zero-row guard is UNREACHABLE by construction, so no test can see it —
   `scripts/mutate.php` proved it by surviving.** Found by `M107` (2026-09-20) in its own controls. `MU4` replaced
@@ -11010,3 +11100,68 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   survives; only its illustration is wrong**, so this is a correction to record rather than a decision to re-ask, and
   `docs/claims/decisions.md` already carries pre-answer corrections in exactly this shape. Filed by `M106`.
   **Tier: early-testing.**
+
+- **`minor` · Nothing relates a decision that RE-TIERS a row to the row it re-tiers, and `P7d` deliberately does not
+  close that half.** Filed 2026-09-24 by `M108`, which built the other half and measured why this one cannot be built
+  the same way. `P7d` compares a row's tier against the tier of the decision it **declares** an awaits token for. The
+  inverse shape carries no such token: `R-e7d6f223` was `ready` while `D53` — the question of what tier it should
+  have — sat three tiers below it, and `R-5ecfa6cd` sat the same way behind `D51`. ⛔ **THERE IS NO JOIN KEY.** The
+  only link is prose inside the decision heading, which names the row id in backticks; and row ids are CONTENT-DERIVED
+  (`scripts/pipeline.php:341` takes `substr($sha, 0, 7)` of the row text), so an id written into a heading rots
+  silently the first time the row's wording is edited. That makes this a heading-to-row **citation** rule — the class
+  `scripts/citation-liveness-lint.php` already solves for paths — rather than a tier comparison. ⚠️ **It would be
+  vacuous today**: zero open decisions name a row id, so a rule added now would pass over an empty set, and
+  `M108` declined to ship a green arm it could not exercise. ⚠️ **But the shape recurred three times in one month**
+  (`D51`, `D52`, `D53`), so the trigger to build it is the next open decision that names a row. **Live.**
+  Filed by `M108`. **Tier: during-testing.**
+
+- **`minor` · A retier's PAYLOAD is a change to another file's row, nothing performs it, and the only record of that
+  is a lane ledger.** Filed 2026-09-24 by `M108` while verifying `R-b6a4ea79`. `docs/claims/lane-a.md` records `M105`
+  answering `D51` and `D53`, stripping both awaits tokens, and **not applying the retiers those decisions existed to
+  commission** — `R-5ecfa6cd` stayed `early-testing` after being answered `before-launch`, `R-e7d6f223` stayed
+  `during-testing` after being answered `early-testing` — and that *"both states passed `pipeline-lint`, fifteen rule
+  groups, green."* ⛔ **THE OBLIGATION LIVES ONLY IN THAT LEDGER**, which is the shape `CLAUDE.md` forbids in terms:
+  *"An open item found in any document is filed as a row or a decision the moment it is found. No document may hold an
+  unqueued obligation."* Both states have since been corrected in the line, so the defect is not a wrong tier today;
+  it is that nothing would notice the next one. ⚠️ **Distinct from the row above, and the difference decides the
+  remedy:** that one asks for a RULE relating two tiers, this one asks that answering a retier decision perform its own
+  payload — a close-out step, or a `scripts/next.php` check that an answered retier decision left the row it names at
+  the tier it was answered to. **Live.** Filed by `M108`. **Tier: during-testing.**
+
+- **`minor` · A bare Vue component name is invisible to the citation harvester, and PSR-4 cannot reach it.** Filed
+  2026-09-24 by `M108`, which widened the harvester to resolve PHP class names and deliberately stopped there.
+  `scripts/backlog-triage.php` now resolves a Studly, multi-word, file-declared name through the basename index — so
+  `FormService` and `MemberController::invite()` harvest — but a single-file component cited by bare name does not,
+  because `composer.json` declares no JavaScript autoload root and the resolution rule for `resources/js/**`,
+  `resources/public-runtime/**` and `packages/design-system/src/**` is a convention rather than a mapping. ⚠️ **Five
+  open rows cite one**: `AdminLayout`, `RuleFormModal`, `AccessCard` and `ModulesCard`, `Users`, `Button`. ⛔ **And two
+  of those names are exactly why this needs deciding rather than copying the PHP arm:** `Users` and `Button` are
+  ordinary words, and `Button` would resolve to a design-system primitive cited by dozens of rows — so a naive widening
+  would manufacture a hub rather than measure one. The PHP arm is protected by a second-capital test that both of those
+  fail; a component arm needs its own answer, most likely requiring the `.vue` suffix or a directory prefix. **Live** —
+  measured against `docs/backlog-triage.md`'s own harvested sets. Filed by `M108`. **Tier: after-launch.**
+
+- **`nit` · `scripts/backlog-triage.php --check` works, is the only drift detector for a generated file in
+  `paths-ignore`, and is invoked by nothing.** Filed 2026-09-24 by `M108` while building the first control harness over
+  that script. The flag compares the derived body against the file on disk and exits 1 on drift. No CI job runs it, no
+  composer script names it, and `.github/workflows/ci.yml` lists `docs/backlog-triage.md` under `paths-ignore` — so a
+  push that leaves the census stale produces no run at all and nothing else notices. ⚠️ **The script says so itself**
+  and gives a reason: making it a gate *"changes what a close-out is obliged to do, which is a decision rather than a
+  fix"*. ⛔ **That reasoning is sound and the row is filed anyway**, because the sentence has sat in the file since
+  `M65` as a deferral with no owner, which is the `D6` shape this repository has a standing rule about. The question is
+  one line: is regenerating the census a close-out obligation, or is the file allowed to lag its own banner? **Live.**
+  Filed by `M108`. **Tier: after-launch.**
+
+- **`minor` · `docs/pipeline.md` is cited BY LINE in at least two places, it is regenerated every increment, and the
+  citation gate cannot see the rot.** Filed 2026-09-24 by `M108` while verifying `R-4346557c`, whose own citation of
+  it had already moved. That row cites `docs/pipeline.md:50`; the line is now `:48`, and a second citer it never named
+  sits at `:70`. The identical stale citation sits inside `D38` in `docs/claims/decisions.md`. ⛔ **NEITHER COPY CAN
+  EVER GO RED.** `docs/claims/**` is excluded from `scripts/citation-liveness-lint.php`'s tier 1 by design, and the
+  gate only checks that a cited line is ALIVE — `.github/workflows/ci.yml:238` says so in capitals — never that it
+  says what the citing sentence claims. A generated queue file re-ranks on every close-out, so **every** line citation
+  into it is wrong within an increment or two while reading as perfectly healthy. ⚠️ **`scripts/pipeline.php` already
+  refuses to do this to itself** — `read_decisions()`'s docblock records that it cites decisions by heading id and
+  never by line, *"because `docs/claims/decisions.md` sits inside `ci.yml`'s `paths-ignore`, so recording an answer
+  moves every heading below it without producing a run"* — and the same argument applies with more force to a file
+  regenerated deliberately. The remedy is to cite the line's rows by `R-` id, which is stable for the life of the row.
+  **Live.** Filed by `M108`. **Tier: during-testing.**

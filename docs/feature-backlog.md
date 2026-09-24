@@ -11165,3 +11165,18 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   moves every heading below it without producing a run"* — and the same argument applies with more force to a file
   regenerated deliberately. The remedy is to cite the line's rows by `R-` id, which is stable for the life of the row.
   **Live.** Filed by `M108`. **Tier: during-testing.**
+
+- **`minor` · `backlog-triage-controls` is registered in CI and absent from `docs/gate-baselines.md`, so its case
+  count is the one gate number nothing tracks.** Filed 2026-09-24 by `M108`, which registered the gate and found the
+  gap while regenerating the baselines from its own post-merge run. `scripts/gate-baselines.php` carries a fixed
+  roster of gate patterns, each a regex over that gate's own pass line; the new harness prints
+  `backlog-triage-controls: passed (8 cases, all landing where they should).` and no pattern matches it, so the
+  baselines file does not carry it and `state.php` cannot report it drifting. ⛔ **THE FAILURE MODE IS THE ONE THIS
+  REPOSITORY ALREADY CATALOGUES:** a gate whose count nobody records can quietly shrink — eight cases becoming two
+  would pass, print `passed`, and move no number any reader is watching. That is the *gate with no floor* shape `M36`
+  gave four linters a floor for, arriving one layer up, at the file whose whole job is to hold the numbers.
+  ⚠️ **The fix is about five lines** — one entry in the roster with a `/backlog-triage-controls: passed \((\d+) cases/`
+  pattern and a `format` closure — and it was NOT taken in `M108` because the gate had already merged, and a code
+  change pushed straight to the trunk without a claim naming a branch is what `scripts/pre-push-guard.php` exists to
+  refuse. ⚠️ **It also wants a floor of its own in the same edit**, on the argument above: a case count is only worth
+  recording if something refuses a suspiciously small one. **Live.** Filed by `M108`. **Tier: during-testing.**

@@ -274,7 +274,7 @@ const GENERATED_LINE_PREFIXES = ['**LANE A NEXT PROMPT', '**LANE B NEXT PROMPT']
 const STRUCK_SPAN_THRESHOLD = 3;
 
 /**
- * ═══ THE TIER RULES (M93) — P7a, P7b, P7c, P7e ═══════════════════════════════════════════════════
+ * ═══ THE TIER RULES (M93, P7d added M108) — P7a, P7b, P7c, P7d, P7e ══════════════════════════════
  *
  * The user's priority became a property of every row — a tier, written at the row's point of truth —
  * and an open decision became a row. These rules hold that SHAPE. They prove nothing about whether a
@@ -321,6 +321,7 @@ if (isset($opts['help'])) {
 
 $verbose = isset($opts['verbose']);
 $failures = [];
+$groups = [];
 $notes = [];
 
 // ── The document under test. Everything below reads this or a named file; nothing walks a tree. ──
@@ -370,12 +371,14 @@ p3c_no_second_queue();
 // ── P4. Held rows are visible, and the stop-list and the line agree in BOTH directions. ──────────
 p4_held_visibility($held);
 
-// ── P7. Every row tiered, the vocabulary closed, every open decision a row, no row awaiting a ghost. ──
+// ── P7. Every row tiered, the vocabulary closed, every open decision a row, no row awaiting a ghost ──
+//    or a question less urgent than itself.
 $decisionSplit = decisions_split();
 
 p7a_tiered($rows);
 p7b_decisions($rows, $decisionSplit);
 p7c_tier_vocabulary($rows);
+p7d_awaits_tier($rows, $decisionSplit);
 p7e_awaits($rows, $decisionSplit);
 
 // ── P2d. Documented artefacts that exist, are used by nothing, and are scheduled nowhere. ────────
@@ -403,8 +406,12 @@ if ($failures !== []) {
     exit(1);
 }
 
+// ⚠️ THE COUNT IS DERIVED, NEVER TYPED. `scripts/gate-baselines.php` reads this figure out of this
+//    line, so a literal here would publish itself as a baseline and disagree with the gate the first
+//    time a rule was added — which is exactly what `P7d` did to the literal that used to sit here.
 fwrite(STDOUT, sprintf(
-    "pipeline-lint: passed (15 rule groups, %d row(s), %d held, %d file(s) scanned).\n",
+    "pipeline-lint: passed (%d rule groups, %d row(s), %d held, %d file(s) scanned).\n",
+    count(array_unique($groups)),
     count($rows),
     count($held),
     $document['files_scanned']
@@ -1393,6 +1400,93 @@ function p7c_tier_vocabulary(array $rows): void
 }
 
 /**
+ * P7d — a row does not await a decision LESS URGENT than itself (M108).
+ *
+ * ⛔ THE DEFECT IS DIRECTIONAL, AND A SYMMETRIC RULE WOULD BE WRONG. An `early-testing` row parked
+ * behind a `before-launch` question is published in the Next section every session is pointed at,
+ * while the only thing that can unblock it is queued two tiers down — that is the failure. The
+ * INVERSE is correct ordering: a later row awaiting an earlier decision gets its answer first, and a
+ * `!==` rule would redden it. `M105` met the first shape three times in one sweep; retiering `D15`
+ * to `early-testing` creates the second immediately, in `R-8990648c`.
+ *
+ * ⛔ WHAT THIS PROVES, AND THE LIMIT IS THE POINT. It proves a DECLARED await is tier-consistent. It
+ * proves NOTHING about a dependency nobody declared: `R-b6b9bfa4` needs `D15` and says so nowhere, so
+ * this rule passes straight over it. A gate that claims more than it measures is the decorative gate
+ * `M43` found, and the way this one stays honest is by saying where it stops.
+ *
+ * ⚠️ GREEN ON ARRIVAL, DELIBERATELY. No row on the line violated this the day it was written — every
+ * cost case the filing row cited had already resolved inside `M105` and `M106`. A rule that is red on
+ * arrival can never merge (`M40`), so the proof is `scripts/mutate.php` against the controls in
+ * `tests/Feature/Docs/PipelineLintControlsTest.php` rather than a live failure.
+ *
+ * ⚠️ P7e OWNS AN AWAITS NAMING AN ANSWERED OR UNKNOWN DECISION, and P7a and P7c own an absent or
+ * mistyped tier. This rule skips both rather than double-reporting one defect under two names.
+ *
+ * @param  list<array<string, mixed>>  $rows
+ * @param  array{open: list<string>, answered: list<string>, tiers: array<string, string>}  $split
+ */
+function p7d_awaits_tier(array $rows, array $split): void
+{
+    $checked = 0;
+    $bad = 0;
+
+    foreach ($rows as $row) {
+        $awaits = (string) ($row['awaits'] ?? '');
+
+        if ($awaits === '' || ! in_array($awaits, $split['open'], true)) {
+            continue;
+        }
+
+        if (! isset($split['tiers'][$awaits])) {
+            cannot_measure(sprintf(
+                '%s is open in %s and its heading carries no `**Tier: x.**` token, so the tier of the '
+                .'question `%s` waits on cannot be read. This REFUSES rather than passing: a missing tier '
+                .'would make every comparison in this rule vacuous while it reported green.',
+                $awaits,
+                DECISIONS,
+                (string) ($row['id'] ?? '?')
+            ));
+        }
+
+        $rowTier = (string) ($row['tier'] ?? '');
+        $decisionTier = $split['tiers'][$awaits];
+
+        $rowRank = array_search($rowTier, TIERS, true);
+        $decisionRank = array_search($decisionTier, TIERS, true);
+
+        if ($rowRank === false || $decisionRank === false) {
+            continue;
+        }
+
+        $checked++;
+
+        if ($rowRank >= $decisionRank) {
+            continue;
+        }
+
+        $bad++;
+        fail('P7d awaits tier', sprintf(
+            '`%s` is tiered %s and awaits %s, which is tiered %s. The row is published as startable work '
+            .'in a tier the user has prioritised, while the only thing that can unblock it sits behind every '
+            .'question in %s. Retier one of the two in the push that fixes this.',
+            (string) ($row['id'] ?? '?'),
+            $rowTier,
+            $awaits,
+            $decisionTier,
+            $decisionTier
+        ));
+    }
+
+    if ($bad === 0) {
+        pass('P7d awaits tier', sprintf(
+            '%d row(s) await an open decision whose tier could be read, and none awaits one less urgent '
+            .'than itself',
+            $checked
+        ));
+    }
+}
+
+/**
  * P7e — a row that awaits a decision awaits one that is still OPEN.
  *
  * ⛔ AN ANSWERED ONE IS THE FAILURE THIS RULE EXISTS FOR. The generator leaves such a row's state alone,
@@ -1448,13 +1542,23 @@ function p7e_awaits(array $rows, array $split): void
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
 
 /**
- * The open and answered decision ids, parsed out of the decisions file BY THIS GATE.
+ * The open and answered decision ids, and every OPEN decision's tier, parsed out of the decisions
+ * file BY THIS GATE.
  *
  * ⛔ NOT READ FROM THE GENERATOR, AND THAT IS THE WHOLE VALUE OF P7b. See the P7 note in the header.
  * A file missing its ANSWERED heading cannot be split, and both rules that read the split would then pass
  * over an empty set — so that refuses rather than reporting green.
  *
- * @return array{open: list<string>, answered: list<string>}
+ * ⛔ THE TIER IS PARSED HERE RATHER THAN TAKEN OFF THE DECISION ROW, AND THAT IS THE WHOLE VALUE OF
+ * P7d (M108). Reading it from the generator was the cheaper route and it was rejected: `p7a_tiered()`
+ * proves a decision row CARRIES a tier and `p7c_tier_vocabulary()` proves the value is in the
+ * vocabulary, but NEITHER proves it is the tier the file states. A rule fed by the generator would
+ * measure the generator's own parse against itself and agree with it however wrong it was.
+ *
+ * ⚠️ A heading carrying no tier is ABSENT from the map rather than defaulted, so P7d can refuse by
+ * name instead of comparing against a value nobody wrote.
+ *
+ * @return array{open: list<string>, answered: list<string>, tiers: array<string, string>}
  */
 function decisions_split(): array
 {
@@ -1467,7 +1571,23 @@ function decisions_split(): array
 
     $ids = static fn (string $section): array => preg_match_all('/^### (D\d+) — /mu', $section, $m) > 0 ? $m[1] : [];
 
-    return ['open' => $ids((string) $parts[0]), 'answered' => $ids((string) $parts[1])];
+    // The tier token sits on the open decision's own heading line — the same line the id comes from —
+    // so one pass over those headings answers both without a second traversal of the file.
+    $tiers = [];
+
+    if (preg_match_all('/^### (D\d+) — .*$/mu', (string) $parts[0], $headings, PREG_SET_ORDER) > 0) {
+        foreach ($headings as $heading) {
+            if (preg_match('/\*\*Tier:\s*([a-z-]+)\.\*\*/u', $heading[0], $tier) === 1) {
+                $tiers[$heading[1]] = $tier[1];
+            }
+        }
+    }
+
+    return [
+        'open' => $ids((string) $parts[0]),
+        'answered' => $ids((string) $parts[1]),
+        'tiers' => $tiers,
+    ];
 }
 
 function generator(): string
@@ -1894,9 +2014,18 @@ function fail(string $rule, string $message): void
     fwrite(STDERR, "pipeline-lint: [FAIL] {$rule} — {$message}\n");
 }
 
+/**
+ * ⛔ IT RECORDS THE GROUP WHETHER OR NOT IT PRINTS, AND THAT ASYMMETRY IS THE POINT (M108). The
+ * pass line's rule-group count used to be a hand-typed literal, which went wrong the moment `P7d`
+ * was added — and `scripts/gate-baselines.php` parses that number out of this gate's own output, so
+ * the stale copy would have been published as a baseline. Recording here and counting at the end
+ * derives it. Tying the record to `$verbose` would make the count depend on a display flag.
+ */
 function pass(string $rule, string $message): void
 {
-    global $verbose;
+    global $verbose, $groups;
+
+    $groups[] = $rule;
 
     if ($verbose) {
         fwrite(STDOUT, "pipeline-lint: [ok]   {$rule} — {$message}\n");

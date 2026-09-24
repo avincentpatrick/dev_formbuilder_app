@@ -85,6 +85,7 @@
         "citation-liveness-lint-controls": "@php scripts/citation-liveness-lint-controls.php",
         "pre-push-guard-controls": "@php scripts/pre-push-guard-controls.php",
         "pipeline-lint": "@php scripts/pipeline-lint.php",
+        "backlog-triage-controls": "@php scripts/backlog-triage-controls.php",
         "test-pointer-lint": "@php scripts/test-pointer-lint.php",
         "test-pointer-lint-selftest": "@php scripts/test-pointer-lint.php --selftest",
         "preflight": "@php scripts/preflight.php",
@@ -107,6 +108,7 @@
             "@citation-liveness-lint-controls",
             "@pre-push-guard-controls",
             "@pipeline-lint",
+            "@backlog-triage-controls",
             "@test-pointer-lint",
             "@test-pointer-lint-selftest"
         ],

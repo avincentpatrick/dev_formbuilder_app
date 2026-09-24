@@ -390,6 +390,20 @@ function harvest_paths(string $body, array $index): array
 
                 $resolved[$hit] = true;
             }
+
+            // ⛔ THE CLASS ARM CONTRIBUTES TO `resolved` AND NEVER TO `unresolved`, WHICH IS WHAT
+            //    KEEPS IT FROM BEING A RANKING CHANGE IN DISGUISE (M108). `citation_health()` reads
+            //    both lists, so a class-shaped word in ordinary prose — `PostgreSQL`, `MemberOnly` —
+            //    that happened not to name a file would otherwise push a row from health 2 to health
+            //    1 and re-order the queue for a word nobody cited. Writing only resolved hits makes
+            //    the change monotonic: a row's health can rise from 0, and can never fall.
+            foreach (class_tokens($span) as $token) {
+                $hit = resolve_token($token, $index);
+
+                if ($hit !== null && declares_class($hit, basename($token, '.php'))) {
+                    $resolved[$hit] = true;
+                }
+            }
         }
     }
 
@@ -420,6 +434,94 @@ function candidate_tokens(string $span): array
     }
 
     return array_values(array_unique($out));
+}
+
+/**
+ * Class-shaped tokens inside one inline code span, as basenames to look up (M108).
+ *
+ * ⛔ THE HARVESTER READ PATHS ONLY, SO A ROW THAT NAMED ITS SUBJECT AS A CLASS CONTRIBUTED NOTHING —
+ * and `D13`'s overlap rule, which is computed from these sets, then passed such a row VACUOUSLY.
+ * `M107`'s own close-out records the consequence in terms: two rows sharing three files "pass the
+ * overlap check only because this row harvests no paths at all". Under-collection is the blind
+ * direction and it reports green, which is the failure `pipeline-lint`'s P2d header already records.
+ *
+ * ⚠️ IT SPLITS ON EVERYTHING THAT IS NOT A WORD CHARACTER, WHICH IS WHY IT NEEDS NO `::` HANDLING AND
+ * NO SEPARATOR OF ITS OWN. `WelcomeNotification::toMail()` yields `WelcomeNotification` and `toMail`,
+ * and the second is refused for starting lowercase. A fully-qualified name splits the same way and
+ * the class is simply the one segment that survives `is_class_shaped()` — so this works whether or
+ * not `candidate_tokens()` has already normalised the separators, and it does not care which.
+ *
+ * @return list<string>
+ */
+function class_tokens(string $span): array
+{
+    $out = [];
+    $pieces = preg_split('/[^A-Za-z0-9_]+/u', $span);
+
+    foreach ($pieces === false ? [] : $pieces as $piece) {
+        if (is_class_shaped($piece)) {
+            $out[] = $piece.'.php';
+        }
+    }
+
+    return array_values(array_unique($out));
+}
+
+/**
+ * Three conjuncts, and each was MEASURED against this repository's own prose rather than chosen.
+ *
+ * ⛔ THE SECOND CAPITAL IS THE LOAD-BEARING ONE, AND IT IS WHY THIS IS SAFE. `Form`, `Button`,
+ * `User`, `Tenant` and `Audit` are all unique class basenames AND ordinary English words, and
+ * `app/Models/Form.php` is itself in the derived hub set — so crediting a row that merely says
+ * "`Form`" in passing would make it touch a hub and become unbatchable. Requiring a capital AFTER the
+ * first lowercase run refuses every one of them while admitting `FormService` and `MemberController`.
+ *
+ * ⚠️ Measured against the fifty-nine rows that harvest nothing today: this refuses `M74`, `R1`,
+ * `Sheet1`, `Default` and `DROP_BYTE_LIMIT`, and admits six real classes.
+ */
+function is_class_shaped(string $name): bool
+{
+    // Studly, word characters only — this alone still admits `M74` and `DROP_BYTE_LIMIT`.
+    if (preg_match('/^[A-Z][A-Za-z0-9_]*$/u', $name) !== 1) {
+        return false;
+    }
+
+    // Carrying a lowercase letter, which refuses an ALL-CAPS constant or a rule id.
+    if (preg_match('/[a-z]/u', $name) !== 1) {
+        return false;
+    }
+
+    // And a SECOND capital, so only a genuinely multi-word name qualifies.
+    return preg_match('/^[A-Z][a-z0-9_]*[A-Z]/u', $name) === 1;
+}
+
+/**
+ * Does the resolved file actually DECLARE that name?
+ *
+ * ⛔ BELT AND BRACES OVER `is_class_shaped()`, AND IT EARNS ITS PLACE ON THE ONE CASE THE PREDICATE
+ * CANNOT SEE: a multi-word English phrase that happens to match a file basename. The predicate reads
+ * the token; this reads the FILE, so the two fail independently. A Vue single-file component named
+ * for a class is also refused here, which is correct — `docs/backlog-triage.md`'s Vue gap is filed as
+ * its own row rather than guessed at.
+ */
+function declares_class(string $path, string $name): bool
+{
+    static $cache = [];
+
+    $key = $path.'#'.$name;
+
+    if (isset($cache[$key])) {
+        return $cache[$key];
+    }
+
+    if (! str_ends_with($path, '.php') || ! is_file($path)) {
+        return $cache[$key] = false;
+    }
+
+    $body = @file_get_contents($path);
+
+    return $cache[$key] = $body !== false
+        && preg_match('/\b(?:class|interface|trait|enum)\s+'.preg_quote($name, '/').'\b/u', $body) === 1;
 }
 
 /**

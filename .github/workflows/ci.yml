@@ -300,6 +300,23 @@ jobs:
       - name: Test-class pointer lint controls (the two red arms and the floor)
         run: composer run test-pointer-lint-selftest
 
+      # M108. scripts/backlog-triage.php derives the hub set that D13's whole grouping rule is
+      # computed from, and until this step it had NO coverage of any kind — the only one of its
+      # siblings without a control, while pipeline-lint, mutate, tracker-surgery, gate-baselines
+      # and tracker-lint all have one. docs/backlog-triage.md is in this workflow's paths-ignore,
+      # so nothing here ever ran on a change to it either.
+      #
+      # ⛔ HOST SCRIPT, NOT A PEST FILE, AND THE REASON IS MEASURED. The script under test resolves
+      # `git rev-parse origin/main` unconditionally before its --json branch, and git is not
+      # installed in the app container. citation-liveness-lint-controls, tracker-lint-controls and
+      # pre-push-guard-controls each refused that same trade; this is the fourth.
+      #
+      # ⛔ scripts/mutate.php CANNOT DRIVE IT — it runs Pest in a container and nothing else. The
+      # five deliberate defects were applied by hand before shipping and every one turned a case
+      # red; the verdicts are in M108's release.
+      - name: Backlog-triage controls (the citation harvester, both directions)
+        run: composer run backlog-triage-controls
+
       - name: Composer audit (SCA)
         run: composer audit
 

@@ -573,13 +573,21 @@ go blind **cannot be predicted** — synthetic directories of up to sixty files 
 46-entry directory collapses to 6. That is why `M76` shipped a comparison rather than a documented list.
 
 ---
-### D15 — `D13`'s one-hub-row cap is now the binding constraint on batch composition, and it is stricter than its own purpose. Keep it, relax it to per-file, or re-derive the hub set per batch? **Tier: after-launch.**
+### D15 — `D13`'s one-hub-row cap is now the binding constraint on batch composition, and it is stricter than its own purpose. Keep it, relax it to per-file, or re-derive the hub set per batch? **Tier: early-testing.**
 
 **Filed 2026-09-05 by Lane A, during `M72`, at the moment the cap decided a batch that value had not.**
 Recorded here rather than as a row because `D13` is a user decision and an increment does not re-scope
 one of those on its own judgement.
 
 ⚠️ **`M93` (2026-09-14): no generator enforces the cap any more.** `render_batch()` and `BATCH_MAX` are deleted, so the one-hub-row cap lives only in `D13`'s text and in whoever groups a tier's rows. The question stands; what it governs is narrower.
+
+⛔ **RETIERED `after-launch` → `early-testing` ON 2026-09-24 (`M108`), A USER DECISION, AND THE REASON IS THAT IT STOPPED BEING A LATER QUESTION.** It now blocks the top of the tier every session is pointed at: `R-b6b9bfa4` cannot be taken without presupposing one of the three answers below, and `R-4346557c` exists only because the cap has no exception procedure. A question that gates the most urgent tier is not `after-launch` work, whatever it is about.
+
+⛔ **AND `M108` MEASURED THE CAP AGAINST EVERY CANDIDATE ROW RATHER THAN AGAINST A BATCH, WHICH IS THE NUMBER THIS DECISION WAS MISSING.** Across the seven rows verified for that increment, **7 of 7 breach the cap**, and **a batch of ONE breaches it** — `R-7849e303` alone harvests three hub files. The reason is structural and has nothing to do with which rows are chosen: **five of the hub files are touched by close-out procedure alone** — `docs/feature-backlog.md` (7 of 7 rows), `docs/pipeline.md` (7 of 7), `PROGRESS.md` (6 of 7), `docs/claims/lane-a.md` (5 of 7) and this file (4 of 7). `M107`'s own work commit `a0132f8` touched **eleven**. ⚠️ So the cap has not been *stricter than its purpose* since those five crossed the threshold; it has been **unsatisfiable**, and every recent increment has been in silent breach of it. Clause 1 — *no two rows may cite the same non-hub file* — is satisfied universally and separates the rows perfectly well: of those seven, only three touch any non-hub file at all and their sets are pairwise disjoint.
+
+⚠️ **A FOURTH OPTION THE ORIGINAL THREE DO NOT COVER, OFFERED AS A RECOMMENDATION AND NOT TAKEN:** keep the cap and make it read the files a row's **remedy edits**, excluding the close-out artefacts every increment touches by procedure. That is the smallest change that makes the rule mean what `M72` meant by it, and it leaves the hub derivation alone. ⛔ `M108` did **not** apply it — this entry is the user's and an increment does not re-scope one of those, which is the same sentence this decision opens with.
+
+⚠️ **AND THE INPUT TO THIS QUESTION MOVED UNDER IT ON THE SAME DAY.** `M108` widened the citation harvester to read class names, which is the row this entry's own closing note asks to be closed first. The derived hub set went from **49 files to 60**, and the rows harvesting no file at all fell from **59 to 30**. Any answer reasoned from the older degree counts is reasoning from a floor that has since risen.
 
 ⛔ **WHAT `M72` MEASURED, AND IT IS THE WHOLE QUESTION.** Fifteen rows were verified read-only before the
 branch was cut. **Five of the six highest-value live rows touch a hub file — and they touch five
@@ -2222,6 +2230,22 @@ an unverified premise. Anyone promising more than ~42% is proposing to skip veri
 half that works.
 
 ⚠️ **AMENDED 2026-09-14 BY THE ANSWER TO `D12`, RECORDED DURING `M93` — THIS NOW GOVERNS HOW THE ROWS OF ONE TIER ARE GROUPED, NOT WHICH ROWS COME NEXT.** The tiered pipeline decides what is next; items 1–5 above still decide how an increment groups rows taken from a single tier. `scripts/backlog-triage.php` no longer proposes a batch, and `scripts/next.php` no longer derives one from this entry.
+
+#### `D13` exceptions — the numbered record, added 2026-09-24 by `M108`
+
+**This subsection records DEVIATIONS from items 1–5 above. It does not amend them, and an entry here is not a precedent.** It exists because `R-4346557c` measured the alternative and found it wanting: the last exception, `M107`'s, was improvised in a closed row's own prose, which means the next session looking for *how may I except this* finds nothing, and the session after that improvises differently. The form is `docs/ux/exceptions-log.md`'s, which has held nineteen design deviations without drifting — **what was not satisfied · why · disposition** — and so is its escalation rule, restated here because it is the half that makes a log honest rather than a place to file guilt:
+
+⛔ **THREE OR MORE EXCEPTIONS FOR THE SAME REASON MEAN THE RULE IS WRONG, NOT THE BATCH.** At that point the entry to write is not a fourth exception; it is an answer to `D15`.
+
+⚠️ **AN EXCEPTION IS NOT ENFORCED BY ANYTHING, AND SAYING SO IS THE POINT.** No gate reads this subsection — `scripts/pipeline-lint.php` has no hub rule, and `M93` deleted `render_batch()` and `BATCH_MAX`, so the cap lives only in this entry's text and in whoever groups a tier's rows. This is a record, not a control. A reader who wants the control should read `D15`.
+
+##### #1 — `M108` (2026-09-24) · three rows, every one touching a hub
+
+**What was not satisfied:** item 1's second clause, *at most one row may touch a hub file*. The batch was `R-b6a4ea79`, `R-7849e303` and `R-4346557c`, and all three touch several. Item 1's **first** clause was satisfied exactly — the two rows carrying non-hub files carry one apiece and they are different files.
+
+**Why:** because no batch could satisfy it, including a batch of one. `M108` measured the cap across all seven candidate rows and **7 of 7 breach it**; `R-7849e303` alone harvests three hub files before any sibling joins it; and five of the hub files are touched by close-out procedure alone. The measurement is recorded at `D15` rather than repeated here. ⚠️ **The honest statement is therefore not that this batch earned an exception but that the rule currently admits nothing** — and the first entry in an exceptions log being *the rule refused everything* is itself the finding.
+
+**Disposition:** `D15` decides the rule; this increment did not touch it. `M108`'s own subject makes the question cheaper to answer rather than answering it — the harvester now reads class names, so the degree counts `D15` reasons about are measured rather than disputed. ⛔ **And the exception is recorded in BOTH places**, which no previous one was: inline at each closed row, the way `M107` did it, and in `PROGRESS.md`'s release paragraph, the way `M90` did it. Either alone is findable from one direction only, and the two precedents disagreeing about where to look is half of why `R-4346557c` was filed.
 
 ---
 

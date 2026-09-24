@@ -16,7 +16,65 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M107` is merged; `early-testing` remains the most urgent tier with open work, and no decision in it is open
+## Status: ACTIVE CLAIM — `M108`, the queueing machinery: P7d, the collision graph's class-name blindness, and a recorded form for a `D13` exception (`m108-queue-machinery`)
+
+Taken 2026-09-24. Branch `m108-queue-machinery`, cut from origin/main at `05ce69a`, PR into main.
+
+**Three rows, all `early-testing`, verified by an eight-agent read-only fan-out before the branch was cut.**
+
+- `R-b6a4ea79` — `docs/feature-backlog.md:10817` — *"`pipeline-lint` has no rule relating a row's tier to the tier of the decision it awaits, so an `early-testing` row can be parked behind a `before-launch` question and every gate passes."*
+- `R-7849e303` — `docs/feature-backlog.md:10917` — *"The collision graph harvests PATHS, so a row that cites its subject by class name is invisible to the rule that depends on it."*
+- `R-4346557c` — `docs/feature-backlog.md:10851` — *"The six `D38` rows cannot be grouped into one increment under `D13`, and they cannot safely be taken apart either."*
+
+### Evidence verified
+
+**`R-b6a4ea79` — PARTLY. Code citations hold; one line range is wrong.**
+- `scripts/pipeline-lint.php:1406-1444` — **HELD, to the line.** `p7e_awaits()` opens at `:1406`, closes at `:1444`, and its only predicate is the open-set membership test. The split it is handed carries id lists only; the word `tier` does not appear in the function.
+- `scripts/pipeline-lint.php:352-392` (the roster) — **MOVED.** `:352` sits inside the MIN_ROWS floor loop; `:392` is one line short of `p6_self_arming()` at `:393`. The real roster is `:364-393`, fourteen calls. The row's *list* is exactly right and **there is no P7d** — a repo-wide grep excluding the nested checkout returns four hits, all prose, none in any PHP file.
+- `scripts/pipeline-lint.php:277-281` — **HELD, verbatim.** The header's own index reads *"P7a, P7b, P7c, P7e"*: the absence is stated in the file.
+- `scripts/pipeline.php:687-699` and `:711-726` — **HELD.** `apply_decision_override()` reads no tier on either side; the row comparator reads the row's own tier and nothing else.
+- Neither script has moved since the row was filed: newest commits `786afd6` (`M94`) and `93b8dae` (`M99`), against a row filed by `M105`.
+
+**`R-7849e303` — HOLDS.** `scripts/backlog-triage.php:416`'s token regex requires a file extension, so no class name can ever be harvested. `resolve_token()` at `:434-443` refuses an ambiguous basename. `derive_hubs()` at `:515-529` counts path degree at the threshold declared at `:63`. All as described.
+
+**`R-4346557c` — PARTLY. Eleven of twelve citations resolve; the twelfth is stale and the cascade is half imaginary.**
+- `docs/api-specification.md:63`, `:73`, `:75` and `docs/architecture/technical-architecture.md:443`, `:449`, `:454` — **HELD**, all six still say what the rows claim.
+- `scripts/citation-liveness-lint.php:77-78` and `.github/workflows/ci.yml:242` — **HELD.** Tier 1 is the docs root with the claims directory excluded.
+- `docs/pipeline.md:50` — **MOVED to `:48`**, with a second citer at `:70` the row never names.
+- ⛔ **And the cascade does not exist for half the six.** **Zero** files cite `technical-architecture.md:449` or `:454` by line; `:443` is cited only from the row's own backlog entry. The three section-7.1 rows carry no cascade at all.
+
+### Premise verified
+
+⛔ **Two of the three rows have LIVE DEFECTS AND DEAD PREMISES, and both rotted inside the increment that filed them.**
+
+**`R-b6a4ea79` — FAILS.** Every one of the four measured-cost artefacts has resolved. `D44` is **answered** and carries no row at all, where the row says it *"sat at rank 151 in `before-launch`"*. `R-e6a10f97` is **closed by `M106`**, where the row says rank 7. `R-5ecfa6cd` was **retiered to `before-launch` by `D51`** and sits at rank 115, where the row says rank 6. `D53` is **answered** and off the line. ⛔ **And the decisive one: no row on the line exhibits the shape today** — all eight rows carrying an awaits token sit at exactly their decision's tier. The rule gap survives; the cost is gone. **P7d will therefore be green on arrival**, which is correct — `M40` established that a rule red on arrival can never merge — and makes `scripts/mutate.php` the only proof.
+
+**`R-7849e303` — PARTLY.** Its worked example is dead: `R-e6a10f97`, the welcome-notification and welcome-listener case, is closed, so the harvester no longer sees it. Re-measured at `HEAD`: **6 of the 59 fully-unharvested rows** gain a path under the proposed arm — `SlackConnector`, `MemberController`, `FormService`, `FormSlug`, `SubmissionFinalizer`, `PlatformHost` — with **zero false positives** in that sample. ⚠️ **And the row harvested its own counterexample into existence**: because its prose writes the two class files as full paths in backticks, `docs/backlog-triage.md:147` credits it with exactly the three files it says are missing.
+
+**`R-4346557c` — PARTLY.** *"Nothing currently says how they may be batched"* is false as worded: `D38`'s own Consequences block at `docs/claims/decisions.md:1294-1299` already states the problem nearly verbatim. What is absent is the exception itself, not a record of the question. ⛔ **And `D15` is an open user decision that governs the rule this row wants excepted** — *"`D13`'s one-hub-row cap … Keep it, relax it to per-file, or re-derive the hub set per batch?"* — which is why this row is taken to record an exception FORM and never to amend the rule.
+
+**The premise that governs the whole batch, measured rather than assumed.** ⛔ **`D13`'s cap — *"at most one row may touch a hub file"* — is unsatisfiable by every batch, including a batch of one.** Across all seven candidate rows, **7 of 7 breach it**, and five of the hub files are touched by close-out procedure alone: `docs/feature-backlog.md` (7 of 7), `docs/pipeline.md` (7 of 7), `PROGRESS.md` (6 of 7), `docs/claims/lane-a.md` (5 of 7), `docs/claims/decisions.md` (4 of 7). `M107`'s own work commit `a0132f8` touched **eleven** hub files. Clause 1 is satisfied universally — only three rows touch any non-hub file and their sets are pairwise disjoint. **It is the second clause that binds, and it binds on process files rather than on subject matter.** This increment is therefore taken **UNDER A RECORDED `D13` EXCEPTION**, filed as exception #1 in the form `R-4346557c` exists to create, and fed back to `D15` as evidence.
+
+### Remedy verdict
+
+**`R-b6a4ea79` — NEEDS CHANGE. Two rules are asked for under one name and only the first is buildable.**
+(a) The awaits half **works**: extend the gate's decision parse with a tier map read by the gate itself, then compare ranks. ⛔ It must be **directional** — only a row more urgent than the decision it awaits is the defect; a symmetric rule would false-red the first legitimate row-later-than-decision, which retiering `D15` creates immediately in `R-8990648c`.
+(b) The inverse half **cannot be built this way**: `R-e7d6f223` never carried an awaits token, so **there is no join key**. Scraping row ids out of decision headings is a citation rule, and row ids are content-derived at `scripts/pipeline.php:341`, so such an id rots the moment the row's text is edited. Zero open decisions name a row today, so it would also be vacuous. **Filed as its own row rather than built.**
+⛔ **Coupling the row does not mention:** `docs/gate-baselines.md:29` pins the gate's rule-group count and `scripts/gate-baselines.php:286` parses that number out of the gate's own pass line. A new rule group moves it.
+
+**`R-7849e303` — NEEDS CHANGE. The direction is right; three traps are unnamed.**
+(a) **False positives on English words.** `Form`, `Button`, `User`, `Tenant` and `Audit` are unique class basenames *and* ordinary prose, and `Form` is itself in the hub set. The predicate ships with a **second-capital** test, so only a genuinely multi-word name qualifies, plus a check that the resolved file actually declares the name; measured against the 59 unharvested rows it rejects `M74`, `R1`, `Sheet1`, `Default` and `DROP_BYTE_LIMIT`.
+(b) **An ordering trap.** `candidate_tokens()` normalises the namespace separator to a forward slash **before** the extension test, so a fully-qualified name is dropped. That normalisation is load-bearing and cannot simply be removed.
+(c) ⛔ **It is a scheduling change, not a counting fix.** More paths raises degree, which moves `derive_hubs()`, which re-ranks the triage comparator, which changes the generated line — so P1 fails any committed line not regenerated in the same push.
+⛔ **AND THE PROOF HAD TO BE RE-PLANNED.** A Pest control **cannot** drive this: `backlog-triage.php` resolves the trunk ref unconditionally before the JSON branch, and **git is not installed in the app container** — the trade `tracker-lint-controls`, `citation-liveness-lint-controls` and `pre-push-guard-controls` each already refused. The control ships as a **host script** on that proven pattern, and `scripts/mutate.php` cannot drive it.
+
+**`R-4346557c` — NEEDS CHANGE, and the change is a narrowing.** A recorded exception works and is cheap. But the row's justification is half wrong, since the section-7.1 half carries no cascade, and its measured touch list includes the two documents the six `D38` rows edit — that is, it was measured as EXECUTING the annotations. **Taken as "record the form" only**, its touch set shrinks to three files, it stops overlapping those six entirely, and M109 executes them under the form this increment writes. ⚠️ **And the gate the row leans on is weaker than it thinks**: `.github/workflows/ci.yml:238` states the citation lint *"checks that a cited line is ALIVE, never that it says what the citing sentence claims."*
+
+Files: `scripts/pipeline-lint.php`, `tests/Feature/Docs/PipelineLintControlsTest.php`, `scripts/backlog-triage.php`, `scripts/backlog-triage-controls.php` (new), `composer.json`, `.github/workflows/ci.yml`, `docs/claims/decisions.md`, `docs/feature-backlog.md`, `docs/backlog-triage.md`, `docs/pipeline.md`, `docs/gate-baselines.md`, `PROGRESS.md`, `docs/claims/lane-a.md`.
+Shared artefacts taken: `docs/claims/decisions.md` (the `D13` exceptions subsection, and `D15`'s tier token), `docs/feature-backlog.md`, `docs/gate-baselines.md`, `PROGRESS.md` (own block only), `.github/workflows/ci.yml`, `composer.json`. Both generated documents — `docs/backlog-triage.md` and `docs/pipeline.md` — are regenerated, never hand-edited.
+Paired files taken: none.
+Namespaces spent: **nothing from either namespace** — no migration, no ADR. The next free ADR stays free and the reserved gap stays reserved for H1d.
+Prediction: P7d passes green on the live tree on its first run, because no row violates it today; both mutants redden `tests/Feature/Docs/PipelineLintControlsTest.php`. `pipeline-lint` reports one more rule group than `docs/gate-baselines.md` records, so that file disagrees until regenerated. The harvester widening moves the hub table off its current size and re-ranks the line, so P1 refuses the first push that forgets to regenerate both documents. PHPStan cannot move — the diff is scripts, tests and docs only. ⚠️ **The one I most expect to be wrong: the class-name predicate's false-positive rate.** The six-of-fifty-nine sample was measured only over rows that harvest NOTHING today; the partially-harvested rows are the larger and unmeasured set, and a single bad resolution there silently makes a row unbatchable.
 
 ## RELEASED — `M107`, the audited two-factor lockout escape, its two sibling gaps, and the fifth tracker surgery (merged as PR #300, `a0132f8`, 6/6 green with real step counts — Static analysis 31 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

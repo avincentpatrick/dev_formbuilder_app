@@ -573,120 +573,6 @@ go blind **cannot be predicted** — synthetic directories of up to sixty files 
 46-entry directory collapses to 6. That is why `M76` shipped a comparison rather than a documented list.
 
 ---
-### D15 — `D13`'s one-hub-row cap is now the binding constraint on batch composition, and it is stricter than its own purpose. Keep it, relax it to per-file, or re-derive the hub set per batch? **Tier: early-testing.**
-
-**Filed 2026-09-05 by Lane A, during `M72`, at the moment the cap decided a batch that value had not.**
-Recorded here rather than as a row because `D13` is a user decision and an increment does not re-scope
-one of those on its own judgement.
-
-⚠️ **`M93` (2026-09-14): no generator enforces the cap any more.** `render_batch()` and `BATCH_MAX` are deleted, so the one-hub-row cap lives only in `D13`'s text and in whoever groups a tier's rows. The question stands; what it governs is narrower.
-
-⛔ **RETIERED `after-launch` → `early-testing` ON 2026-09-24 (`M108`), A USER DECISION, AND THE REASON IS THAT IT STOPPED BEING A LATER QUESTION.** It now blocks the top of the tier every session is pointed at: `R-b6b9bfa4` cannot be taken without presupposing one of the three answers below, and `R-4346557c` exists only because the cap has no exception procedure. A question that gates the most urgent tier is not `after-launch` work, whatever it is about.
-
-⛔ **AND `M108` MEASURED THE CAP AGAINST EVERY CANDIDATE ROW RATHER THAN AGAINST A BATCH, WHICH IS THE NUMBER THIS DECISION WAS MISSING.** Across the seven rows verified for that increment, **7 of 7 breach the cap**, and **a batch of ONE breaches it** — `R-7849e303` alone harvests three hub files. The reason is structural and has nothing to do with which rows are chosen: **five of the hub files are touched by close-out procedure alone** — `docs/feature-backlog.md` (7 of 7 rows), `docs/pipeline.md` (7 of 7), `PROGRESS.md` (6 of 7), `docs/claims/lane-a.md` (5 of 7) and this file (4 of 7). `M107`'s own work commit `a0132f8` touched **eleven**. ⚠️ So the cap has not been *stricter than its purpose* since those five crossed the threshold; it has been **unsatisfiable**, and every recent increment has been in silent breach of it. Clause 1 — *no two rows may cite the same non-hub file* — is satisfied universally and separates the rows perfectly well: of those seven, only three touch any non-hub file at all and their sets are pairwise disjoint.
-
-⚠️ **A FOURTH OPTION THE ORIGINAL THREE DO NOT COVER, OFFERED AS A RECOMMENDATION AND NOT TAKEN:** keep the cap and make it read the files a row's **remedy edits**, excluding the close-out artefacts every increment touches by procedure. That is the smallest change that makes the rule mean what `M72` meant by it, and it leaves the hub derivation alone. ⛔ `M108` did **not** apply it — this entry is the user's and an increment does not re-scope one of those, which is the same sentence this decision opens with.
-
-⚠️ **AND THE INPUT TO THIS QUESTION MOVED UNDER IT ON THE SAME DAY.** `M108` widened the citation harvester to read class names, which is the row this entry's own closing note asks to be closed first. The derived hub set went from **49 files to 60**, and the rows harvesting no file at all fell from **59 to 30**. Any answer reasoned from the older degree counts is reasoning from a floor that has since risen.
-
-⛔ **WHAT `M72` MEASURED, AND IT IS THE WHOLE QUESTION.** Fifteen rows were verified read-only before the
-branch was cut. **Five of the six highest-value live rows touch a hub file — and they touch five
-DIFFERENT ones**: `.github/workflows/ci.yml`, `scripts/mutate.php`, `scripts/backlog-triage.php`,
-`scripts/tracker-lint-controls.php` and `docs/data-dictionary.md`. `D13` allows **one row per batch** to
-touch a hub, so four of those five were unselectable this increment for a reason that has nothing to do
-with them.
-
-⛔ **THE CAP EXISTS TO PREVENT COLLISION, AND ROWS IN FIVE DIFFERENT FILES CANNOT COLLIDE.** `D13`'s own
-reasoning says so: the 26-row component *"is glued only by hub files … which are meta-files, not product
-code"*, and the rule it derived is *"no two rows in a batch may cite the same non-hub file, and at most
-one row may touch a hub file."* The first clause is per-file. The second is per-batch, and that
-asymmetry is what now binds. ⚠️ **It was a sound rule when it was written and the tree has moved under
-it**: the remaining queue is overwhelmingly meta/tooling debt concentrated in a handful of files,
-because that is what six consecutive increments of gate work produces.
-
-⚠️ **AND IT ALREADY COST THIS INCREMENT SOMETHING CONCRETE.** `M72`'s `R3` built the proof `M61` asked
-for, the proof found a live defect in `resources/public-runtime/sw.ts` — a hub file — and the fix is the
-one line its sibling route already carries. It could not be taken, because `R1` had spent the budget. It
-is now a row, and the next increment will pay the re-derivation cost to close a defect that was fully
-diagnosed while the file was open.
-
-**The options, none of them a rewrite of `D13`:**
-
-1. **Keep it as written.** The cap has never yet caused a wrong batch, only a smaller one, and `D13`'s
-   measured ~42% saving does not depend on which rows are in the batch. Costs: the meta/tooling queue
-   drains at one hub row per increment regardless of how cheap the fixes are.
-2. ✅ **Relax the second clause to match the first: *no two rows in a batch may touch the SAME hub
-   file*.** This is what the cap is for, stated the way the other clause already is. Every batch `M72`
-   could have built satisfies it trivially, and it would have let `R3` close its own finding.
-   **Recommended.** ⚠️ The honest cost: a batch touching four hub files is a wider blast radius for
-   `D13`'s bisection rule, so it is worth pairing with *at most two hub-touching rows* until measured.
-3. **Re-derive the hub set per batch rather than globally.** A file is a hub only relative to the rows
-   still open, and `scripts/backlog-triage.php` recomputes it every run — so the set is already dynamic
-   and this option only changes the threshold. Cheapest to implement, least principled: it makes the
-   cap loosen automatically as the queue drains, which is the opposite of what a safety rule should do.
-
-⚠️ **Whatever is chosen, `D13`'s batch SIZE is not in question.** It is answered, proven seven times, and
-this entry is about which rows may sit together — not how many.
-
-⛔ **`M73` (2026-09-05) FALSIFIED THE EVIDENCE THIS ENTRY OFFERS FOR ITSELF. THE QUESTION SURVIVES; THE
-ARGUMENT DOES NOT.** This entry's most concrete claim is that the cap *"already cost this increment
-something concrete"* — that `M72`'s `R3` diagnosed a live `sw.ts` defect, could not fix it, and *"the next
-increment will pay the re-derivation cost"*. **`resources/public-runtime/sw.ts` is not a hub file, and was
-not one when that was written.** `HUB_THRESHOLD` is 3; exactly **two** open rows cite it; and
-`docs/backlog-triage.md` — regenerated by `M72` in its own close-out, in the same commit range that wrote
-the sentence — omits `sw.ts` from the hub table and lists it in the NON-hub cites column of both rows that
-name it. **The `D13` budget never bound on that row.** `M73` took it as an ordinary non-hub row and closed
-it in the same batch as a genuine hub row.
-
-⚠️ **What that does and does not change.** It does NOT answer the question: the five-hub observation that
-opens this entry stands on its own, and a queue concentrated in a handful of meta-files is still the
-condition that makes a per-batch cap bind. It DOES remove the one worked example, so whoever answers this
-should not weigh *"it already cost us a fix"* — that cost was a miscount, not the cap. ⚠️ **And it adds a
-different concern, pointing the other way**: the hub set is derived from harvested citations, and `M73`
-found that `scripts/backlog-triage.php` silently drops any citation written as a PARTIAL path, so such a
-row contributes to no file's hub degree at all. **The hub set that both options reason about is a floor.**
-Filed as its own row; worth closing before this decision is taken on degree counts.
-
-⛔ **`M87` (2026-09-08) ADDS THE MEASUREMENT THIS ENTRY HAS BEEN MISSING SINCE `M73` TOOK ITS WORKED
-EXAMPLE AWAY — AND IT IS STRONGER THAN THE ONE IT REPLACES, BECAUSE IT IS ABOUT THE RULE RATHER THAN ABOUT
-ONE INCREMENT'S LUCK.** `docs/feature-backlog.md` is itself in the derived hub table, at degree **3**
-(cited by the open rows at `6024`, `7926` and `4996`). **Every closure and every correction edits the
-ledger.** So `D13`'s second clause, read to its letter — *at most one row may touch a hub file* — makes a
-batch of more than **one** row illegal, always, for every possible selection. **Eighteen batched increments
-have relied on an exemption nobody wrote down**, and the generator cannot apply it either: it implements
-*cite*, not *touch*, so it never notices.
-
-⚠️ **THAT IS NOT AN ARGUMENT FOR RELAXING THE CAP; IT IS AN ARGUMENT THAT THE CAP AS WRITTEN IS ALREADY
-NOT THE RULE ANYONE FOLLOWS.** Whichever option is chosen here should say what the ledger is, because the
-answer "it is a hub and batches may touch one of them" has been false in practice since `M65`.
-
-⚠️ **AND THE PRACTICAL BIND IS NOW MEASURED RATHER THAN ASSERTED.** Every harness script in this repository
-is a hub file — `pipeline.php` (12), `backlog-triage.php` (11), `state.php` (10), `mutate.php` (6),
-`citation-liveness-lint.php` (6), `tracker-lint-controls.php` (4), `loop.php` (4), `next.php` (3),
-`pipeline-lint.php` (3), `pre-push-guard.php` (3), `tracker-surgery.php` (3) — and `docs/data-dictionary.md`
-(13) with them. The remaining queue is overwhelmingly repairs inside those files, so the cap admits
-**exactly one harness row per increment** regardless of how cheap the rest are. `M87` composed its batch by
-hand against this constraint and rejected the generated proposal for the third increment running, for a
-third distinct mechanism — `M83`'s was a hub-free harvest of a hub-only repair, `M86`'s was a file of nil
-harvested degree, and `M87`'s was three hub-touching rows in a four-row proposal plus a fourth blocked on
-an open decision. **Three different mechanisms, one rule, no fix yet.**
-
-⛔ **`M88` ADDS A FOURTH MECHANISM, AND IT IS THE ONE NO BATCH-COMPOSITION RULE CAN PREVENT: A CORRECTION
-CAN FORCE A HUB TOUCH THAT WAS UNKNOWABLE AT CLAIM TIME.** `M88` declared one hub-touching row
-(`docs/data-dictionary.md`) and composed the rest to be pairwise disjoint. It finished having touched
-**two** hub files, because verifying row `8559`'s *premise* revealed that the false sentence the row was
-built on had also propagated into `D27` — and `docs/claims/decisions.md` is itself a hub file at 3 citing
-rows. ⚠️ **The excess was not chosen and could not have been foreseen**: you cannot know a claim has
-propagated into the decision roster until you check it, and the alternative — knowingly leaving a false
-sentence in the roster while closing the row that proved it false — is strictly worse than exceeding the
-cap. ⚠️ **This is not the ledger exemption argued above**; it is a second, independent way the cap is
-un-followable, and it applies to the *correction* half of `D13`'s own workflow rather than to selection.
-⛔ **Whichever option is taken, it should say what happens when verification itself forces the second hub
-touch**, because that is now measured rather than hypothetical, and answering only the selection half
-would leave `D13` binding on a case no selection can control.
-
----
-
 ### D16 — The `npm audit` judge makes a required status check green when the registry is unreachable. Accept it, isolate it, or keep the hard block? **Tier: after-launch.**
 
 **Filed 2026-09-05 by Lane A, during `M72`, at the moment the trade was taken rather than after.** It is
@@ -1351,6 +1237,134 @@ end state and needs a disclosure-safe refusal designed first, which is a decisio
 
 
 ## ANSWERED
+### D15 — `D13`'s one-hub-row cap is now the binding constraint on batch composition, and it is stricter than its own purpose. **ANSWERED — option 4: the cap reads the files a row REMEDY EDITS, excluding the close-out artefacts.** **Tier: early-testing.**
+
+**Filed 2026-09-05 by Lane A, during `M72`, at the moment the cap decided a batch that value had not.**
+Recorded here rather than as a row because `D13` is a user decision and an increment does not re-scope
+one of those on its own judgement.
+
+⚠️ **`M93` (2026-09-14): no generator enforces the cap any more.** `render_batch()` and `BATCH_MAX` are deleted, so the one-hub-row cap lives only in `D13`'s text and in whoever groups a tier's rows. The question stands; what it governs is narrower.
+
+⛔ **RETIERED `after-launch` → `early-testing` ON 2026-09-24 (`M108`), A USER DECISION, AND THE REASON IS THAT IT STOPPED BEING A LATER QUESTION.** It now blocks the top of the tier every session is pointed at: `R-b6b9bfa4` cannot be taken without presupposing one of the three answers below, and `R-4346557c` exists only because the cap has no exception procedure. A question that gates the most urgent tier is not `after-launch` work, whatever it is about.
+
+⛔ **AND `M108` MEASURED THE CAP AGAINST EVERY CANDIDATE ROW RATHER THAN AGAINST A BATCH, WHICH IS THE NUMBER THIS DECISION WAS MISSING.** Across the seven rows verified for that increment, **7 of 7 breach the cap**, and **a batch of ONE breaches it** — `R-7849e303` alone harvests three hub files. The reason is structural and has nothing to do with which rows are chosen: **five of the hub files are touched by close-out procedure alone** — `docs/feature-backlog.md` (7 of 7 rows), `docs/pipeline.md` (7 of 7), `PROGRESS.md` (6 of 7), `docs/claims/lane-a.md` (5 of 7) and this file (4 of 7). `M107`'s own work commit `a0132f8` touched **eleven**. ⚠️ So the cap has not been *stricter than its purpose* since those five crossed the threshold; it has been **unsatisfiable**, and every recent increment has been in silent breach of it. Clause 1 — *no two rows may cite the same non-hub file* — is satisfied universally and separates the rows perfectly well: of those seven, only three touch any non-hub file at all and their sets are pairwise disjoint.
+
+⚠️ **A FOURTH OPTION THE ORIGINAL THREE DO NOT COVER, OFFERED AS A RECOMMENDATION AND NOT TAKEN:** keep the cap and make it read the files a row's **remedy edits**, excluding the close-out artefacts every increment touches by procedure. That is the smallest change that makes the rule mean what `M72` meant by it, and it leaves the hub derivation alone. ⛔ `M108` did **not** apply it — this entry is the user's and an increment does not re-scope one of those, which is the same sentence this decision opens with.
+
+⚠️ **AND THE INPUT TO THIS QUESTION MOVED UNDER IT ON THE SAME DAY.** `M108` widened the citation harvester to read class names, which is the row this entry's own closing note asks to be closed first. The derived hub set went from **49 files to 60**, and the rows harvesting no file at all fell from **59 to 30**. Any answer reasoned from the older degree counts is reasoning from a floor that has since risen.
+
+⛔ **WHAT `M72` MEASURED, AND IT IS THE WHOLE QUESTION.** Fifteen rows were verified read-only before the
+branch was cut. **Five of the six highest-value live rows touch a hub file — and they touch five
+DIFFERENT ones**: `.github/workflows/ci.yml`, `scripts/mutate.php`, `scripts/backlog-triage.php`,
+`scripts/tracker-lint-controls.php` and `docs/data-dictionary.md`. `D13` allows **one row per batch** to
+touch a hub, so four of those five were unselectable this increment for a reason that has nothing to do
+with them.
+
+⛔ **THE CAP EXISTS TO PREVENT COLLISION, AND ROWS IN FIVE DIFFERENT FILES CANNOT COLLIDE.** `D13`'s own
+reasoning says so: the 26-row component *"is glued only by hub files … which are meta-files, not product
+code"*, and the rule it derived is *"no two rows in a batch may cite the same non-hub file, and at most
+one row may touch a hub file."* The first clause is per-file. The second is per-batch, and that
+asymmetry is what now binds. ⚠️ **It was a sound rule when it was written and the tree has moved under
+it**: the remaining queue is overwhelmingly meta/tooling debt concentrated in a handful of files,
+because that is what six consecutive increments of gate work produces.
+
+⚠️ **AND IT ALREADY COST THIS INCREMENT SOMETHING CONCRETE.** `M72`'s `R3` built the proof `M61` asked
+for, the proof found a live defect in `resources/public-runtime/sw.ts` — a hub file — and the fix is the
+one line its sibling route already carries. It could not be taken, because `R1` had spent the budget. It
+is now a row, and the next increment will pay the re-derivation cost to close a defect that was fully
+diagnosed while the file was open.
+
+✅ **ANSWERED 2026-09-26 (user decision), APPLIED BY `M112` — OPTION 4, `M108`'s, which the original three do not cover.** **The cap reads the files a row's REMEDY EDITS, excluding the close-out artefacts every increment touches by procedure** — `docs/feature-backlog.md`, `docs/pipeline.md`, `PROGRESS.md`, `docs/claims/lane-a.md` and this file. Both of `D13` item 1's clauses stand exactly as written; only their INPUT changes, from *cited* to *edited*.
+
+⛔ **WHAT DECIDED IT WAS A CLAUSE-1 BREACH, WHICH IS NEW.** `M108` and `M109` both recorded exceptions against clause 2 while reporting clause 1 *satisfied exactly*, and `M108` concluded the rule was merely unsatisfiable. `M112` measured a batch where **clause 1 breaks too**: `app/Services/Forms/StructuralValidationGate.php` has citation degree **2** against `HUB_THRESHOLD` 3 — so it is a NON-hub file — and `R-3df897a6` and `R-a6607470` both cite it. Under the citation reading those two rows may not share a batch. Under the remedy reading they may, because `R-a6607470`'s remedy creates one new file and edits none. **The citation reading was forbidding a pair that cannot collide, which is the precise failure `D15` opens by describing.**
+
+⛔ **AND IT ENDED THE EXCEPTION SERIES RATHER THAN EXTENDING IT.** `D13`'s escalation rule says three exceptions for one reason mean the rule is wrong rather than the batch, and that the entry to write at that point is an answer here — not a fourth exception. `M112`'s batch would have been the third. The entry written was this answer.
+
+**What it costs, stated rather than discovered.** A row's remedy-edit set is known only once the row is understood, so batch composition now happens AFTER the verification pass rather than before it. That is a real change of order and it is the honest price: `M112` composed its batch from three verified rows and dropped a fourth (`R-33c7fd56`) on the strength of what its remedy turned out to touch — `docs/data-dictionary.md` §19, a hub, because a fifth column on `user_ui_preferences` belongs in the table that enumerates that table's columns. ⚠️ **No gate forces that edit** — `DocumentedDefaultDriftTest` compares only *documented* cells against `information_schema` and has no completeness arm — **so the temptation the answer creates is to under-declare a remedy to get the hub count down.** That is the one way to cheat this rule, it is named here so it is not discovered later, and `M112` declined it explicitly.
+
+⚠️ **TWO GENERATORS RESTATE THE CLAUSE VERBATIM AND BOTH WERE UPDATED IN THE SAME PUSH** — `scripts/next.php` and `scripts/pipeline.php` each carried *"no two citing the same non-hub file, at most one touching a hub"* into `docs/pipeline.md` and into every hand-off. **No gate reads that sentence**, which is exactly why it had to be changed by hand rather than left to drift. Making them POINT at `D13` instead of copying it is `R-b6b9bfa4`'s remedy and stays with that row, which this answer unblocks.
+
+⚠️ **WHAT THIS DOES NOT DECIDE.** The hub set is still derived at `HUB_THRESHOLD = 3` by `scripts/backlog-triage.php` from harvested *citations*, and that derivation is untouched — a file is still a hub because many rows CITE it, while the cap now asks which rows EDIT it. Those are two different questions and the answer deliberately changes only the second. `R-f8bcf113` and `R-b6b9bfa4` both concern the first and remain open.
+
+**The three original options are kept below as the record of what was weighed, not as live alternatives.**
+
+**The options, none of them a rewrite of `D13`:**
+
+1. **Keep it as written.** The cap has never yet caused a wrong batch, only a smaller one, and `D13`'s
+   measured ~42% saving does not depend on which rows are in the batch. Costs: the meta/tooling queue
+   drains at one hub row per increment regardless of how cheap the fixes are.
+2. ✅ **Relax the second clause to match the first: *no two rows in a batch may touch the SAME hub
+   file*.** This is what the cap is for, stated the way the other clause already is. Every batch `M72`
+   could have built satisfies it trivially, and it would have let `R3` close its own finding.
+   **Recommended.** ⚠️ The honest cost: a batch touching four hub files is a wider blast radius for
+   `D13`'s bisection rule, so it is worth pairing with *at most two hub-touching rows* until measured.
+3. **Re-derive the hub set per batch rather than globally.** A file is a hub only relative to the rows
+   still open, and `scripts/backlog-triage.php` recomputes it every run — so the set is already dynamic
+   and this option only changes the threshold. Cheapest to implement, least principled: it makes the
+   cap loosen automatically as the queue drains, which is the opposite of what a safety rule should do.
+
+⚠️ **Whatever is chosen, `D13`'s batch SIZE is not in question.** It is answered, proven seven times, and
+this entry is about which rows may sit together — not how many.
+
+⛔ **`M73` (2026-09-05) FALSIFIED THE EVIDENCE THIS ENTRY OFFERS FOR ITSELF. THE QUESTION SURVIVES; THE
+ARGUMENT DOES NOT.** This entry's most concrete claim is that the cap *"already cost this increment
+something concrete"* — that `M72`'s `R3` diagnosed a live `sw.ts` defect, could not fix it, and *"the next
+increment will pay the re-derivation cost"*. **`resources/public-runtime/sw.ts` is not a hub file, and was
+not one when that was written.** `HUB_THRESHOLD` is 3; exactly **two** open rows cite it; and
+`docs/backlog-triage.md` — regenerated by `M72` in its own close-out, in the same commit range that wrote
+the sentence — omits `sw.ts` from the hub table and lists it in the NON-hub cites column of both rows that
+name it. **The `D13` budget never bound on that row.** `M73` took it as an ordinary non-hub row and closed
+it in the same batch as a genuine hub row.
+
+⚠️ **What that does and does not change.** It does NOT answer the question: the five-hub observation that
+opens this entry stands on its own, and a queue concentrated in a handful of meta-files is still the
+condition that makes a per-batch cap bind. It DOES remove the one worked example, so whoever answers this
+should not weigh *"it already cost us a fix"* — that cost was a miscount, not the cap. ⚠️ **And it adds a
+different concern, pointing the other way**: the hub set is derived from harvested citations, and `M73`
+found that `scripts/backlog-triage.php` silently drops any citation written as a PARTIAL path, so such a
+row contributes to no file's hub degree at all. **The hub set that both options reason about is a floor.**
+Filed as its own row; worth closing before this decision is taken on degree counts.
+
+⛔ **`M87` (2026-09-08) ADDS THE MEASUREMENT THIS ENTRY HAS BEEN MISSING SINCE `M73` TOOK ITS WORKED
+EXAMPLE AWAY — AND IT IS STRONGER THAN THE ONE IT REPLACES, BECAUSE IT IS ABOUT THE RULE RATHER THAN ABOUT
+ONE INCREMENT'S LUCK.** `docs/feature-backlog.md` is itself in the derived hub table, at degree **3**
+(cited by the open rows at `6024`, `7926` and `4996`). **Every closure and every correction edits the
+ledger.** So `D13`'s second clause, read to its letter — *at most one row may touch a hub file* — makes a
+batch of more than **one** row illegal, always, for every possible selection. **Eighteen batched increments
+have relied on an exemption nobody wrote down**, and the generator cannot apply it either: it implements
+*cite*, not *touch*, so it never notices.
+
+⚠️ **THAT IS NOT AN ARGUMENT FOR RELAXING THE CAP; IT IS AN ARGUMENT THAT THE CAP AS WRITTEN IS ALREADY
+NOT THE RULE ANYONE FOLLOWS.** Whichever option is chosen here should say what the ledger is, because the
+answer "it is a hub and batches may touch one of them" has been false in practice since `M65`.
+
+⚠️ **AND THE PRACTICAL BIND IS NOW MEASURED RATHER THAN ASSERTED.** Every harness script in this repository
+is a hub file — `pipeline.php` (12), `backlog-triage.php` (11), `state.php` (10), `mutate.php` (6),
+`citation-liveness-lint.php` (6), `tracker-lint-controls.php` (4), `loop.php` (4), `next.php` (3),
+`pipeline-lint.php` (3), `pre-push-guard.php` (3), `tracker-surgery.php` (3) — and `docs/data-dictionary.md`
+(13) with them. The remaining queue is overwhelmingly repairs inside those files, so the cap admits
+**exactly one harness row per increment** regardless of how cheap the rest are. `M87` composed its batch by
+hand against this constraint and rejected the generated proposal for the third increment running, for a
+third distinct mechanism — `M83`'s was a hub-free harvest of a hub-only repair, `M86`'s was a file of nil
+harvested degree, and `M87`'s was three hub-touching rows in a four-row proposal plus a fourth blocked on
+an open decision. **Three different mechanisms, one rule, no fix yet.**
+
+⛔ **`M88` ADDS A FOURTH MECHANISM, AND IT IS THE ONE NO BATCH-COMPOSITION RULE CAN PREVENT: A CORRECTION
+CAN FORCE A HUB TOUCH THAT WAS UNKNOWABLE AT CLAIM TIME.** `M88` declared one hub-touching row
+(`docs/data-dictionary.md`) and composed the rest to be pairwise disjoint. It finished having touched
+**two** hub files, because verifying row `8559`'s *premise* revealed that the false sentence the row was
+built on had also propagated into `D27` — and `docs/claims/decisions.md` is itself a hub file at 3 citing
+rows. ⚠️ **The excess was not chosen and could not have been foreseen**: you cannot know a claim has
+propagated into the decision roster until you check it, and the alternative — knowingly leaving a false
+sentence in the roster while closing the row that proved it false — is strictly worse than exceeding the
+cap. ⚠️ **This is not the ledger exemption argued above**; it is a second, independent way the cap is
+un-followable, and it applies to the *correction* half of `D13`'s own workflow rather than to selection.
+⛔ **Whichever option is taken, it should say what happens when verification itself forces the second hub
+touch**, because that is now measured rather than hypothetical, and answering only the selection half
+would leave `D13` binding on a case no selection can control.
+
+---
+
 ### D38 — The API documentation promises features that were never built. Build them, or trim the documentation? **C — mark the six as not built, in place, the way §7.1 already annotates.**
 
 **Answered 2026-09-20 (user decision, in chat), recorded by Lane A during `M105` — C.**
@@ -2355,6 +2369,14 @@ half that works.
 ⛔ **THIS IS THE SECOND ENTRY FOR THE SAME REASON, AND THE THIRD IS THE TRIGGER.** The escalation rule above says three or more exceptions for one reason mean the rule is wrong rather than the batch, and that the entry to write at that point is an answer to `D15` — not a fourth exception. `D15` is open, is tiered `early-testing`, and already carries three options, a recommendation, and `M108`'s fourth option. **The next increment that composes a batch from this queue should expect to be the one that trips it.**
 
 **Disposition:** `D15` decides the rule; this increment did not touch it, for the reason `D15` opens with — an increment does not re-scope a user decision on its own judgement. Recorded in both places the log requires: inline at each of the four closed rows, and in `PROGRESS.md`'s release paragraph.
+
+##### The series ENDED at #2 — `M112` (2026-09-26) tripped the escalation and wrote the answer instead
+
+⛔ **THERE IS NO #3, AND THAT IS THE ENTRY.** `M112` composed a batch from this queue and, as #2 predicted, was the increment that tripped the rule. The escalation above says three exceptions for one reason mean the rule is wrong rather than the batch, and that what gets written at that point is an answer to `D15` — not a fourth exception. **The user answered `D15` the same day, option 4**, and the cap now reads the files a row's REMEDY EDITS rather than the files it cites. The measurement, the cost and the one way to cheat the new rule are all recorded at `D15` rather than repeated here.
+
+⚠️ **AND `M112` FOUND THE THING #1 AND #2 BOTH MISSED, WHICH IS WHY THE ANSWER WAS OWED RATHER THAN MERELY DUE.** Both earlier entries report item 1's FIRST clause — *no two rows may cite the same non-hub file* — as *satisfied exactly*, and `M108` concluded the rule was simply unsatisfiable on clause 2. `M112`'s batch breaches **clause 1**: `app/Services/Forms/StructuralValidationGate.php` sits at citation degree **2** against `HUB_THRESHOLD` 3, so it is a non-hub file, and two of the three rows cite it. **The clause that had been holding was forbidding a pair that cannot collide** — one row rewrites that file, the other only mentions it while creating a new module — which is the failure `D15` opens by describing, finally measured on a real batch rather than argued.
+
+**Disposition:** the subsection stays, because the two entries above are the record of how the rule failed and a later reader needs them. It is closed to new entries under the citation reading, which no longer exists. A future deviation from items 1–5 is logged here as #3 in the ordinary way; it simply will not be for this reason.
 
 ---
 

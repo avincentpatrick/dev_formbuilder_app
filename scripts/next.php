@@ -227,8 +227,10 @@ function render_queue(array $state): string
     $out .= $gate['next_tier'] === null
         ? ' The Next section lists no work outside held rows and open questions.'
         : ' Take work from the Next section — '.$gate['next_tier'].': '.implode(', ', (array) $gate['next'])
-            .' — and group 3-4 rows of ONE tier by D13\'s file-overlap rule (no two citing the same non-hub file,'
-            .' at most one touching a hub).';
+            .' — and group 3-4 rows of ONE tier by D13\'s file-overlap rule, which since D15 reads the files a'
+            .' row\'s REMEDY EDITS rather than the files it cites: no two rows may edit the same file, and at most'
+            .' one may touch a hub. The close-out artefacts every increment touches by procedure are excluded, so'
+            .' compose the batch AFTER verifying the rows rather than before.';
 
     if ((array) ($gate['waiting_ids'] ?? []) !== []) {
         $out .= ' Waiting on the user in '.$gate['tier'].': '.implode(', ', (array) $gate['waiting_ids'])

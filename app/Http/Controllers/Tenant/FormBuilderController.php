@@ -99,13 +99,19 @@ final class FormBuilderController extends Controller
         )));
     }
 
+    /**
+     * ⛔ `payload()`, NOT `validated()` (M111, `R-d5d6db11`). `validated()` rebuilds `config` from the
+     * enumerated `config.*` paths only, so every key no `configRules()` arm lists was dropped here on a
+     * 200 OK. The accessor puts the raw config back under the validated tree; the reasoning is at
+     * `UpdateFieldRequest::payload()`.
+     */
     public function updateField(UpdateFieldRequest $request, Form $form, FormField $field): JsonResponse
     {
         return $this->respond(fn (): array => $this->presenter->field($this->builder->updateField(
             $form,
             $field,
             $this->actor($request),
-            $request->validated(),
+            $request->payload(),
             $request->input('version'),
         )));
     }

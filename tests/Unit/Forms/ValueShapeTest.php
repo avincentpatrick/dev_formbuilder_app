@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\ComparisonOperator;
 use App\Enums\FieldType;
 use App\Enums\ValidationRuleType;
 use App\Enums\ValueShape;
@@ -184,5 +185,60 @@ it('leaves no rule type unanswered by any shape', function (): void {
 
         expect($allowed)->not->toBeEmpty("no shape allows {$rule->value}");
         expect($refused)->not->toBeEmpty("every shape allows {$rule->value} — the column decides nothing");
+    }
+});
+
+// ── allowsOperator(): which comparisons a CONDITION may make against each shape ─────────────────
+
+it('refuses the ordered operators on a temporal shape, because a condition would never hold', function (): void {
+    // StructuredRuleLowering lowers gt/lt/gte/lte to AstBuilders::comparison(), and ExpressionEvaluator
+    // returns false on a NaN operand — so `required_if visit_date > '2026-01-01'` is not a condition that
+    // sometimes holds, it is one that can NEVER hold, and the field it guards never becomes required.
+    foreach ([ComparisonOperator::Gt, ComparisonOperator::Lt, ComparisonOperator::Gte, ComparisonOperator::Lte] as $op) {
+        expect(ValueShape::Temporal->allowsOperator($op))->toBeFalse("Temporal should not allow {$op->value}");
+        expect(ValueShape::Number->allowsOperator($op))->toBeTrue("Number should allow {$op->value}");
+    }
+});
+
+it('allows equality and blankness everywhere there is an answer at all', function (): void {
+    foreach ([ComparisonOperator::Eq, ComparisonOperator::Neq, ComparisonOperator::IsNull] as $op) {
+        foreach (ValueShape::cases() as $shape) {
+            expect($shape->allowsOperator($op))->toBe(
+                $shape !== ValueShape::NoAnswer,
+                "{$shape->value} disagrees about {$op->value}",
+            );
+        }
+    }
+});
+
+it('offers contains only where a value is a list or a string', function (): void {
+    // evalMembershipFunction() branches: an array is a membership test, a scalar a substring test. That is
+    // right for text, a multi-select's list and a cascade's selection — and a trap for a number or a date,
+    // where a substring match reads as a range test and is not one.
+    expect(ValueShape::Text->allowsOperator(ComparisonOperator::Contains))->toBeTrue()
+        ->and(ValueShape::Choice->allowsOperator(ComparisonOperator::Contains))->toBeTrue()
+        ->and(ValueShape::Hierarchy->allowsOperator(ComparisonOperator::Contains))->toBeTrue()
+        ->and(ValueShape::Number->allowsOperator(ComparisonOperator::Contains))->toBeFalse()
+        ->and(ValueShape::Temporal->allowsOperator(ComparisonOperator::Contains))->toBeFalse()
+        ->and(ValueShape::Grid->allowsOperator(ComparisonOperator::Contains))->toBeFalse();
+});
+
+it('offers a note or page break no operator at all', function (): void {
+    foreach (ComparisonOperator::cases() as $op) {
+        expect(ValueShape::NoAnswer->allowsOperator($op))->toBeFalse("NoAnswer should not allow {$op->value}");
+    }
+});
+
+it('leaves no operator unanswered by any shape', function (): void {
+    // Anti-vacuity over the operator axis: every one of the eight must be allowed somewhere and refused
+    // somewhere, or the column decides nothing.
+    expect(ComparisonOperator::cases())->toHaveCount(8);
+
+    foreach (ComparisonOperator::cases() as $op) {
+        $allowed = array_filter(ValueShape::cases(), static fn (ValueShape $s): bool => $s->allowsOperator($op));
+        $refused = array_filter(ValueShape::cases(), static fn (ValueShape $s): bool => ! $s->allowsOperator($op));
+
+        expect($allowed)->not->toBeEmpty("no shape allows {$op->value}");
+        expect($refused)->not->toBeEmpty("every shape allows {$op->value} — the column decides nothing");
     }
 });

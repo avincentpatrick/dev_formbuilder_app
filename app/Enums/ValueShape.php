@@ -181,4 +181,44 @@ enum ValueShape: string
                 || $this === self::Duration,
         };
     }
+
+    /**
+     * Whether a CONDITION (`required_if` / `skip_if`) may compare a value of this shape with this operator.
+     *
+     * ⛔ THE ORDERED FOUR CARRY THE SAME FAIL-CLOSED DEFECT AS `min_value`, BY THE SAME ROUTE.
+     * `StructuredRuleLowering::conditionForOperator()` lowers `gt`/`lt`/`gte`/`lte` to
+     * `AstBuilders::comparison()`, and `ExpressionEvaluator` takes `Coercion::toNumber()` of both sides and
+     * returns **false** on a NaN operand. So `required_if visit_date > '2026-01-01'` is not a condition that
+     * sometimes holds — it is a condition that can never hold, and the field it guards silently never
+     * becomes required. Confined to the three shapes whose stored answer really is a number.
+     *
+     * ⚠️ `contains` IS SAFE WHERE IT IS OFFERED AND MEANINGLESS WHERE IT IS NOT.
+     * `ExpressionEvaluator::evalMembershipFunction()` branches on the value: an array is a membership test,
+     * a scalar is a substring test through `Coercion::toStr()`. That is exactly right for text, for a
+     * multi-select's list and for a cascade's selection, and it is a trap everywhere else — substring-matching
+     * a number or a date reads as a range test and is not one, and an object-valued answer would be searched
+     * as whatever `toStr()` happens to make of it.
+     *
+     * ⚠️ `eq`, `neq` and `is_null` are value-agnostic: `equals()` has its own emptiness and array rules and
+     * never coerces through `toNumber()`, so they apply wherever there is an answer at all.
+     */
+    public function allowsOperator(ComparisonOperator $operator): bool
+    {
+        if ($this === self::NoAnswer) {
+            return false;
+        }
+
+        return match ($operator) {
+            ComparisonOperator::Eq, ComparisonOperator::Neq, ComparisonOperator::IsNull => true,
+
+            ComparisonOperator::Gt, ComparisonOperator::Lt,
+            ComparisonOperator::Gte, ComparisonOperator::Lte => $this === self::Number
+                || $this === self::Duration
+                || $this === self::Scale,
+
+            ComparisonOperator::Contains => $this === self::Text
+                || $this === self::Choice
+                || $this === self::Hierarchy,
+        };
+    }
 }

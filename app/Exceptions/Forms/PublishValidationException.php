@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Exceptions\Forms;
 
 use App\Exceptions\Expressions\ExpressionException;
+use App\Exceptions\Submissions\SubmissionValidationException;
 use App\Exceptions\Templates\TemplateSyntaxException;
 use App\Services\Templates\TemplateScopeResolver;
 use RuntimeException;
@@ -14,22 +15,44 @@ use RuntimeException;
  * refused and the SPECIFIC violation is surfaced (not a generic failure) so the builder UI can point at
  * the offending field/section. Distinct from an authorization failure (403 from FormPolicy) and from a
  * lifecycle-rule violation ({@see FormException}).
+ *
+ * ⛔ IT CARRIES A STRUCTURED LIST AS WELL AS PROSE, SINCE M112 — AND THE PROSE IS THE HARD CONSTRAINT.
+ * Until M112 this envelope was message-only and a publish refused on the FIRST violation, so an author
+ * with four broken fields learned about one of them per attempt. {@see violations()} now carries every
+ * one as `{field, code, message}` — the shape
+ * {@see SubmissionValidationException} already ships for submissions and
+ * `bootstrap/app.php` already renders to both surfaces.
+ *
+ * ⛔ THE AGGREGATE MESSAGE IS THE SENTENCES JOINED, NEVER A SUMMARY, AND THAT IS NOT A STYLE CHOICE.
+ * Roughly twenty-seven assertions across six test files read `getMessage()` and assert a `toContain()`
+ * on a field key or a slug; not one asserts a count. `SubmissionValidationException::summarize()` writes
+ * "N fields failed structural validation.", which drops every key and slug and would redden all of them
+ * at once. Joining preserves each sentence verbatim, so **a single violation produces a message
+ * byte-identical to the pre-M112 one** — that identity is what keeps those assertions green, rather
+ * than a hope that they survive. Borrow the class shape from that sibling; refuse that one method.
+ *
+ * ⚠️ `code` IS STABLE AND IS WHAT A CONSUMER SHOULD MATCH ON, NEVER THE WORDING. Five factories already
+ * received a stable snake_case slug as `$detail` and pass it straight through. The four that carried
+ * free prose — `choiceOptionsInvalid`, `cascadingConfigInvalid`, `matrixConfigInvalid` and
+ * `mediaConfigInvalid` — gained a slug derived from the factory name, and their prose stays in
+ * `message` untouched. So message and structure are gated independently, which is what lets a mutation
+ * prove one without the other.
  */
 final class PublishValidationException extends RuntimeException
 {
     public static function validationReferencesForeignVersion(string $fieldKey): self
     {
-        return new self("The validation rule on “{$fieldKey}” references a field from a different version.");
+        return self::one($fieldKey, 'validation_references_foreign_version', "The validation rule on “{$fieldKey}” references a field from a different version.");
     }
 
     public static function sectionBelongsToForeignVersion(string $fieldKey): self
     {
-        return new self("The field “{$fieldKey}” is placed in a section that belongs to a different version.");
+        return self::one($fieldKey, 'section_belongs_to_foreign_version', "The field “{$fieldKey}” is placed in a section that belongs to a different version.");
     }
 
     public static function queryableFieldMissingType(string $fieldKey): self
     {
-        return new self("The queryable field “{$fieldKey}” must declare an indexed data type before publishing.");
+        return self::one($fieldKey, 'queryable_field_missing_type', "The queryable field “{$fieldKey}” must declare an indexed data type before publishing.");
     }
 
     /**
@@ -40,13 +63,13 @@ final class PublishValidationException extends RuntimeException
     {
         $where = $fieldKey !== null ? "on “{$fieldKey}” " : '';
 
-        return new self("The expression {$where}is invalid ({$detail}).");
+        return self::one($fieldKey, $detail, "The expression {$where}is invalid ({$detail}).");
     }
 
     /** A structured rule whose `rule_value` cannot be used at submission time (bad regex / non-numeric threshold). */
     public static function ruleValueInvalid(string $fieldKey, string $detail): self
     {
-        return new self("The validation rule on “{$fieldKey}” is invalid ({$detail}).");
+        return self::one($fieldKey, $detail, "The validation rule on “{$fieldKey}” is invalid ({$detail}).");
     }
 
     /**
@@ -62,25 +85,25 @@ final class PublishValidationException extends RuntimeException
      */
     public static function templateInvalid(string $ownerKey, string $column, string $detail): self
     {
-        return new self("The {$column} on “{$ownerKey}” has an invalid reference ({$detail}).");
+        return self::one($ownerKey, $detail, "The {$column} on “{$ownerKey}” has an invalid reference ({$detail}).");
     }
 
     /** A choice field (Increment G4a) with no options or duplicate option values — unanswerable / ambiguous. */
     public static function choiceOptionsInvalid(string $fieldKey, string $detail): self
     {
-        return new self("The choices on “{$fieldKey}” are invalid ({$detail}).");
+        return self::one($fieldKey, 'choice_options_invalid', "The choices on “{$fieldKey}” are invalid ({$detail}).");
     }
 
     /** A cascading-select field (Increment G4a) whose level/option hierarchy does not resolve. */
     public static function cascadingConfigInvalid(string $fieldKey, string $detail): self
     {
-        return new self("The cascading choices on “{$fieldKey}” are invalid ({$detail}).");
+        return self::one($fieldKey, 'cascading_config_invalid', "The cascading choices on “{$fieldKey}” are invalid ({$detail}).");
     }
 
     /** A composite grid field (Increment G4b: matrix / likert_matrix) whose row/column/cell config is invalid. */
     public static function matrixConfigInvalid(string $fieldKey, string $detail): self
     {
-        return new self("The grid on “{$fieldKey}” is invalid ({$detail}).");
+        return self::one($fieldKey, 'matrix_config_invalid', "The grid on “{$fieldKey}” is invalid ({$detail}).");
     }
 
     /**
@@ -89,7 +112,7 @@ final class PublishValidationException extends RuntimeException
      */
     public static function compositeInRepeatableSection(string $fieldKey): self
     {
-        return new self("The grid field “{$fieldKey}” cannot be placed inside a repeatable section.");
+        return self::one($fieldKey, 'composite_in_repeatable_section', "The grid field “{$fieldKey}” cannot be placed inside a repeatable section.");
     }
 
     /**
@@ -99,7 +122,7 @@ final class PublishValidationException extends RuntimeException
      */
     public static function expressionReferencesComposite(string $ownerKey, string $compositeKey): self
     {
-        return new self("The expression on “{$ownerKey}” references the grid field “{$compositeKey}”, which cannot be used in an expression.");
+        return self::one($ownerKey, 'expression_references_composite', "The expression on “{$ownerKey}” references the grid field “{$compositeKey}”, which cannot be used in an expression.");
     }
 
     /**
@@ -108,7 +131,7 @@ final class PublishValidationException extends RuntimeException
      */
     public static function geoInRepeatableSection(string $fieldKey): self
     {
-        return new self("The location field “{$fieldKey}” cannot be placed inside a repeatable section.");
+        return self::one($fieldKey, 'geo_in_repeatable_section', "The location field “{$fieldKey}” cannot be placed inside a repeatable section.");
     }
 
     /**
@@ -118,7 +141,7 @@ final class PublishValidationException extends RuntimeException
      */
     public static function expressionReferencesGeo(string $ownerKey, string $geoKey): self
     {
-        return new self("The expression on “{$ownerKey}” references the location field “{$geoKey}”, which cannot be used in an expression.");
+        return self::one($ownerKey, 'expression_references_geo', "The expression on “{$ownerKey}” references the location field “{$geoKey}”, which cannot be used in an expression.");
     }
 
     /**
@@ -128,13 +151,13 @@ final class PublishValidationException extends RuntimeException
      */
     public static function mediaInRepeatableSection(string $fieldKey): self
     {
-        return new self("The media field “{$fieldKey}” cannot be placed inside a repeatable section.");
+        return self::one($fieldKey, 'media_in_repeatable_section', "The media field “{$fieldKey}” cannot be placed inside a repeatable section.");
     }
 
     /** A media field (Increment G6) whose optional count bounds are incoherent (e.g. min_count > max_count). */
     public static function mediaConfigInvalid(string $fieldKey, string $detail): self
     {
-        return new self("The media field “{$fieldKey}” is invalid ({$detail}).");
+        return self::one($fieldKey, 'media_config_invalid', "The media field “{$fieldKey}” is invalid ({$detail}).");
     }
 
     /**
@@ -148,7 +171,7 @@ final class PublishValidationException extends RuntimeException
      */
     public static function hiddenFieldNotAnswerable(string $fieldKey, string $detail): self
     {
-        return new self("The hidden field “{$fieldKey}” cannot require an answer ({$detail}).");
+        return self::one($fieldKey, $detail, "The hidden field “{$fieldKey}” cannot require an answer ({$detail}).");
     }
 
     /**
@@ -159,7 +182,7 @@ final class PublishValidationException extends RuntimeException
      */
     public static function hiddenInRepeatableSection(string $fieldKey): self
     {
-        return new self("The hidden field “{$fieldKey}” cannot be placed inside a repeatable section.");
+        return self::one($fieldKey, 'hidden_in_repeatable_section', "The hidden field “{$fieldKey}” cannot be placed inside a repeatable section.");
     }
 
     /**
@@ -168,6 +191,43 @@ final class PublishValidationException extends RuntimeException
      */
     public static function prefillConfigInvalid(string $fieldKey, string $detail): self
     {
-        return new self("The prefill settings on “{$fieldKey}” are invalid ({$detail}).");
+        return self::one($fieldKey, $detail, "The prefill settings on “{$fieldKey}” are invalid ({$detail}).");
+    }
+
+    /**
+     * @param  list<array{field: ?string, code: string, message: string}>  $violations
+     */
+    private function __construct(string $message, private readonly array $violations)
+    {
+        parent::__construct($message);
+    }
+
+    /**
+     * Every violation this refusal carries, in the order the gate met them.
+     *
+     * @return list<array{field: ?string, code: string, message: string}>
+     */
+    public function violations(): array
+    {
+        return $this->violations;
+    }
+
+    /**
+     * Fold several refusals into one. The message is the parts' sentences joined by a single space —
+     * see the class docblock for why it is never a summary.
+     *
+     * @param  non-empty-list<self>  $parts
+     */
+    public static function several(array $parts): self
+    {
+        $violations = array_merge(...array_map(static fn (self $p): array => $p->violations, $parts));
+
+        return new self(implode(' ', array_column($violations, 'message')), $violations);
+    }
+
+    /** One violation, which is what every named factory above produces. */
+    private static function one(?string $field, string $code, string $message): self
+    {
+        return new self($message, [['field' => $field, 'code' => $code, 'message' => $message]]);
     }
 }

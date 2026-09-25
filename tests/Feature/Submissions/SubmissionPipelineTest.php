@@ -278,7 +278,15 @@ it('persists a submission, its answer document, and the typed index rows', funct
 
 it('prunes irrelevant answers from the persisted document and index', function (): void {
     $version = pipelinePublish($this->tenant, $this->user, function (FormVersion $draft, User $user): void {
-        addFormField($draft, $user, 'country', FieldType::SingleSelect, 0, ['is_queryable' => true, 'indexed_data_type' => IndexedDataType::Text]);
+        addFormField($draft, $user, 'country', FieldType::SingleSelect, 0, [
+            // M112 — the publish gate now refuses ANY option-bearing type with an empty list, not only
+            // `likert_scale`. Both values are needed, not just the one this case submits: `country` is
+            // answered 'CA' below and the sibling's relevance reads ${country} = 'US', so a list missing
+            // either would fail Stage-3 membership instead — a red that looks like the gate and is not.
+            'config' => ['options' => [['value' => 'US', 'label' => 'United States'], ['value' => 'CA', 'label' => 'Canada']]],
+            'is_queryable' => true,
+            'indexed_data_type' => IndexedDataType::Text,
+        ]);
         addFormField($draft, $user, 'state', FieldType::ShortText, 1, ['relevant_expression' => '${country} = \'US\'']);
     });
 

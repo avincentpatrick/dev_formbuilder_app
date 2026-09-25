@@ -7,6 +7,7 @@ namespace App\Services\Forms;
 use App\Enums\FieldType;
 use App\Enums\PrefillSource;
 use App\Enums\RequiredMode;
+use App\Enums\ValueShape;
 use App\Exceptions\Forms\PublishValidationException;
 use App\Models\FormField;
 use App\Models\FormVersion;
@@ -21,7 +22,43 @@ use Illuminate\Support\Collection;
  */
 final class StructuralValidationGate
 {
+    /**
+     * Refuse the publish if the draft has any structural violation, reporting ALL of them.
+     *
+     * ⛔ IT COLLECTS SINCE M112, AND THE AUTHOR-FACING REASON IS THE WHOLE POINT. This method used to
+     * throw inside its own loop, so a draft with four broken fields told the author about one of them
+     * per publish attempt — four round trips to learn four facts the server already knew on the first.
+     */
     public function assertPublishable(FormVersion $version): void
+    {
+        $violations = $this->collect($version);
+
+        if ($violations !== []) {
+            throw PublishValidationException::several($violations);
+        }
+    }
+
+    /**
+     * Every structural violation in the draft, in the order the gate meets them.
+     *
+     * ⚠️ WHY THE CHECKS ARE CAPTURED RATHER THAN REWRITTEN TO RETURN. The non-throwing twin that
+     * {@see TemplateValidationGate::confirmationMessageViolations()} offers is the shape to copy when a
+     * gate is written from scratch. Here there were twenty-five throw sites across eight helpers, each
+     * with its own early-return ordering, pinned by roughly twenty-seven message assertions across six
+     * test files — so rewriting every one of them to return would have been a far larger diff against a
+     * far better-pinned surface, in the same increment that changes which types are checked at all.
+     * {@see capture()} keeps each helper's semantics EXACTLY, including first-wins *within* one option
+     * list, while accumulating *across* fields and concerns. That is the granularity the row asked for:
+     * one violation per field per concern.
+     *
+     * ⚠️ AND IT COLLECTS WITHIN THIS GATE ONLY. {@see PublishService} calls three
+     * gates in sequence, so a draft with both a structural and an expression violation still reports
+     * only the structural set. Widening that is filed as its own row rather than smuggled in here,
+     * because the expression gate runs over a draft this one has already accepted.
+     *
+     * @return list<PublishValidationException>
+     */
+    public function collect(FormVersion $version): array
     {
         $fields = $version->fields()->get();
         $sections = $version->sections()->get();
@@ -36,36 +73,52 @@ final class StructuralValidationGate
         // set lookup rather than a per-field query.
         $fieldIdsWithValidations = $validations->pluck('form_field_id')->flip();
 
+        /** @var list<PublishValidationException> $violations */
+        $violations = [];
+
         foreach ($fields as $field) {
             // Every field's section, when set, belongs to the same version.
             if ($field->form_section_id !== null && ! $sectionIds->has($field->form_section_id)) {
-                throw PublishValidationException::sectionBelongsToForeignVersion($field->key);
+                $violations[] = PublishValidationException::sectionBelongsToForeignVersion($field->key);
             }
             // Every queryable field declares an indexed data type (the projection job needs it).
             if ($field->is_queryable && $field->indexed_data_type === null) {
-                throw PublishValidationException::queryableFieldMissingType($field->key);
+                $violations[] = PublishValidationException::queryableFieldMissingType($field->key);
             }
-            // Increment G4a: the new choice-family types must be publishably answerable.
-            if ($field->field_type === FieldType::LikertScale) {
-                $this->assertChoiceOptionsResolve($field);
+            // Increment G4a, widened in M112: EVERY type that carries an author-defined option list must be
+            // publishably answerable, not only `likert_scale`.
+            //
+            // ⛔ THE OLD ARM WAS `=== FieldType::LikertScale`, AND THAT ASYMMETRY *WAS* THE REPORTED BUG.
+            // `single_select`, `multi_select` and `dropdown` published with zero options and rendered an
+            // empty control to respondents, while `cascading_select` and the two grids refused — which is
+            // exactly the "some input types are not working" partition the row was filed from. Neither half
+            // was a defect in any field type; the gate simply never covered three of them.
+            //
+            // ⛔ AND IT DISPATCHES ON `ValueShape`, NOT ON `FieldType::hasOptions()`, DELIBERATELY.
+            // `docs/piping-output-encoding-design.md:63` forbids composing a gate from the default-armed
+            // `FieldType` predicates — `hasOptions()` is named there explicitly — because a thirty-second
+            // field type is absorbed into the `default` arm in silence. The membership is identical (a test
+            // asserts that type by type); the totality is what is new.
+            if (ValueShape::for($field->field_type)->carriesOptionList()) {
+                $violations[] = $this->capture(fn () => $this->assertChoiceOptionsResolve($field));
             }
             if ($field->field_type === FieldType::CascadingSelect) {
-                $this->assertCascadingResolves($field);
+                $violations[] = $this->capture(fn () => $this->assertCascadingResolves($field));
             }
             // Increment G4b: composite grid config must resolve, and a grid may not sit in a repeatable
             // section (its object value is never routed through the composite pass inside a repeat instance).
             if ($field->field_type === FieldType::Matrix || $field->field_type === FieldType::LikertMatrix) {
                 if ($field->form_section_id !== null && $repeatableSectionIds->has($field->form_section_id)) {
-                    throw PublishValidationException::compositeInRepeatableSection($field->key);
+                    $violations[] = PublishValidationException::compositeInRepeatableSection($field->key);
                 }
-                $this->assertMatrixConfigResolves($field);
+                $violations[] = $this->capture(fn () => $this->assertMatrixConfigResolves($field));
             }
             // Increment G5b1: geo carries no config to validate, but its geometry projection is one row per
             // field per submission (top-level only), so a geo field may not sit in a repeatable section
             // (relaxing this later — projecting per-instance geo — is non-breaking).
             if ($field->field_type->isGeo()) {
                 if ($field->form_section_id !== null && $repeatableSectionIds->has($field->form_section_id)) {
-                    throw PublishValidationException::geoInRepeatableSection($field->key);
+                    $violations[] = PublishValidationException::geoInRepeatableSection($field->key);
                 }
             }
             // Increment G6: media config is wholly optional (so there is no required-config gate), but its
@@ -74,19 +127,19 @@ final class StructuralValidationGate
             // and any configured count bounds must be coherent (min ≤ max).
             if ($field->field_type->isMedia()) {
                 if ($field->form_section_id !== null && $repeatableSectionIds->has($field->form_section_id)) {
-                    throw PublishValidationException::mediaInRepeatableSection($field->key);
+                    $violations[] = PublishValidationException::mediaInRepeatableSection($field->key);
                 }
-                $this->assertMediaConfigResolves($field);
+                $violations[] = $this->capture(fn () => $this->assertMediaConfigResolves($field));
             }
             // Increment H7: a hidden field is the one type the respondent can neither see nor repair, so it
             // must be incapable of producing an error; and neither prefill source can address one instance
             // of a repeat, so it may not sit in a repeatable section.
             if ($field->field_type === FieldType::Hidden) {
                 if ($field->form_section_id !== null && $repeatableSectionIds->has($field->form_section_id)) {
-                    throw PublishValidationException::hiddenInRepeatableSection($field->key);
+                    $violations[] = PublishValidationException::hiddenInRepeatableSection($field->key);
                 }
-                $this->assertHiddenFieldAnswerable($field, $fieldIdsWithValidations);
-                $this->assertPrefillConfigResolves($field);
+                $violations[] = $this->capture(fn () => $this->assertHiddenFieldAnswerable($field, $fieldIdsWithValidations));
+                $violations[] = $this->capture(fn () => $this->assertPrefillConfigResolves($field));
             }
         }
 
@@ -95,12 +148,37 @@ final class StructuralValidationGate
             $ownerKey = $fieldKeyById->get($validation->form_field_id, '(unknown)');
 
             if (! $fieldIds->has($validation->form_field_id)) {
-                throw PublishValidationException::validationReferencesForeignVersion($ownerKey);
+                $violations[] = PublishValidationException::validationReferencesForeignVersion($ownerKey);
+
+                continue; // the second check below would report the same row twice
             }
             if ($validation->related_form_field_id !== null && ! $fieldIds->has($validation->related_form_field_id)) {
-                throw PublishValidationException::validationReferencesForeignVersion($ownerKey);
+                $violations[] = PublishValidationException::validationReferencesForeignVersion($ownerKey);
             }
         }
+
+        return array_values(array_filter($violations));
+    }
+
+    /**
+     * Run one check, returning its refusal instead of letting it propagate.
+     *
+     * ⚠️ `null` MEANS THE CHECK PASSED, and {@see collect()} filters those out at the end rather than
+     * branching here — so a helper that grows a second throw site needs no change at the call site.
+     * Only {@see PublishValidationException} is caught: anything else is a fault in the gate itself and
+     * must still reach the caller, because a gate that swallows its own bugs reports `passed` while blind.
+     *
+     * @param  callable(): void  $check
+     */
+    private function capture(callable $check): ?PublishValidationException
+    {
+        try {
+            $check();
+        } catch (PublishValidationException $violation) {
+            return $violation;
+        }
+
+        return null;
     }
 
     /**

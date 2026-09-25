@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Enums;
 
+use App\Services\Forms\StructuralValidationGate;
+
 /**
  * Which SHAPE a field's VALUE has, for the surfaces that must decide what may be asserted about it
  * (Increment M112). This is the partition the validation editor and the publish gate need, and no
@@ -50,7 +52,7 @@ namespace App\Enums;
  *
  * ⛔ AND `yes_no` IS `Boolean`, NOT `Choice`. Its two options are fixed and are stored nowhere, so a
  * gate that asserts `Choice` fields resolve an option list would refuse EVERY yes/no field in the
- * product. {@see \App\Services\Forms\StructuralValidationGate} depends on that distinction, and
+ * product. {@see StructuralValidationGate} depends on that distinction, and
  * `tests/Unit/Forms/ValueShapeTest.php` pins it as a named case rather than leaving it to the totality
  * assertion, because the totality assertion passes either way.
  */

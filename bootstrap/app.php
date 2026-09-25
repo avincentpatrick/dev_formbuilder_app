@@ -318,7 +318,9 @@ return Application::configure(basePath: dirname(__DIR__))
             : null);
 
         $exceptions->render(fn (PublishValidationException $e, Request $request) => $isApi($request)
-            ? ApiErrorResponse::make(422, 'publish_invalid', $e->getMessage())
+            // M112 — every violation, not only the first. `details` is the 4th argument three other
+            // arms already use; the web arm stays null so the controller keeps rendering the toast.
+            ? ApiErrorResponse::make(422, 'publish_invalid', $e->getMessage(), ['violations' => $e->violations()])
             : null);
 
         $exceptions->render(fn (FormException $e, Request $request) => $isApi($request)

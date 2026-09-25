@@ -16,10 +16,10 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M110`, filing the form-builder overhaul: 25 rows and 9 decisions from a user-directed exploration of the running system (`m110-builder-overhaul-filed`)
+## Status: ACTIVE CLAIM — `M110`, filing the form-builder overhaul: 26 rows and 9 decisions from a user-directed exploration of the running system (`m110-builder-overhaul-filed`)
 
 Taken 2026-09-25. Branch `m110-builder-overhaul-filed`, cut from origin/main at `a496da9`, PR into main.
-Row: **none — this increment FILES rows rather than closing one.** Its source is a user-directed exploration of the running system that produced 19 separate comments about the form builder, delivered in chat on 2026-09-25 with the instruction *"make a comprehensive plan … after the plan is created, include this in our major pipeline so we only have one task list."* This increment writes the resulting 25 increments and 9 decisions into the queue so that none of them is an unqueued obligation.
+Row: **none — this increment FILES rows rather than closing one.** Its source is a user-directed exploration of the running system that produced 19 separate comments about the form builder, delivered in chat on 2026-09-25 with the instruction *"make a comprehensive plan … after the plan is created, include this in our major pipeline so we only have one task list."* This increment writes the resulting 25 increments and 9 decisions into the queue so that none of them is an unqueued obligation. It lands as 26 rows rather than 25: the twenty-sixth is the unguarded client type-mirror census, found while designing the per-type validation model and filed on its own evidence rather than folded into it.
 
 ⛔ **THE THREE FIELDS BELOW ARE ANSWERED AGAINST THE 19 REPORTED ITEMS, NOT AGAINST A LEDGER ROW.** There is no row to verify, so the fields are answered against the thing that plays a row's part here — the user's reported defects, and the claims this plan makes about the tree. Answering them "n/a" would be the `D6` shape exactly: a heading skipped because it did not obviously apply.
 
@@ -60,7 +60,7 @@ Files: `docs/feature-backlog.md`, `docs/claims/decisions.md`, `docs/pipeline.md`
 Shared artefacts taken: `docs/feature-backlog.md`, `docs/claims/decisions.md`, `docs/pipeline.md`, `docs/backlog-triage.md`, `PROGRESS.md` (own block only). **Lane B is retired**, so no paired reader exists for any of them.
 Paired files taken: none.
 Namespaces spent: **`D57` through `D65`** — nine sub-decisions. No migration prefix, no ADR number.
-Prediction: `pipeline-lint` is the gate that will fail, and **P7d is the one most expected to be wrong**. It refuses a row that awaits a decision LESS urgent than itself, and the split meant to satisfy it — `B11a` at early-testing awaiting nothing, `B11c` at during-testing awaiting `D58` — only works if `D58` is tiered early-testing, which is one tier in the correct direction and no more. P7b (every open decision is also a row, bidirectionally) should pass only after the regeneration, never before it. And at least one of the 25 rows is expected to fail its severity-separator parse on the first run, because `U+00B7` is invisible in a diff and this is the first increment to write 25 of them in one pass.
+Prediction: `pipeline-lint` is the gate that will fail, and **P7d is the one most expected to be wrong**. It refuses a row that awaits a decision LESS urgent than itself, and the split meant to satisfy it — `B11a` at early-testing awaiting nothing, `B11c` at during-testing awaiting `D58` — only works if `D58` is tiered early-testing, which is one tier in the correct direction and no more. P7b (every open decision is also a row, bidirectionally) should pass only after the regeneration, never before it. And at least one of the 26 rows is expected to fail its severity-separator parse on the first run, because `U+00B7` is invisible in a diff and this is the first increment to write twenty-six of them in one pass.
 
 ---
 

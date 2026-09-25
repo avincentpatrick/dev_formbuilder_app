@@ -1253,6 +1253,103 @@ honest about it, and the testing site is a single workspace so nobody can meet i
 end state and needs a disclosure-safe refusal designed first, which is a decision rather than a patch.
 
 
+### D57 — Reported item 16 asks for three ways to present sections; `forms.single_page_mode` is a boolean that expresses two of them and "tabular" is not expressible at all. What is the model? **Tier: early-testing.**
+
+**Filed 2026-09-25 by `M110`, from a user-directed exploration of the running system.** The request was *"form also must have an option on how to segregate sections. is it a pager but sectioned, is it a tabular layout or a per page setup."* `D35` already answered the adjacent question — add the single-page setting, default step by step — and `M110` files its write path as a row. But `D35` was about a boolean, and this asks for three modes. ⚠️ **Two of the three are not what they sound like.** "Paged but sectioned" is today's `StepView` and is already built. "Per page" is *also* `single_page_mode = false`, but with a break per question — and `visibleSteps` (`useFormRuntime.ts:405-462`) steps by **section only**, while `page_break` sits in `RENDERS_NOTHING` (`engine/field-roles.ts`) and is ignored entirely by both engines. "Tabular" has no renderer on either side.
+
+- **A — keep the boolean, ship the two modes it already expresses, and file "tabular" as a product idea.** Costs one write path (which `D35` already authorised) and nothing else. Leaves "per page" meaning the same thing as "paged but sectioned", which is a naming disappointment rather than a missing capability.
+- **B — replace it with a `presentation` enum (`stepped | single_page | tabular`) and build a tabular renderer.** Matches the request literally. ⚠️ But `visibleSteps` steps by section in **both** engines, and the server's `StepProjection` moves with it — so this is a two-engine parity change, with golden vectors, for a mode nobody has described a use for beyond naming it.
+- **C — keep the boolean and add an orthogonal `page_break_mode`, so "per page" becomes real by finally honouring the `page_break` field type the step projection currently ignores.** Redeems a field type that exists, is in the palette, and today does nothing at all — which is its own latent defect.
+
+**Recommendation: A now, C next.** A is the part `D35` already bought. C is the answer to the half of the request that is genuinely missing, and it is cheaper than B because `page_break` already exists as a type and a palette entry — the work is teaching two step projections to break on it, not inventing a mode. B invents a renderer from an example rather than a need; if tabular is genuinely wanted, it should be asked for on its own evidence.
+
+
+### D58 — A content-block image is an attachment. Whose is it, and who may read it? **Tier: early-testing.**
+
+**Filed 2026-09-25 by `M110`, from reported item 17** (*"a page where they can put image, welcome notes, instructions"*). The plan stores content blocks in `form_fields.config` on a `note` field and carries images by `attachment_id`, never by URL — a remote image would be an IP-logging beacon aimed at every respondent and would break offline. That settles the reference. It does not settle the ownership, and **the ownership is the single hardest unbuilt piece of item 17.**
+
+⛔ **The trap, named.** `attachments`' morph map already carries `form_field`, so field ownership looks free. It is not: `PublishService` clones the whole draft tree forward into a new draft on every publish, minting **new `form_fields` row ids**. A field-owned attachment therefore dangles the moment the form is published — and the clone is the one path in this system that must stay a pure clone.
+
+- **A — owned by the draft `form_field`, re-pointed by the tree cloner on publish.** No new morph entry, no new `AttachmentKind`. ⚠️ It puts a re-pointing rewrite inside `SchemaTreeCloner`, which is exactly the path whose value is that it copies and does not interpret.
+- **B — owned by the `form`.** Needs a new `AttachmentKind` and a new morph entry, and nothing is cloned. An author editing an image changes it for already-published versions — which is precisely the trade `forms.confirmation_message` already made by living on `forms` rather than `form_versions`, with that reasoning written into its migration.
+- **C — owned by the `form_version`, frozen with its schema.** Most correct for a respondent: what they were shown is what the version says. Most expensive: every publish duplicates every image against a real `UsageMetric::StorageBytes` quota.
+
+**Recommendation: B.** A is refused on the clone-purity argument alone. C is the honest ideal and would be right if images were consent-bearing documents — but a heading illustration is not, and C bills a tenant for every republish. B accepts a real consequence and it is a consequence this repository has already accepted once, in writing, for the same class of content. ⚠️ **Whichever wins, the read route must be publicly readable for a published form and gated on `ScanStatus::servable()`** — an unscanned or infected image renders as its alt text, never as a broken image.
+
+
+### D59 — `ComparisonOperator` is about to gain a human label, and `ConditionRow.vue` already has a different one for the same eight operators. One set or two? **Tier: early-testing.**
+
+**Filed 2026-09-25 by `M110`, from reported item 4** (*"i noticed the operator. if we can show the real meaning not the gt for greater than"*). The validation editor renders operators through `BuilderPresenter::humanize()` (`:254`), which is `ucfirst` over an underscore replacement — so the dropdown literally reads `Gt`, `Lte`, `Neq`. Two tabs away, `ConditionRow.vue:180-210` already ships proper labels (`has at least`, `is blank`, `does not include`) **and** filters them by context. ⚠️ **The two sets cannot simply be merged, because they are not the same sentence.** A rule row reads *"Maximum value · at most · 100"*; a condition reads *"Age is at least 18"*. `at most` is wrong in the second and `is at most` is wrong in the first.
+
+- **A — two sets, each at its own point of truth, pinned by a key-coverage test.** Cheapest, and honest that they are different renderings. Leaves two places to edit when an operator is added, which is the drift shape this repository has measured six times on the client type mirrors.
+- **B — one set in PHP; `ConditionRow` adopts it.** One source. ⚠️ Changes eight strings an author has already learned, and any E2E locator reading them.
+- **C — one enum in PHP with two renderings — `label()` and `sentenceLabel()` — both shipped through `BuilderPresenter::enums()`.** One source of truth, both readings preserved, one extra method.
+
+**Recommendation: C.** It is B's single source with A's two readings, for the cost of one enum method, and it removes the drift surface entirely rather than agreeing to watch it. ⚠️ The symbol belongs with the label, not beside it: `at most (≤)` as one string, so no caller can render the symbol without the words or pair them wrongly.
+
+
+### D60 — A data link snapshots another form's responses. Does that snapshot ride under the schema checksum, or beside it? **Tier: during-testing.**
+
+**Filed 2026-09-25 by `M110`, from reported item 10** (*"in kobo toolbox, there is this thing called connect project … research on this"*). KoboToolbox generates an XML file per link, caches it for 300 seconds with a 600-second regeneration lock, serves stale while revalidating, and delivers it to offline clients as an OpenRosa manifest entry keyed by md5. This system has no OpenRosa manifest; it has a **checksummed schema snapshot** (`form_versions.checksum`) and a service worker. So the question Kobo answered with a manifest hash has to be answered here, and it has to be answered before the table is designed.
+
+- **A — beside it.** The link's data carries its own version stamp and its own cache key; `form_versions.checksum` never moves because a source form received a submission. Costs a second freshness channel for the service worker to reason about.
+- **B — under it.** One freshness signal; an offline client's existing schema pin already tells it to refresh. ⚠️ **Every submission to the source form would invalidate the cached schema of every destination form on every offline device.** A 300-second source TTL becomes a schema re-download storm, and the schema is the large artefact.
+
+**Recommendation: A.** B is simpler exactly until the source form is busy, which is the only condition under which anybody wants a data link. A second freshness channel is what the service worker is for. ⚠️ Whichever wins, `selected_fields` must be `null` (meaning all) or a **non-empty** list — never `[]`. Kobo's own code carries a warning comment because `[]` means "all fields" in its stored config and "no fields" as a computed intersection; refusing the empty list at the FormRequest makes that ambiguity unconstructible here.
+
+
+### D61 — Form media (reference attachments): attached to the form, or to the form version? **Tier: during-testing.**
+
+**Filed 2026-09-25 by `M110`, from reported item 11** (*"we can attach excel, photos, word file, pdf etc that we can make as reference in our form"*). ⛔ **This is blocked before it is designed, and by something small.** `App\Enums\AttachmentKind` has no form-level kind, and the attachment morph map is `submission | form_field | webhook_delivery` — `form` and `scope_node` appear only for `resource_grants`, not for attachments. So this needs a new kind **and** a new morph entry, and the entry's target is this question. Note `form_templates.cover_image_attachment_id` is a real FK that is never populated and has no upload route: the same problem, already half-built.
+
+- **A — the form.** One file, edited in place, visible to every published version. Cheapest, and an author correcting a typo in a reference PDF fixes it everywhere at once.
+- **B — the form version, frozen with the schema.** Publishing duplicates the *reference row*, not the bytes, because `AttachmentStorageService` already computes a SHA-256 on every upload and can dedupe on it. ⚠️ Costs rows on every publish and a dedupe path that must be right.
+
+**Recommendation: B, with byte dedupe.** A reference document a respondent is told to read before answering is part of what they consented to, and an author silently swapping it under a live version is the failure mode worth spending on. The checksum that makes B affordable is already computed for every upload, so B costs rows rather than bytes. ⚠️ Note this answers **differently from `D58`** on purpose, and the difference is the point: a heading illustration is decoration, a reference document is evidence. If they are answered the same way, one of the two answers is wrong.
+
+
+### D62 — Does a form automation run inside the submit request, or on the queue? **Tier: during-testing.**
+
+**Filed 2026-09-25 by `M110`, from reported item 12** (*"in fillout.com, there is this thing called workflows, research on this"*). Fillout's engine is trigger → linear action chain, scoped to one form, with `Filter` (a gate) and `Branch` (a fan-out) as control-flow actions. `Filter` is the case that forces this question: if it can refuse, it must run before the response is accepted.
+
+- **A — queue only.** Every action is dispatched after commit, exactly as `app/Listeners/Connectors/DispatchConnectorsFor*.php` already do over `DomainEventType`. A `Filter` that cannot block still has a job — it stops the rest of its chain.
+- **B — queue, except `Filter`, which runs inline so it can refuse a submission.** Matches the literal mental model of a gate. ⚠️ Makes a third-party outage a *submission* outage, and adds an author-authored expression to the submit path's latency budget.
+
+**Recommendation: A.** The whole offline story assumes a submission is accepted and reconciled later — `outbox.ts`, the Dexie draft store and the queue tag on the confirmation screen all exist because a response may be accepted long before anything else happens to it. B contradicts that at the one moment it matters. If refusing a submission is genuinely wanted, the instrument is the validation engine, which already runs in both places and already refuses.
+
+
+### D63 — Form settings become reachable from both a builder modal and a hub tab. Two entry points — acceptable? **Tier: early-testing.**
+
+**Filed 2026-09-25 by `M110`, from reported item 13** (*"the form itself doesn't have a settings section"*). ⚠️ **The obvious fix is the one already refused.** Folding the five settings routes into one was declined in writing, in three separate FormRequest docblocks; and the builder's missing tab strip is a recorded user decision, restated at `types.ts:162-170`. Both records still hold, and `M110` files the row to respect them: every section keeps its own route and its own FormRequest, and what changes is only where an author *finds* them. That leaves one question the records do not answer.
+
+- **A — both.** A Settings tab on the form hub (for administering a form) and a single "Form settings" modal on the builder toolbar (for authoring one), mounting the **same child components**. Nine ungrouped toolbar buttons become one, which is also what frees the room the live preview needs.
+- **B — builder modal only.** One entry point. ⚠️ Hides settings from somebody administering a form they are not editing, which is a different person on a scoped deployment.
+- **C — hub tab only, with a link out of the builder.** One entry point, and the tab strip already exists. ⚠️ Costs an author a navigation away mid-authoring — which is where the complaint started.
+
+**Recommendation: A.** The usual objection to two entry points is drift, and drift is impossible here because both mount the same components against the same routes; there is no second implementation to disagree. ⚠️ `builder-layout.test.ts` pins all three spellings of the eight secondary toolbar actions with a per-line regex — collapsing the toolbar **must update that test in the same PR**, and `templates-axe.spec.ts` requires Publish to keep its slot text.
+
+
+### D64 — Type conversion across incompatible value shapes — a Photo becoming Short text. Refuse, or allow with total loss? **Tier: early-testing.**
+
+**Filed 2026-09-25 by `M110`, from reported item 19** (*"flexibility to change input type without removing all the encoded rules or configs … unless the input is completely different and impossible to transfer"*). The user's own sentence carves out the impossible case; this decides where the line sits. Today no conversion exists at all — the workaround is delete-and-re-add, which cascade-deletes every validation row, mints a new key from `uniqueKey()`, and dangles every `${key}` reference in the version.
+
+- **A — refuse; the target list offers only shape-compatible types** (plus `note` and `hidden`, which are always allowed because "turn this question off" is the move an author actually wants). Geo, Media and Grid convert only within their own shape.
+- **B — allow anything, behind a confirm dialog naming everything that will be lost.** Maximum flexibility, and no published submission is affected either way because published versions are frozen — the loss is authoring-time only, which is what makes B tempting.
+
+**Recommendation: A.** The loss argument does not settle it, because B's real cost is not data. ⛔ **An unfiltered 31-item dropdown IS reported item 4 wearing a different control** — the same complaint that validation rules must not offer `min_length` on a date. Offering "convert this photo to a phone number" is the same defect in the same session, and A is the same remedy. The compatible set is still wide: every choice type converts to every other choice type carrying its options and their translations, and the whole text and number families are lossless within themselves.
+
+
+### D65 — A preset per-form theme would set more than the six properties `brand-ramp.blade.php` pins as its complete set. Amend the invariant, or confine the preset? **Tier: during-testing.**
+
+**Filed 2026-09-25 by `M110`, from reported item 3** (*"if we can also include a theme selector for the form"*), answered in chat as **preset themes only**, layered over the tenant brand. ⚠️ **That answer collides with a written invariant.** `resources/views/partials/brand-ramp.blade.php` overrides exactly six properties and says so in terms — *"only these SIX properties, never a neutral, semantic or chart token"* — and `GuestBrandingPresenter` is deliberately the **single** reader for the guest style block, the `theme-color` meta and the PWA manifest, on the stated grounds that if any of them derived its own answer they could disagree. A preset that sets a font pairing and a corner radius sets more than six.
+
+- **A — confine the preset.** It sets those six roles plus a named font pair and a radius scale, each added as its **own documented property** with its own line in the partial and its own contrast or legibility check. The set grows; the property that every member is enumerated and justified does not change.
+- **B — amend the sentence** to "the brand ramp sets exactly six; a theme preset may set a documented superset". One edit, and the presets are then free.
+- **C — no per-form theme; per-tenant brand only.** Declines the request and says why.
+
+**Recommendation: A.** The invariant's value is not the number six — it is that the set is closed and each member was argued for. A keeps that and pays the cost of arguing for each addition, which is a cost worth paying exactly once per property. B weakens the sentence to nothing, because "a documented superset" is not a constraint anybody can fail. ⚠️ Every preset must pass the existing contrast gate in **every theme mode**, and that totality is the gate worth writing — a preset that is legible in light and unreadable in dark is the failure this buys protection against.
+
+
 ## ANSWERED
 ### D38 — The API documentation promises features that were never built. Build them, or trim the documentation? **C — mark the six as not built, in place, the way §7.1 already annotates.**
 

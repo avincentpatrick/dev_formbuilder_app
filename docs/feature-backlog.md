@@ -11220,3 +11220,390 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   ancestor by construction, and three of the four hosts sit inside `.mds-modal__body`. Each needs its own
   element-level read, and the modal ones need the modal opened first. **Live** — the guards are unasserted today.
   Filed by `M109`. **Tier: during-testing.**
+
+- **`major` · Every `config` key that `UpdateFieldRequest::configRules()` does not enumerate is silently dropped
+  on every field save, with a 200 OK.** Filed 2026-09-25 by `M110` from a user-directed exploration of the running
+  system, whose report was *"some of the input types are not working properly or not saving when I click publish"*.
+  `UpdateFieldRequest.php:62` declares `config` as `present, array` **alongside** nested `config.*` rules, and
+  Laravel's `Validator::$excludeUnvalidatedArrayKeys` defaults to `true` (`Factory.php:74`), so `validated()`
+  skips the top-level key (`Validator.php:659-664`) and rebuilds `config` from the enumerated paths only.
+  `FormBuilderService.php:267` then whole-column-replaces with the result. ⛔ **THIS IS REACHABLE DATA LOSS, NOT A
+  SHAPE COMPLAINT.** Option `label_translations` is written by XLSForm import (`XlsformImportParser.php:319`),
+  read by the runtime (`schema-mapping.ts:183,282-289`), re-exported (`XlsformExporter.php:433`), faithfully sent
+  back by the client (`ChoicesEditor.vue:17-20` spreads `{...opt, ...patch}`) — and is not in the allowed rule set
+  (`:159-165`). Import a multilingual form, edit any choice field, and every translation is gone. ⚠️ **Only types
+  whose `configRules()` arm is non-empty are affected** — choice, cascading, matrix, likert_matrix, geo, media and
+  hidden. A type returning `[]` keeps its config whole, which is why this has stayed invisible. ⚠️ **The remedy is
+  the uncertain part:** `$excludeUnvalidatedArrayKeys` may not be settable per-instance in Laravel 12, so the
+  reliable route is an explicit `payload()` that merges the raw `config` over `validated()` — measure it before
+  writing the test, and write the test against the current code first to watch it fail. **Live.**
+  Filed by `M110`. **Tier: early-testing.**
+
+- **`minor` · Publish refuses on the first violation only, as a message-only toast, while the warnings path beside
+  it gets a proper banner.** Filed 2026-09-25 by `M110` from the same exploration, and this is the half of *"or if
+  we can show what is wrong to the user so the user can correct it"* that the server owns.
+  `StructuralValidationGate.php:39-91` throws inside its `foreach`, so one mis-configured field aborts the whole
+  transaction and the author is told about exactly one of however many problems exist.
+  `FormPublishController.php:32-36` renders `PublishValidationException` — which is prose, carrying no structured
+  `field` or `code` — as a transient flash toast. ⚠️ **The contrast is in the same controller:** `:42-61` flashes
+  `publishWarnings`, which `Builder.vue:425-435` renders as a dismissible banner. The refusal path got none of
+  that treatment. ⛔ **AND THE GATE IS ASYMMETRIC IN A WAY THAT EXPLAINS THE WHOLE REPORT:**
+  `StructuralValidationGate.php:49-51` calls `assertChoiceOptionsResolve()` for `LikertScale` **only**, so
+  `single_select`, `multi_select` and `dropdown` publish with zero options and render an empty control to
+  respondents, while `cascading_select` (`:52-54`) and the two grids (`:57-62`) refuse. That is precisely the
+  reported partition of *"some input types are not working"* — and neither half is a defect in either field type.
+  Collect every violation, give each one a field key, and cover the three unguarded select types. **Live.**
+  Filed by `M110`. **Tier: early-testing.**
+
+- **`minor` · Publish fires even when the preceding autosave failed, and the Inertia re-render then destroys the
+  only surface that said so.** Filed 2026-09-25 by `M110` from the same exploration. `useBuilderStore.ts:763-767` —
+  `whenIdle()` returns the commit queue, and that queue is built with `.catch(() => undefined)` (`:127`) while
+  `guard()` (`:188-201`) swallows a rejection into `save.error` and returns `null`. So `whenIdle()` **resolves on
+  failure**, and `Builder.vue:144-148` posts to `/publish` regardless. Because the POST re-renders the page, the
+  `saveError` alert at `ConfigPanel.vue:260` is torn down with the store: the author sees a publish outcome and
+  never sees that their last edit did not save. ⚠️ **A second surface is built and unused:** `builderClient.ts:61-72`
+  parses the 422 body into an `errors` map, and `useBuilderStore.ts:196-198` keeps only `.message` — a grep finds
+  no consumer of `errors` anywhere outside the file that builds it. Per-field save errors are already on the wire
+  and are being discarded. **Live.** Filed by `M110`. **Tier: early-testing.**
+
+- **`minor` · Per-type knowledge — which validation rules apply to which field type, and what a new field of each
+  type should already validate — exists nowhere in the system.** Filed 2026-09-25 by `M110`, from the report
+  *"lets make sure that all input type has unique preset configurations so user wont be doing that manually"*.
+  There is no table anywhere saying a `date` cannot take `min_length` or that an `email` should check its format.
+  ⚠️ **Key it on a value SHAPE, not on `FieldType`** — 31 types by 11 rule types is not a table anybody can read
+  or keep right; roughly 16 shapes by 11 is. The enum metadata pattern already exists and is already enforced:
+  eight PHP registries dispatch on `FieldType` with `match` and **no default arm**, deliberately, so a 32nd case
+  is a PHPStan-level-8 failure (the rationale is written out in `OcrFieldEligibility.php:16-29`). ✅ **And the
+  hardest-looking part is already built:** `pattern` is evaluated identically by
+  `StructuredRuleEvaluator.php:59-67` and `structured-rule-evaluator.ts:119-126` — both anchored full-match, both
+  failing closed on empty — so enforcing `email`, `url` and `phone` is a **default validation row on an existing
+  rule type**, not a new `ValidationRuleType` with its DB CHECK value, two evaluator arms, new golden vectors and
+  a new parity surface. **Live.** Filed by `M110`. **Tier: early-testing.**
+
+- **`minor` · The validation editor offers every rule and every operator to every field type, and labels the
+  operators `Gt`, `Lte` and `Neq`.** Filed 2026-09-25 by `M110`, from the report that a text field must not be
+  offered number rules and *"if we can show the real meaning not the gt for greater than … the text plus the
+  symbol"*. `ValidationEditor.vue:93-107` passes `ruleTypes` and `operators` straight through unfiltered; the
+  component takes no `field_type` prop at all (`:11-16`), and nothing in `ConfigPanel.vue` narrows them. The labels
+  come from `BuilderPresenter.php:254`, which is `ucfirst` over an underscore replacement. ⚠️ **The app already
+  knows how to do both, two tabs away:** `ConditionRow.vue:180-210` ships `has at least`, `is blank`,
+  `does not include`, and filters by context. The validation editor simply never got it. ⛔ **One paired change
+  must ship in the same increment or this is a net weakening:** `Encode.vue:1191` has no `novalidate` while
+  `PageView.vue:144` and `StepView.vue:203` do, so a bad email is rejected for a staff keyer and accepted from a
+  respondent on the same form. Adding `novalidate` aligns them and removes the only enforcement that exists —
+  which is safe only once the per-type `pattern` defaults land beside it. **Live.** Filed by `M110`.
+  **Tier: early-testing.** **Awaits D59.**
+
+- **`minor` · Choosing "Conditional" requiredness gives the author no next step, and the editor it looks like it
+  should open writes the wrong thing.** Filed 2026-09-25 by `M110`, from the report *"can we make that a radio
+  button and then show the condition settings when the user selected the conditional instead of going to the
+  validation tab and creating rules"*. Requiredness is an `MdsSegmentedControl` in the **Basics** tab
+  (`ConfigPanel.vue:314-322`); the condition editor is in **Advanced** (`:426-432`), with no path between them.
+  ⛔ **BUT THE LITERAL READING OF THE REQUEST BUILDS THE WRONG FEATURE.** The Advanced editor writes
+  `relevant_expression`, which **hides** a field; `RequiredMode::Conditional` **requires** it. Confirmed at
+  `SemanticValidator::requiredState()` (`:1403-1420`): `Conditional` is honoured only where a `required_*` unit
+  holds, and **with no rule it degrades to optional in silence** — so the control today is a setting that does
+  nothing. What Conditional must reveal is a `required_if` row, which is a structured triple
+  (`related_field_key` + `operator` + `rule_value`, lowered at `StructuredRuleLowering.php:71-83`) and can reuse
+  `ConditionRow.vue` directly. ⚠️ **One row only, in this increment** — multi-row AND/OR is the unreachable
+  `logic_group`/`logic_operator` capability, which is its own row. **Live.** Filed by `M110`.
+  **Tier: early-testing.**
+
+- **`minor` · The left app sidebar cannot be collapsed, and the app has no mechanism for remembering a client-side
+  UI preference at all.** Filed 2026-09-25 by `M110`, from the report that the sidebar *"must have an option to
+  collapse specially when form building is the active page so we have plenty of room for form builder"*.
+  `Sidebar.vue` has no collapse affordance: its width is purely media-query driven — 240px above 1024px, a 64px
+  icon rail below it (`:403-405`), an off-canvas drawer below 480px (`:447-475`) — and the only state that exists
+  is the mobile drawer, owned at `AppLayout.vue:17` and reset on every navigation (`:84-86`). ⚠️ **There is no
+  localStorage anywhere in `resources/js/`**: the single hit is a *comment* at `Pages/forms/Index.vue:104`
+  explaining why a stored flag was deliberately not used, so adding one would be this app's first client-side
+  persisted preference and a new architectural precedent. ✅ **The precedent that already exists is server-side
+  and fits exactly**: `PATCH /settings/appearance` (`routes/tenant.php:268`) with
+  `UpdateAppearanceRequest` — every rule `sometimes`, partial-write by design — delivered through the shared
+  `ui.theme` Inertia prop (`HandleInertiaRequests.php:84`) and read by `useTheme.ts`. A collapse state is a fifth
+  appearance axis, not a new mechanism. **Live.** Filed by `M110`. **Tier: early-testing.**
+
+- **`minor` · A field's type cannot be changed after it is created, and the delete-and-re-add workaround destroys
+  every rule, mints a new key and dangles every expression that referenced it.** Filed 2026-09-25 by `M110`, from
+  the report asking for *"flexibility to change input type without removing all the encoded rules or configs"*.
+  There is no code path: `field_type` appears in neither `UpdateFieldRequest::rules()` (`:48-77`), nor
+  `FormBuilderService::writeField()`'s fill array (`:259-274`), nor `useBuilderStore.fieldPayload()` (`:874-899`),
+  and `ConfigPanel.vue` reads `field.field_type` in seven places and writes it in none. ⛔ **What the author must
+  do instead is worse than it looks.** `deleteField()` (`:282-294`) hard-deletes, and `form_field_validations`
+  cascades on the FK (migration `..._000206:24`), so every validation row is destroyed; `addField()` (`:120-138`)
+  mints a **brand-new key** from `uniqueKey()` (`:625-635`) and resets config — so every `${old_key}` in any
+  `relevant_expression`, any `required_if` row and any `calculated_formula` now dangles, and the publish gate will
+  refuse naming the *referencing* field rather than the deleted one. ⚠️ **Key stability is the whole design, not a
+  nicety:** a conversion that keeps the key makes every reference survive by construction rather than by a rewrite
+  pass. The compatibility model belongs in PHP as enum metadata, and the endpoint must be separate from the
+  autosave PATCH — `configRules()` dispatches on the route model's *current* type, so a type-changing PATCH would
+  validate against the old type's rules. **Live.** Filed by `M110`. **Tier: early-testing.**
+  **Awaits D64.**
+
+- **`minor` · The builder palette offers short and long text as two entries and whole and decimal numbers as two
+  more, and the distinction is a setting rather than a kind.** Filed 2026-09-25 by `M110`, from the report
+  *"lets merge the short and long text, it makes no relevant to users"* and the matching request for numbers with
+  whole-versus-decimal and allow-negative as right-panel settings. ✅ **The user has chosen a palette-level merge**
+  — the palette shows one "Text" and one "Number", a Basics setting flips the stored `field_type`, and the 31-case
+  enum, the DB and the XLSForm round-trip are all untouched. ⚠️ **This is not a second mechanism**: it is the type
+  conversion machinery with a two-member target list, and both pairs are provably lossless (`short_text` and
+  `long_text` both default to an empty config, as do `integer` and `decimal`), so it needs no confirmation dialog.
+  `BuilderPresenter::palette()` (`:207-226`) grows a variants layer; the enum stays authoritative and the frontend
+  still never re-lists the types. ⚠️ **Allow-negative is a toggled default `min_value: 0` row, not a new config
+  key** — reusing an existing rule type means zero engine work and zero parity risk. ⚠️ **And one seeding bug
+  falls out of it:** `addField()` seeds `label` from `$type->label()` (`:131`), so a new merged text field would
+  arrive labelled "Short text" unless it seeds from the palette group instead. **Live.** Filed by `M110`.
+  **Tier: early-testing.**
+
+- **`minor` · There is no projection from the builder's draft model to the schema shape the form runtime consumes,
+  which is the only thing standing between the builder and a live preview.** Filed 2026-09-25 by `M110`, from the
+  report *"can we make that an actual preview of the form? … currently we need to publish it first"*. The builder
+  store holds `LocalField[]`/`LocalSection[]` — server-id-bearing draft rows (`types.ts:25-67`) — while
+  `createFormRuntime()` consumes a `SchemaResponse`, the id-free checksummed snapshot built at publish by
+  `SchemaSnapshotSerializer.php`. ⚠️ **It cannot be the existing serializer.** That one serialises whatever is in
+  the row and lets `StructuralValidationGate` refuse the bad ones at publish; nothing today renders the in-between,
+  and the in-between is the entire point of a preview. The projection must never throw, never omit a field for
+  being incomplete, and never paper over a gap — it substitutes a legible placeholder and records an issue, which
+  is also how *"show what is wrong to the user"* gets delivered **before** publish rather than at it. ⛔ **One of
+  the eight draft-only states is load-bearing and the rest are bookkeeping:** `safeEvaluate()`
+  (`useFormRuntime.ts:310-319`) catches a parser throw, degrades the **whole form** to everything-relevant, and
+  sets `engineFailed` permanently true for the session. A half-typed condition must therefore be pre-parsed and
+  emitted as `null`, never handed to the engine. ✅ `condition-model.ts:85` already exports a bare
+  `parseExpression()`, so that check is a direct call and not a second parser. **Live.** Filed by `M110`.
+  **Tier: early-testing.**
+
+- **`minor` · The builder's middle pane is a structural outline that renders no input control of any kind, so an
+  author cannot see the form until it is published.** Filed 2026-09-25 by `M110`, from the same report.
+  `BuilderCanvas.vue:46-158` renders per field only a drag grip, an uppercase type label, the label text or
+  `(untitled)`, a Required/Conditional badge and two icon buttons — there is no `<input>`, no `<select>`, no
+  `MdsFormField` and no `FieldInput` anywhere in the file. The absence is stated in the tree at
+  `ConfirmationModal.vue:11`. ✅ **Both fillable renderers already exist and already cross the bundle boundary in
+  production**, so this is not a third renderer: `FieldControl.vue:9` imports `@/components/submissions/FieldInput.vue`
+  from the guest SPA, and `Encode.vue:38-42` mounts `createFormRuntime()` inside an Inertia page. Reuse the engine
+  rather than a lighter path — it is the only relevance implementation on the client, and this codebase's measured
+  pathology is hand-mirrors. ⛔ **THE BINDING CONSTRAINT IS ARIA, NOT ARCHITECTURE:** this page may hold exactly
+  one `role="tablist"` (`ConfigPanel.vue:23-27`, `Builder.vue:462-471`) because thirteen Playwright locators walk
+  `[role="tab"]` on it, four in click-every-match loops. The preview is a **third option on the existing centre
+  `MdsSegmentedControl`** (`Builder.vue:531-537`) — a radiogroup, one array entry, no new ARIA node. ⚠️ **That
+  invariant lives only in prose today** and should become an assertion in this increment, before every later
+  builder change depends on it. **Live.** Filed by `M110`. **Tier: early-testing.**
+
+- **`minor` · `forms.single_page_mode` drives real, tested runtime behaviour in both renderers and has no write
+  path anywhere outside the seeders.** Filed 2026-09-25 by `M110`, from the report asking for a section strip under
+  the preview and a choice of how sections are presented. The column exists (migration
+  `..._000201_create_forms_table.php:46`), is read by `PublicFormPresenter.php:38-39` and
+  `EncodeFormPresenter.php:210`, and branches the runtime at `RuntimeSession.vue:624` — but a grep of
+  `app/Http/`, `app/Services/Forms/` and `app/Http/Requests/` for `single_page_mode` returns **zero hits**, so the
+  only way to make a form multi-step today is a direct database write. ✅ **`D35` already answered the shape**
+  — add the setting, default step by step — so the write path is authorised and unblocked. ⚠️ **The section strip
+  is the part that needs care.** It must be a radiogroup, not a tablist, and its labels must be index-prefixed
+  (`1. Consent`) so that a section named "Form" or "Logic" cannot collide by exact text with the existing
+  `showBuilderPane()` and centre-control locators. A segmented control does not survive twenty sections, so the
+  degradation threshold wants to be a named constant with a test rather than a CSS guess. **Live.**
+  Filed by `M110`. **Tier: early-testing.** **Awaits D57.**
+
+- **`minor` · Form-level settings are spread across five modals, a toolbar checkbox and two form-list dialogs, with
+  no settings surface anywhere.** Filed 2026-09-25 by `M110`, from the report *"the form itself doesn't have a
+  settings section"*. Title, save-and-resume, schedule, confirmation message, share, scope and save-as-template
+  each have their own route and their own FormRequest, and the builder toolbar carries nine ungrouped buttons
+  (`Builder.vue:287-387`). ⛔ **THE OBVIOUS FIX IS ALREADY REFUSED, IN WRITING, THREE TIMES.** Folding the routes
+  together was declined at `UpdateFormScheduleRequest.php:15`, `UpdateSaveResumeRequest.php:13` and
+  `UpdateConfirmationMessageRequest.php:16`; and the builder deliberately has no tab strip, recorded at
+  `FormBuilderController.php:50-54` and `Builder.vue:256-259` because a second header row costs the one screen
+  that cannot spare it. ⚠️ **Both records hold, and this row respects them:** every section keeps its route and its
+  FormRequest, and what changes is only where an author finds them. The complaint is findability, not
+  architecture — nothing about five routes is visible to an author, and nine ungrouped buttons are. ✅ **A hub tab
+  is safe:** `MdsTabNav` renders a `nav` wrapping a `ul role="list"` with plain anchors, and `TabNav.test.ts:53-64`
+  asserts it carries no tab role at all. ⚠️ `builder-layout.test.ts` pins all three spellings of the eight
+  secondary toolbar actions with a per-line regex and **must be updated in the same PR**. **Live.**
+  Filed by `M110`. **Tier: early-testing.** **Awaits D63.**
+
+- **`minor` · The "Appearance hint" field is a free-text box in the builder that changes nothing about how any
+  form renders.** Filed 2026-09-25 by `M110`, answering the report *"can you also clarify to me what the
+  appearance hint do?"* — measured answer: at render time, nothing. `ConfigPanel.vue:433-439` writes
+  `form_fields.appearance` as unguided free text with no help and no vocabulary; `public-runtime/lib/types.ts:67`
+  declares it on the render model and `toRenderField()` (`schema-mapping.ts:451-479`) never reads it, so it
+  reaches neither `FieldRow.vue` nor `FieldControl.vue` nor the encode channel. An author who types `vertical` or
+  `minimal` sees no effect anywhere. ⛔ **BUT IT IS NOT DEAD WEIGHT AND MUST NOT SIMPLY BE DELETED.** It is
+  load-bearing for XLSForm interop in **both** directions: `XlsformTypeMap.php:50,52,69,87,92` forces appearances
+  on export, `:107-148` uses them to **disambiguate on import** (`select_one` + `minimal` becomes a Dropdown,
+  `image` + `signature` becomes a Signature), and `XlsformImportParser::resolveAppearance()` (`:257-268`) strips
+  the synthetic one the exporter wrote. ✅ **The user has chosen to wire it up** as a typed, per-field layout
+  vocabulary the renderers honour. ⚠️ **The test that matters is the round trip** — an imported `minimal` must
+  survive an edit and re-export, because the type map disambiguates on exactly those strings. **Live.**
+  Filed by `M110`. **Tier: early-testing.**
+
+- **`minor` · No renderer honours a per-field layout hint, so a typed appearance vocabulary would have an author
+  surface and no effect.** Filed 2026-09-25 by `M110` as the second half of the appearance work, split because it
+  lands in a different hub file and after the vocabulary exists. `toRenderField()` (`schema-mapping.ts:451-479`)
+  builds the render model without reading `appearance`, and both control switches — `schema-mapping.ts:78-118`
+  and the independent copy at `FieldInput.vue:205-250` — dispatch on field type alone. ⚠️ **Two switches, not
+  one**, and neither has a parity test today, so a layout branch added to one and forgotten in the other would
+  give the guest runtime and the encode page different forms. That is the same class of drift the client-mirror
+  census exists to catch, and it should land first. **Live.** Filed by `M110`. **Tier: during-testing.**
+
+- **`minor` · A form can hold no author-composed content — no welcome page, no instructions, no image, no
+  divider — because `note` renders one line of plain text and has no config editor.** Filed 2026-09-25 by `M110`,
+  from the report asking for *"a page where they can put image, welcome notes, instructions, that they can easily
+  layout"*. `FieldInput.vue:506` is the entire renderer (`<p>{{ field.label }}</p>`), and `FieldType::configEditor()`
+  returns `null` for `Note`, so the only authored content is the label column. ⛔ **THE STORAGE FORMAT IS THE WHOLE
+  DECISION AND IT MUST NOT BE AN HTML STRING.** `docs/piping-output-encoding-design.md` §1 states that **CSP is not
+  a defence for this threat** — `PublicRuntimeSecurityHeaders` deliberately sets no `default-src`/`script-src`, and
+  a test asserts their *absence* as a tripwire — so output encoding is the sole control; and §5 forbids centralised
+  store-time escaping. There is no markdown renderer and no sanitizer in the project (five runtime dependencies),
+  and exactly one `v-html` exists, pinned as an invariant. ⚠️ **The market confirms the choice rather than
+  softening it:** Google Forms and Typeform have no author-HTML sink at all, Tally stores a tag-allowlisted tuple
+  array, Jotform bans HTML in headings citing XSS by name, and SurveyJS — the one product that stores raw HTML —
+  states outright that it does not sanitize and carries filed XSS issues on exactly that sink. Store an ordered
+  array of typed, closed-shape blocks with plain-string leaves, depth fixed at two, links scheme-allowlisted at
+  write **and** re-checked at render. ✅ **It is a `note` config, not a 32nd field type** — the slot is free and a
+  new type would cost a DB CHECK migration, a new XLSForm mapping and new arms in eight registries for the same
+  thing. **Live.** Filed by `M110`. **Tier: early-testing.**
+
+- **`minor` · A content block has no renderer, and the one-`v-html` invariant that makes that safe is asserted in
+  only one place.** Filed 2026-09-25 by `M110` as the render half of the content-block work. Both channels reach
+  the same control component — `FieldControl.vue:9` imports `FieldInput.vue` across the bundle boundary — so one
+  new component consumed by the `note` branch serves the guest SPA and the encode page together, with **zero
+  `v-html`**. ⚠️ **The invariant is currently narrow.** The single `v-html` in `resources/` is the Fortify 2FA QR
+  SVG at `TwoFactorSetup.vue:216`, pinned by `public-runtime/__tests__/components.test.ts:549` and by the design
+  doc, which says of it *"it must never be given form content"* — but that pin covers the runtime's own test
+  surface rather than the repository. Once authors can compose content, a census over all of `resources/` is what
+  keeps a well-meaning future edit from turning a block renderer into a sink. ⚠️ **A gate written here proves
+  nothing while green** — it needs a committed mutation that adds a `v-html` and turns it red. **Live.**
+  Filed by `M110`. **Tier: early-testing.**
+
+- **`minor` · A content-block image has nowhere to live, and the surfaces that must escape block text are not in
+  the output-encoding contract.** Filed 2026-09-25 by `M110` as the third and last content-block row, split off
+  because it is blocked and the first two are not. ⛔ **The ownership problem is real and small:** `PublishService`
+  clones the draft tree forward on every publish, minting new `form_fields` row ids, so a field-owned attachment
+  dangles the moment the form is published — and that clone is the one path that must stay a pure clone.
+  ✅ **The upload posture is already written and should be copied rather than redesigned:** the tenant branding
+  logo gates at `StoreBrandingLogoRequest` and then **re-sniffs the MIME from the bytes** in
+  `AttachmentStorageService::storeBrandingLogo()` (`:127`) *because `mimetypes:` validation trusts a header a
+  client controls* — two gates, deliberately duplicated — with **SVG excluded** (an XML document can carry
+  `<script>` and is served same-origin to every respondent) and **GIF excluded** (WCAG 2.2.2). ⚠️ **Each surface
+  owes its own row in `docs/piping-output-encoding-design.md` §5**, which is a per-surface table with a named
+  escaper, owner and test: guest SPA, Blade/PDF, XLSForm export, XLSForm import. ⚠️ **Two of them may not exist**
+  — verify whether a `note` reaches a CSV or XLSX export at all before writing a test for a surface that is not
+  there, and say so if it is not. **Live.** Filed by `M110`. **Tier: during-testing.** **Awaits D58.**
+
+- **`minor` · There is no per-form theme; every form in a workspace renders with the identical tenant ramp.**
+  Filed 2026-09-25 by `M110`, from the report *"if we can also include a theme selector for the form"*, answered
+  in chat as **preset themes only**. There is no `forms.theme` column in use, nothing on `form_versions` and
+  nothing in `BuilderPageProps` carrying styling — the builder has zero styling controls. ✅ **The machinery to
+  build on is unusually good:** `BrandRampGenerator.php` is an OKLCH ramp generator with a byte-parity TypeScript
+  twin (`brand-ramp.ts`) and `BrandingCard.vue` already renders a live preview with a **full contrast report**, so
+  every preset can be gated on measured contrast rather than on taste. ⛔ **It collides with a written invariant.**
+  `partials/brand-ramp.blade.php` overrides exactly six properties and says *"only these SIX properties, never a
+  neutral, semantic or chart token"*, and `GuestBrandingPresenter` is deliberately the **single** reader for the
+  guest style block, the `theme-color` meta and the PWA manifest — on the stated grounds that if any of them
+  derived its own answer they could disagree. A preset that sets a font pairing and a radius scale sets more than
+  six, so it must compose with that presenter rather than fork it. ⚠️ **The gate worth writing is totality across
+  modes** — a preset legible in light and unreadable in dark is the failure this buys protection against.
+  **Live.** Filed by `M110`. **Tier: during-testing.** **Awaits D65.**
+
+- **`minor` · A respondent who finishes a form cannot be sent anywhere; there is a thank-you message and no
+  redirect of any kind.** Filed 2026-09-25 by `M110`, from the report that a finished form *"can be configured to
+  redirect to existing form or a custom url"*. A grep for `redirect_url`, `thank_you` and `post_submit` across
+  `app/`, `resources/`, `database/` and `routes/` returns **only SSO hits** — nothing form-related. What exists is
+  `forms.confirmation_message` (+ `_translations`), edited by `ConfirmationModal.vue`, validated at publish by
+  `TemplateValidationGate`, and rendered by `ConfirmationScreen.vue`, which offers a "submit another response"
+  button and nothing else. ⚠️ **Note those columns live on `forms`, not `form_versions`** — deliberately not frozen
+  per version, with the reasoning in the migration — so a redirect added beside them inherits that same trade and
+  should say so rather than rediscover it. ⛔ **The value is author-supplied and rendered into a navigation on a
+  public page**, so a scheme allowlist is not optional: refuse anything that is not `https://`, refuse
+  `javascript:` explicitly, and make the publish gate refuse a redirect that points at an unpublished form.
+  ⚠️ **One runtime case is easy to get wrong:** the confirmation screen renders a server-issued reference **or** a
+  device-local queue tag when the response is still in the offline outbox — a redirect must not fire on the queued
+  path, because nothing has been accepted yet. **Live.** Filed by `M110`. **Tier: during-testing.**
+
+- **`minor` · The forms list is one flat list per workspace; there is no folder, project, collection or tag
+  grouping anywhere in the schema or the UI.** Filed 2026-09-25 by `M110`, from the report asking for
+  *"a workspace grouping in the form list (filtering option)"*. `FormPresenter::list()` filters by keyword
+  (Postgres FTS over `forms.search_vector`) and by a four-value facet (`FormListFacets`: all / live / draft /
+  closing soon), and sorts by rank then `updated_at`. Migrations and models were grepped for `folder`,
+  `collection`, `project_id` and `group` — nothing. ⛔ **`scope_node_id` is the one grouping-shaped column and it
+  must not be used for this.** `ScopeNode` is an **authorization** hierarchy — an adjacency list with a
+  materialized `path` that `resource_grants` resolve downward through with `path LIKE` — and its documented
+  purpose is who may see a form, not where an author filed it. Overloading it would make a filing decision change
+  who can read the form. ⚠️ **The isolation case is the test that matters:** a collection must not leak the
+  existence of a form the viewer cannot already see, so the facet has to compose with `Form::scopeVisibleTo()`
+  rather than sit beside it. **Live.** Filed by `M110`. **Tier: during-testing.**
+
+- **`minor` · There is no way to use another form's responses inside a form, which is KoboToolbox's "Connect
+  project" and the single largest gap against it.** Filed 2026-09-25 by `M110` from the report
+  *"in kobo toolbox, there is this thing called connect project … follow the kobotoolbox format to have consent
+  from mother form and a selector to show selected columns only or select all. research on this"*. Researched:
+  Kobo calls it **dynamic data attachments** (API name *paired data*), it is **two-key consent** — the source
+  owner flips a per-project `data_sharing` toggle behind an acknowledge modal, **and** the **destination asset's
+  owner**, not the acting user, must hold view-form plus view-submissions on the source — the source is immutable
+  after creation, and the effective column set is the **intersection** of both sides' selections. ⚠️ **Three of
+  Kobo's own traps are avoidable here and should be closed structurally, not documented.** Its `fields: []` means
+  *all* in stored config and *none* as a computed intersection, a collision its own source carries a warning
+  comment about — make the column a nullable list and refuse the empty one. Its instance handle, `xml-external`
+  row name and attachment filename are three names that must be one name, typed twice, failing silently — mint it
+  once from the link row. And it **cannot feed `select_one_from_file`**, a five-year-old open request, because
+  paired data emits `<root><data>` while select-from-file expects `<root><item>`; here options are JSON config, so
+  a link can feed a choice field directly. ⚠️ **Nothing here is measured against this tree** — this is a design
+  sketch from vendor documentation and published source, deliberately not buildable as written. **Live.**
+  Filed by `M110`. **Tier: during-testing.** **Awaits D60.**
+
+- **`minor` · An author cannot attach a reference file to a form, and the attachment model has no form-level kind
+  to hang one on.** Filed 2026-09-25 by `M110` from the report *"there is also a attachments in kobotoolbox that
+  we can copy also … we can attach excel, photos, word file, pdf etc that we can make as reference in our form"*.
+  ⛔ **The blocker is small and comes before the design:** `App\Enums\AttachmentKind` has no form-level kind, and
+  the attachment morph map is `submission | form_field | webhook_delivery` — `form` and `scope_node` appear only
+  for `resource_grants`, not for attachments. ⚠️ **And there is already a half-built instance of exactly this
+  problem:** `form_templates.cover_image_attachment_id` is a real FK with a real migration whose only writer is a
+  seeder writing `null`, and no upload route — it should be closed by the same increment rather than left as a
+  second unfinished path. ✅ **One axis where this app can beat Kobo without trying:** Kobo does per-language media
+  by filename convention (`image::English (en)`), which is why its docs warn that filenames are case-sensitive and
+  must match exactly; this repo has `*_translations` jsonb on every label-bearing column, so a per-language variant
+  is a translations map — which is also what lets an XLSForm export emit that column correctly rather than
+  guessing. ⚠️ **Kobo's filename namespace is shared between form media and data links**, and that is worth
+  copying: one uniqueness constraint covering both, not two that can collide. **Live.** Filed by `M110`.
+  **Tier: during-testing.** **Awaits D61.**
+
+- **`minor` · There is no author-configurable automation — no "when this happens, do that" — only four fixed,
+  non-composable mechanisms.** Filed 2026-09-25 by `M110` from the report *"in fillout.com, there is this thing
+  called workflows, research on this and study on how we can implement this in our project"*. What exists today:
+  a single-hop review lifecycle, a **closed** `NotificationType` enum fanned out by role, webhooks, and connectors
+  dispatched over `DomainEventType` by `app/Listeners/Connectors/DispatchConnectorsFor*.php`. None of them is
+  author-authored and none composes with another. ⚠️ **Researched, and the common assumption is wrong:** a Fillout
+  Workflow is an **automation engine scoped to one form** — trigger, then a linear action chain with `Filter` (a
+  gate) and `Branch` (a fan-out) — **not** multi-form sequencing and not primarily approvals. Fillout's
+  node-and-connector canvas is its *page logic*, a different feature. ⛔ **A NAMING COLLISION MUST BE SETTLED
+  BEFORE A LINE IS WRITTEN.** `docs/workflow-branching-design.md` §2 states there is *"no steps table, no pages
+  table, no edge table and no `next_step_id` column anywhere in this system, and this document adds none"* — that
+  is about the respondent step model, but reusing the word *step* here would make the invariant read as violated.
+  ⚠️ **`NotificationType` is closed and its ORDER is load-bearing** (DB CHECKs are generated from `values()`), so
+  an automation that notifies must reuse a type or **append** — never insert. ⚠️ Fillout documents no else/default
+  path on its Branch; that is a defect to improve on, not a shape to copy. **Live.** Filed by `M110`.
+  **Tier: during-testing.** **Awaits D62.**
+
+- **`minor` · Compound AND/OR validation rules are supported by the database, the serializer and both evaluators,
+  and cannot be authored anywhere.** Filed 2026-09-25 by `M110` while designing the inline `required_if` editor,
+  which can express one row and no more. `form_field_validations` carries `logic_group` (uuid) and
+  `logic_operator`, `SemanticValidator::toUnits()` (`:242-261`) folds grouped members into one unit, and
+  `StructuredRuleEvaluator::conditionGroupHolds()` evaluates them — but `FormBuilderService::replaceValidations()`
+  (`:570-589`) never writes either column, `BuilderPresenter::field()` (`:168-178`) never emits them, and
+  `BuilderValidation` (`types.ts:15-23`) has no such field. ⚠️ **The only writers are the XLSForm importer and
+  `SchemaBlueprintMaterializer.php:185-203`**, so a compound rule can arrive in a form by import or from a
+  template and then be invisible and uneditable in the builder that owns the form — which is worse than not
+  supporting it, because an author cannot see why their field behaves as it does. ⚠️ `SchemaSnapshotSerializer`
+  already remaps the group ordinal and has a test; extend it to a builder-authored group rather than writing a
+  second path. **Live.** Filed by `M110`. **Tier: during-testing.**
+
+- **`minor` · Five of the six client-side copies of the field-type catalogue have no parity test, and the one that
+  does proves the technique works.** Filed 2026-09-25 by `M110` while designing the per-type validation model,
+  which must not become a seventh. The PHP `FieldType` enum is authoritative and the builder palette is fully
+  server-driven — but the **renderers** carry six hand-written mirrors: `schema-mapping.ts:48-59` (`SUPPORTED`,
+  whose own comment admits it mirrors `EncodeFormPresenter::SUPPORTED`), `:72` (`HAS_OPTIONS`), `:75`
+  (`TEXT_TYPES`), `FieldInput.vue:198` (`MEDIA_TYPES`) and `ConfigPanel.vue:178` (`NUMERIC_TYPES`). ✅ **Only
+  `field-roles.ts`'s `RENDERS_NOTHING` is pinned**, by `tests/Unit/Forms/PdfFieldRoleTest.php`, which regex-parses
+  the TypeScript from PHP and asserts set equality — so the instrument already exists in this repository and needs
+  copying, not inventing. ⚠️ **`EncodeFormPresenter`'s own docblock (`:64-72`) admits the duplication and records
+  that collapsing it was deliberately declined** — which makes a parity test the right answer rather than a
+  refactor: it converts five unguarded mirrors into guarded ones **without deleting any of them**. ⚠️ A gate
+  written here is green on arrival and therefore proves nothing until a committed mutation — removing one type
+  from one mirror — turns it red. **Live.** Filed by `M110`. **Tier: early-testing.**

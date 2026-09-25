@@ -533,6 +533,15 @@ function setCascadeLevel(index: number, value: string): void {
     min-width: 0;
 }
 
+/* D28's `.encode-field` host, and the one that PROVES the illustration was inert: this fieldset has
+   carried `min-width: 0` since it was written and still spills, because a flex COLUMN child is
+   already exactly container-width. The overflow is the control's own flex LINE. Note this host is
+   the odd one out on D28's table — it renders in an `MdsCard` and in the public runtime, not in a
+   modal — so its containing scroller is whatever the page provides. */
+.encode-field .mds-segmented {
+    flex-wrap: wrap;
+}
+
 .encode-field__legend {
     padding: 0;
     font-family: var(--mds-font-family-body);

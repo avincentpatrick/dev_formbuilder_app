@@ -1597,7 +1597,7 @@ increment that found it can honestly validate.
 |---|---|
 | Call sites | 13, across 9 files |
 | Stretch-clamped hosts | **4** — `.config__group`, `.mds-field` (members ×2), `.sheets-fields`, `.encode-field` |
-| …of those, inside an `overflow-y: auto` box | **4 of 4** — `.config` for the first, `.mds-modal__body` for the other three |
+| …of those, inside an `overflow-y: auto` box | **2 of the 4 classes established** — `.config` for `.config__group`; `.mds-modal__body` for `.mds-field` (twice) and `.sheets-fields`. ⛔ **`M109` corrected this line.** *"4 of 4 — `.config` for the first, `.mds-modal__body` for the other three"* mixed a class count with a call-site count: those are three call SITES across two classes, and `.encode-field` is in no modal at all — it renders in an `MdsCard` on the encode page and in the public runtime, so its containing scroller was never established. |
 | …with any e2e coverage | **1** (the builder pane, and only through a document-level assertion that cannot see it) |
 | `flex-shrink: 1` on `__seg` | a **no-op** — the initial value, and absent from the tree |
 | The 30px | **unprovenanced** — no test, fixture or snapshot records it |
@@ -1630,6 +1630,8 @@ measures 0 everywhere — the wrong box.
 at CI's font stack — and it is the only thing that can, because the dev host never loads the dyslexia face.
 **It is not shipped here deliberately**: added blind it would either merge green and prove nothing or go
 red and block an increment on a question nobody has answered. It belongs with whichever option is taken.
+
+⛔ **`M109` (2026-09-25) — THE ANSWER SURVIVES; ITS ILLUSTRATION DOES NOT, AND A READER WHO FOLLOWS THE ILLUSTRATION SHIPS A NO-OP.** Option 3 is still the answer and nothing about *guard at the host* changes. But the guard it points at cannot work on any of the four hosts. `Settings/Index.vue`'s `.settings-row` is a flex **ROW**, where `min-width: 0` overrides the automatic minimum size along the MAIN axis — that is why it works there — and the rule the illustration leaves out is `flex-wrap: wrap`, declared on that same host two lines above it. **All four defective hosts are flex COLUMNS**, where a stretched child is already exactly container-width, so `min-width: 0; max-width: 100%` changes nothing whatsoever. ⚠️ **The counter-example was already in the tree and in this entry's own table:** `.encode-field` carries `min-width: 0` today and still spills. What overflows is the control's own flex LINE, whose `__seg` has `min-width: auto` and therefore never shrinks below its longest word plus 24px of padding — and the table above already records `flex-shrink: 1` as inert for the same family of reasons without carrying it through to the recommendation. **The host-side affordance that does work is `flex-wrap: wrap` on the hosted control**, which is what `M109` declared at each of the four hosts. Filed as `R-6c429d4e`, closed beside `R-45b0cf8a` in one increment: shipping the fix while leaving this sentence standing would have left the roster prescribing a change that measures identically.
 
 ---
 
@@ -2246,6 +2248,16 @@ half that works.
 **Why:** because no batch could satisfy it, including a batch of one. `M108` measured the cap across all seven candidate rows and **7 of 7 breach it**; `R-7849e303` alone harvests three hub files before any sibling joins it; and five of the hub files are touched by close-out procedure alone. The measurement is recorded at `D15` rather than repeated here. ⚠️ **The honest statement is therefore not that this batch earned an exception but that the rule currently admits nothing** — and the first entry in an exceptions log being *the rule refused everything* is itself the finding.
 
 **Disposition:** `D15` decides the rule; this increment did not touch it. `M108`'s own subject makes the question cheaper to answer rather than answering it — the harvester now reads class names, so the degree counts `D15` reasons about are measured rather than disputed. ⛔ **And the exception is recorded in BOTH places**, which no previous one was: inline at each closed row, the way `M107` did it, and in `PROGRESS.md`'s release paragraph, the way `M90` did it. Either alone is findable from one direction only, and the two precedents disagreeing about where to look is half of why `R-4346557c` was filed.
+
+##### #2 — `M109` (2026-09-25) · four rows, clause 1 satisfied exactly, clause 2 breached by procedure
+
+**What was not satisfied:** item 1's second clause, *at most one row may touch a hub file*. The batch was `R-e7d6f223`, `R-45b0cf8a`, `R-6c429d4e` and `R-2e2407e2`. ⛔ **Item 1's FIRST clause was satisfied exactly, and it is worth stating because it is the clause that still separates rows:** the four non-hub sets are pairwise disjoint — `deploy.ps1` plus `tests/Feature/Deploy/`; the four segmented-control hosts; none at all; `tests/Feature/Tenancy/CentralHostFallbackTest.php`.
+
+**Why:** the same reason as #1, and nothing about this batch's composition. All four touch `docs/feature-backlog.md` (degree 9) and `docs/pipeline.md` (10) **by close-out procedure alone**, and `R-6c429d4e`'s whole remedy is an edit to this file (8). `M108` measured that no batch can satisfy the clause, including a batch of one; this increment did not re-measure it, because re-measuring a rule that admits nothing produces the same answer.
+
+⛔ **THIS IS THE SECOND ENTRY FOR THE SAME REASON, AND THE THIRD IS THE TRIGGER.** The escalation rule above says three or more exceptions for one reason mean the rule is wrong rather than the batch, and that the entry to write at that point is an answer to `D15` — not a fourth exception. `D15` is open, is tiered `early-testing`, and already carries three options, a recommendation, and `M108`'s fourth option. **The next increment that composes a batch from this queue should expect to be the one that trips it.**
+
+**Disposition:** `D15` decides the rule; this increment did not touch it, for the reason `D15` opens with — an increment does not re-scope a user decision on its own judgement. Recorded in both places the log requires: inline at each of the four closed rows, and in `PROGRESS.md`'s release paragraph.
 
 ---
 

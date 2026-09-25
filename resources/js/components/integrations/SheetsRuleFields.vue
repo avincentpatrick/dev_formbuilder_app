@@ -443,6 +443,13 @@ watch(
     gap: var(--mds-space-4);
 }
 
+/* D28's `.sheets-fields` host. A flex COLUMN, so the control is already container-width and the
+   overflow is its own flex LINE — the wrap is what fixes it, not a width clamp. This control's
+   labels ("Create a sheet for me" / "Use one I already have") are the longest of the four. */
+.sheets-fields .mds-segmented {
+    flex-wrap: wrap;
+}
+
 .sheets-fields__group {
     border: 0;
     margin: 0;

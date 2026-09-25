@@ -90,6 +90,14 @@ const describedby = computed(() => {
     gap: var(--mds-space-2);
 }
 
+/* A segmented control slotted in here is the `.mds-field` case on D28's host list. This host is a
+   flex COLUMN, so clamping the child's width changes nothing — a stretched child is already exactly
+   container-width. What overflows is the control's own flex LINE, so let it wrap. `:slotted` is
+   required: the control arrives through the default slot and so carries the CONSUMER's scope id. */
+.mds-field :slotted(.mds-segmented) {
+    flex-wrap: wrap;
+}
+
 .mds-field__label {
     font-family: var(--mds-font-family-body);
     font-size: var(--mds-type-label-font-size);

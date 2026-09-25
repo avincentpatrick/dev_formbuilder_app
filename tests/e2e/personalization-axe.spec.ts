@@ -111,6 +111,38 @@ test('Builder at extra_large + dyslexia font + teal — accessible & no horizont
         expect(spill, 'the pane switcher overflows its bar under maximum personalization').toBeLessThanOrEqual(1);
     }
 
+    // ⛔ M109 — THE DOCUMENT-LEVEL ASSERTION CANNOT SEE THIS ONE, BY CONSTRUCTION, AND THAT IS WHY THE
+    // ORIGINAL M17 ROW WAS FALSIFIED. `.config` is `overflow-y: auto`, which forces `overflow-x` to
+    // compute to `auto` too, so the Requiredness control's spill becomes a real horizontal scrollbar
+    // INSIDE the pane. `assertNoHorizontalOverflow` deliberately skips any subtree under an
+    // `overflow-x: auto|scroll` ancestor and reports it as `absorbed`, never as the cause — the note at
+    // `support/axe.ts` already names this exact control. Only an element-level read decides it, which is
+    // what D28 asks for. The fix is `flex-wrap: wrap` at each of D28's four stretch-clamped hosts.
+    //
+    // ⚠️ ASK FOR THE PANE BACK FIRST, AND THE REASON IS THE SAME ONE THE HEADER ABOVE GIVES. The builder
+    // is COMPACT at `extra_large` even on the desktop project, so after `forcePersonalization` the config
+    // pane is no longer the one on screen — the `showBuilderPane` at the top of this test ran while the
+    // layout was still wide and did nothing. `false` here means the layout is wide and all three are up.
+    await showBuilderPane(page, 'settings');
+
+    // ⛔ THE GUARD IS ON THE MEASUREMENT, NOT ON THE ELEMENT COUNT, AND THE DIFFERENCE IS NOT ACADEMIC:
+    // `.config` is in the DOM even when its pane is display:none, where `scrollWidth - clientWidth` reads
+    // 0 and the assertion below would pass over a layout it never looked at. Measured on this test's
+    // first run, which is the only reason this is `toBeVisible` and not `toHaveCount(1)`. The Requiredness
+    // group is `v-if="!isCalculated"` too, so a calculated auto-selection would hide it the same way.
+    const configPane = page.locator('.config');
+    await expect(configPane, 'the builder config pane is not on screen, so the measurement would be vacuous').toBeVisible();
+    await expect(
+        configPane.getByRole('group', { name: 'Requiredness' }),
+        'the Requiredness segmented control did not render, so the measurement would be vacuous',
+    ).toBeVisible();
+
+    const configSpill = await configPane.evaluate((el) => el.scrollWidth - el.clientWidth);
+    expect(
+        configSpill,
+        'the builder config pane scrolls sideways under maximum personalization',
+    ).toBeLessThanOrEqual(1);
+
     if (await showBuilderPane(page, 'fields')) {
         await assertClean(page, 'Builder (max personalization) — Add');
         await showBuilderPane(page, 'canvas');

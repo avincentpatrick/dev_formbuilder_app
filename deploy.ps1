@@ -135,6 +135,15 @@ function Get-NormalizedPath([string]$Path) {
 $MoveAttempts = 40
 $MoveRetryMilliseconds = 250
 
+# A deploy makes the PREVIOUS release's hashed chunks unreachable the instant public\build is renamed
+# away, and step 8 then deletes build.prev outright. An already-open tab that fetches a chunk ON DEMAND
+# — a lazily loaded component, not a navigation — asks for a file that no longer exists. Inertia's
+# asset-version check cannot save it (it fires only on an Inertia GET, and the guest runtime is not
+# Inertia at all), so the previous release's orphaned assets are carried forward into the new build and
+# aged out instead. Additive and collision-free: the filenames are content hashes. The window bounds the
+# accumulation, and only assets\ is carried — manifest.json and sw.js are always the new build's alone.
+$BuildRetentionDays = 7
+
 function Move-DirectoryWithRetry {
     param(
         [Parameter(Mandatory = $true)][string]$From,
@@ -181,6 +190,47 @@ function Remove-FileIfPresent {
         Write-Host "--> remove $Path"
         [IO.File]::Delete($Path)
     }
+}
+
+# Carry the previous release's orphaned hashed chunks into the new build, so a tab opened before the
+# swap can still fetch one. Additive only: a hashed name that exists in the new build is never
+# overwritten, and manifest.json and sw.js are not touched at all, so the new release describes itself.
+# Copy-Item preserves LastWriteTime, which is what lets a carried file age out on a later deploy
+# instead of living forever.
+#
+# ⛔ THIS RUNS INSIDE THE WINDOW, DELIBERATELY. Doing it after `up` would leave a gap in which the new
+# build is live and the old chunks are already unreachable, which is the exact defect being closed.
+function Copy-RetainedBuildAssets {
+    param(
+        [Parameter(Mandatory = $true)][string]$FromBuild,
+        [Parameter(Mandatory = $true)][string]$ToBuild,
+        [Parameter(Mandatory = $true)][int]$RetentionDays
+    )
+    $fromAssets = Join-Path $FromBuild 'assets'
+    $toAssets = Join-Path $ToBuild 'assets'
+    if (-not [IO.Directory]::Exists($fromAssets)) {
+        Write-Host "--> retain: no previous assets directory at $fromAssets, nothing to carry forward"
+        return
+    }
+    if (-not [IO.Directory]::Exists($toAssets)) {
+        throw "Deploy step failed: the new build has no assets directory at '$toAssets', so the swap did not produce a usable build."
+    }
+    $cutoff = (Get-Date).AddDays(-$RetentionDays)
+    $carried = 0
+    $aged = 0
+    foreach ($file in [IO.Directory]::GetFiles($fromAssets)) {
+        $dest = Join-Path $toAssets ([IO.Path]::GetFileName($file))
+        if ([IO.File]::Exists($dest)) {
+            continue
+        }
+        if ([IO.File]::GetLastWriteTime($file) -lt $cutoff) {
+            $aged++
+            continue
+        }
+        Copy-Item -LiteralPath $file -Destination $dest -Force
+        $carried++
+    }
+    Write-Host "--> retain: carried $carried chunk(s) forward from the previous release, aged out $aged"
 }
 
 # 7. A Stopped worker drains nothing, so start it. Every caller runs this after `up`, so it can
@@ -428,6 +478,9 @@ try {
         Move-DirectoryWithRetry -From $LiveBuild -To $PrevBuild
     }
     Move-DirectoryWithRetry -From $StageBuild -To $LiveBuild
+    if ([IO.Directory]::Exists($PrevBuild)) {
+        Copy-RetainedBuildAssets -FromBuild $PrevBuild -ToBuild $LiveBuild -RetentionDays $BuildRetentionDays
+    }
 
     # The old release's package, config, route and event caches describe classes and routes that
     # the new vendor\ and code may not have. package:discover rebuilds the package manifest from

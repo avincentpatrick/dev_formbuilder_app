@@ -627,8 +627,8 @@ One `align-self: stretch` retired all three — **and the guard was verified rat
 `showBuilderPane` returns `false` if the pane switcher is hidden, which would have made two `assertClean`
 calls silently vanish rather than pass. Measured at 375px: `switchVisible=true fields=true canvas=true`.
 
-- **`minor` · `MdsSegmentedControl` spills 30px INSIDE the builder's config pane — a real horizontal
-  scrollbar, and not the page-overflow defect it was filed as.** ⛔ **This row replaces the M17 row that
+- ✅ **CLOSED BY `M109` (2026-09-25) — `minor` · ~~`MdsSegmentedControl` spills 30px INSIDE the builder's config pane — a real horizontal
+  scrollbar, and not the page-overflow defect it was filed as.~~** ⛔ **This row replaces the M17 row that
   claimed the control *"spills 30px out of the builder's content region"*, which is falsified**: it
   spills out of `.config` (`ConfigPanel.vue:546-553`, `overflow-y: auto`), which absorbs it, so it
   contributed nothing to the 24px that failed the scan. The offender is the **Requiredness** control
@@ -672,7 +672,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   👤 **What is left is a decision, and it is filed rather than guessed**, because the component-level fix
   touches 13 call sites and the only instrument that can settle it is an e2e run in the container. ⚠️ **A
   fourth option nobody had raised**: `Settings/Index.vue` already solves this at the HOST, with a comment
-  saying so, and three call sites are guarded by it today. Corrected by `M87`.
+  saying so, and three call sites are guarded by it today. Corrected by `M87`. ✅ **CLOSED BY `M109` (2026-09-25), BESIDE `R-6c429d4e` UNDER RECORDED `D13` EXCEPTION #2** — `flex-wrap: wrap` on the hosted control, declared at each of the four stretch-clamped hosts, which is `D28`'s chosen option 3 with the illustration its own row corrects. Every CSS claim above verified against the source. ⚠️ **Two citations had drifted and are repaired here:** the Requiredness control is at `ConfigPanel.vue:314-322` (cited `307-312`) and `.config` at `:557-564` (cited `546-553`). ⛔ **THE 30px IS UN-STRUCK, AND IT IS EXACTLY 30.** This row struck the figure as unprovenanced and `D28:1603` agreed — *"no test, fixture or snapshot records it"*. The new element-level assertion on `.config` measured the spill at **30px** on the first run that could see it, which is the first provenance the number has ever had. ⛔ **AND THE ASSERTION IS LIVE AT ONE PROJECT OF THREE — MEASURED, NOT ASSUMED.** With the `.config__group` rule deliberately disarmed and the build regenerated, the case is **CAUGHT at `mobile` (30px)** and **SURVIVES at `desktop` and `tablet`**, where the pane is wide enough that the control fits. A green run on the two wide projects proves nothing about this defect, which is exactly the property `assertNoHorizontalOverflow` lacks here: `.config` is `overflow-y: auto`, so `overflow-x` computes to `auto`, and the document-level gate files the spill as `absorbed` — `axe.ts:183-191` already named this control as that case. ⚠️ **The first version of the assertion was vacuous and its own guard caught it:** the builder is compact at `extra_large` even on the desktop project, so after `forcePersonalization` the config pane was no longer on screen, where `.config` is still in the DOM and `scrollWidth - clientWidth` reads 0. The guard is now `toBeVisible`, not `toHaveCount(1)`. ➕ **Filed rather than fixed:** three of the four host rules — `.mds-field`, `.sheets-fields`, `.encode-field` — ship with no assertion of their own.
 
 ### Connectors & webhooks
 
@@ -9583,7 +9583,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   workspace and is redirected straight back to the central host it just came from.** Measured by `M93` (2026-09-14). While sign-up is open — the platform
   default — `resources/js/Pages/Welcome.vue` links to the registration page. A central-host registration
   belongs to no workspace, Fortify then redirects to `/dashboard`, and that route exists only in
-  `routes/tenant.php`, so the central host answers 404. ⚠️ **The invitation-only testing setting avoids it
+  `routes/tenant.php`, so the central host redirects it to `APP_URL` rather than answering 404 — corrected in place by `M109`, and the two notes below say the same thing. ⚠️ **The invitation-only testing setting avoids it
   without code**, and the sign-up decision was answered invitation-only in chat on 2026-09-14, so the testing
   server avoids it and this row stays early-testing, while a default install still reaches it. The fix is to relabel or hide the button
   until a self-serve workspace exists, which is now an open decision, or to land such an account on a page that says it has none yet.
@@ -9934,14 +9934,14 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   reach it. CI's E2E job has set it to the central origin since `I11b`, and the comment in
   `tests/e2e/global-setup.ts` saying otherwise is stale. **Latent.** — needs `APP_URL` to differ from the
   request's origin. Filed by `M96`. **Tier: during-testing.**
-- **`minor` · A deploy deletes the previous build's chunks, so an open tab can fail to load a script it needs.**
+- ✅ **CLOSED BY `M109` (2026-09-25) — `minor` · ~~A deploy deletes the previous build's chunks, so an open tab can fail to load a script it needs.~~**
   Found by `M96` (2026-09-15) while verifying the deploy-window row. Every build empties `public/build`, so the
   hashed chunks the previous release served are gone once a deploy swaps the new build in. Inertia's version
   check reloads a tab on its next navigation, but a page that fetches a chunk on demand without navigating,
   such as a lazily loaded component, asks for a file that no longer exists (INFERRED; the on-demand sites were
   counted, not exercised). ⚠️ Keep the previous release's chunks for a grace period, or catch a failed chunk
   load and reload the page. **Live.**
-  Filed by `M96`. **Tier: early-testing.**  ⚠️ **Re-judged by `M98` (2026-09-18), which did not take the row:** the precondition has become ordinary traffic. `DEPLOY_ENABLED` was set on 2026-09-17, so a build swap happens on every merge and every close-out push, and the nightly schedule's Deploy fires at about 08:50Z — 16:50 Philippine time, inside the testers' working day, since the scheduled CI runs were measured starting 08:27-08:33Z rather than at the 03:00Z its cron reads. A tester with the builder open across one of those is unremarkable, which is why the marker above is corrected from latent to live. What remains INFERRED is the other half: which sites fetch a chunk on demand without navigating was counted and never exercised, so a user who wants that measured first may prefer to leave the row latent. Two consequences either way: on this evidence the tier wants re-reading as early-testing, which is the user's call; and the documentation skip that `M98` added to `deploy.ps1` takes close-out pushes back out of the exposure, because a documentation-only push now fast-forwards the checkout and rebuilds nothing, leaving merge pushes and the nightly run on a moved tip as the whole of it. ⛔ **RETIERED `during-testing` → `early-testing` BY `M105` (2026-09-20), ON `D53` ANSWERED `A`.** Automatic deploys have been on since 2026-09-17 (`D47`), so a build swap happens on every merge, and the nightly deploy fires around 16:50 Philippine time — **inside the testers' working day**. The precondition is ordinary traffic, and the unexercised half changes the frequency rather than whether it happens.
+  Filed by `M96`. **Tier: early-testing.**  ⚠️ **Re-judged by `M98` (2026-09-18), which did not take the row:** the precondition has become ordinary traffic. `DEPLOY_ENABLED` was set on 2026-09-17, so a build swap happens on every merge and every close-out push, and the nightly schedule's Deploy fires at about 08:50Z — 16:50 Philippine time, inside the testers' working day, since the scheduled CI runs were measured starting 08:27-08:33Z rather than at the 03:00Z its cron reads. A tester with the builder open across one of those is unremarkable, which is why the marker above is corrected from latent to live. What remains INFERRED is the other half: which sites fetch a chunk on demand without navigating was counted and never exercised, so a user who wants that measured first may prefer to leave the row latent. Two consequences either way: on this evidence the tier wants re-reading as early-testing, which is the user's call; and the documentation skip that `M98` added to `deploy.ps1` takes close-out pushes back out of the exposure, because a documentation-only push now fast-forwards the checkout and rebuilds nothing, leaving merge pushes and the nightly run on a moved tip as the whole of it. ⛔ **RETIERED `during-testing` → `early-testing` BY `M105` (2026-09-20), ON `D53` ANSWERED `A`.** Automatic deploys have been on since 2026-09-17 (`D47`), so a build swap happens on every merge, and the nightly deploy fires around 16:50 Philippine time — **inside the testers' working day**. The precondition is ordinary traffic, and the unexercised half changes the frequency rather than whether it happens. ✅ **CLOSED BY `M109` (2026-09-25), UNDER RECORDED `D13` EXCEPTION #2** — `deploy.ps1` now carries the previous release's orphaned chunks forward into the new build and ages them out (`$BuildRetentionDays`, 7). ⛔ **THE ROW'S MECHANISM WAS WRONG AND THE CORRECTION IS THE USEFUL PART:** the server never empties `public/build` — it builds in `.deploy-stage` and swaps by **rename**, then deletes `build.prev` in step 8, so the chunks become unreachable at the rename rather than at a build. `emptyOutDir` is Vite's default and is only the LOCAL story; `vite.config.ts` declares no `build` key at all. ⛔ **AND THE ROW UNDERSTATED THE EXPOSURE IN THE DIRECTION THAT MATTERS.** It rests on Inertia's version check as the residual cover; that check is `hash_file('xxh128', manifest.json)` and fires only on an Inertia GET — but the **guest runtime is not Inertia at all** (`resources/public-runtime/main.ts` is a plain `createApp`), so a respondent has no version check of any kind, and mounts the same lazy chain through `FieldControl.vue` and `InstanceField.vue`. The *"counted, not exercised"* caveat was accurate and the count is exactly **three**: `FieldInput.vue`'s two `defineAsyncComponent` loaders and `GeoInput.vue`'s `import('leaflet')` — and the third **swallows its own failure deliberately**, which is why the reload option was rejected rather than merely not chosen: no `vite:preloadError` listener could ever have seen it. Retention was the user's call, taken on the record. **Proved by `tests/Feature/Deploy/BuildRetentionTest.php`** (shape, in `DeploySkipAllowlistTest.php`'s device: presence, strict ordering between the swap and the tidy, the age bound, and the collision guard) and by a **PowerShell harness that extracts this very function from `deploy.ps1` by AST** and runs seven scenarios against a scratch tree — the two that matter being a name colliding with the new build (the new bytes win) and a swap that produced no build (it throws). Three mutants CAUGHT: the call removed, the call moved before the swap, and the collision guard disarmed. ➕ **Filed rather than fixed:** a tab open longer than the window still breaks, and the guest runtime still has no version check at all.
 - **`minor` · A worker relaunched by NSSM inside the deploy window starts on a half-swapped checkout.** Found
   by `M96` (2026-09-15) while verifying the deploy-window row. The runbook's worker runs `queue:work
   --max-time=3600`, and NSSM relaunches it whenever it exits. If its hour ends inside the window, it boots
@@ -10854,8 +10854,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   directional rather than merely present. Five control cases, and the gate states its own limit in its docblock:
   **it proves a DECLARED await is tier-consistent and nothing about a dependency nobody declared** — `R-b6b9bfa4`
   needs `D15` and says so nowhere, so `P7d` passes straight over it.
-- **`minor` · `docs/ACCESS-MATRIX.md:105` tells its reader the central host answers a workspace route with a 404,
-  and it does not — it redirects.** Filed 2026-09-20 by `M105`, which found the same false symptom in two places
+- ✅ **CLOSED BY `M109` (2026-09-25) — `minor` · ~~`docs/ACCESS-MATRIX.md:105` tells its reader the central host answers a workspace route with a 404,
+  and it does not — it redirects.~~** Filed 2026-09-20 by `M105`, which found the same false symptom in two places
   while verifying `D51`. The sentence reads *"a direct sign-in there lands on `/dashboard`, a workspace-only route
   the central host answers with a 404"*. `bootstrap/app.php:613-621` renders `NotASubdomainException` for a **web**
   request as `redirect(config('app.url'))`; only the `/api/v1` arm returns 404, and
@@ -10864,7 +10864,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   than a note: naming a defect in a release paragraph does not queue it. `M105` corrected the sibling copy in
   `R-5ecfa6cd`'s own headline; this one lives in the canonical access document and is a separate edit. **Live** —
   `docs/ACCESS-MATRIX.md` is the document an operator reads to learn what the hosts do. Filed by `M105`.
-  **Tier: early-testing.**
+  **Tier: early-testing.** ✅ **CLOSED BY `M109` (2026-09-25), UNDER RECORDED `D13` EXCEPTION #2** — the sentence now says the central host **redirects** to `APP_URL`, names `NotASubdomainException` in `bootstrap/app.php` by symbol rather than by line, and records that only the `/api/v1` arm answers 404 with `CentralHostFallbackTest` pinning it. Every one of this row's four citations held exactly as written — evidence four for four. ⛔ **BUT THE ROW IS A FLOOR AND NOT A CENSUS, AND ITS PREMISE WAS FALSE: THERE ARE TWO AUTHORED COPIES, NOT ONE.** This row says `M105` *"corrected the sibling copy in `R-5ecfa6cd`'s own headline"*, which is true and is not the whole of it — `R-5ecfa6cd`'s **body** still read *"so the central host answers 404"*, contradicted four lines below it by its own `M96` correction. `M96` and `M98` each corrected that row's body while neither rewrote its headline; `M105` then rewrote the headline and did not strike the body sentence. Both copies are now fixed, in place. ⚠️ A third, byte-identical copy sits in `.kilo/worktrees/obsidian-dogwood/` — the untracked second checkout already filed as its own row, reached by a repo-wide `grep -r` and invisible to ripgrep, which is that row's whole point and not this one's to fix.
 - **`minor` · `.github/workflows/ci.yml:84` asserts in the present tense that `DEPLOY_ENABLED` is unset, which `D47`
   made false three days before `D53` was decided on the opposite premise.** Filed 2026-09-20 by `M105` while
   verifying `D53`. The comment reads *"`DEPLOY_ENABLED` is unset, so that was latent rather than live"* and dates
@@ -11087,8 +11087,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `scripts/state.php` warns in terms that rewriting one falsifies the log; the repair belongs at whichever end is
   decided to be authoritative, which is the question. Filed by `M106`. **Tier: after-launch.**
 
-- **`minor` · `D28`'s chosen option is a no-op as written, and the row that awaits it would implement the
-  illustration.** Found by `M106` (2026-09-20) by a read-only verification of `R-45b0cf8a`, which was considered for
+- ✅ **CLOSED BY `M109` (2026-09-25) — `minor` · ~~`D28`'s chosen option is a no-op as written, and the row that awaits it would implement the
+  illustration.~~** Found by `M106` (2026-09-20) by a read-only verification of `R-45b0cf8a`, which was considered for
   this batch and not taken. `D28` answers *guard at the host* and illustrates it with `min-width: 0; max-width: 100%`,
   citing `Settings/Index.vue`. ⛔ **That example is a flex ROW; all four defective hosts are flex COLUMNS.** A child of
   a column flex container with the default `align-items: stretch` is already exactly container-width, so neither
@@ -11099,7 +11099,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `ready`, and the next taker reading only the decision ships a change that measures identically. ⚠️ **The ANSWER
   survives; only its illustration is wrong**, so this is a correction to record rather than a decision to re-ask, and
   `docs/claims/decisions.md` already carries pre-answer corrections in exactly this shape. Filed by `M106`.
-  **Tier: early-testing.**
+  **Tier: early-testing.** ✅ **CLOSED BY `M109` (2026-09-25), BESIDE `R-45b0cf8a` UNDER RECORDED `D13` EXCEPTION #2** — the correction is recorded at `D28` itself, where the chosen option lives, in the shape that entry already uses. The answer survives untouched; only its illustration changed. ⚠️ **The row was right about the mechanism and understated one thing, which verification found:** `Settings/Index.vue`'s `.settings-row` is not merely a flex ROW — it also carries **`flex-wrap: wrap`** two lines above the rule `D28` quotes, so part of why that host is safe is the wrap the illustration never mentions. And the counter-example was already in `D28`'s own table: `.encode-field` carries `min-width: 0` today and still spills. ⛔ **`D28` CARRIES A SECOND DEFECT THIS ROW DOES NOT NAME, AND IT IS CORRECTED IN THE SAME EDIT.** Its cost table read *"4 of 4 — `.config` for the first, `.mds-modal__body` for the other three"*: that mixes a class count with a call-site count — `.mds-field` (twice) and `.sheets-fields` are three call SITES across two classes — and `.encode-field` is in no modal at all, rendering in an `MdsCard` on the encode page and in the public runtime, so its containing scroller was never established. Taken together with `R-45b0cf8a` deliberately: shipping the fix while leaving the illustration standing would have left the roster prescribing a change that measures identically.
 
 - **`minor` · Nothing relates a decision that RE-TIERS a row to the row it re-tiers, and `P7d` deliberately does not
   close that half.** Filed 2026-09-24 by `M108`, which built the other half and measured why this one cannot be built
@@ -11180,3 +11180,43 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   change pushed straight to the trunk without a claim naming a branch is what `scripts/pre-push-guard.php` exists to
   refuse. ⚠️ **It also wants a floor of its own in the same edit**, on the argument above: a case count is only worth
   recording if something refuses a suspiciously small one. **Live.** Filed by `M108`. **Tier: during-testing.**
+
+- **`minor` · A tab open longer than the build-retention window still asks for a chunk that no longer exists.**
+  Filed 2026-09-25 by `M109`, at the moment the window was chosen rather than after. `deploy.ps1` now carries the
+  previous release's orphaned hashed chunks forward and ages them out at `$BuildRetentionDays` (7), which closes
+  `R-e7d6f223` for every tab younger than that. It does not close the tail: a tab left open across more than a
+  week of deploys — a builder someone never closed, an installed guest form on a tablet — can still fetch a chunk
+  whose file has aged out, and the failure is the same silent one. ⚠️ **The window is a judgement, not a
+  measurement**, and nothing in the tree records how long a real tab actually lives; that number is the input this
+  row is missing and the reason it is filed rather than guessed at a larger constant. ⛔ **Raising the constant is
+  NOT obviously the remedy** — it trades a rarer failure for unbounded growth in `public/build`, on a box whose
+  disk nothing here watches. The alternatives are a client-side catch that reloads (rejected for `R-e7d6f223`
+  because it interrupts a respondent mid-form and cannot see `GeoInput.vue`'s deliberate swallow) or an
+  `ASSET_URL`-style immutable asset host, which is a deployment change. **Live** — every deploy ages the previous
+  release one day closer to the cutoff. Filed by `M109`. **Tier: during-testing.**
+
+- **`minor` · The guest runtime has no asset-version check of any kind, so nothing can ever tell a respondent's tab
+  that the release moved.** Filed 2026-09-25 by `M109` while verifying `R-e7d6f223`, whose own text rests on
+  Inertia's check as the residual cover and does not notice that the surface most exposed to the problem is not
+  Inertia. `resources/public-runtime/main.ts` is a plain `createApp`, so there is no `X-Inertia` handshake, no
+  `version()`, and no 409 `Inertia::location` path — the three things that reload an admin tab after a deploy. A
+  respondent on a long multi-step form mounts `FieldControl.vue` and `InstanceField.vue`, both of which reach the
+  same lazy `FieldInput` chain, minutes or hours after boot. ⚠️ **Its only cover today is partial and known:**
+  `sw.ts`'s `StaleWhileRevalidate` route on `/build/` serves a chunk **already fetched once**, and does nothing
+  for one that is fetched for the first time after a swap. ⛔ **The obvious fix is the one that must not be taken
+  blind** — a reload drops whatever is unsaved, and although answers live in Dexie (`lib/db.ts`'s `draft_answers`)
+  that is a product trade about a respondent's session, not a cleanup. **Live.** Filed by `M109`.
+  **Tier: during-testing.**
+
+- **`minor` · Three of the four segmented-control host guards ship with no assertion, and the one that has one is
+  live at a single viewport.** Filed 2026-09-25 by `M109`, in the increment that shipped all four. `R-45b0cf8a`
+  closed with `flex-wrap: wrap` declared at `.config__group`, `.mds-field`, `.sheets-fields` and `.encode-field`,
+  and the new element-level assertion in `tests/e2e/personalization-axe.spec.ts` measures **only `.config`** —
+  which is what `D28` asked for by name, and is three hosts short of what shipped. ⛔ **AND THE MEASURED SCOPE OF
+  THE ONE THAT EXISTS IS NARROWER THAN IT LOOKS:** with the rule deliberately disarmed the case is CAUGHT at
+  `mobile` (30px) and SURVIVES at `desktop` and `tablet`, so two of three projects are green over the defect. A
+  future edit that deletes any of the other three rules moves no gate at all. ⚠️ **The document-level assertion
+  cannot be widened to cover them**: `assertNoHorizontalOverflow` skips subtrees under an `overflow-x: auto|scroll`
+  ancestor by construction, and three of the four hosts sit inside `.mds-modal__body`. Each needs its own
+  element-level read, and the modal ones need the modal opened first. **Live** — the guards are unasserted today.
+  Filed by `M109`. **Tier: during-testing.**

@@ -608,6 +608,16 @@ watch(librarySaved, (value) => {
     gap: var(--mds-space-2);
 }
 
+/* D28 guards this spill at the host, and the affordance that works is the WRAP — not the
+   `min-width: 0; max-width: 100%` D28 first illustrated, which is inert here. This host is a flex
+   COLUMN, so the control is already exactly container-width; what overflows is the control's own
+   flex LINE, whose `__seg` carries `min-width: auto` and never shrinks below its longest word plus
+   its padding. `.config` is `overflow-y: auto`, so the spill became a real horizontal scrollbar that
+   the document-level overflow assertion files as `absorbed` and never reports. */
+.config__group .mds-segmented {
+    flex-wrap: wrap;
+}
+
 .config__group-label {
     font-size: var(--mds-type-label-font-size);
     font-weight: var(--mds-font-weight-medium);

@@ -16,7 +16,73 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M110` is merged; the form-builder overhaul is now 26 rows and 9 decisions in the line, and `early-testing` remains the most urgent tier with open work
+## Status: ACTIVE CLAIM — `R-93610c49` (the sixth tracker surgery) and `R-d5d6db11` (`B0`, config retention) (`m111-tracker-surgery-and-config-retention`)
+
+Taken 2026-09-25. Branch `m111-tracker-surgery-and-config-retention`, cut from `origin/main` at `ebacb1b`, PR into main.
+Row 1: `R-93610c49` — *"PROGRESS.md is within about five close-outs of the tracker-lint byte ceiling"* — `docs/feature-backlog.md:10476`, position 1 in the line, `early-testing`.
+Row 2: `R-d5d6db11` — *"Every `config` key that `UpdateFieldRequest::configRules()` does not enumerate is silently dropped on every field save, with a 200 OK"* — `docs/feature-backlog.md:11224`, position 24 in the line, `early-testing`, the one open `major`. It is `B0` in the approved form-builder overhaul and first in that plan's order.
+
+⛔ **Two rows, one hub-touching, no shared non-hub file — `D13` clause 1 satisfied as written.** Row 1 takes `PROGRESS.md` and `PROGRESS_ARCHIVE.md`, both on `D13`'s own seven-file meta-hub list. Row 2 takes product code only.
+
+### Evidence verified
+
+**Row 1 — `R-93610c49`. Every citation holds, and the row's own figures are stale in the UNFAVOURABLE direction.**
+
+- `scripts/tracker-lint.php` `TRACKER_BYTE_CEILING = 130000` — **holds**, read at `:76`.
+- `scripts/next.php` `HEADROOM_WARNING_BYTES = 8000` — **holds**, read at `:73`.
+- `scripts/next.php:273-274`, the hard-coded derived count reading *"roughly two close-outs at the growth rate scripts/tracker-lint.php measures"* — **holds, verbatim**, inside `tracker_headroom_warning()`. Emitted unchanged at every headroom below the constant.
+- The row states `PROGRESS.md` at 128,421 bytes with 1,579 of headroom as of `M110`'s close-out. The tree at `ebacb1b` reads **128,487 bytes with 1,513 of headroom** — 66 bytes worse, because the row was written before its own increment's final push.
+- ⚠️ **The row's growth rate is understated by a quarter.** It carries +3,198 bytes per close-out, measured by `M104` from `M100`'s surgery. Measured here across the four close-outs since `M107`'s surgery — `git cat-file -s 0a9ae04:PROGRESS.md` = 111,860 against 128,487 now — the rate is **+4,157**. The row's own conclusion, *"less than one close-out of room"*, is therefore right, and right by a wider margin than it claims.
+
+**Row 2 — `R-d5d6db11`. Every citation holds; two premise clauses do not — see the next field.**
+
+- `app/Http/Requests/Forms/UpdateFieldRequest.php:62` — `config` declared `present, array` — **holds**, and the nested `config.*` rules are spread one line earlier at `:49`, which is what makes the skip reachable.
+- `vendor/laravel/framework/src/Illuminate/Validation/Factory.php:74` — the `true` default for `excludeUnvalidatedArrayKeys` — **holds**; pushed onto every instance at `Factory.php:124`.
+- `vendor/laravel/framework/src/Illuminate/Validation/Validator.php:659-664` — the `continue` that skips a rule key whose rules contain `array` when at least one nested rule key exists — **holds**.
+- `app/Services/Forms/FormBuilderService.php:267` — the `config` assignment inside `writeField()`'s single `fill()` at `:259-274` — **holds, and it is a whole-column replace**: nothing reads the existing field config first.
+- `UpdateFieldRequest.php:159-165`, the choices arm enumerating only `options`, `options.*.value` and `options.*.label` — **holds**. `label_translations` is absent.
+- The four `label_translations` hops **all hold**: written at `XlsformImportParser.php:319` and `:343-344`; read at `resources/public-runtime/lib/schema-mapping.ts:183` and `:282-289`; exported at `XlsformExporter.php:433`; round-tripped by `ChoicesEditor.vue:17-20`'s object spread.
+- The seven affected arms are as the row says — media, geo, cascading, matrix, likert_matrix, hidden, choices — and the empty default arm at `:167` is why every other type keeps its config whole.
+- Sole production call site confirmed: `app/Http/Controllers/Tenant/FormBuilderController.php:108` passes `validated()` into `FormBuilderService::updateField()`; route `routes/tenant.php:574-575`. `StoreFieldRequest` validates no `config` at all, so the create path is **not** affected.
+
+### Premise verified
+
+**Row 1 — the premise has expired ONCE MORE, and this row's history is the argument for the field.** `M98` filed it, `M100` discharged it without amending it, `M104` found that and left it open, `M110` found the premise had expired in the other direction and retiered it. Checked here: **the surgery is genuinely owed now**, because the binding fact is not a rate estimate but that 1,513 bytes is smaller than any status bullet this project has written in four increments — the smallest of the four is 3,549. ⚠️ **One premise clause of the row is now FALSE, and it is the clause that governs my own close-out:** the row says the `next.php` half *"wants its own increment; the surgery above does not wait on it."* The second half is true; the first is a scoping opinion, not a fact. I am taking both anyway — the fix is one line in a function this close-out runs regardless, and deferring it would make this the **fourth** amendment cycle on one row. That is a deliberate departure from the row's own instruction and is recorded as one.
+
+**Row 2 — TWO premise clauses are false, and a third understates the row.**
+
+1. ⛔ **"Laravel 12" is wrong — this is `laravel/framework` v13.18.1** (`composer.lock:1575-1576`). The mechanism is unchanged between the two, so the row's conclusion survives; but a remedy chosen by reading Laravel 12's source would have been chosen against the wrong tree.
+2. ⛔ **"`excludeUnvalidatedArrayKeys` may not be settable per-instance" is wrong. It IS.** `Validator.php:162-167` declares the property **`public`**, defaulting to `false` on the class itself; the `true` comes from the factory. So setting it to `false` inside `withValidator()` works at runtime. **The row's prescribed remedy is still the one I am taking, but NOT for the reason the row gives** — see `Remedy verdict`.
+3. ⚠️ **The row is a floor, not a census — it understates itself in three ways.** (a) `matrix` and `likert_matrix` grid-entry `label_translations` already have live READ and EXPORT paths — `XlsformExporter.php:543-562` called from `:196-199` and `:224-226`, `schema-mapping.ts:368` into `buildMatrix()` at `:375-386`, and `BlankFormPrintPresenter.php:417-420` — with only a builder write path, so they are the next to bite. (b) `config.levels[].label_translations` is read at `schema-mapping.ts:265` and written nowhere. (c) **Three sibling request paths share the identical mechanism on other keys**: `app/Support/Connectors/SubscriptionConfigRules.php:117-142`, spread into both connection-subscription requests, consumed at `ConnectionSubscriptionController.php:51,72` and whole-column-replaced at `ConnectionSubscriptionService.php:44`; `app/Http/Requests/Api/V1/SyncSubmissionRequest.php:31-38` on `submissions`; and the inline validate call in `FormBuilderController::reorder()` at `:196-207`. None of the three is in the row.
+
+⚠️ **And one premise of the OBVIOUS remedy is false, which is why it is stated before the code:** merging the STORED row's config over the payload — the shape the word *merge* first suggests — would make it impossible to **clear** a config key, because deleting the last choice row would leave the old `options` in place. The client sends the whole config on every save (`useBuilderStore.ts:883`), so the merge base must be the **request**, never the row.
+
+### Remedy verdict
+
+**Row 1, remedy 1 — the surgery. IMPLEMENTABLE, and measured before a byte was moved.** Move `PROGRESS.md` lines **214-220** (`M108` down to `M102`, one bullet per line, contiguous) — **29,947 bytes**, measured with `explode(chr(10), …)` and newlines included. `PROGRESS.md` 128,487 to **98,540**; headroom 1,513 to **31,460**, about seven close-outs at the measured +4,157. ⚠️ **Seven bullets rather than nine, and the reason is `M107`'s outcome rather than a preference:** `M107` moved nine and left 18,140 bytes, about five close-outs, and the ceiling bound again four close-outs later. Nine here would leave one bullet in `## Current Status`; seven leaves `M110` and `M109` plus `M111`'s own, at a headroom within 700 bytes of `M100`'s 30,781.
+
+**Row 1, remedy 2 — the `next.php` count. IMPLEMENTABLE, one line, and the row's two options are not equal.** The row offers *"derive the count from the headroom and the rate, or print neither and point at `tracker-lint`"*. **Deriving it needs the rate, the rate lives in `tracker-lint`, and carrying a second copy of it here is the same defect one level down** — which is the argument `M104` already made when it removed the "two to three KB" restatement from this very sentence. Taking the second option.
+
+**Row 2 — the prescribed remedy WORKS, and the row's stated reason for choosing it is wrong.** The row says an explicit merge is *"the reliable route"* because the per-instance override may not exist. It does exist. The explicit merge is still correct, for two reasons the row does not give: (a) the property is instance-**wide**, so setting it would also stop pruning `validations` at `:69` — a behaviour change outside the defect's blast radius, harmless today only because `FormBuilderService::replaceValidations()` at `:570-589` reads six named keys; and (b) `UpdateFieldRequest::withValidator()` at `:170` types its argument as the **contract** `Illuminate\Contracts\Validation\Validator`, which does not declare the property, so the poke needs an `instanceof` narrowing to survive PHPStan. An accessor scoped to `config` alone is narrower than both.
+
+**Taking both halves, on the user's decision of 2026-09-25:** an explicit accessor on the FormRequest that overlays `validated()`'s config onto the RAW request config — fixing the class, so `B2a`, `B5a` and `B11a` are not each eaten — **and** real rules for `options.*.label_translations`, `levels.*.label_translations` and the three grid equivalents, fixing the reachable loss with validation rather than mere survival. In-repo precedent for the accessor: `app/Http/Requests/Tenant/StoreFeedbackRequest.php:70-73`.
+
+⛔ **Every test is written against the current code and watched to fail first.** The row instructs it, and it is the only way to know the test sees the defect.
+
+Files: `PROGRESS.md`, `PROGRESS_ARCHIVE.md`, `scripts/next.php`, `app/Http/Requests/Forms/UpdateFieldRequest.php`, `app/Http/Controllers/Tenant/FormBuilderController.php`, `tests/Feature/Forms/FieldConfigRetentionTest.php` (new), `docs/feature-backlog.md`, `docs/claims/lane-a.md`, `docs/pipeline.md`, `docs/gate-baselines.md`.
+Shared artefacts taken: `PROGRESS.md` (own block only), `PROGRESS_ARCHIVE.md`, `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/gate-baselines.md`.
+Paired files taken: **none.** No 7(b-bis) entry is touched — the diff opens no `resources/**`, no `packages/design-system/**`, no `NotificationType`, no nav-model ability key, and no `.vue` template.
+Namespaces spent: **nothing from either namespace** — no migration prefix, no ADR, no sub-decision id, no new decision.
+
+Prediction:
+
+- **PHPStan CAN move and I expect it to hold.** It scans `app`, `database` and `routes`, and this diff touches two `app/` files — so unlike the last several increments I may not say "unchanged by construction". An accessor returning `validated()` merged with `input()` is the shape the baseline already tolerates at `StoreFeedbackRequest`. Measure the delta; do not quote a number.
+- **Pint must be run bare on the host** — `scripts/next.php` is in the diff, and the scoped form every hand-off used to prescribe does not reach `scripts/`.
+- **`citation-liveness-lint` is the gate I most expect to break, and it is the one I name as most likely wrong.** `M86`'s surgery reddened it with `docs/pipeline.md` citing an out-of-range `PROGRESS.md` line. It should NOT fire this time, because `M93` moved the four pipeline markers to `PROGRESS.md:205-208`, above the status block, so a splice at 214-220 shifts none of them. If it fires anyway, the marker positions are not what I have read.
+- **R7 will not arm, and that is expected rather than a failure.** 7 lines against `DROP_LIMIT` 200 and 29,947 bytes against `DROP_BYTE_LIMIT` 50,000 — the `M71` dead zone, now the fourth surgery to sit in it. The marker is landed because `CLAUDE.md` requires it of the move, not of the gate's opinion of the move.
+- **`pipeline-lint` P1 will be red until `docs/pipeline.md` is regenerated**, because closing two rows in `docs/feature-backlog.md` shifts every row citation below `:10476`.
+- **`tracker-surgery.php` A2 is the proof most likely to fail on its first run**, on this project's own record: it failed first-run in `M41` by exactly one byte at the join seam, and `M81`'s first splice deleted 17,547 bytes outright. The added-byte count will be computed from the written note's bytes, never inferred from the residual.
+- **The four new Pest tests: I expect 1, 2 and 4 red before the fix and 3 green throughout.** If test 3 — clearing still clears — is red before the fix, my model of the defect is wrong rather than the test.
 
 ## RELEASED — `M110`, filing the form-builder overhaul: 26 rows and `D57`–`D65` from a user-directed exploration of the running system (merged as PR #303, `5b94314`, 6/6 green with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

@@ -2249,6 +2249,16 @@ half that works.
 
 **Disposition:** `D15` decides the rule; this increment did not touch it. `M108`'s own subject makes the question cheaper to answer rather than answering it — the harvester now reads class names, so the degree counts `D15` reasons about are measured rather than disputed. ⛔ **And the exception is recorded in BOTH places**, which no previous one was: inline at each closed row, the way `M107` did it, and in `PROGRESS.md`'s release paragraph, the way `M90` did it. Either alone is findable from one direction only, and the two precedents disagreeing about where to look is half of why `R-4346557c` was filed.
 
+##### #2 — `M109` (2026-09-25) · four rows, clause 1 satisfied exactly, clause 2 breached by procedure
+
+**What was not satisfied:** item 1's second clause, *at most one row may touch a hub file*. The batch was `R-e7d6f223`, `R-45b0cf8a`, `R-6c429d4e` and `R-2e2407e2`. ⛔ **Item 1's FIRST clause was satisfied exactly, and it is worth stating because it is the clause that still separates rows:** the four non-hub sets are pairwise disjoint — `deploy.ps1` plus `tests/Feature/Deploy/`; the four segmented-control hosts; none at all; `tests/Feature/Tenancy/CentralHostFallbackTest.php`.
+
+**Why:** the same reason as #1, and nothing about this batch's composition. All four touch `docs/feature-backlog.md` (degree 9) and `docs/pipeline.md` (10) **by close-out procedure alone**, and `R-6c429d4e`'s whole remedy is an edit to this file (8). `M108` measured that no batch can satisfy the clause, including a batch of one; this increment did not re-measure it, because re-measuring a rule that admits nothing produces the same answer.
+
+⛔ **THIS IS THE SECOND ENTRY FOR THE SAME REASON, AND THE THIRD IS THE TRIGGER.** The escalation rule above says three or more exceptions for one reason mean the rule is wrong rather than the batch, and that the entry to write at that point is an answer to `D15` — not a fourth exception. `D15` is open, is tiered `early-testing`, and already carries three options, a recommendation, and `M108`'s fourth option. **The next increment that composes a batch from this queue should expect to be the one that trips it.**
+
+**Disposition:** `D15` decides the rule; this increment did not touch it, for the reason `D15` opens with — an increment does not re-scope a user decision on its own judgement. Recorded in both places the log requires: inline at each of the four closed rows, and in `PROGRESS.md`'s release paragraph.
+
 ---
 
 ### D7 — Should `main` get branch protection, with the repository owner as a bypass actor? **Yes.**

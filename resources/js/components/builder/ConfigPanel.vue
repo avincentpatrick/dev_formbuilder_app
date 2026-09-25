@@ -614,7 +614,7 @@ watch(librarySaved, (value) => {
    flex LINE, whose `__seg` carries `min-width: auto` and never shrinks below its longest word plus
    its padding. `.config` is `overflow-y: auto`, so the spill became a real horizontal scrollbar that
    the document-level overflow assertion files as `absorbed` and never reports. */
-.config__group .mds-segmented {
+.config__group .mds-segmented-MUTATED-AWAY {
     flex-wrap: wrap;
 }
 

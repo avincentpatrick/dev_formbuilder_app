@@ -16,7 +16,54 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M109` is merged; `early-testing` remains the most urgent tier with open work, and `D15` is now one exception away from being the entry that must be written
+## Status: ACTIVE CLAIM — `M110`, filing the form-builder overhaul: 25 rows and 9 decisions from a user-directed exploration of the running system (`m110-builder-overhaul-filed`)
+
+Taken 2026-09-25. Branch `m110-builder-overhaul-filed`, cut from origin/main at `a496da9`, PR into main.
+Row: **none — this increment FILES rows rather than closing one.** Its source is a user-directed exploration of the running system that produced 19 separate comments about the form builder, delivered in chat on 2026-09-25 with the instruction *"make a comprehensive plan … after the plan is created, include this in our major pipeline so we only have one task list."* This increment writes the resulting 25 increments and 9 decisions into the queue so that none of them is an unqueued obligation.
+
+⛔ **THE THREE FIELDS BELOW ARE ANSWERED AGAINST THE 19 REPORTED ITEMS, NOT AGAINST A LEDGER ROW.** There is no row to verify, so the fields are answered against the thing that plays a row's part here — the user's reported defects, and the claims this plan makes about the tree. Answering them "n/a" would be the `D6` shape exactly: a heading skipped because it did not obviously apply.
+
+### Evidence verified
+
+Every citation the plan rests on was opened against the merged tree. The five defects behind reported item 7 (*"cascading tools, matrix grid … not saving when I click publish"*):
+
+- **HELD, and confirmed directly rather than on a subagent's word.** `app/Http/Requests/Forms/UpdateFieldRequest.php:62` declares `config` as `present, array` **alongside** nested `config.*` rules; `vendor/laravel/framework/src/Illuminate/Validation/Factory.php:74` sets `excludeUnvalidatedArrayKeys = true`; `Validator.php:659-664` therefore skips the top-level key and rebuilds `config` from the enumerated paths only; `app/Services/Forms/FormBuilderService.php:267` whole-column-replaces with the result. Unenumerated config keys are dropped on every save with a 200 OK.
+- **HELD.** `app/Services/Forms/StructuralValidationGate.php:39-91` throws inside the `foreach`, so publish refuses on the FIRST violation; `app/Http/Controllers/Tenant/FormPublishController.php:32-36` renders it as a message-only flash toast, while `:42-61` gives the *warnings* path a real banner.
+- **HELD.** `resources/js/components/builder/useBuilderStore.ts:763-767` — `whenIdle()` returns a queue that resolves on failure (`:127`, and `guard()` at `:188-201`), so publish fires after a failed autosave and the Inertia re-render then destroys the `saveError` alert at `ConfigPanel.vue:260`.
+- **HELD.** `StructuralValidationGate.php:49-51` calls `assertChoiceOptionsResolve()` for `LikertScale` only — `single_select`, `multi_select` and `dropdown` publish with zero options while `cascading_select` (`:52-54`) and the grids (`:57-62`) refuse. That asymmetry IS the reported partition.
+- **HELD.** `resources/js/components/builder/builderClient.ts:61-72` builds the 422 `errors` map; `useBuilderStore.ts:196-198` keeps only the message. Nothing else consumes it.
+
+And for reported items 2 and 4: `app/Services/Forms/BuilderPresenter.php:254` `humanize()` is `ucfirst` over an underscore replacement, so the operator select literally reads `Gt` / `Lte` / `Neq` — **held**. `form_fields.appearance` is written at `ConfigPanel.vue:433-439` and read by `XlsformTypeMap.php:107-148` on import, but `toRenderField()` (`resources/public-runtime/lib/schema-mapping.ts:451-479`) never reads it — **held: dead at render time, live for XLSForm only.**
+
+Two citations a subagent supplied were re-checked because the design turns on them, and **both resolved the opposite way to the caution that prompted the check**: `resources/js/components/builder/condition-model.ts:85` **does** export a bare `parseExpression()`, so the preview's pre-parse is a direct call and not a second parser; and `packages/design-system/src/components/TabNav/TabNav.vue` renders a `nav` wrapping a `ul` with `role="list"` and plain anchors, with `TabNav.test.ts:53-64` asserting it carries no tab role at all — so a hub Settings tab cannot breach the builder's one-tablist constraint.
+
+### Premise verified
+
+The plan's premise is that **these 19 items are one body of work and not nineteen**, and that filing them separately would re-litigate the same three mechanisms three times over. Checked against the tree, it holds: items 8, 9 and 19 are one conversion mechanism; items 6 and 18 are one build; items 2 and 11 share `form_fields.config` as a surface. The four builder hub files — `Builder.vue`, `ConfigPanel.vue`, `useBuilderStore.ts`, `FormBuilderService.php` — are precisely where they would have collided, and `docs/backlog-triage.md`'s hub table already ranks the ones it can see.
+
+⚠️ **One premise of the user's own report is FALSE, and the plan says so rather than inheriting it.** Item 7 reads as *"cascading tools, matrix grid, and others are not working"* — but both are **fully implemented end to end**: enum, default config, builder editor, request shape, publish gate, serializer, Stage-1 coercion, Stage-3 validation, renderer, XLSForm mapping and golden vectors. A TODO/stub sweep across `app/`, the builder and both renderers returns nothing relevant to either. What fails is the **save and publish path around them**, which is why the plan's first two increments are config retention and the publish gate rather than either field type. The genuinely unfinished types are `signature` (no capture control, deferred in writing at `schema-mapping.ts:57-58`) and `duration` (no renderer; falls through `StructuralAnswerNormalizer.php:331` untouched) — neither of which the report names.
+
+⚠️ **A second premise correction, and it changes what gets built.** Reported item 1 asks that choosing *Conditional* reveal the condition settings "instead of going to the validation tab". Taken literally, that wires Conditional to `ConditionEditor`, which writes `relevant_expression` — and `relevant_expression` **hides** a field while `RequiredMode::Conditional` **requires** it. `SemanticValidator::requiredState()` (`:1403-1420`) confirms it: `Conditional` is honoured only where a `required_*` unit holds, and with no rule it degrades to optional in silence. The row is filed to write a `required_if` **validation row**, and states why the literal reading is wrong.
+
+⚠️ **The premise this increment cannot verify, and does not claim to.** The three researched features (items 10, 11, 12) are filed from vendor documentation and from KoboToolbox's own published source, not from anything measurable in this tree. Their rows are design sketches with named blockers, deliberately not buildable as written, and each names the decision that must be answered first.
+
+### Remedy verdict
+
+**No remedy was prescribed, because there is no row to prescribe one.** What this increment measured instead is that the plan's prescribed fixes are *reachable* — and two were measured before being written down:
+
+- **`pattern` needs no new engine work.** `app/Services/Validation/StructuredRuleEvaluator.php:59-67` and `resources/public-runtime/engine/structured-rule-evaluator.ts:119-126` both compile a stored pattern into an anchored full match and both fail closed on an empty one. So enforcing `email`/`url`/`phone` is a default validation row on an existing rule type — **not** a new `ValidationRuleType`, which would have cost a DB CHECK value, two evaluator arms, new golden vectors and a new parity surface.
+- **The live preview needs one new module, not a new renderer.** `resources/public-runtime/components/FieldControl.vue:9` already imports `FieldInput.vue` across the bundle boundary, and `resources/js/Pages/submissions/Encode.vue:38-42` already mounts `createFormRuntime()` inside an Inertia page. The missing piece is a `LocalField[]` to `SchemaResponse` projection, and nothing else.
+
+⚠️ **The one remedy most likely to be wrong is `B0`'s mechanism.** The plan proposes an explicit `UpdateFieldRequest::payload()` merging the raw config back over `validated()`, because `Validator::$excludeUnvalidatedArrayKeys` may not be settable per-instance in Laravel 12. That is recorded as an uncertainty rather than as a design, and the row says to measure it before writing the test.
+
+Files: `docs/feature-backlog.md`, `docs/claims/decisions.md`, `docs/pipeline.md`, `docs/backlog-triage.md`, `docs/claims/lane-a.md`, `PROGRESS.md`.
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/claims/decisions.md`, `docs/pipeline.md`, `docs/backlog-triage.md`, `PROGRESS.md` (own block only). **Lane B is retired**, so no paired reader exists for any of them.
+Paired files taken: none.
+Namespaces spent: **`D57` through `D65`** — nine sub-decisions. No migration prefix, no ADR number.
+Prediction: `pipeline-lint` is the gate that will fail, and **P7d is the one most expected to be wrong**. It refuses a row that awaits a decision LESS urgent than itself, and the split meant to satisfy it — `B11a` at early-testing awaiting nothing, `B11c` at during-testing awaiting `D58` — only works if `D58` is tiered early-testing, which is one tier in the correct direction and no more. P7b (every open decision is also a row, bidirectionally) should pass only after the regeneration, never before it. And at least one of the 25 rows is expected to fail its severity-separator parse on the first run, because `U+00B7` is invisible in a diff and this is the first increment to write 25 of them in one pass.
+
+---
+
 
 ## RELEASED — `M109`, four `early-testing` rows: an open tab's chunks survive a deploy, the segmented control wraps at its four hosts, and two documents stop describing the wrong behaviour (merged as PR #302, `4358378`, 6/6 green with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

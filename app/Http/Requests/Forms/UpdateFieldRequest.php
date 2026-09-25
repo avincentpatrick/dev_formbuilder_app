@@ -77,6 +77,48 @@ final class UpdateFieldRequest extends FormRequest
     }
 
     /**
+     * What the service writes — `validated()`, with `config` put back together.
+     *
+     * ⛔ WHY THIS EXISTS AND WHY `validated()` IS NOT ENOUGH (M111, `R-d5d6db11`). `config` is declared
+     * `present, array` ALONGSIDE the nested `config.*` rules above, and `Illuminate\Validation\Factory`
+     * sets `$excludeUnvalidatedArrayKeys = true` on every validator it builds. `Validator::validated()`
+     * therefore SKIPS the top-level key and rebuilds `config` from the enumerated paths only — so every
+     * key no `configRules()` arm lists was silently dropped, on a 200 OK, by
+     * `FormBuilderService::writeField()`'s whole-column replace. Option `label_translations` — written
+     * by XLSForm import, read by both renderers, re-exported, and faithfully sent back by the builder —
+     * was the reachable case: import a multilingual form, edit any choice field, lose every translation.
+     *
+     * ⛔ THE MERGE BASE IS THE REQUEST, NEVER THE STORED ROW, AND THAT IS THE WHOLE SAFETY ARGUMENT.
+     * The builder sends the complete config on every save, so overlaying the validated tree onto the
+     * RAW input preserves what the author sent while leaving a removal a removal. Merging the existing
+     * column over the payload — the shape the word *merge* first suggests — would make it impossible to
+     * clear a key: deleting the last choice row would leave the old `options` in place.
+     * `FieldConfigRetentionTest` pins that direction explicitly, because it is the plausible wrong fix.
+     *
+     * ⚠️ REJECTED: setting `$excludeUnvalidatedArrayKeys = false` on the validator. The property IS
+     * public, so the poke works — but it is instance-WIDE, so it would also stop pruning `validations`,
+     * a behaviour change outside this defect's blast radius; and `withValidator()` receives the
+     * CONTRACT, which does not declare the property. An accessor scoped to `config` is narrower on both
+     * counts.
+     *
+     * @return array<string, mixed>
+     */
+    public function payload(): array
+    {
+        $data = $this->validated();
+
+        /** @var array<string, mixed> $raw */
+        $raw = $this->input('config', []);
+
+        /** @var array<string, mixed> $validatedConfig */
+        $validatedConfig = $data['config'] ?? [];
+
+        $data['config'] = array_replace_recursive($raw, $validatedConfig);
+
+        return $data;
+    }
+
+    /**
      * The per-type `config` shape rules (lenient — type/structure only; see the class docblock). A choice
      * type validates its `options` list; `cascading_select` validates its `levels` + parented `options`; a
      * geospatial type (Increment G5b2b) validates its map-capture options (all optional). All values are
@@ -113,11 +155,15 @@ final class UpdateFieldRequest extends FormRequest
                 'config.levels' => ['sometimes', 'array'],
                 'config.levels.*.key' => ['nullable', 'string', 'max:150'],
                 'config.levels.*.label' => ['nullable', 'string', 'max:255'],
+                'config.levels.*.label_translations' => ['sometimes', 'array'],
+                'config.levels.*.label_translations.*' => ['nullable', 'string', 'max:500'],
                 'config.options' => ['sometimes', 'array'],
                 'config.options.*.value' => ['nullable', 'string', 'max:255'],
                 'config.options.*.label' => ['nullable', 'string', 'max:500'],
                 'config.options.*.level' => ['nullable', 'string', 'max:150'],
                 'config.options.*.parent' => ['nullable', 'string', 'max:255'],
+                'config.options.*.label_translations' => ['sometimes', 'array'],
+                'config.options.*.label_translations.*' => ['nullable', 'string', 'max:500'],
             ];
         }
 
@@ -126,12 +172,18 @@ final class UpdateFieldRequest extends FormRequest
                 'config.rows' => ['sometimes', 'array'],
                 'config.rows.*.value' => ['nullable', 'string', 'max:255'],
                 'config.rows.*.label' => ['nullable', 'string', 'max:500'],
+                'config.rows.*.label_translations' => ['sometimes', 'array'],
+                'config.rows.*.label_translations.*' => ['nullable', 'string', 'max:500'],
                 'config.columns' => ['sometimes', 'array'],
                 'config.columns.*.value' => ['nullable', 'string', 'max:255'],
                 'config.columns.*.label' => ['nullable', 'string', 'max:500'],
+                'config.columns.*.label_translations' => ['sometimes', 'array'],
+                'config.columns.*.label_translations.*' => ['nullable', 'string', 'max:500'],
                 'config.cells' => ['sometimes', 'array'],
                 'config.cells.*.value' => ['nullable', 'string', 'max:255'],
                 'config.cells.*.label' => ['nullable', 'string', 'max:500'],
+                'config.cells.*.label_translations' => ['sometimes', 'array'],
+                'config.cells.*.label_translations.*' => ['nullable', 'string', 'max:500'],
             ];
         }
 
@@ -140,9 +192,13 @@ final class UpdateFieldRequest extends FormRequest
                 'config.rows' => ['sometimes', 'array'],
                 'config.rows.*.value' => ['nullable', 'string', 'max:255'],
                 'config.rows.*.label' => ['nullable', 'string', 'max:500'],
+                'config.rows.*.label_translations' => ['sometimes', 'array'],
+                'config.rows.*.label_translations.*' => ['nullable', 'string', 'max:500'],
                 'config.columns' => ['sometimes', 'array'],
                 'config.columns.*.value' => ['nullable', 'string', 'max:255'],
                 'config.columns.*.label' => ['nullable', 'string', 'max:500'],
+                'config.columns.*.label_translations' => ['sometimes', 'array'],
+                'config.columns.*.label_translations.*' => ['nullable', 'string', 'max:500'],
             ];
         }
 
@@ -161,6 +217,8 @@ final class UpdateFieldRequest extends FormRequest
                 'config.options' => ['sometimes', 'array'],
                 'config.options.*.value' => ['nullable', 'string', 'max:255'],
                 'config.options.*.label' => ['nullable', 'string', 'max:500'],
+                'config.options.*.label_translations' => ['sometimes', 'array'],
+                'config.options.*.label_translations.*' => ['nullable', 'string', 'max:500'],
             ];
         }
 

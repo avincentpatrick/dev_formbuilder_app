@@ -72,6 +72,16 @@ const RECENT_RELEASES = 4;
 // to three KB", which was already below the measured mean by the time anyone read it, so the sentence
 // understated the pressure at the exact moment it finally appeared. It now points at the gate that
 // measures the rate instead of carrying a copy that can only rot. Raised by M104.
+//
+// ⛔ AND M104 FIXED THE RATE WHILE LEAVING THE COUNT DERIVED FROM IT, WHICH IS THE SAME DEFECT ONE
+// LEVEL UP (M111). The emitted sentence still read "roughly two close-outs" at every headroom below
+// the constant — accurate at the trigger and wrong by every byte after it. M110's own close-out
+// generated it at 1,513 bytes, under half a close-out, and told the next session "roughly two". The
+// message now states NO count and says why, on R-93610c49's second option: deriving one needs the
+// rate, the rate lives in tracker-lint, and a second copy of it here is what M104 set out to remove.
+// ⚠️ The "about two close-outs" in the paragraph above is the DATED rationale for choosing 8,000 and
+// is left as one; M111 re-measured the rate at +4,157 bytes per close-out across M107..M110, against
+// the +3,198 M104 measured from M100's surgery, so read the rate from the gate rather than from here.
 const HEADROOM_WARNING_BYTES = 8000;
 const LESSON_CHARS = 220;
 
@@ -270,11 +280,11 @@ function tracker_headroom_warning(): string
     }
 
     return sprintf(
-        '⚠️ PROGRESS.md has %s bytes of headroom under the tracker-lint R1 ceiling — roughly two '
-        .'close-outs at the growth rate scripts/tracker-lint.php measures beside the ceiling itself. '
-        .'Plan a tracker surgery BEFORE you push: run php scripts/tracker-lint.php yourself and read '
-        .'the rate THERE rather than from this sentence, then prove the move with '
-        .'scripts/tracker-surgery.php while both files are still uncommitted.',
+        '⚠️ PROGRESS.md has %s bytes of headroom under the tracker-lint R1 ceiling. Plan a tracker '
+        .'surgery BEFORE you push: run php scripts/tracker-lint.php yourself and read the growth rate '
+        .'THERE. This sentence states NO close-out count deliberately — a count derived from that rate '
+        .'is right only at the moment the warning first fires and decays with every byte after it. '
+        .'Then prove the move with scripts/tracker-surgery.php while both files are still uncommitted.',
         number_format($headroom)
     );
 }

@@ -119,14 +119,22 @@ test('Builder at extra_large + dyslexia font + teal — accessible & no horizont
     // `support/axe.ts` already names this exact control. Only an element-level read decides it, which is
     // what D28 asks for. The fix is `flex-wrap: wrap` at each of D28's four stretch-clamped hosts.
     //
-    // ⚠️ THE GUARD IS ON THE MEASUREMENT, NOT ONLY ON THE ELEMENT COUNT. A `.config` that mounted no
-    // segmented control would measure 0 and pass over a broken layout. The Requiredness group is
-    // `v-if="!isCalculated"`, so a calculated auto-selection hides it — assert it is on screen first.
+    // ⚠️ ASK FOR THE PANE BACK FIRST, AND THE REASON IS THE SAME ONE THE HEADER ABOVE GIVES. The builder
+    // is COMPACT at `extra_large` even on the desktop project, so after `forcePersonalization` the config
+    // pane is no longer the one on screen — the `showBuilderPane` at the top of this test ran while the
+    // layout was still wide and did nothing. `false` here means the layout is wide and all three are up.
+    await showBuilderPane(page, 'settings');
+
+    // ⛔ THE GUARD IS ON THE MEASUREMENT, NOT ON THE ELEMENT COUNT, AND THE DIFFERENCE IS NOT ACADEMIC:
+    // `.config` is in the DOM even when its pane is display:none, where `scrollWidth - clientWidth` reads
+    // 0 and the assertion below would pass over a layout it never looked at. Measured on this test's
+    // first run, which is the only reason this is `toBeVisible` and not `toHaveCount(1)`. The Requiredness
+    // group is `v-if="!isCalculated"` too, so a calculated auto-selection would hide it the same way.
     const configPane = page.locator('.config');
-    await expect(configPane, 'the builder config pane did not mount').toHaveCount(1);
+    await expect(configPane, 'the builder config pane is not on screen, so the measurement would be vacuous').toBeVisible();
     await expect(
         configPane.getByRole('group', { name: 'Requiredness' }),
-        'the Requiredness segmented control did not render, so the measurement below would be vacuous',
+        'the Requiredness segmented control did not render, so the measurement would be vacuous',
     ).toBeVisible();
 
     const configSpill = await configPane.evaluate((el) => el.scrollWidth - el.clientWidth);

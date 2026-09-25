@@ -321,7 +321,17 @@ class E2eSeeder extends Seeder
                 // by default (the interaction-driven builder-axe.spec.ts scans them without a stateful toggle).
                 $section->update(['is_repeatable' => true, 'min_instances' => 1, 'max_instances' => 5]);
                 $builder->addField($form, $owner, FieldType::ShortText, $section->id);
-                $builder->addField($form, $owner, FieldType::SingleSelect, $section->id);
+                // M112 — the publish gate refuses ANY option-bearing type with an empty option list, and
+                // `addField()` seeds `['options' => []]`. This form is published five lines below and is the
+                // fixture six spec files open by title, so an option-less select here aborts the whole E2E
+                // run at seed time rather than failing one assertion. The options are given rather than the
+                // type changed: builder-axe scans this form's config panel, and swapping the type would
+                // remove the Choices editor from that scan — which is surface those scans exist to cover.
+                $select = $builder->addField($form, $owner, FieldType::SingleSelect, $section->id);
+                $select->update(['config' => ['options' => [
+                    ['value' => 'daily', 'label' => 'Daily'],
+                    ['value' => 'weekly', 'label' => 'Weekly'],
+                ]]]);
                 $builder->addField($form, $owner, FieldType::Integer, null);
                 app(PublishService::class)->publish($form->refresh(), $owner);
             }

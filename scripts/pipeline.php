@@ -1009,8 +1009,9 @@ function render_next(array $next): string
     }
 
     $out .= 'From **'.$next['tier']."**, the most urgent tier with open work. Take work from here, and group\n"
-        ."the rows of one tier under `D13`'s file-overlap rule — no two citing the same non-hub file, at most\n"
-        ."one touching a hub.\n\n";
+        ."the rows of one tier under `D13`'s file-overlap rule, which since `D15` reads the files a row's\n"
+        ."REMEDY EDITS rather than the files it cites: no two rows may edit the same file, and at most one\n"
+        ."may touch a hub. The close-out artefacts every increment touches by procedure are excluded.\n\n";
 
     foreach ($next['ready'] as $row) {
         $out .= sprintf("- `%s` — %s · ready\n", $row['id'], cell((string) ($row['headline'] ?? $row['title'] ?? '')));

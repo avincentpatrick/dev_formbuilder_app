@@ -194,3 +194,102 @@ it('leaves a required NON-hidden field alone', function (): void {
 
     expect(true)->toBeTrue();
 });
+
+// ── M112: the gate covers every option-bearing type, and reports ALL violations ─────────────────
+
+it('refuses each of the three select types that used to publish with no options', function (string $type): void {
+    // ⛔ THE REPORTED DEFECT. The options check ran for `likert_scale` ONLY, so these three published a
+    // form whose control renders empty to every respondent, while `cascading_select` and the two grids
+    // refused — which is exactly the "some input types are not working" partition the row was filed from.
+    $version = makeDraftVersion(makeForm($this->user));
+    addFormField($version, $this->user, 'colour', FieldType::from($type));
+
+    expect(fn () => $this->gate->assertPublishable($version->refresh()))
+        ->toThrow(PublishValidationException::class, 'colour');
+})->with(['single_select', 'multi_select', 'dropdown']);
+
+it('still refuses a likert_scale with no options, which is the arm that already worked', function (): void {
+    // The negative control for the widening: the pre-existing coverage must not have been traded away.
+    $version = makeDraftVersion(makeForm($this->user));
+    addFormField($version, $this->user, 'satisfaction', FieldType::LikertScale);
+
+    expect(fn () => $this->gate->assertPublishable($version->refresh()))
+        ->toThrow(PublishValidationException::class, 'satisfaction');
+});
+
+it('still publishes a yes_no field, whose two options are fixed and stored nowhere', function (): void {
+    // ⛔ THE CATASTROPHIC-REGRESSION SENTINEL. `yes_no` is choice-SHAPED but carries no author option
+    // list, so classifying it as `ValueShape::Choice` would make EVERY yes/no field in the product
+    // unpublishable. The totality assertions in ValueShapeTest pass either way, which is why this one is
+    // written here, against the gate that would actually do the refusing.
+    $version = makeDraftVersion(makeForm($this->user));
+    addFormField($version, $this->user, 'consented', FieldType::YesNo);
+
+    $this->gate->assertPublishable($version->refresh());
+
+    expect(true)->toBeTrue(); // reached here without throwing
+});
+
+it('reports EVERY violation in one refusal, naming each field', function (): void {
+    // Three independent defects across three fields. Before M112 the author learned about one of them
+    // per publish attempt; the whole point of the row is that they now learn about all three at once.
+    $version = makeDraftVersion(makeForm($this->user));
+    addFormField($version, $this->user, 'colour', FieldType::Dropdown);
+    addFormField($version, $this->user, 'age', FieldType::Integer, 1, ['is_queryable' => true]);
+    addFormField($version, $this->user, 'satisfaction', FieldType::LikertScale, 2);
+
+    try {
+        $this->gate->assertPublishable($version->refresh());
+        $this->fail('expected the gate to refuse this draft');
+    } catch (PublishValidationException $e) {
+        // ⚠️ str_contains(...)->toBeTrue(), never toContain($needle, $message): Pest reads toContain's
+        // second argument as a SECOND NEEDLE, so a case written that way fails on its own explanatory
+        // prose and reports a reason that is not the reason (measured in M109).
+        $message = $e->getMessage();
+
+        expect(str_contains($message, 'colour'))->toBeTrue("the message should name «colour»: {$message}")
+            ->and(str_contains($message, 'age'))->toBeTrue("the message should name «age»: {$message}")
+            ->and(str_contains($message, 'satisfaction'))->toBeTrue("the message should name «satisfaction»: {$message}");
+
+        expect($e->violations())->toHaveCount(3);
+        expect(array_column($e->violations(), 'field'))
+            ->toEqualCanonicalizing(['colour', 'age', 'satisfaction']);
+        expect(array_column($e->violations(), 'code'))
+            ->toEqualCanonicalizing(['choice_options_invalid', 'queryable_field_missing_type', 'choice_options_invalid']);
+    }
+});
+
+it('leaves a single violation byte-identical to its own sentence', function (): void {
+    // ⛔ THIS IS THE PROPERTY THAT KEEPS ~27 PRE-EXISTING ASSERTIONS GREEN, and it is asserted rather
+    // than hoped for. `several()` joins the parts' sentences, so one part joins to itself — which is why
+    // every `toThrow(..., '<key or slug>')` written before M112 still matches. A `summarize()`-style
+    // message ("N fields failed structural validation.") would drop every key and redden all of them.
+    $version = makeDraftVersion(makeForm($this->user));
+    addFormField($version, $this->user, 'age', FieldType::Integer, 0, ['is_queryable' => true]);
+
+    try {
+        $this->gate->assertPublishable($version->refresh());
+        $this->fail('expected the gate to refuse this draft');
+    } catch (PublishValidationException $e) {
+        expect($e->violations())->toHaveCount(1)
+            ->and($e->getMessage())->toBe($e->violations()[0]['message'])
+            ->and($e->violations()[0]['code'])->toBe('queryable_field_missing_type')
+            ->and($e->violations()[0]['field'])->toBe('age');
+    }
+});
+
+it('carries a stable code that is not the prose, so a consumer never matches on wording', function (): void {
+    // The four factories that used to carry free prose as their only detail gained a slug in M112; the
+    // prose stays in `message` untouched. Message and structure are therefore gated independently, which
+    // is what lets one mutation prove one of them without the other.
+    $version = makeDraftVersion(makeForm($this->user));
+    addFormField($version, $this->user, 'colour', FieldType::SingleSelect);
+
+    try {
+        $this->gate->assertPublishable($version->refresh());
+        $this->fail('expected the gate to refuse this draft');
+    } catch (PublishValidationException $e) {
+        expect($e->violations()[0]['code'])->toBe('choice_options_invalid')
+            ->and($e->violations()[0]['message'])->toContain('no options defined');
+    }
+});

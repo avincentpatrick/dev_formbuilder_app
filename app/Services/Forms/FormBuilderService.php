@@ -15,6 +15,7 @@ use App\Models\FormFieldValidation;
 use App\Models\FormSection;
 use App\Models\FormVersion;
 use App\Models\User;
+use App\Support\Forms\DefaultFieldRules;
 use App\Support\Tenancy\PlatformRowCounter;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Database\Eloquent\Model;
@@ -123,7 +124,7 @@ final class FormBuilderService
             $draft = $this->lockDraft($form);
             $section = $this->resolveDraftSectionId($draft, $sectionId);
 
-            return FormField::create([
+            $field = FormField::create([
                 'form_version_id' => $draft->id,
                 'form_section_id' => $section,
                 'key' => $this->uniqueKey($draft, 'field', 'form_fields'),
@@ -134,6 +135,26 @@ final class FormBuilderService
                 'sequence' => $this->nextFieldSequence($draft),
                 'created_by' => $user->id,
             ]);
+
+            // M112 — the per-type checks an author should not have to write by hand. Same transaction and
+            // the same seam as defaultConfig() above; the registry is total, so a thirty-second field type
+            // is a PHPStan error rather than a silent "no defaults".
+            //
+            // ⚠️ It writes through the same columns as replaceValidations(), deliberately not through it:
+            // that method DELETES every existing row first, which is right for a save and wrong for a
+            // create. A new field has none to replace.
+            foreach (DefaultFieldRules::for($type) as $index => $row) {
+                FormFieldValidation::create([
+                    'form_version_id' => $draft->id,
+                    'form_field_id' => $field->id,
+                    'rule_type' => $row['rule_type'],
+                    'rule_value' => $row['rule_value'],
+                    'error_message' => $row['error_message'],
+                    'sequence' => $index,
+                ]);
+            }
+
+            return $field;
         });
     }
 

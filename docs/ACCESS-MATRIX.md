@@ -102,7 +102,7 @@ The two copies share nothing at runtime — not a port, not a database, not a fi
 > The landing page's own footer already hints at this — *"Already a member of a workspace? Go straight to
 > it at `your-workspace.localhost`"* — but its primary **Sign in** button does not, which is what makes
 > the trap easy to fall into. The central host's sign-in is correct for exactly one account:
-> `admin@meridian.test` — but a direct sign-in there lands on `/dashboard`, a workspace-only route the central host answers with a 404, so open `/admin/tenants` directly (it sends an unenrolled operator on to `/admin/two-factor`, the TOTP gate). Only a sign-in bounced from `/admin/*` returns to the console.
+> `admin@meridian.test` — but a direct sign-in there lands on `/dashboard`, a workspace-only route the central host does **not** answer with a 404: `bootstrap/app.php` renders `NotASubdomainException` for a **web** request as a redirect to `APP_URL`, so the sign-in lands back on the guest landing page, whose Sign in and Create links send it round again. Only the `/api/v1` arm answers 404, and `CentralHostFallbackTest` pins the redirect. Open `/admin/tenants` directly instead (it sends an unenrolled operator on to `/admin/two-factor`, the TOTP gate). Only a sign-in bounced from `/admin/*` returns to the console.
 
 The app is subdomain-multitenant and the two directions are both enforced:
 `PreventAccessFromCentralDomains` rejects tenant routes on the bare central host, and

@@ -9583,7 +9583,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   workspace and is redirected straight back to the central host it just came from.** Measured by `M93` (2026-09-14). While sign-up is open — the platform
   default — `resources/js/Pages/Welcome.vue` links to the registration page. A central-host registration
   belongs to no workspace, Fortify then redirects to `/dashboard`, and that route exists only in
-  `routes/tenant.php`, so the central host answers 404. ⚠️ **The invitation-only testing setting avoids it
+  `routes/tenant.php`, so the central host redirects it to `APP_URL` rather than answering 404 — corrected in place by `M109`, and the two notes below say the same thing. ⚠️ **The invitation-only testing setting avoids it
   without code**, and the sign-up decision was answered invitation-only in chat on 2026-09-14, so the testing
   server avoids it and this row stays early-testing, while a default install still reaches it. The fix is to relabel or hide the button
   until a self-serve workspace exists, which is now an open decision, or to land such an account on a page that says it has none yet.

@@ -1597,7 +1597,7 @@ increment that found it can honestly validate.
 |---|---|
 | Call sites | 13, across 9 files |
 | Stretch-clamped hosts | **4** — `.config__group`, `.mds-field` (members ×2), `.sheets-fields`, `.encode-field` |
-| …of those, inside an `overflow-y: auto` box | **4 of 4** — `.config` for the first, `.mds-modal__body` for the other three |
+| …of those, inside an `overflow-y: auto` box | **2 of the 4 classes established** — `.config` for `.config__group`; `.mds-modal__body` for `.mds-field` (twice) and `.sheets-fields`. ⛔ **`M109` corrected this line.** *"4 of 4 — `.config` for the first, `.mds-modal__body` for the other three"* mixed a class count with a call-site count: those are three call SITES across two classes, and `.encode-field` is in no modal at all — it renders in an `MdsCard` on the encode page and in the public runtime, so its containing scroller was never established. |
 | …with any e2e coverage | **1** (the builder pane, and only through a document-level assertion that cannot see it) |
 | `flex-shrink: 1` on `__seg` | a **no-op** — the initial value, and absent from the tree |
 | The 30px | **unprovenanced** — no test, fixture or snapshot records it |
@@ -1630,6 +1630,8 @@ measures 0 everywhere — the wrong box.
 at CI's font stack — and it is the only thing that can, because the dev host never loads the dyslexia face.
 **It is not shipped here deliberately**: added blind it would either merge green and prove nothing or go
 red and block an increment on a question nobody has answered. It belongs with whichever option is taken.
+
+⛔ **`M109` (2026-09-25) — THE ANSWER SURVIVES; ITS ILLUSTRATION DOES NOT, AND A READER WHO FOLLOWS THE ILLUSTRATION SHIPS A NO-OP.** Option 3 is still the answer and nothing about *guard at the host* changes. But the guard it points at cannot work on any of the four hosts. `Settings/Index.vue`'s `.settings-row` is a flex **ROW**, where `min-width: 0` overrides the automatic minimum size along the MAIN axis — that is why it works there — and the rule the illustration leaves out is `flex-wrap: wrap`, declared on that same host two lines above it. **All four defective hosts are flex COLUMNS**, where a stretched child is already exactly container-width, so `min-width: 0; max-width: 100%` changes nothing whatsoever. ⚠️ **The counter-example was already in the tree and in this entry's own table:** `.encode-field` carries `min-width: 0` today and still spills. What overflows is the control's own flex LINE, whose `__seg` has `min-width: auto` and therefore never shrinks below its longest word plus 24px of padding — and the table above already records `flex-shrink: 1` as inert for the same family of reasons without carrying it through to the recommendation. **The host-side affordance that does work is `flex-wrap: wrap` on the hosted control**, which is what `M109` declared at each of the four hosts. Filed as `R-6c429d4e`, closed beside `R-45b0cf8a` in one increment: shipping the fix while leaving this sentence standing would have left the roster prescribing a change that measures identically.
 
 ---
 

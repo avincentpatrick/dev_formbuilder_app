@@ -293,3 +293,150 @@ it('carries a stable code that is not the prose, so a consumer never matches on 
             ->and($e->violations()[0]['message'])->toContain('no options defined');
     }
 });
+
+/*
+|--------------------------------------------------------------------------
+| M113 — a validation rule the field's value shape cannot satisfy is refused at publish.
+|
+| ⛔ THESE RULES DO NOT MERELY FAIL TO CONSTRAIN — THEY FAIL CLOSED, IN BOTH ENGINES.
+| `Coercion::NUMERIC_RE` is `/^-?[0-9]+(\.[0-9]+)?$/`, so `2026-01-15` is not numeric-like.
+| `StructuredRuleEvaluator`'s `MinValue` arm reads `isEmpty($answer) || (isNumericLike($answer) && …)`
+| and `ExpressionEvaluator`'s ordered comparison returns `false` on a NaN operand — so every non-empty
+| answer becomes INVALID and the field is unanswerable, with nothing telling the respondent why.
+| `coercion.ts` and `evaluator.ts` are byte-identical on both points, so this is a correctness defect
+| rather than a parity one.
+|
+| ⚠️ `min_value` WITH A DATE-SHAPED THRESHOLD WAS ALREADY REFUSED, by `ExpressionValidationGate`'s
+| `non_numeric_threshold` arm. What had NO check anywhere is `greater_than_field` — `end_date >
+| start_date`, the most natural temporal rule an author would ever write — which published clean.
+| That asymmetry is why the numeric-threshold case below is pinned separately from the field one.
+|
+| ⛔ THIS IS `ValueShape::allows()`'s FIRST PRODUCTION CALLER. `M112` shipped the table and wired it
+| to nothing, so the row's "the authoring half is closed" was an overstatement measured here.
+*/
+
+it('rejects greater_than_field between two date fields, naming the field and a stable slug', function (): void {
+    $version = makeDraftVersion(makeForm($this->user));
+    $start = addFormField($version, $this->user, 'start_date', FieldType::Date, 0);
+    $end = addFormField($version, $this->user, 'end_date', FieldType::Date, 1);
+
+    FormFieldValidation::create([
+        'form_version_id' => $version->id,
+        'form_field_id' => $end->id,
+        'related_form_field_id' => $start->id,
+        'rule_type' => ValidationRuleType::GreaterThanField,
+    ]);
+
+    // ⚠️ The MESSAGE is author-facing prose and deliberately carries no snake_case slug: unlike the
+    // older factories in this file, `M113` puts `violations()` on the Inertia wire too, so the stable
+    // `code` travels structurally and does not have to be smuggled into the sentence. The slug is
+    // asserted below, on the field it belongs to.
+    expect(fn () => $this->gate->assertPublishable($version->refresh()))
+        ->toThrow(PublishValidationException::class, 'greater_than_field');
+
+    try {
+        $this->gate->assertPublishable($version->refresh());
+    } catch (PublishValidationException $e) {
+        expect($e->violations())->toHaveCount(1)
+            ->and($e->violations()[0]['field'])->toBe('end_date')
+            ->and($e->violations()[0]['code'])->toBe('rule_not_allowed_for_shape')
+            ->and($e->violations()[0]['message'])->toContain('greater_than_field');
+    }
+});
+
+it('rejects min_value on a date field even when the threshold is numeric', function (): void {
+    $version = makeDraftVersion(makeForm($this->user));
+    $visit = addFormField($version, $this->user, 'visit_date', FieldType::Date, 0);
+
+    FormFieldValidation::create([
+        'form_version_id' => $version->id,
+        'form_field_id' => $visit->id,
+        'rule_type' => ValidationRuleType::MinValue,
+        'rule_value' => '0',
+    ]);
+
+    expect(fn () => $this->gate->assertPublishable($version->refresh()))
+        ->toThrow(PublishValidationException::class, 'visit_date');
+});
+
+it('still allows the same ordered rule between two number fields', function (): void {
+    $version = makeDraftVersion(makeForm($this->user));
+    $low = addFormField($version, $this->user, 'low', FieldType::Integer, 0);
+    $high = addFormField($version, $this->user, 'high', FieldType::Integer, 1);
+
+    FormFieldValidation::create([
+        'form_version_id' => $version->id,
+        'form_field_id' => $high->id,
+        'related_form_field_id' => $low->id,
+        'rule_type' => ValidationRuleType::GreaterThanField,
+    ]);
+
+    $this->gate->assertPublishable($version->refresh());
+
+    expect(true)->toBeTrue(); // reached here without throwing
+});
+
+it('still allows a conditional rule on a date field, because conditions apply to every shape', function (): void {
+    $version = makeDraftVersion(makeForm($this->user));
+    $consent = addFormField($version, $this->user, 'consent', FieldType::YesNo, 0);
+    $visit = addFormField($version, $this->user, 'visit_date', FieldType::Date, 1);
+
+    FormFieldValidation::create([
+        'form_version_id' => $version->id,
+        'form_field_id' => $visit->id,
+        'related_form_field_id' => $consent->id,
+        'rule_type' => ValidationRuleType::RequiredIf,
+        'rule_value' => 'yes',
+    ]);
+
+    $this->gate->assertPublishable($version->refresh());
+
+    expect(true)->toBeTrue(); // reached here without throwing
+});
+
+it('reports a shape violation for every offending rule, not just the first', function (): void {
+    $version = makeDraftVersion(makeForm($this->user));
+    $start = addFormField($version, $this->user, 'start_date', FieldType::Date, 0);
+    $end = addFormField($version, $this->user, 'end_date', FieldType::Date, 1);
+
+    FormFieldValidation::create([
+        'form_version_id' => $version->id,
+        'form_field_id' => $end->id,
+        'related_form_field_id' => $start->id,
+        'rule_type' => ValidationRuleType::GreaterThanField,
+    ]);
+    FormFieldValidation::create([
+        'form_version_id' => $version->id,
+        'form_field_id' => $start->id,
+        'rule_type' => ValidationRuleType::MaxValue,
+        'rule_value' => '100',
+    ]);
+
+    try {
+        $this->gate->assertPublishable($version->refresh());
+        expect(false)->toBeTrue('the gate accepted two unsatisfiable rules');
+    } catch (PublishValidationException $e) {
+        expect($e->violations())->toHaveCount(2)
+            ->and(array_column($e->violations(), 'field'))->toEqualCanonicalizing(['end_date', 'start_date']);
+    }
+});
+
+it('leaves an expression-only validation row alone, because it carries no rule type at all', function (): void {
+    // ⛔ REGRESSION PIN. `form_field_validations` has a DB CHECK enforcing `expression` XOR `rule_type`,
+    // so every raw-expression rule has a NULL `rule_type`. The first draft of the shape check above passed
+    // that null straight into `ValueShape::allows()`, whose parameter is not nullable — which escaped this
+    // gate as a TypeError rather than a refusal and reddened `ExpressionValidationGateTest`. Whether an
+    // expression suits its field is the EXPRESSION gate's question; this gate must not answer it.
+    $version = makeDraftVersion(makeForm($this->user));
+    $visit = addFormField($version, $this->user, 'visit_date', FieldType::Date, 0);
+
+    FormFieldValidation::create([
+        'form_version_id' => $version->id,
+        'form_field_id' => $visit->id,
+        'expression' => '${visit_date} != ""',
+    ]);
+
+    $this->gate->assertPublishable($version->refresh());
+
+    expect(true)->toBeTrue(); // reached here without throwing
+});

@@ -68,6 +68,7 @@ final class StructuralValidationGate
 
         $fieldIds = $fields->pluck('id')->flip();
         $fieldKeyById = $fields->pluck('key', 'id');
+        $fieldTypeById = $fields->pluck('field_type', 'id');
 
         // Increment H7 — which fields own at least one validation row, so the hidden-field check below is a
         // set lookup rather than a per-field query.
@@ -154,6 +155,39 @@ final class StructuralValidationGate
             }
             if ($validation->related_form_field_id !== null && ! $fieldIds->has($validation->related_form_field_id)) {
                 $violations[] = PublishValidationException::validationReferencesForeignVersion($ownerKey);
+            }
+
+            // Increment M113: the rule must be one the owning field's VALUE SHAPE can actually satisfy.
+            //
+            // ⛔ THIS IS NOT A TIDINESS CHECK — THE EXCLUDED RULES FAIL *CLOSED*.
+            // `min_value` on a date, or `greater_than_field` between two dates, does not merely fail to
+            // constrain: `Coercion::NUMERIC_RE` does not match `2026-01-15`, `StructuredRuleEvaluator`'s
+            // `MinValue` arm is `isEmpty($answer) || (isNumericLike($answer) && …)`, and
+            // `ExpressionEvaluator`'s ordered comparison returns `false` on a NaN operand — so EVERY
+            // non-empty answer is rejected and the field is unanswerable with no way for the respondent to
+            // discover why. Both engines agree (`coercion.ts`, `evaluator.ts`), so this is a correctness
+            // defect rather than a parity one, and refusing at publish is where the author can still act.
+            //
+            // ⚠️ `min_value` WITH A DATE-SHAPED THRESHOLD WAS ALREADY REFUSED by `ExpressionValidationGate`'s
+            // `non_numeric_threshold` arm. What had no check ANYWHERE is `greater_than_field`, which takes no
+            // `rule_value` at all — so `end_date > start_date` published clean and refused every submission.
+            //
+            // ⛔ AND THIS IS `ValueShape::allows()`'s FIRST PRODUCTION CALLER. `M112` shipped the table with
+            // no consumer on either side, so until here nothing in the system acted on it.
+            // ⛔ `rule_type` IS NULL ON EVERY EXPRESSION ROW, AND SKIPPING THOSE IS NOT DEFENSIVE CODING.
+            // `form_field_validations` carries a DB CHECK enforcing `expression` XOR `rule_type`
+            // (`..._create_form_field_validations`), so a raw-expression rule legitimately has no rule
+            // type at all. Passing that null to `allows()` raised a TypeError that escaped this gate as a
+            // fault rather than a refusal — measured, by reddening `ExpressionValidationGateTest`'s
+            // unparseable-expression case. An expression row's applicability is the EXPRESSION gate's
+            // question, not this one's.
+            $ownerType = $fieldTypeById->get($validation->form_field_id);
+            if ($validation->rule_type !== null && $ownerType !== null && ! ValueShape::for($ownerType)->allows($validation->rule_type)) {
+                $violations[] = PublishValidationException::ruleNotAllowedForShape(
+                    $ownerKey,
+                    $validation->rule_type->value,
+                    ValueShape::for($ownerType)->value,
+                );
             }
         }
 

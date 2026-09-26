@@ -195,6 +195,29 @@ final class PublishValidationException extends RuntimeException
     }
 
     /**
+     * A validation rule whose owning field's {@see \App\Enums\ValueShape} can never satisfy it (Increment
+     * M113). This is NOT "unusual but allowed" — the rule fails CLOSED, so the field becomes unanswerable.
+     *
+     * ⛔ THE FAILURE IS SILENT AND TOTAL, WHICH IS WHY IT IS REFUSED RATHER THAN WARNED ABOUT.
+     * `Coercion::NUMERIC_RE` does not match `2026-01-15`, `StructuredRuleEvaluator`'s `MinValue` arm is
+     * `isEmpty($answer) || (isNumericLike($answer) && …)`, and `ExpressionEvaluator`'s ordered comparison
+     * returns `false` on a NaN operand. So `end_date > start_date` rejects EVERY non-empty answer, and the
+     * respondent is given no way to discover why. Both engines behave identically here — `coercion.ts` and
+     * `evaluator.ts` mirror the same two rules — so this is a correctness defect, not a parity one.
+     *
+     * `$ruleType` and `$shape` are the backed enum values, so the sentence carries stable slugs and the
+     * `code` stays a single constant that tests can match without pinning wording (the A4 rule).
+     */
+    public static function ruleNotAllowedForShape(string $fieldKey, string $ruleType, string $shape): self
+    {
+        return self::one(
+            $fieldKey,
+            'rule_not_allowed_for_shape',
+            "The “{$ruleType}” rule on “{$fieldKey}” can never be satisfied by a {$shape} answer, so every submission would be refused. Remove the rule or change the field's type.",
+        );
+    }
+
+    /**
      * @param  list<array{field: ?string, code: string, message: string}>  $violations
      */
     private function __construct(string $message, private readonly array $violations)

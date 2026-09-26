@@ -16,69 +16,64 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M114`, the four answered decisions recorded and decision-surfacing made just-in-time (`m114-decisions-recorded`)
+## Status: NO ACTIVE CLAIM — `M114` is merged; `D57`, `D59`, `D63`, `D64` and `D66` are recorded, `R-2bda7386` is closed as a proven strict subset for its write-path half with the remainder re-filed, `R-98b2d568` is retiered into the tier being worked, two rows are filed, and `early-testing` remains the most urgent tier with open work
 
-Taken 2026-09-26. Branch `m114-decisions-recorded`, cut from `origin/main` at `6612a2d`, PR into `main`.
+## RELEASED — `M114`, the four answered decisions recorded and decision-surfacing made just-in-time (merged as PR #307, `5a5d6ed`, 6/6 green with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 
-**Documentation only — no product code is touched.** The user answered `D57`, `D59`, `D63` and `D64` on 2026-09-26 in a read-only session while `M113` held the lane, and gave one standing instruction about how decisions reach them. Nothing was written then, and a hand-off carried the four answers forward; they are the one thing in it that cannot be re-derived. This increment records the answers, strips the four `Awaits` tokens they gate, files the two obligations they create, and amends `CLAUDE.md` so a decision is put to the user only when the tier being worked holds a row blocked on it.
+Shipped 2026-09-26. Branch `m114-decisions-recorded`, cut from `origin/main` at `6612a2d`.
 
-Decisions recorded: `D57` → **A**, `D59` → **C**, `D63` → **A**, `D64` → **A**, plus `D66` filed-and-answered to retier `R-98b2d568`.
+**Five decisions recorded, four rows unblocked, one closed, two filed, one retiered, and not one line of product code touched.** Open decisions **37 → 33**, with `early-testing` left holding only `D58`; open rows **272 → 273**. No migration, no ADR, no tracker surgery — `PROGRESS.md` moved **+0 bytes** during the build.
 
-Rows:
-- `R-2bda7386` — *"`forms.single_page_mode` drives real, tested runtime behaviour in both renderers and has no write path anywhere outside the seeders."* `docs/feature-backlog.md:11391`. Filed by `M110`. **Awaits D57**, and taken to be **closed as a proven strict subset of `R-f1332829` for its write-path half**, with its section-strip half re-filed as its own row.
-- `R-e878d49a` — *"The validation editor offers every rule and every operator to every field type, and labels the operators `Gt`, `Lte` and `Neq`."* `docs/feature-backlog.md:11283`. Filed by `M110`. **Awaits D59** — unblocked, not taken.
-- `R-4e96a994` — *"Form-level settings are spread across five modals, a toolbar checkbox and two form-list dialogs, with no settings surface anywhere."* `docs/feature-backlog.md:11405`. Filed by `M110`. **Awaits D63** — unblocked, not taken.
-- `R-495abf48` — *"A field's type cannot be changed after it is created, and the delete-and-re-add workaround destroys every rule, mints a new key and dangles every expression that referenced it."* `docs/feature-backlog.md:11326`. Filed by `M110`. **Awaits D64** — unblocked, not taken.
-- `R-98b2d568` — *"The Next section and the hand-off list open decisions as work to take."* `docs/feature-backlog.md:9921`. Filed by `M96`. **Retiered `during-testing` → `early-testing`** by `D66`, with the reason recorded at the row.
+### ⛔ The finding worth more than the recording, and the hand-off had no idea
 
-### Evidence verified
+**`R-2bda7386` WAS HALF A DUPLICATE, AND ONLY HALF.** `R-f1332829` (`docs/feature-backlog.md:7428`, `early-testing`, ready, filed by `M80` out of `M79`'s 2026-09-06 sweeps) states the same defect — `forms.single_page_mode` has no writer outside the seeders — **nineteen days earlier**, cites the same declaration and read sites, and **already carries `D35`'s answer in its body**. `M110` re-filed it without seeing it, and `D57` was then written on top of the re-filing. Recording the answer would have published **two ready rows for one defect**.
 
-**The `Awaits` census is exact, and it is four.** Measured two independent ways — by grep over the whole repository and by reading the generated line's blocked column. `D57` → `docs/feature-backlog.md:11403`; `D59` → `:11295`; `D63` → `:11419`; `D64` → `:11341`. **One row each, and no row in any other tier names any of the four.** Sixteen rows repo-wide await a decision; the other twelve await `D8`, `D16`, `D17`, `D23`, `D27` (twice), `D29`, `D58`, `D60`, `D61`, `D62` and `D65`.
+⚠️ **But closing it outright would have destroyed work, and that is the part worth keeping.** The user's disposition was *close the newer as a proven strict subset* — given true duplication. Verification refuted that premise: `R-2bda7386` also carries a **section strip** requirement (radiogroup not tablist, index-prefixed labels against an exact-text locator collision, a named degradation constant) that `R-f1332829` never mentions, and `R-f1332829` owns a four-documents-disagree half that `R-2bda7386` never mentions. **Neither contains the other.** So the subset closure was applied to the half it actually fits and the remainder was re-filed as `R-ae391298`. A conditional answer whose condition fails is not an instruction to proceed anyway.
 
-**`R-98b2d568` — citation exact.** `docs/feature-backlog.md:9921`, tier token `**Tier: during-testing.**` at `:9927`, no `Awaits` token, `ready` in the line. ⚠️ **It names `scripts/state.php`, `scripts/next.php` and `scripts/loop.php` — not `scripts/pipeline.php`**, which the hand-off asserted.
+### `D57`'s own option C is built on a false premise, and option C is the half that was filed
 
-**`D57`'s own two citations — one exact, one path-wrong, and the hand-off made the second worse.** `visibleSteps` at `useFormRuntime.ts:405-462` — **the line range is byte-exact in the current tree**, declaration at `:405` and the closing brace at `:462`; the path is `resources/public-runtime/composables/`, not `resources/js/composables/`, which holds no form runtime at all. `RENDERS_NOTHING` resolves to `resources/public-runtime/engine/field-roles.ts:33`; **`resources/js/engine/` does not exist.**
+`D57` says `page_break` *"today does nothing at all — which is its own latent defect."* **It is already load-bearing in two renderers.** On paper it is a literal hard page break (`app/Enums/PrintAnswerArea.php:172` → `PrintAnswerArea::PageBreak`, emitted at `resources/views/pdf/blank-form.blade.php:83`, styled `page-break-before: always` at `_blank-form-styles.blade.php:127`); on export it is an ODK group boundary (`XlsformExporter::emitPageBreak()` `:174-178`, round-tripped at `XlsformTypeMap.php:114`). **So the defect is that screen and paper disagree** — a reconciliation, not a missing feature — and `R-8c517fb6` was written that way rather than as the hand-off drafted it.
 
-**The four decision entries are intact and their options are unedited.** `D57` at line 1142, `D58` at 1153, `D59` at 1166, `D63` at 1207, `D64` at 1218 and `D65` at 1228 in `docs/claims/decisions.md`; `## OPEN` at 24, `## ANSWERED` at 1239.
+Three more corrections went into that row before it was filed:
+1. ⛔ **On screen `page_break` is DELETED, not ignored.** `RENDERS_NOTHING` strips it at `useFormRuntime.ts:409` and `:434`, after which a section holding only page breaks fails the emptiness check at `:438` and **disappears entirely**. It is strictly less than inert.
+2. ⛔ **There are FOUR section walks, not the two `D57` names.** `visibleSteps` and `StepProjection::of()` are the fixture-pinned twins; `SubmissionPdfPresenter::answerBlocks()` (`:152-245`) and `BlankFormPrintPresenter::blocks()` (`:150-180`) are independent and deliberately un-refactored — the first named as such by `StepProjection`'s own docblock at `:43-46`.
+3. ⛔ **Two shape contracts constrain any remedy**: `RENDERS_NOTHING`'s literal is **regex-parsed out of the TypeScript source** by `tests/Unit/Forms/PdfFieldRoleTest.php:73`, so a rename or reshape reddens a PHP test; and `PrintAnswerArea.php:15-23` enumerates four deliberately-disagreeing type sets, each pinned, so moving `page_break` between them is a decision about all four.
 
-### Premise verified
+⚠️ **And the hand-off's own paths were wrong where the decision's were merely partial.** `D57` cites `engine/field-roles.ts`; the hand-off expanded that to `resources/js/engine/field-roles.ts`, which **does not exist** — the file is `resources/public-runtime/engine/field-roles.ts:33`. Same for the composable. The one thing that held byte-exact was the line range `405-462`.
 
-⛔ **`R-2bda7386`'s premise is HALF FALSE — a second copy exists, and the hand-off does not know it.** `R-f1332829` (`docs/feature-backlog.md:7428`, `early-testing`, **ready**, filed by `M80` from `M79`'s 2026-09-06 sweeps) already owns *"no write surface outside the seeders"* and **already carries `D35`'s answer in its body**. `M110` re-filed that half 19 days later. ⚠️ **But it is not a whole duplicate**: `R-2bda7386` additionally carries a section-strip requirement — a radiogroup rather than a tablist, index-prefixed labels against an exact-text locator collision, a named degradation constant — that `R-f1332829` never mentions, and `R-f1332829` owns a four-documents-disagree half that `R-2bda7386` never mentions. Closing it outright would have dropped real queued work.
+### The `M105` trap, walked up to and avoided
 
-⛔ **`D57`'s option C premise is FALSE, and option C is the half being filed.** It says `page_break` *"today does nothing at all — which is its own latent defect."* It is already load-bearing in two renderers: a literal hard page break on paper (`app/Enums/PrintAnswerArea.php:172`, `resources/views/pdf/blank-form.blade.php:83`, `resources/views/pdf/_blank-form-styles.blade.php:127`) and an ODK group boundary on export (`XlsformExporter::emitPageBreak()` at `:174-178`, round-tripped at `XlsformTypeMap.php:114`). **The defect is that screen and paper disagree**, not that nothing happens.
+`M105` recorded two retier decisions and **never changed the rows' tiers**; `pipeline-lint` passed green on both, fifteen rule groups, because **nothing in `pipeline.php` or `pipeline-lint.php` connects a decision to the row it re-tiers**. `D66`'s retier of `R-98b2d568` was therefore applied **at the row**, and verified by reading the regenerated line rather than by trusting a gate: it reads `early-testing`, and the row now leads the Next section — which is fitting, since it is the row that fixes that very display.
 
-⛔ **"Both step projections" undercounts by two.** Four section walks exist: `visibleSteps` and `StepProjection::of()` (`app/Support/Forms/StepProjection.php:105-168`) are the true twins, pinned against each other by `tests/fixtures/step-projection.json`; `SubmissionPdfPresenter::answerBlocks()` (`:152-245`) and `BlankFormPrintPresenter::blocks()` (`:150-180`) are independent and **deliberately** un-refactored, with `StepProjection`'s own docblock naming the first at `:43-46`.
+### Row identity, measured rather than assumed
 
-⚠️ **On screen `page_break` is DELETED, not ignored** — removed at `useFormRuntime.ts:409` and `:434`, after which a section holding only page breaks fails the emptiness check at `:438` and **disappears entirely**. It is strictly less than inert.
+The id is `sha1` of the row's **first physical line** (`scripts/state.php:648`, over `$row['first']`), after the severity, `Tier:` and `Awaits` tokens are stripped. Consequences, all exercised here:
+- Four `Awaits` strips renumbered nothing, as `TOKEN_STRIP` guarantees.
+- Every answer sentence was appended to a row **body**, never to a first line.
+- `R-2bda7386` kept its id **through closure**, because `- ✅ **CLOSED BY …` sits *before* the severity token and leaves the hashed title identical — verified by recomputing the hash, not by inspection.
+- ⚠️ **A re-wrap is as destructive as a rewrite**, and this repository has already paid for it: the row session memory calls `R-54a19217` is now `R-33c7fd56`, and `R-3df897a6` — which that memory names as next in the plan's order — has been closed since `M112`. Both were corrected in memory.
 
-✅ **`R-98b2d568`'s former superset row is CLOSED BY `M99`**, so the retier collides with nothing. `M98` had argued `during-testing` fits because *"no tester sees any of this, the live harm being a duplicate push notification to the user and noise in the hand-off"* — and the user's instruction is exactly the counter-argument, which is the reason recorded at the row.
+### How the prediction fared
 
-✅ **No row awaits `D58`, and that is why it is not put to the user.** Its only dependent row, `R-f0c5b682`, is `during-testing`. `D58` is itself tiered `early-testing`, so the narrow reading of the new rule and the wide one disagree here; **the user chose the narrow one in chat on 2026-09-26** — the trigger is a *work* row, not the decision row.
+| Predicted | Outcome |
+|---|---|
+| `pipeline-lint` P7e green after all four strips | **Held.** 15 rule groups, 317 rows, 880 files. |
+| `tracker-lint` R8 holds, no namespace literal enters `CLAUDE.md` | **Held.** 230 lines, 15,614 bytes, four literal classes each reading zero — checked in the edit script *before* the gate saw it. |
+| PHPStan cannot move | **Held by construction and stated as such** — it scans `app`, `database`, `routes`; this diff touches none. Not re-measured, deliberately. |
+| Pint must be run bare | **Held.** Passed on the host over a diff with no PHP in it. |
+| CI produces a real run | **Held.** Six jobs dispatched with real step counts; `docs/claims/**` sits in `paths-ignore` but the backlog, the line and `CLAUDE.md` do not. |
+| **Most likely wrong: the `R-2bda7386` split** | **WRONG ABOUT THE MECHANISM, RIGHT ABOUT THE RISK.** The worry was that the re-filed row's id would silently differ from the one intended. It did not — both new ids were *derived in the edit script and printed* rather than invented, so there was nothing to mis-predict. The real hazard was one layer out and the user's answer carried it: the disposition assumed a whole duplicate, and the split had to be re-derived against the evidence instead. |
+| **Second most likely wrong: the fourth decision cut** | **WRONG, and for a reason worth recording.** No cut went astray, because the extraction never used line-number arithmetic per cut — the script removed all four bottom-up in one pass with a blank-line assertion on each boundary, then proved conservation by counted line multiset. The prediction described a procedure that was replaced before it could fail. |
 
-✅ **Checked and NOT a defect:** the *"decisions of record — do not re-ask them"* paragraph omits `D6`, `D7`, `D13` and `D15`, so it is a curated list rather than an index. No row filed for the omission.
+### The mechanics
 
-### Remedy verdict
+- ✅ **The move was PROVED, not inspected.** Each entry's original body was asserted to occur **exactly once** in the new file, byte-for-byte (`D57` 2,338 bytes, `D59` 1,742, `D63` 1,754, `D64` 1,620), every heading stem likewise, and a counted line-multiset diff showed **exactly five lines lost** — the four old headings and the record paragraph — against the expected gains and nothing else.
+- ✅ **The backlog's citation invariant held.** 381 citations point into `docs/feature-backlog.md` by line number; **every mid-file hunk is `@@ -N +N @@`** and the only unbalanced hunk is the append at EOF. Verified with `git diff -U0`, not asserted.
+- ✅ **The `## ANSWERED` literal survived byte-for-byte** — `scripts/state.php:439` and `scripts/pipeline-lint.php:1565` both `preg_split` on it and refuse to measure without it.
+- ⛔ **The testing-server notice was NOT re-sent.** `docs/pipeline.md`'s `Notified:` line reads `yes, by M95`, and that line was read rather than the tier count — even though `early-testing` now holds no open decision but `D58`.
+- ⚠️ **`D58` was deliberately not put to the user**, and this is the new rule's first application. It is itself tiered `early-testing`, but the only row awaiting it (`R-f0c5b682`) is `during-testing`. The user was shown both readings of "when is a decision needed" and chose the narrow one; recorded at `D66` so no later session re-derives a different answer.
 
-**The four strips: sound, and id-safe by construction.** `TOKEN_STRIP` (`scripts/state.php:100`) removes both the `Tier:` and `Awaits` tokens *before* the id is hashed, so a strip cannot renumber a row — `M105` measured that over eighteen strips at once. ⛔ **Measured further, and it is the sharper fact:** the id is a `sha1` of the row's **first physical line only** (`scripts/state.php:648`, over `$row['first']`), so a body append is id-safe and **a headline edit — or even a re-wrap — is not**. That has already bitten this repository: the row session memory calls `R-54a19217` is now `R-33c7fd56`.
-
-**`P7e` is the gate that proves Step 2 complete.** `scripts/pipeline-lint.php:1519` refuses a row awaiting an ANSWERED decision. It goes red if any one of the four strips is missed, which is the specific failure that step exists to prevent.
-
-⛔ **The retier is the half that has failed before, and no gate can see it.** `M105` recorded two retier decisions and **never changed the rows' tiers**; `pipeline-lint` passed green on both, fifteen rule groups, because nothing in `pipeline.php` or `pipeline-lint.php` connects a decision to the row it re-tiers — the connection lives only in the decision's prose. The retier is therefore applied at the row by hand and verified by reading the regenerated line, not by a gate.
-
-**Filing `D66` straight into `## ANSWERED` is well precedented** — `D48`, `D47`, `D46`, `D43` and `D13` were each filed and answered at once, under a `**Filed and answered …**` opening line.
-
-Files: `docs/claims/decisions.md`, `docs/feature-backlog.md`, `docs/pipeline.md` (regenerated), `CLAUDE.md`, `docs/claims/lane-a.md`, `PROGRESS.md` (own status block and own hand-off line only).
-Shared artefacts taken: `docs/claims/decisions.md`, `docs/feature-backlog.md`, `docs/pipeline.md`, `CLAUDE.md`, `PROGRESS.md` (own block only).
-Paired files taken: **none**.
-Namespaces spent: **one decision id, `D66`**. No migration prefix, no ADR — `0010` stays reserved for H1d — no sub-decision id, no exceptions-log entry.
-Prediction:
-- `pipeline-lint` P7e green after all four strips, red if one is missed. P7a green — every new row carries a tier.
-- `tracker-lint` R8 holds: no increment number, no migration prefix, no sub-decision literal and no "next free" phrase enters `CLAUDE.md`.
-- PHPStan **cannot** move — it scans `app`, `database` and `routes`, and this diff touches none of them. Stated by construction rather than re-measured.
-- Pint bare on the host passes over a diff containing no PHP.
-- CI produces a real run: `docs/feature-backlog.md`, `docs/pipeline.md` and `CLAUDE.md` all sit outside `paths-ignore`, while `docs/claims/**` does not.
-- **Most likely wrong: the `R-2bda7386` split.** Closing a row and re-filing half of it is one intent spread across two edits, and the new row's id is derived from a first line whose wrapping I am choosing — if I wrap it other than intended the id is simply a different one and **nothing fails**, which is the shape that hides.
-- **Second most likely wrong: the fourth decision cut.** Each entry removed from `## OPEN` shifts every line index below it, so the fourth extraction is the one most likely to take a neighbouring line. Cuts are made bottom-up for that reason, and the `## ANSWERED` literal must survive byte-for-byte or `state.php` and `pipeline-lint` both refuse to measure.
+**THE FILE RECORD.** Amended: `docs/claims/decisions.md` (four entries `OPEN` → `ANSWERED`, one filed-and-answered, the record paragraph extended) · `docs/feature-backlog.md` (four `Awaits` stripped, one row closed, one retiered, two filed) · `docs/pipeline.md` (regenerated) · `CLAUDE.md` (the decisions bullet) · `docs/claims/lane-a.md` · `PROGRESS.md` (own block and hand-off line only). New: none. Paired files taken: **none**. ➕ **Corrected outside the repository:** two session-memory files naming row ids that have since closed or renumbered.
 
 ## RELEASED — `M113`, publish tells the author everything that is wrong (merged as PR #306, `17e0b0d`, 6/6 green with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

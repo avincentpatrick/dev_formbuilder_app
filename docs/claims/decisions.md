@@ -17,7 +17,7 @@ two server-paginated tables (2026-08-18) · fail **open** on an unseeded plan ca
 password policy min-12 + HIBP + classes (2026-08-09) · Google-only social login (2026-08-09) ·
 gamification last (2026-08-09) · the held list stays held until the user signals, and they said
 *"not yet, ask again later"* on 2026-08-18 · **a flaky e2e result fails CI** (2026-08-26, D2 below) · **the M-series ends at zero open
-`major` rows plus three consecutive increments filing none** (2026-08-28, D5 below) · **the batch series ends and the tiered pipeline succeeds it** (2026-09-14, D12 below) · **the testing server is invitation-only** (2026-09-14, D31 below) · **the guest per-address limits are raised on the testing server only** (2026-09-14, D32 below) · **the Windows Server 2016 testing site runs PostgreSQL 15** (2026-09-14, D43 below) · **the testing site is one workspace at the root of `staging.pitahc.gov.ph`, served by Apache** (2026-09-15, D46 below) · **automatic deploys to the testing server are on** (2026-09-17, D47 below) · **the repository stays public with fake data only through testing, and goes private before any real data** (2026-09-17, D48 below) · **inbound TCP 443 is open and `mod_md` renews the testing site's certificate over `tls-alpn-01`, with a scheduled task to activate it** (2026-09-18, D49 below) · **the API documentation marks its six unbuilt promises as not built, in place, rather than deleting them** (2026-09-20, D38 below) · **operators create every workspace, and `tenants:create` stays the only path** (2026-09-20, D44 below) · **the central-host sign-in loop is retiered `before-launch`** (2026-09-20, D51 below) · **the central-host welcome-email copy stays `early-testing`** (2026-09-20, D52 below) · **the deploy that deletes the previous build's chunks is retiered `early-testing`** (2026-09-20, D53 below) · **the offline panel's quota line says what it counts — *"across all sessions on this device"*** (2026-09-20, D26 below) · **the resume shell is cached under a token-free key, closing the enumeration primitive** (2026-09-20, D20 below) · **`MdsSegmentedControl` is left alone and its four stretch-clamped hosts guard themselves** (2026-09-20, D28 below) · **a workspace admin may invite any address** (2026-09-20, D33 below) · **a new account confirms its email address before that address counts as its own** (2026-09-20, D34 below) · **single-page mode becomes an author setting, defaulting to step by step** (2026-09-20, D35 below) · **corrections save on the button, and the documents say they are not resumable** (2026-09-20, D36 below) · **a lost second factor is cleared by an audited admin reset** (2026-09-20, D37 below) · **the testing site sends `Strict-Transport-Security: max-age=300` from the vhost** (2026-09-20, D54 below).
+`major` rows plus three consecutive increments filing none** (2026-08-28, D5 below) · **the batch series ends and the tiered pipeline succeeds it** (2026-09-14, D12 below) · **the testing server is invitation-only** (2026-09-14, D31 below) · **the guest per-address limits are raised on the testing server only** (2026-09-14, D32 below) · **the Windows Server 2016 testing site runs PostgreSQL 15** (2026-09-14, D43 below) · **the testing site is one workspace at the root of `staging.pitahc.gov.ph`, served by Apache** (2026-09-15, D46 below) · **automatic deploys to the testing server are on** (2026-09-17, D47 below) · **the repository stays public with fake data only through testing, and goes private before any real data** (2026-09-17, D48 below) · **inbound TCP 443 is open and `mod_md` renews the testing site's certificate over `tls-alpn-01`, with a scheduled task to activate it** (2026-09-18, D49 below) · **the API documentation marks its six unbuilt promises as not built, in place, rather than deleting them** (2026-09-20, D38 below) · **operators create every workspace, and `tenants:create` stays the only path** (2026-09-20, D44 below) · **the central-host sign-in loop is retiered `before-launch`** (2026-09-20, D51 below) · **the central-host welcome-email copy stays `early-testing`** (2026-09-20, D52 below) · **the deploy that deletes the previous build's chunks is retiered `early-testing`** (2026-09-20, D53 below) · **the offline panel's quota line says what it counts — *"across all sessions on this device"*** (2026-09-20, D26 below) · **the resume shell is cached under a token-free key, closing the enumeration primitive** (2026-09-20, D20 below) · **`MdsSegmentedControl` is left alone and its four stretch-clamped hosts guard themselves** (2026-09-20, D28 below) · **a workspace admin may invite any address** (2026-09-20, D33 below) · **a new account confirms its email address before that address counts as its own** (2026-09-20, D34 below) · **single-page mode becomes an author setting, defaulting to step by step** (2026-09-20, D35 below) · **corrections save on the button, and the documents say they are not resumable** (2026-09-20, D36 below) · **a lost second factor is cleared by an audited admin reset** (2026-09-20, D37 below) · **the testing site sends `Strict-Transport-Security: max-age=300` from the vhost** (2026-09-20, D54 below) · **a form presents its sections in the two modes the boolean already expresses, and "per page" becomes real by honouring `page_break` next** (2026-09-26, D57 below) · **one `ComparisonOperator` enum in PHP carries both a rule-row label and a sentence label** (2026-09-26, D59 below) · **form settings are reachable from both a hub tab and a builder modal, mounting the same components** (2026-09-26, D63 below) · **a field converts only within its own value shape, plus `note` and `hidden`** (2026-09-26, D64 below) · **a filed decision is put to the user only when the tier being worked holds a row blocked on it** (2026-09-26, D66 below).
 
 ---
 
@@ -1139,17 +1139,6 @@ honest about it, and the testing site is a single workspace so nobody can meet i
 end state and needs a disclosure-safe refusal designed first, which is a decision rather than a patch.
 
 
-### D57 — Reported item 16 asks for three ways to present sections; `forms.single_page_mode` is a boolean that expresses two of them and "tabular" is not expressible at all. What is the model? **Tier: early-testing.**
-
-**Filed 2026-09-25 by `M110`, from a user-directed exploration of the running system.** The request was *"form also must have an option on how to segregate sections. is it a pager but sectioned, is it a tabular layout or a per page setup."* `D35` already answered the adjacent question — add the single-page setting, default step by step — and `M110` files its write path as a row. But `D35` was about a boolean, and this asks for three modes. ⚠️ **Two of the three are not what they sound like.** "Paged but sectioned" is today's `StepView` and is already built. "Per page" is *also* `single_page_mode = false`, but with a break per question — and `visibleSteps` (`useFormRuntime.ts:405-462`) steps by **section only**, while `page_break` sits in `RENDERS_NOTHING` (`engine/field-roles.ts`) and is ignored entirely by both engines. "Tabular" has no renderer on either side.
-
-- **A — keep the boolean, ship the two modes it already expresses, and file "tabular" as a product idea.** Costs one write path (which `D35` already authorised) and nothing else. Leaves "per page" meaning the same thing as "paged but sectioned", which is a naming disappointment rather than a missing capability.
-- **B — replace it with a `presentation` enum (`stepped | single_page | tabular`) and build a tabular renderer.** Matches the request literally. ⚠️ But `visibleSteps` steps by section in **both** engines, and the server's `StepProjection` moves with it — so this is a two-engine parity change, with golden vectors, for a mode nobody has described a use for beyond naming it.
-- **C — keep the boolean and add an orthogonal `page_break_mode`, so "per page" becomes real by finally honouring the `page_break` field type the step projection currently ignores.** Redeems a field type that exists, is in the palette, and today does nothing at all — which is its own latent defect.
-
-**Recommendation: A now, C next.** A is the part `D35` already bought. C is the answer to the half of the request that is genuinely missing, and it is cheaper than B because `page_break` already exists as a type and a palette entry — the work is teaching two step projections to break on it, not inventing a mode. B invents a renderer from an example rather than a need; if tabular is genuinely wanted, it should be asked for on its own evidence.
-
-
 ### D58 — A content-block image is an attachment. Whose is it, and who may read it? **Tier: early-testing.**
 
 **Filed 2026-09-25 by `M110`, from reported item 17** (*"a page where they can put image, welcome notes, instructions"*). The plan stores content blocks in `form_fields.config` on a `note` field and carries images by `attachment_id`, never by URL — a remote image would be an IP-logging beacon aimed at every respondent and would break offline. That settles the reference. It does not settle the ownership, and **the ownership is the single hardest unbuilt piece of item 17.**
@@ -1161,17 +1150,6 @@ end state and needs a disclosure-safe refusal designed first, which is a decisio
 - **C — owned by the `form_version`, frozen with its schema.** Most correct for a respondent: what they were shown is what the version says. Most expensive: every publish duplicates every image against a real `UsageMetric::StorageBytes` quota.
 
 **Recommendation: B.** A is refused on the clone-purity argument alone. C is the honest ideal and would be right if images were consent-bearing documents — but a heading illustration is not, and C bills a tenant for every republish. B accepts a real consequence and it is a consequence this repository has already accepted once, in writing, for the same class of content. ⚠️ **Whichever wins, the read route must be publicly readable for a published form and gated on `ScanStatus::servable()`** — an unscanned or infected image renders as its alt text, never as a broken image.
-
-
-### D59 — `ComparisonOperator` is about to gain a human label, and `ConditionRow.vue` already has a different one for the same eight operators. One set or two? **Tier: early-testing.**
-
-**Filed 2026-09-25 by `M110`, from reported item 4** (*"i noticed the operator. if we can show the real meaning not the gt for greater than"*). The validation editor renders operators through `BuilderPresenter::humanize()` (`:254`), which is `ucfirst` over an underscore replacement — so the dropdown literally reads `Gt`, `Lte`, `Neq`. Two tabs away, `ConditionRow.vue:180-210` already ships proper labels (`has at least`, `is blank`, `does not include`) **and** filters them by context. ⚠️ **The two sets cannot simply be merged, because they are not the same sentence.** A rule row reads *"Maximum value · at most · 100"*; a condition reads *"Age is at least 18"*. `at most` is wrong in the second and `is at most` is wrong in the first.
-
-- **A — two sets, each at its own point of truth, pinned by a key-coverage test.** Cheapest, and honest that they are different renderings. Leaves two places to edit when an operator is added, which is the drift shape this repository has measured six times on the client type mirrors.
-- **B — one set in PHP; `ConditionRow` adopts it.** One source. ⚠️ Changes eight strings an author has already learned, and any E2E locator reading them.
-- **C — one enum in PHP with two renderings — `label()` and `sentenceLabel()` — both shipped through `BuilderPresenter::enums()`.** One source of truth, both readings preserved, one extra method.
-
-**Recommendation: C.** It is B's single source with A's two readings, for the cost of one enum method, and it removes the drift surface entirely rather than agreeing to watch it. ⚠️ The symbol belongs with the label, not beside it: `at most (≤)` as one string, so no caller can render the symbol without the words or pair them wrongly.
 
 
 ### D60 — A data link snapshots another form's responses. Does that snapshot ride under the schema checksum, or beside it? **Tier: during-testing.**
@@ -1204,27 +1182,6 @@ end state and needs a disclosure-safe refusal designed first, which is a decisio
 **Recommendation: A.** The whole offline story assumes a submission is accepted and reconciled later — `outbox.ts`, the Dexie draft store and the queue tag on the confirmation screen all exist because a response may be accepted long before anything else happens to it. B contradicts that at the one moment it matters. If refusing a submission is genuinely wanted, the instrument is the validation engine, which already runs in both places and already refuses.
 
 
-### D63 — Form settings become reachable from both a builder modal and a hub tab. Two entry points — acceptable? **Tier: early-testing.**
-
-**Filed 2026-09-25 by `M110`, from reported item 13** (*"the form itself doesn't have a settings section"*). ⚠️ **The obvious fix is the one already refused.** Folding the five settings routes into one was declined in writing, in three separate FormRequest docblocks; and the builder's missing tab strip is a recorded user decision, restated at `types.ts:162-170`. Both records still hold, and `M110` files the row to respect them: every section keeps its own route and its own FormRequest, and what changes is only where an author *finds* them. That leaves one question the records do not answer.
-
-- **A — both.** A Settings tab on the form hub (for administering a form) and a single "Form settings" modal on the builder toolbar (for authoring one), mounting the **same child components**. Nine ungrouped toolbar buttons become one, which is also what frees the room the live preview needs.
-- **B — builder modal only.** One entry point. ⚠️ Hides settings from somebody administering a form they are not editing, which is a different person on a scoped deployment.
-- **C — hub tab only, with a link out of the builder.** One entry point, and the tab strip already exists. ⚠️ Costs an author a navigation away mid-authoring — which is where the complaint started.
-
-**Recommendation: A.** The usual objection to two entry points is drift, and drift is impossible here because both mount the same components against the same routes; there is no second implementation to disagree. ⚠️ `builder-layout.test.ts` pins all three spellings of the eight secondary toolbar actions with a per-line regex — collapsing the toolbar **must update that test in the same PR**, and `templates-axe.spec.ts` requires Publish to keep its slot text.
-
-
-### D64 — Type conversion across incompatible value shapes — a Photo becoming Short text. Refuse, or allow with total loss? **Tier: early-testing.**
-
-**Filed 2026-09-25 by `M110`, from reported item 19** (*"flexibility to change input type without removing all the encoded rules or configs … unless the input is completely different and impossible to transfer"*). The user's own sentence carves out the impossible case; this decides where the line sits. Today no conversion exists at all — the workaround is delete-and-re-add, which cascade-deletes every validation row, mints a new key from `uniqueKey()`, and dangles every `${key}` reference in the version.
-
-- **A — refuse; the target list offers only shape-compatible types** (plus `note` and `hidden`, which are always allowed because "turn this question off" is the move an author actually wants). Geo, Media and Grid convert only within their own shape.
-- **B — allow anything, behind a confirm dialog naming everything that will be lost.** Maximum flexibility, and no published submission is affected either way because published versions are frozen — the loss is authoring-time only, which is what makes B tempting.
-
-**Recommendation: A.** The loss argument does not settle it, because B's real cost is not data. ⛔ **An unfiltered 31-item dropdown IS reported item 4 wearing a different control** — the same complaint that validation rules must not offer `min_length` on a date. Offering "convert this photo to a phone number" is the same defect in the same session, and A is the same remedy. The compatible set is still wide: every choice type converts to every other choice type carrying its options and their translations, and the whole text and number families are lossless within themselves.
-
-
 ### D65 — A preset per-form theme would set more than the six properties `brand-ramp.blade.php` pins as its complete set. Amend the invariant, or confine the preset? **Tier: during-testing.**
 
 **Filed 2026-09-25 by `M110`, from reported item 3** (*"if we can also include a theme selector for the form"*), answered in chat as **preset themes only**, layered over the tenant brand. ⚠️ **That answer collides with a written invariant.** `resources/views/partials/brand-ramp.blade.php` overrides exactly six properties and says so in terms — *"only these SIX properties, never a neutral, semantic or chart token"* — and `GuestBrandingPresenter` is deliberately the **single** reader for the guest style block, the `theme-color` meta and the PWA manifest, on the stated grounds that if any of them derived its own answer they could disagree. A preset that sets a font pairing and a corner radius sets more than six.
@@ -1237,6 +1194,71 @@ end state and needs a disclosure-safe refusal designed first, which is a decisio
 
 
 ## ANSWERED
+### D57 — Reported item 16 asks for three ways to present sections; `forms.single_page_mode` is a boolean that expresses two of them and "tabular" is not expressible at all. What is the model? **A now, C next — ship the two modes the boolean already expresses, then make "per page" real by honouring `page_break`.**
+
+**Answered 2026-09-26 (user decision, in chat), recorded by Lane A during `M114` — A now, C next.**
+
+**Filed 2026-09-25 by `M110`, from a user-directed exploration of the running system.** The request was *"form also must have an option on how to segregate sections. is it a pager but sectioned, is it a tabular layout or a per page setup."* `D35` already answered the adjacent question — add the single-page setting, default step by step — and `M110` files its write path as a row. But `D35` was about a boolean, and this asks for three modes. ⚠️ **Two of the three are not what they sound like.** "Paged but sectioned" is today's `StepView` and is already built. "Per page" is *also* `single_page_mode = false`, but with a break per question — and `visibleSteps` (`useFormRuntime.ts:405-462`) steps by **section only**, while `page_break` sits in `RENDERS_NOTHING` (`engine/field-roles.ts`) and is ignored entirely by both engines. "Tabular" has no renderer on either side.
+
+- **A — keep the boolean, ship the two modes it already expresses, and file "tabular" as a product idea.** Costs one write path (which `D35` already authorised) and nothing else. Leaves "per page" meaning the same thing as "paged but sectioned", which is a naming disappointment rather than a missing capability.
+- **B — replace it with a `presentation` enum (`stepped | single_page | tabular`) and build a tabular renderer.** Matches the request literally. ⚠️ But `visibleSteps` steps by section in **both** engines, and the server's `StepProjection` moves with it — so this is a two-engine parity change, with golden vectors, for a mode nobody has described a use for beyond naming it.
+- **C — keep the boolean and add an orthogonal `page_break_mode`, so "per page" becomes real by finally honouring the `page_break` field type the step projection currently ignores.** Redeems a field type that exists, is in the palette, and today does nothing at all — which is its own latent defect.
+
+**Recommendation: A now, C next.** A is the part `D35` already bought. C is the answer to the half of the request that is genuinely missing, and it is cheaper than B because `page_break` already exists as a type and a palette entry — the work is teaching two step projections to break on it, not inventing a mode. B invents a renderer from an example rather than a need; if tabular is genuinely wanted, it should be asked for on its own evidence.
+
+---
+
+### D59 — `ComparisonOperator` is about to gain a human label, and `ConditionRow.vue` already has a different one for the same eight operators. One set or two? **C — one enum in PHP with two renderings, `label()` and `sentenceLabel()`, both shipped through `BuilderPresenter::enums()`.**
+
+**Answered 2026-09-26 (user decision, in chat), recorded by Lane A during `M114` — C.**
+
+**Filed 2026-09-25 by `M110`, from reported item 4** (*"i noticed the operator. if we can show the real meaning not the gt for greater than"*). The validation editor renders operators through `BuilderPresenter::humanize()` (`:254`), which is `ucfirst` over an underscore replacement — so the dropdown literally reads `Gt`, `Lte`, `Neq`. Two tabs away, `ConditionRow.vue:180-210` already ships proper labels (`has at least`, `is blank`, `does not include`) **and** filters them by context. ⚠️ **The two sets cannot simply be merged, because they are not the same sentence.** A rule row reads *"Maximum value · at most · 100"*; a condition reads *"Age is at least 18"*. `at most` is wrong in the second and `is at most` is wrong in the first.
+
+- **A — two sets, each at its own point of truth, pinned by a key-coverage test.** Cheapest, and honest that they are different renderings. Leaves two places to edit when an operator is added, which is the drift shape this repository has measured six times on the client type mirrors.
+- **B — one set in PHP; `ConditionRow` adopts it.** One source. ⚠️ Changes eight strings an author has already learned, and any E2E locator reading them.
+- **C — one enum in PHP with two renderings — `label()` and `sentenceLabel()` — both shipped through `BuilderPresenter::enums()`.** One source of truth, both readings preserved, one extra method.
+
+**Recommendation: C.** It is B's single source with A's two readings, for the cost of one enum method, and it removes the drift surface entirely rather than agreeing to watch it. ⚠️ The symbol belongs with the label, not beside it: `at most (≤)` as one string, so no caller can render the symbol without the words or pair them wrongly.
+
+---
+
+### D63 — Form settings become reachable from both a builder modal and a hub tab. Two entry points — acceptable? **A — both: a Settings tab on the form hub and a "Form settings" modal on the builder toolbar, mounting the same child components against the same routes.**
+
+**Answered 2026-09-26 (user decision, in chat), recorded by Lane A during `M114` — A.**
+
+**Filed 2026-09-25 by `M110`, from reported item 13** (*"the form itself doesn't have a settings section"*). ⚠️ **The obvious fix is the one already refused.** Folding the five settings routes into one was declined in writing, in three separate FormRequest docblocks; and the builder's missing tab strip is a recorded user decision, restated at `types.ts:162-170`. Both records still hold, and `M110` files the row to respect them: every section keeps its own route and its own FormRequest, and what changes is only where an author *finds* them. That leaves one question the records do not answer.
+
+- **A — both.** A Settings tab on the form hub (for administering a form) and a single "Form settings" modal on the builder toolbar (for authoring one), mounting the **same child components**. Nine ungrouped toolbar buttons become one, which is also what frees the room the live preview needs.
+- **B — builder modal only.** One entry point. ⚠️ Hides settings from somebody administering a form they are not editing, which is a different person on a scoped deployment.
+- **C — hub tab only, with a link out of the builder.** One entry point, and the tab strip already exists. ⚠️ Costs an author a navigation away mid-authoring — which is where the complaint started.
+
+**Recommendation: A.** The usual objection to two entry points is drift, and drift is impossible here because both mount the same components against the same routes; there is no second implementation to disagree. ⚠️ `builder-layout.test.ts` pins all three spellings of the eight secondary toolbar actions with a per-line regex — collapsing the toolbar **must update that test in the same PR**, and `templates-axe.spec.ts` requires Publish to keep its slot text.
+
+---
+
+### D64 — Type conversion across incompatible value shapes — a Photo becoming Short text. Refuse, or allow with total loss? **A — refuse; the target list offers only shape-compatible types, plus `note` and `hidden`, which are always allowed.**
+
+**Answered 2026-09-26 (user decision, in chat), recorded by Lane A during `M114` — A.**
+
+**Filed 2026-09-25 by `M110`, from reported item 19** (*"flexibility to change input type without removing all the encoded rules or configs … unless the input is completely different and impossible to transfer"*). The user's own sentence carves out the impossible case; this decides where the line sits. Today no conversion exists at all — the workaround is delete-and-re-add, which cascade-deletes every validation row, mints a new key from `uniqueKey()`, and dangles every `${key}` reference in the version.
+
+- **A — refuse; the target list offers only shape-compatible types** (plus `note` and `hidden`, which are always allowed because "turn this question off" is the move an author actually wants). Geo, Media and Grid convert only within their own shape.
+- **B — allow anything, behind a confirm dialog naming everything that will be lost.** Maximum flexibility, and no published submission is affected either way because published versions are frozen — the loss is authoring-time only, which is what makes B tempting.
+
+**Recommendation: A.** The loss argument does not settle it, because B's real cost is not data. ⛔ **An unfiltered 31-item dropdown IS reported item 4 wearing a different control** — the same complaint that validation rules must not offer `min_length` on a date. Offering "convert this photo to a phone number" is the same defect in the same session, and A is the same remedy. The compatible set is still wide: every choice type converts to every other choice type carrying its options and their translations, and the whole text and number families are lossless within themselves.
+
+---
+
+### D66 — The generated line offers open decisions and decision-blocked rows as work to take, and the raw counts read as a demand to decide all of them at once. When is a filed decision put to the user? **Narrow — only when the tier being worked holds a work row blocked on it.**
+
+**Filed and answered 2026-09-26 (user decision, in chat), recorded by Lane A during `M114`.** Shown the generated line, the user read its `blocked` and `waiting on you` counts as *decide all of this right now* and said *"for future tasks, you will just ask me for decisions when it is already needed."* ⚠️ **That reading was reasonable, and the line is what made it so:** it uses the same two words for a question nobody has ever seen and for a row whose precondition merely does not hold. Measured against this tree, of **132** blocked rows **61** are latent preconditions, **18** are not-live, **37** are decisions and **16** are rows awaiting one — and only **four** of those sixteen sat in the tier being worked.
+
+⛔ **The trigger is a WORK row, not the decision row.** Both readings were put to the user and the narrow one was chosen. `D58` is the case that separates them: it is itself tiered `early-testing`, but the only row awaiting it (`R-f0c5b682`) is `during-testing` — so under this answer `D58` is **not** put to the user now, and `M114` records that as the rule first application rather than leaving it to be re-derived.
+
+**The imperative half is in `CLAUDE.md`,** under *Taking a row*: file a decision silently with its options and a recommendation, and put it to the user only when the worked tier holds a row blocked on it — never read the whole board at them. **The generator half is `R-98b2d568`** (*"The Next section and the hand-off list open decisions as work to take"*), which this decision **retiers `during-testing` to `early-testing`**, with the reason recorded at the row. ⚠️ `M98` had argued `during-testing` for its sibling because *"no tester sees any of this"* — true, and beside the point: the noise falls on the user directly, which is what this instruction is about.
+
+---
+
 ### D15 — `D13`'s one-hub-row cap is now the binding constraint on batch composition, and it is stricter than its own purpose. **ANSWERED — option 4: the cap reads the files a row REMEDY EDITS, excluding the close-out artefacts.** **Tier: early-testing.**
 
 **Filed 2026-09-05 by Lane A, during `M72`, at the moment the cap decided a batch that value had not.**

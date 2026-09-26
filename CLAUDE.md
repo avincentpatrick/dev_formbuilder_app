@@ -117,6 +117,11 @@ file, never copy out of it. `state.php` reports how far behind the trunk that fi
 - Decisions live in `docs/claims/decisions.md`. When something is genuinely the user's call, **append
   the question, two or three real options and your recommendation, then take the next row in the same
   turn.** Never idle on a question, and never re-ask an open one.
+- ⛔ **File a decision silently; put it to the user only when the tier being worked holds a row whose
+  remaining work is blocked on it.** Ask for those by name, with their options, and **never read the board
+  at them.** The trigger is a *work* row — not the decision row, and not the decision own tier. The line
+  spends the same two words on a question nobody has ever seen and on a row whose precondition merely does
+  not hold, so a raw count of them reads as *decide all of this now*.
 - **A held row is unscheduled, not invisible.** It sits in the line, in its position, with its blocker
   named. Do not start one, do not offer it as the next step, and do not re-derive its blocker for the
   user — it becomes work only on their explicit signal. **Progress is counted over the whole pipeline,

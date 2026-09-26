@@ -9924,7 +9924,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `scripts/next.php`'s "Take work from the Next section" sentence names the open decisions beside the rows,
   and `scripts/loop.php status` prints the same list. A decision is the user's to move, not work an
   increment can take. ⚠️ Carry each bullet's class through, or stop reading at the decisions. **Live.**
-  Filed by `M96`. **Tier: during-testing.**  ⚠️ **Corrected by `M98` (2026-09-18), which verified the row without taking it:** the row is under-scoped, one of its cautions is unnecessary, and the fix is on the reading side rather than the writing side. The hand-off does not merely offer the open decisions as work — it offers the eight BLOCKED rows in the same breath, each blocked on a decision nobody can start, so the row's second option, stopping at the decisions, would still put unstartable rows under "Take work from". And the class is not missing from the document: `docs/pipeline.md` already prints `· ready`, `· blocked (decision: Dnn)` and `· waiting on you` on every Next bullet, and `scripts/state.php` discards that suffix when it reads them. So the fix is to make the READER carry each bullet's class through — ready, blocked or waiting — with only the ready ids named as work and the blocked rows and the decisions listed separately, rather than cutting the list at one boundary. The caution about keeping the ids that feed the waiting sentence can go: `scripts/state.php` reads those from the testing gate's "Waiting on you:" line, not from the Next bullets, so reclassifying the bullets cannot disturb them.
+  Filed by `M96`. **Tier: early-testing.**  ⚠️ **Corrected by `M98` (2026-09-18), which verified the row without taking it:** the row is under-scoped, one of its cautions is unnecessary, and the fix is on the reading side rather than the writing side. The hand-off does not merely offer the open decisions as work — it offers the eight BLOCKED rows in the same breath, each blocked on a decision nobody can start, so the row's second option, stopping at the decisions, would still put unstartable rows under "Take work from". And the class is not missing from the document: `docs/pipeline.md` already prints `· ready`, `· blocked (decision: Dnn)` and `· waiting on you` on every Next bullet, and `scripts/state.php` discards that suffix when it reads them. So the fix is to make the READER carry each bullet's class through — ready, blocked or waiting — with only the ready ids named as work and the blocked rows and the decisions listed separately, rather than cutting the list at one boundary. The caution about keeping the ids that feed the waiting sentence can go: `scripts/state.php` reads those from the testing gate's "Waiting on you:" line, not from the Next bullets, so reclassifying the bullets cannot disturb them.  ⛔ **RETIERED `during-testing` → `early-testing` BY `D66` (2026-09-26, `M114`), AND THE REASON IS THE ANSWER ITSELF.** `M98` argued `during-testing` for the sibling row on the ground that *"no tester sees any of this"*. True, and beside the point: the audience for this defect is the USER, not a tester. Shown the generated line, they read its `blocked` and `waiting on you` counts as a demand to decide everything at once — because the line spends the same two words on a question nobody has seen and on a precondition that merely does not hold. `D66` fixes the asking rule in `CLAUDE.md`; this row is the generator half, and it is now in the tier being worked.
 - **`minor` · The central-host redirect is an absolute `APP_URL`, which a request from another origin cannot
   follow.** Found by `M96` (2026-09-15) while verifying the central landing row. `bootstrap/app.php` renders
   `NotASubdomainException` as a redirect to `config('app.url')`. When a request's own origin is not `APP_URL`
@@ -11292,7 +11292,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `PageView.vue:144` and `StepView.vue:203` do, so a bad email is rejected for a staff keyer and accepted from a
   respondent on the same form. Adding `novalidate` aligns them and removes the only enforcement that exists —
   which is safe only once the per-type `pattern` defaults land beside it. **Live.** Filed by `M110`.
-  **Tier: early-testing.** **Awaits D59.**
+  **Tier: early-testing.** ✅ **`D59` ANSWERED 2026-09-26 (`M114`) — C: ONE `ComparisonOperator` ENUM IN PHP WITH TWO RENDERINGS.** `label()` renders a rule row (*"Maximum value · at most · 100"*) and `sentenceLabel()` renders a condition (*"Age is at least 18"*), both shipped through `BuilderPresenter::enums()`; `ConditionRow.vue` stops owning its own set. ⚠️ **The symbol belongs WITH the label as one string** — `at most (≤)` — so no caller can render the symbol without the words or pair them wrongly. The unfiltered-rules half of this row is unaffected by the answer and is still open work.
 
 - **`minor` · Choosing "Conditional" requiredness gives the author no next step, and the editor it looks like it
   should open writes the wrong thing.** Filed 2026-09-25 by `M110`, from the report *"can we make that a radio
@@ -11338,7 +11338,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   pass. The compatibility model belongs in PHP as enum metadata, and the endpoint must be separate from the
   autosave PATCH — `configRules()` dispatches on the route model's *current* type, so a type-changing PATCH would
   validate against the old type's rules. **Live.** Filed by `M110`. **Tier: early-testing.**
-  **Awaits D64.**
+  ✅ **`D64` ANSWERED 2026-09-26 (`M114`) — A: THE TARGET LIST OFFERS ONLY SHAPE-COMPATIBLE TYPES**, plus `note` and `hidden`, which are always allowed because "turn this question off" is the move an author actually wants. Geo, Media and Grid convert only within their own shape; every choice type converts to every other choice type carrying its options and their translations; the text and number families are lossless within themselves. ⛔ **The reasoning that decided it, preserved:** an unfiltered 31-item dropdown **is reported item 4 wearing a different control** — the same complaint that a date must not be offered `min_length`. The data-loss argument did NOT settle it, because published versions are frozen and the loss would be authoring-time only.
 
 - **`minor` · The builder palette offers short and long text as two entries and whole and decimal numbers as two
   more, and the distinction is a setting rather than a kind.** Filed 2026-09-25 by `M110`, from the report
@@ -11388,7 +11388,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   invariant lives only in prose today** and should become an assertion in this increment, before every later
   builder change depends on it. **Live.** Filed by `M110`. **Tier: early-testing.**
 
-- **`minor` · `forms.single_page_mode` drives real, tested runtime behaviour in both renderers and has no write
+- ✅ **CLOSED BY `M114` (2026-09-26) — `minor` · `forms.single_page_mode` drives real, tested runtime behaviour in both renderers and has no write
   path anywhere outside the seeders.** Filed 2026-09-25 by `M110`, from the report asking for a section strip under
   the preview and a choice of how sections are presented. The column exists (migration
   `..._000201_create_forms_table.php:46`), is read by `PublicFormPresenter.php:38-39` and
@@ -11400,7 +11400,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   (`1. Consent`) so that a section named "Form" or "Logic" cannot collide by exact text with the existing
   `showBuilderPane()` and centre-control locators. A segmented control does not survive twenty sections, so the
   degradation threshold wants to be a named constant with a test rather than a CSS guess. **Live.**
-  Filed by `M110`. **Tier: early-testing.** **Awaits D57.**
+  Filed by `M110`. **Tier: early-testing.** ✅ **`D57` ANSWERED 2026-09-26 (`M114`) — A NOW, C NEXT.** Ship the two modes the boolean already expresses — the write path `D35` authorised — and file "tabular" as a product idea to be asked for on its own evidence. ⛔ **CLOSED HERE AS A PROVEN STRICT SUBSET OF `R-f1332829` FOR ITS WRITE-PATH HALF, AND THE SUBSET IS ONLY A HALF — WHICH IS WHY THE REMAINDER IS RE-FILED RATHER THAN DISCARDED.** `R-f1332829` (`docs/feature-backlog.md:7428`, `early-testing`, ready, filed by `M80` from `M79`'s 2026-09-06 sweeps) states the same defect — no writer outside the seeders — **nineteen days earlier**, names the same declaration and read sites, already carries `D35`'s answer, and additionally owns a four-documents-disagree half this row never mentions. `M110` did not see it. ⚠️ **The section-strip half is NOT in `R-f1332829` and is re-filed by `M114` as its own `early-testing` row.** ⚠️ **And `D57`'s option C is filed too**: `page_break` is not inert, so "per page" is a three-way disagreement rather than a missing feature — see the row `M114` filed for it.
 
 - **`minor` · Form-level settings are spread across five modals, a toolbar checkbox and two form-list dialogs, with
   no settings surface anywhere.** Filed 2026-09-25 by `M110`, from the report *"the form itself doesn't have a
@@ -11416,7 +11416,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   is safe:** `MdsTabNav` renders a `nav` wrapping a `ul role="list"` with plain anchors, and `TabNav.test.ts:53-64`
   asserts it carries no tab role at all. ⚠️ `builder-layout.test.ts` pins all three spellings of the eight
   secondary toolbar actions with a per-line regex and **must be updated in the same PR**. **Live.**
-  Filed by `M110`. **Tier: early-testing.** **Awaits D63.**
+  Filed by `M110`. **Tier: early-testing.** ✅ **`D63` ANSWERED 2026-09-26 (`M114`) — A: BOTH ENTRY POINTS.** A Settings tab on the form hub for administering a form, and one "Form settings" modal on the builder toolbar for authoring it, both mounting the **same child components against the same routes** — so there is no second implementation to drift. ⚠️ **Every section keeps its own route and its own FormRequest**, as the three docblocks refuse; only where an author finds them changes. ⚠️ Collapsing the nine toolbar buttons is what frees the room the live preview and the section strip both need, so this row edits the same region of `Builder.vue` as the section-strip row filed by `M114` and the two must not be batched together under `D13`.
 
 - **`minor` · The "Appearance hint" field is a free-text box in the builder that changes nothing about how any
   form renders.** Filed 2026-09-25 by `M110`, answering the report *"can you also clarify to me what the
@@ -11794,3 +11794,37 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   constant the existing gate then covers for free, or to record at each site why a local literal is correct.
   **Latent** — every one of them agrees with PHP today, and nothing loses data; it bites the first person who
   adds a field type and updates ten places out of twenty-eight. Filed by `M113`. **Tier: during-testing.**
+
+- **`minor` · The builder has no section strip, so an author cannot see or reach a form's sections while
+  authoring it.** Filed 2026-09-26 by `M114`, on recording `D57` — this is the half of `R-2bda7386` that
+  `R-f1332829` does not cover, and that row was closed as a proven strict subset for its write-path half only.
+  The request was for *"a section strip under the preview"*, beside the choice of how sections are presented.
+  ⚠️ **It must be a radiogroup, not a tablist**, and its labels must be index-prefixed (`1. Consent`) so that a
+  section named "Form" or "Logic" cannot collide by exact text with the existing `showBuilderPane()` and
+  centre-control locators. ⚠️ **A segmented control does not survive twenty sections**, so the degradation
+  threshold wants to be a named constant with a test rather than a CSS guess. ⛔ **The room it needs is the room
+  `D63` frees:** collapsing the nine ungrouped toolbar buttons into one "Form settings" modal is what makes space
+  for this strip and for the live preview, so this row and `R-4e96a994` edit the same region of `Builder.vue` and
+  **must not be batched together** under `D13`. **Live.** Filed by `M114`. **Tier: early-testing.**
+
+- **`minor` · `page_break` is a hard page break on paper and an ODK group boundary on export, but is deleted
+  outright on screen — one field type meaning three different things.** Filed 2026-09-26 by `M114`, as the "C
+  next" half of `D57`, which the user accepted as separate queued work. ⛔ **`D57`'s own option C says the type
+  *"today does nothing at all"* AND THAT IS FALSE** — measured before this row was written. It is already
+  load-bearing in two renderers: `app/Enums/PrintAnswerArea.php:172` maps it to `PrintAnswerArea::PageBreak`,
+  `resources/views/pdf/blank-form.blade.php:83` emits the div and `resources/views/pdf/_blank-form-styles.blade.php:127`
+  gives it `page-break-before: always`; `XlsformExporter::emitPageBreak()` (`:174-178`) writes a `begin group` /
+  `end group` pair that IS a page in ODK Collect, round-tripped at `XlsformTypeMap.php:114`. **So the defect is that
+  screen and paper disagree, not that nothing happens** — which makes this a reconciliation rather than a feature.
+  ⛔ **On screen it is DELETED, not ignored:** `RENDERS_NOTHING` (`resources/public-runtime/engine/field-roles.ts:33`)
+  strips it at `useFormRuntime.ts:409` and `:434`, after which a section holding only page breaks fails the
+  emptiness check at `:438` and **disappears entirely** — strictly less than inert. ⚠️ **There are FOUR section
+  walks, not the two `D57` names.** `visibleSteps` (`resources/public-runtime/composables/useFormRuntime.ts:405-462`)
+  and `StepProjection::of()` (`app/Support/Forms/StepProjection.php:105-168`) are the twins, pinned against each
+  other by `tests/fixtures/step-projection.json`; `SubmissionPdfPresenter::answerBlocks()` (`:152-245`) and
+  `BlankFormPrintPresenter::blocks()` (`:150-180`) are independent and deliberately un-refactored, the first named
+  as such by `StepProjection`'s own docblock at `:43-46`. ⛔ **Two shape contracts constrain any remedy:**
+  `RENDERS_NOTHING`'s literal is regex-parsed out of the TypeScript source by `tests/Unit/Forms/PdfFieldRoleTest.php:73`,
+  so a rename or a reshape reddens a PHP test; and `app/Enums/PrintAnswerArea.php:15-23` enumerates four
+  deliberately-disagreeing type sets, each pinned by `tests/Unit/Forms/PrintAnswerAreaTest.php`, so moving
+  `page_break` between them is a decision about all four. **Live.** Filed by `M114`. **Tier: early-testing.**

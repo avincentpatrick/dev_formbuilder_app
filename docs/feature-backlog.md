@@ -11719,10 +11719,78 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   copy of them, which is the property any gate here must keep. A Vitest case importing the exported JSON, or a
   golden-vector entry, would both work. **Live.** Filed by `M112`. **Tier: early-testing.**
 
-- **`minor` · Ordered comparison of dates and times is refused rather than supported, so `end_date > start_date` is a rule an author cannot express at all.** Found by `M113` (2026-09-26) while closing `R-2605e503`, which offered two remedies and got the cheaper one. That row's defect — the rule publishing and then failing CLOSED — is fixed by refusing it at publish, so no form is unanswerable any more; what is NOT fixed is that the most natural temporal rule in any survey remains unavailable. ⛔ **`ValueShape.php:46` ALREADY CLAIMS THIS IS FILED AND UNTIL NOW IT WAS NOT** — the docblock says *"Ordering temporal values is real work and is filed as its own row"*, and the only row was `R-2605e503` itself, which is now closed. This is that row. ⚠️ **The remedy must not widen `Coercion`:** `Coercion.php:8-16` declares itself *"the normative contract the TypeScript client mirror must reproduce byte-for-byte"*, and `NUMERIC_RE` plus `toNumber()` are pinned on both sides by `tests/golden/expressions/coercion.json` and `comparison.json`. The safe shape is a SEPARATE temporal-ordering path keyed off `ValueShape::Temporal`, reached only from `ExpressionEvaluator::numericCompare()` and `StructuredRuleEvaluator`'s `MinValue`/`MaxValue` arms, landing in **both** engines in one commit — a fix in one engine alone converts a correctness defect into a parity defect, which is strictly worse. ✅ **The machinery it needs already exists and is already dual-engine:** `tests/golden/validation/` and `tests/golden/expressions/` are read off disk by both a Pest runner and a Vitest runner, so this costs new VECTORS and a `manifest.json` count bump rather than new harness. ⚠️ **Three sub-questions to settle before writing a line, none of them answered here:** timezone handling, `time` versus `date` versus `datetime` comparability, and partial values. ⚠️ **And two things flip when it lands:** `ValueShape::allows()`/`allowsOperator()` must admit `Temporal`, `ExpressionValidationGate.php:189-191`'s `non_numeric_threshold` arm must stop refusing a date-shaped threshold on a temporal field, and `ValueShapeTest`'s case titled *"refuses min_value and greater_than_field on a temporal shape, because both fail CLOSED"* INVERTS. **Live.** Filed by `M113`. **Tier: during-testing.**
+- **`minor` · Ordered comparison of dates and times is refused rather than supported, so `end_date >
+  start_date` is a rule an author cannot express at all.** Found by `M113` (2026-09-26) while closing
+  `R-2605e503`, which offered two remedies and got the cheaper one. That row's defect — the rule publishing
+  and then failing CLOSED — is fixed by refusing it at publish, so no form is unanswerable any more; what is
+  NOT fixed is that the most natural temporal rule in any survey remains unavailable. ⛔ **`ValueShape.php:46`
+  ALREADY CLAIMS THIS IS FILED AND UNTIL NOW IT WAS NOT** — the docblock says *"Ordering temporal values is
+  real work and is filed as its own row"*, and the only row was `R-2605e503` itself, which is now closed. This
+  is that row. ⚠️ **The remedy must not widen `Coercion`:** `Coercion.php:8-16` declares itself *"the
+  normative contract the TypeScript client mirror must reproduce byte-for-byte"*, and `NUMERIC_RE` plus
+  `toNumber()` are pinned on both sides by `tests/golden/expressions/coercion.json` and `comparison.json`. The
+  safe shape is a SEPARATE temporal-ordering path keyed off `ValueShape::Temporal`, reached only from
+  `ExpressionEvaluator::numericCompare()` and `StructuredRuleEvaluator`'s `MinValue`/`MaxValue` arms, landing
+  in **both** engines in one commit — a fix in one engine alone converts a correctness defect into a parity
+  defect, which is strictly worse. ✅ **The machinery it needs already exists and is already dual-engine:**
+  `tests/golden/validation/` and `tests/golden/expressions/` are read off disk by both a Pest runner and a
+  Vitest runner, so this costs new VECTORS and a `manifest.json` count bump rather than new harness. ⚠️
+  **Three sub-questions to settle before writing a line, none of them answered here:** timezone handling,
+  `time` versus `date` versus `datetime` comparability, and partial values. ⚠️ **And two things flip when it
+  lands:** `ValueShape::allows()`/`allowsOperator()` must admit `Temporal`,
+  `ExpressionValidationGate.php:189-191`'s `non_numeric_threshold` arm must stop refusing a date-shaped
+  threshold on a temporal field, and `ValueShapeTest`'s case titled *"refuses min_value and greater_than_field
+  on a temporal shape, because both fail CLOSED"* INVERTS. **Live.** Filed by `M113`.
+  **Tier: during-testing.**
 
-- **`minor` · The per-field 422 error map is built on every builder save failure and still has no consumer, so a rejected field edit reports one sentence with nothing marked.** Found by `M113` (2026-09-26) while closing `R-9a0e3fd8`, which named this as a second surface and was scoped to the publish path instead. `builderClient.ts:61-72` parses a 422 body into an `errors` map and carries it on `BuilderRequestError` as `public readonly errors: Record<string, string[]> = {}` (`:32`). ⛔ **A grep of all of `resources/js` finds every consumer reading `.message` or only the `instanceof`** — `useBuilderStore.ts:198`, `useGraphNotices.ts:74`, `scopesClient.ts:22`, `integrationsClient.ts:31,62,85,108` — and **the only read of `.errors` anywhere is its own test at `builderClient.test.ts:74`**. ✅ **The map needs a READER, not a rewrite:** it is already correct, already typed and already on the error object, so this is a consumption row and touches no producer. ⚠️ **It wants the field marked inline, not another banner.** `M113` gave the page a publish-refusal banner; a save failure is a different event with a different owner — it belongs on the offending row in the config panel, beside the existing `saveError` alert at `ConfigPanel.vue:260`, which is the one surface the store's verdict already drives. ⚠️ **Widening `save.error` from `string|null` is the likely first step** (`useBuilderStore.ts:197-198` keeps only `.message`), and `ConfigPanel.test.ts:110-124`'s hand-rolled store double must gain any new member or the mount throws. **Live.** Filed by `M113`. **Tier: early-testing.**
+- **`minor` · The per-field 422 error map is built on every builder save failure and still has no consumer, so
+  a rejected field edit reports one sentence with nothing marked.** Found by `M113` (2026-09-26) while closing
+  `R-9a0e3fd8`, which named this as a second surface and was scoped to the publish path instead.
+  `builderClient.ts:61-72` parses a 422 body into an `errors` map and carries it on `BuilderRequestError` as
+  `public readonly errors: Record<string, string[]> = {}` (`:32`). ⛔ **A grep of all of `resources/js` finds
+  every consumer reading `.message` or only the `instanceof`** — `useBuilderStore.ts:198`,
+  `useGraphNotices.ts:74`, `scopesClient.ts:22`, `integrationsClient.ts:31,62,85,108` — and **the only read of
+  `.errors` anywhere is its own test at `builderClient.test.ts:74`**. ✅ **The map needs a READER, not a
+  rewrite:** it is already correct, already typed and already on the error object, so this is a consumption
+  row and touches no producer. ⚠️ **It wants the field marked inline, not another banner.** `M113` gave the
+  page a publish-refusal banner; a save failure is a different event with a different owner — it belongs on
+  the offending row in the config panel, beside the existing `saveError` alert at `ConfigPanel.vue:260`, which
+  is the one surface the store's verdict already drives. ⚠️ **Widening `save.error` from `string|null` is the
+  likely first step** (`useBuilderStore.ts:197-198` keeps only `.message`), and
+  `ConfigPanel.test.ts:110-124`'s hand-rolled store double must gain any new member or the mount throws.
+  **Live.** Filed by `M113`. **Tier: early-testing.**
 
-- **`minor` · The builder and PHP disagree about whether a duration field takes an ordered comparison, and the disagreement is now pinned rather than resolved.** Found by `M113` (2026-09-26) while building the client field-type mirror census. `ConfigPanel.vue:178`'s `NUMERIC_TYPES` is `['integer', 'decimal', 'calculated', 'likert_scale']` — four members. `ValueShape::allowsOperator()` (`ValueShape.php:205-223`) permits `gt`/`lt`/`gte`/`lte` for `Number`, `Duration` and `Scale`, which is **five** types: the same four plus `duration`. ⛔ **`R-09f73330` SAYS THIS SET "MIRRORS NOTHING", AND THAT STOPPED BEING TRUE IN THE INCREMENT THAT FILED IT** — `M112` shipped `allowsOperator()` the same day, so there is now a PHP predicate answering the identical question, and the client is the one that is wrong. ✅ **`tests/Unit/Forms/FieldTypeMirrorDriftTest.php` pins the divergence with its membership stated**, so it cannot widen silently and the day someone reconciles it the gate says exactly what changed. ⚠️ **Consequence is bounded today, which is why it was pinned rather than fixed inside a census increment:** `numeric` is read at `ConditionRow.vue:237` only to decide whether a newly-entered fixed value is emitted as a number literal, not to filter which operators are offered. ⚠️ **Verify that before changing it** — whether a duration field's condition value is currently emitted as a string literal into a comparison the engine coerces anyway was NOT measured, and it decides whether this is cosmetic or live. **Live.** Filed by `M113`. **Tier: during-testing.**
+- **`minor` · The builder and PHP disagree about whether a duration field takes an ordered comparison, and the
+  disagreement is now pinned rather than resolved.** Found by `M113` (2026-09-26) while building the client
+  field-type mirror census. `ConfigPanel.vue:178`'s `NUMERIC_TYPES` is `['integer', 'decimal', 'calculated',
+  'likert_scale']` — four members. `ValueShape::allowsOperator()` (`ValueShape.php:205-223`) permits
+  `gt`/`lt`/`gte`/`lte` for `Number`, `Duration` and `Scale`, which is **five** types: the same four plus
+  `duration`. ⛔ **`R-09f73330` SAYS THIS SET "MIRRORS NOTHING", AND THAT STOPPED BEING TRUE IN THE INCREMENT
+  THAT FILED IT** — `M112` shipped `allowsOperator()` the same day, so there is now a PHP predicate answering
+  the identical question, and the client is the one that is wrong. ✅
+  **`tests/Unit/Forms/FieldTypeMirrorDriftTest.php` pins the divergence with its membership stated**, so it
+  cannot widen silently and the day someone reconciles it the gate says exactly what changed. ⚠️ **Consequence
+  is bounded today, which is why it was pinned rather than fixed inside a census increment:** `numeric` is
+  read at `ConditionRow.vue:237` only to decide whether a newly-entered fixed value is emitted as a number
+  literal, not to filter which operators are offered. ⚠️ **Verify that before changing it** — whether a
+  duration field's condition value is currently emitted as a string literal into a comparison the engine
+  coerces anyway was NOT measured, and it decides whether this is cosmetic or live. **Live.** Filed by `M113`.
+  **Tier: during-testing.**
 
-- **`minor` · The field-type census guards the ten NAMED declarations and roughly seventeen inline disjunctions of the same catalogue remain ungated.** Found by `M113` (2026-09-26) by enumerating every field-type literal in `resources/` while building the census, rather than by trusting either filing row's count. Beyond the ten declarations `R-09f73330` names and the already-gated `RENDERS_NOTHING`, the same type strings appear as bare inline disjunctions at `schema-mapping.ts:91,94,115,118,377,400,424,553`, `FieldInput.vue:239,240,247,248`, `semantic-validator.ts:468,474,480,646,793,821`, `MediaEditor.vue:37`, `GeoInput.vue:38-43` and `ConfigPanel.vue:113`. ⛔ **Two of them are ADDITIONAL COPIES of sets the census already guards** — `schema-mapping.ts:424` is a fourth four-member media disjunction, and `:115` and `:400` are a second and third geo triple — so the census's own equality assertions can be green while a sibling literal three lines away disagrees. ⚠️ **Neither `R-09f73330` nor `R-c5858976` counts these**, which is why their totals differ from each other and from the tree: ten by declaration, six by file, twenty-eight or so by literal. ⚠️ **A regex census is the wrong instrument here and saying so is the point** — an inline disjunction has no name to anchor on, and anchoring on surrounding code is exactly the un-anchoring `DraftProjectionMirrorDriftTest.php:64-65` warns about. The honest remedies are to give each one a named constant the existing gate then covers for free, or to record at each site why a local literal is correct. **Latent** — every one of them agrees with PHP today, and nothing loses data; it bites the first person who adds a field type and updates ten places out of twenty-eight. Filed by `M113`. **Tier: during-testing.**
+- **`minor` · The field-type census guards the ten NAMED declarations and roughly seventeen inline
+  disjunctions of the same catalogue remain ungated.** Found by `M113` (2026-09-26) by enumerating every
+  field-type literal in `resources/` while building the census, rather than by trusting either filing row's
+  count. Beyond the ten declarations `R-09f73330` names and the already-gated `RENDERS_NOTHING`, the same type
+  strings appear as bare inline disjunctions at `schema-mapping.ts:91,94,115,118,377,400,424,553`,
+  `FieldInput.vue:239,240,247,248`, `semantic-validator.ts:468,474,480,646,793,821`, `MediaEditor.vue:37`,
+  `GeoInput.vue:38-43` and `ConfigPanel.vue:113`. ⛔ **Two of them are ADDITIONAL COPIES of sets the census
+  already guards** — `schema-mapping.ts:424` is a fourth four-member media disjunction, and `:115` and `:400`
+  are a second and third geo triple — so the census's own equality assertions can be green while a sibling
+  literal three lines away disagrees. ⚠️ **Neither `R-09f73330` nor `R-c5858976` counts these**, which is why
+  their totals differ from each other and from the tree: ten by declaration, six by file, twenty-eight or so
+  by literal. ⚠️ **A regex census is the wrong instrument here and saying so is the point** — an inline
+  disjunction has no name to anchor on, and anchoring on surrounding code is exactly the un-anchoring
+  `DraftProjectionMirrorDriftTest.php:64-65` warns about. The honest remedies are to give each one a named
+  constant the existing gate then covers for free, or to record at each site why a local literal is correct.
+  **Latent** — every one of them agrees with PHP today, and nothing loses data; it bites the first person who
+  adds a field type and updates ten places out of twenty-eight. Filed by `M113`. **Tier: during-testing.**

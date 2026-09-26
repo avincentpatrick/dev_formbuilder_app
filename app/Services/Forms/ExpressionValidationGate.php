@@ -73,26 +73,67 @@ final class ExpressionValidationGate
             $knownKeys[$section->key] = true;
         }
 
+        // M113: every check below is CAPTURED rather than allowed to propagate, so one refusal names every
+        // broken expression in the draft instead of only the first one the walk happened to meet.
+        //
+        // ⛔ THE THREE GATES ARE STILL SEQUENTIAL AND `PublishService` IS NOT EDITED. Collecting happens
+        // INSIDE each gate, so `assertExpressionsResolve()` still throws once and the next gate in the
+        // sequence is still unreachable when it does. That ordering is load-bearing for the TEMPLATE gate,
+        // which joins a field to its section and would resolve a foreign-version miss to a real-looking
+        // position — this gate never makes that join, but hoisting all three into one collector would.
+        /** @var list<PublishValidationException> $violations */
+        $violations = [];
+
         foreach ($fields as $field) {
-            $this->check($field->relevant_expression, $knownKeys, $objectValuedKeys, ExpressionKind::Relevant, $field->key);
-            $this->check($this->calculateFormula($field), $knownKeys, $objectValuedKeys, ExpressionKind::Calculate, $field->key);
+            $violations[] = $this->capture(fn () => $this->check($field->relevant_expression, $knownKeys, $objectValuedKeys, ExpressionKind::Relevant, $field->key));
+            $violations[] = $this->capture(fn () => $this->check($this->calculateFormula($field), $knownKeys, $objectValuedKeys, ExpressionKind::Calculate, $field->key));
         }
 
         foreach ($sections as $section) {
-            $this->check($section->relevant_expression, $knownKeys, $objectValuedKeys, ExpressionKind::Relevant, $section->key);
+            $violations[] = $this->capture(fn () => $this->check($section->relevant_expression, $knownKeys, $objectValuedKeys, ExpressionKind::Relevant, $section->key));
         }
 
         foreach ($validations as $validation) {
             $ownerKey = $fieldKeyById[$validation->form_field_id] ?? '(unknown)';
 
             if ($validation->expression !== null) {
-                $this->check($validation->expression, $knownKeys, $objectValuedKeys, ExpressionKind::Constraint, $ownerKey);
+                $violations[] = $this->capture(fn () => $this->check($validation->expression, $knownKeys, $objectValuedKeys, ExpressionKind::Constraint, $ownerKey));
 
                 continue;
             }
 
-            $this->assertRuleValue($validation->rule_type, (string) ($validation->rule_value ?? ''), $ownerKey);
+            $violations[] = $this->capture(fn () => $this->assertRuleValue($validation->rule_type, (string) ($validation->rule_value ?? ''), $ownerKey));
         }
+
+        $violations = array_values(array_filter($violations));
+
+        if ($violations !== []) {
+            throw PublishValidationException::several($violations);
+        }
+    }
+
+    /**
+     * Run one check, returning its refusal instead of letting it propagate.
+     *
+     * ⚠️ `null` MEANS THE CHECK PASSED, and the caller filters those out at the end rather than branching
+     * here — so a helper that grows a second throw site needs no change at the call site. Only
+     * {@see PublishValidationException} is caught: anything else is a fault in the gate itself and must
+     * still reach the caller, because a gate that swallows its own bugs reports `passed` while blind.
+     *
+     * Copied deliberately from {@see StructuralValidationGate::capture()} rather than shared — the two
+     * gates are independent and a common base class would couple their walks.
+     *
+     * @param  callable(): void  $check
+     */
+    private function capture(callable $check): ?PublishValidationException
+    {
+        try {
+            $check();
+        } catch (PublishValidationException $violation) {
+            return $violation;
+        }
+
+        return null;
     }
 
     /**

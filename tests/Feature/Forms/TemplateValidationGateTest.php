@@ -285,3 +285,90 @@ it('leaves the version a draft with no snapshot when a template is refused', fun
         ->and($draft->schema_snapshot)->toBe([])
         ->and($form->refresh()->current_published_version_id)->toBeNull();
 });
+
+/*
+|--------------------------------------------------------------------------
+| M113 — the template gate collects every violation instead of stopping at the first.
+|
+| ⛔ THE LOSS WAS THREE-DEEP, NOT ONE-DEEP. `checkAll()` walked `collectAll()`'s findings and threw on
+| the FIRST entry, and it is called six-plus times per publish. So one refusal discarded (a) the later
+| COLUMNS of the same owner, (b) the later LOCALE variants of the same column, and (c) every later
+| field and section. An author fixing one hole learned about the next one on the next attempt.
+|
+| ⚠️ THE THREE GATES ARE STILL RUN IN SEQUENCE AND THAT IS DELIBERATE. `PublishService` calls
+| structural → expression → template, and this gate runs over a draft the structural one has already
+| accepted. `TemplateValidationGate` joins a field to its section, and a miss there resolves to
+| `$sectionSequence ?? -1` — a REAL position, silently wrong. So each gate collects INTERNALLY and
+| throws once; they are not hoisted into a single collector.
+*/
+
+it('reports every violating column on one field, not just the first', function (): void {
+    $form = $this->forms->create($this->tenant, $this->user, 'Survey');
+    $draft = $form->draftVersion;
+    addFormField($draft, $this->user, 'age', FieldType::Integer, 1, [
+        'label' => 'Age of ${ghost_one}',
+        'hint' => 'Ask ${ghost_two}',
+        'placeholder' => 'e.g. ${ghost_three}',
+    ]);
+
+    try {
+        $this->publisher->publish($form->refresh(), $this->user);
+        expect(false)->toBeTrue('the template gate accepted three dangling holes');
+    } catch (PublishValidationException $e) {
+        expect($e->violations())->toHaveCount(3)
+            ->and($e->getMessage())->toContain('label')
+            ->and($e->getMessage())->toContain('hint')
+            ->and($e->getMessage())->toContain('placeholder');
+    }
+});
+
+it('reports a violation in a locale variant as well as the base value', function (): void {
+    // ⛔ THE PER-LOCALE HALF IS THE ONE NOTHING COULD SEE BEFORE. `collectAll()` walks base-then-locales
+    // and the old `checkAll()` threw on the first entry, so a form whose ENGLISH label was fine and whose
+    // French one dangled reported the English problem and hid the French one behind it.
+    $form = $this->forms->create($this->tenant, $this->user, 'Survey');
+    $draft = $form->draftVersion;
+    addFormField($draft, $this->user, 'age', FieldType::Integer, 1, [
+        'label' => 'Age of ${ghost_base}',
+        'label_translations' => ['fr' => 'Age de ${ghost_fr}'],
+    ]);
+
+    try {
+        $this->publisher->publish($form->refresh(), $this->user);
+        expect(false)->toBeTrue('the template gate accepted a dangling hole in a locale variant');
+    } catch (PublishValidationException $e) {
+        expect($e->violations())->toHaveCount(2);
+    }
+});
+
+it('reports violations on two different fields in one refusal', function (): void {
+    $form = $this->forms->create($this->tenant, $this->user, 'Survey');
+    $draft = $form->draftVersion;
+    addFormField($draft, $this->user, 'age', FieldType::Integer, 1, ['label' => 'Age of ${ghost_one}']);
+    addFormField($draft, $this->user, 'city', FieldType::ShortText, 2, ['label' => 'City of ${ghost_two}']);
+
+    try {
+        $this->publisher->publish($form->refresh(), $this->user);
+        expect(false)->toBeTrue('the template gate accepted two dangling holes');
+    } catch (PublishValidationException $e) {
+        expect($e->violations())->toHaveCount(2)
+            ->and(array_column($e->violations(), 'field'))->toEqualCanonicalizing(['age', 'city']);
+    }
+});
+
+it('keeps a single violation byte-identical to the pre-collection message', function (): void {
+    // ⛔ THIS IS WHAT KEEPS THE SIXTEEN EXISTING WORDING ASSERTIONS GREEN. `several()` JOINS the parts'
+    // sentences rather than summarising them, so one violation produces exactly the string the
+    // throw-on-first gate produced. Asserted rather than hoped for — a summary here would have reddened
+    // every `toContain()` in this file at once.
+    $form = $this->forms->create($this->tenant, $this->user, 'Survey');
+    addFormField($form->draftVersion, $this->user, 'age', FieldType::Integer, 1, ['label' => 'Age of ${ghost}']);
+
+    try {
+        $this->publisher->publish($form->refresh(), $this->user);
+        expect(false)->toBeTrue('the template gate accepted a dangling hole');
+    } catch (PublishValidationException $e) {
+        expect($e->violations())->toHaveCount(1)
+            ->and($e->getMessage())->toBe($e->violations()[0]['message']);
+    }
+});

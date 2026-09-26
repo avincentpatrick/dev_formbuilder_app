@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Exceptions\Forms;
 
+use App\Enums\ValueShape;
 use App\Exceptions\Expressions\ExpressionException;
 use App\Exceptions\Submissions\SubmissionValidationException;
 use App\Exceptions\Templates\TemplateSyntaxException;
@@ -195,7 +196,7 @@ final class PublishValidationException extends RuntimeException
     }
 
     /**
-     * A validation rule whose owning field's {@see \App\Enums\ValueShape} can never satisfy it (Increment
+     * A validation rule whose owning field's {@see ValueShape} can never satisfy it (Increment
      * M113). This is NOT "unusual but allowed" — the rule fails CLOSED, so the field becomes unanswerable.
      *
      * ⛔ THE FAILURE IS SILENT AND TOTAL, WHICH IS WHY IT IS REFUSED RATHER THAN WARNED ABOUT.

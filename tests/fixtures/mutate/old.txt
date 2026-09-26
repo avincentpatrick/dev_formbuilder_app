@@ -1,1 +1,1 @@
-sentinel
+                ->with('publishViolations', $e->violations());

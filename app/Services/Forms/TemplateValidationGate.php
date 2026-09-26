@@ -78,27 +78,36 @@ final class TemplateValidationGate
         [$sources, $sectionKeys] = $this->index($fields, $sections);
         $sectionById = $sections->keyBy('id');
 
+        /** @var list<PublishValidationException> $violations */
+        $violations = [];
+
         foreach ($fields as $field) {
             $section = $field->form_section_id !== null ? $sectionById->get($field->form_section_id) : null;
             $position = TemplateScopeResolver::fieldPosition($section?->sequence, $field->sequence);
             $repeat = $section !== null && $section->is_repeatable ? $section->key : null;
 
-            $this->checkAll($field->label, $field->label_translations, $position, $repeat, $sources, $sectionKeys, $field->key, 'label');
-            $this->checkAll($field->hint, $field->hint_translations, $position, $repeat, $sources, $sectionKeys, $field->key, 'hint');
-            $this->checkAll($field->placeholder, null, $position, $repeat, $sources, $sectionKeys, $field->key, 'placeholder');
+            $violations = array_merge(
+                $violations,
+                $this->violationsIn($field->label, $field->label_translations, $position, $repeat, $sources, $sectionKeys, $field->key, 'label'),
+                $this->violationsIn($field->hint, $field->hint_translations, $position, $repeat, $sources, $sectionKeys, $field->key, 'hint'),
+                $this->violationsIn($field->placeholder, null, $position, $repeat, $sources, $sectionKeys, $field->key, 'placeholder'),
+            );
         }
 
         foreach ($sections as $section) {
             $position = TemplateScopeResolver::sectionPosition($section->sequence);
             $repeat = $section->is_repeatable ? $section->key : null;
 
-            $this->checkAll($section->label, $section->label_translations, $position, $repeat, $sources, $sectionKeys, $section->key, 'label');
-            $this->checkAll($section->description, $section->description_translations, $position, $repeat, $sources, $sectionKeys, $section->key, 'description');
+            $violations = array_merge(
+                $violations,
+                $this->violationsIn($section->label, $section->label_translations, $position, $repeat, $sources, $sectionKeys, $section->key, 'label'),
+                $this->violationsIn($section->description, $section->description_translations, $position, $repeat, $sources, $sectionKeys, $section->key, 'description'),
+            );
         }
 
         // The confirmation screen (§6.2) renders AFTER the whole form, so every field precedes it — hence
         // the maximal position — and it is never inside a repeat instance, hence flat scope.
-        $this->checkAll(
+        $violations = array_merge($violations, $this->violationsIn(
             $form->confirmation_message,
             $form->confirmation_message_translations,
             [PHP_INT_MAX, PHP_INT_MAX],
@@ -107,7 +116,11 @@ final class TemplateValidationGate
             $sectionKeys,
             'confirmation_message',
             'confirmation_message',
-        );
+        ));
+
+        if ($violations !== []) {
+            throw PublishValidationException::several($violations);
+        }
     }
 
     /**
@@ -177,14 +190,15 @@ final class TemplateValidationGate
     }
 
     /**
-     * Validate a base value and every locale variant of it — each independently a template (§4).
+     * Every violation in a base value and in each of its locale variants — each independently a template (§4).
      *
      * @param  array<string, mixed>|null  $translations
      * @param  array{int, int}  $position
      * @param  array<string, array{type: PipingEligibility, position: array{int, int}, repeat: ?string}>  $sources
      * @param  array<string, true>  $sectionKeys
+     * @return list<PublishValidationException>
      */
-    private function checkAll(
+    private function violationsIn(
         ?string $base,
         ?array $translations,
         array $position,
@@ -193,17 +207,26 @@ final class TemplateValidationGate
         array $sectionKeys,
         string $ownerKey,
         string $column,
-    ): void {
+    ): array {
         // The collector walks base-then-locales in order and PHP arrays preserve insertion order, so the
-        // first entry is the same violation the pre-H6b early-throw raised. It costs a full walk on the
-        // failure path, which is the path that ends the request anyway.
+        // FIRST entry is still the same violation the pre-H6b early-throw raised — which is what keeps a
+        // single-violation message byte-identical to the one this gate produced before M113.
+        //
+        // ⛔ M113: THIS RETURNS EVERY ENTRY RATHER THAN THROWING ON THE FIRST, AND THAT RECOVERS TWO
+        // LOSSES, NOT ONE. The old `checkAll()` threw inside this loop, so it discarded the later LOCALE
+        // variants of the same column as well as every later column, field and section. A form whose
+        // English label was fine and whose French one dangled reported the English problem alone.
+        $violations = [];
+
         foreach ($this->collectAll($base, $translations, $position, $repeat, $sources, $sectionKeys, $column) as $offending => $violation) {
-            throw PublishValidationException::templateInvalid($ownerKey, $offending, $violation['slug']);
+            $violations[] = PublishValidationException::templateInvalid($ownerKey, $offending, $violation['slug']);
         }
+
+        return $violations;
     }
 
     /**
-     * {@see checkAll()}'s returning twin — every violating column, in walk order. The single walk both the
+     * {@see violationsIn()}'s underlying walk — every violating column, in walk order. The single walk both the
      * publish gate and A3's edit-time warning share, so the two can never disagree about what resolves.
      *
      * @param  array<string, mixed>|null  $translations

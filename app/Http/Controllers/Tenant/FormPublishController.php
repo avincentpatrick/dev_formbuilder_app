@@ -31,7 +31,21 @@ final class FormPublishController extends Controller
 
         try {
             $version = $publisher->publish($form, $user, $validated['note'] ?? null);
-        } catch (PublishValidationException|FormException $e) {
+        } catch (PublishValidationException $e) {
+            // ⛔ M113 — THE STRUCTURED LIST REACHES THE BUILDER ONLY FROM HERE, AND ONLY BECAUSE OF THIS ARM.
+            // `M112` gave `PublishValidationException` a `violations()` list and rendered it for the API at
+            // `bootstrap/app.php`, whose WEB arm returns null on purpose. But this catch runs FIRST — the
+            // render handler never sees a publish refusal on an Inertia request at all — so until now
+            // `violations()` was in scope here and thrown away on every builder publish. The toast keeps
+            // the joined sentence for the forms-list page, which renders no banner.
+            //
+            // ⚠️ A NEW KEY, NOT `publishWarnings`. That one is `list<string>` prose whose banner is titled
+            // "Published, with …" — untrue over a refusal — and two tests pin it absent on this path.
+            return back()
+                ->with('toast', ['type' => 'error', 'message' => $e->getMessage()])
+                ->with('publishViolations', $e->violations());
+        } catch (FormException $e) {
+            // A lifecycle refusal (already published, locked, …) carries no per-field structure to show.
             return back()->with('toast', ['type' => 'error', 'message' => $e->getMessage()]);
         }
 

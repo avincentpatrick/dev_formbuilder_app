@@ -116,3 +116,60 @@ it('still reports a refusal as an error, so a notice never masks a real gate fai
     enterTenant($this->tenant->id, $this->admin->id);
     expect(FormVersion::where('form_id', $form->id)->where('status', FormVersionStatus::Published)->count())->toBe(0);
 });
+
+/*
+|--------------------------------------------------------------------------
+| M113 — a REFUSAL now reaches the builder page structured, not just as one sentence.
+|
+| ⛔ THIS IS THE HALF THE ROW AND M112'S OWN CLOSE-OUT BOTH ASSUMED WAS ALREADY DONE.
+| M112 put `violations()` on the wire for `/api/v1/*` only: `bootstrap/app.php`'s render arm returns
+| null for the web deliberately AND this controller catches the exception before that arm could fire,
+| so `$e->violations()` was in scope and discarded on every Inertia publish. The builder could not
+| render a per-field refusal at any cost until this flash existed.
+|
+| ⚠️ IT IS A NEW KEY, NOT `publishWarnings`. That one is `list<string>` prose whose banner copy reads
+| "Published, with…" — a lie over a refusal — and the two assertions above pin it absent on this path.
+*/
+
+it('flashes the structured violations on a refusal, alongside the error toast', function (): void {
+    $form = app(FormService::class)->create($this->tenant, $this->admin, 'Survey');
+    addFormField($form->draftVersion, $this->admin, 'a', FieldType::ShortText, 1, [
+        'relevant_expression' => '${nonexistent} = \'1\'',
+    ]);
+
+    $this->actingAs($this->admin)
+        ->post("http://acme.meridian.test/forms/{$form->id}/publish")
+        ->assertRedirect()
+        ->assertSessionMissing('publishWarnings')
+        ->assertSessionHas('toast', fn (array $toast): bool => $toast['type'] === 'error')
+        ->assertSessionHas('publishViolations', fn (array $violations): bool => count($violations) === 1
+            && $violations[0]['field'] === 'a'
+            && is_string($violations[0]['code'])
+            && $violations[0]['code'] !== ''
+            && is_string($violations[0]['message']));
+});
+
+it('flashes one entry per violation, so the banner can name every broken field', function (): void {
+    $form = app(FormService::class)->create($this->tenant, $this->admin, 'Survey');
+    addFormField($form->draftVersion, $this->admin, 'a', FieldType::ShortText, 1, [
+        'relevant_expression' => '${ghost_one} = \'1\'',
+    ]);
+    addFormField($form->draftVersion, $this->admin, 'b', FieldType::ShortText, 2, [
+        'relevant_expression' => '${ghost_two} = \'1\'',
+    ]);
+
+    $this->actingAs($this->admin)
+        ->post("http://acme.meridian.test/forms/{$form->id}/publish")
+        ->assertRedirect()
+        ->assertSessionHas('publishViolations', fn (array $violations): bool => count($violations) === 2);
+});
+
+it('flashes no violations when the publish succeeds', function (): void {
+    $form = app(FormService::class)->create($this->tenant, $this->admin, 'Survey');
+    addFormField($form->draftVersion, $this->admin, 'a', FieldType::ShortText, 1);
+
+    $this->actingAs($this->admin)
+        ->post("http://acme.meridian.test/forms/{$form->id}/publish")
+        ->assertRedirect()
+        ->assertSessionMissing('publishViolations');
+});

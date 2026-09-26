@@ -124,6 +124,13 @@ declare module '@inertiajs/core' {
             /** Increment H21a — branching notices raised after a publish that SUCCEEDED (Doc #27 §6). */
             publishWarnings?: string[] | null;
             /**
+             * Increment M113 — the per-field structure of a publish that was REFUSED. One entry per
+             * violation, in the order the gates met them; `field` is the field KEY, or null where the
+             * violation belongs to no single field. `code` is a stable snake_case slug safe to switch on;
+             * `message` is the author-facing sentence, and the toast carries all of them joined.
+             */
+            publishViolations?: { field: string | null; code: string; message: string }[] | null;
+            /**
              * Increment H21c — the answers relevance dropped on the manual-encode channel, labelled as the
              * keyer saw them (Doc #27 §7). Flashed only when the list is non-empty, and only after a
              * submission that was actually created.

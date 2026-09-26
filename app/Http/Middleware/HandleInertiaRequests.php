@@ -119,6 +119,13 @@ class HandleInertiaRequests extends Middleware
                 // hard-coded to "Imported with N warning(s)" — the publish already succeeded and the
                 // wording has to say so.
                 'publishWarnings' => $request->session()->get('publishWarnings'),
+                // The per-field structure of a publish REFUSAL (Increment M113). Its own key for the
+                // opposite reason `publishWarnings` has one: that key reports a publish that SUCCEEDED,
+                // and its banner copy says so, so a refusal cannot borrow it. `M112` already built this
+                // list on `PublishValidationException` and rendered it for `/api/v1/*`; the web arm of
+                // that renderer is null by design AND `FormPublishController` catches first, so this
+                // flash is the only route by which a builder page can see it.
+                'publishViolations' => $request->session()->get('publishViolations'),
                 // The answers RELEVANCE dropped on the manual-encode channel (Increment H21c, Doc #27 §7):
                 // the keyer typed them, Stage 3 masked them off, and the page used to say "Submission
                 // recorded." over the loss. Its own key for the same reason `publishWarnings` is: this one is

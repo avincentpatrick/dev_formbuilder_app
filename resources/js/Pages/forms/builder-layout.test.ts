@@ -158,6 +158,40 @@ describe('forms/Builder — the compact-layout threshold', () => {
         );
     });
 
+    it('does not publish over a save that failed', () => {
+        // ⛔ `whenIdle()` RESOLVES ON FAILURE, DELIBERATELY AND UNCHANGEABLY. `enqueue()` ends with
+        // `queue = run.catch(() => undefined)`, so the promise it returns can never reject, and two
+        // existing Vitest cases (`save-state.test.ts`, `builderClient.test.ts`) `await whenIdle()` AFTER a
+        // failed burst — making it reject would turn both into unhandled rejections. So the guard cannot
+        // live in the store contract; it has to read the verdict after the await.
+        //
+        // Why that matters more than it looks: `router.post` passes no `preserveState`, so Inertia's
+        // non-GET default REMOUNTS this page, `useBuilderStore(props)` re-runs and `save.error` resets to
+        // null. The author therefore saw a publish outcome and never saw that their last edit was lost.
+        expect(source, 'publish must inspect the save verdict after whenIdle() resolves').toMatch(
+            /whenIdle\(\)[\s\S]{0,400}?saveState\.value === 'failed'/,
+        );
+        expect(source, 'publish must not POST when the last save failed').toMatch(
+            /saveState\.value === 'failed'[\s\S]{0,300}?return;/,
+        );
+    });
+
+    it('renders publish violations in their own full-bleed banner', () => {
+        // The refusal banner copies `builder__warnings` for markup and geometry and NOTHING else: that
+        // banner's payload is `list<string>` prose and its title says "Published, with …", which is untrue
+        // over a refusal. The doubled class below is load-bearing — it is a specificity tie against
+        // MdsAlert's own scoped rule, explained in this file's style block and pinned by the flex case.
+        expect(source, 'the violations banner must exist').toMatch(
+            /<MdsAlert[\s\S]{0,300}?class="builder__violations"/,
+        );
+        expect(source, 'it must be driven by the publishViolations flash').toMatch(
+            /publishViolations[\s\S]{0,200}?page\.props\.flash/,
+        );
+        expect(source, 'it must carry the same full-bleed specificity fix as the warnings banner').toContain(
+            '.builder__violations.builder__violations',
+        );
+    });
+
     it('keeps Publish carrying its word at every width', () => {
         // `templates-axe.spec.ts` asserts getByRole('button', { name: 'Publish' }), and that name comes
         // from the slot text rather than from an aria-label.

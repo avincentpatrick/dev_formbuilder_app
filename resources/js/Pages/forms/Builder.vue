@@ -143,6 +143,23 @@ function onInsertFromLibrary(itemId: string): void {
 
 function publish(): void {
     void store.whenIdle().then(() => {
+        // ⛔ M113 — `whenIdle()` RESOLVES ON FAILURE, SO RESOLUTION IS NOT CONSENT TO PUBLISH.
+        // `enqueue()` ends with `queue = run.catch(() => undefined)` and `guard()` swallows a rejection
+        // into `save.error`, so this `.then()` runs just as happily after a write that never landed. The
+        // verdict has to be READ; it cannot be awaited.
+        //
+        // ⛔ AND THE POST IS WHAT DESTROYS THE EVIDENCE. `router.post` passes no `preserveState`, so
+        // Inertia's non-GET default remounts this page, `useBuilderStore(props)` re-runs and `save.error`
+        // resets to null — the author saw a publish outcome and never saw that their last edit was lost.
+        //
+        // ⚠️ The guard is HERE rather than in the store because `whenIdle()`'s resolve-always contract is
+        // depended on by existing tests that await it after a failed burst; making it reject would turn
+        // those into unhandled rejections. The watcher above already pulls the pane carrying the alert on
+        // screen, so refusing to POST is all this needs to do for the author to see why.
+        if (saveState.value === 'failed') {
+            return;
+        }
+
         router.post(`/forms/${props.form.id}/publish`, {}, { preserveScroll: true });
     });
 }
@@ -213,6 +230,19 @@ const warningsDismissed = ref(false);
 // which would be a lie here, and the two can legitimately be on screen together.
 const publishWarnings = computed<string[]>(() => page.props.flash?.publishWarnings ?? []);
 const publishWarningsDismissed = ref(false);
+
+// Increment M113 — the per-field structure of a publish that was REFUSED. `M112` built this list on
+// `PublishValidationException` and rendered it for `/api/v1/*` only; `FormPublishController` catches
+// before that renderer can see a web request, so it now flashes the list and this is its first reader.
+//
+// ⚠️ ITS OWN BANNER, NOT A REUSE OF `publishWarnings`. That payload is `list<string>` prose titled
+// "Published, with …" — untrue over a refusal — and modelling the refusal on it would reproduce the
+// defect being fixed. The two can also legitimately be on screen together, since a failed publish leaves
+// the previous run's notices standing.
+const publishViolations = computed<{ field: string | null; code: string; message: string }[]>(
+    () => page.props.flash?.publishViolations ?? [],
+);
+const publishViolationsDismissed = ref(false);
 
 function openImport(): void {
     importForm.reset();
@@ -418,6 +448,23 @@ function submitImport(): void {
         >
             <ul class="builder__warnings-list">
                 <li v-for="(warning, i) in importWarnings" :key="i">{{ warning }}</li>
+            </ul>
+        </MdsAlert>
+
+        <MdsAlert
+            v-if="publishViolations.length > 0 && !publishViolationsDismissed"
+            class="builder__violations"
+            tone="danger"
+            :title="`Not published — ${publishViolations.length} ${publishViolations.length === 1 ? 'problem' : 'problems'} to fix first`"
+            dismissible
+            dismiss-label="Dismiss publish problems"
+            @dismiss="publishViolationsDismissed = true"
+        >
+            <ul class="builder__warnings-list">
+                <li v-for="(violation, i) in publishViolations" :key="i">
+                    <strong v-if="violation.field">{{ violation.field }}</strong>
+                    {{ violation.message }}
+                </li>
             </ul>
         </MdsAlert>
 
@@ -753,7 +800,8 @@ function submitImport(): void {
  * Repeating the class takes this to (0,3,0) and settles it. Cheaper than the alternative — a `--full-bleed`
  * variant on the shared component — for a shape exactly one page needs.
  */
-.builder__warnings.builder__warnings {
+.builder__warnings.builder__warnings,
+.builder__violations.builder__violations {
     flex-shrink: 0;
     padding: var(--mds-space-3) var(--mds-space-6);
     border-radius: 0;

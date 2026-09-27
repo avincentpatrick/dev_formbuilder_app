@@ -630,14 +630,11 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - ✅ **CLOSED BY `M109` (2026-09-25) — `minor` · ~~`MdsSegmentedControl` spills 30px INSIDE the builder's config pane — a real horizontal
   scrollbar, and not the page-overflow defect it was filed as.~~** ⛔ **This row replaces the M17 row that
   claimed the control *"spills 30px out of the builder's content region"*, which is falsified**: it
-  spills out of `.config` (`ConfigPanel.vue:546-553`, `overflow-y: auto`), which absorbs it, so it
-  contributed nothing to the 24px that failed the scan. The offender is the **Requiredness** control
-  (`ConfigPanel.vue:307-312`, `Optional / Required / Conditional` — no icons, non-compact, 24px of
-  padding per segment) inside `.config__group`, which is a flex column with implicit `align-items:
-  stretch`. ⚠️ **Both numbers in this paragraph had rotted off their subjects before `M116` touched the
-  file** — `:307` was a `config__note` paragraph and `:546` a textarea `rows` attribute — and `M116`'s
-  insertions merely turned them blank, which is what made the liveness gate notice. The control is at
-  `:412-418` and `.config`'s `overflow-y: auto` at `:678`, both re-read rather than shifted arithmetically. ⚠️ **The mechanism the old row gave is also wrong and the error propagated by citation**:
+  spills out of `.config` (`ConfigPanel.vue`'s `overflow-y: auto`), which absorbs it, so it contributed
+  nothing to the 24px that failed the scan. The offender is the **Requiredness** control
+  (`ConfigPanel.vue`'s `MdsSegmentedControl` — no icons, non-compact, 24px of padding per segment) inside
+  `.config__group`, a flex column with implicit `align-items: stretch`. ⚠️ **The two line numbers here had
+  rotted off their subjects before `M116` and are DROPPED rather than repaired — a symbol name cannot rot.** ⚠️ **The mechanism the old row gave is also wrong and the error propagated by citation**:
   `white-space: nowrap` is **not** on `.mds-segmented__seg` — the only two in `SegmentedControl.vue` are
   the sr-only `legend` and `input`. The real construction is `inline-flex` with no `flex-wrap`, a `__seg`
   carrying neither `min-width: 0` nor `flex-shrink`, and `min-width: 0` on the fieldset, which does not
@@ -11824,9 +11821,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   count. Beyond the ten declarations `R-09f73330` names and the already-gated `RENDERS_NOTHING`, the same type
   strings appear as bare inline disjunctions at `schema-mapping.ts:91,94,115,118,377,400,424,553`,
   `FieldInput.vue:239,240,247,248`, `semantic-validator.ts:468,474,480,646,793,821`, `MediaEditor.vue:37`,
-  `GeoInput.vue:38-43` and `ConfigPanel.vue:128-129` (⚠️ cited as `:113` until `M116`, which was a bare `);`
-  on the trunk and went blank under that increment's insertions — the live pair is the `config_editor` key
-  comparisons, re-read rather than shifted). ⛔ **Two of them are ADDITIONAL COPIES of sets the census
+  `GeoInput.vue:38-43` and `ConfigPanel.vue`'s `config_editor` comparisons (cited as `:113` until `M116`, where that was a bare `);` and went blank — number DROPPED, not repaired). ⛔ **Two of them are ADDITIONAL COPIES of sets the census
   already guards** — `schema-mapping.ts:424` is a fourth four-member media disjunction, and `:115` and `:400`
   are a second and third geo triple — so the census's own equality assertions can be green while a sibling
   literal three lines away disagrees. ⚠️ **Neither `R-09f73330` nor `R-c5858976` counts these**, which is why

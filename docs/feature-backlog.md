@@ -634,7 +634,10 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   contributed nothing to the 24px that failed the scan. The offender is the **Requiredness** control
   (`ConfigPanel.vue:307-312`, `Optional / Required / Conditional` — no icons, non-compact, 24px of
   padding per segment) inside `.config__group`, which is a flex column with implicit `align-items:
-  stretch`. ⚠️ **The mechanism the old row gave is also wrong and the error propagated by citation**:
+  stretch`. ⚠️ **Both numbers in this paragraph had rotted off their subjects before `M116` touched the
+  file** — `:307` was a `config__note` paragraph and `:546` a textarea `rows` attribute — and `M116`'s
+  insertions merely turned them blank, which is what made the liveness gate notice. The control is at
+  `:412-418` and `.config`'s `overflow-y: auto` at `:678`, both re-read rather than shifted arithmetically. ⚠️ **The mechanism the old row gave is also wrong and the error propagated by citation**:
   `white-space: nowrap` is **not** on `.mds-segmented__seg` — the only two in `SegmentedControl.vue` are
   the sr-only `legend` and `input`. The real construction is `inline-flex` with no `flex-wrap`, a `__seg`
   carrying neither `min-width: 0` nor `flex-shrink`, and `min-width: 0` on the fieldset, which does not
@@ -11309,6 +11312,43 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `ConditionRow.vue` directly. ⚠️ **One row only, in this increment** — multi-row AND/OR is the unreachable
   `logic_group`/`logic_operator` capability, which is its own row. **Live.** Filed by `M110`.
   **Tier: early-testing.**
+  ✅ **CLOSED BY `M116` (2026-09-28) — AND THE PRESCRIBED REMEDY WAS WRONG, WHICH IS THE FINDING.** Choosing
+  Conditional now reveals a *"Required when…"* editor inside the Basics tab's requiredness group, and the
+  rows it writes are the `required_if`/`required_with` triples `requiredState()` actually reads.
+  ⛔ **`ConditionRow.vue` CANNOT BE REUSED, MEASURED BEFORE A LINE WAS WRITTEN** — this row and the overhaul
+  plan's `B3` entry both prescribe it. It is bound to the `relevant_expression` AST: its props and both emit
+  payloads are `Condition` values from `condition-model.ts`, its subject side offers `count:` and literal
+  operands a `required_if` cannot use, and its `RowOperator` vocabulary diverges from the stored
+  `ComparisonOperator` in **both** directions (`blank`, `not_blank`, `includes`, `excludes` have no PHP case;
+  `is_null` and `contains` have no row operator). It has no concept of `rule_type`, `related_field_key` or
+  `rule_value`. ✅ **The component that already renders this exact row is `ValidationEditor.vue`**, shipped by
+  `M115` — which is the other half of the premise this row could not have known: the editor was never
+  missing, only the path to it. It gains `restrictToRuleTypes` (plus `addLabel`/`emptyText`), and the reveal
+  is a second, narrowed instance rather than a second editor, so `ruleOptionsFor`, `relatedOptionsFor`,
+  `operatorOptionsFor`, `operatorPlaceholderFor` and `takesRuleValue` are not duplicated.
+  ⛔ **ONE ARRAY, TWO SURFACES, AND THE CLOBBER WAS THE REAL DESIGN PROBLEM.** `ValidationEditor` emits a
+  WHOLE fresh array, so wiring the reveal to `setValidations` would delete every rule the Validation tab
+  owns. `setRequiredRules` substitutes **positionally**, so a `pattern` or `skip_if` row keeps its index and
+  the Validation tab does not reshuffle under the author mid-edit. The mutation that points the reveal at
+  `setValidations` is CAUGHT with a single-case kill set, and the case that catches it reads the array back
+  by index rather than counting rows — a count is right in both worlds.
+  ✅ **`ValidationRuleType::governsRequiredness()` IS TRANSMITTED, NOT MIRRORED**, as `governs_requiredness`
+  through `BuilderPresenter::enums()`. A client-side `['required_if','required_with']` literal is the exact
+  defect `M115` was spent removing, and the skip pair is what makes the flag discriminate: a `skip_*` rule
+  makes a field irrelevant, never required. ⚠️ **The reveal does not render for `no_answer` shapes** (no rule
+  type is allowed there) **but the Requiredness control stays visible on purpose** — hiding it would strand a
+  note already marked Required with no repair path, and the publish gate refuses that field by name instead.
+  ⚠️ **`ConfigPanel.test.ts`'s `ENUMS` fixture was inert and that is why no case there had ever rendered a
+  rule row**: two of three requiredness modes, and both rule vocabularies empty. Its new members are
+  load-bearing by assertion rather than by a type annotation, because `tsconfig.json` type-checks no test
+  file. ⚠️ **And `makeStore`'s `fields` list stopped being decoration** — the operator control is disabled
+  until the compared question resolves to a shape, so an empty field list makes a case that drives it pass
+  vacuously. That cost one red run to discover.
+  ⚠️ **No e2e spec, deliberately.** The revealed region is built only from primitives `builder-axe.spec.ts`
+  already scans on the Validation tab, and driving the segmented control mid-loop would mutate the seeded
+  form that loop depends on. Two residuals named rather than hidden: the new legend is unscanned (its tokens
+  are copied verbatim from `ConditionEditor.vue`'s `.cond__legend`, which IS scanned), and the reveal's
+  wrapping at 375px is unscanned.
 
 - **`minor` · The left app sidebar cannot be collapsed, and the app has no mechanism for remembering a client-side
   UI preference at all.** Filed 2026-09-25 by `M110`, from the report that the sidebar *"must have an option to
@@ -11784,7 +11824,9 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   count. Beyond the ten declarations `R-09f73330` names and the already-gated `RENDERS_NOTHING`, the same type
   strings appear as bare inline disjunctions at `schema-mapping.ts:91,94,115,118,377,400,424,553`,
   `FieldInput.vue:239,240,247,248`, `semantic-validator.ts:468,474,480,646,793,821`, `MediaEditor.vue:37`,
-  `GeoInput.vue:38-43` and `ConfigPanel.vue:113`. ⛔ **Two of them are ADDITIONAL COPIES of sets the census
+  `GeoInput.vue:38-43` and `ConfigPanel.vue:128-129` (⚠️ cited as `:113` until `M116`, which was a bare `);`
+  on the trunk and went blank under that increment's insertions — the live pair is the `config_editor` key
+  comparisons, re-read rather than shifted). ⛔ **Two of them are ADDITIONAL COPIES of sets the census
   already guards** — `schema-mapping.ts:424` is a fourth four-member media disjunction, and `:115` and `:400`
   are a second and third geo triple — so the census's own equality assertions can be green while a sibling
   literal three lines away disagrees. ⚠️ **Neither `R-09f73330` nor `R-c5858976` counts these**, which is why
@@ -11848,6 +11890,41 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   a compared-question control for all six rules that name one, where it previously offered it for two) but
   deliberately did not touch the gate: a publish-gate arm is a different surface, and `B3` owns the requiredness
   editor that will produce these rows in volume. **Live.** Filed by `M115`. **Tier: early-testing.**
+  ✅ **CLOSED BY `M116` (2026-09-28) AT THE PUBLISH DOOR, WITH THE SAVE DOOR DELIBERATELY LEFT OPEN.**
+  `StructuralValidationGate::collect()` gained two arms in the validation loop: a rule naming no compared
+  question (`rule_missing_related_field`) and a `required_if`/`skip_if` with no operator
+  (`rule_missing_operator`). ⛔ **TWO INDEPENDENT `if`s, NEVER ONE** — the single combined condition is the
+  plausible wrong fix and lets a `required_with` naming no question through, since that kind tolerates a
+  missing operator and not a missing question. That mutation is CAUGHT by its own case.
+  ⛔ **`required_with`/`skip_with` ARE EXEMPT FROM THE OPERATOR ARM AND MUST STAY PUBLISHABLE:** a null
+  operator there lowers to `isNotNull(related)` — *"when that question is answered at all"* — which
+  `operatorMayBeEmpty()`'s docblock already called the commonest authoring choice. The predicate drives the
+  arm; no literal list of rule names exists.
+  ⛔ **THE SAVE DOOR STAYS PERMISSIVE, AND THE REASON IS STRONGER THAN "DRAFTS ARE LENIENT".**
+  `ValidationEditor.addRule()` seeds a row with a null operator and a null related key, and `ConfigPanel`
+  PATCHes on a 600 ms debounce — so a cross-field rule in `UpdateFieldRequest` would 422 the builder mid-edit
+  and break authoring outright. (That file is also a hub at degree 3.)
+  ✅ **THE ROW'S INFERRED TAIL WAS DRIVEN, AND IT IS WORSE THAN FILED.** A guest gets 422 with code
+  `expression_error`, which `error-normalizer.ts:77-80` classifies `unknown`; offline replay burns all five
+  attempts and parks the row `needs_attention`. ⛔ **One bad rule 422s the WHOLE offline sync batch** —
+  `SyncSubmissionController::replayOne()` catches four exception types and not this one — discarding every
+  other item's per-item result. ⛔ **And the guest is never told:** `useFormRuntime.safeEvaluate()` catches,
+  sets `engineFailed`, returns *"everything relevant, zero errors"*, so the submit guard passes, and the
+  `engineFailed` banner exists only on the staff Encode page. Both of those are filed as their own rows
+  rather than smuggled in: neither file belongs to this one.
+  ⚠️ **Timing was under-stated too.** A `required_*` row on a scalar throws only when that field's answer is
+  empty and never when the owner is `Required`; `skip_if`/`skip_with` throw on **every** submission through
+  `settleRelevance()`, and grid and geo owners call `requiredState()` unconditionally.
+  ⛔ **AND THE SUITE ITSELF CARRIED THE DEFECT.** `StructuralValidationGateTest`'s happy-path case *"still
+  allows a conditional rule on a date field"* created a `required_if` with a related field, a `rule_value`
+  and **no operator** — a careful author wrote the fixture and wrote a row that publishes clean and then
+  throws, without noticing. It is amended with an explicit operator and its comment now points at the case
+  where the operator-less form lives. It was the ONLY existing case the arms reddened: 1,007 tests across
+  `Feature/Forms`, `Feature/Submissions` and `Feature/Guest` pass otherwise, which contradicted the claim's
+  prediction that a second such fixture was hiding in the golden vectors or the G4/G5/G6 suites.
+  ✅ **Seven Pest mutations CAUGHT**, two with single-case kill sets: swapping `takesRelatedField()` for
+  `takesOperator()` reddens only the `greater_than_field` case (proving the arm is the six, not the four),
+  and swapping `governsRequiredness()` for "owns any validation row" reddens only the `skip_if`-only case.
 
 - **`minor` · The encode page still enforces four families of native browser validation the guest runtime does
   not, and nothing in the repository can turn that difference red.** Filed 2026-09-27 by `M115`, split out of
@@ -11882,3 +11959,65 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   wholesale include could redden a hundred files at once. A per-fixture assertion, a `vue-tsc` run scoped to the
   fixtures, or a lint that refuses an un-asserted type annotation in a test are all cheaper. **Live.**
   Filed by `M115`. **Tier: during-testing.**
+
+- **`major` · One unevaluable rule on one form 422s the WHOLE offline sync batch and discards every other
+  queued response's per-item result.** Found by `M116` (2026-09-28) while driving the tail `R-1140a660` had
+  filed as inferred. `SyncSubmissionController::replayOne()` catches exactly four exception types —
+  `SubmissionValidationException`, `SubmissionConflictException`, `SubmissionException` and
+  `FormNotAcceptingSubmissionException` (`app/Http/Controllers/Api/V1/SyncSubmissionController.php:162-168`)
+  — and `ExpressionEvaluationException` is not among them, so it escapes the per-item loop entirely and the
+  batch response becomes a single 422 from `bootstrap/app.php`'s renderable. ⛔ **THE COST IS NOT THE ONE BAD
+  ITEM.** The endpoint's contract is a per-item result list; an escape replaces it, so a device that queued
+  nineteen good responses and one against a form carrying a broken rule learns nothing about the nineteen,
+  and `replay.ts` maps the `unknown` classification to retry — so it re-sends all twenty, five times, and
+  parks the lot as `needs_attention`. ⚠️ **`M116`'s publish gate does NOT close this**: the gate is
+  prospective, and a version already published with such a row keeps throwing forever. ⚠️ **A fifth catch arm
+  is the cheap half; the question the row must answer is what the per-item `error.code` should be**, since
+  `expression_error` is currently a server-fault slug that `error-normalizer.ts:77-80` deliberately does not
+  classify as a validation refusal. **Live.** Filed by `M116`. **Tier: early-testing.**
+
+- **`minor` · A respondent is never told the rule engine failed — every conditional question is shown with no
+  conditions applied, and the submit guard lets them submit anyway.** Found by `M116` (2026-09-28), beside
+  the row above. `useFormRuntime.safeEvaluate()` (`resources/public-runtime/composables/useFormRuntime.ts:307-319`)
+  catches any evaluation throw, sets `engineFailed` and returns a degraded result in which everything is
+  relevant and there are zero field errors. ⛔ **THE DEGRADE IS INVISIBLE AND IT DEFEATS THE GUARD.** Because
+  the degraded result carries no errors, `passed` is `true`, so `RuntimeSession.vue`'s `submit()` does not
+  stop on `field-errors`; the respondent fills a form whose skip logic and conditional requiredness are
+  silently inert, submits, and meets the server's generic 422. ⛔ **AND THE BANNER EXISTS, ON THE WRONG
+  PAGE.** `engineFailed` has exactly one consumer — the staff encode page's *"Conditions could not be
+  applied"* notice (`resources/js/Pages/submissions/Encode.vue:1178-1183`) — and grep finds no consumer under
+  `resources/public-runtime/components` or `App.vue` at all. So a keyer is warned and a respondent is not.
+  ⚠️ **Whether the guest surface should warn or REFUSE is a product question this row must settle**, because
+  a form whose conditions are inert may be collecting answers to questions that should have been skipped.
+  **Live.** Filed by `M116`. **Tier: early-testing.**
+
+- **`minor` · The publish gate is prospective, so a version ALREADY published with an unevaluable conditional
+  rule keeps failing every submission and nothing can find those versions.** Found by `M116` (2026-09-28) as
+  the explicit limit of its own fix. The three arms added to `StructuralValidationGate` run at publish, so
+  they cannot reach a `form_versions` row that is already `published`. ⚠️ **THE POPULATION IS UNMEASURED AND
+  THE CENSUS IS THE FIRST DELIVERABLE, NOT THE REPAIR** — a read-only query over `form_field_validations`
+  joined to published versions, for rows whose `rule_type` is one of the six that name a field and whose
+  `related_form_field_id` is null, plus rows whose type is `required_if`/`skip_if` with a null `operator`.
+  ⚠️ **It may well be zero**, because no seeder, no importer and no `DefaultFieldRules` path has ever written
+  a conditional row — only hand authoring in the builder — and the staging box has had few authors. That is
+  worth knowing before anything is designed: a zero turns this row into a one-line note, while a non-zero
+  needs a decision about whether to rewrite the rows, unpublish the versions, or make the evaluator tolerate
+  an incomplete row at read time. **Live.** Filed by `M116`. **Tier: early-testing.**
+
+- ✅ **CLOSED BY `M116` (2026-09-28), AND FILED IN THE SAME INCREMENT BECAUSE THE LEDGER MUST CARRY IT —
+  `minor` · ~~A `note` or `page_break` can be marked Required, which refuses every submission the form ever
+  receives with an error nobody can clear.~~** Found by `M116` while answering the one question the
+  Conditional reveal forces — what should happen on a field that takes no answer.
+  ⛔ **MEASURED BY A THROWAWAY PROBE RATHER THAN BY READING, BECAUSE THE CLAIM PREDICTED THIS WAS THE THING
+  MOST LIKELY TO BE WRONG.** A draft carrying a `note` marked `Required` published **clean** through the real
+  `PublishService`, and `SubmissionPipeline::submit()` then raised `SubmissionValidationException` carrying
+  `{field: intro, rule: field_required, message: "This field is required."}` — on a field that renders no
+  input control at all. The prediction was wrong: the defect is exactly as read.
+  ⛔ **THE MECHANISM.** `SemanticValidator::collectFieldErrors()` early-returns for calculated, hidden, grid,
+  geo and media fields and for this shape it does not, so the answer is permanently absent,
+  `Coercion::isEmpty()` is true, and the `Required` branch short-circuits before any rule is consulted. The
+  builder offered it: the requiredness control is gated only on `isCalculated`.
+  ✅ **Refused at publish as `display_only_field_required`, dispatched on `ValueShape::NoAnswer` rather than
+  on a field-type list** — the gate's own doctrine, since a type list needs editing every time a
+  display-only type is added. The requiredness control deliberately stays visible on those types so an
+  existing form has a repair path. Its disabling mutation is CAUGHT with a single-case kill set.

@@ -34,16 +34,40 @@ import { MdsButton, MdsIconButton, MdsSelect, MdsTextInput, MdsTextarea } from '
 import { computed } from 'vue';
 import type { BuilderValidation, ComparableField, EnumOption, OperatorOption, RuleTypeOption } from './types';
 
-const props = defineProps<{
-    validations: BuilderValidation[];
-    ruleTypes: RuleTypeOption[];
-    operators: OperatorOption[];
-    /** The OWNING field's `ValueShape` — what may be asserted about the answer this rule constrains. */
-    valueShape: string;
-    /** Every other field in the draft, for the rules that name one. */
-    comparableFields: ComparableField[];
-    disabled?: boolean;
-}>();
+const props = withDefaults(
+    defineProps<{
+        validations: BuilderValidation[];
+        ruleTypes: RuleTypeOption[];
+        operators: OperatorOption[];
+        /** The OWNING field's `ValueShape` — what may be asserted about the answer this rule constrains. */
+        valueShape: string;
+        /** Every other field in the draft, for the rules that name one. */
+        comparableFields: ComparableField[];
+        disabled?: boolean;
+        /**
+         * Narrow this instance to a subset of rule kinds (M116). Undefined — the Validation tab — means
+         * every rule the shape allows, which is the behaviour every existing caller gets.
+         *
+         * ⛔ THIS IS WHY THE BASICS REVEAL IS NOT A SECOND EDITOR. The "Required when…" surface renders the
+         * same row as the Validation tab minus the mode switch: the same rule select, the same compared
+         * question, the same operator filtered by the RELATED field's shape, the same `is answered`
+         * pseudo-option. Duplicating that would duplicate five option-building functions M115 spent an
+         * increment establishing, and the two copies would disagree on the first change.
+         *
+         * Everything follows from the one intersection below: `addRule()`'s seed, `setMode()`'s fallback
+         * and the Add button's disabled state all already read `allowedRuleTypes`.
+         */
+        restrictToRuleTypes?: string[];
+        /** The Add button's wording, so a restricted instance can say what it adds. */
+        addLabel?: string;
+        /** The empty-state sentence. The default describes constraints, which is wrong under a condition. */
+        emptyText?: string;
+    }>(),
+    {
+        addLabel: 'Add rule',
+        emptyText: 'No validation rules. Add one to constrain what respondents can enter.',
+    },
+);
 
 const emit = defineEmits<{ 'update:validations': [value: BuilderValidation[]] }>();
 
@@ -56,8 +80,22 @@ const UNAVAILABLE = ' — not available for this question';
 type SelectOption = EnumOption & { disabled?: boolean };
 
 const allowedRuleTypes = computed<RuleTypeOption[]>(() =>
-    props.ruleTypes.filter((rule) => rule.shapes.includes(props.valueShape)),
+    props.ruleTypes.filter(
+        (rule) =>
+            rule.shapes.includes(props.valueShape) &&
+            (props.restrictToRuleTypes === undefined || props.restrictToRuleTypes.includes(rule.value)),
+    ),
 );
+
+/**
+ * Whether this instance may hold a raw-expression row (M116). A restricted instance may not: an expression
+ * row carries `rule_type: null`, so it can never belong to a restricted partition, and offering the switch
+ * would let an author move a row out of the surface that owns it and into nothing.
+ *
+ * ⚠️ IT GATES THE MODE SELECT ONLY, NEVER THE ROW HEAD — the remove button lives in the same element and
+ * must survive.
+ */
+const allowsExpression = computed<boolean>(() => props.restrictToRuleTypes === undefined);
 
 function ruleTypeOf(row: BuilderValidation): RuleTypeOption | null {
     return props.ruleTypes.find((rule) => rule.value === row.rule_type) ?? null;
@@ -230,6 +268,7 @@ const modeOptions: EnumOption[] = [
         <div v-for="(row, i) in validations" :key="i" class="validations__row">
             <div class="validations__head">
                 <MdsSelect
+                    v-if="allowsExpression"
                     class="validations__mode"
                     :model-value="mode(row)"
                     :options="modeOptions"
@@ -302,9 +341,7 @@ const modeOptions: EnumOption[] = [
             />
         </div>
 
-        <p v-if="validations.length === 0" class="validations__empty">
-            No validation rules. Add one to constrain what respondents can enter.
-        </p>
+        <p v-if="validations.length === 0" class="validations__empty">{{ emptyText }}</p>
         <div>
             <MdsButton
                 variant="tertiary"
@@ -313,7 +350,7 @@ const modeOptions: EnumOption[] = [
                 :disabled="disabled || allowedRuleTypes.length === 0"
                 @click="addRule"
             >
-                Add rule
+                {{ addLabel }}
             </MdsButton>
         </div>
     </div>

@@ -269,6 +269,11 @@ final class BuilderPresenter
                     'takes_operator' => $t->takesOperator(),
                     'takes_related_field' => $t->takesRelatedField(),
                     'operator_may_be_empty' => $t->operatorMayBeEmpty(),
+                    // Increment M116 — whether this rule is what makes `Conditional` requiredness mean
+                    // something, so the Basics tab's "Required when…" reveal can show exactly the rows the
+                    // requiredness setting reads. Transmitted rather than mirrored for the same reason
+                    // `shapes` is: a client-side list of two rule names is a second source that drifts.
+                    'governs_requiredness' => $t->governsRequiredness(),
                 ],
                 ValidationRuleType::cases(),
             ),

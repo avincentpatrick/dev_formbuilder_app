@@ -151,7 +151,14 @@ const TIER2_FILES = ['docs/feature-backlog.md'];
 // re-pointing the corpse first; measured against the tree, that remedy is forbidden by this constant's own
 // contract. ⚠️ THE STANDING REFINEMENT IS UNCHANGED AND IS NOW WORTH MORE: exempt struck-through rows and
 // this ceiling can start ratcheting again on the citations that CAN be repaired. Filed, not taken here.
-const LEDGER_ROT_CEILING = 18;
+// ⚙️ RATCHETED 18 → 17 BY `M116`, in the same commit as the repair that earned it, per this constant's own
+// contract. That increment's insertions turned a `ConfigPanel.vue` citation blank, and the repair DROPPED the
+// line number rather than re-pointing it — the paragraph cites the control by symbol name now, which cannot
+// rot. ⚠️ THE LESSON IS WORTH MORE THAN THE BYTE: the first two attempts at that repair ADDED lines high up
+// in the ledger, which shifted every self-citation below them and manufactured four fresh dead ones at once.
+// A line-count-neutral edit is the only safe way to touch prose above a self-citation, and dropping a number
+// is the only repair that stays repaired.
+const LEDGER_ROT_CEILING = 17;
 
 /** R3 floors. Three, because there are three independent ways for this gate to pass while blind. */
 const MIN_EXPECTED_DOCUMENTS = 40;

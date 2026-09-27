@@ -125,6 +125,20 @@ it('marks exactly the four conditional rules as reading an operator, and the six
         ->and($emptyOk)->toEqualCanonicalizing(['required_with', 'skip_with']);
 });
 
+it('marks exactly the two rules that can make a field required, which is NOT the conditional four', function (): void {
+    // ⛔ THE SKIP PAIR IS THE WHOLE POINT OF THIS CENSUS. All four conditionals read an operator and name a
+    // field, so every other flag on this payload groups them together — but `skip_if`/`skip_with` make a
+    // field IRRELEVANT, never required. The builder's Basics reveal and the publish gate's
+    // conditional-requiredness arm both partition on this flag, so a payload that lumped the four together
+    // would put a skip rule under "Required when…" and would let a field whose only rule is a skip publish
+    // as conditionally required — which is the silent-optional defect M116 closed.
+    $options = ruleTypeOptions($this->payload);
+
+    $governs = array_keys(array_filter($options, static fn (array $o): bool => $o['governs_requiredness'] === true));
+
+    expect($governs)->toEqualCanonicalizing(['required_if', 'required_with']);
+});
+
 it('ships every operator with the row rendering and the shapes it may compare', function (): void {
     $byValue = [];
     foreach ($this->payload['enums']['comparison_operators'] as $option) {

@@ -8,6 +8,7 @@ use App\Enums\RequiredMode;
 use App\Enums\SubmissionSource;
 use App\Enums\SubmissionStatus;
 use App\Enums\ValidationRuleType;
+use App\Exceptions\Forms\PublishValidationException;
 use App\Exceptions\Submissions\SubmissionConflictException;
 use App\Exceptions\Submissions\SubmissionException;
 use App\Exceptions\Submissions\SubmissionValidationException;
@@ -666,4 +667,37 @@ it('refuses a uuid still reserved by a soft-deleted row rather than 23505ing on 
 
     expect(Submission::query()->count())->toBe(0)
         ->and(Submission::withTrashed()->count())->toBe(1);
+});
+
+it('cannot publish a form whose conditional rule would throw on every submission', function (): void {
+    // ⛔ THE ROW'S WHOLE CLAIM, DRIVEN THROUGH THE REAL PUBLISH PATH RATHER THAN THE GATE IN ISOLATION.
+    // Before M116 this draft published clean and then every submission leaving `visit_date` empty raised
+    // `ExpressionEvaluationException` out of `SemanticValidator` — uncaught by `conditionHolds()`, uncaught
+    // here, and answered by `bootstrap/app.php` as a generic failure. A guest saw "A form expression could
+    // not be evaluated", the offline replay burned five attempts and parked the row, and the whole sync
+    // BATCH 422d because `replayOne()` does not catch this type.
+    //
+    // ⚠️ THE ASSERTION IS THAT IT NEVER GETS THAT FAR. `PublishService` runs this gate first of three, so
+    // the author is told at the only moment they can still act. This case is what proves the arm is WIRED,
+    // which `StructuralValidationGateTest` — which constructs the gate directly — cannot say.
+    $build = function (FormVersion $draft, User $u): void {
+        $consent = addFormField($draft, $u, 'consent', FieldType::YesNo, 0);
+        $visit = addFormField($draft, $u, 'visit_date', FieldType::Date, 1);
+
+        FormFieldValidation::create([
+            'form_version_id' => $draft->id,
+            'form_field_id' => $visit->id,
+            'related_form_field_id' => $consent->id,
+            'rule_type' => ValidationRuleType::RequiredIf,
+            'rule_value' => 'yes',
+            // no `operator` — `conditionForOperator()`'s default arm throws on this row
+        ]);
+    };
+
+    try {
+        pipelinePublish($this->tenant, $this->user, $build);
+        $this->fail('expected the publish to be refused before any submission could reach the rule');
+    } catch (PublishValidationException $e) {
+        expect(array_column($e->violations(), 'code'))->toBe(['rule_missing_operator']);
+    }
 });

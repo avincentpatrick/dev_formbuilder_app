@@ -10,6 +10,7 @@ use App\Enums\RequiredMode;
 use App\Enums\ValueShape;
 use App\Exceptions\Forms\PublishValidationException;
 use App\Models\FormField;
+use App\Models\FormFieldValidation;
 use App\Models\FormVersion;
 use App\Services\Validation\SemanticValidator;
 use Illuminate\Support\Collection;
@@ -74,6 +75,15 @@ final class StructuralValidationGate
         // set lookup rather than a per-field query.
         $fieldIdsWithValidations = $validations->pluck('form_field_id')->flip();
 
+        // Increment M116 — which fields own a rule that can actually MAKE them required. Deliberately a
+        // narrower set than the one above: `requiredState()` reads only the `required_*` family, so a field
+        // whose sole rule is a `skip_if` is still a field nothing can ever require. The predicate is
+        // `ValidationRuleType::governsRequiredness()` so this and the builder's reveal answer to one source.
+        $fieldIdsWithRequiredRule = $validations
+            ->filter(static fn (FormFieldValidation $v): bool => $v->rule_type?->governsRequiredness() === true)
+            ->pluck('form_field_id')
+            ->flip();
+
         /** @var list<PublishValidationException> $violations */
         $violations = [];
 
@@ -85,6 +95,33 @@ final class StructuralValidationGate
             // Every queryable field declares an indexed data type (the projection job needs it).
             if ($field->is_queryable && $field->indexed_data_type === null) {
                 $violations[] = PublishValidationException::queryableFieldMissingType($field->key);
+            }
+
+            // Increment M116 — requiredness that can never be satisfied, in two shapes. Both are refused for
+            // the reason `assertHiddenFieldAnswerable()` below is: the alternative is silence, and publish is
+            // the last moment the author can still act.
+            //
+            // (B) Conditional with nothing to condition on. `requiredState()` honours `Conditional` only
+            // through a `required_*` unit and with none the field falls out as OPTIONAL with no warning — so
+            // the builder's Conditional setting was a control that did nothing. ⚠️ There is no symmetric
+            // arm for `Optional` carrying a `required_if`: that direction works today and is legitimate,
+            // because `requiredState()` special-cases only `Required` and treats the other two identically.
+            if ($field->is_required === RequiredMode::Conditional && ! $fieldIdsWithRequiredRule->has($field->id)) {
+                $violations[] = PublishValidationException::conditionalRequirednessHasNoRule($field->key);
+            }
+
+            // (C) A display-only field demanding an answer it cannot take. ⛔ MEASURED, NOT REASONED: a
+            // `note` marked `Required` publishes today and then refuses every submission with
+            // `field_required` on a field that renders no input at all — an error no respondent and no keyer
+            // can ever clear. `SemanticValidator::collectFieldErrors()` early-returns for calculated,
+            // hidden, grid, geo and media fields and for this shape it does not, so the answer is
+            // permanently absent and the required branch fires on the spot.
+            //
+            // ⛔ DISPATCHED ON THE SHAPE RATHER THAN ON A TYPE LIST, per the option-list arm's reasoning
+            // below: `NoAnswer` is the property that makes the demand impossible, and a type list would
+            // need editing every time a display-only type is added.
+            if ($field->is_required !== RequiredMode::Optional && ValueShape::for($field->field_type) === ValueShape::NoAnswer) {
+                $violations[] = PublishValidationException::displayOnlyFieldRequired($field->key, $field->is_required->value);
             }
             // Increment G4a, widened in M112: EVERY type that carries an author-defined option list must be
             // publishably answerable, not only `likert_scale`.
@@ -188,6 +225,46 @@ final class StructuralValidationGate
                     $validation->rule_type->value,
                     ValueShape::for($ownerType)->value,
                 );
+            }
+
+            // Increment M116: a rule that is INCOMPLETE rather than inapplicable. The shape arm above asks
+            // whether this rule suits this field; these two ask whether the rule can be evaluated at all.
+            //
+            // ⛔ IT PUBLISHED CLEAN AND THEN THREW ON EVERY SUBMISSION, and nothing at any of the three
+            // doors refused it. The save door validates each column as plain `nullable` with no cross-field
+            // rule — deliberately, because the builder PATCHes a half-built row on a 600ms debounce and a
+            // required rule there would 422 an author mid-edit. `:156` above checks a related field belongs
+            // to this version only when it is NON-NULL, so a missing one was never the subject of any check.
+            // And nothing catches at the far end: `StructuredRuleEvaluator::conditionHolds()` has no
+            // try/catch, `SemanticValidator` contains none at all, and the throw leaves the submission
+            // pipeline for `bootstrap/app.php`'s renderable, which answers a generic failure.
+            //
+            // ⛔ TOGETHER THESE TWO COVER EVERY THROW CONDITION OF THE CONDITIONAL LOWERING, which is the
+            // claim that makes them a gate rather than two spot checks: `relatedKeyOrThrow()` throws on a
+            // null related id (here) or one absent from the key map (the `:156` arm), and
+            // `conditionForOperator()`'s default arm throws on a null operator (here). Measured against
+            // `StructuredRuleLowering::lowerCondition()`, not inferred from the column list.
+            //
+            // ⛔ TWO INDEPENDENT `if`s, NEVER ONE — the single combined condition is the plausible wrong fix
+            // and it lets a `required_with` naming no question through, because that kind's operator MAY be
+            // absent while its related field may not. Each arm therefore has its own test and its own
+            // mutation with a disjoint kill set.
+            $rule = $validation->rule_type;
+
+            if ($rule !== null) {
+                // All six kinds where a second question is named. `relatedKeyOrThrow()` runs FIRST in
+                // `lowerCondition()`, before any dispatch on the rule type, so this is not the conditional
+                // four — `greater_than_field` and `less_than_field` throw by the same line.
+                if ($rule->takesRelatedField() && $validation->related_form_field_id === null) {
+                    $violations[] = PublishValidationException::ruleMissingRelatedField($ownerKey, $rule->value);
+                }
+                // ⚠️ `required_with` / `skip_with` ARE EXEMPT AND MUST STAY PUBLISHABLE: a null operator
+                // there lowers to `isNotNull(related)` — "when that question is answered at all" — which is
+                // a legitimate condition rather than an omission. `operatorMayBeEmpty()` is the predicate
+                // that says so; a literal list of the two throwing rule names would be a second source.
+                if ($rule->takesOperator() && ! $rule->operatorMayBeEmpty() && $validation->operator === null) {
+                    $violations[] = PublishValidationException::ruleMissingOperator($ownerKey, $rule->value);
+                }
             }
         }
 

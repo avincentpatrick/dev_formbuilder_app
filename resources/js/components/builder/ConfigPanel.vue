@@ -102,6 +102,9 @@ props.store.palette.forEach((group) =>
 /** The shape whose rules the Validation tab may offer. `no_answer` is `note` and `page_break`. */
 const SHAPE_NO_ANSWER = 'no_answer';
 
+/** `RequiredMode::Conditional`. `ServerField.is_required` is a bare string here, so the literal needs a home. */
+const REQUIRED_MODE_CONDITIONAL = 'conditional';
+
 const requiredOptions = enums.required_modes;
 const sectionOptions = computed<EnumOption[]>(() => [
     { value: '', label: 'No section (top level)' },
@@ -253,6 +256,68 @@ function setConfig(key: string, value: unknown): void {
 function setValidations(value: BuilderValidation[]): void {
     setField('validations', value);
 }
+
+/*
+|--------------------------------------------------------------------------
+| Increment M116 — "Required when…" on the Basics tab.
+|
+| ⛔ CHOOSING `Conditional` USED TO DO NOTHING AT ALL. `SemanticValidator::requiredState()` honours the mode
+| only through a `required_if` / `required_with` unit, and with none it falls out as OPTIONAL in silence —
+| so the segmented control wrote a setting no engine acted on, and the editor it looked like it should open
+| (Advanced → `ConditionEditor`) writes `relevant_expression`, which HIDES a field rather than requiring it.
+|
+| ⛔ AND THE ROW'S PRESCRIPTION — "reuse `ConditionRow.vue` directly" — IS WRONG, MEASURED. That component
+| is bound to the `relevant_expression` AST: its props and emits are `Condition` values, its subject side
+| offers count and literal operands a `required_if` cannot use, and its operator vocabulary diverges from
+| the stored `ComparisonOperator` in both directions. `ValidationEditor` is the component that already
+| renders this exact row, so the reveal mounts a second, restricted instance of it.
+|
+| ⛔ ONE ARRAY, TWO SURFACES, AND THE PARTITION IS WHAT KEEPS THEM HONEST. `ValidationEditor` emits a WHOLE
+| fresh array, so handing this instance's output straight to `setValidations` would delete every rule the
+| Validation tab owns. `setRequiredRules` substitutes POSITIONALLY instead: each row the Basics surface does
+| not own keeps its index, so the Validation tab does not reshuffle under the author while they edit here.
+| The two are never mounted at once (the tabs are `v-if`-switched) and both read the same reactive array, so
+| a tab switch re-derives from truth rather than from a copy.
+|--------------------------------------------------------------------------
+*/
+
+/** The rule kinds that can make a field required — transmitted, never a literal pair of names here. */
+const requiredRuleTypes = computed<string[]>(() =>
+    enums.validation_rule_types.filter((rule) => rule.governs_requiredness).map((rule) => rule.value),
+);
+
+/**
+ * ⚠️ `expression === null` IS TESTED FIRST, MIRRORING `SemanticValidator::family()`. A raw-expression row
+ * carries a null `rule_type` and is classified by its expression, never by the rule column.
+ */
+function isRequiredRule(row: BuilderValidation): boolean {
+    return row.expression === null && row.rule_type !== null && requiredRuleTypes.value.includes(row.rule_type);
+}
+
+const requiredRules = computed<BuilderValidation[]>(() => (field.value?.validations ?? []).filter(isRequiredRule));
+
+const isConditionalRequired = computed<boolean>(
+    () => field.value?.is_required === REQUIRED_MODE_CONDITIONAL && valueShape.value !== SHAPE_NO_ANSWER,
+);
+
+function setRequiredRules(next: BuilderValidation[]): void {
+    const current = field.value?.validations ?? [];
+    const merged: BuilderValidation[] = [];
+    let cursor = 0;
+
+    for (const row of current) {
+        if (isRequiredRule(row)) {
+            // A slot this surface owns: take the next edited row, or drop the slot when one was removed.
+            if (cursor < next.length) merged.push(next[cursor++]);
+        } else {
+            merged.push(row);
+        }
+    }
+    // Anything left over is a rule the author just added here.
+    while (cursor < next.length) merged.push(next[cursor++]);
+
+    setValidations(merged.map((row, i) => ({ ...row, sequence: i })));
+}
 function setSection<K extends keyof LocalSection>(key: K, value: LocalSection[K]): void {
     const target = section.value;
     if (!target) return;
@@ -351,6 +416,22 @@ watch(librarySaved, (value) => {
                                 ariaLabel="Requiredness"
                                 @update:model-value="setField('is_required', $event)"
                             />
+
+                            <fieldset v-if="isConditionalRequired" class="config__when">
+                                <legend class="config__when-legend">Required when…</legend>
+                                <ValidationEditor
+                                    :validations="requiredRules"
+                                    :rule-types="enums.validation_rule_types"
+                                    :operators="enums.comparison_operators"
+                                    :value-shape="valueShape"
+                                    :comparable-fields="comparableFields"
+                                    :restrict-to-rule-types="requiredRuleTypes"
+                                    add-label="Add condition"
+                                    empty-text="No condition yet — this question stays optional until you add one."
+                                    @update:validations="setRequiredRules"
+                                />
+                                <p class="config__when-note">These also appear on the Validation tab.</p>
+                            </fieldset>
                         </div>
                     </template>
 
@@ -656,6 +737,39 @@ watch(librarySaved, (value) => {
     font-size: var(--mds-type-label-font-size);
     font-weight: var(--mds-font-weight-medium);
     color: var(--mds-color-text-body);
+}
+
+/* M116 — the "Required when…" reveal. `min-width: 0` for the same reason the segmented control above
+   wraps: this column is `overflow-y: auto`, so anything that refuses to shrink becomes a real horizontal
+   scrollbar rather than a clipped edge, and a fieldset's default `min-width: min-content` refuses. */
+.config__when {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mds-space-2);
+    padding: 0;
+    border: 0;
+    min-width: 0;
+    margin-top: var(--mds-space-2);
+}
+
+/* Copied verbatim from `ConditionEditor.vue`'s `.cond__legend`, which the builder axe scan already covers
+   on the Advanced tab — this one is not scanned (no spec drives the segmented control to Conditional
+   mid-loop), so matching an already-proved set of tokens is what stands in for the scan. */
+.config__when-legend {
+    padding: 0;
+    margin-bottom: var(--mds-space-1);
+    font-size: var(--mds-type-body-sm-font-size);
+    font-weight: var(--mds-font-weight-medium);
+    color: var(--mds-color-text-body);
+}
+
+/* ⚠️ `text-secondary`, NOT `text-muted`: the latter is not a token in this design system — it exists in two
+   places in the tree and one of them is a comment saying so — and an undefined custom property silently
+   inherits rather than erroring, so the note would have rendered at body colour and nothing would have said. */
+.config__when-note {
+    margin: 0;
+    font-size: var(--mds-type-body-sm-font-size);
+    color: var(--mds-color-text-secondary);
 }
 
 .config__checks {

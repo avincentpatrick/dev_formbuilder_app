@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Enums;
 
+use App\Services\Expressions\StructuredRuleLowering;
+
 /**
  * Structured validation rule kinds (data-dictionary §6), mirroring legacy's 11-row `rule_types`
  * lookup. Mutually exclusive with a free-text `expression` on the same row (a DB CHECK enforces
@@ -22,4 +24,97 @@ enum ValidationRuleType: string
     case SkipWith = 'skip_with';
     case GreaterThanField = 'greater_than_field';
     case LessThanField = 'less_than_field';
+
+    /**
+     * How this rule reads to an author (Increment M115). Replaces `BuilderPresenter`'s `humanize()` —
+     * `ucfirst(str_replace('_', ' ', …))` over the enum value — for this list.
+     *
+     * ⛔ A `match` WITH NO `default`, like every other registry in this directory: a twelfth rule type
+     * must be a PHPStan level-8 error rather than a row that renders its own database value at an author.
+     */
+    public function label(): string
+    {
+        return match ($this) {
+            self::MinValue => 'Minimum value',
+            self::MaxValue => 'Maximum value',
+            self::MinLength => 'Minimum length',
+            self::MaxLength => 'Maximum length',
+            self::Pattern => 'Must match a pattern',
+            self::RequiredIf => 'Required when a condition holds',
+            self::RequiredWith => 'Required with another question',
+            self::SkipIf => 'Skipped when a condition holds',
+            self::SkipWith => 'Skipped with another question',
+            self::GreaterThanField => 'Greater than another question',
+            self::LessThanField => 'Less than another question',
+        };
+    }
+
+    /**
+     * Whether the `operator` column is READ for a rule of this kind (Increment M115).
+     *
+     * ⛔ MEASURED AT THE LOWERINGS, NOT REASONED FROM THE COLUMN'S EXISTENCE — and this is the fact the
+     * builder was missing. {@see StructuredRuleLowering::lowerCondition()} is a
+     * `match` over exactly these four cases and throws `unlowerableRuleType` for every other rule type;
+     * `resources/public-runtime/engine/lowering.ts` is its twin. So for the other seven the column is
+     * never read at all, and the builder offering an operator beside `pattern` or `min_length` was
+     * offering a control with no effect.
+     *
+     * ⚠️ AND THE OPERATOR IT NAMES COMPARES THE *RELATED* FIELD, NEVER THE OWNING ONE. That is why
+     * {@see ValueShape::allowsOperator()} must be asked about the field named by
+     * {@see takesRelatedField()}, and asking it about the rule's owner would filter the wrong list.
+     * Pinned behaviourally against the lowering by `tests/Unit/Expressions/ConditionalLoweringPinTest.php`
+     * rather than restated, because a third copy of a control-flow fact is a third thing to drift.
+     */
+    public function takesOperator(): bool
+    {
+        return match ($this) {
+            self::RequiredIf, self::RequiredWith, self::SkipIf, self::SkipWith => true,
+            self::MinValue, self::MaxValue, self::MinLength, self::MaxLength, self::Pattern,
+            self::GreaterThanField, self::LessThanField => false,
+        };
+    }
+
+    /**
+     * Whether a rule of this kind names a SECOND field (Increment M115) — the `related_form_field_id`
+     * column, surfaced to the builder as `related_field_key`.
+     *
+     * ⛔ THE BUILDER KNEW TWO OF THESE SIX AND THAT WAS THE DEFECT. `ValidationEditor.vue` carried a
+     * client-side literal `FIELD_COMPARISON = new Set(['greater_than_field', 'less_than_field'])` and
+     * rendered the compared-field input for those two only — so the four conditional rules, which
+     * `lowerCondition()` cannot lower without a related key, had no control to name one and were
+     * **uncompletable in that editor**. This method replaces that literal rather than joining it.
+     */
+    public function takesRelatedField(): bool
+    {
+        return match ($this) {
+            self::RequiredIf, self::RequiredWith, self::SkipIf, self::SkipWith,
+            self::GreaterThanField, self::LessThanField => true,
+            self::MinValue, self::MaxValue, self::MinLength, self::MaxLength, self::Pattern => false,
+        };
+    }
+
+    /**
+     * Whether a rule of this kind is still evaluable with NO operator — and what the absence means
+     * (Increment M115). Only meaningful where {@see takesOperator()} is true.
+     *
+     * ⛔ AN EMPTY OPERATOR IS NOT "UNSET" HERE, IT IS A DIFFERENT CONDITION. `lowerCondition()` reads
+     * `required_with` / `skip_with` with a null operator as `isNotNull(relatedKey)` — *"when that
+     * question is answered at all"* — which is a legitimate and probably the commonest authoring
+     * choice. For `required_if` / `skip_if` the same null reaches `conditionForOperator()`'s default arm
+     * and **throws**, so a row saved that way publishes clean and then fails every submission.
+     *
+     * ⚠️ THIS IS A THIRD FACT AND THE PLAN FOR THIS INCREMENT NAMED ONLY TWO. It exists because the
+     * editor cannot be honest without it: the operator control must offer an explicit "is answered"
+     * choice where the absence has that meaning, and must not offer an empty one where the absence is
+     * a broken rule.
+     */
+    public function operatorMayBeEmpty(): bool
+    {
+        return match ($this) {
+            self::RequiredWith, self::SkipWith => true,
+            self::RequiredIf, self::SkipIf,
+            self::MinValue, self::MaxValue, self::MinLength, self::MaxLength, self::Pattern,
+            self::GreaterThanField, self::LessThanField => false,
+        };
+    }
 }

@@ -83,38 +83,62 @@ it('leaves a hidden field unvalidated, which the publish gate would otherwise re
     expect($field->validations()->count())->toBe(0);
 });
 
-it('ships an email pattern that actually accepts and rejects the right strings', function (): void {
-    // ⛔ THE CASE THAT MATTERS. The one above proves a row exists; this proves the row works, through the
-    // real StructuredRuleEvaluator rather than a hand-rolled preg_match.
-    expect(passesDefaultPattern(FieldType::Email, 'nurse@pitahc.gov.ph'))->toBeTrue()
-        ->and(passesDefaultPattern(FieldType::Email, 'a.b+tag@sub.example.co.uk'))->toBeTrue()
-        ->and(passesDefaultPattern(FieldType::Email, 'bob'))->toBeFalse()
-        ->and(passesDefaultPattern(FieldType::Email, 'bob@'))->toBeFalse()
-        ->and(passesDefaultPattern(FieldType::Email, 'bob@localhost'))->toBeFalse()
-        ->and(passesDefaultPattern(FieldType::Email, 'two words@example.com'))->toBeFalse();
+/**
+ * The shared accept/reject table (Increment M115, `R-2a4f6afe`). ONE copy, TWO engines: this file drives it
+ * through PHP and `resources/public-runtime/engine/__tests__/default-field-patterns.test.ts` drives the same
+ * rows through a real V8 `RegExp`. The samples used to live inline here, which made them a copy the JS half
+ * would have had to duplicate — and a table that disagrees with itself cannot prove a parity claim.
+ *
+ * ⚠️ IT THROWS RATHER THAN `expect()`s, because this runs at Pest COLLECTION time, before the container
+ * exists. A plain path for the same reason — not `base_path()`.
+ *
+ * @return list<array{name: string, field_type: string, answer: string, expected: bool}>
+ */
+function defaultPatternCases(): array
+{
+    $path = dirname(__DIR__, 2).'/fixtures/default-field-patterns.json';
+    $raw = @file_get_contents($path);
+
+    if ($raw === false) {
+        throw new RuntimeException("default-field-patterns.json must be readable at {$path}");
+    }
+
+    $decoded = json_decode($raw, true, 512, JSON_THROW_ON_ERROR);
+
+    return $decoded['cases'];
+}
+
+dataset('default pattern samples', function (): iterable {
+    foreach (defaultPatternCases() as $case) {
+        yield $case['name'] => [$case];
+    }
 });
 
-it('ships a url pattern that requires an explicit scheme', function (): void {
-    expect(passesDefaultPattern(FieldType::Url, 'https://example.com/path?q=1'))->toBeTrue()
-        ->and(passesDefaultPattern(FieldType::Url, 'http://example.com'))->toBeTrue()
-        ->and(passesDefaultPattern(FieldType::Url, 'example.com'))->toBeFalse()
-        ->and(passesDefaultPattern(FieldType::Url, 'ftp://example.com'))->toBeFalse();
-});
+it('agrees with the shipped pattern on', function (array $case): void {
+    // ⛔ THE CASES THAT MATTER. The ones above prove a row EXISTS; these prove the row WORKS, through the
+    // real StructuredRuleEvaluator rather than a hand-rolled preg_match — and through the same table the
+    // JavaScript engine is driven with, so "both engines agree" is a measured statement rather than a note.
+    expect(passesDefaultPattern(FieldType::from($case['field_type']), $case['answer']))->toBe($case['expected']);
+})->with('default pattern samples');
 
-it('ships a phone pattern that accepts real numbers from more than one country', function (): void {
-    // This is a multi-tenant product: a national format would be the wrong assertion to ship as a default.
-    expect(passesDefaultPattern(FieldType::Phone, '+639171234567'))->toBeTrue()
-        ->and(passesDefaultPattern(FieldType::Phone, '(02) 8123 4567'))->toBeTrue()
-        ->and(passesDefaultPattern(FieldType::Phone, '555-0100'))->toBeTrue()
-        ->and(passesDefaultPattern(FieldType::Phone, 'call me'))->toBeFalse()
-        ->and(passesDefaultPattern(FieldType::Phone, '123'))->toBeFalse();
-});
+it('drives a table that covers both verdicts for all three types, so no case list can go vacuous', function (): void {
+    // ⛔ ANTI-VACUITY. A fixture that failed to load would have thrown at collection; one that SHRANK, or
+    // drifted to one-sided expectations, would leave the dataset above green while asserting almost nothing.
+    // The empty-answer rows are part of the floor: both engines short-circuit `pattern` on an empty answer,
+    // and a format default that silently also meant "required" would be a much worse surprise than none.
+    $cases = defaultPatternCases();
+    $names = array_column($cases, 'name');
 
-it('passes an empty answer for every default, so a default never makes a field required', function (): void {
-    // Both engines short-circuit `pattern` on an empty answer. Requiredness is RequiredMode's job, and a
-    // format default that silently also meant "required" would be a much worse surprise than no default.
-    foreach ([FieldType::Email, FieldType::Url, FieldType::Phone] as $type) {
-        expect(passesDefaultPattern($type, ''))->toBeTrue("an empty answer should pass {$type->value}'s default");
+    expect(count($cases))->toBeGreaterThanOrEqual(15)
+        ->and(count(array_unique($names)))->toBe(count($cases));
+
+    foreach (['email', 'url', 'phone'] as $type) {
+        $mine = array_values(array_filter($cases, static fn (array $c): bool => $c['field_type'] === $type));
+        $verdicts = array_column($mine, 'expected');
+
+        expect($verdicts)->toContain(true)
+            ->and($verdicts)->toContain(false);
+        expect(array_column($mine, 'answer'))->toContain('');
     }
 });
 

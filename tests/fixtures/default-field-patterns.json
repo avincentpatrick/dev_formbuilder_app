@@ -1,0 +1,25 @@
+{
+  "note": "Increment M115 — the accept/reject table for the three pattern rows DefaultFieldRules seeds (email, url, phone). ONE table, TWO engines: tests/Feature/Forms/FieldDefaultValidationsTest.php drives it through PHP's StructuredRuleEvaluator and resources/public-runtime/engine/__tests__/default-field-patterns.test.ts drives it through the TypeScript twin in a real V8 RegExp. THE PATTERNS ARE DELIBERATELY NOT IN THIS FILE: each side reads the shipped body out of app/Support/Forms/DefaultFieldRules.php, because a transcription here would be the copy the row was filed about. Sample strings only.",
+  "cases": [
+    { "name": "email_gov_address", "field_type": "email", "answer": "nurse@pitahc.gov.ph", "expected": true },
+    { "name": "email_subdomain_and_tag", "field_type": "email", "answer": "a.b+tag@sub.example.co.uk", "expected": true },
+    { "name": "email_bare_word", "field_type": "email", "answer": "bob", "expected": false },
+    { "name": "email_no_host", "field_type": "email", "answer": "bob@", "expected": false },
+    { "name": "email_dotless_host", "field_type": "email", "answer": "bob@localhost", "expected": false },
+    { "name": "email_inner_space", "field_type": "email", "answer": "two words@example.com", "expected": false },
+    { "name": "email_empty_answer", "field_type": "email", "answer": "", "expected": true },
+
+    { "name": "url_https_with_query", "field_type": "url", "answer": "https://example.com/path?q=1", "expected": true },
+    { "name": "url_plain_http", "field_type": "url", "answer": "http://example.com", "expected": true },
+    { "name": "url_scheme_missing", "field_type": "url", "answer": "example.com", "expected": false },
+    { "name": "url_wrong_scheme", "field_type": "url", "answer": "ftp://example.com", "expected": false },
+    { "name": "url_empty_answer", "field_type": "url", "answer": "", "expected": true },
+
+    { "name": "phone_e164_ph_mobile", "field_type": "phone", "answer": "+639171234567", "expected": true },
+    { "name": "phone_ph_landline_bracketed", "field_type": "phone", "answer": "(02) 8123 4567", "expected": true },
+    { "name": "phone_us_short", "field_type": "phone", "answer": "555-0100", "expected": true },
+    { "name": "phone_words", "field_type": "phone", "answer": "call me", "expected": false },
+    { "name": "phone_too_short", "field_type": "phone", "answer": "123", "expected": false },
+    { "name": "phone_empty_answer", "field_type": "phone", "answer": "", "expected": true }
+  ]
+}

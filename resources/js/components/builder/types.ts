@@ -95,6 +95,10 @@ export interface PaletteType {
     // The dedicated config editor this type needs beyond the shared tabs (G4a): 'choices' | 'cascading' |
     // null. Mirrors FieldType::configEditor(); the config panel keys its editor tab off this.
     config_editor: string | null;
+    // What may be ASSERTED about this type's value (M115) — `ValueShape::for()`'s twelve-member partition,
+    // not a thirty-first field-type special case. The config panel matches it against each rule type's
+    // `shapes` to decide what the Validation tab may offer, and hides that tab entirely for 'no_answer'.
+    value_shape: string;
 }
 
 export interface PaletteGroup {
@@ -109,11 +113,51 @@ export interface EnumOption {
     label: string;
 }
 
+// One validation rule kind as the server offers it (M115). Mirrors BuilderPresenter::enums() —
+// TRANSMITTED DATA regenerated per page load, not a client-side table: the editor filters with `shapes`
+// and never re-states which rules suit which field, which is the defect `R-e878d49a` filed.
+export interface RuleTypeOption extends EnumOption {
+    // ValueShape values whose `allows()` is true — the same table the publish gate refuses on, so the
+    // author surface and the gate cannot disagree about what is buildable.
+    shapes: string[];
+    // Whether the `operator` column is READ for this rule. Only the four conditional kinds read it; for
+    // the other seven both lowerings throw, so an operator control beside them changes nothing.
+    takes_operator: boolean;
+    // Whether the rule names a SECOND field (`related_field_key`). Six do — the four conditionals plus the
+    // two field comparisons — and before M115 the editor gave a control to only two of them.
+    takes_related_field: boolean;
+    // Whether an ABSENT operator is itself a condition ("when that question is answered at all"), which is
+    // true for `required_with`/`skip_with` and a broken row for `required_if`/`skip_if`.
+    operator_may_be_empty: boolean;
+}
+
+// One comparison operator as a rule row shows it (M115). `label` carries its symbol inside the string
+// (`at most (≤)`) so no caller can render the symbol without the words or pair them wrongly — `D59`.
+//
+// `D59`'s OTHER rendering, the sentence form, is not transmitted: its consumers are the condition editor's
+// own maps, which cover a wider vocabulary than this enum (`not_blank` and `excludes` have no PHP case), and
+// `tests/Unit/Forms/ConditionLabelMirrorDriftTest.php` is what holds those to `sentenceLabel()`.
+export interface OperatorOption extends EnumOption {
+    // ⚠️ The shapes of the RELATED field, never the rule's owner: a conditional rule's operator compares
+    // the value of the field the rule NAMES.
+    shapes: string[];
+}
+
 export interface BuilderEnums {
     required_modes: EnumOption[];
     indexed_data_types: EnumOption[];
-    validation_rule_types: EnumOption[];
-    comparison_operators: EnumOption[];
+    validation_rule_types: RuleTypeOption[];
+    comparison_operators: OperatorOption[];
+}
+
+// A sibling field a validation row may name (M115) — for the six rule types that compare against a second
+// question. Kept separate from `ConditionFieldOption`: that one carries `numeric`, a four-member field-type
+// set the validation editor must NOT filter operators with (`FieldTypeMirrorDriftTest` pins it as a
+// declared divergence from `ValueShape::allowsOperator()`'s five, and `R-c1f90d7a` owns reconciling it).
+export interface ComparableField {
+    key: string;
+    label: string;
+    value_shape: string;
 }
 
 // A question-library item as the picker shows it (Increment G9b). Mirrors BuilderPresenter::libraryItem —

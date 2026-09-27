@@ -9,6 +9,7 @@ use App\Enums\FieldType;
 use App\Enums\IndexedDataType;
 use App\Enums\RequiredMode;
 use App\Enums\ValidationRuleType;
+use App\Enums\ValueShape;
 use App\Models\FieldLibrary;
 use App\Models\Form;
 use App\Models\FormField;
@@ -219,6 +220,10 @@ final class BuilderPresenter
                 'advanced' => $type->isAdvanced(),
                 'has_options' => $type->hasOptions(),
                 'config_editor' => $type->configEditor(),
+                // Increment M115 — what may be ASSERTED about this type's value. It rides here rather than
+                // in `enums()` because the panel already builds its per-type maps from this list, and
+                // because a per-type key in `enums()` would be a thirty-one-entry copy of a twelve-row table.
+                'value_shape' => ValueShape::for($type)->value,
             ];
         }
 
@@ -226,7 +231,21 @@ final class BuilderPresenter
     }
 
     /**
-     * @return array<string, list<array{value: string, label: string}>>
+     * The option lists the config panels bind to.
+     *
+     * ⛔ THE APPLICABILITY LISTS ARE TRANSMITTED DATA, NOT A CLIENT MIRROR, AND THE DISTINCTION IS THE
+     * WHOLE DESIGN (Increment M115). `shapes` is regenerated from {@see ValueShape} on every page load,
+     * so it cannot drift from the enum the way a hand-written client set does — this repository has
+     * measured ten of those. The client filters with it; it never re-states it. What would have been a
+     * mirror is `ValidationEditor.vue` deciding for itself which rules suit which field, which is
+     * exactly the defect `R-e878d49a` filed.
+     *
+     * ⚠️ KEYED ON A SHAPE RATHER THAN ON A FIELD TYPE, for the reason {@see ValueShape}'s docblock
+     * gives: twelve shapes by eleven rule types is a table a person can read, and thirty-one by eleven
+     * is not. The field's own shape rides on the palette entry ({@see palette()}), which is where the
+     * panel already derives its per-type facts.
+     *
+     * @return array<string, list<array<string, mixed>>>
      */
     private function enums(): array
     {
@@ -241,18 +260,49 @@ final class BuilderPresenter
                 IndexedDataType::cases(),
             ),
             'validation_rule_types' => array_map(
-                fn (ValidationRuleType $t) => ['value' => $t->value, 'label' => $this->humanize($t->value)],
+                fn (ValidationRuleType $t) => [
+                    'value' => $t->value,
+                    'label' => $t->label(),
+                    // Which value shapes may carry this rule at all — `ValueShape::allows()`, the same
+                    // table the publish gate refuses on. The editor and the gate now answer to one source.
+                    'shapes' => $this->shapesAllowing(fn (ValueShape $s) => $s->allows($t)),
+                    'takes_operator' => $t->takesOperator(),
+                    'takes_related_field' => $t->takesRelatedField(),
+                    'operator_may_be_empty' => $t->operatorMayBeEmpty(),
+                ],
                 ValidationRuleType::cases(),
             ),
             'comparison_operators' => array_map(
-                fn (ComparisonOperator $t) => ['value' => $t->value, 'label' => $this->humanize($t->value)],
+                fn (ComparisonOperator $t) => [
+                    'value' => $t->value,
+                    // The ROW rendering — `at most (≤)` — because this list feeds a rule row's control and
+                    // the report that filed the row asked for "the text plus the symbol".
+                    //
+                    // ⛔ `sentenceLabel()` IS DELIBERATELY NOT SHIPPED HERE. Its consumers are the two
+                    // client copies in `ConditionRow.vue` and `condition-describer.ts`, which compose a
+                    // sentence and keep their own maps for a vocabulary wider than this enum; what holds
+                    // them to PHP is `ConditionLabelMirrorDriftTest`, not this payload. Transmitting a
+                    // second label nothing reads would be exactly the decorative surface `M43` measured.
+                    'label' => $t->label(),
+                    // ⚠️ These shapes belong to the RELATED field, never the rule's owner: an operator in a
+                    // conditional rule compares the value of the field the rule NAMES. See
+                    // ValidationRuleType::takesOperator() for where that was measured.
+                    'shapes' => $this->shapesAllowing(fn (ValueShape $s) => $s->allowsOperator($t)),
+                ],
                 ComparisonOperator::cases(),
             ),
         ];
     }
 
-    private function humanize(string $value): string
+    /**
+     * @param  callable(ValueShape): bool  $predicate
+     * @return list<string>
+     */
+    private function shapesAllowing(callable $predicate): array
     {
-        return ucfirst(str_replace('_', ' ', $value));
+        return array_values(array_map(
+            fn (ValueShape $s): string => $s->value,
+            array_filter(ValueShape::cases(), $predicate),
+        ));
     }
 }

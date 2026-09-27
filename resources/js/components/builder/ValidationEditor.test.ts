@@ -252,3 +252,84 @@ describe('ValidationEditor — what it emits', () => {
         expect(next.rule_type).toBe('min_length');
     });
 });
+
+/*
+ * Increment M116 — the same editor, restricted to one family of rules.
+ *
+ * The Basics tab's "Required when…" reveal mounts a SECOND instance of this component rather than a second
+ * editor, because the row it needs is byte-identical to the Validation tab's minus the mode switch. These
+ * cases pin the three props that make that possible, and the one that must stay inert for the first caller.
+ */
+
+const REQUIRED_FAMILY = ['required_if', 'required_with'];
+
+function mountRestricted(valueShape: string, validations: BuilderValidation[] = [], restrictToRuleTypes = REQUIRED_FAMILY) {
+    return mount(ValidationEditor, {
+        props: {
+            validations,
+            ruleTypes: RULE_TYPES,
+            operators: OPERATORS,
+            valueShape,
+            comparableFields: FIELDS,
+            restrictToRuleTypes,
+            addLabel: 'Add condition',
+            emptyText: 'No condition yet — this question stays optional until you add one.',
+        },
+    });
+}
+
+describe('ValidationEditor — restricted to one family (M116)', () => {
+    it('offers only the restricted rules, and not a rule the shape would otherwise allow', () => {
+        // ⚠️ `Minimum length` IS THE NON-VACUOUS HALF. The `text` shape allows it, so its absence proves the
+        // restriction is doing the work rather than the shape filter that was already there.
+        const wrapper = mountRestricted('text', [row({ rule_type: 'required_if' })]);
+
+        expect(optionLabels(wrapper, 'Rule 1 check')).toEqual([
+            'Required when a condition holds',
+            'Required with another question',
+        ]);
+        expect(optionLabels(wrapper, 'Rule 1 check')).not.toContain('Minimum length');
+    });
+
+    it('seeds a new row from the restricted list, not from the first rule the shape allows', () => {
+        const wrapper = mountRestricted('text');
+
+        wrapper.findAll('button').find((b) => b.text() === 'Add condition')!.trigger('click');
+
+        const emitted = wrapper.emitted('update:validations')![0][0] as BuilderValidation[];
+        expect(emitted[0].rule_type).toBe('required_if');
+    });
+
+    it('hides the expression switch when restricted, keeps it when not, and keeps the remove button in both', () => {
+        // ⛔ BOTH HALVES IN ONE CASE SO NEITHER IS VACUOUS. An expression row carries `rule_type: null` and
+        // could never belong to a restricted partition, so offering the switch would let an author move a
+        // row out of the surface that owns it into nothing. The remove button shares the row head with that
+        // select, which is why gating the head instead of the select is the mistake this case catches.
+        const restricted = mountRestricted('text', [row({ rule_type: 'required_if' })]);
+        expect(restricted.find('[aria-label="Rule 1 type"]').exists()).toBe(false);
+        expect(restricted.find('[aria-label="Remove rule 1"]').exists()).toBe(true);
+
+        const open = mountEditor('text', [row({ rule_type: 'required_if' })]);
+        expect(open.find('[aria-label="Rule 1 type"]').exists()).toBe(true);
+        expect(open.find('[aria-label="Remove rule 1"]').exists()).toBe(true);
+    });
+
+    it('disables adding when the restriction and the shape intersect to nothing', () => {
+        // `greater_than_field` is allowed on `number`, but it governs no requiredness — so a reveal
+        // restricted to the required family on a shape whose required rules are excluded has nothing to add.
+        const wrapper = mountRestricted('number', [], ['greater_than_field_that_does_not_exist']);
+
+        const add = wrapper.findAll('button').find((b) => b.text() === 'Add condition')!;
+        expect(add.attributes('disabled')).toBeDefined();
+    });
+
+    it('uses the supplied wording, while the default caller keeps the original strings', () => {
+        const restricted = mountRestricted('text');
+        expect(restricted.text()).toContain('No condition yet');
+        expect(restricted.findAll('button').some((b) => b.text() === 'Add condition')).toBe(true);
+
+        const open = mountEditor('text');
+        expect(open.text()).toContain('No validation rules.');
+        expect(open.findAll('button').some((b) => b.text() === 'Add rule')).toBe(true);
+    });
+});

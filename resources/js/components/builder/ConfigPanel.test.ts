@@ -36,14 +36,35 @@ vi.mock('@/composables/useEntitlements', () => ({
     useEntitlements: () => ({ feature: () => mocks.fieldLibrary.value }),
 }));
 
+/**
+ * ⛔ THIS FIXTURE WAS INERT UNTIL M116 AND THAT IS WHY NOTHING HERE HAD EVER RENDERED A RULE ROW.
+ * `required_modes` held two of three modes and both rule vocabularies were empty, so the Basics tab could
+ * not reach the Conditional branch and the Validation tab had nothing to offer. Every member added below is
+ * made LOAD-BEARING by an assertion rather than by a type annotation: `tsconfig.json` excludes every test
+ * file, so a required member added to these interfaces rots to `undefined` here and no gate sees it — which
+ * is exactly how M115 shipped a panel whose rule filter silently offered nothing.
+ *
+ * `min_length` is present so the restriction on the reveal has something real to exclude, and `skip_if` so
+ * `governs_requiredness` discriminates rather than merely renders: it reads an operator and names a field
+ * like the two required rules, and differs only in the flag the partition turns on.
+ */
 const ENUMS: BuilderEnums = {
     required_modes: [
         { value: 'optional', label: 'Optional' },
         { value: 'required', label: 'Required' },
+        { value: 'conditional', label: 'Conditional' },
     ],
     indexed_data_types: [],
-    validation_rule_types: [],
-    comparison_operators: [],
+    validation_rule_types: [
+        { value: 'min_length', label: 'Minimum length', shapes: ['text'], takes_operator: false, takes_related_field: false, operator_may_be_empty: false, governs_requiredness: false },
+        { value: 'required_if', label: 'Required when a condition holds', shapes: ['text', 'choice'], takes_operator: true, takes_related_field: true, operator_may_be_empty: false, governs_requiredness: true },
+        { value: 'required_with', label: 'Required with another question', shapes: ['text', 'choice'], takes_operator: true, takes_related_field: true, operator_may_be_empty: true, governs_requiredness: true },
+        { value: 'skip_if', label: 'Skipped when a condition holds', shapes: ['text', 'choice'], takes_operator: true, takes_related_field: true, operator_may_be_empty: false, governs_requiredness: false },
+    ],
+    comparison_operators: [
+        { value: 'eq', label: 'equals (=)', shapes: ['text', 'choice'] },
+        { value: 'is_null', label: 'is blank', shapes: ['text', 'choice'] },
+    ],
 };
 
 /**
@@ -112,7 +133,15 @@ function section(overrides: Partial<LocalSection> = {}): LocalSection {
     };
 }
 
-function makeStore(selected: { field?: LocalField | null; section?: LocalSection | null } = {}): BuilderStore {
+/**
+ * ⚠️ `fields` IS NOT DECORATION SINCE M116. The panel derives `comparableFields` from it, and the operator
+ * control on a conditional rule is DISABLED until the compared question resolves to a shape — so a store
+ * double with an empty field list silently makes that control unusable, and a case that drives it passes
+ * vacuously or fails for the wrong reason. It defaults to empty because every pre-M116 case wants that.
+ */
+function makeStore(
+    selected: { field?: LocalField | null; section?: LocalSection | null; fields?: LocalField[] } = {},
+): BuilderStore {
     return {
         selectedField: computed(() => selected.field ?? null),
         selectedSection: computed(() => selected.section ?? null),
@@ -122,7 +151,7 @@ function makeStore(selected: { field?: LocalField | null; section?: LocalSection
         enums: ENUMS,
         palette: PALETTE,
         sections: ref<LocalSection[]>([]),
-        fields: ref<LocalField[]>([]),
+        fields: ref<LocalField[]>(selected.fields ?? []),
         touch: () => undefined,
         moveFieldToSection: () => undefined,
         saveFieldToLibrary: () => Promise.resolve(),
@@ -273,5 +302,132 @@ describe('ConfigPanel — the plan gate on Save-to-library (M90)', () => {
         // The route refuses it either way; this spares the click, exactly as Builder.vue says at its own
         // call site for the Fields-to-Library toggle.
         expect((await advancedBodyOf(false)).text()).not.toContain('Save to library');
+    });
+});
+
+/*
+ * Increment M116 — "Required when…" on the Basics tab.
+ *
+ * Choosing Conditional used to write a setting no engine acted on: `requiredState()` honours the mode only
+ * through a required_* rule, and with none the field falls out as optional in silence. These cases pin the
+ * reveal, and — the one that matters — that it cannot delete the rules the Validation tab owns.
+ */
+
+function validation(overrides: Partial<BuilderValidation> = {}): BuilderValidation {
+    return {
+        rule_type: 'min_length',
+        operator: null,
+        rule_value: null,
+        expression: null,
+        error_message: null,
+        related_field_key: null,
+        sequence: 0,
+        ...overrides,
+    };
+}
+
+describe('ConfigPanel — the Conditional requiredness reveal (M116)', () => {
+    it.each([
+        ['optional', 'Optional'],
+        ['required', 'Required'],
+    ])('shows no condition editor when requiredness is %s', (mode) => {
+        const wrapper = mountPanel(makeStore({ field: field({ is_required: mode }) }));
+
+        expect(wrapper.find('[aria-label="Rule 1 check"]').exists()).toBe(false);
+        expect(wrapper.text()).not.toContain('Required when');
+    });
+
+    it('reveals a complete condition row on Basics when requiredness is Conditional', () => {
+        const wrapper = mountPanel(
+            makeStore({
+                field: field({
+                    is_required: 'conditional',
+                    validations: [validation({ rule_type: 'required_if', related_field_key: 'age' })],
+                }),
+            }),
+        );
+
+        expect(wrapper.text()).toContain('Required when');
+        expect(wrapper.find('[aria-label="Rule 1 check"]').exists()).toBe(true);
+        expect(wrapper.find('[aria-label="Rule 1 compared field"]').exists()).toBe(true);
+        expect(wrapper.find('[aria-label="Rule 1 operator"]').exists()).toBe(true);
+        // ⚠️ And NOT the mode switch: a raw expression cannot belong to this partition.
+        expect(wrapper.find('[aria-label="Rule 1 type"]').exists()).toBe(false);
+    });
+
+    it('adds no second tablist and no fourth tab', () => {
+        // ⛔ THE ONE-TABLIST INVARIANT. Thirteen e2e locators walk `[role="tab"]` on this page, so a revealed
+        // sub-panel that introduced its own strip would break them all. It holds by construction here — the
+        // reveal renders only selects, inputs and buttons — and "by construction" is precisely what this
+        // asserts, because the next person to reach for a sub-tabbed editor will not know that.
+        const wrapper = mountPanel(makeStore({ field: field({ is_required: 'conditional' }) }));
+
+        expect(wrapper.findAll('[role="tablist"]')).toHaveLength(1);
+        expect(wrapper.findAll('[role="tab"]').map((t) => t.text())).toEqual(['Basics', 'Validation', 'Advanced']);
+    });
+
+    it('edits only the rules it owns and leaves every other rule byte-identical at its own index', () => {
+        // ⛔ THE CLOBBER CASE, AND IT IS THE REASON THE PARTITION EXISTS. `ValidationEditor` emits a WHOLE
+        // fresh array, so wiring this instance straight to `setValidations` would replace three rules with
+        // one and silently delete the author's pattern and skip rules. Asserting the row COUNT on Basics
+        // would not catch that — the count is right in both worlds — so this reads the field object back and
+        // compares the untouched rows by value AND by index.
+        const target = field({
+            is_required: 'conditional',
+            validations: [
+                validation({ rule_type: 'required_if', related_field_key: 'age', sequence: 0 }),
+                validation({ rule_type: 'min_length', rule_value: '3', sequence: 1 }),
+                validation({ rule_type: 'skip_if', related_field_key: 'age', operator: 'eq', rule_value: 'no', sequence: 2 }),
+            ],
+        });
+        const untouched = [
+            { ...target.validations[1] },
+            { ...target.validations[2] },
+        ];
+
+        // ⚠️ `age` must exist as a sibling field or the operator control stays DISABLED — it is gated on the
+        // compared question resolving to a shape — and this case would pass without ever driving an edit.
+        const wrapper = mountPanel(
+            makeStore({ field: target, fields: [target, field({ id: 'fld-2', uid: 'f2', key: 'age' })] }),
+        );
+
+        // Exactly one row is shown here: the required_if. The min_length and skip_if belong to the other tab.
+        expect(wrapper.findAll('[aria-label="Rule 1 check"]')).toHaveLength(1);
+        expect(wrapper.find('[aria-label="Rule 2 check"]').exists()).toBe(false);
+
+        wrapper.get('[aria-label="Rule 1 operator"]').setValue('eq');
+
+        expect(target.validations).toHaveLength(3);
+        expect(target.validations[0].operator).toBe('eq');
+        expect(target.validations[0].rule_type).toBe('required_if');
+        expect(target.validations[1]).toEqual(untouched[0]);
+        expect(target.validations[2]).toEqual(untouched[1]);
+    });
+
+    it('shows a rule added on Basics on the Validation tab as well, because there is one array', async () => {
+        const target = field({ is_required: 'conditional' });
+        const wrapper = mountPanel(makeStore({ field: target }));
+
+        wrapper.findAll('button').find((b) => b.text() === 'Add condition')!.trigger('click');
+        expect(target.validations).toHaveLength(1);
+        expect(target.validations[0].rule_type).toBe('required_if');
+
+        await wrapper.findAll('[role="tab"]').find((t) => t.text() === 'Validation')!.trigger('click');
+
+        expect(wrapper.find('[aria-label="Rule 1 check"]').exists()).toBe(true);
+        // On the Validation tab the mode switch IS offered — the same row, its full editor.
+        expect(wrapper.find('[aria-label="Rule 1 type"]').exists()).toBe(true);
+    });
+
+    it('offers requiredness on a note but reveals no editor, because no rule can apply to it', () => {
+        // ⚠️ THE CONTROL STAYS VISIBLE DELIBERATELY. Hiding it would strand a note already marked Required
+        // with no way to repair it; the publish gate refuses that field and names the repair instead.
+        const wrapper = mountPanel(
+            makeStore({ field: field({ field_type: 'note', is_required: 'conditional' }) }),
+        );
+
+        expect(wrapper.text()).toContain('Requiredness');
+        expect(wrapper.find('[aria-label="Rule 1 check"]').exists()).toBe(false);
+        expect(wrapper.text()).not.toContain('Required when');
     });
 });

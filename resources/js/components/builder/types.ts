@@ -129,6 +129,12 @@ export interface RuleTypeOption extends EnumOption {
     // Whether an ABSENT operator is itself a condition ("when that question is answered at all"), which is
     // true for `required_with`/`skip_with` and a broken row for `required_if`/`skip_if`.
     operator_may_be_empty: boolean;
+    // Whether this rule is what makes `Conditional` requiredness mean something (M116) — the `required`
+    // bucket of `SemanticValidator::family()`, which is `required_if`/`required_with` and NOT the skip pair:
+    // a skip rule makes a field irrelevant, never required. The Basics tab's "Required when…" reveal shows
+    // exactly the rows where this is true, so it and `requiredState()` cannot disagree about which rows
+    // count. ⚠️ Read it; never re-state the two names here.
+    governs_requiredness: boolean;
 }
 
 // One comparison operator as a rule row shows it (M115). `label` carries its symbol inside the string

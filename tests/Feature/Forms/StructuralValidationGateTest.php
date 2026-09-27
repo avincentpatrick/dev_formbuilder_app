@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\ComparisonOperator;
 use App\Enums\FieldType;
 use App\Enums\IndexedDataType;
 use App\Enums\RequiredMode;
@@ -109,15 +110,26 @@ it('refuses a required hidden field, naming the field and the slug', function ()
         ->toThrow(PublishValidationException::class, 'hidden_field_required');
 });
 
-it('refuses a conditionally-required hidden field too', function (): void {
+it('refuses a conditionally-required hidden field too, and names BOTH reasons', function (): void {
+    // ⚠️ THE SECOND CODE ARRIVED WITH M116 AND IS PINNED RATHER THAN INHERITED. This field trips two
+    // independent arms — it is hidden and cannot be answered, AND its Conditional requiredness owns no
+    // `required_*` rule to trigger it — and `getMessage()` joins the sentences, so a `toThrow()` substring
+    // assertion would have stayed green whichever arms fired. Reading the codes is what makes the
+    // interaction a fact instead of an accident.
     $version = makeDraftVersion(makeForm($this->user));
     addFormField($version, $this->user, 'promo', FieldType::Hidden, 0, [
         'config' => ['prefill_source' => 'url'],
         'is_required' => RequiredMode::Conditional,
     ]);
 
-    expect(fn () => $this->gate->assertPublishable($version->refresh()))
-        ->toThrow(PublishValidationException::class, 'hidden_field_required');
+    try {
+        $this->gate->assertPublishable($version->refresh());
+        $this->fail('expected the publish to be refused');
+    } catch (PublishValidationException $e) {
+        expect(array_column($e->violations(), 'code'))
+            ->toContain('hidden_field_required')
+            ->toContain('conditional_requiredness_without_rule');
+    }
 });
 
 it('refuses a hidden field carrying a validation rule', function (): void {
@@ -377,6 +389,12 @@ it('still allows the same ordered rule between two number fields', function (): 
 });
 
 it('still allows a conditional rule on a date field, because conditions apply to every shape', function (): void {
+    // ⛔ THE `operator` WAS ABSENT HERE UNTIL M116, AND ITS ABSENCE IS THE BEST EVIDENCE THAT INCREMENT'S
+    // ROW WAS REAL. A careful author wrote this happy-path fixture and wrote a row that publishes clean and
+    // then throws on every submission where `visit_date` is empty — `conditionForOperator()`'s default arm —
+    // without noticing, which is exactly the defect. The operator-less form of this row now lives in
+    // "refuses a required_if row that says how to compare nothing"; this case keeps its own subject, which
+    // is that the SHAPE arm does not refuse a conditional rule on a date.
     $version = makeDraftVersion(makeForm($this->user));
     $consent = addFormField($version, $this->user, 'consent', FieldType::YesNo, 0);
     $visit = addFormField($version, $this->user, 'visit_date', FieldType::Date, 1);
@@ -386,6 +404,7 @@ it('still allows a conditional rule on a date field, because conditions apply to
         'form_field_id' => $visit->id,
         'related_form_field_id' => $consent->id,
         'rule_type' => ValidationRuleType::RequiredIf,
+        'operator' => ComparisonOperator::Eq,
         'rule_value' => 'yes',
     ]);
 
@@ -435,6 +454,272 @@ it('leaves an expression-only validation row alone, because it carries no rule t
         'form_field_id' => $visit->id,
         'expression' => '${visit_date} != ""',
     ]);
+
+    $this->gate->assertPublishable($version->refresh());
+
+    expect(true)->toBeTrue(); // reached here without throwing
+});
+
+/*
+|--------------------------------------------------------------------------
+| Increment M116 — a conditional rule that CANNOT BE EVALUATED, and requiredness that cannot be satisfied.
+|
+| The shape arm above asks whether a rule suits its field. These ask whether it can run at all. Every case
+| below published clean before M116 and then threw out of the submission pipeline, or silently did nothing.
+|--------------------------------------------------------------------------
+*/
+
+it('refuses a required_if row that says how to compare nothing', function (): void {
+    $version = makeDraftVersion(makeForm($this->user));
+    $consent = addFormField($version, $this->user, 'consent', FieldType::YesNo, 0);
+    $visit = addFormField($version, $this->user, 'visit_date', FieldType::Date, 1);
+
+    FormFieldValidation::create([
+        'form_version_id' => $version->id,
+        'form_field_id' => $visit->id,
+        'related_form_field_id' => $consent->id,
+        'rule_type' => ValidationRuleType::RequiredIf,
+        'rule_value' => 'yes',
+        // `operator` omitted — this is the row `conditionForOperator()`'s default arm throws on.
+    ]);
+
+    try {
+        $this->gate->assertPublishable($version->refresh());
+        $this->fail('expected the publish to be refused');
+    } catch (PublishValidationException $e) {
+        expect(array_column($e->violations(), 'code'))->toBe(['rule_missing_operator'])
+            ->and(array_column($e->violations(), 'field'))->toBe(['visit_date']);
+    }
+});
+
+it('refuses a skip_if row with no operator, because the skip family throws on EVERY submission', function (): void {
+    // ⚠️ NOT A DUPLICATE OF THE CASE ABOVE, AND THE DIFFERENCE IS THE BLAST RADIUS. A broken `required_*`
+    // row on a scalar throws only when that field's own answer is empty; a broken `skip_*` row is read by
+    // `settleRelevance()` for every top-level field on every submission, before any answer matters.
+    $version = makeDraftVersion(makeForm($this->user));
+    $consent = addFormField($version, $this->user, 'consent', FieldType::YesNo, 0);
+    $notes = addFormField($version, $this->user, 'notes', FieldType::LongText, 1);
+
+    FormFieldValidation::create([
+        'form_version_id' => $version->id,
+        'form_field_id' => $notes->id,
+        'related_form_field_id' => $consent->id,
+        'rule_type' => ValidationRuleType::SkipIf,
+        'rule_value' => 'no',
+    ]);
+
+    // ⚠️ READ THE CODE, NOT THE MESSAGE. These factories keep the slug OUT of the sentence — only
+    // `hiddenFieldNotAnswerable()` interpolates its own code into its prose — so a `toThrow()` substring
+    // assertion on the slug would fail here for the right refusal, which is how this case was first written.
+    try {
+        $this->gate->assertPublishable($version->refresh());
+        $this->fail('expected the publish to be refused');
+    } catch (PublishValidationException $e) {
+        expect(array_column($e->violations(), 'code'))->toBe(['rule_missing_operator'])
+            ->and(array_column($e->violations(), 'field'))->toBe(['notes']);
+    }
+});
+
+it('allows a required_with row with no operator, because the absence IS the condition', function (): void {
+    // ⛔ THE TOLERANCE CONTROL, AND IT IS THE POINT OF THE WHOLE ARM. `lowerCondition()` reads a null
+    // operator on `required_with` / `skip_with` as `isNotNull(related)` — "when that question is answered at
+    // all" — which is legitimate and probably the commonest authoring choice. A gate that refused every
+    // absent operator would refuse it, which is why the arm asks `operatorMayBeEmpty()` rather than
+    // testing the column for null on its own.
+    $version = makeDraftVersion(makeForm($this->user));
+    $consent = addFormField($version, $this->user, 'consent', FieldType::YesNo, 0);
+    $visit = addFormField($version, $this->user, 'visit_date', FieldType::Date, 1);
+
+    FormFieldValidation::create([
+        'form_version_id' => $version->id,
+        'form_field_id' => $visit->id,
+        'related_form_field_id' => $consent->id,
+        'rule_type' => ValidationRuleType::RequiredWith,
+    ]);
+
+    $this->gate->assertPublishable($version->refresh());
+
+    expect(true)->toBeTrue(); // reached here without throwing
+});
+
+it('refuses a required_if row that names no question to compare against', function (): void {
+    $version = makeDraftVersion(makeForm($this->user));
+    $visit = addFormField($version, $this->user, 'visit_date', FieldType::Date, 0);
+
+    FormFieldValidation::create([
+        'form_version_id' => $version->id,
+        'form_field_id' => $visit->id,
+        'rule_type' => ValidationRuleType::RequiredIf,
+        'operator' => ComparisonOperator::Eq,
+        'rule_value' => 'yes',
+        // `related_form_field_id` omitted — `relatedKeyOrThrow()` throws before any dispatch.
+    ]);
+
+    try {
+        $this->gate->assertPublishable($version->refresh());
+        $this->fail('expected the publish to be refused');
+    } catch (PublishValidationException $e) {
+        expect(array_column($e->violations(), 'code'))->toBe(['rule_missing_related_field']);
+    }
+});
+
+it('refuses a greater_than_field row that names no question, proving the arm is the SIX and not the four', function (): void {
+    // ⛔ THE DISJOINTNESS CASE. `relatedKeyOrThrow()` runs first in `lowerCondition()`, before the `match`
+    // on rule type, so the two field comparisons throw by the same line as the four conditionals. An arm
+    // guarded on `takesOperator()` — which is the four — would silently exempt exactly this row.
+    $version = makeDraftVersion(makeForm($this->user));
+    $start = addFormField($version, $this->user, 'start_num', FieldType::Integer, 0);
+
+    FormFieldValidation::create([
+        'form_version_id' => $version->id,
+        'form_field_id' => $start->id,
+        'rule_type' => ValidationRuleType::GreaterThanField,
+    ]);
+
+    try {
+        $this->gate->assertPublishable($version->refresh());
+        $this->fail('expected the publish to be refused');
+    } catch (PublishValidationException $e) {
+        expect(array_column($e->violations(), 'code'))->toBe(['rule_missing_related_field'])
+            ->and(array_column($e->violations(), 'field'))->toBe(['start_num']);
+    }
+});
+
+it('refuses a required_with that names no question, even though its operator may be empty', function (): void {
+    // ⛔ THE TWO-PREDICATES-ARE-INDEPENDENT CASE. Folding the arm into one condition — refuse when a rule
+    // needs an operator AND lacks one AND names no field — is the plausible wrong fix, and it lets exactly
+    // this row through: `required_with` tolerates a missing operator and does NOT tolerate a missing
+    // question. Only a separate `if` per column catches it.
+    $version = makeDraftVersion(makeForm($this->user));
+    $visit = addFormField($version, $this->user, 'visit_date', FieldType::Date, 0);
+
+    FormFieldValidation::create([
+        'form_version_id' => $version->id,
+        'form_field_id' => $visit->id,
+        'rule_type' => ValidationRuleType::RequiredWith,
+    ]);
+
+    try {
+        $this->gate->assertPublishable($version->refresh());
+        $this->fail('expected the publish to be refused');
+    } catch (PublishValidationException $e) {
+        expect(array_column($e->violations(), 'code'))->toBe(['rule_missing_related_field']);
+    }
+});
+
+it('refuses a conditionally-required field that owns no rule saying when', function (): void {
+    // Before M116 this published and then behaved as OPTIONAL in silence: `requiredState()` honours
+    // `Conditional` only through a `required_*` unit, so the builder's Conditional setting did nothing at all.
+    $version = makeDraftVersion(makeForm($this->user));
+    addFormField($version, $this->user, 'phone', FieldType::ShortText, 0, [
+        'is_required' => RequiredMode::Conditional,
+    ]);
+
+    try {
+        $this->gate->assertPublishable($version->refresh());
+        $this->fail('expected the publish to be refused');
+    } catch (PublishValidationException $e) {
+        expect(array_column($e->violations(), 'code'))->toBe(['conditional_requiredness_without_rule'])
+            ->and(array_column($e->violations(), 'field'))->toBe(['phone']);
+    }
+});
+
+it('publishes a conditionally-required field whose required_with rule is present', function (): void {
+    $version = makeDraftVersion(makeForm($this->user));
+    $consent = addFormField($version, $this->user, 'consent', FieldType::YesNo, 0);
+    $phone = addFormField($version, $this->user, 'phone', FieldType::ShortText, 1, [
+        'is_required' => RequiredMode::Conditional,
+    ]);
+
+    FormFieldValidation::create([
+        'form_version_id' => $version->id,
+        'form_field_id' => $phone->id,
+        'related_form_field_id' => $consent->id,
+        'rule_type' => ValidationRuleType::RequiredWith,
+    ]);
+
+    $this->gate->assertPublishable($version->refresh());
+
+    expect(true)->toBeTrue(); // reached here without throwing
+});
+
+it('refuses a conditionally-required field whose only rule is a skip_if', function (): void {
+    // ⛔ THE FAMILY-SCOPE CASE. A `skip_*` rule makes a field IRRELEVANT, never required — it is read by
+    // `settleRelevance()`, not by `requiredState()` — so this field is still one that nothing can ever
+    // require. An arm asking "does this field own any validation row" passes it; asking
+    // `governsRequiredness()` refuses it.
+    $version = makeDraftVersion(makeForm($this->user));
+    $consent = addFormField($version, $this->user, 'consent', FieldType::YesNo, 0);
+    $phone = addFormField($version, $this->user, 'phone', FieldType::ShortText, 1, [
+        'is_required' => RequiredMode::Conditional,
+    ]);
+
+    FormFieldValidation::create([
+        'form_version_id' => $version->id,
+        'form_field_id' => $phone->id,
+        'related_form_field_id' => $consent->id,
+        'rule_type' => ValidationRuleType::SkipIf,
+        'operator' => ComparisonOperator::Eq,
+        'rule_value' => 'no',
+    ]);
+
+    try {
+        $this->gate->assertPublishable($version->refresh());
+        $this->fail('expected the publish to be refused');
+    } catch (PublishValidationException $e) {
+        expect(array_column($e->violations(), 'code'))->toBe(['conditional_requiredness_without_rule']);
+    }
+});
+
+it('publishes an OPTIONAL field carrying a required_if rule, because that direction works today', function (): void {
+    // ⛔ THE ASYMMETRY IS DELIBERATE AND MUST NOT BE "TIDIED" INTO A MATCHING ARM. `requiredState()`
+    // special-cases only `Required`; `Optional` and `Conditional` take the identical path, so an Optional
+    // field carrying a `required_if` IS conditionally required and behaves exactly as authored. Refusing it
+    // would refuse working forms.
+    $version = makeDraftVersion(makeForm($this->user));
+    $consent = addFormField($version, $this->user, 'consent', FieldType::YesNo, 0);
+    $phone = addFormField($version, $this->user, 'phone', FieldType::ShortText, 1, [
+        'is_required' => RequiredMode::Optional,
+    ]);
+
+    FormFieldValidation::create([
+        'form_version_id' => $version->id,
+        'form_field_id' => $phone->id,
+        'related_form_field_id' => $consent->id,
+        'rule_type' => ValidationRuleType::RequiredIf,
+        'operator' => ComparisonOperator::Eq,
+        'rule_value' => 'yes',
+    ]);
+
+    $this->gate->assertPublishable($version->refresh());
+
+    expect(true)->toBeTrue(); // reached here without throwing
+});
+
+it('refuses a required note, because it demands an answer it cannot take', function (): void {
+    // ⛔ MEASURED BEFORE THE ARM WAS WRITTEN, by publishing this exact draft and submitting through the real
+    // pipeline: the publish SUCCEEDED and the submission came back
+    // `SubmissionValidationException` carrying `{field: intro, rule: field_required, message: "This field is
+    // required."}` — on a field that renders no input control at all. No respondent and no keyer can ever
+    // clear it, and every submission the form receives dies the same way.
+    $version = makeDraftVersion(makeForm($this->user));
+    addFormField($version, $this->user, 'intro', FieldType::Note, 0, [
+        'is_required' => RequiredMode::Required,
+    ]);
+
+    try {
+        $this->gate->assertPublishable($version->refresh());
+        $this->fail('expected the publish to be refused');
+    } catch (PublishValidationException $e) {
+        expect(array_column($e->violations(), 'code'))->toBe(['display_only_field_required'])
+            ->and(array_column($e->violations(), 'field'))->toBe(['intro']);
+    }
+});
+
+it('publishes an OPTIONAL note, which is every note an author has ever meant to write', function (): void {
+    $version = makeDraftVersion(makeForm($this->user));
+    addFormField($version, $this->user, 'intro', FieldType::Note, 0);
+    addFormField($version, $this->user, 'divider', FieldType::PageBreak, 1);
 
     $this->gate->assertPublishable($version->refresh());
 

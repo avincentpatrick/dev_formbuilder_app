@@ -117,4 +117,38 @@ enum ValidationRuleType: string
             self::GreaterThanField, self::LessThanField => false,
         };
     }
+
+    /**
+     * Whether a rule of this kind is what makes `RequiredMode::Conditional` mean something (Increment M116)
+     * — that is, whether it can ever turn an unanswered field into a required one.
+     *
+     * ⛔ THIS MIRRORS ONE BUCKET OF {@see \App\Services\Validation\SemanticValidator::family()} AND IS
+     * DELIBERATELY NOT THAT METHOD. `family()` sorts a row into `required` / `skip` / `constraint`, and its
+     * third arm is a `default` — composing a gate or a client payload out of a `default` arm means any rule
+     * type added later is silently classified rather than refused at the `match`. This one enumerates all
+     * eleven cases, so adding a twelfth is a compile error until somebody decides which side it belongs on.
+     * `family()` also classifies expression rows, which have no `rule_type` at all.
+     *
+     * ⚠️ IT EXISTS TO BE TRANSMITTED, NOT MIRRORED. The builder needs this classification to know which
+     * rows belong under the Basics tab's *"Required when…"* reveal, and a client-side literal
+     * `['required_if', 'required_with']` is exactly the defect `M115` was spent removing from
+     * `ValidationEditor.vue`. It rides to the client as `governs_requiredness` through
+     * {@see \App\Services\Forms\BuilderPresenter::enums()} and is censused by
+     * `tests/Feature/Forms/BuilderEnumsPayloadTest.php`.
+     *
+     * ⚠️ THE SKIP FAMILY IS NOT HERE, AND THAT IS THE DISTINCTION WORTH STATING. `skip_if` / `skip_with`
+     * make a field IRRELEVANT rather than required; they are read by `settleRelevance()`, not by
+     * `requiredState()`. A field marked conditionally required whose only rule is a `skip_if` is still a
+     * field nothing can ever require — which is why the publish gate asks this question rather than
+     * "does this field own any validation row at all".
+     */
+    public function governsRequiredness(): bool
+    {
+        return match ($this) {
+            self::RequiredIf, self::RequiredWith => true,
+            self::SkipIf, self::SkipWith,
+            self::MinValue, self::MaxValue, self::MinLength, self::MaxLength, self::Pattern,
+            self::GreaterThanField, self::LessThanField => false,
+        };
+    }
 }

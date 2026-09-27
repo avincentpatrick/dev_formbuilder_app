@@ -219,6 +219,90 @@ final class PublishValidationException extends RuntimeException
     }
 
     /**
+     * A rule that names no second question (Increment M116). All six kinds where
+     * {@see ValidationRuleType::takesRelatedField()} holds reach
+     * {@see \App\Services\Expressions\StructuredRuleLowering::relatedKeyOrThrow()} first, before any
+     * dispatch on the rule type, and it throws `missing_related_field` when the column is null.
+     *
+     * ⚠️ THE CODE IS PREFIXED ON PURPOSE. {@see expressionInvalid()} forwards
+     * `ExpressionException::slug()` straight through as its `code`, so the bare `missing_related_field`
+     * slug can already appear in this envelope minted by a different gate against a different surface.
+     */
+    public static function ruleMissingRelatedField(string $fieldKey, string $ruleType): self
+    {
+        return self::one(
+            $fieldKey,
+            'rule_missing_related_field',
+            "The “{$ruleType}” rule on “{$fieldKey}” does not say which question it compares against, so every submission would be refused. Choose a question or remove the rule.",
+        );
+    }
+
+    /**
+     * A `required_if` or `skip_if` carrying no operator (Increment M116).
+     *
+     * ⛔ `required_with` AND `skip_with` ARE EXEMPT, AND THE EXEMPTION IS NOT A LENIENCY. A null operator
+     * there is itself the condition — {@see \App\Services\Expressions\StructuredRuleLowering::lowerCondition()}
+     * lowers it to `isNotNull(relatedKey)`, *"when that question is answered at all"* — so refusing it would
+     * refuse the commonest authoring choice. Only these two reach `conditionForOperator()`'s default arm,
+     * which throws. The predicate that separates them is
+     * {@see ValidationRuleType::operatorMayBeEmpty()}, never a literal list of rule names.
+     */
+    public static function ruleMissingOperator(string $fieldKey, string $ruleType): self
+    {
+        return self::one(
+            $fieldKey,
+            'rule_missing_operator',
+            "The “{$ruleType}” rule on “{$fieldKey}” does not say how to compare, so every submission would be refused. Choose a comparison or remove the rule.",
+        );
+    }
+
+    /**
+     * Conditional requiredness that nothing can ever trigger (Increment M116).
+     *
+     * ⛔ REFUSED BECAUSE THE ALTERNATIVE IS SILENCE, WHICH IS THE SAME REASON
+     * {@see hiddenFieldNotAnswerable()} exists. {@see \App\Services\Validation\SemanticValidator::requiredState()}
+     * honours `Conditional` only through a `required_*` unit; with none the field falls out as optional and
+     * the author is told nothing, so the setting is a control that does nothing. A `skip_if` does not count:
+     * it makes a field irrelevant, never required — hence {@see ValidationRuleType::governsRequiredness()}
+     * rather than "owns any validation row".
+     *
+     * ⚠️ THERE IS NO SYMMETRIC PARTNER, DELIBERATELY. An `Optional` field carrying a `required_if` row IS
+     * conditionally required today — `requiredState()` special-cases only `Required` and treats `Optional`
+     * and `Conditional` identically — and that direction is legitimate and must keep publishing.
+     */
+    public static function conditionalRequirednessHasNoRule(string $fieldKey): self
+    {
+        return self::one(
+            $fieldKey,
+            'conditional_requiredness_without_rule',
+            "The field “{$fieldKey}” is set to be conditionally required but carries no rule saying when, so it behaves as optional. Add a “required when…” rule to it, or mark it optional.",
+        );
+    }
+
+    /**
+     * A display-only field that demands an answer it cannot take (Increment M116).
+     *
+     * ⛔ MEASURED, NOT REASONED — a `note` marked `Required` publishes clean today and then refuses every
+     * submission with `field_required` on a field that has no input control at all, which no respondent and
+     * no keyer can ever clear. {@see \App\Services\Validation\SemanticValidator::collectFieldErrors()}
+     * early-returns for calculated, hidden, grid, geo and media fields and for these it does not, so the
+     * answer is permanently absent, `Coercion::isEmpty()` is true, and `requiredState()` short-circuits to
+     * required on the spot.
+     *
+     * ⚠️ DISPATCHED ON THE SHAPE, NEVER ON THE FIELD TYPE, per this gate's own rule: a type list needs
+     * editing every time a type is added, while `ValueShape::NoAnswer` is the property that makes the
+     * demand impossible.
+     */
+    public static function displayOnlyFieldRequired(string $fieldKey, string $requiredness): self
+    {
+        return self::one(
+            $fieldKey,
+            'display_only_field_required',
+            "The field “{$fieldKey}” is set to “{$requiredness}” but takes no answer, so every submission would be refused with an error nobody can clear. Mark it optional.",
+        );
+    }
+
+    /**
      * @param  list<array{field: ?string, code: string, message: string}>  $violations
      */
     private function __construct(string $message, private readonly array $violations)

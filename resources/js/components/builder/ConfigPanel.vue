@@ -49,7 +49,7 @@ import MediaEditor from './MediaEditor.vue';
 import PrefillEditor from './PrefillEditor.vue';
 import ValidationEditor from './ValidationEditor.vue';
 import type { BuilderStore } from './useBuilderStore';
-import type { BuilderValidation, ConditionCatalogue, EnumOption, LocalField, LocalSection } from './types';
+import type { BuilderValidation, ComparableField, ConditionCatalogue, EnumOption, LocalField, LocalSection } from './types';
 
 interface Choice {
     value: string;
@@ -87,13 +87,20 @@ const { feature } = useEntitlements();
 const optionTypes = new Set<string>();
 const advancedTypes = new Set<string>();
 const configEditorByType = new Map<string, string | null>();
+// M115 — `ValueShape::for()`'s answer per field type, arriving on the palette entry beside the three facts
+// already harvested here. It decides what the Validation tab may offer and whether that tab exists at all.
+const shapeByType = new Map<string, string>();
 props.store.palette.forEach((group) =>
     group.types.forEach((type) => {
         if (type.has_options) optionTypes.add(type.value);
         if (type.advanced) advancedTypes.add(type.value);
         configEditorByType.set(type.value, type.config_editor);
+        shapeByType.set(type.value, type.value_shape);
     }),
 );
+
+/** The shape whose rules the Validation tab may offer. `no_answer` is `note` and `page_break`. */
+const SHAPE_NO_ANSWER = 'no_answer';
 
 const requiredOptions = enums.required_modes;
 const sectionOptions = computed<EnumOption[]>(() => [
@@ -105,6 +112,10 @@ const configEditor = computed<string | null>(() =>
     field.value ? configEditorByType.get(field.value.field_type) ?? null : null,
 );
 
+const valueShape = computed<string>(() =>
+    field.value ? shapeByType.get(field.value.field_type) ?? '' : '',
+);
+
 const tabs = computed<{ key: string; label: string }[]>(() => {
     if (field.value) {
         const list = [{ key: 'basics', label: 'Basics' }];
@@ -114,7 +125,12 @@ const tabs = computed<{ key: string; label: string }[]>(() => {
         if (configEditor.value === 'geo') list.push({ key: 'geo', label: 'Map' });
         if (configEditor.value === 'media') list.push({ key: 'media', label: 'Media' });
         if (configEditor.value === 'prefill') list.push({ key: 'prefill', label: 'Prefill' });
-        list.push({ key: 'validation', label: 'Validation' }, { key: 'advanced', label: 'Advanced' });
+        // ⛔ M115 — NO VALIDATION TAB FOR A FIELD THAT CARRIES NO ANSWER. `ValueShape::allows()` refuses
+        // every rule type for `no_answer` (`note`, `page_break`), and since M113 the publish gate refuses
+        // them too — so this tab was a route to a form that could not be published, offered on the two
+        // types where it can never do anything.
+        if (valueShape.value !== SHAPE_NO_ANSWER) list.push({ key: 'validation', label: 'Validation' });
+        list.push({ key: 'advanced', label: 'Advanced' });
         return list;
     }
     if (section.value) {
@@ -205,6 +221,22 @@ const catalogue = computed<ConditionCatalogue>(() => {
             .map((s) => ({ key: s.key, label: s.label.trim() === '' ? s.key : s.label })),
     };
 });
+
+// The fields a validation row may compare against (M115). Same source as the catalogue above and the same
+// two exclusions — an empty key cannot be referenced and the row's own field can only ever be a self-cycle
+// — but it carries the VALUE SHAPE rather than the catalogue's `numeric` flag, because the operators a
+// conditional rule may use are decided by the compared field's shape. Those two are NOT the same set:
+// `numeric` is four field types and `ValueShape::allowsOperator()` admits five, a divergence
+// `FieldTypeMirrorDriftTest` pins deliberately and `R-c1f90d7a` owns.
+const comparableFields = computed<ComparableField[]>(() =>
+    props.store.fields.value
+        .filter((f) => f.key !== '' && f.key !== (field.value?.key ?? null))
+        .map((f) => ({
+            key: f.key,
+            label: f.label.trim() === '' ? f.key : f.label,
+            value_shape: shapeByType.get(f.field_type) ?? '',
+        })),
+);
 
 function setField<K extends keyof LocalField>(key: K, value: LocalField[K]): void {
     const target = field.value;
@@ -402,6 +434,8 @@ watch(librarySaved, (value) => {
                             :validations="field.validations"
                             :rule-types="enums.validation_rule_types"
                             :operators="enums.comparison_operators"
+                            :value-shape="valueShape"
+                            :comparable-fields="comparableFields"
                             @update:validations="setValidations"
                         />
                     </template>

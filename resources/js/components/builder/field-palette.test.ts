@@ -20,8 +20,8 @@ const palette = [
         label: 'Text',
         icon: 'text',
         types: [
-            { value: 'short_text', label: 'Short text', advanced: false, has_options: false, config_editor: null },
-            { value: 'long_text', label: 'Long text', advanced: false, has_options: false, config_editor: null },
+            { value: 'short_text', label: 'Short text', advanced: false, has_options: false, config_editor: null, value_shape: 'text' },
+            { value: 'long_text', label: 'Long text', advanced: false, has_options: false, config_editor: null, value_shape: 'text' },
         ],
     },
 ];

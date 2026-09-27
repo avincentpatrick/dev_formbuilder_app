@@ -1,0 +1,189 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Enums\ComparisonOperator;
+use App\Enums\FieldType;
+use App\Enums\ValidationRuleType;
+use App\Enums\ValueShape;
+use App\Models\Tenant;
+use App\Models\User;
+use App\Services\Forms\BuilderPresenter;
+use App\Services\Forms\FormService;
+use App\Support\Tenancy\TenantContext;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
+
+/*
+|--------------------------------------------------------------------------
+| The builder's enum payload — Increment M115, and the FIRST assertion of its shape in this repository.
+|--------------------------------------------------------------------------
+| `BuilderPresenter::enums()` is how the builder learns what may be asserted about a field. Until now
+| nothing checked it at all: no Pest test read the key, and the three Vitest fixtures that construct the
+| TypeScript interface literally all ship `validation_rule_types: []` and `comparison_operators: []`.
+|
+| ⛔ THE EXPECTED SETS BELOW ARE WRITTEN OUT RATHER THAN DERIVED, AND THAT IS THE WHOLE POINT. The payload
+| is built from `ValueShape::allows()` / `allowsOperator()`, so asserting it by calling those same methods
+| would be a tautology that no mutation could redden — it would pass just as happily if the table were
+| wrong. An independent census can fail. These sets are also the readable form of a 12×11 table, which is
+| the reason `ValueShape` is keyed on a shape and not on 31 field types.
+|
+| ⚠️ A CHANGE HERE IS EITHER A DELIBERATE PRODUCT DECISION OR A BUG, NEVER A FIXTURE CHORE. Widening a rule
+| to a shape whose evaluator fails CLOSED makes the field unanswerable — that is what `M113` measured and
+| refused at publish, and `ValueShape`'s docblock records the two splits that came out of it.
+*/
+
+beforeEach(function (): void {
+    TenantContext::flush();
+    $this->tenant = Tenant::create(['name' => 'Alpha', 'slug' => 'alpha', 'default_locale' => 'en']);
+    $this->user = User::factory()->create();
+    enterTenant($this->tenant->id, $this->user->id);
+
+    $form = app(FormService::class)->create($this->tenant, $this->user, 'Survey');
+    $this->payload = app(BuilderPresenter::class)->present($form->refresh());
+});
+
+/** Every shape that can hold an answer — the conditional family's domain. */
+function answerableShapes(): array
+{
+    return ['text', 'number', 'temporal', 'duration', 'choice', 'scale', 'boolean', 'hierarchy', 'geo', 'attachment', 'grid'];
+}
+
+/**
+ * @return array<string, array<string, mixed>>
+ */
+function ruleTypeOptions(array $payload): array
+{
+    $byValue = [];
+    foreach ($payload['enums']['validation_rule_types'] as $option) {
+        $byValue[$option['value']] = $option;
+    }
+
+    return $byValue;
+}
+
+it('ships every rule type with a label, its shapes and the three column facts', function (): void {
+    $options = ruleTypeOptions($this->payload);
+
+    expect($options)->toHaveCount(11);
+
+    foreach (ValidationRuleType::cases() as $type) {
+        $option = $options[$type->value] ?? null;
+
+        expect($option)->not->toBeNull("the payload is missing {$type->value}");
+        expect($option)->toHaveKeys(['value', 'label', 'shapes', 'takes_operator', 'takes_related_field', 'operator_may_be_empty']);
+        expect($option['label'])->not->toBeEmpty()
+            // The defect the row filed: a label DERIVED from the enum value. `humanize()` produced
+            // "Min value" and "Required if" here, and `Gt` / `Lte` / `Neq` next door.
+            ->and($option['label'])->not->toBe(ucfirst(str_replace('_', ' ', $type->value)));
+        expect($option['shapes'])->toBeArray();
+    }
+});
+
+it('offers the length and format rules to text and nothing else', function (): void {
+    $options = ruleTypeOptions($this->payload);
+
+    foreach (['min_length', 'max_length', 'pattern'] as $rule) {
+        expect($options[$rule]['shapes'])->toEqualCanonicalizing(['text'], "{$rule} escaped the text shape");
+    }
+});
+
+it('offers the value bounds only to the three shapes whose stored answer really is a number', function (): void {
+    // ⛔ NOT TIDINESS. `min_value` on a date fails CLOSED — `Coercion::NUMERIC_RE` does not match
+    // `2026-01-15`, so every non-empty answer is invalid and the field is unanswerable. `temporal` is
+    // absent here for that measured reason, and `duration` is present because `XlsformTypeMap` maps it
+    // to `decimal`: its stored answer is a number.
+    $options = ruleTypeOptions($this->payload);
+
+    expect($options['min_value']['shapes'])->toEqualCanonicalizing(['number', 'duration', 'scale'])
+        ->and($options['max_value']['shapes'])->toEqualCanonicalizing(['number', 'duration', 'scale'])
+        ->and($options['greater_than_field']['shapes'])->toEqualCanonicalizing(['number', 'duration'])
+        ->and($options['less_than_field']['shapes'])->toEqualCanonicalizing(['number', 'duration']);
+});
+
+it('offers the conditional family to every shape that can hold an answer, and to no_answer never', function (): void {
+    $options = ruleTypeOptions($this->payload);
+
+    foreach (['required_if', 'required_with', 'skip_if', 'skip_with'] as $rule) {
+        expect($options[$rule]['shapes'])->toEqualCanonicalizing(answerableShapes())
+            ->and($options[$rule]['shapes'])->not->toContain('no_answer');
+    }
+});
+
+it('marks exactly the four conditional rules as reading an operator, and the six that name a field', function (): void {
+    $options = ruleTypeOptions($this->payload);
+
+    $withOperator = array_keys(array_filter($options, static fn (array $o): bool => $o['takes_operator'] === true));
+    $withRelated = array_keys(array_filter($options, static fn (array $o): bool => $o['takes_related_field'] === true));
+    $emptyOk = array_keys(array_filter($options, static fn (array $o): bool => $o['operator_may_be_empty'] === true));
+
+    expect($withOperator)->toEqualCanonicalizing(['required_if', 'required_with', 'skip_if', 'skip_with'])
+        ->and($withRelated)->toEqualCanonicalizing([
+            'required_if', 'required_with', 'skip_if', 'skip_with', 'greater_than_field', 'less_than_field',
+        ])
+        ->and($emptyOk)->toEqualCanonicalizing(['required_with', 'skip_with']);
+});
+
+it('ships every operator with the row rendering and the shapes it may compare', function (): void {
+    $byValue = [];
+    foreach ($this->payload['enums']['comparison_operators'] as $option) {
+        $byValue[$option['value']] = $option;
+    }
+
+    expect($byValue)->toHaveCount(8);
+
+    foreach (ComparisonOperator::cases() as $operator) {
+        expect($byValue[$operator->value])->toHaveKeys(['value', 'label', 'shapes']);
+        // The SENTENCE rendering is deliberately absent: nothing on the client reads it, so transmitting it
+        // would be decorative. What holds it to the two client copies is ConditionLabelMirrorDriftTest.
+        expect($byValue[$operator->value])->not->toHaveKey('sentence_label');
+        expect($byValue[$operator->value]['label'])->not->toBeEmpty()
+            // `Gt`, `Lte` and `Neq` by name — the three the row was filed about.
+            ->and($byValue[$operator->value]['label'])->not->toBe(ucfirst(str_replace('_', ' ', $operator->value)));
+    }
+
+    // The symbol rides INSIDE the label, so no caller can render one without the words (`D59`).
+    expect($byValue['lte']['label'])->toContain('≤')
+        ->and($byValue['gte']['label'])->toContain('≥')
+        ->and($byValue['neq']['label'])->toContain('≠')
+        ->and($byValue['lte']['label'])->toContain('at most');
+
+    // Ordered comparison carries the same fail-closed restriction as the value bounds; equality and
+    // emptiness are value-agnostic; `contains` is meaningful only where the answer is text or a list.
+    expect($byValue['gt']['shapes'])->toEqualCanonicalizing(['number', 'duration', 'scale'])
+        ->and($byValue['lte']['shapes'])->toEqualCanonicalizing(['number', 'duration', 'scale'])
+        ->and($byValue['eq']['shapes'])->toEqualCanonicalizing(answerableShapes())
+        ->and($byValue['is_null']['shapes'])->toEqualCanonicalizing(answerableShapes())
+        ->and($byValue['contains']['shapes'])->toEqualCanonicalizing(['text', 'choice', 'hierarchy']);
+});
+
+it('gives every palette entry its value shape, so the panel can filter without a second table', function (): void {
+    $shapeByType = [];
+    foreach ($this->payload['palette'] as $group) {
+        foreach ($group['types'] as $type) {
+            $shapeByType[$type['value']] = $type['value_shape'];
+        }
+    }
+
+    expect($shapeByType)->toHaveCount(count(FieldType::cases()));
+
+    // Spot-pinned at the boundaries that were measured rather than assumed: `yes_no` is Boolean and not
+    // Choice (its options are fixed and stored nowhere), `duration` is split from the temporal types, and
+    // `note`/`page_break` carry no answer at all — which is what removes the Validation tab for them.
+    expect($shapeByType['short_text'])->toBe('text')
+        ->and($shapeByType['hidden'])->toBe('text')
+        ->and($shapeByType['integer'])->toBe('number')
+        ->and($shapeByType['date'])->toBe('temporal')
+        ->and($shapeByType['duration'])->toBe('duration')
+        ->and($shapeByType['yes_no'])->toBe('boolean')
+        ->and($shapeByType['likert_scale'])->toBe('scale')
+        ->and($shapeByType['cascading_select'])->toBe('hierarchy')
+        ->and($shapeByType['note'])->toBe('no_answer')
+        ->and($shapeByType['page_break'])->toBe('no_answer');
+
+    // Anti-vacuity: every value is a real shape, so a typo cannot pass as a filter nobody matches.
+    foreach ($shapeByType as $fieldType => $shape) {
+        expect(ValueShape::tryFrom($shape))->not->toBeNull("{$fieldType} carries an unknown shape {$shape}");
+    }
+});

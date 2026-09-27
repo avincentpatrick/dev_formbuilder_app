@@ -4,20 +4,161 @@
  * rule (type + optional operator + value) OR a free-text expression — mirroring the DB's expression-XOR-
  * rule_type CHECK. Expressions are persisted UNVALIDATED here; the expression engine (ADR-0004) evaluates
  * them later. Emits a fresh array on every change so the store records one debounced history entry.
+ *
+ * ⛔ WHAT M115 CHANGED, AND WHY IT IS NOT A DISPLAY TWEAK. This editor used to offer all eleven rule types
+ * and all eight operators to all thirty-one field types, labelled `Gt` / `Lte` / `Neq`. Since M113 the
+ * publish gate REFUSES the combinations that cannot work — `min_value` on a date fails closed, making the
+ * field unanswerable — so the editor was inviting an author to build exactly the form that would then be
+ * refused. It now offers what the field's `ValueShape` can actually take, from the same table the gate
+ * refuses on (`ValueShape::allows()`, shipped through `BuilderPresenter::enums()` as `shapes`).
+ *
+ * ⛔ AND THE OPERATOR IS FILTERED BY THE *RELATED* FIELD, NOT THIS ONE. Measured at both lowerings: the
+ * `operator` column is read only by the four conditional rule types, where it compares the value of the
+ * field the rule NAMES (`StructuredRuleLowering::lowerCondition()` → `conditionForOperator()`, and its
+ * TypeScript twin). For the other seven it is never read at all. So the control renders only where it is
+ * read, and its options come from the compared field's shape.
+ *
+ * ⛔ THE FOUR CONDITIONAL RULES WERE UNCOMPLETABLE HERE BEFORE THIS INCREMENT. The compared-field input was
+ * gated on a client-side literal naming `greater_than_field` / `less_than_field` only — so an author could
+ * pick "Required when a condition holds" and had nowhere to say WHICH question. The rule then saved, passed
+ * publish, and threw `missing_related_field` at evaluation, which the respondent met as a generic failure.
+ * `ValidationRuleType::takesRelatedField()` replaces that literal; the publish-gate half is filed.
+ *
+ * ⚠️ NOTHING IS EVER HIDDEN OUT FROM UNDER A SAVED ROW. A value the filters would exclude but the row
+ * already holds stays in its own `<select>`, disabled and labelled — because `MdsSelect` is a native
+ * `<select>` bound with `:value`, so a model value absent from the options renders BLANK and the author
+ * would be editing a rule they cannot see. Same posture as `ConditionRow.vue`'s disabled `selected()`
+ * options, and the same reason.
  */
 import { MdsButton, MdsIconButton, MdsSelect, MdsTextInput, MdsTextarea } from '@meridian/design-system';
-import type { BuilderValidation, EnumOption } from './types';
+import { computed } from 'vue';
+import type { BuilderValidation, ComparableField, EnumOption, OperatorOption, RuleTypeOption } from './types';
 
 const props = defineProps<{
     validations: BuilderValidation[];
-    ruleTypes: EnumOption[];
-    operators: EnumOption[];
+    ruleTypes: RuleTypeOption[];
+    operators: OperatorOption[];
+    /** The OWNING field's `ValueShape` — what may be asserted about the answer this rule constrains. */
+    valueShape: string;
+    /** Every other field in the draft, for the rules that name one. */
+    comparableFields: ComparableField[];
     disabled?: boolean;
 }>();
 
 const emit = defineEmits<{ 'update:validations': [value: BuilderValidation[]] }>();
 
-const FIELD_COMPARISON = new Set(['greater_than_field', 'less_than_field']);
+/** `value: ''` on a native <select> is the placeholder slot, so an "is answered" choice reads as empty. */
+const OPERATOR_ANSWERED = '';
+
+/** Appended to an option the current field type cannot take, so a saved row stays legible. */
+const UNAVAILABLE = ' — not available for this question';
+
+type SelectOption = EnumOption & { disabled?: boolean };
+
+const allowedRuleTypes = computed<RuleTypeOption[]>(() =>
+    props.ruleTypes.filter((rule) => rule.shapes.includes(props.valueShape)),
+);
+
+function ruleTypeOf(row: BuilderValidation): RuleTypeOption | null {
+    return props.ruleTypes.find((rule) => rule.value === row.rule_type) ?? null;
+}
+
+function shapeOfRelated(row: BuilderValidation): string | null {
+    return props.comparableFields.find((field) => field.key === row.related_field_key)?.value_shape ?? null;
+}
+
+/**
+ * The rule <select>'s options: what this field type can take, plus whatever the row already holds. The
+ * second half is what keeps a rule saved before a type change (or before this increment) visible.
+ */
+function ruleOptionsFor(row: BuilderValidation): SelectOption[] {
+    const options: SelectOption[] = allowedRuleTypes.value.map((rule) => ({ value: rule.value, label: rule.label }));
+
+    if (row.rule_type !== null && !options.some((option) => option.value === row.rule_type)) {
+        const current = ruleTypeOf(row);
+        options.unshift({
+            value: row.rule_type,
+            label: (current?.label ?? row.rule_type) + UNAVAILABLE,
+            disabled: true,
+        });
+    }
+
+    return options;
+}
+
+function relatedOptionsFor(row: BuilderValidation): SelectOption[] {
+    const options: SelectOption[] = props.comparableFields.map((field) => ({ value: field.key, label: field.label }));
+
+    // A key pointing at a field that has since been deleted or renamed: shown rather than silently dropped,
+    // because the row is broken and the author is the only one who can decide what it should say.
+    if (row.related_field_key !== null && row.related_field_key !== '' && !options.some((o) => o.value === row.related_field_key)) {
+        options.unshift({ value: row.related_field_key, label: `${row.related_field_key} (deleted)`, disabled: true });
+    }
+
+    return options;
+}
+
+/**
+ * The operator <select>'s options — the compared field's shape decides them, so the list is empty until a
+ * field is named. Where an ABSENT operator is itself a condition, that choice is offered explicitly rather
+ * than left as a blank nobody can read.
+ */
+function operatorOptionsFor(row: BuilderValidation): SelectOption[] {
+    const rule = ruleTypeOf(row);
+    const shape = shapeOfRelated(row);
+
+    if (rule === null || shape === null) {
+        return [];
+    }
+
+    const options: SelectOption[] = [];
+
+    if (rule.operator_may_be_empty) {
+        options.push({ value: OPERATOR_ANSWERED, label: 'is answered' });
+    }
+
+    for (const operator of props.operators) {
+        if (operator.shapes.includes(shape)) {
+            options.push({ value: operator.value, label: operator.label });
+        }
+    }
+
+    if (row.operator !== null && !options.some((option) => option.value === row.operator)) {
+        const current = props.operators.find((operator) => operator.value === row.operator);
+        options.unshift({
+            value: row.operator,
+            label: (current?.label ?? row.operator) + UNAVAILABLE,
+            disabled: true,
+        });
+    }
+
+    return options;
+}
+
+function operatorPlaceholderFor(row: BuilderValidation): string | undefined {
+    if (shapeOfRelated(row) === null) {
+        return 'Choose a question first';
+    }
+
+    // `required_if` / `skip_if` with no operator THROWS at evaluation, so the absence is a broken row and
+    // not a default. Say so here instead of rendering an innocent blank.
+    return ruleTypeOf(row)?.operator_may_be_empty === true ? undefined : 'Choose a comparison';
+}
+
+/** Whether this row still needs a literal to compare against. `is_null` asks nothing of a value. */
+function takesRuleValue(row: BuilderValidation): boolean {
+    const rule = ruleTypeOf(row);
+
+    if (rule === null) {
+        return true;
+    }
+    if (!rule.takes_operator) {
+        // A constraint's threshold, or nothing at all for a rule that compares two fields.
+        return !rule.takes_related_field;
+    }
+
+    return row.operator !== null && row.operator !== OPERATOR_ANSWERED && row.operator !== 'is_null';
+}
 
 function mode(row: BuilderValidation): 'rule' | 'expression' {
     return row.expression !== null && row.expression !== '' ? 'expression' : 'rule';
@@ -30,12 +171,29 @@ function update(index: number, patch: Partial<BuilderValidation>): void {
     );
 }
 
+/**
+ * Changing the rule kind clears the columns the new kind does not read. Leaving them would persist an
+ * operator on a `pattern` row and a related field on a `min_length` one — columns no lowering reads, which
+ * makes them dead data that reads as intent to the next person opening the row.
+ */
+function setRuleType(index: number, value: string): void {
+    const rule = props.ruleTypes.find((candidate) => candidate.value === value) ?? null;
+
+    const current = props.validations[index];
+
+    update(index, {
+        rule_type: value,
+        operator: rule?.takes_operator === true ? current.operator : null,
+        related_field_key: rule?.takes_related_field === true ? current.related_field_key : null,
+    });
+}
+
 function setMode(index: number, next: 'rule' | 'expression'): void {
     update(
         index,
         next === 'expression'
             ? { expression: '', rule_type: null, operator: null, rule_value: null, related_field_key: null }
-            : { expression: null, rule_type: props.ruleTypes[0]?.value ?? null },
+            : { expression: null, rule_type: allowedRuleTypes.value[0]?.value ?? null },
     );
 }
 
@@ -43,7 +201,7 @@ function addRule(): void {
     emit('update:validations', [
         ...props.validations,
         {
-            rule_type: props.ruleTypes[0]?.value ?? null,
+            rule_type: allowedRuleTypes.value[0]?.value ?? null,
             operator: null,
             rule_value: null,
             expression: null,
@@ -92,29 +250,31 @@ const modeOptions: EnumOption[] = [
             <template v-if="mode(row) === 'rule'">
                 <MdsSelect
                     :model-value="row.rule_type ?? ''"
-                    :options="ruleTypes"
+                    :options="ruleOptionsFor(row)"
                     :disabled="disabled"
                     :aria-label="`Rule ${i + 1} check`"
-                    @update:model-value="update(i, { rule_type: $event })"
+                    @update:model-value="setRuleType(i, $event)"
                 />
                 <MdsSelect
-                    :model-value="row.operator ?? ''"
-                    :options="operators"
-                    placeholder="Operator (optional)"
-                    :disabled="disabled"
-                    :aria-label="`Rule ${i + 1} operator`"
-                    @update:model-value="update(i, { operator: $event || null })"
-                />
-                <MdsTextInput
-                    v-if="row.rule_type && FIELD_COMPARISON.has(row.rule_type)"
+                    v-if="ruleTypeOf(row)?.takes_related_field"
                     :model-value="row.related_field_key ?? ''"
-                    placeholder="Compared field key"
+                    :options="relatedOptionsFor(row)"
+                    placeholder="Choose a question"
                     :disabled="disabled"
-                    :aria-label="`Rule ${i + 1} compared field key`"
+                    :aria-label="`Rule ${i + 1} compared field`"
                     @update:model-value="update(i, { related_field_key: $event || null })"
                 />
+                <MdsSelect
+                    v-if="ruleTypeOf(row)?.takes_operator"
+                    :model-value="row.operator ?? ''"
+                    :options="operatorOptionsFor(row)"
+                    :placeholder="operatorPlaceholderFor(row)"
+                    :disabled="disabled || shapeOfRelated(row) === null"
+                    :aria-label="`Rule ${i + 1} operator`"
+                    @update:model-value="update(i, { operator: $event === '' ? null : $event })"
+                />
                 <MdsTextInput
-                    v-else
+                    v-if="takesRuleValue(row)"
                     :model-value="row.rule_value ?? ''"
                     placeholder="Value"
                     :disabled="disabled"
@@ -146,7 +306,13 @@ const modeOptions: EnumOption[] = [
             No validation rules. Add one to constrain what respondents can enter.
         </p>
         <div>
-            <MdsButton variant="tertiary" size="sm" icon-left="plus" :disabled="disabled" @click="addRule">
+            <MdsButton
+                variant="tertiary"
+                size="sm"
+                icon-left="plus"
+                :disabled="disabled || allowedRuleTypes.length === 0"
+                @click="addRule"
+            >
                 Add rule
             </MdsButton>
         </div>

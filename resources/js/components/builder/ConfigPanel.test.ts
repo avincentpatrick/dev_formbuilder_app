@@ -57,8 +57,13 @@ const PALETTE: PaletteGroup[] = [
         label: 'Text',
         icon: 'type',
         types: [
-            { value: 'short_text', label: 'Short text', advanced: false, has_options: false, config_editor: null },
-            { value: 'single_select', label: 'Single select', advanced: false, has_options: true, config_editor: 'choices' },
+            { value: 'short_text', label: 'Short text', advanced: false, has_options: false, config_editor: null, value_shape: 'text' },
+            { value: 'single_select', label: 'Single select', advanced: false, has_options: true, config_editor: 'choices', value_shape: 'choice' },
+            // M115 — a type that carries NO ANSWER, so the Validation tab must not exist for it. It is in
+            // the fixture rather than only in a comment because that is what makes value_shape LOAD-BEARING
+            // here: no type-checker reads this file (tsconfig excludes **/*.test.ts), so a required member
+            // added to PaletteType would otherwise rot silently to undefined.
+            { value: 'note', label: 'Note', advanced: false, has_options: false, config_editor: null, value_shape: 'no_answer' },
         ],
     },
 ];
@@ -148,6 +153,15 @@ describe('ConfigPanel — the tab set it hands the shared widget', () => {
             'Validation',
             'Advanced',
         ]);
+    });
+
+    it('gives a field that carries no answer no Validation tab at all', () => {
+        // M115. ValueShape::allows() refuses every rule type for no_answer, and since M113 the publish gate
+        // refuses them too — so offering the tab on a note was a route to a form that could not be
+        // published. The negative control is the case above: short_text keeps its tab.
+        const note = mountPanel(makeStore({ field: field({ field_type: 'note' }) }));
+
+        expect(note.findAll('[role="tab"]').map((tab) => tab.text())).toEqual(['Basics', 'Advanced']);
     });
 
     it('offers a section only Basics and Advanced', () => {

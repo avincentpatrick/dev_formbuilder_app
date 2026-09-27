@@ -8,7 +8,9 @@ use App\Enums\ValueShape;
 use App\Exceptions\Expressions\ExpressionException;
 use App\Exceptions\Submissions\SubmissionValidationException;
 use App\Exceptions\Templates\TemplateSyntaxException;
+use App\Services\Expressions\StructuredRuleLowering;
 use App\Services\Templates\TemplateScopeResolver;
+use App\Services\Validation\SemanticValidator;
 use RuntimeException;
 
 /**
@@ -221,7 +223,7 @@ final class PublishValidationException extends RuntimeException
     /**
      * A rule that names no second question (Increment M116). All six kinds where
      * {@see ValidationRuleType::takesRelatedField()} holds reach
-     * {@see \App\Services\Expressions\StructuredRuleLowering::relatedKeyOrThrow()} first, before any
+     * {@see StructuredRuleLowering::relatedKeyOrThrow()} first, before any
      * dispatch on the rule type, and it throws `missing_related_field` when the column is null.
      *
      * ⚠️ THE CODE IS PREFIXED ON PURPOSE. {@see expressionInvalid()} forwards
@@ -241,7 +243,7 @@ final class PublishValidationException extends RuntimeException
      * A `required_if` or `skip_if` carrying no operator (Increment M116).
      *
      * ⛔ `required_with` AND `skip_with` ARE EXEMPT, AND THE EXEMPTION IS NOT A LENIENCY. A null operator
-     * there is itself the condition — {@see \App\Services\Expressions\StructuredRuleLowering::lowerCondition()}
+     * there is itself the condition — {@see StructuredRuleLowering::lowerCondition()}
      * lowers it to `isNotNull(relatedKey)`, *"when that question is answered at all"* — so refusing it would
      * refuse the commonest authoring choice. Only these two reach `conditionForOperator()`'s default arm,
      * which throws. The predicate that separates them is
@@ -260,7 +262,7 @@ final class PublishValidationException extends RuntimeException
      * Conditional requiredness that nothing can ever trigger (Increment M116).
      *
      * ⛔ REFUSED BECAUSE THE ALTERNATIVE IS SILENCE, WHICH IS THE SAME REASON
-     * {@see hiddenFieldNotAnswerable()} exists. {@see \App\Services\Validation\SemanticValidator::requiredState()}
+     * {@see hiddenFieldNotAnswerable()} exists. {@see SemanticValidator::requiredState()}
      * honours `Conditional` only through a `required_*` unit; with none the field falls out as optional and
      * the author is told nothing, so the setting is a control that does nothing. A `skip_if` does not count:
      * it makes a field irrelevant, never required — hence {@see ValidationRuleType::governsRequiredness()}
@@ -284,7 +286,7 @@ final class PublishValidationException extends RuntimeException
      *
      * ⛔ MEASURED, NOT REASONED — a `note` marked `Required` publishes clean today and then refuses every
      * submission with `field_required` on a field that has no input control at all, which no respondent and
-     * no keyer can ever clear. {@see \App\Services\Validation\SemanticValidator::collectFieldErrors()}
+     * no keyer can ever clear. {@see SemanticValidator::collectFieldErrors()}
      * early-returns for calculated, hidden, grid, geo and media fields and for these it does not, so the
      * answer is permanently absent, `Coercion::isEmpty()` is true, and `requiredState()` short-circuits to
      * required on the spot.

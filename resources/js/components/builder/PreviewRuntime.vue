@@ -23,8 +23,14 @@
  * by Vue, which is how M117 made a test fail on the comment explaining it.
  *
  * ⚠️ NO LIVE REGION IS RENDERED EITHER, and that is load-bearing for a gate: an sr-only region would bring
- * `clip: rect(0 0 0 0)` into a new `.vue`, and `clipped-node-containment.test.ts` asserts its unguarded list
- * with `toEqual` and forbids adding to it.
+ * the visually-hidden clip idiom into a new `.vue`, and `clipped-node-containment.test.ts` asserts its
+ * unguarded list with `toEqual` and forbids adding to it.
+ *
+ * ⛔ AND THIS PARAGRAPH USED TO SPELL THAT IDIOM OUT, WHICH PUT THIS FILE ON THE LIST IT WAS DESCRIBING.
+ * That gate matches its pattern against the whole source file, comments included, so the sentence promising
+ * the component does not clip anything WAS the clip it was scanned for. Exactly M117's lesson on the other
+ * side of the glass — there, Vue rendered a template comment into `wrapper.html()` and broke the substring
+ * assertion the comment explained. A rule about a forbidden string cannot be documented by quoting it.
  */
 import { computed, provide } from 'vue';
 import { MdsButton } from '@meridian/design-system';
@@ -279,7 +285,7 @@ function go(delta: number): void {
 }
 
 .preview__req {
-    color: var(--mds-color-text-danger);
+    color: var(--mds-color-danger-text);
 }
 
 .preview__inert-hint,
@@ -298,7 +304,7 @@ function go(delta: number): void {
 .preview__issue {
     font-family: var(--mds-font-family-body);
     font-size: var(--mds-type-body-sm-font-size);
-    color: var(--mds-color-text-warning);
+    color: var(--mds-color-status-warning-fg);
 }
 
 .preview__pending {

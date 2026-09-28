@@ -371,20 +371,28 @@ for (const theme of themes) {
         // half; neither can see the PAGE, and nothing in this repo mounts `Builder.vue`. This is the only
         // place the whole-page count can be taken, and it is taken at all three viewports by the project
         // matrix — with the preview on screen, which is the state that could newly break it.
-        await expect(page.getByRole('tablist')).toHaveCount(1);
+        //
+        // ⛔ `locator('[role="tablist"]')`, NOT `getByRole('tablist')`, AND THE DIFFERENCE IS MEASURED. The
+        // first version used `getByRole` and failed at the tablet project with a count of ZERO: below the
+        // 60em container threshold the panes are hidden with `display: none`, `ConfigPanel` goes with them,
+        // and a `display:none` subtree is absent from the ACCESSIBILITY tree that `getByRole` queries. So the
+        // role-based form does not assert "one tablist" — it asserts "the config pane happens to be the
+        // selected one", which is a different and viewport-dependent claim. The attribute locator counts the
+        // DOM, where the invariant actually lives, and holds identically at all three widths.
+        await expect(page.locator('[role="tablist"]')).toHaveCount(1);
 
         await scan(page, 'builder preview view');
 
         // Selecting in the preview drives the SAME config panel the structure canvas does, which is what
         // keeps this one editor rather than two.
         await page.locator('[data-preview-field]').first().click();
-        await expect(page.getByRole('tablist')).toHaveCount(1);
+        await expect(page.locator('[role="tablist"]')).toHaveCount(1);
         await scan(page, 'preview after selecting a field');
 
         // …and back, with the structure canvas intact and still exactly one tablist.
         await page.locator('.builder__centre-tabs').getByText('Structure').click();
         await expect(page.locator('.canvas').first()).toBeVisible();
-        await expect(page.getByRole('tablist')).toHaveCount(1);
+        await expect(page.locator('[role="tablist"]')).toHaveCount(1);
     });
 
     // The structured CONDITION EDITOR (Increment H21d2) — the write half of the same row, and the config

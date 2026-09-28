@@ -907,6 +907,20 @@ function submitImport(): void {
     background-color: var(--mds-color-bg-surface);
 }
 
+/* D28's host-level fix, applied here by M118 and MEASURED rather than added defensively. The centre
+   control went from two segments to three, and at 375px with `extra_large` + OpenDyslexic the third one
+   pushed its flex LINE past the bar: `MdsSegmentedControl` is an `inline-flex` with no `flex-wrap`, and a
+   `__seg` carries `min-width: auto`, so it never shrinks below its longest word plus its padding.
+   ⛔ AND NOTHING IN THIS REPOSITORY COULD SEE IT. `.builder__pane { overflow: hidden }` CLIPS the spill
+   instead of scrolling it, so `assertNoHorizontalOverflow`'s `.app-shell__content` read is flat over this
+   control by construction; axe has no rule for a clipped label; and `personalization-axe` had element-level
+   reads for the pane switcher (M19) and the config pane (M109) but never for this one. The gate was written
+   first, went RED on the real defect, and this is the fix — the same wrap `ConfigPanel.vue` already applies
+   to the Requiredness control, which is the affordance D28 found actually works. */
+.builder__centre-tabs .mds-segmented {
+    flex-wrap: wrap;
+}
+
 .builder__centre-body {
     flex: 1;
     min-height: 0;

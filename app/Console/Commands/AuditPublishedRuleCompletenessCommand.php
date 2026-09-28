@@ -10,6 +10,7 @@ use App\Models\Tenant;
 use App\Support\Tenancy\ExtractionGuard;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Console\Command;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -78,11 +79,20 @@ final class AuditPublishedRuleCompletenessCommand extends Command
         $total = 0;
         $tenantsWithFindings = 0;
 
-        foreach (Tenant::query()->orderBy('slug')->get() as $tenant) {
+        // The annotation is not decoration: `Tenant::query()->get()` is typed as a collection of the base
+        // `Model`, so `$tenant->id` reads as `property.notFound` to PHPStan at level 8 — the same phantom
+        // fifteen other sites in this tree already carry and CI does not report. Narrowing it here keeps this
+        // increment's delta at zero rather than adding a sixteenth.
+        /** @var Collection<int, Tenant> $tenants */
+        $tenants = Tenant::query()->orderBy('slug')->get();
+
+        foreach ($tenants as $tenant) {
+            $tenantId = (string) $tenant->getKey();
+
             /** @var int $found */
             $found = TenantContext::runFor(
-                (string) $tenant->id,
-                fn (): int => $this->auditOneTenant((string) $tenant->id, $missingRelatedField, $missingOperator)
+                $tenantId,
+                fn (): int => $this->auditOneTenant($tenantId, $missingRelatedField, $missingOperator)
             );
 
             $total += $found;

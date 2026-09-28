@@ -11410,7 +11410,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `parseExpression()`, so that check is a direct call and not a second parser. **Live.** Filed by `M110`.
   **Tier: early-testing.** ✅ **CLOSED BY `M112` (2026-09-26) — `B6`, AND IT SHIPPED A GATE THE ROW DID NOT ASK FOR.** `resources/js/components/builder/draft-snapshot.ts` exports `projectDraft()`, which creates one new file and edits none. ✅ **EVERY CITATION HELD.** `condition-model.ts:85` does export a bare `parseExpression()`, so the pre-parse is a direct call and not a second parser; `useFormRuntime.ts:310-319`'s `safeEvaluate()` does catch a parser throw, degrade the WHOLE FORM to everything-relevant and latch `engineFailed` true for the session — which is what makes the pre-parse load-bearing rather than tidy. ⛔ **A SHAPE GAP THE ROW DOES NOT MENTION, MEASURED AT SOURCE RATHER THAN INFERRED: the builder's model is missing EVERY translation column the runtime's model requires.** `ServerField` carries no `label_translations`, `hint_translations` or `default_value_is_expression`; `ServerSection` carries no `label_translations`/`description_translations`; `BuilderValidation` carries no `error_message_translations`, `logic_group_ordinal` or `logic_operator` — while `RawField`, `RawSection` and `RawValidation` require all of them. A grep of `BuilderPresenter.php` finds **no `*_translations` key at all**. They are synthesized as `null`, so **the preview renders the default locale only** — filed below rather than left for `B7` to discover. ✅ **`shape` EXCLUDES LABELS, HINTS, PLACEHOLDERS AND TRANSLATIONS BY CONSTRUCTION, AND INCLUDES OPTION *VALUES* BUT NOT OPTION *LABELS*** — the property `B7` depends on to rebuild the runtime on structural change rather than on every keystroke, asserted in both directions so neither half can pass trivially. ⛔ **THE REAL DELIVERABLE IS `tests/Feature/Docs/DraftProjectionMirrorDriftTest.php`**, which turns a hand-mirror into a guarded one — this repository has ten unguarded ones in this very area. **It catches the gap TypeScript cannot:** an OPTIONAL member added to `RawField` compiles clean while the projection silently omits it, proved by mutation. ⚠️ **AND THE GATE CAUGHT A DEFECT IN ITSELF ON ITS FIRST RUN** — `key,` and `config,` are ES shorthand, so a colon-only regex silently missed two of `RawField`'s seventeen members; it now matches both forms and holds a measured member-count floor. ✅ **19 Vitest cases and 4 Pest cases; four mutations CAUGHT with disjoint kill sets** — reversing the field sort comparator reddens ONLY the duplicate-key case (which is why that case asserts by LABEL, not by position), leaking the label into `shape` reddens ONLY the no-remount property, an optional member added to `RawField` reddens the mirror and the floor, and renaming the `// mirror:` anchor reddens the anti-vacuity arm rather than reporting a clean mirror while blind.
 
-- **`minor` · The builder's middle pane is a structural outline that renders no input control of any kind, so an
+- ✅ **CLOSED BY `M118` (2026-09-28) — `minor` · The builder's middle pane is a structural outline that renders no input control of any kind, so an
   author cannot see the form until it is published.** Filed 2026-09-25 by `M110`, from the same report.
   `BuilderCanvas.vue:46-158` renders per field only a drag grip, an uppercase type label, the label text or
   `(untitled)`, a Required/Conditional badge and two icon buttons — there is no `<input>`, no `<select>`, no
@@ -11426,6 +11426,55 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   invariant lives only in prose today** and should become an assertion in this increment, before every later
   builder change depends on it. **Live.** Filed by `M110`. **Tier: early-testing.**
 
+  ✅ **CLOSED BY `M118` (2026-09-28) — `B7`, AND THE PLAN'S OWN REBUILD MECHANISM WAS WRONG.** The centre
+  `MdsSegmentedControl` gains a third option (`Structure · Preview · Logic`) and `PreviewPane`/`PreviewRuntime`
+  mount the SAME engine the guest SPA and the encode page mount, rendering through the SAME
+  `FieldRow → FieldControl → FieldInput` chain. Nothing is mirrored and no respondent-facing component was
+  edited. ⛔ **THE PREMISE FINDING THAT DECIDED THE ARCHITECTURE: `createFormRuntime(schema)` TAKES A FROZEN
+  SNAPSHOT.** `buildRenderModel()`, `buildEngineSchema()` and `buildTemplateSources()` all run once inside the
+  factory (`useFormRuntime.ts:250-256`) and `templateSources` is documented as *"deliberately never wrapped in
+  `reactive()`"*, so a schema change means a NEW runtime. ⛔ **And `shape` — the plan's prescribed rebuild
+  trigger — excludes far more than labels: `shapeOf()` omits hints, placeholders, section descriptions, every
+  `*_translations` map, `appearance`, `error_message` AND the whole of `config` except option *values*.** So
+  "rebuild on `shape` and read presentation from the engine", as the plan prescribed, yields a preview where
+  typing a label changes nothing until an unrelated structural edit, and where grid rows, cascade levels, geo
+  options and every option LABEL are stale indefinitely. ✅ **The remedy is two channels:** the render model is
+  rebuilt on every store change and drives every visible string (`FieldRow` is prop-driven and
+  `runtime.labelFor(field)` reads the field it is PASSED, so a live `RenderField` renders live text through the
+  frozen piping seam), while the engine is rebuilt only on a `shape` change, debounced 300ms, under a `:key` so
+  it REMOUNTS — necessary because `createFormRuntime` registers a `watch` on the ambient effect scope
+  (`:581`) and ships no disposer. Rebuilds are gated on Preview being the selected view, on `LogicRail`'s
+  `:active` precedent. ⛔ **A REAL DEFECT THE NEW SEGMENT CAUSED, FOUND BY A GATE WRITTEN BEFORE IT:** at 375px
+  with `extra_large` + OpenDyslexic the three-segment control pushes its flex line past its bar, and **no gate
+  in this repository could see it** — `.builder__pane { overflow: hidden }` CLIPS the spill instead of
+  scrolling it, so `assertNoHorizontalOverflow`'s `.app-shell__content` read is flat over it, axe has no rule,
+  and `personalization-axe` had element-level reads for the pane switcher (`M19`) and the config pane (`M109`)
+  but never for this control. Fixed with the host-level `flex-wrap` `ConfigPanel.vue:732` already applies to
+  the Requiredness control — `D28`'s measured affordance. ⛔ **THE ROW'S OWN EVIDENCE: ONE CITATION FALSE, FOUR
+  ROTTED, AND ONE CLAIM FALSE.** `ConfirmationModal.vue:11` names a file `M117` renamed and a sentence it
+  deleted (the in-tree statement moved to `draft-snapshot.ts:7`); `Builder.vue:531-537` and `:462-471` are both
+  **+7** (`:538-544`, `:469-477`); `Encode.vue:38-42` is the IMPORT and was at filing time too, the mount being
+  `:185-195`. ⛔ **And *"that invariant lives only in prose today"* is FALSE** — `ConfigPanel.test.ts:210-219`,
+  `:358-367` and `FormSettingsModal.test.ts:97-110` already assert it at component level. What was genuinely
+  missing is the **page-level** count, now taken in `builder-axe.spec.ts` at all three viewports. ⚠️ **That
+  assertion had to move from `getByRole('tablist')` to `locator('[role="tablist"]')`, measured:** below the
+  container threshold the config pane is `display: none` and absent from the accessibility tree, so the
+  role-based form counted **zero** and was really asserting which pane was selected. ✅ **Thirteen locators and
+  four click-loops are EXACT**, but five places in the tree name the wrong third spec file — filed below.
+  ⚠️ **Four limitations are stated in the pane itself and owned elsewhere:** default locale only
+  (`R-fda28bf1`), always stepped (`R-f1332829`), `page_break` invisible (`R-8c517fb6`), and label text inside a
+  **repeatable** section refreshing only on the next structural change, because `RepeatGroup` resolves members
+  through `runtime.membersOf()` — filed below rather than hidden. **Maps and uploads render inert** (user
+  decision, 2026-09-28): omitting `UploadUrlKey` does NOT disable the picker, which renders in full and fails
+  only on pick, and `GeoInput` would pull Leaflet plus live tiles into the builder route. ✅ **Measured:
+  builder chunk 103.74 kB → 113.71 kB raw, 27.87 → 30.99 kB gzip (+3.12 kB)** — small because the engine was
+  already in this bundle via `Encode.vue`. ✅ **55 new Vitest cases; SEVEN mutations CAUGHT with tight kill
+  sets** (drop the active gate, claim nothing is a capture field, remove the debounce, swallow a pending field,
+  feed the row the frozen model, drop the remount key, select on click only). ⛔ **And FIVE survivors were the
+  finding, not a formality.** Two proved GUARDS DEAD and both were deleted: the shape-equality check inside the
+  shape watcher (the watch SOURCE already filters it) and the shape comparison on activation (the `:key` makes
+  a repeat rebuild a no-op, so idempotence is structural). Three proved TESTS vacuous: `vi.advanceTimersByTime`
+  called before awaiting the tick that SCHEDULES the timer advances a clock with nothing on it.
 - ✅ **CLOSED BY `M114` (2026-09-26) — `minor` · `forms.single_page_mode` drives real, tested runtime behaviour in both renderers and has no write
   path anywhere outside the seeders.** Filed 2026-09-25 by `M110`, from the report asking for a section strip under
   the preview and a choice of how sections are presented. The column exists (migration
@@ -11987,7 +12036,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   a form whose conditions are inert may be collecting answers to questions that should have been skipped.
   **Live.** Filed by `M116`. **Tier: early-testing.**
 
-- **`minor` · The publish gate is prospective, so a version ALREADY published with an unevaluable conditional
+- ✅ **CLOSED BY `M118` (2026-09-28) — `minor` · The publish gate is prospective, so a version ALREADY published with an unevaluable conditional
   rule keeps failing every submission and nothing can find those versions.** Found by `M116` (2026-09-28) as
   the explicit limit of its own fix. The three arms added to `StructuralValidationGate` run at publish, so
   they cannot reach a `form_versions` row that is already `published`. ⚠️ **THE POPULATION IS UNMEASURED AND
@@ -12000,6 +12049,40 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   needs a decision about whether to rewrite the rows, unpublish the versions, or make the evaluator tolerate
   an incomplete row at read time. **Live.** Filed by `M116`. **Tier: early-testing.**
 
+  ✅ **CLOSED BY `M118` (2026-09-28) — THE CENSUS IS ZERO, THE ZERO IS STRUCTURAL, AND THE ROW'S SECOND CLAUSE
+  IS NOW FALSE BY CONSTRUCTION.** ✅ **Measured, read-only:** the local database holds **zero structured
+  validation rows of any kind** across 4 tenants, 36 `form_versions` and 13 published ones — run as `meridian`,
+  which `pg_roles` reports `rolsuper` **and `rolbypassrls`, so RLS hid nothing** and the count is global rather
+  than policy-filtered. ✅ **The query was PROVED, not merely green:** inside a rolled-back transaction, two
+  known-bad rows injected on a published version returned `missing_related_field = 1`, `missing_operator = 1`,
+  `census_total = 2`, and a third HEALTHY row left the total at **2 of 3**. ⛔ **The producer set is now closed
+  and named, which is what makes the zero mean something.** A grep of `database/seeders/` for
+  `form_field_validations`, `FormFieldValidation` and `rule_type` returns **zero files**; `DefaultFieldRules.php:90`
+  emits only `Pattern`, for which `takesRelatedField()` and `takesOperator()` are both false; and the XLSForm
+  importer leaves `rule_type` **null**, as `ValidationSpec`'s own docblock states, so every imported rule is an
+  *expression* row. **Hand authoring in the builder is therefore the only path that can write a structured
+  conditional rule, and `M116` shut it prospectively** — so the population is exactly *rules published before
+  `M116` merged*, a set no local database can contain. ⛔ **AND THE ONE DATABASE THAT COULD CONTAIN IT IS
+  UNREACHABLE BY DESIGN, WHICH IS THIS ROW'S SECOND CLAUSE HAPPENING:** `docs/deployment-infrastructure.md` §8
+  step 2 binds the testing box's PostgreSQL to `listen_addresses = 'localhost'`, admits only `127.0.0.1/32` and
+  `::1/128`, and states there is no firewall rule for its port. *"Nothing can find those versions"* was not a
+  flourish. ✅ **So the remedy is `php artisan forms:audit-published-rules`** — read-only, auto-discovered from
+  `app/Console/Commands/` so `routes/console.php` stays shut, reusing `ValidationRuleType::takesRelatedField()`,
+  `takesOperator()` and `operatorMayBeEmpty()` so the audit and the publish gate share one definition rather
+  than a second copy. It loops per tenant with RLS as the filter, guarded both ways by `ExtractionGuard`: a
+  BYPASSRLS connection would **multiply** the count rather than merely leak it, and a GUC that silently did not
+  take would report a clean zero. Its exit code is the alarm, so it can be scheduled. ⛔ **THE POSITIVE CONTROL
+  IS CONSTRUCTIBLE, UNLIKE `M117`'s ON THESE SAME TABLES, AND BUILDING IT FOUND A TRIGGER NOBODY HAD NAMED.**
+  The fixture reproduces the real history — write the bad row while the version is a draft, then publish once —
+  because `form_versions_published_immutable_fn()` raises `SQLSTATE 23001, "status may only move published to
+  superseded"`, hinting that *a published version can never return to draft*. So there is no un-publish-and-append
+  step available, and the protection is strictly stronger than the migration comment describing it
+  (*"UPDATE unconstrained by status"*). **8 Pest cases; three mutations CAUGHT** (drop the `operatorMayBeEmpty`
+  filter → only the `required_with`/`skip_with` case; audit drafts too → only the draft case; return SUCCESS on
+  findings → all three failing cases). ⚠️ **One mutation SURVIVED and the code changed rather than the story:**
+  `whereNotNull('v.rule_type')` was doing nothing, because `whereIn` cannot match SQL NULL, so the expression-row
+  case passes on that exclusion. The clause is gone and the reason is recorded at the site. ⚠️ **What is NOT
+  closed here is the staging measurement**, which needs shell access to the box — one command, now.
 - ✅ **CLOSED BY `M116` (2026-09-28), AND FILED IN THE SAME INCREMENT BECAUSE THE LEDGER MUST CARRY IT —
   `minor` · ~~A `note` or `page_break` can be marked Required, which refuses every submission the form ever
   receives with an error nobody can clear.~~** Found by `M116` while answering the one question the
@@ -12065,7 +12148,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   same increment's client-side half already parks these as `terminal` instead of retrying five times, so the
   remaining defect is the MESSAGE, not the traffic. **Live.** Filed by `M117`. **Tier: early-testing.**
 
-- **`nit` · `TabNav.stories.ts` hand-builds a copy of the form hub's tab strip and no gate compares it to
+- ✅ **CLOSED BY `M118` (2026-09-28) — `nit` · `TabNav.stories.ts` hand-builds a copy of the form hub's tab strip and no gate compares it to
   `FormTabSet`.** Found 2026-09-28 by `M117` while measuring what a fifth hub tab would break.
   `packages/design-system/src/components/TabNav/TabNav.stories.ts:24` carries the four labels
   `Overview/Responses/Builder/Analytics` as a literal, which is a second copy of what
@@ -12075,3 +12158,73 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the stale copy. ⚠️ **Filed as a `nit` deliberately:** the story is a design-system fixture and a wrong label
   in it misleads a reader without shipping anything, so the honest remedy may be a comment saying the labels are
   illustrative rather than a mechanism to sync them. **Live.** Filed by `M117`. **Tier: early-testing.**
+
+  ✅ **CLOSED BY `M118` (2026-09-28) — THE DRIFT THIS ROW PREDICTED HAS ALREADY HAPPENED, AND MEASURING IT
+  CHANGED THE REMEDY.** The row says the copy *"goes stale the moment the hub gains a tab"*; it is stale now,
+  on a LABEL and without any tab being added. `FormTabSet::for()` emits `'Responses'` for the `submissions`
+  key while `TabNav.stories.ts` says `'Submissions'`, and the `Overflowing` story additionally invents `share`
+  and `versions` keys the hub has never had. ✅ **Both are LEFT EXACTLY AS THEY ARE, deliberately**, and the
+  story's docblock now says so: they are what makes the warning checkable, and correcting them would restore
+  the appearance of a faithful copy while removing the only evidence that it is not one. ⛔ **A GATE IS
+  DECLINED WITH ITS REASON RATHER THAN OMITTED.** The design-system package has no autoloader into `app/` and
+  no PHP at build time, and the real strip is **derived per user from four capability checks**
+  (`FormTabSet.php:52-90`), so it is not a constant anywhere and there is nothing for a fixture to be equal to.
+  Gaining a cross-package dependency to keep a Storybook caption in step would be a far worse trade than a
+  wrong caption — which is the reading this row itself offered when it filed as a `nit`. The docblock names
+  `FormTabSet.php` as the authority so a reader is sent to the derivation instead of trusting the fixture.
+  ⚠️ **`FormTabSetReachabilityTest.php:59` is untouched** — it asserts the four keys exactly and ordered, and
+  nothing here adds a hub tab.
+
+- **`nit` · Five places name `personalization-axe.spec.ts` as one of the three specs walking `[role="tab"]` on
+  the builder, and it holds none.** Found 2026-09-28 by `M118` while verifying the one-tablist invariant before
+  extending the centre control. The sentence *"thirteen locators across builder-axe, responsive-axe and
+  personalization-axe"* appears in `resources/js/components/builder/ConfigPanel.vue:23-27`,
+  `resources/js/Pages/forms/Builder.vue:469-477`, `resources/js/components/builder/ConfigPanel.test.ts:212`,
+  `resources/js/components/builder/FormSettingsModal.test.ts:7` and `docs/claims/lane-a.md`. ✅ **Thirteen and
+  four click-loops are both EXACT** — enumerated one by one. ⛔ **But `personalization-axe.spec.ts` contains
+  zero `[role="tab"]` or `getByRole('tab')` locators**; the third file is `tests/e2e/field-library-axe.spec.ts:84`.
+  ⚠️ **Two stale counts ride along:** `resources/js/Pages/forms/builder-layout.test.ts:86` and `Builder.vue:921`
+  both say **nine**, which is neither the total nor any partition of it that anyone has been able to name.
+  ⚠️ **Why this is a `nit` and not a `minor`:** every locator is correctly enumerated, so nothing is unguarded
+  — what is wrong is the map a future session reads before touching this page, and `M118` had to re-derive the
+  whole list to discover the map was wrong. ⚠️ **It edits two hub files** (`ConfigPanel.vue`, `Builder.vue`),
+  which is why `M118` filed it rather than folding it into a row whose hub budget was already spent.
+  **Live.** Filed by `M118`. **Tier: after-launch.**
+
+- **`nit` · `Encode.vue`'s docblock claims its import crosses into `public-runtime/` "for the first time", and
+  the builder had already crossed it four times.** Found 2026-09-28 by `M118` while establishing whether the
+  preview needed a new architectural edge justified. `resources/js/Pages/submissions/Encode.vue:13-14` reads
+  *"The import crosses from `resources/js/` into `resources/public-runtime/` for the first time; the reverse
+  edge already existed"*. ⛔ **The forward edge already existed in four files inside `resources/js/components/builder/`
+  alone** — `condition-model.ts:37`, `condition-describer.ts:43`, `logic-rail.ts:25` and `draft-snapshot.ts:55-56`
+  — and the reverse edge is three, not one (`FieldControl.vue:9`, `InstanceField.vue:13`, `context.ts:2`).
+  ⚠️ **The claim matters more than it looks:** a session reading it concludes that importing the runtime from an
+  authenticated page is novel and owes an argument, when it is ordinary and already gated by
+  `component-import-lint`. `M118` spent a verification pass establishing that. **Live.** Filed by `M118`.
+  **Tier: after-launch.**
+
+- **`minor` · Inside a repeatable section the builder preview shows label text as of the last structural
+  change, not as of the last keystroke.** Found 2026-09-28 by `M118`, and stated in the preview itself rather
+  than discovered by an author. The preview renders flat steps from a LIVE render model, so wording updates with
+  no engine rebuild; a repeat step delegates to `RepeatGroup`, which resolves its members through
+  `runtime.membersOf()` — the FROZEN model — so member labels refresh only when `shape` next moves.
+  ⚠️ **The alternative was measured and declined:** giving `RepeatGroup`/`InstanceField` a live `fields` prop
+  edits two components on the respondent-facing submit path for an authoring convenience, and faking a single
+  representative instance would trade a bounded staleness for a permanent fiction (no add/remove, no instance
+  numbering). ✅ **It is named in `previewLimitations()`**, which the pane renders and a test pins, so an author
+  reads it rather than filing a bug. The honest fix is a live-fields prop on both components with its own gate
+  run. **Live.** Filed by `M118`. **Tier: during-testing.**
+
+- **`minor` · `getByRole('tablist')` and friends are viewport-dependent on the builder, because the panes are
+  hidden with `display: none` — so a role-based count there asserts which pane is selected, not the
+  invariant.** Found 2026-09-28 by `M118` when a new page-level assertion failed at the tablet project with a
+  count of **zero**. A `display: none` subtree is absent from the accessibility tree, and below the builder's
+  `@container (max-width: 60em)` threshold `ConfigPanel` — which owns the page's only tablist — goes with its
+  pane. `M118`'s own case moved to `locator('[role="tablist"]')`, which counts the DOM and holds identically at
+  all three widths. ⚠️ **WHAT IS UNMEASURED IS WHETHER ANY EXISTING ASSERTION HAS THE SAME SHAPE**, and that is
+  the row: `tests/e2e/` should be swept for role-based locators and counts evaluated against builder panes, and
+  each one decided — some genuinely want "is it on screen", which is a legitimate and different question. ⚠️ It
+  is not hypothetical: `builder-axe.spec.ts`'s four click-every-`[role="tab"]` loops are role-based by
+  construction, and their behaviour at a width where the config pane is hidden is that they iterate ZERO
+  elements and scan nothing — passing, silently, having tested nothing. **Live.** Filed by `M118`.
+  **Tier: during-testing.**

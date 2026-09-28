@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Enums\SubmissionSource;
 use App\Enums\SyncResultStatus;
+use App\Exceptions\Expressions\ExpressionException;
 use App\Exceptions\Submissions\FormNotAcceptingSubmissionException;
 use App\Exceptions\Submissions\SubmissionConflictException;
 use App\Exceptions\Submissions\SubmissionException;
@@ -167,10 +168,43 @@ final class SyncSubmissionController extends Controller
             return $this->failure($uuid, SyncResultStatus::Conflict, 'submission_version_superseded', $e->getMessage());
         } catch (FormNotAcceptingSubmissionException $e) {
             // Schedule (`form_not_open` / `form_closed`) and the transactional response cap
-            // (`max_responses_reached`, raised from inside SubmissionFinalizer). LAST arm, so no existing
-            // classification moves; the exception's own code and details ride through unchanged, which is the
-            // same payload the guest SPA already renders for these three causes.
+            // (`max_responses_reached`, raised from inside SubmissionFinalizer). The exception's own code and
+            // details ride through unchanged, which is the same payload the guest SPA already renders for
+            // these three causes.
+            //
+            // ⚠️ THIS WAS THE LAST ARM UNTIL M117, AND THE REASON THAT MATTERED STILL HOLDS. It was placed
+            // last so no existing classification could move; the arm added below it catches an UNRELATED
+            // hierarchy (the four above are `final` siblings of RuntimeException, not a tree), so nothing
+            // here is shadowed by it and no per-item code changes.
             return $this->failure($uuid, SyncResultStatus::Error, $e->code(), $e->getMessage(), $e->details());
+        } catch (ExpressionException $e) {
+            // ⛔ INCREMENT M117 — WITHOUT THIS ARM THE WHOLE BATCH DIES ON ONE BAD ROW. A form expression that
+            // cannot be evaluated escaped every arm above, so `bootstrap/app.php`'s renderable answered the
+            // REQUEST with a single 422 `expression_error` — replacing the per-item result list this endpoint
+            // exists to return. A device that queued nineteen good responses and one against a form carrying
+            // a broken rule learned nothing about the nineteen.
+            //
+            // ⚠️ THE BASE CLASS, NOT `ExpressionEvaluationException`. That renderable maps a UNION of two
+            // subclasses, and both are reachable from `SemanticValidator`: the evaluation one from the
+            // structured-rule lowering, the SYNTAX one because `ExpressionEvaluator::evaluate()` and
+            // `evaluateBoolean()` PARSE their string argument. An arm naming one subclass reads as fixed and
+            // leaves the other escaping, so the arm is the base and `SyncApiTest` pins that the two lists
+            // cannot diverge.
+            //
+            // ⚠️ `Error`, NOT A NEW STATUS, AND NO `details`. {@see SyncResultStatus::Error} already declares
+            // itself the catch-all for a per-item refusal that is neither a validation failure nor a version
+            // conflict, every one inside a 200 — so `openapi.json` does not move and no consumer reclassifies.
+            // `details` is omitted deliberately: the exported contract types that key as a string while every
+            // arm that populates it sends an object, and adding a sixth object-valued `details` would deepen
+            // that disagreement rather than sit beside it. The slug and field key ride in the message, which
+            // is where {@see ExpressionEvaluationException::missingRelatedField} already puts the key.
+            //
+            // ⛔ AND IT IS DEFENCE FOR DATA THAT ALREADY EXISTS, WHICH IS WHY NO END-TO-END CASE DRIVES IT.
+            // `M116`'s publish gate refuses the authoring shapes prospectively, and the three content child
+            // tables are `draft_child` under FORCE ROW LEVEL SECURITY — so a published version carrying such
+            // a rule cannot be written by ANY role, including `pgsql_privileged`, and cannot be constructed
+            // in a test database at all. Every instance is a version published before that gate existed.
+            return $this->failure($uuid, SyncResultStatus::Error, 'expression_error', $e->getMessage());
         }
     }
 

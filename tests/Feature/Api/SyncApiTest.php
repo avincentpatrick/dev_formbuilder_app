@@ -8,6 +8,9 @@ use App\Enums\RequiredMode;
 use App\Enums\ResourceCapacity;
 use App\Enums\SubmissionSource;
 use App\Enums\SubmissionStatus;
+use App\Exceptions\Expressions\ExpressionEvaluationException;
+use App\Exceptions\Expressions\ExpressionException;
+use App\Exceptions\Expressions\ExpressionSyntaxException;
 use App\Models\Form;
 use App\Models\Submission;
 use App\Models\Tenant;
@@ -773,4 +776,66 @@ it('publishes that same shape in the exported contract, enum included (M69)', fu
         // …and `details` is declared but NOT required, which is what makes it the optional key the
         // response actually omits rather than a promise the endpoint breaks.
         ->and($result['properties']['error']['required'])->toBe(['code', 'message']);
+});
+
+// ── Increment M117 — the fifth arm, and why a source-level gate is the honest instrument ─────────
+
+it('catches the expression BASE class per item, so the arm and bootstrap/app.php cannot diverge', function (): void {
+    // ⛔ WHY THIS CASE IS STRUCTURAL AND NOT AN HTTP DRIVE, MEASURED BEFORE IT WAS WRITTEN. The defect is
+    // real and shipped: `replayOne()` caught four exception types, an expression failure escaped all four,
+    // and `bootstrap/app.php` answered the whole REQUEST with one 422 `expression_error` — destroying the
+    // per-item result list. But the STATE that triggers it can no longer be constructed, by anyone:
+    //
+    //   (a) `M116`'s publish gate refuses the two authoring shapes (`rule_missing_operator`,
+    //       `rule_missing_related_field`) before a draft can be published;
+    //   (b) the three content child tables are `draft_child` under FORCE ROW LEVEL SECURITY, so a
+    //       published version's rules and fields are immutable to EVERY role. Measured in this order: an
+    //       Eloquent insert raised `new row violates row-level security policy`; the same write on
+    //       `pgsql_privileged` matched ZERO rows; an `update()` matched zero rows and reported SUCCESS.
+    //   (c) the remaining `unevaluable` sites are unreachable from an authored expression, because the
+    //       PARSER rejects both under-arity and unknown functions — `selected(consent)` and
+    //       `nosuchfn(consent)` were both measured as parse failures, so `ExpressionValidationGate` stops
+    //       them at publish;
+    //   (d) and every class in the chain — `SubmissionPipeline`, `SemanticValidator`,
+    //       `ExpressionEvaluator`, `ExpressionParser`, `StructuralValidationGate` — is `final`, so there
+    //       is no mocking seam to inject the throw either.
+    //
+    // So the arm is defence for versions published BEFORE that gate existed, which a test database cannot
+    // contain. An end-to-end case here would have to fake the failure, and a faked failure proves only
+    // that the fake was wired. What IS provable, and is what actually broke, is that the per-item arm and
+    // the renderable cover the SAME set of exceptions.
+    $controller = file_get_contents(base_path('app/Http/Controllers/Api/V1/SyncSubmissionController.php'));
+    $bootstrap = file_get_contents(base_path('bootstrap/app.php'));
+
+    expect($controller)->toBeString()->and($bootstrap)->toBeString();
+
+    // 1. The arm exists, and names the BASE class.
+    expect($controller)->toContain('} catch (ExpressionException $e) {')
+        // Mutation M2 — narrowing it to either subclass leaves the other escaping while reading as fixed.
+        ->and($controller)->not->toContain('catch (ExpressionEvaluationException')
+        ->and($controller)->not->toContain('catch (ExpressionSyntaxException')
+        // Mutation M1 — deleting the arm. The per-item code is the slug the renderable already publishes.
+        ->and($controller)->toContain("'expression_error'");
+
+    // 2. The renderable still maps the union this arm is the per-item counterpart of.
+    expect($bootstrap)->toContain('ExpressionSyntaxException|ExpressionEvaluationException $e');
+
+    // 3. ⛔ THE COMPLETENESS ARM, AND IT IS THE ONE WITH TEETH. Text agreement is worth little on its own:
+    //    what matters is that the base arm actually COVERS every subclass the renderable can be handed. A
+    //    third subclass added later would be caught here per item and rendered there per request — but if
+    //    it did NOT extend the base, this arm would silently stop covering it.
+    $files = glob(base_path('app/Exceptions/Expressions/*.php'));
+    expect($files)->toBeArray()->and($files)->toHaveCount(3);
+
+    $subclasses = [];
+    foreach ($files as $file) {
+        $class = 'App\\Exceptions\\Expressions\\'.basename($file, '.php');
+        if ($class !== ExpressionException::class) {
+            expect(is_subclass_of($class, ExpressionException::class))->toBeTrue();
+            $subclasses[] = $class;
+        }
+    }
+
+    sort($subclasses);
+    expect($subclasses)->toBe([ExpressionEvaluationException::class, ExpressionSyntaxException::class]);
 });

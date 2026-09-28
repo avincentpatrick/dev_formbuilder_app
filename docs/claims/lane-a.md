@@ -16,50 +16,62 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M119`, the builder preview gets a section strip (m119-preview-section-strip)
+## Status: NO ACTIVE CLAIM — `M119` is merged; the builder preview gained a section strip and stopped losing the author's place, the eighth tracker surgery bought about six close-outs of headroom, and a gate written first was VACUOUS TWICE before refusing its own green made it able to fail
 
-Taken 2026-09-28. Branch `m119-preview-section-strip`, cut from origin/main at `be772d4b`, PR into main.
-Row: `R-ae391298` — **"The builder has no section strip, so an author cannot see or reach a form's sections while authoring it."** (`docs/feature-backlog.md:11886`), tier `early-testing`, filed by `M114` on recording `D57`.
+## RELEASED — `M119`, the builder preview gets a section strip, and the eighth tracker surgery (merged as PR #312, `1624ef3b`, 6/6 green with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 
-⛔ **HALF OF `B8` DELIBERATELY NOT TAKEN, AND IT IS A SPLIT RATHER THAN A NARROWING.** The overhaul plan's `B8` is this row plus the `single_page_mode` write path (`R-f1332829`, open and `ready`). The two share `PreviewPane.vue`, `preview-model.ts` and `draft-snapshot.ts`, so batching them breaches `D13` clause 1. **The user was given the choice between the breach and the split, in chat, and chose the split** — the same resolution `M117` reached on the same rule. The write path is `M120`, it carries its own cost this row does not (the preview needs a second stacked view, because `PageView` hard-requires `useSubmitFlow()` and cannot be reused), and it owns reconciling a documented default that four documents disagree about.
+Shipped 2026-09-28. Branch `m119-preview-section-strip`, cut from `origin/main` at `1954ff76`.
 
-### Evidence verified
+**One `early-testing` row: `R-ae391298`, the section strip — the first half of the overhaul plan's `B8`.** Closed, **two filed**. No decision answered. Namespaces spent: **nothing from either** — no migration, no ADR, no sub-decision id. **A tracker surgery WAS owed and was taken**: `PROGRESS.md` 126,654 to 101,996 bytes, headroom 3,346 to 28,004, about six close-outs at the measured rate.
 
-The row cites no `file:line` of its own — it is a capability-gap row. It cites four sibling artefacts and two decisions, and **every one resolves**:
+⛔ **ZERO HUB FILES, AND THAT IS THE PREMISE FINDING RATHER THAN A CONVENIENCE.** The row instructs that it and `R-4e96a994` *"edit the same region of `Builder.vue`"* and **must not be batched**, because *"the room it needs is the room `D63` frees"*. Both halves had dissolved before this session opened a file: `M117` collapsed the toolbar — and `R-4e96a994`'s own text already records *"the hub tab frees no toolbar room, so `B7` and `B8` are unblocked by this half alone"* — while `M118` put the preview in the centre pane, which is where the room actually came from. **`Builder.vue` was never opened.** The proof is mechanical rather than asserted: `builder-layout.test.ts` is a pure source-text suite over that one file, so its staying green IS the claim.
 
-- `R-2bda7386` — **held.** CLOSED by `M114` as a proven strict subset for its write-path half only; this row is the re-filed remainder, exactly as the row says.
-- `R-f1332829` — **held**, still OPEN and `ready` (`docs/feature-backlog.md:7429`, pipeline row 19).
-- `R-4e96a994` — **held**, still OPEN (`docs/feature-backlog.md:11492`, pipeline row 26); its builder half shipped in `M117`.
-- `D57` (`docs/claims/decisions.md:1197`) and `D63` (`:1263`) — **both held, both answered.**
-- The two locator families the row names are real and were re-measured: `showBuilderPane()` (`tests/e2e/support/navigate.ts:115-131`), and the centre-control `getByText` reads — which are scoped to `.builder__pane-switch` and `.builder__centre-tabs` respectively, so the row's collision worry is narrower than it states.
+### How the prediction fared — the one I flagged was wrong in the opposite direction to the one I named
 
-### Premise verified
+| Predicted | Actual |
+|---|---|
+| Pint clean; **PHPStan cannot move, because the diff contains no PHP** — say that rather than quote a number | **Held, and stronger than claimed.** Bare host `pint --test` clean over 1,518 files on the first run, no fix needed — the first increment in four to manage that, for the dull reason that `ordered_imports` cannot fire on a diff with no PHP in it. The no-PHP claim was then checked rather than assumed: **no Pest test reads any file this diff touches** (the five that read `resources/js/components/builder/` read `draft-snapshot.ts`, `logic-rail.ts`, `condition-model.ts`, `condition-describer.ts`, `ConditionRow.vue` and `ConfigPanel.vue` — none of mine). |
+| Contract green, `openapi.json` deliberately unmoved | **Held.** No route, no FormRequest, no resource; 42s, green. |
+| ⚠️ **Most expected to be wrong: the new spill gate goes red for a reason I have not predicted** | ⛔ **RIGHT THAT IT WOULD SURPRISE ME AND WRONG ABOUT THE DIRECTION, WHICH IS THE WHOLE LESSON.** I predicted a red I would have to fix. What happened was **two green runs that could not have failed**, and only refusing them found it. `M118` recorded *"I predicted the scan and got the spec"*; this is the sequel — **I predicted a failure and got a pass, which is the harder one to notice, because a passing gate asks nothing of you.** |
+| Second most likely wrong: `token-references.test.ts`, third increment running | **Did not move — and this time it was RUN rather than reasoned about.** `--mds-space-2` is a real token. ⚠️ **It sits in `packages/design-system/` and scans `resources/`, so the builder-directory Vitest run never touched it**; it was run explicitly, as was `clipped-node-containment.test.ts` (also predicted unmoved, also green, 3 passed). Naming a gate in a prediction and not running it is how a prediction becomes decoration. |
+| Not expected to move: `builder-layout.test.ts`, `DraftProjectionMirrorDrift`, `FieldTypeMirrorDrift` | **All held.** `resources/js/Pages/forms` — **70 passed across 4 files** — was also outside the directory first run and was run explicitly for the same reason. |
 
-⛔ **EXPIRED — AND IT IS THE ONE CLAUSE THE ROW RESTS ITS BATCHING INSTRUCTION ON.** The row states that *"the room it needs is the room `D63` frees"*, and concludes that it and `R-4e96a994` *"edit the same region of `Builder.vue` and must not be batched together under `D13`"*. Both halves have dissolved since it was filed:
+### ⛔ The gate was VACUOUS TWICE, and the second reason is now a filed row
 
-- `M117` already collapsed the toolbar — ten controls to seven, `builder__label` 8 to 6 — and **`R-4e96a994`'s own text now records the consequence**: *"the hub tab frees no toolbar room, so `B7` and `B8` are unblocked by this half alone."*
-- `M118` then put the preview in the centre pane, so the strip's home is `PreviewRuntime.vue`, not the toolbar. **This increment does not open `Builder.vue` at all and touches ZERO hub files**, so the collision the row warns about cannot occur and no `D13` breach is needed.
+**A green gate proves nothing about a gate you have just written** — the rule was followed, the gate went green anyway, and the two causes were different.
 
-⚠️ **A second premise clause, also checked, and it inverted.** The row requires the strip be *"a radiogroup, not a tablist"*. That still holds — but `M118` has since added `PreviewPane.test.ts:430`, asserting the preview HTML contains no `radiogroup`. The two are compatible **only** because `MdsSegmentedControl` is a native `<fieldset>` of radios and writes no literal role attribute, which means that gate would go green **vacuously** on the very thing it was written to refuse. It is rewritten here rather than relied on.
+- **First, a wrong mechanism I invented and then disproved.** I concluded a `display: flex` wrapper let `SegmentedControl`'s own `min-width: 0` absorb the overflow, leaving `scrollWidth - clientWidth` reading zero, and changed the wrapper to a block on that basis. ⛔ **MEASURED ON FORCED CONTENT, THAT IS FALSE: the flex form reports a spill of 123px and the block form 126px. Both see it.** The claim had already reached a commit message; the wrapper stays a block for consistency with the three hosts that already carry a read, and the comment now says so. **I inferred a mechanism from a green gate, which is the same error as inferring correctness from one.**
+- **Second, the real reason, and it generalises to every spill read on the page.** ⛔ **NO SEEDED FIXTURE PROJECTS TO A CONTROL WIDE ENOUGH TO OVERFLOW.** `Logic Notices Demo` carries seven sections but relevance gates four at the empty answer state, so `visibleSteps` yields **three**, rendering 335px of content in a 335px bar; `Community Health Survey` projects to two. A spill assertion on any of these is green by construction and **would stay green with the affordance deleted**. Filed.
 
-### Remedy verdict
+What makes the gate able to fail is asserting `D28`'s affordance directly — `flex-wrap` on the hosted control — which was **RED on `nowrap`** before the host guard and green after, at all three viewports. The spill read is kept beside it because the two answer different questions: one that the affordance is present, the other that it is sufficient.
 
-**Works as prescribed, and the row understates itself by one defect.** Its three prescriptions — a radiogroup rather than a tablist, index-prefixed labels, and a degradation threshold as a named constant with a test rather than a CSS guess — are each correct and each buildable as written; `preview-model.ts:39-45` independently demands the third, naming this row's threshold as the thing that went wrong before.
+### The row understated itself by one defect, and it predates the row
 
-⚠️ **What the row does not mention, measured before any test was written:** `PreviewRuntime` is keyed on the engine `shape`, so every structural edit remounts it and `currentStepKey` reseeds to `visibleSteps[0].key`. **The preview already snaps back to page 1 mid-edit today.** A strip that shows the author where they are turns that from mildly odd into plainly broken, so it is fixed in the same row — `goToStep()` already returns `'exact' | 'nearest' | 'first-incomplete' | 'none'`, so nothing new is needed in the runtime.
+`PreviewRuntime` is keyed on the engine `shape`, so every structural edit remounts it and `createFormRuntime` reseeds `visibleSteps[0].key`. **The preview has snapped back to page 1 mid-edit since `M118` shipped it.** A strip showing the author where they are turns that from disorienting into plainly broken, so it is fixed here rather than filed: `PreviewPane` does not remount, so it holds the key, and the child reports back the one `goToStep` **resolved** to — never the one it was handed, because a stale request would otherwise replay into every later rebuild. Nothing was added to the runtime; `goToStep` already returns `'exact' | 'nearest' | 'first-incomplete' | 'none'`.
 
-Files: `resources/js/components/builder/PreviewStepStrip.vue` (new), `PreviewRuntime.vue`, `PreviewPane.vue`, `preview-model.ts`, `PreviewStepStrip.test.ts` (new), `PreviewPane.test.ts`, `preview-model.test.ts`, `tests/e2e/personalization-axe.spec.ts`, `tests/e2e/builder-axe.spec.ts`.
-Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/backlog-triage.md`, `docs/gate-baselines.md`, `PROGRESS.md`, `PROGRESS_ARCHIVE.md`, and the two top-level `tests/e2e/*.spec.ts` above.
-Paired files taken: none.
-Namespaces spent: **nothing from either** — no migration, no ADR, no sub-decision id.
-⚠️ **A tracker surgery is owed and is part of this increment, by measurement rather than by choice.** `PROGRESS.md` stands at 126,654 bytes with 3,346 of headroom, and the last five close-outs added 3,359 to 6,212 bytes each — the smallest of them overflows the ceiling.
+### Five mutations CAUGHT, two with disjoint kill sets
 
-Prediction:
-- **Pint clean and PHPStan unmoved, and the honest statement is that this diff CANNOT move PHPStan** — it contains no PHP at all — rather than a quoted number. `M117` and `M118` both got burned quoting one.
-- Contract job green: no route, no FormRequest, no resource, so `openapi.json` does not move.
-- ⚠️ **MOST EXPECTED TO BE WRONG: the new element-level spill read on the strip.** I expect it RED on its first run at 375px with `extra_large` plus OpenDyslexic — a strip of section names is much wider than the three-segment control that already overflowed in `M118` — and I expect the `D28` `flex-wrap` host guard to clear it. **What I most expect to get wrong is which assertion breaks**, because that is exactly `M118`'s lesson: it predicted the axe scan and got the spec.
-- Second most likely wrong: `token-references.test.ts`. Three increments running, an invented token name has reached a commit.
-- **Not expected to move: `builder-layout.test.ts` — and its staying green IS the mechanical proof of the premise finding above**, because it reads `Builder.vue` and nothing else. Also not expected: `clipped-node-containment.test.ts`, `DraftProjectionMirrorDrift`, `FieldTypeMirrorDrift`.
+`mutate.php` is Pest-only, so these were hand-run against a harness making its three assertions — token from a file, sha256 must MOVE, restore verified by byte comparison. **Caught:** dropping the `initialStepKey` seeding; swallowing the `go` emit; reading the frozen `step.title` instead of the live model; and both threshold mutations. **The threshold pair is disjoint and that is what makes it mean something:** `<=` to `<` reddens **only** *renders segments at the ceiling*; removing degradation reddens **only** the three select-side cases and leaves the ceiling case green. A single case at three options would have survived all three of those.
+
+⚠️ **One test of mine was vacuous on its first run and the mock is why.** *"is absent when the form has a single step"* failed because the mocked engine hard-codes two steps and the store cannot influence it — so the case had no way to ask for a one-step form. The mock gained a drivable step count rather than the case being deleted.
+
+### The eighth surgery, not the seventh
+
+⛔ **`M111`'s release calls itself "the sixth"; `M116` then performed one and its release prose does not mention it at all.** The count was recovered from the `MOVED` notes in `PROGRESS_ARCHIVE.md`, which are complete and machine-readable, rather than from the newest sentence — and filed as a `nit`, because `state.php` derives the increment, the ADR, the migration prefix and the exceptions entry but derives no surgery count, so prose is the only place it lives.
+
+Moved `M116`..`M112`: **9 lines, 24,658 bytes**, split by pre-measured line index 215-223. **`tracker-surgery.php` A1-A4 all passing on the FIRST run** — slice sha256 `f5c00a4f66734875`, byte conservation exact with no tolerance. ⚠️ **Its one failure was mine and the assertion caught it precisely:** a second run declaring 165 added bytes for a 167-byte string reported *"off by 2"*.
+
+⛔ **AND THE SURGERY ROTTED A LEDGER CITATION, WHICH IS `M116`'s LESSON ARRIVING FROM THE OTHER SIDE.** Inserting eleven lines into the archive shifted a `PROGRESS_ARCHIVE.md:6908` citation onto a blank line, taking the ledger tier to **18 over its ceiling of 17**. Those same three numbers had already rotted twice — `M92` re-derived them, `M100` again. **They are DROPPED rather than re-pointed a fourth time**, in a **line-count-neutral** edit so the self-citation below them does not move in turn. Back to 17 of 17.
+
+### Also fixed rather than filed
+
+`public/hot.m119-aside` reached a commit. E2E cannot run while `public/hot` exists, so every session that runs E2E moves it aside, and `.gitignore` pins the exact path — a rename escapes its own rule and one `git add -A` commits it. Same family as `M118`'s `nul` in the repo root. The rule is now `/public/hot.*`.
+
+### Measured
+
+Vitest **397 passed across 16 files** in `resources/js/components/builder` (46 new cases), plus **70 across 4** in `resources/js/Pages/forms` and the two design-system gates run explicitly. vue-tsc clean. Pint clean, bare, host — 1,518 files. Every host lint gate green, via `preflight --with-gates --with-pint` — **the whole command, which is `M117`'s lesson.** PHPStan not quoted: the diff contains no PHP. E2E: `personalization-axe` **21/21** and `builder-axe --grep "preview view"` **6/6**, both locally, then 6/6 in CI. Builder chunk **113.71 to 114.97 kB** raw, **30.99 to 31.02 kB** gzip.
+
+Files: as claimed, plus `.gitignore` for the trap above — and **not** `Builder.vue`, which was the point.
 
 ## RELEASED — `M118`, the builder shows the real form, and a prospective gate gets its census (merged as PR #311, `31ff77d3`, 6/6 green with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

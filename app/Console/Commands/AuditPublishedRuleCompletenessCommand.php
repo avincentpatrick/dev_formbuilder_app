@@ -126,7 +126,12 @@ final class AuditPublishedRuleCompletenessCommand extends Command
             ->join('form_versions as fv', 'fv.id', '=', 'v.form_version_id')
             ->join('form_fields as f', 'f.id', '=', 'v.form_field_id')
             ->where('fv.status', FormVersionStatus::Published->value)
-            ->whereNotNull('v.rule_type')
+            // No `whereNotNull('v.rule_type')` here, and its ABSENCE is measured rather than assumed. An
+            // explicit one was written first and `scripts/mutate.php` reported it SURVIVED: neutering it
+            // changed nothing, because `whereIn` cannot match SQL NULL, so the two clauses below already
+            // exclude every expression row (the XOR CHECK makes `rule_type` null exactly when `expression`
+            // is set). The case asserting an expression row is ignored therefore passes on that exclusion,
+            // not on a redundant predicate kept for reassurance.
             ->where(function ($q) use ($missingRelatedField, $missingOperator): void {
                 $q->where(function ($q) use ($missingRelatedField): void {
                     $q->whereIn('v.rule_type', $missingRelatedField)->whereNull('v.related_form_field_id');

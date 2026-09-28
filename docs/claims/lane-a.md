@@ -16,7 +16,50 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M118` is merged; the builder’s centre pane renders the real form through the same engine respondents get, the prospective publish gate has a census and a command that can take it, three rows are closed and four filed, and a gate written before the feature caught a real overflow the new segment caused
+## Status: ACTIVE CLAIM — `M119`, the builder preview gets a section strip (m119-preview-section-strip)
+
+Taken 2026-09-28. Branch `m119-preview-section-strip`, cut from origin/main at `be772d4b`, PR into main.
+Row: `R-ae391298` — **"The builder has no section strip, so an author cannot see or reach a form's sections while authoring it."** (`docs/feature-backlog.md:11886`), tier `early-testing`, filed by `M114` on recording `D57`.
+
+⛔ **HALF OF `B8` DELIBERATELY NOT TAKEN, AND IT IS A SPLIT RATHER THAN A NARROWING.** The overhaul plan's `B8` is this row plus the `single_page_mode` write path (`R-f1332829`, open and `ready`). The two share `PreviewPane.vue`, `preview-model.ts` and `draft-snapshot.ts`, so batching them breaches `D13` clause 1. **The user was given the choice between the breach and the split, in chat, and chose the split** — the same resolution `M117` reached on the same rule. The write path is `M120`, it carries its own cost this row does not (the preview needs a second stacked view, because `PageView` hard-requires `useSubmitFlow()` and cannot be reused), and it owns reconciling a documented default that four documents disagree about.
+
+### Evidence verified
+
+The row cites no `file:line` of its own — it is a capability-gap row. It cites four sibling artefacts and two decisions, and **every one resolves**:
+
+- `R-2bda7386` — **held.** CLOSED by `M114` as a proven strict subset for its write-path half only; this row is the re-filed remainder, exactly as the row says.
+- `R-f1332829` — **held**, still OPEN and `ready` (`docs/feature-backlog.md:7429`, pipeline row 19).
+- `R-4e96a994` — **held**, still OPEN (`docs/feature-backlog.md:11492`, pipeline row 26); its builder half shipped in `M117`.
+- `D57` (`docs/claims/decisions.md:1197`) and `D63` (`:1263`) — **both held, both answered.**
+- The two locator families the row names are real and were re-measured: `showBuilderPane()` (`tests/e2e/support/navigate.ts:115-131`), and the centre-control `getByText` reads — which are scoped to `.builder__pane-switch` and `.builder__centre-tabs` respectively, so the row's collision worry is narrower than it states.
+
+### Premise verified
+
+⛔ **EXPIRED — AND IT IS THE ONE CLAUSE THE ROW RESTS ITS BATCHING INSTRUCTION ON.** The row states that *"the room it needs is the room `D63` frees"*, and concludes that it and `R-4e96a994` *"edit the same region of `Builder.vue` and must not be batched together under `D13`"*. Both halves have dissolved since it was filed:
+
+- `M117` already collapsed the toolbar — ten controls to seven, `builder__label` 8 to 6 — and **`R-4e96a994`'s own text now records the consequence**: *"the hub tab frees no toolbar room, so `B7` and `B8` are unblocked by this half alone."*
+- `M118` then put the preview in the centre pane, so the strip's home is `PreviewRuntime.vue`, not the toolbar. **This increment does not open `Builder.vue` at all and touches ZERO hub files**, so the collision the row warns about cannot occur and no `D13` breach is needed.
+
+⚠️ **A second premise clause, also checked, and it inverted.** The row requires the strip be *"a radiogroup, not a tablist"*. That still holds — but `M118` has since added `PreviewPane.test.ts:430`, asserting the preview HTML contains no `radiogroup`. The two are compatible **only** because `MdsSegmentedControl` is a native `<fieldset>` of radios and writes no literal role attribute, which means that gate would go green **vacuously** on the very thing it was written to refuse. It is rewritten here rather than relied on.
+
+### Remedy verdict
+
+**Works as prescribed, and the row understates itself by one defect.** Its three prescriptions — a radiogroup rather than a tablist, index-prefixed labels, and a degradation threshold as a named constant with a test rather than a CSS guess — are each correct and each buildable as written; `preview-model.ts:39-45` independently demands the third, naming this row's threshold as the thing that went wrong before.
+
+⚠️ **What the row does not mention, measured before any test was written:** `PreviewRuntime` is keyed on the engine `shape`, so every structural edit remounts it and `currentStepKey` reseeds to `visibleSteps[0].key`. **The preview already snaps back to page 1 mid-edit today.** A strip that shows the author where they are turns that from mildly odd into plainly broken, so it is fixed in the same row — `goToStep()` already returns `'exact' | 'nearest' | 'first-incomplete' | 'none'`, so nothing new is needed in the runtime.
+
+Files: `resources/js/components/builder/PreviewStepStrip.vue` (new), `PreviewRuntime.vue`, `PreviewPane.vue`, `preview-model.ts`, `PreviewStepStrip.test.ts` (new), `PreviewPane.test.ts`, `preview-model.test.ts`, `tests/e2e/personalization-axe.spec.ts`, `tests/e2e/builder-axe.spec.ts`.
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/backlog-triage.md`, `docs/gate-baselines.md`, `PROGRESS.md`, `PROGRESS_ARCHIVE.md`, and the two top-level `tests/e2e/*.spec.ts` above.
+Paired files taken: none.
+Namespaces spent: **nothing from either** — no migration, no ADR, no sub-decision id.
+⚠️ **A tracker surgery is owed and is part of this increment, by measurement rather than by choice.** `PROGRESS.md` stands at 126,654 bytes with 3,346 of headroom, and the last five close-outs added 3,359 to 6,212 bytes each — the smallest of them overflows the ceiling.
+
+Prediction:
+- **Pint clean and PHPStan unmoved, and the honest statement is that this diff CANNOT move PHPStan** — it contains no PHP at all — rather than a quoted number. `M117` and `M118` both got burned quoting one.
+- Contract job green: no route, no FormRequest, no resource, so `openapi.json` does not move.
+- ⚠️ **MOST EXPECTED TO BE WRONG: the new element-level spill read on the strip.** I expect it RED on its first run at 375px with `extra_large` plus OpenDyslexic — a strip of section names is much wider than the three-segment control that already overflowed in `M118` — and I expect the `D28` `flex-wrap` host guard to clear it. **What I most expect to get wrong is which assertion breaks**, because that is exactly `M118`'s lesson: it predicted the axe scan and got the spec.
+- Second most likely wrong: `token-references.test.ts`. Three increments running, an invented token name has reached a commit.
+- **Not expected to move: `builder-layout.test.ts` — and its staying green IS the mechanical proof of the premise finding above**, because it reads `Builder.vue` and nothing else. Also not expected: `clipped-node-containment.test.ts`, `DraftProjectionMirrorDrift`, `FieldTypeMirrorDrift`.
 
 ## RELEASED — `M118`, the builder shows the real form, and a prospective gate gets its census (merged as PR #311, `31ff77d3`, 6/6 green with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

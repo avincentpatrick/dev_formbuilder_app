@@ -1,0 +1,335 @@
+<script setup lang="ts">
+/**
+ * The builder preview's engine host (Increment M118, `B7`). One instance == one `createFormRuntime()`.
+ *
+ * ⛔ THIS COMPONENT IS REMOUNTED, NEVER UPDATED, AND THAT IS A REQUIREMENT RATHER THAN A STYLE.
+ * `createFormRuntime()` registers a `watch` on whatever effect scope is active when it is called and ships
+ * no disposer, so reassigning a module-level runtime inside a watcher leaks one step watcher per rebuild.
+ * `PreviewPane` therefore keys this component on the engine `shape`; Vue tears the old scope down and the
+ * watcher goes with it. That is the same device the guest SPA uses on a version-drift reschema.
+ *
+ * ⛔ IT RENDERS FROM `model`, NOT FROM `runtime.renderModel`, WHICH IS THE POINT OF THE WHOLE DESIGN.
+ * `SectionView` is deliberately NOT reused for flat steps: it resolves its fields out of
+ * `runtime.renderModel`, the FROZEN snapshot, so an author's label edit would not appear until some
+ * unrelated structural change rebuilt the engine. `FieldRow` and `FieldControl` are prop-driven and
+ * `runtime.labelFor(field)` reads the field it is PASSED, so a live `RenderField` renders live text through
+ * the frozen piping seam. The engine is asked only for relevance, the required marker and step membership.
+ *
+ * ⛔ A SILENT ANNOUNCER IS PROVIDED, AND OMITTING ONE IS NOT AN OPTION. `FieldRow` calls `useAnnouncer()`,
+ * which THROWS when nothing provided it. But its announcements are respondent-session behaviour — "New
+ * question: …" on every relevance change — and an author editing conditions would drive a screen-reader
+ * firehose describing their own keystrokes. So the announcer is real in shape and writes nowhere, and the
+ * reason lives here rather than in the template: a comment in a template is rendered into `wrapper.html()`
+ * by Vue, which is how M117 made a test fail on the comment explaining it.
+ *
+ * ⚠️ NO LIVE REGION IS RENDERED EITHER, and that is load-bearing for a gate: an sr-only region would bring
+ * `clip: rect(0 0 0 0)` into a new `.vue`, and `clipped-node-containment.test.ts` asserts its unguarded list
+ * with `toEqual` and forbids adding to it.
+ */
+import { computed, provide } from 'vue';
+import { MdsButton } from '@meridian/design-system';
+import FieldRow from '../../../public-runtime/components/FieldRow.vue';
+import RepeatGroup from '../../../public-runtime/components/RepeatGroup.vue';
+import { AnnouncerKey, RuntimeKey } from '../../../public-runtime/composables/context';
+import { createFormRuntime } from '../../../public-runtime/composables/useFormRuntime';
+import type { RenderField, RenderModel, SchemaResponse } from '../../../public-runtime/lib/types';
+import type { ProjectionIssue } from './draft-snapshot';
+import { engineKnows, isCaptureField, previewFieldsFor, previewPendingFields, previewSectionFor } from './preview-model';
+
+const props = defineProps<{
+    /** The frozen snapshot this engine was built from. Never mutated; a new one arrives as a remount. */
+    snapshot: SchemaResponse;
+    /** The LIVE render model. Updates in place on every store change, with no remount. */
+    model: RenderModel;
+    issuesByKey: Record<string, ProjectionIssue[]>;
+    /** The `uid` of the field currently selected in the config panel, so the preview can mark it. */
+    selectedKey: string | null;
+}>();
+
+const emit = defineEmits<{ select: [key: string] }>();
+
+const runtime = createFormRuntime(props.snapshot, {
+    initialLocale: props.snapshot.form.default_locale,
+    // No query string and no frozen clock: a preview has no URL prefill to honour, and `now`/`today` staying
+    // unavailable matches the pre-H21a behaviour rather than inventing an authoring clock.
+    search: '',
+});
+
+provide(RuntimeKey, runtime);
+provide(AnnouncerKey, { message: computed(() => ''), announce: () => {} });
+
+const steps = computed(() => runtime.visibleSteps.value);
+const step = computed(() => runtime.currentStep.value);
+const section = computed(() => (step.value ? previewSectionFor(step.value, props.model) : null));
+const fields = computed(() => (step.value ? previewFieldsFor(step.value, props.model) : []));
+const pending = computed(() => previewPendingFields(steps.value, props.model));
+
+const title = computed(() => (section.value ? runtime.sectionTitleFor(section.value) : null));
+const description = computed(() => (section.value ? runtime.sectionDescriptionFor(section.value) : null));
+
+const position = computed(() => {
+    const index = steps.value.findIndex((s) => s.key === step.value?.key);
+
+    return index < 0 ? null : { index, total: steps.value.length };
+});
+
+function issuesFor(field: RenderField): ProjectionIssue[] {
+    return props.issuesByKey[field.key] ?? [];
+}
+
+/**
+ * The required marker, or null when the engine has not caught up.
+ *
+ * A field in the current step is by construction known to the engine, so this matters for the pending block
+ * only — but asking through {@link engineKnows} rather than trusting position keeps the two blocks honest if
+ * the pending list ever feeds a step.
+ */
+function marker(field: RenderField): string | null {
+    if (! engineKnows(runtime, field.key)) {
+        return null;
+    }
+
+    return runtime.requiredMarkerFor(field) === 'required' ? 'required' : null;
+}
+
+/**
+ * Step movement uses `goToStep`, NEVER `attemptNext`.
+ *
+ * `attemptNext()` refuses to advance past a step holding validation errors — right for a respondent
+ * answering about themselves, and wrong here: it would trap an author inside their own half-built form with
+ * no way to look at the rest of it.
+ */
+function go(delta: number): void {
+    const at = position.value;
+    const next = at === null ? null : steps.value[at.index + delta];
+
+    if (next) {
+        runtime.goToStep(next.key);
+    }
+}
+</script>
+
+<template>
+    <div class="preview" data-builder-preview>
+        <div v-if="position && position.total > 1" class="preview__nav">
+            <MdsButton
+                v-if="position.index > 0"
+                type="button"
+                variant="secondary"
+                size="sm"
+                @click="go(-1)"
+            >
+                Back
+            </MdsButton>
+            <span class="preview__position">Page {{ position.index + 1 }} of {{ position.total }}</span>
+            <MdsButton
+                v-if="position.index < position.total - 1"
+                type="button"
+                variant="secondary"
+                size="sm"
+                @click="go(1)"
+            >
+                Next
+            </MdsButton>
+        </div>
+
+        <p v-if="steps.length === 0" class="preview__empty">
+            Nothing to show yet. Add a question, and it appears here as a respondent will see it.
+        </p>
+
+        <section v-else class="preview__step" data-section :data-section-key="step?.key">
+            <header v-if="title" class="preview__head">
+                <h3 class="preview__title" tabindex="-1" data-section-heading>{{ title }}</h3>
+                <p v-if="description" class="preview__desc">{{ description }}</p>
+            </header>
+
+            <RepeatGroup v-if="step?.isRepeat && section" :section="section" />
+
+            <div v-else class="preview__fields">
+                <div
+                    v-for="field in fields"
+                    :key="field.key"
+                    class="preview__row"
+                    :class="{ 'preview__row--selected': field.key === selectedKey }"
+                    :data-preview-field="field.key"
+                    @click="emit('select', field.key)"
+                    @focusin="emit('select', field.key)"
+                >
+                    <div v-if="isCaptureField(field)" class="preview__inert" :data-preview-inert="field.key">
+                        <p class="preview__inert-label">
+                            {{ runtime.labelFor(field) }}
+                            <span v-if="marker(field)" class="preview__req" aria-hidden="true">*</span>
+                        </p>
+                        <p v-if="runtime.hintFor(field)" class="preview__inert-hint">{{ runtime.hintFor(field) }}</p>
+                        <p class="preview__inert-note">Shown to respondents, but not interactive while you edit.</p>
+                    </div>
+                    <FieldRow v-else :field="field" />
+
+                    <ul v-if="issuesFor(field).length > 0" class="preview__issues">
+                        <li v-for="issue in issuesFor(field)" :key="issue.code" class="preview__issue">
+                            {{ issue.message }}
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <section v-if="pending.length > 0" class="preview__pending" data-preview-pending>
+            <h3 class="preview__pending-title">Just added</h3>
+            <p class="preview__pending-note">
+                These appear on a page as soon as the preview catches up with your edit.
+            </p>
+            <ul class="preview__pending-list">
+                <li v-for="field in pending" :key="field.key" :data-preview-pending-field="field.key">
+                    {{ runtime.labelFor(field) }}
+                </li>
+            </ul>
+        </section>
+    </div>
+</template>
+
+<style scoped>
+.preview {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mds-space-5);
+    padding: var(--mds-space-5);
+}
+
+.preview__nav {
+    display: flex;
+    align-items: center;
+    gap: var(--mds-space-3);
+}
+
+.preview__position {
+    font-family: var(--mds-font-family-body);
+    font-size: var(--mds-type-label-font-size);
+    color: var(--mds-color-text-secondary);
+}
+
+.preview__empty {
+    margin: 0;
+    font-family: var(--mds-font-family-body);
+    font-size: var(--mds-type-body-md-font-size);
+    color: var(--mds-color-text-secondary);
+}
+
+.preview__step,
+.preview__fields {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mds-space-5);
+}
+
+.preview__head {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mds-space-1);
+}
+
+.preview__title {
+    margin: 0;
+    font-family: var(--mds-font-family-display);
+    font-size: var(--mds-type-heading-3-font-size);
+    line-height: var(--mds-type-heading-3-line-height);
+    font-weight: var(--mds-type-heading-3-font-weight);
+    color: var(--mds-color-text-heading);
+}
+
+.preview__title:focus-visible {
+    outline: 2px solid var(--mds-color-focus-ring);
+    outline-offset: 4px;
+}
+
+.preview__desc {
+    margin: 0;
+    font-family: var(--mds-font-family-body);
+    font-size: var(--mds-type-body-md-font-size);
+    color: var(--mds-color-text-secondary);
+}
+
+/* The selected row echoes the config panel's subject. A left rule rather than a fill, so it never competes
+   with a control's own focus ring or with an error state. */
+.preview__row {
+    border-left: 3px solid transparent;
+    padding-left: var(--mds-space-3);
+}
+
+.preview__row--selected {
+    border-left-color: var(--mds-color-action-primary-bg);
+}
+
+.preview__inert {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mds-space-1);
+    padding: var(--mds-space-3);
+    border: 1px dashed var(--mds-color-border-default);
+    border-radius: var(--mds-radius-md);
+    background-color: var(--mds-color-bg-sunken);
+}
+
+.preview__inert-label {
+    margin: 0;
+    font-family: var(--mds-font-family-body);
+    font-size: var(--mds-type-label-font-size);
+    font-weight: var(--mds-font-weight-medium);
+    color: var(--mds-color-text-body);
+}
+
+.preview__req {
+    color: var(--mds-color-text-danger);
+}
+
+.preview__inert-hint,
+.preview__inert-note {
+    margin: 0;
+    font-family: var(--mds-font-family-body);
+    font-size: var(--mds-type-body-sm-font-size);
+    color: var(--mds-color-text-secondary);
+}
+
+.preview__issues {
+    margin: var(--mds-space-2) 0 0;
+    padding-left: var(--mds-space-4);
+}
+
+.preview__issue {
+    font-family: var(--mds-font-family-body);
+    font-size: var(--mds-type-body-sm-font-size);
+    color: var(--mds-color-text-warning);
+}
+
+.preview__pending {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mds-space-1);
+    padding: var(--mds-space-3);
+    border: 1px solid var(--mds-color-border-default);
+    border-radius: var(--mds-radius-md);
+}
+
+.preview__pending-title {
+    margin: 0;
+    font-family: var(--mds-font-family-body);
+    font-size: var(--mds-type-label-font-size);
+    font-weight: var(--mds-font-weight-semibold);
+    color: var(--mds-color-text-heading);
+}
+
+.preview__pending-note {
+    margin: 0;
+    font-family: var(--mds-font-family-body);
+    font-size: var(--mds-type-body-sm-font-size);
+    color: var(--mds-color-text-secondary);
+}
+
+.preview__pending-list {
+    margin: var(--mds-space-1) 0 0;
+    padding-left: var(--mds-space-4);
+    font-family: var(--mds-font-family-body);
+    font-size: var(--mds-type-body-sm-font-size);
+    color: var(--mds-color-text-body);
+}
+</style>

@@ -22,6 +22,7 @@ import FieldPalette from '@/components/builder/FieldPalette.vue';
 import LibraryPicker from '@/components/builder/LibraryPicker.vue';
 import BuilderCanvas from '@/components/builder/BuilderCanvas.vue';
 import LogicRail from '@/components/builder/LogicRail.vue';
+import PreviewPane from '@/components/builder/PreviewPane.vue';
 import ConfigPanel from '@/components/builder/ConfigPanel.vue';
 import ConflictDialog from '@/components/builder/ConflictDialog.vue';
 import FormSettingsModal from '@/components/builder/FormSettingsModal.vue';
@@ -47,15 +48,28 @@ const { feature } = useEntitlements();
 // Left-pane view: add a fresh field type (palette) or insert a reusable question (library, Increment G9b).
 const leftTab = ref<'fields' | 'library'>('fields');
 
+type CentreView = 'structure' | 'preview' | 'logic';
+
 // Centre-pane view (Increment H21d1): the structure the author edits, or the branching it produces. The
 // Logic view is READ-DERIVED — it writes nothing, and selecting a node there drives the same config panel,
 // so an author reads the rail and edits in place rather than moving between two editors. Both views share
 // one store, which is why the rail updates as conditions are typed.
-const centreView = ref<'structure' | 'logic'>('structure');
+const centreView = ref<CentreView>('structure');
 const centreViews = [
     { value: 'structure', label: 'Structure', icon: 'layout' as const },
+    { value: 'preview', label: 'Preview', icon: 'monitor' as const },
     { value: 'logic', label: 'Logic', icon: 'filter' as const },
 ];
+
+// ⛔ A REAL NARROWING, NOT A TERNARY. This handler read
+// `centreView = $event === 'logic' ? 'logic' : 'structure'` until M118, which silently collapsed every
+// unrecognised value onto `structure` — so adding a third segment without touching this line makes the new
+// option a NO-OP CLICK, with nothing red anywhere to say so. `onPaneChange` below has had the correct shape
+// since JR5; this is the same device, and a widened union now makes a missing arm a type error instead of a
+// silent default.
+function onCentreViewChange(value: string): void {
+    if (value === 'structure' || value === 'preview' || value === 'logic') centreView.value = value;
+}
 
 // JR5 — which pane is on screen when the builder is COMPACT (`@container (max-width: 60em)` of the page's
 // own box). The state exists at EVERY width and NOTHING IN JS EVER READS A WIDTH: above the threshold the
@@ -70,8 +84,10 @@ const centreViews = [
 // Labels are `Add` · `Form` · `Settings` rather than the panes' own names: "Fields" already labels the
 // LEFT PANE'S INNER toggle below, so at 375px the word would appear twice, six pixels apart, meaning two
 // different things. None of these three collides with that toggle (Fields/Library), the centre control
-// (Structure/Logic) or the config tablist. `layout` and `settings` are avoided as icons for the same
-// reason — the centre control's Structure option and the sidebar's nav item already use them.
+// (Structure/Preview/Logic) or the config tablist. `layout` and `settings` are avoided as icons for the same
+// reason — the centre control's Structure option and the sidebar's nav item already use them, and M118's
+// Preview option takes `monitor` for the same reason: it is the only unused glyph in the 59-name set that
+// reads as "see it as a respondent" without colliding with `forms` (the pane switcher's own Form option).
 const pane = ref<'fields' | 'canvas' | 'settings'>('canvas');
 const paneOptions = [
     { value: 'fields', label: 'Add', icon: 'plus' as const },
@@ -540,7 +556,7 @@ function submitImport(): void {
                         :options="centreViews"
                         ariaLabel="Centre pane view"
                         compact
-                        @update:model-value="centreView = $event === 'logic' ? 'logic' : 'structure'"
+                        @update:model-value="onCentreViewChange"
                     />
                 </div>
                 <div class="builder__centre-body">
@@ -550,6 +566,13 @@ function submitImport(): void {
                         v-show="centreView === 'structure'"
                         :store="store"
                         :field-type-labels="fieldTypeLabels"
+                    />
+                    <PreviewPane
+                        v-show="centreView === 'preview'"
+                        :store="store"
+                        :form="form"
+                        :draft="draft"
+                        :active="centreView === 'preview'"
                     />
                     <LogicRail
                         v-show="centreView === 'logic'"

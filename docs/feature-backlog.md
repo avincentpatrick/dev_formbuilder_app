@@ -7679,7 +7679,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   not survive re-derivation. ⛔ **AND THIS ROW LOOKS LIKE THAT LARGEST BUCKET, SO CHECK IT FIRST.** `M80`'s
   own citation pass found the deferral stated four times outside the cited design doc:
   `docs/data-privacy-gdpr-compliance.md:77` and `docs/piping-output-encoding-design.md:279` each say the
-  opt-in "stays deferred", as do `PROGRESS_ARCHIVE.md:6908`, `:6902` and `:6903`. ⚠️ **M92 RE-DERIVED
+  opt-in "stays deferred", as do three release bullets in `PROGRESS_ARCHIVE.md` — cited by CONTENT rather than by line, because `M119`'s surgery rotted these three numbers for the FOURTH time and they were DROPPED instead of re-pointed yet again; the grep recipe two sentences below is the durable form. ⚠️ **M92 RE-DERIVED
   THOSE THREE FROM THE CONTENT, AND THEY WERE ALREADY WRONG BEFORE ITS SURGERY MOVED ANYTHING.** The
   numbers this row carried resolved to unrelated `H23`/`H24` release bullets roughly twenty-two lines
   above the sentences it describes; the citation gate passed them because they were ALIVE, which is
@@ -11883,8 +11883,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   **Latent** — every one of them agrees with PHP today, and nothing loses data; it bites the first person who
   adds a field type and updates ten places out of twenty-eight. Filed by `M113`. **Tier: during-testing.**
 
-- **`minor` · The builder has no section strip, so an author cannot see or reach a form's sections while
-  authoring it.** Filed 2026-09-26 by `M114`, on recording `D57` — this is the half of `R-2bda7386` that
+- ✅ **CLOSED BY `M119` (2026-09-28) — `minor` · ~~The builder has no section strip, so an author cannot see or reach a form's sections while
+  authoring it.~~** Filed 2026-09-26 by `M114`, on recording `D57` — this is the half of `R-2bda7386` that
   `R-f1332829` does not cover, and that row was closed as a proven strict subset for its write-path half only.
   The request was for *"a section strip under the preview"*, beside the choice of how sections are presented.
   ⚠️ **It must be a radiogroup, not a tablist**, and its labels must be index-prefixed (`1. Consent`) so that a
@@ -11894,6 +11894,21 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `D63` frees:** collapsing the nine ungrouped toolbar buttons into one "Form settings" modal is what makes space
   for this strip and for the live preview, so this row and `R-4e96a994` edit the same region of `Builder.vue` and
   **must not be batched together** under `D13`. **Live.** Filed by `M114`. **Tier: early-testing.**
+  ⛔ **CLOSED BY `M119`, AND THE ROW'S BATCHING INSTRUCTION WAS THE HALF THAT HAD EXPIRED.** The strip ships inside
+  `PreviewRuntime.vue`; `Builder.vue` was **not opened at all** and the increment touched **zero hub files**, so the
+  collision with `R-4e96a994` this row warns about could not occur. Both halves of that premise had already dissolved:
+  `M117` collapsed the toolbar (ten controls to seven) and `R-4e96a994`'s own text records the consequence — *"the hub
+  tab frees no toolbar room, so `B7` and `B8` are unblocked by this half alone"* — and `M118` then put the preview in
+  the centre pane, which is where the room actually came from. ✅ **All three prescriptions held and were built as
+  written:** a radiogroup rather than a tablist (`MdsSegmentedControl` is a native fieldset of radios, so the roving
+  the role promises is implemented and no role attribute is written), index-prefixed labels, and the degradation
+  threshold as a named constant with a test on **both** sides of it. ⛔ **THE ROW UNDERSTATED ITSELF BY ONE DEFECT
+  THAT PREDATES IT:** `PreviewRuntime` is keyed on the engine `shape`, so every structural edit remounted it and
+  `createFormRuntime` reseeded the first visible step — the preview had snapped back to page 1 mid-edit since `M118`.
+  The strip turns that from disorienting into plainly broken, so it is fixed here; `PreviewPane` holds the key and the
+  child reports back the one `goToStep` **resolved** to. ⚠️ **What is NOT closed here:** `single_page_mode`'s write
+  path is `R-f1332829`, deliberately split off on the user's choice between that split and a `D13` clause 1 breach,
+  and `previewLimitations()` still says sections are always stepped because that remains true.
 
 - **`minor` · `page_break` is a hard page break on paper and an ODK group boundary on export, but is deleted
   outright on screen — one field type meaning three different things.** Filed 2026-09-26 by `M114`, as the "C
@@ -12228,3 +12243,34 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   construction, and their behaviour at a width where the config pane is hidden is that they iterate ZERO
   elements and scan nothing — passing, silently, having tested nothing. **Live.** Filed by `M118`.
   **Tier: during-testing.**
+
+- **`minor` · No seeded fixture projects to a builder control wide enough to overflow, so all four element-level
+  spill reads on that page are green by FIXTURE rather than by design.** Found 2026-09-28 by `M119` while writing
+  the fourth one and refusing to accept it green. ⛔ **MEASURED, NOT INFERRED.** At 375px with `extra_large` and
+  OpenDyslexic — the combination `D28` and `M19` are both about — the preview's section strip renders **three**
+  segments occupying 335px of a 335px bar. `Logic Notices Demo` carries seven sections, but relevance gates four of
+  them at the empty answer state, so `visibleSteps` yields three; `Community Health Survey` projects to two. ⚠️ **So
+  a spill assertion on any of these controls is green by construction and would stay green with the affordance
+  deleted** — the exact shape of a decorative gate, and the reason `M119`'s own first two attempts could not fail.
+  ✅ **The same probe shows the reads themselves are sound once the content is wide enough:** with labels forced long,
+  the wrapper reports a spill of **126px** with `flex-wrap: nowrap` and **0** with `wrap`, and a `display: flex`
+  wrapper reports **123px** rather than hiding it — so `M19`'s, `M109`'s and `M118`'s reads are not vacuous in
+  mechanism, only under-exercised by the corpus. ⛔ **AND ONE BRANCH HAS NO END-TO-END COVERAGE AT ALL:** the strip
+  degrades to an `MdsSelect` above `PREVIEW_STRIP_MAX_SEGMENTS`, and no seeded form reaches that threshold, so only
+  Vitest ever renders it. The remedy is a seeded form with enough UNCONDITIONALLY visible sections, and long enough
+  section names, to stress a segmented control — which serves all four reads at once rather than one. ⚠️ Adding it to
+  an existing fixture is not free: six spec files open `Community Health Survey` by title and `builder-axe.spec.ts`
+  scans its config panel, so the section count is load-bearing for scans that have nothing to do with overflow.
+  **Live.** Filed by `M119`. **Tier: during-testing.**
+
+- **`nit` · How many tracker surgeries have happened is recorded only in release prose, and one of them never
+  recorded itself.** Found 2026-09-28 by `M119` while writing its own. `M111`'s release calls itself *"the sixth
+  tracker surgery"*; `M116` then performed one — its commit carries the `[tracker-surgery]` marker and its `MOVED`
+  note is in `PROGRESS_ARCHIVE.md` — and **its release prose does not mention it at all**, so a session counting
+  from the newest sentence gets seven for what is really the eighth. ⛔ **THIS IS THE DEFECT `CLAUDE.md` EXISTS TO
+  PREVENT, IN THE ONE PLACE NO SCRIPT DERIVES.** `scripts/state.php` derives the increment, the ADR, the migration
+  prefix and the exceptions entry; it derives no surgery count, so the only durable source is the `MOVED` notes in
+  the archive — which ARE reliable, complete and machine-readable, and which is how `M119` recovered the number.
+  The remedy is to count those notes in `state.php` and stop writing the ordinal in prose, or to stop claiming an
+  ordinal at all. ⚠️ Nothing is broken today and no surgery was performed wrongly; the cost is a number that reads
+  as authoritative and is off by one for every future session. **Live.** Filed by `M119`. **Tier: after-launch.**

@@ -74,14 +74,18 @@ function onChange(value: string): void {
 
 <style scoped>
 /*
- * ⛔ A BLOCK, NEVER A FLEX CONTAINER, AND THAT IS A MEASUREMENT DECISION RATHER THAN A LOOK.
- * `SegmentedControl` sets `min-width: 0` on its own fieldset. Given a flex PARENT that removes the
- * fieldset's width floor, so it shrinks to this element's width and its segments then overflow the
- * FIELDSET rather than this element — leaving `scrollWidth - clientWidth` here reading zero while the
- * labels visibly spill. Measured in M119: the new gate passed at 375px with `extra_large` and
- * OpenDyslexic while the control was plainly overflowing, which is a gate that cannot fail. As a block
- * the fieldset keeps its intrinsic width and the spill lands here, where the gate can see it — the same
- * construction as the three element-level reads this page already had.
+ * ⚠️ A BLOCK ONLY FOR CONSISTENCY, AND THE STRONGER CLAIM THIS COMMENT ONCE MADE WAS FALSE.
+ * It said a `display: flex` wrapper would let the fieldset's own `min-width: 0` absorb the overflow,
+ * leaving `scrollWidth - clientWidth` reading zero while the labels spilled. MEASURED AT 375px WITH
+ * `extra_large` AND OpenDyslexic, ON FORCED CONTENT LONG ENOUGH TO ACTUALLY OVERFLOW: the flex form
+ * reports a spill of 123px and the block form 126px. Both see it. The claim was inferred from a green
+ * gate and the gate was green for an entirely different reason — no seeded fixture produces a strip
+ * wide enough to overflow at all, which is what `personalization-axe.spec.ts` now records and what a
+ * filed row asks for a fixture to fix.
+ *
+ * So: a block because the three hosts on this page that already carry an element-level overflow read
+ * are blocks, and one less shape to reason about is worth more than a preference. The guard below is
+ * what actually prevents the spill, in either form.
  */
 .preview__strip {
     padding-bottom: var(--mds-space-2);

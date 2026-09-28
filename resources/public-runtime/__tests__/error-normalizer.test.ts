@@ -35,6 +35,13 @@ describe('normalizeError', () => {
     });
 
     it.each([
+        // ⛔ M117 — THE 422 BRANCH HAD NO ROW HERE AT ALL, WHICH IS HOW IT DRIFTED. It was a two-code
+        // allowlist and everything else fell to `unknown` → `retry`, so an unevaluable form rule was
+        // re-sent to the ceiling before parking. The three rows below pin all three of its outcomes, and
+        // each is independently mutable: the allowlist, the new terminal arm, and the default.
+        [422, 'submission_invalid', 'field'],
+        [422, 'expression_error', 'terminal'],
+        [422, 'some_unmapped_422', 'unknown'],
         [401, 'share_token_expired', 'remint'],
         [401, 'invalid_share_token', 'terminal'],
         [403, 'guest_disabled', 'terminal'],

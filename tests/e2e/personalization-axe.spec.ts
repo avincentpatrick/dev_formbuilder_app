@@ -143,6 +143,32 @@ test('Builder at extra_large + dyslexia font + teal — accessible & no horizont
         'the builder config pane scrolls sideways under maximum personalization',
     ).toBeLessThanOrEqual(1);
 
+
+    // ⛔ THE CENTRE CONTROL, MEASURED FOR THE FIRST TIME IN M118, AND IT IS THE ONE SEGMENTED CONTROL ON THIS
+    // PAGE NO GATE COULD SEE. The pane switcher above has had an element-level read since M19 and the config
+    // pane since M109, but `.builder__centre-tabs` had neither — and it is the control M118 widened from two
+    // segments to three (`Structure · Preview · Logic`). `.builder__pane { overflow: hidden }` CLIPS its
+    // spill rather than scrolling it, so `assertNoHorizontalOverflow`'s `.app-shell__content` read is flat
+    // over it by construction, and axe has no rule for a clipped label. The identical `inline-flex` with no
+    // `flex-wrap` that M19 documented for the pane switcher applies here, one segment wider.
+    await showBuilderPane(page, 'canvas');
+
+    const centre = page.locator('.builder__centre-tabs');
+    await expect(
+        centre,
+        'the builder centre control is not on screen, so the measurement would be vacuous',
+    ).toBeVisible();
+    await expect(
+        centre.getByText('Preview', { exact: true }),
+        'the third segment did not render, so a spill of zero would prove nothing',
+    ).toBeVisible();
+
+    const centreSpill = await centre.evaluate((el) => el.scrollWidth - el.clientWidth);
+    expect(
+        centreSpill,
+        'the builder centre control overflows its bar under maximum personalization',
+    ).toBeLessThanOrEqual(1);
+
     if (await showBuilderPane(page, 'fields')) {
         await assertClean(page, 'Builder (max personalization) — Add');
         await showBuilderPane(page, 'canvas');

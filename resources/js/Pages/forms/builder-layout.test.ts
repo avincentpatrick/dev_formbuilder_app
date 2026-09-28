@@ -228,4 +228,75 @@ describe('forms/Builder — the compact-layout threshold', () => {
         expect(publish, 'the Publish button must keep its plain slot text').toBeDefined();
         expect(publish).not.toContain('builder__label');
     });
+
+    // ── Increment M118, `B7` — the centre pane's third option ───────────────────────────────────────────
+    //
+    // Kept in this suite, and as SOURCE TEXT, for the reason this file's own header gives: nothing in this
+    // repo mounts `Builder.vue`, because doing so would drag `useBuilderStore`, the CSRF sidecar and ~20
+    // children into a new Inertia mock for zero coverage of the thing under test. `PreviewPane.test.ts`
+    // mounts the PANE and proves the behaviour; what can only be asserted here is the page-level wiring.
+
+    it('offers exactly three centre views, and Preview is one of them', () => {
+        const options = source.match(/const centreViews = \[([\s\S]*?)\];/)?.[1];
+
+        expect(options, 'the centre control must declare its options as a literal').toBeDefined();
+        expect((options!.match(/value:/g) ?? []).length, 'three centre views').toBe(3);
+        expect(options).toContain("value: 'preview'");
+    });
+
+    // ⛔ THE TERNARY THAT WOULD HAVE MADE THE NEW OPTION A NO-OP CLICK. Until M118 this handler read
+    // `centreView = $event === 'logic' ? 'logic' : 'structure'`, which silently collapsed every unrecognised
+    // value onto `structure` — so a third segment changed nothing and no gate anywhere said so. The positive
+    // assertion names the handler, because a negative one alone would be satisfied by the comment above it.
+    it('narrows the centre view through a guard, never through a two-way ternary', () => {
+        expect(source).toContain('@update:model-value="onCentreViewChange"');
+
+        const handler = source.match(/function onCentreViewChange\(value: string\): void \{[\s\S]*?\n\}/)?.[0];
+
+        expect(handler, 'the centre view must be narrowed by a named function').toBeDefined();
+        for (const view of ['structure', 'preview', 'logic']) {
+            expect(handler, `the handler must admit ${view}`).toContain(`'${view}'`);
+        }
+        expect(handler, 'a ternary here silently swallows every value it does not name').not.toContain('?');
+    });
+
+    // ⛔ `list-layout.spec.ts` ASSERTS `.builder__pane` COUNT IS EXACTLY 3, at all three viewports, counting
+    // by `offsetParent` — so even a `display:none` fourth pane reddens it. The preview is a centre VIEW
+    // inside the canvas pane, which is also what keeps `builder__label` at six and adds no ARIA node.
+    it('adds the preview inside the canvas pane, never as a fourth pane', () => {
+        expect((source.match(/builder__pane builder__pane--/g) ?? []).length, 'exactly three panes').toBe(3);
+        expect(source).toContain('<PreviewPane');
+        expect(source).toContain(`v-show="centreView === 'preview'"`);
+    });
+
+    // ⚠️ THE PANE-SWITCHER CASE ABOVE CANNOT SEE THIS CONTROL, WHICH IS WHY THIS IS A SECOND CASE RATHER THAN
+    // AN EXTRA ASSERTION IN IT. Its `source.match(/ariaLabel="([^"]+)"\s*\n\s*compact/)` is NON-GLOBAL, so it
+    // returns the FIRST such pair — the pane switcher, only because that control happens to come first in the
+    // template — and the centre control has never been covered by it. Matching globally and asserting BOTH
+    // labels by name removes the dependency on source order from both cases at once.
+    it("the centre control's group label shares no word with any of its options", () => {
+        const labels = [...source.matchAll(/ariaLabel="([^"]+)"\s*\n\s*compact/g)].map((m) => m[1]);
+
+        expect(labels, 'both segmented controls declare an ariaLabel').toHaveLength(2);
+        expect(labels).toContain('Builder pane');
+        expect(labels).toContain('Centre pane view');
+
+        // The legend renders INSIDE the element `builder-axe` scopes its `getByText` to, so a shared word
+        // resolves two nodes and fails strict mode on every call at once.
+        const centre = labels.find((l) => l === 'Centre pane view')!;
+        for (const word of ['Structure', 'Preview', 'Logic']) {
+            expect(centre, `the centre legend must not contain ${word}`).not.toContain(word);
+        }
+    });
+
+    it('gives the preview a glyph no other control on this page uses', () => {
+        // `layout` is Structure, `filter` is Logic, `forms` is the pane switcher's Form, `sliders` its
+        // Settings, `plus` its Add. A repeated glyph is the same collision the labels are guarded against,
+        // one channel over — and `monitor` was chosen because it is the only unused one that reads as
+        // "see it as a respondent".
+        const icons = [...source.matchAll(/icon: '([a-z-]+)' as const/g)].map((m) => m[1]);
+
+        expect(icons).toContain('monitor');
+        expect(new Set(icons).size, 'no glyph is used twice on this page').toBe(icons.length);
+    });
 });

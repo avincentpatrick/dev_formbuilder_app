@@ -342,6 +342,59 @@ for (const theme of themes) {
         await scan(page, 'back to structure');
     });
 
+
+    // The PREVIEW view (Increment M118, `B7`) — the builder's third centre-pane view, and the first surface
+    // in the app that mounts the respondent runtime inside an authenticated page. `Logic Notices Demo` is
+    // reused deliberately: it is seeded with conditions, so the scan sees relevance actually doing something
+    // rather than a flat list of controls, and it is the same fixture the logic case walks.
+    test(`Builder — preview view (${theme})`, async ({ page }) => {
+        await openBuilder(page, 'Logic Notices Demo');
+        await showBuilderPane(page, 'canvas');
+        await forceTheme(page, theme);
+
+        await page.locator('.builder__centre-tabs').getByText('Preview').click();
+
+        // The pane, not merely the click. `[data-builder-preview]` is the engine host, so its presence is
+        // proof the runtime mounted — a segment that switched nothing would leave this absent, which is
+        // exactly what the ternary this increment replaced would have done.
+        await expect(page.locator('[data-builder-preview]')).toBeVisible({ timeout: 15_000 });
+
+        // A real control, from the SHARED renderer. Without this the scan could pass on an empty pane, which
+        // is the whole defect the row was filed about ("renders no input control of any kind").
+        await expect(page.locator('[data-builder-preview] input, [data-builder-preview] textarea, [data-builder-preview] select').first())
+            .toBeVisible({ timeout: 15_000 });
+
+        // ⛔ THE PAGE-LEVEL ONE-TABLIST INVARIANT, ASSERTED FOR THE FIRST TIME HERE. Thirteen locators walk
+        // `[role="tab"]` on this page and FOUR are loops that CLICK every match, so a second tablist would
+        // have its tabs clicked mid-scan and every settle locator would resolve to whichever strip came first
+        // in the DOM. `ConfigPanel.test.ts` and `FormSettingsModal.test.ts` each assert their own component's
+        // half; neither can see the PAGE, and nothing in this repo mounts `Builder.vue`. This is the only
+        // place the whole-page count can be taken, and it is taken at all three viewports by the project
+        // matrix — with the preview on screen, which is the state that could newly break it.
+        //
+        // ⛔ `locator('[role="tablist"]')`, NOT `getByRole('tablist')`, AND THE DIFFERENCE IS MEASURED. The
+        // first version used `getByRole` and failed at the tablet project with a count of ZERO: below the
+        // 60em container threshold the panes are hidden with `display: none`, `ConfigPanel` goes with them,
+        // and a `display:none` subtree is absent from the ACCESSIBILITY tree that `getByRole` queries. So the
+        // role-based form does not assert "one tablist" — it asserts "the config pane happens to be the
+        // selected one", which is a different and viewport-dependent claim. The attribute locator counts the
+        // DOM, where the invariant actually lives, and holds identically at all three widths.
+        await expect(page.locator('[role="tablist"]')).toHaveCount(1);
+
+        await scan(page, 'builder preview view');
+
+        // Selecting in the preview drives the SAME config panel the structure canvas does, which is what
+        // keeps this one editor rather than two.
+        await page.locator('[data-preview-field]').first().click();
+        await expect(page.locator('[role="tablist"]')).toHaveCount(1);
+        await scan(page, 'preview after selecting a field');
+
+        // …and back, with the structure canvas intact and still exactly one tablist.
+        await page.locator('.builder__centre-tabs').getByText('Structure').click();
+        await expect(page.locator('.canvas').first()).toBeVisible();
+        await expect(page.locator('[role="tablist"]')).toHaveCount(1);
+    });
+
     // The structured CONDITION EDITOR (Increment H21d2) — the write half of the same row, and the config
     // panel's densest control group. Doc #27 §9 asks for axe plus keyboard traversal at 375px, which the
     // three-viewport project matrix gives; what this test adds is that BOTH modes are scanned, because they

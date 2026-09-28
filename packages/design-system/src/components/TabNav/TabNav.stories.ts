@@ -10,6 +10,21 @@ const dark: Decorator = (story) => {
  * The form hub's strip is the first consumer (Increment J2b). Every story renders the real shape — a
  * resource-named landmark whose items are links — because the a11y scan these stories drive is this
  * component's only automated axe gate outside the two e2e specs that happen to load a page using it.
+ *
+ * ⛔ EVERY LABEL AND KEY BELOW IS AN ILLUSTRATIVE FIXTURE. IT IS NOT THE HUB'S TAB SET, NOTHING COMPARES
+ * THE TWO, AND THEY ALREADY DISAGREE (Increment M118, `R-a810cd42`). The authority is
+ * `app/Support/Forms/FormTabSet::for()`, which DERIVES the strip per user from four capability checks — so
+ * the real set varies by role and cannot be a constant anywhere. This file's `submissions` item is labelled
+ * "Submissions" while `FormTabSet` emits "Responses", and `Overflowing` invents `share` and `versions`
+ * keys the hub has never had. Both are left exactly as they are, deliberately: they are what makes this
+ * warning checkable, and correcting them would restore the appearance of a faithful copy while removing
+ * the only evidence that it is not one.
+ *
+ * ⚠️ A GATE WAS CONSIDERED AND DECLINED, WHICH IS NOT THE SAME AS OVERLOOKED. This package is
+ * deliberately app-independent — it has no autoloader into `app/`, no PHP at build time, and gaining
+ * either to keep a Storybook caption in step would be a far worse trade than a wrong caption. So the
+ * fixture cannot import the derived set and no assertion can make the two disagree loudly. Read
+ * `FormTabSet.php` for what the product shows; read these stories for what the component does.
  */
 const meta = {
     title: 'Components/TabNav',

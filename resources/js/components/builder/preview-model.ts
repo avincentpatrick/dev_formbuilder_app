@@ -45,6 +45,24 @@ import type { FormRuntime, RuntimeStep } from '../../../public-runtime/composabl
  */
 export const PREVIEW_REBUILD_DEBOUNCE_MS = 300;
 
+/**
+ * How many sections the strip renders as segments before it degrades to a select.
+ *
+ * ⛔ A NAMED CONSTANT WITH A TEST ON BOTH SIDES OF IT, WHICH IS WHAT THE ROW ASKED FOR AND WHY.
+ * `MdsSegmentedControl` is an `inline-flex` that never shrinks a segment below its longest word, so a
+ * twenty-section form would render a bar no width can hold. The threshold is a legibility decision rather
+ * than a breakpoint, so it is stated once here instead of guessed at in CSS — the same reasoning as
+ * {@link PREVIEW_REBUILD_DEBOUNCE_MS} above, and the row that asked for this strip named a CSS-guess
+ * threshold as the thing that went wrong the last time.
+ */
+export const PREVIEW_STRIP_MAX_SEGMENTS = 7;
+
+/** The strip's label for the lead block — the fields an author left above every section. */
+export const LEAD_STEP_LABEL = 'First questions';
+
+/** The strip's label for a section whose own title is still empty. Mirrors `UNTITLED_LABEL` for fields. */
+export const UNTITLED_SECTION_LABEL = 'Untitled section';
+
 export interface PreviewModel {
     /** The frozen snapshot an engine rebuild consumes. Changes identity on every store change; only `shape` gates the rebuild. */
     projection: DraftProjection;
@@ -82,6 +100,39 @@ export function previewSectionFor(step: RuntimeStep, model: RenderModel): Render
     }
 
     return model.sections.find((s) => s.key === step.sectionKey) ?? null;
+}
+
+/** One strip entry: the step it selects, and the text an author reads. */
+export interface PreviewStripOption {
+    value: string;
+    label: string;
+}
+
+/**
+ * The strip's entries, index-prefixed, resolved in the LIVE model.
+ *
+ * ⛔ IT MUST NOT READ `RuntimeStep.title`, AND THAT IS NOT A STYLE PREFERENCE. That field is resolved once
+ * inside `createFormRuntime` off the FROZEN snapshot, so a section renamed a moment ago would still read its
+ * old name in the strip while its own heading, a centimetre below it, read the new one. Resolving through
+ * {@link previewSectionFor} and the caller's `titleFor` keeps the strip on the same live channel as every
+ * other visible string in the preview.
+ *
+ * ⚠️ THE INDEX PREFIX IS LOAD-BEARING AND IS NOT DECORATION. A section may legitimately be named "Form",
+ * "Logic" or "Preview", and the builder's pane switcher and centre control are both located by EXACT text.
+ * Prefixing with the position means no section name can ever be an exact match for one of those controls,
+ * which is cheaper and far more durable than asking every future locator to scope itself.
+ */
+export function previewStepLabels(
+    steps: readonly RuntimeStep[],
+    model: RenderModel,
+    titleFor: (section: RenderSection) => string,
+): PreviewStripOption[] {
+    return steps.map((step, index) => {
+        const section = previewSectionFor(step, model);
+        const title = section === null ? LEAD_STEP_LABEL : titleFor(section).trim() || UNTITLED_SECTION_LABEL;
+
+        return { value: step.key, label: `${index + 1}. ${title}` };
+    });
 }
 
 /**

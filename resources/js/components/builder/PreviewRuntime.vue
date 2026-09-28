@@ -32,7 +32,7 @@
  * side of the glass — there, Vue rendered a template comment into `wrapper.html()` and broke the substring
  * assertion the comment explained. A rule about a forbidden string cannot be documented by quoting it.
  */
-import { computed, provide } from 'vue';
+import { computed, provide, watch } from 'vue';
 import { MdsButton } from '@meridian/design-system';
 import FieldRow from '../../../public-runtime/components/FieldRow.vue';
 import RepeatGroup from '../../../public-runtime/components/RepeatGroup.vue';
@@ -40,7 +40,8 @@ import { AnnouncerKey, RuntimeKey } from '../../../public-runtime/composables/co
 import { createFormRuntime } from '../../../public-runtime/composables/useFormRuntime';
 import type { RenderField, RenderModel, SchemaResponse } from '../../../public-runtime/lib/types';
 import type { ProjectionIssue } from './draft-snapshot';
-import { engineKnows, isCaptureField, previewFieldsFor, previewPendingFields, previewSectionFor } from './preview-model';
+import { engineKnows, isCaptureField, previewFieldsFor, previewPendingFields, previewSectionFor, previewStepLabels } from './preview-model';
+import PreviewStepStrip from './PreviewStepStrip.vue';
 
 const props = defineProps<{
     /** The frozen snapshot this engine was built from. Never mutated; a new one arrives as a remount. */
@@ -50,9 +51,17 @@ const props = defineProps<{
     issuesByKey: Record<string, ProjectionIssue[]>;
     /** The `uid` of the field currently selected in the config panel, so the preview can mark it. */
     selectedKey: string | null;
+    /**
+     * The step to open on, carried across remounts by the parent.
+     *
+     * This component is REMOUNTED on every engine rebuild, so anything it holds itself is lost each time
+     * the author makes a structural edit. `PreviewPane` does not remount, so the selected step lives there
+     * and arrives here as a prop.
+     */
+    initialStepKey: string | null;
 }>();
 
-const emit = defineEmits<{ select: [key: string] }>();
+const emit = defineEmits<{ select: [key: string]; step: [key: string] }>();
 
 const runtime = createFormRuntime(props.snapshot, {
     initialLocale: props.snapshot.form.default_locale,
@@ -78,6 +87,37 @@ const position = computed(() => {
 
     return index < 0 ? null : { index, total: steps.value.length };
 });
+
+const stripOptions = computed(() => previewStepLabels(steps.value, props.model, runtime.sectionTitleFor));
+
+/**
+ * Reopen the step the author was on before this rebuild.
+ *
+ * ⛔ WITHOUT THIS THE PREVIEW SNAPS BACK TO PAGE 1 ON EVERY STRUCTURAL EDIT, and it does so today.
+ * `createFormRuntime` seeds `currentStepKey` to the first visible step, and this component is keyed on the
+ * engine `shape` — so adding a question to section four returns the author to section one, 300ms later,
+ * with no indication why. The strip is what makes that plainly broken rather than merely disorienting.
+ *
+ * `goToStep` is the right primitive and already exists: a key that no longer resolves degrades to the
+ * nearest surviving predecessor, or to the first incomplete step, instead of throwing. So a section
+ * deleted while it was on screen lands somewhere sensible rather than nowhere.
+ */
+if (props.initialStepKey !== null) {
+    runtime.goToStep(props.initialStepKey);
+}
+
+// `immediate` so the parent learns the key the seed or the `goToStep` above actually RESOLVED to, which is
+// not necessarily the one it asked for. Reporting the resolved key is what stops a stale request being
+// replayed into every later rebuild.
+watch(
+    () => runtime.currentStepKey.value,
+    (key) => {
+        if (key !== '') {
+            emit('step', key);
+        }
+    },
+    { immediate: true },
+);
 
 function issuesFor(field: RenderField): ProjectionIssue[] {
     return props.issuesByKey[field.key] ?? [];
@@ -117,6 +157,13 @@ function go(delta: number): void {
 
 <template>
     <div class="preview" data-builder-preview>
+        <PreviewStepStrip
+            v-if="stripOptions.length > 1"
+            :options="stripOptions"
+            :current-key="step?.key ?? null"
+            @go="runtime.goToStep($event)"
+        />
+
         <div v-if="position && position.total > 1" class="preview__nav">
             <MdsButton
                 v-if="position.index > 0"

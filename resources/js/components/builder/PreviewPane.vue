@@ -120,6 +120,16 @@ watch(
 
 onBeforeUnmount(clearPending);
 
+/**
+ * The step the preview is showing, held HERE because this component does not remount.
+ *
+ * ⛔ `PreviewRuntime` IS KEYED ON THE ENGINE SHAPE, so it is torn down and rebuilt on every structural
+ * edit and cannot remember anything itself. `createFormRuntime` then seeds the first visible step, which
+ * is why the preview has snapped back to page 1 mid-edit ever since it shipped. Parking the key one level
+ * up is the whole fix; the child reports back the key it RESOLVED to, never the one it was handed.
+ */
+const stepKey = ref<string | null>(null);
+
 const selectedKey = computed(() => props.store.selectedField.value?.key ?? null);
 
 function onSelect(key: string): void {
@@ -140,7 +150,9 @@ function onSelect(key: string): void {
             :model="model.renderModel"
             :issues-by-key="model.issuesByKey"
             :selected-key="selectedKey"
+            :initial-step-key="stepKey"
             @select="onSelect"
+            @step="stepKey = $event"
         />
 
         <footer class="builder-preview__limits">

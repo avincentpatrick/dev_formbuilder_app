@@ -33,14 +33,17 @@ vi.mock('../../../public-runtime/composables/useFormRuntime', () => ({
     createFormRuntime: (schema: unknown) => {
         created.push(schema);
 
+        // ⛔ THE REAL FACTORY SEEDS THE FIRST VISIBLE STEP ON EVERY BUILD, AND THE MOCK MUST TOO.
+        // That reseed IS the defect `initialStepKey` exists to undo, so a mock that let the module ref
+        // survive a rebuild would make the preservation case below pass with the feature deleted.
+        currentStepKey.value = 's1';
+
         return {
-            visibleSteps: computed(() => [
-                { key: 's1', sectionKey: 's1', title: 'Section one', fieldKeys: ['q1'], isRepeat: false },
-                { key: 's2', sectionKey: 's2', title: 'Section two', fieldKeys: ['q2'], isRepeat: false },
-            ]),
-            currentStep: computed(() => currentStepKey.value === 's1'
-                ? { key: 's1', sectionKey: 's1', title: 'Section one', fieldKeys: ['q1'], isRepeat: false }
-                : { key: 's2', sectionKey: 's2', title: 'Section two', fieldKeys: ['q2'], isRepeat: false }),
+            currentStepKey,
+            visibleSteps: computed(() => STEPS.slice(0, stepCount.value)),
+            currentStep: computed(
+                () => STEPS.slice(0, stepCount.value).find((s) => s.key === currentStepKey.value) ?? null,
+            ),
             fieldRelevance: computed(() => ({ q1: true, q2: true, cap: true })),
             goToStep: (key: string) => (currentStepKey.value = key),
             sectionTitleFor: (s: { label: string }) => s.label,
@@ -52,7 +55,22 @@ vi.mock('../../../public-runtime/composables/useFormRuntime', () => ({
     },
 }));
 
+const STEPS = [
+    { key: 's1', sectionKey: 's1', title: 'Section one', fieldKeys: ['q1'], isRepeat: false },
+    { key: 's2', sectionKey: 's2', title: 'Section two', fieldKeys: ['q2'], isRepeat: false },
+];
+
 const currentStepKey = ref('s1');
+
+/**
+ * How many of {@link STEPS} the mocked engine currently publishes.
+ *
+ * ⛔ THE STEP COUNT HAS TO BE DRIVABLE OR THE STRIP'S OWN `v-if` IS UNTESTABLE. The mock reports a step
+ * list the store cannot influence — deliberately, since the property under test here is a CALL COUNT
+ * rather than a projection — so a case about a single-step form has no way to ask for one. This is the
+ * smallest knob that makes that case real instead of vacuous.
+ */
+const stepCount = ref(2);
 
 import PreviewPane from './PreviewPane.vue';
 import { PREVIEW_REBUILD_DEBOUNCE_MS } from './preview-model';
@@ -108,16 +126,18 @@ function section(key: string, overrides: Partial<LocalSection> = {}): LocalSecti
 interface Double {
     store: BuilderStore;
     fields: ReturnType<typeof ref<LocalField[]>>;
+    sections: ReturnType<typeof ref<LocalSection[]>>;
     selected: () => Selection;
 }
 
 function makeStore(fields: LocalField[], sections: LocalSection[]): Double {
     const selection = ref<Selection>(null);
     const fieldsRef = ref(fields);
+    const sectionsRef = ref(sections);
 
     const store = {
         fields: fieldsRef,
-        sections: ref(sections),
+        sections: sectionsRef,
         selection,
         selectedField: computed(() => {
             const s = selection.value;
@@ -127,7 +147,7 @@ function makeStore(fields: LocalField[], sections: LocalSection[]): Double {
         select: (next: Selection) => (selection.value = next),
     } as unknown as BuilderStore;
 
-    return { store, fields: fieldsRef, selected: () => selection.value };
+    return { store, fields: fieldsRef, sections: sectionsRef, selected: () => selection.value };
 }
 
 const FORM = {
@@ -161,6 +181,7 @@ beforeEach(() => {
     vi.useFakeTimers();
     created.length = 0;
     currentStepKey.value = 's1';
+    stepCount.value = 2;
     uid = 0;
 });
 
@@ -410,6 +431,72 @@ describe('step movement', () => {
     });
 });
 
+describe('the section strip', () => {
+    it('lists every step, index-prefixed and titled from the LIVE model', async () => {
+        const double = twoSections();
+        const wrapper = mountPane(double, true);
+        await flushPromises();
+
+        expect(wrapper.get('[data-preview-strip]').text()).toContain('1. S1');
+        expect(wrapper.get('[data-preview-strip]').text()).toContain('2. S2');
+
+        // ⛔ A RENAME MOVES NO SHAPE, so no engine is rebuilt and the frozen `RuntimeStep.title` still reads
+        // "S2". A strip sourced from the runtime would show the old name here, directly above a heading
+        // showing the new one. The engine call count is asserted alongside so this cannot pass by accident
+        // of a rebuild nobody asked for.
+        const sections = double.sections.value!;
+        double.sections.value = [sections[0], { ...sections[1], label: 'Household roster' }];
+        await flushPromises();
+
+        expect(wrapper.get('[data-preview-strip]').text()).toContain('2. Household roster');
+        expect(created).toHaveLength(1);
+    });
+
+    it('moves the preview to the chosen step', async () => {
+        const wrapper = mountPane(twoSections(), true);
+        await flushPromises();
+
+        const radios = wrapper.get('[data-preview-strip]').findAll('input[type="radio"]');
+        expect(radios).toHaveLength(2);
+
+        await radios[1].setValue();
+        await flushPromises();
+
+        expect(wrapper.get('[data-section-heading]').text()).toBe('S2');
+    });
+
+    // ⛔ THE DEFECT THE STRIP MAKES VISIBLE, AND IT PREDATES THE STRIP. `PreviewRuntime` is keyed on the
+    // engine shape, so a structural edit tears it down; `createFormRuntime` then seeds the first visible
+    // step. Before M119 the preview therefore jumped back to page 1 roughly 300ms after any structural
+    // edit, with nothing on screen to explain it. The mock reseeds on every build for exactly this reason.
+    it('keeps the author on their step across an engine rebuild', async () => {
+        const double = twoSections();
+        const wrapper = mountPane(double, true);
+        await flushPromises();
+
+        await wrapper.get('[data-preview-strip]').findAll('input[type="radio"]')[1].setValue();
+        await flushPromises();
+        expect(wrapper.get('[data-section-heading]').text()).toBe('S2');
+
+        double.fields.value = [...double.fields.value!, field('q3', { form_section_id: 'sec-s1', sequence: 2 })];
+        await flushPromises();
+        vi.advanceTimersByTime(PREVIEW_REBUILD_DEBOUNCE_MS);
+        await flushPromises();
+
+        expect(created).toHaveLength(2);
+        expect(wrapper.get('[data-section-heading]').text()).toBe('S2');
+    });
+
+    // One step is not a choice, and a control offering it would be a control an author can only confirm.
+    it('is absent when the form has a single step', async () => {
+        stepCount.value = 1;
+        const wrapper = mountPane(makeStore([field('q1')], []), true);
+        await flushPromises();
+
+        expect(wrapper.find('[data-preview-strip]').exists()).toBe(false);
+    });
+});
+
 describe('the ARIA invariant this page holds permanently', () => {
     // ⛔ THIRTEEN Playwright locators walk `[role="tab"]` on the builder, four of them loops that CLICK every
     // match, so a second tablist would have its tabs clicked mid-scan. `ConfigPanel.test.ts` asserts the
@@ -425,12 +512,21 @@ describe('the ARIA invariant this page holds permanently', () => {
         expect(html).not.toContain('tabpanel');
     });
 
-    // A radiogroup owes arrow-key roving. The nav is two ordinary buttons and claims no group role at all,
-    // which is the same conclusion M117 reached for the settings rail.
-    it('claims no radiogroup role it does not implement', async () => {
+    // ⛔ THIS CASE ASSERTS THE IMPLEMENTATION, NOT THE ABSENCE OF A STRING, AND THE DIFFERENCE IS WHY IT WAS
+    // REWRITTEN. Until M119 the pane held no group at all, and `not.toContain('radiogroup')` said everything
+    // there was to say. The section strip IS a radiogroup — and it would have passed that old assertion
+    // VACUOUSLY, because `MdsSegmentedControl` takes its semantics from a native `<fieldset>` of radio
+    // inputs and writes no role attribute for a substring check to find. So the string check is kept for the
+    // one thing it can still refuse, a hand-rolled role with no roving behind it, and the radios themselves
+    // are what prove the roving is really there.
+    it('implements its radiogroup with native radios rather than claiming the role', async () => {
         const wrapper = mountPane(twoSections(), true);
         await flushPromises();
 
-        expect(wrapper.html()).not.toContain('radiogroup');
+        const strip = wrapper.get('[data-preview-strip]');
+        expect(strip.findAll('fieldset')).toHaveLength(1);
+        expect(strip.findAll('input[type="radio"]')).toHaveLength(2);
+        expect(wrapper.html()).not.toContain('role="radiogroup"');
     });
+
 });

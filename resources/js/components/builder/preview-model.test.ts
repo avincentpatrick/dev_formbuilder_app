@@ -19,6 +19,10 @@ import {
     previewLimitations,
     previewPendingFields,
     previewSectionFor,
+    previewStepLabels,
+    LEAD_STEP_LABEL,
+    PREVIEW_STRIP_MAX_SEGMENTS,
+    UNTITLED_SECTION_LABEL,
 } from './preview-model';
 import type { DraftProjectionInput } from './draft-snapshot';
 import type { LocalField, LocalSection } from './types';
@@ -284,5 +288,50 @@ group('the debounce and the limitation list are stated, not implied', () => {
         expect(limits).toContain('default language');
         expect(limits).toContain('Page breaks');
         expect(limits).toContain('repeatable section');
+    });
+});
+
+group('the strip labels a step from the live model, never from the frozen one', () => {
+    const titleFor = (s: { label: string }) => s.label;
+
+    it('prefixes the position, so no section name can collide with a builder control', () => {
+        const model = buildPreviewModel(
+            input([field({ uid: 'f1', key: 'q1', form_section_id: 'sec-a' })], [section({ uid: 's1', key: 'a', label: 'Logic' })]),
+        ).renderModel;
+
+        const labels = previewStepLabels([step({ key: 'a', sectionKey: 'a' })], model, titleFor as never);
+
+        // ⛔ "Logic" IS A REAL SECTION NAME AND ALSO THE NAME OF A CENTRE-PANE CONTROL located by exact text.
+        // The prefix is what makes the two un-confusable without asking every locator to scope itself.
+        expect(labels).toEqual([{ value: 'a', label: '1. Logic' }]);
+        expect(labels[0].label).not.toBe('Logic');
+    });
+
+    it('names the lead block rather than leaving it blank', () => {
+        const model = buildPreviewModel(input([field({ uid: 'f1', key: 'q1' })])).renderModel;
+
+        const labels = previewStepLabels([step({ key: '__lead__', sectionKey: null })], model, titleFor as never);
+
+        expect(labels).toEqual([{ value: '__lead__', label: `1. ${LEAD_STEP_LABEL}` }]);
+    });
+
+    // An author creates a section before naming it, and a strip entry reading "3. " is unreachable by name
+    // for a screen reader and unclickable-by-intent for everyone else.
+    it('falls back for a section whose title is still empty', () => {
+        const model = buildPreviewModel(
+            input([field({ uid: 'f1', key: 'q1', form_section_id: 'sec-a' })], [section({ uid: 's1', key: 'a', label: '  ' })]),
+        ).renderModel;
+
+        const labels = previewStepLabels([step({ key: 'a', sectionKey: 'a' })], model, titleFor as never);
+
+        expect(labels[0].label).toBe(`1. ${UNTITLED_SECTION_LABEL}`);
+    });
+
+    // ⛔ THE THRESHOLD IS A PRODUCT DECISION AND THIS IS WHAT KEEPS IT ONE. `PreviewStepStrip.test.ts`
+    // asserts the render on both sides of it; this asserts the number itself has not drifted into a value
+    // no control can hold, which is how the CSS guess this row replaced went wrong.
+    it('states a segment ceiling a segmented control can actually render', () => {
+        expect(PREVIEW_STRIP_MAX_SEGMENTS).toBeGreaterThanOrEqual(3);
+        expect(PREVIEW_STRIP_MAX_SEGMENTS).toBeLessThanOrEqual(9);
     });
 });

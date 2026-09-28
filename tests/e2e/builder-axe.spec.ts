@@ -389,6 +389,20 @@ for (const theme of themes) {
         await expect(page.locator('[role="tablist"]')).toHaveCount(1);
         await scan(page, 'preview after selecting a field');
 
+        // The section strip moves the preview, and does it as a RADIOGROUP — so the page-level tablist
+        // count must survive the interaction. Clicking the label rather than the input is deliberate:
+        // `MdsSegmentedControl` clips its radios to 1x1px, which makes `.check()` an actionability
+        // coin-flip, and `showBuilderPane()` documents the same lesson for the pane switcher.
+        const strip = page.locator('[data-preview-strip]');
+        await expect(strip).toBeVisible();
+
+        const shownStep = page.locator('[data-builder-preview] [data-section]').first();
+        const before = await shownStep.getAttribute('data-section-key');
+        await strip.locator('label').nth(1).click();
+        await expect(shownStep).not.toHaveAttribute('data-section-key', before ?? '');
+        await expect(page.locator('[role="tablist"]')).toHaveCount(1);
+        await scan(page, 'preview after moving through the section strip');
+
         // …and back, with the structure canvas intact and still exactly one tablist.
         await page.locator('.builder__centre-tabs').getByText('Structure').click();
         await expect(page.locator('.canvas').first()).toBeVisible();

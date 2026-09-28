@@ -175,3 +175,67 @@ test('Builder at extra_large + dyslexia font + teal — accessible & no horizont
         await assertClean(page, 'Builder (max personalization) — Form');
     }
 });
+
+// ⛔ THE FOURTH ELEMENT-LEVEL SPILL READ ON THIS PAGE, AND IT MEASURES THE WIDEST CONTROL OF THE FOUR.
+// The pane switcher has had one since M19, the config pane since M109 and the centre control since M118 —
+// each added because `.builder__pane { overflow: hidden }` CLIPS a spill instead of scrolling it, so
+// `assertNoHorizontalOverflow`'s `.app-shell__content` read is flat over it by construction and axe has no
+// rule for a clipped label. The section strip is the same `inline-flex` with no wrap, carrying SECTION
+// NAMES rather than one-word labels, so it is the likeliest of the four to overflow and was the first to do
+// so: this case was written before the `flex-wrap` host guard existed and went red on the real defect.
+//
+// ⛔ AND A SPILL READ ALONE CANNOT FAIL HERE, WHICH WAS MEASURED RATHER THAN REASONED ABOUT. `Logic Notices
+// Demo` carries seven sections, but relevance gates four of them at the empty answer state, so the strip
+// renders exactly three short segments ("1. Intake", "2. Tail", "3. Preferences") occupying 335px of a
+// 335px bar at 375px with `extra_large` and OpenDyslexic. `Community Health Survey` projects to two. NO
+// SEEDED FORM PROJECTS TO A STRIP WIDE ENOUGH TO OVERFLOW, so a spill assertion on its own is green by
+// construction and would stay green if the affordance were deleted — the exact shape of a decorative gate.
+//
+// ✅ SO THE STRUCTURAL HALF IS WHAT MAKES THIS GATE ABLE TO FAIL. Section names are author-controlled and
+// unbounded, so the strip's protection cannot be "the fixtures happen to be short"; it is `D28`'s measured
+// affordance, `flex-wrap` on the hosted control, and that is asserted directly. Written before the guard
+// existed and RED on the first run, reporting `nowrap`. The spill read is kept beside it because the two
+// answer different questions: one that the affordance is present, the other that it is sufficient.
+test('Builder preview strip at extra_large + dyslexia font + teal — no horizontal overflow', async ({
+    page,
+}) => {
+    await openBuilder(page, 'Logic Notices Demo');
+    await forceTheme(page, 'dark');
+    await forcePersonalization(page, { accent: 'teal', fontSize: 'extra_large', dyslexia: true });
+
+    // ⚠️ AFTER `forcePersonalization`, NEVER BEFORE. At `extra_large` the builder goes compact even at the
+    // 1440 desktop project, because its 60em container threshold resolves against the personalised type
+    // scale — so a pane selected earlier is not the pane on screen now.
+    await showBuilderPane(page, 'canvas');
+    await page.locator('.builder__centre-tabs').getByText('Preview', { exact: true }).click();
+    await expect(page.locator('[data-builder-preview]')).toBeVisible({ timeout: 15_000 });
+
+    const strip = page.locator('[data-preview-strip]');
+    await expect(
+        strip,
+        'the section strip is not on screen, so the measurement below would be vacuous',
+    ).toBeVisible({ timeout: 15_000 });
+
+    // ⛔ IT MUST HAVE RENDERED AS SEGMENTS, not as the select it degrades to above the ceiling.
+    // A `<select>` cannot overflow its bar, so a spill of zero measured on one is not a weaker
+    // result — it is no result at all, and it would look identical to a pass.
+    const segments = await strip.locator('input[type="radio"]').count();
+    expect(
+        segments,
+        'the strip did not render as segments, so a spill of zero proves nothing about the control that can spill',
+    ).toBeGreaterThan(1);
+
+    const wrap = await strip.locator('fieldset').evaluate((el) => getComputedStyle(el).flexWrap);
+    expect(
+        wrap,
+        'the hosted segmented control cannot wrap, so a long section name will spill a bar that CLIPS it',
+    ).toBe('wrap');
+
+    const spill = await strip.evaluate((el) => el.scrollWidth - el.clientWidth);
+    expect(
+        spill,
+        'the preview section strip overflows its bar under maximum personalization',
+    ).toBeLessThanOrEqual(1);
+
+    await assertClean(page, 'Builder preview strip (max personalization)');
+});

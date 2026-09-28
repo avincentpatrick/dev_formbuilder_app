@@ -16,7 +16,104 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M119` is merged; the builder preview gained a section strip and stopped losing the author's place, the eighth tracker surgery bought about six close-outs of headroom, and a gate written first was VACUOUS TWICE before refusing its own green made it able to fail
+## Status: ACTIVE CLAIM — `M120`, the `single_page_mode` write path and the preview that could not see it (`m120-page-mode`)
+
+Taken 2026-09-29. Branch `m120-page-mode`, cut from `origin/main` at `80054654`, PR into `main`.
+Row: `R-f1332829` — *"`forms.single_page_mode` has no write surface outside the seeders, so single-page
+mode is unreachable for a real tenant — and its documented default disagrees across four documents"*
+(`docs/feature-backlog.md:7429`, **Tier: early-testing**). The second half of the overhaul plan's `B8`;
+`M119` shipped the first half. `D35` authorises the setting and fixes its default; `D57` fixes the model
+(keep the boolean, ship its two modes, no `presentation` enum).
+
+### Evidence verified
+
+Twelve of fourteen citations **hold**. `Form.php:41`/`:88`/`:120`, `PublicFormPresenter.php:39`,
+`EncodeFormPresenter.php:210`, `DemoSeeder.php:535`, `EncodeStepPayloadTest.php:76`,
+`FormService.php:67` (the six-key `Form::create([` that omits the column), both halves of the
+`save_and_resume` precedent, the migration's `->default(false)`, `docs/data-dictionary.md:221`,
+`docs/PRD.md:103` and `PROGRESS_ARCHIVE.md:297` all resolve exactly as described. An independent census
+confirms the substantive claim: **no writer anywhere outside three seeder lines and one test.**
+
+**Two citations have ROTTED, and neither was visible to the citation-liveness linter.**
+`database/seeders/E2eSeeder.php:372`, `:474` and `:534` are really `:409`, `:511` and `:571` — all three
+drifted by exactly **+37**. `docs/ux/form-filling-ux-flow.md:337` is really `:339`, and the row cites it
+**twice**. ⚠️ Two of the three seeder lines land on live-but-wrong content (a `publish()` call, an option
+fixture), which the linter passes by design — **it proves a citation lands on content, never that it
+lands on the right content.** Repaired here.
+
+### Premise verified
+
+**The row understates itself in three ways, and the first is this increment's real subject.**
+
+⛔ **The builder preview is this row's territory in writing, and the row's own text never mentions it.**
+`PreviewPane.vue` carries *"`BuilderPresenter` emits no `single_page_mode` … so the projection's own
+`?? false` decides and the preview is always stepped. That is `R-f1332829`'s territory."*
+`docs/ux/form-filling-ux-flow.md:79` requires the same thing from the other side: the flag *"governs
+pagination and chrome only, which is exactly what lets the builder preview stay visually representative
+of both modes."* So the row is a floor, and the preview is inside it.
+
+⚠️ **A document disagrees with ITSELF, which "four documents, two values" cannot express.**
+`docs/ux/form-filling-ux-flow.md:77` opens *"`single_page_mode = false`, the default for a newly-created
+form"* and then, in the same parenthetical, *"which this document treats as the literal default value of
+`single_page_mode = true`"*.
+
+⚠️ **The doc half is NARROWER than the row claims, not wider.** The migration and
+`docs/data-dictionary.md:221` say `false` and are both **correct under `D35`** — and are pinned against
+the live schema by `DocumentedDefaultDriftTest`. Only the two prose sites move. That gate reads the
+`Default` column of markdown tables, which is precisely why it never saw a contradiction living in prose.
+
+⚠️ **Census blind spot, wider than this row.** `useFormRuntime.ts` contains a NUL byte, so ripgrep calls
+it binary and **silently drops it** without `--text` — and the runtime's own declaration and read of the
+flag live there. Every grep-derived row in this ledger inherits this. Filed rather than fixed here.
+
+### Remedy verdict
+
+**Works, and measurably so before a line was written** — both respondent-facing channels already honour
+the flag, so a writer changes real behaviour on the day it ships. The guest runtime reads it into
+`runtime.singlePageMode` and branches `PageView` against `StepView`; `Encode.vue` honours it in six
+places. The builder preview does not, and that is the gap.
+
+⛔ **AND THE PRESCRIBED SHAPE HAS A TRAP MY OWN FIRST ANSWER WALKED INTO.** `runtime.singlePageMode` is a
+**plain boolean captured once inside `createFormRuntime`**, and the engine is remounted only when `shape`
+moves — but `shapeOf()` reads only `sections` and `fields` and **never `form`**. So an engine-sourced read
+means a toggle changes the schema, moves no shape, remounts nothing, and leaves the old mode on screen
+until some unrelated structural edit. I first proposed widening the engine key to force that remount.
+**It works and it is wrong in kind:** `preview-model.ts` splits the two channels deliberately — the engine
+answers relevance and step membership, the render model drives everything visible with no remount — and
+pagination is chrome. The correct source is **`props.model.form.single_page_mode`**, the live channel the
+section strip's own labels already travel on. No remount, no widened key, `shapeOf()` untouched.
+
+Files: `app/Http/Requests/Forms/UpdatePageModeRequest.php`,
+`app/Http/Controllers/Tenant/FormPageModeController.php`, `app/Services/Forms/FormService.php`,
+`app/Services/Forms/BuilderPresenter.php`, `routes/tenant.php`,
+`resources/js/components/builder/PageModePanel.vue`,
+`resources/js/components/builder/FormSettingsModal.vue`,
+`resources/js/components/builder/PreviewPane.vue`,
+`resources/js/components/builder/PreviewRuntime.vue`,
+`resources/js/components/builder/preview-model.ts`, `resources/js/components/builder/types.ts`,
+`tests/Feature/Tenant/FormPageModeSettingsTest.php`, `tests/Feature/Audit/AuditCoverageTest.php`, and the
+Vitest suites `FormSettingsModal.test.ts`, `PreviewPane.test.ts`, `preview-model.test.ts`,
+`PageModePanel.test.ts`. **NOT `Pages/forms/Builder.vue`** — it already passes `:form` whole, so
+`builder-layout.test.ts` staying green is the proof, as in `M119`.
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/PRD.md`, `docs/ux/form-filling-ux-flow.md`,
+`PROGRESS.md` (own block only), `docs/claims/lane-a.md`. **Not `openapi.json`** — the contract gate covers
+`/api/v1` only and the column is already documented on the public schema. **Not the migration and not
+`docs/data-dictionary.md`** — both already say what `D35` decided.
+Paired files taken: none.
+Namespaces spent: **nothing from either** — no migration, no ADR, no sub-decision id.
+Prediction: Pint clean or one `ordered_imports`. **PHPStan owes a real number rather than the usual
+"cannot move"** — `app/` and `routes/` both change, which is the opposite of `M119`'s diff. Contract
+unmoved deliberately. ⚠️ **Most expected to be wrong: the preview's rebuild mechanism.** `M118` measured
+`B7`'s central mechanism wrong and `M119` predicted a red and got a vacuous pass — both misses were about
+how the preview rebuilds, and this is the third increment running to bet on it. The live-channel read is
+predicted to need **no** engine rebuild at all; the proving case asserts both that the mode changed and
+that the engine was not rebuilt, and mutating the read back to `runtime.singlePageMode` must redden that
+case **alone**. Second most likely wrong: `FormSettingsModal.test.ts` asserts the modal's HTML contains no
+`radiogroup` and the new control is a radio group — predicted green, because the word lives only in that
+component's script docblock and a CSS comment and never its template, but `M117` measured that Vue renders
+*template* comments into `html()`, so the margin is thin and it gets **run rather than reasoned about**.
+Third: that same file forbids `MdsSegmentedControl` by name, scoped to its five-entry rail — predicted to
+need a written reconciliation plus `D28`'s `flex-wrap` host guard, not a different control.
 
 ## RELEASED — `M119`, the builder preview gets a section strip, and the eighth tracker surgery (merged as PR #312, `1624ef3b`, 6/6 green with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

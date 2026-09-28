@@ -121,6 +121,25 @@ describe('replayOutbox', () => {
         expect((await db.outbox.get('u1'))?.status).toBe('needs_attention');
     });
 
+    it('parks an unevaluable form rule on the FIRST attempt instead of re-sending it to the ceiling', async () => {
+        await enqueue(db, input('u1'));
+        const { fetchFn, submitBodies } = makeFetch({ submit: () => res(422, errorBody('expression_error')) });
+
+        expect(await replayOutbox(db, fetchFn)).toMatchObject({ needsAttention: 1 });
+        expect((await db.outbox.get('u1'))?.status).toBe('needs_attention');
+
+        // ⛔ THE SEND COUNT IS THE ASSERTION, NOT THE STATUS. Until M117 `expression_error` classified as
+        // `unknown`, which REPLAY_OUTCOME maps to `retry` — so this row stayed `pending`, and the four
+        // passes below re-sent it four more times, each failing identically for a reason no retry can
+        // change, before the ceiling finally parked it. Asserting only the end state would pass either way:
+        // both paths reach `needs_attention`. The difference is entirely in the traffic.
+        expect(submitBodies).toHaveLength(1);
+        for (let i = 0; i < 4; i += 1) {
+            await replayOutbox(db, fetchFn);
+        }
+        expect(submitBodies).toHaveLength(1);
+    });
+
     it('flags a 409 as conflict for the G8c UX and records the code', async () => {
         await enqueue(db, input('u1'));
         const { fetchFn } = makeFetch({ submit: () => res(409, errorBody('form_updated')) });

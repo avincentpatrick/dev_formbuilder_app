@@ -123,14 +123,19 @@ describe('forms/Builder — the compact-layout threshold', () => {
 
     it('gives every compacted toolbar button an aria-label equal to its visible text', () => {
         // Below the threshold `.builder__label` is `display: none` and the aria-label is the ONLY name
-        // left. `builder-axe` asserts getByRole('button', { name: 'Share' }) at all three viewports, and
-        // WCAG 2.5.3 Label-in-Name holds only while the two strings match — so they cannot be allowed to
-        // drift. `title` is pinned too: it is what gives a mouse user on an extra_large desktop (where the
-        // threshold is 1200px of container) any affordance at all over eight bare glyphs.
+        // left. `builder-axe` asserts getByRole('button', { name: 'Form settings' }) at all three viewports,
+        // and WCAG 2.5.3 Label-in-Name holds only while the two strings match — so they cannot be allowed
+        // to drift. `title` is pinned too: it is what gives a mouse user on an extra_large desktop (where
+        // the threshold is 1200px of container) any affordance at all over a row of bare glyphs.
         const buttons = source.match(/<MdsButton[\s\S]*?<\/MdsButton>/g) ?? [];
         const compacted = buttons.filter((b) => b.includes('builder__label'));
 
-        expect(compacted, 'the eight secondary toolbar actions').toHaveLength(8);
+        // ⛔ M117 — EIGHT BECAME SIX, AND THE NUMBER IS THE ASSERTION RATHER THAN BOOKKEEPING. Schedule,
+        // Confirmation and Share became sections of one "Form settings" modal under `D63`, and the
+        // save-and-resume checkbox went with them. This row wrapping to ~4 rows / ~250px at 375px is the
+        // defect JR5 existed to fix, so a silent REGROWTH restores it — which is what an exact count
+        // refuses and a `toBeLessThan` would wave through. Changing it is a deliberate act with a reason.
+        expect(compacted, 'the six secondary toolbar actions').toHaveLength(6);
 
         for (const button of compacted) {
             const label = button.match(/aria-label="([^"]+)"/)?.[1];
@@ -139,6 +144,27 @@ describe('forms/Builder — the compact-layout threshold', () => {
             expect(label, button.slice(0, 90)).toBe(text);
             expect(button, button.slice(0, 90)).toContain(`title="${label}"`);
         }
+    });
+
+    it('opens the settings modal from the toolbar and mounts no dialog the modal now owns', () => {
+        // ⛔ THE POINT OF `D63` IS ONE ENTRY POINT, AND THE WAY THIS REGRESSES IS A DIALOG LEFT BEHIND. If
+        // a later change re-adds a Schedule or Share button "just for convenience" the builder is back to
+        // two entry points to the same route, which is the drift the decision exists to make impossible.
+        // Mounting the three converted components here would do it silently — the modal would still work.
+        expect(source).toContain('<FormSettingsModal');
+        expect(source).toContain('aria-label="Form settings"');
+
+        for (const gone of ['<ScheduleModal', '<ConfirmationModal', '<ShareModal']) {
+            expect(source, `${gone} belongs to the settings modal now`).not.toContain(gone);
+        }
+
+        // The save-and-resume checkbox was the only non-button control in the row; it is a section now.
+        expect(source).not.toContain('<MdsCheckbox');
+
+        // ⚠️ Save as template STAYS, deliberately: it mints a new object rather than setting anything on
+        // this form, and `templates-axe.spec.ts` clicks that name unscoped with `.first()` on the forms
+        // list — so a second control with the name is the thing to avoid, not this one.
+        expect(source).toContain('aria-label="Save as template"');
     });
 
     it('brings the config pane on screen when a save fails', () => {

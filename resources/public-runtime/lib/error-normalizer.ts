@@ -76,7 +76,29 @@ function extractFieldErrors(code: string, details: Record<string, unknown> | nul
 
 function classify(status: number, code: string): ErrorKind {
     if (status === 422) {
-        return code === 'submission_invalid' || code === 'validation_failed' ? 'field' : 'unknown';
+        if (code === 'submission_invalid' || code === 'validation_failed') {
+            return 'field';
+        }
+
+        // ⛔ M117 — `expression_error` IS NOT RETRYABLE, AND UNTIL NOW IT WAS. This branch was a two-code
+        // allowlist and everything else fell to `unknown`, which `replay.ts` maps to `retry`. So a queued
+        // response against a form whose stored rule cannot be evaluated was re-sent five times, each attempt
+        // failing identically for a reason no retry can change, and parked as `needs_attention` only after
+        // burning the ceiling. `terminal` parks it on the FIRST attempt with the same outcome and none of
+        // the traffic.
+        //
+        // ⚠️ THE OMISSION WAS NOT A DECISION, WHICH IS WHY IT IS SAFE TO CHANGE. The 403 and 409 blocks
+        // below reason per code in comments; this one named no code at all, so `expression_error` was
+        // `unknown` by silence rather than by a judgement anyone recorded.
+        //
+        // ⚠️ AND IT IS `terminal` RATHER THAN A NEW KIND ON PURPOSE. `REPLAY_OUTCOME` is keyed on the whole
+        // of `ErrorKind`, so a new kind would force an edit there and in `types.ts` for a row that wants
+        // exactly what `terminal` already does — park for a human, never retry.
+        if (code === 'expression_error') {
+            return 'terminal';
+        }
+
+        return 'unknown';
     }
     if (status === 401) {
         return code === 'share_token_expired' ? 'remint' : 'terminal';

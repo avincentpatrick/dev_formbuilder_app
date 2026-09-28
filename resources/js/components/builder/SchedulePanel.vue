@@ -1,22 +1,26 @@
 <script setup lang="ts">
 /**
- * The scheduled-form config modal (Increment H12b) — sets or clears a form's open/close window + response
- * cap over PATCH /forms/{form}/schedule (ungated, `can:update,form`). Mirrors the builder's XLSForm-import
- * modal flow.
+ * The scheduled-form config section (Increment H12b) — sets or clears a form's open/close window + response
+ * cap over PATCH /forms/{form}/schedule (ungated, `can:update,form`).
+ *
+ * ⚠️ WAS `ScheduleModal.vue` UNTIL M117. It is now a section of {@link FormSettingsModal} under `D63`; the
+ * route and {@see \App\Http\Requests\Forms\UpdateFormScheduleRequest} are untouched, which is what keeps
+ * that request's "deliberately NOT folded into FormMetadataRequest" docblock true. One call site, so it was
+ * converted in place.
  *
  * The design system has no date primitive, so open/close use native `datetime-local` inputs: the author
  * enters a NAIVE wall-clock and picks an IANA timezone, and the server interprets that wall-clock IN the
  * chosen zone to store the absolute instant (see UpdateFormScheduleRequest). Prefill therefore renders the
  * stored ISO instant back into the form's timezone as a wall-clock string. Uses Inertia `useForm` so the
  * request's per-field 422s (close-before-open ordering, IANA timezone, positive cap) surface inline; a
- * successful save flashes the controller's toast and refreshes the builder props (which re-prefill on the
- * next open).
+ * successful save flashes the controller's toast and refreshes the builder props.
  */
 import { watch } from 'vue';
 import { useForm } from '@inertiajs/vue3';
-import { MdsButton, MdsFormField, MdsModal, MdsNumberInput, MdsSelect } from '@meridian/design-system';
+import { MdsButton, MdsFormField, MdsNumberInput, MdsSelect } from '@meridian/design-system';
 
 const props = defineProps<{
+    /** Whether the SETTINGS MODAL is open — see `ConfirmationPanel`'s prop note for why, not the section. */
     open: boolean;
     formId: string;
     form: {
@@ -27,8 +31,6 @@ const props = defineProps<{
     };
     timezones: string[];
 }>();
-
-const emit = defineEmits<{ 'update:open': [value: boolean] }>();
 
 const form = useForm<{
     opens_at: string;
@@ -82,14 +84,11 @@ watch(
     { immediate: true },
 );
 
-function close(): void {
-    emit('update:open', false);
-}
-
 /**
  * PATCH the schedule. A blank datetime maps to null (open-ended on that side); `clear` nulls the whole
  * window + cap (timezone is still required by the request, so the current zone is kept). preserveState keeps
- * the canvas store intact while the back() redirect refreshes `props.form.*`.
+ * the canvas store intact while the back() redirect refreshes `props.form.*`. It does not dismiss the
+ * settings modal — see `ConfirmationPanel::submit()`.
  */
 function submit(clear: boolean): void {
     form
@@ -102,13 +101,12 @@ function submit(clear: boolean): void {
         .patch(`/forms/${props.formId}/schedule`, {
             preserveScroll: true,
             preserveState: true,
-            onSuccess: () => close(),
         });
 }
 </script>
 
 <template>
-    <MdsModal :open="open" title="Schedule form" @close="close">
+    <div class="schedule">
         <p class="schedule__prose">
             Set an optional open/close window and a response cap. Open and close times are interpreted in the
             timezone you choose. Leave a field blank for no limit on that side.
@@ -159,19 +157,27 @@ function submit(clear: boolean): void {
                 />
             </MdsFormField>
         </div>
-        <template #actions>
+        <div class="settings-panel__actions">
             <MdsButton variant="tertiary" :disabled="form.processing" @click="submit(true)">
                 Clear schedule
             </MdsButton>
-            <MdsButton variant="tertiary" @click="close">Cancel</MdsButton>
             <MdsButton variant="primary" icon-left="check" :loading="form.processing" @click="submit(false)">
                 Save schedule
             </MdsButton>
-        </template>
-    </MdsModal>
+        </div>
+    </div>
 </template>
 
 <style scoped>
+/* ⛔ A CONTAINER QUERY, NOT A MEDIA QUERY, AND THE SWAP IS THE WHOLE REASON THIS BLOCK CHANGED IN M117.
+   As a dialog this grid dropped to one column below a 520px VIEWPORT, which was right when the panel was
+   the full width of the modal. Inside the settings modal the same panel sits beside a ~140px rail in a
+   520px shell, so a 1440px viewport would keep two columns in a ~340px box — the media query would report
+   "plenty of room" about a viewport this content no longer fills. The container reports its own width. */
+.schedule {
+    container-type: inline-size;
+}
+
 .schedule__prose {
     margin: 0 0 var(--mds-space-4);
     color: var(--mds-color-text-body);
@@ -183,7 +189,7 @@ function submit(clear: boolean): void {
     gap: var(--mds-space-4);
 }
 
-@media (max-width: 520px) {
+@container (max-width: 380px) {
     .schedule__grid {
         grid-template-columns: 1fr;
     }
@@ -216,5 +222,14 @@ function submit(clear: boolean): void {
 
 .schedule__input[aria-invalid='true'] {
     border-color: var(--mds-color-action-danger-bg);
+}
+
+/* Re-declared, not inherited — see ConfirmationPanel's note. */
+.settings-panel__actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: var(--mds-space-2);
+    margin-top: var(--mds-space-6);
 }
 </style>

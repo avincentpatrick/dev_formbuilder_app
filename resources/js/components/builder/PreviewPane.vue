@@ -76,10 +76,16 @@ function rebuild(): void {
     engine.value = { shape: model.value.projection.shape, schema: model.value.projection.schema };
 }
 
+// The watch SOURCE is the shape, so this fires only when the shape has actually moved. It carried an
+// additional `engine.value?.shape === shape` guard until a mutation proved the two redundant: deleting
+// either one left every case green, because the source already filters what the guard re-checked. The
+// source is kept because it states the intent — rebuild when the STRUCTURE moves — and the guard is gone
+// rather than left as a clause nothing can kill. Its counterpart in the activation watcher below is a
+// different comparison and is live.
 watch(
     () => model.value.projection.shape,
-    (shape) => {
-        if (! props.active || engine.value?.shape === shape) {
+    () => {
+        if (! props.active) {
             return;
         }
 
@@ -89,7 +95,15 @@ watch(
 );
 
 // First activation builds immediately — an author who has just switched to Preview should not watch an empty
-// pane for 300ms. A later re-entry catches up in one rebuild if the shape moved while they were away.
+// pane for 300ms — and a re-entry catches up on whatever moved while they were away.
+//
+// ⛔ CALLING `rebuild()` UNCONDITIONALLY IS SAFE, AND THE REASON IS THE `:key` RATHER THAN A COMPARISON.
+// This read `if (engine.value?.shape !== model.value.projection.shape)` until a mutation proved the branch
+// unkillable: `PreviewRuntime` is keyed on `engine.shape`, so re-assigning an IDENTICAL shape changes no key,
+// Vue reuses the instance, setup never re-runs and no second engine is built. The idempotence is therefore
+// structural — a property of the key — instead of a condition that could drift out of step with it. The test
+// asserting that toggling away and back builds nothing now pins the key, which is the thing actually doing
+// the work.
 watch(
     () => props.active,
     (active) => {
@@ -99,9 +113,7 @@ watch(
             return;
         }
 
-        if (engine.value?.shape !== model.value.projection.shape) {
-            rebuild();
-        }
+        rebuild();
     },
     { immediate: true },
 );

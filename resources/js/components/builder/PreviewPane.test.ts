@@ -14,6 +14,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
  * digest level; this asserts the consequence the digest exists for — one keystroke in a label must not tear
  * the engine down. Asserting the digest and assuming the wiring is how a gate ends up decorative.
  *
+ * ⛔ EVERY CASE FLUSHES BEFORE IT ADVANCES THE CLOCK, AND THAT ORDER IS LOAD-BEARING RATHER THAN TIDY.
+ * A Vue watcher runs as a queued pre-flush job on the next microtask, so the `setTimeout` it schedules does
+ * not exist yet at the moment the state changes. `vi.advanceTimersByTime()` called before `await
+ * flushPromises()` therefore advances a clock with nothing on it, the rebuild never fires, and the assertion
+ * passes having measured nothing. Measured here, not theorised: three mutants SURVIVED on the wrong order and
+ * were CAUGHT the moment it was fixed -- including one that deleted the active gate outright.
+ *
  * The child components that need a complete `FormRuntime` (`FieldRow`, `RepeatGroup`) are stubbed for the same
  * reason the store is a double: mounting them would make every case here a test of the guest renderer, which
  * `public-runtime`'s own suites already cover, and would need the mock to grow into a second engine.
@@ -179,10 +186,27 @@ describe('the engine is built once, and only when Preview is the selected view',
         expect(created).toHaveLength(0);
 
         double.fields.value = [...double.fields.value, field('q3', { sequence: 2 })];
+        await flushPromises();
         vi.advanceTimersByTime(PREVIEW_REBUILD_DEBOUNCE_MS * 4);
         await flushPromises();
 
         expect(created).toHaveLength(0);
+    });
+
+    // ⛔ THE ASSERTION THAT MAKES THE ACTIVATION WATCHER'S SHAPE COMPARISON PROVABLE. Without it, toggling
+    // Structure -> Preview -> Structure -> Preview rebuilds the engine every time an author glances at the
+    // pane, and no other case in this file would notice.
+    it('does not rebuild when toggled away and back with nothing changed', async () => {
+        const wrapper = mountPane(twoSections(), true);
+        await flushPromises();
+        expect(created).toHaveLength(1);
+
+        await wrapper.setProps({ active: false });
+        await flushPromises();
+        await wrapper.setProps({ active: true });
+        await flushPromises();
+
+        expect(created).toHaveLength(1);
     });
 
     it('collapses every change made while away into ONE rebuild on re-entry', async () => {
@@ -213,6 +237,7 @@ describe('a label edit does not rebuild the engine, and a structural edit does',
         double.fields.value = double.fields.value.map((f) =>
             f.key === 'q1' ? { ...f, label: 'Rewritten while typing' } : f,
         );
+        await flushPromises();
         vi.advanceTimersByTime(PREVIEW_REBUILD_DEBOUNCE_MS * 4);
         await flushPromises();
 
@@ -244,6 +269,7 @@ describe('a label edit does not rebuild the engine, and a structural edit does',
 
         for (const key of ['a', 'b', 'c']) {
             double.fields.value = double.fields.value.map((f) => (f.sequence === 0 ? { ...f, key } : f));
+            await flushPromises();
             vi.advanceTimersByTime(PREVIEW_REBUILD_DEBOUNCE_MS - 50);
             await flushPromises();
         }
@@ -279,15 +305,36 @@ describe('what the author reads', () => {
         expect(created).toHaveLength(1);
     });
 
-    it('renders a capture field inert, with no file input and no map', async () => {
-        const double = makeStore([field('cap', { field_type: 'image_capture' })], []);
+    // ⛔ THE CAPTURE FIELD IS KEYED `q1` SO THE ENGINE PLACES IT IN A STEP, WHICH IS THE ONLY WAY THE INERT
+    // BRANCH IS REACHED AT ALL. A first version used the key `cap`, which the mock's step list does not
+    // mention, so the field landed in the pending block and `isCaptureField` was never called -- a mutation
+    // making it return `false` unconditionally SURVIVED. Asserting `not.toContain('type="file"')` was no help
+    // either: `FieldRow` is stubbed, so no real control is rendered in this suite whatever the branch decides.
+    // The assertion has to be that the inert branch RAN and `FieldRow` did NOT.
+    it.each(['image_capture', 'file_upload', 'geopoint'])('renders a `%s` field inert, not as a control', async (type) => {
+        const double = makeStore([field('q1', { field_type: type })], []);
         const wrapper = mountPane(double, true);
         await flushPromises();
 
-        // The step list the mock returns does not mention `cap`, so it lands in the pending block — which is
-        // itself the assertion that a field the engine has not placed is SHOWN rather than swallowed.
-        expect(wrapper.find('[data-preview-pending]').exists()).toBe(true);
-        expect(wrapper.html()).not.toContain('type="file"');
+        expect(wrapper.find('[data-preview-inert="q1"]').exists()).toBe(true);
+        expect(wrapper.findComponent({ name: 'FieldRow' }).exists()).toBe(false);
+        expect(wrapper.text()).toContain('not interactive while you edit');
+    });
+
+    it('renders an ordinary field as a real control, not inert', async () => {
+        const wrapper = mountPane(twoSections(), true);
+        await flushPromises();
+
+        expect(wrapper.find('[data-preview-inert="q1"]').exists()).toBe(false);
+        expect(wrapper.findComponent({ name: 'FieldRow' }).exists()).toBe(true);
+    });
+
+    it('shows a field the engine has not placed yet rather than swallowing it', async () => {
+        const double = makeStore([field('brand_new')], []);
+        const wrapper = mountPane(double, true);
+        await flushPromises();
+
+        expect(wrapper.find('[data-preview-pending-field="brand_new"]').exists()).toBe(true);
     });
 
     it('names every limitation it has, in the pane itself', async () => {

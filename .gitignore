@@ -28,6 +28,9 @@
 /public/build
 /public/fonts-manifest.dev.json
 /public/hot
+# E2E cannot run while `public/hot` exists, so every session that runs it moves the file aside —
+# and a rename escapes the exact-path rule above. M119 committed `public/hot.m119-aside` that way.
+/public/hot.*
 /public/storage
 /storage/*.key
 /storage/pail

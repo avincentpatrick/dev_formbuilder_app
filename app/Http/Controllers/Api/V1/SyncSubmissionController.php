@@ -134,6 +134,26 @@ final class SyncSubmissionController extends Controller
             return $this->failure($uuid, SyncResultStatus::Error, 'forbidden', 'You are not authorized to create submissions on this form.');
         }
 
+        // ⛔ THE PIPELINE CALL AND ITS FIVE CATCH ARMS LIVE IN THEIR OWN METHOD, AND THE THIN-CONTROLLER
+        // GATE IS WHY — MEASURED, NOT PRE-EMPTED. `M117` added the fifth arm and `scripts/controller-gate.php`
+        // failed the push at cyclomatic complexity 11 against its ceiling of 10. The split is along the seam
+        // the method already had: everything above resolves and AUTHORIZES an item, everything below submits
+        // one that is already resolved. ⚠️ So the ordering guarantee the block above documents at length —
+        // authorization strictly before the pipeline, so no refusal leaks the version status, the schedule
+        // window or a `client_submission_uuid` probe — is now structural rather than a matter of statement
+        // order, because the pipeline is unreachable except through this call.
+        return $this->submitResolved($pipeline, $user, $item, $uuid, $version);
+    }
+
+    /**
+     * Submit ONE already-resolved, already-authorized item and map every refusal it can raise onto a
+     * per-item result. Raises nothing: an escape here is what destroys the batch response.
+     *
+     * @param  array<string, mixed>  $item
+     * @return array<string, mixed>
+     */
+    private function submitResolved(SubmissionPipeline $pipeline, User $user, array $item, string $uuid, FormVersion $version): array
+    {
         try {
             $result = $pipeline->submit(new SubmissionPayload(
                 version: $version,

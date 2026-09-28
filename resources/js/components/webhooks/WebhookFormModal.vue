@@ -4,7 +4,7 @@
  * (POST /webhooks), non-null = edit (PATCH /webhooks/{id}). Uses Inertia `useForm` so the request's per-field
  * 422s (name, the PublicHttpUrl SSRF check, the event-type subset, form scope) surface inline via
  * `MdsFormField :error`; a successful save flashes the controller's toast and closes. Mirrors the builder's
- * ScheduleModal flow. The signing secret is never a field here — it is minted server-side and revealed once
+ * SchedulePanel flow (`ScheduleModal` until M117, when `D63` made it a section of the form-settings modal). The signing secret is never a field here — it is minted server-side and revealed once
  * through the separate SecretRevealModal after create.
  */
 import { watch } from 'vue';

@@ -11455,6 +11455,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   asserts it carries no tab role at all. ⚠️ `builder-layout.test.ts` pins all three spellings of the eight
   secondary toolbar actions with a per-line regex and **must be updated in the same PR**. **Live.**
   Filed by `M110`. **Tier: early-testing.** ✅ **`D63` ANSWERED 2026-09-26 (`M114`) — A: BOTH ENTRY POINTS.** A Settings tab on the form hub for administering a form, and one "Form settings" modal on the builder toolbar for authoring it, both mounting the **same child components against the same routes** — so there is no second implementation to drift. ⚠️ **Every section keeps its own route and its own FormRequest**, as the three docblocks refuse; only where an author finds them changes. ⚠️ Collapsing the nine toolbar buttons is what frees the room the live preview and the section strip both need, so this row edits the same region of `Builder.vue` as the section-strip row filed by `M114` and the two must not be batched together under `D13`.
+  ⛔ **BUILDER HALF SHIPPED BY `M117`; THE HUB HALF IS RE-FILED AS ITS OWN ROW AND THIS ROW STAYS OPEN.** One "Form settings" modal on the builder toolbar now holds five sections — Details, Share, Schedule, Thank-you message and Save and finish later — each still on its own route and its own FormRequest, so all four refusal docblocks stay true. **Ten toolbar controls became seven and the `builder__label` count went 8 → 6.** ⚠️ **`D63` ANSWERED *BOTH* ENTRY POINTS AND ONLY ONE IS BUILT, WHICH IS A DEFERRAL WITH AN OWNER RATHER THAN A NARROWING:** a hub tab is a real route (`FormTabSetReachabilityTest` GETs every offered tab and asserts success, so a tab with no route is red by construction), and that route lands in `routes/tenant.php` — a hub beside `Builder.vue`, which `D13` clause 2 refuses without a stated breach. The user chose the split over the breach in chat on 2026-09-28. It costs the critical path nothing: the hub tab frees no toolbar room, so `B7` and `B8` are unblocked by this half alone. ⛔ **THREE THINGS `M117` MEASURED THAT THIS ROW GOT WRONG.** (a) **Every line number in it was exactly 30 low** — `17e0b0df` (`M113`) added +30 lines above the toolbar, so `:287-387` is `:317-417` and the no-tab-strip record at `:256-259` is at `:286-289`, where `:256-259` now resolves to unrelated prose. (b) **The component census is wrong: `ShareModal` has TWO call sites** — `Builder.vue` *and* `Show.vue:482` — so it was SPLIT (body → `SharePanel.vue`, wrapper kept) rather than converted in place like Schedule and Confirmation; converting it would have silently deleted the hub's Share button. (c) **The refusal chain is FOUR links, not three:** `AssignFormScopeRequest` is the root the save-resume docblock cites, with a route-level twin at `routes/tenant.php:623-627`. ⚠️ **And the blast radius was larger than the row states:** besides `builder-layout.test.ts`'s count, **four** `builder-axe.spec.ts` assertions clicked `Share` and expected `dialog "Share form"` — the merge-blocking proof for the `I10a` inert-stack fix, so they were rewritten through the new flow, never deleted, and a fifth case now scans the rail's contrast.
 
 - **`minor` · The "Appearance hint" field is a free-text box in the builder that changes nothing about how any
   form renders.** Filed 2026-09-25 by `M110`, answering the report *"can you also clarify to me what the
@@ -11955,7 +11956,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   fixtures, or a lint that refuses an un-asserted type annotation in a test are all cheaper. **Live.**
   Filed by `M115`. **Tier: during-testing.**
 
-- **`major` · One unevaluable rule on one form 422s the WHOLE offline sync batch and discards every other
+- ✅ **CLOSED BY `M117` (2026-09-28) — `major` · One unevaluable rule on one form 422s the WHOLE offline sync batch and discards every other
   queued response's per-item result.** Found by `M116` (2026-09-28) while driving the tail `R-1140a660` had
   filed as inferred. `SyncSubmissionController::replayOne()` catches exactly four exception types —
   `SubmissionValidationException`, `SubmissionConflictException`, `SubmissionException` and
@@ -11969,7 +11970,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   prospective, and a version already published with such a row keeps throwing forever. ⚠️ **A fifth catch arm
   is the cheap half; the question the row must answer is what the per-item `error.code` should be**, since
   `expression_error` is currently a server-fault slug that `error-normalizer.ts:77-80` deliberately does not
-  classify as a validation refusal. **Live.** Filed by `M116`. **Tier: early-testing.**
+  classify as a validation refusal. **Live.** Filed by `M116`. **Tier: early-testing.** ✅ **CLOSED BY `M117` — AND THE ROW'S HEADLINE CHAIN WAS WRONG IN ITS PREMISE, IN BOTH DIRECTIONS.** `replayOne()` now catches the abstract `ExpressionException`, reporting `expression_error` per item as `SyncResultStatus::Error` inside a 200, so one bad row no longer replaces the per-item result list. ⛔ **(a) `replay.ts` IS NOT A CLIENT OF THE BATCH ENDPOINT AT ALL** — it posts one row at a time to the *guest* endpoint (`api-client.ts:174`), which this controller's own docblock states at `:33-34`. So "re-sends all twenty, five times, and parks the lot" described neither channel: the batch endpoint has **no in-repo client**, and on the guest channel each row parks independently. Both halves were still real defects and both are fixed — the guest half by classifying `expression_error` as `terminal` in `error-normalizer.ts`, which `REPLAY_OUTCOME` already parks, so it no longer burns five attempts on a failure no retry can change. ⛔ **(b) A SECOND UNCAUGHT TYPE HAD THE IDENTICAL ESCAPE:** `ExpressionSyntaxException` shares `bootstrap/app.php:595`'s union arm and is reachable from the same path because `ExpressionEvaluator::evaluate()` PARSES its argument — hence the arm names the BASE class. ⚠️ **One claim corrected:** the 422 branch was a two-code allowlist with no comment, so `expression_error` fell to `unknown` **by omission, not by a recorded decision** — there was no decision to overturn. ⛔ **AND THE GATE IS STRUCTURAL, WHICH IS A MEASURED VERDICT RATHER THAN A SHORTCUT: THE TRIGGERING STATE IS NO LONGER CONSTRUCTIBLE BY ANYONE.** `M116`'s publish gate refuses the authoring shapes; the three content child tables are `draft_child` under **FORCE ROW LEVEL SECURITY**, so a published version is immutable to *every* role — an Eloquent insert raised the RLS violation, the same write on `pgsql_privileged` matched **zero rows**, and an `update()` matched zero rows and **reported success**; the parser rejects both under-arity and unknown functions (`selected(consent)` and `nosuchfn(consent)` both measured as parse failures), so no authored expression reaches the remaining `unevaluable` sites; and `SubmissionPipeline`, `SemanticValidator`, `ExpressionEvaluator`, `ExpressionParser` and `StructuralValidationGate` are all `final`, so there is no mocking seam either. The arm is therefore defence for versions published BEFORE that gate, which a test database cannot hold — so `SyncApiTest` pins that the arm and the renderable cover the same set, with a completeness arm over the exception directory. Four mutations CAUGHT (two Pest via `mutate.php`, two Vitest hand-run).
 
 - **`minor` · A respondent is never told the rule engine failed — every conditional question is shown with no
   conditions applied, and the submit guard lets them submit anyway.** Found by `M116` (2026-09-28), beside
@@ -12016,3 +12017,61 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   on a field-type list** — the gate's own doctrine, since a type list needs editing every time a
   display-only type is added. The requiredness control deliberately stays visible on those types so an
   existing form has a repair path. Its disabling mutation is CAUGHT with a single-case kill set.
+- **`minor` · The hub Settings tab — the half of `D63` `M117` did not build.** Filed 2026-09-28 by `M117`, as the
+  named remainder of `R-4e96a994` rather than as a new idea: `D63` answered **both** entry points and only the
+  builder modal shipped. ⛔ **THE REASON IS THE GROUPING RULE, NOT THE WORK.** A hub tab is a real route —
+  `FormTabSet::for()` builds `href`s (`app/Support/Forms/FormTabSet.php:44-93`) and
+  `tests/Feature/Forms/FormTabSetReachabilityTest.php` makes one live `GET` per offered key with
+  `assertSuccessful()`, so a tab with no route is red by construction — and that route lands in
+  `routes/tenant.php`, a hub, beside `Builder.vue`, which `D13` clause 2 refuses without a stated breach. The
+  user chose the split over the breach in chat on 2026-09-28. ✅ **THE PANELS ALREADY EXIST AND ARE THE POINT:**
+  `GeneralPanel.vue`, `SharePanel.vue`, `SchedulePanel.vue`, `ConfirmationPanel.vue` and `SaveResumePanel.vue`
+  were built parent-agnostic — every section route returns `back()` with a toast and every call passes
+  `preserveScroll`/`preserveState` with no `only:` keys — so the page mounts the same components and `D63`'s
+  "no second implementation to drift" holds by construction. **The work is: one gated route + controller + page,
+  a fifth `FormTabSet` entry, and the two tests that pin the tab set exactly** —
+  `FormTabSetReachabilityTest.php:53-60` asserts `toBe(['overview','submissions','builder','analytics'])` and
+  `FormHubGateTest.php:230-241` pins `tabs.0..3` plus `has('tabs', 4)`. ⚠️ **Two things to carry in:** the hub
+  scan `tests/e2e/responsive-axe.spec.ts:265-291` waits on `getByRole('navigation', { name: <form title> })`, so
+  a new nav landmark must not share that accessible name (`landmark-unique`); and **Scope belongs here rather
+  than on the builder** — it confers capacity instead of describing the form, which is why
+  `routes/tenant.php:623-627` gives it its own route, so the hub tab is where the second form-list dialog
+  finally lands. **Live.** Filed by `M117`. **Tier: early-testing.**
+
+- **`minor` · `openapi.json` types the sync per-item `error.details` as a string, and every arm that populates it
+  sends an object.** Found 2026-09-28 by `M117` while measuring where its new catch arm could put a field key.
+  `components/schemas/SyncSubmissionResultResource` declares `details` as `["string","null"]`, inferred by
+  Scramble from `SyncSubmissionResultResource`'s `when()` closure on `details`, whose return is `mixed`. But **all
+  three** populating arms send a map: `['fields' => …]` (the `submission_invalid` arm of `SyncSubmissionController::replayOne()`), plus
+  `details.closes_at` and `details.max_responses` in `tests/Feature/Api/SyncApiTest.php`. ⛔ **NOTHING IS RED, AND THAT
+  IS THE ROW.** The contract test pins the KEY LIST and that `details` is optional (`SyncApiTest.php`, the M69 contract-shape case)
+  but never its TYPE, so an integrator generating a client from this document gets a `string` where a map
+  arrives. ⚠️ **It is why `M117`'s arm carries no `details` at all** — adding a fourth object-valued `details`
+  would have deepened the disagreement, and fixing the type moves `openapi.json`, a hub, which that increment's
+  batch could not take. The remedy is a typed shape on the resource (or a Scramble annotation) plus a contract
+  arm that asserts the type and not merely the key. **Live.** Filed by `M117`. **Tier: early-testing.**
+
+- **`minor` · `ExpressionException` escapes four single-response submission paths, which answer a generic 422
+  with no field and no code a client can branch on.** Found 2026-09-28 by `M117` beside the `major` it closed.
+  The batch loop is fixed; these are not. `GuestSubmissionController.php:114` has **zero `catch` statements in
+  the whole file** — and it is the path `replay.ts` actually uses; `Tenant/SubmissionController.php:133` guards
+  only the draft race at `:143-145`; `SubmissionDraftController.php:108-129` catches three of the same four
+  submission exceptions and misses the expression types identically; and
+  `SubmissionEditController.php:135` catches only `SubmissionEditException`, with `:104` recording that
+  `SubmissionValidationException` is *deliberately* uncaught. Each escapes to `bootstrap/app.php:595-608`'s
+  renderable, so a respondent reads *"A form expression could not be evaluated."* ⚠️ **Blast radius is one
+  response rather than a destroyed per-item contract, which is why `M117` did not widen its claim to cover
+  them** — but `M117` also measured that the guest channel is the one with real users on it. ⚠️ The
+  same increment's client-side half already parks these as `terminal` instead of retrying five times, so the
+  remaining defect is the MESSAGE, not the traffic. **Live.** Filed by `M117`. **Tier: early-testing.**
+
+- **`nit` · `TabNav.stories.ts` hand-builds a copy of the form hub's tab strip and no gate compares it to
+  `FormTabSet`.** Found 2026-09-28 by `M117` while measuring what a fifth hub tab would break.
+  `packages/design-system/src/components/TabNav/TabNav.stories.ts:24` carries the four labels
+  `Overview/Responses/Builder/Analytics` as a literal, which is a second copy of what
+  `app/Support/Forms/FormTabSet.php:44-93` derives. ⛔ **It is a COPY, not a gate** — the design-system package
+  is deliberately app-independent, so the story cannot import the PHP-derived set and nothing can make the two
+  disagree loudly. It goes stale the moment the hub gains a tab, and the Storybook axe job will keep passing on
+  the stale copy. ⚠️ **Filed as a `nit` deliberately:** the story is a design-system fixture and a wrong label
+  in it misleads a reader without shipping anything, so the honest remedy may be a comment saying the labels are
+  illustrative rather than a mechanism to sync them. **Live.** Filed by `M117`. **Tier: early-testing.**

@@ -14,7 +14,6 @@ import {
     MdsAlert,
     MdsBreadcrumb,
     MdsButton,
-    MdsCheckbox,
     MdsEmptyState,
     MdsModal,
     MdsSegmentedControl,
@@ -25,10 +24,8 @@ import BuilderCanvas from '@/components/builder/BuilderCanvas.vue';
 import LogicRail from '@/components/builder/LogicRail.vue';
 import ConfigPanel from '@/components/builder/ConfigPanel.vue';
 import ConflictDialog from '@/components/builder/ConflictDialog.vue';
-import ConfirmationModal from '@/components/builder/ConfirmationModal.vue';
-import ScheduleModal from '@/components/builder/ScheduleModal.vue';
+import FormSettingsModal from '@/components/builder/FormSettingsModal.vue';
 import SaveAsTemplateModal from '@/components/forms/SaveAsTemplateModal.vue';
-import ShareModal from '@/components/forms/ShareModal.vue';
 import { useBuilderStore } from '@/components/builder/useBuilderStore';
 import { saveLabel } from '@/components/builder/save-label';
 import type { BuilderPageProps } from '@/components/builder/types';
@@ -164,38 +161,19 @@ function publish(): void {
     });
 }
 
-// Per-form "Save and finish later" opt-in (Increment H10). A form-level setting (not a version edit), so it
-// PATCHes its own guarded route directly; gated `feature('save_and_resume')` client-side + at the route.
-const saveResume = ref(props.form.save_and_resume);
-function onToggleSaveResume(value: boolean): void {
-    saveResume.value = value;
-    router.patch(
-        `/forms/${props.form.id}/save-resume`,
-        { save_and_resume: value },
-        {
-            preserveScroll: true,
-            preserveState: true,
-            // Revert the optimistic toggle if the write is rejected (e.g. the plan no longer includes it).
-            onError: () => {
-                saveResume.value = !value;
-            },
-        },
-    );
-}
-
-// ── Schedule (Increment H12b) — a form-level open/close window + response cap. A modal over its own guarded
-// PATCH route (ungated, `can:update,form`), independent of the draft/version edits. ──
-const scheduleOpen = ref(false);
-
-// ── Confirmation message (Increment H6a) — the thank-you copy shown after a submit, and the first
-// author-editable text that may carry `${key}` piping holes. Same shape as Schedule: a modal over its own
-// guarded PATCH route, ungated by plan. ──
-const confirmationOpen = ref(false);
-
-// ── Share (Increment I1, PRD Feature #3) — the public link, its QR and its embed snippet. Same shape again:
-// a modal over its own guarded PATCH route, ungated by plan. It lives on the toolbar rather than beside
-// Publish because sharing is not a step in publishing — an author revisits the link long after. ──
-const shareOpen = ref(false);
+// ── Form settings (Increment M117, decision `D63`) ──────────────────────────────────────────────────
+// ONE modal replacing four toolbar controls: Schedule (H12b), Confirmation message (H6a), Share (I1) and
+// the save-and-resume checkbox (H10) — plus the form's title and description, which until now were
+// reachable only by leaving the builder for the forms list.
+//
+// ⚠️ NOTHING IS FOLDED SERVER-SIDE. Each section keeps its own route and its own FormRequest, which is what
+// keeps the four docblocks that refuse that fold true. See `FormSettingsModal.vue`'s header for the whole
+// argument, including why its section rail is local rather than a design-system component.
+//
+// ⚠️ AND THE STATE THAT USED TO LIVE HERE WENT WITH IT. The optimistic save-and-resume toggle and its
+// revert-on-error moved into `SaveResumePanel` verbatim; this page no longer holds a per-section ref, so
+// adding a sixth section touches one file rather than three.
+const settingsOpen = ref(false);
 
 // ── Save as template (G9a) — flush queued builder writes first, so the server snapshots the draft the
 // author sees (the modal traps focus, so no further canvas edits can race the POST while it is open). ──
@@ -296,11 +274,19 @@ function submitImport(): void {
                 </div>
             </div>
             <!--
-                JR5. The eight SECONDARY actions carry a permanent `aria-label` + `title` and wrap their
-                word in `.builder__label`, which the @container block hides below 60em — nine buttons that
-                wrapped to ~4 rows / ~250px at 375px become ~1 row of glyphs. Publish is deliberately NOT
-                one of them: it keeps its word at every width, and `templates-axe.spec.ts` asserts its name
-                comes from that slot text.
+                JR5. The SECONDARY actions carry a permanent `aria-label` + `title` and wrap their word in
+                `.builder__label`, which the @container block hides below 60em — buttons that wrapped to
+                ~4 rows / ~250px at 375px become ~1 row of glyphs. Publish is deliberately NOT one of them:
+                it keeps its word at every width, and `templates-axe.spec.ts` asserts its name comes from
+                that slot text.
+
+                ⚠️ THERE WERE EIGHT OF THEM AND NOW THERE ARE SIX (M117). Schedule, Confirmation and Share
+                became sections of one "Form settings" modal under `D63`, and the save-and-resume checkbox —
+                the only non-button control in this row — went with them. `builder-layout.test.ts` asserts
+                the COUNT, so it moved in the same change; the count is the point, because this row wrapping
+                to four rows at 375px is the defect JR5 existed to fix and a silent regrowth would restore
+                it. Save as template stays: it mints a new object rather than setting anything on this form,
+                and the forms list already carries a control with that exact name.
 
                 ⚠️ ONE ELEMENT, NOT A TEXT/ICON PAIR TOGGLED BY `display: none`. A pair would duplicate
                 sixteen `v-if="feature(…)"` / `:disabled` / `@click` declarations (the J1e "second caller
@@ -371,45 +357,19 @@ function submitImport(): void {
                 >
                     <span class="builder__label">Save as template</span>
                 </MdsButton>
-                <!-- Per-form save-and-resume opt-in (H10) — only when the tenant plan includes it (Starter+). -->
-                <MdsCheckbox
-                    v-if="feature('save_and_resume')"
-                    :model-value="saveResume"
-                    label="Save &amp; resume"
-                    class="builder__toggle"
-                    @update:model-value="onToggleSaveResume"
-                />
-                <!-- Scheduled-form config (H12b) — ungated, all tiers; enforcement is server-side. -->
+                <!-- Form settings (M117, `D63`) — Details, Share, Schedule, Thank-you message and Save and
+                     finish later, each still on its own route. NOT disabled on `readOnly`, inheriting the
+                     reason the Share button carried: a form with no editable draft still has a live link
+                     worth copying, and this is where an author goes to turn responses OFF — which matters
+                     most exactly when they cannot edit. -->
                 <MdsButton
                     variant="secondary"
-                    icon-left="calendar"
-                    aria-label="Schedule"
-                    title="Schedule"
-                    @click="scheduleOpen = true"
+                    icon-left="sliders"
+                    aria-label="Form settings"
+                    title="Form settings"
+                    @click="settingsOpen = true"
                 >
-                    <span class="builder__label">Schedule</span>
-                </MdsButton>
-                <!-- Confirmation message (H6a) — ungated, all tiers; references are checked at publish. -->
-                <MdsButton
-                    variant="secondary"
-                    icon-left="message-check"
-                    aria-label="Confirmation"
-                    title="Confirmation"
-                    @click="confirmationOpen = true"
-                >
-                    <span class="builder__label">Confirmation</span>
-                </MdsButton>
-                <!-- Share (I1) — ungated, all tiers. Not disabled on `readOnly`: a form with no editable
-                     draft still has a live link worth copying, and the panel is where an author goes to
-                     turn responses OFF, which matters most exactly when they cannot edit. -->
-                <MdsButton
-                    variant="secondary"
-                    icon-left="share"
-                    aria-label="Share"
-                    title="Share"
-                    @click="shareOpen = true"
-                >
-                    <span class="builder__label">Share</span>
+                    <span class="builder__label">Form settings</span>
                 </MdsButton>
                 <MdsButton variant="primary" icon-left="check" :disabled="readOnly" @click="publish">
                     Publish
@@ -609,18 +569,14 @@ function submitImport(): void {
         <!-- Save as template (G9a) — snapshots the current draft into a tenant-owned private template. -->
         <SaveAsTemplateModal v-model:open="templateOpen" :form-id="form.id" :default-name="form.title" />
 
-        <!-- Scheduled-form config (H12b) — open/close window + response cap over PATCH /forms/{form}/schedule. -->
-        <ScheduleModal v-model:open="scheduleOpen" :form-id="form.id" :form="form" :timezones="timezones" />
-
-        <!-- Confirmation message (H6a) — the post-submit thank-you copy, over PATCH /forms/{form}/confirmation. -->
-        <ConfirmationModal v-model:open="confirmationOpen" :form-id="form.id" :form="form" />
-
-        <!-- Share (I1) — the public link, QR and embed snippet, over PATCH /forms/{form}/share. -->
-        <ShareModal
-            v-model:open="shareOpen"
+        <!-- Form settings (M117, `D63`) — five sections, five untouched routes. -->
+        <FormSettingsModal
+            v-model:open="settingsOpen"
             :form-id="form.id"
-            :form-title="form.title"
+            :form="form"
+            :timezones="timezones"
             :share="share"
+            :save-resume-available="feature('save_and_resume')"
         />
 
         <MdsModal :open="importOpen" title="Import XLSForm" @close="importOpen = false">

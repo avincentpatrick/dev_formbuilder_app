@@ -2,13 +2,18 @@
 /**
  * The confirmation-message editor (Increment H6a, `docs/piping-output-encoding-design.md` §6.2) — sets or
  * clears the thank-you copy a respondent sees after submitting, over PATCH /forms/{form}/confirmation
- * (ungated, `can:update,form`). Mirrors {@link ScheduleModal} exactly: a modal over an Inertia `useForm`
- * PATCH, so the request's per-field 422s surface inline and a successful save flashes the controller's
- * toast and refreshes the builder props.
+ * (ungated, `can:update,form`).
+ *
+ * ⚠️ WAS `ConfirmationModal.vue` UNTIL M117, AND THE ROUTE DID NOT MOVE WITH IT. `D63` folds the builder's
+ * nine ungrouped toolbar buttons into one "Form settings" modal, so this surface is now a SECTION of
+ * {@link FormSettingsModal} rather than a dialog of its own. Every reason the fold was refused three times
+ * over in the FormRequest docblocks still holds and is still honoured: this section keeps its own route and
+ * its own {@see \App\Http\Requests\Forms\UpdateConfirmationMessageRequest}. What changed is only where an
+ * author finds it. The file had exactly ONE call site (`Pages/forms/Builder.vue`), which is why it was
+ * converted in place rather than split into a panel plus a wrapper the way `ShareModal` had to be.
  *
  * This is the first author-editable text in the product that may carry `${key}` piping holes, and it shows
  * the RAW template — an author needs to see `${child_name}`, not a value there is no submission to supply.
- * (No builder preview surface exists; rendering a filled example is not this increment's job.)
  *
  * Validation is split deliberately. The request rule checks GRAMMAR only, so a malformed hole like
  * `${1abc}` fails here and inline; whether `${child_name}` actually names a pipeable field is resolved at
@@ -21,9 +26,15 @@
  */
 import { computed, watch } from 'vue';
 import { useForm } from '@inertiajs/vue3';
-import { MdsButton, MdsFormField, MdsModal, MdsTextarea } from '@meridian/design-system';
+import { MdsButton, MdsFormField, MdsTextarea } from '@meridian/design-system';
 
 const props = defineProps<{
+    /**
+     * Whether the SETTINGS MODAL is open — not whether this section is the visible one. Re-seeding on the
+     * modal's open rather than on the section becoming visible is deliberate: switching sections and coming
+     * back must not silently discard what the author typed, and `FormSettingsModal` keeps every visited
+     * section mounted for exactly that reason.
+     */
     open: boolean;
     formId: string;
     form: {
@@ -33,8 +44,6 @@ const props = defineProps<{
         supported_locales: string[];
     };
 }>();
-
-const emit = defineEmits<{ 'update:open': [value: boolean] }>();
 
 const form = useForm<{
     confirmation_message: string;
@@ -64,14 +73,15 @@ watch(
     { immediate: true },
 );
 
-function close(): void {
-    emit('update:open', false);
-}
-
 /**
  * PATCH the message. A blank base message maps to null, restoring the runtime default; `clear` nulls both
  * columns. Blank variants are dropped rather than stored as empty strings, so locale resolution's
  * never-blank fallback (which treats '' as missing) has nothing to trip over.
+ *
+ * ⚠️ IT NO LONGER CLOSES ON SUCCESS, AND THAT IS THE POINT OF THE SETTINGS SURFACE. As a dialog this
+ * dismissed itself on save; as one section of five, dismissing the whole modal would throw the author out
+ * of the thing they opened to make several changes in. The controller's `back()` toast is the confirmation,
+ * exactly as it is on the forms list.
  */
 function submit(clear: boolean): void {
     form
@@ -92,13 +102,12 @@ function submit(clear: boolean): void {
         .patch(`/forms/${props.formId}/confirmation`, {
             preserveScroll: true,
             preserveState: true,
-            onSuccess: () => close(),
         });
 }
 </script>
 
 <template>
-    <MdsModal :open="open" title="Confirmation message" @close="close">
+    <div class="confirmation">
         <p class="confirmation__prose">
             The thank-you message a respondent sees after submitting. Leave it blank to use the built-in
             default. Reference an earlier answer with <code class="confirmation__code">${'{'}key{'}'}</code> —
@@ -139,16 +148,15 @@ function submit(clear: boolean): void {
             />
         </MdsFormField>
 
-        <template #actions>
+        <div class="settings-panel__actions">
             <MdsButton variant="tertiary" :disabled="form.processing" @click="submit(true)">
                 Reset to default
             </MdsButton>
-            <MdsButton variant="tertiary" @click="close">Cancel</MdsButton>
             <MdsButton variant="primary" icon-left="check" :loading="form.processing" @click="submit(false)">
                 Save message
             </MdsButton>
-        </template>
-    </MdsModal>
+        </div>
+    </div>
 </template>
 
 <style scoped>
@@ -163,5 +171,15 @@ function submit(clear: boolean): void {
     background: var(--mds-color-bg-sunken);
     font-family: var(--mds-font-family-mono);
     font-size: 0.9em;
+}
+
+/* ⚠️ RE-DECLARED, NOT INHERITED — the same note `AccessCard.vue` carries. `<style scoped>` reaches a child
+   SFC's ROOT node only, so the settings modal cannot style this footer for its sections. */
+.settings-panel__actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: var(--mds-space-2);
+    margin-top: var(--mds-space-6);
 }
 </style>

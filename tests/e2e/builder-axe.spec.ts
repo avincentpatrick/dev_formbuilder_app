@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Locator, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { assertNoHorizontalOverflow, forceTheme, settleAnimations } from './support/axe';
 import { openBuilder, showBuilderPane } from './support/navigate';
@@ -192,27 +192,58 @@ for (const theme of themes) {
     // Read-only on purpose: this suite shares one database with the rest of the e2e run, so toggling the
     // form's real share settings here would mutate state E2eSeederIdempotencyTest and the guest-runtime
     // specs both depend on. The two seeded rows already give both states without a write.
+    // ⚠️ M117 — THE WAY IN CHANGED AND THE PROOF DID NOT. `D63` folded the builder's Share, Schedule and
+    // Confirmation buttons into one "Form settings" modal, so the entry point is now that button plus the
+    // rail's Share section. These two cases are the merge-blocking proof that `I10a`'s inert walk works on
+    // real product markup, so they are REWRITTEN rather than dropped — and they now prove slightly more than
+    // before, because the surface under test is a dialog with an extra interactive control group in it.
+    //
+    // The locators are SCOPED to the dialog on purpose. "Settings" is already the compact pane switcher's
+    // third pane label (`tests/e2e/support/navigate.ts` resolves it by exact text against
+    // `.builder__pane-switch`), so an unscoped `/settings/i` match is ambiguous at compact widths. The
+    // toolbar button's full accessible name is `Form settings`, which collides with nothing.
+    async function openSettingsShare(page: Page, formTitle: string): Promise<Locator> {
+        await openBuilder(page, formTitle);
+        await page.getByRole('button', { name: 'Form settings' }).click();
+
+        const dialog = page.getByRole('dialog', { name: 'Form settings' });
+        await expect(dialog).toBeVisible({ timeout: 10_000 });
+        await dialog.getByRole('button', { name: 'Share', exact: true }).click();
+
+        return dialog;
+    }
+
     test(`Builder — share panel, not yet shared (${theme})`, async ({ page }) => {
-        await openBuilder(page, 'Community Health Survey');
-        await page.getByRole('button', { name: 'Share' }).click();
-        await expect(page.getByRole('dialog', { name: 'Share form' })).toBeVisible({ timeout: 10_000 });
+        const dialog = await openSettingsShare(page, 'Community Health Survey');
+        // The section is really on screen, not merely mounted behind `v-show`.
+        await expect(dialog.locator('[data-section="share"]')).toBeVisible({ timeout: 10_000 });
         await forceTheme(page, theme);
         // I10a: whole-page again, and the DOM-level claim stated directly rather than inferred from an axe
         // side-effect. `closest('[inert]')` rather than a getByRole count, because that would depend on
         // Playwright's own ARIA engine honouring inert; this depends only on the DOM.
         await assertBackgroundInert(page);
-        await scan(page, 'share panel — no link yet');
+        await scan(page, 'form settings — share, no link yet');
     });
 
     test(`Builder — share panel, live link (${theme})`, async ({ page }) => {
-        await openBuilder(page, 'Clinic Intake');
-        await page.getByRole('button', { name: 'Share' }).click();
-        await expect(page.getByRole('dialog', { name: 'Share form' })).toBeVisible({ timeout: 10_000 });
+        const dialog = await openSettingsShare(page, 'Clinic Intake');
         // The QR is a server round-trip; scanning before it lands would miss its alt text entirely.
-        await expect(page.locator('img.share__qr')).toBeVisible({ timeout: 10_000 });
+        await expect(dialog.locator('img.share__qr')).toBeVisible({ timeout: 10_000 });
         await forceTheme(page, theme);
         await assertBackgroundInert(page);
-        await scan(page, 'share panel — live link');
+        await scan(page, 'form settings — share, live link');
+    });
+
+    // ⛔ THE RAIL IS THE ONE PART OF THIS MODAL NO UNIT TEST CAN SCAN. `FormSettingsModal.test.ts` pins its
+    // ROLES; only axe on real markup can say whether the selected chip's fill clears contrast in both
+    // themes — and it is the one surface in this increment that copies a colour pairing
+    // (`action-primary-bg` + `text-on-primary`) rather than inheriting one from a design-system component.
+    test(`Builder — form settings, rail contrast (${theme})`, async ({ page }) => {
+        const dialog = await openSettingsShare(page, 'Clinic Intake');
+        await expect(dialog.getByRole('group', { name: 'Settings section' })).toBeVisible({ timeout: 10_000 });
+        await forceTheme(page, theme);
+        await assertBackgroundInert(page);
+        await scan(page, 'form settings — section rail');
     });
 
     test(`Builder — empty canvas (${theme})`, async ({ page }) => {

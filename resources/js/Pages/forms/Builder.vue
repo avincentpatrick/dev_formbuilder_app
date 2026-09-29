@@ -592,7 +592,7 @@ function submitImport(): void {
         <!-- Save as template (G9a) — snapshots the current draft into a tenant-owned private template. -->
         <SaveAsTemplateModal v-model:open="templateOpen" :form-id="form.id" :default-name="form.title" />
 
-        <!-- Form settings (M117, `D63`) — five sections, five untouched routes. -->
+        <!-- Form settings (M117, `D63`) — six sections, six untouched routes. `M120` added Pages. -->
         <FormSettingsModal
             v-model:open="settingsOpen"
             :form-id="form.id"

@@ -48,10 +48,11 @@ const model = computed(() =>
             description: props.form.description,
             default_locale: props.form.default_locale,
             supported_locales: props.form.supported_locales,
-            // `BuilderPresenter` emits no `single_page_mode` and `BuilderPageProps.form` does not declare it,
-            // so the projection's own `?? false` decides and the preview is always stepped. That is
-            // `R-f1332829`'s territory — the column has no write path anywhere outside the seeders — and is
-            // named in `previewLimitations()` rather than papered over with a guess here.
+            // `R-f1332829` — the flag reaches the projection HERE, which is what lets the preview render the
+            // mode the author chose instead of always stepping. It travels on the LIVE channel deliberately:
+            // `buildRenderModel` passes `form` through verbatim and `shapeOf()` never reads `form` at all, so
+            // the engine cannot be the source of it. `PreviewRuntime` carries the full argument.
+            single_page_mode: props.form.single_page_mode,
         },
         version: props.draft ?? { id: 'preview', version_number: 0 },
         sections: props.store.sections.value,

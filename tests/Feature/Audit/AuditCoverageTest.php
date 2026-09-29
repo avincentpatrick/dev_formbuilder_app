@@ -125,6 +125,21 @@ it('audits the save-and-resume toggle', function (): void {
     expect($audit->new_values)->toBe(['save_and_resume' => true]);
 });
 
+it('audits the page-mode toggle', function (): void {
+    // ⛔ OWED BY A CLOSED-SET CLAIM RATHER THAN BY TASTE. `FormService::recordFormUpdate`'s docblock frames
+    // "every form-config write is audited the same way" as a property of the code, so a seventh
+    // `form`/`updated` setter that skipped it would falsify that sentence silently. Deleting the
+    // `recordFormUpdate` call from `setSinglePageMode` reddens exactly here.
+    $form = app(FormService::class)->create($this->tenant, $this->admin, 'Survey');
+
+    app(FormService::class)->setSinglePageMode($form, true, $this->admin);
+
+    $audit = formAudit($form->id, AuditEvent::Updated);
+
+    expect($audit->old_values)->toBe(['single_page_mode' => false]);
+    expect($audit->new_values)->toBe(['single_page_mode' => true]);
+});
+
 it('audits confirmation copy by LOCALE KEYS, never the translations map', function (): void {
     $form = app(FormService::class)->create($this->tenant, $this->admin, 'Survey');
 

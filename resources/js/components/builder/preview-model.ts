@@ -136,6 +136,34 @@ export function previewStepLabels(
 }
 
 /**
+ * The steps to RENDER: every visible one in single-page mode, the current one otherwise.
+ *
+ * ⛔ THE CALLER MUST PASS THE FLAG FROM THE LIVE RENDER MODEL, NEVER FROM `runtime.singlePageMode`, AND THAT
+ * IS A CORRECTNESS CLAIM RATHER THAN A STYLE ONE. `FormRuntime.singlePageMode` is a plain boolean captured
+ * once inside `createFormRuntime`, and the engine is only ever rebuilt when `shape` moves — but `shapeOf()`
+ * reads `sections` and `fields` and NEVER `form`. So toggling the setting changes the schema, moves no
+ * shape, remounts nothing, and an engine-sourced read would keep showing the old mode until some unrelated
+ * structural edit happened 300ms later. That is the "preview that lies" this file's header opens by
+ * refusing, reached from a new direction: the mode is chrome, so it belongs on the live channel with every
+ * other visible string.
+ *
+ * Empty rather than a `steps[0]` fallback when there is no current step: `currentStep` already degrades to
+ * the first visible step itself, so a second fallback here would render a heading over nothing in the one
+ * state — zero visible steps — that the pane's empty-state copy exists for.
+ */
+export function previewRenderedSteps(
+    steps: readonly RuntimeStep[],
+    current: RuntimeStep | null,
+    singlePageMode: boolean,
+): RuntimeStep[] {
+    if (singlePageMode) {
+        return [...steps];
+    }
+
+    return current === null ? [] : [current];
+}
+
+/**
  * The step's fields, resolved in the LIVE model and in the step's own order.
  *
  * ⚠️ THE FILTER IS THE HALF OF THE DEBOUNCE CONTRACT THAT POINTS THIS WAY. The engine's step lists a key the
@@ -214,7 +242,13 @@ export function previewLimitations(): string[] {
     return [
         'Photo, file and location questions are shown but not interactive.',
         'Only the default language is shown.',
-        'Page breaks are not shown, and sections are always stepped.',
+        // ⚠️ THIS ENTRY LOST ITS SECOND CLAUSE IN `M120` AND THE COUNT DID NOT MOVE, which is exactly why
+        // the suite needed a new assertion rather than trusting the existing one. It used to read
+        // "Page breaks are not shown, and sections are always stepped." — `R-f1332829` gave
+        // `single_page_mode` a writer and the preview now renders whichever mode the author chose, so that
+        // half is a feature rather than a limitation. The page-break half stays, owned by `R-8c517fb6` and
+        // `D57`'s clause C, which is what makes "per page" real by honouring the field type.
+        'Page breaks are not shown.',
         'Inside a repeatable section, wording updates on the next structural change.',
     ];
 }

@@ -69,14 +69,15 @@ const form = {
     timezone: 'UTC',
     max_responses: null,
     save_and_resume: false,
+    single_page_mode: false,
 };
 
-function mountModal(over: { share?: ShareProps | null; saveResumeAvailable?: boolean } = {}) {
+function mountModal(over: { share?: ShareProps | null; saveResumeAvailable?: boolean; singlePageMode?: boolean } = {}) {
     return mount(FormSettingsModal, {
         props: {
             open: true,
             formId: 'form-1',
-            form,
+            form: { ...form, single_page_mode: over.singlePageMode ?? false },
             timezones: ['UTC', 'Asia/Manila'],
             share: over.share === undefined ? share : over.share,
             saveResumeAvailable: over.saveResumeAvailable ?? true,
@@ -91,6 +92,24 @@ function mountModal(over: { share?: ShareProps | null; saveResumeAvailable?: boo
 /** The rail's buttons, in DOM order. */
 function railLabels(wrapper: ReturnType<typeof mountModal>): string[] {
     return wrapper.findAll('.form-settings__rail-button').map((b) => b.text());
+}
+
+/**
+ * A rail button BY LABEL rather than by index.
+ *
+ * ⚠️ INDEX LOOKUPS WERE A LATENT FAULT HERE AND `M120` COLLECTED ON IT. `share` and `save-resume` are
+ * FILTERED out of this rail rather than disabled in it, so a position was never stable — and adding a sixth
+ * section moved three assertions that were each testing something else entirely, which reads as three
+ * unrelated regressions rather than one arithmetic change.
+ */
+function railButton(wrapper: ReturnType<typeof mountModal>, label: string) {
+    const found = wrapper.findAll('.form-settings__rail-button').find((b) => b.text() === label);
+
+    if (found === undefined) {
+        throw new Error(`No rail button labelled "${label}". Present: ${railLabels(wrapper).join(', ')}`);
+    }
+
+    return found;
 }
 
 group('FormSettingsModal — the rail', () => {
@@ -113,11 +132,12 @@ group('FormSettingsModal — the rail', () => {
         wrapper.unmount();
     });
 
-    it('offers exactly the five sections, and names none of them after a builder pane', () => {
+    it('offers exactly the six sections, and names none of them after a builder pane', () => {
         const wrapper = mountModal();
 
         expect(railLabels(wrapper)).toEqual([
             'Details',
+            'Pages',
             'Share',
             'Schedule',
             'Thank-you message',
@@ -145,7 +165,7 @@ group('FormSettingsModal — the rail', () => {
 
         expect(pressed()).toEqual(['Details']);
 
-        await wrapper.findAll('.form-settings__rail-button')[2].trigger('click');
+        await railButton(wrapper, 'Schedule').trigger('click');
         expect(pressed()).toEqual(['Schedule']);
 
         wrapper.unmount();
@@ -163,10 +183,10 @@ group('FormSettingsModal — mounting', () => {
         expect(wrapper.find('.share').exists()).toBe(false);
 
         await wrapper.findAll('.form-settings__rail-button')[1].trigger('click');
-        expect(wrapper.find('.share').exists()).toBe(true);
+        await railButton(wrapper, 'Share').trigger('click');
 
         // …and it survives navigating away.
-        await wrapper.findAll('.form-settings__rail-button')[0].trigger('click');
+        await railButton(wrapper, 'Details').trigger('click');
         expect(wrapper.find('.share').exists()).toBe(true);
 
         // ⚠️ THE STYLE, NOT `isVisible()`. Measured: with the Share section hidden its wrapper carries
@@ -185,9 +205,44 @@ group('FormSettingsModal — gated sections', () => {
         const wrapper = mountModal({ saveResumeAvailable: false });
 
         expect(railLabels(wrapper)).not.toContain('Save and finish later');
-        expect(railLabels(wrapper)).toHaveLength(4);
+        expect(railLabels(wrapper)).toHaveLength(5);
 
         wrapper.unmount();
+    });
+
+    it('keeps Pages in the rail with every plan feature off, because no entitlement gates it', () => {
+        // ⚠️ THE ASSERTION IS THE ABSENCE OF A GATE. `share` and `save-resume` are filtered by a server
+        // answer; presentation mode has no entitlement key at all, which is why its route carries
+        // `can:update,form` alone. Mutating the rail entry to `available: props.saveResumeAvailable`
+        // reddens exactly here and nowhere else.
+        const wrapper = mountModal({ saveResumeAvailable: false, share: null });
+
+        expect(railLabels(wrapper)).toEqual(['Details', 'Pages', 'Schedule', 'Thank-you message']);
+
+        wrapper.unmount();
+    });
+
+    it('seeds the Pages section from the form, in both directions', async () => {
+        // The panel is mounted on first visit, so the section has to be opened before it exists at all.
+        const stepped = mountModal({ singlePageMode: false });
+        await railButton(stepped, 'Pages').trigger('click');
+        expect(stepped.find('[data-section="pages"] .is-selected').text()).toBe('Step by step');
+        stepped.unmount();
+
+        const onePage = mountModal({ singlePageMode: true });
+        await railButton(onePage, 'Pages').trigger('click');
+        expect(onePage.find('[data-section="pages"] .is-selected').text()).toBe('One page');
+
+        // ⛔ AND THE OPEN PANEL STILL CLAIMS NO ROLE THIS MODAL FORBIDS, WHICH THE CASE ABOVE CANNOT SHOW.
+        // The no-`radiogroup`/no-`tablist` assertion in "the rail" group mounts the modal without opening a
+        // section, so it never sees this control at all — a pass there is silent about the one section that
+        // hosts one. `MdsSegmentedControl` takes its radiogroup semantics from a native fieldset of radios
+        // and writes no role attribute, and four e2e loops click every `[role="tab"]` on this page, so the
+        // invariant is asserted HERE, with the section actually open. Measured rather than reasoned about.
+        expect(onePage.html()).not.toContain('radiogroup');
+        expect(onePage.find('[role="tab"]').exists()).toBe(false);
+        expect(onePage.find('[data-section="pages"] fieldset').exists()).toBe(true);
+        onePage.unmount();
     });
 
     it('drops Share when the server does not offer it, and still opens on a real section', () => {

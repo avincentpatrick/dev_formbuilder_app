@@ -67,6 +67,10 @@ final class BuilderPresenter
                 // Per-form save-and-resume opt-in (H10) — drives the builder toggle; the guest runtime reads its
                 // own effective flag (tenant plan AND this) from PublicFormPresenter.
                 'save_and_resume' => $form->save_and_resume,
+                // Presentation mode (`D35`, row `R-f1332829`) — drives the Pages settings section AND the
+                // live preview, which until this row had no way to know and was therefore always stepped.
+                // The preview reads it off the RENDER model, never off the engine: see `PreviewRuntime`.
+                'single_page_mode' => $form->single_page_mode,
                 // Raw schedule values (Increment H12b) — the Schedule modal prefills from these (the ISO instants
                 // are rendered back into `timezone` for the datetime-local inputs). Enforcement uses `acceptance`
                 // on the runtime presenters; the builder only needs the raw window + cap to round-trip a PATCH.

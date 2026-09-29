@@ -150,19 +150,33 @@ function makeStore(fields: LocalField[], sections: LocalSection[]): Double {
     return { store, fields: fieldsRef, sections: sectionsRef, selected: () => selection.value };
 }
 
-const FORM = {
+const FORM_BASE = {
     id: 'form-1',
     title: 'Survey',
     description: null,
     default_locale: 'en',
     supported_locales: ['en'],
-} as never;
+    // `M120` — the presentation mode reaches the projection through this prop, so it has to be a real key
+    // here. Left off, every single-page case below would read `undefined`, render stepped, and pass for the
+    // wrong reason.
+    single_page_mode: false,
+};
+
+/** The `form` prop, with the presentation mode chosen per case. */
+function formProp(singlePage = false) {
+    return { ...FORM_BASE, single_page_mode: singlePage } as never;
+}
 
 const STUBS = { FieldRow: true, RepeatGroup: true };
 
-function mountPane(double: Double, active = true) {
+function mountPane(double: Double, active = true, singlePage = false) {
     return mount(PreviewPane, {
-        props: { store: double.store, form: FORM, draft: { id: 'ver-1', version_number: 1 }, active },
+        props: {
+            store: double.store,
+            form: formProp(singlePage),
+            draft: { id: 'ver-1', version_number: 1 },
+            active,
+        },
         global: { stubs: STUBS },
     });
 }
@@ -529,4 +543,106 @@ describe('the ARIA invariant this page holds permanently', () => {
         expect(wrapper.html()).not.toContain('role="radiogroup"');
     });
 
+});
+
+
+/**
+ * One page or step by step (`R-f1332829`, `D35`, `D57`) — the half of `B8` that gave the column a writer.
+ *
+ * ⛔ THE PREVIEW HAD NO WAY TO KNOW THE MODE UNTIL THIS ROW. `BuilderPresenter` emitted no
+ * `single_page_mode`, so the projection's own `?? false` decided and the preview was always stepped, which
+ * `previewLimitations()` had to state out loud. These cases are what stop it regressing to that.
+ */
+describe('one page or step by step', () => {
+    it('shows one step at a time when the form is stepped, which is the default', async () => {
+        const wrapper = mountPane(twoSections());
+        await flushPromises();
+
+        expect(wrapper.findAll('[data-section]')).toHaveLength(1);
+        expect(wrapper.get('[data-section]').attributes('data-section-key')).toBe('s1');
+        // Non-vacuous: the second section's field has no node AT ALL in this mode, which is what makes the
+        // one-page case below a real difference rather than a re-count of the same DOM.
+        expect(wrapper.find('[data-preview-field="q2"]').exists()).toBe(false);
+
+        wrapper.unmount();
+    });
+
+    it('shows every section in one scroll in one-page mode', async () => {
+        const wrapper = mountPane(twoSections(), true, true);
+        await flushPromises();
+
+        const sections = wrapper.findAll('[data-section]');
+
+        expect(sections).toHaveLength(2);
+        expect(sections.map((s) => s.attributes('data-section-key'))).toEqual(['s1', 's2']);
+        expect(wrapper.findAll('[data-section-heading]').map((h) => h.text())).toEqual(['S1', 'S2']);
+        expect(wrapper.find('[data-preview-field="q1"]').exists()).toBe(true);
+        expect(wrapper.find('[data-preview-field="q2"]').exists()).toBe(true);
+
+        wrapper.unmount();
+    });
+
+    it('drops the strip and the Back/Next chrome in one-page mode, because there is nowhere to go', async () => {
+        const wrapper = mountPane(twoSections(), true, true);
+        await flushPromises();
+
+        expect(wrapper.find('[data-preview-strip]').exists()).toBe(false);
+        expect(wrapper.text()).not.toContain('Page 1 of 2');
+        expect(wrapper.findAll('button').map((b) => b.text())).not.toContain('Next');
+
+        wrapper.unmount();
+    });
+
+    it('still renders through the SAME FieldRow, and selection works from the second section', async () => {
+        // The reuse claim is the one `preview-model.ts` opens with: one component set, both modes. Selection
+        // is driven from `q2`, which exists at all only in one-page mode.
+        const double = twoSections();
+        const wrapper = mountPane(double, true, true);
+        await flushPromises();
+
+        expect(wrapper.findAllComponents({ name: 'FieldRow' })).toHaveLength(2);
+
+        await wrapper.get('[data-preview-field="q2"]').trigger('click');
+        expect(double.selected()).not.toBeNull();
+
+        wrapper.unmount();
+    });
+
+    it('honours a mode change with NO engine rebuild, which IS the mechanism', async () => {
+        // ⛔ THIS IS THE ONLY CASE HERE THAT CAN TELL THE TWO SOURCES APART, AND IT IS WHY IT EXISTS.
+        // `runtime.singlePageMode` is a plain boolean captured once inside `createFormRuntime`, and
+        // `shapeOf()` reads `sections`/`fields` and never `form` — so an engine-sourced read means a toggle
+        // moves no shape, remounts nothing, and leaves the OLD mode on screen until an unrelated structural
+        // edit. Reading the live render model needs no rebuild at all, so BOTH halves are asserted: the
+        // sections appear, AND `created` does not grow.
+        //
+        // ⛔ MEASURED WITH TWO MUTATIONS, BECAUSE THE FIRST ONE PROVES LESS THAN IT LOOKS. Reverting the read
+        // to `runtime.singlePageMode` reddens FOUR cases here — but only because this mock returns no
+        // `singlePageMode` at all, so the mutant reads `undefined` and every mode is stepped. That catches
+        // ABSENCE, not staleness. Adding `singlePageMode: schema.form.single_page_mode` to the mock, so the
+        // engine reads the flag correctly at build time, leaves exactly THIS case failing and the other 29
+        // green. That is the measurement worth keeping: this case is the only one in the suite that can
+        // catch a mode which was right when the engine was built and wrong afterwards.
+        //
+        // ⚠️ AND THE CLOCK IS ADVANCED BEFORE `created` IS RE-READ, WHICH IS WHAT MAKES "no rebuild" A
+        // MEASUREMENT. This file's header records three mutants surviving an assertion that advanced a clock
+        // with nothing on it; asserting a rebuild did NOT happen without ever running the timer that would
+        // have performed it is the same vacuity wearing the opposite sign.
+        const wrapper = mountPane(twoSections());
+        await flushPromises();
+
+        expect(wrapper.findAll('[data-section]')).toHaveLength(1);
+
+        const builds = created.length;
+
+        await wrapper.setProps({ form: formProp(true) });
+        await flushPromises();
+        vi.advanceTimersByTime(PREVIEW_REBUILD_DEBOUNCE_MS * 4);
+        await flushPromises();
+
+        expect(wrapper.findAll('[data-section]')).toHaveLength(2);
+        expect(created).toHaveLength(builds);
+
+        wrapper.unmount();
+    });
 });

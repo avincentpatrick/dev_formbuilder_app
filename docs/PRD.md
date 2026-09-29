@@ -100,7 +100,7 @@ The legacy system and the two market references (KoboToolbox, Fillout.com) are s
 ### 3.2 Intuitive by default
 
 Every feature is designed to be usable **without a manual**:
-- Clear, sensible defaults everywhere (e.g., a new form defaults to single-page mode with manual encoding and guest links off until explicitly enabled).
+- Clear, sensible defaults everywhere (e.g., a new form defaults to step-by-step pages — one section at a time, with single-page mode an explicit opt-in per decision `D35` (2026-09-20), which reversed this document's original single-page default in favour of the value the schema always carried — with manual encoding and guest links off until explicitly enabled).
 - **One consistent page layout and design language app-wide** (Product Principle 3.3) — a user who has learned the dashboard has effectively already learned 80% of the submissions inbox and the settings pages.
 - **Progressive disclosure of advanced power**: the expression engine, XLSForm import/export, and cross-form analytics all sit behind explicit "Advanced" entry points rather than being forced into a beginner's first-run experience. A first-time business-ops user should never have to see the phrase "expression engine" to build a working lead form; a first-time M&E user should be able to reach it in one click when they need it.
 

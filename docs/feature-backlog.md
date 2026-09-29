@@ -3155,7 +3155,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   ⚠️ **THREE LOOK-ALIKES WERE ALREADY PASSING AND WERE DELIBERATELY LEFT ALONE** — M20's lesson that a
   character-identical declaration is not an identical defect, re-measured and holding for a second
   increment. `templates-axe.spec.ts:12-17` was the strongest-looking candidate of the five (
-  `/forms/templates` genuinely IS `feature:form_templates`-gated, `routes/tenant.php:486-487`) and
+  `/forms/templates` genuinely IS `feature:form_templates`-gated, `routes/tenant.php`'s `forms.templates` route) and
   **already asserts `Use this template` is visible**, which no dashboard can satisfy;
   `admin-console-axe.spec.ts:45-52` routes through `openConsole()`, which **ends** in `console.ts:34`'s
   URL assertion; and this file's own `filteredToZero` loop already asserts its `No matching` heading —
@@ -7426,14 +7426,15 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   twelve days earlier to record **two** consumers. ⚠️ The rule is restated in **13 files / 15 occurrences**,
   not the three the open row names, so "amend all three documents" undercounts by ten. **Live.** Filed by `M78`. **Tier: after-launch.**
 
-- **`minor` · `forms.single_page_mode` has no write surface outside the seeders, so single-page mode is
-  unreachable for a real tenant — and its documented default disagrees across four documents.** Measured by
+- ✅ **CLOSED BY `M120` (2026-09-29) — `minor` · `forms.single_page_mode` has no write surface outside the
+  seeders, so single-page mode is unreachable for a real tenant — and its documented default disagrees across
+  four documents.** Measured by
   `M79`'s sweeps (2026-09-06), brought here by `M80` through the three-term join — absent in code **and**
   unfiled **and** undecided — then attacked by a refuter that did not overturn it. ⛔ **NO WRITER OUTSIDE
   SEEDERS.** Declared at `app/Models/Form.php:41`, `:88` and `:120`, read at
   `app/Services/Submissions/EncodeFormPresenter.php:210` and
   `app/Services/Submissions/PublicFormPresenter.php:39` — and every assignment in the tree is a seeder or a
-  test (`database/seeders/DemoSeeder.php:535`, `database/seeders/E2eSeeder.php:372`, `:474` and `:534`,
+  test (`database/seeders/DemoSeeder.php:535`, `database/seeders/E2eSeeder.php:409`, `:511` and `:571`,
   `tests/Feature/Submissions/EncodeStepPayloadTest.php:76`). The sole creation path,
   `app/Services/Forms/FormService.php:67`, opens a `Form::create([` whose six explicit keys on the lines
   below it omit the column, so every real form takes the database default. No `FormRequest` names it, and
@@ -7443,10 +7444,45 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `app/Http/Controllers/Tenant/FormSaveResumeController.php`. ⛔ **THE DEFAULT HALF IS NARROWER THAN THE
   SWEEP OFFERED AND WORSE THAN IT LOOKS.** It is not doc-vs-code; it is four documents holding two
   incompatible values. `database/migrations/2026_07_06_000201_create_forms_table.php:46` and
-  `docs/data-dictionary.md:221` say `false`. `docs/ux/form-filling-ux-flow.md:337` calls `true` "the literal
+  `docs/data-dictionary.md:221` say `false`. `docs/ux/form-filling-ux-flow.md:339` calls `true` "the literal
   default for a new form" and `docs/PRD.md:103` agrees. So repairing one pair does not settle it. ⚠️ The
   cost is already on the record: `PROGRESS_ARCHIVE.md:297` logs an E2E timeout caused by the seeded form
-  defaulting to multi-step. **Live.** Filed by `M80`. **Tier: early-testing.** ⚠️ **`D35` ANSWERED 2026-09-20 (`M105`) — add the setting, default step by step.** ⚠️ **The answer settles the setting, not the documents.** Four of them hold two incompatible defaults — the migration and `docs/data-dictionary.md:221` say `false`; `docs/ux/form-filling-ux-flow.md:337` and `docs/PRD.md:103` say `true` — and whoever takes this row reconciles all four. Measured by `M105`.
+  defaulting to multi-step. **Live.** Filed by `M80`. **Tier: early-testing.** ⚠️ **`D35` ANSWERED 2026-09-20 (`M105`) — add the setting, default step by step.** ⚠️ **The answer settles the setting, not the documents.** Four of them hold two incompatible defaults — the migration and `docs/data-dictionary.md:221` say `false`; `docs/ux/form-filling-ux-flow.md:339` and `docs/PRD.md:103` say `true` — and whoever takes this row reconciles all four. Measured by `M105`.
+  ✅ **CLOSED BY `M120`.** The column has a writer: `UpdatePageModeRequest` + `FormPageModeController` +
+  `PATCH /forms/{form}/page-mode` + `FormService::setSinglePageMode`, and a **Pages** section in
+  `FormSettingsModal` using `MdsSegmentedControl` so both modes are named and the default is visible.
+  ⛔ **`can:update,form` ALONE, and the missing second gate is the decision rather than a copy error** — the
+  entitlement catalog holds no key for presentation mode, so this copies the schedule route rather than
+  save-resume's feature-gated pair, and both docblocks say so. **Zero edits to `Pages/forms/Builder.vue`**;
+  `builder-layout.test.ts` staying green is the proof, as in `M119`.
+  ⛔ **THE ROW UNDERSTATED ITSELF: THE BUILDER PREVIEW WAS ITS TERRITORY IN WRITING AND ITS TEXT NEVER SAID
+  SO.** `PreviewPane.vue` named this row by id as the owner of the gap, and UX §3.1 requires the preview to
+  represent both modes. The preview now does — and the mechanism is the finding: `runtime.singlePageMode` is a
+  plain boolean captured once inside `createFormRuntime`, and `shapeOf()` reads sections and fields and never
+  `form`, so an engine-sourced read would have left a stale mode on screen until an unrelated structural edit.
+  The read goes on the LIVE render-model channel and needs no rebuild at all. **A first design that widened
+  the engine key to force a remount was written down and then discarded as wrong in kind.**
+  ⚠️ **THE DOCUMENT HALF WAS NARROWER THAN THIS ROW CLAIMED, AND THE CITATIONS ABOVE NOW DESCRIBE THE
+  PRE-`M120` STATE.** The migration and `docs/data-dictionary.md` said `false` and were already right under
+  `D35`; only the two prose sites moved. `docs/ux/form-filling-ux-flow.md:339` and `docs/PRD.md:103` now say
+  step by step, so the sentences above calling them `true` are a record of what was measured rather than a
+  live claim — both edits were **line-count-neutral** precisely so those coordinates still resolve.
+  ⚠️ **And one of them disagreed with ITSELF**, which "four documents, two values" could not express: §3.1's
+  parenthetical opened `single_page_mode = false` and then treated `true` as the literal default in the same
+  sentence.
+  ⛔ **ALSO FIXED RATHER THAN FILED, AND IT WAS FOUND BY A TEST THAT FAILED ON ITS FIRST RUN.**
+  `FormService::create()` omitted the key, so a freshly created `Form` carried **`null`** while its stored row
+  carried `false` — and `BuilderPresenter` publishes that attribute into a prop the client declares `boolean`.
+  The decided default is now explicit at the sole creation path, which is also what stops the app's behaviour
+  depending on a migration default four documents disagreed about.
+  ⚠️ **Two citations in the evidence above were ROTTED and are repaired here**: `E2eSeeder.php` `:372`/`:474`/
+  `:534` were really `:409`/`:511`/`:571`, all drifted by exactly **+37**, and the UX-doc coordinate was cited
+  twice. Two of the three seeder lines landed on live-but-wrong content, which the citation-liveness linter
+  passes by design — **it proves a citation lands on content, never that it lands on the right content.**
+  ⚠️ **The honest blast radius is wider than the builder:** giving the column a writer makes the single-page
+  branch of the guest runtime AND of manual encoding author-reachable for the first time. Neither is new code
+  and both were already covered, but nothing could reach them before. **Twelve mutations run, twelve CAUGHT**,
+  with disjoint kill sets; the one that matters is recorded at `PreviewPane.test.ts`. **Two filed.**
 
 - **`minor` · `forms.allow_manual_encoding` is documented as Feature #7's capability flag and has neither a
   reader nor a writer — the only one of five inert `allow_*` flags whose feature actually shipped.**
@@ -7555,7 +7591,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   at `docs/competitive-feature-parity-matrix.md:7` defines ✓ as "fully supported today";
   `docs/competitive-feature-parity-matrix.md:118` repeats the claim. ⛔ **THE PREMISE UNDER THE ✓ IS
   FALSE.** The row leans on "the same Phase-1 `POST /submissions` endpoint as manual encoding" — and that
-  endpoint is `routes/tenant.php:666`, a session-authenticated Inertia **web** route no token-holding
+  endpoint is `routes/tenant.php`'s `forms.share` route, a session-authenticated Inertia **web** route no token-holding
   caller can reach. `routes/api.php` has four submission-writing routes (`:300` sync, `:308` promote,
   `:531` the public guest post and `:565` the guest draft store, which reaches
   `app/Services/Submissions/SubmissionDraftService.php:409` and creates a `submissions` row) and
@@ -8904,7 +8940,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   ARGUMENT.** Table-keying alone surfaces **8**; the literal-`null` sibling alone surfaces **3**; together
   **13**, because two more need both. They are two edits in two functions — the join term and
   `is_declaration_line()` — and **closing this row does not close its sibling at
-  `docs/feature-backlog.md:7858`**. The `null` half is filed separately below rather than folded in.
+  `docs/feature-backlog.md`'s closed-vocabulary row**. The `null` half is filed separately below rather than folded in.
   ⚠️ **Term 1 is table-blind too and is deliberately left alone**: it tests the column name against every
   migration concatenated, so a documented phantom passes it. That is the subject of the open
   nine-`tenants`-columns row, not this one, and table-keying it needs a per-table migration parse.
@@ -9062,7 +9098,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `database/factories/` and `database/seeders/` — yields the identical three with none of that blast
   radius**, but it needs `$path` threaded from `column_is_used()` into `is_declaration_line()`, i.e. a
   signature change. That is the "no new plumbing" claim failing, and it is why this is filed rather than
-  taken. Read with `docs/feature-backlog.md:7858`, which owns the closed-vocabulary half.
+  taken. Read with `docs/feature-backlog.md`'s closed-vocabulary row, which owns the closed-vocabulary half.
   **Live.** Filed by `M89`. **Tier: after-launch.**
 - ~~**`minor` · The repository's only claimed two-connection concurrency test does not exist, and a shipped
   file cites it as the reason it does not race.**~~ Found by `M89`'s fan-out (2026-09-10).
@@ -10658,7 +10694,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   re-point, moved both claims onto the exact lines their citations already named.** Two defects were repaired by
   an edit that was not trying to, and nothing anywhere reported either the defect or the repair. ⚠️ **A third is
   still wrong and is the reason this is filed rather than merely recorded:** `docs/feature-backlog.md:8906` and
-  `:9064` cite `docs/feature-backlog.md:7858` as the row that *"owns the closed-vocabulary half"*, and at the base
+  `:9064` cite `docs/feature-backlog.md`'s closed-vocabulary row as the row that *"owns the closed-vocabulary half"*, and at the base
   commit `:7858` held a sentence about `tenants.trial_ends_at` masking `subscriptions.trial_ends_at` — unrelated,
   and unrelated again after the shift. ⚠️ **Re-derive that one by grepping for the closed-vocabulary claim and
   re-point both citing sentences at whatever line carries it**, and do not repair it by adding or subtracting six:
@@ -11504,7 +11540,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   asserts it carries no tab role at all. ⚠️ `builder-layout.test.ts` pins all three spellings of the eight
   secondary toolbar actions with a per-line regex and **must be updated in the same PR**. **Live.**
   Filed by `M110`. **Tier: early-testing.** ✅ **`D63` ANSWERED 2026-09-26 (`M114`) — A: BOTH ENTRY POINTS.** A Settings tab on the form hub for administering a form, and one "Form settings" modal on the builder toolbar for authoring it, both mounting the **same child components against the same routes** — so there is no second implementation to drift. ⚠️ **Every section keeps its own route and its own FormRequest**, as the three docblocks refuse; only where an author finds them changes. ⚠️ Collapsing the nine toolbar buttons is what frees the room the live preview and the section strip both need, so this row edits the same region of `Builder.vue` as the section-strip row filed by `M114` and the two must not be batched together under `D13`.
-  ⛔ **BUILDER HALF SHIPPED BY `M117`; THE HUB HALF IS RE-FILED AS ITS OWN ROW AND THIS ROW STAYS OPEN.** One "Form settings" modal on the builder toolbar now holds five sections — Details, Share, Schedule, Thank-you message and Save and finish later — each still on its own route and its own FormRequest, so all four refusal docblocks stay true. **Ten toolbar controls became seven and the `builder__label` count went 8 → 6.** ⚠️ **`D63` ANSWERED *BOTH* ENTRY POINTS AND ONLY ONE IS BUILT, WHICH IS A DEFERRAL WITH AN OWNER RATHER THAN A NARROWING:** a hub tab is a real route (`FormTabSetReachabilityTest` GETs every offered tab and asserts success, so a tab with no route is red by construction), and that route lands in `routes/tenant.php` — a hub beside `Builder.vue`, which `D13` clause 2 refuses without a stated breach. The user chose the split over the breach in chat on 2026-09-28. It costs the critical path nothing: the hub tab frees no toolbar room, so `B7` and `B8` are unblocked by this half alone. ⛔ **THREE THINGS `M117` MEASURED THAT THIS ROW GOT WRONG.** (a) **Every line number in it was exactly 30 low** — `17e0b0df` (`M113`) added +30 lines above the toolbar, so `:287-387` is `:317-417` and the no-tab-strip record at `:256-259` is at `:286-289`, where `:256-259` now resolves to unrelated prose. (b) **The component census is wrong: `ShareModal` has TWO call sites** — `Builder.vue` *and* `Show.vue:482` — so it was SPLIT (body → `SharePanel.vue`, wrapper kept) rather than converted in place like Schedule and Confirmation; converting it would have silently deleted the hub's Share button. (c) **The refusal chain is FOUR links, not three:** `AssignFormScopeRequest` is the root the save-resume docblock cites, with a route-level twin at `routes/tenant.php:623-627`. ⚠️ **And the blast radius was larger than the row states:** besides `builder-layout.test.ts`'s count, **four** `builder-axe.spec.ts` assertions clicked `Share` and expected `dialog "Share form"` — the merge-blocking proof for the `I10a` inert-stack fix, so they were rewritten through the new flow, never deleted, and a fifth case now scans the rail's contrast.
+  ⛔ **BUILDER HALF SHIPPED BY `M117`; THE HUB HALF IS RE-FILED AS ITS OWN ROW AND THIS ROW STAYS OPEN.** One "Form settings" modal on the builder toolbar now holds five sections — Details, Share, Schedule, Thank-you message and Save and finish later — each still on its own route and its own FormRequest, so all four refusal docblocks stay true. **Ten toolbar controls became seven and the `builder__label` count went 8 → 6.** ⚠️ **`D63` ANSWERED *BOTH* ENTRY POINTS AND ONLY ONE IS BUILT, WHICH IS A DEFERRAL WITH AN OWNER RATHER THAN A NARROWING:** a hub tab is a real route (`FormTabSetReachabilityTest` GETs every offered tab and asserts success, so a tab with no route is red by construction), and that route lands in `routes/tenant.php` — a hub beside `Builder.vue`, which `D13` clause 2 refuses without a stated breach. The user chose the split over the breach in chat on 2026-09-28. It costs the critical path nothing: the hub tab frees no toolbar room, so `B7` and `B8` are unblocked by this half alone. ⛔ **THREE THINGS `M117` MEASURED THAT THIS ROW GOT WRONG.** (a) **Every line number in it was exactly 30 low** — `17e0b0df` (`M113`) added +30 lines above the toolbar, so `:287-387` is `:317-417` and the no-tab-strip record at `:256-259` is at `:286-289`, where `:256-259` now resolves to unrelated prose. (b) **The component census is wrong: `ShareModal` has TWO call sites** — `Builder.vue` *and* `Show.vue:482` — so it was SPLIT (body → `SharePanel.vue`, wrapper kept) rather than converted in place like Schedule and Confirmation; converting it would have silently deleted the hub's Share button. (c) **The refusal chain is FOUR links, not three:** `AssignFormScopeRequest` is the root the save-resume docblock cites, with a route-level twin at `routes/tenant.php`'s `forms.scope` route. ⚠️ **And the blast radius was larger than the row states:** besides `builder-layout.test.ts`'s count, **four** `builder-axe.spec.ts` assertions clicked `Share` and expected `dialog "Share form"` — the merge-blocking proof for the `I10a` inert-stack fix, so they were rewritten through the new flow, never deleted, and a fifth case now scans the rail's contrast.
 
 - **`minor` · The "Appearance hint" field is a free-text box in the builder that changes nothing about how any
   form renders.** Filed 2026-09-25 by `M110`, answering the report *"can you also clarify to me what the
@@ -12133,7 +12169,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   scan `tests/e2e/responsive-axe.spec.ts:265-291` waits on `getByRole('navigation', { name: <form title> })`, so
   a new nav landmark must not share that accessible name (`landmark-unique`); and **Scope belongs here rather
   than on the builder** — it confers capacity instead of describing the form, which is why
-  `routes/tenant.php:623-627` gives it its own route, so the hub tab is where the second form-list dialog
+  `routes/tenant.php`'s `forms.scope` route gives it its own route, so the hub tab is where the second form-list dialog
   finally lands. **Live.** Filed by `M117`. **Tier: early-testing.**
 
 - **`minor` · `openapi.json` types the sync per-item `error.details` as a string, and every arm that populates it
@@ -12274,3 +12310,33 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   The remedy is to count those notes in `state.php` and stop writing the ordinal in prose, or to stop claiming an
   ordinal at all. ⚠️ Nothing is broken today and no surgery was performed wrongly; the cost is a number that reads
   as authoritative and is off by one for every future session. **Live.** Filed by `M119`. **Tier: after-launch.**
+
+- **`minor` · `useFormRuntime.ts` contains a NUL byte, so ripgrep classifies it as binary and silently drops
+  it from every sweep run without `--text` — including the runtime's own read of `single_page_mode`.** Measured
+  by `M120` while verifying `R-f1332829`'s census: an exhaustive grep for `single_page_mode` across the tree
+  missed `resources/public-runtime/composables/useFormRuntime.ts:134` (the declaration
+  `readonly singlePageMode: boolean`) and `:1156` (the read `singlePageMode: schema.form.single_page_mode`),
+  both of which are load-bearing — `:1156` is the line the whole guest single-page branch hangs on. ⛔ **THE
+  FAILURE MODE IS SILENCE, WHICH IS WHAT MAKES THIS FILABLE RATHER THAN A CURIOSITY.** `rg` prints no warning
+  and exits 0; the file simply is not in the results, so a census reads as complete. `grep -a` and `rg --text`
+  both see it. ⚠️ **The blast radius is every grep-derived row in this ledger, not this one row.** Row
+  `R-f1332829`'s own evidence was written from a sweep with this hole in it and understated the reader set;
+  the three-term joins `M79`/`M80` ran over the whole tree are the same shape. The remedy is either to strip
+  the NUL byte (it is almost certainly an accident of an earlier edit — nothing reads the file as binary) or
+  to make the repo's grep idiom `--text` by default and say so where sweeps are prescribed. Stripping it is
+  the smaller change and removes the trap rather than documenting it. **Live.** Filed by `M120`.
+  **Tier: during-testing.**
+
+- **`minor` · The `save_and_resume` writer stack has no HTTP-level test and no client test, so the one
+  per-form setting with a plan gate is the one nothing exercises through its route.** Measured by `M120` while
+  copying that stack as the precedent for `PATCH /forms/{form}/page-mode`. `tests/Feature/Audit/AuditCoverageTest.php`
+  calls `FormService::setSaveAndResume()` directly, and that is the only test that touches the writer at all:
+  a grep of `tests/` for `save-resume` and for the route name returns nothing else, so **`can:update,form`
+  stacked with `feature:save_and_resume` is asserted nowhere.** ⚠️ **It is the stack where that matters most**,
+  because it is the only per-form setting route carrying a `feature:` gate — the case the gate exists for is a
+  plan that stops including the feature under a session that still has the control on screen, which is also
+  exactly what `SaveResumePanel.vue`'s optimistic revert (`:42-56`) is written for, and that revert is
+  untested too. ⛔ **`M120` DELIBERATELY DID NOT INHERIT THE GAP** — `tests/Feature/Tenant/FormPageModeSettingsTest.php`
+  covers its own route's 403, both write directions and both validation arms, and `PageModePanel.test.ts`
+  covers the URL, the payload key and the revert. The remedy is the same six cases pointed at save-resume,
+  plus the plan-gated 403 that only that route can have. **Live.** Filed by `M120`. **Tier: during-testing.**

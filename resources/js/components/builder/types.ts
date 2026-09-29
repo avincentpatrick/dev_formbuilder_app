@@ -186,6 +186,10 @@ export interface BuilderPageProps {
         description: string | null;
         status: string;
         save_and_resume: boolean;
+        // Presentation mode (`D35`): true renders every section in one scroll, false one section per step.
+        // Read by the Pages settings section and by `PreviewPane`, which feeds it into the projection so
+        // the preview renders the mode the author actually chose.
+        single_page_mode: boolean;
         // Raw schedule window + cap (Increment H12b) — the Schedule modal prefills from these. ISO instants
         // (rendered back into `timezone` for the datetime-local inputs); null when that bound is unset.
         opens_at: string | null;

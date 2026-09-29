@@ -23,6 +23,7 @@ use App\Http\Controllers\Tenant\FormBuilderController;
 use App\Http\Controllers\Tenant\FormConfirmationMessageController;
 use App\Http\Controllers\Tenant\FormController;
 use App\Http\Controllers\Tenant\FormHubController;
+use App\Http\Controllers\Tenant\FormPageModeController;
 use App\Http\Controllers\Tenant\FormPrintController;
 use App\Http\Controllers\Tenant\FormPublishController;
 use App\Http\Controllers\Tenant\FormSaveResumeController;
@@ -633,6 +634,21 @@ Route::middleware([
     // enable a feature the tenant plan includes; the guest runtime + draft channel both consult the flag.
     Route::patch('/forms/{form}/save-resume', [FormSaveResumeController::class, 'update'])
         ->middleware(['can:update,form', 'feature:save_and_resume'])->name('forms.save-resume');
+
+    // Presentation mode (`D35`, row `R-f1332829`) — one page, or one section at a time. Same shape as the
+    // schedule route below: its own endpoint and a guarded FormService::setSinglePageMode write, never
+    // mass-assignment — which matters more here than for its siblings, because this column IS fillable.
+    //
+    // ⚠️ `can:update,form` ALONE, AND THE MISSING SECOND GATE IS THE DECISION RATHER THAN A COPY ERROR. The
+    // save-resume route above stacks `feature:save_and_resume` because the entitlement catalog holds a key
+    // for it. It holds none for presentation mode, and minting one here would be a pricing decision rather
+    // than the enforcement of one — the argument the share route below already makes in full.
+    //
+    // ⛔ Until this route existed the column had NO writer outside the seeders, so the single-page branch of
+    // both readers — the guest runtime and manual encoding — was unreachable for a real tenant despite
+    // being built and tested. That is the whole of `R-f1332829`.
+    Route::patch('/forms/{form}/page-mode', [FormPageModeController::class, 'update'])
+        ->middleware('can:update,form')->name('forms.page-mode');
 
     // Scheduled forms (Increment H12a) — set/clear a form's open/close window + response cap. Its own route +
     // guarded FormService::setSchedule write. Ungated (all tiers): scheduled forms carry no plan feature, so

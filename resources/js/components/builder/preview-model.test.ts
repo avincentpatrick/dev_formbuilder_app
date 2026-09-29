@@ -18,6 +18,7 @@ import {
     previewFieldsFor,
     previewLimitations,
     previewPendingFields,
+    previewRenderedSteps,
     previewSectionFor,
     previewStepLabels,
     LEAD_STEP_LABEL,
@@ -289,6 +290,21 @@ group('the debounce and the limitation list are stated, not implied', () => {
         expect(limits).toContain('Page breaks');
         expect(limits).toContain('repeatable section');
     });
+
+    /**
+     * ⛔ EVERY ASSERTION IN THE CASE ABOVE SURVIVES `M120`'s EDIT, WHICH IS EXACTLY WHY THIS ONE IS NOT
+     * OPTIONAL. `R-f1332829` deleted the SECOND CLAUSE of a compound entry and left the entry in place, so
+     * the count floor held at four and all four subject substrings — including `Page breaks` — still matched
+     * over a list that had materially changed. A gate that cannot see the change it guards is decoration.
+     */
+    it('no longer claims the preview is always stepped, because it is not', () => {
+        const limits = previewLimitations().join(' ');
+
+        expect(limits).not.toContain('always stepped');
+        expect(limits).not.toContain('sections are always');
+        // And the half that is still true, still said: page breaks belong to `R-8c517fb6` / `D57` clause C.
+        expect(limits).toContain('Page breaks are not shown.');
+    });
 });
 
 group('the strip labels a step from the live model, never from the frozen one', () => {
@@ -333,5 +349,44 @@ group('the strip labels a step from the live model, never from the frozen one', 
     it('states a segment ceiling a segmented control can actually render', () => {
         expect(PREVIEW_STRIP_MAX_SEGMENTS).toBeGreaterThanOrEqual(3);
         expect(PREVIEW_STRIP_MAX_SEGMENTS).toBeLessThanOrEqual(9);
+    });
+});
+
+/**
+ * Which steps the preview renders (`M120`, `R-f1332829`, `D35`).
+ *
+ * The decision is one ternary, and it lives here rather than in the component for the reason
+ * `PREVIEW_STRIP_MAX_SEGMENTS` does: it is provable without mounting, and the argument for where the flag
+ * must come from needs somewhere to live that a computed in an SFC does not give it.
+ */
+group('previewRenderedSteps', () => {
+    const s1 = step({ key: 's1' });
+    const s2 = step({ key: 's2' });
+
+    it('renders only the current step when the form is stepped', () => {
+        expect(previewRenderedSteps([s1, s2], s2, false).map((s) => s.key)).toEqual(['s2']);
+    });
+
+    it('renders every visible step in one-page mode, in order', () => {
+        expect(previewRenderedSteps([s1, s2], s1, true).map((s) => s.key)).toEqual(['s1', 's2']);
+    });
+
+    it('renders the whole list in one-page mode even with no current step', () => {
+        // The engine seeds a current step on every build, so this is defence rather than a live path — but it
+        // is the branch that would otherwise render nothing at all for a one-page form.
+        expect(previewRenderedSteps([s1, s2], null, true).map((s) => s.key)).toEqual(['s1', 's2']);
+    });
+
+    it('renders nothing when stepped with no current step, rather than falling back to the first', () => {
+        // ⛔ NOT `[steps[0]]`. `currentStep` already degrades to the first visible step itself, so a second
+        // fallback here would put a heading over nothing in the one state — zero visible steps — that the
+        // pane's empty-state copy exists for.
+        expect(previewRenderedSteps([s1, s2], null, false)).toEqual([]);
+    });
+
+    it('returns a copy, so a caller cannot reorder the engine\'s own step list', () => {
+        const steps = [s1, s2];
+
+        expect(previewRenderedSteps(steps, s1, true)).not.toBe(steps);
     });
 });

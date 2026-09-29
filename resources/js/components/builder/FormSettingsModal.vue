@@ -5,8 +5,8 @@
  * ── WHAT THIS REPLACES, AND WHAT IT DELIBERATELY DOES NOT ─────────────────────────────────────────
  * The report behind this was *"the form itself doesn't have a settings section"*. It was a findability
  * complaint, not an architecture one — and the architectural fix it seems to invite is REFUSED IN WRITING,
- * four times over: `UpdateFormScheduleRequest`, `UpdateSaveResumeRequest` and `UpdateConfirmationMessageRequest`
- * each carry a docblock declining to fold their route into `FormMetadataRequest`, and `routes/tenant.php`
+ * five times over: `UpdateFormScheduleRequest`, `UpdateSaveResumeRequest`, `UpdateConfirmationMessageRequest`
+ * and `UpdatePageModeRequest` each carry a docblock declining to fold their route into `FormMetadataRequest`, and `routes/tenant.php`
  * makes the same argument for scope at route level. So nothing is folded here. Every section below keeps its
  * own route and its own FormRequest; the only thing that changes is where an author finds them.
  *
@@ -25,6 +25,10 @@
  *     `search-nav` measures segment right-edges against their container for exactly this reason. Five
  *     segments do not fit a 520px dialog, let alone the full-screen sheet it becomes below 480px, and the
  *     repo has horizontal-overflow assertions that would catch the spill.
+ *     ⚠️ SCOPED TO THIS RAIL, AND `M120` IS WHERE THE SCOPE STARTED TO MATTER. Both clauses above are about
+ *     FIVE segments in a VERTICAL list. {@link PageModePanel} uses the same control for a TWO-option
+ *     HORIZONTAL choice in the panel body, which is the shape it is for — carrying `D28`'s `flex-wrap` host
+ *     guard, as every other host of it does. The refusal here stands; it is not a ban on the component.
  *   - It has no vertical orientation and no `aria-orientation` anywhere in the package.
  *   - `MdsModal` is hard-capped at `max-width: 520px` with no size prop, and NO consumer overrides that
  *     geometry — 41 call sites, zero `:deep` into the panel. So the rail must fit inside 520px.
@@ -56,12 +60,13 @@ import { computed, ref, watch } from 'vue';
 import { MdsButton, MdsModal } from '@meridian/design-system';
 import ConfirmationPanel from '@/components/builder/ConfirmationPanel.vue';
 import GeneralPanel from '@/components/builder/GeneralPanel.vue';
+import PageModePanel from '@/components/builder/PageModePanel.vue';
 import SaveResumePanel from '@/components/builder/SaveResumePanel.vue';
 import SchedulePanel from '@/components/builder/SchedulePanel.vue';
 import SharePanel from '@/components/forms/SharePanel.vue';
 import type { ShareProps } from '@/components/forms/types';
 
-type SectionKey = 'general' | 'share' | 'schedule' | 'confirmation' | 'save-resume';
+type SectionKey = 'general' | 'pages' | 'share' | 'schedule' | 'confirmation' | 'save-resume';
 
 const props = defineProps<{
     open: boolean;
@@ -78,6 +83,7 @@ const props = defineProps<{
         timezone: string;
         max_responses: number | null;
         save_and_resume: boolean;
+        single_page_mode: boolean;
     };
     timezones: string[];
     share: ShareProps | null;
@@ -96,6 +102,7 @@ const emit = defineEmits<{ 'update:open': [value: boolean] }>();
 const sections = computed<{ key: SectionKey; label: string }[]>(() => {
     const all: { key: SectionKey; label: string; available: boolean }[] = [
         { key: 'general', label: 'Details', available: true },
+        { key: 'pages', label: 'Pages', available: true },
         { key: 'share', label: 'Share', available: props.share !== null },
         { key: 'schedule', label: 'Schedule', available: true },
         { key: 'confirmation', label: 'Thank-you message', available: true },
@@ -163,6 +170,15 @@ watch(
                 <template v-if="mounted.has('general')">
                     <div v-show="active === 'general'" class="form-settings__section" :data-section="'general'">
                         <GeneralPanel :open="props.open" :form-id="props.formId" :form="props.form" />
+                    </div>
+                </template>
+                <template v-if="mounted.has('pages')">
+                    <div v-show="active === 'pages'" class="form-settings__section" :data-section="'pages'">
+                        <PageModePanel
+                            :open="props.open"
+                            :form-id="props.formId"
+                            :single-page-mode="props.form.single_page_mode"
+                        />
                     </div>
                 </template>
                 <template v-if="props.share !== null && mounted.has('share')">

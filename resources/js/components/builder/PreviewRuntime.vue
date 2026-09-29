@@ -38,9 +38,10 @@ import FieldRow from '../../../public-runtime/components/FieldRow.vue';
 import RepeatGroup from '../../../public-runtime/components/RepeatGroup.vue';
 import { AnnouncerKey, RuntimeKey } from '../../../public-runtime/composables/context';
 import { createFormRuntime } from '../../../public-runtime/composables/useFormRuntime';
-import type { RenderField, RenderModel, SchemaResponse } from '../../../public-runtime/lib/types';
+import type { RuntimeStep } from '../../../public-runtime/composables/useFormRuntime';
+import type { RenderField, RenderModel, RenderSection, SchemaResponse } from '../../../public-runtime/lib/types';
 import type { ProjectionIssue } from './draft-snapshot';
-import { engineKnows, isCaptureField, previewFieldsFor, previewPendingFields, previewSectionFor, previewStepLabels } from './preview-model';
+import { engineKnows, isCaptureField, previewFieldsFor, previewPendingFields, previewRenderedSteps, previewSectionFor, previewStepLabels } from './preview-model';
 import PreviewStepStrip from './PreviewStepStrip.vue';
 
 const props = defineProps<{
@@ -75,12 +76,49 @@ provide(AnnouncerKey, { message: computed(() => ''), announce: () => {} });
 
 const steps = computed(() => runtime.visibleSteps.value);
 const step = computed(() => runtime.currentStep.value);
-const section = computed(() => (step.value ? previewSectionFor(step.value, props.model) : null));
-const fields = computed(() => (step.value ? previewFieldsFor(step.value, props.model) : []));
 const pending = computed(() => previewPendingFields(steps.value, props.model));
 
-const title = computed(() => (section.value ? runtime.sectionTitleFor(section.value) : null));
-const description = computed(() => (section.value ? runtime.sectionDescriptionFor(section.value) : null));
+/**
+ * ⛔ THE MODE COMES FROM THE LIVE RENDER MODEL AND NEVER FROM `runtime.singlePageMode`, AND THAT IS A
+ * CORRECTNESS CLAIM RATHER THAN A STYLE ONE. `FormRuntime.singlePageMode` is a plain boolean captured once
+ * inside `createFormRuntime`, and this component is REMOUNTED only when `shape` moves — but `shapeOf()`
+ * reads `sections` and `fields` and never `form`. So an author toggling the setting changes the schema,
+ * moves no shape, remounts nothing, and an engine-sourced read would sit on the old mode until some
+ * unrelated structural edit happened. `buildRenderModel` passes `form` through verbatim, so the live model
+ * has the answer with no rebuild at all — which is the same two-channel split the strip's own labels take,
+ * arriving from a new direction. `preview-model.ts`'s `previewRenderedSteps` states it once more, because
+ * it is the one mutation that separates a working setting from a decorative one.
+ */
+const singlePage = computed(() => props.model.form.single_page_mode);
+
+/** The steps actually rendered below: every visible one on one page, or just the current one. */
+const rendered = computed(() => previewRenderedSteps(steps.value, step.value, singlePage.value));
+
+/**
+ * One rendered section — exactly the per-step shape the four single-step computeds used to hold, resolved
+ * in the LIVE model so wording stays current between rebuilds.
+ */
+interface PreviewBlock {
+    step: RuntimeStep;
+    section: RenderSection | null;
+    title: string | null;
+    description: string | null;
+    fields: RenderField[];
+}
+
+const blocks = computed<PreviewBlock[]>(() =>
+    rendered.value.map((s) => {
+        const section = previewSectionFor(s, props.model);
+
+        return {
+            step: s,
+            section,
+            title: section === null ? null : runtime.sectionTitleFor(section),
+            description: section === null ? null : runtime.sectionDescriptionFor(section),
+            fields: previewFieldsFor(s, props.model),
+        };
+    }),
+);
 
 const position = computed(() => {
     const index = steps.value.findIndex((s) => s.key === step.value?.key);
@@ -158,13 +196,13 @@ function go(delta: number): void {
 <template>
     <div class="preview" data-builder-preview>
         <PreviewStepStrip
-            v-if="stripOptions.length > 1"
+            v-if="!singlePage && stripOptions.length > 1"
             :options="stripOptions"
             :current-key="step?.key ?? null"
             @go="runtime.goToStep($event)"
         />
 
-        <div v-if="position && position.total > 1" class="preview__nav">
+        <div v-if="!singlePage && position && position.total > 1" class="preview__nav">
             <MdsButton
                 v-if="position.index > 0"
                 type="button"
@@ -190,42 +228,53 @@ function go(delta: number): void {
             Nothing to show yet. Add a question, and it appears here as a respondent will see it.
         </p>
 
-        <section v-else class="preview__step" data-section :data-section-key="step?.key">
-            <header v-if="title" class="preview__head">
-                <h3 class="preview__title" tabindex="-1" data-section-heading>{{ title }}</h3>
-                <p v-if="description" class="preview__desc">{{ description }}</p>
-            </header>
+        <!-- ⛔ `v-else` AND `v-for` MAY NOT SHARE AN ELEMENT — Vue 3 gives `v-if` priority over `v-for`, so
+             the single-step `v-else` this replaced could not simply grow a `v-for`. The `<template>` adds no
+             DOM node and keeps the empty/non-empty branch exactly as it was. -->
+        <template v-else>
+            <section
+                v-for="block in blocks"
+                :key="block.step.key"
+                class="preview__step"
+                data-section
+                :data-section-key="block.step.key"
+            >
+                <header v-if="block.title" class="preview__head">
+                    <h3 class="preview__title" tabindex="-1" data-section-heading>{{ block.title }}</h3>
+                    <p v-if="block.description" class="preview__desc">{{ block.description }}</p>
+                </header>
 
-            <RepeatGroup v-if="step?.isRepeat && section" :section="section" />
+                <RepeatGroup v-if="block.step.isRepeat && block.section" :section="block.section" />
 
-            <div v-else class="preview__fields">
-                <div
-                    v-for="field in fields"
-                    :key="field.key"
-                    class="preview__row"
-                    :class="{ 'preview__row--selected': field.key === selectedKey }"
-                    :data-preview-field="field.key"
-                    @click="emit('select', field.key)"
-                    @focusin="emit('select', field.key)"
-                >
-                    <div v-if="isCaptureField(field)" class="preview__inert" :data-preview-inert="field.key">
-                        <p class="preview__inert-label">
-                            {{ runtime.labelFor(field) }}
-                            <span v-if="marker(field)" class="preview__req" aria-hidden="true">*</span>
-                        </p>
-                        <p v-if="runtime.hintFor(field)" class="preview__inert-hint">{{ runtime.hintFor(field) }}</p>
-                        <p class="preview__inert-note">Shown to respondents, but not interactive while you edit.</p>
+                <div v-else class="preview__fields">
+                    <div
+                        v-for="field in block.fields"
+                        :key="field.key"
+                        class="preview__row"
+                        :class="{ 'preview__row--selected': field.key === selectedKey }"
+                        :data-preview-field="field.key"
+                        @click="emit('select', field.key)"
+                        @focusin="emit('select', field.key)"
+                    >
+                        <div v-if="isCaptureField(field)" class="preview__inert" :data-preview-inert="field.key">
+                            <p class="preview__inert-label">
+                                {{ runtime.labelFor(field) }}
+                                <span v-if="marker(field)" class="preview__req" aria-hidden="true">*</span>
+                            </p>
+                            <p v-if="runtime.hintFor(field)" class="preview__inert-hint">{{ runtime.hintFor(field) }}</p>
+                            <p class="preview__inert-note">Shown to respondents, but not interactive while you edit.</p>
+                        </div>
+                        <FieldRow v-else :field="field" />
+
+                        <ul v-if="issuesFor(field).length > 0" class="preview__issues">
+                            <li v-for="issue in issuesFor(field)" :key="issue.code" class="preview__issue">
+                                {{ issue.message }}
+                            </li>
+                        </ul>
                     </div>
-                    <FieldRow v-else :field="field" />
-
-                    <ul v-if="issuesFor(field).length > 0" class="preview__issues">
-                        <li v-for="issue in issuesFor(field)" :key="issue.code" class="preview__issue">
-                            {{ issue.message }}
-                        </li>
-                    </ul>
                 </div>
-            </div>
-        </section>
+            </section>
+        </template>
 
         <section v-if="pending.length > 0" class="preview__pending" data-preview-pending>
             <h3 class="preview__pending-title">Just added</h3>

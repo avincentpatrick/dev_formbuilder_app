@@ -71,6 +71,15 @@ final class FormService
                 'default_locale' => $tenant->default_locale ?? 'en',
                 'owner_user_id' => $creator->id,
                 'created_by' => $creator->id,
+                // ⛔ EXPLICIT RATHER THAN LEFT TO THE COLUMN DEFAULT, AND `M120` MEASURED WHY. `D35` fixed the
+                // default at step by step, and the migration already said `false` — but a `Form::create()`
+                // that omits the key returns a model whose attribute is NULL until something refreshes it,
+                // while the stored row is `false`. {@see BuilderPresenter} publishes that attribute into a
+                // prop the client declares as `boolean`, so the omission put a `null` into a boolean contract
+                // on any path that presents a form it just created. Stating the decided default here also
+                // stops the app's behaviour depending on a migration default that four documents disagreed
+                // about, which is the other half of `R-f1332829`.
+                'single_page_mode' => false,
             ]);
 
             $draft = FormVersion::create([
@@ -160,9 +169,14 @@ final class FormService
     }
 
     /**
-     * The one emission site the six `form`/`updated` setters share (I2). Keeping it private rather than
-     * repeating six `record()` calls is what makes "every form-config write is audited the same way" a
-     * property of the code instead of a review convention.
+     * The one emission site every `form`/`updated` setter shares but one (I2). Keeping it private rather
+     * than repeating the `record()` call per setter is what makes "every form-config write is audited the
+     * same way" a property of the code instead of a review convention.
+     *
+     * ⚠️ THE COUNT USED TO BE WRITTEN HERE TWICE AND WAS WRONG BOTH TIMES, so it is stated as the property
+     * instead. The one exception is {@see self::setShareSettings()}, which emits `form`/`updated` directly
+     * because it writes four columns and wants them in one ledger row. `self::create()` and
+     * `self::archive()` are not exceptions — they emit `created` and `archived`, not `updated`.
      *
      * @param  array<string, mixed>  $old
      * @param  array<string, mixed>  $new
@@ -237,6 +251,35 @@ final class FormService
         return DB::transaction(function () use ($form, $enabled, $actor): Form {
             $old = ['save_and_resume' => $form->save_and_resume];
             $new = ['save_and_resume' => $enabled];
+
+            $form->forceFill($new)->save();
+
+            $this->recordFormUpdate($form, $old, $new, $actor);
+
+            return $form->refresh();
+        });
+    }
+
+    /**
+     * Set a form's presentation mode (`D35`, UX §3.1) — the only writer of `forms.single_page_mode`
+     * outside the seeders, and until row `R-f1332829` there was none at all.
+     *
+     * `forceFill` with an explicit key for the same reason as {@see self::assignScope()}: `single_page_mode`
+     * is in `Form::$fillable`, so centralizing the write keeps a plain `$form->update($validated)` behind
+     * `can:update,form` from ever setting it as a side effect of an unrelated edit.
+     *
+     * ⚠️ PRESENTATION ONLY, WHICH IS WHY THERE IS NO VERSION OR PIPELINE EFFECT. It governs pagination and
+     * chrome; it never changes which component renders a field type, what a submission accepts, or what the
+     * publish gate refuses — UX §3.1 states that invariant, and it is what lets the builder preview render
+     * both modes from one component set. Both readers resolve it off the form row rather than the version
+     * snapshot — `PublicFormPresenter` and `EncodeFormPresenter` both resolve it off the form row. Named
+     * rather than `{@see}`-linked, so this docblock owes no runtime-unused import.
+     */
+    public function setSinglePageMode(Form $form, bool $singlePage, ?User $actor = null): Form
+    {
+        return DB::transaction(function () use ($form, $singlePage, $actor): Form {
+            $old = ['single_page_mode' => $form->single_page_mode];
+            $new = ['single_page_mode' => $singlePage];
 
             $form->forceFill($new)->save();
 

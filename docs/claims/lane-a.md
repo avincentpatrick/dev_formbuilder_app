@@ -16,114 +16,68 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M120`, the `single_page_mode` write path and the preview that could not see it (`m120-page-mode`)
+## Status: NO ACTIVE CLAIM — `M120` is merged; `forms.single_page_mode` finally has a writer, so the single-page branch of the guest runtime and of manual encoding are author-reachable for the first time, the builder preview renders the mode the author chose off the LIVE channel rather than a boolean the engine froze at construction, and the pre-push guard caught me trying to put three commits on the trunk
 
-Taken 2026-09-29. Branch `m120-page-mode`, cut from `origin/main` at `80054654`, PR into `main`.
-Row: `R-f1332829` — *"`forms.single_page_mode` has no write surface outside the seeders, so single-page
-mode is unreachable for a real tenant — and its documented default disagrees across four documents"*
-(`docs/feature-backlog.md:7429`, **Tier: early-testing**). The second half of the overhaul plan's `B8`;
-`M119` shipped the first half. `D35` authorises the setting and fixes its default; `D57` fixes the model
-(keep the boolean, ship its two modes, no `presentation` enum).
+## RELEASED — `M120`, the `single_page_mode` write path and the preview that could not see it (merged as PR #313, `24748b1f`, 6/6 green with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 
-### Evidence verified
+Shipped 2026-09-29. Branch `m120-page-mode`, cut from `origin/main` at `80054654`.
 
-Twelve of fourteen citations **hold**. `Form.php:41`/`:88`/`:120`, `PublicFormPresenter.php:39`,
-`EncodeFormPresenter.php:210`, `DemoSeeder.php:535`, `EncodeStepPayloadTest.php:76`,
-`FormService.php:67` (the six-key `Form::create([` that omits the column), both halves of the
-`save_and_resume` precedent, the migration's `->default(false)`, `docs/data-dictionary.md:221`,
-`docs/PRD.md:103` and `PROGRESS_ARCHIVE.md:297` all resolve exactly as described. An independent census
-confirms the substantive claim: **no writer anywhere outside three seeder lines and one test.**
+**One `early-testing` row: `R-f1332829`, the second half of the overhaul plan's `B8`.** Closed, **two filed**. No decision answered — `D35` and `D57` were already answered and were followed. Namespaces spent: **nothing from either** — no migration, no ADR, no sub-decision id. **No tracker surgery owed**: `PROGRESS.md` had 24,626 bytes of headroom after `M119`'s.
 
-**Two citations have ROTTED, and neither was visible to the citation-liveness linter.**
-`database/seeders/E2eSeeder.php:372`, `:474` and `:534` are really `:409`, `:511` and `:571` — all three
-drifted by exactly **+37**. `docs/ux/form-filling-ux-flow.md:337` is really `:339`, and the row cites it
-**twice**. ⚠️ Two of the three seeder lines land on live-but-wrong content (a `publish()` call, an option
-fixture), which the linter passes by design — **it proves a citation lands on content, never that it
-lands on the right content.** Repaired here.
+⛔ **THE COLUMN HAD NO WRITER OF ANY KIND, AND TWO SHIPPED FEATURES WERE UNREACHABLE BEHIND THAT.** `forms.single_page_mode` arrived with the first forms migration and is read by `PublicFormPresenter`, `EncodeFormPresenter`, `useFormRuntime` and `Encode.vue` — but every assignment in the tree was a seeder or a test. So the single-page branch of the **guest runtime** and of **manual encoding** were both built, both covered, and both unreachable for a real tenant. That is the honest scope of this increment, wider than "the builder gained a setting".
 
-### Premise verified
+Now: `UpdatePageModeRequest` + `FormPageModeController` + `PATCH /forms/{form}/page-mode` + `FormService::setSinglePageMode`, and a **Pages** section in `FormSettingsModal` using `MdsSegmentedControl`. ⛔ **`can:update,form` ALONE, and the missing second gate is the decision rather than a copy error** — the entitlement catalog holds no key for presentation mode and minting one would be a pricing decision rather than the enforcement of one, so this copies the schedule route rather than save-resume's feature-gated pair, and both docblocks say so. **`Pages/forms/Builder.vue` needed no structural edit**, so `builder-layout.test.ts` staying green is the proof, the same one `M119` used — and the claim says *no structural edit* rather than *untouched*, because one comment in it did move (below).
 
-**The row understates itself in three ways, and the first is this increment's real subject.**
+### ⛔ The row understated itself, and the preview's mechanism is the whole increment
 
-⛔ **The builder preview is this row's territory in writing, and the row's own text never mentions it.**
-`PreviewPane.vue` carries *"`BuilderPresenter` emits no `single_page_mode` … so the projection's own
-`?? false` decides and the preview is always stepped. That is `R-f1332829`'s territory."*
-`docs/ux/form-filling-ux-flow.md:79` requires the same thing from the other side: the flag *"governs
-pagination and chrome only, which is exactly what lets the builder preview stay visually representative
-of both modes."* So the row is a floor, and the preview is inside it.
+`PreviewPane.vue` named `R-f1332829` **by id** as the owner of the preview gap, and UX §3.1 requires the preview to stay representative of both modes. The row's own text never mentions the preview at all.
 
-⚠️ **A document disagrees with ITSELF, which "four documents, two values" cannot express.**
-`docs/ux/form-filling-ux-flow.md:77` opens *"`single_page_mode = false`, the default for a newly-created
-form"* and then, in the same parenthetical, *"which this document treats as the literal default value of
-`single_page_mode = true`"*.
+⛔ **AND MY FIRST DESIGN FOR IT WAS WRONG IN KIND, WHICH IS THE THIRD INCREMENT RUNNING TO GET THIS MECHANISM WRONG FIRST.** `runtime.singlePageMode` is a plain boolean captured once inside `createFormRuntime`, and the engine remounts only when `shape` moves — but `shapeOf()` reads `sections` and `fields` and **never `form`**. I planned to widen the engine key to force the remount. That works, and it is wrong: `preview-model.ts` splits the two channels deliberately — the engine answers relevance and step membership, the render model drives everything visible with no remount — and pagination is chrome. The read goes on the **live render-model channel**: no remount, no widened key, `shapeOf()` untouched. Corrected before a line was written, and the discarded design is recorded rather than quietly dropped.
 
-⚠️ **The doc half is NARROWER than the row claims, not wider.** The migration and
-`docs/data-dictionary.md:221` say `false` and are both **correct under `D35`** — and are pinned against
-the live schema by `DocumentedDefaultDriftTest`. Only the two prose sites move. That gate reads the
-`Default` column of markdown tables, which is precisely why it never saw a contradiction living in prose.
+⚠️ **MEASURED WITH TWO MUTATIONS, BECAUSE THE FIRST PROVES LESS THAN IT LOOKS.** Reverting the read to `runtime.singlePageMode` reddens **four** cases — but only because the suite's mock supplies no `singlePageMode`, so the mutant reads `undefined` and every mode is stepped. That catches **absence**. Teaching the mock to read the flag correctly at build time leaves **exactly one** case failing, and 29 green: the one asserting a mode change with **no engine rebuild**. That case is the only one in the suite that can catch a mode which was right when the engine was built and wrong afterwards, and its comment now records both numbers rather than my original claim that it "reddens alone".
 
-⚠️ **Census blind spot, wider than this row.** `useFormRuntime.ts` contains a NUL byte, so ripgrep calls
-it binary and **silently drops it** without `--text` — and the runtime's own declaration and read of the
-flag live there. Every grep-derived row in this ledger inherits this. Filed rather than fixed here.
+### How the prediction fared — the one I flagged was right to flag, and I had already made the mistake
 
-### Remedy verdict
+| Predicted | Actual |
+|---|---|
+| Pint clean, or one `ordered_imports` | ⛔ **Wrong, and the fixer did something I had not predicted.** Two files, four fixers each — and `fully_qualified_strict_types` **shortened my fully-qualified `{@see}` tags and added two runtime-unused imports to each file.** The precedent sanctions that (`UpdateSaveResumeRequest` imports `FormService` purely so a `{@see}` resolves), but two unused imports in a controller is worse than a sentence without a link, so both docblocks name the classes in backticks and own no import. Bare host `pint --test` then clean over **1521** files. |
+| **PHPStan owes a real number rather than the usual "cannot move"** | **Held, and the answer is a delta of zero.** 15 locally — *all* `property.notFound` on model/resource properties, none in this diff. The diff does move `app/` and `routes/`, so the number was genuinely owed rather than inapplicable, which is the distinction `M119` could not draw. |
+| Contract unmoved, deliberately | **Held.** `single_page_mode` was already documented on `PublicFormSchema` and the gate covers `/api/v1` only; a tenant Inertia route owes nothing. |
+| ⚠️ **Most expected to be wrong: the preview's rebuild mechanism** | ⛔ **RIGHT TO FLAG IT, AND THE ERROR WAS ALREADY IN MY PLAN.** Not a surprise during the build — a design I had written down and then had to discard. Flagging the area worked; it caught the mistake before the first file was opened rather than after. |
+| Second: `FormSettingsModal`'s no-`radiogroup` assertion goes green because the word lives only in a script docblock and a CSS comment | **Held — and the case was VACUOUS about it, which the prediction did not anticipate.** It mounts the modal **without opening a section**, so it never sees the control at all; sections mount on first visit. A pass there was silent about the one section that hosts one. A new assertion with the Pages section actually open was added, and that is the honest one. |
+| Third: the `MdsSegmentedControl` refusal needs a written reconciliation plus `D28`'s `flex-wrap` host guard, not a different control | **Held exactly.** `FormSettingsModal`'s docblock scopes its refusal to the five-entry vertical rail; the new panel carries the guard and the reconciliation, and `personalization-axe` is 21/21 at `extra_large` + OpenDyslexic. |
 
-**Works, and measurably so before a line was written** — both respondent-facing channels already honour
-the flag, so a writer changes real behaviour on the day it ships. The guest runtime reads it into
-`runtime.singlePageMode` and branches `PageView` against `StepView`; `Encode.vue` honours it in six
-places. The builder preview does not, and that is the gap.
+### ⛔ Four things nothing predicted, and the first was found by a test failing on its first run
 
-⛔ **AND THE PRESCRIBED SHAPE HAS A TRAP MY OWN FIRST ANSWER WALKED INTO.** `runtime.singlePageMode` is a
-**plain boolean captured once inside `createFormRuntime`**, and the engine is remounted only when `shape`
-moves — but `shapeOf()` reads only `sections` and `fields` and **never `form`**. So an engine-sourced read
-means a toggle changes the schema, moves no shape, remounts nothing, and leaves the old mode on screen
-until some unrelated structural edit. I first proposed widening the engine key to force that remount.
-**It works and it is wrong in kind:** `preview-model.ts` splits the two channels deliberately — the engine
-answers relevance and step membership, the render model drives everything visible with no remount — and
-pagination is chrome. The correct source is **`props.model.form.single_page_mode`**, the live channel the
-section strip's own labels already travel on. No remount, no widened key, `shapeOf()` untouched.
+- **`FormService::create()` omitted the key, so a freshly created `Form` carried `null` while its stored row carried `false`** — and `BuilderPresenter` publishes that attribute into a prop the client declares `boolean`. A `null` in a boolean contract on any path presenting a form it had just created. The decided default is now explicit at the sole creation path, which also stops the app depending on a migration default four documents disagreed about. ⚠️ **And the first version of that test measured the wrong thing:** `makeForm()` is a bare `Form::create()` in `tests/Pest.php` that omits the key exactly as the service used to, so it reproduced the `null` rather than testing the fix. The case goes through `FormService::create()` now.
+- **Five OTHER ledger citations rotted because this increment's own edits shifted their targets** — two into `routes/tenant.php` (my one-line import), three self-citations into `docs/feature-backlog.md` (my 32 added lines). Their line numbers are **DROPPED rather than re-pointed**, which is `M116`'s lesson arriving on schedule. Ledger tier back to **17 of 17**, its ceiling.
+- ⚠️ **The predicted ratchet to 16 was not available, and the claim behind it was wrong.** A read-only pass asserted the dead `E2eSeeder` citation pointed at a blank line; it pointed at a bare closing brace, which the linter passes by design — so it was never in the rot count and nothing could be lowered. **The ceiling was left alone.**
+- **`SuiteCollectionFloorTest` fails inside the container even run alone**, reporting 40 missing `tests/Feature/Forms/*` files — the Windows bind-mount truncation its own docblock documents, with CI as the stated authority. Pre-existing, none of them mine.
 
-Files: `app/Http/Requests/Forms/UpdatePageModeRequest.php`,
-`app/Http/Controllers/Tenant/FormPageModeController.php`, `app/Services/Forms/FormService.php`,
-`app/Services/Forms/BuilderPresenter.php`, `routes/tenant.php`,
-`resources/js/components/builder/PageModePanel.vue`,
-`resources/js/components/builder/FormSettingsModal.vue`,
-`resources/js/components/builder/PreviewPane.vue`,
-`resources/js/components/builder/PreviewRuntime.vue`,
-`resources/js/components/builder/preview-model.ts`, `resources/js/components/builder/types.ts`,
-`tests/Feature/Tenant/FormPageModeSettingsTest.php`, `tests/Feature/Audit/AuditCoverageTest.php`, and the
-Vitest suites `FormSettingsModal.test.ts`, `PreviewPane.test.ts`, `preview-model.test.ts`,
-`PageModePanel.test.ts`. **NO STRUCTURAL EDIT TO `Pages/forms/Builder.vue`** — it already passes `:form`
-whole, so `builder-layout.test.ts` staying green is the proof, as in `M119`.
+### The claim was extended mid-build, and the pre-push guard caught how I tried to publish it
 
-⚠️ **CLAIM EXTENDED MID-BUILD, PUSHED BEFORE THE FILE WAS OPENED, TO ONE COMMENT IN `Pages/forms/Builder.vue`.**
-The original claim excluded that file outright. A read-only pass then found that its template comment reads
-*"Form settings (M117, `D63`) — five sections, five untouched routes"*, and **this increment is what makes that
-false** — there are now six of each. Nothing asserts on the comment (`builder-layout.test.ts` matches
-`<MdsButton>` blocks and forbids `<MdsCheckbox`; neither reads it), so the edit is provably safe and the
-source-text suite still carries the decoupling proof. ⛔ **The alternative was to file a `nit` for a
-one-word defect I had just created, which reads as avoidance rather than bookkeeping.** The precise
-property being claimed is therefore *no structural edit*, not *file untouched*, and it is stated that way
-above rather than left to be read charitably.
-Shared artefacts taken: `docs/feature-backlog.md`, `docs/PRD.md`, `docs/ux/form-filling-ux-flow.md`,
-`PROGRESS.md` (own block only), `docs/claims/lane-a.md`. **Not `openapi.json`** — the contract gate covers
-`/api/v1` only and the column is already documented on the public schema. **Not the migration and not
-`docs/data-dictionary.md`** — both already say what `D35` decided.
-Paired files taken: none.
-Namespaces spent: **nothing from either** — no migration, no ADR, no sub-decision id.
-Prediction: Pint clean or one `ordered_imports`. **PHPStan owes a real number rather than the usual
-"cannot move"** — `app/` and `routes/` both change, which is the opposite of `M119`'s diff. Contract
-unmoved deliberately. ⚠️ **Most expected to be wrong: the preview's rebuild mechanism.** `M118` measured
-`B7`'s central mechanism wrong and `M119` predicted a red and got a vacuous pass — both misses were about
-how the preview rebuilds, and this is the third increment running to bet on it. The live-channel read is
-predicted to need **no** engine rebuild at all; the proving case asserts both that the mode changed and
-that the engine was not rebuilt, and mutating the read back to `runtime.singlePageMode` must redden that
-case **alone**. Second most likely wrong: `FormSettingsModal.test.ts` asserts the modal's HTML contains no
-`radiogroup` and the new control is a radio group — predicted green, because the word lives only in that
-component's script docblock and a CSS comment and never its template, but `M117` measured that Vue renders
-*template* comments into `html()`, so the margin is thin and it gets **run rather than reasoned about**.
-Third: that same file forbids `MdsSegmentedControl` by name, scoped to its five-entry rail — predicted to
-need a written reconciliation plus `D28`'s `flex-wrap` host guard, not a different control.
+A read-only pass found that `Builder.vue`'s template comment reads *"Form settings (M117, `D63`) — five sections, five untouched routes"*, and **this increment is what makes that false.** The original claim excluded that file outright, so the choice was to file a `nit` for a one-word defect I had just created — which reads as avoidance — or to extend the claim. ⛔ **The property worth claiming was never "file untouched"; it is "no structural edit",** and the claim now says so in those words. `builder-layout.test.ts` reads that comment nowhere and still passes 18/18, so the source-text suite still carries the decoupling proof. Line 191's *"adding a sixth section touches one file rather than three"* is deliberately left alone: this increment **validated** that claim rather than falsifying it.
+
+⛔ **AND THE FIRST ATTEMPT TO PUBLISH THE EXTENSION WAS WRONG IN EXACTLY THE WAY THE GUARD EXISTS FOR.** `git push origin HEAD:main` from the working branch would have put **all three** branch commits on the trunk with no squash merge and no gate — `M48`'s defect. The pre-push guard refused, named the count, and stated the correct form: *"A claim, a claim extension and a close-out are each ONE commit; 3 is work."* The extension was rebuilt as one commit **on `origin/main`** and pushed alone (`be7722b9..36e1cfec`) before the file was opened. **The guard was not overridden and `--no-verify` was not used.**
+
+### Twelve mutations, twelve CAUGHT, with disjoint kill sets
+
+`mutate.php` for the four PHP ones — and it **refused a dirty target** and an **empty replacement token**, both correctly, which is why the work was committed first and why "delete the presenter key" became "rename it". The Vitest ones were hand-run against the same three assertions (token from a file, sha256 must move, restore by byte comparison).
+
+**PHP:** drop the audit emission → the `AuditCoverage` case · invert the written value → **both** direction cases · drop `can:update,form` → the 403 case · rename the presenter key → the presenter case.
+**Client:** engine-sourced read → 4 cases, or **1** with a mock that reads correctly · always-all-steps → the two stepped cases · never-single-page → the two one-page cases · restore the compound limitation string → **the new negative alone**, which is exactly why it was owed · rename the panel's URL → the URL case · delete the optimistic revert → the revert case · `flex-wrap` to `nowrap` → the host-guard case.
+
+⚠️ **`previewLimitations()` is the one worth naming.** Its entry lost a **clause**, not an entry, so the count floor held at four and all four pinned substrings — `Page breaks` included — still matched over a list that had materially changed. The existing case could not see the change it guards; the new negative can.
+
+### The documents, and one that disagreed with itself
+
+`D35` fixed the default at step by step. The migration and `docs/data-dictionary.md` already said `false` and are pinned against the live schema by `DocumentedDefaultDriftTest`, so **only the two prose sites moved** — the row's "four documents" framing was **narrower** than it claimed, not wider. ⚠️ **And §3.1's parenthetical contradicted itself inside one sentence**, opening `single_page_mode = false` and then treating `true` as the literal default; "four documents, two values" cannot express that. Appendix A item 1, which the appendix preamble explicitly offers up for later ratification, is recorded as superseded. **Both edits line-count-neutral**, verified before and after, because the ledger cites that item by line from two places.
+
+### Measured
+
+Vitest **150 files, 2631 tests, all green** — the whole suite, including the design-system token and clipped-node gates, run rather than reasoned about. Pest per directory: Tenant **74**, Forms **501**, Submissions **430**, Docs+Audit **249**, Migrations **9**. vue-tsc clean. Pint clean, bare, host. Every host lint gate green via `preflight --with-gates --with-pint` — the whole command. E2E: `builder-axe --grep "preview view|settings"` **12/12** and `personalization-axe` **21/21**. Builder chunk **114.97 → 116.60 kB** raw.
+
+Files: as claimed, plus `docs/pipeline.md` by procedure and **one comment line in `Builder.vue`** under a pushed claim extension — and **not** `openapi.json`, the migration or `docs/data-dictionary.md`, each of which was claimed as untouched and stayed so.
 
 ## RELEASED — `M119`, the builder preview gets a section strip, and the eighth tracker surgery (merged as PR #312, `1624ef3b`, 6/6 green with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

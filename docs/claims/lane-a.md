@@ -93,8 +93,18 @@ Files: `app/Http/Requests/Forms/UpdatePageModeRequest.php`,
 `resources/js/components/builder/preview-model.ts`, `resources/js/components/builder/types.ts`,
 `tests/Feature/Tenant/FormPageModeSettingsTest.php`, `tests/Feature/Audit/AuditCoverageTest.php`, and the
 Vitest suites `FormSettingsModal.test.ts`, `PreviewPane.test.ts`, `preview-model.test.ts`,
-`PageModePanel.test.ts`. **NOT `Pages/forms/Builder.vue`** — it already passes `:form` whole, so
-`builder-layout.test.ts` staying green is the proof, as in `M119`.
+`PageModePanel.test.ts`. **NO STRUCTURAL EDIT TO `Pages/forms/Builder.vue`** — it already passes `:form`
+whole, so `builder-layout.test.ts` staying green is the proof, as in `M119`.
+
+⚠️ **CLAIM EXTENDED MID-BUILD, PUSHED BEFORE THE FILE WAS OPENED, TO ONE COMMENT IN `Pages/forms/Builder.vue`.**
+The original claim excluded that file outright. A read-only pass then found that its template comment reads
+*"Form settings (M117, `D63`) — five sections, five untouched routes"*, and **this increment is what makes that
+false** — there are now six of each. Nothing asserts on the comment (`builder-layout.test.ts` matches
+`<MdsButton>` blocks and forbids `<MdsCheckbox`; neither reads it), so the edit is provably safe and the
+source-text suite still carries the decoupling proof. ⛔ **The alternative was to file a `nit` for a
+one-word defect I had just created, which reads as avoidance rather than bookkeeping.** The precise
+property being claimed is therefore *no structural edit*, not *file untouched*, and it is stated that way
+above rather than left to be read charitably.
 Shared artefacts taken: `docs/feature-backlog.md`, `docs/PRD.md`, `docs/ux/form-filling-ux-flow.md`,
 `PROGRESS.md` (own block only), `docs/claims/lane-a.md`. **Not `openapi.json`** — the contract gate covers
 `/api/v1` only and the column is already documented on the public schema. **Not the migration and not

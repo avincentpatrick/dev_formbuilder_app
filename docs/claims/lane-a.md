@@ -16,7 +16,103 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M120` is merged; `forms.single_page_mode` finally has a writer, so the single-page branch of the guest runtime and of manual encoding are author-reachable for the first time, the builder preview renders the mode the author chose off the LIVE channel rather than a boolean the engine froze at construction, and the pre-push guard caught me trying to put three commits on the trunk
+## Status: ACTIVE CLAIM — `M121`, the type-conversion engine, plus three hub-free rows (`m121-type-conversion-engine`)
+
+Taken 2026-10-01. Branch `m121-type-conversion-engine`, cut from `origin/main` at `7ad332ec`, PR into `main`.
+Rows, all **Tier: early-testing**:
+- `R-495abf48` — *"A field's type cannot be changed after it is created, and the delete-and-re-add workaround
+  destroys every rule, mints a new key and dangles every expression that referenced it"*
+  (`docs/feature-backlog.md:11400`). The overhaul plan's `B5a`, **first half only: the engine.** The HTTP half
+  (a request, a controller and two routes in `routes/tenant.php`) is `M122`, on the user's choice of the split over
+  a stated two-hub breach (in chat, 2026-10-01). **The row stays open** with that owner.
+- `R-95a94b36` — *"A respondent is never told the rule engine failed"* (`:12075`).
+- `R-aa133bab` — *"The resume READ escapes service-worker caching only because its path prefix is `drafts/`"* (`:10957`).
+- `R-950ef5f1` — *"`MemberController::invite()` validates … with no domain-ownership check"* (`:2440`) — a closure, no code.
+
+### Evidence verified
+
+**`R-495abf48` — partly holds.** Held: no path writes `field_type` after creation; `UpdateFieldRequest::rules()`
+(`:48-77`) has no `field_type`; `configRules()` dispatches on the route model's current type (`:49`);
+`useBuilderStore.fieldPayload()` is exactly `:874-899`; the migration `…_000206:24` cascade is exact. **Rotted:**
+`writeField()`'s fill is `:280-295` (not `:259-274`), `deleteField()` `:303-315`, `addField()` `:121-159` (M112's
+default seeding moved it), `uniqueKey()` `:646-656`; `ConfigPanel.vue` reads `field_type` on nine lines, not seven.
+**False:** *"any `required_if` row … dangles"* — `related_form_field_id` is ALSO `cascadeOnDelete` (`…_000206:25`),
+so delete-and-re-add silently DELETES other fields' rules that name the field, which is worse than the row says.
+
+**`R-95a94b36` — holds.** `safeEvaluate()` is `useFormRuntime.ts:310-319` (the row's `:307` includes the comment
+above it), `passed` is `:357`, and `RuntimeSession.vue:395-399` gates submit on `passed` alone. `engineFailed` has
+exactly one consumer, `Encode.vue:1178-1183`, and no test anywhere induces it.
+
+**`R-aa133bab` — holds.** The resume READ is `routes/api.php:606`; `sw.ts` caches under `:58`, `:71` and `:89`; the
+only GET under `api/v1/public/f/` is `forms.schema` (`:519`). The M78 arm in `sw.test.ts` hard-codes its URL, so it
+cannot see the route rename the row is about.
+
+**`R-950ef5f1` — holds as a description of the code** (`MemberController.php:60`), and the remedy is refused on the
+record: `D33` = A, keep inviting anyone.
+
+### Premise verified
+
+**`R-495abf48`.**
+- ⛔ **`B2a` did not ship what the plan names.** No `FieldType::valueShape()`, `defaultValidations()` or
+  `paletteGroup()` exists; it shipped `ValueShape::for/allows/allowsOperator/carriesOptionList` and
+  `DefaultFieldRules::for`. So **`FieldType.php` is not touched** here.
+- ⛔ **"A rule survives iff the target shape allows it" is not the whole rule.** `hidden` is Text-shaped, and publish
+  refuses any rule on a hidden field; the email default `pattern` also survives on Text. Hidden and the default swap
+  need explicit steps.
+- ⛔ **`D64` did not decide the family boundaries.** `ValueShape` splits `likert_scale`, `yes_no` and
+  `cascading_select` away from Choice, and the plan's lossy cascade↔choice rows contradict `D64`'s "refuse". The user
+  decided them in chat on 2026-10-01; recorded as a `D64` amendment in this increment.
+- `B0`'s raw-config overlay (`UpdateFieldRequest::payload()`) makes a type-changing PATCH carry the old type's keys —
+  the separate-endpoint premise is stronger than the row argued.
+- `replaceValidations()` drops `error_message_translations`, `logic_group` and `logic_operator` on every save, so the
+  engine converts **in place** and never reuses it.
+- The version token has one-second resolution and a validations-only edit does not bump it, so a confirmed plan
+  carries a **fingerprint**.
+- `ValueShape::allowsOperator()` has **no publish-gate consumer**: a conversion can make another field's condition
+  unholdable and still publish clean. Filed at close-out, not widened into this row.
+
+**`R-95a94b36`.** ADR-0008 §D4 does **not** settle warn-versus-refuse — it is about tenant quota. The user answered
+**Warn** (`D67`, 2026-10-01). The latch can fire **mid-fill**, not only at mount: a constraint throws only once its
+field is answered. The builder preview mounts its own engine and never `RuntimeSession`, so it is filed, not covered.
+
+**`R-aa133bab`.** `routes/api.php:593-595` says *"THE WARNING IS NOW A GATE"* and names only `sw.test.ts`, which
+cannot see the route side — a hub, so filed as a nit. The row's second sentence (`D20`'s owed measurement) belongs to
+`R-68656155`.
+
+**`R-950ef5f1`.** Its `Awaits D33` token was struck by `M105`. The residual is operational only (*"watch invitation
+volume"*). `R-2dc95042` is **not** closable by the same answer — `D34` owes a build.
+
+### Remedy verdict
+
+- **`R-495abf48` — works, with the corrections above.** An in-place UPDATE of `field_type` keeps the id and the key,
+  so every reference survives by construction. A pure `FieldTypeConversion` + `ConversionPlan`, and public
+  `conversionPlans()`/`convertField()` on `FormBuilderService` so that `M122` needs no hub edit.
+- **`R-95a94b36` — works.** A notice in `RuntimeSession`'s `#notice` slot bound to `runtime.engineFailed`, plus an
+  announcer write for the mid-fill latch. No `useFormRuntime.ts` edit.
+- **`R-aa133bab` — works.** One Pest gate and no production edit. Green on arrival by construction; proved only by
+  mutations.
+- **`R-950ef5f1` — none needed.** `D33` = A is the answer, not a deferral.
+
+Files: `app/Enums/ConversionFamily.php`, `app/Enums/ConversionWarning.php`, `app/Enums/ConversionDropReason.php`,
+`app/Support/Forms/FieldTypeConversion.php`, `app/Support/Forms/ConversionPlan.php` (all new);
+`app/Services/Forms/FormBuilderService.php`, `app/Exceptions/Forms/FormException.php`;
+`resources/public-runtime/components/RuntimeSession.vue`; `tests/Unit/Forms/FieldTypeConversionTest.php`,
+`tests/Feature/Forms/FieldConversionServiceTest.php`, `tests/Feature/Http/ServiceWorkerCachePrefixRouteTest.php`
+(new), `resources/public-runtime/__tests__/components.test.ts`.
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/claims/decisions.md` (the `D64` amendment and `D67`),
+`docs/pipeline.md`, `PROGRESS.md` (own block), and `docs/backlog-triage.md` + `docs/gate-baselines.md` regenerated
+**as procedure**. Not `openapi.json`, and not any `routes/*.php`.
+Hubs: ⛔ **`app/Services/Forms/FormBuilderService.php` is the only hub edited.** `routes/api.php`,
+`resources/public-runtime/sw.ts` and `routes/tenant.php` are mutated **transiently** by `scripts/mutate.php`, restored
+by sha256 and **never committed** — the new gate reads the working tree, so the commit-the-mutation rule, which exists
+for diff-based gates, does not apply to it.
+Paired files taken: none.
+Namespaces spent: nothing from either namespace. One decision id: `D67`.
+Prediction: Pint clean or one `ordered_imports`. PHPStan: **a delta of zero** on the ~15 local `property.notFound`
+phantoms, and the new `match ($enum)` arms exhaustive. Contract: unmoved — no `/api/v1` surface is touched.
+⚠️ **Most expected to be wrong: T1.3, the mid-fill latch** — established by reading only (an empty field's constraints
+are skipped; a `greater_than_field` with no related field throws in lowering; `FieldRow` re-reads `result` on input).
+Second: the pinned count of **182** allowed conversion pairs. Third: the container's Pest collector dropping a new file.
 
 ## RELEASED — `M120`, the `single_page_mode` write path and the preview that could not see it (merged as PR #313, `24748b1f`, 6/6 green with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

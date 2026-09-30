@@ -15,7 +15,9 @@ use App\Models\FormFieldValidation;
 use App\Models\FormSection;
 use App\Models\FormVersion;
 use App\Models\User;
+use App\Support\Forms\ConversionPlan;
 use App\Support\Forms\DefaultFieldRules;
+use App\Support\Forms\FieldTypeConversion;
 use App\Support\Tenancy\PlatformRowCounter;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Database\Eloquent\Model;
@@ -344,6 +346,131 @@ final class FormBuilderService
 
             return $copy->refresh();
         });
+    }
+
+    // ── Type conversion (Increment M121) ────────────────────────────────────────
+
+    /**
+     * What converting this field to each type it may become would do — one {@see ConversionPlan} per
+     * target, in the order {@see FieldTypeConversion::targetsFor()} offers them. A read: no transaction,
+     * no lock, nothing written.
+     *
+     * ⚠️ PUBLIC SO THE HTTP HALF (`M122`) NEEDS NO EDIT HERE. Its GET maps these through `toArray()`.
+     *
+     * @return list<ConversionPlan>
+     */
+    public function conversionPlans(Form $form, FormField $field): array
+    {
+        $this->assertStillDraftChild($form, $field);
+
+        $live = FormField::query()->whereKey($field->getKey())->first();
+
+        if ($live === null) {
+            throw FormException::childRemovedDuringEdit();
+        }
+
+        $validations = $this->conversionRows($live);
+        $repeatable = $this->inRepeatableSection($live);
+
+        return array_map(
+            fn (FieldType $to): ConversionPlan => $this->planConversion($live, $validations, $to, $repeatable),
+            FieldTypeConversion::targetsFor($live->field_type),
+        );
+    }
+
+    /**
+     * Change a field's type IN PLACE: one UPDATE of the field row, a DELETE of only the rules the plan
+     * drops, an INSERT of only the new type's shipped checks. The id and the key never change, so every
+     * reference to the field survives by construction — see {@see FieldTypeConversion}.
+     *
+     * ⛔ THE TOKEN IS REQUIRED HERE, UNLIKE updateField(). A null token skips the drift check there; a type
+     * change is the one edit that must never land on a row the author did not see.
+     *
+     * ⛔ AND THE TOKEN IS NOT ENOUGH, WHICH IS WHY THE FINGERPRINT EXISTS. The token is `updated_at` at
+     * second precision, and an edit to validation rows alone never bumps it — so the plan is RECOMPUTED
+     * under the lock and must hash to what the author confirmed. A null $fingerprint is accepted only for
+     * a plan that needs no confirmation (a lossless flip such as short text to long text); anything else
+     * refuses with the same 409 a stale token gets, because the remedy is the same: read the plans again.
+     *
+     * ⛔ IT NEVER GOES THROUGH writeField()/replaceValidations(). That path deletes every rule and re-inserts
+     * the ones the builder sent, which drops `error_message_translations`, `logic_group` and
+     * `logic_operator` — the builder never round-trips them. A conversion that claims to keep a rule keeps
+     * the ROW. It also means no row naming a sibling is inserted, so the M92 sibling lock set is not needed:
+     * the one field row is the whole lock, taken before any validation row, in the M91 order.
+     *
+     * ⚠️ NO AUDIT EVENT: `docs/audit-compliance-logging-spec.md` excludes edits to draft `form_fields` rows,
+     * because publishing is the audited moment.
+     */
+    public function convertField(Form $form, FormField $field, User $user, FieldType $to, string $expectedVersion, ?string $fingerprint): FormField
+    {
+        $this->assertDraftChild($form, $field);
+
+        return DB::transaction(function () use ($form, $field, $user, $to, $expectedVersion, $fingerprint): FormField {
+            $this->assertStillDraftChild($form, $field);
+
+            // A locking select is filtered by the draft_child UPDATE policy rather than erroring, so a row
+            // that stopped being a draft child since the guard matches nothing — the same verdict.
+            $locked = FormField::query()->whereKey($field->getKey())->lockForUpdate()->first();
+
+            if ($locked === null) {
+                throw FormException::childRemovedDuringEdit();
+            }
+
+            // Against the FRESH locked row, so the check and the write cannot be separated. Drift is decided
+            // before compatibility: a stale client gets the current row, not a verdict on a pair it never saw.
+            $this->assertNoDrift($locked, $expectedVersion);
+
+            $plan = $this->planConversion($locked, $this->conversionRows($locked), $to, $this->inRepeatableSection($locked));
+
+            if ($fingerprint === null) {
+                if ($plan->requiresConfirmation()) {
+                    throw new BuilderConflictException($locked);
+                }
+            } elseif (! hash_equals($plan->fingerprint(), $fingerprint)) {
+                throw new BuilderConflictException($locked);
+            }
+
+            // field_type is always dirty here, so this always issues the UPDATE.
+            $locked->fill([...$plan->fieldAttributes(), 'updated_by' => $user->id])->save();
+
+            if ($plan->droppedIds() !== []) {
+                FormFieldValidation::query()
+                    ->where('form_field_id', $locked->getKey())
+                    ->whereIn('id', $plan->droppedIds())
+                    ->delete();
+            }
+
+            foreach ($plan->added as $row) {
+                FormFieldValidation::create([
+                    'form_version_id' => $locked->form_version_id,
+                    'form_field_id' => $locked->getKey(),
+                    'rule_type' => $row['rule_type'],
+                    'rule_value' => $row['rule_value'],
+                    'error_message' => $row['error_message'],
+                    'sequence' => $row['sequence'],
+                ]);
+            }
+
+            return $locked->refresh();
+        });
+    }
+
+    /** @return list<FormFieldValidation> the field's own rows, in the order a plan reads them */
+    private function conversionRows(FormField $field): array
+    {
+        return array_values($field->validations()->orderBy('sequence')->orderBy('id')->get()->all());
+    }
+
+    /** @param  list<FormFieldValidation>  $validations */
+    private function planConversion(FormField $field, array $validations, FieldType $to, bool $repeatable): ConversionPlan
+    {
+        return FieldTypeConversion::plan($field, $validations, $to, $this->defaultConfig($to), $repeatable);
+    }
+
+    private function inRepeatableSection(FormField $field): bool
+    {
+        return $field->form_section_id !== null
+            && FormSection::query()->whereKey($field->form_section_id)->where('is_repeatable', true)->exists();
     }
 
     // ── Question library (Increment G9b) ──────────────────────────────────────────

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Exceptions\Forms;
 
+use App\Enums\FieldType;
 use App\Services\Forms\BlueprintValidator;
 use RuntimeException;
 
@@ -92,6 +93,16 @@ final class FormException extends RuntimeException
     public static function relatedFieldRemovedDuringEdit(): self
     {
         return new self('A field this rule refers to was removed by another editor. Refresh the builder and try again.');
+    }
+
+    /**
+     * A type conversion the conversion table does not admit (Increment M121, `D64`): a question may become
+     * only a type of its own family, or `note`/`hidden`. Raised by `FieldTypeConversion::plan()`, the
+     * single point that enforces the table.
+     */
+    public static function conversionRefused(FieldType $from, FieldType $to): self
+    {
+        return new self("This question cannot be changed from {$from->label()} to {$to->label()}.");
     }
 
     public static function formHasNoDraft(): self

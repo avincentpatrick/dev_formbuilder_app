@@ -451,7 +451,8 @@ it('gives a note the target default config, and warns of setup exactly when publ
     $converted = conversionServiceConvert($this->builder, $form, $note, $this->user, $to);
     $keys = array_column(conversionServiceViolations($draft), 'field');
 
-    expect($converted->config)->toBe($expected)
+    // toEqual, not toBe: the config came back out of jsonb, which does not keep key order (M111).
+    expect($converted->config)->toEqual($expected)
         ->and(in_array(ConversionWarning::NeedsSetup, $plan->warnings, true))
         ->toBe(in_array($converted->key, $keys, true), "{$to->value}: the warning and the publish gate disagree");
 })->with([

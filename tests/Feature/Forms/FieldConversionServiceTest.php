@@ -465,7 +465,7 @@ it('gives a note the target default config, and warns of setup exactly when publ
     'file upload' => [FieldType::FileUpload, []],
 ]);
 
-it('lets a note become calculated with a warning, because publish will not catch the missing formula', function (): void {
+it('lets a note become calculated with a warning, because publish refuses it until it has a formula', function (): void {
     $form = conversionServiceForm($this->tenant, $this->user);
     $draft = conversionServiceDraft($form);
     $note = $this->builder->addField($form, $this->user, FieldType::Note, null);
@@ -473,10 +473,10 @@ it('lets a note become calculated with a warning, because publish will not catch
 
     conversionServiceConvert($this->builder, $form, $note, $this->user, FieldType::Calculated);
 
-    // The premise of the warning, pinned: both gates are silent about an empty formula.
+    // The premise of the warning, pinned: the structural gate is silent, the expression gate refuses (M122).
     expect($plan->warnings)->toBe([ConversionWarning::CalculatedNeedsFormula])
         ->and((new StructuralValidationGate)->collect($draft))->toBe([]);
-    app(ExpressionValidationGate::class)->assertExpressionsResolve($draft);
+    expect(fn () => app(ExpressionValidationGate::class)->assertExpressionsResolve($draft))->toThrow(PublishValidationException::class, $note->key);
 });
 
 it('keeps the id and key across a round trip through note, clearing what a note cannot hold', function (): void {

@@ -199,3 +199,64 @@ it('keeps a single expression violation byte-identical to the pre-collection mes
             ->and($e->getMessage())->toBe($e->violations()[0]['message']);
     }
 });
+
+/*
+|--------------------------------------------------------------------------
+| M122 — a calculated question with no formula is refused at publish (R-244d53dc).
+|
+| `check()` treats a blank expression as "no expression", which is right for relevance and constraints and
+| wrong for a formula: a calculated question exists ONLY to compute, so a blank formula is a question that
+| silently computes nothing in every submission. Three ways in, none refused before this: adding a Calculated
+| question (its default config is empty), converting a note or hidden field to one (M121), and importing an
+| XLSForm `calculate` row with no `calculation`. The trim matches the runtime's own skip
+| (`SemanticValidator`), so what publish refuses is exactly what the runtime would have ignored.
+|--------------------------------------------------------------------------
+*/
+
+it('refuses a calculated question with no formula, naming it', function (array $config): void {
+    $form = $this->forms->create($this->tenant, $this->user, 'Survey');
+    $draft = $form->draftVersion;
+    addFormField($draft, $this->user, 'total', FieldType::Calculated, 0, ['config' => $config]);
+
+    try {
+        $this->gate->assertExpressionsResolve($draft->refresh());
+        $this->fail('a calculated question with no formula passed the gate');
+    } catch (PublishValidationException $e) {
+        expect(array_map(static fn (array $v): array => [$v['field'], $v['code']], $e->violations()))
+            ->toBe([['total', 'calculated_formula_missing']]);
+    }
+})->with([
+    'no formula key' => [[]],
+    'null' => [['calculated_formula' => null]],
+    'empty' => [['calculated_formula' => '']],
+    'whitespace only' => [['calculated_formula' => "  \t "]],
+    'not a string' => [['calculated_formula' => 42]],
+]);
+
+it('refuses the blank formula at publish alongside every other broken expression', function (): void {
+    $form = $this->forms->create($this->tenant, $this->user, 'Survey');
+    $draft = $form->draftVersion;
+    addFormField($draft, $this->user, 'total', FieldType::Calculated, 0, ['config' => []]);
+    addFormField($draft, $this->user, 'shown', FieldType::ShortText, 1, ['relevant_expression' => '${ghost} = 1']);
+
+    try {
+        $this->publisher->publish($form->refresh(), $this->user);
+        $this->fail('a draft with a blank formula published');
+    } catch (PublishValidationException $e) {
+        $blank = array_values(array_filter($e->violations(), static fn (array $v): bool => $v['code'] === 'calculated_formula_missing'));
+        expect($e->violations())->toHaveCount(2)
+            ->and(array_column($blank, 'field'))->toBe(['total']);
+    }
+});
+
+it('leaves a formula with surrounding whitespace, and every non-calculated question, alone', function (): void {
+    $form = $this->forms->create($this->tenant, $this->user, 'Survey');
+    $draft = $form->draftVersion;
+    addFormField($draft, $this->user, 'a', FieldType::Integer, 0, ['config' => []]);
+    addFormField($draft, $this->user, 'total', FieldType::Calculated, 1, ['config' => ['calculated_formula' => '  ${a} + 1 ']]);
+    addFormField($draft, $this->user, 'remark', FieldType::Note, 2, ['config' => []]);
+
+    $this->gate->assertExpressionsResolve($draft->refresh());
+
+    expect($this->publisher->publish($form->refresh(), $this->user)->status)->toBe(FormVersionStatus::Published);
+});

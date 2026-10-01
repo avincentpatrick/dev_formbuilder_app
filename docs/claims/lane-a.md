@@ -16,7 +16,112 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M123` is merged; a question's type can be changed in the builder with one undo, publish refuses a condition the other question cannot support, a broken rule no longer discards a keyer's typing, repeat sections stop showing unsupported boxes, and a yes/no condition written "= yes" is filed as a `major`
+## Status: ACTIVE CLAIM — `M124`, a yes/no condition holds the same way in the browser and on the server, and page breaks paginate stepped forms (`m124-yes-no-and-page-breaks`)
+
+Taken 2026-10-02. Branch `m124-yes-no-and-page-breaks`, cut from `origin/main` at `a9c272d6`, PR into `main`.
+Rows, both **Tier: early-testing**:
+- `R-9f296f7e` — *"A condition on a yes/no question written the natural way — "= yes" — never holds, so the rule it
+  drives silently never applies"* (`docs/feature-backlog.md:12443`). The tree's one open `major`; `M123` filed it and
+  said to take it first.
+- `R-8c517fb6` — *"`page_break` is a hard page break on paper and an ODK group boundary on export, but is deleted
+  outright on screen — one field type meaning three different things"* (`:11949`). Buildable since the `D57` amendment.
+- Also recorded, no code: **`D13` exception #3** in `docs/claims/decisions.md`. Row 1's remedy edits three hub files,
+  and the user allowed it in chat today in two answers — first the corpus note in the architecture document, then
+  `FieldInput.vue` — because a split ships either a regression or a stale document.
+
+Verified by three read-only Explore agents (the two engines, the two condition editors, the page-break remedy), then a
+Plan agent's adversarial review of the design, whose load-bearing claims I re-read on the tree.
+
+### Evidence verified
+
+**`R-9f296f7e` — held, and imprecise in a direction that matters.** The normalizer's yes/no arm
+(`StructuralAnswerNormalizer.php:282-284`, `toYesNo()` `:390-399`) makes a boolean before Stage 3, and
+`ExpressionEvaluator::equals()` (`:186-214`) compares a quoted literal through `Coercion::toStr()`, which writes `true`
+as `'1'` and `false` as `''`. "Only a value of `1` matches" is imprecise: `AstBuilders::literalFor()` makes a
+numeric-looking rule value a Number literal, so `1`, `'1'`, `'01'` and `'1.0'` all match a Yes — and **nothing matches
+a No**, because `false` stringifies to `''`.
+
+**`R-8c517fb6` — held; one range moved.** `visibleSteps` (`useFormRuntime.ts:405-462`), `RENDERS_NOTHING`
+(`engine/field-roles.ts:33`), `StepProjection` and its fixture are as cited. `BlankFormPrintPresenter::blocks()` now
+spans `:150-218`, not `:150-180`; `PrintAnswerArea.php:172` and the blade's `page-break-before` are exact.
+
+### Premise verified
+
+**`R-9f296f7e` — false in the dangerous direction.** The row believes the browser engine mirrors the coercion and so
+fails the same way. The engine does mirror it, but the browser FEEDS it strings: the Yes/No control emits `'yes'`/`'no'`
+(`FieldInput.vue:188-191`), `setAnswer` stores them unchanged, and the engine's one entry (`useFormRuntime.ts:312`)
+passes them through `toSemanticInput` untouched. So in the browser `= 'yes'` HOLDS while the server, holding a boolean,
+says it does not: a question gated `${consent} = 'yes'` is shown, answered, and then **pruned by the server at
+submit** — silent data loss, not a rule that merely never fires. `!= 'yes'` is constant-true on the server. A resumed
+draft returns booleans, so the Yes/No control shows blank (`FieldInput.vue:272`) and the browser engine disagrees with
+itself. Both editors write `= 'yes'` (`condition-model.ts:352`, and the validation editor's free-text value), and the
+XLSForm export writes yes/no as `select_one yes_no` with choices `yes`/`no`, so `= 'yes'` is also the ODK-natural
+form. `runtime.test.ts:320-357` pins the browser's string behaviour; no golden vector holds a boolean answer, and both
+golden runners call Stage 3 directly, skipping the normalizer.
+
+**`R-8c517fb6` — `D57`'s amendment holds; "hub-free" holds only on a condition.** The step key is persisted by three
+writers into a column documented at `docs/data-dictionary.md:473` — a hub — and validated `max:255`, so a page key
+must never be persisted: resume lands on the section's first visible page. `Encode.vue` matches steps to server blocks
+by key (`:261-271`), so the option must default OFF. The preview's engine does not remount on a single-page toggle,
+because `shapeOf()` never reads `form`. No seeder and no e2e spec contains a page break.
+
+### Remedy verdict
+
+**`R-9f296f7e` — necessary, not sufficient.** A yes/no-aware equality on both engines is right as far as it goes. It
+must also canonicalize a yes/no answer at the entry to Stage 3 in BOTH engines (non-empty scalars only; `''` never), so
+the browser reads it as the server does; give `selected()` and the internal `contains` the same reading; compare
+against a STRICT literal table (`yes`/`true`/`1`, `no`/`false`/`0`) kept apart from the permissive answer table moved
+out of the normalizer, PHP-trimmed and ASCII-lowercased in both languages — JS's `.trim()` strips NBSP and not NUL,
+PHP's the reverse; and teach the Yes/No control to show a boolean, or the canonical booleans that now reach the guest
+outbox show blank on offline conflict review. The vectors must discriminate by OUTCOME: the PHP golden runner compares
+with `toEqual`, under which `true == 'yes'`.
+
+**`R-8c517fb6` — works, with five corrections.** Chunk keys are assigned before predicate 3 (the first chunk holding a
+rendering field keeps the bare key); `continuation` is computed after it; `goToStep` on a bare key whose first page is
+hidden answers `'exact'`, not `'nearest'`; `removedWithAnswers` is computed from fields that LEFT the visible set, or a
+merge announces that answers "won't be included"; and the print fix covers leading, trailing and consecutive breaks,
+not only a breaks-only section.
+
+Files:
+- Row 1: `app/Services/Expressions/ExpressionEvaluator.php` (hub), `app/Services/Expressions/Coercion.php`,
+  `app/Services/Validation/SemanticValidator.php`, `app/Services/Submissions/StructuralAnswerNormalizer.php`,
+  `resources/public-runtime/engine/coercion.ts`, `resources/public-runtime/engine/evaluator.ts`,
+  `resources/public-runtime/engine/semantic-validator.ts`, `resources/js/components/submissions/FieldInput.vue` (hub),
+  `docs/architecture/technical-architecture.md` (hub), `tests/golden/expressions/manifest.json`,
+  `tests/golden/validation/manifest.json`; new `tests/golden/expressions/yes-no.json`,
+  `tests/golden/validation/yes_no.json`, `tests/Unit/Expressions/YesNoCoercionTest.php`,
+  `tests/Feature/Submissions/YesNoConditionTest.php`, `resources/public-runtime/engine/__tests__/yes-no.test.ts`,
+  `resources/public-runtime/__tests__/yes-no-runtime.test.ts`, `resources/js/components/submissions/FieldInput.test.ts`.
+- Row 2: `resources/public-runtime/composables/useFormRuntime.ts`, `resources/public-runtime/components/RuntimeSession.vue`,
+  `resources/public-runtime/components/SectionView.vue`, `resources/public-runtime/components/StepView.vue`,
+  `resources/public-runtime/components/ProgressIndicator.vue`, `resources/js/components/builder/PreviewRuntime.vue`,
+  `resources/js/components/builder/preview-model.ts`, `resources/js/components/builder/preview-model.test.ts`,
+  `resources/js/components/builder/PreviewRuntime.test.ts`, `app/Services/Forms/BlankFormPrintPresenter.php`,
+  `tests/Feature/Forms/BlankFormPrintPresenterTest.php`, `docs/ux/form-filling-ux-flow.md`,
+  `docs/workflow-branching-design.md`; new `resources/public-runtime/__tests__/pagination.test.ts`,
+  `resources/public-runtime/__tests__/pagination-components.test.ts`.
+
+Hubs: **row 1 only** — `ExpressionEvaluator.php`, `FieldInput.vue` and `docs/architecture/technical-architecture.md`,
+under `D13` exception #3. No file is edited by two rows.
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/claims/decisions.md` (exception #3), `PROGRESS.md` (own
+block), `docs/architecture/technical-architecture.md`, `docs/ux/form-filling-ux-flow.md`,
+`docs/workflow-branching-design.md`, the two golden corpora, and `docs/pipeline.md` + `docs/backlog-triage.md`
+regenerated as procedure. Not `openapi.json`.
+Paired files taken: none.
+Namespaces spent: nothing from either namespace. No decision id.
+Prediction:
+- Pint: clean, or one layout fixer on a new test.
+- PHPStan (container, scoped to the changed PHP files): zero.
+- Golden runners: both engines green over the two new files, and every existing vector byte-identical, because a form
+  with no yes/no question takes the canonicalization's fast path.
+- Vitest and vue-tsc: green; the only existing test edited is `preview-model.test.ts` (the limitation floor), and
+  `PreviewRuntime.test.ts` is appended to.
+- Contract and Storybook axe: unmoved — no `/api/v1` and no design-system change.
+- E2E: green and unmoved — no seeded form holds a page break or a condition on a yes/no question.
+- ⚠️ **Most expected wrong: the citation lint.** The ledger tier sits at 17 of 17, and `useFormRuntime.ts`,
+  `ExpressionEvaluator.php`, `SemanticValidator.php` and `FieldInput.vue` are all cited by line; I expect at least one
+  shifted anchor to need a line-neutral repair.
+- Second: a `StepView` announcement case in Vitest.
 
 ## RELEASED — `M123`, a question's type can be changed in the builder, plus three hub-free fixes (merged as PR #316, `25684658`, 6/6 green with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

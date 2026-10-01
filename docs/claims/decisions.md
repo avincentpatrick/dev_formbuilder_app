@@ -2458,6 +2458,14 @@ half that works.
 
 **Disposition:** the subsection stays, because the two entries above are the record of how the rule failed and a later reader needs them. It is closed to new entries under the citation reading, which no longer exists. A future deviation from items 1–5 is logged here as #3 in the ordinary way; it simply will not be for this reason.
 
+##### #3 — `M124` (2026-10-02) · one row editing three hub files, allowed by the user in chat
+
+**What was not satisfied:** item 1's second clause as `M117` read it — *two hub files in one row's remedy is what the clause refuses without a stated breach*. `R-9f296f7e` edits three: `app/Services/Expressions/ExpressionEvaluator.php` (the equality rule), `resources/js/components/submissions/FieldInput.vue` (a Yes/No control that can show a boolean) and `docs/architecture/technical-architecture.md` (the note that document requires whenever a golden corpus grows). ⚠️ **The clause's literal text is satisfied** — *at most one row may touch a hub file*, and `R-8c517fb6`, the batch's other row, edits none — so this entry records a deviation from a READING, which is why it is worth writing down rather than arguing away. Clause 1 is satisfied exactly: the two rows' edited files, tests included, are disjoint.
+
+**Why:** one mechanism spans two engines and the one control that displays the answer. Without the document note, both corpora grow under a sentence that calls them frozen, and that document calls a changed count with no note *drift*. Without `FieldInput.vue`, the fix ships a regression: canonical booleans reach the guest outbox, so an offline response reopened for conflict review would show its Yes/No answers blank — the same defect resume and edit already have, which this fixes too.
+
+**Disposition:** **the user allowed both in chat on 2026-10-02** — first the document note, then `FieldInput.vue` — each put to them by name because `R-9f296f7e`, an `early-testing` work row, was blocked on the choice. Recorded in both places this log requires: inline at the closed row, and in `PROGRESS.md`'s release paragraph. Not a precedent, and the first of its reason, so the escalation rule above is not engaged.
+
 ---
 
 ### D7 — Should `main` get branch protection, with the repository owner as a bypass actor? **Yes.**

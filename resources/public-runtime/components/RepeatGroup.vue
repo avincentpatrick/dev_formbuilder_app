@@ -11,6 +11,7 @@ import { computed, nextTick, ref } from 'vue';
 import { MdsButton } from '@meridian/design-system';
 import InstanceField from './InstanceField.vue';
 import { useAnnouncer, useRuntime } from '../composables/context';
+import { rendersNothing } from '../lib/schema-mapping';
 import type { RenderSection } from '../lib/types';
 
 const props = defineProps<{ section: RenderSection }>();
@@ -26,7 +27,13 @@ const sectionKey = computed(() => props.section.key);
 // It feeds the "Add X" button, each instance legend and the add/remove announcements, so a raw `${key}`
 // leaking here would reach a screen reader as well as the screen.
 const label = computed(() => runtime.sectionTitleFor(props.section));
-const members = computed(() => runtime.membersOf(sectionKey.value));
+// Increment M123 — H7's renders-nothing rule, on the one path that bypassed it. `visibleSteps` already drops a
+// calculated or page-break member from a repeat step's `fieldKeys`, but this loop reads the store's TOTAL member
+// list, so every instance mounted FieldInput's "unsupported" branch for one — "Not available for manual entry
+// yet" under its label, in the guest form and the builder preview alike, and announced as a new question when
+// its condition flipped. Render-only on purpose: `membersOf()` stays total for the store's own walks, and nothing
+// computes or validates a member of either type through it.
+const members = computed(() => runtime.membersOf(sectionKey.value).filter((f) => !rendersNothing(f.fieldType)));
 const uids = computed(() => runtime.instanceUidsFor(sectionKey.value));
 const count = computed(() => runtime.instanceCount(sectionKey.value));
 const canAdd = computed(() => runtime.canAddInstance(sectionKey.value));

@@ -99,10 +99,13 @@ Files:
   `resources/js/components/builder/PreviewRuntime.test.ts`, `app/Services/Forms/BlankFormPrintPresenter.php`,
   `tests/Feature/Forms/BlankFormPrintPresenterTest.php`, `docs/ux/form-filling-ux-flow.md`,
   `docs/workflow-branching-design.md`; new `resources/public-runtime/__tests__/pagination.test.ts`,
-  `resources/public-runtime/__tests__/pagination-components.test.ts`.
+  `resources/public-runtime/__tests__/pagination-components.test.ts`. **Extended mid-build, by this pushed commit
+  before the file was opened:** `docs/offline-first-sync-design.md` (hub) — one citation, `useFormRuntime.ts:296`,
+  rotted to a blank line by the paginated step model, and tier 1 of the citation lint tolerates none. The user chose
+  the one-line repair (cite the symbol) over restructuring the new code to keep that line still.
 
-Hubs: **row 1 only** — `ExpressionEvaluator.php`, `FieldInput.vue` and `docs/architecture/technical-architecture.md`,
-under `D13` exception #3. No file is edited by two rows.
+Hubs: row 1 — `ExpressionEvaluator.php`, `FieldInput.vue` and `docs/architecture/technical-architecture.md`; row 2 —
+`docs/offline-first-sync-design.md` (one citation). All under `D13` exception #3. No file is edited by two rows.
 Shared artefacts taken: `docs/feature-backlog.md`, `docs/claims/decisions.md` (exception #3), `PROGRESS.md` (own
 block), `docs/architecture/technical-architecture.md`, `docs/ux/form-filling-ux-flow.md`,
 `docs/workflow-branching-design.md`, the two golden corpora, and `docs/pipeline.md` + `docs/backlog-triage.md`

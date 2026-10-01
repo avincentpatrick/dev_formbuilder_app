@@ -16,141 +16,62 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M123`, a question's type can be changed in the builder, plus three hub-free fixes (`m123-change-type`)
+## Status: NO ACTIVE CLAIM — `M123` is merged; a question's type can be changed in the builder with one undo, publish refuses a condition the other question cannot support, a broken rule no longer discards a keyer's typing, repeat sections stop showing unsupported boxes, and a yes/no condition written "= yes" is filed as a `major`
 
-Taken 2026-10-01. Branch `m123-change-type`, cut from `origin/main` at `0200d7bf`, PR into `main`.
-Rows, all **Tier: early-testing**:
-- `R-495abf48` — *"A field's type cannot be changed after it is created, and the delete-and-re-add workaround
-  destroys every rule, mints a new key and dangles every expression that referenced it"*
-  (`docs/feature-backlog.md:11400`). The overhaul plan's `B5b`, **its dialog half**: a "Change type" control on the
-  Basics tab, the confirmation dialog with the census, the store actions and one undo entry. **This closes the row**:
-  palette grouping, the Basics variant switch and allow-negative are `R-a367bf9e`'s, and go to `M124`.
-- `R-2c172882` — *"The publish gate never checks a conditional rule's operator against the RELATED field's value
-  shape, so a condition that can never hold publishes clean"* (`:12344`).
-- `R-d8780a8b` — *"`ExpressionException` escapes four single-response submission paths, which answer a generic 422
-  with no field and no code a client can branch on"* (`:12188`).
-- **A new row, filed and closed here** — inside a repeatable section, a calculated or page-break question renders as
-  *"Not available for manual entry yet (Phase 2)"* in every instance, in the guest form and in the builder preview.
-  Found while verifying `R-8c517fb6`; no row covered it.
-- Also recorded, no code: **`D57` amended** — page breaks paginate automatically (no setting), and staff manual entry
-  stays one step per section for now. The user's answers in chat on 2026-10-01, put to them under `D66` because
-  `R-8c517fb6`, an `early-testing` work row, was blocked on them. That row goes to `M124`.
+## RELEASED — `M123`, a question's type can be changed in the builder, plus three hub-free fixes (merged as PR #316, `25684658`, 6/6 green with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 
-Two read-only fan-outs verified every candidate before this batch was composed: eight verifiers, then a designer and
-three adversarial checkers. The design's own reviewer hit a session limit, so I reviewed it against the tree myself.
+Shipped 2026-10-02. Branch `m123-change-type`, cut from `origin/main` at `0200d7bf`; the claim commit is `f5c305b2`.
 
-### Evidence verified
+**Four `early-testing` rows closed, five amended, ten filed — one of them a `major`.** Closed: `R-495abf48` (the overhaul's `B5b`, dialog half, and with it the row's own ask), `R-2c172882`, `R-d8780a8b`, and a repeat-section row filed and closed here. **`D57` amended** with the user's answers in chat: page breaks paginate automatically, and staff manual entry stays one step per section for now — so `R-8c517fb6` is buildable and hub-free. Namespaces spent: nothing from either. **No tracker surgery owed.**
 
-**`R-495abf48` — holds; four citations rotted.** `M122`'s half is as recorded: the routes
-(`routes/tenant.php:585-588`), the controller (`FormFieldConversionController.php:50-96`) and the request
-(`ConvertFieldRequest.php:35-42`); no file under `resources/` calls either route. The original filing's citations
-moved: `writeField()`'s fill is now `FormBuilderService.php:282-297`, `deleteField()` `:305-317`, `addField()`
-`:123-161`, `uniqueKey()` `:773-781`. `fieldPayload()` (`useBuilderStore.ts:874-899`) is exact and still sends no
-`field_type`. `ConfigPanel.vue` reads `field_type` on seven lines for the selected field and two for other fields,
-and writes it on none.
+### ⛔ The finding that matters most was not in the batch: a yes/no condition written "= yes" never holds
 
-**`R-2c172882` — true in its claim, partly false in its examples.** `StructuralValidationGate::collect()` checks only
-the OWNER's shape and completeness, although `$fieldTypeById` already holds the related field's type. But
-`ValueShape::allowsOperator()` now has two production consumers (`M122` added `ConversionCensus::numeric()`); a
-likert → single-select conversion copies the options verbatim, so a `gt` on it still holds; and a note under `is_null`
-or `neq` makes a condition ALWAYS hold. The defect class is a **constant** condition, not one that never holds.
+Verifying `R-2c172882` turned up a sibling that a throwaway probe then measured through the REAL publish and encode paths: a `required_if` naming a yes/no `consent` with `equals` / `yes` published clean, and a submission answering yes with the governed field empty was RECORDED with no error — for a `true` answer, for a `"yes"` answer, and for a rule value of `true`. The structural normalizer makes a yes/no answer a boolean before Stage 3, and `ExpressionEvaluator::equals()` compares a quoted literal as a string, so `true` is `'1'`. Only `1` matches, and no editor offers it. A relevance expression `${consent} = 'yes'` is reasoned, not run, to fail identically. Filed `major`, `early-testing`; the next increment should take it first.
 
-**`R-d8780a8b` — every citation resolves; three claims are false.** A code a client branches on does exist
-(`expression_error`, `bootstrap/app.php:597` and `:603`, classified `terminal` by `error-normalizer.ts:97-99`);
-`SubmissionDraftController::store` cannot reach the engine (`saveDraft()` runs no Stage 3); and the API promote route
-(`SubmissionPromoteController.php:49`) was missing from the four. Encode and edit are Inertia requests, so they get a
-toast-only `back()` with no errors bag — not a 422.
+### The type-change client — one hub, and a history that no longer assumes a type never moves
 
-**The new repeat row — traced end to end.** `membersOf()` is unfiltered (`useFormRuntime.ts:265-274`), `RepeatGroup.vue:29`
-iterates it, `InstanceField` passes `supported: false`, and `FieldInput.vue:519-522` renders the label plus the
-notice. Encode is immune: `EncodeFormPresenter.php:99` omits both types before any block is built.
+- **One hub, edited twice and line-neutrally where it had to be.** `ConfigPanel.vue:260` is cited twice by the ledger at its 17-of-17 ceiling, so the `FieldTypeControl` import is paired with deleting the blank line after the imports — that missing blank is load-bearing. The mount line shifts three later anchors onto live lines; the citation lint's ROT set is byte-identical to the pre-`M123` baseline.
+- **The store converts in its serialized queue, after a flush, reading the row token inside the task** — `updateField()` checks its token before its lock, so a PATCH racing the convert could restore the old type's rules with no 409 (filed). Neither request goes through `guard()`: a read and a refused conversion are not failed saves. A 409 adopts the server's row and re-reads the plans; it never opens the conflict dialog, whose "Keep mine" would PATCH old-type content onto the converted row.
+- **One undo entry.** It converts back, then restores the pre-conversion content only when `roundTripIsExact()` says the round trip did not — the design review showed "only when the forward plan was lossy" misses three cases, among them an email field whose pattern the author deleted (lossless forward, but the way back re-adds the pattern).
+- ⛔ **The history assumed a type never changes, and nothing said so.** `FieldSnapshot` carries `field_type` while the PATCH cannot send it, and `undo()` moved an entry to redo even when its server call failed. `undo()`/`redo()` now have three outcomes — done, retry (kept on its stack), dropped (stale) — Edit entries refuse a snapshot of another type, and "Keep mine" refuses across types. The Logic rail's fingerprint gains `field_type`.
+- **No client type list.** "Not asked" is derived from two transmitted palette facts (`no_answer`, the `prefill` editor). The variant switch, palette grouping and allow-negative stay `R-a367bf9e`'s, which now needs only `BuilderPresenter.php`.
 
-### Premise verified
+### The three hub-free rows
 
-**`R-495abf48`.**
-- The precondition holds: `M122` merged. But the docblock's two instructions are necessary, not sufficient. The client
-  must flush autosave before the GET as well as the POST; it must send the POST through the store's serialized queue,
-  because `updateField()` checks drift before it takes its lock, so a PATCH racing the convert can silently restore the
-  old type's rules; and it must adopt the response in place, keeping the uid.
-- ⛔ **The store's history assumes a field's type never changes.** `FieldSnapshot` carries `field_type`, the PATCH
-  cannot send it, and `undo()` moves an entry to redo even when its server call failed. Once a type can change in
-  another tab, an Edit entry's undo could flip the type on screen only. The type guards are owed by this row.
-- ⛔ **The hub file is at the citation ceiling.** `ConfigPanel.vue:260` is cited twice by the ledger, which sits at
-  17 of 17, and a plain import line rots both. The import is made line-neutral by deleting the blank line after the
-  imports — **that missing blank line is load-bearing.** The mount line shifts later anchors onto live lines only.
-- The variant switch has no transmitted data: palette variants are `BuilderPresenter.php`, a hub, so it waits for
-  `R-a367bf9e`. The new control is built as its home.
+- **`R-2c172882`:** the arm asks the RELATED question's shape, via `ValidationRuleType::relatedComparison()` — a null `_with` operator is `IsNull`'s comparison, the field comparisons order with `Gt`/`Lt` (the census's predicate) — and lives on the enum so the gate needed no `use` line above the lines an ADR cites. ⛔ The row's examples were wrong in detail: the defect is a constant condition, not one that never holds.
+- **`R-d8780a8b`:** the hub-free variant — two controller catches with `report()` and an errors bag (never `baseline`), each import compensated line-neutrally, `store()` at the controller gate's ceiling of 10; the guest sentence is client copy keyed on the code. ⛔ The row was wrong three ways (a code existed; the draft controller cannot reach the engine; the API promote path was missing).
+- **The repeat row:** a render-only filter in `RepeatGroup.vue`; `membersOf()` stays total.
 
-**`R-2c172882`.** Reachable today through the editor's re-point (`ValidationEditor.vue` keeps the operator when the
-compared question changes), the save door (`UpdateFieldRequest` validates the operator as a bare enum), the blueprint
-materializer, and conversion — not only through `M121`. The gate is prospective: published versions are frozen, but
-rows are cloned forward, so the NEXT publish of such a form is refused. No seeder, fixture or golden vector publishes
-such a row.
+### How the prediction fared
 
-**`R-d8780a8b`.** `D67`, answered after the row was filed, made this refusal the designed end of the guest flow, so its
-message matters more now. The staff defect the row missed is page state: `Encode.vue` keeps state only when the errors
-bag is non-empty, so a toast-only refusal on the edit page replaces the editor's typed corrections. A submit from the
-resume page still loops, because its GET re-runs Stage 3 — not this row's; filed.
+| Predicted | Actual |
+|---|---|
+| Pint: one layout fixer at most | **Better:** clean on every file, first run; bare Pint passes over 1536 files. |
+| PHPStan (scoped): zero | **Held.** No errors on the five changed PHP files. |
+| Vitest and vue-tsc green; no existing test edited except the two appends | **Held.** 156 files / 2692; both vue-tsc passes clean; `ConfigPanel.test.ts` and `builder-layout.test.ts` untouched and green. |
+| Contract and Storybook axe unmoved | **Held** on PR #316. |
+| E2E: the Basics-tab specs green; the new spec 6/6 with zero writes | **Held.** CI's E2E job is green with all 20 steps. Locally, `builder-convert-axe.spec.ts` passed 6 / 6 with zero writes, and `builder-axe.spec.ts` passed 61 across all three widths. |
+| ⚠️ **Most expected wrong: the citation lint** | ⛔ **Wrong in the good direction.** No retune: anchor `:883` landed on a live comment, the mount's shift on live lines, and the ROT set is identical to the baseline. |
+| Second: a Vitest mutation red set among the history cases differs | **Held** — S11 (undo always PATCHes) reddened two of the three predicted; the third case asserts state, not requests. |
 
-**The new repeat row.** Calculated and page-break questions both publish inside a repeat, and XLSForm import puts
-`calculate` rows there. Nothing computes or validates through `membersOf()` for these types, so a render-only filter is
-safe.
+### ⛔ Three things nothing predicted
 
-### Remedy verdict
+- **`BacklogProvenanceTest` caught my own row:** "Filed by" and `` `M123` `` fell on different physical lines, which reads as no filer.
+- **Writing the mutation predictions found a weak test before any mutant ran.** Opening the dialog without waiting for the flush would have survived the original FT6, because the store refuses the read anyway; the real defect is a second modal stacked over the conflict dialog. FT6 now asserts that no dialog of ours exists.
+- **"Run the specs your diff reaches" was 354 Playwright tests across five specs** — hours at one worker. Stopped after seven green tests; `builder-axe` ran alone, and CI is the authority for the rest. I also told the user "70 mutations" mid-session; the true count is 55, corrected in the PR body.
 
-- **`R-495abf48` — works, with three additions the docblock does not name.** A new `FieldTypeControl.vue` as the first
-  child of the Basics tab (the hub edit: one import made line-neutral, one mount line) owns a props-only
-  `ConvertFieldDialog.vue`. Store actions `loadConversionPlans()` and `convertField()` run in the queue and outside
-  `guard()`: a read must never set the save verdict, and a refused conversion is not a failed save. A 409 adopts the
-  server's row and re-reads the plans; it never opens the ConflictDialog. One history entry: undo converts back, then
-  PATCHes the pre-conversion snapshot only when the round trip is not exact. `undo()`/`redo()` keep a failed step for
-  a retry and drop a stale one. Type guards on Edit entries and on `resolveConflict('mine')`; `field_type` joins the
-  Logic rail's fingerprint. Residual, stated: an undo that needs the PATCH inherits `R-86a0426d`'s loss.
-- **`R-2c172882` — works, with five corrections.** A null operator on a `_with` rule means "is answered", so it must
-  map to `IsNull` rather than be skipped (skipping it misses a `_with` naming a note; passing it raises a TypeError). The
-  arm runs only after the owner check passed, or two exact-count tests double-report. Field comparisons use
-  `allowsOperator(Gt/Lt)` — the census's own predicate — so an integer compared with a likert still publishes. Two new
-  `rule_`-prefixed codes, because the owner-shape message would name the wrong question. And the mapping lives on a new
-  `ValidationRuleType::relatedComparison()`, so the gate needs no new `use` line: an import would silently retarget a
-  zero-tolerance ADR citation into that file.
-- **`R-d8780a8b` — none prescribed; ours, hub-free.** Catch `ExpressionException` in `SubmissionController::store`
-  (around the whole draft and pipeline branch) and `SubmissionEditController::update`; each helper `report()`s and
-  returns `back()->withErrors()` keyed `answers.<field>` (or `expression`; never `baseline`) with an honest toast.
-  Each import is compensated line-neutrally, and `store()` lands exactly at the controller gate's ceiling of 10. Guest
-  copy: `error-normalizer.ts` substitutes a client sentence for `expression_error`, as the API envelope's own
-  description promises.
-- **The new repeat row — filter `RepeatGroup`'s members by `rendersNothing`.** Render-only; `membersOf()` stays total.
+### Fifty-five mutations, all CAUGHT; two predictions missed, both by over-predicting a red
 
-Files:
-- Row 1: `resources/js/components/builder/ConfigPanel.vue` (hub), `resources/js/components/builder/useBuilderStore.ts`,
-  `resources/js/components/builder/useGraphNotices.ts`; new in `resources/js/components/builder/`:
-  `FieldTypeControl.vue`, `ConvertFieldDialog.vue`, `field-conversion.ts`, `builder-store-fixtures.ts`,
-  `field-conversion.test.ts`, `conversion-store.test.ts`, `ConvertFieldDialog.test.ts`, `FieldTypeControl.test.ts`,
-  `useGraphNotices.test.ts`; new `tests/e2e/builder-convert-axe.spec.ts`.
-- Row 2: `app/Enums/ValidationRuleType.php`, `app/Services/Forms/StructuralValidationGate.php`,
-  `app/Exceptions/Forms/PublishValidationException.php`, `tests/Feature/Forms/StructuralValidationGateTest.php`.
-- Row 3: `app/Http/Controllers/Tenant/SubmissionController.php`,
-  `app/Http/Controllers/Tenant/SubmissionEditController.php`, `resources/public-runtime/lib/error-normalizer.ts`,
-  `resources/public-runtime/__tests__/error-normalizer.test.ts`; new
-  `tests/Feature/Submissions/ExpressionRefusalTest.php`.
-- Row 4: `resources/public-runtime/components/RepeatGroup.vue`, `resources/public-runtime/__tests__/components.test.ts`;
-  new `resources/js/components/builder/PreviewRuntime.test.ts`.
+- **Gate, eleven** through `scripts/mutate.php`; M7 (the related field's `allows($rule)`) reddened four of the five predicted — a note's shape allows no rule at all, so the mutant still refuses note-related rows.
+- **Controllers, nine** through `scripts/mutate.php`, every red set as predicted.
+- **Guest copy, three, and the repeat filter, three** — Vitest by hand (sha256 move, byte restore), every red set as predicted.
+- **The type-change client, twenty-nine** — Vitest by hand; every red set as predicted except S11.
 
-Hubs: **`resources/js/components/builder/ConfigPanel.vue` only** (row 1). No file is edited by two rows.
-Shared artefacts taken: `docs/feature-backlog.md`, `docs/claims/decisions.md` (the `D57` amendment), `PROGRESS.md`
-(own block), and `docs/pipeline.md` + `docs/backlog-triage.md` regenerated as procedure. Not `openapi.json`.
-Paired files taken: none.
-Namespaces spent: nothing from either namespace. No decision id.
-Prediction:
-- Pint: one layout fixer at most, on the new PHP test or a helper.
-- PHPStan (container, scoped): zero new errors; `relatedComparison()`'s total `match` passes level 8.
-- Vitest and vue-tsc: green once implemented; no existing test edited except the two appends.
-- Contract and Storybook axe: unmoved — no `/api/v1` and no design-system change.
-- E2E: `builder-axe`, `responsive-axe`, `personalization-axe` and `field-library-axe` stay green over the new Basics
-  row; the new spec is green in all six runs and records zero writes.
-- ⚠️ **Most expected wrong: the citation lint.** The `useBuilderStore.ts` block moves the ledger anchor `:883` into new
-  code and the ConfigPanel mount shifts three anchors; I expect at least one landing to need a retune.
-- Second: a Vitest mutation red set among the history-outcome cases differs from its prediction.
+### Measured
+
+Pest per directory at 3G: Forms **573**, Submissions **439**, Unit **1402** (2 pre-existing warnings), Http **30**, Docs **142** + the known bind-mount `SuiteCollectionFloorTest`. Vitest **156 files / 2692**. vue-tsc clean (main and sw). Pint bare over **1536** files and every host lint gate through `preflight --with-gates --with-pint`. Citation lint: ledger **17 / 17**, tier 1 at 0, ROT set unchanged. E2E locally: `builder-convert-axe.spec.ts` **6 / 6**; `builder-axe.spec.ts` **61 passed** across all three widths; the five-spec run (354 tests) was stopped after seven green tests, and CI's E2E job ran the rest green. Seen working in the running app: a throwaway Playwright probe converted Logic Notices Demo's `age` to Decimal number through the real dialog, undid it from the toolbar, and a reload showed the SERVER holding Whole number again — two `convert` POSTs and no PATCH, because whole number ↔ decimal is an exact round trip; the fixture is back to `integer`.
+
+Files: as claimed, including `resources/js/components/builder/PreviewRuntime.test.ts`. Shared artefacts: `docs/feature-backlog.md`, `docs/claims/decisions.md` (the `D57` amendment in the claim commit; the decisions-of-record list), and `docs/pipeline.md` + `docs/backlog-triage.md` regenerated as procedure. Not `openapi.json`.
 
 ## RELEASED — `M122`, the type-conversion routes and their cross-field census, plus the blank-formula refusal (merged as PR #315, `aa953d65`, 6/6 green with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

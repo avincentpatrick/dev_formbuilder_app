@@ -322,6 +322,42 @@ final class PublishValidationException extends RuntimeException
     }
 
     /**
+     * A conditional rule whose comparison the RELATED question's answer can never support (Increment M123,
+     * `R-2c172882`) — an ordering on a choice or a note, `contains` on a number, "is answered" on a note.
+     *
+     * ⛔ THE CONDITION IS CONSTANT, AND NEITHER ENGINE SAYS SO. An ordered comparison returns false on a NaN
+     * operand, `contains` on a scalar is a substring test, and a note is never answered — so the rule is always
+     * true or always false whatever the respondent does, and the field it governs is silently always (or never)
+     * required or skipped. `$relatedKind` is the related field type's own label, so the author reads the kind
+     * of question in plain words; `field` is the rule's OWNER, where the author edits the rule.
+     */
+    public static function ruleOperatorNotAllowedForRelatedShape(string $fieldKey, string $ruleType, string $relatedKey, string $relatedKind, string $comparison): self
+    {
+        return self::one(
+            $fieldKey,
+            'rule_operator_not_allowed_for_related_shape',
+            "The “{$ruleType}” rule on “{$fieldKey}” compares the {$relatedKind} question “{$relatedKey}” using “{$comparison}”, which that kind of answer cannot support, so the condition never changes with the answer. Choose a different comparison or a different question.",
+        );
+    }
+
+    /**
+     * A field comparison against a question whose answer cannot be ordered (Increment M123, `R-2c172882`).
+     *
+     * ⚠️ THE OWNER-SHAPE ARM CANNOT SEE THIS ONE, because the owner is a number and therefore allowed the rule.
+     * The failure is on the other side: the related answer coerces to NaN, the ordering is false, and every
+     * non-empty answer to the owner is refused with no way for the respondent to discover why — the same
+     * fail-closed shape {@see ruleNotAllowedForShape()} refuses, reached through the question it compares with.
+     */
+    public static function ruleRelatedFieldNotOrderable(string $fieldKey, string $ruleType, string $relatedKey, string $relatedKind): self
+    {
+        return self::one(
+            $fieldKey,
+            'rule_related_field_not_orderable',
+            "The “{$ruleType}” rule on “{$fieldKey}” compares it with the {$relatedKind} question “{$relatedKey}”, whose answers are not numbers, so every answer to “{$fieldKey}” would be refused. Compare it with a number question or remove the rule.",
+        );
+    }
+
+    /**
      * @param  list<array{field: ?string, code: string, message: string}>  $violations
      */
     private function __construct(string $message, private readonly array $violations)

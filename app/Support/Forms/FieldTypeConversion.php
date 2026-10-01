@@ -52,7 +52,7 @@ use LogicException;
  * ⚠️ WHAT THIS CANNOT SEE: ANY OTHER FIELD. A plan describes one field. What a conversion does to the
  * fields that REFER to it — a multiple choice's `contains` meaning a different thing once it is a single
  * choice, an ordered comparison against a scale that is now a choice, a `${key}` that a note can no longer
- * answer — is the cross-field census that the HTTP half (`M122`) owns.
+ * answer — is `ConversionCensus`'s, which `M122`'s GET reports beside each plan.
  */
 final class FieldTypeConversion
 {

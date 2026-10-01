@@ -21,7 +21,7 @@ enum ConversionWarning: string
     /** The target needs choices, levels, rows, columns or cells before publish will accept it. */
     case NeedsSetup = 'needs_setup';
 
-    /** A calculated field with no formula computes nothing, and no publish gate catches that. */
+    /** A calculated field with no formula computes nothing, and publish refuses it until it has one (M122). */
     case CalculatedNeedsFormula = 'calculated_needs_formula';
 
     /** A hidden field holds nothing until it declares where its value comes from. */
@@ -46,7 +46,7 @@ enum ConversionWarning: string
     {
         return match ($this) {
             self::NeedsSetup => 'This question needs its choices, levels, rows or columns set up before the form can be published.',
-            self::CalculatedNeedsFormula => 'A calculated question computes nothing until it has a formula, and publishing will not stop you.',
+            self::CalculatedNeedsFormula => 'A calculated question computes nothing until it has a formula, and the form cannot be published without one.',
             self::HiddenNeedsPrefillSource => 'A hidden question holds nothing until you choose where its value comes from.',
             self::DefaultValueFormat => 'The default value was written for the old type and may not suit the new one.',
             self::IndexingUnavailable => 'This question is marked for reporting, but answers of the new type cannot be indexed.',

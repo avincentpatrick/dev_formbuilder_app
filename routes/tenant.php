@@ -22,6 +22,7 @@ use App\Http\Controllers\Tenant\FormAnalyticsController;
 use App\Http\Controllers\Tenant\FormBuilderController;
 use App\Http\Controllers\Tenant\FormConfirmationMessageController;
 use App\Http\Controllers\Tenant\FormController;
+use App\Http\Controllers\Tenant\FormFieldConversionController;
 use App\Http\Controllers\Tenant\FormHubController;
 use App\Http\Controllers\Tenant\FormPageModeController;
 use App\Http\Controllers\Tenant\FormPrintController;
@@ -578,6 +579,13 @@ Route::middleware([
         ->middleware('can:update,form')->name('forms.fields.destroy');
     Route::post('/forms/{form}/fields/{field}/duplicate', [FormBuilderController::class, 'duplicateField'])
         ->middleware('can:update,form')->name('forms.fields.duplicate');
+    // Type conversion (Increment M122): its own controller and endpoint, never the autosave PATCH, whose
+    // configRules() dispatch on the field's CURRENT type. GET reads every plan with its cross-field census;
+    // POST applies one under the token and the confirmed plan's fingerprint.
+    Route::get('/forms/{form}/fields/{field}/conversions', [FormFieldConversionController::class, 'index'])
+        ->middleware('can:update,form')->name('forms.fields.conversions');
+    Route::post('/forms/{form}/fields/{field}/convert', [FormFieldConversionController::class, 'store'])
+        ->middleware('can:update,form')->name('forms.fields.convert');
     Route::post('/forms/{form}/reorder', [FormBuilderController::class, 'reorder'])
         ->middleware('can:update,form')->name('forms.reorder');
 

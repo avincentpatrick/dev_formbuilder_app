@@ -2257,7 +2257,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   applies"* bullet; `GoogleSessionStarter`'s *"PERSONAL TWO-FACTOR STILL APPLIES"* docblock; and
   `GoogleSignInWebTest`'s *"THE DELIBERATE DIVERGENCE"* comment. ⛔ **AND EIGHT *CORRECT* §D22 CITATIONS SIT IN THE SAME
   GREP** — `SsoStepUpController`, `SsoStepUpService`, `SsoAuthOutcome`, the step-up migration,
-  `routes/tenant.php:357`, `SsoStepUpWebTest` and ADR-0016's own two — so this was decided by **reading
+  `routes/tenant.php`'s SSO step-up block, `SsoStepUpWebTest` and ADR-0016's own two — so this was decided by **reading
   each line, never by sweeping a pattern**, which is PR #153's 133-reference shape in miniature.
   `PROGRESS_ARCHIVE.md` keeps what was believed at the time.
   ⚠️⚠️ **AND THIS INCREMENT REPRODUCED THE VERY DEFECT CLASS IT CLOSES — FOUR TIMES, IN ITS OWN PROSE.**

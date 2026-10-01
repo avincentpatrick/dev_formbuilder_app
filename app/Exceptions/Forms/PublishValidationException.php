@@ -305,6 +305,23 @@ final class PublishValidationException extends RuntimeException
     }
 
     /**
+     * A calculated question with no formula (Increment M122, `R-244d53dc`). It would publish, compute nothing in
+     * every submission, and say so nowhere — the runtime skips a blank formula in silence on both engines.
+     *
+     * ⚠️ THE CODE IS PREFIXED ON PURPOSE, as {@see ruleMissingRelatedField()} explains: a bare
+     * `missing_formula` is already a code the builder's DRAFT projection mints for the preview, and the two
+     * must stay distinguishable in any log that carries both.
+     */
+    public static function calculatedFormulaMissing(string $fieldKey): self
+    {
+        return self::one(
+            $fieldKey,
+            'calculated_formula_missing',
+            "The calculated question “{$fieldKey}” has no formula, so it would compute nothing in every submission. Add a formula or remove the question.",
+        );
+    }
+
+    /**
      * @param  list<array{field: ?string, code: string, message: string}>  $violations
      */
     private function __construct(string $message, private readonly array $violations)

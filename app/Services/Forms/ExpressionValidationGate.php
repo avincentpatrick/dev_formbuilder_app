@@ -86,7 +86,7 @@ final class ExpressionValidationGate
 
         foreach ($fields as $field) {
             $violations[] = $this->capture(fn () => $this->check($field->relevant_expression, $knownKeys, $objectValuedKeys, ExpressionKind::Relevant, $field->key));
-            $violations[] = $this->capture(fn () => $this->check($this->calculateFormula($field), $knownKeys, $objectValuedKeys, ExpressionKind::Calculate, $field->key));
+            $violations[] = $this->capture(fn () => $this->checkFormula($field, $knownKeys, $objectValuedKeys));
         }
 
         foreach ($sections as $section) {
@@ -190,5 +190,34 @@ final class ExpressionValidationGate
         if ($isThreshold && ! Coercion::isNumericLike($ruleValue)) {
             throw PublishValidationException::ruleValueInvalid($ownerKey, 'non_numeric_threshold');
         }
+    }
+
+    /**
+     * A calculated question's formula — the one expression for which blank is NOT "no expression" (Increment
+     * M122, `R-244d53dc`). {@see check()} skips a blank expression, which is right for relevance and for a
+     * constraint, and was wrong here: a calculated question exists only to compute, so a blank formula
+     * published clean and computed nothing in every submission. Reached three ways — adding a Calculated
+     * question (its default config is empty), converting a note or hidden field to one, and importing an
+     * XLSForm `calculate` row with no `calculation`.
+     *
+     * The blank test trims, exactly as `SemanticValidator`'s own skip does, so publish refuses precisely what
+     * the runtime would otherwise have ignored. Every other type reaches {@see check()} with null, as before.
+     *
+     * ⚠️ APPENDED HERE, AND THE CALL SITE ABOVE WAS REPLACED IN PLACE, ON PURPOSE: this file is cited by line
+     * from a design document and from the ledger, and a single inserted line in the field loop rots a ledger
+     * citation past its ceiling.
+     *
+     * @param  array<string, bool>  $knownKeys
+     * @param  array<string, 'grid'|'geo'>  $objectValuedKeys
+     */
+    private function checkFormula(FormField $field, array $knownKeys, array $objectValuedKeys): void
+    {
+        $formula = $this->calculateFormula($field);
+
+        if ($field->field_type === FieldType::Calculated && ($formula === null || trim($formula) === '')) {
+            throw PublishValidationException::calculatedFormulaMissing($field->key);
+        }
+
+        $this->check($formula, $knownKeys, $objectValuedKeys, ExpressionKind::Calculate, $field->key);
     }
 }

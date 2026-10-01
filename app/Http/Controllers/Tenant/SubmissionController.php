@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Tenant;
 
 use App\Enums\SubmissionSource;
 use App\Enums\SubmissionStatus;
+use App\Exceptions\Expressions\ExpressionException;
 use App\Exceptions\Submissions\SubmissionValidationException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Submissions\EncodeSubmissionRequest;
@@ -27,11 +28,10 @@ use Inertia\Response;
 
 /**
  * Manual encoding — the first Submission Pipeline channel to get a UI (Increment F4b). Authorization is the
- * `can:create,<Submission>,form` route middleware ({@see SubmissionPolicy}: permission +
- * per-form collaborator scope + published). This controller is a thin channel adapter: it hands the raw
- * answers to the submissions services (the adapter never validates), and lets the pipeline's
- * {@see SubmissionValidationException} bubble to the central bootstrap/app.php render closure
- * (→ `back()->withErrors()` for the web / 422 for the API).
+ * `can:create,<Submission>,form` route middleware ({@see SubmissionPolicy}: permission + per-form collaborator
+ * scope + published). This controller is a thin channel adapter: it hands the raw answers to the submissions
+ * services (the adapter never validates), and lets the pipeline's {@see SubmissionValidationException} bubble
+ * to the central bootstrap/app.php render closure (→ `back()->withErrors()` for the web / 422 for the API).
  *
  * ── TWO CLAIMS IN THIS PARAGRAPH STOPPED BEING TRUE IN I9b, so they are corrected rather than left ──────
  * It no longer "resolves the form's published version" unconditionally: a Submit carrying the uuid of an
@@ -122,27 +122,31 @@ final class SubmissionController extends Controller
             checkBaseline: $request->claimsBaseline(),
             baseContentChecksum: $request->baseContentChecksum(),
         );
+        try {
+            if ($draft !== null) {
+                // Capture the final edits (Stage 1 only), then finalize the SAME row in place via promote()
+                // (full Stage 3). The submission keeps its id, so a resume link, an audit row or an outbox entry
+                // pointing at the draft still points at the submission.
+                $drafts->saveDraft($payload);
+                $result = $drafts->promote($draft, actorId: (string) $user->id);
+            } else {
+                $result = $pipeline->submit($payload);
 
-        if ($draft !== null) {
-            // Capture the final edits (Stage 1 only), then finalize the SAME row in place via promote()
-            // (full Stage 3). The submission keeps its id, so a resume link, an audit row or an outbox entry
-            // pointing at the draft still points at the submission.
-            $drafts->saveDraft($payload);
-            $result = $drafts->promote($draft, actorId: (string) $user->id);
-        } else {
-            $result = $pipeline->submit($payload);
-
-            // ⚠️ THE RACE BACKSTOP, and without it R1 survives the branch above. The `$draft` lookup and the
-            // pipeline's own Stage 2b both run BEFORE any autosave transaction commits, so a Submit clicked
-            // ~1.5s after the last keystroke can have both miss: the insert then hits the
-            // (tenant_id, client_submission_uuid) partial-unique index, the 23505 catch resolves the row —
-            // which is the DRAFT the autosave just committed — and returns it `created: false`. The response
-            // is a success toast over a row that stays `draft` forever, exactly the shape the draft branch
-            // exists to prevent. Re-checking the RESULT rather than the pre-state is what closes it, because
-            // the result is the only value that has seen the committed row.
-            if ($result->submission->status === SubmissionStatus::Draft) {
-                $result = $drafts->promote($result->submission, actorId: (string) $user->id);
+                // ⚠️ THE RACE BACKSTOP, and without it R1 survives the branch above. The `$draft` lookup and the
+                // pipeline's own Stage 2b both run BEFORE any autosave transaction commits, so a Submit clicked
+                // ~1.5s after the last keystroke can have both miss: the insert then hits the
+                // (tenant_id, client_submission_uuid) partial-unique index, the 23505 catch resolves the row —
+                // which is the DRAFT the autosave just committed — and returns it `created: false`. The response
+                // is a success toast over a row that stays `draft` forever, exactly the shape the draft branch
+                // exists to prevent. Re-checking the RESULT rather than the pre-state is what closes it, because
+                // the result is the only value that has seen the committed row.
+                if ($result->submission->status === SubmissionStatus::Draft) {
+                    $result = $drafts->promote($result->submission, actorId: (string) $user->id);
+                }
             }
+        } catch (ExpressionException $e) {
+            // Both promotes and the submit run Stage 3, so the try covers the whole branch (M123).
+            return $this->refuseExpression($e);
         }
 
         // Increment H21c (Doc #27 §7) — tell the keyer what relevance took away. The result carried this all
@@ -188,5 +192,29 @@ final class SubmissionController extends Controller
         abort_if($form->current_published_version_id === null, 404);
 
         return FormVersion::query()->whereKey($form->current_published_version_id)->firstOrFail();
+    }
+
+    /**
+     * Increment M123 (`R-d8780a8b`) — a form rule the server could not evaluate, refused WITHOUT losing the page.
+     *
+     * ⛔ THE ERRORS BAG IS THE POINT, NOT DECORATION. Escaping, the exception reached the central renderer, which
+     * answers an Inertia request with a toast-only `back()` — and `Encode.vue` keeps its state only when the page
+     * comes back carrying errors, so the keyer's answers were thrown away. `answers.<key>` is the key the page
+     * renders inline; a throw that names no field still keeps the page under a neutral key. ⚠️ NEVER `baseline`:
+     * the page reads that key as an editing conflict and offers to discard the keyer's work.
+     *
+     * ⚠️ `report()`, BECAUSE CATCHING SILENCES IT. Escaping, it was reported before rendering; a broken published
+     * rule is a fault the operator must still hear about. No "try again": the same answers fail the same way.
+     */
+    private function refuseExpression(ExpressionException $e): RedirectResponse
+    {
+        report($e);
+
+        $field = $e->fieldKey();
+        $message = "This response can't be submitted because one of this form's rules couldn't be checked. Your answers are still on the page.";
+
+        return back()
+            ->withErrors([$field === null ? 'expression' : 'answers.'.$field => $message])
+            ->with('toast', ['type' => 'error', 'message' => $message]);
     }
 }

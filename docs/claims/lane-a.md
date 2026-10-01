@@ -16,99 +16,82 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M122`, the type-conversion HTTP half and its cross-field census, plus the blank-formula publish refusal (`m122-conversion-routes`)
+## Status: NO ACTIVE CLAIM — `M122` is merged; a question's type can be changed over HTTP, the dialog will be told which other questions the change re-means, a calculated question with no formula no longer publishes, and `D68`/`D69` are answered
 
-Taken 2026-10-01. Branch `m122-conversion-routes`, cut from `origin/main` at `aacabcca`, PR into `main`.
-Rows, all **Tier: early-testing**:
-- `R-495abf48` — *"A field's type cannot be changed after it is created, and the delete-and-re-add workaround
-  destroys every rule, mints a new key and dangles every expression that referenced it"*
-  (`docs/feature-backlog.md:11400`). The overhaul plan's `B5a`, **second half: the HTTP surface and the cross-field
-  census** that `M121` assigned here. **The row stays open** afterwards, owned by `B5b` (the client: dialog, palette
-  grouping, Basics variant switch), which has no row of its own.
-- `R-244d53dc` — *"A calculated question with no formula publishes clean and computes nothing"* (`:12367`).
-- Also recorded, no code: **`D68` = B** (`localStorage`) and **`D69` = B** (the label is author-only once a note has
-  blocks), both answered by the user in chat on 2026-10-01 — the decision-surfacing rule owed them, because each
-  blocks an `early-testing` work row by name (`R-33c7fd56`, `R-c9f50df2`).
+## RELEASED — `M122`, the type-conversion routes and their cross-field census, plus the blank-formula refusal (merged as PR #315, `aa953d65`, 6/6 green with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 
-### Evidence verified
+Shipped 2026-10-01. Branch `m122-conversion-routes`, cut from `origin/main` at `aacabcca`; the claim commit is `0f2f57fa`.
 
-**`R-495abf48` (the half this increment owns) — holds.** `FormBuilderService::conversionPlans()` (`:362`) and
-`convertField()` (`:404`) are public; `ConversionPlan::toArray()`'s key lists are pinned at
-`FieldTypeConversionTest.php:638-654`. `BuilderConflictException` has no `render()` and `FormException` has only an
-API arm (`bootstrap/app.php:326-328`), so on a web route it would fall through to a 500 — the new controller must map
-both itself, which is what the row says. `FieldTypeConversion.php:52-55` names this increment as the census's owner.
+**Two `early-testing` rows: one closed, one half-shipped. Two decisions answered, one row filed.** Closed: `R-244d53dc`. `R-495abf48`'s HTTP half shipped; the row stays open for `B5b`, the client, which has no row of its own. **`D68` = B and `D69` = B**, the user's answers in chat today, were put to them under `D66`'s rule, because each blocked an `early-testing` work row by name. Their `Awaits` tokens are replaced by the answers. Filed: a `nit` (the draft projection checks `config.formula`, a key nothing writes). `R-2dc95042` was re-verified and not taken: its remedy edits three or four hubs. Namespaces spent: nothing from either. **No tracker surgery owed.**
 
-**`R-244d53dc` — holds at every citation.** `ExpressionValidationGate::check()` returns early on a blank expression
-(`:145-147`) and the Calculate call reaches it through `calculateFormula()` (`:89`, `:172-181`); `StructuralValidationGate`
-has no `Calculated` arm; the runtime skips a blank formula (`SemanticValidator.php:1363-1382`,
-`semantic-validator.ts:1160`); a new calculated field's default config is `[]` (`FormBuilderService.php:751-760`); the
-premise pin is `FieldConversionServiceTest.php:468-480`.
+### ⛔ The census is a reverse index the tree did not have, and the row understated it
 
-### Premise verified
+A conversion keeps the id and the key, so every reference survives *syntactically*. What changes is its *meaning*, and nothing said so:
+- the expression gate checks that a key resolves, never how it is used;
+- `StepGraphInspector` is forward-only;
+- `referencedKeys()` returns bare keys.
 
-**`R-495abf48`.**
-- **No route-enumerating gate covers `forms.*`** — the service-worker route gate inspects only `build/`,
-  `api/v1/public/f/` and `f/`; there is no Ziggy/wayfinder; `openapi.json` and Scramble cover `/api/v1` only; no doc
-  that lists builder endpoints is read by a test. So the two routes oblige no second file.
-- ⛔ **The trap is citation drift, not a gate.** The ledger is at its rot ceiling (17 of 17,
-  `citation-liveness-lint.php:161`), and the `use` import sorts to line 25, so it and the route block shift every
-  `routes/tenant.php:N` citation — the ledger's and ADR-0009's `:49` / ADR-0011's `:405`. Tuned by measurement, not
-  repaired after the fact.
-- ⛔ **The row UNDERSTATES the census.** Beyond its four named cases: operator-less rule rows (`greater_than_field`,
-  `less_than_field`, and `required_with`/`skip_with` with a null operator) reference the field too; the field's OWN
-  constraint expressions are kept by the engine and deferred to the expression gate, which never checks ordering or
-  list shape (`FieldTypeConversion.php:269`) — likert→multi with `. >= 2` refuses every answer; multi/cascade→hidden
-  turns `contains` from membership into a substring test; and arithmetic is a numeric use like ordering.
-- ⚠️ **The census is advisory and outside the fingerprint**, which covers only the converted field
-  (`ConversionPlan.php:149-166`): another tab editing a referencing field is not caught. Acceptable for a warning —
-  publish remains the gate.
+`ConversionCensus` gathers every use of the key once. It then lets four judges report what each target changes: `reference_has_no_answer`, `numeric_use_on_non_number`, `list_meaning_changes` and `template_hole_unanswerable`.
 
-**`R-244d53dc`.**
-- ⛔ **The row understates its reach.** An XLSForm `calculate` with no `calculation` imports as
-  `calculated_formula = ''` (`XlsformImportParser.php:211-212`) — a third way in beyond the two it names.
-- The gate's only production caller is `PublishService.php:127`, so nothing refuses at import, template or library
-  time; no client mirrors publish codes and no doc enumerates them.
-- No seeder, platform template, fixture or E2E spec carries a calculated field, and every test that publishes one
-  supplies a formula — so the refusal reddens nothing but the premise pin it is meant to flip.
-- ⚠️ **The fix is not retroactive.** Already-published blank formulas stay, so the runtime skips stay.
-- ⚠️ `FieldTypeConversion::filled()` does not trim, so the warning and the refusal disagree on a whitespace-only
-  formula — **unreachable**, because a conversion to calculated always starts from the target's empty default config.
+**The row named four cases, and the floor was wider.** These also change meaning:
+- **Operator-less rule rows.** `greater_than_field`, and a `required_with` that means "is answered", are read by lowering every row through `StructuredRuleLowering` into the walk that reads expressions.
+- **The field's OWN constraint expressions.** The engine keeps them and defers to an expression gate that never checks ordering, so `. >= 2` on a scale that becomes a multi-select refuses every answer and publishes clean.
+- **Multi/cascade → hidden.** Membership becomes a substring test.
+- **Arithmetic.** It is a numeric use, like ordering.
 
-### Remedy verdict
+⛔ **The judges are INDEPENDENT, which the plan review forced.** One combined "was this reference already bad?" check was the obvious design, and it is wrong. A `contains` on a single choice is already a substring test, so a combined verdict would stay silent while the field lost its answer. A dedicated case pins this, and mutation M4 (no-answer made to defer to the list judge) reddened exactly the three cases it should.
 
-- **`R-495abf48` — works as prescribed, plus one structure nobody has built.** `ConvertFieldRequest`, a new
-  `FormFieldConversionController` with its own 409/422 `respond()` copied from `FormBuilderController.php:229-242`,
-  and two routes. The census is a REVERSE index the tree does not have — `StepGraphInspector` is forward-only and
-  `ExpressionParser::referencedKeys()` returns bare keys — so `ConversionCensus` gathers every use of the key once
-  (rule rows lowered through `StructuredRuleLowering` so one AST walk covers expressions and rows alike) and four
-  INDEPENDENT judges report what the conversion changes. A combined `bad(source)` was rejected: a weak pre-existing
-  problem would hide a definite break (a single-select `contains` → note).
-- **`R-244d53dc` — works, placed so no cited line moves.** The file is cited by line from a HUB doc
-  (`docs/piping-output-encoding-design.md` → `:47`) and from the ledger (`:185`, `:189-191`); a one-line insertion in
-  the field loop takes the ledger to 18/17. So the Calculate call is replaced in place and the refusal is a method
-  appended at the end of the class.
+✅ **Seen working in the running app, not only in tests.** On `demo`'s "Referral Router", converting `referral_type` from single select to multi select reports `list_meaning_changes` on both section conditions (`${referral_type} = 'clinic'` would never hold against a list). Converting it to note reports `reference_has_no_answer` on both. Dropdown and hidden report nothing. ⚠️ **The multi-select plan is lossless and needs no confirmation, yet its census is non-empty.** That is real data saying what the controller docblock tells `B5b`: show the dialog whenever `census` is non-empty.
 
-Files: `routes/tenant.php`; `app/Http/Controllers/Tenant/FormFieldConversionController.php`,
-`app/Http/Requests/Forms/ConvertFieldRequest.php`, `app/Services/Forms/ConversionCensus.php`,
-`app/Enums/ConversionImpact.php`, `tests/Feature/Forms/FieldConversionRoutesTest.php`,
-`tests/Feature/Forms/ConversionCensusTest.php` (all new); `app/Support/Forms/FieldTypeConversion.php` (docblock,
-line-neutral); `app/Services/Forms/ExpressionValidationGate.php`, `app/Exceptions/Forms/PublishValidationException.php`,
-`app/Enums/ConversionWarning.php`, `tests/Feature/Forms/ExpressionValidationGateTest.php`,
-`tests/Feature/Forms/FieldConversionServiceTest.php`.
-Hubs: **`routes/tenant.php` only** — the two rows share no file.
-Shared artefacts taken: `docs/feature-backlog.md`, `docs/claims/decisions.md` (`D68`/`D69` answers), `PROGRESS.md`
-(own block), and `docs/pipeline.md` + `docs/backlog-triage.md` regenerated as procedure. Not `openapi.json`.
-Paired files taken: none.
-Namespaces spent: nothing from either namespace. No decision id.
-Prediction:
-- Pint: one or two layout fixers on the new files, nothing on edited ones.
-- PHPStan: two or three real errors of mine on the census's array shapes, then zero; the known
-  `FormBuilderService.php` phantoms are untouched because that file is not.
-- Contract, Vitest, Storybook axe and E2E: unmoved — no `/api/v1`, no TypeScript, no UI.
-- Citation lint: the route block needs at least one comment-length retune before the ledger reads 17/17.
-- ⚠️ **Most expected wrong: lowering operator-less rule rows through `StructuredRuleLowering`** — I expect at least
-  one row shape to throw or lower to a node my walk does not classify, so a case I wrote as positive comes back empty.
-- Second: a mutation red set differs from its prediction on the census's independent judges.
+### The blank formula, placed so no cited line moved
+
+`ExpressionValidationGate` is cited by line from a hub design document (`:47`) and from the ledger (`:185`, `:189-191`). A one-line insertion in its field loop would take the ledger to 18 of 17. So the Calculate call is replaced **in place** and `checkFormula()` is **appended**. ⛔ **The row understated its reach:** an XLSForm `calculate` with no `calculation` imports as `''`, a third way in. It is refused now too. The fix is not retroactive.
+
+### How the prediction fared
+
+| Predicted | Actual |
+|---|---|
+| Pint: one or two layout fixers on the new files | **Wrong, in the good direction.** Clean on the first run, 1535 files. |
+| PHPStan: two or three real errors on the census's array shapes, then zero | **Wrong, in the good direction.** Zero on the first scoped run. |
+| Contract, Vitest, Storybook axe, E2E unmoved | **Held.** Contract, Frontend, Storybook axe and E2E all green on PR #315 with their usual step counts; no TypeScript and no `/api/v1` file was touched. |
+| Citation lint: the route block needs at least one comment-length retune | ⛔ **Wrong in mechanism.** The route block killed nothing. The one-line `use` import, at line 25, moved `routes/tenant.php:357` onto a blank line (ledger 18/17), and no comment length can tune an import. The line number was dropped in place (`M116`'s rule). |
+| ⚠️ **Most expected wrong: lowering operator-less rows** | **Held.** `greater_than_field` and a null-operator `required_with` both lowered and classified on the first green run. |
+| Second: a mutation red set differs from its prediction | **Wrong.** All nine matched exactly. |
+
+### ⛔ Three things nothing predicted
+
+- **A gate I wrote was green before the feature existed.** The cross-tenant case expected a 404, and a route that does not exist answers 404 too. It passed on the red run. It now asserts the owner's own GET is 200 first, so its 404 can only come from the binding.
+- **Every read after a request found no row.** The tenancy middleware leaves the RLS context elsewhere when it returns, so a bare `refresh()` after `getJson()` throws `ModelNotFoundException`. `BuilderRoutesTest` re-enters for the same reason; the new file has a helper that does it.
+- **The Forms directory died at the container's default 128 MB**, mid-run. A filtered run then printed NOTHING for it, not a failure: the grep for `Tests:` simply found no line, which is silence that can pass for a pass. That is the `PROGRESS.md` gotcha about the local OOM (run with `-d memory_limit=3G`), and at 3G it is 563 passed.
+
+### Nine mutations, nine CAUGHT, every red set as predicted (written before the first ran)
+
+Through `scripts/mutate.php`:
+- **Census:**
+  - M1, `judge()` iterates nothing: eight census cases + the routes census case.
+  - M2, numeric judge forgets the source: the "already wrong" negative alone.
+  - M3, list judge always false: the two list cases.
+  - M4, no-answer defers to a list use: three cases.
+  - M5, the empty-literal exemption removed: the `!= ''` negative alone.
+- **Controller:** M6, 409 mapped to 422: both 409 cases.
+- **Gate:**
+  - M7, the refusal removed: five dataset cases + the publish case + the flipped service pin.
+  - M8, `trim()` dropped: one case. *Inferred* to be the whitespace one, because the log truncated the name and it is the only input the mutant changes.
+- **Routes:** M9, the GET's `can:update,form` removed, a transient edit to a hub file that was never committed: the viewer case alone.
+
+### Measured
+
+Pest by directory:
+- Forms **563** (at 3G; 527 + 36 new)
+- Docs **142** + the known bind-mount `SuiteCollectionFloorTest`
+- Http **30**
+- Xlsform **15**
+- Submissions **430**
+- Unit **1402**
+
+Every host lint gate and Pint pass through `preflight --with-gates --with-pint`, and `tracker-lint` and `test-pointer-lint` are green. Ledger citations 17 of 17. Not run: Vitest and vue-tsc (no TypeScript changed), E2E (no spec reaches the routes; no UI until `B5b`).
+
+Files: as claimed. Shared artefacts: `docs/feature-backlog.md`, `docs/claims/decisions.md`, and `docs/pipeline.md` + `docs/backlog-triage.md` regenerated as procedure. Not `openapi.json`.
 
 ## RELEASED — `M121`, the type-conversion engine, plus three hub-free rows (merged as PR #314, `4b0326fb`, 6/6 green with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

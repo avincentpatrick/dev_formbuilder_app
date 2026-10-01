@@ -16,118 +16,79 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M121`, the type-conversion engine, plus three hub-free rows (`m121-type-conversion-engine`)
+## Status: NO ACTIVE CLAIM — `M121` is merged; a question can change type in place without losing its rules (the engine half — `M122` owns the routes), a respondent is told when the rule engine fails and can still submit, the resume READ's escape from the service-worker cache is a gate on both sides, and a mutation found a vacuous assertion in the gate I had just written
 
-Taken 2026-10-01. Branch `m121-type-conversion-engine`, cut from `origin/main` at `7ad332ec`, PR into `main`.
-Rows, all **Tier: early-testing**:
-- `R-495abf48` — *"A field's type cannot be changed after it is created, and the delete-and-re-add workaround
-  destroys every rule, mints a new key and dangles every expression that referenced it"*
-  (`docs/feature-backlog.md:11400`). The overhaul plan's `B5a`, **first half only: the engine.** The HTTP half
-  (a request, a controller and two routes in `routes/tenant.php`) is `M122`, on the user's choice of the split over
-  a stated two-hub breach (in chat, 2026-10-01). **The row stays open** with that owner.
-- `R-95a94b36` — *"A respondent is never told the rule engine failed"* (`:12075`).
-- `R-aa133bab` — *"The resume READ escapes service-worker caching only because its path prefix is `drafts/`"* (`:10957`).
-- `R-950ef5f1` — *"`MemberController::invite()` validates … with no domain-ownership check"* (`:2440`) — a closure, no code.
+## RELEASED — `M121`, the type-conversion engine, plus three hub-free rows (merged as PR #314, `4b0326fb`, 6/6 green with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 
-### Evidence verified
+Shipped 2026-10-01. Branch `m121-type-conversion-engine`, cut from `origin/main` at `b0020150` (the claim commit).
 
-**`R-495abf48` — partly holds.** Held: no path writes `field_type` after creation; `UpdateFieldRequest::rules()`
-(`:48-77`) has no `field_type`; `configRules()` dispatches on the route model's current type (`:49`);
-`useBuilderStore.fieldPayload()` is exactly `:874-899`; the migration `…_000206:24` cascade is exact. **Rotted:**
-`writeField()`'s fill is `:280-295` (not `:259-274`), `deleteField()` `:303-315`, `addField()` `:121-159` (M112's
-default seeding moved it), `uniqueKey()` `:646-656`; `ConfigPanel.vue` reads `field_type` on nine lines, not seven.
-**False:** *"any `required_if` row … dangles"* — `related_form_field_id` is ALSO `cascadeOnDelete` (`…_000206:25`),
-so delete-and-re-add silently DELETES other fields' rules that name the field, which is worse than the row says.
+**Four `early-testing` rows: three closed, one half-shipped.** Closed: `R-95a94b36`, `R-aa133bab`, and `R-950ef5f1` (by `D33` = A, with no code). `R-495abf48` stays open with `M122` owning its HTTP half. **Eight rows filed and three decisions filed silently (`D68`–`D70`).** Five user decisions taken in chat: the four that fix where `D64`'s shape line falls (recorded as a `D64` amendment) and `D67` = A, warn. Namespaces spent: nothing from either; one decision id, `D67`, plus `D68`–`D70` filed open. **No tracker surgery owed.**
 
-**`R-95a94b36` — holds.** `safeEvaluate()` is `useFormRuntime.ts:310-319` (the row's `:307` includes the comment
-above it), `passed` is `:357`, and `RuntimeSession.vue:395-399` gates submit on `passed` alone. `engineFailed` has
-exactly one consumer, `Encode.vue:1178-1183`, and no test anywhere induces it.
+### ⛔ The plan's B5a design was wrong in three places, and `D64` had not decided its own boundaries
 
-**`R-aa133bab` — holds.** The resume READ is `routes/api.php:606`; `sw.ts` caches under `:58`, `:71` and `:89`; the
-only GET under `api/v1/public/f/` is `forms.schema` (`:519`). The M78 arm in `sw.test.ts` hard-codes its URL, so it
-cannot see the route rename the row is about.
+`B2a` shipped `ValueShape` and `DefaultFieldRules`, not the `FieldType::valueShape()`/`defaultValidations()`/`paletteGroup()` the plan names — so `FieldType.php`, a plan hub, was never touched. *"A rule survives iff the target shape allows it"* is not the rule: `hidden` is Text-shaped and publish refuses any rule on it, and the email default pattern survives on Text. And the plan's lossy cascade↔choice rows contradict `D64`'s "refuse". ⛔ **`ValueShape` puts `likert_scale`, `yes_no` and `cascading_select` outside Choice, so `D64`'s "every choice type converts to every other" decided nothing at its edges.** Four questions went to the user and every answer was the recommendation; the amendment is under `D64`. **182 of 961 ordered pairs are allowed**, and the unit suite pins that number against an oracle written in a different form.
 
-**`R-950ef5f1` — holds as a description of the code** (`MemberController.php:60`), and the remedy is refused on the
-record: `D33` = A, keep inviting anyone.
+⛔ **The row understated its own defect in the worse direction.** It said delete-and-re-add leaves other fields' `required_if` rows dangling. `related_form_field_id` is `cascadeOnDelete` too, so they are DELETED — with no error. A conversion is an in-place UPDATE, so nothing is re-pointed, cascaded or deleted outside the one field, and a service test pins that another field's rule naming the converted one is byte-identical afterwards.
 
-### Premise verified
+**The split held to one hub.** `FormBuilderService.php` gained `conversionPlans()` and `convertField()` as PUBLIC methods so `M122` needs no edit to it; the reviewer caught that the private draft guards would otherwise have forced `M122` into a second hub. `convertField()` requires its token, takes the row lock first, never goes through `replaceValidations()`, and refuses a fingerprint that no longer matches — the token cannot see a validations-only edit, and the service test proves that premise before asserting the refusal.
 
-**`R-495abf48`.**
-- ⛔ **`B2a` did not ship what the plan names.** No `FieldType::valueShape()`, `defaultValidations()` or
-  `paletteGroup()` exists; it shipped `ValueShape::for/allows/allowsOperator/carriesOptionList` and
-  `DefaultFieldRules::for`. So **`FieldType.php` is not touched** here.
-- ⛔ **"A rule survives iff the target shape allows it" is not the whole rule.** `hidden` is Text-shaped, and publish
-  refuses any rule on a hidden field; the email default `pattern` also survives on Text. Hidden and the default swap
-  need explicit steps.
-- ⛔ **`D64` did not decide the family boundaries.** `ValueShape` splits `likert_scale`, `yes_no` and
-  `cascading_select` away from Choice, and the plan's lossy cascade↔choice rows contradict `D64`'s "refuse". The user
-  decided them in chat on 2026-10-01; recorded as a `D64` amendment in this increment.
-- `B0`'s raw-config overlay (`UpdateFieldRequest::payload()`) makes a type-changing PATCH carry the old type's keys —
-  the separate-endpoint premise is stronger than the row argued.
-- `replaceValidations()` drops `error_message_translations`, `logic_group` and `logic_operator` on every save, so the
-  engine converts **in place** and never reuses it.
-- The version token has one-second resolution and a validations-only edit does not bump it, so a confirmed plan
-  carries a **fingerprint**.
-- `ValueShape::allowsOperator()` has **no publish-gate consumer**: a conversion can make another field's condition
-  unholdable and still publish clean. Filed at close-out, not widened into this row.
+### ⛔ The claim was extended mid-build — to `composer.lock`, because the trunk went red under everyone
 
-**`R-95a94b36`.** ADR-0008 §D4 does **not** settle warn-versus-refuse — it is about tenant quota. The user answered
-**Warn** (`D67`, 2026-10-01). The latch can fire **mid-fill**, not only at mount: a constraint throws only once its
-field is answered. The builder preview mounts its own engine and never `RuntimeSession`, so it is filed, not covered.
+PR #314's `Composer audit (SCA)` step failed on advisories published 2026-09-29/30, after `M120`'s green run, against
+four packages already locked. **The gate was red for every PR, the trunk included, independent of this diff.** The user
+chose to patch inside `M121` (in chat) over a separate increment or an audit ignore list; the claim was extended as one
+commit on `origin/main` (`dd1ef2f3`) before the lock file was opened. Smallest patched versions only, and nothing else
+moved: `laravel/framework` 13.18.1 → 13.30.1, `league/commonmark` 2.10.0 → 2.10.3, `league/flysystem` 3.35.2 → 3.35.3,
+`phpseclib/phpseclib` 3.0.56 → 3.0.57 (and `stancl/tenancy` below). `composer.json`'s `^13.8` already admitted them. The OpenAPI export stayed
+byte-identical, and because Laravel moved twelve minor releases the WHOLE Pest suite was re-run per directory before the
+push rather than this increment's suites alone.
 
-**`R-aa133bab`.** `routes/api.php:593-595` says *"THE WARNING IS NOW A GATE"* and names only `sw.test.ts`, which
-cannot see the route side — a hub, so filed as a nit. The row's second sentence (`D20`'s owed measurement) belongs to
-`R-68656155`.
+⛔ **AND THAT RE-RUN FOUND A REGRESSION THE BUMP HAD CAUSED — WHICH IS WHY IT WAS OWED.** Laravel 13.30's `SeedCommand`
+declares a `$signature` (its new positional `class` argument); stancl/tenancy 3.10.0's `tenants:seed` extends it and sets
+only `$name`, so it inherited the signature and registered as **`db:seed`, overwriting Laravel's**. Every `$this->seed()`
+died on a missing `--tenants` option — 65 Connectors cases — `tenants:seed` vanished, and a production `db:seed` would
+have run the tenant seeder. **stancl/tenancy 3.10.1 is the upstream fix**, measured: `db:seed` is Laravel's again,
+`tenants:seed` exists, Connectors 269/269. That is a FIFTH package, still `composer.lock` only. ⚠️ **And I made seven
+Docs cases red myself** by swapping `vendor/` while that suite was running — a half-extracted package — which a re-run
+cleared. Never change `vendor/` beside a live suite; `mutate.php`'s R1 guards against exactly this for mutations and
+nothing guards it for a `composer update`.
 
-**`R-950ef5f1`.** Its `Awaits D33` token was struck by `M105`. The residual is operational only (*"watch invitation
-volume"*). `R-2dc95042` is **not** closable by the same answer — `D34` owes a build.
+⛔ **AND THE COMPOSER FAILURE HAD BEEN HIDING A SECOND ONE.** With the Composer audit green, the same step's `npm audit`
+judge blocked on a **high** advisory in `axios` (1.0.0–1.19.0), a production dependency reached through
+`@inertiajs/core` and `laravel-precognition`. The claim was extended a second time, to `package-lock.json`, before it was
+opened (`3e0e215a`); 1.18.1 → 1.20.0, eight lines of lock, `npm-audit-judge.php` clean, Vitest 150/2635 and vue-tsc
+re-run. ⚠️ **A gate that fails on its first step reports nothing about the steps after it** — the second advisory was
+present on the first red run and invisible in it.
 
-### Remedy verdict
+### How the prediction fared
 
-- **`R-495abf48` — works, with the corrections above.** An in-place UPDATE of `field_type` keeps the id and the key,
-  so every reference survives by construction. A pure `FieldTypeConversion` + `ConversionPlan`, and public
-  `conversionPlans()`/`convertField()` on `FormBuilderService` so that `M122` needs no hub edit.
-- **`R-95a94b36` — works.** A notice in `RuntimeSession`'s `#notice` slot bound to `runtime.engineFailed`, plus an
-  announcer write for the mid-fill latch. No `useFormRuntime.ts` edit.
-- **`R-aa133bab` — works.** One Pest gate and no production edit. Green on arrival by construction; proved only by
-  mutations.
-- **`R-950ef5f1` — none needed.** `D33` = A is the answer, not a deferral.
+| Predicted | Actual |
+|---|---|
+| Pint clean or one `ordered_imports` | **Wrong in detail.** Three fixers on `FieldTypeConversion.php` (`no_multiline_whitespace_around_double_arrow`, `unary_operator_spaces`, `not_operator_with_successor_space`) — all layout, run before any mutation token was fixed. `M120`'s fully-qualified `{@see}` trap was avoided by backticking the one reference, not met. |
+| PHPStan: a delta of zero | ⛔ **Wrong on the first scoped run:** two real errors of mine — an `is_array()` over a PHPDoc-typed array and an always-true `instanceof`. Fixed, then zero. The two remaining in `FormBuilderService.php` are the `property.notFound` phantoms on `duplicateField()`'s unchanged lines. |
+| Contract unmoved | **Held.** No `/api/v1` surface; `openapi.json` untouched. |
+| ⚠️ **Most expected wrong: T1.3, the mid-fill latch, established by reading only** | **Held exactly.** Red as *notice absent*, green after, and a mount-time-snapshot mutation reddens it ALONE — so the reading was right that an empty field's checks are skipped and the latch fires on the answer. |
+| Second: the count of 182 | **Held.** |
+| Third: the container's collector dropping a new file | **Half held.** `SuiteCollectionFloorTest` lists `FieldConversionServiceTest` among the 40 it cannot see — the known bind-mount truncation — but the explicit-path and directory runs both collected it. |
 
-Files: `app/Enums/ConversionFamily.php`, `app/Enums/ConversionWarning.php`, `app/Enums/ConversionDropReason.php`,
-`app/Support/Forms/FieldTypeConversion.php`, `app/Support/Forms/ConversionPlan.php` (all new);
-`app/Services/Forms/FormBuilderService.php`, `app/Exceptions/Forms/FormException.php`;
-`resources/public-runtime/components/RuntimeSession.vue`; `tests/Unit/Forms/FieldTypeConversionTest.php`,
-`tests/Feature/Forms/FieldConversionServiceTest.php`, `tests/Feature/Http/ServiceWorkerCachePrefixRouteTest.php`
-(new), `resources/public-runtime/__tests__/components.test.ts`.
-Shared artefacts taken: `docs/feature-backlog.md`, `docs/claims/decisions.md` (the `D64` amendment and `D67`),
-`docs/pipeline.md`, `PROGRESS.md` (own block), and `docs/backlog-triage.md` + `docs/gate-baselines.md` regenerated
-**as procedure**. Not `openapi.json`, and not any `routes/*.php`.
-Hubs: ⛔ **`app/Services/Forms/FormBuilderService.php` is the only hub edited.** `routes/api.php`,
-`resources/public-runtime/sw.ts` and `routes/tenant.php` are mutated **transiently** by `scripts/mutate.php`, restored
-by sha256 and **never committed** — the new gate reads the working tree, so the commit-the-mutation rule, which exists
-for diff-based gates, does not apply to it.
-Paired files taken: none.
-Namespaces spent: nothing from either namespace. One decision id: `D67`.
-Prediction: Pint clean or one `ordered_imports`. PHPStan: **a delta of zero** on the ~15 local `property.notFound`
-phantoms, and the new `match ($enum)` arms exhaustive. Contract: unmoved — no `/api/v1` surface is touched.
-⚠️ **Most expected to be wrong: T1.3, the mid-fill latch** — established by reading only (an empty field's constraints
-are skipped; a `greater_than_field` with no related field throws in lowering; `FieldRow` re-reads `result` on input).
-Second: the pinned count of **182** allowed conversion pairs. Third: the container's Pest collector dropping a new file.
+### ⛔ Four things nothing predicted
 
-⚠️ **CLAIM EXTENDED 2026-10-01, BEFORE `composer.lock` WAS OPENED — `composer.lock` only.** PR #314's `Composer audit (SCA)`
-step failed on advisories published 2026-09-29/30, after `M120`'s green run, against packages already locked:
-`laravel/framework` (low, debug-page XSS, fixed in 13.30.0; locked 13.18.1), `league/commonmark` (one high DoS, one
-medium raw-HTML bypass; fixed after 2.10.1), `league/flysystem` (low; fixed in 3.35.3) and `phpseclib/phpseclib` (medium;
-fixed in 3.0.57). The gate is red for every PR, the trunk included, independent of this diff. **The user chose to bump
-them inside `M121`** (in chat, 2026-10-01) over a separate increment or an audit ignore list. Smallest patched versions
-only; `composer.json`'s `^13.8` already admits them, so no other file changes. ⚠️ Laravel moves twelve minor releases,
-so the full Pest directories are re-run before the push, not just this increment's suites.
+- **A gate I wrote was VACUOUS, and a mutation's red set is what said so.** The route gate shipped `->not->toContain($name, "cached under {$prefix}")`. Pest's `toContain()` is variadic, so the message was a second needle, the pair was never contained, and the negation could not fail — the trap `M87`–`M89` recorded and I walked into anyway. Moving the route under `f/` reddened only the equality case; **the mismatch with the predicted red set, not a failure, exposed it.** Rewritten with `toBeFalse($message)` and both route mutations re-run red.
+- **My own first Vitest mutation proved nothing.** The mount-snapshot mutant referenced a name it never defined, so it was "never show the notice" and reddened three cases. The prediction said one; the helper was extended to apply token pairs and the honest mutant reddens exactly one.
+- **`jsonb` reordered a config's keys and a `toBe` failed on correct data** — `M111`'s trap, met on the first green run. The comparison is `toEqual`, with the reason at the assertion.
+- **My two import lines killed a ledger citation** (`FormBuilderService.php:267` became blank). It names `writeField()` now rather than a new number; every other ledger edit was line-neutral, so the tier stays 17 of 17.
 
-⚠️ **CLAIM EXTENDED AGAIN 2026-10-01, BEFORE `package-lock.json` WAS OPENED — `package-lock.json` only.** With the
-Composer audit green, the same CI step's `npm audit` judge — which the Composer failure had been hiding — blocks on a
-**high** advisory in `axios` (1.0.0–1.19.0), a production dependency reached transitively through Inertia; locked at
-1.18.1, fixed only in 1.20.0, which every dependent's `^1.x` range admits. Same gate, same class, same remedy the user
-chose for the Composer advisories: the smallest fixed version, inside `M121`, lock file only.
+### Twenty-five mutations, twenty-five CAUGHT
+
+**Engine, fourteen, through `scripts/mutate.php`:** `compatible()` always true (25 cases, including the governing-rule property and the page-break arm via a `LogicException`), no default swap, hidden decided by shape, no forced Optional, `accepted_types` kept, no `needs_setup`, no default dedupe, note keeps its columns, no fingerprint check (S7 alone), no drift check (S6 alone), `replaceValidations()` reused (the two row-identity cases alone), no row lock (the lock-order case alone), fingerprint blind to kept rows (six kept-row arms + S7), no `ksort` (the canonicalisation case alone). ⚠️ Two side-effects recorded rather than tidied: the lock-order case also reddens without the default swap, because its fixture relies on email→phone dropping a row; and the "row added" fingerprint arm stays green under the kept-blind mutant, because the added default's sequence still moves the hash.
+**Respondent notice, four, by hand** (sha256 moved, restored by bytes): invert the binding (all four), mount snapshot (mid-fill alone), refuse at submit (the warn pin alone), drop the announcement (mid-fill alone). `MdsBanner`'s role is the primitive's, so no role mutation applies.
+**Route gate, seven, transient on hub files, none committed:** route under `f/`, a parameter-first URI, the `sw.ts` prefix widened, a fourth non-`startsWith` cache route (the count floor alone), a stale allow-list entry (exact equality alone), the route renamed (the by-name floor alone), the manifest under `/build/`.
+
+### Measured
+
+Pest per directory: Unit **1402**, Forms **527**, Xlsform **15**, Http **30**, Submissions **430**, Guest **86**, Audit **107**, Migrations **16**, Docs **142** + the known bind-mount `SuiteCollectionFloorTest`. Vitest **150 files, 2635 tests**. vue-tsc clean. Pint bare on the host over **1529** files. Every host lint gate green through `preflight --with-gates --with-pint`. E2E: none run — the engine has no UI yet and the engine-failed state cannot be seeded.
+
+Files: as claimed, plus `composer.lock` and `package-lock.json` under two pushed claim extensions. Shared artefacts: `docs/feature-backlog.md`, `docs/claims/decisions.md`, and `docs/pipeline.md` + `docs/backlog-triage.md` regenerated as procedure. Not `openapi.json`, not any `routes/*.php` (mutated transiently only).
 
 ## RELEASED — `M120`, the `single_page_mode` write path and the preview that could not see it (merged as PR #313, `24748b1f`, 6/6 green with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

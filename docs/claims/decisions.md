@@ -1215,6 +1215,11 @@ end state and needs a disclosure-safe refusal designed first, which is a decisio
 
 **Recommendation: A now, C next.** A is the part `D35` already bought. C is the answer to the half of the request that is genuinely missing, and it is cheaper than B because `page_break` already exists as a type and a palette entry — the work is teaching two step projections to break on it, not inventing a mode. B invents a renderer from an example rather than a need; if tabular is genuinely wanted, it should be asked for on its own evidence.
 
+⛔ **AMENDED 2026-10-01 (user decisions, in chat), recorded by Lane A during `M123` — WHAT "C NEXT" MEANS.** C's own text adds an orthogonal `page_break_mode`, while the recommendation says the work is teaching the step projections to break, *"not inventing a mode"* — so `R-8c517fb6` was silently deciding which, along with what the staff page does. Two questions were put to the user under `D66`, because that `early-testing` work row was blocked on them, and both answers were the recommendation:
+- **Page breaks paginate AUTOMATICALLY in every step-by-step form.** No `page_break_mode` and no new setting. A live stepped form that already contains a page break starts splitting on the next deploy, without a republish; single-page mode is unaffected.
+- **Staff manual entry (the encode page) stays one step per section for now.** The respondent form and the builder preview split; the encode channel can follow later if testers ask.
+- `R-8c517fb6` is buildable from here and carries the design detail; it is queued for `M124`.
+
 ---
 
 ### D59 — `ComparisonOperator` is about to gain a human label, and `ConditionRow.vue` already has a different one for the same eight operators. One set or two? **C — one enum in PHP with two renderings, `label()` and `sentenceLabel()`, both shipped through `BuilderPresenter::enums()`.**

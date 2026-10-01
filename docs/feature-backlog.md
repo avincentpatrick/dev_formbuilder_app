@@ -12418,3 +12418,15 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   in the preview, nothing counts the issues, and the engine skips a blank formula anyway. It becomes visible the moment
   the preview summarises its issues or shows a calculated value. A hub file, so filed rather than taken. **Latent.**
   Filed by `M122`. **Tier: during-testing.**
+
+- **`minor` · The Decision Board has drifted from `docs/claims/decisions.md` in both directions, and the line sends the
+  user to it for decisions it does not hold.** Measured by `M122` (2026-10-01) while recording `D68` and `D69`, which
+  had no card to mark. Of the Board's 39 cards, 36 read `open` — and **eleven of those decisions are answered** in
+  `decisions.md` (`D15`, `D20`, `D26`, `D28`, `D33`–`D38`, `D44`), so a card the user opens may ask a settled question.
+  The other direction is worse: **nine open decisions have no card at all** (`D50`, `D55`, `D56`, `D58`, `D60`–`D62`,
+  `D65`, `D70`), while `scripts/pipeline.php` writes every open decision's blocker as *"answer Dn on the Decision
+  Board"* — including `D58`, the one `early-testing` decision left. Nothing compares the two stores, and the record
+  step (*"set the card to `recorded`"*) lives only in a session's memory, never in a script or a gate. The remedy is a
+  sync — push a card for every open decision, mark every answered one `recorded` — plus a check that names any id
+  present in one store and not the other; or, if the Board is retired, a blocker sentence that stops naming it.
+  **Live.** Filed by `M122`. **Tier: early-testing.**

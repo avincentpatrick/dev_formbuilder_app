@@ -114,6 +114,15 @@ phantoms, and the new `match ($enum)` arms exhaustive. Contract: unmoved — no 
 are skipped; a `greater_than_field` with no related field throws in lowering; `FieldRow` re-reads `result` on input).
 Second: the pinned count of **182** allowed conversion pairs. Third: the container's Pest collector dropping a new file.
 
+⚠️ **CLAIM EXTENDED 2026-10-01, BEFORE `composer.lock` WAS OPENED — `composer.lock` only.** PR #314's `Composer audit (SCA)`
+step failed on advisories published 2026-09-29/30, after `M120`'s green run, against packages already locked:
+`laravel/framework` (low, debug-page XSS, fixed in 13.30.0; locked 13.18.1), `league/commonmark` (one high DoS, one
+medium raw-HTML bypass; fixed after 2.10.1), `league/flysystem` (low; fixed in 3.35.3) and `phpseclib/phpseclib` (medium;
+fixed in 3.0.57). The gate is red for every PR, the trunk included, independent of this diff. **The user chose to bump
+them inside `M121`** (in chat, 2026-10-01) over a separate increment or an audit ignore list. Smallest patched versions
+only; `composer.json`'s `^13.8` already admits them, so no other file changes. ⚠️ Laravel moves twelve minor releases,
+so the full Pest directories are re-run before the push, not just this increment's suites.
+
 ## RELEASED — `M120`, the `single_page_mode` write path and the preview that could not see it (merged as PR #313, `24748b1f`, 6/6 green with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 
 Shipped 2026-09-29. Branch `m120-page-mode`, cut from `origin/main` at `80054654`.

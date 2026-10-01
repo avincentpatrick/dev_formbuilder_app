@@ -10,6 +10,7 @@ use App\Enums\ValidationRuleType;
 use App\Exceptions\Forms\PublishValidationException;
 use App\Models\FormFieldValidation;
 use App\Models\FormSection;
+use App\Models\FormVersion;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Forms\StructuralValidationGate;
@@ -724,4 +725,231 @@ it('publishes an OPTIONAL note, which is every note an author has ever meant to 
     $this->gate->assertPublishable($version->refresh());
 
     expect(true)->toBeTrue(); // reached here without throwing
+});
+
+/*
+|--------------------------------------------------------------------------
+| Increment M123 (R-2c172882) — the condition must be able to mean something against the question it NAMES
+|--------------------------------------------------------------------------
+|
+| The arms above ask whether a rule suits its OWN field, and whether it can run at all. These ask whether its
+| comparison can mean anything against the RELATED question: a conditional rule's operator, and a field
+| comparison's ordering, are evaluated against the other question's answer. Against the wrong kind of answer the
+| condition is CONSTANT — an ordering on a choice or a note never holds, `is blank` on a note always holds — and
+| both engines evaluate it in silence, so it published clean and quietly did the wrong thing for every
+| respondent. The census warns about the conversions that produce these rows; only this gate refuses them.
+*/
+
+/**
+ * The refusal's codes, fields and messages — or three empty lists when the draft publishes.
+ *
+ * @return array{codes: list<string>, fields: list<?string>, messages: list<string>}
+ */
+function relatedKindRefusal(StructuralValidationGate $gate, FormVersion $version): array
+{
+    try {
+        $gate->assertPublishable($version->refresh());
+    } catch (PublishValidationException $e) {
+        return [
+            'codes' => array_column($e->violations(), 'code'),
+            'fields' => array_column($e->violations(), 'field'),
+            'messages' => array_column($e->violations(), 'message'),
+        ];
+    }
+
+    return ['codes' => [], 'fields' => [], 'messages' => []];
+}
+
+it('refuses an ordering on a single-choice question, naming the rule owner and the compared question', function (): void {
+    $version = makeDraftVersion(makeForm($this->user));
+    $colour = addFormField($version, $this->user, 'colour', FieldType::SingleSelect, 0, [
+        'config' => ['options' => [['value' => '1', 'label' => 'Red'], ['value' => '2', 'label' => 'Blue']]],
+    ]);
+    $reason = addFormField($version, $this->user, 'reason', FieldType::ShortText, 1);
+
+    FormFieldValidation::create([
+        'form_version_id' => $version->id,
+        'form_field_id' => $reason->id,
+        'related_form_field_id' => $colour->id,
+        'rule_type' => ValidationRuleType::RequiredIf,
+        'operator' => ComparisonOperator::Gt,
+        'rule_value' => '1',
+    ]);
+
+    $refusal = relatedKindRefusal($this->gate, $version);
+
+    expect($refusal['codes'])->toBe(['rule_operator_not_allowed_for_related_shape'])
+        ->and($refusal['fields'])->toBe(['reason'])
+        ->and($refusal['messages'][0])->toContain('colour')
+        ->and($refusal['messages'][0])->toContain('Single choice');
+});
+
+it('refuses `contains` on a number question, whose answer is not a list', function (): void {
+    $version = makeDraftVersion(makeForm($this->user));
+    $count = addFormField($version, $this->user, 'household_size', FieldType::Integer, 0);
+    $notes = addFormField($version, $this->user, 'notes', FieldType::LongText, 1);
+
+    FormFieldValidation::create([
+        'form_version_id' => $version->id,
+        'form_field_id' => $notes->id,
+        'related_form_field_id' => $count->id,
+        'rule_type' => ValidationRuleType::RequiredIf,
+        'operator' => ComparisonOperator::Contains,
+        'rule_value' => '5',
+    ]);
+
+    expect(relatedKindRefusal($this->gate, $version)['codes'])->toBe(['rule_operator_not_allowed_for_related_shape']);
+});
+
+it('refuses a required_with with no operator naming a note, because "is answered" can never hold for it', function (): void {
+    // ⛔ THE CASE A NULL-SKIPPING ARM MISSES. A null operator on `required_with` is not "unset": the lowering reads it
+    // as `isNotNull(related)` — "when that question is answered at all" — and a note is never answered. So the
+    // null must be read as the lowering's own operand, `IsNull`, rather than skipped.
+    $version = makeDraftVersion(makeForm($this->user));
+    $intro = addFormField($version, $this->user, 'intro', FieldType::Note, 0);
+    $followUp = addFormField($version, $this->user, 'follow_up', FieldType::ShortText, 1);
+
+    FormFieldValidation::create([
+        'form_version_id' => $version->id,
+        'form_field_id' => $followUp->id,
+        'related_form_field_id' => $intro->id,
+        'rule_type' => ValidationRuleType::RequiredWith,
+    ]);
+
+    $refusal = relatedKindRefusal($this->gate, $version);
+
+    expect($refusal['codes'])->toBe(['rule_operator_not_allowed_for_related_shape'])
+        ->and($refusal['fields'])->toBe(['follow_up'])
+        ->and($refusal['messages'][0])->toContain('is answered')
+        ->and($refusal['messages'][0])->toContain('Note / label');
+});
+
+it('reports a required_if with no operator naming a note ONCE, as the missing operator it is', function (): void {
+    // The tolerance control for the case above: a null on an `_if` rule is `rule_missing_operator`'s, and reading it
+    // as `IsNull` too would report one broken row twice.
+    $version = makeDraftVersion(makeForm($this->user));
+    $intro = addFormField($version, $this->user, 'intro', FieldType::Note, 0);
+    $followUp = addFormField($version, $this->user, 'follow_up', FieldType::ShortText, 1);
+
+    FormFieldValidation::create([
+        'form_version_id' => $version->id,
+        'form_field_id' => $followUp->id,
+        'related_form_field_id' => $intro->id,
+        'rule_type' => ValidationRuleType::RequiredIf,
+        'rule_value' => 'x',
+    ]);
+
+    expect(relatedKindRefusal($this->gate, $version)['codes'])->toBe(['rule_missing_operator']);
+});
+
+it('asks the RELATED question, never the rule owner: an ordering on a number publishes from a date-owned rule', function (): void {
+    $version = makeDraftVersion(makeForm($this->user));
+    $age = addFormField($version, $this->user, 'age', FieldType::Integer, 0);
+    $visit = addFormField($version, $this->user, 'visit_date', FieldType::Date, 1);
+
+    FormFieldValidation::create([
+        'form_version_id' => $version->id,
+        'form_field_id' => $visit->id,
+        'related_form_field_id' => $age->id,
+        'rule_type' => ValidationRuleType::RequiredIf,
+        'operator' => ComparisonOperator::Gt,
+        'rule_value' => '18',
+    ]);
+
+    expect(relatedKindRefusal($this->gate, $version)['codes'])->toBe([]);
+});
+
+it('asks the RELATED question, never the rule owner: an ordering on a date is refused from a number-owned rule', function (): void {
+    $version = makeDraftVersion(makeForm($this->user));
+    $visit = addFormField($version, $this->user, 'visit_date', FieldType::Date, 0);
+    $age = addFormField($version, $this->user, 'age', FieldType::Integer, 1);
+
+    FormFieldValidation::create([
+        'form_version_id' => $version->id,
+        'form_field_id' => $age->id,
+        'related_form_field_id' => $visit->id,
+        'rule_type' => ValidationRuleType::RequiredIf,
+        'operator' => ComparisonOperator::Gt,
+        'rule_value' => '2026-01-01',
+    ]);
+
+    $refusal = relatedKindRefusal($this->gate, $version);
+
+    expect($refusal['codes'])->toBe(['rule_operator_not_allowed_for_related_shape'])
+        ->and($refusal['fields'])->toBe(['age']);
+});
+
+it('refuses a number compared with a date by greater_than_field, on the rule owner', function (): void {
+    $version = makeDraftVersion(makeForm($this->user));
+    $visit = addFormField($version, $this->user, 'visit_date', FieldType::Date, 0);
+    $age = addFormField($version, $this->user, 'age', FieldType::Integer, 1);
+
+    FormFieldValidation::create([
+        'form_version_id' => $version->id,
+        'form_field_id' => $age->id,
+        'related_form_field_id' => $visit->id,
+        'rule_type' => ValidationRuleType::GreaterThanField,
+    ]);
+
+    $refusal = relatedKindRefusal($this->gate, $version);
+
+    expect($refusal['codes'])->toBe(['rule_related_field_not_orderable'])
+        ->and($refusal['fields'])->toBe(['age']);
+});
+
+it('publishes a number compared with a likert scale, which orders its numeric scores correctly', function (): void {
+    // The census's own predicate (`allowsOperator(Gt)` on the related shape) admits Scale; the stricter "Number or
+    // Duration" reading would refuse a rule that evaluates exactly as written.
+    $version = makeDraftVersion(makeForm($this->user));
+    $satisfaction = addFormField($version, $this->user, 'satisfaction', FieldType::LikertScale, 0, [
+        'config' => ['options' => [['value' => '1', 'label' => 'Low'], ['value' => '5', 'label' => 'High']]],
+    ]);
+    $score = addFormField($version, $this->user, 'score', FieldType::Integer, 1);
+
+    FormFieldValidation::create([
+        'form_version_id' => $version->id,
+        'form_field_id' => $score->id,
+        'related_form_field_id' => $satisfaction->id,
+        'rule_type' => ValidationRuleType::GreaterThanField,
+    ]);
+
+    expect(relatedKindRefusal($this->gate, $version)['codes'])->toBe([]);
+});
+
+it('refuses a number compared with a note by less_than_field, ignoring any stored operator', function (): void {
+    $version = makeDraftVersion(makeForm($this->user));
+    $intro = addFormField($version, $this->user, 'intro', FieldType::Note, 0);
+    $score = addFormField($version, $this->user, 'score', FieldType::Integer, 1);
+
+    FormFieldValidation::create([
+        'form_version_id' => $version->id,
+        'form_field_id' => $score->id,
+        'related_form_field_id' => $intro->id,
+        'rule_type' => ValidationRuleType::LessThanField,
+        // A stray operator: the field comparisons never read the column, so it must not change the verdict.
+        'operator' => ComparisonOperator::Eq,
+    ]);
+
+    expect(relatedKindRefusal($this->gate, $version)['codes'])->toBe(['rule_related_field_not_orderable']);
+});
+
+it('leaves a compared question from another version to the foreign-version arm, reporting the row once', function (): void {
+    $foreignVersion = makeDraftVersion(makeForm($this->user));
+    $foreign = addFormField($foreignVersion, $this->user, 'colour', FieldType::SingleSelect, 0, [
+        'config' => ['options' => [['value' => '1', 'label' => 'Red']]],
+    ]);
+
+    $version = makeDraftVersion(makeForm($this->user));
+    $reason = addFormField($version, $this->user, 'reason', FieldType::ShortText, 0);
+
+    FormFieldValidation::create([
+        'form_version_id' => $version->id,
+        'form_field_id' => $reason->id,
+        'related_form_field_id' => $foreign->id,
+        'rule_type' => ValidationRuleType::RequiredIf,
+        'operator' => ComparisonOperator::Gt,
+        'rule_value' => '1',
+    ]);
+
+    expect(relatedKindRefusal($this->gate, $version)['codes'])->toBe(['validation_references_foreign_version']);
 });

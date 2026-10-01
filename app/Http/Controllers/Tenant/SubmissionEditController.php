@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Tenant;
 
 use App\Enums\SubmissionStatus;
+use App\Exceptions\Expressions\ExpressionException;
 use App\Exceptions\Submissions\SubmissionEditException;
 use App\Exceptions\Submissions\SubmissionValidationException;
 use App\Http\Controllers\Controller;
@@ -54,7 +55,6 @@ final class SubmissionEditController extends Controller
     {
         /** @var User $editor */
         $editor = $request->user();
-
         // A draft is editable, just not HERE. Its answers belong to I9b's resume page, which has the autosave,
         // the completeness meter and the resume cursor this surface deliberately lacks. Redirecting rather
         // than refusing means a stale "Edit answers" link on a row that was never finalized still lands
@@ -136,6 +136,8 @@ final class SubmissionEditController extends Controller
             return back()
                 ->withErrors(['baseline' => $e->getMessage()])
                 ->with('toast', ['type' => 'error', 'message' => $e->getMessage()]);
+        } catch (ExpressionException $e) {
+            return $this->refuseExpression($e);
         }
 
         // ⚠️ THE OUTCOME IS NAMED IN THE TOAST, not only pre-warned on the page. The banner's
@@ -173,5 +175,24 @@ final class SubmissionEditController extends Controller
             Form::query()->whereKey($submission->form_id)->firstOrFail(),
             FormVersion::query()->whereKey($submission->form_version_id)->firstOrFail(),
         ];
+    }
+
+    /**
+     * Increment M123 (`R-d8780a8b`) — a form rule the server could not evaluate, refused without discarding the
+     * editor's corrections. Its own arm, never folded into the `SubmissionEditException` one above: that arm keys
+     * its bag `baseline`, which the page reads as an editing conflict and offers to discard. `answers.<key>` is the
+     * key the page renders inline, a throw that names no field keeps the page under a neutral key, and `report()`
+     * runs because catching the exception is what used to report it. The twin is `SubmissionController`'s.
+     */
+    private function refuseExpression(ExpressionException $e): RedirectResponse
+    {
+        report($e);
+
+        $field = $e->fieldKey();
+        $message = "These corrections can't be saved because one of this form's rules couldn't be checked. Your changes are still on the page.";
+
+        return back()
+            ->withErrors([$field === null ? 'expression' : 'answers.'.$field => $message])
+            ->with('toast', ['type' => 'error', 'message' => $message]);
     }
 }

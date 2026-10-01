@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeError } from '../lib/error-normalizer';
+import { EXPRESSION_ERROR_MESSAGE, normalizeError } from '../lib/error-normalizer';
 
 describe('normalizeError', () => {
     it('groups the submission_invalid LIST shape by field', () => {
@@ -90,5 +90,32 @@ describe('normalizeError', () => {
     it('parses Retry-After for rate limiting', () => {
         const n = normalizeError(429, { error: { code: 'rate_limited', message: 'slow down' } }, '30');
         expect(n.retryAfterSeconds).toBe(30);
+    });
+
+    it('gives a broken form rule respondent copy of its own, because the server sentence is developer copy', () => {
+        // ⛔ M123 (R-d8780a8b). The API envelope's own description says `message` is "never shown to a respondent —
+        // the public runtime renders its own localized copy keyed by `code`", and for this code it was shown verbatim:
+        // "A form expression could not be evaluated." `D67` made that refusal the designed end of the guest flow, so
+        // it is the sentence a respondent reads after being told to "answer the ones that do".
+        const server = 'A form expression could not be evaluated.';
+        const n = normalizeError(422, { error: { code: 'expression_error', message: server } });
+
+        expect(n.message).toBe(EXPRESSION_ERROR_MESSAGE);
+        expect(n.message).not.toBe(server);
+        // The failure repeats for the same answers, so the copy must never invite a retry.
+        expect(n.message).not.toMatch(/try again/i);
+        expect(n.kind).toBe('terminal');
+        expect(n.code).toBe('expression_error');
+    });
+
+    it.each([
+        // The control for the case above: the substitution is keyed on the CODE. Keying it on the kind would
+        // swallow `guest_disabled` (also terminal); keying it on the status would swallow every other 422; and
+        // `finalized` relies on the server sentence in RuntimeSession's tail.
+        [403, 'guest_disabled'],
+        [422, 'some_unmapped_422'],
+        [409, 'draft_already_finalized'],
+    ])('keeps the server sentence for %i %s', (status, code) => {
+        expect(normalizeError(status, { error: { code, message: 'server sentence' } }).message).toBe('server sentence');
     });
 });

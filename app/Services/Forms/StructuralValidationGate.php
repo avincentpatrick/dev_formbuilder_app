@@ -265,6 +265,36 @@ final class StructuralValidationGate
                 if ($rule->takesOperator() && ! $rule->operatorMayBeEmpty() && $validation->operator === null) {
                     $violations[] = PublishValidationException::ruleMissingOperator($ownerKey, $rule->value);
                 }
+
+                // Increment M123 (`R-2c172882`): the comparison must be one the RELATED question's answer can
+                // support. The arms above ask whether the rule suits its owner and whether it can run at all; this
+                // asks whether it can mean anything. Against the wrong kind of answer the condition is CONSTANT —
+                // an ordering on a choice or a note never holds, "is answered" on a note never holds — and neither
+                // engine says so. `relatedComparison()` follows the lowering (a null `_with` operator is `IsNull`'s
+                // comparison; the field comparisons order with `Gt`/`Lt`), so this asks the same predicate the
+                // conversion census warns with.
+                //
+                // ⚠️ ONLY ONCE THE OWNER CHECK PASSED, so one broken row is never reported twice, and only when the
+                // compared question resolves in this version — the foreign-version arm owns the rest.
+                $compared = $rule->relatedComparison($validation->operator);
+                $relatedType = $validation->related_form_field_id !== null
+                    ? $fieldTypeById->get($validation->related_form_field_id)
+                    : null;
+
+                if ($compared !== null && $relatedType !== null && $ownerType !== null
+                    && ValueShape::for($ownerType)->allows($rule)
+                    && ! ValueShape::for($relatedType)->allowsOperator($compared)) {
+                    $relatedKey = (string) $fieldKeyById->get($validation->related_form_field_id, '(unknown)');
+                    $violations[] = $rule->takesOperator()
+                        ? PublishValidationException::ruleOperatorNotAllowedForRelatedShape(
+                            $ownerKey,
+                            $rule->value,
+                            $relatedKey,
+                            $relatedType->label(),
+                            $validation->operator?->label() ?? 'is answered',
+                        )
+                        : PublishValidationException::ruleRelatedFieldNotOrderable($ownerKey, $rule->value, $relatedKey, $relatedType->label());
+                }
             }
         }
 

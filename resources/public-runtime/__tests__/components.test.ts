@@ -1623,3 +1623,123 @@ describe('RuntimeSession — a respondent is told when the rule engine failed (R
         wrapper.unmount();
     });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────────
+// Increment M123 — a repeatable section's members that render nothing. `RepeatGroup` iterated the store's TOTAL
+// member list, so a calculated or page-break member mounted FieldInput's "unsupported" branch in every instance:
+// its label plus "Not available for manual entry yet (Phase 2)." — in the guest form and the builder preview, and
+// for XLSForm rosters whose `calculate` rows import into the repeat. The flat path never had this; only the
+// repeat loop bypassed H7's renders-nothing rule.
+// ─────────────────────────────────────────────────────────────────────────────────────────────────
+
+describe('RuntimeSession — non-rendering members of a repeatable section (M123)', () => {
+    const rosterSchema = (singlePageMode: boolean) =>
+        schemaResponse({
+            form: { single_page_mode: singlePageMode },
+            sections: [
+                section({ key: 'hh', label: 'Household members', is_repeatable: true, min_instances: 0, max_instances: 3 }),
+            ],
+            fields: [
+                field({ key: 'member_name', label: 'Member name', section_key: 'hh', section_sequence: 0 }),
+                field({ key: 'brk', label: 'Page break', field_type: 'page_break', section_key: 'hh', section_sequence: 1 }),
+                field({
+                    key: 'total',
+                    label: 'Running total',
+                    field_type: 'calculated',
+                    section_key: 'hh',
+                    section_sequence: 2,
+                    config: { calculated_formula: '1 + 1' },
+                }),
+                field({
+                    key: 'intro',
+                    label: 'Count everyone who slept here last night.',
+                    field_type: 'note',
+                    section_key: 'hh',
+                    section_sequence: 3,
+                }),
+            ],
+        });
+
+    it.each([true, false])(
+        'renders no row for a page-break or calculated member in any instance (single_page_mode=%s)',
+        async (singlePageMode) => {
+            const client = fakeClient();
+            const wrapper = mount(RuntimeSession, { props: { schema: rosterSchema(singlePageMode), bootstrap, client } });
+            await settle();
+
+            const addButton = () => wrapper.findAll('button').find((b) => b.text().includes('Add Household members'))!;
+            await addButton().trigger('click');
+            await settle();
+            await addButton().trigger('click');
+            await settle();
+
+            const instances = wrapper.findAll('[data-repeat-instance]');
+            expect(instances).toHaveLength(2);
+            instances.forEach((instance) => {
+                // The note still renders — it is display-only, not renders-nothing — and the one real input remains.
+                expect(instance.findAll('input')).toHaveLength(1);
+                expect(instance.text()).toContain('Member name');
+                expect(instance.text()).toContain('Count everyone who slept here last night.');
+                expect(instance.text()).not.toContain('Page break');
+                expect(instance.text()).not.toContain('Running total');
+                expect(instance.find('.encode-unsupported').exists()).toBe(false);
+            });
+            expect(wrapper.text()).not.toContain('Not available for manual entry');
+
+            // And the answers still nest exactly as before: nothing was dropped from what is submitted.
+            const inputs = wrapper.findAll('[data-repeat-instance] input');
+            await inputs[0].setValue('Ana');
+            await inputs[1].setValue('Beni');
+            await wrapper.find('form').trigger('submit');
+            await settle();
+
+            expect(client.submit).toHaveBeenCalledWith(
+                expect.objectContaining({ answers: { hh: [{ member_name: 'Ana' }, { member_name: 'Beni' }] } }),
+            );
+            wrapper.unmount();
+        },
+    );
+
+    it('never announces a non-rendering member as a new question, while a real one still is', async () => {
+        const schema = schemaResponse({
+            sections: [section({ key: 'hh', label: 'People', is_repeatable: true, min_instances: 0, max_instances: 3 })],
+            fields: [
+                field({ key: 'member_name', label: 'Member name', section_key: 'hh', section_sequence: 0 }),
+                field({
+                    key: 'total',
+                    label: 'Running total',
+                    field_type: 'calculated',
+                    section_key: 'hh',
+                    section_sequence: 1,
+                    config: { calculated_formula: '1 + 1' },
+                    relevant_expression: "${member_name} = 'x'",
+                }),
+                field({
+                    key: 'member_age',
+                    label: 'Age',
+                    field_type: 'integer',
+                    section_key: 'hh',
+                    section_sequence: 2,
+                    relevant_expression: "${member_name} = 'y'",
+                }),
+            ],
+        });
+        const wrapper = mount(RuntimeSession, { props: { schema, bootstrap, client: fakeClient() } });
+        await settle();
+
+        await wrapper.findAll('button').find((b) => b.text().includes('Add People'))!.trigger('click');
+        await settle();
+
+        // Turns the calculated member's condition on: nothing on screen changes, so nothing may be announced.
+        await wrapper.find('[data-repeat-instance] input').setValue('x');
+        await settle();
+        expect(announced(wrapper)).not.toContain('Running total');
+
+        // The positive control, as a second step because the live region keeps only the latest message.
+        await wrapper.find('[data-repeat-instance] input').setValue('y');
+        await settle();
+        expect(announced(wrapper)).toContain('New question: Age');
+
+        wrapper.unmount();
+    });
+});

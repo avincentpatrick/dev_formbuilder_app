@@ -153,4 +153,33 @@ enum ValidationRuleType: string
             self::GreaterThanField, self::LessThanField => false,
         };
     }
+
+    /**
+     * The comparison this rule makes against its RELATED question's answer, or null when it makes none the
+     * publish gate can judge (Increment M123, `R-2c172882`).
+     *
+     * ⛔ IT FOLLOWS THE LOWERING, NOT THE COLUMN — {@see StructuredRuleLowering::lowerCondition()} is the
+     * authority for what each row actually compares:
+     *   - The four conditional kinds compare with their stored operator. A NULL operator on `required_with` /
+     *     `skip_with` is not "unset": it lowers to `isNotNull(related)`, so the comparison it makes is `IsNull`'s
+     *     and a note — which is never answered — makes it a constant. A null on `required_if` / `skip_if` stays
+     *     null here, because that row is the missing-operator refusal's and reporting it twice helps nobody.
+     *   - `greater_than_field` / `less_than_field` ORDER the two answers and never read the operator column at
+     *     all, so a stray stored operator must not change the verdict.
+     *   - The other five name no second question.
+     *
+     * ⚠️ IT LIVES HERE SO THE GATE NEEDS NO NEW `use` LINE. `StructuralValidationGate.php` is cited by line from
+     * an ADR (zero tolerance), and an import above those anchors would silently retarget them onto other
+     * prose — the citation linter checks only that a cited line is alive, never that it still says the thing.
+     */
+    public function relatedComparison(?ComparisonOperator $stored): ?ComparisonOperator
+    {
+        return match ($this) {
+            self::RequiredIf, self::SkipIf, self::RequiredWith, self::SkipWith => $stored
+                ?? ($this->operatorMayBeEmpty() ? ComparisonOperator::IsNull : null),
+            self::GreaterThanField => ComparisonOperator::Gt,
+            self::LessThanField => ComparisonOperator::Lt,
+            self::MinValue, self::MaxValue, self::MinLength, self::MaxLength, self::Pattern => null,
+        };
+    }
 }

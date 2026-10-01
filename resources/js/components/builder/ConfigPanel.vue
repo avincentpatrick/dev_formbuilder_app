@@ -42,6 +42,7 @@ import {
 import CascadingEditor from './CascadingEditor.vue';
 import ChoicesEditor from './ChoicesEditor.vue';
 import ConditionEditor from './ConditionEditor.vue';
+import FieldTypeControl from './FieldTypeControl.vue';
 import GeoEditor from './GeoEditor.vue';
 import LikertMatrixEditor from './LikertMatrixEditor.vue';
 import MatrixEditor from './MatrixEditor.vue';
@@ -50,7 +51,6 @@ import PrefillEditor from './PrefillEditor.vue';
 import ValidationEditor from './ValidationEditor.vue';
 import type { BuilderStore } from './useBuilderStore';
 import type { BuilderValidation, ComparableField, ConditionCatalogue, EnumOption, LocalField, LocalSection } from './types';
-
 interface Choice {
     value: string;
     label: string;
@@ -375,6 +375,7 @@ watch(librarySaved, (value) => {
                     </p>
 
                     <template v-if="activeTab === 'basics'">
+                        <FieldTypeControl :store="store" />
                         <MdsFormField label="Label" v-slot="{ id }">
                             <MdsTextInput :id="id" :model-value="field.label" @update:model-value="setField('label', $event)" />
                         </MdsFormField>

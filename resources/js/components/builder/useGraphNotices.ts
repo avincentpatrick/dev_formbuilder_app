@@ -130,6 +130,10 @@ export function useGraphNotices(formId: string, store: BuilderStore, active: Ref
  *
  * Sequence is in, too: the forward-reference rule is positional, so re-ordering two sections can create or
  * clear a notice without any expression changing.
+ *
+ * And a field's TYPE (M123): the server's empty-at-open check reads it — a hidden or calculated question is never
+ * a visible step — so once a question's type can change in place, leaving it out would leave a stale clean bill on
+ * the rail after the last visible question of a section became hidden.
  */
 function logicFingerprint(store: BuilderStore): string {
     // The separators are written as escapes and are load-bearing rather than decorative: without them
@@ -139,7 +143,7 @@ function logicFingerprint(store: BuilderStore): string {
         .map((s) => `${s.key}\u001f${s.sequence}\u001f${s.relevant_expression ?? ''}`)
         .join('\u001e');
     const fields = store.fields.value
-        .map((f) => `${f.key}\u001f${f.sequence}\u001f${f.form_section_id ?? ''}\u001f${f.relevant_expression ?? ''}`)
+        .map((f) => `${f.key}\u001f${f.field_type}\u001f${f.sequence}\u001f${f.form_section_id ?? ''}\u001f${f.relevant_expression ?? ''}`)
         .join('\u001e');
 
     return `${sections}\u001d${fields}`;

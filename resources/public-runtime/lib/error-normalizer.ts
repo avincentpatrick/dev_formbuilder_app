@@ -174,13 +174,22 @@ function parseRetryAfter(header: string | null): number | null {
     return Number.isFinite(seconds) ? seconds : null;
 }
 
+/**
+ * M123 (R-d8780a8b) — respondent copy for a form rule the server could not evaluate. The envelope's `message` is
+ * developer copy ("never shown to a respondent", per the API's own description), and D67 made this refusal the
+ * end of the guest flow after the engine-failed notice. So: the same "couldn't be checked" wording as that notice,
+ * no "try again" (the same answers fail the same way), and no claim that the owner was told.
+ */
+export const EXPRESSION_ERROR_MESSAGE =
+    "Your response couldn't be submitted because one of this form's rules couldn't be checked. Please let the form's owner know.";
+
 export function normalizeError(status: number, body: unknown, retryAfter: string | null = null): NormalizedError {
     const env = extractEnvelope(body);
     const code = env.code ?? `http_${status}`;
     return {
         httpStatus: status,
         code,
-        message: env.message ?? defaultMessage(status),
+        message: code === 'expression_error' ? EXPRESSION_ERROR_MESSAGE : (env.message ?? defaultMessage(status)),
         fieldErrors: extractFieldErrors(code, env.details),
         kind: classify(status, code),
         retryAfterSeconds: parseRetryAfter(retryAfter),

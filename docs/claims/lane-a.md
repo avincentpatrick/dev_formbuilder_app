@@ -123,6 +123,12 @@ them inside `M121`** (in chat, 2026-10-01) over a separate increment or an audit
 only; `composer.json`'s `^13.8` already admits them, so no other file changes. ⚠️ Laravel moves twelve minor releases,
 so the full Pest directories are re-run before the push, not just this increment's suites.
 
+⚠️ **CLAIM EXTENDED AGAIN 2026-10-01, BEFORE `package-lock.json` WAS OPENED — `package-lock.json` only.** With the
+Composer audit green, the same CI step's `npm audit` judge — which the Composer failure had been hiding — blocks on a
+**high** advisory in `axios` (1.0.0–1.19.0), a production dependency reached transitively through Inertia; locked at
+1.18.1, fixed only in 1.20.0, which every dependent's `^1.x` range admits. Same gate, same class, same remedy the user
+chose for the Composer advisories: the smallest fixed version, inside `M121`, lock file only.
+
 ## RELEASED — `M120`, the `single_page_mode` write path and the preview that could not see it (merged as PR #313, `24748b1f`, 6/6 green with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 
 Shipped 2026-09-29. Branch `m120-page-mode`, cut from `origin/main` at `80054654`.

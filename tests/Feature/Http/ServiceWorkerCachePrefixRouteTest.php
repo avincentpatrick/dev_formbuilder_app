@@ -113,8 +113,12 @@ it('finds the resume READ by name, and it answers under no cached prefix', funct
     expect($resume)->not->toBeNull()
         ->and($resume?->methods())->toContain('GET');
 
+    // ⛔ NOT `->not->toContain($name, $message)`: toContain() is VARIADIC, so the message becomes a second
+    // needle, the pair is never contained, and the negation passes over anything. That form shipped here
+    // first and was VACUOUS — the M2a mutation (the route moved under `f/`) left this case green.
     foreach (swCachePrefixLiterals() as $prefix) {
-        expect(swGetRouteNamesUnder($prefix))->not->toContain('api.v1.public.drafts.resume', "cached under {$prefix}");
+        expect(in_array('api.v1.public.drafts.resume', swGetRouteNamesUnder($prefix), true))
+            ->toBeFalse("the resume READ answers under the cached prefix {$prefix}");
     }
 });
 

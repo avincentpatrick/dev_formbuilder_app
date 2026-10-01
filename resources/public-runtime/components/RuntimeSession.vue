@@ -119,6 +119,9 @@ const runtime = createFormRuntime(props.schema, {
     search: props.search,
     // Increment H21a — the clock, frozen for the life of this session (Doc #27 §3.4).
     now: props.now,
+    // Increment M124 (`D57`, amended) — page breaks paginate a stepped form. The schema is fixed for the session
+    // (a version drift remounts), so a plain boolean is exact; a single-page form never splits.
+    paginateAtPageBreaks: !props.schema.form.single_page_mode,
 });
 const announcer = createAnnouncer();
 
@@ -160,10 +163,11 @@ const autosave = createAutosave({
     checksum: runtime.schemaChecksum,
     answers: runtime.answers,
     locale: runtime.locale,
-    currentStepKey: runtime.currentStepKey,
+    // Increment M124 — the BLOCK, never a page of it: what a saved draft records (`resumeStepKey`).
+    currentStepKey: runtime.resumeStepKey,
     // A conflict-review session must not autosave — the durable copy is the parked outbox row (Increment G8c).
     enabled: !props.resolving,
-    // Increment M21 — the visit read at `:124`, so an abandoned draft is never restored into the next
+    // Increment M21 — the visit `respondentSessionId` reads, so an abandoned draft is never restored into the next
     // respondent's form. `undefined` (a bare test mount, where the inject falls back to null) keeps the
     // pre-M21 unscoped behaviour, which is M15's convention for this argument throughout the runtime.
     sessionId: respondentSessionId ?? undefined,
@@ -550,7 +554,7 @@ async function saveDraftAction(options: { email?: string | null; finishLater: bo
             answers: { ...runtime.answers },
             clientSubmissionUuid: runtime.clientSubmissionUuid,
             locale: runtime.locale.value,
-            draftCurrentStep: runtime.currentStepKey.value,
+            draftCurrentStep: runtime.resumeStepKey.value,
             guestContactEmail: options.email ?? null,
             deviceId,
             appVersion: APP_VERSION,

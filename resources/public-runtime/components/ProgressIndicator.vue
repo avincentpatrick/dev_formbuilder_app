@@ -14,12 +14,14 @@
  */
 import { computed } from 'vue';
 import { useRuntime } from '../composables/context';
+import { stepTitle } from '../composables/useFormRuntime';
 
 const runtime = useRuntime();
 
 const steps = computed(() => runtime.visibleSteps.value);
 const currentIndex = computed(() => Math.max(runtime.currentStepIndex.value, 0));
-const currentTitle = computed(() => runtime.currentStep.value?.title ?? null);
+// Increment M124 — a page after a section's first reads "(continued)", so two pages never share one name.
+const currentTitle = computed(() => (runtime.currentStep.value ? stepTitle(runtime.currentStep.value) : null));
 </script>
 
 <template>
@@ -33,7 +35,7 @@ const currentTitle = computed(() => runtime.currentStep.value?.title ?? null);
                     v-if="index !== currentIndex && runtime.hasVisited(step.key)"
                     type="button"
                     class="progress__dot progress__dot--done"
-                    :aria-label="`Go to step ${index + 1}${step.title ? `: ${step.title}` : ''}`"
+                    :aria-label="`Go to step ${index + 1}${stepTitle(step) ? `: ${stepTitle(step)}` : ''}`"
                     @click="runtime.goToStep(step.key)"
                 >
                     {{ index + 1 }}

@@ -4,6 +4,9 @@
  * focusable (tabindex="-1") so step navigation and focus-rescue can land on it (UX §10.2). Individual field
  * visibility is handled per-row by relevance; a section that is entirely irrelevant is dropped upstream by
  * the store's `visibleSteps`.
+ *
+ * Increment M124 — one PAGE of a section, when page breaks paginate it: every page keeps the heading, because
+ * focus lands on it after each Next, and only the first page the respondent can see carries the description.
  */
 import { computed } from 'vue';
 import FieldRow from './FieldRow.vue';
@@ -23,7 +26,14 @@ const section = computed(() =>
 // Increment H6b — locale-resolved then hole-filled through the store's seam. No repeat scope: a section
 // sits BEFORE its own members positionally, so a hole in its heading naming one is a forward reference
 // the publish gate refuses. Its holes can only ever name flat fields.
-const title = computed(() => (section.value ? runtime.sectionTitleFor(section.value) : null));
+const title = computed(() => {
+    if (section.value === null) {
+        return null;
+    }
+    const piped = runtime.sectionTitleFor(section.value);
+
+    return props.step.continuation ? `${piped} (continued)` : piped;
+});
 
 const description = computed(() => (section.value ? runtime.sectionDescriptionFor(section.value) : null));
 
@@ -40,7 +50,7 @@ const fields = computed(() =>
     <section class="section" data-section :data-section-key="step.key">
         <header v-if="title" class="section__head">
             <h2 class="section__title" tabindex="-1" data-section-heading>{{ title }}</h2>
-            <p v-if="description" class="section__desc">{{ description }}</p>
+            <p v-if="description && !step.continuation" class="section__desc">{{ description }}</p>
         </header>
         <RepeatGroup v-if="step.isRepeat && section" :section="section" />
         <div v-else class="section__fields">

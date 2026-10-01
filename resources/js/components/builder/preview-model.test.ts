@@ -94,6 +94,7 @@ function step(overrides: Partial<RuntimeStep> = {}): RuntimeStep {
         title: 'Section one',
         fieldKeys: ['q1'],
         isRepeat: false,
+        continuation: false,
         ...overrides,
     } as RuntimeStep;
 }
@@ -284,10 +285,10 @@ group('the debounce and the limitation list are stated, not implied', () => {
     it('lists every limitation the preview actually has', () => {
         const limits = previewLimitations().join(' ');
 
-        expect(previewLimitations().length).toBeGreaterThanOrEqual(4);
+        // Three since `M124`: page breaks left the list when the preview started paginating (`R-8c517fb6`).
+        expect(previewLimitations().length).toBeGreaterThanOrEqual(3);
         expect(limits).toContain('not interactive');
         expect(limits).toContain('default language');
-        expect(limits).toContain('Page breaks');
         expect(limits).toContain('repeatable section');
     });
 
@@ -302,8 +303,14 @@ group('the debounce and the limitation list are stated, not implied', () => {
 
         expect(limits).not.toContain('always stepped');
         expect(limits).not.toContain('sections are always');
-        // And the half that is still true, still said: page breaks belong to `R-8c517fb6` / `D57` clause C.
-        expect(limits).toContain('Page breaks are not shown.');
+    });
+
+    // `M124` (`R-8c517fb6`): a stepped preview paginates at page breaks exactly as the respondent's form does,
+    // and neither paginates a repeatable section — so no page-break wording belongs on a list of what the
+    // preview does NOT do. A substring check, because a narrowed entry ("…inside a repeatable section") would
+    // still be the false claim this case exists to refuse.
+    it('no longer claims page breaks are missing, because the preview shows them', () => {
+        expect(previewLimitations().join(' ').toLowerCase()).not.toContain('page break');
     });
 });
 
@@ -341,6 +348,24 @@ group('the strip labels a step from the live model, never from the frozen one', 
         const labels = previewStepLabels([step({ key: 'a', sectionKey: 'a' })], model, titleFor as never);
 
         expect(labels[0].label).toBe(`1. ${UNTITLED_SECTION_LABEL}`);
+    });
+
+    // `M124` — two pages of one section are two strip entries, and they must not read the same.
+    it('marks a later page of a paginated section as continuing', () => {
+        const model = buildPreviewModel(
+            input([field({ uid: 'f1', key: 'q1', form_section_id: 'sec-a' })], [section({ uid: 's1', key: 'a', label: 'Household' })]),
+        ).renderModel;
+
+        const labels = previewStepLabels(
+            [step({ key: 'a', sectionKey: 'a' }), step({ key: 'a#pb1', sectionKey: 'a', continuation: true })],
+            model,
+            titleFor as never,
+        );
+
+        expect(labels).toEqual([
+            { value: 'a', label: '1. Household' },
+            { value: 'a#pb1', label: '2. Household (continued)' },
+        ]);
     });
 
     // ⛔ THE THRESHOLD IS A PRODUCT DECISION AND THIS IS WHAT KEEPS IT ONE. `PreviewStepStrip.test.ts`

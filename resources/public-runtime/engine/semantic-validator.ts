@@ -17,7 +17,7 @@
  * field and a same-instance sibling). Instance count is enforced against min/max on the relevant section.
  */
 
-import { ABSENT, isEmpty, toNumber, toStr, type EngineValue, type MaybeAbsent } from './coercion';
+import { ABSENT, isEmpty, toNumber, toStr, yesNoAnswer, type EngineValue, type MaybeAbsent } from './coercion';
 import { EvaluationContext, type Answers } from './context';
 import { ExpressionEvaluator, makeExpressionEvaluator } from './evaluator';
 import { rendersNothing } from './field-roles';
@@ -120,6 +120,7 @@ export class SemanticValidator {
 
     /** The pure core (also the golden-vector runner's entry) — no I/O. */
     evaluate(input: SemanticInput): SemanticResult {
+        input = this.canonicalizeYesNo(input);
         const fieldKeyById: FieldKeysById = {};
         for (const field of input.fields) {
             fieldKeyById[field.id] = field.key;
@@ -1227,6 +1228,89 @@ export class SemanticValidator {
 
         return aKeys.every((key) => Object.prototype.hasOwnProperty.call(b, key));
     }
+
+    /**
+     * `M124` — the mirror of `SemanticValidator::canonicalizeYesNo()`. The browser runs no Stage 2, so its
+     * Yes/No control's `'yes'`/`'no'` arrive here as strings while the server's normalizer hands PHP a
+     * boolean, and `${consent} = 'yes'` held here while the server pruned the answer it guarded. Every
+     * non-empty scalar yes/no answer, top level and inside each repeat instance, is read through
+     * {@link yesNoAnswer} — the normalizer's own table — so both engines evaluate the same boolean. '' stays
+     * unanswered, an array or object is left alone, and a version with no yes/no question returns its input
+     * untouched. It never mutates the input: the runtime passes flat answers by reference.
+     */
+    private canonicalizeYesNo(input: SemanticInput): SemanticInput {
+        const repeatKeyById: Record<string, string> = {};
+        for (const section of input.sections) {
+            if (section.is_repeatable === true) {
+                repeatKeyById[section.id] = section.key;
+            }
+        }
+
+        const topLevel: Record<string, true> = {};
+        // repeatable section key => its yes/no member keys
+        const members: Record<string, Record<string, true>> = {};
+        for (const field of input.fields) {
+            if (field.field_type !== 'yes_no') {
+                continue;
+            }
+
+            const sectionKey =
+                field.form_section_id !== null && hasOwn(repeatKeyById, field.form_section_id)
+                    ? repeatKeyById[field.form_section_id]
+                    : null;
+            if (sectionKey === null) {
+                topLevel[field.key] = true;
+            } else {
+                (members[sectionKey] ??= {})[field.key] = true;
+            }
+        }
+
+        if (Object.keys(topLevel).length === 0 && Object.keys(members).length === 0) {
+            return input;
+        }
+
+        const answers: SemanticInput['answers'] = { ...input.answers };
+        for (const [key, value] of Object.entries(answers)) {
+            // A section key may equal a field key (the H21a guard in evaluate()), so an instance list is
+            // recognised by its section first; a list is never a scalar yes/no answer.
+            if (hasOwn(members, key) && Array.isArray(value)) {
+                const keys = members[key];
+                answers[key] = (value as unknown[]).map((instance) =>
+                    isPlainObject(instance) ? yesNoInstance(instance, keys) : instance,
+                ) as InstanceAnswers[];
+            } else if (hasOwn(topLevel, key)) {
+                answers[key] = yesNoValue(value);
+            }
+        }
+
+        return { ...input, answers };
+    }
+}
+
+function hasOwn(map: object, key: string): boolean {
+    return Object.prototype.hasOwnProperty.call(map, key);
+}
+
+function isPlainObject(value: unknown): value is Record<string, EngineValue> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function yesNoInstance(instance: Record<string, EngineValue>, keys: Record<string, true>): Record<string, EngineValue> {
+    const out = { ...instance };
+    for (const memberKey of Object.keys(out)) {
+        if (hasOwn(keys, memberKey)) {
+            out[memberKey] = yesNoValue(out[memberKey]);
+        }
+    }
+
+    return out;
+}
+
+/** A non-empty scalar yes/no answer read as a boolean; '' and every array or object pass through untouched. */
+function yesNoValue<T>(value: T): T | boolean {
+    return (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') && !isEmpty(value)
+        ? yesNoAnswer(value)
+        : value;
 }
 
 /** Assemble a ready-to-use validator — mirrors the Pest `makeSemanticValidator()` helper. */

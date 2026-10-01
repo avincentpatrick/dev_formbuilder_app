@@ -281,7 +281,7 @@ final class StructuralAnswerNormalizer
 
             FieldType::YesNo => is_array($value)
                 ? [false, null, $this->mismatch($field->key, 'expected_scalar', 'This field must be a single value.')]
-                : [true, $this->toYesNo($value), null],
+                : [true, Coercion::yesNoAnswer($value), null],
 
             FieldType::MultiSelect => [true, $this->toStringList($value), null],
 
@@ -381,21 +381,6 @@ final class StructuralAnswerNormalizer
     private function mismatch(string $key, string $rule, string $message): array
     {
         return ['field' => $key, 'rule' => $rule, 'message' => $message];
-    }
-
-    /**
-     * Yes/No → a real bool. A superset of {@see Coercion::toBool} that also reads the string `"no"` as false
-     * (the common serialised form of a No answer).
-     */
-    private function toYesNo(mixed $value): bool
-    {
-        if (is_string($value)) {
-            $lower = strtolower(trim($value));
-
-            return ! in_array($lower, ['', '0', 'false', 'no'], true);
-        }
-
-        return Coercion::toBool($value);
     }
 
     /**

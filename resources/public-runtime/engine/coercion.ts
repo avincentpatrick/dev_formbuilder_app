@@ -105,3 +105,61 @@ export function toBool(value: MaybeAbsent): boolean {
 
     return false;
 }
+
+/**
+ * PHP `trim()`'s default set — space, `\t`, `\n`, `\r`, NUL and `\x0B` — and nothing else. JavaScript's own
+ * `.trim()` is NOT this: it strips NBSP and the other Unicode spaces and keeps NUL, the reverse of PHP on both.
+ */
+const PHP_TRIM_RE = /^[ \t\n\r\0\x0B]+|[ \t\n\r\0\x0B]+$/g;
+
+function phpTrim(value: string): string {
+    return value.replace(PHP_TRIM_RE, '');
+}
+
+/** PHP 8's `strtolower()` is ASCII-only; `.toLowerCase()` folds every script. */
+function asciiLower(value: string): string {
+    return value.replace(/[A-Z]/g, (letter) => String.fromCharCode(letter.charCodeAt(0) + 32));
+}
+
+/**
+ * `M124` — the mirror of `Coercion::yesNoLiteral()`: the STRICT reading of whatever a yes/no answer is
+ * compared with. `yes`, `true` and `1` read as true and `no`, `false` and `0` as false, trimmed and
+ * lowercased as PHP does it; the numbers 1 and 0 likewise; everything else — `maybe`, `''`, a boolean, null,
+ * absent — is null, which equals no answer. Deliberately not {@link yesNoAnswer}'s permissive table.
+ */
+export function yesNoLiteral(value: MaybeAbsent): boolean | null {
+    if (typeof value === 'number') {
+        return value === 1 ? true : value === 0 ? false : null;
+    }
+
+    if (typeof value !== 'string') {
+        return null;
+    }
+
+    switch (asciiLower(phpTrim(value))) {
+        case 'yes':
+        case 'true':
+        case '1':
+            return true;
+        case 'no':
+        case 'false':
+        case '0':
+            return false;
+        default:
+            return null;
+    }
+}
+
+/**
+ * `M124` — the mirror of `Coercion::yesNoAnswer()`: a yes/no ANSWER as a boolean, by the table the server's
+ * Stage 2 applies. The browser runs no Stage 2, so its Yes/No control's `'yes'`/`'no'` reach the engine as
+ * strings; Stage 3 reads them through this. A string is false only when, trimmed and lowercased, it is '',
+ * '0', 'false' or 'no'; any other value reads through {@link toBool}.
+ */
+export function yesNoAnswer(value: MaybeAbsent): boolean {
+    if (typeof value === 'string') {
+        return !['', '0', 'false', 'no'].includes(asciiLower(phpTrim(value)));
+    }
+
+    return toBool(value);
+}

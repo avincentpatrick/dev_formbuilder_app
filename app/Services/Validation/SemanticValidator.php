@@ -87,6 +87,7 @@ final class SemanticValidator
     /** The pure core (also the golden-vector runner's entry) — no database access. */
     public function evaluate(SemanticInput $input): SemanticResult
     {
+        $input = $this->canonicalizeYesNo($input);
         $fieldKeyById = [];
         foreach ($input->fields as $field) {
             $fieldKeyById[$field->id] = $field->key;
@@ -1449,5 +1450,87 @@ final class SemanticValidator
         }
 
         return $row->error_message ?? $default;
+    }
+
+    /**
+     * `M124` — the browser runs no Stage 2, so a yes/no answer can reach this stage as the string its control
+     * emits as well as the boolean the server's normalizer writes; `${consent} = 'yes'` then held in the
+     * browser while the server pruned the answer it guarded. Every non-empty scalar yes/no answer, top level
+     * and inside each repeat instance, is read through {@see Coercion::yesNoAnswer()} — the normalizer's own
+     * table — so both engines evaluate the same boolean whichever form arrived; on the server it is a no-op.
+     * '' stays unanswered, and an array or object is left to the checks that own it. A version with no yes/no
+     * question returns its input untouched, which keeps every pre-`M124` golden vector byte-identical.
+     */
+    private function canonicalizeYesNo(SemanticInput $input): SemanticInput
+    {
+        /** @var array<string, string> $repeatKeyById */
+        $repeatKeyById = [];
+        foreach ($input->sections as $section) {
+            if ($section->is_repeatable === true) {
+                $repeatKeyById[$section->id] = $section->key;
+            }
+        }
+
+        /** @var array<string, true> $topLevel */
+        $topLevel = [];
+        /** @var array<string, array<string, true>> $members repeatable section key => its yes/no member keys */
+        $members = [];
+        foreach ($input->fields as $field) {
+            if ($field->field_type !== FieldType::YesNo) {
+                continue;
+            }
+
+            $sectionKey = $field->form_section_id === null ? null : ($repeatKeyById[$field->form_section_id] ?? null);
+            if ($sectionKey === null) {
+                $topLevel[$field->key] = true;
+            } else {
+                $members[$sectionKey][$field->key] = true;
+            }
+        }
+
+        if ($topLevel === [] && $members === []) {
+            return $input;
+        }
+
+        $answers = $input->answers;
+        foreach ($answers as $key => $value) {
+            // A section key may equal a field key (the H21a guard in evaluate()), so an instance list is
+            // recognised by its section first; a list is never a scalar yes/no answer.
+            if (isset($members[$key]) && is_array($value)) {
+                foreach ($value as $index => $instance) {
+                    if (is_array($instance)) {
+                        $value[$index] = $this->yesNoInstance($instance, $members[$key]);
+                    }
+                }
+                $answers[$key] = $value;
+            } elseif (isset($topLevel[$key])) {
+                $answers[$key] = $this->yesNoValue($value);
+            }
+        }
+
+        return new SemanticInput($input->fields, $input->sections, $input->validations, $answers, $input->locale, $input->now);
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $instance
+     * @param  array<string, true>  $keys
+     * @return array<array-key, mixed>
+     */
+    private function yesNoInstance(array $instance, array $keys): array
+    {
+        foreach ($instance as $memberKey => $memberValue) {
+            if (isset($keys[$memberKey])) {
+                $instance[$memberKey] = $this->yesNoValue($memberValue);
+            }
+        }
+
+        return $instance;
+    }
+
+    private function yesNoValue(mixed $value): mixed
+    {
+        $scalar = is_string($value) || is_int($value) || is_float($value) || is_bool($value);
+
+        return $scalar && ! Coercion::isEmpty($value) ? Coercion::yesNoAnswer($value) : $value;
     }
 }

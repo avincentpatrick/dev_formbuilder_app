@@ -1,0 +1,149 @@
+[
+  {
+    "name": "yes_no_required_if_eq_yes_fires_on_a_yes",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "consent", "field_type": "yes_no"}, {"key": "details", "is_required": "conditional", "rules": [{"rule_type": "required_if", "operator": "eq", "related": "consent", "rule_value": "yes"}]}]},
+    "answers": {"consent": true},
+    "expected": {"relevance": {"fields": {"consent": true, "details": true}, "sections": {}}, "errors": [{"field": "details", "rule": "field_required"}], "effective_answers": {"consent": true}, "computed": {}}
+  },
+  {
+    "name": "yes_no_required_if_eq_yes_fires_on_the_browser_string",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "consent", "field_type": "yes_no"}, {"key": "details", "is_required": "conditional", "rules": [{"rule_type": "required_if", "operator": "eq", "related": "consent", "rule_value": "yes"}]}]},
+    "answers": {"consent": "yes"},
+    "expected": {"relevance": {"fields": {"consent": true, "details": true}, "sections": {}}, "errors": [{"field": "details", "rule": "field_required"}], "effective_answers": {"consent": true}, "computed": {}}
+  },
+  {
+    "name": "yes_no_required_if_eq_yes_quiet_on_a_no",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "consent", "field_type": "yes_no"}, {"key": "details", "is_required": "conditional", "rules": [{"rule_type": "required_if", "operator": "eq", "related": "consent", "rule_value": "yes"}]}]},
+    "answers": {"consent": false},
+    "expected": {"relevance": {"fields": {"consent": true, "details": true}, "sections": {}}, "errors": [], "effective_answers": {"consent": false}, "computed": {}}
+  },
+  {
+    "name": "yes_no_required_if_eq_yes_quiet_on_the_browser_no",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "consent", "field_type": "yes_no"}, {"key": "details", "is_required": "conditional", "rules": [{"rule_type": "required_if", "operator": "eq", "related": "consent", "rule_value": "yes"}]}]},
+    "answers": {"consent": "no"},
+    "expected": {"relevance": {"fields": {"consent": true, "details": true}, "sections": {}}, "errors": [], "effective_answers": {"consent": false}, "computed": {}}
+  },
+  {
+    "name": "yes_no_required_if_neq_yes_quiet_on_a_yes",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "consent", "field_type": "yes_no"}, {"key": "details", "is_required": "conditional", "rules": [{"rule_type": "required_if", "operator": "neq", "related": "consent", "rule_value": "yes"}]}]},
+    "answers": {"consent": true},
+    "expected": {"relevance": {"fields": {"consent": true, "details": true}, "sections": {}}, "errors": [], "effective_answers": {"consent": true}, "computed": {}}
+  },
+  {
+    "name": "yes_no_required_if_neq_yes_fires_when_unanswered",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "consent", "field_type": "yes_no"}, {"key": "details", "is_required": "conditional", "rules": [{"rule_type": "required_if", "operator": "neq", "related": "consent", "rule_value": "yes"}]}]},
+    "answers": {},
+    "expected": {"relevance": {"fields": {"consent": true, "details": true}, "sections": {}}, "errors": [{"field": "details", "rule": "field_required"}], "effective_answers": {}, "computed": {}}
+  },
+  {
+    "name": "yes_no_required_if_eq_no_fires_on_a_no",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "consent", "field_type": "yes_no"}, {"key": "details", "is_required": "conditional", "rules": [{"rule_type": "required_if", "operator": "eq", "related": "consent", "rule_value": "no"}]}]},
+    "answers": {"consent": false},
+    "expected": {"relevance": {"fields": {"consent": true, "details": true}, "sections": {}}, "errors": [{"field": "details", "rule": "field_required"}], "effective_answers": {"consent": false}, "computed": {}}
+  },
+  {
+    "name": "yes_no_required_if_rule_value_any_case",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "consent", "field_type": "yes_no"}, {"key": "details", "is_required": "conditional", "rules": [{"rule_type": "required_if", "operator": "eq", "related": "consent", "rule_value": "TRUE"}]}]},
+    "answers": {"consent": true},
+    "expected": {"relevance": {"fields": {"consent": true, "details": true}, "sections": {}}, "errors": [{"field": "details", "rule": "field_required"}], "effective_answers": {"consent": true}, "computed": {}}
+  },
+  {
+    "name": "yes_no_required_if_rule_value_one_still_holds",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "consent", "field_type": "yes_no"}, {"key": "details", "is_required": "conditional", "rules": [{"rule_type": "required_if", "operator": "eq", "related": "consent", "rule_value": "1"}]}]},
+    "answers": {"consent": true},
+    "expected": {"relevance": {"fields": {"consent": true, "details": true}, "sections": {}}, "errors": [{"field": "details", "rule": "field_required"}], "effective_answers": {"consent": true}, "computed": {}}
+  },
+  {
+    "name": "yes_no_relevance_eq_yes_keeps_the_answer",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "consent", "field_type": "yes_no"}, {"key": "dep", "relevant": "${consent} = 'yes'"}]},
+    "answers": {"consent": true, "dep": "x"},
+    "expected": {"relevance": {"fields": {"consent": true, "dep": true}, "sections": {}}, "errors": [], "effective_answers": {"consent": true, "dep": "x"}, "computed": {}}
+  },
+  {
+    "name": "yes_no_bare_reference_to_a_no_hides",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "consent", "field_type": "yes_no"}, {"key": "dep", "relevant": "${consent}"}]},
+    "answers": {"consent": "no", "dep": "x"},
+    "expected": {"relevance": {"fields": {"consent": true, "dep": false}, "sections": {}}, "errors": [], "effective_answers": {"consent": false}, "computed": {}}
+  },
+  {
+    "name": "yes_no_number_literal_against_the_browser_string",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "consent", "field_type": "yes_no"}, {"key": "dep", "relevant": "${consent} = 1"}]},
+    "answers": {"consent": "yes", "dep": "x"},
+    "expected": {"relevance": {"fields": {"consent": true, "dep": true}, "sections": {}}, "errors": [], "effective_answers": {"consent": true, "dep": "x"}, "computed": {}}
+  },
+  {
+    "name": "yes_no_answer_is_trimmed_and_case_folded",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "consent", "field_type": "yes_no"}, {"key": "dep", "relevant": "${consent} = 'no'"}]},
+    "answers": {"consent": " NO ", "dep": "x"},
+    "expected": {"relevance": {"fields": {"consent": true, "dep": true}, "sections": {}}, "errors": [], "effective_answers": {"consent": false, "dep": "x"}, "computed": {}}
+  },
+  {
+    "name": "yes_no_answer_nbsp_is_not_trimmed",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "consent", "field_type": "yes_no"}, {"key": "dep", "relevant": "${consent} = 'yes'"}]},
+    "answers": {"consent": "\u00a0no", "dep": "x"},
+    "expected": {"relevance": {"fields": {"consent": true, "dep": true}, "sections": {}}, "errors": [], "effective_answers": {"consent": true, "dep": "x"}, "computed": {}}
+  },
+  {
+    "name": "yes_no_answer_nul_is_trimmed",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "consent", "field_type": "yes_no"}, {"key": "dep", "relevant": "${consent} = 'no'"}]},
+    "answers": {"consent": "\u0000no", "dep": "x"},
+    "expected": {"relevance": {"fields": {"consent": true, "dep": true}, "sections": {}}, "errors": [], "effective_answers": {"consent": false, "dep": "x"}, "computed": {}}
+  },
+  {
+    "name": "yes_no_empty_string_stays_unanswered",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "consent", "field_type": "yes_no", "is_required": "required"}]},
+    "answers": {"consent": ""},
+    "expected": {"relevance": {"fields": {"consent": true}, "sections": {}}, "errors": [{"field": "consent", "rule": "field_required"}], "effective_answers": {"consent": ""}, "computed": {}}
+  },
+  {
+    "name": "yes_no_text_question_no_is_untouched",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "gate"}, {"key": "dep", "relevant": "${gate}"}]},
+    "answers": {"gate": "no", "dep": "x"},
+    "expected": {"relevance": {"fields": {"gate": true, "dep": true}, "sections": {}}, "errors": [], "effective_answers": {"gate": "no", "dep": "x"}, "computed": {}}
+  },
+  {
+    "name": "yes_no_repeat_member_bare_reference",
+    "grammar_version": "2.0",
+    "schema": {"sections": [{"key": "hh", "repeatable": true}], "fields": [{"key": "smoker", "field_type": "yes_no", "section": "hh"}, {"key": "packs", "field_type": "integer", "section": "hh", "relevant": "${smoker}"}]},
+    "answers": {"hh": [{"smoker": "yes", "packs": 2}, {"smoker": "no", "packs": 1}]},
+    "expected": {"relevance": {"fields": {}, "sections": {"hh": true}}, "errors": [], "effective_answers": {"hh": [{"smoker": true, "packs": 2}, {"smoker": false}]}, "computed": {}, "repeat_relevance": {"hh": [{"smoker": true, "packs": true}, {"smoker": true, "packs": false}]}}
+  },
+  {
+    "name": "yes_no_calculated_if_yes",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "consent", "field_type": "yes_no"}, {"key": "score", "field_type": "calculated", "calculate": "if(${consent} = 'yes', 10, 0)"}]},
+    "answers": {"consent": true},
+    "expected": {"relevance": {"fields": {"consent": true, "score": true}, "sections": {}}, "errors": [], "effective_answers": {"consent": true}, "computed": {"score": 10}}
+  },
+  {
+    "name": "yes_no_legacy_contains_operator",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "consent", "field_type": "yes_no"}, {"key": "details", "is_required": "conditional", "rules": [{"rule_type": "required_if", "operator": "contains", "related": "consent", "rule_value": "yes"}]}]},
+    "answers": {"consent": true},
+    "expected": {"relevance": {"fields": {"consent": true, "details": true}, "sections": {}}, "errors": [{"field": "details", "rule": "field_required"}], "effective_answers": {"consent": true}, "computed": {}}
+  },
+  {
+    "name": "yes_no_selected_in_relevance",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "consent", "field_type": "yes_no"}, {"key": "dep", "relevant": "selected(${consent}, 'yes')"}]},
+    "answers": {"consent": true, "dep": "x"},
+    "expected": {"relevance": {"fields": {"consent": true, "dep": true}, "sections": {}}, "errors": [], "effective_answers": {"consent": true, "dep": "x"}, "computed": {}}
+  }
+]

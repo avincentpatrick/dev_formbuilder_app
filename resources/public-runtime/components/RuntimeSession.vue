@@ -8,7 +8,8 @@
  * App re-mounts this component (a new `:key`) on a version-drift `reschema`, so a superseding republish gets a
  * clean store with a fresh `client_submission_uuid` while the retained answers are carried in by key.
  */
-import { computed, inject, onBeforeUnmount, onMounted, provide, ref } from 'vue';
+import { computed, inject, onBeforeUnmount, onMounted, provide, ref, watch } from 'vue';
+import { MdsBanner } from '@meridian/design-system';
 import RuntimeShell from './RuntimeShell.vue';
 import PageView from './PageView.vue';
 import StepView from './StepView.vue';
@@ -123,6 +124,23 @@ const announcer = createAnnouncer();
 
 provide(RuntimeKey, runtime);
 provide(AnnouncerKey, announcer);
+
+// R-95a94b36 (M121) — the respondent is told when the rule engine fails, and Submit stays open (D67 = warn):
+// the server stays authoritative, exactly as the staff encode page already behaves. ⚠️ The copy is hedged
+// on purpose. `engineFailed` latches and never resets, while a failure that depends on an answer (a broken
+// check on a question) clears once that answer is emptied — so the notice must stay true after recovery.
+// ⛔ THE LATCH CAN FIRE MID-FILL, NOT ONLY AT MOUNT, and a banner inserted into a live page is not reliably
+// spoken. So the same sentence goes through the SPA's one announcer — AFTER the render that just wrote
+// "New question: …" for every question the degrade revealed, or that last label would win.
+const ENGINE_FAILED_NOTICE =
+    "Some of this form's rules couldn't be checked on your device, so you may see questions that don't apply to you. Answer the ones that do.";
+watch(
+    runtime.engineFailed,
+    (failed) => {
+        if (failed) announcer.announce(ENGINE_FAILED_NOTICE);
+    },
+    { flush: 'post' },
+);
 
 // The offline DB + replay driver are provided by App.vue (shared with the service worker); fall back to a
 // fresh handle if a test mounts this component in isolation.
@@ -603,6 +621,15 @@ const description = computed(() => runtime.renderModel.form.description);
                 :resolution="stepResolution"
                 :step-title="resumeStepTitle"
                 :note="resume.note"
+            />
+            <!-- R-95a94b36: a standing CONDITION, so the design system's Banner (fixed role="status"), not an Alert.
+                 Its own element: the `notice` ref below is nulled and overwritten by every submit. -->
+            <MdsBanner
+                v-if="runtime.engineFailed.value"
+                tone="warning"
+                icon="alert"
+                :message="ENGINE_FAILED_NOTICE"
+                data-engine-notice
             />
             <div
                 v-if="notice"

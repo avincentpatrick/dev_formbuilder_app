@@ -1192,6 +1192,34 @@ end state and needs a disclosure-safe refusal designed first, which is a decisio
 
 **Recommendation: A.** The invariant's value is not the number six — it is that the set is closed and each member was argued for. A keeps that and pays the cost of arguing for each addition, which is a cost worth paying exactly once per property. B weakens the sentence to nothing, because "a documented superset" is not a constraint anybody can fail. ⚠️ Every preset must pass the existing contrast gate in **every theme mode**, and that totality is the gate worth writing — a preset that is legible in light and unreadable in dark is the failure this buys protection against.
 
+### D68 — The app sidebar is to be collapsible. Where does the collapsed state persist — on the server for the user, or in the browser for the device? **Tier: early-testing.**
+
+**Filed 2026-10-01 by `M121`, from re-verifying `R-33c7fd56` (the collapsible sidebar, the overhaul plan's `B4`).** The row and the plan's title both say server-side, but that was a recommendation carried forward, never a decision: nothing here or in the plan's decisions records it. The only recorded basis is PRD Feature #9's *"stored server-side … not merely in browser local storage"*, which was written for the theme axes.
+
+- **A — server-side**, a fifth column on `user_ui_preferences` through `PATCH /settings/appearance`. Follows the person across devices and workspaces. Costs a migration, four hub files, and a full page round trip per toggle — which on the builder can cancel an in-flight publish response — and no e2e spec may click it, because every spec shares one seeded user and the row would leak silently into every later desktop scan.
+- **B — `localStorage`**, per device and per workspace. No PHP, no migration, two hub files, testable end to end because storage is per browser context. It is the first stored client preference in `resources/js`, and a collapse chosen on a laptop does not follow the person to a desktop monitor.
+
+**Recommendation: B.** A collapse is a screen-size preference, closer to the drawer state than to a theme, and it is the cheaper and the more testable of the two. If the person wants it to follow them across devices, A is right and costs what it says.
+
+### D69 — When a note carries content blocks, does the respondent still see the note's label? **Tier: early-testing.**
+
+**Filed 2026-10-01 by `M121`, from verifying `R-6dedc3a9` (content blocks).** Today a note renders its label and nothing else. Once it can hold headings, paragraphs and callouts, the label either duplicates the first heading or becomes something only the author sees. The renderer (`R-c9f50df2`) cannot be built without the answer, and the editor's help text under the Label input depends on it.
+
+- **A — always shown, above the blocks.** Today's behaviour, extended; authors will repeat their heading.
+- **B — author-only once blocks exist.** The label names the note in the canvas, the logic rail and the PDF, and respondents see only the blocks. Backward compatible — no note has blocks today.
+- **C — a per-note "Show the label to respondents" switch.**
+
+**Recommendation: B.**
+
+### D70 — Do content blocks carry translations? **Tier: during-testing.**
+
+**Filed 2026-10-01 by `M121`, from verifying `R-6dedc3a9`.** Labels and hints are translated per locale on every surface; the proposed block shape has no translation member, and because the shape refuses unknown keys, adding one later is a deliberate widening rather than an accident.
+
+- **A — not yet.** The shape ships without translations and is widened later by appending an optional member; a multilingual form shows its blocks in the base language until then, and the editor says so.
+- **B — now.** Every text leaf carries a translations map from the first block, multiplying the editor's inputs by the form's languages before anything ships.
+
+**Recommendation: A.** It does not block the shape half of `R-6dedc3a9`, which is why it is filed `during-testing`.
+
 
 ## ANSWERED
 ### D57 — Reported item 16 asks for three ways to present sections; `forms.single_page_mode` is a boolean that expresses two of them and "tabular" is not expressible at all. What is the model? **A now, C next — ship the two modes the boolean already expresses, then make "per page" real by honouring `page_break`.**
@@ -1247,6 +1275,12 @@ end state and needs a disclosure-safe refusal designed first, which is a decisio
 
 **Recommendation: A.** The loss argument does not settle it, because B's real cost is not data. ⛔ **An unfiltered 31-item dropdown IS reported item 4 wearing a different control** — the same complaint that validation rules must not offer `min_length` on a date. Offering "convert this photo to a phone number" is the same defect in the same session, and A is the same remedy. The compatible set is still wide: every choice type converts to every other choice type carrying its options and their translations, and the whole text and number families are lossless within themselves.
 
+⛔ **AMENDED 2026-10-01 (user decisions, in chat), recorded by Lane A during `M121` — WHERE THE SHAPE LINE ACTUALLY FALLS.** Building the engine showed that `A` did not decide the boundaries: `ValueShape` puts `likert_scale` (Scale), `yes_no` (Boolean) and `cascading_select` (Hierarchy) outside Choice, while the recommendation's *"every choice type converts to every other choice type"* and the overhaul plan's lossy cascade↔choice rows assumed otherwise. Four questions were put to the user and every answer was the recommendation:
+- **The choice family is the four OPTION-LIST types** — `single_select`, `multi_select`, `dropdown`, `likert_scale` (`ValueShape::carriesOptionList()`). They convert among each other carrying their options and each option's `label_translations`. `yes_no` and `cascading_select` convert **only** to `note` or `hidden`; flattening cascade levels is refused, as `A` refuses loss.
+- **`note` and `hidden` are TWO-WAY.** "Always allowed" holds as a target and now as a source too, so a parked field can be turned back — which is what lets the builder's undo reverse a conversion through the same endpoint. That includes `note`/`hidden` → `calculated`, with a warning that a formula must be added, because publish does not catch an empty one.
+- **`calculated` converts only to `note`/`hidden`, and `page_break` converts to and from nothing.** `integer`↔`decimal` is lossless. ⚠️ **`duration` is its own `ValueShape`, so under `A`'s own words it too converts only to `note`/`hidden`** — recorded here as the literal reading, not as a fifth question.
+- **The row is split:** `M121` ships the engine (`app/Support/Forms/FieldTypeConversion.php`), `M122` the request, controller and routes.
+
 ---
 
 ### D66 — The generated line offers open decisions and decision-blocked rows as work to take, and the raw counts read as a demand to decide all of them at once. When is a filed decision put to the user? **Narrow — only when the tier being worked holds a work row blocked on it.**
@@ -1256,6 +1290,17 @@ end state and needs a disclosure-safe refusal designed first, which is a decisio
 ⛔ **The trigger is a WORK row, not the decision row.** Both readings were put to the user and the narrow one was chosen. `D58` is the case that separates them: it is itself tiered `early-testing`, but the only row awaiting it (`R-f0c5b682`) is `during-testing` — so under this answer `D58` is **not** put to the user now, and `M114` records that as the rule first application rather than leaving it to be re-derived.
 
 **The imperative half is in `CLAUDE.md`,** under *Taking a row*: file a decision silently with its options and a recommendation, and put it to the user only when the worked tier holds a row blocked on it — never read the whole board at them. **The generator half is `R-98b2d568`** (*"The Next section and the hand-off list open decisions as work to take"*), which this decision **retiers `during-testing` to `early-testing`**, with the reason recorded at the row. ⚠️ `M98` had argued `during-testing` for its sibling because *"no tester sees any of this"* — true, and beside the point: the noise falls on the user directly, which is what this instruction is about.
+
+---
+
+### D67 — When the rule engine fails on a respondent's device, every conditional question is shown with no conditions applied. Does the guest form warn and let them submit, or refuse to submit? **A — warn, and keep Submit working.**
+
+**Filed and answered 2026-10-01 (user decision, in chat), recorded by Lane A during `M121`.** It decides `R-95a94b36` (*"A respondent is never told the rule engine failed"*), whose own text left the question open. ⛔ **ADR-0008 §D4 did NOT settle it, although a first reading said it did:** §D4 says a completed submission is never rejected because the tenant exceeded quota, and the route comments at `routes/api.php` apply that to route gates — neither speaks to a client-side guard, and the client already refuses submit on field errors.
+
+- **A — warn.** Show a notice that some rules could not be checked, so the respondent may see questions that do not apply, and leave Submit working. The server stays the authority, which is how the degrade was designed, and it is exactly what the staff encode page already does. Cost: if the server's engine fails too, the respondent fills the form and then meets *"A form expression could not be evaluated."*
+- **B — refuse.** Show the notice and block Submit; save-for-later stays. Cost: any fault confined to the device becomes a hard block on a response the server would have accepted, and it only saves effort when the fault is visible on arrival — a broken answer check surfaces mid-fill.
+
+**Recommendation: A**, and **A was chosen.** ⚠️ The engine's failure latch never resets, so the notice's copy is hedged (*"you may see questions that don't apply"*) to stay true after an input-dependent failure clears.
 
 ---
 

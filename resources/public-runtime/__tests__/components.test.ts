@@ -5,7 +5,7 @@ import type { ApiClient } from '../lib/api-client';
 import { ApiError } from '../lib/api-client';
 import { normalizeError } from '../lib/error-normalizer';
 import type { Bootstrap } from '../lib/types';
-import { field, schemaResponse, section } from './fixtures';
+import { field, schemaResponse, section, validation } from './fixtures';
 import { openDb } from '../lib/db';
 import { enqueue } from '../lib/outbox';
 import { attachToSubmission, listForSubmission, localMediaRefId, stash } from '../lib/media-queue';
@@ -1522,6 +1522,103 @@ describe('RuntimeSession — resume drift explains itself (H21b §5.3)', () => {
         expect(wrapper.text()).toContain('Welcome back');
         expect(wrapper.text()).not.toContain('no longer applies to your answers');
         expect(wrapper.text()).toContain('Step 2 of 2');
+
+        wrapper.unmount();
+    });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────────
+// R-95a94b36 (M121) — a respondent is told when the rule engine failed. `safeEvaluate()` catches any
+// engine throw, latches `engineFailed`, and degrades the form to "every question applies, no errors" —
+// which used to happen in silence. D67 = warn: the notice appears and Submit stays open, because the
+// server stays authoritative (the staff encode page already behaves this way).
+// ─────────────────────────────────────────────────────────────────────────────────────────────────
+describe('RuntimeSession — a respondent is told when the rule engine failed (R-95a94b36)', () => {
+    const NOTICE = "Some of this form's rules couldn't be checked on your device";
+
+    /** `${gate} =` ends in an operator with nothing after it, so the parser throws on every evaluation. */
+    const brokenRelevance = () =>
+        schemaResponse({
+            fields: [
+                field({ key: 'gate', label: 'Gate', sequence: 1 }),
+                field({ key: 'inner', label: 'Inner', sequence: 2, relevant_expression: '${gate} =' }),
+            ],
+        });
+
+    it('tells the respondent at mount, and shows the question it could not hide', async () => {
+        const wrapper = mount(RuntimeSession, { props: { schema: brokenRelevance(), bootstrap, client: fakeClient() } });
+        await settle();
+
+        // The degrade really happened: a question whose condition can never hold is on screen.
+        expect(wrapper.text()).toContain('Inner');
+        const notice = wrapper.find('[data-engine-notice]');
+        expect(notice.exists()).toBe(true);
+        expect(notice.attributes('role')).toBe('status');
+        expect(notice.text()).toContain(NOTICE);
+
+        wrapper.unmount();
+    });
+
+    it('shows no notice when every rule evaluates', async () => {
+        const schema = schemaResponse({
+            fields: [
+                field({ key: 'gate', label: 'Gate', sequence: 1 }),
+                field({ key: 'inner', label: 'Inner', sequence: 2, relevant_expression: "${gate} = 'go'" }),
+            ],
+        });
+        const wrapper = mount(RuntimeSession, { props: { schema, bootstrap, client: fakeClient() } });
+        await settle();
+
+        // The condition WAS applied — so the absence below is a healthy engine, not an empty page.
+        expect(wrapper.text()).toContain('Gate');
+        expect(wrapper.text()).not.toContain('Inner');
+        expect(wrapper.find('[data-engine-notice]').exists()).toBe(false);
+
+        wrapper.unmount();
+    });
+
+    it('tells them the moment a check that cannot be evaluated is first reached, not only at mount', async () => {
+        // A field comparison with no field to compare against: the pre-M116 population the publish gate now
+        // refuses. An empty question's checks are skipped, so nothing throws until it is answered.
+        const schema = schemaResponse({
+            fields: [
+                field({
+                    key: 'age',
+                    label: 'Age',
+                    field_type: 'integer',
+                    validations: [validation({ rule_type: 'greater_than_field', related_field_key: null })],
+                }),
+            ],
+        });
+        const wrapper = mount(RuntimeSession, { props: { schema, bootstrap, client: fakeClient() } });
+        await settle();
+        expect(wrapper.find('[data-engine-notice]').exists()).toBe(false);
+
+        await wrapper.find('input').setValue('5');
+        await settle();
+
+        expect(wrapper.find('[data-engine-notice]').exists()).toBe(true);
+        // A banner inserted into a live page is not reliably spoken, so the announcer carries it too.
+        expect(announced(wrapper)).toContain(NOTICE);
+
+        // The latch never resets, which is why the copy is hedged: it stays true after the answer is emptied.
+        await wrapper.find('input').setValue('');
+        await settle();
+        expect(wrapper.find('[data-engine-notice]').exists()).toBe(true);
+
+        wrapper.unmount();
+    });
+
+    it('does not block Submit — the server stays authoritative (D67 = warn)', async () => {
+        const client = fakeClient();
+        const wrapper = mount(RuntimeSession, { props: { schema: brokenRelevance(), bootstrap, client } });
+        await settle();
+        expect(wrapper.find('[data-engine-notice]').exists()).toBe(true);
+
+        await wrapper.find('form').trigger('submit');
+        await settle();
+
+        expect(client.submit).toHaveBeenCalled();
 
         wrapper.unmount();
     });

@@ -1192,6 +1192,34 @@ end state and needs a disclosure-safe refusal designed first, which is a decisio
 
 **Recommendation: A.** The invariant's value is not the number six — it is that the set is closed and each member was argued for. A keeps that and pays the cost of arguing for each addition, which is a cost worth paying exactly once per property. B weakens the sentence to nothing, because "a documented superset" is not a constraint anybody can fail. ⚠️ Every preset must pass the existing contrast gate in **every theme mode**, and that totality is the gate worth writing — a preset that is legible in light and unreadable in dark is the failure this buys protection against.
 
+### D68 — The app sidebar is to be collapsible. Where does the collapsed state persist — on the server for the user, or in the browser for the device? **Tier: early-testing.**
+
+**Filed 2026-10-01 by `M121`, from re-verifying `R-33c7fd56` (the collapsible sidebar, the overhaul plan's `B4`).** The row and the plan's title both say server-side, but that was a recommendation carried forward, never a decision: nothing here or in the plan's decisions records it. The only recorded basis is PRD Feature #9's *"stored server-side … not merely in browser local storage"*, which was written for the theme axes.
+
+- **A — server-side**, a fifth column on `user_ui_preferences` through `PATCH /settings/appearance`. Follows the person across devices and workspaces. Costs a migration, four hub files, and a full page round trip per toggle — which on the builder can cancel an in-flight publish response — and no e2e spec may click it, because every spec shares one seeded user and the row would leak silently into every later desktop scan.
+- **B — `localStorage`**, per device and per workspace. No PHP, no migration, two hub files, testable end to end because storage is per browser context. It is the first stored client preference in `resources/js`, and a collapse chosen on a laptop does not follow the person to a desktop monitor.
+
+**Recommendation: B.** A collapse is a screen-size preference, closer to the drawer state than to a theme, and it is the cheaper and the more testable of the two. If the person wants it to follow them across devices, A is right and costs what it says.
+
+### D69 — When a note carries content blocks, does the respondent still see the note's label? **Tier: early-testing.**
+
+**Filed 2026-10-01 by `M121`, from verifying `R-6dedc3a9` (content blocks).** Today a note renders its label and nothing else. Once it can hold headings, paragraphs and callouts, the label either duplicates the first heading or becomes something only the author sees. The renderer (`R-c9f50df2`) cannot be built without the answer, and the editor's help text under the Label input depends on it.
+
+- **A — always shown, above the blocks.** Today's behaviour, extended; authors will repeat their heading.
+- **B — author-only once blocks exist.** The label names the note in the canvas, the logic rail and the PDF, and respondents see only the blocks. Backward compatible — no note has blocks today.
+- **C — a per-note "Show the label to respondents" switch.**
+
+**Recommendation: B.**
+
+### D70 — Do content blocks carry translations? **Tier: during-testing.**
+
+**Filed 2026-10-01 by `M121`, from verifying `R-6dedc3a9`.** Labels and hints are translated per locale on every surface; the proposed block shape has no translation member, and because the shape refuses unknown keys, adding one later is a deliberate widening rather than an accident.
+
+- **A — not yet.** The shape ships without translations and is widened later by appending an optional member; a multilingual form shows its blocks in the base language until then, and the editor says so.
+- **B — now.** Every text leaf carries a translations map from the first block, multiplying the editor's inputs by the form's languages before anything ships.
+
+**Recommendation: A.** It does not block the shape half of `R-6dedc3a9`, which is why it is filed `during-testing`.
+
 
 ## ANSWERED
 ### D57 — Reported item 16 asks for three ways to present sections; `forms.single_page_mode` is a boolean that expresses two of them and "tabular" is not expressible at all. What is the model? **A now, C next — ship the two modes the boolean already expresses, then make "per page" real by honouring `page_break`.**

@@ -144,8 +144,8 @@ export function useBuilderStore(props: BuilderPageProps) {
         return save.wrote ? 'saved' : 'idle';
     });
 
-    // Read-only by design: the only writers are `guard()` and the burst verdict above. The narrowing from Ref
-    // to ComputedRef is itself the guarantee that nothing else can ever set it.
+    // Read-only by design: the only writers are `guard()`, `reportFailure()` and the burst verdict above. The
+    // narrowing from Ref to ComputedRef is itself the guarantee that nothing else can ever set it.
     const saveError = computed(() => save.error);
 
     const saving = computed(() => saveState.value === 'saving');
@@ -325,8 +325,8 @@ export function useBuilderStore(props: BuilderPageProps) {
         return enqueue(async () => {
             const entry = undoStack.value.pop();
             if (!entry) return;
-            await entry.undo();
-            redoStack.value.push(entry);
+            const outcome = await runHistory(entry.undo);
+            if (outcome !== 'dropped') (outcome === 'done' ? redoStack : undoStack).value.push(entry);
         });
     }
 
@@ -334,8 +334,8 @@ export function useBuilderStore(props: BuilderPageProps) {
         return enqueue(async () => {
             const entry = redoStack.value.pop();
             if (!entry) return;
-            await entry.redo();
-            undoStack.value.push(entry);
+            const outcome = await runHistory(entry.redo);
+            if (outcome !== 'dropped') (outcome === 'done' ? undoStack : redoStack).value.push(entry);
         });
     }
 
@@ -670,14 +670,14 @@ export function useBuilderStore(props: BuilderPageProps) {
             pushHistory(
                 `Edit ${after.label || 'field'}`,
                 async () => {
-                    const current = findField(uid);
+                    const current = sameTypeField(uid, before, 'undo');
                     if (!current) return;
                     applyFieldSnapshot(current, before);
                     await persistField(uid);
                     baselines.set(uid, clone(before));
                 },
                 async () => {
-                    const current = findField(uid);
+                    const current = sameTypeField(uid, after, 'redo');
                     if (!current) return;
                     applyFieldSnapshot(current, after);
                     await persistField(uid);
@@ -728,7 +728,7 @@ export function useBuilderStore(props: BuilderPageProps) {
             if (state.kind === 'field') {
                 const field = findField(state.uid);
                 if (!field) return;
-                if (choice === 'theirs') {
+                if (choice === 'theirs' || refuseMineAcrossTypes(state)) {
                     Object.assign(field, { ...(state.theirs as ServerField), uid: state.uid });
                 } else {
                     // Keep my in-flight values; adopt THEIR version token so the overwrite is accepted.
@@ -763,6 +763,211 @@ export function useBuilderStore(props: BuilderPageProps) {
     function whenIdle(): Promise<unknown> {
         flushCommit();
         return queue;
+    }
+
+    // ── Changing a question's type (Increment M123, `B5b`) ─────────────────────────────────────────
+    // ⛔ EVERY REQUEST HERE RUNS IN THE QUEUE, AFTER A FLUSH, AND READS THE ROW'S TOKEN INSIDE ITS TASK.
+    // `updateField()` checks its token before it takes the row lock, so a PATCH racing the convert can write the
+    // old type's rules back over it with no 409 — and the token is second-precision, so a PATCH queued in the
+    // same second as the convert carries a token the convert did not visibly move. Serializing is the only
+    // protection the client has.
+    //
+    // ⛔ A CONVERSION'S 409 NEVER REACHES THE CONFLICT DIALOG. Its three triggers (a stale token, a stale plan, a
+    // missing fingerprint) share one body and one remedy — read the plans again — and "Keep mine" would PATCH the
+    // old type's content onto the converted row. The server's row is adopted and the caller re-reads.
+
+    /** A failure the author must see, booked the way `guard()` books a failed write. */
+    function reportFailure(message: string): void {
+        burstAttempted = true;
+        burstFailed = true;
+        save.error = message;
+    }
+
+    function blockedReason(): string | null {
+        if (conflict.value !== null) return CONVERT_BLOCKED_BY_CONFLICT;
+        if (save.error !== null) return CONVERT_BLOCKED_BY_FAILED_SAVE;
+        return null;
+    }
+
+    function typeLabel(value: string): string {
+        return props.palette.flatMap((g) => g.types).find((t) => t.value === value)?.label ?? value;
+    }
+
+    /** Replace the row with the server's IN PLACE — so the uid, the selection and every history entry survive. */
+    function adoptField(field: LocalField, row: ServerField): void {
+        Object.assign(field, { ...clone(row), uid: field.uid });
+        baselines.set(field.uid, fieldSnapshot(field));
+    }
+
+    /** A READ: no burst bookkeeping, so it can never move the save verdict. */
+    async function requestPlans(field: LocalField): Promise<ConversionPlan[] | string> {
+        try {
+            const result = await builderClient.get<{ plans: ConversionPlan[] }>(`${base}/fields/${field.id}/conversions`);
+            // The GET carries no token and never 409s; the narrowing makes that a fact rather than a hope.
+            return result.conflict ? result.message : result.data.plans;
+        } catch (error) {
+            return error instanceof BuilderRequestError ? error.message : PLANS_UNAVAILABLE;
+        }
+    }
+
+    /** Every type this question may become, as the server plans each conversion right now. */
+    function loadConversionPlans(uid: Uid): Promise<PlansOutcome> {
+        flushCommit(); // the plans must describe what is on screen, not a keystroke ago
+        return enqueue(async (): Promise<PlansOutcome> => {
+            const field = findField(uid);
+            if (!field) return { status: 'failed', message: QUESTION_GONE };
+            const blocked = blockedReason();
+            if (blocked !== null) return { status: 'failed', message: blocked };
+            const plans = await requestPlans(field);
+            if (typeof plans === 'string') return { status: 'failed', message: plans };
+            // Every plan names the type the SERVER holds; a mismatch means it moved somewhere this page never saw.
+            if (plans.some((p) => p.from !== field.field_type)) return { status: 'failed', message: TYPE_MOVED_ELSEWHERE };
+            return { status: 'loaded', from: field.field_type, plans };
+        });
+    }
+
+    /** Apply one plan the author confirmed. Always sends the plan's fingerprint, so the server refuses a plan that moved. */
+    function convertField(uid: Uid, plan: ConversionPlan): Promise<ConvertOutcome> {
+        flushCommit();
+        return enqueue(async (): Promise<ConvertOutcome> => {
+            const field = findField(uid);
+            if (!field) return { status: 'failed', message: QUESTION_GONE };
+            const blocked = blockedReason();
+            if (blocked !== null) return { status: 'failed', message: blocked };
+            if (field.field_type !== plan.from) return { status: 'stale' };
+            const before = fieldSnapshot(field); // equals the baseline: the flush landed first
+            let result: BuilderResult<ServerField>;
+            try {
+                result = await builderClient.post<ServerField>(`${base}/fields/${field.id}/convert`, {
+                    to: plan.to,
+                    version: field.version,
+                    fingerprint: plan.fingerprint,
+                });
+            } catch (error) {
+                // A refused conversion is not a failed save: nothing changed on either side, so the verdict stays.
+                return { status: 'failed', message: error instanceof BuilderRequestError ? error.message : CONVERT_FAILED };
+            }
+            if (result.conflict) {
+                adoptField(field, result.current);
+                return { status: 'stale' };
+            }
+            burstAttempted = true; // a write landed, so this burst may now reach "saved"
+            adoptField(field, result.data);
+            pushConversion(uid, plan, before);
+            return { status: 'converted' };
+        });
+    }
+
+    /**
+     * The conversion's ONE history entry. Undo converts back, then restores the pre-conversion content only when
+     * the round trip did not already restore it — that PATCH re-sends every rule, and a rule's imported translations
+     * and AND/OR grouping cannot survive it (`R-86a0426d`). Undo and redo apply a freshly read plan WITHOUT the
+     * census: the author is reversing their own change, not making a new one.
+     */
+    function pushConversion(uid: Uid, plan: ConversionPlan, before: FieldSnapshot): void {
+        const { from, to } = plan;
+        let forward = plan; // the plan that produced the current state; every redo replaces it
+        let restorePending = false; // the type is back but the pre-conversion content has not landed yet
+        pushHistory(
+            `Change ${before.label || 'field'} to ${typeLabel(to)}`,
+            async () => {
+                const live = findField(uid);
+                if (!live) return; // deleted since — as the Edit entries do
+                if (live.field_type === to) {
+                    const reverse = await convertInHistory(live, from, UNDO_FAILED);
+                    restorePending = !roundTripIsExact(forward, reverse);
+                } else if (live.field_type !== from) {
+                    throw new StaleHistoryStep(UNDO_TYPE_MOVED); // neither side of this entry: drop it
+                } // `=== from`: an earlier attempt already converted back, so a retry only owes the restore
+                if (restorePending) {
+                    // A PATCH cannot change a type, so it runs only once the type is back.
+                    await restoreSnapshot(live, before, UNDO_FAILED);
+                    restorePending = false;
+                }
+                baselines.set(uid, fieldSnapshot(live));
+            },
+            async () => {
+                const live = findField(uid);
+                if (!live || live.field_type === to) return; // already there: idempotent
+                if (live.field_type !== from) throw new StaleHistoryStep(REDO_TYPE_MOVED);
+                forward = await convertInHistory(live, to, REDO_FAILED);
+                restorePending = false;
+            },
+        );
+    }
+
+    /** A history step's conversion: a fresh plan, then the POST. Throws so `runHistory()` can keep or drop the entry. */
+    async function convertInHistory(live: LocalField, target: string, failure: string): Promise<ConversionPlan> {
+        const plans = await requestPlans(live);
+        if (typeof plans === 'string') throw new HistoryStepFailed(`${failure} ${plans}`);
+        const plan = plans.find((p) => p.to === target);
+        if (plan === undefined || plan.from !== live.field_type) {
+            throw new StaleHistoryStep(`${failure} ${TYPE_MOVED_ELSEWHERE}`);
+        }
+        const result = await guard(() =>
+            builderClient.post<ServerField>(`${base}/fields/${live.id}/convert`, {
+                to: target,
+                version: live.version,
+                fingerprint: plan.fingerprint,
+            }),
+        );
+        if (result === null) throw new HistoryStepFailed(`${failure} ${save.error ?? ''}`.trim());
+        if (result.conflict) {
+            adoptField(live, result.current);
+            throw new StaleHistoryStep(`${failure} ${CHANGED_ELSEWHERE}`);
+        }
+        adoptField(live, result.data);
+        return plan;
+    }
+
+    async function restoreSnapshot(live: LocalField, snap: FieldSnapshot, failure: string): Promise<void> {
+        const onServer = fieldSnapshot(live);
+        applyFieldSnapshot(live, snap);
+        const result = await guard(() => builderClient.patch<ServerField>(`${base}/fields/${live.id}`, fieldPayload(live)));
+        if (result === null) {
+            applyFieldSnapshot(live, onServer); // the screen shows what the server holds; a retry PATCHes again
+            throw new HistoryStepFailed(`${failure} ${save.error ?? ''}`.trim());
+        }
+        if (result.conflict) {
+            adoptField(live, result.current);
+            throw new StaleHistoryStep(`${failure} ${CHANGED_ELSEWHERE}`);
+        }
+        live.version = result.data.version;
+    }
+
+    /**
+     * Run one undo or redo step. Three outcomes, because a step can fail in two different ways: one that may
+     * work next time (kept on its stack for a retry) and one that never can — the type moved elsewhere — which
+     * is dropped rather than retried forever. Every entry older than this increment never throws, so it is
+     * always `done` and moves to the other stack exactly as before.
+     */
+    async function runHistory(step: () => Promise<void>): Promise<'done' | 'retry' | 'dropped'> {
+        try {
+            await step();
+            return 'done';
+        } catch (error) {
+            reportFailure(error instanceof Error && error.message !== '' ? error.message : HISTORY_STEP_FAILED);
+            return error instanceof StaleHistoryStep ? 'dropped' : 'retry';
+        }
+    }
+
+    /**
+     * The row an Edit entry may apply its snapshot to. A row whose type has moved since is refused for good: the
+     * snapshot carries `field_type`, the PATCH cannot send it, so applying it would flip the type on screen only.
+     */
+    function sameTypeField(uid: Uid, snap: FieldSnapshot, step: 'undo' | 'redo'): LocalField | undefined {
+        const live = findField(uid);
+        if (live !== undefined && live.field_type !== snap.field_type) {
+            throw new StaleHistoryStep(step === 'undo' ? EDIT_UNDO_TYPE_MOVED : EDIT_REDO_TYPE_MOVED);
+        }
+        return live;
+    }
+
+    /** "Keep mine" re-sends content written for the type the author saw; when theirs is another type, theirs is kept. */
+    function refuseMineAcrossTypes(state: ConflictState): boolean {
+        const across = (state.mine as LocalField).field_type !== (state.theirs as ServerField).field_type;
+        if (across) reportFailure(MINE_ACROSS_TYPES);
+        return across;
     }
 
     // ── Order snapshot helpers ───────────────────────────────────────────────────
@@ -825,6 +1030,9 @@ export function useBuilderStore(props: BuilderPageProps) {
         addSection,
         deleteSection,
         moveFieldToSection,
+        // changing a question's type (M123)
+        loadConversionPlans,
+        convertField,
         // reorder session (drag / keyboard grab)
         flattenedFields,
         orderedSections,
@@ -912,3 +1120,123 @@ function sectionPayload(section: LocalSection): Record<string, unknown> {
 }
 
 export type BuilderStore = ReturnType<typeof useBuilderStore>;
+
+// ── Changing a question's type: the wire shapes and the store's own rules (Increment M123) ───────────────────
+// Declared down here, not in `types.ts`, so the store needs no new import above the lines the ledger cites.
+
+/** A rule row as a plan names it — by sequence and content, never by id (`ConversionPlan::publicRow()`). */
+export interface ConversionRule {
+    sequence: number;
+    rule_type: string | null;
+    operator: string | null;
+    rule_value: string | null;
+    expression: string | null;
+    error_message: string | null;
+}
+
+export interface ConversionDroppedRule extends ConversionRule {
+    reason: string;
+    /** The server's own sentence for why the rule cannot survive the conversion. */
+    reason_message: string;
+}
+
+export interface ConversionAddedRule {
+    sequence: number;
+    rule_type: string;
+    rule_value: string;
+    error_message: string;
+}
+
+/** `column` is one of `is_required`, `default_value`, `default_value_is_expression`, `is_queryable`, `indexed_data_type`. */
+export interface ConversionChange {
+    column: string;
+    from: string | boolean | null;
+    to: string | boolean | null;
+}
+
+export interface ConversionWarningItem {
+    code: string;
+    message: string;
+}
+
+/** `site` is one of `relevance`, `section_relevance`, `formula`, `constraint`, `rule`, `template`. */
+export interface ConversionCensusEntry {
+    code: string;
+    site: string;
+    /** The OWNER of the reference: a field key, a section key, or `confirmation_message`. */
+    key: string;
+    message: string;
+}
+
+/** One conversion as `GET …/fields/{field}/conversions` plans it, with the census of what it re-means elsewhere. */
+export interface ConversionPlan {
+    from: string;
+    to: string;
+    lossless: boolean;
+    requires_confirmation: boolean;
+    fingerprint: string;
+    config_dropped: string[];
+    changes: ConversionChange[];
+    kept: ConversionRule[];
+    dropped: ConversionDroppedRule[];
+    added: ConversionAddedRule[];
+    warnings: ConversionWarningItem[];
+    census: ConversionCensusEntry[];
+}
+
+export type PlansOutcome = { status: 'loaded'; from: string; plans: ConversionPlan[] } | { status: 'failed'; message: string };
+
+export type ConvertOutcome = { status: 'converted' } | { status: 'stale' } | { status: 'failed'; message: string };
+
+/** A history step that can never apply again — the type moved elsewhere — so its entry is dropped. */
+class StaleHistoryStep extends Error {}
+
+/** A history step that failed this time, so its entry stays on its stack for a retry. */
+class HistoryStepFailed extends Error {}
+
+/**
+ * Whether converting back lands on exactly the pre-conversion content, so the lossy restoring PATCH must NOT run.
+ *
+ * ⚠️ "THE FORWARD PLAN WAS LOSSLESS" IS NOT ENOUGH, and that was the first rule written. A lossless forward plan
+ * still fails to round-trip when the reverse re-adds a shipped check the author had deleted (an email field with no
+ * pattern → short text is lossless; the way back adds the pattern), when the reverse drops an author-written rule
+ * that happens to equal the source type's shipped one, or when the reverse resets columns the forward never touched.
+ * Exact means: nothing lost forward, and the way back removes precisely the rows the forward added — matched by
+ * CONTENT, because any intervening PATCH re-sequences rows.
+ */
+export function roundTripIsExact(forward: ConversionPlan, reverse: ConversionPlan): boolean {
+    if (!forward.lossless) return false;
+    if (reverse.added.length > 0 || reverse.changes.length > 0 || reverse.config_dropped.length > 0) return false;
+    const pool = [...reverse.dropped];
+    for (const added of forward.added) {
+        const i = pool.findIndex(
+            (d) =>
+                d.rule_type === added.rule_type &&
+                d.rule_value === added.rule_value &&
+                d.error_message === added.error_message &&
+                d.operator === null &&
+                d.expression === null,
+        );
+        if (i < 0) return false;
+        pool.splice(i, 1);
+    }
+    return pool.length === 0;
+}
+
+const QUESTION_GONE = 'This question no longer exists.';
+const CONVERT_BLOCKED_BY_CONFLICT = 'Resolve the editing conflict first, then change the type.';
+const CONVERT_BLOCKED_BY_FAILED_SAVE =
+    'Your last change hasn’t saved, so the type can’t be changed yet. Close this and fix the problem shown at the top of the settings panel.';
+const TYPE_MOVED_ELSEWHERE = 'This question’s type was changed somewhere else. Reload the page to see it.';
+const PLANS_UNAVAILABLE = 'Couldn’t load the types this question can change to.';
+const CONVERT_FAILED = 'Something went wrong changing the type. Try again.';
+const CHANGED_ELSEWHERE = 'The question was changed somewhere else.';
+const UNDO_FAILED = 'Couldn’t undo the type change.';
+const REDO_FAILED = 'Couldn’t redo the type change.';
+const UNDO_TYPE_MOVED = 'The type change can’t be undone: this question’s type was changed somewhere else.';
+const REDO_TYPE_MOVED = 'The type change can’t be redone: this question’s type was changed somewhere else.';
+const EDIT_UNDO_TYPE_MOVED = 'That edit can’t be undone: this question’s type has changed since it was made.';
+const EDIT_REDO_TYPE_MOVED = 'That edit can’t be redone: this question’s type has changed since it was made.';
+const MINE_ACROSS_TYPES =
+    'This question was changed to another type somewhere else, so your edit couldn’t be kept. The other version is shown.';
+const HISTORY_STEP_FAILED = 'That step couldn’t be completed.';

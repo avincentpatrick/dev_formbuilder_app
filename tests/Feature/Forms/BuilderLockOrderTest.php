@@ -44,6 +44,11 @@ uses(RefreshDatabase::class);
 | records for its own untested trim. What is provable, deterministically and on one connection, is the
 | ORDER, which is the property the fix changes. The negative arm below is what keeps that honest.
 |
+| ⚠️ M126 MOVED THE WITNESS, NOT THE PROPERTY. `replaceValidations()` now keeps an unchanged rule row in place
+| (`R-86a0426d`), so a resubmit that changes no rule issues no DELETE — the statement every arm below used to
+| read as "the first validation write". Each arm now reads the first statement that touches
+| `form_field_validations` at all, which the lock must still precede.
+|
 | ⚠️ Helpers are prefixed `builderLockOrder*` deliberately: Pest loads every file in a directory into one
 | process, so a same-named file-scope helper is a fatal redeclaration. `publishLocking*` is already taken
 | in this directory by PublishLockingTest.
@@ -161,8 +166,15 @@ it('takes the field row before any validation row even when the payload is clean
         .'builderLockOrderPayload() must reproduce the stored row exactly.'
     );
 
+    // ⛔ M126 (`R-86a0426d`): an unchanged rule is KEPT IN PLACE, so a clean resubmit writes no validation row
+    //    at all. The witness below was the DELETE that used to come first; it is now the first statement that
+    //    TOUCHES the table, the read included — stricter, and present on every path.
+    foreach (['delete from "form_field_validations"', 'update "form_field_validations"', 'insert into "form_field_validations"'] as $write) {
+        expect(builderLockOrderFirstIndex($log, $write))->toBeNull("a clean resubmit still issued `{$write}`");
+    }
+
     $lock = builderLockOrderFirstIndex($log, 'form_fields', 'for update');
-    $childWrite = builderLockOrderFirstIndex($log, 'delete from "form_field_validations"');
+    $childTouch = builderLockOrderFirstIndex($log, '"form_field_validations"');
 
     // Both floors first. Either one missing makes the comparison below vacuous, and the null-coercion
     // note on builderLockOrderFirstIndex() is why that would not have shown up as a failure.
@@ -170,10 +182,10 @@ it('takes the field row before any validation row even when the payload is clean
         'no locking select on `form_fields` was issued at all — writeField() no longer takes the field '
         .'row before it writes children, and the clean-payload deadlock against a publisher is open again.'
     );
-    expect($childWrite)->not->toBeNull('no validation write was issued, so the ordering proves nothing');
+    expect($childTouch)->not->toBeNull('no statement touched orm_field_validations, so the ordering proves nothing');
 
     expect($lock)->toBeLessThan(
-        $childWrite,
+        $childTouch,
         'writeField() touched `form_field_validations` before it locked `form_fields`. A publisher takes '
         .'those two tables in the opposite order, so this is the 40P01 cycle — and updateField()`s typed '
         .'catch re-throws anything that is not 23503, so the loser lands as an unrendered JSON 500.'
@@ -202,11 +214,11 @@ it('takes them in the same order when the payload is dirty, which is the case th
     );
 
     $lock = builderLockOrderFirstIndex($log, 'form_fields', 'for update');
-    $childWrite = builderLockOrderFirstIndex($log, 'delete from "form_field_validations"');
+    $childTouch = builderLockOrderFirstIndex($log, '"form_field_validations"');
 
     expect($lock)->not->toBeNull('no locking select on `form_fields` was issued on the dirty path either');
-    expect($childWrite)->not->toBeNull('no validation write was issued, so the ordering proves nothing');
-    expect($lock)->toBeLessThan($childWrite, 'the dirty path reached the validation rows first');
+    expect($childTouch)->not->toBeNull('no statement touched orm_field_validations, so the ordering proves nothing');
+    expect($lock)->toBeLessThan($childTouch, 'the dirty path reached the validation rows first');
 });
 
 it('still writes what it was asked to write, and still refuses a stale token', function (): void {
@@ -327,12 +339,12 @@ it('locks the sibling a cross-field rule names, ascending, before it writes any 
     });
 
     $lock = builderLockOrderFirstIndex($log, 'form_fields', 'for update');
-    $childWrite = builderLockOrderFirstIndex($log, 'delete from "form_field_validations"');
+    $childTouch = builderLockOrderFirstIndex($log, '"form_field_validations"');
 
     // Floors first — see the null-coercion note on builderLockOrderFirstIndex().
     expect($lock)->not->toBeNull('no locking select on `form_fields` was issued at all');
-    expect($childWrite)->not->toBeNull('no validation write was issued, so the ordering proves nothing');
-    expect($lock)->toBeLessThan($childWrite, 'the validation rows were reached before the field rows were locked');
+    expect($childTouch)->not->toBeNull('no statement touched orm_field_validations, so the ordering proves nothing');
+    expect($lock)->toBeLessThan($childTouch, 'the validation rows were reached before the field rows were locked');
 
     $statement = $log[$lock];
 

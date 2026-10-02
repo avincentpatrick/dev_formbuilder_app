@@ -712,28 +712,112 @@ final class FormBuilderService
     }
 
     /**
+     * Make the field's rule rows what the builder sent, KEEPING every row whose rule is unchanged (`M126`,
+     * `R-86a0426d`).
+     *
+     * ⛔ WHY NOT DELETE AND RE-INSERT, WHICH THIS USED TO DO. Three columns never reach the builder —
+     * `error_message_translations` (the XLSForm importer and the blueprint materializer write it),
+     * `logic_group` and `logic_operator` (the materializer) — because `BuilderPresenter::field()` emits none of
+     * them and `fieldPayload()` sends six keys per rule. Every field save sends its rules, so every save — a
+     * label edit included — deleted all three, with a 200. Both engines read the grouping, and translated
+     * messages render at runtime and re-export to XLSForm.
+     *
+     * ⚠️ A RULE IS MATCHED BY WHAT IT IS, because no row id reaches the client and position cannot identify
+     * one (the validation editor renumbers on a removal). Two rows are the same rule when their type, operator,
+     * value, expression and compared question are equal; identical rules pair off in sequence order. A matched
+     * row takes the new message and sequence IN PLACE and keeps the three columns. The trade-off is deliberate:
+     * a rule whose VALUE changed is a new rule and starts without them, while an edited MESSAGE keeps its
+     * translations — a translation that has fallen behind its message is better than one silently deleted.
+     *
+     * Unmatched rows are deleted BEFORE anything is inserted, as the old delete-all was, so the rule-XOR check
+     * and the sibling foreign key see the same sequence of writes. `convertField()` keeps rows in place the
+     * same way, by id, because it reads them.
+     *
      * @param  list<array<string, mixed>>  $rows
      * @param  array<string, string>  $siblingIdByKey  resolved by resolveValidationSiblings() BEFORE the lock
      */
     private function replaceValidations(FormField $field, array $rows, array $siblingIdByKey): void
     {
-        $field->validations()->delete();
+        /** @var array<string, list<FormFieldValidation>> $existingByRule */
+        $existingByRule = [];
+
+        foreach ($field->validations()->orderBy('sequence')->orderBy('id')->get() as $existing) {
+            $existingByRule[self::ruleIdentity(
+                $existing->rule_type?->value,
+                $existing->operator?->value,
+                $existing->rule_value,
+                $existing->expression,
+                $existing->related_form_field_id,
+            )][] = $existing;
+        }
+
+        /** @var list<array{row: FormFieldValidation, error_message: ?string, sequence: int}> $kept */
+        $kept = [];
+        /** @var list<array<string, mixed>> $inserts */
+        $inserts = [];
 
         foreach ($rows as $index => $row) {
             $relatedKey = $row['related_field_key'] ?? null;
+            $relatedId = $relatedKey !== null ? ($siblingIdByKey[$relatedKey] ?? null) : null;
+            $identity = self::ruleIdentity(
+                $row['rule_type'] ?? null,
+                $row['operator'] ?? null,
+                $row['rule_value'] ?? null,
+                $row['expression'] ?? null,
+                $relatedId,
+            );
 
-            FormFieldValidation::create([
+            $match = isset($existingByRule[$identity]) ? array_shift($existingByRule[$identity]) : null;
+
+            if ($match !== null) {
+                $kept[] = ['row' => $match, 'error_message' => $row['error_message'] ?? null, 'sequence' => $index];
+
+                continue;
+            }
+
+            $inserts[] = [
                 'form_version_id' => $field->form_version_id,
                 'form_field_id' => $field->id,
-                'related_form_field_id' => $relatedKey !== null ? ($siblingIdByKey[$relatedKey] ?? null) : null,
+                'related_form_field_id' => $relatedId,
                 'rule_type' => $row['rule_type'] ?? null,
                 'operator' => $row['operator'] ?? null,
                 'rule_value' => $row['rule_value'] ?? null,
                 'expression' => $row['expression'] ?? null,
                 'error_message' => $row['error_message'] ?? null,
                 'sequence' => $index,
-            ]);
+            ];
         }
+
+        $unmatchedIds = [];
+
+        foreach ($existingByRule as $leftOver) {
+            foreach ($leftOver as $existing) {
+                $unmatchedIds[] = $existing->id;
+            }
+        }
+
+        if ($unmatchedIds !== []) {
+            $field->validations()->whereIn('id', $unmatchedIds)->delete();
+        }
+
+        foreach ($kept as $keep) {
+            $keep['row']->fill(['error_message' => $keep['error_message'], 'sequence' => $keep['sequence']])->save();
+        }
+
+        foreach ($inserts as $insert) {
+            FormFieldValidation::create($insert);
+        }
+    }
+
+    /**
+     * What makes two rule rows the same rule, as one string — see replaceValidations(). An empty string reads as
+     * null, because the request's `ConvertEmptyStringsToNull` turns one into the other before the service sees it.
+     */
+    private static function ruleIdentity(?string $ruleType, ?string $operator, ?string $ruleValue, ?string $expression, ?string $relatedId): string
+    {
+        $parts = array_map(static fn (?string $part): ?string => $part === '' ? null : $part, [$ruleType, $operator, $ruleValue, $expression, $relatedId]);
+
+        return json_encode($parts, JSON_THROW_ON_ERROR);
     }
 
     private function resolveDraftSectionId(FormVersion $draft, ?string $sectionId): ?string

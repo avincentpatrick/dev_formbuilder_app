@@ -368,6 +368,36 @@ final class PublishValidationException extends RuntimeException
     }
 
     /**
+     * An expression that compares a date, time or date-and-time question with more than / less than, or does
+     * arithmetic on one (Increment M126, `R-87160c81`). Ordering is numeric-only in both engines, so it never
+     * changes with the answer — and in a constraint, every answer is refused. ⚠️ "NOT SUPPORTED YET", because it
+     * is: `D71` queued date comparison as its own row, and this refusal lifts when that ships. `$ownerKey` is the
+     * question or section the expression belongs to; `$kind` is the compared type's own label.
+     */
+    public static function expressionOrdersDate(string $ownerKey, string $dateKey, string $kind): self
+    {
+        return self::one(
+            $ownerKey,
+            'expression_orders_date',
+            "The expression on “{$ownerKey}” compares the {$kind} question “{$dateKey}” using more than, less than or arithmetic. Comparing dates and times that way is not supported yet, so the expression never changes with the answer. Compare with “=” or remove the comparison.",
+        );
+    }
+
+    /**
+     * An expression that reads a question as a number when its answers never are one — a note, a page break, a
+     * yes/no, a list of choices, a file (Increment M126, `R-87160c81`). The ordering is false and the arithmetic NaN
+     * whatever the respondent does. A count of a list is a number; the list itself is not.
+     */
+    public static function expressionOrdersNonNumber(string $ownerKey, string $otherKey, string $kind): self
+    {
+        return self::one(
+            $ownerKey,
+            'expression_orders_non_number',
+            "The expression on “{$ownerKey}” uses the {$kind} question “{$otherKey}” as a number, with more than, less than or arithmetic, but its answers are never numbers, so the expression never changes with the answer. Compare a number question, or remove the comparison.",
+        );
+    }
+
+    /**
      * @param  list<array{field: ?string, code: string, message: string}>  $violations
      */
     private function __construct(string $message, private readonly array $violations)

@@ -112,6 +112,20 @@ whose hand-rolled store double meets `FieldTypeControl`'s new switches — `Conf
 a palette that has no `variant` and a store without `touch` in some doubles. Second: the citation lint, through the
 lines `palette()` and `addField()` push down.
 
+### Extended mid-build — `app/Models/FormField.php`, before the file is opened (2026-10-02)
+
+**Found by the real-browser probe, measured through the real server:** the builder's create response
+(`POST /forms/{form}/fields`) hands the client `null` for `is_pii`, `is_sensitive` and `is_queryable`, because Eloquent
+never reads back a database default and `FormField` declares none; the client sends them back on the next PATCH, and
+`UpdateFieldRequest` refuses all three as not boolean — **422, "The is pii field must be true or false. (and 2 more
+errors)"**. So on the trunk the first edit of EVERY newly added question fails until a reload; and `M125`'s label seed
+makes that PATCH fire on every Text or Number add with no user action, then blocks the format switch behind "your last
+change hasn't saved". Not in the ledger (grepped). **Remedy:** the three columns' own defaults (`false`, per
+`2026_07_06_000205_create_form_fields_table.php`) as the model's `$attributes`, so every creator gets them in memory.
+`FormField.php` is cited by two open rows, below the hub threshold, and by no line citation anywhere. Files added:
+`app/Models/FormField.php` and a new `tests/Feature/Forms/FieldCreateRoundTripTest.php`. The defect is filed and closed
+in this increment's ledger edit.
+
 ## RELEASED — `M124`, a yes/no condition holds the same way in the browser and on the server, and page breaks paginate stepped forms (merged as PR #317, `55356a7b`, 6/6 green with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 
 Shipped 2026-10-02. Branch `m124-yes-no-and-page-breaks`, cut from `origin/main` at `a9c272d6`; the claim commit is `18c2b5ae`, extended mid-build by `4a4cd632`.

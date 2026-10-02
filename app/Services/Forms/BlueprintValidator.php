@@ -6,6 +6,7 @@ namespace App\Services\Forms;
 
 use App\Enums\FieldType;
 use App\Exceptions\Forms\FormException;
+use App\Rules\ContentBlocks;
 use App\Services\Xlsform\XlsformImportParser;
 
 /**
@@ -75,6 +76,8 @@ final class BlueprintValidator
             if ($sectionKey !== null && ! isset($sectionKeys[$sectionKey])) {
                 throw FormException::invalidBlueprint("Field \"{$key}\" references an unknown section_key: {$sectionKey}.");
             }
+
+            $this->assertNoteContent($field, "Field \"{$key}\"");
         }
 
         // Second pass: each validation is well-formed (rule_xor_chk) and its cross-field reference resolves
@@ -113,6 +116,28 @@ final class BlueprintValidator
             if (is_array($validation)) {
                 $this->assertValidationXor($validation);
             }
+        }
+
+        $this->assertNoteContent($fieldBlueprint, 'The library item');
+    }
+
+    /**
+     * A note's content blocks (Increment M125, `R-6dedc3a9`), checked as leniently as the builder's own save does — the
+     * template materializer and the question library write `config` verbatim, so this is the one door they share. The
+     * strict check, which refuses a blank heading, is publish's ({@see StructuralValidationGate}).
+     *
+     * @param  array<string, mixed>  $field
+     */
+    private function assertNoteContent(array $field, string $subject): void
+    {
+        $content = is_array($field['config'] ?? null) ? ($field['config']['content'] ?? null) : null;
+        if (($field['field_type'] ?? null) !== FieldType::Note->value || $content === null) {
+            return;
+        }
+
+        $problem = ContentBlocks::problem($content, strict: false);
+        if ($problem !== null) {
+            throw FormException::invalidBlueprint("{$subject} is a note whose content is invalid: {$problem}.");
         }
     }
 

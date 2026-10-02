@@ -9,18 +9,30 @@
  * autosave channel, and a dropped keystroke must never change what a question is. So this calls the store's own
  * queued actions, the pane-level precedent `BuilderCanvas`, `LogicRail` and `PreviewPane` already follow.
  *
- * ⚠️ AT RENDER IT READS ONLY `selectedField` AND `palette`. `ConfigPanel.test.ts` mounts the panel with a hand-built
- * store double holding a fixed set of members; everything else here is touched only inside a handler, after plans
- * have loaded. `FieldTypeControl.test.ts` pins that contract against a double, so a render-time read of a member
- * the double lacks fails there rather than in the hub's own suite.
+ * ⚠️ AT RENDER IT READS ONLY `selectedField`, `palette` AND `enums`. `ConfigPanel.test.ts` mounts the panel with a
+ * hand-built store double holding a fixed set of members; everything else here is touched only inside a handler.
+ * `FieldTypeControl.test.ts` pins that contract against a double, so a render-time read of a member the double lacks
+ * fails there rather than in the hub's own suite.
  *
- * ⚠️ IT IS ALSO WHERE `R-a367bf9e`'s VARIANT SWITCH WILL LIVE ("Single line / Paragraph"), once the palette transmits
- * which types are variants of one another: `openDialog(preselect)` is its entry point for a plan that needs review.
+ * ✅ AND IT IS WHERE `R-a367bf9e`'s VARIANT SWITCH LIVES (M125). The palette shows one "Text" and one "Number"; a field
+ * of a variant group gets a segmented "format" control over the group's members, labelled with their own TRANSMITTED
+ * type labels, and a number gets "Allow negative numbers". A switch reads the plans, applies a plan that needs no
+ * review directly (one request, one undo entry — the store records it), and opens the dialog preselected when it does.
  */
 import { computed, nextTick, reactive, ref, useId, watch } from 'vue';
-import { MdsButton } from '@meridian/design-system';
+import { MdsButton, MdsCheckbox, MdsSegmentedControl } from '@meridian/design-system';
 import ConvertFieldDialog from './ConvertFieldDialog.vue';
-import { consequenceView, staleMessage, targetGroups, type ConvertPhase } from './field-conversion';
+import {
+    consequenceView,
+    NEGATIVE_FLOOR_RULE,
+    needsReview,
+    negativeFloor,
+    staleMessage,
+    targetGroups,
+    variantOptions,
+    withNegativesAllowed,
+    type ConvertPhase,
+} from './field-conversion';
 import type { Uid } from './types';
 import type { BuilderStore, ConversionPlan } from './useBuilderStore';
 
@@ -32,6 +44,7 @@ const labelOf = (value: string): string => paletteByValue.get(value)?.label ?? v
 
 const labelId = useId();
 const valueId = useId();
+const negativeHintId = useId();
 
 const dialog = reactive({
     open: false,
@@ -178,6 +191,97 @@ function requestClose(): void {
 function shut(): void {
     session++; // a late answer to this session can no longer touch the dialog
     dialog.open = false;
+    void nextTick(resyncControls); // a cancelled switch must not leave its radio claiming a format the field lacks
+}
+
+/*
+|--------------------------------------------------------------------------
+| Increment M125 — the variant switch and "Allow negative numbers".
+|--------------------------------------------------------------------------
+| ⛔ A NATIVE CONTROL CHECKS ITSELF ON THE CLICK, BEFORE ANYTHING IS DECIDED. When the switch is then refused, cancelled
+| in the dialog or ignored while another is in flight, the bound value never changes, so Vue has no reason to re-patch
+| `checked` and the radio keeps claiming a format the field does not have. `resyncControls()` re-sets the inputs from
+| the field IN PLACE — never by remounting them, which would drop the focus a keyboard user is standing on, and would
+| hand the dialog a dead opener to return focus to.
+*/
+const formatRoot = ref<HTMLElement | null>(null);
+const negativeRoot = ref<HTMLElement | null>(null);
+let switching = false;
+
+const variant = computed(() => (field.value ? (paletteByValue.get(field.value.field_type)?.variant ?? null) : null));
+const formatOptions = computed(() => (variant.value ? variantOptions(paletteByValue.values(), variant.value.group) : []));
+/** Offered only where the server offers a minimum for this type's shape — a toggle must not build a rule publish refuses. */
+const offersNegativeToggle = computed(() => {
+    const type = field.value ? paletteByValue.get(field.value.field_type) : undefined;
+    if (!type || !variant.value) return false;
+
+    return props.store.enums.validation_rule_types.some((rule) => rule.value === NEGATIVE_FLOOR_RULE && rule.shapes.includes(type.value_shape));
+});
+const floor = computed(() => negativeFloor(field.value?.validations ?? []));
+
+function resyncControls(): void {
+    const type = field.value?.field_type;
+    formatRoot.value?.querySelectorAll<HTMLInputElement>('input[type="radio"]').forEach((input) => {
+        input.checked = input.value === type;
+    });
+    const box = negativeRoot.value?.querySelector<HTMLInputElement>('input[type="checkbox"]');
+    if (box) box.checked = floor.value.allowed;
+}
+
+async function switchFormat(to: string): Promise<void> {
+    const target = field.value;
+    if (!target || to === target.field_type) return;
+    if (switching || preparing || dialog.open) {
+        resyncControls();
+        return;
+    }
+    switching = true;
+    announcement.value = '';
+    try {
+        const loaded = await props.store.loadConversionPlans(target.uid);
+        if (field.value?.uid !== target.uid) return;
+        if (loaded.status === 'failed') {
+            announcement.value = loaded.message;
+            return;
+        }
+        const plan = loaded.plans.find((candidate) => candidate.to === to);
+        if (!plan) {
+            announcement.value = `This question can no longer change to ${labelOf(to)}.`;
+            return;
+        }
+        if (needsReview(plan)) {
+            // The dialog says what the switch would change, this format already chosen; the author decides there.
+            switching = false;
+            await openDialog(to);
+            return;
+        }
+        const outcome = await props.store.convertField(target.uid, plan);
+        if (outcome.status === 'converted') {
+            await nextTick(); // after the type watcher, which would otherwise clear the line it is about to say
+            announcedType = to;
+            announcement.value = `Changed to ${labelOf(to)}. Use Undo to change it back.`;
+        } else if (outcome.status === 'failed') {
+            announcement.value = outcome.message;
+        } else {
+            announcement.value = 'This question changed elsewhere, so its format was not switched. Check it and try again.';
+        }
+    } finally {
+        switching = false;
+        await nextTick();
+        resyncControls();
+    }
+}
+
+function setNegativesAllowed(allowed: boolean): void {
+    const target = field.value;
+    if (!target) return;
+    const next = withNegativesAllowed(target.validations, allowed);
+    if (next === target.validations) {
+        resyncControls();
+        return;
+    }
+    target.validations = next;
+    props.store.touch(target.uid, 'field');
 }
 
 defineExpose({ openDialog });
@@ -197,6 +301,27 @@ defineExpose({ openDialog });
             >
                 Change type
             </MdsButton>
+        </div>
+        <div v-if="variant && formatOptions.length > 1" ref="formatRoot" class="field-type__group" data-variant-switch>
+            <span class="field-type__label">{{ variant.label }} format</span>
+            <MdsSegmentedControl
+                :model-value="field.field_type"
+                :options="formatOptions"
+                :ariaLabel="`${variant.label} format`"
+                @update:model-value="switchFormat"
+            />
+        </div>
+        <div v-if="offersNegativeToggle" ref="negativeRoot" class="field-type__group" data-negative-toggle>
+            <MdsCheckbox
+                :model-value="floor.allowed"
+                label="Allow negative numbers"
+                :disabled="floor.state === 'custom'"
+                :describedby="floor.state === 'custom' ? negativeHintId : undefined"
+                @update:model-value="setNegativesAllowed"
+            />
+            <p v-if="floor.state === 'custom'" :id="negativeHintId" class="field-type__hint">
+                A minimum is set on the Validation tab — change it there.
+            </p>
         </div>
         <p class="field-type__status" role="status">{{ announcement }}</p>
 
@@ -247,6 +372,26 @@ defineExpose({ openDialog });
     font-weight: var(--mds-font-weight-semibold);
     color: var(--mds-color-text-body);
     overflow-wrap: anywhere;
+}
+
+.field-type__group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mds-space-1);
+    min-width: 0;
+}
+
+/* The D28 affordance `ConfigPanel` applies to its own segmented control: wrap the segments' flex line rather than let
+   "Whole number · Decimal number" refuse to shrink at 375px and the largest text size. */
+.field-type__group .mds-segmented {
+    flex-wrap: wrap;
+}
+
+.field-type__hint {
+    margin: 0;
+    font-size: var(--mds-type-body-sm-font-size);
+    line-height: var(--mds-type-body-sm-line-height);
+    color: var(--mds-color-text-secondary);
 }
 
 /* Empty at rest and so zero-height; never `display: none`, which a screen reader would not announce from. */

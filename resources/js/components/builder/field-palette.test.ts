@@ -1,6 +1,7 @@
 import { mount } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import FieldPalette from './FieldPalette.vue';
+import { PALETTE } from './builder-store-fixtures';
 
 // The palette's own scroll region must be reachable by keyboard (WCAG 2.1.1 / axe
 // `scrollable-region-focusable`). It normally satisfies the rule through its 31 add-buttons — but
@@ -77,6 +78,32 @@ describe('FieldPalette — scrollable region keyboard access', () => {
 
         expect(wrapper.findAll('button').every((b) => b.attributes('disabled') !== undefined)).toBe(true);
         expect(wrapper.find('.palette').attributes('tabindex')).toBe('0');
+
+        wrapper.unmount();
+    });
+});
+
+describe('FieldPalette — one entry per variant group (M125)', () => {
+    it('lists "Text" and "Number" once each, in their primary member’s place, and adds that member', async () => {
+        const wrapper = mount(FieldPalette, { props: { palette: PALETTE } });
+        const labels = wrapper.findAll('.palette__item-label').map((label) => label.text());
+
+        // Short/long text and whole/decimal are ONE entry each; the types without a group are listed as before.
+        expect(labels).toEqual(['Text', 'Email', 'Phone', 'Number', 'Calculated', 'Note / label', 'Hidden field', 'Page break']);
+
+        const buttons = wrapper.findAll('button.palette__item');
+        await buttons[labels.indexOf('Text')].trigger('click');
+        await buttons[labels.indexOf('Number')].trigger('click');
+        expect(wrapper.emitted('add')).toEqual([['short_text'], ['integer']]);
+        expect(buttons[labels.indexOf('Number')].attributes('title')).toBe('Number');
+
+        wrapper.unmount();
+    });
+
+    it('lists every type when the palette carries no variant data', () => {
+        const wrapper = mount(FieldPalette, { props: { palette } });
+
+        expect(wrapper.findAll('.palette__item-label').map((label) => label.text())).toEqual(['Short text', 'Long text']);
 
         wrapper.unmount();
     });

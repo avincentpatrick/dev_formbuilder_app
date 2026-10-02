@@ -181,3 +181,199 @@ describe('FieldTypeControl', () => {
         wrapper.unmount();
     });
 });
+
+describe('FieldTypeControl — the format switch and “Allow negative numbers” (M125)', () => {
+    const MIN_VALUE = {
+        value: 'min_value',
+        label: 'Minimum value',
+        shapes: ['number', 'duration', 'scale'],
+        takes_operator: false,
+        takes_related_field: false,
+        operator_may_be_empty: false,
+        governs_requiredness: false,
+    };
+
+    function numberStore(field: Parameters<typeof serverField>[0] = {}): BuilderStore {
+        const store = useBuilderStore(
+            pageProps({
+                fields: [serverField({ field_type: 'integer', ...field })],
+                enums: { ...ENUMS, validation_rule_types: [...ENUMS.validation_rule_types, MIN_VALUE] },
+            }),
+        );
+        store.select({ kind: 'field', uid: store.fields.value[0].uid });
+
+        return store;
+    }
+
+    function radios(wrapper: ReturnType<typeof mountControl>) {
+        return wrapper.findAll<HTMLInputElement>('[data-variant-switch] input[type="radio"]');
+    }
+
+    function checkedFormat(wrapper: ReturnType<typeof mountControl>): string | undefined {
+        return radios(wrapper).find((radio) => radio.element.checked)?.element.value;
+    }
+
+    function rowSummary(store: BuilderStore): [string | null, string | null, number][] {
+        return store.fields.value[0].validations.map((row) => [row.rule_type, row.rule_value, row.sequence]);
+    }
+
+    it('offers the group’s members by their palette labels, and nothing for a type listed alone (FT8)', () => {
+        const wrapper = mountControl(liveStore(), false);
+
+        expect(wrapper.findAll('[data-variant-switch] label').map((label) => label.text())).toEqual(['Short text', 'Long text']);
+        expect(wrapper.get('[data-variant-switch]').text()).toContain('Text format');
+        expect(checkedFormat(wrapper)).toBe('short_text');
+        // The minimum is not offered for text, so neither is the toggle that would write one.
+        expect(wrapper.find('[data-negative-toggle]').exists()).toBe(false);
+
+        const email = mountControl(liveStore({ field_type: 'email' }), false);
+        expect(email.find('[data-variant-switch]').exists()).toBe(false);
+    });
+
+    it('applies a switch that needs no review directly — one read, one write, no dialog, one undo (FT9)', async () => {
+        const mock = fetchMock()
+            .mockResolvedValueOnce(jsonResponse(200, { plans: [conversionPlan(), conversionPlan({ to: 'note', requires_confirmation: true })] }))
+            .mockResolvedValueOnce(jsonResponse(200, serverField({ field_type: 'long_text', version: 'v2' })))
+            .mockResolvedValueOnce(jsonResponse(200, { plans: [conversionPlan({ from: 'long_text', to: 'short_text' })] }))
+            .mockResolvedValueOnce(jsonResponse(200, serverField({ version: 'v3' })));
+        const store = liveStore();
+        const wrapper = mountControl(store);
+
+        await radios(wrapper)[1].setValue(true);
+        await settle();
+
+        expect(requestLog(mock).map((r) => r.method)).toEqual(['GET', 'POST']);
+        expect(requestLog(mock)[1].body).toEqual({ to: 'long_text', version: 'v1', fingerprint: 'a'.repeat(64) });
+        expect(wrapper.find('[role="dialog"]').exists()).toBe(false);
+        expect(store.fields.value[0].field_type).toBe('long_text');
+        expect(checkedFormat(wrapper)).toBe('long_text');
+        expect(wrapper.get('.field-type__status').text()).toBe('Changed to Long text. Use Undo to change it back.');
+
+        await store.undo();
+        await settle();
+        expect(store.fields.value[0].field_type).toBe('short_text');
+        expect(store.canUndo.value).toBe(false);
+        expect(checkedFormat(wrapper)).toBe('short_text');
+        wrapper.unmount();
+    });
+
+    it('opens the dialog with the format chosen when the plan needs review, and a cancel leaves the radio true (FT10)', async () => {
+        const review = conversionPlan({ from: 'decimal', to: 'integer', requires_confirmation: true });
+        const mock = fetchMock()
+            .mockResolvedValueOnce(jsonResponse(200, { plans: [review] }))
+            .mockResolvedValueOnce(jsonResponse(200, { plans: [review] }));
+        const store = numberStore({ field_type: 'decimal', default_value: '2.5' });
+        const wrapper = mountControl(store);
+
+        await radios(wrapper)[0].setValue(true);
+        await settle();
+
+        expect(requestLog(mock).map((r) => r.method)).toEqual(['GET', 'GET']);
+        expect(wrapper.get<HTMLSelectElement>('[data-convert-target]').element.value).toBe('integer');
+
+        await wrapper.get('[data-convert-cancel]').trigger('click');
+        await settle();
+
+        expect(requestLog(mock).map((r) => r.method)).toEqual(['GET', 'GET']);
+        expect(store.fields.value[0].field_type).toBe('decimal');
+        // The radio checked itself on the click; with nothing converted it must not go on claiming "Whole number".
+        expect(checkedFormat(wrapper)).toBe('decimal');
+        wrapper.unmount();
+    });
+
+    it('says why a refused switch changed nothing, and its radio ends on the true format (FT11)', async () => {
+        const mock = fetchMock().mockResolvedValueOnce(jsonResponse(422, { message: 'The label is too long.' }));
+        const store = liveStore();
+        store.fields.value[0].label = 'x'.repeat(300);
+        store.touch(store.fields.value[0].uid, 'field');
+        await store.whenIdle();
+        await settle();
+        const wrapper = mountControl(store);
+
+        await radios(wrapper)[1].setValue(true);
+        await settle();
+
+        expect(requestLog(mock).map((r) => r.method)).toEqual(['PATCH']);
+        expect(wrapper.get('.field-type__status').text()).toContain('hasn’t saved');
+        expect(checkedFormat(wrapper)).toBe('short_text');
+        wrapper.unmount();
+    });
+
+    it('sends nothing for a click back while a switch is in flight, and ends on the switch’s outcome (FT12)', async () => {
+        let release!: (response: Response) => void;
+        const mock = fetchMock()
+            .mockReturnValueOnce(new Promise<Response>((resolve) => (release = resolve)))
+            .mockResolvedValueOnce(jsonResponse(200, serverField({ field_type: 'long_text', version: 'v2' })));
+        const store = liveStore();
+        const wrapper = mountControl(store);
+
+        await radios(wrapper)[1].setValue(true);
+        await flushPromises();
+        await radios(wrapper)[0].setValue(true);
+        await flushPromises();
+        expect(requestLog(mock).map((r) => r.method)).toEqual(['GET']);
+
+        release(jsonResponse(200, { plans: [conversionPlan()] }));
+        await settle();
+
+        expect(requestLog(mock).map((r) => r.method)).toEqual(['GET', 'POST']);
+        expect(store.fields.value[0].field_type).toBe('long_text');
+        expect(checkedFormat(wrapper)).toBe('long_text');
+        wrapper.unmount();
+    });
+
+    it('writes and removes only its own minimum, keeping every other rule where it is (FT13)', async () => {
+        const mock = fetchMock().mockResolvedValue(jsonResponse(200, serverField({ field_type: 'integer', version: 'v2' })));
+        const store = numberStore({
+            is_required: 'conditional',
+            validations: [
+                { rule_type: 'required_if', operator: 'eq', rule_value: 'yes', expression: null, error_message: null, related_field_key: 'consent', sequence: 0 },
+                { rule_type: 'max_value', operator: null, rule_value: '120', expression: null, error_message: null, related_field_key: null, sequence: 1 },
+            ],
+        });
+        const wrapper = mountControl(store);
+        const box = wrapper.get<HTMLInputElement>('[data-negative-toggle] input[type="checkbox"]');
+        expect(box.element.checked).toBe(true);
+
+        await box.setValue(false);
+        expect(rowSummary(store)).toEqual([
+            ['required_if', 'yes', 0],
+            ['max_value', '120', 1],
+            ['min_value', '0', 2],
+        ]);
+        await store.whenIdle();
+        await settle();
+        expect(requestLog(mock).map((r) => r.method)).toEqual(['PATCH']);
+        expect((requestLog(mock)[0].body as { validations: unknown[] }).validations).toHaveLength(3);
+
+        await box.setValue(true);
+        expect(rowSummary(store)).toEqual([
+            ['required_if', 'yes', 0],
+            ['max_value', '120', 1],
+        ]);
+        wrapper.unmount();
+    });
+
+    it('reads a minimum the Validation tab set, and leaves it to that tab (FT14)', () => {
+        const minimum = (value: string) => ({
+            rule_type: 'min_value',
+            operator: null,
+            rule_value: value,
+            expression: null,
+            error_message: null,
+            related_field_key: null,
+            sequence: 0,
+        });
+        const below = mountControl(numberStore({ validations: [minimum('-10')] }), false);
+        const box = below.get<HTMLInputElement>('[data-negative-toggle] input[type="checkbox"]');
+
+        expect(box.element.disabled).toBe(true);
+        expect(box.element.checked).toBe(true);
+        const hint = below.get('[data-negative-toggle] .field-type__hint');
+        expect(hint.text()).toContain('Validation tab');
+        expect(box.attributes('aria-describedby')).toBe(hint.attributes('id'));
+
+        const above = mountControl(numberStore({ validations: [minimum('5')] }), false);
+        expect(above.get<HTMLInputElement>('[data-negative-toggle] input[type="checkbox"]').element.checked).toBe(false);
+    });
+});

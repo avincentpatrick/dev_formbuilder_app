@@ -346,6 +346,13 @@ export function useBuilderStore(props: BuilderPageProps) {
             if (!created) return;
             const local = toLocalField(created);
             fields.value.push(local);
+            // M125 — the palette added "Text"/"Number", so the question says that rather than "Short text". Saved
+            // before the baseline and the snapshot are taken, so the add stays ONE undo entry and redo replays it.
+            const seeded = variantLabelOf(props.palette, typeValue);
+            if (seeded !== null && local.label !== seeded) {
+                local.label = seeded;
+                await persistField(local.uid);
+            }
             baselines.set(local.uid, fieldSnapshot(local));
             selection.value = { kind: 'field', uid: local.uid };
 
@@ -1240,3 +1247,13 @@ const EDIT_REDO_TYPE_MOVED = 'That edit can’t be redone: this question’s typ
 const MINE_ACROSS_TYPES =
     'This question was changed to another type somewhere else, so your edit couldn’t be kept. The other version is shown.';
 const HISTORY_STEP_FAILED = 'That step couldn’t be completed.';
+
+/** The label a new field of a palette variant group arrives with (M125), or null for a type the palette lists by itself. */
+function variantLabelOf(palette: BuilderPageProps['palette'], typeValue: string): string | null {
+    for (const group of palette) {
+        const type = group.types.find((candidate) => candidate.value === typeValue);
+        if (type !== undefined) return type.variant?.label ?? null;
+    }
+
+    return null;
+}

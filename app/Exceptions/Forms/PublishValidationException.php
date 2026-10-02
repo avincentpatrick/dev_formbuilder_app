@@ -358,6 +358,16 @@ final class PublishValidationException extends RuntimeException
     }
 
     /**
+     * A note whose content blocks a respondent must not be shown (Increment M125, `R-6dedc3a9`) — a blank heading, an
+     * empty paragraph, a link with no address, or a shape no renderer reads. The builder's save accepts the first three
+     * mid-edit; publish is where they are refused. `$detail` is `ContentBlocks::problem()`'s phrase.
+     */
+    public static function noteContentInvalid(string $fieldKey, string $detail): self
+    {
+        return self::one($fieldKey, 'note_content_invalid', "The note “{$fieldKey}” has content that cannot be shown: {$detail}.");
+    }
+
+    /**
      * @param  list<array{field: ?string, code: string, message: string}>  $violations
      */
     private function __construct(string $message, private readonly array $violations)

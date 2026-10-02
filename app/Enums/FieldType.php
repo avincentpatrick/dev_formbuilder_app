@@ -202,4 +202,28 @@ enum FieldType: string
             default => false,
         };
     }
+
+    /**
+     * The palette group this type is one variant of, or null when the type is its own palette entry
+     * (Increment M125, `R-a367bf9e`). Short and long text are one "Text"; whole and decimal numbers are one
+     * "Number"; the Basics tab switches between them through the conversion routes.
+     *
+     * ⛔ TOTAL, WITH NO `default` ARM, deliberately: a thirty-second type must be placed here on purpose.
+     * Grouping a type is a promise that it converts losslessly to and from its siblings, which
+     * `FieldVariantGroupTest` checks for every member.
+     */
+    public function variantGroup(): ?FieldVariantGroup
+    {
+        return match ($this) {
+            self::ShortText, self::LongText => FieldVariantGroup::Text,
+            self::Integer, self::Decimal => FieldVariantGroup::Number,
+            self::Email, self::Phone, self::Url, self::Calculated,
+            self::Date, self::Time, self::Datetime, self::Duration,
+            self::SingleSelect, self::MultiSelect, self::Dropdown, self::YesNo, self::CascadingSelect,
+            self::LikertScale, self::LikertMatrix,
+            self::Geopoint, self::Geotrace, self::Geoshape,
+            self::FileUpload, self::ImageCapture, self::AudioCapture, self::VideoCapture, self::Signature,
+            self::Note, self::PageBreak, self::Hidden, self::Matrix => null,
+        };
+    }
 }

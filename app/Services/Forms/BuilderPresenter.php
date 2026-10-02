@@ -204,8 +204,8 @@ final class BuilderPresenter
     }
 
     /**
-     * The palette: every FieldType grouped by category, with labels/icons + the advanced flag. Built from
-     * the enum so the frontend never re-lists the 31 types.
+     * The palette: every FieldType grouped by category, with labels/icons, the advanced flag and the variant
+     * group (M125). Built from the enum so the frontend never re-lists the 31 types — or which are variants.
      *
      * @return list<array<string, mixed>>
      */
@@ -228,6 +228,8 @@ final class BuilderPresenter
                 // in `enums()` because the panel already builds its per-type maps from this list, and
                 // because a per-type key in `enums()` would be a thirty-one-entry copy of a twelve-row table.
                 'value_shape' => ValueShape::for($type)->value,
+                // Increment M125 — additive: the palette shows ONE entry per group, and all 31 entries stay.
+                'variant' => $type->variantGroup()?->paletteVariant($type),
             ];
         }
 

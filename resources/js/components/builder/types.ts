@@ -99,6 +99,16 @@ export interface PaletteType {
     // not a thirty-first field-type special case. The config panel matches it against each rule type's
     // `shapes` to decide what the Validation tab may offer, and hides that tab entirely for 'no_answer'.
     value_shape: string;
+    // The palette group this type is one variant of (M125) — `FieldVariantGroup` via BuilderPresenter, or null.
+    // The palette shows ONE entry per group (its primary) and the Basics tab switches between the members.
+    // Optional: a hand-built palette in a test may carry none, and absent reads as ungrouped.
+    variant?: PaletteVariant | null;
+}
+
+export interface PaletteVariant {
+    group: string;
+    label: string;
+    primary: boolean;
 }
 
 export interface PaletteGroup {

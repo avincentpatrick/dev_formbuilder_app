@@ -12571,3 +12571,16 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   every spec shares one database and the seeded forms are read by other specs. The direct conversion and the toggle's
   row are covered in Vitest through the real store. The remedy is a spec that adds a throwaway field, switches it and
   switches it back, then deletes it. **Not live** — a coverage gap. Filed by `M125`. **Tier: during-testing.**
+
+- ✅ **CLOSED BY `M125` (2026-10-02) — `major` · A question fresh from the builder's create route could not be saved
+  until the page was reloaded.** Found by `M125`'s real-browser probe and measured through the real server: the create
+  response (`POST /forms/{form}/fields`) carried `null` for `is_pii`, `is_sensitive` and `is_queryable`, because Eloquent
+  never reads back a database default and `FormField` declared none; the builder keeps the row it is given and sends it
+  back on the next save, and `UpdateFieldRequest` refuses all three as not boolean — **422, "The is pii field must be
+  true or false. (and 2 more errors)"**. So the first edit of every newly added question — its label above all — failed
+  until a reload, and the edit was lost with it. No test could see it, because every route test writes its own booleans
+  into the PATCH. **Live.** Filed by `M125`. **Tier: early-testing.** ✅ **CLOSED BY `M125`:** the three columns' own
+  defaults (`false`) are the model's `$attributes`, so every creator holds them in memory. `FieldCreateRoundTripTest`
+  saves a create response straight back, key for key as the builder's `fieldPayload()` builds it, for five field types,
+  and was red on all five before the fix. ⚠️ `M125`'s label seed is what surfaced it: seeding "Text" saves a new field
+  with no user action, so without this fix every Text or Number add would have shown a save error at once.

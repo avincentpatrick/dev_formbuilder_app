@@ -105,7 +105,7 @@ final class ExpressionValidationGate
             $violations[] = $this->capture(fn () => $this->assertRuleValue($validation->rule_type, (string) ($validation->rule_value ?? ''), $ownerKey));
         }
 
-        $violations = array_values(array_filter($violations));
+        $violations = array_values(array_filter([...$violations, ...$this->orderingViolations($version)]));
 
         if ($violations !== []) {
             throw PublishValidationException::several($violations);
@@ -219,5 +219,123 @@ final class ExpressionValidationGate
         }
 
         $this->check($formula, $knownKeys, $objectValuedKeys, ExpressionKind::Calculate, $field->key);
+    }
+
+    /**
+     * Every expression that reads a question as a NUMBER when that question's answers never are one (Increment
+     * M126, `R-87160c81`).
+     *
+     * ⛔ THE EXPRESSION IS CONSTANT, AND NEITHER ENGINE SAYS SO. Ordering is numeric-only in both engines
+     * (`ExpressionEvaluator::numericCompare()`): an operand that is not numeric-like makes `> < >= <=` false,
+     * and arithmetic on one is NaN. So `${remark} > 3` on a note, `${dob} <= today()` on a date and
+     * `${hobbies} > 2` on a multi-select published clean and then never changed with the answer — and in a
+     * constraint, every answer was refused. {@see check()} only resolves keys; `M123`'s arms in
+     * {@see StructuralValidationGate} judge structured rule rows, never an expression.
+     *
+     * A use is NUMERIC exactly as the conversion census reads it ({@see ExpressionKeyUse}, the one walker both
+     * share): an ordering, arithmetic, or `int()`. A constraint's `.` names its own question. A question whose
+     * answer is refused outright as an operand (grid, geo) is left to {@see check()}, so it is reported once.
+     * An expression that does not parse is skipped for the same reason.
+     *
+     * ⚠️ APPENDED HERE, AND ITS CALL SITE REPLACED THE COLLECTION LINE IN PLACE, for the reason
+     * {@see checkFormula()} gives: this file is cited by line from design documents and from the ledger. It reads
+     * the version's rows itself, three queries at publish, so that no import line moves a cited line either.
+     *
+     * @return list<PublishValidationException>
+     */
+    private function orderingViolations(FormVersion $version): array
+    {
+        $fields = $version->fields()->get();
+        $sections = $version->sections()->get();
+        $validations = $version->validations()->get();
+
+        /** @var array<string, FieldType> $typeByKey */
+        $typeByKey = [];
+        /** @var array<string, string> $keyById */
+        $keyById = [];
+        /** @var list<array{owner: string, expression: ?string, self: ?string}> $sites */
+        $sites = [];
+
+        foreach ($fields as $field) {
+            $typeByKey[$field->key] = $field->field_type;
+            $keyById[$field->id] = $field->key;
+            $sites[] = ['owner' => $field->key, 'expression' => $field->relevant_expression, 'self' => null];
+            $sites[] = ['owner' => $field->key, 'expression' => $this->calculateFormula($field), 'self' => null];
+        }
+
+        foreach ($sections as $section) {
+            $sites[] = ['owner' => $section->key, 'expression' => $section->relevant_expression, 'self' => null];
+        }
+
+        foreach ($validations as $validation) {
+            $ownerKey = $keyById[$validation->form_field_id] ?? null;
+
+            if ($ownerKey !== null) {
+                $sites[] = ['owner' => $ownerKey, 'expression' => $validation->expression, 'self' => $ownerKey];
+            }
+        }
+
+        $violations = [];
+
+        foreach ($sites as $site) {
+            if ($site['expression'] === null || trim($site['expression']) === '') {
+                continue;
+            }
+
+            try {
+                $ast = $this->parser->parse($site['expression']);
+            } catch (ExpressionSyntaxException) {
+                continue; // check() has already refused it
+            }
+
+            $keys = $this->parser->referencedKeys($ast);
+
+            if ($site['self'] !== null && ! in_array($site['self'], $keys, true)) {
+                $keys[] = $site['self'];
+            }
+
+            foreach ($keys as $key) {
+                $type = $typeByKey[$key] ?? null;
+                $kind = $type !== null ? self::numberNeverHeldBy($type) : null;
+
+                if ($type === null || $kind === null || ! ExpressionKeyUse::of($ast, $key, $key === $site['self'])['numeric']) {
+                    continue;
+                }
+
+                $violations[] = $kind === 'date'
+                    ? PublishValidationException::expressionOrdersDate($site['owner'], $key, $type->label())
+                    : PublishValidationException::expressionOrdersNonNumber($site['owner'], $key, $type->label());
+            }
+        }
+
+        return $violations;
+    }
+
+    /**
+     * Why a question's answer can never be numeric-like — `date` for the three temporal types, whose ordering is
+     * not supported YET (`D71`: date comparison is its own row), `non_number` for every other — or null when it
+     * can be. Text, hidden, calculated and the single choices can hold a numeric string, so they stay allowed;
+     * grid and geo are refused as operands outright by {@see check()}.
+     *
+     * ⛔ A `match` ON THE ENUM WITH NO `default` ARM — a thirty-second field type is a PHPStan error here.
+     *
+     * @return 'date'|'non_number'|null
+     */
+    private static function numberNeverHeldBy(FieldType $type): ?string
+    {
+        return match ($type) {
+            FieldType::Date, FieldType::Time, FieldType::Datetime => 'date',
+
+            FieldType::Note, FieldType::PageBreak, FieldType::YesNo,
+            FieldType::MultiSelect, FieldType::CascadingSelect,
+            FieldType::FileUpload, FieldType::ImageCapture, FieldType::AudioCapture,
+            FieldType::VideoCapture, FieldType::Signature => 'non_number',
+
+            FieldType::ShortText, FieldType::LongText, FieldType::Email, FieldType::Phone, FieldType::Url,
+            FieldType::Hidden, FieldType::Integer, FieldType::Decimal, FieldType::Calculated, FieldType::Duration,
+            FieldType::SingleSelect, FieldType::Dropdown, FieldType::LikertScale,
+            FieldType::Geopoint, FieldType::Geotrace, FieldType::Geoshape,
+            FieldType::Matrix, FieldType::LikertMatrix => null,
+        };
     }
 }

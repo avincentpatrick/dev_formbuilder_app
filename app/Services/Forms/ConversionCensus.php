@@ -14,15 +14,7 @@ use App\Models\Form;
 use App\Models\FormField;
 use App\Models\FormFieldValidation;
 use App\Models\FormSection;
-use App\Services\Expressions\Ast\ArithmeticNode;
-use App\Services\Expressions\Ast\ComparisonNode;
-use App\Services\Expressions\Ast\FieldReferenceNode;
-use App\Services\Expressions\Ast\FunctionCallNode;
-use App\Services\Expressions\Ast\LiteralNode;
-use App\Services\Expressions\Ast\LogicalNode;
 use App\Services\Expressions\Ast\Node;
-use App\Services\Expressions\Ast\NotNode;
-use App\Services\Expressions\Ast\SelfReferenceNode;
 use App\Services\Expressions\ExpressionParser;
 use App\Services\Expressions\StructuredRuleLowering;
 use App\Services\Templates\TemplateParser;
@@ -214,8 +206,7 @@ final class ConversionCensus
             return null;
         }
 
-        $use = ['present' => false, 'numeric' => false, 'list' => false];
-        $this->walk($node, $key, $selfIsKey, $use);
+        $use = ExpressionKeyUse::of($node, $key, $selfIsKey);
 
         return $use['present'] ? ['site' => $site, 'key' => $siteKey, 'numeric' => $use['numeric'], 'list' => $use['list']] : null;
     }
@@ -273,78 +264,6 @@ final class ConversionCensus
         $formula = data_get($field->config, 'calculated_formula');
 
         return is_string($formula) ? $formula : null;
-    }
-
-    /**
-     * Mark how $node uses the key. A direct use is classified by the position it sits in; anything else is
-     * walked, so `${k} + 1 > 3` is a numeric use through the arithmetic, and parentheses are already gone.
-     *
-     * @param  array{present: bool, numeric: bool, list: bool}  $use
-     */
-    private function walk(Node $node, string $key, bool $selfIsKey, array &$use): void
-    {
-        if ($node instanceof ComparisonNode) {
-            $this->classify($node->left, self::comparisonUse($node->op, $node->right), $key, $selfIsKey, $use);
-            $this->classify($node->right, self::comparisonUse($node->op, $node->left), $key, $selfIsKey, $use);
-        } elseif ($node instanceof ArithmeticNode) {
-            $this->classify($node->left, 'numeric', $key, $selfIsKey, $use);
-            $this->classify($node->right, 'numeric', $key, $selfIsKey, $use);
-        } elseif ($node instanceof FunctionCallNode) {
-            $kind = match ($node->name) {
-                'contains', 'count' => 'list',
-                'int' => 'numeric',
-                default => null, // `selected()` reads a list and a value alike; `if()` passes its value through
-            };
-
-            foreach ($node->args as $arg) {
-                $this->classify($arg, $kind, $key, $selfIsKey, $use);
-            }
-        } elseif ($node instanceof LogicalNode) {
-            $this->classify($node->left, null, $key, $selfIsKey, $use);
-            $this->classify($node->right, null, $key, $selfIsKey, $use);
-        } elseif ($node instanceof NotNode) {
-            $this->classify($node->operand, null, $key, $selfIsKey, $use);
-        }
-    }
-
-    /**
-     * @param  'numeric'|'list'|null  $kind
-     * @param  array{present: bool, numeric: bool, list: bool}  $use
-     */
-    private function classify(Node $operand, ?string $kind, string $key, bool $selfIsKey, array &$use): void
-    {
-        $named = ($operand instanceof FieldReferenceNode && $operand->key === $key)
-            || ($selfIsKey && $operand instanceof SelfReferenceNode);
-
-        if (! $named) {
-            $this->walk($operand, $key, $selfIsKey, $use);
-
-            return;
-        }
-
-        $use['present'] = true;
-
-        if ($kind !== null) {
-            $use[$kind] = true;
-        }
-    }
-
-    /**
-     * How a comparison uses one side, given the other. `= ''` and `!= ''` are emptiness tests, valid on a
-     * list and a value alike (`ExpressionEvaluator` decides emptiness before its array rule), so only an
-     * equality against something else reads a list differently from one value.
-     *
-     * @return 'numeric'|'list'|null
-     */
-    private static function comparisonUse(ComparisonOperator $operator, Node $other): ?string
-    {
-        return match ($operator) {
-            ComparisonOperator::Gt, ComparisonOperator::Lt,
-            ComparisonOperator::Gte, ComparisonOperator::Lte => 'numeric',
-            ComparisonOperator::Eq, ComparisonOperator::Neq,
-            ComparisonOperator::Contains => $other instanceof LiteralNode && $other->isEmptyStringLiteral() ? null : 'list',
-            ComparisonOperator::IsNull => null,
-        };
     }
 
     private static function answers(FieldType $type): bool

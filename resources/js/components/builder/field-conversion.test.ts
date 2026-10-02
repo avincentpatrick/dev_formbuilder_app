@@ -7,11 +7,14 @@ import {
     GROUP_NOT_ASKED,
     GROUP_QUESTION_TYPES,
     needsReview,
+    negativeFloor,
     staleMessage,
     targetGroups,
+    variantOptions,
+    withNegativesAllowed,
     type ConsequenceContext,
 } from './field-conversion';
-import type { LocalField, LocalSection, PaletteType } from './types';
+import type { BuilderValidation, LocalField, LocalSection, PaletteType } from './types';
 
 const paletteByValue = new Map(PALETTE.flatMap((group) => group.types.map((type) => [type.value, type] as const)));
 
@@ -155,5 +158,58 @@ describe('staleMessage', () => {
     it('says what the question is now, and asks for a new choice only when the old one is gone', () => {
         expect(staleMessage('Email', true)).toBe('It is now Email. Here is what changing it does now.');
         expect(staleMessage(null, false)).toBe('Here is what changing its type does now. The type you chose is no longer offered, so choose again.');
+    });
+});
+
+describe('the variant groups (M125)', () => {
+    function rule(rule_type: string | null, rule_value: string | null, extra: Partial<BuilderValidation> = {}): BuilderValidation {
+        return { rule_type, operator: null, rule_value, expression: null, error_message: null, related_field_key: null, sequence: 0, ...extra };
+    }
+
+    it('lists a group’s members in palette order, by their own labels', () => {
+        expect(variantOptions(paletteByValue.values(), 'text')).toEqual([
+            { value: 'short_text', label: 'Short text' },
+            { value: 'long_text', label: 'Long text' },
+        ]);
+        expect(variantOptions(paletteByValue.values(), 'number').map((option) => option.value)).toEqual(['integer', 'decimal']);
+        expect(variantOptions(paletteByValue.values(), 'nothing')).toEqual([]);
+    });
+
+    it('reads no minimum, a minimum of zero and any other minimum apart', () => {
+        expect(negativeFloor([])).toEqual({ state: 'none', allowed: true });
+        expect(negativeFloor([rule('min_value', ' 0 ')])).toEqual({ state: 'zero', allowed: false });
+        expect(negativeFloor([rule('min_value', '5')])).toEqual({ state: 'custom', allowed: false });
+        expect(negativeFloor([rule('min_value', '-3')])).toEqual({ state: 'custom', allowed: true });
+        expect(negativeFloor([rule('min_value', '0'), rule('min_value', '0')])).toEqual({ state: 'custom', allowed: false });
+        // A raw-expression row is classified by its expression, never by the rule column.
+        expect(negativeFloor([rule(null, null, { expression: '. >= 0' })])).toEqual({ state: 'none', allowed: true });
+    });
+
+    it('adds and removes only its own row, and renumbers without reordering the rest', () => {
+        const rows = [rule('required_if', 'yes', { operator: 'eq', related_field_key: 'consent' }), rule('max_value', '120', { sequence: 1 })];
+
+        const refused = withNegativesAllowed(rows, false);
+        expect(refused.map((row) => [row.rule_type, row.rule_value, row.sequence])).toEqual([
+            ['required_if', 'yes', 0],
+            ['max_value', '120', 1],
+            ['min_value', '0', 2],
+        ]);
+
+        // Interleaved: a rule added on the Validation tab AFTER the floor keeps its place when the floor goes.
+        const interleaved = [...refused, rule('pattern', '^\\d+$', { sequence: 3 })];
+        expect(withNegativesAllowed(interleaved, true).map((row) => [row.rule_type, row.sequence])).toEqual([
+            ['required_if', 0],
+            ['max_value', 1],
+            ['pattern', 2],
+        ]);
+    });
+
+    it('returns the very same array when there is nothing to do, including over another minimum', () => {
+        const none = [rule('max_value', '120')];
+        const custom = [rule('min_value', '5')];
+
+        expect(withNegativesAllowed(none, true)).toBe(none);
+        expect(withNegativesAllowed(custom, true)).toBe(custom);
+        expect(withNegativesAllowed(custom, false)).toBe(custom);
     });
 });

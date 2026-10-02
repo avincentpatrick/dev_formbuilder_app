@@ -1,17 +1,31 @@
 <script setup lang="ts">
 /**
- * The builder's left pane: every one of the 31 field types as an add-button, grouped by category
+ * The builder's left pane: the field types as add-buttons — one per variant group (M125) — grouped by category
  * (data straight from the FieldType enum via BuilderPresenter, so the palette never re-lists them).
  * Advanced types (geo / media capture / cascading / matrix) are shown fully but flagged — their rich
  * config editors follow the form engine (ADR-0004). Adding places the field in the current section.
  */
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { MdsIcon } from '@meridian/design-system';
 import type { IconName } from '@meridian/design-system';
 import type { PaletteGroup } from './types';
 
 const props = defineProps<{ palette: PaletteGroup[]; disabled?: boolean }>();
 const emit = defineEmits<{ add: [typeValue: string] }>();
+
+/**
+ * Increment M125 (`R-a367bf9e`): ONE entry per variant group — "Text", "Number" — at its primary member's place,
+ * adding that member. The other members are a setting in the Basics tab, not a kind of question, so they are not
+ * listed here. Which types are variants is transmitted (`PaletteType.variant`); a type without one is listed as before.
+ */
+const groups = computed<PaletteGroup[]>(() =>
+    props.palette.map((group) => ({
+        ...group,
+        types: group.types
+            .filter((type) => !type.variant || type.variant.primary)
+            .map((type) => (type.variant ? { ...type, label: type.variant.label } : type)),
+    })),
+);
 
 /**
  * Keyboard access to the palette's own scroll region (WCAG 2.1.1 / axe `scrollable-region-focusable`).
@@ -74,7 +88,7 @@ watch(() => props.palette, () => queueMicrotask(measure), { deep: false });
         :aria-label="scrollable ? 'Add a field' : undefined"
     >
         <h2 class="palette__title">Add a field</h2>
-        <div v-for="group in palette" :key="group.category" class="palette__group">
+        <div v-for="group in groups" :key="group.category" class="palette__group">
             <div class="palette__group-head">
                 <MdsIcon :name="(group.icon as IconName)" size="sm" />
                 <span>{{ group.label }}</span>

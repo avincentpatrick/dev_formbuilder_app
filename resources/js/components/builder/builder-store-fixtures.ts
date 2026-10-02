@@ -96,14 +96,20 @@ export function serverSection(overrides: Partial<ServerSection> = {}): ServerSec
  * The palette entries these tests convert between. `note` carries `no_answer` and `hidden` carries the `prefill`
  * editor, because those two TRANSMITTED facts — not a type list — are what put a target under "Not asked".
  */
+// M125 — the variant groups as BuilderPresenter transmits them: one "Text" and one "Number" in the palette.
+const TEXT_PRIMARY = { group: 'text', label: 'Text', primary: true };
+const TEXT_OTHER = { group: 'text', label: 'Text', primary: false };
+const NUMBER_PRIMARY = { group: 'number', label: 'Number', primary: true };
+const NUMBER_OTHER = { group: 'number', label: 'Number', primary: false };
+
 export const PALETTE: PaletteGroup[] = [
     {
         category: 'text',
         label: 'Text',
         icon: 'type',
         types: [
-            { value: 'short_text', label: 'Short text', advanced: false, has_options: false, config_editor: null, value_shape: 'text' },
-            { value: 'long_text', label: 'Long text', advanced: false, has_options: false, config_editor: null, value_shape: 'text' },
+            { value: 'short_text', label: 'Short text', advanced: false, has_options: false, config_editor: null, value_shape: 'text', variant: TEXT_PRIMARY },
+            { value: 'long_text', label: 'Long text', advanced: false, has_options: false, config_editor: null, value_shape: 'text', variant: TEXT_OTHER },
             { value: 'email', label: 'Email', advanced: false, has_options: false, config_editor: null, value_shape: 'text' },
             { value: 'phone', label: 'Phone', advanced: false, has_options: false, config_editor: null, value_shape: 'text' },
         ],
@@ -113,8 +119,8 @@ export const PALETTE: PaletteGroup[] = [
         label: 'Number',
         icon: 'hash',
         types: [
-            { value: 'integer', label: 'Whole number', advanced: false, has_options: false, config_editor: null, value_shape: 'number' },
-            { value: 'decimal', label: 'Decimal number', advanced: false, has_options: false, config_editor: null, value_shape: 'number' },
+            { value: 'integer', label: 'Whole number', advanced: false, has_options: false, config_editor: null, value_shape: 'number', variant: NUMBER_PRIMARY },
+            { value: 'decimal', label: 'Decimal number', advanced: false, has_options: false, config_editor: null, value_shape: 'number', variant: NUMBER_OTHER },
             { value: 'calculated', label: 'Calculated', advanced: true, has_options: false, config_editor: null, value_shape: 'number' },
         ],
     },

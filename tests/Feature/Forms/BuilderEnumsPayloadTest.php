@@ -201,3 +201,24 @@ it('gives every palette entry its value shape, so the panel can filter without a
         expect(ValueShape::tryFrom($shape))->not->toBeNull("{$fieldType} carries an unknown shape {$shape}");
     }
 });
+
+it('marks the four palette variants, one primary per group, and nothing else', function (): void {
+    // M125 (R-a367bf9e). Written out rather than derived from FieldVariantGroup, for the reason the file header
+    // gives: a census computed by the code under test cannot fail.
+    $variantByType = [];
+    foreach ($this->payload['palette'] as $group) {
+        foreach ($group['types'] as $type) {
+            $variantByType[$type['value']] = $type['variant'];
+        }
+    }
+
+    // Additive: the entries are still all 31, so the three client maps that read them lose nothing.
+    expect($variantByType)->toHaveCount(count(FieldType::cases()))
+        ->and($variantByType['short_text'])->toBe(['group' => 'text', 'label' => 'Text', 'primary' => true])
+        ->and($variantByType['long_text'])->toBe(['group' => 'text', 'label' => 'Text', 'primary' => false])
+        ->and($variantByType['integer'])->toBe(['group' => 'number', 'label' => 'Number', 'primary' => true])
+        ->and($variantByType['decimal'])->toBe(['group' => 'number', 'label' => 'Number', 'primary' => false]);
+
+    $grouped = array_filter($variantByType, fn (?array $variant): bool => $variant !== null);
+    expect(array_keys($grouped))->toEqualCanonicalizing(['short_text', 'long_text', 'integer', 'decimal']);
+});

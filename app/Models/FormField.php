@@ -78,6 +78,23 @@ class FormField extends Model implements TenantScoped
     ];
 
     /**
+     * The three flags' defaults — the columns' own (`false`, `2026_07_06_000205_create_form_fields_table.php`).
+     *
+     * ⛔ INCREMENT M125, FOUND THROUGH THE REAL SERVER: without them a field fresh from `create()` carries NULL in memory,
+     * because Eloquent never reads back a database default. The builder's create response therefore handed the client
+     * `null` for all three; the client sends a row back as it was given, and `UpdateFieldRequest` refuses null as not
+     * boolean — so the first edit of EVERY newly added question failed 422 until a reload. `FieldCreateRoundTripTest`
+     * saves a create response straight back, which is the only shape of test that can see it.
+     *
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'is_pii' => false,
+        'is_sensitive' => false,
+        'is_queryable' => false,
+    ];
+
+    /**
      * @return array<string, string>
      */
     protected function casts(): array

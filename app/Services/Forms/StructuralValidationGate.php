@@ -12,6 +12,7 @@ use App\Exceptions\Forms\PublishValidationException;
 use App\Models\FormField;
 use App\Models\FormFieldValidation;
 use App\Models\FormVersion;
+use App\Rules\ContentBlocks;
 use App\Services\Validation\SemanticValidator;
 use Illuminate\Support\Collection;
 
@@ -178,6 +179,11 @@ final class StructuralValidationGate
                 }
                 $violations[] = $this->capture(fn () => $this->assertHiddenFieldAnswerable($field, $fieldIdsWithValidations));
                 $violations[] = $this->capture(fn () => $this->assertPrefillConfigResolves($field));
+            }
+            // Increment M125: a note's content blocks, STRICTLY — the save accepted a blank heading mid-edit, and a
+            // respondent must never be shown one. A note with no `content` is today's one-line note and passes.
+            if ($field->field_type === FieldType::Note) {
+                $violations[] = $this->capture(fn () => $this->assertNoteContentResolves($field));
             }
         }
 
@@ -506,6 +512,20 @@ final class StructuralValidationGate
         }
         if (count($values) !== count(array_unique($values))) {
             throw PublishValidationException::matrixConfigInvalid($field->key, "duplicate {$label} values");
+        }
+    }
+
+    /** A note's `config.content`, when present, must be a block list a respondent can be shown ({@see ContentBlocks}). */
+    private function assertNoteContentResolves(FormField $field): void
+    {
+        $content = data_get($field->config, 'content');
+        if ($content === null) {
+            return;
+        }
+
+        $problem = ContentBlocks::problem($content, strict: true);
+        if ($problem !== null) {
+            throw PublishValidationException::noteContentInvalid($field->key, $problem);
         }
     }
 }

@@ -7,7 +7,7 @@
  * `no_answer` value shape (a note) or the `prefill` editor (a hidden field) — never from a `{note, hidden}` literal,
  * which would be one more client-side type mirror nothing pins.
  */
-import type { BuilderEnums, LocalField, LocalSection, PaletteType } from './types';
+import type { BuilderEnums, BuilderValidation, LocalField, LocalSection, PaletteType } from './types';
 import type { ConversionAddedRule, ConversionCensusEntry, ConversionChange, ConversionPlan, ConversionRule } from './useBuilderStore';
 
 export type ConvertPhase = 'loading' | 'load-failed' | 'choosing' | 'applying' | 'stale' | 'apply-failed';
@@ -211,4 +211,67 @@ export function staleMessage(nowTypeLabel: string | null, choiceStillOffered: bo
     const lead = nowTypeLabel === null ? 'Here is what changing its type does now.' : `It is now ${nowTypeLabel}. Here is what changing it does now.`;
 
     return choiceStillOffered ? lead : `${lead} The type you chose is no longer offered, so choose again.`;
+}
+
+/*
+|--------------------------------------------------------------------------
+| Increment M125 — the palette's variant groups (`R-a367bf9e`).
+|--------------------------------------------------------------------------
+| The palette shows one "Text" and one "Number"; the Basics tab switches a field between the members of its group.
+| Which types form a group is TRANSMITTED (`PaletteType.variant`), never listed here.
+*/
+
+/** The members of a variant group, in palette order, as segmented-control options labelled with their own type labels. */
+export function variantOptions(palette: Iterable<PaletteType>, group: string): TargetOption[] {
+    return [...palette].filter((type) => type.variant?.group === group).map((type) => ({ value: type.value, label: type.label }));
+}
+
+/** The one rule "Allow negative numbers" writes: a minimum of exactly 0, the existing `min_value` rule — no new config key. */
+export const NEGATIVE_FLOOR_RULE = 'min_value';
+
+/**
+ * What a field's rules say about negative answers. `custom` is any OTHER minimum — one the author set on the Validation
+ * tab — which the toggle reads but never rewrites; `allowed` then reports whether that minimum still admits a negative.
+ */
+export interface NegativeFloor {
+    state: 'none' | 'zero' | 'custom';
+    allowed: boolean;
+}
+
+function isMinimum(row: BuilderValidation): boolean {
+    // `expression === null` first, mirroring the M116 partition: a raw-expression row is never a structured rule.
+    return row.expression === null && row.rule_type === NEGATIVE_FLOOR_RULE;
+}
+
+export function negativeFloor(rows: readonly BuilderValidation[]): NegativeFloor {
+    const minimums = rows.filter(isMinimum);
+    if (minimums.length === 0) return { state: 'none', allowed: true };
+    if (minimums.length === 1 && (minimums[0].rule_value ?? '').trim() === '0') return { state: 'zero', allowed: false };
+
+    // A blank threshold constrains nothing, so a row being typed does not read as a refusal.
+    return { state: 'custom', allowed: minimums.every((row) => (row.rule_value ?? '').trim() === '' || Number(row.rule_value) < 0) };
+}
+
+/**
+ * The rows with the toggle's own row added or removed — and nothing else moved. The M116 discipline, re-stated because
+ * `ConfigPanel`'s partition is private to a hub: every row this toggle does not own keeps its relative order, so the
+ * "Required when…" reveal beside it and the Validation tab never reshuffle. Returns the SAME array when there is nothing
+ * to do, including over a `custom` minimum, which belongs to the Validation tab.
+ */
+export function withNegativesAllowed(rows: BuilderValidation[], allowed: boolean): BuilderValidation[] {
+    const { state } = negativeFloor(rows);
+    let next: BuilderValidation[];
+
+    if (allowed && state === 'zero') {
+        next = rows.filter((row) => !isMinimum(row));
+    } else if (!allowed && state === 'none') {
+        next = [
+            ...rows,
+            { rule_type: NEGATIVE_FLOOR_RULE, operator: null, rule_value: '0', expression: null, error_message: null, related_field_key: null, sequence: rows.length },
+        ];
+    } else {
+        return rows;
+    }
+
+    return next.map((row, i) => ({ ...row, sequence: i }));
 }

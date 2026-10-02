@@ -11,6 +11,7 @@ use App\Enums\RequiredMode;
 use App\Enums\ValidationRuleType;
 use App\Models\Form;
 use App\Models\FormField;
+use App\Rules\ContentBlocks;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -220,6 +221,12 @@ final class UpdateFieldRequest extends FormRequest
                 'config.options.*.label_translations' => ['sometimes', 'array'],
                 'config.options.*.label_translations.*' => ['nullable', 'string', 'max:500'],
             ];
+        }
+
+        // Increment M125: a note's content blocks. ONE rule over the whole list and no wildcard sub-rules, because
+        // payload() puts back whatever a sub-rule prunes — so an unknown key must refuse, never be dropped.
+        if ($type === FieldType::Note) {
+            return ['config.content' => ['sometimes', 'nullable', new ContentBlocks]];
         }
 
         return [];

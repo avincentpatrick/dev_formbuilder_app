@@ -16,115 +16,48 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M125`, one "Text" and one "Number" in the builder palette, plus the content-block shape (`m125-palette-merge`)
+## Status: NO ACTIVE CLAIM — `M125` is merged; the builder palette shows one Text and one Number, a note's content blocks have a closed shape, and a newly added question can be saved straight away
 
-Taken 2026-10-02. Branch `m125-palette-merge`, cut from `origin/main` at `fb9dd61e`, PR into `main`.
-Rows, both **Tier: early-testing**:
-- `R-a367bf9e` — *"The builder palette offers short and long text as two entries and whole and decimal numbers as two
-  more, and the distinction is a setting rather than a kind"* (`docs/feature-backlog.md:11417`). The overhaul's next
-  step; queued for `M124`, which took the open `major` instead. **Its one hub is `BuilderPresenter.php`.**
-- `R-6dedc3a9`, **the shape half only** (the overhaul's `B11a` storage shape) — *"A form can hold no author-composed
-  content — no welcome page, no instructions, no image, no divider"* (`:11569`). Hub-free. The row stays open for its
-  editor (`ConfigPanel.vue`, a hub) and its data-dictionary line (a hub), both after `R-c9f50df2`'s renderer.
+## RELEASED — `M125`, one "Text" and one "Number" in the builder palette, the content-block shape, and a create response the builder can save straight back (merged as PR #318, `070bf91e`, 6/6 green with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 
-**`D13`, read through `D15` (the files each remedy EDITS):** one hub in the batch (`BuilderPresenter.php`), and no
-file is edited by both rows. ⛔ **`R-57711a3a` was verified and NOT taken:** its exact fix transmits a
-`related_comparison` fact from `BuilderPresenter.php`, the same file as row 1. Every other ready `early-testing` row
-edits two or more hubs. `D58` blocks only a `during-testing` row, so it is not asked.
+Shipped 2026-10-02. Branch `m125-palette-merge`, cut from `origin/main` at `fb9dd61e`; the claim commit is `a931915e`, extended mid-build by `85ae4d38`.
 
-Verified by three read-only Explore agents (the palette merge; the validation editor; the hub census of the other
-rows), and the load-bearing claims re-read on the tree.
+**Two `early-testing` rows done and a `major` found, filed and closed in the same increment; one `nit` filed. Zero `major` rows are open.** Closed: `R-a367bf9e` and the new major. `R-6dedc3a9` shipped its shape half and stays open for the editor. Re-verified and not taken: `R-57711a3a`, whose exact fix edits `BuilderPresenter.php` — the hub this batch spent. Namespaces spent: nothing from either. **No tracker surgery owed.**
 
-### Evidence verified
+### ⛔ The finding that matters most came from the real browser, not from any test
 
-**`R-a367bf9e` — held; two citations moved.** `BuilderPresenter::palette()` is now `:212-235` (the row says
-`:207-226`); each type entry carries `value`, `label`, `advanced`, `has_options`, `config_editor`, `value_shape` and
-nothing group-shaped. `FormBuilderService::addField()` seeds `'label' => $type->label()` at `:134` (the row says `:131`).
-`FieldTypeControl.vue` is mounted in the Basics tab with the whole store, as `M123` recorded. The client store's
-`addField()` (`useBuilderStore.ts:343-365`) POSTs only `{ field_type, section_id }`, so the label is the server's.
+A throwaway Playwright probe — a form created for it, Text added and switched to Long, Number added and switched to Decimal, negatives turned off — went red on the first save. Measured through the real server: the builder's create response (`POST /forms/{form}/fields`) carried `null` for `is_pii`, `is_sensitive` and `is_queryable`, because Eloquent never reads back a database default and `FormField` declared none; the builder sends a row back as it was given, and `UpdateFieldRequest` refused all three as not boolean — **422**. So on the trunk the first edit of EVERY newly added question failed until a reload, and `M125`'s label seed would have fired that save on every Text or Number add with no user action. No test could see it: every route test writes its own booleans into the PATCH, and Vitest mocks fetch. Fixed with the columns' own defaults as the model's `$attributes` (claim extension `85ae4d38`, pushed before the file was opened); `FieldCreateRoundTripTest` saves a create response straight back, key for key as `fieldPayload()` builds it, for five types — red on all five before the fix. After it, the probe passed and the database read `long_text` "Text" and `decimal` "Number" with a `min_value` `0` rule.
 
-**`R-6dedc3a9` (shape half) — held.** `FieldInput.vue:506` is still the whole note renderer, and
-`FieldType::configEditor()` still returns `null` for `Note`. `UpdateFieldRequest::payload()` (`:106-119`) still overlays
-the raw config over `validated()`, and `configRules()` has no note arm.
+### The palette merge — one hub, and the label seed moved to the client
 
-### Premise verified
+`FieldType::variantGroup()` (total, no `default` arm) and a new `FieldVariantGroup` enum feed an ADDITIVE `variant` key on every palette entry; all 31 stay. `FieldPalette.vue` shows one "Text" and one "Number" at the primary member's place. The Basics tab's "Text format" / "Number format" is a segmented control over the group's members, labelled with their TRANSMITTED type labels — ⚠️ **a deviation from the plan's three switches**, taken because a switch named "Allow decimals" would have needed a client literal naming `decimal`. A switch reads the plans and converts DIRECTLY when the plan needs no review (one request, one undo entry), else opens the existing dialog with that format chosen. ⛔ **A native radio checks itself on the click, before anything is decided**, and Vue has no diff to patch when the switch is then refused or cancelled — so the inputs are re-set from the field IN PLACE; my first draft remounted them on a counter key, which would have dropped a keyboard user's focus and handed the dialog a dead opener, and was caught in review before it ran. "Allow negative numbers" owns one `min_value` `0` row, added and removed positionally, offered only where the transmitted rule table offers `min_value` for the shape. The store seeds "Text" / "Number" before the add's baseline and snapshot, so redo replays it.
 
-**`R-a367bf9e`.**
-- **No variant or group concept exists anywhere**: only forward-looking docblocks (`FieldTypeControl.vue:17-18`,
-  `ConversionPlan.php:66-69`). A variant group is not a category — the Text category holds five types.
-- **The metadata must be additive.** `BuilderEnumsPayloadTest` counts all 31 palette entries, and three client maps
-  read them.
-- **"Provably lossless" still holds.** `FieldTypeConversionTest` pins all four directions as lossless with no
-  confirmation. The one case that needs review is decimal → integer with a default value. A null fingerprint passes
-  only for a plan needing no confirmation (`FormBuilderService.php:425-431`).
-- ⛔ **The label seed moves to the client store, measured.** A server seed edits `FormBuilderService.php` (a hub) and
-  breaks `builder-axe.spec.ts:176`'s `/^Reorder Short text/` (a hub): the seeder's Short text fixture takes its label
-  from `$type->label()`. A client seed costs one extra PATCH per Text or Number add.
-- ⚠️ **The row overstates one reason.** A `DefaultFieldRules` seed would force a confirmation only after the author had
-  removed the row, not on every switch (`FieldTypeConversion` skips a default that is already kept). The conclusion —
-  no seed — stands, and `FieldDefaultValidationsTest` pins the defaults to email, url and phone anyway.
-- ⚠️ **The `M116` positional partition is private to `ConfigPanel.vue`** (a hub), so the allow-negative toggle
-  re-implements its discipline in a pure helper, mounted beside "Required when…" on the same reactive rows.
+### The content-block shape — hub-free
 
-**`R-6dedc3a9` (shape half).** `M121`'s three traps still hold: the overlay puts a pruned key back, so the shape is
-closed by REFUSAL; `TrimStrings` eats span-edge whitespace; and the config is written by more than the FormRequest.
-⚠️ **Narrower than `M121` said:** `POST /api/v1/field-library` stores `default_config` verbatim BY DESIGN and
-`BlueprintValidator::validateField()` re-validates it on insertion, the same choke point the template materializer
-passes through — so the blueprint validator is the one other writer to guard, and the library request is untouched.
-⚠️ **And a fourth trap nobody recorded:** `ConvertEmptyStringsToNull` runs after `TrimStrings`, so an empty span text
-arrives as `null` and the lenient rule must accept it as blank. `config.content` is used nowhere in `app/` or the
-client. `D70` (translations) does not block this half, by its own text.
+`note.config.content` is a closed block list (`heading` 1|2, `paragraph`, `callout`, `divider`; spans `text|bold|italic|code|link`) refused — never pruned — by one rule, `App\Rules\ContentBlocks`: lenient on the PATCH and in `BlueprintValidator`, strict at publish. `TrimStrings` is exempted for `config.content.*` in `ValidationServiceProvider`; `ConvertEmptyStringsToNull` still makes an emptied span `null`, which the lenient rule takes as blank. ⛔ **`parse_url('https://')` answers FALSE, not null** — the unit matrix caught a host-less link passing as safe before it shipped. `image` stays out until `D58`.
 
-### Remedy verdict
+### How the prediction fared
 
-**`R-a367bf9e` — works, with one hub.** `FieldType::variantGroup()` (appended at the end of the enum, so no cited line
-moves) feeds an additive `variant` key in `palette()`; `FieldPalette.vue` shows one entry per group;
-`FieldTypeControl.vue` gains "Long answer", "Allow decimals" and "Allow negative numbers". A type switch is two requests
-— GET the plans, then convert directly when the plan needs no review, or open the existing dialog preselected. No
-route, controller, request or service changes.
+| Predicted | Actual |
+|---|---|
+| Pint: clean, or one fixer on a new test | **Wrong in detail:** one fixer, on `PublishValidationException.php` — a `{@see \App\Rules\ContentBlocks::problem()}` docblock wanted an import; made a plain code reference. Bare Pint then clean over 1544 files. |
+| PHPStan (scoped): zero | **Held:** the only reports are the known container phantom on two untouched presenter lines; `FormField.php` clean. |
+| Pest green; no existing test edited but the appended payload case | **Held.** |
+| Vitest and vue-tsc green; only appends | **Held**, after vue-tsc's first run refused `:aria-label` on `MdsSegmentedControl` — Vue tooling reads it as an attribute; the prop is `ariaLabel`. |
+| Contract, Storybook axe and E2E unmoved | **Held in CI.** Locally `builder-convert-axe` went red 4 of 6 and then once more on desktop — the single-threaded dev server was taking 6–7 s a request; two further runs passed, then 6/6, and `builder-axe` 60/60. |
+| Citation lint: ROT set identical | **Held** for the gated tiers. Three ACCURATE ledger citations into `UpdateFieldRequest.php` moved one line under the new import and were re-pointed in place. |
+| ⚠️ **Most expected wrong: a builder test double meeting the new switches** | **Wrong in the good direction:** none reddened. |
+| Second: the citation lint | **Held.** |
 
-**`R-6dedc3a9` (shape half) — works, hub-free.** One custom rule over the whole `config.content` list, lenient on the
-PATCH and strict at publish; the `TrimStrings` exemption registered in `ValidationServiceProvider` (never
-`bootstrap/app.php`); a strict note arm in `StructuralValidationGate`; a lenient check in `BlueprintValidator`. `image`
-stays out of the closed set until `D58`. The publish banner renders the server's message, so no client copy is owed.
+### Fourteen mutations, all CAUGHT; one prediction under-shot
 
-Files: `app/Enums/FieldType.php`, `app/Enums/FieldVariantGroup.php` (new), `app/Services/Forms/BuilderPresenter.php`
-(hub), `resources/js/components/builder/types.ts`, `resources/js/components/builder/FieldPalette.vue`,
-`resources/js/components/builder/FieldTypeControl.vue`, `resources/js/components/builder/useBuilderStore.ts`,
-`resources/js/components/builder/builder-store-fixtures.ts`, `resources/js/components/builder/field-conversion.ts`,
-`app/Rules/ContentBlocks.php` (new), `app/Http/Requests/Forms/UpdateFieldRequest.php`,
-`app/Providers/ValidationServiceProvider.php`, `app/Services/Forms/StructuralValidationGate.php`,
-`app/Exceptions/Forms/PublishValidationException.php`, `app/Services/Forms/BlueprintValidator.php`; tests
-`tests/Feature/Forms/BuilderEnumsPayloadTest.php`, `tests/Unit/Forms/FieldVariantGroupTest.php` (new),
-`tests/Unit/Forms/ContentBlocksRuleTest.php` (new), `tests/Feature/Forms/NoteContentShapeTest.php` (new),
-`resources/js/components/builder/field-palette.test.ts`, `resources/js/components/builder/FieldTypeControl.test.ts`,
-`resources/js/components/builder/field-conversion.test.ts`, `resources/js/components/builder/add-field-label.test.ts`
-(new).
-Shared artefacts taken: `docs/feature-backlog.md`, and as procedure `docs/pipeline.md`, `docs/backlog-triage.md`,
-`docs/gate-baselines.md`, `PROGRESS.md` (own block). Not `openapi.json` — neither request is on `/api/v1`.
-Paired files taken: none.
-Namespaces spent: nothing from either namespace.
-Prediction: Pint clean, or one layout fixer on a new test. PHPStan (scoped to the changed `app/` files): zero.
-Pest green, with no existing test edited except the appended `BuilderEnumsPayloadTest` case. Vitest and both vue-tsc
-passes green, with no existing test edited except the appends. Contract, Storybook axe and E2E unmoved. The citation
-lint's ROT set identical to the baseline (tier 1 at 0, ledger 17 of 17). ⚠️ **Most expected wrong:** a builder test
-whose hand-rolled store double meets `FieldTypeControl`'s new switches — `ConfigPanel.test.ts` mounts the control with
-a palette that has no `variant` and a store without `touch` in some doubles. Second: the citation lint, through the
-lines `palette()` and `addField()` push down.
+Eight through `scripts/mutate.php` — the `variant` key dropped (1 red), `email` put in the Text group (3), the `TrimStrings` exemption on the wrong path (1), `javascript` allowed (4), the gate run leniently (1), the PATCH's note arm removed (3), the blueprint check a no-op (1), the model's defaults renamed away (5) — and six in Vitest by hand: the palette listing every member (1), the toggle prepending its row (2), the resync a no-op (2), no label seed (1), the toggle offered regardless of the rule table (1), and the switch always opening the dialog — predicted FT9 alone, it also reddened FT12, whose successful switch expects a direct write.
 
-### Extended mid-build — `app/Models/FormField.php`, before the file is opened (2026-10-02)
+### Measured
 
-**Found by the real-browser probe, measured through the real server:** the builder's create response
-(`POST /forms/{form}/fields`) hands the client `null` for `is_pii`, `is_sensitive` and `is_queryable`, because Eloquent
-never reads back a database default and `FormField` declares none; the client sends them back on the next PATCH, and
-`UpdateFieldRequest` refuses all three as not boolean — **422, "The is pii field must be true or false. (and 2 more
-errors)"**. So on the trunk the first edit of EVERY newly added question fails until a reload; and `M125`'s label seed
-makes that PATCH fire on every Text or Number add with no user action, then blocks the format switch behind "your last
-change hasn't saved". Not in the ledger (grepped). **Remedy:** the three columns' own defaults (`false`, per
-`2026_07_06_000205_create_form_fields_table.php`) as the model's `$attributes`, so every creator gets them in memory.
-`FormField.php` is cited by two open rows, below the hub threshold, and by no line citation anywhere. Files added:
-`app/Models/FormField.php` and a new `tests/Feature/Forms/FieldCreateRoundTripTest.php`. The defect is filed and closed
-in this increment's ledger edit.
+Pest per directory at 3G: Unit **1551** (2 pre-existing warnings), Forms **593**, Submissions **448**, Connectors **269**, Api **153**, Analytics **116**, Guest **86**, Webhooks **78**, Http **30**, Seeders **16**, Xlsform **15**, Public **6**, Expressions **2**, Docs **142** + the known bind-mount `SuiteCollectionFloorTest`. Vitest **162 files / 2860**. vue-tsc clean (main and sw). `preflight --with-gates --with-pint` green; citation lint tier 1 at 0, ledger 17 / 17. ⚠️ `builder-axe.spec.ts` lists **60** cases, not the 61 `M123` recorded.
+
+Files: as claimed, plus the extension (`app/Models/FormField.php`, `tests/Feature/Forms/FieldCreateRoundTripTest.php`); `FieldVariantGroupTest` landed in `tests/Feature/Forms/`, not `tests/Unit/Forms/`, because the honest guard is a field added through the real service. Shared artefacts: `docs/feature-backlog.md`, and `docs/pipeline.md` + `docs/backlog-triage.md` regenerated as procedure. Not `openapi.json`.
 
 ## RELEASED — `M124`, a yes/no condition holds the same way in the browser and on the server, and page breaks paginate stepped forms (merged as PR #317, `55356a7b`, 6/6 green with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

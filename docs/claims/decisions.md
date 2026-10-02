@@ -1317,6 +1317,18 @@ end state and needs a disclosure-safe refusal designed first, which is a decisio
 
 ---
 
+### D71 — A date compared with `>` or `<` never holds, because ordering is numeric-only. Does publish refuse it now, or is date comparison built first? **A — refuse it at publish now, and queue real date comparison as its own `early-testing` row.**
+
+**Filed and answered 2026-10-02 (user decision, in chat), recorded by Lane A during `M126` — A, the recommendation.** Put to the user under `D66`'s rule, because `R-87160c81` — an `early-testing` work row — could not fix its refusal set without the answer. Ordering in both engines is numeric-only (`ExpressionEvaluator::numericCompare()`, through `Coercion::NUMERIC_RE`), and `today()` returns `YYYY-MM-DD`, so `${dob} <= today()` is constant false. In a constraint, that means every answer is refused. `docs/architecture/technical-architecture.md` records chronological ordering as deferred, but nothing stopped an author from writing one: the condition editor offers "is more than" on a date, and an XLSForm import carries ODK's common date constraints straight in.
+
+- **A — refuse now, build soon.** Publish refuses a date ordering with a message naming the question, and date comparison is filed `early-testing`. Some imported forms will not publish until the condition is removed.
+- **B — do not refuse; build date comparison next.** The silent failure stays live for one more increment.
+- **C — refuse now, build later.** As A, with date comparison filed `during-testing`.
+
+**Recommendation: A.** A form that publishes and then refuses every answer is worse than one that will not publish and says why. And the refusal is lifted precisely when date ordering ships, so it costs nothing permanent.
+
+---
+
 ### D15 — `D13`'s one-hub-row cap is now the binding constraint on batch composition, and it is stricter than its own purpose. **ANSWERED — option 4: the cap reads the files a row REMEDY EDITS, excluding the close-out artefacts.** **Tier: early-testing.**
 
 **Filed 2026-09-05 by Lane A, during `M72`, at the moment the cap decided a batch that value had not.**

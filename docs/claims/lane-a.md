@@ -16,107 +16,127 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M126`, a builder save keeps a rule's imported translations and grouping, and publish refuses an ordering that can never hold (`m126-rule-rows-and-orderings`)
+## Status: NO ACTIVE CLAIM — `M126` is merged; a builder save keeps a rule's imported translations and grouping, and publish refuses an expression that can never hold
 
-Taken 2026-10-02. Branch `m126-rule-rows-and-orderings`, cut from `origin/main` at `9198b3b1`, PR into `main`.
-Rows, both **Tier: early-testing**:
-- `R-86a0426d` — *"Every builder save of a field deletes its imported `error_message_translations`, `logic_group` and
-  `logic_operator`"* (`docs/feature-backlog.md:12356`). **Its one hub is `FormBuilderService.php`.**
-- `R-87160c81`, **sub-claim (2) only** — *"A condition can still be constant while every operator suits the compared
-  question's kind, and publish cannot see it"* (`:12457`): an ordering inside an EXPRESSION is never checked against
-  its operand's kind. Hub-free. The row stays open for its headline, (1); (3) and (4) are split out as rows.
+## RELEASED — `M126`, a builder save keeps each rule's translations and grouping, and publish refuses an ordering that can never hold (merged as PR #319, `4dacc724`, 6/6 green with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 
-**`D13`, read through `D15` (the files each remedy EDITS):** one hub in the batch (`FormBuilderService.php`), and no
-file is edited by both rows. ⛔ **`R-57711a3a` was re-verified and NOT taken,** although `M125` named it next: its fix
-edits `BuilderPresenter.php`, a second hub. `R-86a0426d` was preferred because it is silent data loss, while
-`R-57711a3a` is an editor offering what publish already refuses. It is `M127`'s hub row, and its re-verification is
-recorded at the row in this increment. `D58` blocks only a `during-testing` row, so it is not asked. **`D71` was asked
-and answered in chat** (refuse a date ordering at publish now, and build date comparison as its own `early-testing`
-row), because this batch's refusal set turned on it.
+Shipped 2026-10-02. Branch `m126-rule-rows-and-orderings`, cut from `origin/main` at `9198b3b1`; the claim commit is `be2f65fd`.
 
-Verified by three read-only Explore agents (one per row, and `R-57711a3a`), with the load-bearing claims re-read on the
-tree: the ordering semantics, `today()`'s return value, the census walker, and every line citation into the files
-edited.
+**One `early-testing` row closed, one half-shipped, five rows filed, `D71` asked and answered in chat.** Closed: `R-86a0426d`. `R-87160c81` shipped its second sibling and stays open for its headline. `R-57711a3a` was re-verified and not taken; it is `M127`'s hub row. Filed: date comparison (`D71`), the condition editor's ordering gap, a blank compared answer, grid/geo `contains` (latent), and the undo `default_value_is_expression` residue. Namespaces spent: nothing from either. **No tracker surgery owed — but `M127` or `M128` will owe the ninth.**
 
-### Evidence verified
+### ⛔ The data loss was wider than the row said
 
-**`R-86a0426d` — held, and the row UNDERSTATES itself.** `writeField()` calls `replaceValidations()` unconditionally
-(`FormBuilderService.php:299`). That method opens with `$field->validations()->delete()` (`:720`) and re-inserts seven
-columns (`:725-735`). `UpdateFieldRequest` (`:70-76`) declares six `validations.*` keys, and `validated()` prunes the
-rest. `fieldPayload()` lists those six by name (`useBuilderStore.ts:1105-1112`). `BuilderPresenter::field()` emits
-neither a row id nor any of the three columns (`:173-183`). ⛔ **So a label edit ALONE deletes them**, not only
-"touching any field's rules".
+`R-86a0426d` said that touching a field's rules deleted its imported translations and grouping. In fact, ANY save of the field did it — a label edit included — because every save sends its rules and `replaceValidations()` deleted and re-inserted them all. Rule rows are now kept in place by CONTENT, matched on type, operator, value, expression and compared question, one-to-one in sequence order. A matched row takes the new message and sequence and keeps all three columns. The fix is server-only and spends one hub, because no row id reaches the client and position cannot identify a row.
 
-**`R-87160c81` (2) — held.** `ExpressionValidationGate::check()` (`:143-169`) only parses, resolves keys, and refuses a
-grid or geo reference. `ExpressionParser::assertReferencesResolve()` treats every field key as known. Ordering is
-numeric-only in both engines (`ExpressionEvaluator::numericCompare()`, `:147-154`, through `Coercion::NUMERIC_RE`), so a
-date, time, yes/no, list or note operand makes `> < >= <=` constant false. `today()` returns `YYYY-MM-DD` (`:289-292`).
+The trade-off is stated in the docblock. A rule whose value changes is a new rule, and starts without its translations and grouping. A rule whose message changes keeps them.
 
-### Premise verified
+Two premises were corrected at the row:
+- **Who writes the columns.** The XLSForm importer writes only the translations; the grouping comes from the blueprint materializer.
+- **The tests.** `FieldValidationRetentionTest` PATCHes through the real route with a body built the way `fieldPayload()` builds it.
 
-**`R-86a0426d` — held, with one correction.**
-- **The loss matters.** Both engines honour the grouping (`SemanticValidator.php:243-259`,
-  `semantic-validator.ts:257-262`). Translations render at runtime and re-export to XLSForm.
-- ⚠️ **The writer attribution is mixed:** the XLSForm importer writes only `error_message_translations`. The grouping
-  comes from `SchemaBlueprintMaterializer` (templates and the field library).
-- `convertField()` already keeps rows in place (`:436-452`).
-- **`ValidationEditor` keeps unknown keys on a row**, so the loss is only at `fieldPayload()` and the request's pruning.
-- **The `default_value_is_expression` undo residue the row also carries is a different defect.** It is filed as its
-  own row, not fixed here.
+### Publish refuses an ordering that can never hold — and dates are "not supported yet"
 
-**`R-87160c81` (2) — held, and the row has nothing around it that has moved.** `M123`'s gate arms cover structured rule
-rows only. `docs/architecture/technical-architecture.md` already records chronological ordering as deferred
-(`${appt} >= today()` *"is not yet supported"*), yet nothing refuses one. The condition editor offers "is more than" on
-every question, and the seeded fixtures order only on `${age}`.
+`ExpressionValidationGate` now refuses an expression that reads a question as a NUMBER — an ordering, arithmetic or `int()` — when that question's answers never are numeric-like. That covers a note, a page break, a yes/no or any list type. It also covers a date, time or datetime, worded *"not supported yet"*.
 
-### Remedy verdict
+`D71` was put to the user because this row's refusal set turned on it. They chose to refuse date orderings now and queue real date comparison as its own `early-testing` row.
 
-**`R-86a0426d` — the row offers two fixes, and only (a), "keep rows in place", fits one hub.**
-- **(b), round-tripping the three columns, is out.** It touches `BuilderPresenter.php`, `FormBuilderService.php` and
-  perhaps `draft-snapshot.ts`, and it would let a client forge a group id.
-- **(a) as an id match is impossible.** No row id reaches the client, and position is unreliable, because
-  `ValidationEditor` renumbers on removal.
-- **So (a) is built as a CONTENT match, server only.** An incoming row matches an existing one on
-  `(rule_type, operator, rule_value, expression, related_form_field_id)`, one-to-one in sequence order.
-  - A matched row updates `error_message` and `sequence` in place, and keeps its translations and grouping.
-  - Unmatched existing rows are deleted, and unmatched incoming rows are inserted.
-  - **The stated trade-off:** a rule whose VALUE is edited is a new rule, and loses both.
-- **Line safety.** Every citation into this file points above `:720`.
+How it was built:
+- **One walker.** The census's walker moved verbatim into `ExpressionKeyUse`, so the census and the gate read one walk; `ConversionCensusTest` is unedited and green.
+- **Zero line shift.** The gate is cited by line from the ledger and two design documents. So the collection line was replaced in place, the walk was appended, and the walk reads its own rows from the version — because Pint wanted two docblock class names imported, and two `use` lines would have shifted every citation.
 
-**`R-87160c81` (2) — none prescribed; measured instead.**
-- **The walker.** The census's walker (`ConversionCensus::walk()`/`classify()`/`comparisonUse()`) already classifies
-  ordering, arithmetic and `int()` uses of a key as `numeric`. It moves verbatim into one shared class that both the
-  census and the gate call, so there is one walker, not two.
-- **What is refused.** The gate refuses a numeric use of a key whose type can NEVER hold a numeric-like answer: note,
-  page break, yes/no, date, time, datetime, and the list types. A constraint's `.` counts too.
-- **What is left alone.** Text, hidden, calculated and single choice can hold numeric strings and stay allowed. Grid and
-  geo are already refused outright, so they are excluded to avoid reporting them twice.
-- **The codes.** Two new ones: a date code worded *"not supported yet"*, per `D71`, and one for every other kind.
-- **Placement, at zero line shift.** The ledger cites `:185` and `:189`, and docs cite `:47` and `:63`. So the
-  unfiltered collection line is replaced in place, and the walk is appended after `checkFormula()`.
-- **What is split out.** (1) needs `ValueShape.php`. (3) needs a golden vector, and so
-  `technical-architecture.md`. The condition editor needs `ConfigPanel.vue`. Date comparison needs both engines and the
-  corpus note. (4) is unreachable on any form published since `M123`. Each is a hub, so each is a row.
+### How the prediction fared
 
-Files: `app/Services/Forms/FormBuilderService.php` (hub), `app/Services/Forms/ExpressionValidationGate.php`,
-`app/Services/Forms/ConversionCensus.php`, `app/Services/Forms/ExpressionKeyUse.php` (new),
-`app/Exceptions/Forms/PublishValidationException.php`, `tests/Feature/Forms/FieldValidationRetentionTest.php` (new),
-`tests/Feature/Forms/ExpressionValidationGateTest.php`.
-Shared artefacts taken: `docs/feature-backlog.md`, `docs/claims/decisions.md` (`D71`), and `docs/pipeline.md` +
-`docs/backlog-triage.md` regenerated as procedure. Not `openapi.json`.
-Paired files taken: none.
-Namespaces spent: nothing from either namespace.
-Prediction:
-- **Pint:** clean on a bare `pint --test`, or one fixer on a new test.
-- **PHPStan** (container): only the known phantom.
-- **Pest:** `tests/Feature/Forms`, `tests/Unit`, `tests/Feature/Xlsform`, `tests/Feature/Seeders` and
-  `tests/Feature/Submissions` green at 3G, with every existing test untouched except appends. `ConversionCensusTest`
-  green and unedited across the extraction.
-- **Golden runners:** byte-identical, because no engine changes.
-- **Vitest, vue-tsc, Contract, Storybook axe and E2E:** unmoved, because there is no client change.
-- **Citation lint:** tier 1 at 0, and the ledger at its ceiling.
-- ⚠️ **Most expected wrong:** an existing test or fixture that publishes an ordering on a date, yes/no or list
-  question and now reddens. Second: a test that counts validation rows or reads their ids after a field PATCH.
+| Predicted | Actual |
+|---|---|
+| Pint: clean, or one fixer on a new test | **Wrong in detail.** `fully_qualified_strict_types` wanted the walk's two FQCN docblock types imported, which would have moved every cited gate line. The walk takes the `FormVersion` instead. Two new tests also wanted a single blank line at EOF. After that, bare Pint was clean over the project. |
+| PHPStan (container): only the known phantom | **Held:** two reports, both on `duplicateField()`'s untouched lines. CI's Static analysis job: green, 32 steps. |
+| Pest green, every existing test untouched except appends | **Wrong once.** `BuilderLockOrderTest`'s three ordering arms read the first `DELETE` as "the first validation write". An unchanged resubmit no longer deletes anything, so the witness moved to the first statement that touches the table at all (stricter, because it includes the read). The clean arm now pins that such a resubmit writes no validation row. Everything else held, including `ConversionCensusTest` unedited across the move. |
+| Golden runners byte-identical | **Held** — no engine and no corpus was touched. |
+| Vitest, vue-tsc, Contract, Storybook axe, E2E unmoved | **Held in CI:** Frontend 12, Contract 16, Storybook axe 11 and E2E 20 steps, all green. |
+| Citation lint: tier 1 at 0, the ledger at its ceiling | **Held:** 1241 citations, 30 unresolved (unchanged), ledger 17 / 17. |
+| ⚠️ **Most expected wrong: an existing fixture ordering a never-numeric question** | **Wrong in the good direction:** none exists. The seeded forms order only on `${age}`. |
+| Second: a test counting rule rows or reading their ids after a PATCH | **Right in kind, wrong in where:** it was the lock-order witness, not a count. |
+
+### Ten mutations, all CAUGHT, every red set exactly as written down beforehand
+
+All ten ran through `scripts/mutate.php`:
+- **Retention:** never matching (8 red); the stored side reading no operator (1); a kept row keeping its old sequence (1); keeping its old message (1); no empty-string normalization (1).
+- **Gate:** the call removed (27); a date treated as numeric (7); arithmetic not classified (3, one of them a census case); the constraint's `.` ignored (1); the date code never chosen (11).
+
+⚠️ **The first batch measured nothing and said so.** PowerShell split `--old=(Join-Path …)` into two arguments, so all ten aborted on argument parsing. The run "completed" in seconds, and every log read `ABORT — missing --old`. Re-run with each argument built as one string.
+
+### ✅ Seen in a real browser
+
+A throwaway Playwright probe ran through the real server, against a form seeded for it and deleted afterwards. `public/hot` was moved aside and the assets were built first.
+
+- **The save.** Renaming the field in the builder answered 200, and the database kept both rule rows' ids, Spanish messages and AND/OR group.
+- **The publish.** It was refused, and the banner named `probe_shown` and said *"not supported yet"*.
+
+⚠️ The seed could not find the demo user through `User::query()`: the `users` SELECT policy hides every row until a context is set. The id is read on the privileged connection, and the model is loaded inside the context.
+
+### ⚠️ One process deviation, recorded rather than smoothed
+
+**`tests/Feature/Forms/BuilderLockOrderTest.php` was not in the claim's file list, and it was edited without a pushed claim extension first.** The fix moved that file's witness out from under it, which was found only when the Forms suite went red on it. The rule says an extension is pushed before an unclaimed file is opened, and this one was not.
+
+Separately, the ordering walk's parameter change landed while a background suite was running. It was behaviour-identical, and the Forms directory ran after it, against the final code.
+
+### Measured
+
+Pest per directory at 3G:
+
+| Directory | Tests |
+|---|---|
+| Unit | 1551 (2 pre-existing warnings) |
+| Forms | 656 |
+| Submissions | 448 |
+| Tenancy | 358 |
+| Connectors | 269 |
+| Sso | 229 |
+| Auth | 187 |
+| Api | 153 |
+| Gamification | 136 |
+| Admin | 135 |
+| Scoping | 127 |
+| Search | 123 |
+| Analytics | 116 |
+| Audit | 107 |
+| Guest | 86 |
+| Notifications | 86 |
+| Mail | 83 |
+| Webhooks | 78 |
+| Tenant | 74 |
+| Entitlements | 68 |
+| Branding | 56 |
+| Queue | 50 |
+| Navigation | 49 |
+| Settings | 37 |
+| Http | 30 |
+| Feedback | 24 |
+| Dashboard | 23 |
+| Attachments | 22 |
+| Maintenance | 20 |
+| Deploy | 17 |
+| Seeders | 16 |
+| Migrations | 16 |
+| Xlsform | 15 |
+| Theme | 9 |
+| Onboarding | 8 |
+| Public | 6 |
+| Rbac | 3 |
+| Security | 3 |
+| Expressions | 2 |
+| Docs | 142, plus the known bind-mount `SuiteCollectionFloorTest` |
+
+Gates: `preflight --with-gates --with-pint` green; `test-pointer-lint`, `tracker-lint` and `state.php --check` green. Vitest was not run locally, because there is no client change.
+
+**Files:** as claimed, plus `tests/Feature/Forms/BuilderLockOrderTest.php` (above).
+
+**Shared artefacts:**
+- `docs/feature-backlog.md`
+- `docs/claims/decisions.md` (`D71`)
+- `docs/pipeline.md` and `docs/backlog-triage.md`, regenerated as procedure
+
+Not `openapi.json`.
 
 ## RELEASED — `M125`, one "Text" and one "Number" in the builder palette, the content-block shape, and a create response the builder can save straight back (merged as PR #318, `070bf91e`, 6/6 green with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

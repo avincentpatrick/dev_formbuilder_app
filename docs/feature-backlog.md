@@ -11946,7 +11946,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   path is `R-f1332829`, deliberately split off on the user's choice between that split and a `D13` clause 1 breach,
   and `previewLimitations()` still says sections are always stepped because that remains true.
 
-- **`minor` · `page_break` is a hard page break on paper and an ODK group boundary on export, but is deleted
+- ✅ **CLOSED BY `M124` (2026-10-02) — `minor` · `page_break` is a hard page break on paper and an ODK group boundary on export, but is deleted
   outright on screen — one field type meaning three different things.** Filed 2026-09-26 by `M114`, as the "C
   next" half of `D57`, which the user accepted as separate queued work. ⛔ **`D57`'s own option C says the type
   *"today does nothing at all"* AND THAT IS FALSE** — measured before this row was written. It is already
@@ -11956,17 +11956,17 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `end group` pair that IS a page in ODK Collect, round-tripped at `XlsformTypeMap.php:114`. **So the defect is that
   screen and paper disagree, not that nothing happens** — which makes this a reconciliation rather than a feature.
   ⛔ **On screen it is DELETED, not ignored:** `RENDERS_NOTHING` (`resources/public-runtime/engine/field-roles.ts:33`)
-  strips it at `useFormRuntime.ts:409` and `:434`, after which a section holding only page breaks fails the
-  emptiness check at `:438` and **disappears entirely** — strictly less than inert. ⚠️ **There are FOUR section
-  walks, not the two `D57` names.** `visibleSteps` (`resources/public-runtime/composables/useFormRuntime.ts:405-462`)
+  strips it in `useFormRuntime.ts`'s `visibleSteps`, after which a section holding only page breaks fails the
+  emptiness check and **disappears entirely** — strictly less than inert. ⚠️ **There are FOUR section
+  walks, not the two `D57` names.** `visibleSteps` (`resources/public-runtime/composables/useFormRuntime.ts`)
   and `StepProjection::of()` (`app/Support/Forms/StepProjection.php:105-168`) are the twins, pinned against each
   other by `tests/fixtures/step-projection.json`; `SubmissionPdfPresenter::answerBlocks()` (`:152-245`) and
-  `BlankFormPrintPresenter::blocks()` (`:150-180`) are independent and deliberately un-refactored, the first named
+  `BlankFormPrintPresenter::blocks()` are independent and deliberately un-refactored, the first named
   as such by `StepProjection`'s own docblock at `:43-46`. ⛔ **Two shape contracts constrain any remedy:**
   `RENDERS_NOTHING`'s literal is regex-parsed out of the TypeScript source by `tests/Unit/Forms/PdfFieldRoleTest.php:73`,
   so a rename or a reshape reddens a PHP test; and `app/Enums/PrintAnswerArea.php:15-23` enumerates four
   deliberately-disagreeing type sets, each pinned by `tests/Unit/Forms/PrintAnswerAreaTest.php`, so moving
-  `page_break` between them is a decision about all four. **Live.** Filed by `M114`. **Tier: early-testing.** ✅ **UNBLOCKED BY THE `D57` AMENDMENT (2026-10-02, recorded by `M123`):** page breaks paginate AUTOMATICALLY in every stepped form, with no setting, and staff manual entry stays one step per section for now. ⛔ **RE-VERIFIED BY `M123`, NOT TAKEN — the remedy is hub-free:** split `visibleSteps` at `page_break` behind a runtime option the guest runtime and the builder preview turn on and the encode page leaves off; keep `page_break` in `RENDERS_NOTHING`; and do NOT teach PHP's `StepProjection` to split, because its consumers only ask whether a section has a visible step. ⚠️ **Corrections:** "deleted outright on screen" was false inside repeatable sections, where it rendered as an unsupported control — `M123` filed and fixed that half separately; "four section walks" is a floor (the encode presenter, the inbox presenter and the exporter walk sections too); and the XLSForm export is a round-trip marker, not pagination. The blank-form PDF prints a section heading over a section holding only a page break — fold that in. Queued for `M124`.
+  `page_break` between them is a decision about all four. **Live.** Filed by `M114`. **Tier: early-testing.** ✅ **UNBLOCKED BY THE `D57` AMENDMENT (2026-10-02, recorded by `M123`):** page breaks paginate AUTOMATICALLY in every stepped form, with no setting, and staff manual entry stays one step per section for now. ⛔ **RE-VERIFIED BY `M123`, NOT TAKEN — the remedy is hub-free:** split `visibleSteps` at `page_break` behind a runtime option the guest runtime and the builder preview turn on and the encode page leaves off; keep `page_break` in `RENDERS_NOTHING`; and do NOT teach PHP's `StepProjection` to split, because its consumers only ask whether a section has a visible step. ⚠️ **Corrections:** "deleted outright on screen" was false inside repeatable sections, where it rendered as an unsupported control — `M123` filed and fixed that half separately; "four section walks" is a floor (the encode presenter, the inbox presenter and the exporter walk sections too); and the XLSForm export is a round-trip marker, not pagination. The blank-form PDF prints a section heading over a section holding only a page break — fold that in. Queued for `M124`. ✅ **CLOSED BY `M124` (2026-10-02).** `createFormRuntime()` gained `paginateAtPageBreaks` (off by default; the guest runtime passes `!single_page_mode`, the builder preview a computed off its LIVE model, never the frozen snapshot, so a switch to one page needs no remount); a stepped form now cuts each non-repeatable section and the lead block at every page break that currently APPLIES (a break hidden by its own condition does not cut), and the encode page stays one step per section. ⛔ **The prescribed remedy was right and three of its seams were not in it:** IDENTITY — the first page holding a question keeps the bare section key and each later page is `section#break`, assigned BEFORE predicate 3 so a page keeps its key while pages before it come and go; PERSISTENCE — `submissions.draft_current_step` is documented to hold a section key and validated to 255 characters, so a draft records `resumeStepKey` (the block, never the page) and `goToStep()` lands a block key on its first VISIBLE page as `'exact'`, not drift; and MERGING — a page can vanish into its neighbour, so `StepChange` gained `rescueReason` (`'repaginated'` follows the questions and is announced as a change of page) and counts answers left behind only when their FIELD left the screen. Every page keeps the heading (marked "continued" after the first) and only the first carries the description, in the guest form and the preview alike; the preview's page-break limitation is deleted. The blank-form PDF prints a section's leading breaks before its heading, no heading over a breaks-only section, and a break only where it separates printed questions. `StepProjection.php` and its fixture are untouched, and a new guard proves pagination never changes which SECTIONS show, case for case. ✅ Store, component, preview and presenter tests; 11 mutations CAUGHT, eight in Vitest by hand and three through `scripts/mutate.php`, every red set exactly as written down beforehand. ⛔ **`D13` exception #3:** the step model moved a line `docs/offline-first-sync-design.md` (a hub) cited, so this row repaired that one citation, by the user's choice.
 - ✅ **CLOSED BY `M116` (2026-09-28) — `major` · ~~An incomplete conditional validation row saves, publishes, and then fails every submission the
   form ever receives.~~** Found by `M115` (2026-09-27) while building the validation editor's operator half, by
   opening all three doors rather than the one the work needed. ⛔ **Nothing refuses it at any of them.**
@@ -12440,7 +12440,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `calculate` rows import into the repeat hit it directly. The encode page is immune: its presenter omits both types
   before any block is built. **Live.** Filed by `M123`. **Tier: early-testing.** ✅ **CLOSED BY `M123`:** `RepeatGroup`'s members are filtered by `rendersNothing()`, render-only — `membersOf()` stays total, and nothing computes or validates a member of either type through it. Three runtime cases and one preview case, each red against the old component; three mutations CAUGHT.
 
-- **`major` · A condition on a yes/no question written the natural way — "= yes" — never holds, so the rule it drives
+- ✅ **CLOSED BY `M124` (2026-10-02) — `major` · A condition on a yes/no question written the natural way — "= yes" — never holds, so the rule it drives
   silently never applies.** Measured by `M123` with a throwaway probe through the real publish and encode paths: a
   `required_if` on `details` naming a yes/no `consent` with operator `equals` and value `yes` published clean, and a
   submission answering `consent` yes with `details` empty was RECORDED with no error — for a `true` answer and for a
@@ -12452,7 +12452,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `${consent} = 'yes'` meets the same comparison, so "show this question when consent is yes" would never show it; the
   TypeScript engine mirrors the coercion. The remedy is a decision about meaning as much as code — the natural fix is a
   yes/no-aware equality on both engines (with golden vectors), so `yes`/`no`/`true`/`false` compare against the boolean.
-  **Live.** Filed by `M123`. **Tier: early-testing.**
+  **Live.** Filed by `M123`. **Tier: early-testing.** ✅ **CLOSED BY `M124` (2026-10-02) — AND THE ROW UNDERSTATED ITSELF IN THE DANGEROUS DIRECTION.** The browser does NOT fail the same way: its Yes/No control emits the strings `'yes'`/`'no'` and nothing converted them, so in the browser `= 'yes'` HELD while the server, holding a boolean, said it did not — a question shown and answered there had its answer PRUNED by the server at submit (silent data loss), `!= 'yes'` was constant-true on the server, nothing matched a No (`false` stringified to `''`), and a resumed draft (booleans) disagreed with a fresh one (strings) inside the browser itself. **Fixed on both sides of the wire and in both engines:** `equals()` gained rule 3b — a boolean compares by meaning, through a STRICT `Coercion::yesNoLiteral()` (`yes`/`true`/`1`, `no`/`false`/`0`, PHP-trimmed and ASCII-lowercased in both languages), so an unanswered side equals neither — and `selected()`/the internal `contains` read a boolean the same way; Stage 3 in BOTH engines reads every non-empty scalar yes/no answer through `Coercion::yesNoAnswer()`, the normalizer's own table moved out of `StructuralAnswerNormalizer`, so the browser evaluates the boolean the server stores (idempotent on the server; a form with no yes/no question takes a fast path, so every older vector is byte-identical); and `FieldInput.vue`'s Yes/No control shows a stored boolean, which fixes the blank Yes/No on resume and on the staff edit page and prevents a new one on offline conflict review. ✅ 33 expression and 21 validation golden vectors (the corpora extended deliberately, noted in `docs/architecture/technical-architecture.md`), a pipeline test that is `M123`'s probe made permanent, and unit, runtime and component tests; 14 mutations CAUGHT, eight through `scripts/mutate.php` and six in Vitest by hand, every red set exactly as written down beforehand — including two pre-existing browser cases that now reach rule 3b, because the browser's `'yes'` is read as a boolean. ⚠️ **Live forms change on deploy, without a republish:** answers the server used to prune are kept, `neq` rules stop being constant, and a submission PDF that replays relevance now shows yes-gated questions it used to drop. ⛔ **`D13` exception #3:** this row edited three hub files, allowed by the user in chat.
 
 - **`minor` · A condition can still be constant while every operator suits the compared question's kind, and publish
   cannot see it.** Measured by `M123` at the code while closing `R-2c172882`, not run. `ValueShape` puts single and
@@ -12521,3 +12521,46 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   verifying `R-f1312153`. The web group carries no throttle middleware, so the five web export routes are unthrottled
   while their two `/api/v1` twins inherit the API limiter; the comment says otherwise. **Not live** — a comment.
   Filed by `M123`. **Tier: after-launch.**
+
+- **`minor` · The condition editor and the validation editor take a yes/no comparison value as free text.** Measured by
+  `M124` while closing `R-9f296f7e`. `ConditionRow.vue` prints what the author types as a quoted literal and
+  `ValidationEditor.vue` stores it as `rule_value`, and neither knows the compared question is a yes/no one —
+  `ConfigPanel.vue`'s `choicesOf` reads `config.options`, which a yes/no field does not carry. Since `M124` `yes`,
+  `Yes`, `true` and `1` all hold for a Yes, so a typed value works; but a Yes/No picker would make a misspelt `yse`
+  impossible, and `yse` now reads as neither answer. The remedy needs the compared field's kind in the condition
+  catalogue, a hub edit to `ConfigPanel.vue`. **Live.** Filed by `M124`. **Tier: during-testing.**
+
+- **`nit` · `ValueShape.php` says equality "never coerces through `toNumber()`", and it does.** Measured by `M124`. The
+  comment above `allowsOperator()` calls `eq`/`neq`/`is_null` value-agnostic because `equals()` "never coerces through
+  `toNumber()`" — but rule 5 of both engines' `equals()` compares two numeric-like operands through `toNumber()`, and
+  `M124`'s rule 3b reads a yes/no answer by meaning. The gate's verdicts are unaffected; only the stated reason is
+  wrong. A hub file, so it waits for an increment that already edits it. **Not live** — a comment. Filed by `M124`.
+  **Tier: during-testing.**
+
+- **`minor` · A yes/no answer of `n`, `off`, `0.0` or any other unrecognised word is stored as Yes.** Measured by `M124`
+  while moving the table. `Coercion::yesNoAnswer()` (until `M124` the normalizer's private `toYesNo()`) reads a string as
+  No only when, trimmed and lowercased, it is empty, `0`, `false` or `no`, and every other string as Yes. The Yes/No
+  control sends only `yes`/`no`, so this is reached through the sync API, an API client or an import — a client
+  sending `n` for No records the opposite answer, with a 200. The remedy is a structural refusal for an unrecognised
+  word rather than a guess, applied to Stage 2 and to both engines' Stage 3 reading alike. **Latent** — no
+  first-party client sends such a value. Filed by `M124`. **Tier: during-testing.**
+
+- **`minor` · An XLSForm export makes a conditionally-required question always required.** Measured by `M124` while
+  verifying `R-9f296f7e`. `XlsformExporter` writes `required = yes` for `conditional` exactly as for `required`, and
+  exports none of the `required_if`/`required_with` rows behind it, so in ODK Collect the question must always be
+  answered. `docs/xlsform-interop-spec.md` says the condition is "folded into the field's own `relevant`", which the
+  exporter does not do — and which would be wrong if it did, because `relevant` HIDES a question while conditional
+  requiredness only requires it. XLSForm's `required` column takes an expression, which is the faithful export.
+  **Live.** Filed by `M124`. **Tier: during-testing.**
+
+- **`minor` · No seeded form contains a page break, so no end-to-end spec can see pagination.** Measured by `M124`.
+  Pagination is covered by Vitest through the real store and components and by the blank-form presenter's Pest cases,
+  but no Playwright spec walks a paginated section, so focus, the announcements and the 375px layout of a stepped
+  form with pages are unasserted in a real browser. The remedy is a seeded form with a page break and one spec.
+  **Not live** — a coverage gap. Filed by `M124`. **Tier: during-testing.**
+
+- **`nit` · A page break that starts to apply below the respondent's place on a page moves the questions after it to
+  the next page under them.** Measured by `M124` at the code. A break conditioned on an answer given above it on the
+  same page splits that page while the respondent is on it; the page they are on keeps its key, so they stay, and a
+  question below the break — perhaps the one they had focused — moves to the next page and loses focus. It needs a
+  break conditioned on an earlier answer on its own page. **Latent.** Filed by `M124`. **Tier: during-testing.**

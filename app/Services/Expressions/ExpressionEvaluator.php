@@ -199,6 +199,19 @@ final class ExpressionEvaluator
             return false;
         }
 
+        // 3b (M124): a yes/no answer is a boolean and compares by MEANING, never through toStr()'s '1'/'': two
+        //    answers compare as booleans, and anything else through Coercion::yesNoLiteral — so `= 'yes'` holds
+        //    for a Yes, `= 'no'` for a No, and an unanswered side equals neither.
+        if (is_bool($left) && is_bool($right)) {
+            return $left === $right;
+        }
+
+        if (is_bool($left) || is_bool($right)) {
+            return is_bool($left)
+                ? Coercion::yesNoLiteral($right) === $left
+                : Coercion::yesNoLiteral($left) === $right;
+        }
+
         // 4: a quoted string literal on either side forces string comparison.
         if ($this->isStringLiteral($leftNode) || $this->isStringLiteral($rightNode)) {
             return Coercion::toStr($left) === Coercion::toStr($right);
@@ -238,8 +251,9 @@ final class ExpressionEvaluator
 
         return match ($node->name) {
             'selected' => $this->membership($value, $needle),
-            // Internal, lowering-only (F3): array membership, else substring on a scalar.
-            'contains' => is_array($value)
+            // Internal, lowering-only (F3): array membership, else substring on a scalar. A yes/no answer is a
+            // member of its own meaning (M124), never a substring of toStr()'s '1'.
+            'contains' => is_array($value) || is_bool($value)
                 ? $this->membership($value, $needle)
                 : (! Coercion::isEmpty($value) && str_contains(Coercion::toStr($value), $needle)),
             default => throw ExpressionEvaluationException::unevaluable('function '.$node->name),
@@ -287,6 +301,11 @@ final class ExpressionEvaluator
     {
         if (is_array($value)) {
             return in_array($needle, array_map(static fn (mixed $item): string => Coercion::toStr($item), $value), true);
+        }
+
+        // M124: `selected(${consent}, 'yes')` holds for a Yes — the needle read as equals() rule 3b reads it.
+        if (is_bool($value)) {
+            return Coercion::yesNoLiteral($needle) === $value;
         }
 
         if (Coercion::isEmpty($value)) {

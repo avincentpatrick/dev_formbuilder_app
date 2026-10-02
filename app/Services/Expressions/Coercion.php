@@ -103,4 +103,55 @@ final class Coercion
 
         return false;
     }
+
+    /**
+     * `M124` — the STRICT reading of whatever a yes/no answer is compared with. The answer itself is a boolean
+     * by the time it is compared (Stage 2 writes one, and Stage 3 reads a string answer through
+     * {@see yesNoAnswer()}), and the other side means yes or no only if it says so: `yes`, `true` and `1` read
+     * as true and `no`, `false` and `0` as false, trimmed and lowercased, so `Yes` and ` NO ` do too. The
+     * numbers 1 and 0 read the same way, because a numeric-looking rule value lowers to a Number literal.
+     * Everything else — `maybe`, `y`, `''`, a boolean, null, absent — is null, which equals no answer at all.
+     *
+     * Deliberately NOT {@see yesNoAnswer()}'s table, which reads every other non-empty string as yes: right
+     * for an answer a client sent, wrong for a comparison an author wrote, where `= 'maybe'` must not hold for
+     * a Yes. The TypeScript twin must trim and lowercase exactly as PHP does, not as JavaScript does.
+     */
+    public static function yesNoLiteral(mixed $value): ?bool
+    {
+        if (is_int($value) || is_float($value)) {
+            return match ((float) $value) {
+                1.0 => true,
+                0.0 => false,
+                default => null,
+            };
+        }
+
+        if (! is_string($value)) {
+            return null;
+        }
+
+        return match (strtolower(trim($value))) {
+            'yes', 'true', '1' => true,
+            'no', 'false', '0' => false,
+            default => null,
+        };
+    }
+
+    /**
+     * `M124` — a yes/no ANSWER as a boolean: the table Stage 2's `StructuralAnswerNormalizer` has always
+     * applied, moved here so Stage 3 can apply the same one to an answer that never passed through Stage 2 —
+     * the browser's, which arrives as the string its control emits. A string is false only when, trimmed and
+     * lowercased, it is '', '0', 'false' or 'no', and every other string is yes; any other value reads through
+     * {@see toBool()}. It is not a superset of toBool: '0.0' is false there and yes here, and ' 0 ' the reverse.
+     */
+    public static function yesNoAnswer(mixed $value): bool
+    {
+        if (is_string($value)) {
+            $lower = strtolower(trim($value));
+
+            return ! in_array($lower, ['', '0', 'false', 'no'], true);
+        }
+
+        return self::toBool($value);
+    }
 }

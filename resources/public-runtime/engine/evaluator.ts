@@ -10,7 +10,7 @@
  * A NaN arithmetic result normalises to `null` at the value boundary (a blank computed value).
  */
 
-import { ABSENT, isEmpty, isNumericLike, toBool, toNumber, toStr, type EngineValue, type MaybeAbsent } from './coercion';
+import { ABSENT, isEmpty, isNumericLike, toBool, toNumber, toStr, yesNoLiteral, type EngineValue, type MaybeAbsent } from './coercion';
 import { isEmptyStringLiteral, isStringLiteral, type Node } from './ast';
 import { EvaluationContext } from './context';
 import { ExpressionEvaluationError } from './errors';
@@ -164,6 +164,17 @@ export class ExpressionEvaluator {
             return false;
         }
 
+        // 3b (M124): a yes/no answer is a boolean and compares by MEANING, never through toStr()'s '1'/'': two
+        //    answers compare as booleans, and anything else through yesNoLiteral — so `= 'yes'` holds for a
+        //    Yes, `= 'no'` for a No, and an unanswered side equals neither.
+        if (typeof left === 'boolean' && typeof right === 'boolean') {
+            return left === right;
+        }
+
+        if (typeof left === 'boolean' || typeof right === 'boolean') {
+            return typeof left === 'boolean' ? yesNoLiteral(right) === left : yesNoLiteral(left) === right;
+        }
+
         // 4: a quoted string literal on either side forces string comparison.
         if (isStringLiteral(leftNode) || isStringLiteral(rightNode)) {
             return toStr(left) === toStr(right);
@@ -205,9 +216,10 @@ export class ExpressionEvaluator {
         switch (node.name) {
             case 'selected':
                 return this.membership(value, needle);
-            // Internal, lowering-only: array membership, else substring on a scalar.
+            // Internal, lowering-only: array membership, else substring on a scalar. A yes/no answer is a
+            // member of its own meaning (M124), never a substring of toStr()'s '1'.
             case 'contains':
-                return Array.isArray(value)
+                return Array.isArray(value) || typeof value === 'boolean'
                     ? this.membership(value, needle)
                     : !isEmpty(value) && toStr(value).includes(needle);
             default:
@@ -255,6 +267,11 @@ export class ExpressionEvaluator {
     private membership(value: MaybeAbsent, needle: string): boolean {
         if (Array.isArray(value)) {
             return value.map((item) => toStr(item)).includes(needle);
+        }
+
+        // M124: `selected(${consent}, 'yes')` holds for a Yes — the needle read as equals() rule 3b reads it.
+        if (typeof value === 'boolean') {
+            return yesNoLiteral(needle) === value;
         }
 
         if (isEmpty(value)) {

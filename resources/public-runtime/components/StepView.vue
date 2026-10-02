@@ -20,7 +20,7 @@ import SaveForLater from './SaveForLater.vue';
 import SectionView from './SectionView.vue';
 import SummaryBanner from './SummaryBanner.vue';
 import { useAnnouncer, useRuntime, useSubmitFlow } from '../composables/context';
-import type { ErroredItem } from '../composables/useFormRuntime';
+import { stepTitle, type ErroredItem, type StepChange } from '../composables/useFormRuntime';
 
 const runtime = useRuntime();
 const announcer = useAnnouncer();
@@ -70,7 +70,7 @@ function focusHeading(): void {
 function stepLabel(): string {
     const index = Math.max(runtime.currentStepIndex.value, 0);
     const total = runtime.visibleSteps.value.length;
-    const title = runtime.currentStep.value?.title;
+    const title = runtime.currentStep.value ? stepTitle(runtime.currentStep.value) : null;
     return `step ${index + 1} of ${total}${title ? `: ${title}` : ''}`;
 }
 
@@ -109,9 +109,14 @@ watch(
         }
 
         if (change.removedWithAnswers.length > 0) {
-            const names = change.removedWithAnswers
-                .map((key) => titleForRemoved(key, change.removed))
-                .filter((name): name is string => name !== null);
+            // Increment M124 — two pages of one section are one name, said once.
+            const names = [
+                ...new Set(
+                    change.removedWithAnswers
+                        .map((key) => titleForRemoved(key, change))
+                        .filter((name): name is string => name !== null),
+                ),
+            ];
             const text =
                 names.length > 0
                     ? `Your answers in ${formatList(names)} won’t be included because ${names.length === 1 ? 'that step is' : 'those steps are'} no longer relevant. They’re saved in case ${names.length === 1 ? 'it applies' : 'they apply'} again.`
@@ -128,7 +133,11 @@ watch(
                 announcer.announce(
                     change.rescuedTo === null
                         ? 'The step you were on no longer applies, and there are no further questions. You can submit the answers you’ve given.'
-                        : `The step you were on no longer applies. You’ve been moved to ${stepLabel()}.`,
+                        : change.rescueReason === 'repaginated'
+                          ? // Increment M124 — nothing stopped applying: the page merged into another, and the
+                            // questions the respondent was on are still in front of them.
+                            `The page you were on is now part of ${stepLabel()}.`
+                          : `The step you were on no longer applies. You’ve been moved to ${stepLabel()}.`,
                 );
             });
             return;
@@ -142,12 +151,17 @@ watch(
     },
 );
 
-/** The removed step's title, read from the change record's own snapshot — it is gone from `visibleSteps`. */
-function titleForRemoved(key: string, removed: string[]): string | null {
-    if (!removed.includes(key)) {
+/**
+ * The removed step's title, read from the change record's own snapshot — it is gone from `visibleSteps`. A page
+ * of a section is named by its section (Increment M124), looked up through the record rather than read out of
+ * the page's key.
+ */
+function titleForRemoved(key: string, change: StepChange): string | null {
+    if (!change.removed.includes(key)) {
         return null;
     }
-    const section = runtime.renderModel.sections.find((s) => s.key === key);
+    const group = change.groupOf[key] ?? key;
+    const section = runtime.renderModel.sections.find((s) => s.key === group);
     return section ? `“${runtime.sectionTitleFor(section)}”` : null;
 }
 

@@ -130,8 +130,10 @@ export function previewStepLabels(
     return steps.map((step, index) => {
         const section = previewSectionFor(step, model);
         const title = section === null ? LEAD_STEP_LABEL : titleFor(section).trim() || UNTITLED_SECTION_LABEL;
+        // Increment M124 — a page after a section's first: two entries must never read the same.
+        const page = step.continuation === true ? ' (continued)' : '';
 
-        return { value: step.key, label: `${index + 1}. ${title}` };
+        return { value: step.key, label: `${index + 1}. ${title}${page}` };
     });
 }
 
@@ -242,13 +244,11 @@ export function previewLimitations(): string[] {
     return [
         'Photo, file and location questions are shown but not interactive.',
         'Only the default language is shown.',
-        // ⚠️ THIS ENTRY LOST ITS SECOND CLAUSE IN `M120` AND THE COUNT DID NOT MOVE, which is exactly why
-        // the suite needed a new assertion rather than trusting the existing one. It used to read
-        // "Page breaks are not shown, and sections are always stepped." — `R-f1332829` gave
-        // `single_page_mode` a writer and the preview now renders whichever mode the author chose, so that
-        // half is a feature rather than a limitation. The page-break half stays, owned by `R-8c517fb6` and
-        // `D57`'s clause C, which is what makes "per page" real by honouring the field type.
-        'Page breaks are not shown.',
+        // `M124` DELETED the page-break entry (`R-8c517fb6`): a stepped preview now splits a section at each
+        // page break exactly as the respondent's form does. It is deleted rather than narrowed to repeatable
+        // sections, because the respondent's form does not paginate those either — a "limitation" this list
+        // shares with the real form is not one. `M120` had already taken its other clause, once
+        // `single_page_mode` gained a writer.
         'Inside a repeatable section, wording updates on the next structural change.',
     ];
 }

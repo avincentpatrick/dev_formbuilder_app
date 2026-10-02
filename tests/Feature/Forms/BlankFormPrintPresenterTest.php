@@ -445,3 +445,83 @@ it('reads the key names a REAL publish actually writes', function (): void {
         ->and($lead['hint'])->toBe('As written on the ID.')
         ->and($lead['area'])->toBe('comb');
 });
+
+// Increment M124 (`R-8c517fb6`) — a page break prints, but it is not a question. Until M124 a section holding only
+// a break printed its heading over nothing, and a section opening with one printed its heading at the foot of a
+// page, stranded above its own questions on the next.
+
+it('prints no heading over a section that holds nothing but a page break', function (): void {
+    [$form, $version] = printFixture([
+        'sections' => [
+            ['key' => 'one', 'label' => 'One', 'sequence' => 1, 'is_repeatable' => false],
+            ['key' => 'breaker', 'label' => 'Breaker', 'sequence' => 2, 'is_repeatable' => false],
+            ['key' => 'two', 'label' => 'Two', 'sequence' => 3, 'is_repeatable' => false],
+        ],
+        'fields' => [
+            printField('q1', 'short_text', ['section_key' => 'one']),
+            printField('cut', 'page_break', ['section_key' => 'breaker']),
+            printField('q2', 'short_text', ['section_key' => 'two']),
+        ],
+    ]);
+
+    $model = $this->present->present($form, $version);
+
+    expect(array_column($model['blocks'], 'label'))->toBe(['One', null, 'Two'])
+        ->and(printedKeys($model))->toBe(['q1', 'cut', 'q2']);
+});
+
+it('prints a section\'s leading page break before its heading, never after it', function (): void {
+    [$form, $version] = printFixture([
+        'sections' => [
+            ['key' => 'one', 'label' => 'One', 'sequence' => 1, 'is_repeatable' => false],
+            ['key' => 'two', 'label' => 'Two', 'sequence' => 2, 'is_repeatable' => false],
+        ],
+        'fields' => [
+            printField('q1', 'short_text', ['section_key' => 'one']),
+            printField('cut', 'page_break', ['section_key' => 'two', 'section_sequence' => 0]),
+            printField('q2', 'short_text', ['section_key' => 'two', 'section_sequence' => 1]),
+        ],
+    ]);
+
+    $model = $this->present->present($form, $version);
+
+    expect(array_column($model['blocks'], 'label'))->toBe(['One', null, 'Two'])
+        ->and(printedKeys($model))->toBe(['q1', 'cut', 'q2']);
+});
+
+it('opens and closes the sheet on a question, and prints one break for a run of them', function (): void {
+    // A break before the first question opens on a blank page, one after the last closes on one, and two with
+    // nothing between them leave a blank page between their neighbours. The one between q1 and q2 is real.
+    [$form, $version] = printFixture([
+        'sections' => [],
+        'fields' => [
+            printField('opening', 'page_break', ['sequence' => 0]),
+            printField('q1', 'short_text', ['sequence' => 1]),
+            printField('first_of_run', 'page_break', ['sequence' => 2]),
+            printField('second_of_run', 'page_break', ['sequence' => 3]),
+            printField('q2', 'short_text', ['sequence' => 4]),
+            printField('closing', 'page_break', ['sequence' => 5]),
+        ],
+    ]);
+
+    expect(printedKeys($this->present->present($form, $version)))->toBe(['q1', 'second_of_run', 'q2']);
+});
+
+it('starts every repeat instance on a new page without stranding its numbered heading', function (): void {
+    [$form, $version] = printFixture([
+        'sections' => [
+            ['key' => 'members', 'label' => 'Household member', 'sequence' => 1, 'is_repeatable' => true, 'min_instances' => 2],
+        ],
+        'fields' => [
+            printField('respondent', 'short_text', ['section_key' => null]),
+            printField('new_page', 'page_break', ['section_key' => 'members', 'section_sequence' => 0]),
+            printField('member_name', 'short_text', ['section_key' => 'members', 'section_sequence' => 1]),
+        ],
+    ]);
+
+    $blocks = $this->present->present($form, $version)['blocks'];
+
+    expect(array_column($blocks, 'instance'))->toBe([null, null, 1, null, 2])
+        ->and(array_column($blocks, 'label'))->toBe([null, null, 'Household member', null, 'Household member'])
+        ->and(printedKeys(['blocks' => $blocks]))->toBe(['respondent', 'new_page', 'member_name', 'new_page', 'member_name']);
+});

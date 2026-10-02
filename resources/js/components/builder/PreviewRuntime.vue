@@ -69,6 +69,11 @@ const runtime = createFormRuntime(props.snapshot, {
     // No query string and no frozen clock: a preview has no URL prefill to honour, and `now`/`today` staying
     // unavailable matches the pre-H21a behaviour rather than inventing an authoring clock.
     search: '',
+    // Increment M124 — page breaks paginate a stepped form here exactly as for the respondent. A COMPUTED off
+    // the live model, never a getter: `props.model` is a fresh object on every store change, so a getter would
+    // re-run the step list on every keystroke, while this invalidates only when the mode itself flips — and it
+    // follows that flip with no remount (the same live channel `singlePage` below reads, for the same reason).
+    paginateAtPageBreaks: computed(() => !props.model.form.single_page_mode),
 });
 
 provide(RuntimeKey, runtime);
@@ -110,11 +115,15 @@ const blocks = computed<PreviewBlock[]>(() =>
     rendered.value.map((s) => {
         const section = previewSectionFor(s, props.model);
 
+        // Increment M124 — a later page of a paginated section keeps its heading, marked as continuing, and drops
+        // the description, exactly as the respondent's `SectionView` does.
+        const title = section === null ? null : runtime.sectionTitleFor(section);
+
         return {
             step: s,
             section,
-            title: section === null ? null : runtime.sectionTitleFor(section),
-            description: section === null ? null : runtime.sectionDescriptionFor(section),
+            title: title !== null && s.continuation ? `${title} (continued)` : title,
+            description: section === null || s.continuation ? null : runtime.sectionDescriptionFor(section),
             fields: previewFieldsFor(s, props.model),
         };
     }),

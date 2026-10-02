@@ -19,7 +19,7 @@
  * the answer-array shape and the per-instance hybrid-validation gates; it evaluates nothing itself.
  */
 
-import { computed, reactive, ref, watch, type ComputedRef, type Ref } from 'vue';
+import { computed, reactive, ref, toValue, watch, type ComputedRef, type MaybeRefOrGetter, type Ref } from 'vue';
 import {
     Coercion,
     makeSemanticValidator,
@@ -58,6 +58,13 @@ import type { AnswerMap, RenderField, RenderModel, RenderSection, SchemaResponse
  */
 export const LEAD_STEP_KEY = '__lead__';
 
+/**
+ * Increment M124 — the field type that opens a new page when `paginateAtPageBreaks` is on. Named here rather
+ * than added to a set in `engine/field-roles.ts`: `RENDERS_NOTHING` stays the one list `PdfFieldRoleTest`
+ * parses, and a page break still renders nothing — it only decides where a page ends.
+ */
+const PAGE_BREAK = 'page_break';
+
 export type Marker = 'required' | 'optional' | 'none';
 
 export interface RuntimeStep {
@@ -67,6 +74,23 @@ export interface RuntimeStep {
     fieldKeys: string[];
     /** A repeatable-section step renders an add/remove-instance loop instead of a flat field list (G2). */
     isRepeat: boolean;
+    /**
+     * Increment M124 — true for every page of a block after the first one the respondent can see. A section split
+     * by page breaks shows its heading on every page, because focus lands on it, but its description once.
+     */
+    continuation: boolean;
+}
+
+/**
+ * Increment M124 — the title a step is announced and listed under: its section's, marked as continuing on a page
+ * after the first, so two pages of one section never read as two steps with the same name.
+ */
+export function stepTitle(step: RuntimeStep): string | null {
+    if (step.title === null) {
+        return null;
+    }
+
+    return step.continuation ? `${step.title} (continued)` : step.title;
 }
 
 /** One entry in the error summary banner — addressed so instance + count errors jump correctly (G2). */
@@ -99,12 +123,25 @@ export interface StepChange {
      * The subset of `removed` that still holds a respondent-entered answer (§4.4). The data is safe — answers
      * are never deleted on hide — but in multi-step mode no `FieldRow` for an off-screen step is mounted, so
      * the field-level note cannot fire and today NOTHING is said. This is what a component says it with.
+     *
+     * Increment M124 — counted over FIELDS that left the visible set: a page can vanish by merging into its
+     * neighbour, and its answers are then still on screen, one page over.
      */
     removedWithAnswers: string[];
     /** The step the respondent was on when it vanished, or null if the current step survived (§4.2). */
     rescuedFrom: string | null;
     /** Where they were moved to; null when the graph emptied out entirely (§4.1's terminal state). */
     rescuedTo: string | null;
+    /**
+     * Increment M124 — WHY they were moved: `'irrelevant'` when their step no longer applies (§4.2), and
+     * `'repaginated'` when their page merged into the one that now holds its questions. Null without a rescue.
+     */
+    rescueReason: 'irrelevant' | 'repaginated' | null;
+    /**
+     * Increment M124 — the block each step key in this change belongs to (a section key, or `LEAD_STEP_KEY`), so
+     * a component can name a removed PAGE by its section without parsing the page's key.
+     */
+    groupOf: Record<string, string>;
     previousCount: number;
     count: number;
 }
@@ -151,6 +188,12 @@ export interface FormRuntime {
 
     readonly visibleSteps: ComputedRef<RuntimeStep[]>;
     readonly currentStepKey: Ref<string>;
+    /**
+     * Increment M124 — the step a saved draft records: the BLOCK the respondent is in (a section key, or
+     * `LEAD_STEP_KEY`), never a page of it. The draft column is documented to hold exactly that and is validated
+     * to 255 characters, which a page key could exceed; `goToStep()` lands a block key on its first visible page.
+     */
+    readonly resumeStepKey: ComputedRef<string>;
     readonly currentStepIndex: ComputedRef<number>;
     readonly currentStep: ComputedRef<RuntimeStep | null>;
     readonly isFirstStep: ComputedRef<boolean>;
@@ -241,6 +284,14 @@ export interface RuntimeOptions {
      * server's clock stays authoritative at submit either way.
      */
     now?: string | null;
+    /**
+     * Increment M124 (`D57`, amended 2026-10-01) — split each non-repeatable section, and the leading
+     * section-less block, into pages at every page break that currently applies. ON in the guest runtime and
+     * the builder preview, each only while the form is stepped; OFF by default, because the staff encode page
+     * stays one step per section — it matches each step to a server-built block BY KEY — and a single page
+     * never paginates. Read reactively, so the preview follows a live switch to single-page without a remount.
+     */
+    paginateAtPageBreaks?: MaybeRefOrGetter<boolean>;
 }
 
 function isInstanceObject(value: unknown): value is InstanceAnswers {
@@ -402,59 +453,119 @@ export function createFormRuntime(schema: SchemaResponse, opts: RuntimeOptions =
         return fields.some((f) => fieldRelevance.value[f.key] === true);
     }
 
+    /** Increment M124 — see `RuntimeOptions.paginateAtPageBreaks`. Off unless a caller turns it on. */
+    const paginate = computed(() => toValue(opts.paginateAtPageBreaks) === true);
+
+    /** The lead block's fields in authored order, page breaks and non-rendering fields included. */
+    function leadFieldsInOrder(): RenderField[] {
+        return renderModel.fields.filter((f) => f.sectionKey === null).sort((a, b) => a.sequence - b.sequence);
+    }
+
+    /** A non-repeatable section's fields in authored order, page breaks and non-rendering fields included. */
+    function sectionFieldsInOrder(sectionKey: string): RenderField[] {
+        return renderModel.fields
+            .filter((f) => f.sectionKey === sectionKey)
+            .sort((a, b) => (a.sectionSequence ?? a.sequence) - (b.sectionSequence ?? b.sequence));
+    }
+
+    /**
+     * Increment M124 — one block's authored field order, cut into pages at each page break that currently
+     * applies. A break hidden by its own condition does not cut, and with pagination off the block is one page,
+     * exactly the step it always was.
+     *
+     * KEYS ARE ASSIGNED HERE, BEFORE predicate 3 runs over the pages: the first page holding a field that renders
+     * keeps the block's bare key, and each later page is `${base}#${the break that opens it}`. So a page keeps its
+     * key while pages before it come and go, a cursor saved before pagination existed still names the block's
+     * first page, and a first page emptied by conditions never hands its bare key on — which would read as the
+     * respondent's page vanishing. `#` cannot occur in a section key or a field key.
+     */
+    function pagesOf(base: string, ordered: RenderField[]): { key: string; fields: RenderField[] }[] {
+        const pages: { key: string; fields: RenderField[] }[] = [];
+        let opener: string | null = null;
+        let fields: RenderField[] = [];
+        const close = (): void => {
+            if (fields.length > 0) {
+                pages.push({ key: pages.length === 0 ? base : `${base}#${opener}`, fields });
+            }
+            fields = [];
+        };
+
+        for (const field of ordered) {
+            if (field.fieldType === PAGE_BREAK) {
+                if (paginate.value && fieldRelevance.value[field.key] === true) {
+                    close();
+                    opener = field.key;
+                }
+                continue;
+            }
+            // Increment H7 — hidden and calculated fields render nothing, so a block (or page) holding only those
+            // has no question in it and vanishes, rather than render a heading over a blank panel.
+            if (!rendersNothing(field.fieldType)) {
+                fields.push(field);
+            }
+        }
+        close();
+
+        return pages;
+    }
+
     const visibleSteps = computed<RuntimeStep[]>(() => {
         const steps: RuntimeStep[] = [];
 
-        const leadFields = renderModel.fields
-            .filter((f) => f.sectionKey === null && !rendersNothing(f.fieldType))
-            .sort((a, b) => a.sequence - b.sequence);
+        // Increment H21a — predicate 3, per PAGE since M124: a page none of whose questions currently applies is
+        // a dead step. Deliberately NOT applied to `fieldKeys`: filtering the key list would change `erroredItems`
+        // and `attemptNext()`'s existing behaviour for no gain, since both already gate on relevance themselves.
+        // Only the emptiness test moves. `continuation` is read AFTER it, so the first page the respondent can
+        // actually see is the one that carries the description.
+        const pushPages = (base: string, sectionKey: string | null, title: string | null, ordered: RenderField[]): void => {
+            let shown = false;
+            for (const page of pagesOf(base, ordered)) {
+                if (!anyFieldCurrentlyRelevant(page.fields, sectionKey, false)) {
+                    continue;
+                }
+                steps.push({
+                    key: page.key,
+                    sectionKey,
+                    title,
+                    fieldKeys: page.fields.map((f) => f.key),
+                    isRepeat: false,
+                    continuation: shown,
+                });
+                shown = true;
+            }
+        };
+
         // The lead block needs predicate 3 too — its fields are top-level, so `fieldRelevance` covers them,
         // and a fully-gated lead block is exactly the dead step this predicate abolishes.
-        if (leadFields.length > 0 && anyFieldCurrentlyRelevant(leadFields, null, false)) {
-            steps.push({
-                key: LEAD_STEP_KEY,
-                sectionKey: null,
-                title: null,
-                fieldKeys: leadFields.map((f) => f.key),
-                isRepeat: false,
-            });
-        }
+        pushPages(LEAD_STEP_KEY, null, null, leadFieldsInOrder());
 
         for (const section of renderModel.sections) {
             if (sectionRelevance.value[section.key] === false) {
                 continue;
             }
-            const isRepeat = section.isRepeatable;
-            const sectionFields = (
-                isRepeat
-                    ? membersBySection[section.key] ?? []
-                    : renderModel.fields
-                          .filter((f) => f.sectionKey === section.key)
-                          .sort((a, b) => (a.sectionSequence ?? a.sequence) - (b.sectionSequence ?? b.sequence))
-            ).filter((f) => !rendersNothing(f.fieldType));
-            // Increment H7 — the filter runs BEFORE this emptiness check on purpose: a section holding
-            // nothing but hidden/calculated fields has no question in it, so it should vanish entirely
-            // rather than render a heading over a blank panel.
-            if (sectionFields.length === 0) {
+            // Locale-resolved but NOT piped, deliberately (Increment H6b). `visibleSteps` feeds
+            // `currentStepIndex`, `erroredItems` and the watcher that writes `currentStepKey`, so
+            // rendering holes in here would put the whole answer document into the step model's
+            // dependency graph and couple step NAVIGATION to typing, for a cosmetic gain. Consumers
+            // pipe it at the point of display via `sectionTitleFor()`.
+            const title = resolveText(section.label, section.labelTranslations, locale.value);
+            if (!section.isRepeatable) {
+                pushPages(section.key, section.key, title, sectionFieldsInOrder(section.key));
                 continue;
             }
-            // Increment H21a — predicate 3. Deliberately NOT applied to `fieldKeys` below: filtering the key
-            // list would change `erroredItems` and `attemptNext()`'s existing behaviour for no gain, since
-            // both already gate on relevance themselves. Only the emptiness test moves.
-            if (!anyFieldCurrentlyRelevant(sectionFields, section.key, isRepeat)) {
+            // A repeatable section is ONE step and never paginates: it renders an add/remove loop, and its
+            // instances are what the respondent pages through.
+            const members = (membersBySection[section.key] ?? []).filter((f) => !rendersNothing(f.fieldType));
+            if (members.length === 0 || !anyFieldCurrentlyRelevant(members, section.key, true)) {
                 continue;
             }
             steps.push({
                 key: section.key,
                 sectionKey: section.key,
-                // Locale-resolved but NOT piped, deliberately (Increment H6b). `visibleSteps` feeds
-                // `currentStepIndex`, `erroredItems` and the watcher that writes `currentStepKey`, so
-                // rendering holes in here would put the whole answer document into the step model's
-                // dependency graph and couple step NAVIGATION to typing, for a cosmetic gain. Consumers
-                // pipe it at the point of display via `sectionTitleFor()`.
-                title: resolveText(section.label, section.labelTranslations, locale.value),
-                fieldKeys: sectionFields.map((f) => f.key),
-                isRepeat,
+                title,
+                fieldKeys: members.map((f) => f.key),
+                isRepeat: true,
+                continuation: false,
             });
         }
 
@@ -490,6 +601,10 @@ export function createFormRuntime(schema: SchemaResponse, opts: RuntimeOptions =
             return visibleSteps.value[idx];
         }
         return visibleSteps.value.length > 0 ? visibleSteps.value[0] : null;
+    });
+    const resumeStepKey = computed(() => {
+        const step = visibleSteps.value.find((s) => s.key === currentStepKey.value);
+        return step === undefined ? currentStepKey.value : (step.sectionKey ?? LEAD_STEP_KEY);
     });
     const isFirstStep = computed(() => currentStepIndex.value <= 0);
     // Increment H21b, Doc #27 §4.1 — the length guard is the whole fix. `findIndex` over an empty list is -1
@@ -583,11 +698,27 @@ export function createFormRuntime(schema: SchemaResponse, opts: RuntimeOptions =
         const prevKeys = new Set(prev.map((s) => s.key));
         const gone = prev.filter((s) => !nextKeys.has(s.key));
 
+        // Increment M124 — a page can vanish by MERGING into its neighbour (a break hidden by its own condition, or
+        // the preview switched to a single page), and its questions are then still on screen, one page over. So
+        // answers count as left behind only when their FIELD left the visible set, and a rescue first follows the
+        // vanished page's fields to the page now holding them. Without page breaks a step's fields leave with it,
+        // so both rules reduce exactly to the ones they replace.
+        const stillShown = new Set(next.filter((s) => !s.isRepeat).flatMap((s) => s.fieldKeys));
+        const leftWithAnswers = (step: RuntimeStep): boolean =>
+            step.isRepeat ? stepHoldsAnswer(step) : step.fieldKeys.some((key) => !stillShown.has(key) && holdsValue(key));
+
         const vanished = currentStepKey.value !== '' && !nextKeys.has(currentStepKey.value) ? currentStepKey.value : null;
 
         let rescuedTo: string | null = null;
+        let rescueReason: StepChange['rescueReason'] = null;
         if (vanished !== null) {
-            rescuedTo = nearestSurvivor(vanished, prev);
+            const was = prev.find((s) => s.key === vanished);
+            const absorbedBy =
+                was === undefined || was.isRepeat
+                    ? undefined
+                    : next.find((s) => !s.isRepeat && s.fieldKeys.some((key) => was.fieldKeys.includes(key)));
+            rescuedTo = absorbedBy?.key ?? nearestSurvivor(vanished, prev);
+            rescueReason = absorbedBy !== undefined ? 'repaginated' : rescuedTo !== null ? 'irrelevant' : null;
             if (rescuedTo !== null) {
                 setCurrentStep(rescuedTo);
             }
@@ -596,13 +727,20 @@ export function createFormRuntime(schema: SchemaResponse, opts: RuntimeOptions =
             setCurrentStep(next[0].key);
         }
 
+        const groupOf: Record<string, string> = {};
+        for (const step of [...prev, ...next]) {
+            groupOf[step.key] = step.sectionKey ?? LEAD_STEP_KEY;
+        }
+
         previousSteps = next.slice();
         lastStepChange.value = {
             added: next.filter((s) => !prevKeys.has(s.key)).map((s) => s.key),
             removed: gone.map((s) => s.key),
-            removedWithAnswers: gone.filter(stepHoldsAnswer).map((s) => s.key),
+            removedWithAnswers: gone.filter(leftWithAnswers).map((s) => s.key),
             rescuedFrom: vanished,
             rescuedTo,
+            rescueReason,
+            groupOf,
             previousCount: prev.length,
             count: next.length,
         };
@@ -1124,23 +1262,41 @@ export function createFormRuntime(schema: SchemaResponse, opts: RuntimeOptions =
             setCurrentStep(key);
             return 'exact';
         }
+        // Increment M124 — a block key (a section's, or `__lead__`) whose first page is not visible still names
+        // the block the respondent is in: land on its first visible page and report it EXACT, so a resume never
+        // claims drift that did not happen. Every resume takes this path once a section paginates, because a
+        // draft records the block and never the page (`resumeStepKey`).
+        const firstPage = visibleSteps.value.find((s) => (s.sectionKey ?? LEAD_STEP_KEY) === key);
+        if (firstPage !== undefined) {
+            setCurrentStep(firstPage.key);
+            return 'exact';
+        }
         // Known to this version but not currently visible → §4.2's nearest surviving predecessor, over the
         // FULL authored order rather than the visible one (the visible list is precisely what it fell out of).
+        // Since M124 that order lists every page a block COULD have, whether or not its break applies right now,
+        // so a page key resolves by position too.
         //
         // `__lead__` is included only when this version still HAS section-less fields. That is what degrades
         // §5.3's case (c) — a stored `__lead__` after a republish moved those fields into a section — into
         // case (a), an unknown key, exactly as the section specifies: there is no position left to walk from.
+        const authored = (stepKey: string, sectionKey: string | null, isRepeat: boolean): RuntimeStep => ({
+            key: stepKey,
+            sectionKey,
+            title: null,
+            fieldKeys: [],
+            isRepeat,
+            continuation: false,
+        });
+        const authoredPages = (base: string, sectionKey: string | null, ordered: RenderField[]): RuntimeStep[] => [
+            authored(base, sectionKey, false),
+            ...ordered.filter((f) => f.fieldType === PAGE_BREAK).map((f) => authored(`${base}#${f.key}`, sectionKey, false)),
+        ];
+        const lead = leadFieldsInOrder();
         const authoredOrder: RuntimeStep[] = [
-            ...(renderModel.fields.some((f) => f.sectionKey === null)
-                ? [{ key: LEAD_STEP_KEY, sectionKey: null, title: null, fieldKeys: [], isRepeat: false }]
-                : []),
-            ...renderModel.sections.map((s) => ({
-                key: s.key,
-                sectionKey: s.key,
-                title: null,
-                fieldKeys: [],
-                isRepeat: s.isRepeatable,
-            })),
+            ...(lead.length > 0 ? authoredPages(LEAD_STEP_KEY, null, lead) : []),
+            ...renderModel.sections.flatMap((s) =>
+                s.isRepeatable ? [authored(s.key, s.key, true)] : authoredPages(s.key, s.key, sectionFieldsInOrder(s.key)),
+            ),
         ];
         const survivor = nearestSurvivor(key, authoredOrder);
         if (survivor !== null) {
@@ -1169,6 +1325,7 @@ export function createFormRuntime(schema: SchemaResponse, opts: RuntimeOptions =
         erroredItems,
         visibleSteps,
         currentStepKey,
+        resumeStepKey,
         currentStepIndex,
         currentStep,
         isFirstStep,

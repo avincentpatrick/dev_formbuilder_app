@@ -268,7 +268,7 @@ const textType = computed<'text' | 'email' | 'tel' | 'url' | 'date' | 'time' | '
     }
 });
 
-// The bare-string binding for text/select/yesno controls (modelValue is typed `unknown` for the union).
+// The bare-string binding for text/select/yesno controls (modelValue is typed `unknown` for the union). The yes/no binding also shows a stored boolean (M124): resume, edit and offline review all seed one.
 const stringValue = computed<string>(() => (typeof props.modelValue === 'string' ? props.modelValue : ''));
 const numberValue = computed<number | null>(() => (typeof props.modelValue === 'number' ? props.modelValue : null));
 const listValue = computed<string[]>(() => (Array.isArray(props.modelValue) ? (props.modelValue as string[]) : []));
@@ -422,7 +422,7 @@ function setCascadeLevel(index: number, value: string): void {
         </div>
         <MdsSegmentedControl
             v-else
-            :model-value="stringValue"
+            :model-value="typeof modelValue === 'boolean' ? (modelValue ? 'yes' : 'no') : stringValue"
             :options="yesNoOptions"
             :ariaLabel="field.label"
             @update:model-value="emit('update:modelValue', $event)"

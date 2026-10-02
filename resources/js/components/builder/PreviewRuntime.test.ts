@@ -54,3 +54,67 @@ describe('PreviewRuntime — a repeatable section with members that render nothi
         wrapper.unmount();
     });
 });
+
+/**
+ * Increment M124 (`R-8c517fb6`) — a stepped preview paginates at a page break exactly as the respondent's form does.
+ *
+ * ⛔ THE SWITCH TO ONE PAGE IS A PROP CHANGE, NOT A REMOUNT. `PreviewPane` remounts this component only when the
+ * engine's `shape` moves, and `shapeOf()` never reads `form` — so the mode must arrive through the LIVE model, the
+ * channel `M120` established for the same setting. The snapshot below never changes; only `model` does.
+ */
+describe('PreviewRuntime — page breaks paginate a stepped preview (M124)', () => {
+    function snapshot(singlePage: boolean) {
+        return schemaResponse({
+            form: { single_page_mode: singlePage },
+            sections: [section({ key: 'hh', label: 'Household', description: 'About the people you live with.' })],
+            fields: [
+                field({ key: 'q1', label: 'First question', section_key: 'hh', sequence: 0, section_sequence: 0 }),
+                field({ key: 'pb', field_type: 'page_break', section_key: 'hh', sequence: 1, section_sequence: 1 }),
+                field({ key: 'q2', label: 'Second question', section_key: 'hh', sequence: 2, section_sequence: 2 }),
+            ],
+        });
+    }
+
+    function mountStepped() {
+        const stepped = snapshot(false);
+
+        return mount(PreviewRuntime, {
+            props: { snapshot: stepped, model: buildRenderModel(stepped), issuesByKey: {}, selectedKey: null, initialStepKey: null },
+        });
+    }
+
+    it('splits the section at the break, and marks the later page as continuing without its description', async () => {
+        const wrapper = mountStepped();
+        await flushPromises();
+
+        expect(wrapper.text()).toContain('Page 1 of 2');
+        expect(wrapper.text()).toContain('First question');
+        expect(wrapper.text()).not.toContain('Second question');
+        expect(wrapper.text()).toContain('About the people you live with.');
+
+        await wrapper.findAll('button').filter((b) => b.text() === 'Next')[0].trigger('click');
+        await flushPromises();
+
+        expect(wrapper.text()).toContain('Page 2 of 2');
+        expect(wrapper.find('[data-section-heading]').text()).toBe('Household (continued)');
+        expect(wrapper.text()).toContain('Second question');
+        expect(wrapper.text()).not.toContain('About the people you live with.');
+
+        wrapper.unmount();
+    });
+
+    it('follows a switch to one page through the live model, with no remount', async () => {
+        const wrapper = mountStepped();
+        await flushPromises();
+        expect(wrapper.text()).not.toContain('Second question');
+
+        await wrapper.setProps({ model: buildRenderModel(snapshot(true)) });
+        await flushPromises();
+
+        expect(wrapper.text()).toContain('First question');
+        expect(wrapper.text()).toContain('Second question');
+        expect(wrapper.findAll('[data-section-heading]')).toHaveLength(1);
+
+        wrapper.unmount();
+    });
+});

@@ -143,6 +143,12 @@ final class BlankFormPrintPresenter
      * `StepProjection`'s predicate 2 applies on screen, for the same reason: a heading over an empty
      * panel tells the person holding the paper that they missed something.
      *
+     * Increment M124 (`R-8c517fb6`) — the same rule for a PAGE BREAK, which prints but is not a question.
+     * A section's leading breaks print BEFORE its heading, in a block of their own (per instance for a
+     * repeatable section, so "each member starts a new page" survives), so a heading is never stranded at
+     * the foot of a page above its own questions — and a section holding nothing but breaks prints no
+     * heading at all. {@see tidyPageBreaks()} then keeps only the breaks that separate printed questions.
+     *
      * @param  list<array<string, mixed>>  $sections
      * @param  array<string, list<array<string, mixed>>>  $bySection
      * @return list<array<string, mixed>>
@@ -171,6 +177,7 @@ final class BlankFormPrintPresenter
 
             $repeatable = $this->isRepeatable($section);
             $instances = $this->repeatInstances($section);
+            [$leadingBreaks, $rows] = $this->splitLeadingBreaks($rows);
 
             // A non-repeatable section is one block with no instance number. A repeatable one prints
             // its blocks numbered exactly as `RepeatGroup.vue` numbers them on screen, so a keyer
@@ -178,6 +185,14 @@ final class BlankFormPrintPresenter
             // is numbered even at ONE instance, because "Household member 1" on the paper is what
             // tells the enumerator a second one is possible on another sheet.
             for ($i = 1; $i <= $instances; $i++) {
+                if ($leadingBreaks !== []) {
+                    $blocks[] = ['label' => null, 'description' => null, 'instance' => null, 'conditional' => false, 'fields' => $leadingBreaks];
+                }
+
+                if ($rows === []) {
+                    continue;
+                }
+
                 $blocks[] = [
                     'label' => $label,
                     'description' => $description === '' ? null : $description,
@@ -214,7 +229,85 @@ final class BlankFormPrintPresenter
             }
         }
 
-        return $blocks;
+        return $this->tidyPageBreaks($blocks);
+    }
+
+    /**
+     * Increment M124 — a block's leading page breaks, split from the rows after them.
+     *
+     * @param  list<array<string, mixed>>  $rows
+     * @return array{0: list<array<string, mixed>>, 1: list<array<string, mixed>>}
+     */
+    private function splitLeadingBreaks(array $rows): array
+    {
+        $count = 0;
+        foreach ($rows as $row) {
+            if (($row['area'] ?? null) !== PrintAnswerArea::PageBreak->value) {
+                break;
+            }
+            $count++;
+        }
+
+        return [array_slice($rows, 0, $count), array_slice($rows, $count)];
+    }
+
+    /**
+     * Increment M124 — a page break prints only where it SEPARATES printed questions.
+     *
+     * One before the first question would open the sheet on a blank page, one after the last would close it
+     * on one, and two with nothing between them print a blank page between their neighbours. So, walking
+     * the whole document in order, a break survives only when a question has printed before it and another
+     * prints after it before the next surviving break — the last of a run wins, the rest collapse into it —
+     * and a block left with nothing to print is dropped. Heading blocks always keep a question, so only the
+     * heading-less blocks of hoisted breaks can empty.
+     *
+     * @param  list<array<string, mixed>>  $blocks
+     * @return list<array<string, mixed>>
+     */
+    private function tidyPageBreaks(array $blocks): array
+    {
+        $isBreak = static fn (mixed $row): bool => is_array($row) && ($row['area'] ?? null) === PrintAnswerArea::PageBreak->value;
+
+        /** @var array<string, true> $kept "block:row" for every surviving break */
+        $kept = [];
+        $questionPrinted = false;
+        $pending = null;
+        foreach ($blocks as $b => $block) {
+            /** @var list<array<string, mixed>> $fields */
+            $fields = $block['fields'];
+            foreach ($fields as $r => $row) {
+                if ($isBreak($row)) {
+                    $pending = $questionPrinted ? "{$b}:{$r}" : null;
+
+                    continue;
+                }
+
+                if ($pending !== null) {
+                    $kept[$pending] = true;
+                    $pending = null;
+                }
+                $questionPrinted = true;
+            }
+        }
+
+        $tidy = [];
+        foreach ($blocks as $b => $block) {
+            /** @var list<array<string, mixed>> $fields */
+            $fields = $block['fields'];
+            $rows = [];
+            foreach ($fields as $r => $row) {
+                if (! $isBreak($row) || isset($kept["{$b}:{$r}"])) {
+                    $rows[] = $row;
+                }
+            }
+
+            if ($rows !== []) {
+                $block['fields'] = $rows;
+                $tidy[] = $block;
+            }
+        }
+
+        return $tidy;
     }
 
     /**

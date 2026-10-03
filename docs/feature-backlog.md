@@ -2455,7 +2455,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   it. ⚠️ **Materially weaker than what M18 closed, and the difference is what makes it a `minor`**: the
   registrant sets their own password and **nothing forges `email_verified_at`**, so the account squats an
   address without minting a false claim about mailbox control — which is the property `identityIsEstablished()`
-  reads. Older than SSO, and any fix touches the ordinary registration path for everybody. Filed by `M18`. **Live** — reachable today by anyone who can reach the registration form, judged by `M65`. **Tier: early-testing.** ⚠️ **`D34` ANSWERED 2026-09-20 (`M105`) — confirm the address first.** ⛔ **RE-VERIFIED BY `M122` (2026-10-01), NOT TAKEN — ITS REMEDY EDITS THREE OR FOUR HUBS** (`TenantMembershipService.php`'s docblock, `docs/security-threat-model.md`, `docs/TESTING-GUIDE.md` §8, and likely `docs/PRD.md`), so it cannot ride beside another hub row. The minimal remedy needs no migration: join on `Verified` rather than `Registered` in `JoinTenantOnRegistration`, re-check `RegistrationGate` there, skip a Google sign-up and an email-change re-verification, and fold `SendWelcomeEmail` in rather than order two listeners. ⚠️ **FOUR PREMISES HAVE MOVED.** (a) The `identityIsEstablished()` reasoning above predates `M76`: a squatted account now counts as established through `password_set_at`, which registration stamps. (b) Verification has been ENFORCED since J3a (`verified` on the tenant group), so what `D34` still owes is everything minted BEFORE confirmation — the Active membership, its notifications, points, the seat, and the SSO grandfather. (c) Delaying the join does not free the ADDRESS: the account holds it, and an unverified squat also blocks the real owner's Google sign-in, so fully meeting *"stops the squatting"* needs more than the join (verifying on password reset, or expiring never-verified accounts) — settle that when this row is built. (d) `D31` turns platform sign-up off on the testing server, so this door is likely shut there. ⚠️ **UNVERIFIED, AND OWED AN ADVERSARIAL CHECK BEFORE THIS ROW IS BUILT:** an attacker who registers the victim's address in their own SSO-entitled workspace holds an Active membership; if the owner later reclaims the account by password reset, that IdP asserting the address would skip the domain check, because the membership is Active.
+  reads. Older than SSO, and any fix touches the ordinary registration path for everybody. Filed by `M18`. **Live** — reachable today by anyone who can reach the registration form, judged by `M65`. **Tier: during-testing.** **Retiered down from `early-testing` 2026-10-03 by `M127`: it is neither one of the user's 19 builder comments nor a builder defect found while fixing one, and `D72` puts everything else after the Oct 12 testing.** ⚠️ **Security-flavoured: first in line once the Oct 12 work is done.** ⚠️ **`D34` ANSWERED 2026-09-20 (`M105`) — confirm the address first.** ⛔ **RE-VERIFIED BY `M122` (2026-10-01), NOT TAKEN — ITS REMEDY EDITS THREE OR FOUR HUBS** (`TenantMembershipService.php`'s docblock, `docs/security-threat-model.md`, `docs/TESTING-GUIDE.md` §8, and likely `docs/PRD.md`), so it cannot ride beside another hub row. The minimal remedy needs no migration: join on `Verified` rather than `Registered` in `JoinTenantOnRegistration`, re-check `RegistrationGate` there, skip a Google sign-up and an email-change re-verification, and fold `SendWelcomeEmail` in rather than order two listeners. ⚠️ **FOUR PREMISES HAVE MOVED.** (a) The `identityIsEstablished()` reasoning above predates `M76`: a squatted account now counts as established through `password_set_at`, which registration stamps. (b) Verification has been ENFORCED since J3a (`verified` on the tenant group), so what `D34` still owes is everything minted BEFORE confirmation — the Active membership, its notifications, points, the seat, and the SSO grandfather. (c) Delaying the join does not free the ADDRESS: the account holds it, and an unverified squat also blocks the real owner's Google sign-in, so fully meeting *"stops the squatting"* needs more than the join (verifying on password reset, or expiring never-verified accounts) — settle that when this row is built. (d) `D31` turns platform sign-up off on the testing server, so this door is likely shut there. ⚠️ **UNVERIFIED, AND OWED AN ADVERSARIAL CHECK BEFORE THIS ROW IS BUILT:** an attacker who registers the victim's address in their own SSO-entitled workspace holds an Active membership; if the owner later reclaims the account by password reset, that IdP asserting the address would skip the domain check, because the membership is Active.
 - ✅ **CLOSED BY `M9` (2026-08-24) — `major` · ~~SSO adopts an existing account whenever a PENDING INVITATION exists, so an SSO-entitled
   admin can be signed in as any stranger they invited — no emailed token required.** Found by M8's
   adversarial pass and **verified against the code by hand before filing**; it is the same conflation M8
@@ -5891,7 +5891,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
  ⚠️ **And the cheaper half of the exposure is not in `sw.ts` at all:** the resume READ
   escapes caching only because its path prefix is `drafts/` rather than `f/`; `routes/api.php` now says so
   at the site, and one route rename or a consolidation of the two public groups re-opens it. **Live.**
-  Filed by `M70`. **Tier: early-testing.** ⚠️ **`D20` ANSWERED 2026-09-20 (`M105`) — cache the resume shell under a token-free key.** ⚠️ **Two things the answer does NOT settle, both filed by `M105`:** option 2 needs its own measurement first — whether a constant-key shell breaks the resume boot's own `data-resume-token` read, since the served HTML would then be some *other* session's; and the cheaper half of the exposure is untouched, because the resume READ escapes caching only by its `drafts/` path prefix, so one route rename re-opens it. ⚠️ **`M121` (2026-10-01): that READ half is now GATED** — `tests/Feature/Http/ServiceWorkerCachePrefixRouteTest.php` (`R-aa133bab`, closed) fails if the route moves under a cached prefix or a cached prefix widens over it. The constant-key measurement this row owes is untouched.
+  Filed by `M70`. **Tier: during-testing.** **Retiered down from `early-testing` 2026-10-03 by `M127`: it is neither one of the user's 19 builder comments nor a builder defect found while fixing one, and `D72` puts everything else after the Oct 12 testing.** ⚠️ **Security-flavoured: first in line once the Oct 12 work is done.** ⚠️ **`D20` ANSWERED 2026-09-20 (`M105`) — cache the resume shell under a token-free key.** ⚠️ **Two things the answer does NOT settle, both filed by `M105`:** option 2 needs its own measurement first — whether a constant-key shell breaks the resume boot's own `data-resume-token` read, since the served HTML would then be some *other* session's; and the cheaper half of the exposure is untouched, because the resume READ escapes caching only by its `drafts/` path prefix, so one route rename re-opens it. ⚠️ **`M121` (2026-10-01): that READ half is now GATED** — `tests/Feature/Http/ServiceWorkerCachePrefixRouteTest.php` (`R-aa133bab`, closed) fails if the route moves under a cached prefix or a cached prefix widens over it. The constant-key measurement this row owes is untouched.
 
 - **`minor` · The audit spec's §1 table is asserted by nothing, and a static sweep cannot be the thing that
   asserts it.** `docs/audit-compliance-logging-spec.md` §1 calls itself *"a definitive, checkable list"*;
@@ -7545,7 +7545,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   two endpoints and any status read. ⚠️ **It is also not specific to exports** — `PATCH /tenant`, form
   write CRUD, the draft group, `GET/PATCH/DELETE /submissions/{submission}`, attachments, `users`/`roles`
   and `subscription` are absent from `routes/api.php` the same way, and the sibling rows in this block name
-  them. **Live.** Filed by `M80`. **Tier: early-testing.** ⚠️ **`D38` ANSWERED 2026-09-20 (`M105`) — mark the six as not built, in place, rather than trimming the documentation.**
+  them. **Live.** Filed by `M80`. **Tier: during-testing.** **Retiered down from `early-testing` 2026-10-03 by `M127`: it is neither one of the user's 19 builder comments nor a builder defect found while fixing one, and `D72` puts everything else after the Oct 12 testing.** ⚠️ **`D38` ANSWERED 2026-09-20 (`M105`) — mark the six as not built, in place, rather than trimming the documentation.**
 
 - **`minor` · The documented `Users & roles` API resource group (`GET/POST /api/v1/users`, `/api/v1/roles`)
   has zero routes, and a shipped schema decision was already paid for it.** Measured by `M79`'s sweeps
@@ -7562,7 +7562,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   deferral**: `docs/multi-tenancy-rbac-design.md:742` defers the request/response *shapes* to Doc #14, and
   `docs/api-specification.md:13` points straight back at §7.1 as the authoritative inventory. Neither
   defers the build. This repository builds `/api/v1` twins deliberately — `routes/tenant.php:767` says
-  so — so the web surface does not discharge it. **Live.** Filed by `M80`. **Tier: early-testing.** ⚠️ **`D38` ANSWERED 2026-09-20 (`M105`) — mark the six as not built, in place, rather than trimming the documentation.** ⛔ **THIS IS THE ROW THAT MADE THE ANSWER `C` RATHER THAN `A`.** `D38`'s premise sentence *"nothing shipped depends on them"* is false here: the documented `GET /api/v1/roles` is the stated reason roles use UUIDv7 primary keys rather than Spatie's bigints, cited at `docs/multi-tenancy-rbac-design.md:56`, `app/Models/Role.php:13` and `config/permission.php:20-21`. **That schema shipped**, so a plain trim orphans the rationale for a decision already paid for.
+  so — so the web surface does not discharge it. **Live.** Filed by `M80`. **Tier: during-testing.** **Retiered down from `early-testing` 2026-10-03 by `M127`: it is neither one of the user's 19 builder comments nor a builder defect found while fixing one, and `D72` puts everything else after the Oct 12 testing.** ⚠️ **`D38` ANSWERED 2026-09-20 (`M105`) — mark the six as not built, in place, rather than trimming the documentation.** ⛔ **THIS IS THE ROW THAT MADE THE ANSWER `C` RATHER THAN `A`.** `D38`'s premise sentence *"nothing shipped depends on them"* is false here: the documented `GET /api/v1/roles` is the stated reason roles use UUIDv7 primary keys rather than Spatie's bigints, cited at `docs/multi-tenancy-rbac-design.md:56`, `app/Models/Role.php:13` and `config/permission.php:20-21`. **That schema shipped**, so a plain trim orphans the rationale for a decision already paid for.
 
 - **`minor` · §7.1's `Form draft` row pins four `/api/v1` builder endpoints registered nowhere, and the
   `validations` sub-resource exists on neither surface.** Measured by `M79`'s sweeps (2026-09-06), joined
@@ -7583,7 +7583,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `app/Services/Forms/FormBuilderService.php:240`, `:276`, `:316-318` and `:572` — so nothing in the tree implements
   them as an addressable resource at all. ⚠️ Adjacent and deliberately in scope of the same repair:
   `docs/architecture/technical-architecture.md:441` also pins `POST /api/v1/forms` and
-  `PATCH/DELETE /api/v1/forms/{form}`, and only the two GETs exist. **Live.** Filed by `M80`. **Tier: early-testing.** ⚠️ **`D38` ANSWERED 2026-09-20 (`M105`) — mark the six as not built, in place, rather than trimming the documentation.**
+  `PATCH/DELETE /api/v1/forms/{form}`, and only the two GETs exist. **Live.** Filed by `M80`. **Tier: during-testing.** **Retiered down from `early-testing` 2026-10-03 by `M127`: it is neither one of the user's 19 builder comments nor a builder defect found while fixing one, and `D72` puts everything else after the Oct 12 testing.** ⚠️ **`D38` ANSWERED 2026-09-20 (`M105`) — mark the six as not built, in place, rather than trimming the documentation.**
 
 - **`minor` · The parity matrix scores API/programmatic import as Phase-1 shipped, and the code's own enum
   docblock calls it a later channel.** Measured by `M79`'s sweeps (2026-09-06), joined and refuted by
@@ -7703,7 +7703,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   long closed — and it was never converted into a queue row, nor were its three siblings from the same
   sentence. `docs/api-specification.md:304` is §4 Out of Scope and does not carry it. That archive note is
   the record of a deferral nobody filed, which is exactly what this row corrects. **Live.**
-  Filed by `M80`. **Tier: early-testing.** ⚠️ **`D38` ANSWERED 2026-09-20 (`M105`) — mark the six as not built, in place, rather than trimming the documentation.** ⚠️ **`M105` re-measured one clause:** *"exactly two hits repository-wide"* now returns six, because the ledger rows quoting the sentence are themselves hits. The two substantive hits are unchanged. Note also that `PROGRESS_ARCHIVE.md:322` records `Idempotency-Key (§2.4) deferred` — this is a **lapsed deferral**, not an unbacked promise.
+  Filed by `M80`. **Tier: during-testing.** **Retiered down from `early-testing` 2026-10-03 by `M127`: it is neither one of the user's 19 builder comments nor a builder defect found while fixing one, and `D72` puts everything else after the Oct 12 testing.** ⚠️ **`D38` ANSWERED 2026-09-20 (`M105`) — mark the six as not built, in place, rather than trimming the documentation.** ⚠️ **`M105` re-measured one clause:** *"exactly two hits repository-wide"* now returns six, because the ledger rows quoting the sentence are themselves hits. The two substantive hits are unchanged. Note also that `PROGRESS_ARCHIVE.md:322` records `Idempotency-Key (§2.4) deferred` — this is a **lapsed deferral**, not an unbacked promise.
 
 - **`minor` · The per-endpoint `include_answers: true` webhook payload opt-in has no key anywhere — and
   four other files appear to record it as a deferral already taken.** Measured by `M79`'s sweeps
@@ -7785,7 +7785,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `app/Providers/AppServiceProvider.php:374` records that `throttle:api` is priority-sorted *ahead of*
   authentication, so `$request->user()` is unresolved inside that closure and it keys on the token hash — a
   per-user 300/min limiter has to solve that ordering rather than copy the `api` shape. **Live.**
-  Filed by `M80`. **Tier: early-testing.** ⚠️ **`D38` ANSWERED 2026-09-20 (`M105`) — mark the six as not built, in place, rather than trimming the documentation.**
+  Filed by `M80`. **Tier: during-testing.** **Retiered down from `early-testing` 2026-10-03 by `M127`: it is neither one of the user's 19 builder comments nor a builder defect found while fixing one, and `D72` puts everything else after the Oct 12 testing.** ⚠️ **`D38` ANSWERED 2026-09-20 (`M105`) — mark the six as not built, in place, rather than trimming the documentation.**
 
 - **`minor` · `export_artifact` objects are documented as auto-deleted seven days after generation, and no
   scheduled cleanup task is declared.** Measured by `M79`'s sweeps (2026-09-06). ⛔ **UNJUDGED — the
@@ -7854,7 +7854,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   its table neighbours: this is a **concurrency** promise, so a limiter audit that checks `RateLimiter::for`
   definitions passes straight over it. ⚠️ Pairs with the async-export row above —
   `docs/architecture/technical-architecture.md:469` opens §7.3 and defines both export modes, and neither
-  is built. **Live.** Filed by `M80`. **Tier: early-testing.** ⚠️ **`D38` ANSWERED 2026-09-20 (`M105`) — mark the six as not built, in place, rather than trimming the documentation.** ⛔ **RE-VERIFIED BY `M123` (2026-10-02), NOT TAKEN:** under `D38` = C this is one in-place `**not built**` annotation in `docs/api-specification.md`, a hub. No export endpoint exists on `/api/v1` for a guard to protect, and a guard on the web inbox export would show testers a bare 429 page and lock them out of re-exporting a form after a cancelled download. Folded in, so the one pass fixes them: the same table claims X-RateLimit headers on every rate-limited response, which the guest per-form limiter and the monthly-quota refusal do not send; and §7.3's 5,000-row / 30-second sync ceiling is stated and unbuilt.
+  is built. **Live.** Filed by `M80`. **Tier: during-testing.** **Retiered down from `early-testing` 2026-10-03 by `M127`: it is neither one of the user's 19 builder comments nor a builder defect found while fixing one, and `D72` puts everything else after the Oct 12 testing.** ⚠️ **`D38` ANSWERED 2026-09-20 (`M105`) — mark the six as not built, in place, rather than trimming the documentation.** ⛔ **RE-VERIFIED BY `M123` (2026-10-02), NOT TAKEN:** under `D38` = C this is one in-place `**not built**` annotation in `docs/api-specification.md`, a hub. No export endpoint exists on `/api/v1` for a guard to protect, and a guard on the web inbox export would show testers a bare 429 page and lock them out of re-exporting a form after a cancelled download. Folded in, so the one pass fixes them: the same table claims X-RateLimit headers on every rate-limited response, which the guest per-form limiter and the monthly-quota refusal do not send; and §7.3's 5,000-row / 30-second sync ceiling is stated and unbuilt.
 
 - ~~**`minor` · `PROGRESS.md` is within roughly one status bullet of its `tracker-lint` R1 byte ceiling, and
   the two surfaces a session actually reads before pushing both stay silent about it.**~~
@@ -9954,14 +9954,14 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `AirtableConnector` classifies that refusal as blocking and pauses the rule (INFERRED from the error
   classifier; not measured against the live API). Now that the field type reaches the editor, it can mark
   those fields as not writable. **Latent.** — needs a tenant to map an answer onto a computed field.
-  Filed by `M96`. **Tier: early-testing.**
+  Filed by `M96`. **Tier: during-testing.** **Retiered down from `early-testing` 2026-10-03 by `M127`: it is neither one of the user's 19 builder comments nor a builder defect found while fixing one, and `D72` puts everything else after the Oct 12 testing.**
 - **`minor` · The Next section and the hand-off list open decisions as work to take.** Found by `M96`
   (2026-09-15) while verifying the zero-gate row. `scripts/state.php` reads every bullet of
   `docs/pipeline.md`'s Next section into its next-work list, including the bullets waiting on the user, so
   `scripts/next.php`'s "Take work from the Next section" sentence names the open decisions beside the rows,
   and `scripts/loop.php status` prints the same list. A decision is the user's to move, not work an
   increment can take. ⚠️ Carry each bullet's class through, or stop reading at the decisions. **Live.**
-  Filed by `M96`. **Tier: early-testing.**  ⚠️ **Corrected by `M98` (2026-09-18), which verified the row without taking it:** the row is under-scoped, one of its cautions is unnecessary, and the fix is on the reading side rather than the writing side. The hand-off does not merely offer the open decisions as work — it offers the eight BLOCKED rows in the same breath, each blocked on a decision nobody can start, so the row's second option, stopping at the decisions, would still put unstartable rows under "Take work from". And the class is not missing from the document: `docs/pipeline.md` already prints `· ready`, `· blocked (decision: Dnn)` and `· waiting on you` on every Next bullet, and `scripts/state.php` discards that suffix when it reads them. So the fix is to make the READER carry each bullet's class through — ready, blocked or waiting — with only the ready ids named as work and the blocked rows and the decisions listed separately, rather than cutting the list at one boundary. The caution about keeping the ids that feed the waiting sentence can go: `scripts/state.php` reads those from the testing gate's "Waiting on you:" line, not from the Next bullets, so reclassifying the bullets cannot disturb them.  ⛔ **RETIERED `during-testing` → `early-testing` BY `D66` (2026-09-26, `M114`), AND THE REASON IS THE ANSWER ITSELF.** `M98` argued `during-testing` for the sibling row on the ground that *"no tester sees any of this"*. True, and beside the point: the audience for this defect is the USER, not a tester. Shown the generated line, they read its `blocked` and `waiting on you` counts as a demand to decide everything at once — because the line spends the same two words on a question nobody has seen and on a precondition that merely does not hold. `D66` fixes the asking rule in `CLAUDE.md`; this row is the generator half, and it is now in the tier being worked.
+  Filed by `M96`. **Tier: during-testing.** **Retiered down from `early-testing` 2026-10-03 by `M127`: it is neither one of the user's 19 builder comments nor a builder defect found while fixing one, and `D72` puts everything else after the Oct 12 testing.**  ⚠️ **Corrected by `M98` (2026-09-18), which verified the row without taking it:** the row is under-scoped, one of its cautions is unnecessary, and the fix is on the reading side rather than the writing side. The hand-off does not merely offer the open decisions as work — it offers the eight BLOCKED rows in the same breath, each blocked on a decision nobody can start, so the row's second option, stopping at the decisions, would still put unstartable rows under "Take work from". And the class is not missing from the document: `docs/pipeline.md` already prints `· ready`, `· blocked (decision: Dnn)` and `· waiting on you` on every Next bullet, and `scripts/state.php` discards that suffix when it reads them. So the fix is to make the READER carry each bullet's class through — ready, blocked or waiting — with only the ready ids named as work and the blocked rows and the decisions listed separately, rather than cutting the list at one boundary. The caution about keeping the ids that feed the waiting sentence can go: `scripts/state.php` reads those from the testing gate's "Waiting on you:" line, not from the Next bullets, so reclassifying the bullets cannot disturb them.  ⛔ **RETIERED `during-testing` → `early-testing` BY `D66` (2026-09-26, `M114`), AND THE REASON IS THE ANSWER ITSELF.** `M98` argued `during-testing` for the sibling row on the ground that *"no tester sees any of this"*. True, and beside the point: the audience for this defect is the USER, not a tester. Shown the generated line, they read its `blocked` and `waiting on you` counts as a demand to decide everything at once — because the line spends the same two words on a question nobody has seen and on a precondition that merely does not hold. `D66` fixes the asking rule in `CLAUDE.md`; this row is the generator half, and it is now in the tier being worked.
 - **`minor` · The central-host redirect is an absolute `APP_URL`, which a request from another origin cannot
   follow.** Found by `M96` (2026-09-15) while verifying the central landing row. `bootstrap/app.php` renders
   `NotASubdomainException` as a redirect to `config('app.url')`. When a request's own origin is not `APP_URL`
@@ -10999,7 +10999,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   points the reader AWAY from the one thing in it the grouping rule depends on. **Live** — every session that groups a
   batch reads the wrong list. ⚠️ **The remedy is a pointer, not a second copy:** `CLAUDE.md` must name where the set is
   derived, and must not restate its members, which would be the two-copies defect this repository gates elsewhere.
-  Filed by `M106`. **Tier: early-testing.** ✅ **UNBLOCKED 2026-09-26 — `D15` IS ANSWERED (option 4) AND THE `Awaits` TOKEN IS STRUCK.** `M108` declined to take this row because its remedy presupposed an answer `D15` had not given; that answer now exists, so pointing `CLAUDE.md` at the derived hub set no longer hard-codes one of three candidate outcomes. ⚠️ **AND THE REMEDY HAS GROWN BY TWO FILES, MEASURED BY `M112`:** `scripts/next.php` and `scripts/pipeline.php` each restated `D13`s clause VERBATIM and both had to be hand-edited when the answer landed, because no gate reads that sentence. Making them POINT at `D13` instead of copying it is this row work. ⚠️ Its **forty-seven** was stale on arrival and is stale again: the derived set held 49, then 60 after `M108` widened the harvester, and **73** when `M112` measured it. Derive it; never read it here.
+  Filed by `M106`. **Tier: during-testing.** **Retiered down from `early-testing` 2026-10-03 by `M127`: it is neither one of the user's 19 builder comments nor a builder defect found while fixing one, and `D72` puts everything else after the Oct 12 testing.** ✅ **UNBLOCKED 2026-09-26 — `D15` IS ANSWERED (option 4) AND THE `Awaits` TOKEN IS STRUCK.** `M108` declined to take this row because its remedy presupposed an answer `D15` had not given; that answer now exists, so pointing `CLAUDE.md` at the derived hub set no longer hard-codes one of three candidate outcomes. ⚠️ **AND THE REMEDY HAS GROWN BY TWO FILES, MEASURED BY `M112`:** `scripts/next.php` and `scripts/pipeline.php` each restated `D13`s clause VERBATIM and both had to be hand-edited when the answer landed, because no gate reads that sentence. Making them POINT at `D13` instead of copying it is this row work. ⚠️ Its **forty-seven** was stale on arrival and is stale again: the derived set held 49, then 60 after `M108` widened the harvester, and **73** when `M112` measured it. Derive it; never read it here.
   ⛔ **`M108` (2026-09-24) EXAMINED THIS ROW AND DID NOT TAKE IT, BECAUSE ITS REMEDY PRESUPPOSES AN ANSWER `D15` HAS
   NOT GIVEN.** Pointing `CLAUDE.md` at the derived set hard-codes one of `D15`'s three candidate answers into the
   file every session auto-loads, and `D15` opens by recording that an increment does not re-scope a user decision on
@@ -11564,7 +11564,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   and the independent copy at `FieldInput.vue:205-250` — dispatch on field type alone. ⚠️ **Two switches, not
   one**, and neither has a parity test today, so a layout branch added to one and forgotten in the other would
   give the guest runtime and the encode page different forms. That is the same class of drift the client-mirror
-  census exists to catch, and it should land first. **Live.** Filed by `M110`. **Tier: during-testing.**
+  census exists to catch, and it should land first. **Live.** Filed by `M110`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-03 by `M127`: it is one of the user's 19 builder comments, wanted for the Oct 12 testing (`D72`).**
 
 - **`minor` · A form can hold no author-composed content — no welcome page, no instructions, no image, no
   divider — because `note` renders one line of plain text and has no config editor.** Filed 2026-09-25 by `M110`,
@@ -11609,7 +11609,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   owes its own row in `docs/piping-output-encoding-design.md` §5**, which is a per-surface table with a named
   escaper, owner and test: guest SPA, Blade/PDF, XLSForm export, XLSForm import. ⚠️ **Two of them may not exist**
   — verify whether a `note` reaches a CSV or XLSX export at all before writing a test for a surface that is not
-  there, and say so if it is not. **Live.** Filed by `M110`. **Tier: during-testing.** **Awaits D58.**
+  there, and say so if it is not. **Live.** Filed by `M110`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-03 by `M127`: it is one of the user's 19 builder comments, wanted for the Oct 12 testing (`D72`).** **`D58` answered 2026-10-03 (`M127`): B — the image belongs to the form.**
 
 - **`minor` · There is no per-form theme; every form in a workspace renders with the identical tenant ramp.**
   Filed 2026-09-25 by `M110`, from the report *"if we can also include a theme selector for the form"*, answered
@@ -11624,7 +11624,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   derived its own answer they could disagree. A preset that sets a font pairing and a radius scale sets more than
   six, so it must compose with that presenter rather than fork it. ⚠️ **The gate worth writing is totality across
   modes** — a preset legible in light and unreadable in dark is the failure this buys protection against.
-  **Live.** Filed by `M110`. **Tier: during-testing.** **Awaits D65.**
+  **Live.** Filed by `M110`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-03 by `M127`: it is one of the user's 19 builder comments, wanted for the Oct 12 testing (`D72`).** **`D65` answered 2026-10-03 (`M127`): A — confine the preset, each added property documented and contrast-checked.**
 
 - **`minor` · A respondent who finishes a form cannot be sent anywhere; there is a thank-you message and no
   redirect of any kind.** Filed 2026-09-25 by `M110`, from the report that a finished form *"can be configured to
@@ -11639,7 +11639,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `javascript:` explicitly, and make the publish gate refuse a redirect that points at an unpublished form.
   ⚠️ **One runtime case is easy to get wrong:** the confirmation screen renders a server-issued reference **or** a
   device-local queue tag when the response is still in the offline outbox — a redirect must not fire on the queued
-  path, because nothing has been accepted yet. **Live.** Filed by `M110`. **Tier: during-testing.**
+  path, because nothing has been accepted yet. **Live.** Filed by `M110`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-03 by `M127`: it is one of the user's 19 builder comments, wanted for the Oct 12 testing (`D72`).**
 
 - **`minor` · The forms list is one flat list per workspace; there is no folder, project, collection or tag
   grouping anywhere in the schema or the UI.** Filed 2026-09-25 by `M110`, from the report asking for
@@ -11652,7 +11652,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   purpose is who may see a form, not where an author filed it. Overloading it would make a filing decision change
   who can read the form. ⚠️ **The isolation case is the test that matters:** a collection must not leak the
   existence of a form the viewer cannot already see, so the facet has to compose with `Form::scopeVisibleTo()`
-  rather than sit beside it. **Live.** Filed by `M110`. **Tier: during-testing.**
+  rather than sit beside it. **Live.** Filed by `M110`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-03 by `M127`: it is one of the user's 19 builder comments, wanted for the Oct 12 testing (`D72`).**
 
 - **`minor` · There is no way to use another form's responses inside a form, which is KoboToolbox's "Connect
   project" and the single largest gap against it.** Filed 2026-09-25 by `M110` from the report
@@ -11670,7 +11670,14 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   paired data emits `<root><data>` while select-from-file expects `<root><item>`; here options are JSON config, so
   a link can feed a choice field directly. ⚠️ **Nothing here is measured against this tree** — this is a design
   sketch from vendor documentation and published source, deliberately not buildable as written. **Live.**
-  Filed by `M110`. **Tier: during-testing.** **Awaits D60.**
+  Filed by `M110`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-03 by `M127`: it is one of the user's 19 builder comments, wanted for the Oct 12 testing (`D72`).** **`D60` answered 2026-10-03 (`M127`): A — the linked data rides beside the schema checksum, with its own version stamp and cache key.** **v1 for the Oct 12 testing (`D72`):** link another form in the same workspace under the two-key consent above, and feed a `single_select`/`dropdown`'s options from its responses. ⛔ Nothing in v1 may break offline submission. What v1 leaves is its own `during-testing` row, filed next.
+
+- **`minor` · A form cannot use another form's responses in a calculation or a lookup — the part of Connect project
+  left after its Oct 12 v1.** Filed 2026-10-03 by `M127`, split from the Connect project row above under `D72`,
+  which trims that row to a v1 for the Oct 12 testing: a linked form feeds a `single_select`/`dropdown`'s options.
+  Left here: pulldata-style lookups and calculations over linked data, and whatever of `D60`'s separate freshness
+  channel (answered A — beside the schema checksum) v1 does not need.
+  **Live.** Filed by `M127`. **Tier: during-testing.**
 
 - **`minor` · An author cannot attach a reference file to a form, and the attachment model has no form-level kind
   to hang one on.** Filed 2026-09-25 by `M110` from the report *"there is also a attachments in kobotoolbox that
@@ -11686,7 +11693,15 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   is a translations map — which is also what lets an XLSForm export emit that column correctly rather than
   guessing. ⚠️ **Kobo's filename namespace is shared between form media and data links**, and that is worth
   copying: one uniqueness constraint covering both, not two that can collide. **Live.** Filed by `M110`.
-  **Tier: during-testing.** **Awaits D61.**
+  **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-03 by `M127`: it is one of the user's 19 builder comments, wanted for the Oct 12 testing (`D72`).** **`D61` answered 2026-10-03 (`M127`): B — frozen per published version, with byte dedupe.** **v1 for the Oct 12 testing (`D72`):** PDF and image reference files per form, shown to respondents, frozen per published version with byte dedupe. What v1 leaves is its own `during-testing` row, filed next.
+
+- **`minor` · Form attachments carry no audio, video or per-language media, and the XLSForm export has no media
+  column — the part of form attachments left after their Oct 12 v1.** Filed 2026-10-03 by `M127`, split from the
+  form-attachments row above under `D72`, which trims that row to a v1 for the Oct 12 testing: PDF and image
+  reference files per form, frozen per published version with byte dedupe (`D61` answered B). Left here: audio and
+  video, per-language media through a translations map, the XLSForm export's media column, and populating
+  `form_templates.cover_image_attachment_id`, a real foreign key that nothing writes.
+  **Live.** Filed by `M127`. **Tier: during-testing.**
 
 - **`minor` · There is no author-configurable automation — no "when this happens, do that" — only four fixed,
   non-composable mechanisms.** Filed 2026-09-25 by `M110` from the report *"in fillout.com, there is this thing
@@ -11703,7 +11718,15 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   ⚠️ **`NotificationType` is closed and its ORDER is load-bearing** (DB CHECKs are generated from `values()`), so
   an automation that notifies must reuse a type or **append** — never insert. ⚠️ Fillout documents no else/default
   path on its Branch; that is a defect to improve on, not a shape to copy. **Live.** Filed by `M110`.
-  **Tier: during-testing.** **Awaits D62.**
+  **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-03 by `M127`: it is one of the user's 19 builder comments, wanted for the Oct 12 testing (`D72`).** **`D62` answered 2026-10-03 (`M127`): A — queue only.** **v1 for the Oct 12 testing (`D72`):** an on-submit trigger with email and webhook actions, queue only. What v1 leaves is its own `during-testing` row, filed next.
+
+- **`minor` · A form automation has no Slack, Delay, Filter or Branch action and no form-abandoned trigger — the
+  part of form automations left after their Oct 12 v1.** Filed 2026-10-03 by `M127`, split from the automations
+  row above under `D72`, which trims that row to a v1 for the Oct 12 testing: an on-submit trigger with email and
+  webhook actions, queue only (`D62` answered A). Left here: Slack (reusing the existing `Connection` provider),
+  Delay, Filter, Branch with an else path, and the form-abandoned trigger, which needs a sweeper
+  (`FormScheduleSweeper` is the precedent). "Run AI" stays refused.
+  **Live.** Filed by `M127`. **Tier: during-testing.**
 
 - **`minor` · Compound AND/OR validation rules are supported by the database, the serializer and both evaluators,
   and cannot be authored anywhere.** Filed 2026-09-25 by `M110` while designing the inline `required_if` editor,
@@ -11716,7 +11739,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   template and then be invisible and uneditable in the builder that owns the form — which is worse than not
   supporting it, because an author cannot see why their field behaves as it does. ⚠️ `SchemaSnapshotSerializer`
   already remaps the group ordinal and has a test; extend it to a builder-authored group rather than writing a
-  second path. **Live.** Filed by `M110`. **Tier: during-testing.**
+  second path. **Live.** Filed by `M110`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-03 by `M127`: it is one of the user's 19 builder comments, wanted for the Oct 12 testing (`D72`).**
 
 - ✅ **CLOSED BY `M113` (2026-09-26) — `minor` · Five of the six client-side copies of the field-type catalogue have no parity test, and the one that
   does proves the technique works.** Filed 2026-09-25 by `M110` while designing the per-type validation model,
@@ -12183,7 +12206,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   arrives. ⚠️ **It is why `M117`'s arm carries no `details` at all** — adding a fourth object-valued `details`
   would have deepened the disagreement, and fixing the type moves `openapi.json`, a hub, which that increment's
   batch could not take. The remedy is a typed shape on the resource (or a Scramble annotation) plus a contract
-  arm that asserts the type and not merely the key. **Live.** Filed by `M117`. **Tier: early-testing.**
+  arm that asserts the type and not merely the key. **Live.** Filed by `M117`. **Tier: during-testing.** **Retiered down from `early-testing` 2026-10-03 by `M127`: it is neither one of the user's 19 builder comments nor a builder defect found while fixing one, and `D72` puts everything else after the Oct 12 testing.**
 
 - ✅ **CLOSED BY `M123` (2026-10-02) — `minor` · `ExpressionException` escapes four single-response submission paths, which answer a generic 422
   with no field and no code a client can branch on.** Found 2026-09-28 by `M117` beside the `major` it closed.
@@ -12406,7 +12429,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `R-a367bf9e` (the palette merge) needs `R-495abf48`'s HTTP half, and `R-c9f50df2` (content-block rendering) needs
   `R-6dedc3a9`'s block shape; both read `ready`, and a session taking either first would invent the missing half.
   `M121` recorded both at the rows in prose, which the generator cannot read. The remedy is a `Needs R-xxxxxxxx`
-  token with a lint arm that refuses an unknown or closed target. **Live.** Filed by `M121`. **Tier: early-testing.** ⚠️ **`M122` (2026-10-01) moved both examples:** `R-a367bf9e`'s precondition now holds (the routes shipped), and `R-c9f50df2` lost its `Awaits D69` token when `D69` was answered — so it now reads `ready` while still needing `R-6dedc3a9`, which makes it the live case of this defect.
+  token with a lint arm that refuses an unknown or closed target. **Live.** Filed by `M121`. **Tier: during-testing.** **Retiered down from `early-testing` 2026-10-03 by `M127`: it is neither one of the user's 19 builder comments nor a builder defect found while fixing one, and `D72` puts everything else after the Oct 12 testing.** ⚠️ **`M122` (2026-10-01) moved both examples:** `R-a367bf9e`'s precondition now holds (the routes shipped), and `R-c9f50df2` lost its `Awaits D69` token when `D69` was answered — so it now reads `ready` while still needing `R-6dedc3a9`, which makes it the live case of this defect.
 
 - **`nit` · The builder's draft projection checks a calculated question's formula under a key nothing writes, so its
   "no formula yet" issue fires for every calculated question and a blank formula reaches the preview engine.** Measured
@@ -12429,7 +12452,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   step (*"set the card to `recorded`"*) lives only in a session's memory, never in a script or a gate. The remedy is a
   sync — push a card for every open decision, mark every answered one `recorded` — plus a check that names any id
   present in one store and not the other; or, if the Board is retired, a blocker sentence that stops naming it.
-  **Live.** Filed by `M122`. **Tier: early-testing.** ⛔ **RE-VERIFIED BY `M123` (2026-10-02), NOT TAKEN — THE PREMISE MOVED:** since `D66` every answer has arrived in chat and is recorded "(user decision, in chat)", and the Board's role is written down only in a session's memory, never in this repository. So the repository's defect is that FOUR generator sites name a channel the repository cannot see — `pipeline.php`'s decision blocker and its gate line, and the dormant waiting sentences in `next.php` and `state.php` (plus two fixture copies in `PipelineLintControlsTest`) — and the in-repo fix edits three hubs. ⚠️ Pushing the nine missing cards would read the board at the user, against `D66`; and retiring the Board would strand `D40`'s pilot-customer note, which `decisions.md` deliberately keeps there.
+  **Live.** Filed by `M122`. **Tier: during-testing.** **Retiered down from `early-testing` 2026-10-03 by `M127`: it is neither one of the user's 19 builder comments nor a builder defect found while fixing one, and `D72` puts everything else after the Oct 12 testing.** ⛔ **RE-VERIFIED BY `M123` (2026-10-02), NOT TAKEN — THE PREMISE MOVED:** since `D66` every answer has arrived in chat and is recorded "(user decision, in chat)", and the Board's role is written down only in a session's memory, never in this repository. So the repository's defect is that FOUR generator sites name a channel the repository cannot see — `pipeline.php`'s decision blocker and its gate line, and the dormant waiting sentences in `next.php` and `state.php` (plus two fixture copies in `PipelineLintControlsTest`) — and the in-repo fix edits three hubs. ⚠️ Pushing the nine missing cards would read the board at the user, against `D66`; and retiring the Board would strand `D40`'s pilot-customer note, which `decisions.md` deliberately keeps there.
 
 - ✅ **CLOSED BY `M123` (2026-10-02) — `minor` · Inside a repeatable section, a calculated or page-break question renders as an
   unsupported control in every instance.** Found by `M123` while verifying `R-8c517fb6`. `RepeatGroup.vue` iterated the

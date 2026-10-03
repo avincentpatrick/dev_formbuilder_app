@@ -111,7 +111,10 @@ const MIN_GENERATOR_FILES = 600;
 
 const MIN_ROWS = 90;
 
-const MIN_HELD_ROWS = 5;
+// Lowered from 5 by `M127` (2026-10-03, user-approved in chat). The floor had sat AT the live count rather
+// than below it, so the first held row the user released — OCR, under `D72` — read as a blind scan. Four
+// remain; three keeps the floor one below the live count, as every other floor here sits.
+const MIN_HELD_ROWS = 3;
 
 const MIN_PLAN_ROWS = 8;
 

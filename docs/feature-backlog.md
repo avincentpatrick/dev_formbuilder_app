@@ -12842,3 +12842,14 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   took 94s for 24 cases, two of them HTML 409s. Production renders it with debug off and is not affected. The remedy
   is an `errors/409` view, or JSON in those cases, as `FormContentImageUploadTest` sends. **Not live**.
   Filed by `M129`. **Tier: after-launch.**
+
+- **`nit` · No gate refuses a size container that its own `@container` query restyles, the defect `M129` found in
+  the form-settings sections.** Found by `M129`. An element cannot match its own container query, so
+  `.form-settings`, which declared `container-type` and then restyled itself under `@container (max-width: 420px)`,
+  never stacked its rail: on the hub at 375px the Schedule section overflowed by 63px, and in the builder's modal
+  the same defect was latent because no spec had scanned a section wider than Share at that width. `M129` fixed it
+  by moving the container onto a host element. The pattern is mechanically detectable: strip the comments from a
+  component's `<style>`, collect the selectors that declare `container-type`, and refuse one that reappears inside
+  an `@container` block of the same file. Measured: such a scan flags the pre-fix file and passes all seven
+  components that declare a container today. The remedy is that scan as a host lint gate beside
+  `component-import-lint.php`. **Not live**. Filed by `M129`. **Tier: after-launch.**

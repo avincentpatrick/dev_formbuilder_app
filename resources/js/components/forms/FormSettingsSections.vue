@@ -133,93 +133,95 @@ watch(
 </script>
 
 <template>
-    <div class="form-settings">
-        <!-- The rail. ⛔ Its two forbidden roles, and why, are in this file's header — NAMED THERE AND
-             DELIBERATELY NOT HERE, because Vue renders template comments into the DOM and the gate in
-             `FormSettingsModal.test.ts` is a substring check over `wrapper.html()`. A comment that
-             spelled either role would fail the very assertion it was explaining. -->
-        <div class="form-settings__rail" role="group" aria-label="Settings section">
-            <button
-                v-for="section in sections"
-                :key="section.key"
-                type="button"
-                class="form-settings__rail-button"
-                :class="{ 'form-settings__rail-button--active': active === section.key }"
-                :aria-pressed="active === section.key"
-                @click="select(section.key)"
-            >
-                {{ section.label }}
-            </button>
-        </div>
+    <div class="form-settings-host">
+        <div class="form-settings">
+            <!-- The rail. ⛔ Its two forbidden roles, and why, are in this file's header — NAMED THERE AND
+                 DELIBERATELY NOT HERE, because Vue renders template comments into the DOM and the gate in
+                 `FormSettingsModal.test.ts` is a substring check over `wrapper.html()`. A comment that
+                 spelled either role would fail the very assertion it was explaining. -->
+            <div class="form-settings__rail" role="group" aria-label="Settings section">
+                <button
+                    v-for="section in sections"
+                    :key="section.key"
+                    type="button"
+                    class="form-settings__rail-button"
+                    :class="{ 'form-settings__rail-button--active': active === section.key }"
+                    :aria-pressed="active === section.key"
+                    @click="select(section.key)"
+                >
+                    {{ section.label }}
+                </button>
+            </div>
 
-        <div class="form-settings__body">
-            <!-- ⛔ THE TWO DIRECTIVES SIT ON DIFFERENT ELEMENTS, AND THAT IS NOT STYLE. On one element
-                 `v-if` wins and the `v-show` never hides anything — measured: the hidden section
-                 reported itself VISIBLE and a switch would have shown two panels at once. `template
-                 v-if` does the mounting, the wrapper does the showing. -->
-            <template v-if="mounted.has('general')">
-                <div v-show="active === 'general'" class="form-settings__section" :data-section="'general'">
-                    <GeneralPanel :open="props.open" :form-id="props.formId" :form="props.form" />
-                </div>
-            </template>
-            <template v-if="mounted.has('pages')">
-                <div v-show="active === 'pages'" class="form-settings__section" :data-section="'pages'">
-                    <PageModePanel
-                        :open="props.open"
-                        :form-id="props.formId"
-                        :single-page-mode="props.form.single_page_mode"
-                    />
-                </div>
-            </template>
-            <template v-if="props.share != null && mounted.has('share')">
-                <div v-show="active === 'share'" class="form-settings__section" :data-section="'share'">
-                    <SharePanel
-                        :open="props.open"
-                        :form-id="props.formId"
-                        :form-title="props.form.title"
-                        :share="props.share"
-                    />
-                </div>
-            </template>
-            <template v-if="props.ocrScanning != null && mounted.has('scanning')">
-                <div v-show="active === 'scanning'" class="form-settings__section" :data-section="'scanning'">
-                    <ScanningPanel :open="props.open" :form-id="props.formId" :scanning="props.ocrScanning" />
-                </div>
-            </template>
-            <template v-if="mounted.has('schedule')">
-                <div v-show="active === 'schedule'" class="form-settings__section" :data-section="'schedule'">
-                    <SchedulePanel
-                        :open="props.open"
-                        :form-id="props.formId"
-                        :form="props.form"
-                        :timezones="props.timezones"
-                    />
-                </div>
-            </template>
-            <template v-if="mounted.has('confirmation')">
-                <div v-show="active === 'confirmation'" class="form-settings__section" :data-section="'confirmation'">
-                    <ConfirmationPanel :open="props.open" :form-id="props.formId" :form="props.form" />
-                </div>
-            </template>
-            <template v-if="props.saveResumeAvailable && mounted.has('save-resume')">
-                <div v-show="active === 'save-resume'" class="form-settings__section" :data-section="'save-resume'">
-                    <SaveResumePanel
-                        :open="props.open"
-                        :form-id="props.formId"
-                        :enabled="props.form.save_and_resume"
-                    />
-                </div>
-            </template>
-            <template v-if="props.scope != null && mounted.has('scope')">
-                <div v-show="active === 'scope'" class="form-settings__section" :data-section="'scope'">
-                    <ScopePanel
-                        :open="props.open"
-                        :form-id="props.formId"
-                        :current-node-id="props.scope.current_node_id"
-                        :scopes="props.scope.options"
-                    />
-                </div>
-            </template>
+            <div class="form-settings__body">
+                <!-- ⛔ THE TWO DIRECTIVES SIT ON DIFFERENT ELEMENTS, AND THAT IS NOT STYLE. On one element
+                     `v-if` wins and the `v-show` never hides anything — measured: the hidden section
+                     reported itself VISIBLE and a switch would have shown two panels at once. `template
+                     v-if` does the mounting, the wrapper does the showing. -->
+                <template v-if="mounted.has('general')">
+                    <div v-show="active === 'general'" class="form-settings__section" :data-section="'general'">
+                        <GeneralPanel :open="props.open" :form-id="props.formId" :form="props.form" />
+                    </div>
+                </template>
+                <template v-if="mounted.has('pages')">
+                    <div v-show="active === 'pages'" class="form-settings__section" :data-section="'pages'">
+                        <PageModePanel
+                            :open="props.open"
+                            :form-id="props.formId"
+                            :single-page-mode="props.form.single_page_mode"
+                        />
+                    </div>
+                </template>
+                <template v-if="props.share != null && mounted.has('share')">
+                    <div v-show="active === 'share'" class="form-settings__section" :data-section="'share'">
+                        <SharePanel
+                            :open="props.open"
+                            :form-id="props.formId"
+                            :form-title="props.form.title"
+                            :share="props.share"
+                        />
+                    </div>
+                </template>
+                <template v-if="props.ocrScanning != null && mounted.has('scanning')">
+                    <div v-show="active === 'scanning'" class="form-settings__section" :data-section="'scanning'">
+                        <ScanningPanel :open="props.open" :form-id="props.formId" :scanning="props.ocrScanning" />
+                    </div>
+                </template>
+                <template v-if="mounted.has('schedule')">
+                    <div v-show="active === 'schedule'" class="form-settings__section" :data-section="'schedule'">
+                        <SchedulePanel
+                            :open="props.open"
+                            :form-id="props.formId"
+                            :form="props.form"
+                            :timezones="props.timezones"
+                        />
+                    </div>
+                </template>
+                <template v-if="mounted.has('confirmation')">
+                    <div v-show="active === 'confirmation'" class="form-settings__section" :data-section="'confirmation'">
+                        <ConfirmationPanel :open="props.open" :form-id="props.formId" :form="props.form" />
+                    </div>
+                </template>
+                <template v-if="props.saveResumeAvailable && mounted.has('save-resume')">
+                    <div v-show="active === 'save-resume'" class="form-settings__section" :data-section="'save-resume'">
+                        <SaveResumePanel
+                            :open="props.open"
+                            :form-id="props.formId"
+                            :enabled="props.form.save_and_resume"
+                        />
+                    </div>
+                </template>
+                <template v-if="props.scope != null && mounted.has('scope')">
+                    <div v-show="active === 'scope'" class="form-settings__section" :data-section="'scope'">
+                        <ScopePanel
+                            :open="props.open"
+                            :form-id="props.formId"
+                            :current-node-id="props.scope.current_node_id"
+                            :scopes="props.scope.options"
+                        />
+                    </div>
+                </template>
+            </div>
         </div>
     </div>
 </template>
@@ -232,6 +234,14 @@ watch(
     display: grid;
     grid-template-columns: 140px minmax(0, 1fr);
     gap: var(--mds-space-5);
+}
+
+/* ⛔ THE CONTAINER IS THE HOST, NOT THE GRID. An element cannot match its own container query, so while
+   `.form-settings` declared `container-type` and the query below restyled `.form-settings`, the query never
+   applied and the rail stayed beside the body at every width. Measured in M129: on the hub at 375px the body
+   was ~183px and the Schedule section's date inputs overflowed it by 63px; in the modal the same defect was
+   latent, because no spec had scanned a section wider than Share at that width. */
+.form-settings-host {
     container-type: inline-size;
 }
 

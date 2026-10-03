@@ -181,6 +181,18 @@ it('turns confidence into tiers and withholds a value below the review threshold
         ->and($fields['notes'])->toMatchArray(['tier' => 'manual', 'value' => null, 'text' => 'MILD FEVER FOR TWO DAYS']);
 });
 
+it('puts a value at exactly a threshold on the side the design names: 90 is auto, 70 is review', function (): void {
+    $fields = ocrMatchFields($this->matcher, $this->form, $this->version, $this->model, ocrMatchAnswers(), ['confidence' => [
+        'patient_name' => 0.90,
+        'age' => 0.70,
+        'notes' => 0.69,
+    ]]);
+
+    expect($fields['patient_name'])->toMatchArray(['confidence' => 90, 'tier' => 'auto'])
+        ->and($fields['age'])->toMatchArray(['confidence' => 70, 'tier' => 'review', 'value' => '34'])
+        ->and($fields['notes'])->toMatchArray(['confidence' => 69, 'tier' => 'manual', 'value' => null]);
+});
+
 it('reads a letter O in a number box as a zero, and flags it for review whatever its confidence', function (): void {
     $fields = ocrMatchFields($this->matcher, $this->form, $this->version, $this->model, ['age' => '3O']);
 

@@ -16,191 +16,135 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M128`, OCR groundwork 1 (a scan read and matched to its printed form), the collapsible sidebar and per-field save errors (`m128-ocr-groundwork-sidebar-save-errors`)
+## Status: NO ACTIVE CLAIM — `M128` is merged; a scanned paper form is read and matched on the server, and OCR groundwork 2 (the review screen and the save) is next
 
-Taken 2026-10-03. Branch `m128-ocr-groundwork-sidebar-save-errors`, cut from `origin/main` at `ece77511`, PR into `main`.
-The first Oct 12 increment under `D72`, named by the user. Three items:
-- **`ocr-single-form`, groundwork 1 of 2** — the marker at the end of `docs/ocr-pipeline-design.md`. It takes the scan
-  upload, the reading job and the field matching from the printed layout, plus two fixes to the printed paper. The marker
-  **stays open**; groundwork 2 is the "accept scans" setting, the upload and review screen, and the save.
-- **`R-33c7fd56`** — the left app sidebar cannot be collapsed (`docs/feature-backlog.md:11386`). `D68` = B: `localStorage`.
-- **`R-d001de0c`** — the per-field 422 error map has no consumer (`docs/feature-backlog.md:11893`).
+## RELEASED — `M128`, a scanned paper form is read and matched to the questions it was printed from, the sidebar collapses, and a refused field edit marks its field (merged as PR #321, `1551f8b4`, 6/6 green with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 
-⛔ **`D13` exception #4, allowed by the user in chat on 2026-10-03.** All three items edit hub files, and their edited files
-are pairwise disjoint. Recorded in `docs/claims/decisions.md` in this push.
+Shipped 2026-10-03. Branch `m128-ocr-groundwork-sidebar-save-errors`, cut from `origin/main` at `ece77511`. The claim
+commit is `5b4d4716`; extension 1 is `e07265ee` and extension 2 is `bdef143f`.
 
-### Evidence verified
+**The first Oct 12 increment under `D72`.** Three items, kept together as `D13` exception #4 by the user's choice in
+chat.
+- **Closed:** `R-d001de0c`, `R-33c7fd56`, and the yes/no print row, which was filed and closed here.
+- **Still open:** `ocr-single-form`, for groundwork 2 (the review screen and the save). Its title is narrowed to that.
+- **Filed:** ten rows in extension 2, the stale-seed E2E row, and a blocked `early-testing` marker,
+  `ocr-testing-server-key` (billing, and the key in the testing server's `.env`).
+- **Namespaces spent:** migration prefix `2026_08_17_000116`, and decision `D73` (filed silently, `before-launch`). No ADR.
+- **Tracker:** the ninth surgery rides in this pull request.
 
-**`ocr-single-form`** — measured against `ece77511`:
-- The marker is `state=ready`, `tier=early-testing`. The printed form is as `§2.5` says: `BlankFormPrintPresenter::present()`
-  returns blocks of `{key, area, label, hint, comb, options, grid}`, and the running head carries the 8-character checksum
-  stamp. Rendering the seeded `Patient Intake` gives stamp `ef38a6c1`.
-- **Already in the tree, each with no writer:** `AttachmentKind::OcrSourceScan`, `SubmissionSource::OcrSingle`,
-  `QueueName::OcrProcessing` (both workers listen on it), `forms.allow_ocr_single` (no reader either),
-  `attachments.ocr_confidence_avg`, the plan key `ocr_single` (Professional and up) and the `ocr_single` module toggle.
-  `CapabilityFlags::isOcrCompatible()` exists.
-- **No OCR route, job, table, client or config exists.** Neither of the `/api/v1` OCR endpoints that
-  `docs/architecture/technical-architecture.md` names is declared.
+### OCR groundwork 1 — what a scan does now
 
-**`R-33c7fd56`:**
-- **Exact:** `Sidebar.vue:403-405` and `:447-475` (widths), `:141`, `:166-168` and `:244` (the rail band and the tooltip
-  gate), and `AppLayout.vue:17` and `:84-86`.
-- **The `public-runtime` storage citations hold:** `lib/device.ts:13`, `composables/useAutosave.ts:116` and
-  `lib/respondent-session.ts:120`. The only `resources/js` hit is the comment at `Pages/forms/Index.vue:104`.
-- **Moved:** `stubMatchMedia()` is `Sidebar.test.ts:428-445` (the row says `:452-470`), and the `Builder.vue` derivation is
-  `:929-964` (the row says `:894-903`).
-- **Overstated:** there are 13 `not.toContain` assertions on `labels()`, not ~20.
+1. **Upload.** `POST /forms/{form}/ocr/scans` takes one to five page images, or one PDF of up to five pages. Before
+   storing anything, it refuses:
+   - a form that has not opted in;
+   - a current version that cannot be read;
+   - a PDF sent alongside other pages;
+   - a wrong type or size.
+2. **Storage.** Each page is stored as a private, virus-checked `ocr_source_scan` attachment, and an `ocr_scans` row
+   is queued.
+3. **Reading.** `ReadOcrScanJob` reads one page per run. It waits for the page's virus check, then sends the page to
+   Cloud Vision with the key in a header. The raw answer is kept at a fixed path, so a run killed after the call
+   does not pay twice.
+   - A provider failure never throws. Each run is a transaction, so the job releases itself and counts the attempt
+     on the row instead.
+4. **Matching.** After the last page, `PrintedFormMatcher` reads the eight-character stamp to find which version the
+   paper was printed from. It then matches answers against `BlankFormPrintPresenter::present()`, the model the
+   paper was printed from.
+5. **Result.** Each question gets a state, a value in the shape the save path accepts, the text read, a confidence
+   and a tier:
+   - **auto:** 90 and above;
+   - **review:** 70 to 89;
+   - **withheld for a person:** below 70.
 
-**`R-d001de0c`:**
-- **Held:** `builderClient.ts:61-72` (it runs for every non-OK, non-409 response) and `:32`, `useBuilderStore.ts:198`, the
-  four consumer files, and the only `.errors` read, at `builderClient.test.ts:74`.
-- **Wrong:** `ConfigPanel.vue:260` is now a comment. The alert is at `:357`.
-- **Moved:** the store double is `ConfigPanel.test.ts:142-159` (the row says `:110-124`).
-- **Only partly true:** "the mount throws". The double is cast `as unknown as BuilderStore` and test files are not
-  type-checked, so a missing member is `undefined`.
+`GET /forms/{form}/ocr/scans/{scan}` returns the result. There is no UI yet; groundwork 2 builds on this.
 
-### Premise verified
+⚠️ **Not measured on a real Vision answer.** Billing on the Google Cloud project that owns the key was off for the
+whole build (`403 BILLING_DISABLED`, re-probed at the end). So the matcher is proved on documents laid out from
+`present()` and on the two real error bodies, with their project numbers zeroed. The claim allowed this. The live
+read opens groundwork 2, and the samples due 2026-10-08 calibrate it.
 
-**`ocr-single-form`:**
-- ⛔ **The provider key is set and does NOT work yet.** On 2026-10-03 Cloud Vision answered `403 BILLING_DISABLED` for the
-  key's project. The memory's *"credential supplied 2026-08-05"* is half the premise. The user has been asked to attach
-  billing. Until then the live read is blocked, and everything else proceeds against Vision's documented response format.
-- ⛔ **The paper the user is printing samples from has a defect.** A `yes_no` question prints a ruled write-in box. It has
-  no `config.options`, so the blade's `@forelse … @empty` falls through. Measured: `Patient Intake`'s `consent` gives
-  `choices` with zero options. This is fixed here, because the samples are due 2026-10-08.
-- **The routes are session web routes,** gated like manual encoding. That is the H14 precedent for a staff surface. The
-  `/api/v1` twins are filed, not built.
-- **`TenantAwareJob::handle()` wraps every run in a transaction,** and Windows PHP cannot enforce `--timeout`. So the
-  reading job reads one page per run.
-- **A local test could call Google.** The real key is in `.env`, `QUEUE_CONNECTION=sync`, and nothing blocks stray HTTP
-  globally. `phpunit.xml` blanks the key.
-- **Groundwork 2 inherits five facts:**
-  - `saveDraft()` and `promote()` refuse a superseded version;
-  - `AttachmentPolicy` knows only `submission` and `form_field` owners;
-  - `SubmissionFinalizer` re-points only media-answer attachments;
-  - the reaper deletes expired drafts after 30 days;
-  - `duration` has no encode control.
+### The paper fix reached the samples in time
 
-**`R-33c7fd56`:**
-- **`D68` = B holds.** There is no Inertia SSR, so reading storage in `setup()` cannot mismatch.
-- **M121's correction holds:** collapsed, the content box is viewport − 64, continuous across 1024 and 1025px, so no
-  layout inverts.
-- **The row is a floor:** besides `Builder.vue`, `DataTable.vue:627-629` makes a derivation that becomes false. Four
-  more places are merely incomplete prose.
-- No e2e spec targets the sidebar.
+A yes/no question printed as a write-in box, because a yes/no has no option list. It now prints Yes and No boxes, and
+the form's header asks for an X in each chosen box. A sheet printed earlier carries the same stamp and the old box, so
+the matcher also reads a written YES or NO for that one type. The general case, a stamp naming the schema and not the
+layout, is a row.
 
-**`R-d001de0c`:**
-- **`guard()` receives only a function,** so nothing knows which field failed.
-- **`select()` flushes, then switches,** so a failure can land after another field is selected.
-- **Create, section, library and reorder requests also 422 through `guard()`.**
-- **A `FormException` 422 carries no `errors` map.**
+### `R-d001de0c` and `R-33c7fd56`
 
-### Remedy verdict
+- **Save errors.** Only a field's own save names an owner, so a refusal's map is filed under the field that was
+  refused. The panel marks that control in place, and lists any key without a control in plain words. A field's
+  marks clear only when that field saves or is deleted.
+- **Sidebar.** It collapses to its icon rail above 1024px, and `localStorage` remembers that per device (`D68` = B).
+  The forced rail sits under `min-width: 1025px`, and the tooltip gate keeps J4b's Escape fix.
 
-**`ocr-single-form`:**
-- **What the marker prescribes for this half works:** upload, reading job and field matching.
-- **The matcher consumes `present()`,** the same model the paper was printed from.
-- **Measured before any code:** a typed-filled `Patient Intake` renders through dompdf exactly as printed, with comb
-  characters, DD/MM/YYYY captions and X marks. The PDF is 3,337 bytes, against 3,005 for the blank control.
-- ⚠️ **Open:** the live Vision read, blocked on billing. It is re-measured, and committed as a fixture, before release.
+Both closures are written in full at the rows.
 
-**`R-33c7fd56`:**
-- **Option B's remedy works,** with M121's (c), (d) and (e).
-- **Measured:** an unscoped forced rail out-ranks the drawer's 260px (specificity 0,4,0 against 0,2,0), so it sits under
-  `min-width: 1025px`.
-- **The tooltip gate** `!(isRail || (collapsed && !isMobile))` keeps J4b's Escape fix, traced through `Tooltip.vue:201-212`.
+### How the prediction fared
 
-**`R-d001de0c`:**
-- **"A reader, not a rewrite" holds.**
-- **"Widen `save.error` first" is the wrong first step.** It would move `Builder.vue`'s regex-pinned watch and about 20
-  string assertions, so a new uid-keyed member is the reader instead.
-- **Inline marking uses `MdsFormField`'s existing `error` prop.**
+| Predicted | Actual |
+|---|---|
+| CI runs and goes 6/6 | **Right.** The pull request went 6/6 on its first complete run, `37119695594` on `0ca95f22`. One earlier run was cancelled by the marker push, with four of its jobs already green. The post-merge run, `37120854127` on `1551f8b4`, also went 6/6. |
+| Most likely red: a tenancy drift test on the new table | **Right.** `ConstraintBoundaryDriftTest`'s composite-FK census went red on `ocr_scans_form_fk` and nothing else, and took extension 1. `TenantExtractColumnDriftTest` gained its census row, as planned. |
+| Second: the ledger citation tier, from `Sidebar.vue` and `ConfigPanel.vue` line shifts | **Right in kind, wrong in file.** The tier touched 18 once, from the save-errors row's own `useBuilderStore.ts` citation; the number was dropped in place. `ConfigPanel.vue`'s shift moved the tier-1 citation in `docs/workflow-branching-design.md`, which now names the two `ConditionEditor` mounts instead of a line. Closed at its ceiling. |
+| PHPStan gains nothing in CI | **Right:** Static analysis was green with 32 steps in the pull request run and the post-merge run. |
+| Pint asks for one or two fixes on new files | **Right:** two (`OcrAnswerReader.php` and the test typesetter). Bare Pint then passed over the whole project. |
+| `openapi.json` is byte-identical | **Right:** a fresh `scramble:export` is byte-identical (`0d678cbc…`). |
+| ⚠️ **Most likely wrong:** Vision reads the typed comb characters cleanly, and the 7pt grey stamps are legible | **Unmeasured.** Billing was off for the whole build. The matcher survives either outcome: it drops `\|` border artefacts, and it anchors on the label when no stamp is read. |
 
-Files:
-- **OCR:**
-  - new: `config/ocr.php`, `database/migrations/2026_08_17_000116_create_ocr_scans_table.php`, `app/Models/OcrScan.php`,
-    `app/Enums/OcrScanStatus.php`, `app/Services/Ocr/*`, `app/Jobs/ReadOcrScanJob.php`,
-    `app/Http/Controllers/Tenant/OcrScanController.php`, `app/Http/Requests/Ocr/StoreOcrScanRequest.php`,
-    `tests/Unit/Ocr/*`, `tests/Feature/Ocr/*`, `tests/fixtures/ocr/*`;
-  - edited: `.env.example`, `phpunit.xml`, `routes/tenant.php` (hub), `app/Services/Attachments/AttachmentStorageService.php`,
-    `app/Services/Forms/BlankFormPrintPresenter.php`, `resources/views/pdf/blank-form.blade.php`,
-    `resources/views/pdf/_blank-form-styles.blade.php` (only if the key stamp must darken),
-    `app/Support/Tenancy/TenantScopedTables.php`, `app/Support/Tenancy/ConstraintBoundaries.php`,
-    `tests/Feature/Tenancy/TenantExtractColumnDriftTest.php`, `tests/Feature/Forms/BlankFormPrintPresenterTest.php`,
-    `tests/Feature/Forms/BlankFormPrintRendererTest.php`, `docs/ocr-pipeline-design.md` and `docs/data-dictionary.md` (hub).
-- **Sidebar:**
-  - new: `resources/js/composables/useSidebarCollapse.ts` and its test, `tests/e2e/sidebar-collapse.spec.ts`;
-  - edited: `resources/js/components/shell/Sidebar.vue`, `Sidebar.test.ts`, `resources/js/Pages/forms/Builder.vue` (hub,
-    comment only), `packages/design-system/src/components/DataTable/DataTable.vue` (comment only),
-    `resources/js/Pages/forms/Index.vue` (comment only), `docs/ux/design-system-reference.md` (hub).
-- **Save errors:**
-  - new: `resources/js/components/builder/field-save-errors.ts` (a pure map from server keys to the panel's controls)
-    and its test;
-  - edited: `resources/js/components/builder/useBuilderStore.ts`, `save-state.test.ts`,
-    `resources/js/components/builder/ConfigPanel.vue` (hub), `ConfigPanel.test.ts` (hub), and
-    `docs/workflow-branching-design.md` (its citation of `ConfigPanel.vue:388-390` only, if my edits move it).
-- **Close-out:** `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/backlog-triage.md`, `docs/claims/decisions.md`,
-  `docs/claims/lane-a.md`, `docs/gate-baselines.md`, `PROGRESS.md` (own block and hand-off line), and
-  `PROGRESS_ARCHIVE.md` (the ninth tracker surgery).
+### Twenty-eight mutations, all CAUGHT; three red sets off by one
 
-- **Extension 1, pushed before either file was opened:** `tests/Feature/Tenancy/ConstraintBoundaryDriftTest.php`,
-  whose census pins every composite tenant FK by name, so the new `ocr_scans_form_fk` joins its list (the Tenancy
-  directory, run whole, reddened on that one case and nothing else: 359 passed). Also the new `app/Exceptions/Ocr/*`
-  for the reading path's typed refusals.
-- **Extension 2, after an adversarial design review, pushed before any of it is built.** The review's corrections are
-  taken into the design. Only two change the file set, and both shrink it:
-  - **A run never throws for a provider failure.** Every run is a transaction (`TenantAwareJob::handle()`) and
-    `failed()` is final and only logs, so a throw would roll back the run's progress and leave the scan unfinished.
-    Instead an `attempts` column on `ocr_scans` counts runs that ended without progress. The job releases itself, and
-    marks the scan failed at `ocr.max_attempts`. That is the `DeliverWebhookJob` stance.
-  - **The client maps by the provider's `reason` before the HTTP status.** A wrong key is `400 INVALID_ARGUMENT` with
-    `API_KEY_INVALID`, probed today, so a status-first map would tell users to rescan a good file. Billing off is
-    `403 BILLING_DISABLED`. Both real bodies, with the project number zeroed, are fixtures.
-  - **Each page's raw answer goes to a fixed path,** checked before calling, so a run killed after the call does not pay
-    twice.
-  - **No foreign key on `ocr_scans.form_version_id`,** so `ConstraintBoundaries.php` is NOT edited. A version is never
-    deleted apart from its form, and `ocr_scans_form_fk` cascades that.
-  - **No `confidence_avg` column.** `attachments.ocr_confidence_avg` is the documented per-scan home, and the job
-    writes it on each page.
-  - **The `{scan}` route checks `form_id` in the controller rather than `scopeBindings()`,** so `Form.php` gains no
-    relationship and stays out of the claim.
-  - **The matcher reads each field's type from the version's snapshot,** so the presenter's rows are unchanged.
-  - **The upload route carries an inline `throttle`.** It is a stopgap; metering is a row.
-  - **Part B clears a field's marks on that field's next successful save or delete**, not at the burst verdict, so a
-    later success on another question cannot hide a refusal. The save state stays failed while any field holds marks.
-    The conversion-undo PATCH is not attributed to a field, because it restores the server's values before it throws.
-  - **A yes/no answer is also read from a written YES or NO,** because a sheet printed before this increment carries the
-    same stamp and the old write-in box.
-  - ⚠️ **Merging does not wait for the live Vision read.** If billing is still off when everything else is green, `M128`
-    merges without the real-answer fixture and the probe opens groundwork 2, because the paper fix must reach the
-    samples due 2026-10-08.
-  - **Ten rows filed in this push**, each found while planning or decided not to fix, rather than at close-out
-    (`CLAUDE.md`):
-    - a refused edit becoming the undo baseline;
-    - raw request paths in refusal messages;
-    - the missing `/api/v1` OCR twins;
-    - no OCR retention or erasure;
-    - no OCR metering;
-    - the provider's file limits;
-    - the data dictionary's "until `clean`";
-    - incomplete sidebar-width prose;
-    - the dev container's 2 MB upload limit;
-    - the stamp naming the schema, not the layout.
-  - The prediction below restated a gate figure. It now points at `docs/gate-baselines.md`.
+Every mutant was written down with its red set before it ran.
+- **Pest, through `scripts/mutate.php` (18):**
+  - tier bounds and the withheld manual value (1, 1, 2);
+  - caption grouping (3) and X marks (2);
+  - stamp versus fallback (2);
+  - the header key, credential reasons and billing (1, 1, 2);
+  - backoff, attempts cap, reuse, opt-in, PDF-alone and the virus wait (1 each);
+  - the yes/no boxes (4), the written yes/no fallback (1) and deskew (3).
+- **Vitest, by byte backup (10):** uid attribution (2), the failed verdict (1), clear on save (1), clear on delete
+  (1), the inline mark (1), the listed issue (1), both halves of the tooltip gate (1, 1), the stored value (2) and
+  the storage guard (1).
 
-Shared artefacts taken: `docs/**` (the files above), `phpunit.xml`, `PROGRESS.md` (own block only), and the new top-level
-`tests/e2e/sidebar-collapse.spec.ts`.
-Paired files taken: none. `clipped-node-containment.test.ts` reads `Sidebar.vue`, but the file already positions nodes, so
-its known list does not move.
-Namespaces spent: migration prefix `2026_08_17_000116`; decision id `D73`. No ADR (`0010` stays reserved).
-Prediction:
-- **CI runs and goes 6/6** after the local gates.
-- **Most likely red:** a tenancy drift test on the new table, from the classification, the extract census or the
-  constraint-boundary lint. Second: the ledger citation tier (at its ceiling per `docs/gate-baselines.md`), from `Sidebar.vue` and `ConfigPanel.vue` line
-  shifts.
-- **PHPStan** gains nothing in CI. **Pint** asks for one or two fixes on new files. **`openapi.json`** is byte-identical.
-- **Most likely to be WRONG:** that Vision reads typed comb characters as clean single symbols, with no box-border
-  artefacts and with the 7pt grey key stamps legible.
+**25 of 28 red sets were exactly as written.**
+- **The mark mutant and the yes/no-box mutant** each predicted one test too many. The job's end-to-end page has no
+  choice question.
+- **The deskew mutant**, named the most likely miss, was caught by three tests, not two. The page-reuse job test
+  reads the same tilted page.
+
+### ✅ Seen in a real browser
+
+A throwaway probe ran through the real server, on a production build. It typed "Bad Key" into a field's key and got a
+422. Field key turned `aria-invalid` and was described by "The key field format is invalid." Putting the key back
+answered 200 and cleared the mark. A refused PATCH persists nothing, so the probe left the seeded form as it found it.
+
+### ⚠️ Deviations, recorded rather than smoothed
+
+- **An unclaimed path was written.** The test typesetter was first created under `tests/Support/Ocr`, which no claim
+  covered. It was moved into the claimed `tests/Feature/Ocr/Support` before any commit, so nothing unclaimed reached
+  the branch, but the file was written there first.
+- **A row was found after the build:** the OCR key and billing on the testing server. It lived only in the plan file,
+  so it went in as a marker before the merge.
+
+### Measured
+
+- **Pest per directory at 3G:**
+  - Unit 1556 (2 pre-existing warnings);
+  - Forms 658, Submissions 448, Tenancy 360, Attachments 22, Queue 50, Migrations 16;
+  - OCR plus the two print test files: 84 (326 assertions);
+  - Docs 142 passed and 5 skipped, plus the known container-only `SuiteCollectionFloorTest` failure.
+- **Vitest (`--pool=forks`):** save-state 17, ConfigPanel 21, field-save-errors 6, Sidebar 43, useSidebarCollapse 4.
+  The two new test files are counted in `docs/gate-baselines.md`, regenerated from the post-merge run.
+- **E2E, one spec at a time:**
+  - `sidebar-collapse.spec.ts` (desktop): passed;
+  - `builder-axe.spec.ts`: 60 / 60;
+  - `responsive-axe.spec.ts`: 207 passed and 12 failed, the 12 on two pages whose seeded rows the local database has
+    lost (filed).
+- **CI:** the pull request run, `37119695594` on `0ca95f22`, went 6/6, and both scans that failed locally pass there on the fresh seed. Every gate figure is in `docs/gate-baselines.md`. The post-merge run, `37120854127` on `1551f8b4`, went 6/6 (Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11).
+
+➡️ **Next, under `D72`:** `ocr-single-form` groundwork 2 — the per-form "accept scans" setting, the upload and
+review-and-correct screen with its 90/70 colours, and the save into `SubmissionPipeline`. It starts with the live
+Vision read once billing is on.
 
 ## RELEASED — `M127`, the Oct 12 realignment: the user's 19 builder comments and OCR become the `early-testing` tier (merged as PR #320, `40afe7da`, 6/6 green with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

@@ -114,7 +114,7 @@ it('shows a scan still being read as the waiting page, with the route it polls a
     $this->actingAs($this->admin)->get(ocrReviewUrl($this->form, $scan))
         ->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->component('ocr/ScanStatus')
+            ->component('ocr/ScanStatus', false)
             ->where('scan.status', 'queued')
             ->where('scan.status_label', 'Waiting to be read')
             ->where('scan.poll_url', "/forms/{$this->form->id}/ocr/scans/{$scan->id}")
@@ -131,7 +131,7 @@ it('shows a scan that could not be read with the reason it ended on', function (
     $this->actingAs($this->admin)->get(ocrReviewUrl($this->form, $scan))
         ->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->component('ocr/ScanStatus')
+            ->component('ocr/ScanStatus', false)
             ->where('scan.status', 'failed')
             ->where('scan.error_message', 'The reading service could not open this file.'));
 });
@@ -142,7 +142,7 @@ it('renders a read scan as the encode page in scan mode, with no draft channel a
     $this->actingAs($this->admin)->get(ocrReviewUrl($this->form, $scan))
         ->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->component('submissions/Encode')
+            ->component('submissions/Encode', false)
             ->where('draft_url', null)
             ->where('draft', null)
             ->where('editing', null)

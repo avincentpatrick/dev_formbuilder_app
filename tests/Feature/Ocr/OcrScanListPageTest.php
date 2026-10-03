@@ -91,7 +91,7 @@ it('lists this form\'s scans, newest first, each with where it leads', function 
     $this->actingAs($this->admin)->get(ocrListUrl($this->form))
         ->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->component('ocr/Scans')
+            ->component('ocr/Scans', false)
             ->where('accepts_scans', true)
             ->where('refusal', null)
             ->where('upload.url', "/forms/{$this->form->id}/ocr/scans")

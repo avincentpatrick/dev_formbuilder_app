@@ -9,6 +9,8 @@ use App\Models\Form;
 use App\Models\User;
 use App\Policies\FormPolicy;
 use App\Services\Forms\FormHubPresenter;
+use App\Services\Forms\FormSettingsPresenter;
+use App\Support\Forms\FormTabSet;
 use App\Support\Navigation\CrumbTrail;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -44,6 +46,28 @@ final class FormHubController extends Controller
         return Inertia::render('forms/Show', [
             ...$presenter->show($form, $user),
             'crumbs' => CrumbTrail::forms($user)->current($form->title),
+        ]);
+    }
+
+    /**
+     * The hub's Settings tab — `GET /forms/{form}/settings` (M129, the half of `D63` that `M117` did not build).
+     *
+     * The same sections as the builder's "Form settings" modal, mounted against the same routes, plus Scope.
+     * Gated `can:update,form`, the gate on every one of those section routes, so the tab is offered exactly
+     * where its saves would be accepted.
+     *
+     * ⚠️ ON THIS CONTROLLER RATHER THAN ITS OWN, AND ONLY FOR A REASON OUTSIDE IT: a new controller is a new
+     * `use` line in `routes/tenant.php`, which shifts every line of that file a document cites.
+     */
+    public function settings(Request $request, Form $form, FormSettingsPresenter $presenter): Response
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        return Inertia::render('forms/Settings', [
+            ...$presenter->page($form, $user),
+            'tabs' => FormTabSet::for($form, $user),
+            'crumbs' => CrumbTrail::forms($user)->form($form)->current('Settings'),
         ]);
     }
 }

@@ -89,6 +89,13 @@ final class FormTabSet
             $tabs[] = ['key' => 'analytics', 'label' => 'Analytics', 'href' => $base.'/analytics', 'icon' => 'chart-bar'];
         }
 
+        // M129 — the hub half of `D63`. `can:update,form` is the gate on every settings section's own route, so
+        // the tab is offered exactly where its saves would be accepted. The icon is the builder's Form settings
+        // button's, so the two entry points read as one place.
+        if ($user->can('update', $form)) {
+            $tabs[] = ['key' => 'settings', 'label' => 'Settings', 'href' => $base.'/settings', 'icon' => 'sliders'];
+        }
+
         return $tabs;
     }
 }

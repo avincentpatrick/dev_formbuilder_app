@@ -214,7 +214,7 @@ The durable, logical form record — the stable identity that a `public_slug` an
 | `public_slug` | `varchar(120)` | Yes | `NULL` | No | Unique per tenant; the `/f/{slug}`-style public URL segment (legacy pattern, carried forward per plan §Main Features #3). `NULL` until guest access is first enabled. |
 | `allow_guest_submissions` | `boolean` | No | `false` | No | Capability flag — Main Feature #3. |
 | `allow_manual_encoding` | `boolean` | No | `true` | No | Capability flag — Main Feature #7. |
-| `allow_ocr_single` | `boolean` | No | `false` | No | Capability flag — Main Feature #1 (Phase 3; column exists from Phase 0 per the plan's "structural, not retrofitted" principle). |
+| `allow_ocr_single` | `boolean` | No | `false` | No | Capability flag — Main Feature #1 (Phase 3; column exists from Phase 0 per the plan's "structural, not retrofitted" principle). Whether this form takes scans of its printed paper: the upload (`OcrScanService`) refuses while it is false. **Writer (M129):** `FormService::setOcrScanning()`, behind `PATCH /forms/{form}/ocr-scanning` — `can:update,form`, then the `ocr_single` module toggle before the plan — from the Scanning section of the form's settings; `FormService::create()` states the `false` default explicitly. |
 | `allow_ocr_linelist` | `boolean` | No | `false` | No | Capability flag — Main Feature #2. |
 | `allow_api_import` | `boolean` | No | `true` | No | Capability flag for the `api_import` submission source. |
 | `allow_offline_sync` | `boolean` | No | `true` | No | Whether this form may be downloaded into the offline PWA client (plan §2.4). |

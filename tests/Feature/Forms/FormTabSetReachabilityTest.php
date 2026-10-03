@@ -50,13 +50,14 @@ afterEach(function (): void {
     app(PermissionRegistrar::class)->setPermissionsTeamId(null);
 });
 
-it('offers an Owner the four tabs, and no more', function (): void {
+it('offers an Owner the five tabs, and no more', function (): void {
     // The dataset below names its URLs by tab key, so it is only exhaustive if the key set is what it
     // assumes. This case is what keeps the two in step: add a fifth tab and it reddens here, which is the
     // prompt to add its reachability row rather than discovering the omission in the browser.
     $keys = array_column(FormTabSet::for($this->form, $this->owner), 'key');
 
-    expect($keys)->toBe(['overview', 'submissions', 'builder', 'analytics']);
+    // M129 added Settings, the hub half of `D63`, after Analytics.
+    expect($keys)->toBe(['overview', 'submissions', 'builder', 'analytics', 'settings']);
 });
 
 it('offers a tab whose href resolves to a real page', function (string $key): void {
@@ -74,7 +75,7 @@ it('offers a tab whose href resolves to a real page', function (string $key): vo
         ->actingAs($this->owner)
         ->get('http://acme.meridian.test'.$tab['href'])
         ->assertSuccessful();
-})->with(['overview', 'submissions', 'builder', 'analytics']);
+})->with(['overview', 'submissions', 'builder', 'analytics', 'settings']);
 
 it('points Responses at a destination that survives a form with no responses at all', function (): void {
     /*

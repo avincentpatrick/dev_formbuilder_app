@@ -1033,6 +1033,15 @@ Route::middleware([
         ->middleware(['can:create,'.Submission::class.',form', 'module:ocr_single', 'feature:ocr_single'])
         ->whereUuid('scan')
         ->name('forms.ocr.scans.confirm');
+    // M129: the form hub's Settings tab (`D63`'s hub half), gated like every settings section's own route; and
+    // the Scanning section's write, the module toggle BEFORE the plan, as the scan routes order them. Both sit
+    // on already-imported controllers, because a new `use` line here shifts every line a document cites.
+    Route::get('/forms/{form}/settings', [FormHubController::class, 'settings'])
+        ->middleware('can:update,form')
+        ->name('forms.settings');
+    Route::patch('/forms/{form}/ocr-scanning', [FormController::class, 'updateOcrScanning'])
+        ->middleware(['can:update,form', 'module:ocr_single', 'feature:ocr_single'])
+        ->name('forms.ocr-scanning');
 });
 
 /*

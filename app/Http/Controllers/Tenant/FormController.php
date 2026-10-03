@@ -8,6 +8,7 @@ use App\Http\Controllers\Concerns\ReadsKeywordFilter;
 use App\Http\Controllers\Concerns\ResolvesTenant;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Forms\FormMetadataRequest;
+use App\Http\Requests\Forms\UpdateOcrScanningRequest;
 use App\Models\Form;
 use App\Models\ScopeNode;
 use App\Models\User;
@@ -114,6 +115,27 @@ final class FormController extends Controller
         $this->forms->updateMetadata($form, (string) $request->string('title'), $request->input('description'), $user);
 
         return back()->with('toast', ['type' => 'success', 'message' => 'Form updated.']);
+    }
+
+    /**
+     * The Scanning settings section (M129): whether this form accepts scans of its printed paper.
+     *
+     * ⚠️ ON THIS CONTROLLER RATHER THAN ITS OWN, AND ONLY FOR A REASON OUTSIDE IT: a new controller is a new
+     * `use` line in `routes/tenant.php`, which shifts every line of that file a document cites. The setting
+     * still keeps its own route and its own FormRequest, which is the rule `D63` and four docblocks protect.
+     */
+    public function updateOcrScanning(UpdateOcrScanningRequest $request, Form $form): RedirectResponse
+    {
+        $enabled = $request->boolean('allow_ocr_single');
+
+        /** @var User $user */
+        $user = $request->user();
+        $this->forms->setOcrScanning($form, $enabled, $user);
+
+        return back()->with('toast', [
+            'type' => 'success',
+            'message' => $enabled ? 'This form now accepts scans of its paper copies.' : 'This form no longer accepts scans.',
+        ]);
     }
 
     public function archive(Request $request, Form $form): RedirectResponse

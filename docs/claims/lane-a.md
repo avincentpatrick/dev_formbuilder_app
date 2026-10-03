@@ -16,173 +16,110 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M129`, OCR groundwork 2 (the scans page, the review screen and the save), the hub Settings tab with the accept-scans setting, and the content-block editor with images (`m129-ocr-review-settings-content`)
+## Status: NO ACTIVE CLAIM — `M129` is merged; a scanned paper form is reviewed, corrected and saved as a response, the form hub has a Settings tab, and a note has a Content tab with images
 
-Taken 2026-10-03. Branch `m129-ocr-review-settings-content`, cut from `origin/main` at `77ad45b7`, PR into `main`.
-The second Oct 12 increment under `D72`, named by the user. Three items, one commit each, in this order:
-- **A — `ocr-single-form`, groundwork 2 of 2** — the marker at the end of `docs/ocr-pipeline-design.md`: a scans page,
-  the review-and-correct screen and the save into `SubmissionPipeline`. The marker closes when A and B's setting land.
-- **B — `R-1132a6f3`, the hub Settings tab** (`docs/feature-backlog.md:12177`), which closes `R-4e96a994` (`:11528`)
-  with it, **plus the per-form "accept scans" setting** from A's marker. The setting is built here because it is a
-  settings section and shares B's files.
-- **C — `R-6dedc3a9`'s editor half and `R-f0c5b682`** (`:11569`, `:11599`): the content-block editor and form-owned
-  images, author side.
+## RELEASED — `M129`, a scanned paper form is reviewed, corrected and saved as a response, the form hub gains a Settings tab, and a note gains a Content tab with images (merged as PR #322, `8f50a220`, 6/6 green with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 
-⛔ **`D13` exception #5, allowed by the user in chat on 2026-10-03.** Every item edits hubs; `routes/tenant.php` and
-`docs/data-dictionary.md` are edited by all three. Clause 1 holds: the three non-hub file sets are pairwise disjoint.
-It is the second exception for the Oct 12 reason, so a third for that reason trips the escalation rule. Also in this
-push: `D74` (a scan of superseded paper) filed and answered in chat, `D70` answered in chat, nine rows filed, and
-`R-c9f50df2` and `R-6dedc3a9` amended.
+Shipped 2026-10-04. Branch `m129-ocr-review-settings-content`, cut from `origin/main` at `77ad45b7`. The claim commit is
+`c255b1cd`; extension 1 is `15c9710f`.
 
-### Evidence verified
+**The second Oct 12 increment under `D72`.** Three items, kept together as `D13` exception #5 by the user's choice in
+chat — the second exception for the Oct 12 reason, so a third for that reason trips the escalation rule.
+- **Closed:** `R-1132a6f3`, `R-4e96a994`, `R-6dedc3a9` (its editor half; the renderer is `R-c9f50df2`), `R-f0c5b682`,
+  and the `ocr-single-form` marker (`state=done`; the live read waits on `ocr-testing-server-key`).
+- **Filed:** nine rows in the claim push and three during the build — no OCR test proves content sniffing, an HTML 409
+  in tests waits about 30s for the debug page, and no gate refuses a size container that its own `@container` query
+  restyles.
+- **Decisions:** `D74` filed and answered (A) and `D70` answered (A), both in chat.
+- **Namespaces spent:** migration prefix `2026_08_17_000117`, decision `D74`. No ADR.
+- **Tracker:** no surgery owed.
 
-**A — `ocr-single-form`**, measured against `77ad45b7`:
-- The marker is `state=ready`, `tier=early-testing` (`docs/ocr-pipeline-design.md:237`). Groundwork 1 is as `M128`
-  released it: the two `ocr/scans` routes at `routes/tenant.php:1009-1015`, `OcrScanController::present()` reporting a
-  page COUNT only, `OcrScanStatus` with four cases and no confirmed state, and no `submission_id` on `ocr_scans`.
-- **`forms.allow_ocr_single` still has no writer**; only tests set it. `OcrScanService.php:56-58` is its sole reader,
-  and `OcrException.php:33` already tells users to turn scanning on "in the form's settings".
-- **The encode page prefills only from a draft or a saved response** (`Encode.vue:193`), submits to a hard-coded URL
-  (`:671-679`), autosaves while the form is open (`:538`), and keeps its state on a failed submit only when the page
-  carries an errors bag (`:694`).
-- **Every save path refuses a superseded version:** `SubmissionPipeline.php:70-73`, and
-  `SubmissionDraftService.php:115-118` and `:195-197`.
-- **A scan page is unreadable through `GET /attachments/{id}` for every role:** `AttachmentPolicy::withinOwnerScope()`
-  knows only `submission` and `form_field`.
+### What a reviewer can do now (OCR groundwork 2)
+- **Scan paper forms**, on a form's Responses tab where the form accepts scans, opens a scans page: upload one to five
+  photos or one PDF, and see the 25 newest scans with their state.
+- **A scan being read** waits on a page that checks every 2.5 seconds; one that failed says why and offers entering it
+  by hand.
+- **A read scan** opens the encode page in scan mode, with the scanned pages beside the form. Every uncertain answer is
+  marked in words — check it below 90%, enter it by hand below 70%, blank, not found — and old paper carries onto the
+  current version by key (`D74`), listing what could not carry. **Save response** goes through `SubmissionPipeline`
+  with source `ocr_single`, keyed on the scan id so a retry makes no second response, and the pages move to the
+  response.
 
-**B — `R-1132a6f3` and `R-4e96a994`:**
-- **Held:** `FormTabSet.php:44-93`, `FormTabSetReachabilityTest.php:53-60` (`:59` pins four keys),
-  `FormHubGateTest.php:230-241` (`:236-240`), `Show.vue:482`, and the `forms.scope` route (`routes/tenant.php:638-639`).
-- **Understated:** the builder modal holds SIX sections, not five. `M120` added Pages (`FormSettingsModal.vue:105`).
-- **Wrong:** "the two form-list dialogs" are Rename and Scope (`GeneralPanel.vue:5-9`). Save as template was kept out
-  of settings on purpose (`Builder.vue:304-305`).
-- **A correction `M117` recorded never landed:** `FormRowActions.vue:13-14` and `:73-76` still call themselves the only
-  call site, and `Show.vue:347-349` says assigning a scope "lives on the forms list".
+### The hub Settings tab, and a defect the builder's modal had carried since `M117`
+- The tab mounts the builder modal's sections against the same routes, plus Scope for a scopes manager and the new
+  Scanning section: the per-form "accept scans" switch, gated by `can:update`, the module and then the plan.
+- ⛔ **Its own spec found a real layout defect on its first local run.** The sections declared `container-type` on the
+  grid that their `@container` query restyled, and an element cannot match its own container query, so the rail never
+  stacked: at 375px the Schedule section overflowed by 63px. It had been latent in the builder's modal since `M117`,
+  because no spec had scanned a section wider than Share at that width. A container host fixed it (`14d426e3`). A
+  scan for the pattern flags the old file and passes all seven components that declare a container; it is filed as a
+  lint-gate row.
 
-**C — `R-6dedc3a9` and `R-f0c5b682`:**
-- **Held:** `FieldInput.vue:506` is still the whole note renderer. `FieldType::configEditor()` returns `null` for a
-  note (`FieldType.php:153-165`). `ContentBlocks` refuses an `image` block. `PublishService.php:168-179` clones the
-  draft tree. `storeBrandingLogo()` re-sniffs the bytes (`AttachmentStorageService.php:129`).
-- **Wrong in the row:** "`mimetypes:` validation trusts a header a client controls" (`:11605-11607`, copied from
-  `StoreBrandingLogoRequest.php:14-18`). Laravel's rule reads the file's bytes. The second gate is still right, as the
-  write path's own guard for callers that bypass HTTP.
-- **Wrong in `D58`'s option text:** B does not need "a new morph entry". `form` is already a global alias through
-  `ResourceScopeable::morphMap()` (`AppServiceProvider.php:362-368`), so only a new `AttachmentKind` is needed, and
-  `kind` has no CHECK, so no migration.
+### The content-block editor (author side)
+- A note's Content tab composes headings, paragraphs, callouts, dividers and images. Text is edited in a small syntax
+  and saved as closed spans. Respondents still see the note's label until `R-c9f50df2`, and the tab says so from first
+  paint, with "Shown in the form's default language only." (`D70` = A).
+- ⛔ **The TS link check was wrong in its first draft, measured against PHP:** it took the FIRST `@`, stripped any
+  digits after a colon and counted UTF-16 units, so it passed `https://a@b@/` and `https://host:99999/` — links PHP
+  refuses, which would have cost the author the whole save. It now reads `parse_url()`'s authority rules, and PHP
+  requires `//` for http(s), because `parse_url('https:443')` reads the host `https`. Both halves read 36 vectors
+  generated by PHP.
+- Images belong to the form (`D58` = B). They are sniffed from the bytes in the request and again in the write path,
+  read by whoever may open the form, and checked at publish (missing, another form's, the wrong kind or infected).
 
-### Premise verified
+### How the prediction fared
 
-**A:**
-- ⛔ **A new `use` line in `routes/tenant.php` turns CI red.** `routes/tenant.php:723` is cited by the ledger (at its
-  ceiling per `docs/gate-baselines.md`) and sits under a blank line, so one import shifts it onto the blank. Every new
-  action therefore goes on a controller the file already imports, and every route is appended after the M128 OCR
-  routes, where the only citation below is the ledger's already-stale `:1172`.
-- **`duration` has no control in any channel.** `FieldTypeMirrorDriftTest` pins the encode and guest lists together,
-  so a read duration cannot be saved. It is listed for the reviewer, and a row is filed.
-- **CI's E2E job runs `QUEUE_CONNECTION=sync`,** so a spec that uploads would call Vision. The review spec opens a
-  seeded read scan instead.
-- **Billing on the Vision key's project was off at `M128`'s end.** It is re-probed first; nothing waits on it.
-- ⛔ **`ClientUuidScopeTest` allows exactly one file to query `client_submission_uuid`.** The confirm path keys the
-  pipeline on the scan id and never queries the column.
+| Predicted | Actual |
+|---|---|
+| CI goes 6/6 after the local gates | **Wrong twice before it was right.** Run 1 failed Pest on 17 cases (`ViteManifestNotFoundException`: CI builds no manifest, and locally `public/hot` supplied one). Run 2 failed 5 (`->component()` without `false`: the page-file check fails only on Linux). Both are repo conventions that 99 existing calls already followed, and neither can fail on this host. Run 3, `37147232557` on `1bda57eb`, went 6/6 with Pest at 5826 passed. |
+| Most likely red: the citation lint | **Right in kind.** It went red locally at every item's host run — the ledger reached 18 once, from `ConfigPanel.test.ts:210` — and each number was dropped in place, ending at 17/17. It never reached CI. |
+| Second: a census or drift test meeting a new column, kind or constant | **Did not go red:** both censuses were updated in the commit that added the column and the kind. |
+| ⚠️ Most likely wrong: the three new E2E specs pass axe and the 375px check on their first CI run | **The risk was real, and it showed locally rather than in CI.** The review spec passed 18/18 first time; the Settings spec failed at 375px on the layout defect above; the Content spec timed out once in its cleanup. Both were fixed before the push, and E2E passed on the first CI run. |
 
-**B:**
-- **The hub sends `share` absent, not null,** and the modal tests `!== null`, so a page mount would crash `SharePanel`.
-  New sections test `!= null`.
-- **axe here never runs `landmark-unique`** (`tests/e2e/support/axe.ts:376-378` keeps WCAG tags only). The real hazard
-  is Playwright's substring match on the `navigation` named with the form title, so the page renders exactly one.
-- **A required builder prop would force an edit to `builder-store-fixtures.ts`,** which is C's file, so the new prop is
-  optional.
+### Thirty-four mutations: thirty-two caught, two equivalent survivors
+Every red set was written down before its run.
+- **Pest, through `scripts/mutate.php` (23):** 22 caught. **B6 survived, predicted caught:** `create()` ends in
+  `return $form->refresh()`, so its explicit `allow_ocr_single => false` and the column default cannot be told
+  apart — an equivalent mutant. I read the docblock's `M120` sentence instead of the method's last line.
+- **Vitest, by byte backup (11):** 10 caught. **B7 survived, as predicted:** both entry points always send `share`.
+- **Four red sets were wider than written:** A3 (4, written 1 — every confirm case leans on the idempotency key), C8
+  (4, written 2), B2 and B8 (the older rail cases saw the change too).
+- **One planned mutation had no target:** "the manual value kept". The withholding is the `M128` matcher's, pinned by
+  `PrintedFormMatcherTest`, and A's carry relies on it, as its docblock says.
 
-**C:**
-- ⚠️ **The row orders the renderer (`R-c9f50df2`) before this editor** ("so no author gets a control with no effect",
-  `:11585`). The approved Oct 12 plan reverses that, and the renderer is the next increment. So the Content tab says
-  respondents do not see the content yet, and the Label help does not claim `D69` until the renderer ships. Recorded
-  at both rows in this push.
-- **No route serves a tenant file to a respondent, and the guest page's CSP is `img-src 'self'`.** The guest read route
-  and the service worker's image cache go to `R-c9f50df2`, their only consumer.
-- **`StructuralValidationGate.php:45-47` is cited by ADR-0011,** so the image check adds no `use` line there.
+### ✅ Seen in a real browser
+A probe ran on a production build, through the real server:
+- the seeded scan was reviewed, one answer corrected (34 → 35) and saved — the toast, the response, and the scanned
+  page still served after the save;
+- the Settings tab's switch flipped both ways, with the Responses button following it;
+- a composed note survived a reload, and its publish was refused with "The note “field_1” has content that cannot be
+  shown: block 3 is an image with no description."
 
-### Remedy verdict
+### ⚠️ Deviations, recorded rather than smoothed
+- `OcrException.php` was edited before extension 1 was pushed (recorded in the extension).
+- The claim named "a `FieldType` unit test"; the case went into `NoteContentShapeTest` through `BuilderPresenter`'s
+  palette instead, which tests the wiring the client reads.
+- Six commits followed their items: B's layout fix and C's E2E budget, each found by the item's own spec, then the
+  two CI-only test conventions for A and for B.
+- C dropped its first draft's per-image "Replace" control. The visible native file input is the precedent, and
+  removing and re-adding an image does the same.
 
-**A:** the marker's remedy holds, with four corrections from an adversarial design review:
-1. The review is the encode page in a scan mode, not a staged draft, because drafts belong to one user and are reaped.
-2. Old paper carries by key (`D74`), filtered so that no control is handed a value it cannot show.
-3. Page images get their own scan-gated route, so `AttachmentPolicy` stays C's.
-4. The confirm turns conflict and closed-form refusals into an errors bag, because a toast-only `back()` remounts the
-   page and drops the reviewer's corrections (`Encode.vue:694`).
+### Measured
+- **Pest per directory at 3G:**
+  - A's runs: Ocr 88, Navigation 49, Seeders 16, Tenancy 360, Submissions 448;
+  - B's runs: Tenant 81, Audit 108, Forms 667;
+  - C's runs: Unit 1609 (2 pre-existing warnings), Forms 691, Ocr 88, Auth 187, Api 153, Guest 86, Branding 56,
+    Http 30, Attachments 24;
+  - Docs 142 and 5 skipped, plus the known container-only `SuiteCollectionFloorTest` failure. A diff of C's runs'
+    PASS/FAIL classes against the host's file walk found no file skipped, with a negative control (11 of 11).
+- **Vitest (`--pool=forks`):** the builder folder 27 files / 575, and each item's own files; vue-tsc clean.
+- **E2E, one spec at a time, three viewports, both themes:** `ocr-review-axe` 18/18, `form-settings-axe` 12/12,
+  `builder-content-axe` 6/6, `builder-axe` 60/60.
+- **CI:** run 3, `37147232557` on `1bda57eb`, 6/6. The post-merge run, `37148686010` on `8f50a220`, went 6/6. Every gate
+  figure is in `docs/gate-baselines.md`.
 
-**B:** the row's remedy holds: one gated route and page, a fifth tab, and the two pins. The modal's rail and body are
-extracted into one component that both entry points mount, so `D63`'s "no second implementation" holds by construction.
-
-**C:** the remedy holds for the editor and the form-owned image, with two corrections. The image check at publish reads
-the database inside the strict gate, so a template copy of another form's image is refused (a row). And the §5 contract
-rows are extended in place, because inserted rows rot tier-1 citations.
-
-Files:
-- **A:**
-  - new: `app/Http/Requests/Ocr/ConfirmOcrScanRequest.php`, `app/Services/Ocr/OcrScanListPresenter.php`,
-    `OcrScanReviewPresenter.php`, `OcrAnswerCarry.php`, `OcrScanConfirmation.php`,
-    `app/Support/Attachments/InlineAttachmentResponse.php`,
-    `database/migrations/2026_08_17_000117_add_confirmation_to_ocr_scans_table.php`, `resources/js/Pages/ocr/*`,
-    `resources/js/components/ocr/*`, `tests/Feature/Ocr/*` (new files), `tests/e2e/ocr-review-axe.spec.ts`, and the
-    Vitest files beside the new components and pages;
-  - edited: `OcrScanController.php`, `app/Models/OcrScan.php`, `SubmissionInboxController.php`,
-    `app/Support/Navigation/CrumbTrail.php`, `resources/js/Pages/submissions/Encode.vue` (hub), `encode.test.ts`,
-    `resources/js/Pages/submissions/Inbox.vue`, `inbox.test.ts`, `database/seeders/E2eSeeder.php`,
-    `tests/Feature/Ocr/OcrScanRoutesTest.php`, `tests/Feature/Tenancy/TenantExtractColumnDriftTest.php`,
-    `routes/tenant.php` (hub), `docs/data-dictionary.md` (hub), `docs/ocr-pipeline-design.md`,
-    `docs/piping-output-encoding-design.md` (hub), `docs/security-threat-model.md` (hub), and
-    `docs/ux/design-system-reference.md` (hub; its `Encode.vue:897-899` citation only).
-- **B:**
-  - new: `resources/js/components/forms/FormSettingsSections.vue`, `ScanningPanel.vue`, `ScopePanel.vue`,
-    `resources/js/Pages/forms/Settings.vue`, `app/Services/Forms/FormSettingsPresenter.php`,
-    `app/Http/Requests/Forms/UpdateOcrScanningRequest.php`, `tests/Feature/Forms/FormSettingsPageTest.php`,
-    `tests/Feature/Tenant/FormOcrScanningSettingsTest.php`, `tests/e2e/form-settings-axe.spec.ts`, and Vitest files
-    beside the new components and page;
-  - edited: `FormSettingsModal.vue`, `FormSettingsModal.test.ts`, `AssignScopeModal.vue`, `components/forms/types.ts`,
-    `components/builder/types.ts`, `resources/js/Pages/forms/Builder.vue` (hub), `FormTabSet.php`,
-    `FormHubController.php`, `FormController.php`, `app/Services/Forms/FormService.php` (hub), `BuilderPresenter.php`
-    (hub), `FormHubPresenter.php`, `Show.vue`, `FormRowActions.vue`, `FormTabSetReachabilityTest.php`,
-    `FormHubGateTest.php`, `tests/Feature/Audit/AuditCoverageTest.php`, `routes/tenant.php` (hub), and
-    `docs/data-dictionary.md` (hub).
-- **C:**
-  - new: `app/Http/Requests/Forms/StoreFormContentImageRequest.php`,
-    `resources/js/components/builder/ContentBlocksEditor.vue`, `content-markup.ts`, `content-blocks.ts`,
-    `tests/fixtures/content-block-links.json`, `tests/Feature/Forms/FormContentImageUploadTest.php`,
-    `NoteContentSurfacesTest.php`, `tests/Unit/Forms/ContentBlocksMirrorDriftTest.php`,
-    `tests/e2e/builder-content-axe.spec.ts`, and Vitest files beside the new components;
-  - edited: `app/Rules/ContentBlocks.php`, `app/Enums/FieldType.php`, `app/Enums/AttachmentKind.php` (hub),
-    `app/Policies/AttachmentPolicy.php`, `app/Services/Forms/StructuralValidationGate.php`,
-    `AttachmentStorageService.php`, `config/attachments.php` (hub), `AttachmentController.php`,
-    `StoreBrandingLogoRequest.php` (docblock only), `ConfigPanel.vue` (hub), `ConfigPanel.test.ts`,
-    `builder-store-fixtures.ts`, `useBuilderStore.ts`, `field-save-errors.ts` and its test, `ContentBlocksRuleTest.php`,
-    `NoteContentShapeTest.php`, `AttachmentPolicyTest.php`, a `FieldType` unit test, `routes/tenant.php` (hub),
-    `docs/data-dictionary.md` (hub), and `docs/piping-output-encoding-design.md` (hub).
-- **Close-out:** `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/backlog-triage.md`, `docs/claims/decisions.md`,
-  `docs/claims/lane-a.md`, `docs/gate-baselines.md`, and `PROGRESS.md` (own block and hand-off line).
-- **Extension 1, pushed with A built and uncommitted:**
-  - **A:** `app/Exceptions/Ocr/OcrException.php`, for one factory, `notReviewable()` (the confirm's refusal for a scan
-    that has not been read). ⚠️ **Deviation:** that file was edited BEFORE this extension was pushed — the slip
-    `M126`, `M127` and `M128` each recorded. Also `resources/js/Pages/submissions/encode-scan.test.ts`, a new test
-    file beside the edited `Encode.vue` that the claim's "beside the new components and pages" did not cover.
-  - **C, named before it is created:** `app/Services/Forms/ContentImageOwnership.php`, the publish check's database
-    half. It sits in the gate's own namespace, so `StructuralValidationGate.php` (cited by ADR-0011) calls it with no
-    `use` line.
-
-Shared artefacts taken: `docs/**` (the files above), the three new top-level `tests/e2e/*.spec.ts`, and `PROGRESS.md`
-(own block only). `openapi.json` is not taken: every new route is a session web route.
-Paired files taken: none. The new `.vue` files position nothing with a clip, use only semantic tokens, and import every
-component they use.
-Namespaces spent: migration prefix `2026_08_17_000117`; decision id `D74`. No ADR (`0010` stays reserved).
-Prediction:
-- **CI goes 6/6** after the local gates.
-- **Most likely red:** the citation lint, from shifted ledger or tier-1 citations (`ConfigPanel.vue`, `Encode.vue`,
-  `BuilderPresenter.php`, `E2eSeeder.php`). The per-commit host run should catch it first.
-- **Second:** a census or drift test meeting a new column, kind or mirrored constant (`TenantExtractColumnDriftTest`,
-  `DocumentedEnumCatalogDriftTest`).
-- **Most likely wrong:** that the three new E2E specs pass axe and the 375px overflow check in both themes on their
-  first CI run. The review grid, the zoom frames and the native file inputs are new layout that is costly to measure
-  on this host.
+➡️ **Next, under `D72` (the Oct 6 slot, one day early):** content blocks render (`R-c9f50df2`), the appearance hint on
+the author side and in the renderers (`R-6c76bed2`, `R-048a3286`), and a redirect after submit (`R-db169c29`).
 
 ## RELEASED — `M128`, a scanned paper form is read and matched to the questions it was printed from, the sidebar collapses, and a refused field edit marks its field (merged as PR #321, `1551f8b4`, 6/6 green with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

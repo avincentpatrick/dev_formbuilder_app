@@ -43,6 +43,10 @@ async function archive(page: Page, formId: string): Promise<void> {
 
 for (const theme of themes) {
     test(`Builder — a note's Content tab, composed (${theme})`, async ({ page }, info) => {
+        // A real create, an upload, three autosaves, a whole-builder scan and an archive. Measured: the desktop
+        // light case ran past the default 60s locally — the scan of all three panes is the slow part — and was
+        // killed in the archive, after its scan had passed. `impersonation.spec.ts`'s budget, for the same reason.
+        test.setTimeout(150_000);
         const formId = await createForm(page, `Content tab ${theme} ${info.project.name} ${Date.now()}`);
 
         try {

@@ -26,6 +26,7 @@ import { Link, usePage } from '@inertiajs/vue3';
 import { MdsIcon, MdsTooltip, useInertBackground } from '@meridian/design-system';
 import { navGroups, type NavItem } from './nav-model';
 import { useMemberStreak } from '@/composables/useMemberStreak';
+import { useSidebarCollapse } from '@/composables/useSidebarCollapse';
 
 /** The one destination that carries a count badge. See `badgeFor()` for why this is a literal. */
 const ACHIEVEMENTS_KEY = 'achievements';
@@ -177,6 +178,15 @@ onBeforeUnmount(() => {
 // the page there would inert a shell that has no overlay covering it.
 const takesPage = computed(() => props.drawerOpen && isMobile.value);
 
+/**
+ * M128 (`R-33c7fd56`): the sidebar can be collapsed to its icon rail on a wide screen, remembered per
+ * device (`D68` = B). A user-collapsed rail is a rail, so its labels need the bubble the 481–1024 band has.
+ * ⚠️ `!isMobile` IS J4b's FIX AND MUST STAY: below 480px the drawer moves focus programmatically, and an
+ * enabled tooltip would take the drawer's first Escape (see `RAIL_QUERY` above).
+ */
+const { collapsed, toggle } = useSidebarCollapse();
+const showsRailTooltip = computed(() => isRail.value || (collapsed.value && !isMobile.value));
+
 useInertBackground({ active: takesPage, root: wrap, initialFocus: '.sidebar__item' });
 
 function onKeydown(event: KeyboardEvent): void {
@@ -189,7 +199,7 @@ function onKeydown(event: KeyboardEvent): void {
         id="app-drawer"
         ref="wrap"
         class="sidebar-wrap"
-        :class="{ 'is-open': drawerOpen }"
+        :class="{ 'is-open': drawerOpen, 'is-collapsed': collapsed }"
         tabindex="-1"
         @keydown="onKeydown"
     >
@@ -213,6 +223,27 @@ function onKeydown(event: KeyboardEvent): void {
             <button type="button" class="sidebar__close" aria-label="Close navigation" @click="emit('close')">
                 <MdsIcon name="close" size="md" aria-hidden="true" />
             </button>
+            <!--
+                M128 — collapse to the icon rail on a wide screen. Shown only above 1024px, where the sidebar is
+                otherwise always full width; below that it already is a rail or a drawer. Named, expanded-state
+                and target exactly as the top nav's hamburger, so the two controls over this landmark agree. A
+                plain button rather than `MdsIconButton`, whose native `title` would double this tooltip.
+            -->
+            <MdsTooltip :text="collapsed ? 'Expand navigation' : 'Collapse navigation'" placement="right" block>
+                <template #default="{ trigger }">
+                    <button
+                        v-bind="trigger"
+                        type="button"
+                        class="sidebar__collapse"
+                        :aria-label="collapsed ? 'Expand navigation' : 'Collapse navigation'"
+                        :aria-expanded="!collapsed"
+                        aria-controls="app-drawer"
+                        @click="toggle"
+                    >
+                        <MdsIcon :name="collapsed ? 'chevron-right' : 'chevron-left'" size="md" aria-hidden="true" />
+                    </button>
+                </template>
+            </MdsTooltip>
             <div v-for="group in visibleGroups" :key="group.key" class="sidebar__group">
                 <!--
                     ⚠️ A <div>, AND THE ELEMENT TYPE IS PINNED BY THREE SEPARATE THINGS.
@@ -241,7 +272,7 @@ function onKeydown(event: KeyboardEvent): void {
                     :aria-labelledby="group.label ? labelId(group.key) : undefined"
                 >
                     <li v-for="item in group.items" :key="item.key">
-                        <MdsTooltip :text="item.label" placement="right" block :disabled="!isRail">
+                        <MdsTooltip :text="item.label" placement="right" block :disabled="!showsRailTooltip">
                             <template #default="{ trigger }">
                                 <Link
                                     v-bind="trigger"
@@ -530,6 +561,81 @@ a.sidebar__item:focus-visible {
         margin-top: var(--mds-space-5);
         padding-top: 0;
         border-top: none;
+    }
+}
+
+/* ── M128 (`R-33c7fd56`): the user-collapsed rail, wide screens only ─────────────────────────────────────
+   Everything below is appended rather than woven into the blocks above, because those blocks are cited by
+   line from the backlog. The toggle exists only above 1024px; below that the sidebar is already a rail or a
+   drawer. 44px is DSR §4.4's target size, which applies at desktop too, and it fits the rail's 48px. */
+.sidebar__collapse {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    min-height: 44px;
+    margin-left: auto;
+    margin-bottom: var(--mds-space-2);
+    border: none;
+    border-radius: var(--mds-radius-md);
+    background-color: transparent;
+    color: var(--mds-color-text-secondary);
+    cursor: pointer;
+}
+
+.sidebar__collapse:hover {
+    background-color: var(--mds-color-bg-sunken);
+}
+
+.sidebar__collapse:focus-visible {
+    outline: 2px solid var(--mds-color-focus-ring);
+    outline-offset: -2px;
+}
+
+@media (max-width: 1024px) {
+    .sidebar__collapse {
+        display: none;
+    }
+}
+
+/* ⚠️ THE COLLAPSED RAIL MUST STAY INSIDE `min-width: 1025px`. `.sidebar-wrap.is-collapsed .sidebar` out-ranks
+   the drawer's `.sidebar { width: 260px }` (specificity 0,4,0 against 0,2,0 once scoped), so unconfined it
+   would paint the open mobile drawer as a 64px rail with its labels clipped. These are the tablet rail's
+   declarations above, repeated for a wide screen whose user asked for the rail. */
+@media (min-width: 1025px) {
+    .sidebar-wrap.is-collapsed .sidebar {
+        width: 64px;
+        padding: var(--mds-space-4) var(--mds-space-2);
+    }
+    .sidebar-wrap.is-collapsed .sidebar__item {
+        justify-content: center;
+        gap: 0;
+    }
+    .sidebar-wrap.is-collapsed .sidebar__label {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
+    }
+    .sidebar-wrap.is-collapsed .sidebar__badge {
+        position: absolute;
+        top: var(--mds-space-1);
+        right: var(--mds-space-1);
+    }
+    .sidebar-wrap.is-collapsed .sidebar__group-label {
+        display: none;
+    }
+    .sidebar-wrap.is-collapsed .sidebar__group + .sidebar__group {
+        margin-top: var(--mds-space-2);
+        padding-top: var(--mds-space-2);
+        border-top: 1px solid var(--mds-color-border-default);
+    }
+    .sidebar-wrap.is-collapsed .sidebar__collapse {
+        margin-right: auto;
     }
 }
 </style>

@@ -932,16 +932,16 @@ function submitImport(): void {
    over. ERGONOMICALLY: all three panes stacked into one scrolling column, so reaching the canvas at 375px
    meant scrolling past ~31 palette buttons and reaching the config panel meant scrolling past the whole
    canvas. ARITHMETICALLY: 1024 is not a width this page ever has. The builder is the app's only fluid
-   page, so its box is `viewport − sidebar`, and the sidebar is 240px above 1024px and a 64px rail at or
+   page, so its box is `viewport − sidebar`, and the sidebar is 240px above 1024px (unless collapsed) and a 64px rail at or
    below it — so the box is 785px at a 1025px VIEWPORT and 960px at a 1024px one, NARROWER ON THE WIDER
    SCREEN. The three-column grid therefore stayed on through 1025–1200 with a canvas track of
    785 − 260 − 340 = 185px, and Playwright's projects are 375/834/1440, so no gate in this repo has
    ever rendered that state.
 
    60em = 960px, and it is the answer to two independent questions that agree: 260 (palette) + 340 (config)
-   + 360 (the smallest canvas worth having); and 1024 − 64, the widest box that can
-   exist while the sidebar is still a rail. The second is what makes the transition CONTINUOUS across the
-   sidebar swap — compact at 1024, compact at 1025, three panes from 1201 up.
+   + 360 (the smallest canvas worth having); and 1024 − 64, the widest box the AUTOMATIC rail can leave
+   (M128: a user-collapsed rail is 64px at ANY width, so the box is viewport − 64 — 961 at 1025, three panes on
+   a 361px canvas, still continuous). The second keeps the swap CONTINUOUS: compact 1024/1025, panes from 1201.
 
    ⚠️ THE INCLUSIVITY OF `max-width` IS LOAD-BEARING. At 59.9375em a 1024px viewport (box exactly 960)
    would flip to the WIDE layout while 1025px (box 785) stayed compact — the inversion, reintroduced from

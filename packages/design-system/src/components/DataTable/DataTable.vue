@@ -624,9 +624,9 @@ watch(() => [props.rows, props.columns, props.loading], () => queueMicrotask(mea
    `body-lg`, so the query resolves against 16/18/20px and scales with the text it is protecting; a `px`
    value is correct at exactly ONE type scale, which is the defect JR3 shipped and had to fix.
 
-   The number is 56em = 896 / 1008 / 1120px, and 896 is not a preference: it is THE WIDEST CONTENT BOX
-   THAT CAN EXIST WHILE THE SIDEBAR IS STILL A 64px RAIL (viewport 1024 − 64 rail − 64 padding). Choosing
-   exactly that makes the switch CONTINUOUS across the sidebar swap, which no smaller value can do:
+   The number is 56em = 896 / 1008 / 1120px, and 896 is not a preference: it is THE WIDEST CONTENT BOX THE
+   AUTOMATIC 64px RAIL CAN LEAVE (viewport 1024 − 64 rail − 64 padding; a user-collapsed rail, M128, leaves 897
+   at 1025 — a table, still continuous). Choosing it makes the switch CONTINUOUS, which no smaller value can do:
 
        viewport   375   834   1024        1025          1200   1201   1440   1600(wide)
        box        343   706   896         721           896    897    1136   1296

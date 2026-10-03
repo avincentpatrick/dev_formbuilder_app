@@ -189,7 +189,7 @@ The footer states, per version and re-derived from that version's own frozen byt
 >   - `SubmissionDraftService::saveDraft()` and `promote()` refuse a superseded version, so a scan of old paper needs a decision before it can become a draft;
 >   - `AttachmentPolicy` knows only `submission` and `form_field` owners, so the review screen cannot yet serve a scan image;
 >   - the draft reaper deletes any expired draft after 30 days;
->   - `duration` has no encode control.
+>   - `duration` has no encode control, so groundwork 2 lists a read duration for the reviewer rather than saving it (a filed row).
 
 ---
 
@@ -199,6 +199,15 @@ The footer states, per version and re-derived from that version's own frozen byt
 - **Linelist**: the same side-by-side pattern, but paginated across the N staged rows the batch produced — a reviewer works through row 1, row 2, ... row N (or filters to only low-confidence rows first), each one a full review-and-correct pass identical in shape to the single-form case.
 - **Column-to-field mapping (linelist-specific, one-time per form, reused thereafter)**: the OCR provider's table/document-structure detection (not plain single-block text OCR) extracts the sheet's row/column grid; the *first* linelist upload against a given form requires the uploader to map each detected column to a target field (a simple "column 1 → `age`, column 2 → `village_name`, ..." picker) — this mapping is cached per form and reused automatically on subsequent linelist uploads. **Drift detection**: if a later upload's detected column headers don't match the cached mapping's expected headers (e.g., the paper template changed), the system flags the mismatch and asks for re-confirmation rather than silently applying a stale mapping to structurally different data.
 - Confirming a staged draft (single or one row of a linelist) submits it through the ordinary `SubmissionPipeline` with `source` set appropriately — at that point it is an ordinary submission in every respect, including full expression-engine validation (`relevant`/`constraint`) exactly as if it had been manually encoded.
+
+> ✅ **As-built: groundwork 2 (M129, 2026-10-03). A scan is reviewed and saved as an ordinary response.**
+>
+> - **Where it starts.** A form's Responses tab offers "Scan paper forms" when the form accepts scans and the reader may enter responses. The scans page, `GET /forms/{form}/ocr/scans`, takes the upload and lists the newest scans. A scan's review route shows a page that waits while the scan is read, the reason and a way to key the response by hand if reading failed, and otherwise the review screen.
+> - **The review screen is the manual-encoding page in a scan mode, not a second renderer.** It renders the form's CURRENT published version with the scanned pages beside it, zoomable. A PDF scan is a download link, because tenant pages cannot be framed (a filed row). Each answer the scan touched carries a note in words: none at the auto threshold and above, "check this answer" between the two thresholds, and "needs manual entry" below them and for an unreadable answer. The colour marks the row; the words carry the meaning. Autosave is off.
+> - ⚠️ **§4's "staged draft" is not used.** A draft belongs to one user and is reaped after its TTL, while a scan belongs to the workspace until someone saves it. `M128` already kept the per-field record in `ocr_scans.extraction`, and the scan row is what holds a review until it is saved.
+> - **Old paper (`D74`, answered in chat).** A sheet printed from a superseded version carries its answers onto the current version, question by question: the same key, the same type, and a value the current question can hold. Anything else is listed for the reviewer with the text the scan read. A `duration` is listed too, because no channel has a control for it.
+> - **The save, as built.** `POST /forms/{form}/ocr/scans/{scan}/confirm` sends the reviewer's answers, never the extraction, through `SubmissionPipeline::submit()` with `source = ocr_single` and the scan's own id as the idempotency key. It then links the scan to the response and moves its page files there (§5). A conflict, a closed form or an unevaluable rule comes back with an errors bag, so the reviewer's corrections stay on the page.
+> - **The setting.** The per-form "Scanning" section of the form's settings, `PATCH /forms/{form}/ocr-scanning`, writes `forms.allow_ocr_single`. It sits in the builder's Form settings and on the form's Settings tab.
 
 ---
 

@@ -11,9 +11,12 @@ use App\Models\Form;
 use App\Models\Submission;
 use App\Models\User;
 use App\Policies\SubmissionPolicy;
+use App\Services\Entitlements\EntitlementService;
+use App\Services\Settings\TenantSettingRegistry;
 use App\Services\Submissions\SubmissionExporter;
 use App\Services\Submissions\SubmissionInboxPresenter;
 use App\Services\Submissions\SubmissionPdfRequestService;
+use App\Support\Entitlements\FeatureAdmission;
 use App\Support\Forms\FormTabSet;
 use App\Support\Navigation\CrumbTrail;
 use Illuminate\Http\RedirectResponse;
@@ -62,8 +65,13 @@ final class SubmissionInboxController extends Controller
      * `submissions.view` open this page for any form in the tenant and read its TITLE above an empty list.
      * `can:viewOverview,form` is the bound-form half. See `routes/tenant.php`.
      */
-    public function forForm(Request $request, Form $form, SubmissionInboxPresenter $presenter): Response
-    {
+    public function forForm(
+        Request $request,
+        Form $form,
+        SubmissionInboxPresenter $presenter,
+        EntitlementService $entitlements,
+        TenantSettingRegistry $settings,
+    ): Response {
         /** @var User $user */
         $user = $request->user();
 
@@ -76,7 +84,26 @@ final class SubmissionInboxController extends Controller
             'form' => ['id' => $form->id, 'title' => $form->title],
             'tabs' => FormTabSet::for($form, $user),
             'crumbs' => CrumbTrail::forms($user)->form($form)->current('Responses'),
+            'scan_url' => $this->scanUrl($user, $form, $entitlements, $settings),
         ]);
+    }
+
+    /**
+     * The "Scan paper forms" entry on a form's Responses tab (M129), or null.
+     *
+     * Offered only where the scans page would admit this reader — its three gates, asked as the route asks
+     * them — AND the form accepts scans. The page itself renders for a form that does not, to say why; the
+     * entry does not, because a button leading to "this form does not accept scans" is a dead end on the one
+     * screen where responses are counted.
+     */
+    private function scanUrl(User $user, Form $form, EntitlementService $entitlements, TenantSettingRegistry $settings): ?string
+    {
+        $offered = $form->allow_ocr_single === true
+            && $user->can('create', [Submission::class, $form])
+            && $settings->moduleEnabled('ocr_single')
+            && FeatureAdmission::admits($entitlements, 'ocr_single');
+
+        return $offered ? route('forms.ocr.scans.index', $form, false) : null;
     }
 
     /**

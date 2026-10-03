@@ -1012,7 +1012,27 @@ Route::middleware([
         ->name('forms.ocr.scans.store');
     Route::get('/forms/{form}/ocr/scans/{scan}', [OcrScanController::class, 'show'])
         ->middleware(['can:create,'.Submission::class.',form', 'module:ocr_single', 'feature:ocr_single'])
+        ->whereUuid('scan')
         ->name('forms.ocr.scans.show');
+    // M129 (groundwork 2): the scans page, one scan's review, its page files, and saving it as a response. The
+    // same gates as the two above. `{scan}` is a uuid by constraint, so a malformed id is a 404 rather than a
+    // Postgres error, and `{page}` is the page's position on the scan, never an attachment id.
+    Route::get('/forms/{form}/ocr/scans', [OcrScanController::class, 'index'])
+        ->middleware(['can:create,'.Submission::class.',form', 'module:ocr_single', 'feature:ocr_single'])
+        ->name('forms.ocr.scans.index');
+    Route::get('/forms/{form}/ocr/scans/{scan}/review', [OcrScanController::class, 'review'])
+        ->middleware(['can:create,'.Submission::class.',form', 'module:ocr_single', 'feature:ocr_single'])
+        ->whereUuid('scan')
+        ->name('forms.ocr.scans.review');
+    Route::get('/forms/{form}/ocr/scans/{scan}/pages/{page}', [OcrScanController::class, 'page'])
+        ->middleware(['can:create,'.Submission::class.',form', 'module:ocr_single', 'feature:ocr_single'])
+        ->whereUuid('scan')
+        ->whereNumber('page')
+        ->name('forms.ocr.scans.page');
+    Route::post('/forms/{form}/ocr/scans/{scan}/confirm', [OcrScanController::class, 'confirm'])
+        ->middleware(['can:create,'.Submission::class.',form', 'module:ocr_single', 'feature:ocr_single'])
+        ->whereUuid('scan')
+        ->name('forms.ocr.scans.confirm');
 });
 
 /*

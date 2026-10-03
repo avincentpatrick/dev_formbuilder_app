@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Models\WebhookEndpoint;
 use App\Policies\FormPolicy;
 use App\Services\Entitlements\EntitlementService;
+use App\Services\Settings\TenantSettingRegistry;
 use App\Services\Submissions\SubmissionInboxPresenter;
 use App\Support\Entitlements\FeatureAdmission;
 use App\Support\Forms\FormHubLink;
@@ -261,6 +262,25 @@ final class CrumbTrail
     private static function featureAdmits(EntitlementService $entitlements, string $key): bool
     {
         return FeatureAdmission::admits($entitlements, $key);
+    }
+
+    /**
+     * That form's scanned paper forms (M129) — the page a scan is uploaded on, and found again after reading.
+     *
+     * ⚠️ THE ROUTE'S THREE GATES, asked as the route asks them: `can:create` on a submission for this form,
+     * the workspace's `ocr_single` module toggle, and the plan through {@see featureAdmits()}. The module is
+     * asked separately because {@see FeatureAdmission} admits a request with no plan catalog without reading
+     * the toggle, while `RequireModule` refuses it either way. ⚠️ On the two pages that carry this crumb all
+     * three gates have already passed, so it is a fail-closed guard no shipped page can observe — labelled as
+     * one, the convention {@see formSubmissions()} follows.
+     */
+    public function ocrScans(Form $form, EntitlementService $entitlements, TenantSettingRegistry $settings): self
+    {
+        $reachable = $this->user->can('create', [Submission::class, $form])
+            && $settings->moduleEnabled('ocr_single')
+            && self::featureAdmits($entitlements, 'ocr_single');
+
+        return $this->push('Scanned forms', $reachable ? FormHubLink::path($form->id).'/ocr/scans' : null);
     }
 
     /**

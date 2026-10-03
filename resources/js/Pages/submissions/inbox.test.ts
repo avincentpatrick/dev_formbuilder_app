@@ -228,6 +228,21 @@ describe('submissions inbox — one form’s responses', () => {
         wrapper.unmount();
     });
 
+    it('offers "Scan paper forms" only when the server sends where it leads (M129)', async () => {
+        const without = render(perFormProps());
+        expect(without.findAll('button').some((button) => button.text().includes('Scan paper forms'))).toBe(false);
+        without.unmount();
+
+        mocks.visit.mockClear();
+        const offered = render(perFormProps({ scan_url: `/forms/${FORM_ID}/ocr/scans` }));
+        const button = offered.findAll('button').find((candidate) => candidate.text().includes('Scan paper forms'));
+        expect(button).toBeDefined();
+
+        await button!.trigger('click');
+        expect(mocks.visit).toHaveBeenCalledWith(`/forms/${FORM_ID}/ocr/scans`);
+        offered.unmount();
+    });
+
     it('drops the Form column and the Form dropdown, which are noise here', () => {
         const wrapper = render(perFormProps());
 

@@ -7,6 +7,7 @@ namespace App\Policies;
 use App\Enums\AttachmentKind;
 use App\Enums\ScanStatus;
 use App\Models\Attachment;
+use App\Models\Form;
 use App\Models\FormField;
 use App\Models\Submission;
 use App\Models\User;
@@ -50,9 +51,9 @@ use App\Services\Authorization\ResourceGrantResolver;
  * mitigation when the ids were legitimately theirs once.
  *
  * ⚠️ THE OWNER IS RESOLVED LOCALLY, AND THAT IS A CONSTRAINT RATHER THAN A STYLE CHOICE. `attachable_type`
- * carries five aliases and only three are in the global morph map: `tenant` (brand logo) and
- * `feedback_report` (screenshot) are DELIBERATELY absent, because registering them would change how
- * Sanctum's `tokenable_type` and Spatie's `model_type` serialize and split existing rows between alias and
+ * carries seven aliases. Four are in the global morph map — `submission`, `form_field`, `webhook_delivery` and, since
+ * M129, `form` — and `tenant`, `feedback_report` and `ocr_scan` are DELIBERATELY absent, because registering them
+ * would change how Sanctum's `tokenable_type` and Spatie's `model_type` serialize and split existing rows between alias and
  * FQCN — the `enforceMorphMap` break that cost 90 test failures. `BrandingMorphAliasTest` pins that absence
  * and prescribes this exact remedy: "a LOCAL resolution (a match on `kind`, or a dedicated relation), never
  * a global registration". So nothing here touches `$attachment->attachable`.
@@ -96,6 +97,13 @@ final class AttachmentPolicy
             AttachmentKind::ExportArtifact => $user->can('submissions.view')
                 && $this->withinOwnerScope($user, $attachment),
 
+            // M129, `D58` = B. A note's image belongs to the FORM, so the people who may see it are the people who may
+            // open that form's hub — `viewOverview`, the hub's own gate — which reads the same for the editor composing
+            // the note and a viewer reading the form. A respondent never comes here: the renderer's guest read is
+            // `R-c9f50df2`'s. An image held by anything but a form fails closed.
+            AttachmentKind::FormContentImage => $attachment->attachable_type === 'form'
+                && $this->mayOpenForm($user, $attachment->attachable_id),
+
             // Wired by nothing today. It fails closed rather than falling into the submission arm, whose
             // scope is meaningless for a file owned by a user: an avatar feature must decide here.
             AttachmentKind::Avatar => false,
@@ -114,6 +122,14 @@ final class AttachmentPolicy
             'form_field' => $this->scopedToStagedField($user, $attachment->attachable_id),
             default => false,
         };
+    }
+
+    /** A form's own file: delegated to {@see FormPolicy::viewOverview()}, never copied. A missing form fails closed. */
+    private function mayOpenForm(User $user, string $formId): bool
+    {
+        $form = Form::query()->whereKey($formId)->first();
+
+        return $form !== null && $user->can('viewOverview', $form);
     }
 
     /**

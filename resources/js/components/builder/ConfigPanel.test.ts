@@ -84,7 +84,7 @@ const PALETTE: PaletteGroup[] = [
             // the fixture rather than only in a comment because that is what makes value_shape LOAD-BEARING
             // here: no type-checker reads this file (tsconfig excludes **/*.test.ts), so a required member
             // added to PaletteType would otherwise rot silently to undefined.
-            { value: 'note', label: 'Note', advanced: false, has_options: false, config_editor: null, value_shape: 'no_answer' },
+            { value: 'note', label: 'Note', advanced: false, has_options: false, config_editor: 'content', value_shape: 'no_answer' },
         ],
     },
 ];
@@ -140,9 +140,16 @@ function section(overrides: Partial<LocalSection> = {}): LocalSection {
  * vacuously or fails for the wrong reason. It defaults to empty because every pre-M116 case wants that.
  */
 function makeStore(
-    selected: { field?: LocalField | null; section?: LocalSection | null; fields?: LocalField[]; errors?: Record<string, Record<string, string[]>> } = {},
+    selected: {
+        field?: LocalField | null;
+        section?: LocalSection | null;
+        fields?: LocalField[];
+        errors?: Record<string, Record<string, string[]>>;
+        touch?: (uid: string, kind: string) => void;
+    } = {},
 ): BuilderStore {
     return {
+        formId: 'form-1',
         selectedField: computed(() => selected.field ?? null),
         selectedSection: computed(() => selected.section ?? null),
         saveError: ref<string | null>(null), saveFieldErrors: ref<Record<string, Record<string, string[]>>>(selected.errors ?? {}),
@@ -152,7 +159,7 @@ function makeStore(
         palette: PALETTE,
         sections: ref<LocalSection[]>([]),
         fields: ref<LocalField[]>(selected.fields ?? []),
-        touch: () => undefined,
+        touch: selected.touch ?? (() => undefined),
         moveFieldToSection: () => undefined,
         saveFieldToLibrary: () => Promise.resolve(),
     } as unknown as BuilderStore;
@@ -188,9 +195,31 @@ describe('ConfigPanel — the tab set it hands the shared widget', () => {
         // M115. ValueShape::allows() refuses every rule type for no_answer, and since M113 the publish gate
         // refuses them too — so offering the tab on a note was a route to a form that could not be
         // published. The negative control is the case above: short_text keeps its tab.
+        // M129: a note gained the Content tab, between Basics and Advanced, from `FieldType::configEditor()`.
         const note = mountPanel(makeStore({ field: field({ field_type: 'note' }) }));
 
-        expect(note.findAll('[role="tab"]').map((tab) => tab.text())).toEqual(['Basics', 'Advanced']);
+        expect(note.findAll('[role="tab"]').map((tab) => tab.text())).toEqual(['Basics', 'Content', 'Advanced']);
+    });
+
+    it("mounts a note's content editor on the Content tab, and an emptied list removes the key rather than saving []", async () => {
+        // M129, `R-6dedc3a9`. The absence is what every reader of the config treats as "no blocks"; an empty list
+        // would be a second spelling of the same thing.
+        const touch = vi.fn();
+        const note = field({ field_type: 'note', config: { content: [{ type: 'divider' }], other: 1 } });
+        const wrapper = mountPanel(makeStore({ field: note, touch }));
+
+        await wrapper.findAll('[role="tab"]').find((tab) => tab.text() === 'Content')!.trigger('click');
+        const editor = wrapper.findComponent({ name: 'ContentBlocksEditor' });
+        expect(editor.props('blocks')).toEqual([{ type: 'divider' }]);
+        expect(editor.props('formId')).toBe('form-1');
+
+        editor.vm.$emit('update:blocks', [{ type: 'divider' }, { type: 'heading', level: 2, text: 'Next' }]);
+        expect(note.config).toEqual({ content: [{ type: 'divider' }, { type: 'heading', level: 2, text: 'Next' }], other: 1 });
+
+        editor.vm.$emit('update:blocks', []);
+        expect(note.config).toEqual({ other: 1 });
+        expect(touch).toHaveBeenCalledTimes(2);
+        expect(touch).toHaveBeenLastCalledWith('f1', 'field');
     });
 
     it('offers a section only Basics and Advanced', () => {

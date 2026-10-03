@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Tenant;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Attachments\StoreAttachmentRequest;
+use App\Http\Requests\Forms\StoreFormContentImageRequest;
 use App\Models\Attachment;
 use App\Models\Form;
 use App\Models\FormVersion;
@@ -26,6 +27,10 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  * A thin channel adapter over {@see AttachmentStorageService}; the file stages against the form's published
  * version and is re-pointed to the submission at persist. Serving is withheld until the scan status is
  * servable (an unscanned/infected file 409s regardless of permission).
+ *
+ * Since M129 it also takes a form author's image for a note's content (`POST /forms/{form}/content-images`, gated
+ * `can:update,form` — `R-f0c5b682`). The image belongs to the FORM, not a version (`D58` = B), and staff read it
+ * back through the same `show()`, under `AttachmentPolicy`'s `FormContentImage` arm.
  */
 final class AttachmentController extends Controller
 {
@@ -41,6 +46,28 @@ final class AttachmentController extends Controller
         );
 
         return response()->json(['data' => $attachment->toAnswerRef()], 201);
+    }
+
+    /**
+     * 201 with what the editor needs to show the image at once: its id (what the block stores), where staff read it,
+     * and whether it has passed its virus check — until it has, `show()` answers 409 and the editor says "checking".
+     */
+    public function storeFormContentImage(StoreFormContentImageRequest $request, Form $form, AttachmentStorageService $service): JsonResponse
+    {
+        $attachment = $service->storeFormContentImage(
+            $request->uploadedImage(),
+            (string) $form->tenant_id,
+            (string) $form->id,
+            (string) $request->user()?->getAuthIdentifier(),
+        );
+
+        return response()->json(['data' => [
+            'id' => $attachment->id,
+            'url' => route('attachments.show', $attachment, false),
+            'servable' => $attachment->fresh()?->virus_scan_status->servable() ?? false,
+            'width' => $attachment->width,
+            'height' => $attachment->height,
+        ]], 201);
     }
 
     public function show(Attachment $attachment): StreamedResponse

@@ -183,7 +183,7 @@ final class StructuralValidationGate
             // Increment M125: a note's content blocks, STRICTLY — the save accepted a blank heading mid-edit, and a
             // respondent must never be shown one. A note with no `content` is today's one-line note and passes.
             if ($field->field_type === FieldType::Note) {
-                $violations[] = $this->capture(fn () => $this->assertNoteContentResolves($field));
+                $violations[] = $this->capture(fn () => $this->assertNoteContentResolves($field, (string) $version->form_id));
             }
         }
 
@@ -515,8 +515,12 @@ final class StructuralValidationGate
         }
     }
 
-    /** A note's `config.content`, when present, must be a block list a respondent can be shown ({@see ContentBlocks}). */
-    private function assertNoteContentResolves(FormField $field): void
+    /**
+     * A note's `config.content`, when present, must be a block list a respondent can be shown ({@see ContentBlocks}) —
+     * and since M129 each image in it must be this form's own ({@see ContentImageOwnership}). The shape is asked first,
+     * so the ownership query only ever sees well-formed uuids.
+     */
+    private function assertNoteContentResolves(FormField $field, string $formId): void
     {
         $content = data_get($field->config, 'content');
         if ($content === null) {
@@ -526,6 +530,17 @@ final class StructuralValidationGate
         $problem = ContentBlocks::problem($content, strict: true);
         if ($problem !== null) {
             throw PublishValidationException::noteContentInvalid($field->key, $problem);
+        }
+
+        $images = ContentBlocks::imageIds($content);
+        $foreign = ContentImageOwnership::foreign($formId, array_values($images));
+        foreach ($images as $index => $id) {
+            if (in_array($id, $foreign, true)) {
+                throw PublishValidationException::noteContentInvalid(
+                    $field->key,
+                    'block '.($index + 1).'’s image is missing, belongs to another form, or failed its virus check — upload it again',
+                );
+            }
         }
     }
 }

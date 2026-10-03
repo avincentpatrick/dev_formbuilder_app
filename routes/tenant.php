@@ -1042,6 +1042,11 @@ Route::middleware([
     Route::patch('/forms/{form}/ocr-scanning', [FormController::class, 'updateOcrScanning'])
         ->middleware(['can:update,form', 'module:ocr_single', 'feature:ocr_single'])
         ->name('forms.ocr-scanning');
+    // M129, `R-f0c5b682`: an image for a note's content. Whoever may edit the form may illustrate it, and the
+    // image belongs to the form (`D58` = B). Throttled like an upload, because each one is stored and scanned.
+    Route::post('/forms/{form}/content-images', [AttachmentController::class, 'storeFormContentImage'])
+        ->middleware(['can:update,form', 'throttle:30,1'])
+        ->name('forms.content-images.store');
 });
 
 /*

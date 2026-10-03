@@ -14,6 +14,13 @@ use App\Rules\ContentBlocks;
 // doubled backslashes (CLAUDE.md, Traps on this host).
 //
 // ⚠️ Helpers are prefixed `contentBlocks*`: Pest loads every file into one process.
+//
+// M129 adds the image block (`R-f0c5b682`, `D58` = B) and the link vectors the builder's editor shares
+// (`tests/fixtures/content-block-links.json`): the TS half reads the same file, so the two halves cannot drift apart
+// without one suite going red.
+
+/** A well-formed image id: the rule checks the shape only; whose image it is, the publish gate asks the database. */
+const CONTENT_BLOCKS_IMAGE_ID = '0192e2e0-0000-7000-8000-0000000000c1';
 
 /** @return array<string, mixed> */
 function contentBlocksSpan(string $text = 'Read the form', array $extra = []): array
@@ -43,7 +50,24 @@ function contentBlocksEveryKind(): array
             contentBlocksSpan(' or '),
             contentBlocksSpan('call', ['link' => 'tel:+6321234567']),
         ]],
+        ['type' => 'image', 'attachment_id' => CONTENT_BLOCKS_IMAGE_ID, 'alt' => 'A map of the clinic entrance'],
     ];
+}
+
+/** @return array<string, array{string, bool}> */
+function contentBlocksLinkVectors(): array
+{
+    /** @var array{safe: list<string>, unsafe: list<string>} $vectors */
+    $vectors = json_decode((string) file_get_contents(__DIR__.'/../../fixtures/content-block-links.json'), true, flags: JSON_THROW_ON_ERROR);
+
+    $cases = [];
+    foreach (['safe' => true, 'unsafe' => false] as $half => $expected) {
+        foreach ($vectors[$half] as $position => $link) {
+            $cases["{$half} #".($position + 1)] = [$link, $expected];
+        }
+    }
+
+    return $cases;
 }
 
 it('accepts every block kind, in both modes', function (bool $strict): void {
@@ -61,6 +85,8 @@ it('accepts what an author has mid-edit when lenient, and refuses it when strict
     'a paragraph of blanks' => [['type' => 'paragraph', 'spans' => [contentBlocksSpan(' '), ['text' => null]]], 'has no text'],
     'a callout with no text' => [['type' => 'callout', 'tone' => 'info', 'spans' => []], 'has no text'],
     'a link with no address' => [['type' => 'paragraph', 'spans' => [contentBlocksSpan('here', ['link' => null])]], 'link with no address'],
+    'an image not described yet' => [['type' => 'image', 'attachment_id' => CONTENT_BLOCKS_IMAGE_ID, 'alt' => null], 'image with no description'],
+    'an image described with spaces' => [['type' => 'image', 'attachment_id' => CONTENT_BLOCKS_IMAGE_ID, 'alt' => '   '], 'image with no description'],
 ]);
 
 it('refuses a bad shape in both modes', function (mixed $value, string $reason): void {
@@ -71,7 +97,12 @@ it('refuses a bad shape in both modes', function (mixed $value, string $reason):
     'an object instead of a list' => [['first' => ['type' => 'divider']], 'list of blocks'],
     'a block that is a list' => [[['divider']], 'is not a block'],
     'an unknown type' => [[['type' => 'video', 'src' => 'x']], 'unknown type'],
-    'an image, until D58' => [[['type' => 'image', 'attachment_id' => '01J']], 'unknown type'],
+    'an image naming an id that is not a uuid' => [[['type' => 'image', 'attachment_id' => '01J', 'alt' => 'A map']], 'names no uploaded file'],
+    'an image naming no id' => [[['type' => 'image', 'alt' => 'A map']], 'names no uploaded file'],
+    'an image whose id is a number' => [[['type' => 'image', 'attachment_id' => 42, 'alt' => 'A map']], 'names no uploaded file'],
+    'an image carrying an address' => [[['type' => 'image', 'attachment_id' => CONTENT_BLOCKS_IMAGE_ID, 'alt' => 'A map', 'url' => 'https://example.org/x.png']], 'unknown setting “url”'],
+    'an image description that is not text' => [[['type' => 'image', 'attachment_id' => CONTENT_BLOCKS_IMAGE_ID, 'alt' => 42]], 'description is not text'],
+    'an image description too long' => [[['type' => 'image', 'attachment_id' => CONTENT_BLOCKS_IMAGE_ID, 'alt' => str_repeat('a', ContentBlocks::MAX_ALT_LENGTH + 1)]], 'longer than'],
     'an html key on a block' => [[['type' => 'heading', 'level' => 1, 'text' => 'Hi', 'html' => '<b>x</b>']], 'unknown setting “html”'],
     'an html key on a span' => [[['type' => 'paragraph', 'spans' => [contentBlocksSpan('Hi', ['html' => '<b>x</b>'])]]], 'unknown setting “html”'],
     'a span nesting spans' => [[['type' => 'paragraph', 'spans' => [contentBlocksSpan('Hi', ['spans' => [contentBlocksSpan()]])]]], 'unknown setting “spans”'],
@@ -127,3 +158,28 @@ it('accepts the links a form can safely show', function (string $link): void {
     'mailto' => ['mailto:help@example.org'],
     'tel' => ['tel:+6321234567'],
 ]);
+
+it('agrees with every link vector it shares with the editor in the builder', function (string $link, bool $safe): void {
+    expect(ContentBlocks::linkIsSafe($link))->toBe($safe);
+})->with(contentBlocksLinkVectors());
+
+it('reads a link fixture with both halves populated, so the vectors above can never pass by being absent', function (): void {
+    $cases = contentBlocksLinkVectors();
+
+    expect(array_filter($cases, static fn (array $case): bool => $case[1]))->toHaveCount(13)
+        ->and(array_filter($cases, static fn (array $case): bool => ! $case[1]))->toHaveCount(23);
+});
+
+it('lists every image id by the position of its block, in lower case, and nothing else', function (): void {
+    $blocks = [
+        ['type' => 'divider'],
+        ['type' => 'image', 'attachment_id' => strtoupper(CONTENT_BLOCKS_IMAGE_ID), 'alt' => 'A'],
+        ['type' => 'paragraph', 'spans' => [contentBlocksSpan()]],
+        ['type' => 'image', 'attachment_id' => CONTENT_BLOCKS_IMAGE_ID, 'alt' => 'B'],
+        ['type' => 'image', 'alt' => 'no id'],
+    ];
+
+    expect(ContentBlocks::imageIds($blocks))->toBe([1 => CONTENT_BLOCKS_IMAGE_ID, 3 => CONTENT_BLOCKS_IMAGE_ID])
+        ->and(ContentBlocks::imageIds('not a list'))->toBe([])
+        ->and(ContentBlocks::imageIds(['first' => ['type' => 'image', 'attachment_id' => CONTENT_BLOCKS_IMAGE_ID]]))->toBe([]);
+});

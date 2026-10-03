@@ -3520,9 +3520,9 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   test covering only `pending` stays green if `infected` is later added to the servable set.
   ⚠️ **CITATION DRIFT, THE FOURTH INCREMENT RUNNING, AND MINOR THIS TIME.** The row cites
   `app/Enums/ScanStatus.php:12` for the *"serving gate the threat model relies on"* docblock; it is at
-  `:26-27`. `FeedbackController.php:75` and `AttachmentController.php:43` were both exact. Filed by `M29`.
+  `:26-27`. `FeedbackController.php:75` and `AttachmentController::show()`'s scan-status guard were both exact (`M129` dropped the second's line number, which its import moved). Filed by `M29`.
 - ~~**`minor` · `AttachmentController`'s docblock calls `GET /attachments/{attachment}` a "signed read-back", and nothing about it is signed.**~~
-  ✅ **DONE — M34 (2026-08-27).** Citation exact: `app/Http/Controllers/Tenant/AttachmentController.php:20`.
+  ✅ **DONE — M34 (2026-08-27).** Citation exact: the class docblock of `app/Http/Controllers/Tenant/AttachmentController.php` (`M129` dropped its line number, which its import moved).
   The word is struck, and the docblock now names the controls that **do** exist rather than leaving a hole
   where the false one was — because "strike the word" alone hands the next reader the same question with no
   answer, and a docblock is what they check *instead of* the middleware. The route is session auth, plus
@@ -3564,7 +3564,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   ⛔ **AND ASKING THE KILLER QUESTION OF EVERY GATE ON THE ROUTE — NOT ONLY THE ONES THE ROW NAMES — FOUND A
   THIRD NAKED ONE.** `FeedbackConsoleController.php:78`'s `abort_unless(...->servable(), 409)` was asserted
   by **nothing**: M34 pinned that guard on the two routes it was looking at (`FeedbackController.php:75`,
-  `AttachmentController.php:43`) and this console copy is the third, so quarantined bytes could be served to
+  `AttachmentController::show()`'s scan-status guard) and this console copy is the third, so quarantined bytes could be served to
   the one principal who reads across every tenant with the whole repository green. Covered here, with the
   streaming case one column apart as its positive control.
   ⚠️ **MEASURED COST, RECORDED SO IT IS NOT REDISCOVERED:** a web-route 409 assertion in this suite runs
@@ -11490,8 +11490,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   ROTTED, AND ONE CLAIM FALSE.** `ConfirmationModal.vue:11` names a file `M117` renamed and a sentence it
   deleted (the in-tree statement moved to `draft-snapshot.ts:7`); `Builder.vue:531-537` and `:462-471` are both
   **+7** (`:538-544`, `:469-477`); `Encode.vue:38-42` is the IMPORT and was at filing time too, the mount being
-  `:185-195`. ⛔ **And *"that invariant lives only in prose today"* is FALSE** — `ConfigPanel.test.ts:210-219`,
-  `:358-367` and `FormSettingsModal.test.ts:97-110` already assert it at component level. What was genuinely
+  `:185-195`. ⛔ **And *"that invariant lives only in prose today"* is FALSE** — `ConfigPanel.test.ts`'s *exactly one tablist* case
+  and its *adds no second tablist* case (`M129` dropped both line numbers, which its edits moved) and `FormSettingsModal.test.ts:97-110` already assert it at component level. What was genuinely
   missing is the **page-level** count, now taken in `builder-axe.spec.ts` at all three viewports. ⚠️ **That
   assertion had to move from `getByRole('tablist')` to `locator('[role="tablist"]')`, measured:** below the
   container threshold the config pane is `display: none` and absent from the accessibility tree, so the
@@ -12823,3 +12823,22 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   translations but leaves the language list alone. So the guest form's language switcher (`PublicFormPresenter`)
   never offers an imported translation, and the builder and its preview cannot show one either (`R-fda28bf1`).
   **Live.** Filed by `M129`. **Tier: during-testing.**
+
+- **`minor` · No OCR upload test proves the upload reads a file's type from its bytes, and one test's comment says
+  it does.** Found by `M129` while writing the content-image upload tests. `UploadedFile::fake()` reports its type
+  from the file's NAME (`Illuminate\Http\Testing\File::getMimeType()` returns `MimeType::from($this->name)`), so
+  `ocrRoutePng()` in `tests/Feature/Ocr/OcrScanRoutesTest.php`, whose comment says the type is "SNIFFED as image/png
+  rather than declared", is `image/png` because it is named `page.png`, and an SVG named `.png` would pass every OCR
+  case. Measured in `M129`: the first content-image case passed an SVG named `.png` with a 201 for exactly this
+  reason, and the same bytes were refused once they arrived as a real `UploadedFile`. The OCR upload does read the
+  bytes of a real file (`storeOcrScanPage()` re-sniffs), so this is a gap in the tests, not in the server. The remedy
+  is one OCR case built from a real file, as `FormContentImageUploadTest`'s `contentImageRealFile()` builds one, and a
+  corrected comment. **Not live**. Filed by `M129`. **Tier: during-testing.**
+
+- **`nit` · A test that asks for a 409 as a web page waits about 30 seconds for the debug error page.** Found by
+  `M129`. Laravel ships no `errors/409` view, so with debug on in the test environment an HTML 409 falls through to
+  the full debug renderer. Measured: 40s for `OcrScanRoutesTest`'s "withholds a page until its virus check has
+  passed", against under a second for the same request sent with `Accept: application/json`; the Attachments folder
+  took 94s for 24 cases, two of them HTML 409s. Production renders it with debug off and is not affected. The remedy
+  is an `errors/409` view, or JSON in those cases, as `FormContentImageUploadTest` sends. **Not live**.
+  Filed by `M129`. **Tier: after-launch.**

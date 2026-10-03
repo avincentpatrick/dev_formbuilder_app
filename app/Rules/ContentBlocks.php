@@ -6,6 +6,7 @@ namespace App\Rules;
 
 use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
+use Illuminate\Support\Str;
 use Illuminate\Translation\PotentiallyTranslatedString;
 
 /**
@@ -17,6 +18,7 @@ use Illuminate\Translation\PotentiallyTranslatedString;
  *   paragraph {type, spans}
  *   callout   {type, tone: info|success|warning|danger, spans}
  *   divider   {type}
+ *   image     {type, attachment_id, alt}          attachment_id is one of the form's own uploads (M129, `D58` = B)
  *   span      {text, bold?, italic?, code?, link?}
  *
  * ⛔ CLOSED BY REFUSAL, NEVER BY ENUMERATION. `UpdateFieldRequest::payload()` overlays the raw config back over
@@ -34,7 +36,16 @@ use Illuminate\Translation\PotentiallyTranslatedString;
  * check and a script to the browser unless such characters are refused outright. A relative link is refused too: there
  * is no page of ours a form's text needs to point at. The renderer re-checks at render; this is the write half.
  *
- * ⚠️ `image` is NOT in the closed set. Whose attachment it is, and who may read it, is `D58`.
+ * ⚠️ THE BUILDER ASKS THE SAME QUESTION BEFORE IT SAVES. `linkLooksSafe()` in `content-markup.ts` is this method's
+ * twin, so the editor keeps a link it knows will be refused as plain text instead of losing the whole save to it. Both
+ * halves read `tests/fixtures/content-block-links.json` and each suite fails on a vector its half disagrees with, so a
+ * change here that the fixture does not carry is a change the editor has not heard about.
+ *
+ * ── AN IMAGE IS A POINTER, AND WHOSE IT IS IS ASKED AT PUBLISH (M129, `R-f0c5b682`) ──────────────────────────
+ * `D58` = B: a note's image belongs to the FORM (kind `form_content_image`, owner alias `form`). This rule checks the
+ * SHAPE in both modes — the id must be a uuid — and in strict mode a description, because an image a screen-reader
+ * user is told nothing about is not content. Whether the id names THIS form's own image is a database question a rule
+ * cannot ask: `StructuralValidationGate` asks it at publish, over {@see imageIds()}.
  */
 final class ContentBlocks implements ValidationRule
 {
@@ -48,6 +59,8 @@ final class ContentBlocks implements ValidationRule
 
     public const MAX_LINK_LENGTH = 2000;
 
+    public const MAX_ALT_LENGTH = 300;
+
     /** @var list<string> */
     public const LINK_SCHEMES = ['https', 'http', 'mailto', 'tel'];
 
@@ -60,6 +73,7 @@ final class ContentBlocks implements ValidationRule
         'paragraph' => ['type', 'spans'],
         'callout' => ['type', 'tone', 'spans'],
         'divider' => ['type'],
+        'image' => ['type', 'attachment_id', 'alt'],
     ];
 
     private const SPAN_KEYS = ['text', 'bold', 'italic', 'code', 'link'];
@@ -124,7 +138,31 @@ final class ContentBlocks implements ValidationRule
                 ? self::spansProblem($block['spans'] ?? null, $strict)
                 : 'has an unknown tone',
             'divider' => null,
+            'image' => self::imageProblem($block, $strict),
         };
+    }
+
+    /**
+     * The attachment id of every image block, keyed by the block's position, for the publish gate's ownership check.
+     * Lowercased, because Postgres answers a uuid in lowercase whatever case it was written in. A malformed block is
+     * skipped, never thrown on: {@see problem()} is the authority on shape, and the gate asks it first.
+     *
+     * @return array<int, string>
+     */
+    public static function imageIds(mixed $value): array
+    {
+        if (! is_array($value) || ! array_is_list($value)) {
+            return [];
+        }
+
+        $ids = [];
+        foreach ($value as $index => $block) {
+            if (is_array($block) && ($block['type'] ?? null) === 'image' && is_string($block['attachment_id'] ?? null)) {
+                $ids[$index] = strtolower($block['attachment_id']);
+            }
+        }
+
+        return $ids;
     }
 
     /**
@@ -146,6 +184,30 @@ final class ContentBlocks implements ValidationRule
         }
         if ($strict && trim((string) $text) === '') {
             return 'is a heading with no text';
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $block
+     */
+    private static function imageProblem(array $block, bool $strict): ?string
+    {
+        $id = $block['attachment_id'] ?? null;
+        if (! is_string($id) || ! Str::isUuid($id)) {
+            return 'is an image that names no uploaded file';
+        }
+
+        $alt = $block['alt'] ?? null;
+        if ($alt !== null && ! is_string($alt)) {
+            return 'is an image whose description is not text';
+        }
+        if (is_string($alt) && mb_strlen($alt) > self::MAX_ALT_LENGTH) {
+            return 'is an image whose description is longer than '.self::MAX_ALT_LENGTH.' characters';
+        }
+        if ($strict && trim((string) $alt) === '') {
+            return 'is an image with no description';
         }
 
         return null;
@@ -229,6 +291,13 @@ final class ContentBlocks implements ValidationRule
         }
         if ($scheme !== 'http' && $scheme !== 'https') {
             return true;
+        }
+
+        // An http(s) link must name its host after `//` (M129). Without this, `parse_url()` reads `https:443` as the
+        // host `https` on port 443 — a "safe" link to nowhere, and a reading the editor's twin could only copy by
+        // re-implementing PHP's port-guessing branch.
+        if (! str_starts_with(substr($link, strlen($match[0])), '//')) {
+            return false;
         }
 
         // ⚠️ `parse_url()` answers FALSE, not null, for a URL it cannot parse — `https://` among them — so a `?? ''`

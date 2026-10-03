@@ -75,7 +75,7 @@ it('renders the Settings tab for an Owner, current in the strip, with the trail 
     $this->withoutVite()->actingAs($this->owner)->get(settingsPageUrl($this->form))
         ->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->component('forms/Settings')
+            ->component('forms/Settings', false)
             ->where('form.id', $this->form->id)
             ->where('form.title', 'Clinic Visit')
             ->where('tabs.4.key', 'settings')

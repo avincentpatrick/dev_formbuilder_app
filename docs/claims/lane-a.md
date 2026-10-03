@@ -160,6 +160,14 @@ Files:
     `docs/data-dictionary.md` (hub), and `docs/piping-output-encoding-design.md` (hub).
 - **Close-out:** `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/backlog-triage.md`, `docs/claims/decisions.md`,
   `docs/claims/lane-a.md`, `docs/gate-baselines.md`, and `PROGRESS.md` (own block and hand-off line).
+- **Extension 1, pushed with A built and uncommitted:**
+  - **A:** `app/Exceptions/Ocr/OcrException.php`, for one factory, `notReviewable()` (the confirm's refusal for a scan
+    that has not been read). ⚠️ **Deviation:** that file was edited BEFORE this extension was pushed — the slip
+    `M126`, `M127` and `M128` each recorded. Also `resources/js/Pages/submissions/encode-scan.test.ts`, a new test
+    file beside the edited `Encode.vue` that the claim's "beside the new components and pages" did not cover.
+  - **C, named before it is created:** `app/Services/Forms/ContentImageOwnership.php`, the publish check's database
+    half. It sits in the gate's own namespace, so `StructuralValidationGate.php` (cited by ADR-0011) calls it with no
+    `use` line.
 
 Shared artefacts taken: `docs/**` (the files above), the three new top-level `tests/e2e/*.spec.ts`, and `PROGRESS.md`
 (own block only). `openapi.json` is not taken: every new route is a session web route.

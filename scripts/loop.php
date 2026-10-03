@@ -40,11 +40,12 @@ const DECISIONS = 'docs/claims/decisions.md';
 //
 // ⚠️ HELD ROWS ARE UNSCHEDULED, NOT INVISIBLE (M79). They must never be auto-started — but they ARE
 //    counted, and each sits in docs/pipeline.md with its blocker named; the older instruction that they
-//    were not to be reported or counted was overridden by the user. The list is closed: OCR, all
-//    uploading/import, payments, Track B, GDPR/legal/pricing. `scripts/pipeline-lint.php` P4 checks it
-//    against the held rows in both directions.
+//    were not to be reported or counted was overridden by the user. The list is closed: all
+//    uploading/import, payments, Track B, GDPR/legal/pricing. OCR left it on 2026-10-03 (`M127`): the user
+//    released it for the Oct 12 testing (`D72`), and P4 would refuse a keyword no held row covers.
+//    `scripts/pipeline-lint.php` P4 checks it against the held rows in both directions.
 const HELD_TOPICS = [
-    'ocr', 'upload', 'uploading', 'import', 'payment', 'payments', 'stripe',
+    'upload', 'uploading', 'import', 'payment', 'payments', 'stripe',
     'billing', 'track b', 'gdpr', 'legal', 'pricing',
 ];
 

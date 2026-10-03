@@ -210,4 +210,6 @@ The footer states, per version and re-derived from that version's own frozen byt
 <!-- The pipeline markers below are DELIBERATELY at end-of-file. A marker inserted mid-document
      shifts every line beneath it, and this repository cites documents as `path:N` — 25 such
      citations point into the files that carry markers. End-of-file shifts nothing. -->
-<!-- pipeline: id=ocr-channels title="PRD Features #1 and #2 — both OCR channels, per-form and linelist" phase=3 state=held size=XL blocker="user: needs filled paper-form samples and ground-truth data only the user can supply" tier=before-launch -->
+<!-- pipeline: id=ocr-single-form title="PRD Feature #1 — the single-form OCR channel: scan upload, the reading job, field matching from the printed layout, and the review-and-correct screen into SubmissionPipeline" phase=3 state=ready size=XL tier=early-testing -->
+<!-- pipeline: id=ocr-provider-bakeoff title="H1d — choose the OCR provider (Cloud Vision or Document AI) on real samples, calibrate the 90/70 thresholds, and write the reserved ADR-0010" phase=3 state=blocked size=M blocker="user: needs 10–20 hand-filled Print blank copies, scanned and photographed, with correct answers for five — due 2026-10-08 (D72)" tier=early-testing -->
+<!-- pipeline: id=ocr-linelist title="PRD Feature #2 — the linelist OCR channel" phase=3 state=blocked size=L blocker="user: needs 2–3 scanned linelist sheets and their blank templates (D72 puts it after Oct 12)" tier=during-testing -->

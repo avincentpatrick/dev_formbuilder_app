@@ -16,7 +16,77 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M126` is merged; a builder save keeps a rule's imported translations and grouping, and publish refuses an expression that can never hold
+## Status: ACTIVE CLAIM — `M127`, the Oct 12 realignment: the user's 19 builder comments and OCR become the whole `early-testing` tier (`m127-oct12-realignment`)
+
+Taken 2026-10-03. Branch `m127-oct12-realignment`, cut from `origin/main` at `98f16b2b`, PR into `main`.
+**Docs only — no code, no test, no migration.** The user set a testing date in chat on 2026-10-03: **Oct 12**. The
+app must be ready by then with all 19 form-builder comments (`M110`) and OCR, and everything else continues while
+users test. This increment writes that priority into the line.
+
+Scope:
+- **`D58` = B, `D60` = A, `D61` = B, `D62` = A, `D65` = A** recorded as answered (user decision, in chat, every one the
+  recommendation), and their five `**Awaits Dn.**` tokens stripped at the rows.
+- **`D72` filed and answered:** the Oct 12 scope. All 19 comments, with Connect project, form attachments and
+  automations as v1. The single-form OCR channel. One lane (ADR-0022 stands). OCR groundwork interleaved, accuracy
+  tuned on samples due 2026-10-08.
+- **Retiered up to `early-testing`:** the nine comment rows now `during-testing`, which are `R-048a3286`,
+  `R-6017d6d8`, `R-db169c29`, `R-9e634897`, `R-5da4a30f`, `R-bf49e4c1`, `R-b7bc5149`, `R-799d60f5` and `R-f0c5b682`.
+  The big three (`R-5da4a30f`, `R-bf49e4c1`, `R-b7bc5149`) each get a v1 scope written at the row, and a new
+  `during-testing` row carries the rest.
+- **Retiered down to `during-testing`,** each with its reason at the row: the fourteen `early-testing` rows that are
+  neither a comment nor a builder defect found while fixing one. They are `R-98b2d568`, `R-2ca49f19`, `R-6175d935`,
+  `R-b6b9bfa4`, `R-9e3e417e`, `R-1b966250`, `R-47552102`, `R-fcfc1f52`, `R-4328a4d9`, `R-90f16b17`, `R-f1312153`,
+  `R-2dc95042`, `R-68656155` and `R-cfb8641a`.
+- **OCR un-held:** `ocr-channels` is split into `ocr-single-form` (`early-testing`, ready), `ocr-provider-bakeoff`
+  (`early-testing`, blocked on samples) and `ocr-linelist` (`during-testing`, blocked on samples).
+  `uploading-import` **stays held**, because the user released OCR only.
+
+### Evidence verified
+
+Measured against `docs/pipeline.md` at `98f16b2b` and the rows' own points of truth:
+- **The nine up-rows** each carry `**Tier: during-testing.**`, and **the fourteen down-rows** each carry
+  `**Tier: early-testing.**`, in `docs/feature-backlog.md`.
+- The five `**Awaits Dn.**` tokens sit one per row in the `M110` block of `docs/feature-backlog.md`, and **nowhere
+  else**. No marker carries `decision=` for any of the five.
+- `D58`, `D60`, `D61`, `D62` and `D65` sit under `## OPEN` in `docs/claims/decisions.md`, recommending B, A, B, A and A.
+- The held `ocr-channels` marker is the last line of `docs/ocr-pipeline-design.md`.
+- No `D72` exists anywhere in `docs/` or `PROGRESS.md`.
+
+### Premise verified
+
+- **The priority is the user's,** given in chat on 2026-10-03 across three answers: trimmed scope, one lane, and
+  accept all five recommendations. The user asked for the sample-free OCR work to go first.
+- **ADR-0022 stands.** Two lanes were offered and declined once its three incidents were named, so nothing here
+  touches `lane-b.md`, `preflight` or tracker-lint R6.
+- **The testing-server notice is not re-owed.** `before-testing` is untouched (0 of 7), and the line's `Notified:`
+  reads yes (`M95`).
+- **OCR's prerequisites hold:**
+  - the provider key `OCR_GOOGLE_VISION_KEY` is set in the local `.env`;
+  - the printed blank form exists (route `forms.print`, the **Print blank** button in `forms/Show.vue`);
+  - ADR-0010 is still the reserved gap.
+- ⚠️ **`M126` named `R-57711a3a` as `M127`'s hub row.** That forward reference is superseded by the user's priority.
+  The row stays `early-testing`, as a builder defect testers will hit, and a later increment takes it.
+- ⚠️ **Two of the fourteen down-rows are security-flavoured:** `R-68656155` (the service worker caches a
+  credential-bearing shell) and `R-2dc95042` (self-registration domain squatting). The plan the user approved names
+  both as first in line after Oct 12.
+
+### Remedy verdict
+
+**A retier is a token edit at each row's point of truth, plus the line regenerated in the same push** (`CLAUDE.md`).
+`pipeline.php` reads the tier from the row and the blocker from `**Awaits Dn.**`, so stripping the token is what
+moves a row from `blocked` to `ready`. Row first lines are not edited, because a row id is the sha1 of its first
+line. The new rows are filed with severity, Filed-by, liveness and tier, as `BacklogProvenanceTest` requires.
+
+Files: `docs/claims/lane-a.md`, `docs/claims/decisions.md`, `docs/feature-backlog.md`, `docs/ocr-pipeline-design.md`,
+`docs/pipeline.md` and `docs/backlog-triage.md` (both generated), and `PROGRESS.md` (own status block and hand-off line
+only). `docs/gate-baselines.md` is regenerated at close-out.
+Shared artefacts taken: `docs/**` (the files above) and `PROGRESS.md` (own block only).
+Paired files taken: none.
+Namespaces spent: nothing from either; the decision id `D72`.
+Prediction: CI runs, because `docs/feature-backlog.md`, `docs/pipeline.md` and `docs/ocr-pipeline-design.md` are not in
+`paths-ignore`, and goes 6/6 with no code moved. The most likely red is `BacklogProvenanceTest` on a new row missing a
+marker. The most likely to be **wrong** is my expectation that `pipeline-lint` accepts three OCR markers stacked at the
+end of one section without complaint.
 
 ## RELEASED — `M126`, a builder save keeps each rule's translations and grouping, and publish refuses an ordering that can never hold (merged as PR #319, `4dacc724`, 6/6 green with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

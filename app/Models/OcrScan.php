@@ -20,7 +20,8 @@ use Illuminate\Support\Carbon;
  *
  * `pages` is an ordered list of `{attachment_id: string, response_path: string|null}`; a null
  * `response_path` is a page not yet read. `extraction` is `PrintedFormMatcher`'s result once every page
- * is read.
+ * is read. Once a reviewer saves the scan (M129, groundwork 2), `submission_id`, `confirmed_at` and
+ * `confirmed_by` record the response it became, and its page files belong to that response.
  *
  * @property string $id
  * @property string $tenant_id
@@ -35,6 +36,9 @@ use Illuminate\Support\Carbon;
  * @property string|null $error_code
  * @property string|null $error_message
  * @property Carbon|null $read_at
+ * @property string|null $submission_id
+ * @property Carbon|null $confirmed_at
+ * @property string|null $confirmed_by
  * @property Carbon $created_at
  * @property Carbon $updated_at
  */
@@ -59,6 +63,9 @@ class OcrScan extends Model implements TenantScoped
         'error_code',
         'error_message',
         'read_at',
+        'submission_id',
+        'confirmed_at',
+        'confirmed_by',
     ];
 
     /**
@@ -83,6 +90,7 @@ class OcrScan extends Model implements TenantScoped
             'extraction' => 'array',
             'attempts' => 'integer',
             'read_at' => 'datetime',
+            'confirmed_at' => 'datetime',
         ];
     }
 
@@ -96,5 +104,27 @@ class OcrScan extends Model implements TenantScoped
     public function formVersion(): BelongsTo
     {
         return $this->belongsTo(FormVersion::class);
+    }
+
+    /** @return BelongsTo<User, $this> */
+    public function uploader(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'uploaded_by');
+    }
+
+    /**
+     * The response a reviewer saved from this scan (M129), or nothing while it is still a proposal.
+     *
+     * @return BelongsTo<Submission, $this>
+     */
+    public function submission(): BelongsTo
+    {
+        return $this->belongsTo(Submission::class);
+    }
+
+    /** True once a reviewer has saved this scan as a response; it is then no longer reviewable. */
+    public function isConfirmed(): bool
+    {
+        return $this->submission_id !== null;
     }
 }

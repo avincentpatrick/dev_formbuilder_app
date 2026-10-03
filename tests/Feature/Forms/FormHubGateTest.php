@@ -237,7 +237,8 @@ it('offers an Owner every tab', function (): void {
             ->where('tabs.1.key', 'submissions')
             ->where('tabs.2.key', 'builder')
             ->where('tabs.3.key', 'analytics')
-            ->has('tabs', 4)
+            ->where('tabs.4.key', 'settings')
+            ->has('tabs', 5)
             ->has('share'));
 });
 

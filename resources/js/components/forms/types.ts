@@ -35,3 +35,48 @@ export interface ShareProps {
     // that leads nowhere.
     public_url: string | null;
 }
+
+/**
+ * The fields the form-settings sections read and write (M129, `D63`): the same block in the builder's "Form
+ * settings" modal and on the hub's Settings tab, from one server presenter, `FormSettingsPresenter`, so the two
+ * entry points can never show a section different values.
+ */
+export interface FormSettingsForm {
+    title: string;
+    description: string | null;
+    save_and_resume: boolean;
+    single_page_mode: boolean;
+    opens_at: string | null;
+    closes_at: string | null;
+    timezone: string;
+    max_responses: number | null;
+    confirmation_message: string | null;
+    confirmation_message_translations: Record<string, string>;
+    default_locale: string;
+    supported_locales: string[];
+}
+
+/**
+ * The Scanning section (M129): whether this form accepts scans of its printed paper, and whether its current
+ * published version is one paper can carry. The server sends null where the workspace cannot scan at all.
+ */
+export interface OcrScanningProps {
+    enabled: boolean;
+    eligible: boolean;
+    /** Why the current version cannot be read, in the upload's own words; null when it can. */
+    reason: string | null;
+}
+
+/** One node of the scope picker (G10b2). */
+export interface ScopeOption {
+    id: string;
+    name: string;
+    parent_id: string | null;
+    is_active: boolean;
+}
+
+/** The hub-only Scope section (M129): sent only to a holder of `scopes.manage`, the route's second gate. */
+export interface ScopeSectionProps {
+    current_node_id: string | null;
+    options: ScopeOption[];
+}

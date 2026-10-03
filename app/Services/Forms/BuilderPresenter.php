@@ -32,7 +32,10 @@ final class BuilderPresenter
      * same payload and two encodings of "what is this form's public link" is J1e's audit-export defect over
      * again. `BuilderRoutesTest` and `ShareModal.test.ts` pass unedited, which is the proof it moved nothing.
      */
-    public function __construct(private readonly FormSharePresenter $share) {}
+    public function __construct(
+        private readonly FormSharePresenter $share,
+        private readonly FormSettingsPresenter $settings,
+    ) {}
 
     /**
      * @return array<string, mixed>
@@ -58,34 +61,18 @@ final class BuilderPresenter
                 ->all()
             : [];
 
+        $settings = $this->settings->form($form);
+
         return [
+            // `id` and `status` are the builder's own. Every other key belongs to a settings section and comes
+            // from {@see FormSettingsPresenter}, which the form hub's Settings tab reads too (M129, `D63`), in
+            // the order these keys always had.
             'form' => [
                 'id' => $form->id,
-                'title' => $form->title,
-                'description' => $form->description,
+                'title' => $settings['title'],
+                'description' => $settings['description'],
                 'status' => $form->status->value,
-                // Per-form save-and-resume opt-in (H10) — drives the builder toggle; the guest runtime reads its
-                // own effective flag (tenant plan AND this) from PublicFormPresenter.
-                'save_and_resume' => $form->save_and_resume,
-                // Presentation mode (`D35`, row `R-f1332829`) — drives the Pages settings section AND the
-                // live preview, which until this row had no way to know and was therefore always stepped.
-                // The preview reads it off the RENDER model, never off the engine: see `PreviewRuntime`.
-                'single_page_mode' => $form->single_page_mode,
-                // Raw schedule values (Increment H12b) — the Schedule modal prefills from these (the ISO instants
-                // are rendered back into `timezone` for the datetime-local inputs). Enforcement uses `acceptance`
-                // on the runtime presenters; the builder only needs the raw window + cap to round-trip a PATCH.
-                'opens_at' => $form->opens_at?->toIso8601String(),
-                'closes_at' => $form->closes_at?->toIso8601String(),
-                'timezone' => $form->timezone,
-                'max_responses' => $form->max_responses,
-                // The confirmation template + its locale variants (Increment H6a) — raw, so the Confirmation
-                // modal round-trips exactly what the author wrote. The builder never renders a template:
-                // an author needs to see `${child_name}`, not a value there is no submission to supply.
-                'confirmation_message' => $form->confirmation_message,
-                'confirmation_message_translations' => $form->confirmation_message_translations ?? [],
-                // The form's locale set, so the modal can offer one message box per supported locale.
-                'default_locale' => $form->default_locale,
-                'supported_locales' => $form->supported_locales === [] ? [$form->default_locale] : array_values($form->supported_locales),
+                ...array_diff_key($settings, ['title' => true, 'description' => true]),
             ],
             'share' => $this->share->present($form),
             'draft' => $draft ? [
@@ -101,6 +88,9 @@ final class BuilderPresenter
             // Sourced server-side so every option is guaranteed to pass UpdateFormScheduleRequest's
             // Rule::in(DateTimeZone::listIdentifiers()) — a client-built list could drift and 422.
             'timezones' => DateTimeZone::listIdentifiers(),
+            // M129 — the Scanning section's facts, or null where this workspace cannot scan (the PATCH route's
+            // gates). An OPTIONAL prop on the client, so a builder fixture without it still type-checks.
+            'ocr_scanning' => $this->settings->ocrScanning($form),
         ];
     }
 

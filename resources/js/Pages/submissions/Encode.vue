@@ -36,6 +36,8 @@ import { MdsAlert, MdsBreadcrumb, MdsButton, MdsCard, type BreadcrumbItem } from
 import PageHeader from '@/components/shell/PageHeader.vue';
 import { createServerAutosave } from '@/composables/useServerAutosave';
 import FieldInput, { type AnswerValue, type EncodeField } from '@/components/submissions/FieldInput.vue';
+import ScanPages from '@/components/ocr/ScanPages.vue';
+import { scanNote, type ScanNote, type ScanReview } from '@/components/ocr/scan-review';
 import {
     createFormRuntime,
     LEAD_STEP_KEY,
@@ -154,6 +156,12 @@ const props = defineProps<{
      * so both call sites below are `v-if`-guarded rather than defaulting to a URL.
      */
     cancel_url: string | null;
+    /**
+     * The scan being reviewed (M129, single-form OCR), or absent in every other mode. Its presence IS scan
+     * mode: the answers start from what the scan read, autosave stays off, each answer carries the scan's
+     * note, and Save posts the reviewer's answers to `scan.submit_url` rather than to the encode route.
+     */
+    scan?: ScanReview | null;
 }>();
 
 /**
@@ -167,6 +175,9 @@ const props = defineProps<{
  * thing here — "there is no submission being corrected" — and the predicate has to say so.
  */
 const isEditing = computed(() => props.editing != null);
+
+/** M129 — scan mode, by the same `!= null` reading: every existing encode test omits the prop. */
+const isScanning = computed(() => props.scan != null);
 
 
 const page = usePage();
@@ -190,7 +201,7 @@ const runtime = createFormRuntime(props as unknown as SchemaResponse, {
     // restores, only that there is one. No uuid is adopted in edit mode — the submission is identified by its
     // id in the PATCH URL, and minting or adopting an idempotency key here would be a second identifier for a
     // request that already has an authorized one.
-    initialAnswers: (props.draft?.answers ?? props.editing?.answers) as Record<string, never> | undefined,
+    initialAnswers: (props.draft?.answers ?? props.editing?.answers ?? props.scan?.answers) as Record<string, never> | undefined,
     initialClientSubmissionUuid: props.draft?.client_submission_uuid,
 });
 
@@ -535,7 +546,13 @@ const autosave = createServerAutosave({
     // background tick that silently sends an approved submission back for re-review is the opposite of what
     // autosave is for. This is the belt to the presenter's null-URL braces; either alone would look
     // sufficient, which is why both are here.
-    enabled: computed(() => autosaveArmed.value && !isEditing.value && (isOpen.value || props.draft !== null)),
+    //
+    // ⚠️ NOR IN SCAN MODE (M129), by the same belt-and-braces: the review presenter also sends a null
+    // `draft_url`. A review autosaved down the draft channel would create a draft row nobody asked for, under
+    // a uuid this page minted — and the scan, not a draft, is what holds a review until it is saved.
+    enabled: computed(
+        () => autosaveArmed.value && !isEditing.value && !isScanning.value && (isOpen.value || props.draft !== null),
+    ),
 });
 
 /**
@@ -627,6 +644,12 @@ async function submit(): Promise<void> {
 
     if (isEditing.value) {
         submitEdit();
+
+        return;
+    }
+
+    if (isScanning.value) {
+        submitScan();
 
         return;
     }
@@ -767,6 +790,81 @@ function submitEdit(): void {
     );
 }
 
+/**
+ * M129 — save a reviewed scan as a response: a POST to the scan's own route, never the encode POST.
+ *
+ * The body is the answers and nothing else. The idempotency key is the scan's id, which the server owns, so
+ * there is no `client_submission_uuid` to send — this page's runtime minted one it never uses — and no draft
+ * baseline, because a scan is not a draft.
+ *
+ * `preserveState` is the edit path's predicate, and the server is built to arm it: a validation refusal comes
+ * back under `answers.*`, and a conflict, a closed form or an unevaluable rule under `scan`, so the reviewer's
+ * corrections stay on the page. A success redirects to the saved response.
+ */
+function submitScan(): void {
+    if (submitting.value || props.scan == null) {
+        return;
+    }
+    runtime.markSubmitAttempted();
+
+    // Detached from the reactive proxy, for the submit path's reason.
+    const answers = JSON.parse(JSON.stringify(runtime.answers)) as Record<string, never>;
+
+    router.post(
+        props.scan.submit_url,
+        { answers },
+        {
+            preserveScroll: true,
+            onStart: () => {
+                submitting.value = true;
+            },
+            onFinish: () => {
+                submitting.value = false;
+            },
+            preserveState: (page) => Object.keys(page.props.errors ?? {}).length > 0,
+        },
+    );
+}
+
+/** M129 — the scan's note beside each answer it touched, keyed by field key. */
+const scanNotes = computed<Record<string, ScanNote>>(() => {
+    const notes: Record<string, ScanNote> = {};
+    if (props.scan == null) {
+        return notes;
+    }
+    const multiPage = props.scan.pages.length > 1;
+    for (const [key, meta] of Object.entries(props.scan.fields)) {
+        const note = scanNote(meta, multiPage);
+        if (note !== null) {
+            notes[key] = note;
+        }
+    }
+    return notes;
+});
+
+/**
+ * M129 — answers the scan filled in whose question the OTHER answers now hide. They are posted (this page posts
+ * the full answer map) and the pipeline prunes them, so the reviewer is told before saving rather than after.
+ */
+const scanHiddenAnswers = computed<string[]>(() => {
+    const scan = props.scan;
+    if (scan == null) {
+        return [];
+    }
+    const labels: string[] = [];
+    for (const block of props.blocks) {
+        for (const field of block.fields) {
+            if (field.key in scan.answers && runtime.fieldRelevance.value[field.key] === false) {
+                labels.push(field.label);
+            }
+        }
+    }
+    return labels;
+});
+
+/** The scan-mode save failure that names no field (a conflict, a closed form, an unevaluable rule). */
+const scanError = computed<string | null>(() => (isScanning.value ? (pageErrors.value.scan ?? null) : null));
+
 /*
  * ── THE ESCAPE ROUTE FROM A REFUSED CORRECTION (Increment M74) ──────────────────────────────────────
  *
@@ -875,8 +973,16 @@ interface GuardedVisit {
 }
 
 function guardApplies(): boolean {
-    return isEditing.value && editDirty.value && !leaving;
+    // M129 — a scan review is unsaved in the same way an edit is: no autosave, nothing kept until Save.
+    return (isEditing.value || isScanning.value) && editDirty.value && !leaving;
 }
+
+/** The leave prompt names the channel, because "unsaved" is only true here (see the alert's comment). */
+const leaveMessage = computed(() =>
+    isScanning.value
+        ? 'Your corrections to this scan are not saved until you choose Save response. Leaving now discards them; the scan itself stays, and can be reviewed again.'
+        : 'Nothing on the edit channel is saved until you choose Save changes. Leaving now discards every change you have typed.',
+);
 
 /** A real browser navigation — closing the tab, reloading, typing a URL. The native prompt is all there is. */
 function onGuardedUnload(event: BeforeUnloadEvent): void {
@@ -988,11 +1094,13 @@ function onConflictKeydown(event: KeyboardEvent): void {
 </script>
 
 <template>
-    <div class="encode">
-        <Head :title="isEditing ? `Edit answers — ${form.title}` : `Encode — ${form.title}`" />
+    <div class="encode" :class="{ 'encode--scan': isScanning }">
+        <Head
+            :title="isScanning ? `Review a scan — ${form.title}` : isEditing ? `Edit answers — ${form.title}` : `Encode — ${form.title}`"
+        />
 
         <PageHeader
-            :title="isEditing ? 'Edit answers' : draft === null ? 'New submission' : 'Continue submission'"
+            :title="isScanning ? 'Review a scanned response' : isEditing ? 'Edit answers' : draft === null ? 'New submission' : 'Continue submission'"
             icon="submissions"
         >
             <template #breadcrumbs>
@@ -1027,6 +1135,10 @@ function onConflictKeydown(event: KeyboardEvent): void {
         <p class="encode__intro">
             <template v-if="isEditing">
                 Correcting a recorded response for <strong>{{ form.title }}</strong> (v{{ version.version_number }}).
+            </template>
+            <template v-else-if="isScanning">
+                Checking a scanned response for <strong>{{ form.title }}</strong> (v{{ version.version_number }}).
+                Compare each answer with the paper, correct what is wrong, then save it.
             </template>
             <template v-else>
                 Encoding a response for <strong>{{ form.title }}</strong> (v{{ version.version_number }}).
@@ -1079,6 +1191,45 @@ function onConflictKeydown(event: KeyboardEvent): void {
             </span>
         </div>
 
+        <!-- M129 — what the reviewer must know before checking a single answer: an older printing, a stamp
+             that could not be read, pages past the limit, nothing read at all, and every answer on the paper
+             that could not be filled in, in the server's own words. `role="status"` for the edit banner's
+             reason: present at first paint and never changing. -->
+        <div v-if="isScanning && scan!.notices.length > 0" class="encode__scan-notices">
+            <div
+                v-for="notice in scan!.notices"
+                :key="notice.code"
+                class="encode__scan-notice"
+                :class="`encode__scan-notice--${notice.tone}`"
+                role="status"
+                :data-notice="notice.code"
+            >
+                <p class="encode__scan-notice-text">{{ notice.message }}</p>
+                <ul v-if="notice.items" class="encode__scan-notice-list">
+                    <li v-for="(item, i) in notice.items" :key="i">
+                        <strong>{{ item.label }}</strong><template v-if="item.text"> — the scan read “{{ item.text }}”</template>.
+                        {{ item.message }}
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- M129 — the live half: answers the scan filled in that the other answers now hide. Always present in
+             scan mode and filled in place, so a screen reader is already observing it when it changes. -->
+        <div v-if="isScanning" class="encode__scan-hidden" role="status" aria-live="polite">
+            <template v-if="scanHiddenAnswers.length > 0">
+                <p class="encode__scan-notice-text">
+                    {{ scanHiddenAnswers.length === 1 ? 'One answer the scan filled in does' : `${scanHiddenAnswers.length} answers the scan filled in do` }}
+                    not apply to the other answers, so {{ scanHiddenAnswers.length === 1 ? 'it' : 'they' }} will not be
+                    saved: {{ scanHiddenAnswers.join(', ') }}.
+                </p>
+            </template>
+        </div>
+
+        <!-- M129 — a save refused for a reason no single answer carries. Inserted after a POST returns, so
+             assertive — the conflict alert's argument below. -->
+        <MdsAlert v-if="scanError !== null" tone="danger" assertive title="This response was not saved" :message="scanError" />
+
         <!-- The one autosave failure a keyer must act on rather than wait out (a submitted-elsewhere draft or
              an expired session). `role="alert"` because unlike the indicator above, continuing to type after
              this is wasted work. -->
@@ -1110,7 +1261,7 @@ function onConflictKeydown(event: KeyboardEvent): void {
                 tone="warning"
                 assertive
                 title="You have unsaved corrections"
-                message="Nothing on the edit channel is saved until you choose Save changes. Leaving now discards every change you have typed."
+                :message="leaveMessage"
             >
                 <template #actions>
                     <MdsButton data-leave-stay size="sm" variant="secondary" @click="stayOnPage">
@@ -1186,6 +1337,12 @@ function onConflictKeydown(event: KeyboardEvent): void {
         <div v-if="scheduleNotice" class="encode__schedule-banner" role="alert">
             <strong class="encode__schedule-title">{{ scheduleNotice.title }}</strong>
             <span class="encode__schedule-body">{{ scheduleNotice.body }}</span>
+        </div>
+
+        <!-- M129 — the paper, beside the form on a wide screen and above it on a narrow one (the grid lives on
+             `.encode--scan`). Rendered only in scan mode, so the other three modes keep their exact DOM. -->
+        <div v-if="isScanning" class="encode__scan-pages">
+            <ScanPages :pages="scan!.pages" />
         </div>
 
         <form class="encode__form" @submit.prevent="submit">
@@ -1332,7 +1489,15 @@ function onConflictKeydown(event: KeyboardEvent): void {
 
                         <!-- Flat step (or the synthetic lead block): relevant fields render directly. -->
                         <div v-else class="encode__fields">
-                            <div v-for="field in rowsOf(step)" :key="field.key" :id="anchorFor(field.key)">
+                            <!-- M129 — in scan mode a row the scan has something to say about carries its note
+                                 under the control and a coloured edge; the note's words, not the colour, carry
+                                 the meaning. No class and no note in the other modes. -->
+                            <div
+                                v-for="field in rowsOf(step)"
+                                :key="field.key"
+                                :id="anchorFor(field.key)"
+                                :class="scanNotes[field.key] ? ['encode__scan-row', `encode__scan-row--${scanNotes[field.key].tone}`] : undefined"
+                            >
                                 <FieldInput
                                     :field="field"
                                     :model-value="flatValue(field.key)"
@@ -1340,6 +1505,7 @@ function onConflictKeydown(event: KeyboardEvent): void {
                                     :read-only="isEditing"
                                     @update:model-value="setFlatValue(field.key, $event)"
                                 />
+                                <p v-if="scanNotes[field.key]" class="encode__scan-note">{{ scanNotes[field.key].text }}</p>
                             </div>
                         </div>
                     </div>
@@ -1383,7 +1549,7 @@ function onConflictKeydown(event: KeyboardEvent): void {
                     :loading="submitting"
                     :disabled="!canSubmit"
                 >
-                    {{ isEditing ? 'Save changes' : 'Submit response' }}
+                    {{ isEditing ? 'Save changes' : isScanning ? 'Save response' : 'Submit response' }}
                 </MdsButton>
             </div>
         </form>
@@ -1758,5 +1924,95 @@ function onConflictKeydown(event: KeyboardEvent): void {
     justify-content: flex-end;
     gap: var(--mds-space-4);
     flex-wrap: wrap;
+}
+
+/* ── M129 — scan mode ───────────────────────────────────────────────────────────────────────────────────
+   The paper and the form side by side on a wide screen. Every child of the page spans both columns except the
+   paper (left, sticky) and the form (right); auto-placement puts the two on one row because the paper comes
+   first in the DOM. Below the breakpoint nothing changes but the paper's gap: it stacks above the form. */
+.encode__scan-pages {
+    margin: 0 0 var(--mds-space-6);
+}
+
+@media (min-width: 75rem) {
+    .encode--scan {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 45rem);
+        column-gap: var(--mds-space-6);
+        align-items: start;
+        max-width: 90rem;
+    }
+
+    .encode--scan > * {
+        grid-column: 1 / -1;
+    }
+
+    .encode--scan > .encode__scan-pages {
+        grid-column: 1;
+        position: sticky;
+        top: var(--mds-space-4);
+        margin: 0;
+    }
+
+    .encode--scan > .encode__form {
+        grid-column: 2;
+    }
+}
+
+.encode__scan-notices {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mds-space-3);
+    margin: 0 0 var(--mds-space-6);
+}
+
+.encode__scan-notice,
+.encode__scan-hidden:not(:empty) {
+    padding: var(--mds-space-3) var(--mds-space-4);
+    border: 1px solid var(--mds-color-border-default);
+    border-left: 4px solid var(--mds-color-status-warning-fg);
+    border-radius: var(--mds-radius-md);
+    background-color: var(--mds-color-bg-surface);
+}
+
+.encode__scan-hidden:not(:empty) {
+    margin: 0 0 var(--mds-space-6);
+}
+
+.encode__scan-notice--info {
+    border-left-color: var(--mds-color-status-info-fg);
+}
+
+.encode__scan-notice-text {
+    margin: 0;
+}
+
+.encode__scan-notice-list {
+    margin: var(--mds-space-2) 0 0;
+    padding-left: var(--mds-space-5);
+}
+
+/* A row the scan has something to say about: a coloured edge, and the note in words beneath the control. */
+.encode__scan-row {
+    padding-left: var(--mds-space-3);
+    border-left: 4px solid var(--mds-color-border-strong);
+}
+
+.encode__scan-row--warning {
+    border-left-color: var(--mds-color-status-warning-fg);
+}
+
+.encode__scan-row--danger {
+    border-left-color: var(--mds-color-danger-text);
+}
+
+.encode__scan-row--info {
+    border-left-color: var(--mds-color-status-info-fg);
+}
+
+.encode__scan-note {
+    margin: var(--mds-space-1) 0 0;
+    color: var(--mds-color-text-secondary);
+    font-size: var(--mds-type-body-sm-font-size);
 }
 </style>

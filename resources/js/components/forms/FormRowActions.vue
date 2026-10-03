@@ -10,8 +10,9 @@
  *   - `responsive-axe.spec.ts` navigates by `'Response statistics'` and `'New submission'`;
  *   - `templates-axe.spec.ts` clicks `'Save as template'` unscoped, so that button must be in the
  *     accessibility tree WITHOUT a hover or a menu open;
- *   - `'Rename form'` opens the only call site of `PATCH /forms/{form}` in the entire client, and
- *     `'Set form scope'` is the only mount of `AssignScopeModal`. Neither may be folded away.
+ *   - `'Rename form'` opens the forms list's only call site of `PATCH /forms/{form}` (the settings' Details
+ *     section is the other, since M117), and `'Set form scope'` is the only mount of `AssignScopeModal` (the
+ *     hub's Settings tab mounts its `ScopePanel` body directly, since M129). Neither may be folded away.
  *
  * ⚠️ AND WHY NINE BUTTONS STAY VISIBLE ON A ~260px CARD, WRAPPING TO TWO ROWS.
  *
@@ -71,9 +72,9 @@ const publishing = computed(() => props.publishingId === props.row.id);
              builder is not), but it left an editor two clicks from the page they spend their day in.
 
              ⚠️ THIS IS AN ADDITION BESIDE THE `edit` ICON, NEVER A REPLACEMENT FOR IT. That icon is
-             *Rename form*, and its modal is the ONLY call site of `PATCH /forms/{form}` in the entire
-             client — "tidying" the two together would delete the only way to rename a form anywhere in
-             the product.
+             *Rename form*, and its modal is the forms list's only call site of `PATCH /forms/{form}` —
+             "tidying" the two together would delete the only way to rename a form from this list (the
+             form's settings, Details section, are the other way, since M117).
 
              ⚠️ `layout`, NOT `edit`, AND THE MISMATCH WITH THE TAB STRIP IS THE LESSER EVIL. `FormTabSet`
              gives the Builder tab `edit`, so matching it would have put TWO identical glyphs in this row

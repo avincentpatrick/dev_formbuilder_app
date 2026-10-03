@@ -13,9 +13,9 @@ use Illuminate\Http\UploadedFile;
  *
  * **The rules here are the FIRST of two gates, never the only one.**
  * {@see AttachmentStorageService::storeBrandingLogo()} re-checks the size and CONTENT-SNIFFS the MIME
- * from the file's bytes before storing anything, because `mimetypes:` validation trusts a header a client
- * controls. The duplication is deliberate: this layer exists to give a friendly, field-attached error, and
- * the service layer exists to be correct.
+ * from the file's bytes before storing anything. `mimetypes:` reads the bytes as well — Laravel asks `finfo`,
+ * not the client's header, which this note claimed until M129 — so the duplication is not about trust: this
+ * layer gives a friendly, field-attached error, and the service guards every caller that skips this request.
  *
  * Both read the same `config('attachments.branding_logo.*')` so the two can never disagree about what is
  * allowed — a hard-coded list here would drift from the allowlist that actually enforces.

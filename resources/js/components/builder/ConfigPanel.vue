@@ -42,6 +42,7 @@ import {
 import CascadingEditor from './CascadingEditor.vue';
 import ChoicesEditor from './ChoicesEditor.vue';
 import ConditionEditor from './ConditionEditor.vue';
+import ContentBlocksEditor from './ContentBlocksEditor.vue';
 import FieldTypeControl from './FieldTypeControl.vue';
 import GeoEditor from './GeoEditor.vue';
 import LikertMatrixEditor from './LikertMatrixEditor.vue';
@@ -49,6 +50,7 @@ import MatrixEditor from './MatrixEditor.vue';
 import MediaEditor from './MediaEditor.vue';
 import PrefillEditor from './PrefillEditor.vue';
 import ValidationEditor from './ValidationEditor.vue';
+import type { ContentBlock } from './content-blocks';
 import { sortFieldSaveErrors } from './field-save-errors';
 import type { BuilderStore } from './useBuilderStore';
 import type { BuilderValidation, ComparableField, ConditionCatalogue, EnumOption, LocalField, LocalSection } from './types';
@@ -134,6 +136,7 @@ const tabs = computed<{ key: string; label: string }[]>(() => {
         if (configEditor.value === 'geo') list.push({ key: 'geo', label: 'Map' });
         if (configEditor.value === 'media') list.push({ key: 'media', label: 'Media' });
         if (configEditor.value === 'prefill') list.push({ key: 'prefill', label: 'Prefill' });
+        if (configEditor.value === 'content') list.push({ key: 'content', label: 'Content' });
         // ⛔ M115 — NO VALIDATION TAB FOR A FIELD THAT CARRIES NO ANSWER. `ValueShape::allows()` refuses
         // every rule type for `no_answer` (`note`, `page_break`), and since M113 the publish gate refuses
         // them too — so this tab was a route to a form that could not be published, offered on the two
@@ -192,6 +195,11 @@ const mediaCaptureSource = computed<string | null>(() => (field.value?.config.ca
 // existing `default_value` column rather than a second config key.
 const prefillSource = computed<string | null>(() => (field.value?.config.prefill_source as string | undefined) ?? null);
 const prefillUrlParam = computed<string | null>(() => (field.value?.config.url_param as string | undefined) ?? null);
+// A note's content blocks (M129, `R-6dedc3a9`). The server's `ContentBlocks` rule is the authority on the shape.
+const contentBlocks = computed<ContentBlock[]>(() => {
+    const raw = field.value?.config.content;
+    return Array.isArray(raw) ? (raw as ContentBlock[]) : [];
+});
 
 // What the structured condition editor may offer (Increment H21d2). Assembled here because the editor takes
 // no store — the sub-editor house contract — and because only the panel knows which row is being edited.
@@ -257,6 +265,21 @@ function setConfig(key: string, value: unknown): void {
     const target = field.value;
     if (!target) return;
     target.config = { ...target.config, [key]: value };
+    props.store.touch(target.uid, 'field');
+}
+/**
+ * An emptied list REMOVES the key rather than saving `[]`: a note with no `content` is today's one-line note, and
+ * the absence is what every reader of the config already treats as "no blocks".
+ */
+function setContent(blocks: ContentBlock[]): void {
+    const target = field.value;
+    if (!target) return;
+    if (blocks.length > 0) {
+        setConfig('content', blocks);
+        return;
+    }
+    const { content: _removed, ...rest } = target.config;
+    target.config = rest;
     props.store.touch(target.uid, 'field');
 }
 function setValidations(value: BuilderValidation[]): void {
@@ -518,6 +541,10 @@ watch(librarySaved, (value) => {
                             @update:urlParam="setConfig('url_param', $event)"
                             @update:defaultValue="setField('default_value', $event)"
                         />
+                    </template>
+
+                    <template v-else-if="activeTab === 'content'">
+                        <ContentBlocksEditor :blocks="contentBlocks" :form-id="store.formId" @update:blocks="setContent" />
                     </template>
 
                     <template v-else-if="activeTab === 'validation'">

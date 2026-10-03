@@ -599,7 +599,7 @@ function submitImport(): void {
             :form="form"
             :timezones="timezones"
             :share="share"
-            :save-resume-available="feature('save_and_resume')"
+            :save-resume-available="feature('save_and_resume')" :ocr-scanning="ocr_scanning"
         />
 
         <MdsModal :open="importOpen" title="Import XLSForm" @close="importOpen = false">

@@ -140,6 +140,20 @@ it('audits the page-mode toggle', function (): void {
     expect($audit->new_values)->toBe(['single_page_mode' => true]);
 });
 
+it('audits the scanning toggle', function (): void {
+    // M129 — the eighth `form`/`updated` setter, owed the same audit row as the seven before it, for the
+    // closed-set reason the page-mode case gives. The `false` on the old side also pins `create()`'s explicit
+    // default: a model created without the key would report `null` here, not `false`.
+    $form = app(FormService::class)->create($this->tenant, $this->admin, 'Survey');
+
+    app(FormService::class)->setOcrScanning($form, true, $this->admin);
+
+    $audit = formAudit($form->id, AuditEvent::Updated);
+
+    expect($audit->old_values)->toBe(['allow_ocr_single' => false]);
+    expect($audit->new_values)->toBe(['allow_ocr_single' => true]);
+});
+
 it('audits confirmation copy by LOCALE KEYS, never the translations map', function (): void {
     $form = app(FormService::class)->create($this->tenant, $this->admin, 'Survey');
 

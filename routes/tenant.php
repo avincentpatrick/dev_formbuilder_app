@@ -1012,7 +1012,41 @@ Route::middleware([
         ->name('forms.ocr.scans.store');
     Route::get('/forms/{form}/ocr/scans/{scan}', [OcrScanController::class, 'show'])
         ->middleware(['can:create,'.Submission::class.',form', 'module:ocr_single', 'feature:ocr_single'])
+        ->whereUuid('scan')
         ->name('forms.ocr.scans.show');
+    // M129 (groundwork 2): the scans page, one scan's review, its page files, and saving it as a response. The
+    // same gates as the two above. `{scan}` is a uuid by constraint, so a malformed id is a 404 rather than a
+    // Postgres error, and `{page}` is the page's position on the scan, never an attachment id.
+    Route::get('/forms/{form}/ocr/scans', [OcrScanController::class, 'index'])
+        ->middleware(['can:create,'.Submission::class.',form', 'module:ocr_single', 'feature:ocr_single'])
+        ->name('forms.ocr.scans.index');
+    Route::get('/forms/{form}/ocr/scans/{scan}/review', [OcrScanController::class, 'review'])
+        ->middleware(['can:create,'.Submission::class.',form', 'module:ocr_single', 'feature:ocr_single'])
+        ->whereUuid('scan')
+        ->name('forms.ocr.scans.review');
+    Route::get('/forms/{form}/ocr/scans/{scan}/pages/{page}', [OcrScanController::class, 'page'])
+        ->middleware(['can:create,'.Submission::class.',form', 'module:ocr_single', 'feature:ocr_single'])
+        ->whereUuid('scan')
+        ->whereNumber('page')
+        ->name('forms.ocr.scans.page');
+    Route::post('/forms/{form}/ocr/scans/{scan}/confirm', [OcrScanController::class, 'confirm'])
+        ->middleware(['can:create,'.Submission::class.',form', 'module:ocr_single', 'feature:ocr_single'])
+        ->whereUuid('scan')
+        ->name('forms.ocr.scans.confirm');
+    // M129: the form hub's Settings tab (`D63`'s hub half), gated like every settings section's own route; and
+    // the Scanning section's write, the module toggle BEFORE the plan, as the scan routes order them. Both sit
+    // on already-imported controllers, because a new `use` line here shifts every line a document cites.
+    Route::get('/forms/{form}/settings', [FormHubController::class, 'settings'])
+        ->middleware('can:update,form')
+        ->name('forms.settings');
+    Route::patch('/forms/{form}/ocr-scanning', [FormController::class, 'updateOcrScanning'])
+        ->middleware(['can:update,form', 'module:ocr_single', 'feature:ocr_single'])
+        ->name('forms.ocr-scanning');
+    // M129, `R-f0c5b682`: an image for a note's content. Whoever may edit the form may illustrate it, and the
+    // image belongs to the form (`D58` = B). Throttled like an upload, because each one is stored and scanned.
+    Route::post('/forms/{form}/content-images', [AttachmentController::class, 'storeFormContentImage'])
+        ->middleware(['can:update,form', 'throttle:30,1'])
+        ->name('forms.content-images.store');
 });
 
 /*

@@ -262,3 +262,40 @@ group('FormSettingsModal — gated sections', () => {
         wrapper.unmount();
     });
 });
+
+group('the Scanning section (M129)', () => {
+    function mountWith(ocrScanning: unknown) {
+        return mount(FormSettingsModal, {
+            props: {
+                open: true,
+                formId: 'form-1',
+                form,
+                timezones: ['UTC'],
+                share,
+                saveResumeAvailable: true,
+                ocrScanning,
+                teleport: false,
+            } as never,
+            global: { stubs: { teleport: true } },
+        });
+    }
+
+    it('is absent when the server sends no Scanning facts, whether null or absent', () => {
+        // ⚠️ BOTH, because the hub sends an unoffered prop ABSENT, and `!== null` reads absent as present.
+        expect(railLabels(mountWith(null))).not.toContain('Scanning');
+        expect(railLabels(mountWith(undefined))).not.toContain('Scanning');
+        // The positive half: the rail rendered, so the absence above is not an empty modal.
+        expect(railLabels(mountWith(undefined))).toContain('Share');
+    });
+
+    it('sits beside Share when offered, and opens the Scanning panel', async () => {
+        const wrapper = mountWith({ enabled: false, eligible: true, reason: null });
+
+        expect(railLabels(wrapper)).toEqual([
+            'Details', 'Pages', 'Share', 'Scanning', 'Schedule', 'Thank-you message', 'Save and finish later',
+        ]);
+
+        await railButton(wrapper, 'Scanning').trigger('click');
+        expect(wrapper.find('[data-section="scanning"]').text()).toContain('Accept scans of paper copies');
+    });
+});

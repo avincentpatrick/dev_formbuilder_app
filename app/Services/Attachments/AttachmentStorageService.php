@@ -361,6 +361,83 @@ final class AttachmentStorageService
     }
 
     /**
+     * Store an IMAGE FOR A NOTE'S CONTENT (M129, `R-f0c5b682`) — the fifth sibling, for the logo's reasons: no
+     * {@see FormField} owns it, so there is no per-field type list, size cap or `is_pii` to inherit. The discipline
+     * transfers unchanged: content-sniffed type, server-generated key, sniffed extension, queued virus scan, quota.
+     *
+     * ── OWNED BY THE FORM (`D58` = B) ────────────────────────────────────────────────────────────────────
+     * The owner is the form, under the alias `form` — which, unlike `tenant`, `feedback_report` and `ocr_scan`, is
+     * ALREADY in the global morph map (`ResourceScopeable::morphMap()`), so nothing is registered here. The image
+     * outlives every version that shows it, which is why it is not owned by a version or a field: publishing clones
+     * the draft's fields, and a field-owned image would be orphaned by its own form's next publish.
+     *
+     * **`is_pii` is FALSE**, the logo's argument rather than the scan's: it is material the author publishes to
+     * every respondent, not something a respondent wrote.
+     *
+     * The type and size checks repeat the request's on purpose, as the write path's own guard for any caller that
+     * does not come through HTTP.
+     *
+     * @throws AttachmentException on a rejected type or an over-size image
+     */
+    public function storeFormContentImage(UploadedFile $file, string $tenantId, string $formId, string $uploadedBy): Attachment
+    {
+        $mime = $file->getMimeType() ?? 'application/octet-stream';
+
+        /** @var list<string> $accepted */
+        $accepted = config('attachments.form_content_image.accepted_types');
+
+        if (! $this->mimeAllowed($mime, $accepted)) {
+            throw AttachmentException::mimeRejected($mime);
+        }
+
+        $maxBytes = (int) config('attachments.form_content_image.max_bytes');
+
+        if ((int) $file->getSize() > $maxBytes) {
+            throw AttachmentException::tooLarge($maxBytes);
+        }
+
+        $this->quota->assertCanCreate(UsageMetric::StorageBytes, (int) $file->getSize());
+
+        $kind = AttachmentKind::FormContentImage;
+        $disk = (string) config('filesystems.default');
+
+        $uuid = Uuid::uuid7()->toString();
+        $extension = $file->extension() ?: 'bin';
+        $directory = "tenants/{$tenantId}/{$kind->value}/".date('Ym');
+        $storedPath = Storage::disk($disk)->putFileAs($directory, $file, "{$uuid}.{$extension}");
+
+        if ($storedPath === false) {
+            throw AttachmentException::storeFailed();
+        }
+
+        [$width, $height] = $this->imageDimensions($file, $mime);
+
+        $attachment = Attachment::create([
+            'id' => $uuid,
+            'attachable_type' => 'form',
+            'attachable_id' => $formId,
+            'kind' => $kind,
+            'disk' => $disk,
+            'path' => $storedPath,
+            'original_filename' => $file->getClientOriginalName(),
+            'mime_type' => $mime,
+            'size_bytes' => (int) $file->getSize(),
+            'checksum_sha256' => hash_file('sha256', (string) $file->getRealPath()) ?: null,
+            'width' => $width,
+            'height' => $height,
+            'duration_seconds' => null,
+            'is_encrypted_at_rest' => false,
+            'is_pii' => false,
+            'virus_scan_status' => ScanStatus::Pending,
+            'uploaded_by' => $uploadedBy,
+        ]);
+
+        ScanAttachmentJob::dispatch($attachment->id, $tenantId);
+
+        return $attachment;
+    }
+
+    /**
      * @throws AttachmentException
      */
     private function resolveMediaField(FormVersion $version, string $fieldKey): FormField

@@ -43,6 +43,18 @@ final class OcrException extends RuntimeException
         );
     }
 
+    /**
+     * A confirmation for a scan with nothing to save (M129): still being read, or reading failed.
+     *
+     * ⚠️ NOT SELF-RENDERED ON THAT PATH. The confirmation is an Inertia POST from the review page, and this
+     * class renders JSON; the controller catches it and answers with an errors bag instead, which is what
+     * keeps the reviewer's corrections on the page (`Encode.vue` preserves state only when errors arrive).
+     */
+    public static function notReviewable(): self
+    {
+        return new self(409, 'ocr_scan_not_reviewable', 'This scan has not been read, so there is nothing to save yet.');
+    }
+
     public static function pdfNotAlone(): self
     {
         return new self(422, 'ocr_pdf_not_alone', 'Upload a PDF scan on its own. Photos of one form can be uploaded together, one photo per page.');

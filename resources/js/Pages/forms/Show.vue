@@ -345,7 +345,7 @@ function isPrintable(version: VersionRow): boolean {
                     <dd>{{ versionLabel }}</dd>
                 </div>
                 <!-- The node's NAME, never a picker: assigning a scope is `scopes.manage` and lives on the
-                     forms list. A reader who cannot manage the hierarchy can still legitimately see where in
+                     forms list and, since M129, on this form's Settings tab. A reader who cannot manage the hierarchy can still legitimately see where in
                      it this form sits — the audit ledger already prints it on every row. -->
                 <div v-if="form.scope_node_name" class="hub__meta-item">
                     <dt>Scope</dt>

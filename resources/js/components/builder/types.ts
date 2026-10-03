@@ -8,7 +8,7 @@
 
 import type { BreadcrumbItem } from '@meridian/design-system';
 
-import type { ShareProps } from '@/components/forms/types';
+import type { OcrScanningProps, ShareProps } from '@/components/forms/types';
 
 export type Uid = string;
 
@@ -92,8 +92,8 @@ export interface PaletteType {
     label: string;
     advanced: boolean;
     has_options: boolean;
-    // The dedicated config editor this type needs beyond the shared tabs (G4a): 'choices' | 'cascading' |
-    // null. Mirrors FieldType::configEditor(); the config panel keys its editor tab off this.
+    // The dedicated config editor this type needs beyond the shared tabs (G4a), or null. Mirrors
+    // FieldType::configEditor(), which holds the list of values; the config panel keys its editor tab off this.
     config_editor: string | null;
     // What may be ASSERTED about this type's value (M115) — `ValueShape::for()`'s twelve-member partition,
     // not a thirty-first field-type special case. The config panel matches it against each rule type's
@@ -223,6 +223,12 @@ export interface BuilderPageProps {
     library: LibraryItem[];
     // The canonical IANA identifier list for the Schedule modal's timezone select (Increment H12b).
     timezones: string[];
+    /**
+     * The Scanning settings section's facts (M129), or null where the workspace cannot scan. OPTIONAL, so a
+     * builder fixture written before it existed still type-checks — the absent-means-off reading the modal
+     * applies to it with `!= null`.
+     */
+    ocr_scanning?: OcrScanningProps | null;
     /**
      * The toolbar's path trail, resolved SERVER-SIDE by `CrumbTrail` (Increment J2d).
      *

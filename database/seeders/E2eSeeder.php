@@ -14,6 +14,7 @@ use App\Enums\FeedbackStatus;
 use App\Enums\FieldType;
 use App\Enums\FormScheduleState;
 use App\Enums\NotificationType;
+use App\Enums\OcrScanStatus;
 use App\Enums\PlanTier;
 use App\Enums\ResourceCapacity;
 use App\Enums\SubmissionPdfOutcome;
@@ -31,6 +32,7 @@ use App\Models\Form;
 use App\Models\FormField;
 use App\Models\FormVersion;
 use App\Models\Notification;
+use App\Models\OcrScan;
 use App\Models\Plan;
 use App\Models\Role;
 use App\Models\SavedReportView;
@@ -44,6 +46,7 @@ use App\Models\TenantUser;
 use App\Models\User;
 use App\Models\WebhookDelivery;
 use App\Models\WebhookEndpoint;
+use App\Services\Attachments\AttachmentStorageService;
 use App\Services\Authorization\ResourceGrantService;
 use App\Services\Forms\FormBuilderService;
 use App\Services\Forms\FormService;
@@ -62,6 +65,7 @@ use Database\Seeders\Concerns\DeterministicIds;
 use Database\Seeders\Concerns\SeedsGamificationLedger;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Seeder;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -781,6 +785,7 @@ class E2eSeeder extends Seeder
 
             // Last, so the ledger it inspects already contains everything the seeders above wrote.
             $this->seedAuditLog($owner, $reviewer);
+            $this->seedOcrScan($tenant, $owner); // M129 — after the audit inspection: it writes no audit row
         });
 
         $tenant->forceFill(['owner_user_id' => $owner->id])->save();
@@ -2009,6 +2014,105 @@ class E2eSeeder extends Seeder
             FieldType::SingleSelect => $firstOption,
             FieldType::MultiSelect => $firstOption !== null ? [$firstOption] : [],
             default => null,
+        };
+    }
+
+    /** Deterministic id for the seeded scan (M129), so re-seeding finds it rather than adding a second. */
+    private const OCR_SCAN_FIXTURE_ID = '0192e2e0-0000-7000-8000-00000000c501';
+
+    /** A 1×1 PNG: the page image. The review screen needs a page to show, not a legible one. */
+    private const OCR_SCAN_FIXTURE_PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+
+    /**
+     * One READ scan of Clinic Intake (M129, single-form OCR groundwork 2), so `ocr-review-axe.spec.ts` can
+     * scan the review screen without uploading anything.
+     *
+     * ⛔ NEVER UPLOAD IN THE SPEC: CI's e2e job runs `QUEUE_CONNECTION=sync`, so an upload would run the
+     * reading job inline against the real provider. The extraction is therefore written here, built from the
+     * published version's own fields, with every reviewer-facing state on one screen — auto, review, the
+     * withheld `manual` tier, blank and unreadable — because a scan over a screen where every note looks the
+     * same proves nothing about the others (the argument {@see self::seedFeedback()} makes for its badges).
+     *
+     * The page goes through the real write path, `storeOcrScanPage()`, rather than a forged row: it is that
+     * path's sniffing, key and virus-check status the review screen serves. Clinic Intake is all-scalar and
+     * repeat-free, so it is OCR-compatible, and it is switched to accept scans here, which is what puts the
+     * "Scan paper forms" entry on its Responses tab.
+     */
+    private function seedOcrScan(Tenant $tenant, User $owner): void
+    {
+        $intake = Form::query()->where('title', 'Clinic Intake')->first();
+        if (! $intake instanceof Form || $intake->current_published_version_id === null) {
+            return;
+        }
+
+        $intake->forceFill(['allow_ocr_single' => true])->save();
+
+        if (OcrScan::query()->whereKey(self::OCR_SCAN_FIXTURE_ID)->exists()) {
+            return;
+        }
+
+        $version = FormVersion::query()->whereKey($intake->current_published_version_id)->firstOrFail();
+
+        $fields = [];
+        $counts = ['read' => 0, 'blank' => 0, 'unreadable' => 0, 'not_found' => 0, 'skipped' => 0];
+        foreach ((array) ($version->schema_snapshot['fields'] ?? []) as $field) {
+            if (! is_array($field) || ! is_string($field['key'] ?? null)) {
+                continue;
+            }
+            $read = $this->ocrFixtureRead((string) ($field['field_type'] ?? ''));
+            $fields[$field['key']] = $read;
+            $counts[$read['state']]++;
+        }
+
+        $page = app(AttachmentStorageService::class)->storeOcrScanPage(
+            UploadedFile::fake()->createWithContent('clinic-intake-page-1.png', (string) base64_decode(self::OCR_SCAN_FIXTURE_PNG)),
+            (string) $tenant->id,
+            self::OCR_SCAN_FIXTURE_ID,
+            (string) $owner->id,
+        );
+
+        $scan = new OcrScan([
+            'tenant_id' => (string) $tenant->id,
+            'form_id' => $intake->id,
+            'form_version_id' => $version->id,
+            'uploaded_by' => $owner->id,
+            'status' => OcrScanStatus::Read,
+            'provider' => 'google_vision',
+            'pages' => [['attachment_id' => (string) $page->id, 'response_path' => null]],
+            'extraction' => [
+                'version' => ['id' => $version->id, 'number' => $version->version_number, 'stamp' => substr((string) $version->checksum, 0, 8), 'matched_by' => 'stamp'],
+                'pages' => 1,
+                'counts' => $counts,
+                'fields' => $fields,
+                'warnings' => [],
+            ],
+            'read_at' => now(),
+        ]);
+        $scan->id = self::OCR_SCAN_FIXTURE_ID;
+        $scan->save();
+    }
+
+    /**
+     * What the fixture scan "read" for one question, by type — in the reader's own shapes (numbers as text,
+     * a withheld value as null).
+     *
+     * @return array{type: string, state: string, value: mixed, text: string|null, confidence: int|null, tier: string|null, page: int|null, anchored_by: string|null}
+     */
+    private function ocrFixtureRead(string $type): array
+    {
+        $read = static fn (mixed $value, string $text, int $confidence, string $tier): array => [
+            'type' => $type, 'state' => 'read', 'value' => $value, 'text' => $text,
+            'confidence' => $confidence, 'tier' => $tier, 'page' => 1, 'anchored_by' => 'key',
+        ];
+
+        return match ($type) {
+            'short_text' => $read('Maria Santos', 'MARIA SANTOS', 96, 'auto'),
+            'integer' => $read('34', '34', 81, 'review'),
+            'single_select' => $read('female', 'X Female', 95, 'auto'),
+            'multi_select' => $read(null, 'X Fever X Cough?', 52, 'manual'),
+            'date' => $read('1990-04-12', '12 04 1990', 93, 'auto'),
+            'long_text' => ['type' => $type, 'state' => 'unreadable', 'value' => null, 'text' => 'ilegible scrawl', 'confidence' => 38, 'tier' => null, 'page' => 1, 'anchored_by' => 'label'],
+            default => ['type' => $type, 'state' => 'blank', 'value' => null, 'text' => null, 'confidence' => null, 'tier' => null, 'page' => 1, 'anchored_by' => 'key'],
         };
     }
 }

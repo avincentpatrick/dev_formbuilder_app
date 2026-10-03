@@ -45,6 +45,9 @@ const NAMES: Record<string, string> = {
     default_value: 'Default value',
     indexed_data_type: 'Indexed data type',
     'config.calculated_formula': 'Calculation formula',
+    // M129: a note's content blocks, named by the tab that edits them — the refusal is one sentence for the whole
+    // list (`ContentBlocks` answers "block 3 …"), so the pane's alert says it once, above every tab.
+    'config.content': 'Content',
     is_required: 'Requiredness',
     relevant_expression: 'Show this question when',
     is_pii: 'Personal data',

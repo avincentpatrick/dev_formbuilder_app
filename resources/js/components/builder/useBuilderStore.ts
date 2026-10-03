@@ -1046,6 +1046,8 @@ export function useBuilderStore(props: BuilderPageProps) {
         canRedo,
         palette: props.palette,
         enums: props.enums,
+        // M129: the note's Content tab uploads images against the form, and the panel takes no page props.
+        formId: props.form.id,
         library,
         librarySaved,
         // actions

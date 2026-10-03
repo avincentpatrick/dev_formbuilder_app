@@ -179,8 +179,8 @@ final class FormHubPresenter
     }
 
     /**
-     * The node's NAME, not its id — the row already carries the id and the hub has no picker on it (that is
-     * the forms list's, gated on `scopes.manage`). A reader who cannot manage scopes can still legitimately
+     * The node's NAME, not its id — the row already carries the id and the hub's Overview has no picker on it (the
+     * picker is on the forms list and, since M129, the hub's Settings tab, both gated on `scopes.manage`). A reader who cannot manage scopes can still legitimately
      * see which part of the hierarchy a form belongs to; it is printed on every row of the ledger already.
      */
     private function scopeNodeName(Form $form): ?string

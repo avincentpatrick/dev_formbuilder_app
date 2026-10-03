@@ -2,14 +2,18 @@
 
 declare(strict_types=1);
 
+use App\Enums\AttachmentKind;
 use App\Enums\FieldType;
+use App\Enums\ScanStatus;
 use App\Exceptions\Forms\FormException;
 use App\Exceptions\Forms\PublishValidationException;
+use App\Models\Attachment;
 use App\Models\Form;
 use App\Models\FormField;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Forms\BlueprintValidator;
+use App\Services\Forms\BuilderPresenter;
 use App\Services\Forms\FormService;
 use App\Services\Forms\StructuralValidationGate;
 use App\Support\Tenancy\TenantContext;
@@ -26,6 +30,10 @@ uses(RefreshDatabase::class);
 | The builder's PATCH (lenient, through the real subdomain pipeline and its global middleware), the blueprint
 | validator that the template materializer and the question library share (lenient), and the publish gate (strict).
 | The unit matrix in tests/Unit/Forms/ContentBlocksRuleTest.php owns the shape itself; this file owns the WIRING.
+|
+| M129 adds the image block (`R-f0c5b682`, `D58` = B): the save takes any well-formed id, because ownership is a
+| database question the rule cannot ask, and the publish gate asks it — so the publish cases below are the half
+| that refuses another form's image.
 |
 | ⚠️ Helpers are prefixed `noteContent*`: Pest loads every test file into one process.
 */
@@ -125,8 +133,87 @@ it('refuses a shape the renderers cannot read, and persists none of it', functio
 })->with([
     'an html key on a span' => [[['type' => 'paragraph', 'spans' => [['text' => 'Hi', 'html' => '<img src=x onerror=alert(1)>']]]]],
     'a javascript link' => [noteContentLinkedParagraph('javascript:alert(1)')],
-    'an image before D58' => [[['type' => 'image', 'attachment_id' => '01J']]],
+    'an image naming no uploaded file' => [[['type' => 'image', 'attachment_id' => '01J', 'alt' => 'A map']]],
+    'an image carrying an address' => [[['type' => 'image', 'attachment_id' => '0192e2e0-0000-7000-8000-0000000000c1', 'alt' => 'A map', 'url' => 'https://example.org/x.png']]],
 ]);
+
+it('saves an image block from the builder, with its description still to come', function (): void {
+    [$tenant, $admin, $form, $fieldId, $key] = noteContentAuthor();
+    $image = ['type' => 'image', 'attachment_id' => '0192e2e0-0000-7000-8000-0000000000c1', 'alt' => null];
+
+    noteContentPatch($admin, $form, $fieldId, $key, ['content' => [$image]])->assertOk();
+
+    enterTenant($tenant->id, $admin->id);
+    // toEqual, not toBe: the column is jsonb, which keeps keys in its own order.
+    expect(FormField::query()->findOrFail($fieldId)->config['content'])->toEqual([$image]);
+});
+
+it('offers a note the Content editor in the builder palette, and no other type', function (): void {
+    $tenant = Tenant::create(['name' => 'Alpha', 'slug' => 'alpha', 'default_locale' => 'en']);
+    $user = User::factory()->create();
+    enterTenant($tenant->id, $user->id);
+    $form = app(FormService::class)->create($tenant, $user, 'Survey');
+
+    $editors = [];
+    foreach (app(BuilderPresenter::class)->present($form->refresh())['palette'] as $group) {
+        foreach ($group['types'] as $type) {
+            $editors[$type['value']] = $type['config_editor'];
+        }
+    }
+
+    expect($editors['note'])->toBe('content')
+        ->and(array_keys(array_filter($editors, static fn (?string $editor): bool => $editor === 'content')))->toBe(['note']);
+});
+
+it('refuses at publish every image that is not this form’s own usable upload, and passes its own', function (): void {
+    $user = User::factory()->create();
+    $tenant = Tenant::create(['name' => 'Alpha', 'slug' => 'alpha', 'default_locale' => 'en']);
+    enterTenant($tenant->id, $user->id);
+    $form = makeForm($user);
+    $other = makeForm($user);
+    $version = makeDraftVersion($form);
+
+    $image = fn (array $state = []): string => (string) Attachment::factory()->create([
+        'attachable_type' => 'form',
+        'attachable_id' => $form->id,
+        'kind' => AttachmentKind::FormContentImage,
+        'mime_type' => 'image/png',
+        'virus_scan_status' => ScanStatus::Clean,
+        ...$state,
+    ])->id;
+
+    // Field key => [image id, description]. The first two pass: a scan that has not run yet is no reason to refuse.
+    $notes = [
+        'own' => [$image(), 'A map of the entrance'],
+        'pending' => [$image(['virus_scan_status' => ScanStatus::Pending]), 'A map'],
+        'other_form' => [$image(['attachable_id' => $other->id]), 'A map'],
+        'wrong_kind' => [$image(['kind' => AttachmentKind::BrandingLogo]), 'A map'],
+        'wrong_owner' => [$image(['attachable_type' => 'tenant', 'attachable_id' => $tenant->id]), 'A map'],
+        'infected' => [$image(['virus_scan_status' => ScanStatus::Infected]), 'A map'],
+        'missing' => ['0192e2e0-0000-7000-8000-00000000dead', 'A map'],
+        'deleted' => [tap($image(), static fn (string $id) => Attachment::query()->whereKey($id)->firstOrFail()->delete()), 'A map'],
+        'undescribed' => [$image(), '   '],
+    ];
+    foreach (array_keys($notes) as $position => $name) {
+        addFormField($version, $user, $name, FieldType::Note, $position, ['config' => ['content' => [
+            ['type' => 'paragraph', 'spans' => [['text' => 'See below.']]],
+            ['type' => 'image', 'attachment_id' => $notes[$name][0], 'alt' => $notes[$name][1]],
+        ]]]);
+    }
+
+    try {
+        (new StructuralValidationGate)->assertPublishable($version->refresh());
+        $violations = [];
+    } catch (PublishValidationException $e) {
+        $violations = $e->violations();
+    }
+
+    $byField = array_column($violations, 'message', 'field');
+    expect(array_keys($byField))->toBe(['other_form', 'wrong_kind', 'wrong_owner', 'infected', 'missing', 'deleted', 'undescribed'])
+        ->and(array_values(array_unique(array_column($violations, 'code'))))->toBe(['note_content_invalid'])
+        ->and($byField['other_form'])->toContain('block 2’s image is missing, belongs to another form, or failed its virus check')
+        ->and($byField['undescribed'])->toContain('block 2 is an image with no description');
+});
 
 it('refuses a blank heading at publish, naming the note — and passes good content and a plain note', function (): void {
     $user = User::factory()->create();

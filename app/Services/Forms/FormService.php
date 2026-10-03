@@ -80,6 +80,8 @@ final class FormService
                 // stops the app's behaviour depending on a migration default that four documents disagreed
                 // about, which is the other half of `R-f1332829`.
                 'single_page_mode' => false,
+                // The same trap, the same fix (M129): the Scanning section publishes this as a boolean.
+                'allow_ocr_single' => false,
             ]);
 
             $draft = FormVersion::create([
@@ -280,6 +282,30 @@ final class FormService
         return DB::transaction(function () use ($form, $singlePage, $actor): Form {
             $old = ['single_page_mode' => $form->single_page_mode];
             $new = ['single_page_mode' => $singlePage];
+
+            $form->forceFill($new)->save();
+
+            $this->recordFormUpdate($form, $old, $new, $actor);
+
+            return $form->refresh();
+        });
+    }
+
+    /**
+     * Let a form accept scans of its printed paper, or stop it (M129 — single-form OCR groundwork 2): the only
+     * writer of `forms.allow_ocr_single`, which the upload has read since `M128` with nothing to set it.
+     *
+     * `forceFill` with an explicit key for the reason given at {@see self::assignScope()}: the column is in
+     * `Form::$fillable`, and switching on a channel that sends respondents' answers to an outside reader must
+     * never be a side effect of an unrelated edit. The workspace half of the gate — the `ocr_single` module and
+     * the plan — lives at the route; this method writes the form's half. Like save-and-resume, no version or
+     * pipeline effect: it decides only whether this form's scans are taken in.
+     */
+    public function setOcrScanning(Form $form, bool $enabled, ?User $actor = null): Form
+    {
+        return DB::transaction(function () use ($form, $enabled, $actor): Form {
+            $old = ['allow_ocr_single' => $form->allow_ocr_single];
+            $new = ['allow_ocr_single' => $enabled];
 
             $form->forceFill($new)->save();
 

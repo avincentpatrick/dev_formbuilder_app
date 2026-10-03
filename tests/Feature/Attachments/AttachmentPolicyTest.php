@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\AttachmentKind;
 use App\Enums\FeedbackStatus;
 use App\Enums\ResourceCapacity;
 use App\Enums\ScanStatus;
@@ -109,7 +110,7 @@ function memberWithStoredObject(string $roleName, string $kind): array
  * The submission's respondent is deliberately NULL — otherwise `SubmissionPolicy`'s respondent arm could
  * satisfy a case meant to be decided by collaboration, and the test would pass for the wrong reason.
  *
- * @param  'submission_media'|'export_artifact'|'webhook_envelope'|'branding_logo'|'staged_field'  $kind
+ * @param  'submission_media'|'export_artifact'|'webhook_envelope'|'branding_logo'|'staged_field'|'form_content_image'  $kind
  * @return array{0: User, 1: Attachment, 2: Form}
  */
 function callerWithScopedObject(string $roleName, bool $collaborates, string $kind = 'submission_media'): array
@@ -128,6 +129,12 @@ function callerWithScopedObject(string $roleName, bool $collaborates, string $ki
         'staged_field' => Attachment::factory()->forField(
             FormField::query()->where('form_version_id', $form->current_published_version_id)->firstOrFail(),
         )->clean()->create(),
+        'form_content_image' => Attachment::factory()->clean()->create([
+            'attachable_type' => 'form',
+            'attachable_id' => $form->id,
+            'kind' => AttachmentKind::FormContentImage,
+            'mime_type' => 'image/png',
+        ]),
         default => Attachment::factory()->forSubmission($submission)->clean()->create(),
     };
 
@@ -259,6 +266,14 @@ it('scopes a file still staged against a form field to that field s form', funct
     // yet, so the scope is the field's FORM — asserted in both directions because a staged file is the one
     // owner class that cannot reach `SubmissionPolicy` at all.
     [$caller, $attachment] = callerWithScopedObject('form_editor', $collaborates, 'staged_field');
+
+    $this->actingAs($caller)->get(attachmentUrl($attachment))->assertStatus($status);
+})->with([[false, 403], [true, 200]]);
+
+it('scopes a note’s image to whoever may open the form that owns it', function (bool $collaborates, int $status): void {
+    // M129, `D58` = B. The image belongs to the FORM, not to a submission, so `submissions.view` is not the floor:
+    // the arm asks `FormPolicy::viewOverview`, which a form_editor passes only with a grant on that form.
+    [$caller, $attachment] = callerWithScopedObject('form_editor', $collaborates, 'form_content_image');
 
     $this->actingAs($caller)->get(attachmentUrl($attachment))->assertStatus($status);
 })->with([[false, 403], [true, 200]]);

@@ -24,6 +24,7 @@ use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 use Spatie\Permission\PermissionRegistrar;
+use Tests\Feature\Ocr\Support\ReadScanFixture;
 
 uses(RefreshDatabase::class);
 
@@ -241,4 +242,51 @@ it('reports a scan under its own form, and 404s the same id asked for under anot
 
 it('throttles the upload, because every page is a paid provider call', function (): void {
     expect(Route::getRoutes()->getByName('forms.ocr.scans.store')?->gatherMiddleware())->toContain('throttle:20,1');
+});
+
+/*
+| M129 — the scan's own routes constrain `{scan}` to a uuid, and serve its page files.
+*/
+
+it('answers 404 for a malformed scan id on every scan route, where it used to reach Postgres as a 500', function (): void {
+    $scan = ReadScanFixture::make($this->form, $this->admin, []);
+    $this->actingAs($this->admin)->getJson(ocrRouteUrl($this->form, "/{$scan->id}"))->assertOk();
+
+    foreach (['', '/review', '/pages/1'] as $tail) {
+        $this->actingAs($this->admin)->get(ocrRouteUrl($this->form, "/not-a-uuid{$tail}"))->assertNotFound();
+    }
+    $this->actingAs($this->admin)->post(ocrRouteUrl($this->form, '/not-a-uuid/confirm'), ['answers' => []])->assertNotFound();
+});
+
+it('serves a scan page inline as the image it was sniffed as, never letting the browser guess', function (): void {
+    $scan = ReadScanFixture::make($this->form, $this->admin, []);
+
+    $response = $this->actingAs($this->admin)->get(ocrRouteUrl($this->form, "/{$scan->id}/pages/1"))->assertOk();
+
+    expect($response->headers->get('Content-Type'))->toBe('image/png')
+        ->and($response->headers->get('X-Content-Type-Options'))->toBe('nosniff')
+        ->and((string) $response->headers->get('Content-Disposition'))->toStartWith('inline');
+});
+
+it('answers 404 for a page number the scan does not have, after its first page is served', function (): void {
+    $scan = ReadScanFixture::make($this->form, $this->admin, []);
+    $this->actingAs($this->admin)->get(ocrRouteUrl($this->form, "/{$scan->id}/pages/1"))->assertOk();
+
+    $this->actingAs($this->admin)->get(ocrRouteUrl($this->form, "/{$scan->id}/pages/2"))->assertNotFound();
+    $this->actingAs($this->admin)->get(ocrRouteUrl($this->form, "/{$scan->id}/pages/0"))->assertNotFound();
+});
+
+it('withholds a page until its virus check has passed', function (): void {
+    $scan = ReadScanFixture::make($this->form, $this->admin, [], servable: false);
+
+    $this->actingAs($this->admin)->get(ocrRouteUrl($this->form, "/{$scan->id}/pages/1"))->assertStatus(409);
+});
+
+it('sends a PDF scan as a download, never inline in the tenant\'s origin', function (): void {
+    $scan = ReadScanFixture::make($this->form, $this->admin, [], page: ocrRoutePdf());
+
+    $response = $this->actingAs($this->admin)->get(ocrRouteUrl($this->form, "/{$scan->id}/pages/1"))->assertOk();
+
+    expect($response->headers->get('Content-Type'))->toBe('application/pdf')
+        ->and((string) $response->headers->get('Content-Disposition'))->toStartWith('attachment');
 });

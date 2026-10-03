@@ -109,6 +109,11 @@ const props = defineProps<{
      * `inbox.test.ts`'s "renders no Breadcrumb and no TabNav" case meaningful.
      */
     crumbs?: BreadcrumbItem[];
+    /**
+     * M129 — the scans page for this form, or null/absent. The SERVER decides it, from the scans route's own
+     * gates and the form's opt-in, so the button never leads somewhere that refuses the reader.
+     */
+    scan_url?: string | null;
 }>();
 
 /**
@@ -237,6 +242,11 @@ function formatDate(iso: string | null): string {
                 <MdsBreadcrumb :items="crumbs ?? []" :link-component="Link" />
             </template>
             <template #actions>
+                <!-- M129 — scanning a filled-in paper form is a way to enter a response, so it lives where the
+                     responses are. Offered only when the server sends the destination (`scan_url`). -->
+                <MdsButton v-if="scan_url" variant="secondary" icon-left="upload" @click="router.visit(scan_url)">
+                    Scan paper forms
+                </MdsButton>
                 <!-- On the per-form page Export needs no form to be chosen: the route already is one. -->
                 <template v-if="can.export && exportFormId">
                     <MdsButton variant="secondary" icon-left="download" @click="download('csv')">Export CSV</MdsButton>

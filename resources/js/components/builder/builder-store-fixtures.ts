@@ -129,7 +129,7 @@ export const PALETTE: PaletteGroup[] = [
         label: 'Layout',
         icon: 'layout',
         types: [
-            { value: 'note', label: 'Note / label', advanced: false, has_options: false, config_editor: null, value_shape: 'no_answer' },
+            { value: 'note', label: 'Note / label', advanced: false, has_options: false, config_editor: 'content', value_shape: 'no_answer' },
             { value: 'hidden', label: 'Hidden field', advanced: true, has_options: false, config_editor: 'prefill', value_shape: 'text' },
             { value: 'page_break', label: 'Page break', advanced: false, has_options: false, config_editor: null, value_shape: 'no_answer' },
         ],

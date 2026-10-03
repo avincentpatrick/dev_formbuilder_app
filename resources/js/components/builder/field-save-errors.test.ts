@@ -77,4 +77,13 @@ describe('describeSavePath', () => {
         expect(describeSavePath('relevant_expression')).toBe('Show this question when');
         expect(describeSavePath('mystery_path')).toBe('mystery_path');
     });
+
+    it("names a note's refused content by the tab that edits it, in the pane's list rather than on a control (M129)", () => {
+        const sorted = sortFieldSaveErrors({ 'config.content': ["The note's content is invalid: block 2 has a link this form cannot show."] });
+
+        expect(sorted.inline).toEqual({});
+        expect(sorted.listed).toEqual([
+            { key: 'config.content', text: "Content: The note's content is invalid: block 2 has a link this form cannot show." },
+        ]);
+    });
 });

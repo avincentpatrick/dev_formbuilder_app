@@ -1149,6 +1149,17 @@ end state and needs a disclosure-safe refusal designed first, which is a decisio
 **Recommendation: A.** It does not block the shape half of `R-6dedc3a9`, which is why it is filed `during-testing`.
 
 
+### D73 — Single-form OCR sends each scanned page, which carries a respondent's handwritten answers, to Google Cloud Vision, and neither the threat model nor any text in the product says so. What does that data flow need before launch? **Tier: before-launch.**
+
+**Filed 2026-10-03 by `M128`, from building the reading job.** The reading job posts each stored page to `vision.googleapis.com` over TLS, with the workspace's scan in the request body and the API key in a header, and keeps Google's full response privately beside the scan so the matcher can be re-run without a second call. `docs/security-threat-model.md` lists OCR scans only as untrusted uploads; it has no row for a third party that receives respondent data. Nothing on the paper form, in the OCR module's description or in the workspace settings tells anybody that a scan leaves the server. Testing under `D72` uses made-up answers, so nothing real is sent before Oct 12, and this does not block the testing.
+
+- **A — document it.** A threat-model row for the external processor (what is sent, what is kept, for how long, under which key), and one sentence in the OCR module's description: "Scans are read by Google Cloud Vision." Nothing respondent-facing, because staff decide to scan.
+- **B — A, plus notice at collection.** When a form accepts scans, its printed blank form says that answers may be read by an automated service.
+- **C — keep scans in-house.** Replace Cloud Vision with a recognizer that runs on the server. This is a different product decision, with an accuracy cost the samples would have to measure.
+
+**Recommendation: A**, with B added if the deploying agency's privacy officer asks for notice at collection. A is what the threat model owes in any case, and B is a printed sentence that can be added without touching the reading path.
+
+
 ## ANSWERED
 ### D57 — Reported item 16 asks for three ways to present sections; `forms.single_page_mode` is a boolean that expresses two of them and "tabular" is not expressible at all. What is the model? **A now, C next — ship the two modes the boolean already expresses, then make "per page" real by honouring `page_break`.**
 
@@ -2506,6 +2517,14 @@ half that works.
 **Why:** one mechanism spans two engines and the one control that displays the answer. Without the document note, both corpora grow under a sentence that calls them frozen, and that document calls a changed count with no note *drift*. Without `FieldInput.vue`, the fix ships a regression: canonical booleans reach the guest outbox, so an offline response reopened for conflict review would show its Yes/No answers blank — the same defect resume and edit already have, which this fixes too.
 
 **Disposition:** **the user allowed all three in chat on 2026-10-02** — first the document note, then `FieldInput.vue`, then the citation repair (over restructuring the new code so the cited line stood still) — each put to them by name because an `early-testing` work row was blocked on the choice. The citation repair was its own pushed claim extension before the file was opened. Recorded in both places this log requires: inline at the closed rows, and in `PROGRESS.md`'s release paragraph. Not a precedent, and the first of its reason, so the escalation rule above is not engaged.
+
+##### #4 — `M128` (2026-10-03) · three items, each editing hub files, allowed by the user in chat
+
+**What was not satisfied:** item 1's second clause, *at most one row may touch a hub file*. `M128` takes three items, and each one edits hubs. `ocr-single-form`'s groundwork 1 edits `routes/tenant.php` and `docs/data-dictionary.md`. `R-33c7fd56` edits the width-derivation comment in `resources/js/Pages/forms/Builder.vue` and `docs/ux/design-system-reference.md`. `R-d001de0c` edits `resources/js/components/builder/ConfigPanel.vue` and `ConfigPanel.test.ts`. Clause 1 is satisfied exactly: the three items' edited files are pairwise disjoint.
+
+**Why:** the Oct 12 deadline (`D72`). The plan the user approved puts all three in the first Oct 12 increment. Splitting them one hub row per increment would cost about half a day of close-out overhead that the schedule does not have, and files that do not overlap cannot collide.
+
+**Disposition:** the user chose to keep all three, in chat on 2026-10-03, asked by name because the batch named in the prompt breached the clause. Each item is its own commit, so a red run bisects to one item, and if the OCR part runs long the other two move to `M129` rather than squeezing verification. Recorded in both places this log requires: inline at the closed rows and in `PROGRESS.md`'s release paragraph. Not a precedent, and the first of its reason, so the escalation rule above is not engaged.
 
 ---
 

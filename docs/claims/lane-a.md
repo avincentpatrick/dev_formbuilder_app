@@ -16,7 +16,146 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M127` is merged; the user's 19 builder comments and single-form OCR are the whole `early-testing` tier, for the Oct 12 testing
+## Status: ACTIVE CLAIM — `M128`, OCR groundwork 1 (a scan read and matched to its printed form), the collapsible sidebar and per-field save errors (`m128-ocr-groundwork-sidebar-save-errors`)
+
+Taken 2026-10-03. Branch `m128-ocr-groundwork-sidebar-save-errors`, cut from `origin/main` at `ece77511`, PR into `main`.
+The first Oct 12 increment under `D72`, named by the user. Three items:
+- **`ocr-single-form`, groundwork 1 of 2** — the marker at the end of `docs/ocr-pipeline-design.md`. It takes the scan
+  upload, the reading job and the field matching from the printed layout, plus two fixes to the printed paper. The marker
+  **stays open**; groundwork 2 is the "accept scans" setting, the upload and review screen, and the save.
+- **`R-33c7fd56`** — the left app sidebar cannot be collapsed (`docs/feature-backlog.md:11386`). `D68` = B: `localStorage`.
+- **`R-d001de0c`** — the per-field 422 error map has no consumer (`docs/feature-backlog.md:11893`).
+
+⛔ **`D13` exception #4, allowed by the user in chat on 2026-10-03.** All three items edit hub files, and their edited files
+are pairwise disjoint. Recorded in `docs/claims/decisions.md` in this push.
+
+### Evidence verified
+
+**`ocr-single-form`** — measured against `ece77511`:
+- The marker is `state=ready`, `tier=early-testing`. The printed form is as `§2.5` says: `BlankFormPrintPresenter::present()`
+  returns blocks of `{key, area, label, hint, comb, options, grid}`, and the running head carries the 8-character checksum
+  stamp. Rendering the seeded `Patient Intake` gives stamp `ef38a6c1`.
+- **Already in the tree, each with no writer:** `AttachmentKind::OcrSourceScan`, `SubmissionSource::OcrSingle`,
+  `QueueName::OcrProcessing` (both workers listen on it), `forms.allow_ocr_single` (no reader either),
+  `attachments.ocr_confidence_avg`, the plan key `ocr_single` (Professional and up) and the `ocr_single` module toggle.
+  `CapabilityFlags::isOcrCompatible()` exists.
+- **No OCR route, job, table, client or config exists.** Neither of the `/api/v1` OCR endpoints that
+  `docs/architecture/technical-architecture.md` names is declared.
+
+**`R-33c7fd56`:**
+- **Exact:** `Sidebar.vue:403-405` and `:447-475` (widths), `:141`, `:166-168` and `:244` (the rail band and the tooltip
+  gate), and `AppLayout.vue:17` and `:84-86`.
+- **The `public-runtime` storage citations hold:** `lib/device.ts:13`, `composables/useAutosave.ts:116` and
+  `lib/respondent-session.ts:120`. The only `resources/js` hit is the comment at `Pages/forms/Index.vue:104`.
+- **Moved:** `stubMatchMedia()` is `Sidebar.test.ts:428-445` (the row says `:452-470`), and the `Builder.vue` derivation is
+  `:929-964` (the row says `:894-903`).
+- **Overstated:** there are 13 `not.toContain` assertions on `labels()`, not ~20.
+
+**`R-d001de0c`:**
+- **Held:** `builderClient.ts:61-72` (it runs for every non-OK, non-409 response) and `:32`, `useBuilderStore.ts:198`, the
+  four consumer files, and the only `.errors` read, at `builderClient.test.ts:74`.
+- **Wrong:** `ConfigPanel.vue:260` is now a comment. The alert is at `:357`.
+- **Moved:** the store double is `ConfigPanel.test.ts:142-159` (the row says `:110-124`).
+- **Only partly true:** "the mount throws". The double is cast `as unknown as BuilderStore` and test files are not
+  type-checked, so a missing member is `undefined`.
+
+### Premise verified
+
+**`ocr-single-form`:**
+- ⛔ **The provider key is set and does NOT work yet.** On 2026-10-03 Cloud Vision answered `403 BILLING_DISABLED` for the
+  key's project. The memory's *"credential supplied 2026-08-05"* is half the premise. The user has been asked to attach
+  billing. Until then the live read is blocked, and everything else proceeds against Vision's documented response format.
+- ⛔ **The paper the user is printing samples from has a defect.** A `yes_no` question prints a ruled write-in box. It has
+  no `config.options`, so the blade's `@forelse … @empty` falls through. Measured: `Patient Intake`'s `consent` gives
+  `choices` with zero options. This is fixed here, because the samples are due 2026-10-08.
+- **The routes are session web routes,** gated like manual encoding. That is the H14 precedent for a staff surface. The
+  `/api/v1` twins are filed, not built.
+- **`TenantAwareJob::handle()` wraps every run in a transaction,** and Windows PHP cannot enforce `--timeout`. So the
+  reading job reads one page per run.
+- **A local test could call Google.** The real key is in `.env`, `QUEUE_CONNECTION=sync`, and nothing blocks stray HTTP
+  globally. `phpunit.xml` blanks the key.
+- **Groundwork 2 inherits five facts:**
+  - `saveDraft()` and `promote()` refuse a superseded version;
+  - `AttachmentPolicy` knows only `submission` and `form_field` owners;
+  - `SubmissionFinalizer` re-points only media-answer attachments;
+  - the reaper deletes expired drafts after 30 days;
+  - `duration` has no encode control.
+
+**`R-33c7fd56`:**
+- **`D68` = B holds.** There is no Inertia SSR, so reading storage in `setup()` cannot mismatch.
+- **M121's correction holds:** collapsed, the content box is viewport − 64, continuous across 1024 and 1025px, so no
+  layout inverts.
+- **The row is a floor:** besides `Builder.vue`, `DataTable.vue:627-629` makes a derivation that becomes false. Four
+  more places are merely incomplete prose.
+- No e2e spec targets the sidebar.
+
+**`R-d001de0c`:**
+- **`guard()` receives only a function,** so nothing knows which field failed.
+- **`select()` flushes, then switches,** so a failure can land after another field is selected.
+- **Create, section, library and reorder requests also 422 through `guard()`.**
+- **A `FormException` 422 carries no `errors` map.**
+
+### Remedy verdict
+
+**`ocr-single-form`:**
+- **What the marker prescribes for this half works:** upload, reading job and field matching.
+- **The matcher consumes `present()`,** the same model the paper was printed from.
+- **Measured before any code:** a typed-filled `Patient Intake` renders through dompdf exactly as printed, with comb
+  characters, DD/MM/YYYY captions and X marks. The PDF is 3,337 bytes, against 3,005 for the blank control.
+- ⚠️ **Open:** the live Vision read, blocked on billing. It is re-measured, and committed as a fixture, before release.
+
+**`R-33c7fd56`:**
+- **Option B's remedy works,** with M121's (c), (d) and (e).
+- **Measured:** an unscoped forced rail out-ranks the drawer's 260px (specificity 0,4,0 against 0,2,0), so it sits under
+  `min-width: 1025px`.
+- **The tooltip gate** `!(isRail || (collapsed && !isMobile))` keeps J4b's Escape fix, traced through `Tooltip.vue:201-212`.
+
+**`R-d001de0c`:**
+- **"A reader, not a rewrite" holds.**
+- **"Widen `save.error` first" is the wrong first step.** It would move `Builder.vue`'s regex-pinned watch and about 20
+  string assertions, so a new uid-keyed member is the reader instead.
+- **Inline marking uses `MdsFormField`'s existing `error` prop.**
+
+Files:
+- **OCR:**
+  - new: `config/ocr.php`, `database/migrations/2026_08_17_000116_create_ocr_scans_table.php`, `app/Models/OcrScan.php`,
+    `app/Enums/OcrScanStatus.php`, `app/Services/Ocr/*`, `app/Jobs/ReadOcrScanJob.php`,
+    `app/Http/Controllers/Tenant/OcrScanController.php`, `app/Http/Requests/Ocr/StoreOcrScanRequest.php`,
+    `tests/Unit/Ocr/*`, `tests/Feature/Ocr/*`, `tests/fixtures/ocr/*`;
+  - edited: `.env.example`, `phpunit.xml`, `routes/tenant.php` (hub), `app/Services/Attachments/AttachmentStorageService.php`,
+    `app/Services/Forms/BlankFormPrintPresenter.php`, `resources/views/pdf/blank-form.blade.php`,
+    `resources/views/pdf/_blank-form-styles.blade.php` (only if the key stamp must darken),
+    `app/Support/Tenancy/TenantScopedTables.php`, `app/Support/Tenancy/ConstraintBoundaries.php`,
+    `tests/Feature/Tenancy/TenantExtractColumnDriftTest.php`, `tests/Feature/Forms/BlankFormPrintPresenterTest.php`,
+    `tests/Feature/Forms/BlankFormPrintRendererTest.php`, `docs/ocr-pipeline-design.md` and `docs/data-dictionary.md` (hub).
+- **Sidebar:**
+  - new: `resources/js/composables/useSidebarCollapse.ts` and its test, `tests/e2e/sidebar-collapse.spec.ts`;
+  - edited: `resources/js/components/shell/Sidebar.vue`, `Sidebar.test.ts`, `resources/js/Pages/forms/Builder.vue` (hub,
+    comment only), `packages/design-system/src/components/DataTable/DataTable.vue` (comment only),
+    `resources/js/Pages/forms/Index.vue` (comment only), `docs/ux/design-system-reference.md` (hub).
+- **Save errors:**
+  - new: `resources/js/components/builder/field-save-errors.ts` (a pure map from server keys to the panel's controls)
+    and its test;
+  - edited: `resources/js/components/builder/useBuilderStore.ts`, `save-state.test.ts`,
+    `resources/js/components/builder/ConfigPanel.vue` (hub), `ConfigPanel.test.ts` (hub), and
+    `docs/workflow-branching-design.md` (its citation of `ConfigPanel.vue:388-390` only, if my edits move it).
+- **Close-out:** `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/backlog-triage.md`, `docs/claims/decisions.md`,
+  `docs/claims/lane-a.md`, `docs/gate-baselines.md`, `PROGRESS.md` (own block and hand-off line), and
+  `PROGRESS_ARCHIVE.md` (the ninth tracker surgery).
+
+Shared artefacts taken: `docs/**` (the files above), `phpunit.xml`, `PROGRESS.md` (own block only), and the new top-level
+`tests/e2e/sidebar-collapse.spec.ts`.
+Paired files taken: none. `clipped-node-containment.test.ts` reads `Sidebar.vue`, but the file already positions nodes, so
+its known list does not move.
+Namespaces spent: migration prefix `2026_08_17_000116`; decision id `D73`. No ADR (`0010` stays reserved).
+Prediction:
+- **CI runs and goes 6/6** after the local gates.
+- **Most likely red:** a tenancy drift test on the new table, from the classification, the extract census or the
+  constraint-boundary lint. Second: the ledger citation tier at 17/17, from `Sidebar.vue` and `ConfigPanel.vue` line
+  shifts.
+- **PHPStan** gains nothing in CI. **Pint** asks for one or two fixes on new files. **`openapi.json`** is byte-identical.
+- **Most likely to be WRONG:** that Vision reads typed comb characters as clean single symbols, with no box-border
+  artefacts and with the 7pt grey key stamps legible.
 
 ## RELEASED — `M127`, the Oct 12 realignment: the user's 19 builder comments and OCR become the `early-testing` tier (merged as PR #320, `40afe7da`, 6/6 green with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

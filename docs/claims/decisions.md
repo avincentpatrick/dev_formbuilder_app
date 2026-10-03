@@ -1139,16 +1139,6 @@ honest about it, and the testing site is a single workspace so nobody can meet i
 end state and needs a disclosure-safe refusal designed first, which is a decision rather than a patch.
 
 
-### D70 — Do content blocks carry translations? **Tier: during-testing.**
-
-**Filed 2026-10-01 by `M121`, from verifying `R-6dedc3a9`.** Labels and hints are translated per locale on every surface; the proposed block shape has no translation member, and because the shape refuses unknown keys, adding one later is a deliberate widening rather than an accident.
-
-- **A — not yet.** The shape ships without translations and is widened later by appending an optional member; a multilingual form shows its blocks in the base language until then, and the editor says so.
-- **B — now.** Every text leaf carries a translations map from the first block, multiplying the editor's inputs by the form's languages before anything ships.
-
-**Recommendation: A.** It does not block the shape half of `R-6dedc3a9`, which is why it is filed `during-testing`.
-
-
 ### D73 — Single-form OCR sends each scanned page, which carries a respondent's handwritten answers, to Google Cloud Vision, and neither the threat model nor any text in the product says so. What does that data flow need before launch? **Tier: before-launch.**
 
 **Filed 2026-10-03 by `M128`, from building the reading job.** The reading job posts each stored page to `vision.googleapis.com` over TLS, with the workspace's scan in the request body and the API key in a header, and keeps Google's full response privately beside the scan so the matcher can be re-run without a second call. `docs/security-threat-model.md` lists OCR scans only as untrusted uploads; it has no row for a third party that receives respondent data. Nothing on the paper form, in the OCR module's description or in the workspace settings tells anybody that a scan leaves the server. Testing under `D72` uses made-up answers, so nothing real is sent before Oct 12, and this does not block the testing.
@@ -1366,6 +1356,32 @@ end state and needs a disclosure-safe refusal designed first, which is a decisio
 - **`D58`, `D60`, `D61`, `D62` and `D65` — all accepted as recommended,** each recorded above.
 
 **What moved:** nine comment rows up into `early-testing`; fourteen rows that are neither a comment nor a builder defect found while fixing one down into `during-testing`, each with the reason at the row (`R-68656155` and `R-2dc95042`, both security-flavoured, first once the Oct 12 work is done); and `ocr-channels` un-held and split into `ocr-single-form`, `ocr-provider-bakeoff` and `ocr-linelist`. `uploading-import` stays held — the user released OCR only. The testing-server notice is not re-owed, because `before-testing` is untouched.
+
+---
+
+### D70 — Do content blocks carry translations? **A — not yet. Blocks show in the form's base language, and the editor says so.**
+
+**Answered 2026-10-03 (user decision, in chat), recorded by Lane A during `M129` — A, the recommendation.** Put to the user under `D66`'s rule, because the editor half of `R-6dedc3a9` — an `early-testing` work row, taken by `M129` — takes a different shape under each answer. No row carried an `Awaits D70` token, so none is stripped. Measured at the time: `forms.supported_locales` has no writer anywhere in `app/`, so no form can become multilingual through the product today, and the answer changes nothing a tester will see before Oct 12.
+
+**Filed 2026-10-01 by `M121`, from verifying `R-6dedc3a9`.** Labels and hints are translated per locale on every surface; the proposed block shape has no translation member, and because the shape refuses unknown keys, adding one later is a deliberate widening rather than an accident.
+
+- **A — not yet.** The shape ships without translations and is widened later by appending an optional member; a multilingual form shows its blocks in the base language until then, and the editor says so.
+- **B — now.** Every text leaf carries a translations map from the first block, multiplying the editor's inputs by the form's languages before anything ships.
+
+**Recommendation: A.** It does not block the shape half of `R-6dedc3a9`, which is why it is filed `during-testing`.
+
+---
+
+### D74 — A scanned sheet was printed from a version of the form that has since been republished. What happens to its answers? **A — carry them onto the current published version, question by question; list every answer that cannot carry for the reviewer.**
+
+**Filed and answered 2026-10-03 (user decision, in chat), recorded by Lane A during `M129` — A, the recommendation.** Put to the user under `D66`'s rule, because `ocr-single-form` — an `early-testing` work row, taken by `M129` — could not build its save path without the answer. It was an unqueued obligation until then: `docs/ocr-pipeline-design.md` §3's as-built note said a scan of old paper "needs a decision before it can become a draft", and no row or decision held it.
+
+The matcher reads a sheet against the version it was printed from, superseded ones included, because the printed stamp names that version. Every save path refuses a version that is no longer published: `SubmissionPipeline::submit()`, `SubmissionDraftService::saveDraft()` and `promote()`. Any republish supersedes the version a sheet was printed from, including one that only fixes a typo, and during testing authors republish often.
+
+- **A — carry the answers over.** Each answer moves to the question with the same key in the current version, when the type is the same and the value is one the current question can hold (every choice still offered, every cascade level valid, a flat target). Anything else is listed for the reviewer with its label and the text read. The pipeline then validates the reviewed answers as it validates any response.
+- **B — refuse the scan.** Tell the reviewer that the paper is from an older version, and to print a fresh blank or enter the response by hand.
+
+**Recommendation: A.** It is what a person keying old paper into the current form already does, and B turns every typo fix into a refused stack of paper. The carry rule is strict on purpose: a value is never handed to a control that cannot show it, so nothing the reviewer cannot see is saved.
 
 ---
 
@@ -2525,6 +2541,14 @@ half that works.
 **Why:** the Oct 12 deadline (`D72`). The plan the user approved puts all three in the first Oct 12 increment. Splitting them one hub row per increment would cost about half a day of close-out overhead that the schedule does not have, and files that do not overlap cannot collide.
 
 **Disposition:** the user chose to keep all three, in chat on 2026-10-03, asked by name because the batch named in the prompt breached the clause. Each item is its own commit, so a red run bisects to one item, and if the OCR part runs long the other two move to `M129` rather than squeezing verification. Recorded in both places this log requires: inline at the closed rows and in `PROGRESS.md`'s release paragraph. Not a precedent, and the first of its reason, so the escalation rule above is not engaged.
+
+##### #5 — `M129` (2026-10-03) · three items, each editing hub files, allowed by the user in chat
+
+**What was not satisfied:** item 1's second clause, *at most one row may touch a hub file*. `M129` takes three items and each edits hubs. All three edit `routes/tenant.php` and `docs/data-dictionary.md`. A (`ocr-single-form`, groundwork 2) also edits `resources/js/Pages/submissions/Encode.vue`, `docs/piping-output-encoding-design.md`, `docs/security-threat-model.md` and one citation in `docs/ux/design-system-reference.md`. B (`R-1132a6f3` with `R-4e96a994`, plus A's accept-scans setting) also edits `resources/js/Pages/forms/Builder.vue`, `app/Services/Forms/FormService.php` and `BuilderPresenter.php`. C (`R-6dedc3a9` and `R-f0c5b682`) also edits `resources/js/components/builder/ConfigPanel.vue`, `app/Enums/AttachmentKind.php`, `config/attachments.php` and `docs/piping-output-encoding-design.md`. Clause 1 is satisfied exactly: the three non-hub sets are pairwise disjoint, which took two design choices — A serves scan pages through its own helper, so the attachment controller and policy stay C's, and B's new builder prop is optional, so the builder's test fixtures stay C's.
+
+**Why:** the Oct 12 deadline (`D72`), as for #4. The plan the user approved puts all three in one day's slot, and the user named them together in the prompt.
+
+**Disposition:** the user chose to keep all three, in chat on 2026-10-03, asked by name because the batch named in the prompt breached the clause. Each item is its own commit, and an item that runs long moves to `M130` rather than squeezing verification. Recorded in both places this log requires: inline at the closed rows and in `PROGRESS.md`'s release paragraph. ⚠️ **This is the second exception for the Oct 12 reason.** The escalation rule above is not engaged yet. A third for the same reason means the rule, not the batch, needs an answer: file a decision about the rule rather than writing #6.
 
 ---
 

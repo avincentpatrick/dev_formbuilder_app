@@ -282,6 +282,85 @@ final class AttachmentStorageService
     }
 
     /**
+     * Store ONE PAGE OF AN OCR SCAN (M128, single-form OCR groundwork 1) — the fourth sibling, and a sibling
+     * for the reasons the feedback screenshot is: no {@see FormField} owns it, so there is no per-field type
+     * list, size cap or `is_pii` to inherit. The discipline transfers unchanged: content-sniffed type,
+     * server-generated key, sniffed extension, queued virus scan, storage quota.
+     *
+     * ── OWNED BY THE SCAN UNTIL A PERSON CONFIRMS IT ─────────────────────────────────────────────────────
+     * The owner is the `ocr_scans` row, under the alias `ocr_scan`, and like `feedback_report` the caller
+     * MINTS that row's id first, so both directions agree from the first INSERT. `docs/ocr-pipeline-design.md`
+     * §5 gives the page to the SUBMISSION a confirmed scan becomes; nothing re-points it yet, because the
+     * confirmation is groundwork 2, and {@see SubmissionPipeline} re-points only attachments a media ANSWER
+     * references, which a source scan never is. The alias is stored and not registered in the morph map, for
+     * `storeBrandingLogo()`'s reason.
+     *
+     * **`is_pii` is TRUE**: a scan is a photograph of a respondent's handwritten answers.
+     *
+     * The type and size checks repeat the request's on purpose. The request refuses with a field-addressed
+     * 422; this is the write path's own guard, so no other caller can store a page the reader cannot send.
+     *
+     * @throws AttachmentException on a rejected type or an over-size page
+     */
+    public function storeOcrScanPage(UploadedFile $file, string $tenantId, string $ocrScanId, string $uploadedBy): Attachment
+    {
+        $mime = $file->getMimeType() ?? 'application/octet-stream';
+
+        /** @var list<string> $accepted */
+        $accepted = config('ocr.upload.accepted_types');
+
+        if (! $this->mimeAllowed($mime, $accepted)) {
+            throw AttachmentException::mimeRejected($mime);
+        }
+
+        $maxBytes = (int) config('ocr.upload.max_bytes_per_file');
+
+        if ((int) $file->getSize() > $maxBytes) {
+            throw AttachmentException::tooLarge($maxBytes);
+        }
+
+        $this->quota->assertCanCreate(UsageMetric::StorageBytes, (int) $file->getSize());
+
+        $kind = AttachmentKind::OcrSourceScan;
+        $disk = (string) config('filesystems.default');
+
+        $uuid = Uuid::uuid7()->toString();
+        $extension = $file->extension() ?: 'bin';
+        $directory = "tenants/{$tenantId}/{$kind->value}/".date('Ym');
+        $storedPath = Storage::disk($disk)->putFileAs($directory, $file, "{$uuid}.{$extension}");
+
+        if ($storedPath === false) {
+            throw AttachmentException::storeFailed();
+        }
+
+        [$width, $height] = $this->imageDimensions($file, $mime);
+
+        $attachment = Attachment::create([
+            'id' => $uuid,
+            'attachable_type' => 'ocr_scan',
+            'attachable_id' => $ocrScanId,
+            'kind' => $kind,
+            'disk' => $disk,
+            'path' => $storedPath,
+            'original_filename' => $file->getClientOriginalName(),
+            'mime_type' => $mime,
+            'size_bytes' => (int) $file->getSize(),
+            'checksum_sha256' => hash_file('sha256', (string) $file->getRealPath()) ?: null,
+            'width' => $width,
+            'height' => $height,
+            'duration_seconds' => null,
+            'is_encrypted_at_rest' => false,
+            'is_pii' => true,
+            'virus_scan_status' => ScanStatus::Pending,
+            'uploaded_by' => $uploadedBy,
+        ]);
+
+        ScanAttachmentJob::dispatch($attachment->id, $tenantId);
+
+        return $attachment;
+    }
+
+    /**
      * @throws AttachmentException
      */
     private function resolveMediaField(FormVersion $version, string $fieldKey): FormField

@@ -39,6 +39,7 @@ use App\Http\Controllers\Tenant\ImpersonationSessionController;
 use App\Http\Controllers\Tenant\InvitationController;
 use App\Http\Controllers\Tenant\MemberController;
 use App\Http\Controllers\Tenant\NotificationController;
+use App\Http\Controllers\Tenant\OcrScanController;
 use App\Http\Controllers\Tenant\OnboardingController;
 use App\Http\Controllers\Tenant\PreferencesController;
 use App\Http\Controllers\Tenant\ResourceGrantController;
@@ -1001,6 +1002,17 @@ Route::middleware([
     */
     Route::post('/impersonate/exit', [ImpersonationSessionController::class, 'destroy'])
         ->name('impersonate.exit');
+
+    // Single-form OCR (M128, groundwork 1 — docs/ocr-pipeline-design.md): upload one scan, and read how reading
+    // it went. The manual-encoding gate decides WHO, since OCR is a way of entering responses; then the module
+    // toggle BEFORE the plan, so a workspace that switched scanning off is told so rather than told to upgrade.
+    // The literal throttle bounds a runaway client — every page is a paid provider call, and metering is a row.
+    Route::post('/forms/{form}/ocr/scans', [OcrScanController::class, 'store'])
+        ->middleware(['can:create,'.Submission::class.',form', 'module:ocr_single', 'feature:ocr_single', 'throttle:20,1'])
+        ->name('forms.ocr.scans.store');
+    Route::get('/forms/{form}/ocr/scans/{scan}', [OcrScanController::class, 'show'])
+        ->middleware(['can:create,'.Submission::class.',form', 'module:ocr_single', 'feature:ocr_single'])
+        ->name('forms.ocr.scans.show');
 });
 
 /*

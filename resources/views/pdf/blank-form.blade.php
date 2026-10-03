@@ -57,7 +57,7 @@
 
         <p class="head__meta">
             Version {{ $model['version_number'] }}@if ($model['published_at'] !== null), published {{ $model['published_at'] }}@endif.
-            Please write in CAPITAL LETTERS, one character per box.
+            Please write in CAPITAL LETTERS, one character per box, and mark each choice with an X.
         </p>
     </header>
 

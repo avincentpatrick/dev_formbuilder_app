@@ -7778,7 +7778,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   representative case is `app/Providers/AppServiceProvider.php:377` (`api`, 600/min); every other
   registration was read for its per-minute value and none is 300, none is user-keyed at that figure.
   ⚠️ **"The only throttle on an authenticated tenant route" is likewise too strong** —
-  `routes/tenant.php:952` (`throttle:120,1`) is the only *numeric-literal* throttle inside the `auth` group,
+  `routes/tenant.php`'s `throttle:120,1` was the only *numeric-literal* throttle in the `auth` group (`M128` added `throttle:20,1`),
   while `routes/tenant.php:385` and `:395` carry named limiters in the same group, both 20/min. Neither is
   300, so the conclusion survives; a taker grepping `throttle:` will get three hits and should not read
   that as the row being overtaken. ⚠️ **Premise for whoever writes the remedy:**

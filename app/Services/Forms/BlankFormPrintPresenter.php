@@ -351,7 +351,7 @@ final class BlankFormPrintPresenter
                 'conditional' => ($field['is_required'] ?? null) === RequiredMode::Conditional->value
                     || $this->stringOrNull($field['relevant_expression'] ?? null) !== null,
                 'comb' => $area === PrintAnswerArea::Comb ? $this->combGroups($type, $field) : null,
-                'options' => $area === PrintAnswerArea::Choices ? $this->optionList($config, 'options', $locale) : [],
+                'options' => $area === PrintAnswerArea::Choices ? $this->choiceOptions($type, $config, $locale) : [],
                 'grid' => $area === PrintAnswerArea::Grid ? [
                     'rows' => $this->optionList($config, 'rows', $locale),
                     'columns' => $this->optionList($config, 'columns', $locale),
@@ -633,5 +633,36 @@ final class BlankFormPrintPresenter
     private function blankToNull(string $value): ?string
     {
         return $value === '' ? null : $value;
+    }
+
+    /**
+     * The tick boxes one `choices` field prints (Increment M128).
+     *
+     * ⚠️ A YES/NO QUESTION HAS NO STORED OPTIONS, AND IT USED TO PRINT AS A WRITE-IN BOX. `yes_no` is not a
+     * `hasOptions()` type — its two answers are fixed and never stored (`ValueShape::Boolean`) — so
+     * `optionList()` read an empty `config.options`, and the template's empty branch drew the ruled
+     * "write it in" box meant for a malformed choice list. `PrintAnswerArea` has always classed `yes_no` as
+     * `choices`, which is what `docs/ocr-pipeline-design.md` §2.5.2 says paper should show. So the two
+     * answers are supplied here, in the same `{value, label}` shape as any option list. The values are the
+     * literals `Coercion::yesNoAnswer()` reads as true and false, so an OCR mark on "Yes" lands on the same
+     * canonical boolean a screen answer does. The labels are the ones `SchemaValueFormatter` prints for a
+     * stored yes/no answer in the submission PDF, so the blank form and the filled one agree.
+     *
+     * This method is appended rather than placed beside `optionList()`, deliberately: this file is cited by
+     * line from the backlog, and an insertion above those lines would move them.
+     *
+     * @param  array<string, mixed>  $config
+     * @return list<array{value: string, label: string}>
+     */
+    private function choiceOptions(FieldType $type, array $config, ?string $locale): array
+    {
+        if ($type === FieldType::YesNo) {
+            return [
+                ['value' => 'yes', 'label' => 'Yes'],
+                ['value' => 'no', 'label' => 'No'],
+            ];
+        }
+
+        return $this->optionList($config, 'options', $locale);
     }
 }

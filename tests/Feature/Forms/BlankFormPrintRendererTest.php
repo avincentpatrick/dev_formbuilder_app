@@ -254,3 +254,21 @@ it('slugs the download filename, and falls back rather than emitting a bare vers
     [$blank, $blankVersion] = printableForm($this->tenant, $this->user, '???');
     expect($this->renderer->filename($blank, $blankVersion))->toBe('blank-form-v1-blank.pdf');
 });
+
+it('prints a yes/no question as two tick boxes, and tells the respondent to mark with an X (M128)', function (): void {
+    $form = app(FormService::class)->create($this->tenant, $this->user, 'Consent Check');
+    addFormField($form->draftVersion, $this->user, 'consented', FieldType::YesNo, 0);
+    $published = app(PublishService::class)->publish($form->refresh(), $this->user);
+
+    $html = $this->renderer->html($form->refresh(), $published);
+
+    // The question's own markup, from its key stamp to the end of its answer area.
+    expect(preg_match('#q__key">consented</span>(.*?)</section>#s', $html, $match))->toBe(1);
+    $question = $match[1];
+
+    expect(substr_count($question, 'class="choice__box"'))->toBe(2)
+        ->and($question)->toContain('</span>Yes</div>')
+        ->and($question)->toContain('</span>No</div>')
+        ->and(str_contains($question, 'class="ruled"'))->toBeFalse('a yes/no question must not print a write-in box')
+        ->and($html)->toContain('mark each choice with an X');
+});

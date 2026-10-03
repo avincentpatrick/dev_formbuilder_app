@@ -143,6 +143,11 @@ Files:
   `docs/claims/lane-a.md`, `docs/gate-baselines.md`, `PROGRESS.md` (own block and hand-off line), and
   `PROGRESS_ARCHIVE.md` (the ninth tracker surgery).
 
+- **Extension 1, pushed before either file was opened:** `tests/Feature/Tenancy/ConstraintBoundaryDriftTest.php`,
+  whose census pins every composite tenant FK by name, so the new `ocr_scans_form_fk` joins its list (the Tenancy
+  directory, run whole, reddened on that one case and nothing else: 359 passed). Also the new `app/Exceptions/Ocr/*`
+  for the reading path's typed refusals.
+
 Shared artefacts taken: `docs/**` (the files above), `phpunit.xml`, `PROGRESS.md` (own block only), and the new top-level
 `tests/e2e/sidebar-collapse.spec.ts`.
 Paired files taken: none. `clipped-node-containment.test.ts` reads `Sidebar.vue`, but the file already positions nodes, so

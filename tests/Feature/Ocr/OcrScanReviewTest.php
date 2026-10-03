@@ -34,6 +34,9 @@ uses(RefreshDatabase::class);
 */
 
 beforeEach(function (): void {
+    // These cases render whole pages, and CI builds no Vite manifest: without the suite opt-out every render is a
+    // 500 there while it passes here, where the dev server or a local build supplies one (measured, M129).
+    $this->withoutVite();
     TenantContext::flush();
     app(PermissionRegistrar::class)->setPermissionsTeamId(null);
     (new RolePermissionSeeder)->run();

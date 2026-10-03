@@ -11903,7 +11903,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   page a publish-refusal banner; a save failure is a different event with a different owner — it belongs on
   the offending row in the config panel, beside the existing `saveError` alert at `ConfigPanel.vue:260`, which
   is the one surface the store's verdict already drives. ⚠️ **Widening `save.error` from `string|null` is the
-  likely first step** (`useBuilderStore.ts:197-198` keeps only `.message`), and
+  likely first step** (`useBuilderStore.ts`'s `guard()` keeps only `.message`), and
   `ConfigPanel.test.ts:110-124`'s hand-rolled store double must gain any new member or the mount throws.
   **Live.** Filed by `M113`. **Tier: early-testing.**
 

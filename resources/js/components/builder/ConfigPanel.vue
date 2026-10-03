@@ -49,6 +49,7 @@ import MatrixEditor from './MatrixEditor.vue';
 import MediaEditor from './MediaEditor.vue';
 import PrefillEditor from './PrefillEditor.vue';
 import ValidationEditor from './ValidationEditor.vue';
+import { sortFieldSaveErrors } from './field-save-errors';
 import type { BuilderStore } from './useBuilderStore';
 import type { BuilderValidation, ComparableField, ConditionCatalogue, EnumOption, LocalField, LocalSection } from './types';
 interface Choice {
@@ -71,6 +72,11 @@ const props = defineProps<{ store: BuilderStore }>();
 const field = props.store.selectedField;
 const section = props.store.selectedSection;
 const saveError = props.store.saveError;
+const saveFieldErrors = props.store.saveFieldErrors;
+// M128 (`R-d001de0c`): a refused save, marked ON the selected field's controls; every other key in words, and a line per OTHER refused field.
+const fieldSaveErrors = computed(() => sortFieldSaveErrors(field.value ? saveFieldErrors.value[field.value.uid] : undefined));
+const otherRefusals = computed<string[]>(() => props.store.fields.value.filter((f) => f.uid !== field.value?.uid && saveFieldErrors.value[f.uid] !== undefined).map((f) => `“${f.label || f.key}” has a change that was not saved. Select it to see why.`));
+const saveIssues = computed<string[]>(() => [...fieldSaveErrors.value.listed.map((issue) => issue.text), ...otherRefusals.value]);
 const enums = props.store.enums;
 const saving = props.store.saving;
 // Transient "Saved to library" confirmation (Increment G9b), cleared after a beat.
@@ -354,7 +360,10 @@ watch(librarySaved, (value) => {
              Above the strip, not between the strip and its own panel. A save failure is about the pane
              rather than about the selected tab, and wedging it into the tab-to-panel gap was the one
              place it could not belong. -->
-        <p v-if="saveError" class="config__error" role="alert">{{ saveError }}</p>
+        <div v-if="saveError || saveIssues.length > 0" class="config__error" role="alert">
+            <p v-if="saveError">{{ saveError }}</p>
+            <ul v-if="saveIssues.length > 0"><li v-for="issue in saveIssues" :key="issue">{{ issue }}</li></ul>
+        </div>
 
         <div v-if="!field && !section" class="config__empty">
             <p>Select a field or section to configure it.</p>
@@ -376,35 +385,35 @@ watch(librarySaved, (value) => {
 
                     <template v-if="activeTab === 'basics'">
                         <FieldTypeControl :store="store" />
-                        <MdsFormField label="Label" v-slot="{ id }">
-                            <MdsTextInput :id="id" :model-value="field.label" @update:model-value="setField('label', $event)" />
+                        <MdsFormField label="Label" :error="fieldSaveErrors.inline.label" v-slot="{ id, describedby, invalid }">
+                            <MdsTextInput :id="id" :describedby="describedby" :invalid="invalid" :model-value="field.label" @update:model-value="setField('label', $event)" />
                         </MdsFormField>
                         <MdsFormField
                             v-if="isCalculated"
-                            label="Calculation formula"
+                            label="Calculation formula" :error="fieldSaveErrors.inline['config.calculated_formula']"
                             help="Evaluated on the server. Use ${field} references, arithmetic (+ - * /), comparisons, and if()/count()/int()/today()/now()."
-                            v-slot="{ id, describedby }"
+                            v-slot="{ id, describedby, invalid }"
                         >
                             <MdsTextarea
                                 :id="id"
-                                :describedby="describedby"
+                                :describedby="describedby" :invalid="invalid"
                                 :model-value="calculatedFormula"
                                 :rows="2"
                                 placeholder="e.g. ${quantity} * ${unit_price}"
                                 @update:model-value="setConfig('calculated_formula', $event || null)"
                             />
                         </MdsFormField>
-                        <MdsFormField label="Help text" v-slot="{ id }">
+                        <MdsFormField label="Help text" :error="fieldSaveErrors.inline.hint" v-slot="{ id, describedby, invalid }">
                             <MdsTextarea
-                                :id="id"
+                                :id="id" :describedby="describedby" :invalid="invalid"
                                 :model-value="field.hint ?? ''"
                                 :rows="2"
                                 @update:model-value="setField('hint', $event || null)"
                             />
                         </MdsFormField>
-                        <MdsFormField v-if="!isCalculated" label="Placeholder" v-slot="{ id }">
+                        <MdsFormField v-if="!isCalculated" label="Placeholder" :error="fieldSaveErrors.inline.placeholder" v-slot="{ id, describedby, invalid }">
                             <MdsTextInput
-                                :id="id"
+                                :id="id" :describedby="describedby" :invalid="invalid"
                                 :model-value="field.placeholder ?? ''"
                                 @update:model-value="setField('placeholder', $event || null)"
                             />
@@ -523,10 +532,10 @@ watch(librarySaved, (value) => {
                     </template>
 
                     <template v-else-if="activeTab === 'advanced'">
-                        <MdsFormField label="Field key" help="Referenced in expressions and exports. Lowercase, unique." v-slot="{ id, describedby }">
+                        <MdsFormField label="Field key" help="Referenced in expressions and exports. Lowercase, unique." :error="fieldSaveErrors.inline.key" v-slot="{ id, describedby, invalid }">
                             <MdsTextInput
                                 :id="id"
-                                :describedby="describedby"
+                                :describedby="describedby" :invalid="invalid"
                                 :model-value="field.key"
                                 @update:model-value="setField('key', $event)"
                             />
@@ -546,16 +555,16 @@ watch(librarySaved, (value) => {
                             legend="Show this question only when…"
                             @update:expression="setField('relevant_expression', $event)"
                         />
-                        <MdsFormField label="Appearance hint" v-slot="{ id }">
+                        <MdsFormField label="Appearance hint" :error="fieldSaveErrors.inline.appearance" v-slot="{ id, describedby, invalid }">
                             <MdsTextInput
-                                :id="id"
+                                :id="id" :describedby="describedby" :invalid="invalid"
                                 :model-value="field.appearance ?? ''"
                                 @update:model-value="setField('appearance', $event || null)"
                             />
                         </MdsFormField>
-                        <MdsFormField label="Default value" v-slot="{ id }">
+                        <MdsFormField label="Default value" :error="fieldSaveErrors.inline.default_value" v-slot="{ id, describedby, invalid }">
                             <MdsTextInput
-                                :id="id"
+                                :id="id" :describedby="describedby" :invalid="invalid"
                                 :model-value="field.default_value ?? ''"
                                 @update:model-value="setField('default_value', $event || null)"
                             />
@@ -577,9 +586,9 @@ watch(librarySaved, (value) => {
                                 @update:model-value="setField('is_queryable', $event)"
                             />
                         </div>
-                        <MdsFormField v-if="field.is_queryable" label="Indexed data type" v-slot="{ id }">
+                        <MdsFormField v-if="field.is_queryable" label="Indexed data type" :error="fieldSaveErrors.inline.indexed_data_type" v-slot="{ id, describedby, invalid }">
                             <MdsSelect
-                                :id="id"
+                                :id="id" :describedby="describedby" :invalid="invalid"
                                 :model-value="field.indexed_data_type ?? ''"
                                 :options="enums.indexed_data_types"
                                 placeholder="Choose a type"
@@ -799,5 +808,16 @@ watch(librarySaved, (value) => {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: var(--mds-space-3);
+}
+
+/* M128 (`R-d001de0c`): the alert now holds the save sentence and, under it, every refused setting the panel
+   cannot mark in place. Appended at the end because this stylesheet is cited by line from the backlog. */
+.config__error p,
+.config__error ul {
+    margin: 0;
+}
+
+.config__error ul {
+    padding-left: var(--mds-space-4);
 }
 </style>

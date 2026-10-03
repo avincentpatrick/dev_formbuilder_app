@@ -318,3 +318,99 @@ group('the save verdict is explicit, never inferred from an idle queue', () => {
         expect(store.saveState.value).toBe('saved');
     });
 });
+
+group('a refused field keeps its marks until THAT field saves (M128, R-d001de0c)', () => {
+    /** Two questions, so a refusal on one can be followed by a success on the other. */
+    function twoFieldProps(): BuilderPageProps {
+        return {
+            ...pageProps(),
+            fields: [serverField({ id: 'f1', key: 'first' }), serverField({ id: 'f2', key: 'second', sequence: 2 })],
+        };
+    }
+
+    async function editAt(store: Store, index: number, label: string): Promise<void> {
+        const field = store.fields.value[index];
+        field.label = label;
+        store.touch(field.uid, 'field');
+
+        await store.whenIdle();
+        await flushPromises();
+    }
+
+    const refused = {
+        message: 'The label field is required.',
+        errors: { label: ['The label field is required.'], 'validations.0.rule_value': ['The rule value must be a number.'] },
+    };
+
+    it('keeps the server\'s map under the refused field\'s uid, and the verdict failed', async () => {
+        fetchMock().mockResolvedValue(jsonResponse(422, refused));
+        const store = useBuilderStore(twoFieldProps());
+
+        await editAt(store, 0, '');
+
+        expect(store.saveFieldErrors.value).toEqual({ [store.fields.value[0].uid]: refused.errors });
+        expect(store.saveState.value).toBe('failed');
+    });
+
+    it('does not let a later success on ANOTHER question erase the marks, or claim everything saved', async () => {
+        // ⭐ `select()` flushes and then switches, so this is the ordinary path: the refusal lands, the author
+        // moves on, and the next question saves. The refused value is still on screen and nothing re-sends it.
+        const mock = fetchMock().mockResolvedValueOnce(jsonResponse(422, refused));
+        const store = useBuilderStore(twoFieldProps());
+        await editAt(store, 0, '');
+
+        mock.mockResolvedValue(jsonResponse(200, serverField({ id: 'f2', key: 'second', version: 'v2' })));
+        await editAt(store, 1, 'Second question');
+
+        expect(store.saveFieldErrors.value[store.fields.value[0].uid]).toEqual(refused.errors);
+        expect(store.saveError.value).toBeNull();
+        expect(store.saveState.value).toBe('failed');
+    });
+
+    it('clears a field\'s marks when that field next saves, and only then reaches saved', async () => {
+        const mock = fetchMock().mockResolvedValueOnce(jsonResponse(422, refused));
+        const store = useBuilderStore(twoFieldProps());
+        await editAt(store, 0, '');
+
+        mock.mockResolvedValue(jsonResponse(200, serverField({ id: 'f1', key: 'first', version: 'v2' })));
+        await editAt(store, 0, 'Fixed');
+
+        expect(store.saveFieldErrors.value).toEqual({});
+        expect(store.saveState.value).toBe('saved');
+    });
+
+    it('replaces a field\'s marks with none when its next refusal carries no map', async () => {
+        const mock = fetchMock().mockResolvedValueOnce(jsonResponse(422, refused));
+        const store = useBuilderStore(twoFieldProps());
+        await editAt(store, 0, '');
+
+        mock.mockResolvedValue(jsonResponse(500, { message: 'Server error.' }));
+        await editAt(store, 0, 'Again');
+
+        expect(store.saveFieldErrors.value).toEqual({});
+        expect(store.saveError.value).toBe('Server error.');
+    });
+
+    it('marks no field for a refusal of a request that is not that field\'s own save', async () => {
+        fetchMock().mockResolvedValue(jsonResponse(422, { message: 'Bad section.', errors: { label: ['Bad section.'] } }));
+        const store = useBuilderStore(twoFieldProps());
+
+        await store.addSection();
+        await flushPromises();
+
+        expect(store.saveError.value).toBe('Bad section.');
+        expect(store.saveFieldErrors.value).toEqual({});
+    });
+
+    it('clears the marks of a question that is deleted', async () => {
+        const mock = fetchMock().mockResolvedValueOnce(jsonResponse(422, refused));
+        const store = useBuilderStore(twoFieldProps());
+        await editAt(store, 0, '');
+
+        mock.mockResolvedValue(jsonResponse(204, null));
+        await store.deleteField(store.fields.value[0].uid);
+        await flushPromises();
+
+        expect(store.saveFieldErrors.value).toEqual({});
+    });
+});

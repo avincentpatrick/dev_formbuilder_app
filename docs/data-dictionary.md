@@ -1288,6 +1288,42 @@ One earned badge (K1b; ADR-0020 §D9, `docs/gamification-design.md` §7). Persis
 
 ---
 
+## 33. `ocr_scans`
+
+One uploaded scan of a printed blank form, and what reading it produced (M128, single-form OCR groundwork 1; `docs/ocr-pipeline-design.md` §3 and §6). **A staged proposal, not a submission.** `docs/ocr-pipeline-design.md` §1's one rule is that OCR output reaches `SubmissionPipeline` only after a person confirms it, so nothing downstream reads this table as an answer. The confirmation is groundwork 2; this row remembers what the machine read and how sure it was, so the review screen can show the reviewer where to look.
+
+**Writers:** `App\Services\Ocr\OcrScanService` (the upload, `POST /forms/{form}/ocr/scans`) and `App\Services\Ocr\OcrScanReader`, driven one page per run by `App\Jobs\ReadOcrScanJob` on the `ocr-processing` queue. **Reader:** `GET /forms/{form}/ocr/scans/{scan}`, for the review screen to come.
+
+⚠️ **THE PAGES ARE `attachments` ROWS, kind `ocr_source_scan`, owner alias `ocr_scan`** (§10). The page files go through the shared write path: content-sniffed type, server-generated key, virus scan and storage quota. `docs/ocr-pipeline-design.md` §5 gives a page to the submission a confirmed scan becomes, and nothing re-points it yet. **The per-scan confidence lives there too,** in `attachments.ocr_confidence_avg`, which the reading job writes on every page; this table keeps no second copy.
+
+⚠️ **THE PROVIDER'S RAW ANSWER FOR EACH PAGE IS A PRIVATE FILE BESIDE THE PAGE, NOT A ROW** (`pages[].response_path`). It is written before the row records it, and read back before any call, so a run killed after the call does not pay for the page twice. It also lets the calibration re-run the matcher on real scans. These files are respondent data that no quota counts and no erasure finds; that is a filed row.
+
+| Column | Type | Nullable | Default | PII? | Description |
+|---|---|---|---|---|---|
+| `id` | `uuid` | No | application-generated (`HasUuidv7`) | No | Primary key. Minted by `OcrScanService` BEFORE the pages are stored, so each page's attachment row names its owner from its first INSERT (the `feedback_reports` precedent). |
+| `tenant_id` | `uuid` | No | — | No | FK to `tenants.id`, `ON DELETE CASCADE`. |
+| `form_id` | `uuid` | No | — | No | The form the scan was uploaded to. **Composite** FK `(tenant_id, form_id)` → `forms (tenant_id, id)`, `ON DELETE CASCADE` (`ocr_scans_form_fk`). |
+| `form_version_id` | `uuid` | Yes | `NULL` | No | The version the paper was printed from, read off the 8-character checksum stamp on the page (`docs/ocr-pipeline-design.md` §2.5.5). A superseded version is a valid answer. **No foreign key, deliberately:** `form_versions` has no `(tenant_id, id)` unique, the reading job resolves the id only among this form's own versions, and a version is never deleted apart from its form. Null until the scan is read. |
+| `uploaded_by` | `uuid` | Yes | `NULL` | No | FK to `users.id`, `ON DELETE SET NULL` — a departed member does not take a workspace's scans with them. |
+| `status` | `varchar(20)` — PHP enum: `OcrScanStatus` | No | `'queued'` | No | `queued` → `reading` → `read`, or `failed`. CHECK-constrained from `OcrScanStatus::values()`. `read` means a proposal is ready for review, never that it is right. |
+| `provider` | `varchar(30)` | No | — | No | `config('ocr.provider')` at upload — `google_vision` until H1d (ADR-0010, reserved) decides. |
+| `pages` | `jsonb` | No | — | No | Ordered list of `{attachment_id, response_path}`. A null `response_path` is a page not yet read, which is how the job resumes one page per run. |
+| `extraction` | `jsonb` | Yes | `NULL` | **Yes** | Set when the scan is `read`: `version` (`id`, `number`, the `stamp` read, and `matched_by`: `stamp`, `stamp_near` or `unconfirmed`), `pages`, `counts`, `fields` and `warnings`. `fields` maps each field key to `{type, state, value, text, confidence, tier, page, anchored_by}`. `state` is `read`, `blank`, `unreadable`, `not_found` or `skipped`. `tier` is `auto`, `review` or `manual` by `config('ocr.confidence')`. Below the review threshold `value` is withheld and `text` kept. ⚠️ **`jsonb` keeps no key order**, so a reader orders fields by the version's printed order, never by this map. |
+| `attempts` | `smallint` | No | `0` | No | Runs that ended without progress: a provider failure worth retrying, or a page still waiting for its virus scan. At `config('ocr.max_attempts')` the scan is `failed`. Counted here because a run that throws rolls back its own writes, and the base job's `failed()` only logs. |
+| `error_code` | `varchar(40)` | Yes | `NULL` | No | Set with `failed`. Values: `provider_not_configured`, `provider_billing_disabled`, `provider_unauthorized`, `provider_unavailable`, `unreadable_file`, `infected_upload`, `scan_check_pending`, `scan_missing`, `form_missing`, `form_not_published`, `form_not_eligible`. |
+| `error_message` | `text` | Yes | `NULL` | No | What to do about it, in the reader's words (§6's "actionable guidance"). |
+| `read_at` | `timestamptz` | Yes | `NULL` | No | When the scan reached `read`. |
+| `created_at` / `updated_at` | `timestamptz` | No | set by Eloquent | No | — |
+
+**Index**: `(tenant_id, form_id, created_at)` — a form's scans, newest first, which is the review list's one question.
+
+> **Design Notes**
+> - **RLS**: `strict`. Listed in `TenantScopedTables::STRICT`, and every column goes into the tenant extract. The extraction is the tenant's own respondents' answers, which the tenant owns exactly as it owns `submission_answers`.
+> - **The upload refuses before it stores.** Every page's type and size, the page count, a PDF alone, the scan's total and the storage quota for all of it are checked first. A refusal on page three cannot leave pages one and two behind.
+> - **Retention is a filed `before-launch` row.** An unconfirmed scan and its raw answers are kept indefinitely until it lands, and metering the paid provider calls is another.
+
+---
+
 ## Foreign Key Relationship Summary
 
 ```
@@ -1436,6 +1472,11 @@ badge_awards.user_id                   -> users.id                          (ext
                                           (single-column, same reason as point_awards above — see §32)
                                           (no subject FK of ANY kind, and no subject column either: a badge
                                            is about a member's whole history against one rule, not a row)
+
+ocr_scans.tenant_id                    -> tenants.id                        (CASCADE)
+ocr_scans.(tenant_id, form_id)         -> forms.(tenant_id, id)             (composite, CASCADE — see §33)
+ocr_scans.uploaded_by                  -> users.id           (external, nullable, SET NULL)
+                                          (form_version_id carries NO db-level FK — see §33)
 ```
 
 **Cascade behavior summary** (stated once for brevity rather than repeated per row above): only `form_fields.form_section_id` → `SET NULL` (a field whose section row is deleted becomes ungrouped rather than deleted); every `form_version_id`- and `form_field_id`-family FK is `ON DELETE CASCADE` within its own version (deleting a draft version cleans up its own unpublished sections/fields/validations — published/superseded versions are never deleted, only superseded, so this path is only ever exercised on discarded drafts). `tenant_id` FKs are never cascade-deleted automatically; tenant offboarding is a deliberate, audited, application-orchestrated job, not an implicit `ON DELETE CASCADE` across 17 tables.

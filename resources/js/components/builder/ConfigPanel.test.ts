@@ -140,12 +140,12 @@ function section(overrides: Partial<LocalSection> = {}): LocalSection {
  * vacuously or fails for the wrong reason. It defaults to empty because every pre-M116 case wants that.
  */
 function makeStore(
-    selected: { field?: LocalField | null; section?: LocalSection | null; fields?: LocalField[] } = {},
+    selected: { field?: LocalField | null; section?: LocalSection | null; fields?: LocalField[]; errors?: Record<string, Record<string, string[]>> } = {},
 ): BuilderStore {
     return {
         selectedField: computed(() => selected.field ?? null),
         selectedSection: computed(() => selected.section ?? null),
-        saveError: ref<string | null>(null),
+        saveError: ref<string | null>(null), saveFieldErrors: ref<Record<string, Record<string, string[]>>>(selected.errors ?? {}),
         saving: ref(false),
         librarySaved: ref<string | null>(null),
         enums: ENUMS,
@@ -429,5 +429,46 @@ describe('ConfigPanel — the Conditional requiredness reveal (M116)', () => {
         expect(wrapper.text()).toContain('Requiredness');
         expect(wrapper.find('[aria-label="Rule 1 check"]').exists()).toBe(false);
         expect(wrapper.text()).not.toContain('Required when');
+    });
+});
+
+describe('ConfigPanel — a refused save marks the field (M128, R-d001de0c)', () => {
+    it('marks the refused control in place, tied to its message for assistive technology', () => {
+        const target = field();
+        const wrapper = mountPanel(makeStore({ field: target, errors: { [target.uid]: { label: ['The label field is required.'] } } }));
+
+        const input = wrapper.find('input[aria-invalid="true"]');
+        expect(input.exists()).toBe(true);
+        expect(input.element).toBe(wrapper.findAll('input').find((i) => (i.element as HTMLInputElement).value === target.label)!.element);
+
+        const described = (input.attributes('aria-describedby') ?? '').split(' ');
+        const message = described.map((id) => wrapper.find(`[id="${id}"]`)).find((el) => el.exists() && el.text().includes('The label field is required.'));
+        expect(message).toBeDefined();
+    });
+
+    it('lists a refusal with no control of its own in the alert, in the panel\'s words', () => {
+        const target = field();
+        const wrapper = mountPanel(makeStore({ field: target, errors: { [target.uid]: { 'validations.0.rule_value': ['The rule value must be a number.'] } } }));
+
+        const alert = wrapper.find('[role="alert"]');
+        expect(alert.exists()).toBe(true);
+        expect(alert.text()).toContain('Rule 1: The rule value must be a number.');
+        expect(wrapper.find('[aria-invalid="true"]').exists()).toBe(false);
+    });
+
+    it('says which OTHER question still holds a refused change, so moving on cannot hide it', () => {
+        const selected = field();
+        const other = field({ uid: 'f2', id: 'fld-2', key: 'age', label: 'Age' });
+        const wrapper = mountPanel(makeStore({ field: selected, fields: [selected, other], errors: { f2: { label: ['Bad.'] } } }));
+
+        expect(wrapper.find('[role="alert"]').text()).toContain('“Age” has a change that was not saved. Select it to see why.');
+        expect(wrapper.find('[aria-invalid="true"]').exists()).toBe(false);
+    });
+
+    it('marks nothing and raises no alert when nothing was refused', () => {
+        const wrapper = mountPanel(makeStore({ field: field() }));
+
+        expect(wrapper.find('[aria-invalid="true"]').exists()).toBe(false);
+        expect(wrapper.find('[role="alert"]').exists()).toBe(false);
     });
 });

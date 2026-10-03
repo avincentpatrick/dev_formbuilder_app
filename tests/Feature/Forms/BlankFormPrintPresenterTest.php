@@ -9,6 +9,7 @@ use App\Models\FormSection;
 use App\Models\FormVersion;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Services\Expressions\Coercion;
 use App\Services\Forms\BlankFormPrintPresenter;
 use App\Services\Forms\FormService;
 use App\Services\Forms\PublishService;
@@ -524,4 +525,26 @@ it('starts every repeat instance on a new page without stranding its numbered he
     expect(array_column($blocks, 'instance'))->toBe([null, null, 1, null, 2])
         ->and(array_column($blocks, 'label'))->toBe([null, null, 'Household member', null, 'Household member'])
         ->and(printedKeys(['blocks' => $blocks]))->toBe(['respondent', 'new_page', 'member_name', 'new_page', 'member_name']);
+});
+
+it('gives a yes/no question its two tick boxes, not the write-in box of a broken choice list (M128)', function (): void {
+    // ⚠️ A yes/no answer has no stored options (its two values are fixed), so the old option read was
+    // EMPTY and the template's empty branch printed a ruled "write it in" box — on the paper the OCR
+    // samples are printed from. Measured on the seeded `Patient Intake`: `consent | choices | options=0`.
+    [$form, $version] = printFixture(['sections' => [], 'fields' => [
+        printField('consent', 'yes_no', ['sequence' => 1]),
+        printField('colour', 'single_select', ['sequence' => 2, 'config' => ['options' => [['value' => 'r', 'label' => 'Red']]]]),
+    ]]);
+
+    [$consent, $colour] = $this->present->present($form, $version)['blocks'][0]['fields'];
+
+    expect($consent['area'])->toBe('choices')
+        ->and($consent['options'])->toBe([['value' => 'yes', 'label' => 'Yes'], ['value' => 'no', 'label' => 'No']])
+        // A real option list is untouched by the yes/no arm.
+        ->and($colour['options'])->toBe([['value' => 'r', 'label' => 'Red']]);
+
+    // The printed values are the literals the server already reads as the canonical booleans, so a mark
+    // on "Yes" lands on the same `true` a screen answer does.
+    expect(Coercion::yesNoAnswer($consent['options'][0]['value']))->toBeTrue()
+        ->and(Coercion::yesNoAnswer($consent['options'][1]['value']))->toBeFalse();
 });

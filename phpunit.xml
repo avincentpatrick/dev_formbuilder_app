@@ -86,5 +86,13 @@
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
+        <!--
+            M128: blank the OCR provider key for the whole suite. A developer's `.env` holds a REAL
+            Cloud Vision key, QUEUE_CONNECTION above is `sync` so a dispatched reading job runs inline,
+            and nothing blocks stray HTTP globally — so without this line a local test that forgot
+            `Http::fake()` would send a scan to Google. `force` so a stray `docker exec -e` cannot
+            undo it. NO CI CHANGE: CI loads `.env.example`, whose key is empty.
+        -->
+        <env name="OCR_GOOGLE_VISION_KEY" value="" force="true"/>
     </php>
 </phpunit>

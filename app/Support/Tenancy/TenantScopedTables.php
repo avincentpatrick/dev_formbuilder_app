@@ -71,6 +71,9 @@ final class TenantScopedTables
         'model_has_roles',
         'notification_preferences',
         'notifications',
+        // M128. Nothing withheld: a scan's extraction is its respondents' answers, which the tenant owns as
+        // it owns `submission_answers`, and the page files sit in `attachments` under the same scope.
+        'ocr_scans',
         'personal_access_tokens',
         // K1a. Nothing withheld: the ledger carries no credential, no derived column and no fact about a
         // subject outside this tenant — `subject_id` is a uuid of the tenant's own row, or a one-way digest

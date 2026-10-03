@@ -675,3 +675,121 @@ describe('Sidebar — the Achievements streak badge (K1e)', () => {
         on.unmount();
     });
 });
+
+describe('Sidebar — collapsing to the rail on a wide screen (M128, R-33c7fd56)', () => {
+    const MOBILE_QUERY = '(max-width: 480px)';
+    const KEY = 'meridian:sidebar-collapsed';
+
+    /** Its own stub, keyed by query like the drawer suite's, so a mobile case and a desktop case cannot share a slot. */
+    function viewport(matching: string[]): void {
+        Object.defineProperty(window, 'matchMedia', {
+            writable: true,
+            configurable: true,
+            value: (query: string) => ({
+                matches: matching.includes(query),
+                addEventListener: () => undefined,
+                removeEventListener: () => undefined,
+            }),
+        });
+    }
+
+    const opened: VueWrapper[] = [];
+
+    function open(): VueWrapper {
+        mocks.pageProps.props = { auth: { user: { name: 'Demo Owner' }, can: allAbilities() }, entitlements: { features: {} } };
+        const wrapper = mount(Sidebar, { props: { drawerOpen: false }, attachTo: document.body });
+        opened.push(wrapper);
+        return wrapper;
+    }
+
+    afterEach(() => {
+        while (opened.length > 0) opened.pop()?.unmount();
+        document.body.innerHTML = '';
+        window.localStorage.clear();
+    });
+
+    it('collapses on the toggle, names the next action, and remembers it on this device', async () => {
+        viewport([]); // wider than 1024px: neither the drawer nor the band rail
+        const wrapper = open();
+        await flushPromises();
+
+        const toggle = wrapper.find('button.sidebar__collapse');
+        expect(toggle.attributes('aria-label')).toBe('Collapse navigation');
+        expect(toggle.attributes('aria-expanded')).toBe('true');
+        expect(toggle.attributes('aria-controls')).toBe('app-drawer');
+        expect(wrapper.classes()).not.toContain('is-collapsed');
+
+        await toggle.trigger('click');
+
+        expect(wrapper.classes()).toContain('is-collapsed');
+        expect(toggle.attributes('aria-label')).toBe('Expand navigation');
+        expect(toggle.attributes('aria-expanded')).toBe('false');
+        expect(window.localStorage.getItem(KEY)).toBe('1');
+
+        await toggle.trigger('click');
+        expect(wrapper.classes()).not.toContain('is-collapsed');
+        expect(window.localStorage.getItem(KEY)).toBeNull();
+    });
+
+    it('opens collapsed when this device remembered it', async () => {
+        viewport([]);
+        window.localStorage.setItem(KEY, '1');
+
+        const wrapper = open();
+        await flushPromises();
+
+        expect(wrapper.classes()).toContain('is-collapsed');
+    });
+
+    /**
+     * Focus the first link and report whether its tooltip opened. ⚠️ `aria-describedby` is set only while
+     * the bubble is VISIBLE (`Tooltip.vue`), so reading it without focusing proves nothing either way —
+     * the first draft of these cases did exactly that and the drawer case passed over nothing.
+     */
+    async function tooltipOpensOnFocus(wrapper: VueWrapper): Promise<boolean> {
+        const link = wrapper.find('a.sidebar__item');
+        expect(link.exists()).toBe(true);
+        await link.trigger('focusin');
+        await flushPromises();
+
+        return link.attributes('aria-describedby') !== undefined && document.querySelector('[role="tooltip"]') !== null;
+    }
+
+    it('gives a user-collapsed rail the band rail label tooltips, and an expanded sidebar none', async () => {
+        viewport([]);
+        const expanded = open();
+        await flushPromises();
+        expect(await tooltipOpensOnFocus(expanded)).toBe(false);
+        expanded.unmount();
+        opened.pop();
+        document.body.innerHTML = '';
+
+        window.localStorage.setItem(KEY, '1');
+        const collapsed = open();
+        await flushPromises();
+        expect(await tooltipOpensOnFocus(collapsed)).toBe(true);
+    });
+
+    it('keeps the drawer tooltips off below 480px even when collapsed, so the first Escape still closes it', async () => {
+        // J4b's fix: the drawer moves focus onto a link programmatically, and an enabled tooltip would claim
+        // the Escape. A collapse remembered from a wide screen must not switch them back on.
+        viewport([MOBILE_QUERY]);
+        window.localStorage.setItem(KEY, '1');
+
+        const wrapper = open();
+        await flushPromises();
+
+        expect(await tooltipOpensOnFocus(wrapper)).toBe(false);
+    });
+
+    it('keeps the toggle out of the item list and away from the drawer first focus', async () => {
+        viewport([]);
+        const wrapper = open();
+        await flushPromises();
+
+        const toggle = wrapper.find('button.sidebar__collapse');
+        expect(toggle.classes()).not.toContain('sidebar__item');
+        expect(toggle.element.closest('ul')).toBeNull();
+        expect(toggle.element.closest('.sidebar__group')).toBeNull();
+    });
+});

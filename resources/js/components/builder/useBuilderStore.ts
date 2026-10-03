@@ -83,11 +83,12 @@ export function useBuilderStore(props: BuilderPageProps) {
     // toolbar's polite live region announced "All changes saved" at the instant a write failed, beside an
     // alert saying the opposite. Live at every width including 1440px, and older than the increment that
     // documented it. (WCAG 4.1.3 Status Messages; exceptions-log #13 §3.)
-    const save = reactive<{ inFlight: number; error: string | null; wrote: boolean }>({
-        inFlight: 0,
-        error: null,
-        wrote: false,
-    });
+    const save = reactive<{
+        inFlight: number;
+        error: string | null;
+        wrote: boolean;
+        fieldErrors: Record<Uid, Record<string, string[]>>;
+    }>({ inFlight: 0, error: null, wrote: false, fieldErrors: {} });
 
     // Per-BURST bookkeeping, deliberately plain closure variables rather than reactive state: nothing renders
     // from them, and a reactive flag flipping mid-burst would make the indicator flicker between two verdicts
@@ -139,7 +140,8 @@ export function useBuilderStore(props: BuilderPageProps) {
      */
     const saveState = computed<SaveState>(() => {
         if (save.inFlight > 0) return 'saving';
-        if (save.error !== null || conflict.value !== null) return 'failed';
+        // A field still holding a refusal is a change the server does not have, whatever saved since (M128).
+        if (save.error !== null || conflict.value !== null || Object.keys(save.fieldErrors).length > 0) return 'failed';
 
         return save.wrote ? 'saved' : 'idle';
     });
@@ -147,6 +149,15 @@ export function useBuilderStore(props: BuilderPageProps) {
     // Read-only by design: the only writers are `guard()`, `reportFailure()` and the burst verdict above. The
     // narrowing from Ref to ComputedRef is itself the guarantee that nothing else can ever set it.
     const saveError = computed(() => save.error);
+
+    /**
+     * Per-field refusals, keyed by field uid (M128, `R-d001de0c`): the server's `{ errors }` map from the last
+     * refused PATCH of that field, which `ConfigPanel` marks on the controls. ⚠️ KEYED BY UID AND CLEARED PER
+     * FIELD, never at the burst verdict: `select()` flushes and then switches, so a refusal can land after
+     * another question is selected, and a later success on THAT question must not erase this one's marks —
+     * its refused value is still on screen and nothing has sent it again.
+     */
+    const saveFieldErrors = computed(() => save.fieldErrors);
 
     const saving = computed(() => saveState.value === 'saving');
     const canUndo = computed(() => undoStack.value.length > 0);
@@ -185,7 +196,7 @@ export function useBuilderStore(props: BuilderPageProps) {
     }
 
     // ── Error-guarded request wrapper ───────────────────────────────────────────
-    async function guard<T>(fn: () => Promise<BuilderResult<T>>): Promise<BuilderResult<T> | null> {
+    async function guard<T>(fn: () => Promise<BuilderResult<T>>, owner?: { uid: Uid }): Promise<BuilderResult<T> | null> {
         // Set BEFORE the await: this is what separates "the burst tried and everything landed" from "the burst
         // was a no-op", and a request that throws immediately must still count as an attempt.
         burstAttempted = true;
@@ -196,6 +207,13 @@ export function useBuilderStore(props: BuilderPageProps) {
             burstFailed = true;
             save.error =
                 error instanceof BuilderRequestError ? error.message : 'Something went wrong saving your change.';
+            // Only a field's own PATCH names an owner. Its marks describe THIS refusal: one without a map (a
+            // network failure, a `FormException`) leaves none standing from an earlier one.
+            if (owner !== undefined) {
+                const map = error instanceof BuilderRequestError ? error.errors : {};
+                if (Object.keys(map).length > 0) save.fieldErrors[owner.uid] = map;
+                else delete save.fieldErrors[owner.uid];
+            }
             return null;
         }
     }
@@ -211,13 +229,14 @@ export function useBuilderStore(props: BuilderPageProps) {
     async function persistField(uid: Uid): Promise<void> {
         const field = findField(uid);
         if (!field) return;
-        const result = await guard(() => builderClient.patch<ServerField>(`${base}/fields/${field.id}`, fieldPayload(field)));
+        const result = await guard(() => builderClient.patch<ServerField>(`${base}/fields/${field.id}`, fieldPayload(field)), { uid });
         if (!result) return;
         if (result.conflict) {
             conflict.value = { kind: 'field', uid, mine: clone(field), theirs: result.current };
             return;
         }
         field.version = result.data.version;
+        delete save.fieldErrors[uid]; // the server holds this field now: its marks are answered
     }
 
     async function deleteFieldServer(uid: Uid): Promise<boolean> {
@@ -226,6 +245,7 @@ export function useBuilderStore(props: BuilderPageProps) {
         const result = await guard(() => builderClient.delete(`${base}/fields/${field.id}`));
         if (!result) return false;
         removeFieldLocal(uid);
+        delete save.fieldErrors[uid]; // a deleted question has nothing left to mark
         return true;
     }
 
@@ -1020,6 +1040,7 @@ export function useBuilderStore(props: BuilderPageProps) {
         saving,
         saveState,
         saveError,
+        saveFieldErrors,
         conflict,
         canUndo,
         canRedo,

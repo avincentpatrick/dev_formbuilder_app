@@ -102,7 +102,7 @@ function clearFilters(): void {
 /**
  * The view lives in the URL rather than in a stored preference (user decision, JR3). It costs a round
  * trip the client could have avoided, and buys three things a `localStorage` flag would not: it is
- * SSR-safe with no hydration guard — the app has no client-side storage anywhere today — it is
+ * SSR-safe with no hydration guard — the app stored nothing client-side then; M128's sidebar collapse is the first — it is
  * shareable, and it is assertable server-side. `replace: true` keeps it out of the back button, which is
  * the same contract the filter already has.
  */

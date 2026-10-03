@@ -167,6 +167,30 @@ The footer states, per version and re-derived from that version's own frozen byt
   - **< 70**: left blank in the staged draft, flagged as "needs manual entry" rather than auto-filled with a low-confidence guess — a wrong auto-fill silently accepted by a reviewer clicking through quickly is worse than an empty, obviously-incomplete field.
 - `attachments.ocr_confidence_avg` (`docs/data-dictionary.md` §10) stores the average across all fields on the source scan — a per-scan summary metric for dashboards/QA, not the authoritative per-field record (which lives transiently in the staged draft until confirmed, then is simply the submission's own answer — no separate confidence-per-answer column exists or is needed, since confidence is a review-time concern, not a permanent property of the confirmed data).
 
+> ✅ **As-built: groundwork 1 (M128, 2026-10-03). The reading path ships; the review screen and the save are groundwork 2.**
+>
+> - **One scan, end to end on the server.** `POST /forms/{form}/ocr/scans` takes 1–5 photos or one PDF, and `GET /forms/{form}/ocr/scans/{scan}` reports progress. The gates are manual encoding's `can:create`, then the `ocr_single` module toggle before the plan, then the form's own `allow_ocr_single` (which has no writer yet; groundwork 2 adds the setting) and `CapabilityFlags::isOcrCompatible()`. `App\Jobs\ReadOcrScanJob` reads one page per run on `ocr-processing`. It calls Cloud Vision over REST with the platform key in the `X-Goog-Api-Key` header, stores the raw answer beside the page, and matches the scan once every page is read. State lives in `ocr_scans` (`docs/data-dictionary.md` §33).
+> - **§3's matching is `App\Services\Ocr\PrintedFormMatcher`,** and it reads the layout from `BlankFormPrintPresenter::present()`, the same model the paper is typeset from:
+>   - the version comes from the page's checksum stamp, a superseded one included;
+>   - a page photographed at a tilt is deskewed;
+>   - each question is anchored on its key stamp, or else its label, in printed order;
+>   - a captioned comb is split by where each character sits under DD / MM / YYYY, never by counting;
+>   - an X before an option's label is a mark.
+>
+>   Confidence is the lowest character confidence, scaled to 0–100. The 90 / 70 thresholds are `config/ocr.php`, where H1d calibrates them. Below 70 the value is withheld and the text kept. A blank question is `blank`, not a failure (§2.5.1).
+> - ⚠️ **Departures from this document, each deliberate:**
+>   - **§1's endpoints.** The routes are session web routes, the H14 precedent for a staff surface. The `/api/v1` pair is a filed row.
+>   - **§5's owner.** A source scan is owned by its `ocr_scans` row (alias `ocr_scan`) until a person confirms it. `SubmissionFinalizer` re-points only attachments a media ANSWER names, so groundwork 2 must re-point the scan to its submission itself.
+>   - **§3's per-field record.** It lives in `ocr_scans.extraction` rather than in a staged draft. `attachments.ocr_confidence_avg` holds the per-scan average, on every page.
+>   - **§6, provider failures.** A provider failure worth retrying (rate-limited, unavailable, no answer in time) is counted on the row and retried with a growing delay, up to `ocr.max_attempts`. Anything else fails the scan with an actionable message, and the files are kept. A file the provider cannot open fails the scan as `unreadable_file`. That is not §6's "poor scan quality", which still degrades into low confidence, because the provider returns text for a poor photo and an error only for a file it cannot decode.
+>   - **The provider's own error shape.** A wrong key is answered `400 INVALID_ARGUMENT` with reason `API_KEY_INVALID`, and billing off is `403 BILLING_DISABLED`. The client reads the reason before the status. ⚠️ **On 2026-10-03 the platform's key was refused for billing**, so no real scan has been read yet; the matcher is built and tested against Vision's documented response shape.
+> - **§2.5 changed with it.** A yes/no question prints two tick boxes; it printed a write-in box before, because it stores no options. The header asks respondents to mark each choice with an X. The checksum stamp cannot tell those two layouts apart, so the matcher also reads a written YES or NO. A layout revision on the stamp is a filed row.
+> - **Groundwork 2 inherits these facts:**
+>   - `SubmissionDraftService::saveDraft()` and `promote()` refuse a superseded version, so a scan of old paper needs a decision before it can become a draft;
+>   - `AttachmentPolicy` knows only `submission` and `form_field` owners, so the review screen cannot yet serve a scan image;
+>   - the draft reaper deletes any expired draft after 30 days;
+>   - `duration` has no encode control.
+
 ---
 
 ## 4. Review-and-Correct UX
@@ -210,6 +234,7 @@ The footer states, per version and re-derived from that version's own frozen byt
 <!-- The pipeline markers below are DELIBERATELY at end-of-file. A marker inserted mid-document
      shifts every line beneath it, and this repository cites documents as `path:N` — 25 such
      citations point into the files that carry markers. End-of-file shifts nothing. -->
-<!-- pipeline: id=ocr-single-form title="PRD Feature #1 — the single-form OCR channel: scan upload, the reading job, field matching from the printed layout, and the review-and-correct screen into SubmissionPipeline" phase=3 state=ready size=XL tier=early-testing -->
+<!-- pipeline: id=ocr-single-form title="PRD Feature #1 — single-form OCR, groundwork 2: the per-form accept-scans setting, the upload and review-and-correct screen with its 90/70 colours, and the save into SubmissionPipeline (groundwork 1, the reading path, shipped in M128)" phase=3 state=ready size=XL tier=early-testing -->
 <!-- pipeline: id=ocr-provider-bakeoff title="H1d — choose the OCR provider (Cloud Vision or Document AI) on real samples, calibrate the 90/70 thresholds, and write the reserved ADR-0010" phase=3 state=blocked size=M blocker="user: needs 10–20 hand-filled Print blank copies, scanned and photographed, with correct answers for five — due 2026-10-08 (D72)" tier=early-testing -->
 <!-- pipeline: id=ocr-linelist title="PRD Feature #2 — the linelist OCR channel" phase=3 state=blocked size=L blocker="user: needs 2–3 scanned linelist sheets and their blank templates (D72 puts it after Oct 12)" tier=during-testing -->
+<!-- pipeline: id=ocr-testing-server-key title="Single-form OCR on the testing server: the Cloud Vision key in the server .env, and billing switched on for the Google Cloud project that owns it. Without both every scan fails with a message (billing measured off on 2026-10-03, 403 BILLING_DISABLED)" phase=3 state=blocked size=S blocker="user: switch on billing for the Google Cloud project that owns the Vision key; then the key goes into the testing server .env in a supervised chat step (the Oct 11 step under D72)" tier=early-testing -->

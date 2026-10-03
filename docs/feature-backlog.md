@@ -12650,3 +12650,82 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   back, but `default_value_is_expression` is in no client payload, no presenter field and no request rule, so a
   `today()` default returns as the text `today()`. Reachable only through undo after converting a question with an
   expression default to a note. **Live.** Filed by `M126`. **Tier: early-testing.**
+
+- **`minor` · A field edit the server refuses still becomes the builder's new baseline and its undo entry, so the
+  refused value is never sent again.** Found by `M128` while giving the 422 map a reader (`R-d001de0c`).
+  `commitFieldEdit` advances the field's saved baseline and pushes an "Edit …" history entry before it learns whether
+  the PATCH landed, and only a 409 stops it. After a refusal the rejected value stays on screen, now marked inline, but
+  nothing re-sends it until the author edits that field again, and undo replays a step the server never held.
+  `M128` keeps the marks until that field's next successful save, which makes the refusal visible; it does not make
+  the history honest. The remedy moves the baseline and the history push after the verdict, inside the same queued
+  task. Rare in testing, because it needs a server refusal on an autosave. **Live.** Filed by `M128`.
+  **Tier: during-testing.**
+
+- **`nit` · A refused builder save names the request path, not the setting, in its message.**
+  Found by `M128`. `UpdateFieldRequest` declares no `attributes()` and the app has no `lang/` directory, so Laravel
+  writes "The config.options.0.label field is required." The inline mark now sits on the right control, but a key with
+  no control of its own is listed in the alert under that raw path. The remedy is an `attributes()` map in the request,
+  which is the one place that knows every path. **Live.** Filed by `M128`. **Tier: during-testing.**
+
+- **`minor` · The two `/api/v1` OCR endpoints the architecture names do not exist; single-form OCR is reachable only
+  through the session web routes.** Found by `M128`. `docs/architecture/technical-architecture.md` and
+  `docs/ocr-pipeline-design.md` §1 and §6 name `POST /api/v1/forms/{form}/ocr/single` and
+  `GET /api/v1/ocr/jobs/{job}`, and `docs/api-specification.md` defers their payloads to the design document. `M128`
+  builds `POST /forms/{form}/ocr/scans` and `GET /forms/{form}/ocr/scans/{scan}` for the staff screen, which is the H14
+  precedent for a session surface. An integrator reading the specification finds two endpoints that 404. The remedy
+  is either the bearer twins, under `GroupBPolicyGateTest`'s rules and in `openapi.json`, or a correction to the three
+  documents. **Live.** Filed by `M128`. **Tier: before-launch.**
+
+- **`minor` · Nothing ever deletes an OCR scan, and the provider's raw answers sit outside `attachments`, beyond the
+  storage quota and any personal-data sweep.** Found by `M128`. A scan that is never confirmed keeps its
+  `ocr_scans` row and its page files indefinitely. Each page's raw Cloud Vision answer is stored as a private file
+  beside the scan, so a later calibration can re-match without paying again. Those files are respondent data, are not
+  `attachments` rows, and so are counted by no quota and found by no `is_pii` erasure. The remedy is a retention rule
+  (a reaper for unconfirmed scans, and the raw answers deleted once a scan is confirmed or reaped) plus either an
+  attachment kind for the raw answers or an explicit place in the erasure path. **Live.** Filed by `M128`.
+  **Tier: before-launch.**
+
+- **`minor` · Every OCR page costs a paid provider call, and nothing meters or caps them per workspace.**
+  Found by `M128`. `UsageMetric` has no OCR metric and no plan carries an OCR quota; the `ocr_single` plan key decides
+  only whether a workspace may scan at all. `M128` puts a per-user rate limit on the upload route, which bounds a
+  runaway client and nothing else. Cloud Vision's free tier is 1,000 pages a month per Google project, shared by every
+  workspace on the platform. The remedy is an OCR page metric metered at read time and a plan quota enforced at upload,
+  the `QuotaGuard` pattern. **Live.** Filed by `M128`. **Tier: before-launch.**
+
+- **`nit` · Single-form OCR refuses an iPhone's HEIC photo, reads a PDF only to its fifth page, and refuses a page
+  over 7 MB.** Found by `M128`. All three are the provider's limits, not choices: Cloud Vision accepts JPEG, PNG and
+  WEBP but not HEIC, and reads an inline PDF up to five pages. A request body is capped at 10 MB, which base64 makes
+  about 7 MB of file. Each limit is stated to the uploader, and none is configurable per plan. A phone browser usually
+  converts HEIC to JPEG on upload; a file picker on a computer does not. **Not live**. Filed by `M128`.
+  **Tier: during-testing.**
+
+- **`nit` · The data dictionary says an attachment is not served until its scan is `clean`, and every attachment is
+  served while it is `skipped`.** Found by `M128` while reusing the attachment write path for OCR pages.
+  `docs/data-dictionary.md` §10's `virus_scan_status` row describes files as withheld until `clean`, while
+  `ScanStatus::servable()` admits `clean` and `skipped`, and with no scanner wired every upload is `skipped`. The code
+  is the deliberate behaviour (`config/attachments.php`); the sentence is the defect. **Live.** Filed by `M128`.
+  **Tier: during-testing.**
+
+- **`nit` · Prose in four files still derives layout from "a 240px sidebar above 1024px", which a collapsed sidebar
+  no longer guarantees.** Found by `M128` while making the sidebar collapsible (`R-33c7fd56`). The derivations that
+  became FALSE are corrected in that increment: `Builder.vue`'s container threshold and `DataTable.vue`'s 56em.
+  These four are only incomplete: `AppLayout.vue`'s gutter table, `FormCard.vue`'s width note, `nav-model.ts` and
+  `icons.ts` (both "below 1024px the sidebar is icons only"), and two assertion messages in `builder-layout.test.ts`
+  and `tests/e2e/list-layout.spec.ts`. Every layout still holds, because the content box stays continuous across
+  1024px. **Not live**. Filed by `M128`. **Tier: during-testing.**
+
+- **`minor` · The dev container keeps PHP's stock upload limits, 2 MB per file and 8 MB per request, so no upload
+  over 2 MB can be tried locally.** Found by `M128` while preparing an OCR probe. `docker/Dockerfile` installs no
+  `php.ini`, and `php -r 'echo ini_get(...)'` in the app container reads `2M` and `8M`. Meanwhile `config/attachments.php`
+  allows 25 MB and the testing server allows 25M and 30M (`docs/deployment-infrastructure.md` §8, step 1). A phone
+  photo for a media field or an OCR scan therefore fails at PHP before the app sees it, and only locally. The remedy is
+  one ini file in the image, matching the server. **Live.** Filed by `M128`. **Tier: during-testing.**
+
+- **`minor` · The printed form's stamp identifies the schema, not the layout, so a sheet printed before a layout
+  change and one printed after it are the same sheet to the reader.** Found by `M128`, whose own paper fix is the
+  case. The running head prints the first eight characters of the version checksum (`docs/ocr-pipeline-design.md`
+  §2.5.5), and that checksum covers the snapshot, not the template. `M128` changes how a yes/no question prints (a
+  write-in box became two tick boxes) without changing any checksum, so a scan of an older print carries the same
+  stamp and a different layout. `M128`'s matcher accepts both for that one change. The general remedy is a layout
+  revision printed beside the stamp and read back, so a future template change cannot be confused for the current
+  one. **Latent.** Filed by `M128`. **Tier: during-testing.**

@@ -147,6 +147,46 @@ Files:
   whose census pins every composite tenant FK by name, so the new `ocr_scans_form_fk` joins its list (the Tenancy
   directory, run whole, reddened on that one case and nothing else: 359 passed). Also the new `app/Exceptions/Ocr/*`
   for the reading path's typed refusals.
+- **Extension 2, after an adversarial design review, pushed before any of it is built.** The review's corrections are
+  taken into the design. Only two change the file set, and both shrink it:
+  - **A run never throws for a provider failure.** Every run is a transaction (`TenantAwareJob::handle()`) and
+    `failed()` is final and only logs, so a throw would roll back the run's progress and leave the scan unfinished.
+    Instead an `attempts` column on `ocr_scans` counts runs that ended without progress. The job releases itself, and
+    marks the scan failed at `ocr.max_attempts`. That is the `DeliverWebhookJob` stance.
+  - **The client maps by the provider's `reason` before the HTTP status.** A wrong key is `400 INVALID_ARGUMENT` with
+    `API_KEY_INVALID`, probed today, so a status-first map would tell users to rescan a good file. Billing off is
+    `403 BILLING_DISABLED`. Both real bodies, with the project number zeroed, are fixtures.
+  - **Each page's raw answer goes to a fixed path,** checked before calling, so a run killed after the call does not pay
+    twice.
+  - **No foreign key on `ocr_scans.form_version_id`,** so `ConstraintBoundaries.php` is NOT edited. A version is never
+    deleted apart from its form, and `ocr_scans_form_fk` cascades that.
+  - **No `confidence_avg` column.** `attachments.ocr_confidence_avg` is the documented per-scan home, and the job
+    writes it on each page.
+  - **The `{scan}` route checks `form_id` in the controller rather than `scopeBindings()`,** so `Form.php` gains no
+    relationship and stays out of the claim.
+  - **The matcher reads each field's type from the version's snapshot,** so the presenter's rows are unchanged.
+  - **The upload route carries an inline `throttle`.** It is a stopgap; metering is a row.
+  - **Part B clears a field's marks on that field's next successful save or delete**, not at the burst verdict, so a
+    later success on another question cannot hide a refusal. The save state stays failed while any field holds marks.
+    The conversion-undo PATCH is not attributed to a field, because it restores the server's values before it throws.
+  - **A yes/no answer is also read from a written YES or NO,** because a sheet printed before this increment carries the
+    same stamp and the old write-in box.
+  - ⚠️ **Merging does not wait for the live Vision read.** If billing is still off when everything else is green, `M128`
+    merges without the real-answer fixture and the probe opens groundwork 2, because the paper fix must reach the
+    samples due 2026-10-08.
+  - **Ten rows filed in this push**, each found while planning or decided not to fix, rather than at close-out
+    (`CLAUDE.md`):
+    - a refused edit becoming the undo baseline;
+    - raw request paths in refusal messages;
+    - the missing `/api/v1` OCR twins;
+    - no OCR retention or erasure;
+    - no OCR metering;
+    - the provider's file limits;
+    - the data dictionary's "until `clean`";
+    - incomplete sidebar-width prose;
+    - the dev container's 2 MB upload limit;
+    - the stamp naming the schema, not the layout.
+  - The prediction below restated a gate figure. It now points at `docs/gate-baselines.md`.
 
 Shared artefacts taken: `docs/**` (the files above), `phpunit.xml`, `PROGRESS.md` (own block only), and the new top-level
 `tests/e2e/sidebar-collapse.spec.ts`.
@@ -156,7 +196,7 @@ Namespaces spent: migration prefix `2026_08_17_000116`; decision id `D73`. No AD
 Prediction:
 - **CI runs and goes 6/6** after the local gates.
 - **Most likely red:** a tenancy drift test on the new table, from the classification, the extract census or the
-  constraint-boundary lint. Second: the ledger citation tier at 17/17, from `Sidebar.vue` and `ConfigPanel.vue` line
+  constraint-boundary lint. Second: the ledger citation tier (at its ceiling per `docs/gate-baselines.md`), from `Sidebar.vue` and `ConfigPanel.vue` line
   shifts.
 - **PHPStan** gains nothing in CI. **Pint** asks for one or two fixes on new files. **`openapi.json`** is byte-identical.
 - **Most likely to be WRONG:** that Vision reads typed comb characters as clean single symbols, with no box-border

@@ -182,6 +182,10 @@ Files:
   `resources/js/components/builder/PreviewRuntime.test.ts`. Item 4 makes the builder preview place a note's content
   headings one level deeper than the respondent's page (`PreviewRuntime.vue` titles its sections with an `h3`), and
   the only suite that mounts the real preview is this one; the list above names the component and not its test.
+- **Extension 4, pushed with item 4 built and before the file was edited:** `docs/adr/0007-async-execution-substrate.md`,
+  for two citations. Both cite `app/Providers/AppServiceProvider.php:105-127` as where every limiter is keyed, and that
+  range has held the share-token service, not the limiters, for a long time; item 4 adds four import lines above it, so
+  the tier-1 lint now sees the first line blank. The citations will name the `RateLimiter::for()` registrations instead.
 
 Shared artefacts taken: `docs/**` (the files above), `openapi.json`, the top-level `tests/e2e/*.spec.ts` named above
 (one new), and `PROGRESS.md` (own block only).

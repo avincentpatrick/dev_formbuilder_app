@@ -30,7 +30,7 @@
          for app identity — the manifest declares an explicit `id` (`/f/{slug}`), so the manifest URL is not
          what pins an installed app, and a changed query string cannot fork one into two. --}}
     <meta name="theme-color" content="{{ $brand['theme_color'] }}">
-    <link rel="manifest" href="/f/{{ $slug }}/manifest.webmanifest?b={{ $brand['version'] }}">
+    <link rel="manifest" href="/f/{{ $slug }}/manifest.webmanifest?b={{ $brand['manifest_version'] }}">
     <link rel="icon" type="image/png" href="/icons/icon-192.png">
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon-180.png">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -39,7 +39,7 @@
     {{-- H23b — the tenant ramp, emitted unconditionally when the tenant's brand is ACTIVE. There is no
          precedence rule to apply here (the admin root has one): a respondent has no preferences for the
          tenant's brand to lose to. --}}
-    @include('partials.brand-ramp', ['tokens' => $brand['tokens']])
+    @include('partials.brand-ramp', ['tokens' => $brand['tokens'], 'styleId' => $brand['style_id'], 'lines' => $brand['lines']])
 </head>
 <body>
     {{-- data-resume-token (Increment H9b) is present only when the shell was opened from a save-and-resume

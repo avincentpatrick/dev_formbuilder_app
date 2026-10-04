@@ -136,6 +136,37 @@ routes carry no tenancy middleware, so no tenant is resolved — and a user may 
 
 ---
 
+## Addendum — per-form PRESET themes (M131, 2026-10-04; `D65` = A, `D81`)
+
+`forms.theme`, listed above as "built and unread since Increment F", is now read and written. Three decisions, each
+recorded where a future reader of this ADR would look for it:
+
+1. **§D7's six properties stay six for the tenant ramp; a preset may add DOCUMENTED properties, and only those.** `D65`
+   chose to confine the preset rather than loosen the sentence: a preset sets the six colour roles plus a font pair and
+   a radius scale, and the extra set is closed — `--mds-font-family-display`, `--mds-font-family-body-default`,
+   `--mds-radius-md`, `--mds-radius-lg`, `--mds-radius-xl` (`App\Enums\FormThemePreset::DOCUMENTED_PROPERTIES`). Each
+   carries its own check in `FormThemePresetTest`: system stacks ending in a generic family under a character whitelist
+   (the partial emits them unescaped inside `<style>`), and `6 < md < lg <= xl`. Growing the set means arguing for a
+   property and gating it, never "a documented superset". The neutral, semantic and chart prohibitions are untouched.
+2. **§D8 holds for presets by PINNING.** A preset's ramp is written down as literals and asserted equal to
+   `generate(seed)`, so an engine change turns a test red and a re-pin is a reviewed commit, not a silent repaint. The
+   seventeen pairings are re-measured on the literals, in both themes (`BrandRampGenerator::measureTokens()`).
+3. **One reader still.** `GuestBrandingPresenter::forGuest($form)` answers the style block, `theme-color` and the
+   per-form manifest together; a preset REPLACES the tenant block on its own form (`style id="form-theme"`). The
+   device-wide `data-brand-version` stays the WORKSPACE's fingerprint — `offline-first-sync-design.md` §4.1 says why —
+   and the manifest link takes a per-form one. Presets render on every plan (`D81`); the tenant's own ramp stays
+   behind `isActive()` at Starter+.
+
+**Found while building it, and filed rather than fixed:** in dark mode every generated ramp — a tenant's and a
+preset's alike — paints `fg` text on a `tint` fill at about 3.35:1 where a secondary or tertiary button is HOVERED.
+The seventeen pairings never measure `fg` on `tint`, and axe cannot see a hover state. Fixing it is a target change,
+which is a `VERSION` bump and a re-derivation — this ADR's own procedure — so it is its own row.
+
+**Still not addressed:** mail and the response PDF (`BrandPalette`), the encode page and OCR review keep the workspace
+look on a themed form — filed as its own row.
+
+---
+
 ## When to Revisit
 
 - **A sixth consuming surface appears that can resolve `var()`.** §D8's storage argument is grounded in mail and dompdf being unable to; it does not become wrong, but it becomes worth restating.

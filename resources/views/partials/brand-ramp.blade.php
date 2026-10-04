@@ -25,9 +25,20 @@
      Only these SIX properties, never a neutral, semantic or chart token — ADR-0014 §D7, and §D11's
      rule that a data series must look the same to two colleagues reading one screenshot.
 
-     @param  ?array<string, array<string, string>>  $tokens  theme => role => `#RRGGBB` --}}
+     ── A FORM'S PRESET THEME ADDS ITS DOCUMENTED LINES, AND NOTHING ELSE (M131, `D65` = A) ─────────────
+     On a form with a preset the guest shell passes `styleId` `form-theme` and the preset's `lines`: its font
+     pair and radius scale, each one of `FormThemePreset::DOCUMENTED_PROPERTIES` — the set grows only by a
+     property argued for and gated, never by "a documented superset". The admin root and the maintenance page
+     pass neither, so their block is exactly the six, as before. ⚠️ The lines are emitted RAW (`{!! !!}`):
+     inside `<style>` an HTML entity is not decoded, so an escaped quote would rename the font. They are
+     server constants, never author text, and `FormThemePresetTest` holds every value to a character
+     whitelist that cannot close a declaration, a rule or this element.
+
+     @param  ?array<string, array<string, string>>  $tokens  theme => role => `#RRGGBB`
+     @param  ?string  $styleId  the block's id: `tenant-brand` (default) or `form-theme`
+     @param  ?array<string, string>  $lines  documented extra properties, property => value (presets only) --}}
 @if (is_array($tokens))
-    <style id="tenant-brand">
+    <style id="{{ $styleId ?? 'tenant-brand' }}">
         :root {
             --mds-color-action-primary-bg: {{ $tokens['light']['bg'] }};
             --mds-color-action-primary-bg-hover: {{ $tokens['light']['bg_hover'] }};
@@ -35,6 +46,9 @@
             --mds-color-action-primary-fg: {{ $tokens['light']['fg'] }};
             --mds-color-action-primary-tint: {{ $tokens['light']['tint'] }};
             --mds-color-focus-ring: {{ $tokens['light']['ring'] }};
+@foreach ($lines ?? [] as $property => $value)
+            {!! $property !!}: {!! $value !!};
+@endforeach
         }
 
         :root[data-theme-mode='dark'] {

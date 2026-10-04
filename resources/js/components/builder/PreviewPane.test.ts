@@ -160,6 +160,9 @@ const FORM_BASE = {
     // here. Left off, every single-page case below would read `undefined`, render stepped, and pass for the
     // wrong reason.
     single_page_mode: false,
+    // M131 — the preset theme the preview paints. Null + empty is the workspace brand: nothing scoped.
+    theme_preset: null as string | null,
+    theme_presets: [] as unknown[],
 };
 
 /** The `form` prop, with the presentation mode chosen per case. */
@@ -644,5 +647,47 @@ describe('one page or step by step', () => {
         expect(created).toHaveLength(builds);
 
         wrapper.unmount();
+    });
+});
+
+/**
+ * M131 (`R-6017d6d8`) — the preview paints the form's preset theme, scoped to its own root, and paints nothing
+ * for the workspace brand, which the admin shell around it already carries.
+ */
+describe('PreviewPane — the preset theme', () => {
+    const GRAPHITE = {
+        value: 'graphite',
+        label: 'Graphite',
+        description: '',
+        font: '',
+        radius: '',
+        tokens: {
+            light: { bg: '#4A5568', bg_hover: '#3C4759', bg_active: '#2C3648', fg: '#4A5568', tint: '#F0F5FE', ring: '#3C4759' },
+            dark: { bg: '#545F73', bg_hover: '#3E485B', bg_active: '#2F3A4B', fg: '#8793A8', tint: '#364052', ring: '#8793A8' },
+        },
+        lines: { '--mds-radius-xl': '12px' },
+    };
+
+    it('scopes the chosen preset to the preview root', () => {
+        const wrapper = mount(PreviewPane, {
+            props: {
+                store: twoSections().store,
+                form: { ...FORM_BASE, theme_preset: 'graphite', theme_presets: [GRAPHITE] } as never,
+                draft: { id: 'ver-1', version_number: 1 },
+                active: true,
+            },
+            global: { stubs: STUBS },
+        });
+
+        expect(wrapper.attributes('data-form-theme-preview')).toBe('');
+        expect(wrapper.get('style').text()).toContain('[data-form-theme-preview] { --mds-color-action-primary-bg: #4A5568;');
+        expect(wrapper.get('style').text()).toContain('--mds-radius-xl: 12px;');
+    });
+
+    it('paints nothing for the workspace brand', () => {
+        const wrapper = mountPane(twoSections());
+
+        expect(wrapper.attributes('data-form-theme-preview')).toBeUndefined();
+        expect(wrapper.find('style').exists()).toBe(false);
     });
 });

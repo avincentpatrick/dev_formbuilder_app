@@ -416,6 +416,37 @@ class E2eSeeder extends Seeder
                 ]);
             }
 
+            // M131 (`R-6017d6d8`) — a guest form wearing a PRESET THEME, so the public-runtime axe scan measures a
+            // generated ramp on a real page in light and dark: the E2E workspace is deliberately unbranded, so until
+            // this form no scan had ever met one. Graphite, because it moves all three documented additions at once
+            // (serif headings, crisp corners) alongside the colours. The theme is written directly rather than through
+            // `FormService::setTheme()`, whose audit row would move the counts the audit scans read.
+            if (Form::query()->where('title', 'Themed Intake')->doesntExist()) {
+                $themed = app(FormService::class)->create(
+                    $tenant, $owner, 'Themed Intake', 'A guest form in the Graphite preset theme (M131).'
+                );
+                $tb = app(FormBuilderService::class);
+                $section = $tb->addSection($themed);
+                $tb->addField($themed, $owner, FieldType::ShortText, $section->id)->update(['label' => 'Full name']);
+                $tb->addField($themed, $owner, FieldType::SingleSelect, $section->id)->update([
+                    'label' => 'Preferred clinic day',
+                    'config' => ['options' => [
+                        ['value' => 'weekday', 'label' => 'Weekday'],
+                        ['value' => 'weekend', 'label' => 'Weekend'],
+                    ]],
+                ]);
+                $tb->addField($themed, $owner, FieldType::YesNo, $section->id)->update(['label' => 'First visit?']);
+                app(PublishService::class)->publish($themed->refresh(), $owner);
+
+                $themed->forceFill([
+                    'public_slug' => 'themed-intake',
+                    'allow_guest_submissions' => true,
+                    'supported_locales' => ['en'],
+                    'single_page_mode' => true,
+                    'theme' => ['preset' => 'graphite'],
+                ])->save();
+            }
+
             // A guest-enabled form showcasing the Increment G4a/G4b controls — a Likert rating scale (radio
             // group), an N-level cascading (dependent) select, a Likert matrix (radiogroup per row), and a
             // matrix (per-cell select). All optional so an empty guest load is axe-clean. Reached at

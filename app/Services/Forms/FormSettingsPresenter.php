@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Forms;
 
 use App\Enums\FormStatus;
+use App\Enums\FormThemePreset;
 use App\Exceptions\Ocr\OcrException;
 use App\Models\Form;
 use App\Models\FormVersion;
@@ -75,6 +76,10 @@ final class FormSettingsPresenter
             'redirect_form_id' => $form->redirect_form_id,
             'redirect_url' => $form->redirect_url,
             'redirect_targets' => $this->redirectTargets($form, $viewer),
+            // M131 (`R-6017d6d8`, `D81`) — the form's preset theme, and every preset as the Theme section and the
+            // builder preview draw it. Transmitted from `FormThemePreset`, so no client file holds a colour.
+            'theme_preset' => FormThemePreset::fromTheme($form->theme)?->value,
+            'theme_presets' => FormThemePreset::catalogue(),
             // The form's locale set, so the section can offer one message box per supported locale.
             'default_locale' => $form->default_locale,
             'supported_locales' => $form->supported_locales === [] ? [$form->default_locale] : array_values($form->supported_locales),

@@ -353,4 +353,18 @@ final class BrandRampGenerator
             ['theme' => 'dark', 'role' => 'tint', 'against' => 'ink', 'min' => self::TEXT_MIN, 'label' => 'ink on tint'],
         ];
     }
+
+    /**
+     * Measure every §4.1 pairing over a ramp somebody else produced — a form theme preset's pinned literals
+     * (M131, `App\Enums\FormThemePreset`). Public and static so a gate can re-measure the hexes that actually
+     * render rather than trust the run that produced them: the preset test does exactly that, in both themes.
+     * Appended at the end of the class rather than beside `measure()`, so no line the documents cite moves.
+     *
+     * @param  array<string, array<string, string>>  $tokens
+     * @return list<array{theme: string, pairing: string, ratio: float, min: float}>
+     */
+    public static function measureTokens(array $tokens): array
+    {
+        return (new self)->measure($tokens);
+    }
 }

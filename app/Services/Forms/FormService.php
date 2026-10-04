@@ -7,6 +7,7 @@ namespace App\Services\Forms;
 use App\Enums\AuditEvent;
 use App\Enums\FormBotChallenge;
 use App\Enums\FormStatus;
+use App\Enums\FormThemePreset;
 use App\Enums\FormVersionStatus;
 use App\Enums\ResourceCapacity;
 use App\Enums\UsageMetric;
@@ -261,6 +262,28 @@ final class FormService
             $new = ['folder_id' => $folder?->getKey(), 'folder_name' => $folder?->name];
 
             $form->forceFill(['folder_id' => $folder?->getKey()])->save();
+
+            $this->recordFormUpdate($form, $old, $new, $actor);
+
+            return $form->refresh();
+        });
+    }
+
+    /**
+     * Give a form a preset theme, or return it to the workspace's own brand (M131, `R-6017d6d8`, `D65`, `D81`) —
+     * the only writer of `forms.theme`, which is no longer mass-assignable.
+     *
+     * Stored as `{"preset": "<value>"}` rather than the enum value bare, so a later per-form option (a logo, a
+     * header image) is a new key rather than a column migration. Gated `can:update,form` alone on the route:
+     * presets are on every plan (`D81`). The audit records the preset's value on both sides.
+     */
+    public function setTheme(Form $form, ?FormThemePreset $preset, ?User $actor = null): Form
+    {
+        return DB::transaction(function () use ($form, $preset, $actor): Form {
+            $old = ['theme_preset' => FormThemePreset::fromTheme($form->theme)?->value];
+            $new = ['theme_preset' => $preset?->value];
+
+            $form->forceFill(['theme' => $preset === null ? null : ['preset' => $preset->value]])->save();
 
             $this->recordFormUpdate($form, $old, $new, $actor);
 

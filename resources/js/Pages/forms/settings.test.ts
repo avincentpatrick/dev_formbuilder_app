@@ -41,6 +41,8 @@ const FORM = {
     redirect_form_id: null,
     redirect_url: null,
     redirect_targets: [],
+    theme_preset: null,
+    theme_presets: [],
     default_locale: 'en',
     supported_locales: ['en'],
 };
@@ -91,7 +93,7 @@ describe('forms/Settings', () => {
         const wrapper = mount(Settings, { props: props() as never });
 
         expect(railLabels(wrapper)).toEqual([
-            'Details', 'Pages', 'Share', 'Scanning', 'Schedule', 'Thank-you message', 'Save and finish later', 'Scope',
+            'Details', 'Pages', 'Theme', 'Share', 'Scanning', 'Schedule', 'Thank-you message', 'Save and finish later', 'Scope',
         ]);
     });
 

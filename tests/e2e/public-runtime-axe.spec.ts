@@ -23,6 +23,34 @@ for (const theme of themes) {
     });
 }
 
+// M131 (`R-6017d6d8`, `D65`) — a guest form in a PRESET THEME (E2eSeeder's "Themed Intake", Graphite). The E2E
+// workspace is unbranded on purpose, so this is the first scan of a generated ramp on a real page; `D65` asked
+// that every preset hold in light AND dark, and this is where a pairing the engine does not measure would show.
+// A choice is selected first, so the selected state of a round button is scanned with the rest.
+for (const theme of themes) {
+    test(`Public runtime, preset theme (${theme}) — accessible & no horizontal overflow`, async ({ page }) => {
+        await page.goto('/f/themed-intake', { waitUntil: 'networkidle' });
+        await page
+            .getByRole('heading', { name: 'Themed Intake', level: 1 })
+            .waitFor({ state: 'visible', timeout: 15_000 });
+        await forceTheme(page, theme);
+
+        // The preset painted this page, documented lines included — not the (absent) workspace ramp.
+        await expect(page.locator('style#form-theme')).toHaveCount(1);
+        await expect(page.locator('style#tenant-brand')).toHaveCount(0);
+        const radiusXl = await page.evaluate(() =>
+            getComputedStyle(document.documentElement).getPropertyValue('--mds-radius-xl').trim(),
+        );
+        expect(radiusXl).toBe('12px');
+
+        // The label, as a person clicks it: the native input is visually hidden under the drawn circle.
+        await page.getByText('Weekend', { exact: true }).click();
+        await expect(page.getByRole('radio', { name: 'Weekend' })).toBeChecked();
+
+        await assertClean(page, `Public runtime, Graphite preset (${theme})`);
+    });
+}
+
 // The save-and-resume UI (Increment H10). Clinic Intake opts into save-and-resume (E2eSeeder), so the multi-step
 // runtime renders a "Save and finish later" control; opening it upserts a server draft and shows a resume link in
 // a modal. Scan the open dialog for WCAG 2.2 AA + no horizontal overflow in light and dark.

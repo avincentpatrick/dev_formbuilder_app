@@ -51,6 +51,7 @@ use Illuminate\Support\Carbon;
  * @property array<int, string> $supported_locales
  * @property string $owner_user_id
  * @property ?string $scope_node_id
+ * @property ?array<string, mixed> $theme the form's preset theme, `{"preset": "<value>"}` (M131, `D65`); null is the workspace brand
  * @property ?string $folder_id the forms-list folder (M131, `D78`); filing only, grants nothing; written only by assignFolder()
  * @property string $created_by
  * @property ?Carbon $published_at
@@ -98,7 +99,6 @@ class Form extends Model implements TenantScoped
         'default_locale',
         'supported_locales',
         'capability_flags',
-        'theme',
         'owner_user_id',
         'scope_node_id',
         'created_by',

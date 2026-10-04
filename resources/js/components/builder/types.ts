@@ -8,7 +8,7 @@
 
 import type { BreadcrumbItem } from '@meridian/design-system';
 
-import type { OcrScanningProps, RedirectKind, RedirectTargetOption, ShareProps } from '@/components/forms/types';
+import type { OcrScanningProps, RedirectKind, RedirectTargetOption, ShareProps, ThemePresetOption } from '@/components/forms/types';
 
 export type Uid = string;
 
@@ -219,6 +219,9 @@ export interface BuilderPageProps {
         redirect_form_id: string | null;
         redirect_url: string | null;
         redirect_targets: RedirectTargetOption[];
+        // M131 — the preset theme (FormSettingsForm says the rest); `PreviewPane` paints it on the preview.
+        theme_preset: string | null;
+        theme_presets: ThemePresetOption[];
         default_locale: string;
         supported_locales: string[];
     };

@@ -35,6 +35,7 @@ use App\Http\Controllers\Tenant\FormScopeController;
 use App\Http\Controllers\Tenant\FormShareController;
 use App\Http\Controllers\Tenant\FormShareQrController;
 use App\Http\Controllers\Tenant\FormTemplateController;
+use App\Http\Controllers\Tenant\FormThemeController;
 use App\Http\Controllers\Tenant\FormXlsformController;
 use App\Http\Controllers\Tenant\GoogleCompleteController;
 use App\Http\Controllers\Tenant\ImpersonationSessionController;
@@ -676,6 +677,11 @@ Route::middleware([
     // being built and tested. That is the whole of `R-f1332829`.
     Route::patch('/forms/{form}/page-mode', [FormPageModeController::class, 'update'])
         ->middleware('can:update,form')->name('forms.page-mode');
+
+    // A form's preset theme (M131, `R-6017d6d8`). `can:update,form` alone, like page mode: `D81` puts presets
+    // on every plan, so there is no `feature:` gate — the workspace's own brand colour stays Starter+.
+    Route::patch('/forms/{form}/theme', [FormThemeController::class, 'update'])
+        ->middleware('can:update,form')->name('forms.theme');
 
     // Scheduled forms (Increment H12a) — set/clear a form's open/close window + response cap. Its own route +
     // guarded FormService::setSchedule write. Ungated (all tiers): scheduled forms carry no plan feature, so

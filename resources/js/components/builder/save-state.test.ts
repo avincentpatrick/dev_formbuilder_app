@@ -96,6 +96,8 @@ function pageProps(): BuilderPageProps {
             redirect_form_id: null,
             redirect_url: null,
             redirect_targets: [],
+            theme_preset: null,
+            theme_presets: [],
             default_locale: 'en',
             supported_locales: ['en'],
         },

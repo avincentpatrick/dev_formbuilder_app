@@ -195,7 +195,9 @@ for (const theme of themes) {
         const map = dialog.getByRole('img', { name: 'Clinic map.png' });
         await expect.poll(() => map.evaluate((img: HTMLImageElement) => (img.complete ? img.naturalWidth : 0))).toBe(240);
         await assertClean(page, 'Before Your Visit (reference file dialog)');
-        await dialog.getByRole('button', { name: 'Close' }).click();
+        // Escape, not a name: the dialog has two buttons named Close (its own and the actions one).
+        await page.keyboard.press('Escape');
+        await expect(dialog).toBeHidden();
 
         const download = page.waitForEvent('download');
         await files.getByRole('button', { name: /Visit checklist\.pdf/ }).click();

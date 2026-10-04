@@ -499,7 +499,9 @@ test('Public runtime — a reference file opened once opens again offline, and o
     await files.getByRole('button', { name: /Clinic map\.png/ }).click();
     const map = page.getByRole('dialog', { name: 'Clinic map.png' }).getByRole('img', { name: 'Clinic map.png' });
     await expect.poll(() => map.evaluate((img: HTMLImageElement) => (img.complete ? img.naturalWidth : 0))).toBe(240);
-    await page.getByRole('dialog', { name: 'Clinic map.png' }).getByRole('button', { name: 'Close' }).click();
+    // Escape: the dialog has two buttons named Close (its own and the actions one).
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog', { name: 'Clinic map.png' })).toBeHidden();
 
     const keys = await page.evaluate(async () =>
         (await (await caches.open('guest-reference-files')).keys()).map((request) => new URL(request.url).pathname),
@@ -518,7 +520,9 @@ test('Public runtime — a reference file opened once opens again offline, and o
     await expect
         .poll(() => offlineMap.evaluate((img: HTMLImageElement) => (img.complete ? img.naturalWidth : 0)), { timeout: 10_000 })
         .toBe(240);
-    await page.getByRole('dialog', { name: 'Clinic map.png' }).getByRole('button', { name: 'Close' }).click();
+    // Escape: the dialog has two buttons named Close (its own and the actions one).
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog', { name: 'Clinic map.png' })).toBeHidden();
 
     await page.getByRole('list', { name: 'Reference files' }).getByRole('button', { name: /Visit checklist\.pdf/ }).click();
     // The visible line, not the text: the same words also go to the page's one live region for screen readers.

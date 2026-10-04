@@ -168,6 +168,12 @@ Files:
   `docs/piping-output-encoding-design.md`, `docs/ux/form-filling-ux-flow.md`, `openapi.json` (hub).
 - **Close-out:** `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/backlog-triage.md`, `docs/claims/decisions.md`,
   `docs/claims/lane-a.md`, `docs/gate-baselines.md`, and `PROGRESS.md` (own block and hand-off line).
+- **Extension 1, pushed with item 1 built and uncommitted, before the file was opened:**
+  `docs/workflow-branching-design.md`, for one citation. Item 1's deletion moved `toSemanticInput()` far above the
+  `schema-mapping.ts:604-606` that document cites by line (tier 1, zero tolerance: the line is now past the end of
+  the file), and items 3 and 4 move that file again, so the citation names the function instead of a line. Also
+  named, because the list above gives them only by kind: `resources/public-runtime/__tests__/components.test.ts`,
+  `resume-boot.test.ts` and `fixtures.ts`.
 
 Shared artefacts taken: `docs/**` (the files above), `openapi.json`, the top-level `tests/e2e/*.spec.ts` named above
 (one new), and `PROGRESS.md` (own block only).

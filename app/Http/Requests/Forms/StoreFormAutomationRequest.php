@@ -75,7 +75,7 @@ final class StoreFormAutomationRequest extends FormRequest
         /** @var list<string>|null $recipients */
         $recipients = $this->validated('recipients');
 
-        return $recipients === null ? null : array_values(array_map(static fn (string $r): string => trim($r), $recipients));
+        return $recipients === null ? null : array_map(static fn (string $r): string => trim($r), $recipients);
     }
 
     public function webhookUrl(): ?string

@@ -154,10 +154,15 @@ final class FormReferenceFileService
         $rows = $version->referenceFiles()->orderBy('position')->orderBy('created_at')->get();
         $attachments = Attachment::query()->whereIn('id', $rows->pluck('attachment_id'))->get()->keyBy('id');
 
-        return array_values($rows
-            ->filter(static fn (FormVersionReferenceFile $row): bool => $attachments->has($row->attachment_id))
-            ->map(static fn (FormVersionReferenceFile $row): array => self::authorRow($row, $attachments->get($row->attachment_id)))
-            ->all());
+        $files = [];
+        foreach ($rows as $row) {
+            $attachment = $attachments->get($row->attachment_id);
+            if ($attachment instanceof Attachment) {
+                $files[] = self::authorRow($row, $attachment);
+            }
+        }
+
+        return $files;
     }
 
     /**

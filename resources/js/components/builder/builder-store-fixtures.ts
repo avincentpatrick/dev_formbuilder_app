@@ -147,9 +147,9 @@ export const ENUMS: BuilderEnums = {
         { value: 'number', label: 'Number' },
     ],
     validation_rule_types: [
-        { value: 'pattern', label: 'Must match a pattern', shapes: ['text'], takes_operator: false, takes_related_field: false, operator_may_be_empty: false, governs_requiredness: false },
-        { value: 'min_length', label: 'Minimum length', shapes: ['text'], takes_operator: false, takes_related_field: false, operator_may_be_empty: false, governs_requiredness: false },
-        { value: 'required_if', label: 'Required when a condition holds', shapes: ['text', 'number'], takes_operator: true, takes_related_field: true, operator_may_be_empty: false, governs_requiredness: true },
+        { value: 'pattern', label: 'Must match a pattern', shapes: ['text'], takes_operator: false, takes_related_field: false, operator_may_be_empty: false, governs_requiredness: false, related_comparison: null },
+        { value: 'min_length', label: 'Minimum length', shapes: ['text'], takes_operator: false, takes_related_field: false, operator_may_be_empty: false, governs_requiredness: false, related_comparison: null },
+        { value: 'required_if', label: 'Required when a condition holds', shapes: ['text', 'number'], takes_operator: true, takes_related_field: true, operator_may_be_empty: false, governs_requiredness: true, related_comparison: null },
     ],
     comparison_operators: [{ value: 'eq', label: 'equals (=)', shapes: ['text', 'number'] }],
 };

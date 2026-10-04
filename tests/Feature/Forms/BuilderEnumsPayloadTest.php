@@ -139,6 +139,33 @@ it('marks exactly the two rules that can make a field required, which is NOT the
     expect($governs)->toEqualCanonicalizing(['required_if', 'required_with']);
 });
 
+it('ships the related comparison of each rule exactly as the gate judges a compared question by it', function (): void {
+    // M131 (`R-57711a3a`). The editor filters the compared-question list by this fact; publish refuses by
+    // `ValidationRuleType::relatedComparison()`. Transmitted rather than mirrored, so the two cannot disagree.
+    $options = ruleTypeOptions($this->payload);
+
+    foreach (ValidationRuleType::cases() as $type) {
+        expect($options[$type->value]['related_comparison'])
+            ->toBe($type->relatedComparison(null)?->value, $type->value);
+
+        // A rule that READS an operator compares with whatever operator it stores; every other rule's
+        // comparison is constant, so the one transmitted value is the whole truth for it.
+        foreach (ComparisonOperator::cases() as $stored) {
+            if ($type->takesOperator()) {
+                expect($type->relatedComparison($stored))->toBe($stored, "{$type->value} / {$stored->value}");
+            } else {
+                expect($type->relatedComparison($stored))->toBe($type->relatedComparison(null), "{$type->value} / {$stored->value}");
+            }
+        }
+    }
+
+    expect($options['greater_than_field']['related_comparison'])->toBe('gt')
+        ->and($options['less_than_field']['related_comparison'])->toBe('lt')
+        ->and($options['required_with']['related_comparison'])->toBe('is_null')
+        ->and($options['required_if']['related_comparison'])->toBeNull()
+        ->and($options['min_length']['related_comparison'])->toBeNull();
+});
+
 it('ships every operator with the row rendering and the shapes it may compare', function (): void {
     $byValue = [];
     foreach ($this->payload['enums']['comparison_operators'] as $option) {

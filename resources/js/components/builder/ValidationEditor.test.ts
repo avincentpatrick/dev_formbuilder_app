@@ -19,12 +19,12 @@ import ValidationEditor from './ValidationEditor.vue';
 import type { BuilderValidation, ComparableField, OperatorOption, RuleTypeOption } from './types';
 
 const RULE_TYPES: RuleTypeOption[] = [
-    { value: 'min_length', label: 'Minimum length', shapes: ['text'], takes_operator: false, takes_related_field: false, operator_may_be_empty: false },
-    { value: 'pattern', label: 'Must match a pattern', shapes: ['text'], takes_operator: false, takes_related_field: false, operator_may_be_empty: false },
-    { value: 'min_value', label: 'Minimum value', shapes: ['number', 'duration', 'scale'], takes_operator: false, takes_related_field: false, operator_may_be_empty: false },
-    { value: 'greater_than_field', label: 'Greater than another question', shapes: ['number', 'duration'], takes_operator: false, takes_related_field: true, operator_may_be_empty: false },
-    { value: 'required_if', label: 'Required when a condition holds', shapes: ['text', 'number', 'temporal'], takes_operator: true, takes_related_field: true, operator_may_be_empty: false },
-    { value: 'required_with', label: 'Required with another question', shapes: ['text', 'number', 'temporal'], takes_operator: true, takes_related_field: true, operator_may_be_empty: true },
+    { value: 'min_length', label: 'Minimum length', shapes: ['text'], takes_operator: false, takes_related_field: false, operator_may_be_empty: false, related_comparison: null },
+    { value: 'pattern', label: 'Must match a pattern', shapes: ['text'], takes_operator: false, takes_related_field: false, operator_may_be_empty: false, related_comparison: null },
+    { value: 'min_value', label: 'Minimum value', shapes: ['number', 'duration', 'scale'], takes_operator: false, takes_related_field: false, operator_may_be_empty: false, related_comparison: null },
+    { value: 'greater_than_field', label: 'Greater than another question', shapes: ['number', 'duration'], takes_operator: false, takes_related_field: true, operator_may_be_empty: false, related_comparison: 'gt' },
+    { value: 'required_if', label: 'Required when a condition holds', shapes: ['text', 'number', 'temporal'], takes_operator: true, takes_related_field: true, operator_may_be_empty: false, related_comparison: null },
+    { value: 'required_with', label: 'Required with another question', shapes: ['text', 'number', 'temporal'], takes_operator: true, takes_related_field: true, operator_may_be_empty: true, related_comparison: 'is_null' },
 ];
 
 const OPERATORS: OperatorOption[] = [
@@ -331,5 +331,71 @@ describe('ValidationEditor — restricted to one family (M116)', () => {
         const open = mountEditor('text');
         expect(open.text()).toContain('No validation rules.');
         expect(open.findAll('button').some((b) => b.text() === 'Add rule')).toBe(true);
+    });
+});
+
+/**
+ * M131 (`R-57711a3a`) — the editor stops offering a compared question publish refuses, re-pointing clears an
+ * operator the new question cannot take, and a saved question the filter hides stays visible.
+ */
+describe('ValidationEditor — the compared question publish will accept', () => {
+    const NOTE: ComparableField = { key: 'intro', label: 'Intro note', value_shape: 'no_answer' };
+    const PAIN: ComparableField = { key: 'pain', label: 'Pain (1-5)', value_shape: 'scale' };
+
+    function mountWith(validations: BuilderValidation[], fields: ComparableField[] = FIELDS) {
+        return mount(ValidationEditor, {
+            props: { validations, ruleTypes: RULE_TYPES, operators: OPERATORS, valueShape: 'number', comparableFields: fields },
+        });
+    }
+
+    it('offers a field comparison only the questions it can order', () => {
+        const wrapper = mountWith([row({ rule_type: 'greater_than_field' })], [...FIELDS, PAIN]);
+        const offered = optionLabels(wrapper, 'Rule 1 compared field');
+
+        expect(offered).toContain('Your age');
+        expect(offered).toContain('Pain (1-5)');
+        expect(offered).not.toContain('Notes');
+        expect(offered).not.toContain('Date of visit');
+    });
+
+    it('never offers a note to a rule that reads an operator', () => {
+        const wrapper = mountWith([row({ rule_type: 'required_if' })], [...FIELDS, NOTE]);
+
+        expect(optionLabels(wrapper, 'Rule 1 compared field')).not.toContain('Intro note');
+    });
+
+    it('keeps a saved question the filter hides, visible and disabled', () => {
+        const wrapper = mountWith([row({ rule_type: 'greater_than_field', related_field_key: 'notes' })]);
+        const saved = control(wrapper, 'Rule 1 compared field').findAll('option').find((o) => o.text().startsWith('Notes'));
+
+        expect(saved?.text()).toBe('Notes — not available for this question');
+        expect(saved?.attributes('disabled')).toBeDefined();
+    });
+
+    it('clears an operator the new question cannot take, and its value, when the rule is re-pointed', async () => {
+        const wrapper = mountWith([row({ rule_type: 'required_if', related_field_key: 'age', operator: 'gt', rule_value: '18' })]);
+
+        await control(wrapper, 'Rule 1 compared field').setValue('notes');
+        const emitted = wrapper.emitted('update:validations')!.at(-1)![0] as BuilderValidation[];
+
+        expect(emitted[0]).toMatchObject({ related_field_key: 'notes', operator: null, rule_value: null });
+    });
+
+    it('drops a compared question the new rule kind cannot name', async () => {
+        const wrapper = mountWith([row({ rule_type: 'required_if', related_field_key: 'notes', operator: 'eq' })]);
+
+        await control(wrapper, 'Rule 1 check').setValue('greater_than_field');
+        const emitted = wrapper.emitted('update:validations')!.at(-1)![0] as BuilderValidation[];
+
+        expect(emitted[0]).toMatchObject({ rule_type: 'greater_than_field', related_field_key: null, operator: null });
+    });
+
+    it('offers "is answered" only where an empty comparison can read the question', () => {
+        const readable = mountWith([row({ rule_type: 'required_with', related_field_key: 'age' })]);
+        expect(optionLabels(readable, 'Rule 1 operator')).toContain('is answered');
+
+        // The fixture's `is_null` does not read a scale, so an empty comparison against one is not offered.
+        const unreadable = mountWith([row({ rule_type: 'required_with', related_field_key: 'pain' })], [...FIELDS, PAIN]);
+        expect(optionLabels(unreadable, 'Rule 1 operator')).not.toContain('is answered');
     });
 });

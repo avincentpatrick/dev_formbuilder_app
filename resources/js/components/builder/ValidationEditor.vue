@@ -33,6 +33,7 @@
 import { MdsButton, MdsIconButton, MdsSelect, MdsTextInput, MdsTextarea } from '@meridian/design-system';
 import { computed } from 'vue';
 import type { BuilderValidation, ComparableField, EnumOption, OperatorOption, RuleTypeOption } from './types';
+import { mayCompare, operatorReads, repointPatch, ruleChangePatch } from './validation-options';
 
 const props = withDefaults(
     defineProps<{
@@ -124,13 +125,28 @@ function ruleOptionsFor(row: BuilderValidation): SelectOption[] {
     return options;
 }
 
+/**
+ * The compared-question options: only the questions this rule can be judged by (M131, `R-57711a3a`) — see
+ * `validation-options.ts`. Publish refuses the rest, so offering them was inviting a refusal.
+ */
 function relatedOptionsFor(row: BuilderValidation): SelectOption[] {
-    const options: SelectOption[] = props.comparableFields.map((field) => ({ value: field.key, label: field.label }));
+    const rule = ruleTypeOf(row);
+    const offered = rule === null ? props.comparableFields : props.comparableFields.filter((field) => mayCompare(rule, props.operators, field));
+    const options: SelectOption[] = offered.map((field) => ({ value: field.key, label: field.label }));
 
-    // A key pointing at a field that has since been deleted or renamed: shown rather than silently dropped,
-    // because the row is broken and the author is the only one who can decide what it should say.
-    if (row.related_field_key !== null && row.related_field_key !== '' && !options.some((o) => o.value === row.related_field_key)) {
-        options.unshift({ value: row.related_field_key, label: `${row.related_field_key} (deleted)`, disabled: true });
+    const key = row.related_field_key;
+
+    if (key !== null && key !== '' && !options.some((o) => o.value === key)) {
+        const existing = props.comparableFields.find((field) => field.key === key);
+
+        // A key pointing at a field that has since been deleted or renamed, or one this rule can no longer be
+        // judged by: shown rather than silently dropped, because the row is broken and the author is the only one
+        // who can decide what it should say.
+        options.unshift(
+            existing === undefined
+                ? { value: key, label: `${key} (deleted)`, disabled: true }
+                : { value: key, label: existing.label + UNAVAILABLE, disabled: true },
+        );
     }
 
     return options;
@@ -151,7 +167,8 @@ function operatorOptionsFor(row: BuilderValidation): SelectOption[] {
 
     const options: SelectOption[] = [];
 
-    if (rule.operator_may_be_empty) {
+    // "is answered" is the empty operator, judged as `is_null` — offered only where that can read the question.
+    if (rule.operator_may_be_empty && operatorReads('is_null', shape, props.operators)) {
         options.push({ value: OPERATOR_ANSWERED, label: 'is answered' });
     }
 
@@ -217,13 +234,15 @@ function update(index: number, patch: Partial<BuilderValidation>): void {
 function setRuleType(index: number, value: string): void {
     const rule = props.ruleTypes.find((candidate) => candidate.value === value) ?? null;
 
-    const current = props.validations[index];
+    // M131: the compared question survives only if the NEW kind can be judged by it, and the operator only if
+    // the new kind reads one that can read that question — `required_if` on text → `greater_than_field` used to
+    // keep the text question, which publish refuses.
+    update(index, { ...ruleChangePatch(props.validations[index], rule, props.comparableFields, props.operators), rule_type: value });
+}
 
-    update(index, {
-        rule_type: value,
-        operator: rule?.takes_operator === true ? current.operator : null,
-        related_field_key: rule?.takes_related_field === true ? current.related_field_key : null,
-    });
+/** Re-pointing clears an operator the new question cannot take, and the value it compared against (M131). */
+function setRelated(index: number, key: string | null): void {
+    update(index, repointPatch(props.validations[index], key, props.comparableFields, props.operators));
 }
 
 function setMode(index: number, next: 'rule' | 'expression'): void {
@@ -301,7 +320,7 @@ const modeOptions: EnumOption[] = [
                     placeholder="Choose a question"
                     :disabled="disabled"
                     :aria-label="`Rule ${i + 1} compared field`"
-                    @update:model-value="update(i, { related_field_key: $event || null })"
+                    @update:model-value="setRelated(i, $event || null)"
                 />
                 <MdsSelect
                     v-if="ruleTypeOf(row)?.takes_operator"

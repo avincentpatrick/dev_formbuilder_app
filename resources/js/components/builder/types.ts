@@ -142,6 +142,10 @@ export interface RuleTypeOption extends EnumOption {
     // Whether an ABSENT operator is itself a condition ("when that question is answered at all"), which is
     // true for `required_with`/`skip_with` and a broken row for `required_if`/`skip_if`.
     operator_may_be_empty: boolean;
+    // M131 (`R-57711a3a`) — the operator a compared question is judged by when the row stores none
+    // (`ValidationRuleType::relatedComparison(null)`): `gt`/`lt` for the field comparisons, `is_null` for an
+    // empty `_with`, null otherwise. `validation-options.ts` filters the compared-question list by it.
+    related_comparison: string | null;
     // Whether this rule is what makes `Conditional` requiredness mean something (M116) — the `required`
     // bucket of `SemanticValidator::family()`, which is `required_if`/`required_with` and NOT the skip pair:
     // a skip rule makes a field irrelevant, never required. The Basics tab's "Required when…" reveal shows

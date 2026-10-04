@@ -279,6 +279,10 @@ final class BuilderPresenter
                     // requiredness setting reads. Transmitted rather than mirrored for the same reason
                     // `shapes` is: a client-side list of two rule names is a second source that drifts.
                     'governs_requiredness' => $t->governsRequiredness(),
+                    // M131 (`R-57711a3a`) — the operator a compared question is judged by when the row stores none:
+                    // `gt`/`lt` for the two field comparisons, `is_null` for an empty `_with`, null otherwise. The
+                    // editor filters the compared-question list by it, and publish refuses by the same method.
+                    'related_comparison' => $t->relatedComparison(null)?->value,
                 ],
                 ValidationRuleType::cases(),
             ),

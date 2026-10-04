@@ -189,6 +189,11 @@ Prediction:
 | Third | an E2E layout check on the forms list, from the folder caption on each card and the tenth row action |
 | ⚠️ Most likely wrong | that both engines agree on the five new golden vectors on the first run — the mixed required-ALL plus constraint-ANY vector has no precedent in either corpus |
 
+**Claim extension 1 (2026-10-04, pushed before the file was edited):** `tests/Feature/Forms/FormSettingsPageTest.php` —
+it pins the builder form block's keys in order, and item 2's `theme_preset` and `theme_presets` (from
+`FormSettingsPresenter::form()`, which the builder spreads) extend that block. Found by the local `tests/Feature/Forms`
+directory run, the only red of 761.
+
 ## RELEASED — `M130`, the Oct 6 slot: content blocks render, a real choice layout with round buttons, and a redirect after submit (merged as PR #323, `e5f6245f`, 6/6 green with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 
 Shipped 2026-10-04. Branch `m130-content-appearance-redirect`, cut from `origin/main` at `dd68ada9`. The claim commit is

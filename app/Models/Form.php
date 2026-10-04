@@ -44,6 +44,8 @@ use Illuminate\Support\Carbon;
  * @property ?int $guest_rate_limit_per_minute
  * @property ?string $confirmation_message
  * @property ?array<string, mixed> $confirmation_message_translations
+ * @property ?string $redirect_url where a respondent goes after the thank-you screen (M130, `D76`); never with a form
+ * @property ?string $redirect_form_id the other form a respondent goes to instead; written only by setConfirmationMessage()
  * @property array<string, mixed> $capability_flags
  * @property string $default_locale
  * @property array<int, string> $supported_locales

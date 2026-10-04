@@ -25,12 +25,14 @@ use App\Services\Submissions\EncodeFormPresenter;
 | that collapsing the duplication was deliberately declined, so converting unguarded mirrors into guarded
 | ones is the remedy — the sets stay where they are and drift becomes a red build.
 |
-| ⛔ TWO OF THE TEN MIRROR NO PHP COUNTERPART AT ALL, AND THAT IS A FINDING RATHER THAN A GAP.
-| `TEXT_TYPES` and the inline literal in `FieldInput.vue` are a TypeScript-only control-kind grouping:
-| they cannot drift FROM a source because they ARE one, and an undeclared one. They are pinned against
-| EACH OTHER (they are byte-identical today and a silent divergence would give the guest runtime and the
-| encode page different controls) and against the catalogue, which catches a typo'd type string — a class
-| of defect nothing in this repository catches today.
+| ⛔ TWO OF THE TEN MIRRORED NO PHP COUNTERPART AT ALL, AND THAT IS A FINDING RATHER THAN A GAP.
+| `TEXT_TYPES` and the inline literal in `FieldInput.vue` were a TypeScript-only control-kind grouping:
+| they cannot drift FROM a source because they ARE one, and an undeclared one. ⚠️ `M130` DELETED
+| `TEXT_TYPES`, with the `controlFor()` it fed: nothing in production read that function, so the
+| "different controls on the guest runtime and the encode page" this paragraph used to fear could never
+| happen — every channel renders through `FieldInput.vue`'s own switch. The literal that remains is pinned
+| as a STATED grouping and against the catalogue, which catches a typo'd type string. The drift that can
+| happen is in the three adapters feeding that switch: `EncodeFieldAdapterParityTest`.
 |
 | ⚠️ AND `NUMERIC_TYPES` IS A DECLARED DIVERGENCE, NOT A MIRROR. `R-09f73330` says it "mirrors nothing";
 | that was true when it was filed and stopped being true in the same increment that filed it. `M112`'s
@@ -53,15 +55,14 @@ function clientTypeMirrors(): array
     return [
         'schema_mapping.SUPPORTED' => ['path' => 'resources/public-runtime/lib/schema-mapping.ts', 'name' => 'SUPPORTED', 'grammar' => 'set'],
         'schema_mapping.HAS_OPTIONS' => ['path' => 'resources/public-runtime/lib/schema-mapping.ts', 'name' => 'HAS_OPTIONS', 'grammar' => 'set'],
-        'schema_mapping.TEXT_TYPES' => ['path' => 'resources/public-runtime/lib/schema-mapping.ts', 'name' => 'TEXT_TYPES', 'grammar' => 'set'],
         'display_value.HAS_OPTIONS' => ['path' => 'resources/public-runtime/engine/display-value.ts', 'name' => 'HAS_OPTIONS', 'grammar' => 'set'],
         'display_value.GEO_TYPES' => ['path' => 'resources/public-runtime/engine/display-value.ts', 'name' => 'GEO_TYPES', 'grammar' => 'set'],
         'display_value.MEDIA_TYPES' => ['path' => 'resources/public-runtime/engine/display-value.ts', 'name' => 'MEDIA_TYPES', 'grammar' => 'set'],
         'semantic_validator.MEDIA_FIELD_TYPES' => ['path' => 'resources/public-runtime/engine/semantic-validator.ts', 'name' => 'MEDIA_FIELD_TYPES', 'grammar' => 'set'],
         'field_input.MEDIA_TYPES' => ['path' => 'resources/js/components/submissions/FieldInput.vue', 'name' => 'MEDIA_TYPES', 'grammar' => 'array'],
         'config_panel.NUMERIC_TYPES' => ['path' => 'resources/js/components/builder/ConfigPanel.vue', 'name' => 'NUMERIC_TYPES', 'grammar' => 'set'],
-        // The only unnamed one: an inline literal inside `controlKind()`'s if-chain, anchored on the
-        // statement it governs because there is no identifier to anchor on.
+        // The only unnamed one: an inline literal inside `FieldInput.vue`'s `control` computed, anchored on
+        // the statement it governs because there is no identifier to anchor on.
         'field_input.inline_text' => ['path' => 'resources/js/components/submissions/FieldInput.vue', 'name' => '(inline text literal)', 'grammar' => 'inline_text'],
     ];
 }
@@ -80,7 +81,6 @@ function clientTypeMirrorFloors(): array
     return [
         'schema_mapping.SUPPORTED' => 25,
         'schema_mapping.HAS_OPTIONS' => 4,
-        'schema_mapping.TEXT_TYPES' => 7,
         'display_value.HAS_OPTIONS' => 4,
         'display_value.GEO_TYPES' => 3,
         'display_value.MEDIA_TYPES' => 5,
@@ -208,8 +208,8 @@ it('keeps the geo mirror equal to FieldType::isGeo()', function (): void {
 });
 
 it('keeps all three media mirrors equal to FieldType::isMedia()', function (): void {
-    // THREE copies of one set, in three files, two bundles apart. A layout branch added to one and
-    // forgotten in another gives the guest runtime and the encode page different forms — which is the
+    // THREE copies of one set, in three files, two bundles apart. A type added to one and forgotten in
+    // another gives the engine and the renderer different ideas of which answers are files — which is the
     // drift class this census exists for, stated at its worst case.
     $php = phpTypesWhere(static fn (FieldType $t): bool => $t->isMedia());
 
@@ -218,14 +218,16 @@ it('keeps all three media mirrors equal to FieldType::isMedia()', function (): v
         ->and(clientTypeMembers('field_input.MEDIA_TYPES'))->toEqualCanonicalizing($php);
 });
 
-it('keeps the two text groupings equal to each other, because neither mirrors PHP', function (): void {
-    // ⛔ THESE MIRROR NOTHING AND THEREFORE CANNOT BE CHECKED AGAINST PHP — measured, not assumed.
+it('pins the text control grouping as a stated grouping, because it mirrors nothing in PHP', function (): void {
+    // ⛔ THIS MIRRORS NOTHING AND THEREFORE CANNOT BE CHECKED AGAINST PHP — measured, not assumed.
     // `ValueShape::Text` is `{short_text, long_text, email, phone, url, hidden}`; `FieldCategory::Text`
-    // is five; `PrintAnswerArea::Comb` is eleven. None of them is this seven. They are a TypeScript-only
-    // CONTROL-KIND grouping — the seventh partition of the same thirty-one cases — so the strongest true
-    // statement available is that the two copies of it agree, which today they do byte for byte.
-    expect(clientTypeMembers('schema_mapping.TEXT_TYPES'))
-        ->toEqualCanonicalizing(clientTypeMembers('field_input.inline_text'));
+    // is five; `PrintAnswerArea::Comb` is eleven. None of them is this seven. It is a TypeScript-only
+    // CONTROL-KIND grouping — the seventh partition of the same thirty-one cases. Until `M130` a second copy
+    // (`schema-mapping.ts`'s `TEXT_TYPES`) was pinned equal to it; that copy fed only the unread
+    // `controlFor()` and was deleted with it, so the membership is now STATED here, the way
+    // `NUMERIC_TYPES` below states its divergence: changing it is a decision this test makes visible.
+    expect(clientTypeMembers('field_input.inline_text'))
+        ->toEqualCanonicalizing(['short_text', 'email', 'phone', 'url', 'date', 'time', 'datetime']);
 });
 
 it('records NUMERIC_TYPES as a DIVERGENCE from ValueShape, not as a mirror of it', function (): void {

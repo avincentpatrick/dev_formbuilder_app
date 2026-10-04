@@ -11,6 +11,7 @@
  */
 import { computed, nextTick, ref, watch } from 'vue';
 import FieldInput, { type AnswerValue, type EncodeField, type GeoEnvelope, type MediaAttachmentRef } from '@/components/submissions/FieldInput.vue';
+import { announcementFor } from '@/components/submissions/note-content';
 import { resolveCascade, resolveText } from '../lib/schema-mapping';
 import { useAnnouncer, useRuntime } from '../composables/context';
 import type { RenderField } from '../lib/types';
@@ -48,6 +49,9 @@ const encodeField = computed<EncodeField>(() => ({
         label: resolveText(o.label, o.labelTranslations, runtime.locale.value),
     })),
     cascade: resolveCascade(props.field.cascade, runtime.locale.value),
+    // M130 — the author's choice layout and a note's content blocks, as FieldControl carries them.
+    appearance: props.field.appearance,
+    content: props.field.content,
     supported: props.field.supported,
 }));
 
@@ -72,8 +76,10 @@ watch(relevant, (isRelevant, wasRelevant) => {
         }
     } else if (!wasRelevant && isRelevant) {
         // The SCOPED label, so a screen-reader user hears the same question a sighted one reads — and
-        // never a raw `${key}` token, which §3.4 forbids on every surface, this one included.
-        announcer.announce(`New question: ${label.value}`);
+        // never a raw `${key}` token, which §3.4 forbids on every surface, this one included. A note with
+        // content blocks is announced by what it says instead (M130, `D69`).
+        const message = announcementFor(props.field.fieldType, props.field.content, label.value);
+        if (message !== null) announcer.announce(message);
     }
 });
 

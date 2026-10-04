@@ -37,6 +37,10 @@ const FORM = {
     max_responses: null,
     confirmation_message: null,
     confirmation_message_translations: {},
+    redirect_kind: 'none',
+    redirect_form_id: null,
+    redirect_url: null,
+    redirect_targets: [],
     default_locale: 'en',
     supported_locales: ['en'],
 };

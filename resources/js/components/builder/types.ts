@@ -8,7 +8,7 @@
 
 import type { BreadcrumbItem } from '@meridian/design-system';
 
-import type { OcrScanningProps, ShareProps } from '@/components/forms/types';
+import type { OcrScanningProps, RedirectKind, RedirectTargetOption, ShareProps } from '@/components/forms/types';
 
 export type Uid = string;
 
@@ -103,6 +103,9 @@ export interface PaletteType {
     // The palette shows ONE entry per group (its primary) and the Basics tab switches between the members.
     // Optional: a hand-built palette in a test may carry none, and absent reads as ungrouped.
     variant?: PaletteVariant | null;
+    // The layouts an author may choose for this type (M130) — `FieldAppearance::for()` via BuilderPresenter. Empty
+    // for a type with no layout setting; optional for the same reason as `variant`, and absent reads as empty.
+    appearances?: EnumOption[];
 }
 
 export interface PaletteVariant {
@@ -211,6 +214,11 @@ export interface BuilderPageProps {
         // which case the runtime's built-in default stands.
         confirmation_message: string | null;
         confirmation_message_translations: Record<string, string>;
+        // M130 (`D76`) — where a respondent goes after the thank-you screen (FormSettingsForm says the rest).
+        redirect_kind: RedirectKind;
+        redirect_form_id: string | null;
+        redirect_url: string | null;
+        redirect_targets: RedirectTargetOption[];
         default_locale: string;
         supported_locales: string[];
     };

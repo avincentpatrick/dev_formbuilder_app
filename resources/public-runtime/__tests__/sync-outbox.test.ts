@@ -375,3 +375,32 @@ describe('createSyncOutbox — respondent scope (Increment M15)', () => {
         expect(driver.earlierUnsent.value).toBe(0);
     });
 });
+
+describe('registerBackgroundSync — the replay request after a queued submit (M130)', () => {
+    /** A service worker that records what the page asks of it. */
+    function withWorker(online: boolean) {
+        const env = fakeEnv({ online });
+        const postMessage = vi.fn();
+        const register = vi.fn(async () => undefined);
+        Object.assign(env.nav, { serviceWorker: { ready: Promise.resolve({ active: { postMessage }, sync: { register } }) } });
+        return { env, postMessage, register };
+    }
+
+    it('asks the worker to replay at once while online', async () => {
+        const { env, postMessage, register } = withWorker(true);
+        makeDriver(env, okFetch()).registerBackgroundSync();
+
+        await vi.waitFor(() => expect(register).toHaveBeenCalledWith('outbox-sync'));
+        expect(postMessage).toHaveBeenCalledWith('replay-outbox');
+    });
+
+    it('only registers the background sync while offline, so no attempt is spent on a send that must fail', async () => {
+        // The attempt it would spend is what showed "Retrying" to a respondent who had just been told their answers
+        // were saved on the device — the copy a pending row with no attempts carries.
+        const { env, postMessage, register } = withWorker(false);
+        makeDriver(env, okFetch()).registerBackgroundSync();
+
+        await vi.waitFor(() => expect(register).toHaveBeenCalledWith('outbox-sync'));
+        expect(postMessage).not.toHaveBeenCalled();
+    });
+});

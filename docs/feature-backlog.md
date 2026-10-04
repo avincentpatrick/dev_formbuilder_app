@@ -1106,7 +1106,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `:275-282` call site).
   ⚠️ **THE ROWS NAME TWO FOLD SITES AND A SWEEP OF `resources/public-runtime/` FOUND TWELVE** — nine on the
   409 path (`error-normalizer.ts:101` · `RuntimeSession.vue:160/182/354` · `replay.ts:223/291` ·
-  `App.vue:43` · `outbox-status.ts:130` · `outbox.ts:160`) plus three consumers. **Grepping the shape rather
+  `App.vue` · `outbox-status.ts:130` · `outbox.ts:160`) plus three consumers. **Grepping the shape rather
   than trusting the row's count is six-for-six** (M8, M9, M11, M12, M13, M14).
   **As built:** the classifier reads `error.code` on a 409 exactly as it has read it on a 403 since I8b, and
   four causes gained four `ErrorKind`s — `draft_stale`, `conflict`, `uuid_claimed`, `finalized`. `refresh`
@@ -7436,7 +7436,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `app/Services/Submissions/PublicFormPresenter.php:39` — and every assignment in the tree is a seeder or a
   test (`database/seeders/DemoSeeder.php:535`, `database/seeders/E2eSeeder.php` (three fixtures),
   `tests/Feature/Submissions/EncodeStepPayloadTest.php:76`). The sole creation path,
-  `app/Services/Forms/FormService.php:67`, opens a `Form::create([` whose six explicit keys on the lines
+  `app/Services/Forms/FormService.php`, opens a `Form::create([` whose six explicit keys on the lines
   below it omit the column, so every real form takes the database default. No `FormRequest` names it, and
   `resources/js/Pages/forms/` has no toggle. ⚠️ **The sibling establishes this is a gap and not a house
   style**: `save_and_resume` carries a dedicated writer stack —
@@ -7444,10 +7444,10 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `app/Http/Controllers/Tenant/FormSaveResumeController.php`. ⛔ **THE DEFAULT HALF IS NARROWER THAN THE
   SWEEP OFFERED AND WORSE THAN IT LOOKS.** It is not doc-vs-code; it is four documents holding two
   incompatible values. `database/migrations/2026_07_06_000201_create_forms_table.php:46` and
-  `docs/data-dictionary.md:221` say `false`. `docs/ux/form-filling-ux-flow.md:339` calls `true` "the literal
+  `docs/data-dictionary.md:221` say `false`. `docs/ux/form-filling-ux-flow.md` calls `true` "the literal
   default for a new form" and `docs/PRD.md:103` agrees. So repairing one pair does not settle it. ⚠️ The
   cost is already on the record: `PROGRESS_ARCHIVE.md:297` logs an E2E timeout caused by the seeded form
-  defaulting to multi-step. **Live.** Filed by `M80`. **Tier: early-testing.** ⚠️ **`D35` ANSWERED 2026-09-20 (`M105`) — add the setting, default step by step.** ⚠️ **The answer settles the setting, not the documents.** Four of them hold two incompatible defaults — the migration and `docs/data-dictionary.md:221` say `false`; `docs/ux/form-filling-ux-flow.md:339` and `docs/PRD.md:103` say `true` — and whoever takes this row reconciles all four. Measured by `M105`.
+  defaulting to multi-step. **Live.** Filed by `M80`. **Tier: early-testing.** ⚠️ **`D35` ANSWERED 2026-09-20 (`M105`) — add the setting, default step by step.** ⚠️ **The answer settles the setting, not the documents.** Four of them hold two incompatible defaults — the migration and `docs/data-dictionary.md:221` say `false`; `docs/ux/form-filling-ux-flow.md` and `docs/PRD.md:103` say `true` — and whoever takes this row reconciles all four. Measured by `M105`.
   ✅ **CLOSED BY `M120`.** The column has a writer: `UpdatePageModeRequest` + `FormPageModeController` +
   `PATCH /forms/{form}/page-mode` + `FormService::setSinglePageMode`, and a **Pages** section in
   `FormSettingsModal` using `MdsSegmentedControl` so both modes are named and the default is visible.
@@ -7464,7 +7464,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the engine key to force a remount was written down and then discarded as wrong in kind.**
   ⚠️ **THE DOCUMENT HALF WAS NARROWER THAN THIS ROW CLAIMED, AND THE CITATIONS ABOVE NOW DESCRIBE THE
   PRE-`M120` STATE.** The migration and `docs/data-dictionary.md` said `false` and were already right under
-  `D35`; only the two prose sites moved. `docs/ux/form-filling-ux-flow.md:339` and `docs/PRD.md:103` now say
+  `D35`; only the two prose sites moved. `docs/ux/form-filling-ux-flow.md` and `docs/PRD.md:103` now say
   step by step, so the sentences above calling them `true` are a record of what was measured rather than a
   live claim — both edits were **line-count-neutral** precisely so those coordinates still resolve.
   ⚠️ **And one of them disagreed with ITSELF**, which "four documents, two values" could not express: §3.1's
@@ -7499,7 +7499,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `allow_ocr_single` and `allow_ocr_linelist` are equally reader-less. The other four sit ahead of unbuilt
   or held features and `docs/data-dictionary.md:217` carries that rationale explicitly; this one's feature
   is built, which is what makes it filable rather than a ratified absence. (b) The `$fillable` entry is
-  **not** a mass-assignment risk: `app/Services/Forms/FormService.php:67` opens an explicit six-key array,
+  **not** a mass-assignment risk: `app/Services/Forms/FormService.php` opens an explicit six-key array,
   so nothing can set it either. ⚠️ **The remedy is genuinely two-directional** — `docs/PRD.md:252` opens
   Feature #7 and its acceptance criteria never ask for a per-form off switch, so narrowing
   `docs/data-dictionary.md:216` is as defensible as wiring the gate, and the row should be taken with both
@@ -7775,7 +7775,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   named eight limiter sites; the tree actually holds **26** `RateLimiter::for()` registrations across three
   providers — 14 in `app/Providers/AppServiceProvider.php`, 10 in `app/Providers/FortifyServiceProvider.php`
   and one job limiter at `app/Providers/QueueServiceProvider.php:64` that the sweep never named. The
-  representative case is `app/Providers/AppServiceProvider.php:377` (`api`, 600/min); every other
+  representative case is `app/Providers/AppServiceProvider.php`'s `api` limiter (600/min); every other
   registration was read for its per-minute value and none is 300, none is user-keyed at that figure.
   ⚠️ **"The only throttle on an authenticated tenant route" is likewise too strong** —
   `routes/tenant.php`'s `throttle:120,1` was the only *numeric-literal* throttle in the `auth` group (`M128` added `throttle:20,1`),
@@ -11297,11 +11297,11 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `whenIdle()` returns the commit queue, and that queue is built with `.catch(() => undefined)` (`:127`) while
   `guard()` (`:188-201`) swallows a rejection into `save.error` and returns `null`. So `whenIdle()` **resolves on
   failure**, and `Builder.vue:144-148` posts to `/publish` regardless. Because the POST re-renders the page, the
-  `saveError` alert at `ConfigPanel.vue:260` is torn down with the store: the author sees a publish outcome and
+  `saveError` alert at `ConfigPanel.vue` is torn down with the store: the author sees a publish outcome and
   never sees that their last edit did not save. ⚠️ **A second surface is built and unused:** `builderClient.ts:61-72`
   parses the 422 body into an `errors` map, and `useBuilderStore.ts:196-198` keeps only `.message` — a grep finds
   no consumer of `errors` anywhere outside the file that builds it. Per-field save errors are already on the wire
-  and are being discarded. **Live.** Filed by `M110`. **Tier: early-testing.** ✅ **CLOSED BY `M113` (2026-09-26) — AND THE ROW'S PREMISE WAS FALSE IN ITS MOST LOAD-BEARING HALF, WHICH IS THE FINDING OF THIS INCREMENT.** ✅ Every citation held; one is off by one (`:127` is blank, the `.catch(() => undefined)` is at **`:128`**). ⛔ **THE STRUCTURED VIOLATION LIST WAS NEVER ON THE INERTIA WIRE.** The row, and `M112`'s own close-out, both read as though `B1a` had already put it there and only the rendering was left. `M112` rendered it for **`/api/v1/*` only**: `bootstrap/app.php:324` returns `null` for the web arm deliberately — **and it never even gets the chance**, because `FormPublishController.php:32-36` catches `PublishValidationException` *before* the render handler could fire and flashes `getMessage()` alone, with the violations in scope and discarded. **No builder page could render a per-field refusal at any cost.** The controller now flashes it under its own key, and `HandleInertiaRequests` + `inertia.d.ts` carry it. ⚠️ **A NEW KEY, NOT `publishWarnings`:** that payload is `list<string>` prose whose banner is titled *"Published, with …"* — untrue over a refusal — and two existing assertions pin it absent on this path. Modelling the refusal on it would have reproduced the defect being filed, which `M112` warned about in the abstract and is concrete here. ⛔ **THE GUARD CANNOT LIVE IN THE STORE, MEASURED RATHER THAN CHOSEN.** `whenIdle()` resolves on failure by construction — `enqueue()` ends with `queue = run.catch(() => undefined)` — and **two existing Vitest cases await it after a deliberately failed burst** (`save-state.test.ts:277`, `builderClient.test.ts:255-263`), so making it reject turns both into unhandled rejections. The verdict is therefore **read** after the await, in `Builder.vue`. ✅ **And the row's teardown claim is structural, not incidental:** `router.post` passes `preserveScroll` but **no `preserveState`**, so Inertia's non-GET default remounts the page, re-runs `useBuilderStore(props)` and resets the save error. ✅ **`ConfigPanel.vue` was NOT edited** — its alert at `:260` is already correct and already hoisted out of the selection branch; the defect is the remount, so the repair belongs at the call site. That kept this row at **one** hub file. ✅ **The banner copies `builder__warnings` for markup and geometry ONLY**, including the doubled-class specificity fix at `:756-761`, which it now shares. `MdsAlert` renders `role="status"`, so the one-tablist invariant, the thirteen `[role="tab"]` locators and `list-layout`'s three-pane count cannot see it, and **no spec clicks Publish** — `templates-axe.spec.ts:36` only asserts it visible, so the Publish button keeps its plain slot text. ⚠️ **The 422 `errors` map is still unconsumed and is filed as its own row** — it is built at `builderClient.ts:61-72`, typed on `BuilderRequestError:32`, and its only reader anywhere is its own test at `builderClient.test.ts:74`. ✅ **Mutation `m113-violations-not-flashed` CAUGHT** (the controller flashes an empty list — only the two flash cases redden, the success case stays green). ⚠️ **The client guard's control has NO HARNESS LANE and was run by hand, said plainly rather than implied:** `mutate.php` drives Pest only, so the guard was removed from `Builder.vue` with the sha256 recorded before and after and confirmed moved, Vitest run (1 failed / 11 passed — the guard case alone), then restored from a pre-write byte copy with the sha256 confirmed back and `git status` clean.
+  and are being discarded. **Live.** Filed by `M110`. **Tier: early-testing.** ✅ **CLOSED BY `M113` (2026-09-26) — AND THE ROW'S PREMISE WAS FALSE IN ITS MOST LOAD-BEARING HALF, WHICH IS THE FINDING OF THIS INCREMENT.** ✅ Every citation held; one is off by one (`:127` is blank, the `.catch(() => undefined)` is at **`:128`**). ⛔ **THE STRUCTURED VIOLATION LIST WAS NEVER ON THE INERTIA WIRE.** The row, and `M112`'s own close-out, both read as though `B1a` had already put it there and only the rendering was left. `M112` rendered it for **`/api/v1/*` only**: `bootstrap/app.php:324` returns `null` for the web arm deliberately — **and it never even gets the chance**, because `FormPublishController.php:32-36` catches `PublishValidationException` *before* the render handler could fire and flashes `getMessage()` alone, with the violations in scope and discarded. **No builder page could render a per-field refusal at any cost.** The controller now flashes it under its own key, and `HandleInertiaRequests` + `inertia.d.ts` carry it. ⚠️ **A NEW KEY, NOT `publishWarnings`:** that payload is `list<string>` prose whose banner is titled *"Published, with …"* — untrue over a refusal — and two existing assertions pin it absent on this path. Modelling the refusal on it would have reproduced the defect being filed, which `M112` warned about in the abstract and is concrete here. ⛔ **THE GUARD CANNOT LIVE IN THE STORE, MEASURED RATHER THAN CHOSEN.** `whenIdle()` resolves on failure by construction — `enqueue()` ends with `queue = run.catch(() => undefined)` — and **two existing Vitest cases await it after a deliberately failed burst** (`save-state.test.ts`, `builderClient.test.ts:255-263`), so making it reject turns both into unhandled rejections. The verdict is therefore **read** after the await, in `Builder.vue`. ✅ **And the row's teardown claim is structural, not incidental:** `router.post` passes `preserveScroll` but **no `preserveState`**, so Inertia's non-GET default remounts the page, re-runs `useBuilderStore(props)` and resets the save error. ✅ **`ConfigPanel.vue` was NOT edited** — its alert at `:260` is already correct and already hoisted out of the selection branch; the defect is the remount, so the repair belongs at the call site. That kept this row at **one** hub file. ✅ **The banner copies `builder__warnings` for markup and geometry ONLY**, including the doubled-class specificity fix at `:756-761`, which it now shares. `MdsAlert` renders `role="status"`, so the one-tablist invariant, the thirteen `[role="tab"]` locators and `list-layout`'s three-pane count cannot see it, and **no spec clicks Publish** — `templates-axe.spec.ts:36` only asserts it visible, so the Publish button keeps its plain slot text. ⚠️ **The 422 `errors` map is still unconsumed and is filed as its own row** — it is built at `builderClient.ts:61-72`, typed on `BuilderRequestError:32`, and its only reader anywhere is its own test at `builderClient.test.ts:74`. ✅ **Mutation `m113-violations-not-flashed` CAUGHT** (the controller flashes an empty list — only the two flash cases redden, the success case stays green). ⚠️ **The client guard's control has NO HARNESS LANE and was run by hand, said plainly rather than implied:** `mutate.php` drives Pest only, so the guard was removed from `Builder.vue` with the sha256 recorded before and after and confirmed moved, Vitest run (1 failed / 11 passed — the guard case alone), then restored from a pre-write byte copy with the sha256 confirmed back and `git status` clean.
 
 - ✅ **CLOSED BY `M112` (2026-09-26) — `minor` · Per-type knowledge — which validation rules apply to which field type, and what a new field of each
   type should already validate — exists nowhere in the system.** Filed 2026-09-25 by `M110`, from the report
@@ -11546,7 +11546,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   form renders.** Filed 2026-09-25 by `M110`, answering the report *"can you also clarify to me what the
   appearance hint do?"* — measured answer: at render time, nothing. `ConfigPanel.vue:433-439` writes
   `form_fields.appearance` as unguided free text with no help and no vocabulary; `public-runtime/lib/types.ts:67`
-  declares it on the render model and `toRenderField()` (`schema-mapping.ts:451-479`) never reads it, so it
+  declares it on the render model and `toRenderField()` (in `schema-mapping.ts`) never reads it, so it
   reaches neither `FieldRow.vue` nor `FieldControl.vue` nor the encode channel. An author who types `vertical` or
   `minimal` sees no effect anywhere. ⛔ **BUT IT IS NOT DEAD WEIGHT AND MUST NOT SIMPLY BE DELETED.** It is
   load-bearing for XLSForm interop in **both** directions: `XlsformTypeMap.php:50,52,69,87,92` forces appearances
@@ -11559,12 +11559,12 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - **`minor` · No renderer honours a per-field layout hint, so a typed appearance vocabulary would have an author
   surface and no effect.** Filed 2026-09-25 by `M110` as the second half of the appearance work, split because it
-  lands in a different hub file and after the vocabulary exists. `toRenderField()` (`schema-mapping.ts:451-479`)
-  builds the render model without reading `appearance`, and both control switches — `schema-mapping.ts:78-118`
-  and the independent copy at `FieldInput.vue:205-250` — dispatch on field type alone. ⚠️ **Two switches, not
+  lands in a different hub file and after the vocabulary exists. `toRenderField()` (in `schema-mapping.ts`)
+  builds the render model without reading `appearance`, and both control switches — `controlFor()` in `schema-mapping.ts`
+  and the independent copy, `FieldInput.vue`'s `control` computed — dispatch on field type alone. ⚠️ **Two switches, not
   one**, and neither has a parity test today, so a layout branch added to one and forgotten in the other would
   give the guest runtime and the encode page different forms. That is the same class of drift the client-mirror
-  census exists to catch, and it should land first. **Live.** Filed by `M110`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-03 by `M127`: it is one of the user's 19 builder comments, wanted for the Oct 12 testing (`D72`).** ⚠️ **VERIFIED BY `M130` (2026-10-04), TAKEN — THE "TWO SWITCHES" PREMISE IS FALSE.** `controlFor()` (`schema-mapping.ts:78-122`) fills `RenderField.control`, which no production code reads; every channel renders through `FieldInput.vue`'s own `control`. What can drift is the three adapters that build the field `FieldInput` receives — `EncodeFormPresenter::field()`, `FieldControl.vue` and `InstanceField.vue` — so the parity gate that lands first is a census of those three, and the unread switch is deleted rather than pinned. One branch was already pinned, against this row's "neither has a parity test": `FieldTypeMirrorDriftTest`'s text-type arm. Single choice and Dropdown rendered the same native select in every channel; `D77` makes a single choice round buttons.
+  census exists to catch, and it should land first. **Live.** Filed by `M110`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-03 by `M127`: it is one of the user's 19 builder comments, wanted for the Oct 12 testing (`D72`).** ⚠️ **VERIFIED BY `M130` (2026-10-04), TAKEN — THE "TWO SWITCHES" PREMISE IS FALSE.** `controlFor()` in `schema-mapping.ts` filled `RenderField.control`, which no production code reads; every channel renders through `FieldInput.vue`'s own `control`. What can drift is the three adapters that build the field `FieldInput` receives — `EncodeFormPresenter::field()`, `FieldControl.vue` and `InstanceField.vue` — so the parity gate that lands first is a census of those three, and the unread switch is deleted rather than pinned. One branch was already pinned, against this row's "neither has a parity test": `FieldTypeMirrorDriftTest`'s text-type arm. Single choice and Dropdown rendered the same native select in every channel; `D77` makes a single choice round buttons.
 
 - ✅ **CLOSED BY `M129` (2026-10-04) — `minor` · A form can hold no author-composed content — no welcome page, no instructions, no image, no
   divider — because `note` renders one line of plain text and has no config editor.** Filed 2026-09-25 by `M110`,
@@ -11594,7 +11594,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   surface rather than the repository. Once authors can compose content, a census over all of `resources/` is what
   keeps a well-meaning future edit from turning a block renderer into a sink. ⚠️ **A gate written here proves
   nothing while green** — it needs a committed mutation that adds a `v-html` and turns it red. **Live.**
-  Filed by `M110`. **Tier: early-testing.** ⚠️ **NOT BUILDABLE BEFORE `R-6dedc3a9` FIXES THE BLOCK SHAPE — recorded by `M121`, 2026-10-01.** It reads `ready` because the line cannot express that ordering (filed below). ⚠️ **The render path is wider than this row says:** `EncodeFormPresenter::field()` carries no config at all, and `InstanceField.vue` builds its own `encodeField` for repeat instances (reached from the builder preview through `RepeatGroup`), so the honest file list is six — three of them census hubs (`FieldInput.vue`, `FieldControl.vue`, `schema-mapping.ts`). It needs its own split. ✅ **`D69` ANSWERED 2026-10-01 (`M122`) — B: once a note has blocks, its label is for the author only** — it names the note in the canvas, the logic rail and the PDF, and the respondent sees the blocks alone. ⛔ **STILL NOT BUILDABLE BEFORE `R-6dedc3a9`** (the block shape this renders), whatever the line now says: it has no grammar for one row waiting on another's code (`R-6175d935`). ✅ **`M125` (2026-10-02) shipped the block shape this renders** (`R-6dedc3a9`'s shape half), so the precondition above now holds. ⚠️ Two facts the renderer inherits: span text may arrive `null` (`ConvertEmptyStringsToNull`), and the render-time link re-check is a TypeScript twin of `ContentBlocks::linkIsSafe()` — which wants a drift test, or it is one more unguarded mirror. ⚠️ **`M129` (2026-10-03) hands this row two pieces of `R-f0c5b682`, because this row is their only consumer.** (1) The GUEST read route for a content-block image: publicly readable for a published form, gated on `ScanStatus::servable()` (an unservable image renders as its alt text), and same-origin with the guest page, whose CSP is `img-src 'self'`. (2) The service worker's caching of those images: `sw.ts`'s network-first `guest-schema` cache holds 20 entries under `/api/v1/public/f/`, so an image routed there would evict a cached schema. It also inherits two things from `M129`'s editor: the Content tab's "respondents do not see this yet" notice, which this row removes, and the shared link-vector fixture that `linkLooksSafe()` and `linkIsSafe()` both read — the drift test asked for above. ⚠️ **VERIFIED BY `M130` (2026-10-04), TAKEN.** `components.test.ts:549` is a comment, not a check, and the only `v-html` assertion pins one file (`ContentBlocksEditor.test.ts:58-66`), so the census covers `resources/` and `packages/design-system/src`, which the guest bundle also ships. Five of the six render files are hubs now, not three. The encode page already receives `config.content` inside `version.schema`; it simply never reached `FieldInput`. The guest image route goes OUTSIDE `/api/v1/public/f/` and on its own limiter: under that prefix the schema cache would claim it and `ServiceWorkerCachePrefixRouteTest` refuses it, and on `throttle:guest` a note's 50 images would spend the per-token submit budget. Its offline cache key drops the share token, which is minted on every visit and lives 24 hours. The author-only label still reached screen readers through the "New question" announcement (`FieldRow.vue:61`, `InstanceField.vue:76`). `MdsAlert` is a live status region, so a static `MdsCallout` joins the design system rather than a local exception.
+  Filed by `M110`. **Tier: early-testing.** ⚠️ **NOT BUILDABLE BEFORE `R-6dedc3a9` FIXES THE BLOCK SHAPE — recorded by `M121`, 2026-10-01.** It reads `ready` because the line cannot express that ordering (filed below). ⚠️ **The render path is wider than this row says:** `EncodeFormPresenter::field()` carries no config at all, and `InstanceField.vue` builds its own `encodeField` for repeat instances (reached from the builder preview through `RepeatGroup`), so the honest file list is six — three of them census hubs (`FieldInput.vue`, `FieldControl.vue`, `schema-mapping.ts`). It needs its own split. ✅ **`D69` ANSWERED 2026-10-01 (`M122`) — B: once a note has blocks, its label is for the author only** — it names the note in the canvas, the logic rail and the PDF, and the respondent sees the blocks alone. ⛔ **STILL NOT BUILDABLE BEFORE `R-6dedc3a9`** (the block shape this renders), whatever the line now says: it has no grammar for one row waiting on another's code (`R-6175d935`). ✅ **`M125` (2026-10-02) shipped the block shape this renders** (`R-6dedc3a9`'s shape half), so the precondition above now holds. ⚠️ Two facts the renderer inherits: span text may arrive `null` (`ConvertEmptyStringsToNull`), and the render-time link re-check is a TypeScript twin of `ContentBlocks::linkIsSafe()` — which wants a drift test, or it is one more unguarded mirror. ⚠️ **`M129` (2026-10-03) hands this row two pieces of `R-f0c5b682`, because this row is their only consumer.** (1) The GUEST read route for a content-block image: publicly readable for a published form, gated on `ScanStatus::servable()` (an unservable image renders as its alt text), and same-origin with the guest page, whose CSP is `img-src 'self'`. (2) The service worker's caching of those images: `sw.ts`'s network-first `guest-schema` cache holds 20 entries under `/api/v1/public/f/`, so an image routed there would evict a cached schema. It also inherits two things from `M129`'s editor: the Content tab's "respondents do not see this yet" notice, which this row removes, and the shared link-vector fixture that `linkLooksSafe()` and `linkIsSafe()` both read — the drift test asked for above. ⚠️ **VERIFIED BY `M130` (2026-10-04), TAKEN.** `components.test.ts:549` is a comment, not a check, and the only `v-html` assertion pins one file (`ContentBlocksEditor.test.ts`), so the census covers `resources/` and `packages/design-system/src`, which the guest bundle also ships. Five of the six render files are hubs now, not three. The encode page already receives `config.content` inside `version.schema`; it simply never reached `FieldInput`. The guest image route goes OUTSIDE `/api/v1/public/f/` and on its own limiter: under that prefix the schema cache would claim it and `ServiceWorkerCachePrefixRouteTest` refuses it, and on `throttle:guest` a note's 50 images would spend the per-token submit budget. Its offline cache key drops the share token, which is minted on every visit and lives 24 hours. The author-only label still reached screen readers through the "New question" announcement (`FieldRow.vue:61`, `InstanceField.vue:76`). `MdsAlert` is a live status region, so a static `MdsCallout` joins the design system rather than a local exception.
 
 - ✅ **CLOSED BY `M129` (2026-10-04) — `minor` · A content-block image has nowhere to live, and the surfaces that must escape block text are not in
   the output-encoding contract.** Filed 2026-09-25 by `M110` as the third and last content-block row, split off
@@ -11746,14 +11746,14 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   which must not become a seventh. The PHP `FieldType` enum is authoritative and the builder palette is fully
   server-driven — but the **renderers** carry six hand-written mirrors: `schema-mapping.ts:48-59` (`SUPPORTED`,
   whose own comment admits it mirrors `EncodeFormPresenter::SUPPORTED`), `:72` (`HAS_OPTIONS`), `:75`
-  (`TEXT_TYPES`), `FieldInput.vue:198` (`MEDIA_TYPES`) and `ConfigPanel.vue:178` (`NUMERIC_TYPES`). ✅ **Only
+  (`TEXT_TYPES`), `FieldInput.vue` (`MEDIA_TYPES`) and `ConfigPanel.vue:178` (`NUMERIC_TYPES`). ✅ **Only
   `field-roles.ts`'s `RENDERS_NOTHING` is pinned**, by `tests/Unit/Forms/PdfFieldRoleTest.php`, which regex-parses
   the TypeScript from PHP and asserts set equality — so the instrument already exists in this repository and needs
   copying, not inventing. ⚠️ **`EncodeFormPresenter`'s own docblock (`:64-72`) admits the duplication and records
   that collapsing it was deliberately declined** — which makes a parity test the right answer rather than a
   refactor: it converts five unguarded mirrors into guarded ones **without deleting any of them**. ⚠️ A gate
   written here is green on arrival and therefore proves nothing until a committed mutation — removing one type
-  from one mirror — turns it red. **Live.** Filed by `M110`. **Tier: early-testing.** ✅ **CLOSED BY `M113` (2026-09-26) — AS A PROVEN STRICT SUBSET OF `R-09f73330`, NOT WORKED SEPARATELY.** ✅ Its citations hold, with two off-by-N: `HAS_OPTIONS` is declared at `schema-mapping.ts:73`, not `:72` (`:72` is the comment), and the `EncodeFormPresenter` docblock admission runs `:64-69`, not `:64-72`. ⛔ **ALL FIVE GAPS IT NAMES APPEAR IN `R-09f73330` VERBATIM, AT THE SAME FILE AND LINE** — `schema-mapping.ts:48`/`:73`/`:75`, `FieldInput.vue:198` and `ConfigPanel.vue:178` — and it names **no** declaration that row does not. (It also cites `field-roles.ts`'s `RENDERS_NOTHING`, but as already-gated *evidence*, not as a gap.) So the single gate written for `R-09f73330` necessarily closes this one too, and **working both would have collided on three production files** under `D13` clause 1. ⚠️ **Its *"six copies, five ungated"* is a FLOOR:** there are **ten** ungated declarations by declaration count, and an eleventh that was already gated. ⚠️ **And its supporting citation is mis-aimed, though its conclusion survives:** `EncodeFormPresenter`'s docblock at `:64-69` declines collapsing the *builder functions*, not the `SUPPORTED` constant — the admission that actually supports the row is on the TypeScript side, at `schema-mapping.ts:46`. ⚠️ **Its *"the instrument exists and needs copying"* is now UNDERSTATED:** the technique has been copied three further times since it was filed — `DraftProjectionMirrorDriftTest`, `DocumentedEnumMirrorDriftTest` (a table-driven generalisation over three grammars) and the `NotificationType`/`ShellAbility` parity tests.
+  from one mirror — turns it red. **Live.** Filed by `M110`. **Tier: early-testing.** ✅ **CLOSED BY `M113` (2026-09-26) — AS A PROVEN STRICT SUBSET OF `R-09f73330`, NOT WORKED SEPARATELY.** ✅ Its citations hold, with two off-by-N: `HAS_OPTIONS` is declared at `schema-mapping.ts:73`, not `:72` (`:72` is the comment), and the `EncodeFormPresenter` docblock admission runs `:64-69`, not `:64-72`. ⛔ **ALL FIVE GAPS IT NAMES APPEAR IN `R-09f73330` VERBATIM, AT THE SAME FILE AND LINE** — `schema-mapping.ts:48`/`:73`/`:75`, `FieldInput.vue`'s `MEDIA_TYPES` and `ConfigPanel.vue:178` — and it names **no** declaration that row does not. (It also cites `field-roles.ts`'s `RENDERS_NOTHING`, but as already-gated *evidence*, not as a gap.) So the single gate written for `R-09f73330` necessarily closes this one too, and **working both would have collided on three production files** under `D13` clause 1. ⚠️ **Its *"six copies, five ungated"* is a FLOOR:** there are **ten** ungated declarations by declaration count, and an eleventh that was already gated. ⚠️ **And its supporting citation is mis-aimed, though its conclusion survives:** `EncodeFormPresenter`'s docblock at `:64-69` declines collapsing the *builder functions*, not the `SUPPORTED` constant — the admission that actually supports the row is on the TypeScript side, at `schema-mapping.ts:46`. ⚠️ **Its *"the instrument exists and needs copying"* is now UNDERSTATED:** the technique has been copied three further times since it was filed — `DraftProjectionMirrorDriftTest`, `DocumentedEnumMirrorDriftTest` (a table-driven generalisation over three grammars) and the `NotificationType`/`ShellAbility` parity tests.
 
 - **`minor` · Three more request paths prune an array key by the same mechanism `B0` just fixed, and one of
   them may be doing it on purpose.** Found by `M111` (2026-09-25) while sweeping for the CLASS behind
@@ -11813,7 +11813,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   for says "five", counted by file. By declaration there are ten: `schema-mapping.ts:48-61` `SUPPORTED`, `:73`
   `HAS_OPTIONS`, `:75` `TEXT_TYPES`; `display-value.ts:44` `HAS_OPTIONS` (a second copy), `:47` `GEO_TYPES`,
   `:55` `MEDIA_TYPES`; `semantic-validator.ts:32` `MEDIA_FIELD_TYPES` (a third copy of the media set);
-  `FieldInput.vue:198` `MEDIA_TYPES` (a fourth) and `:237` an inline text-type literal (a second `TEXT_TYPES`);
+  `FieldInput.vue`'s `MEDIA_TYPES` (a fourth) and its inline text-type literal (a second `TEXT_TYPES`);
   and `ConfigPanel.vue:178` `NUMERIC_TYPES`. ⛔ **`TEXT_TYPES` and `NUMERIC_TYPES` MIRROR NOTHING** — there is no
   PHP predicate or registry either one corresponds to, so they cannot drift from a source; they ARE a source, and
   an undeclared one. ✅ **The technique is proven and is now used twice:** `tests/Unit/Forms/PdfFieldRoleTest.php`
@@ -11901,7 +11901,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   rewrite:** it is already correct, already typed and already on the error object, so this is a consumption
   row and touches no producer. ⚠️ **It wants the field marked inline, not another banner.** `M113` gave the
   page a publish-refusal banner; a save failure is a different event with a different owner — it belongs on
-  the offending row in the config panel, beside the existing `saveError` alert at `ConfigPanel.vue:260`, which
+  the offending row in the config panel, beside the existing `saveError` alert at `ConfigPanel.vue`, which
   is the one surface the store's verdict already drives. ⚠️ **Widening `save.error` from `string|null` is the
   likely first step** (`useBuilderStore.ts`'s `guard()` keeps only `.message`), and
   `ConfigPanel.test.ts:110-124`'s hand-rolled store double must gain any new member or the mount throws.
@@ -12434,7 +12434,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - **`nit` · The builder's draft projection checks a calculated question's formula under a key nothing writes, so its
   "no formula yet" issue fires for every calculated question and a blank formula reaches the preview engine.** Measured
   by `M122` while closing `R-244d53dc`. `draft-snapshot.ts`'s state 7 reads `config.formula` (`:248-251`), but the
-  builder writes `config.calculated_formula` (`ConfigPanel.vue:162`, `:393`) and nothing maps one to the other — so the
+  builder writes `config.calculated_formula` (`ConfigPanel.vue`) and nothing maps one to the other — so the
   guard's `delete` never removes a blank formula, and `missing_formula` is recorded for every calculated question,
   formula or not. `draft-snapshot.test.ts:166-174` pins the wrong key, which is why it is green. ⚠️ **Invisible today:**
   an issue renders only beside its field's own control (`PreviewRuntime.vue:161`), a calculated question renders nothing
@@ -12754,7 +12754,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   reconnected before anything is delivered". CI seeds a fresh database for every run, so neither fails there, and a
   local failure of either reads like a real regression. The remedy is to make each scan reach its row directly (a
   filter on the audit event, a fixture connection that cannot lapse), or to say in the spec that both need a fresh
-  seed. **Live.** Filed by `M128`. **Tier: during-testing.**
+  seed. **Live.** Filed by `M128`. **Tier: during-testing.** ⚠️ **`M130` (2026-10-04) FIXED THE AUDIT HALF, AFTER IT WENT RED IN CI TOO** — so "neither fails there" no longer held: the increment's seeded forms and new guest submissions pushed the seeded `permission_changed` rows off page one by the time CI's last project ran. The scan now opens `/audit-log?event=permission_changed` and passes on every viewport, here and against a long-lived database. **The drift half remains.**
 
 - **`nit` · The printed blank form says "Scans of this form can be read automatically" even when the form does not
   accept scans.** Found by `M129` while adding the accept-scans setting. The footer of
@@ -12930,3 +12930,45 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   no `lang` of its own (WCAG 3.1.1, 3.1.2). Reachable only once a form has a second language, which nothing in the
   product can give it yet (`forms.supported_locales` has no writer). **Latent.**
   Filed by `M130`. **Tier: during-testing.**
+
+- **`minor` · A note's content headings skip a level when the note sits in a block that has no heading.** Found by
+  `M130` while building `R-c9f50df2`. `NoteContent.vue` places a content heading one or two levels under the
+  heading its surface gives it (`ContentHeadingBaseKey`: 2 on the guest and encode pages, 3 in the builder
+  preview), and each surface leaves the section heading out when a block has no title — the guest page's block
+  of section-less questions (`SectionView.vue`), the encode page's untitled block (`Encode.vue`) and the
+  preview's (`PreviewRuntime.vue`). A note there puts an `h3` straight under the page's `h1`. An XLSForm import
+  leaves top-level questions in no section (`XlsformImporter`), so an author who adds a heading to an imported
+  note reaches it. The base belongs to whatever renders, or leaves out, the section heading. **Latent.**
+  Filed by `M130`. **Tier: during-testing.**
+
+- **`major` · An archived form keeps collecting responses through its public link while the forms list hides it.**
+  Found by `M130` while verifying `R-db169c29`. `FormService::archive()` discards the draft and leaves
+  `allow_guest_submissions` and `current_published_version_id` as they were
+  (`docs/form-versioning-schema-migration.md` §9 keeps the published version "addressable for historical
+  reporting"), and neither `GuestFormController::mint()` nor `GuestSubmissionController::store()` reads the
+  form's status, so `/f/{slug}` still mints, renders and accepts. Meanwhile `FormPresenter` leaves archived
+  forms out of the list, so responses arrive on a form its author can no longer find. Either archiving closes
+  the link (and the guest routes refuse an archived form with the 404 they give a disabled one), or the list
+  shows archived forms that still collect. **Live.** Filed by `M130`. **Tier: during-testing.**
+
+- **`minor` · An offline submit shows "Retrying" at once, because the page asks the service worker to send while
+  the device is known to be offline.** Found by `M130` in its own E2E run: `public-runtime-offline.spec.ts`'s
+  offline-submit case failed in 4 of 21 runs on M130's front-end and 0 of 12 on the one before it.
+  `RuntimeSession`'s offline arm calls `registerBackgroundSync()`, which registers the Background Sync tag AND posts
+  `replay-outbox` to the worker; the worker's pass fails offline, `attempts` becomes 1, and the row the respondent
+  was just told is saved reads "Retrying — Couldn't send yet" (`outbox-status.ts`) with a Retry button that cannot
+  work. The race is older than M130; the heavier page only widened it. **Live.** Filed by `M130`.
+  **Tier: during-testing.**
+
+- **`minor` · The single-response-only form that `docs/ux/form-filling-ux-flow.md` §9 specifies is not built: every guest
+  confirmation offers "Submit another response".** Found by `M130` while verifying `R-db169c29`. The §9 table makes the
+  option tenant-configurable ("submit another" vs. a single-response-only form); `ConfirmationScreen.vue` always shows the
+  button and no setting exists. A form meant to be answered once per respondent therefore invites a second response.
+  **Not live**. Filed by `M130`. **Tier: before-launch.**
+
+- **`minor` · `openapi.json` documents the guest submit's success as a bare string, so its body — `id`, `reference`,
+  `status` and, since M130, `redirect` — is in no contract.** Found by `M130` while regenerating the document for
+  `R-db169c29`. `GuestSubmissionController::store()` answers `201` or `200` from one expression, and Scramble documents
+  that as `200: {type: string}`; adding `redirect` changed nothing in the export. A client generated from the contract
+  cannot read the reference or the destination. An explicit response annotation fixes it. **Live.** Filed by `M130`.
+  **Tier: during-testing.**

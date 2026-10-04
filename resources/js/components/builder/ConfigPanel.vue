@@ -98,12 +98,15 @@ const configEditorByType = new Map<string, string | null>();
 // M115 — `ValueShape::for()`'s answer per field type, arriving on the palette entry beside the three facts
 // already harvested here. It decides what the Validation tab may offer and whether that tab exists at all.
 const shapeByType = new Map<string, string>();
+// M130 (`R-6c76bed2`) — the layouts an author may choose per type, `FieldAppearance::for()` transmitted on the palette.
+const layoutsByType = new Map<string, EnumOption[]>();
 props.store.palette.forEach((group) =>
     group.types.forEach((type) => {
         if (type.has_options) optionTypes.add(type.value);
         if (type.advanced) advancedTypes.add(type.value);
         configEditorByType.set(type.value, type.config_editor);
         shapeByType.set(type.value, type.value_shape);
+        layoutsByType.set(type.value, type.appearances ?? []);
     }),
 );
 
@@ -112,6 +115,9 @@ const SHAPE_NO_ANSWER = 'no_answer';
 
 /** `RequiredMode::Conditional`. `ServerField.is_required` is a bare string here, so the literal needs a home. */
 const REQUIRED_MODE_CONDITIONAL = 'conditional';
+
+/** M130 (`D69`): once a note has content blocks, respondents see those instead, and the label is the author's alone. */
+const NOTE_LABEL_HELP = 'Respondents see this label only while the note has no content. Once it has content, the label names the note here and in the PDF.';
 
 const requiredOptions = enums.required_modes;
 const sectionOptions = computed<EnumOption[]>(() => [
@@ -166,6 +172,19 @@ watch(tabs, (list) => {
     if (!list.some((t) => t.key === activeTab.value)) activeTab.value = list[0]?.key ?? 'basics';
 });
 
+// M130 (`R-6c76bed2`): the free-text "Appearance hint" became a choice of layouts. A stored value outside the
+// type's list — an XLSForm import's `likert`, or a layout kept through a type change — is shown as it is and
+// may be kept or replaced, never edited, because the save request accepts it only unchanged.
+const layoutOptions = computed<EnumOption[]>(() => (field.value ? layoutsByType.get(field.value.field_type) ?? [] : []));
+const keptAppearance = computed<string | null>(() => {
+    const stored = field.value?.appearance ?? null;
+    return stored === null || stored === '' || layoutOptions.value.some((option) => option.value === stored) ? null : stored;
+});
+const layoutSelectOptions = computed<EnumOption[]>(() => [
+    { value: '', label: 'One per line (default)' },
+    ...layoutOptions.value,
+    ...(keptAppearance.value !== null ? [{ value: keptAppearance.value, label: `Kept from an earlier setting or an import: ${keptAppearance.value}` }] : []),
+]);
 const advanced = computed(() => (field.value ? advancedTypes.has(field.value.field_type) : false));
 const isCalculated = computed(() => field.value?.field_type === 'calculated');
 const calculatedFormula = computed<string>(() => (field.value?.config.calculated_formula as string | undefined) ?? '');
@@ -408,7 +427,7 @@ watch(librarySaved, (value) => {
 
                     <template v-if="activeTab === 'basics'">
                         <FieldTypeControl :store="store" />
-                        <MdsFormField label="Label" :error="fieldSaveErrors.inline.label" v-slot="{ id, describedby, invalid }">
+                        <MdsFormField label="Label" :help="field.field_type === 'note' ? NOTE_LABEL_HELP : undefined" :error="fieldSaveErrors.inline.label" v-slot="{ id, describedby, invalid }">
                             <MdsTextInput :id="id" :describedby="describedby" :invalid="invalid" :model-value="field.label" @update:model-value="setField('label', $event)" />
                         </MdsFormField>
                         <MdsFormField
@@ -470,6 +489,20 @@ watch(librarySaved, (value) => {
 
                     <template v-else-if="activeTab === 'options'">
                         <ChoicesEditor :options="choices" @update:options="setConfig('options', $event)" />
+                        <MdsFormField
+                            v-if="layoutOptions.length > 0"
+                            label="Choice layout"
+                            help="How the choices are arranged on the form. Side by side and in columns suit short choices."
+                            :error="fieldSaveErrors.inline.appearance"
+                            v-slot="{ id, describedby, invalid }"
+                        >
+                            <MdsSelect
+                                :id="id" :describedby="describedby" :invalid="invalid"
+                                :model-value="field.appearance ?? ''"
+                                :options="layoutSelectOptions"
+                                @update:model-value="setField('appearance', $event || null)"
+                            />
+                        </MdsFormField>
                     </template>
 
                     <template v-else-if="activeTab === 'cascading'">
@@ -582,13 +615,13 @@ watch(librarySaved, (value) => {
                             legend="Show this question only when…"
                             @update:expression="setField('relevant_expression', $event)"
                         />
-                        <MdsFormField label="Appearance hint" :error="fieldSaveErrors.inline.appearance" v-slot="{ id, describedby, invalid }">
-                            <MdsTextInput
-                                :id="id" :describedby="describedby" :invalid="invalid"
-                                :model-value="field.appearance ?? ''"
-                                @update:model-value="setField('appearance', $event || null)"
-                            />
-                        </MdsFormField>
+                        <div v-if="layoutOptions.length === 0 && keptAppearance !== null" class="config__kept" data-kept-appearance>
+                            <p class="config__kept-text">
+                                Appearance <code>{{ keptAppearance }}</code> is kept from an earlier setting or an import. It
+                                goes back out in XLSForm exports and does not change how this form looks.
+                            </p>
+                            <MdsButton size="sm" variant="secondary" @click="setField('appearance', null)">Remove appearance</MdsButton>
+                        </div>
                         <MdsFormField label="Default value" :error="fieldSaveErrors.inline.default_value" v-slot="{ id, describedby, invalid }">
                             <MdsTextInput
                                 :id="id" :describedby="describedby" :invalid="invalid"
@@ -846,5 +879,23 @@ watch(librarySaved, (value) => {
 
 .config__error ul {
     padding-left: var(--mds-space-4);
+}
+
+/* M130 (`R-6c76bed2`): an appearance the type has no layout setting for, shown as kept rather than editable.
+   `text-secondary` for the same reason `.config__when-note` gives; the column is `overflow-y: auto`, so the
+   value wraps rather than pushing a horizontal scrollbar. */
+.config__kept {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--mds-space-2);
+    min-width: 0;
+}
+
+.config__kept-text {
+    margin: 0;
+    color: var(--mds-color-text-secondary);
+    font-size: var(--mds-type-body-sm-font-size);
+    overflow-wrap: anywhere;
 }
 </style>

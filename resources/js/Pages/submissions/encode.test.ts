@@ -602,6 +602,36 @@ describe('encode page — the server error summary', () => {
         wrapper.unmount();
     });
 
+    it('lands on the chosen round button of an answered single choice, as Tab would (M130)', async () => {
+        // `D77` made a single choice a group of radios; the first focusable in its anchor is the FIRST radio,
+        // which is not where the answer is. The jump prefers `input:checked`, as `SummaryBanner.vue` does.
+        mocks.pageProps.errors = { 'answers.colour': 'Choose a colour this clinic stocks.' };
+        const options = [
+            { value: 'red', label: 'Red' },
+            { value: 'blue', label: 'Blue' },
+        ];
+        const wrapper = mount(Encode, {
+            props: payload({
+                fields: [field({ key: 'colour', label: 'Favourite colour', field_type: 'single_select', sequence: 1, config: { options } })],
+                blocks: [{ key: null, label: null, fields: [{ ...blockField({ key: 'colour', field_type: 'single_select', label: 'Favourite colour' }), options }] }],
+                singlePage: true,
+                editing: { id: 'sub-1', answers: { colour: 'blue' }, status: 'submitted', baseline: 'checksum-baseline-1', demotes_on_save: false },
+                update_url: '/submissions/sub-1/answers',
+                draft_url: null,
+            }) as never,
+            attachTo: document.body,
+        });
+
+        await wrapper.findAll('button').find((b) => b.text().trim() === 'Favourite colour')!.trigger('click');
+        await nextTick();
+
+        const focused = document.activeElement as HTMLInputElement | null;
+        expect(focused?.type).toBe('radio');
+        expect(focused?.value).toBe('blue');
+
+        wrapper.unmount();
+    });
+
     it('says nothing when the pipeline raised nothing', async () => {
         const wrapper = mountEncode(routerPayload({ singlePage: false }));
         await typeInto(wrapper, 'Role', 'staff');
@@ -1226,5 +1256,34 @@ describe('encode page — Submit does not race its own draft channel (M68)', () 
         await nextTick();
 
         expect(draftWrites()).toHaveLength(1);
+    });
+});
+
+describe('encode page — a note with content blocks (M130, `R-c9f50df2`)', () => {
+    it('shows the keyer what a respondent sees, under the section heading, and never the note’s label', () => {
+        const content = [
+            { type: 'heading', level: 1, text: 'Consent' },
+            { type: 'paragraph', spans: [{ text: 'Read this aloud before you begin.' }] },
+        ];
+        const wrapper = mountEncode(
+            payload({
+                sections: [section({ key: 's1', label: 'Before you begin', sequence: 1 })],
+                fields: [field({ key: 'intro', label: 'Intro (for the team)', field_type: 'note', section_key: 's1', sequence: 1, config: { content } })],
+                blocks: [
+                    {
+                        key: 's1',
+                        label: 'Before you begin',
+                        fields: [{ ...blockField({ key: 'intro', field_type: 'note', label: 'Intro (for the team)' }), content, supported: false }],
+                    },
+                ],
+                singlePage: true,
+            }),
+        );
+
+        // The page titles the block with an h2, so the note's major heading is an h3.
+        expect(wrapper.find('h2.encode__block-title').text()).toBe('Before you begin');
+        expect(wrapper.find('[data-note-content] h3').text()).toBe('Consent');
+        expect(wrapper.text()).toContain('Read this aloud before you begin.');
+        expect(wrapper.text()).not.toContain('Intro (for the team)');
     });
 });

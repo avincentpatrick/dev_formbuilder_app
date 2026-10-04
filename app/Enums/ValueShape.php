@@ -28,7 +28,7 @@ use App\Services\Forms\StructuralValidationGate;
  * ⚠️ THIS IS THE SEVENTH PARTITION OF THESE SAME THIRTY-ONE CASES, AND SAYING SO IS THE POINT.
  * {@see AnswerEnvelope} partitions the stored answer's container; {@see FieldCategory} groups the
  * palette; {@see IndexedDataType} types the projected index column; {@see AnalyticsFieldEligibility},
- * {@see PrintAnswerArea} and the TypeScript `ControlKind` each partition for their own surface. None of
+ * {@see PrintAnswerArea} and `FieldInput.vue`'s `control` computed each partition for their own surface. None of
  * them answers "what may be asserted about this value", which is why this one exists — but a reader
  * reaching for an eighth should check those six first.
  *

@@ -157,27 +157,6 @@ export interface MintResponse {
 
 // ── 2. RENDER ────────────────────────────────────────────────────────────────────────────────
 
-/** The control kinds the reused F4b `FieldInput.vue` renders (derived exactly as its own `control` computed). */
-export type ControlKind =
-    | 'text'
-    | 'textarea'
-    | 'number'
-    | 'select'
-    | 'checkboxes'
-    | 'yesno'
-    // Increment G4a: a single-choice rating scale (radio group) + an N-level dependent select.
-    | 'scale'
-    | 'cascading'
-    // Increment G4b: the object-valued grids — a likert grid (radio-group per row) + a full matrix (per-cell select).
-    | 'likert_matrix'
-    | 'matrix'
-    // Increment G5b2: geospatial capture (geopoint / geotrace / geoshape) — a coordinate/vertex control + map.
-    | 'geo'
-    // Increment G6: media capture (file / image / audio / video) — a file input + progressive-enhancement capture.
-    | 'media'
-    | 'note'
-    | 'unsupported';
-
 export interface RenderOption {
     value: string;
     label: string;
@@ -245,7 +224,6 @@ export interface RenderField {
     key: string;
     sectionKey: string | null;
     fieldType: string;
-    control: ControlKind;
     supported: boolean;
     isRequired: RequiredMode;
     /** True when a validation rule (`required_if`/`required_with`) can make this field conditionally required. */
@@ -264,6 +242,10 @@ export interface RenderField {
     geo: RenderGeo | null;
     /** Media capture config (Increment G6: file / image / audio / video); null for every other field type. */
     media: RenderMedia | null;
+    /** The author's layout for a list question's choices (M130), carried raw; `FieldInput` reads it. */
+    appearance: string | null;
+    /** A note's content blocks (M130), carried raw from `config.content`; null for every other type. */
+    content: unknown[] | null;
     sequence: number;
     sectionSequence: number | null;
 }
@@ -364,6 +346,18 @@ export interface SubmitResult {
     reference: string;
     status: string;
     created: boolean;
+    /**
+     * M130 (`R-db169c29`, `D76`) — where to send the respondent after the thank-you screen, or null to stay.
+     * Only a submit the server ACCEPTED has one: a response queued offline never gets this answer, so it can
+     * never move. Optional so a test double that predates it still type-checks; absent reads as null.
+     */
+    redirect?: SubmitRedirect | null;
+}
+
+/** A destination after the thank-you screen (M130, `D76`): where, and a name the screen can say it by. */
+export interface SubmitRedirect {
+    url: string;
+    label: string;
 }
 
 // ── H10 save-and-resume ────────────────────────────────────────────────────────────────────────

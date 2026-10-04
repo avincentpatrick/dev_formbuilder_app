@@ -3,8 +3,9 @@
  *  - `buildEngineSchema()` → the static `fields`/`sections`/`validations` the F6a `SemanticValidator` consumes
  *    (the engine's `SchemaField` is intentionally minimal — relevance/validation columns only; id == key since
  *    the snapshot is FK-by-key). Answers + locale are plugged in reactively at evaluate time.
- *  - `buildRenderModel()` → the UI-facing superset (labels/hints/options/translations/control kind) the
- *    components walk; the engine never sees any of this.
+ *  - `buildRenderModel()` → the UI-facing superset (labels/hints/options/translations) the components walk;
+ *    the engine never sees any of this. Which control renders a field is `FieldInput.vue`'s decision alone:
+ *    the render model carries no control kind since `M130` (see the note above `resolveText()`).
  *
  * Keeping them separate is deliberate: the engine schema is the sole thing the byte-identical PHP/TS authority
  * agrees on; the render model is presentation only. The SPA maps INTO the engine and only FILTERS what the
@@ -25,7 +26,6 @@ import type {
 } from '../engine';
 import type {
     AnswerMap,
-    ControlKind,
     RawField,
     RawSection,
     RenderCascade,
@@ -72,54 +72,10 @@ export { rendersNothing } from '../engine';
 // Field types that carry an author-defined option list (mirror of FieldType::hasOptions()).
 const HAS_OPTIONS = new Set<string>(['single_select', 'multi_select', 'dropdown', 'likert_scale']);
 
-const TEXT_TYPES = new Set<string>(['short_text', 'email', 'phone', 'url', 'date', 'time', 'datetime']);
-
-/** Derive the control kind exactly as the reused F4b `FieldInput.vue` does. */
-export function controlFor(fieldType: string, supported: boolean): ControlKind {
-    if (fieldType === 'note') {
-        return 'note';
-    }
-    if (!supported) {
-        return 'unsupported';
-    }
-    if (TEXT_TYPES.has(fieldType)) {
-        return 'text';
-    }
-    if (fieldType === 'long_text') {
-        return 'textarea';
-    }
-    if (fieldType === 'integer' || fieldType === 'decimal') {
-        return 'number';
-    }
-    if (fieldType === 'single_select' || fieldType === 'dropdown') {
-        return 'select';
-    }
-    if (fieldType === 'multi_select') {
-        return 'checkboxes';
-    }
-    if (fieldType === 'yes_no') {
-        return 'yesno';
-    }
-    if (fieldType === 'likert_scale') {
-        return 'scale';
-    }
-    if (fieldType === 'cascading_select') {
-        return 'cascading';
-    }
-    if (fieldType === 'likert_matrix') {
-        return 'likert_matrix';
-    }
-    if (fieldType === 'matrix') {
-        return 'matrix';
-    }
-    if (fieldType === 'geopoint' || fieldType === 'geotrace' || fieldType === 'geoshape') {
-        return 'geo';
-    }
-    if (fieldType === 'file_upload' || fieldType === 'image_capture' || fieldType === 'audio_capture' || fieldType === 'video_capture') {
-        return 'media';
-    }
-    return 'unsupported';
-}
+// ⛔ M130 DELETED `controlFor()`, its `TEXT_TYPES` set and `RenderField.control`. They claimed to derive the
+// control kind "exactly as" `FieldInput.vue` does, no production code read them, and they had already
+// drifted from it. `FieldInput.vue`'s own `control` computed is the ONE switch every channel renders through;
+// what can drift is the three adapters that build its field, which `EncodeFieldAdapterParityTest` censuses.
 
 /** Resolve a translated string for the current locale, falling back to the default-locale base (never blank). */
 export function resolveText(base: string, translations: Record<string, string> | null, locale: string): string {
@@ -458,7 +414,6 @@ function toRenderField(field: RawField): RenderField {
         key: field.key,
         sectionKey: field.section_key,
         fieldType: field.field_type,
-        control: controlFor(field.field_type, supported),
         supported,
         isRequired: field.is_required,
         hasConditionalRequirement,
@@ -472,6 +427,8 @@ function toRenderField(field: RawField): RenderField {
         matrix: buildMatrix(field),
         geo: buildGeo(field),
         media: buildMedia(field),
+        appearance: field.appearance ?? null,
+        content: field.field_type === 'note' && Array.isArray(field.config?.content) ? (field.config.content as unknown[]) : null,
         sequence: field.sequence,
         sectionSequence: field.section_sequence,
     };
@@ -508,8 +465,8 @@ export function buildRenderModel(schema: SchemaResponse): RenderModel {
  * `config`, which is what `displayValue()` reads to resolve a choice code to its author-defined label.
  *
  * Built from `version.schema.fields` rather than from the render model ON PURPOSE, and this is the trap
- * Doc #26 §3.2 names by hand: `toRenderField()` has already projected `config` into five presentation
- * shapes and dropped the original, and `buildOptions()` only runs for `HAS_OPTIONS` types — so a
+ * Doc #26 §3.2 names by hand: `toRenderField()` has already projected `config` into six presentation
+ * shapes (a note's raw `content` since M130) and dropped the rest, and `buildOptions()` only runs for `HAS_OPTIONS` types — so a
  * `cascading_select`'s options are not on `RenderField` at all, and a renderer fed from there would emit
  * "ncr; manila" where PHP emits "Metro Manila; Manila". Re-deriving `config` would also be a SECOND
  * normalisation of the one input the two engines must agree on byte for byte.

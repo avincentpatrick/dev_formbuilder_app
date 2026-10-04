@@ -161,6 +161,7 @@ it('audits confirmation copy by LOCALE KEYS, never the translations map', functi
         $form,
         'Thank you.',
         ['fr' => 'Merci.', 'es' => 'Gracias.'],
+        null, // the after-submit destination, left as it is (M130)
         $this->admin,
     );
 

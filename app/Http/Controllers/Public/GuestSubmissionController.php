@@ -14,6 +14,7 @@ use App\Http\Requests\Public\GuestSubmissionRequest;
 use App\Models\Form;
 use App\Models\FormVersion;
 use App\Models\Submission;
+use App\Services\Forms\FormRedirectResolver;
 use App\Services\Submissions\ClientUuidResolver;
 use App\Services\Submissions\SubmissionDraftService;
 use App\Services\Submissions\SubmissionPayload;
@@ -79,6 +80,7 @@ final class GuestSubmissionController extends Controller
         SubmissionPipeline $pipeline,
         SubmissionDraftService $drafts,
         GuestShareTokenService $tokens,
+        FormRedirectResolver $redirects,
     ): JsonResponse {
         $token = $this->shareToken($request);
 
@@ -127,6 +129,10 @@ final class GuestSubmissionController extends Controller
                 // `SubmissionReferenceDisclosureTest` asserts structurally.
                 'reference' => SubmissionReference::format($result->submission->reference),
                 'status' => $result->submission->status->value,
+                // Where to send the respondent after the thank-you screen, as `url` and a `label` naming it, or null
+                // to stay. Resolved when the response is accepted, so it reflects the form's settings now, and a
+                // destination that has stopped taking responses is null rather than a dead end.
+                'redirect' => $redirects->resolve($form),
             ],
         ], $result->created ? 201 : 200);
     }

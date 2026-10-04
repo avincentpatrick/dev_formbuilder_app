@@ -430,6 +430,12 @@ final class EncodeFormPresenter
             // The already-server-set value shown beside a `'fixed'` row, so the keyer can see what will be
             // recorded rather than an unexplained blank. Never editable, never submitted.
             'prefill_value' => $prefill === PrefillSource::Fixed ? $field->default_value : null,
+            // M130 — the author's choice layout, carried raw for the shared FieldInput to read; the guest
+            // adapters carry the same member (EncodeFieldAdapterParityTest).
+            'appearance' => $field->appearance,
+            // M130 (`R-c9f50df2`) — a note's content blocks, raw as the version holds them; FieldInput draws them in
+            // place of the note's label (`D69`). Null for every other type, as the guest adapters send it.
+            'content' => $type === FieldType::Note && is_array($field->config['content'] ?? null) ? $field->config['content'] : null,
             // `note` is display-only (handled by the page), never an input; a repeatable section's fields are
             // supported and render inside the add/remove-instance loop (Increment G2). A hidden field is
             // keyable ONLY when it is externally sourced — a `fixed` or source-less one has no answer this

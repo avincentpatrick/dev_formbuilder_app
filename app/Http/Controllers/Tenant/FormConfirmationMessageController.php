@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Rules\ValidTemplate;
 use App\Services\Forms\FormService;
 use App\Services\Forms\TemplateValidationGate;
+use App\Support\Forms\RedirectTarget;
 use Illuminate\Http\RedirectResponse;
 
 /**
@@ -67,19 +68,36 @@ final class FormConfirmationMessageController extends Controller
         /** @var User $user */
         $user = $request->user();
 
-        $this->forms->setConfirmationMessage($form, $message, $translations, $user);
+        // M130 (`D76`) — null when the save does not mention a destination, which leaves it as it is.
+        $redirect = $request->redirectTarget();
 
+        $this->forms->setConfirmationMessage($form, $message, $translations, $redirect, $user);
+
+        return back()->with('toast', $this->toast($form, $message, $translations, $redirect));
+    }
+
+    /**
+     * One flash key, one toast (the design-system §3.7 bridge), so a warning REPLACES rather than follows the
+     * success copy — and still says the save happened, because it did. A save that carried a destination names
+     * the whole screen rather than the message (M130).
+     *
+     * @param  ?array<string, string>  $translations
+     * @return array{type: string, message: string}
+     */
+    private function toast(Form $form, ?string $message, ?array $translations, ?RedirectTarget $redirect): array
+    {
         if ($message === null) {
-            return back()->with('toast', ['type' => 'success', 'message' => 'Confirmation message reset to the default.']);
+            return ['type' => 'success', 'message' => $redirect === null
+                ? 'Confirmation message reset to the default.'
+                : 'Thank-you screen saved. It shows the built-in message.'];
         }
 
+        $saved = $redirect === null ? 'Confirmation message saved.' : 'Thank-you screen saved.';
         $warning = $this->danglingReferenceWarning($form, $message, $translations);
 
-        // One flash key, one toast (the design-system §3.7 bridge), so the warning REPLACES rather than
-        // follows the success copy — and still says the save happened, because it did.
-        return back()->with('toast', $warning === null
-            ? ['type' => 'success', 'message' => 'Confirmation message saved.']
-            : ['type' => 'info', 'message' => 'Confirmation message saved. '.$warning]);
+        return $warning === null
+            ? ['type' => 'success', 'message' => $saved]
+            : ['type' => 'info', 'message' => $saved.' '.$warning];
     }
 
     /**

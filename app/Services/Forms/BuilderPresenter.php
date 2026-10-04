@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Forms;
 
 use App\Enums\ComparisonOperator;
+use App\Enums\FieldAppearance;
 use App\Enums\FieldType;
 use App\Enums\IndexedDataType;
 use App\Enums\RequiredMode;
@@ -16,6 +17,7 @@ use App\Models\FormField;
 use App\Models\FormFieldValidation;
 use App\Models\FormSection;
 use App\Models\FormVersion;
+use App\Models\User;
 use DateTimeZone;
 use Illuminate\Support\Collection;
 
@@ -40,7 +42,7 @@ final class BuilderPresenter
     /**
      * @return array<string, mixed>
      */
-    public function present(Form $form): array
+    public function present(Form $form, ?User $viewer = null): array
     {
         $draft = $form->draft_version_id !== null
             ? FormVersion::query()->whereKey($form->draft_version_id)->first()
@@ -61,7 +63,8 @@ final class BuilderPresenter
                 ->all()
             : [];
 
-        $settings = $this->settings->form($form);
+        // M130 — the viewer, for the destination picker's list of forms they may open (FormSettingsPresenter).
+        $settings = $this->settings->form($form, $viewer);
 
         return [
             // `id` and `status` are the builder's own. Every other key belongs to a settings section and comes
@@ -220,6 +223,12 @@ final class BuilderPresenter
                 'value_shape' => ValueShape::for($type)->value,
                 // Increment M125 — additive: the palette shows ONE entry per group, and all 31 entries stay.
                 'variant' => $type->variantGroup()?->paletteVariant($type),
+                // Increment M130 — the layouts an author may choose for this type (`FieldAppearance::for()`),
+                // transmitted rather than listed in the client; empty for every type with no layout setting.
+                'appearances' => array_map(
+                    static fn (FieldAppearance $appearance): array => ['value' => $appearance->value, 'label' => $appearance->label()],
+                    FieldAppearance::for($type),
+                ),
             ];
         }
 

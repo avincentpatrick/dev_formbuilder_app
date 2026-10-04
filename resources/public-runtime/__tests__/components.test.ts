@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 import RuntimeSession from '../components/RuntimeSession.vue';
+import SummaryBanner from '../components/SummaryBanner.vue';
 import type { ApiClient } from '../lib/api-client';
 import { ApiError } from '../lib/api-client';
 import { normalizeError } from '../lib/error-normalizer';
@@ -96,7 +97,7 @@ describe('RuntimeSession (component wiring)', () => {
         expect(client.submit).toHaveBeenCalledWith(expect.objectContaining({ answers: { name: 'Ada' } }));
         // The second payload is Increment H6b's rendered confirmation copy — null here because this form
         // sets no `confirmation_message`, which is what keeps App.vue's hardcoded default in place.
-        expect(wrapper.emitted('submitted')?.[0]).toEqual([SUBMISSION_ID, SUBMISSION_REFERENCE, null]);
+        expect(wrapper.emitted('submitted')?.[0]).toEqual([SUBMISSION_ID, SUBMISSION_REFERENCE, null, null]);
 
         wrapper.unmount();
     });
@@ -606,7 +607,7 @@ describe('RuntimeSession — piping (Increment H6b, Doc #26)', () => {
         await wrapper.find('form').trigger('submit');
         await settle();
 
-        expect(wrapper.emitted('submitted')?.[0]).toEqual([SUBMISSION_ID, SUBMISSION_REFERENCE, 'Thanks, Ada!']);
+        expect(wrapper.emitted('submitted')?.[0]).toEqual([SUBMISSION_ID, SUBMISSION_REFERENCE, 'Thanks, Ada!', null]);
         wrapper.unmount();
     });
 
@@ -623,7 +624,7 @@ describe('RuntimeSession — piping (Increment H6b, Doc #26)', () => {
         await wrapper.find('form').trigger('submit');
         await settle();
 
-        expect(wrapper.emitted('submitted')?.[0]).toEqual([SUBMISSION_ID, SUBMISSION_REFERENCE, 'Salamat, Ada!']);
+        expect(wrapper.emitted('submitted')?.[0]).toEqual([SUBMISSION_ID, SUBMISSION_REFERENCE, 'Salamat, Ada!', null]);
         wrapper.unmount();
     });
 
@@ -634,7 +635,7 @@ describe('RuntimeSession — piping (Increment H6b, Doc #26)', () => {
         await wrapper.find('form').trigger('submit');
         await settle();
 
-        expect(wrapper.emitted('submitted')?.[0]).toEqual([SUBMISSION_ID, SUBMISSION_REFERENCE, null]);
+        expect(wrapper.emitted('submitted')?.[0]).toEqual([SUBMISSION_ID, SUBMISSION_REFERENCE, null, null]);
         wrapper.unmount();
     });
 
@@ -648,7 +649,7 @@ describe('RuntimeSession — piping (Increment H6b, Doc #26)', () => {
         await wrapper.find('form').trigger('submit');
         await settle();
 
-        expect(wrapper.emitted('submitted')?.[0]).toEqual([SUBMISSION_ID, SUBMISSION_REFERENCE, null]);
+        expect(wrapper.emitted('submitted')?.[0]).toEqual([SUBMISSION_ID, SUBMISSION_REFERENCE, null, null]);
         wrapper.unmount();
     });
 
@@ -1740,6 +1741,137 @@ describe('RuntimeSession — non-rendering members of a repeatable section (M123
         await settle();
         expect(announced(wrapper)).toContain('New question: Age');
 
+        wrapper.unmount();
+    });
+});
+
+// ── M130 (`D77`) — the error summary's jump lands on the CHECKED round button, as Tab would ───────────────
+describe('SummaryBanner — jumping to a question answered with round buttons', () => {
+    function radioGroup(checked: string | null): HTMLElement {
+        const anchor = document.createElement('div');
+        anchor.id = 'field-colour';
+        for (const value of ['red', 'blue', 'green']) {
+            const radio = document.createElement('input');
+            radio.type = 'radio';
+            radio.name = 'colour-group';
+            radio.value = value;
+            radio.checked = value === checked;
+            anchor.appendChild(radio);
+        }
+        document.body.appendChild(anchor);
+
+        return anchor;
+    }
+
+    async function jump(): Promise<void> {
+        const wrapper = mount(SummaryBanner, {
+            props: { items: [{ address: 'colour', label: 'Favourite colour', stepKey: 's1' }] },
+            attachTo: document.body,
+        });
+        await wrapper.find('button').trigger('click');
+        await flushPromises();
+        wrapper.unmount();
+    }
+
+    it('focuses the chosen radio, not the first one', async () => {
+        const anchor = radioGroup('blue');
+        await jump();
+
+        expect((document.activeElement as HTMLInputElement | null)?.value).toBe('blue');
+        anchor.remove();
+    });
+
+    it('focuses the first radio when nothing is chosen yet', async () => {
+        // The positive control for the line above: the same anchor with no answer still gets focus at all.
+        const anchor = radioGroup(null);
+        await jump();
+
+        expect((document.activeElement as HTMLInputElement | null)?.value).toBe('red');
+        anchor.remove();
+    });
+});
+
+describe('RuntimeSession — a note with content is announced by what it says (M130, R-c9f50df2, D69)', () => {
+    it('announces the content when a note appears, never its author-only label', async () => {
+        const schema = schemaResponse({
+            fields: [
+                field({ key: 'gate', label: 'Gate', sequence: 0 }),
+                field({
+                    key: 'fasting',
+                    label: 'Fasting note (for the team)',
+                    field_type: 'note',
+                    sequence: 1,
+                    config: { content: [{ type: 'paragraph', spans: [{ text: 'Bring your ' }, { text: 'card', bold: true }, { text: '.' }] }] },
+                    relevant_expression: "${gate} = 'go'",
+                }),
+                field({ key: 'age', label: 'Age', field_type: 'integer', sequence: 2, relevant_expression: "${gate} = 'age'" }),
+            ],
+        });
+        const wrapper = mount(RuntimeSession, { props: { schema, bootstrap, client: fakeClient() } });
+        await settle();
+
+        await wrapper.find('input').setValue('go');
+        await settle();
+        expect(announced(wrapper)).toBe('New information: Bring your card.');
+        // The guest page draws the blocks through `FieldControl`, and the label nowhere — the presence first, since
+        // an empty render would satisfy the absence too.
+        expect(wrapper.find('[data-note-content]').text()).toBe('Bring your card.');
+        expect(wrapper.text()).not.toContain('Fasting note (for the team)');
+
+        // The positive control: an ordinary question is still announced by its label.
+        await wrapper.find('input').setValue('age');
+        await settle();
+        expect(announced(wrapper)).toBe('New question: Age');
+
+        wrapper.unmount();
+    });
+
+    it('draws and announces a note inside a repeated section the same way (InstanceField)', async () => {
+        const schema = schemaResponse({
+            sections: [section({ key: 'hh', label: 'People', is_repeatable: true, min_instances: 0, max_instances: 3 })],
+            fields: [
+                field({ key: 'member_name', label: 'Member name', section_key: 'hh', section_sequence: 0 }),
+                field({
+                    key: 'member_note',
+                    label: 'Member note (for the team)',
+                    field_type: 'note',
+                    section_key: 'hh',
+                    section_sequence: 1,
+                    config: { content: [{ type: 'paragraph', spans: [{ text: 'Ask for their health card.' }] }] },
+                    relevant_expression: "${member_name} = 'z'",
+                }),
+            ],
+        });
+        const wrapper = mount(RuntimeSession, { props: { schema, bootstrap, client: fakeClient() } });
+        await settle();
+        await wrapper.findAll('button').find((b) => b.text().includes('Add People'))!.trigger('click');
+        await settle();
+
+        await wrapper.find('[data-repeat-instance] input').setValue('z');
+        await settle();
+
+        expect(announced(wrapper)).toBe('New information: Ask for their health card.');
+        expect(wrapper.find('[data-repeat-instance] [data-note-content]').text()).toBe('Ask for their health card.');
+        expect(wrapper.text()).not.toContain('Member note (for the team)');
+
+        wrapper.unmount();
+    });
+});
+
+describe('RuntimeSession — the destination after the thank-you (M130, D76)', () => {
+    it('passes the destination the server answered with up to the app, beside the reference', async () => {
+        const next = { url: 'https://health.example.org/next', label: 'health.example.org' };
+        const client = fakeClient({
+            submit: vi.fn(async () => ({ id: SUBMISSION_ID, reference: SUBMISSION_REFERENCE, status: 'submitted', created: true, redirect: next })),
+        });
+        const wrapper = mount(RuntimeSession, {
+            props: { schema: schemaResponse({ fields: [field({ key: 'name', label: 'Full name' })] }), bootstrap, client },
+        });
+
+        await wrapper.find('form').trigger('submit');
+        await settle();
+
+        expect(wrapper.emitted('submitted')?.[0]).toEqual([SUBMISSION_ID, SUBMISSION_REFERENCE, null, next]);
         wrapper.unmount();
     });
 });

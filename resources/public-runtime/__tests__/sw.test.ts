@@ -151,19 +151,20 @@ function apiGet(path: string): MatchArg {
 }
 
 describe('sw.ts runtime cache route table', () => {
-    it('registers the three runtime caches', () => {
+    it('registers the four runtime caches', () => {
         // A floor on the table itself. Without it, a route deleted outright would take its own
         // status assertion with it and the file would stay green while covering nothing — the
-        // vacuous-success shape this repository gates everywhere else.
-        expect(routes).toHaveLength(3);
+        // vacuous-success shape this repository gates everywhere else. M130 added the fourth.
+        expect(routes).toHaveLength(4);
         expect(routes.map((r) => r.strategy.cacheName)).toEqual([
             'guest-shell-assets',
             'guest-schema',
             'guest-shell-html',
+            'guest-content-images',
         ]);
     });
 
-    it.each(['guest-shell-assets', 'guest-schema', 'guest-shell-html'])(
+    it.each(['guest-shell-assets', 'guest-schema', 'guest-shell-html', 'guest-content-images'])(
         'caches a 200 on %s',
         async (cacheName) => {
             // The control arm. If this ever goes red the filter is too strict, not too loose, and
@@ -172,7 +173,7 @@ describe('sw.ts runtime cache route table', () => {
         },
     );
 
-    it.each(['guest-shell-assets', 'guest-schema', 'guest-shell-html'])(
+    it.each(['guest-shell-assets', 'guest-schema', 'guest-shell-html', 'guest-content-images'])(
         'refuses an opaque (status 0) response on %s',
         async (cacheName) => {
             // ⛔ THE DISCRIMINATOR, AND THE ONLY ARM THAT WAS RED BEFORE M77. Delete the
@@ -221,6 +222,30 @@ describe('sw.ts route matchers — which URLs enter a cache at all', () => {
         expect(matcherFor('guest-schema')(resumeRead)).toBe(false);
         expect(matcherFor('guest-shell-html')(resumeRead)).toBe(false);
         expect(matcherFor('guest-shell-assets')(resumeRead)).toBe(false);
+        expect(matcherFor('guest-content-images')(resumeRead)).toBe(false);
+    });
+
+    it('claims a content image for the image cache only, and keys it without the share token (M130)', async () => {
+        const image = apiGet('/api/v1/public/content-images/token-a/att-1');
+
+        expect(matcherFor('guest-content-images')(image)).toBe(true);
+        // Off the schema prefix on purpose: an image there would evict a cached schema.
+        expect(matcherFor('guest-schema')(image)).toBe(false);
+        expect(matcherFor('guest-shell-html')(image)).toBe(false);
+        expect(matcherFor('guest-content-images')(apiGet('/api/v1/public/f/some-share-token'))).toBe(false);
+
+        const plugins = (routeFor('guest-content-images').plugins ?? []) as Array<{
+            cacheKeyWillBeUsed?: (o: { request: Request; mode: string }) => Promise<Request | string>;
+        }>;
+        const keyPlugin = plugins.find((plugin) => typeof plugin.cacheKeyWillBeUsed === 'function');
+        expect(keyPlugin, 'the image route has no cache-key plugin').toBeDefined();
+
+        const keyFor = (token: string) =>
+            keyPlugin!.cacheKeyWillBeUsed!({ request: new Request(`https://acme.test/api/v1/public/content-images/${token}/att-1`), mode: 'read' });
+
+        // A token minted on the next visit must find the same entry, or every visit re-downloads every image.
+        expect(await keyFor('token-a')).toBe('https://acme.test/api/v1/public/content-images/att-1');
+        expect(await keyFor('token-b')).toBe(await keyFor('token-a'));
     });
 
     it('⚠️ RECORDS THAT THE RESUME SHELL *IS* CACHED TODAY — a pinned exposure, not an endorsement', () => {

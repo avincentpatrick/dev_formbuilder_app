@@ -407,3 +407,63 @@ test('Public runtime — a mis-cased entry never becomes a second cached shell, 
         .waitFor({ state: 'visible', timeout: 15_000 });
     await context.setOffline(false);
 });
+
+// M130 (`R-c9f50df2`) — a note's picture still renders offline. Once the schema loads online, the page asks for every
+// image its version names that the service worker's `guest-content-images` cache does not hold yet, and the worker
+// stores each under a key WITHOUT the share token — so the offline reload, whose cached shell carries an older
+// token, still finds it.
+test('Public runtime — a note’s picture still renders offline', async ({ page, context }) => {
+    await page.goto('/f/visit-guide', { waitUntil: 'networkidle' });
+    await page
+        .getByRole('heading', { name: 'Before Your Visit', level: 1 })
+        .waitFor({ state: 'visible', timeout: 15_000 });
+
+    const swAvailable = await page.evaluate(() => 'serviceWorker' in navigator);
+    test.skip(!swAvailable, 'No service worker on this origin, so nothing can render offline.');
+
+    await page.evaluate(async () => {
+        await Promise.race([navigator.serviceWorker.ready, new Promise((resolve) => setTimeout(resolve, 10_000))]);
+    });
+    // The first navigation ran before the worker took control; under it, the shell, the schema and — through the
+    // warm-up — the picture are all cached.
+    await page.reload({ waitUntil: 'networkidle' });
+    await page
+        .getByRole('heading', { name: 'Before Your Visit', level: 1 })
+        .waitFor({ state: 'visible', timeout: 15_000 });
+    await page.waitForFunction(
+        async () => {
+            for (const name of ['guest-shell-html', 'guest-schema', 'guest-content-images']) {
+                if (!(await caches.keys()).includes(name)) {
+                    return false;
+                }
+                if ((await (await caches.open(name)).keys()).length === 0) {
+                    return false;
+                }
+            }
+            return true;
+        },
+        null,
+        { timeout: 15_000 },
+    );
+
+    // One entry for the one picture, and its key names no token.
+    const keys = await page.evaluate(async () =>
+        (await (await caches.open('guest-content-images')).keys()).map((request) => new URL(request.url).pathname),
+    );
+    expect(keys).toHaveLength(1);
+    expect(keys[0]).toMatch(/^\/api\/v1\/public\/content-images\/[0-9a-f-]{36}$/);
+
+    await context.setOffline(true);
+    await page.reload({ waitUntil: 'commit' });
+    await page
+        .getByRole('heading', { name: 'Before Your Visit', level: 1 })
+        .waitFor({ state: 'visible', timeout: 15_000 });
+
+    const picture = page.getByRole('img', { name: /a blue building facing the road/ });
+    await picture.scrollIntoViewIfNeeded();
+    await expect
+        .poll(() => picture.evaluate((img: HTMLImageElement) => (img.complete ? img.naturalWidth : 0)), { timeout: 10_000 })
+        .toBe(240);
+
+    await context.setOffline(false);
+});

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Forms;
 
+use App\Enums\FormStatus;
 use App\Exceptions\Ocr\OcrException;
 use App\Models\Form;
 use App\Models\FormVersion;
@@ -13,6 +14,7 @@ use App\Services\Entitlements\EntitlementService;
 use App\Services\Scoping\ScopeNodePresenter;
 use App\Services\Settings\TenantSettingRegistry;
 use App\Support\Entitlements\FeatureAdmission;
+use App\Support\Forms\GuestReachability;
 use DateTimeZone;
 
 /**
@@ -42,7 +44,7 @@ final class FormSettingsPresenter
      *
      * @return array<string, mixed>
      */
-    public function form(Form $form): array
+    public function form(Form $form, ?User $viewer = null): array
     {
         return [
             'title' => $form->title,
@@ -66,10 +68,44 @@ final class FormSettingsPresenter
             // see `${child_name}`, not a value there is no submission to supply.
             'confirmation_message' => $form->confirmation_message,
             'confirmation_message_translations' => $form->confirmation_message_translations ?? [],
+            // M130 (`R-db169c29`, `D76`) — where a respondent goes after the thank-you screen, raw, and the forms this
+            // author may send them to. `live` is the predicate the submit response resolves with, so the panel warns
+            // about exactly the destinations a respondent would not be sent to.
+            'redirect_kind' => $form->redirect_form_id !== null ? 'form' : ($form->redirect_url !== null ? 'url' : 'none'),
+            'redirect_form_id' => $form->redirect_form_id,
+            'redirect_url' => $form->redirect_url,
+            'redirect_targets' => $this->redirectTargets($form, $viewer),
             // The form's locale set, so the section can offer one message box per supported locale.
             'default_locale' => $form->default_locale,
             'supported_locales' => $form->supported_locales === [] ? [$form->default_locale] : array_values($form->supported_locales),
         ];
+    }
+
+    /**
+     * The forms an author may send a respondent to: every other form they may author, archived ones aside, by title.
+     * The author's own list, through the scope the forms list uses, so the picker never names a form they cannot
+     * open. Empty without a viewer — a presenter call outside a request has nobody to ask on behalf of.
+     *
+     * @return list<array{id: string, title: string, live: bool}>
+     */
+    private function redirectTargets(Form $form, ?User $viewer): array
+    {
+        if ($viewer === null) {
+            return [];
+        }
+
+        return array_values(Form::query()
+            ->visibleTo($viewer)
+            ->whereKeyNot($form->id)
+            ->where('status', '!=', FormStatus::Archived->value)
+            ->orderBy('title')
+            ->get()
+            ->map(static fn (Form $target): array => [
+                'id' => $target->id,
+                'title' => $target->title,
+                'live' => GuestReachability::reachable($target),
+            ])
+            ->all());
     }
 
     /**
@@ -116,7 +152,7 @@ final class FormSettingsPresenter
     public function page(Form $form, User $user): array
     {
         return [
-            'form' => ['id' => $form->id, ...$this->form($form)],
+            'form' => ['id' => $form->id, ...$this->form($form, $user)],
             'share' => $this->share->present($form),
             'timezones' => DateTimeZone::listIdentifiers(),
             'ocr_scanning' => $this->ocrScanning($form),

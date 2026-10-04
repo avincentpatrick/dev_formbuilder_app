@@ -28,7 +28,7 @@ Three-layer architecture; the full manifest→fill→replay sequence including i
 ```
 
 - `checksum` is the same value `docs/form-versioning-schema-migration.md` §3.2 already computes over the canonical `schema_snapshot` serialization — the client compares this against its cached copy's checksum before deciding whether to re-download the full manifest, avoiding unnecessary transfer on a poor connection.
-- `media_refs` covers static, form-level media (e.g., an image embedded in a field's hint/label) that must be cached alongside the schema for genuinely offline rendering — distinct from *respondent-submitted* media (§5), which flows the opposite direction.
+- `media_refs` covers static, form-level media (e.g., an image embedded in a field's hint/label) that must be cached alongside the schema for genuinely offline rendering — distinct from *respondent-submitted* media (§5), which flows the opposite direction. **As built (M130):** such media now exists — a note's content image — and the manifest still emits `media_refs` empty (`R-0924ab3b`). The guest page does not wait for it: the image is read from its own token-scoped route, and once the schema loads online the page requests every image its version names that the service worker's `guest-content-images` cache does not hold yet, so a later step's image renders offline.
 
 ---
 

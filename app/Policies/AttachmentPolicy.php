@@ -20,8 +20,8 @@ use App\Services\Authorization\ResourceGrantResolver;
  * additionally gated on the scan status ({@see ScanStatus::servable()}) in the controller, so an
  * unscanned/infected file is withheld regardless of permission.
  *
- * (Respondent-facing preview needs no server round-trip — a just-captured file previews from a local
- * `blob:` URL — so there is no guest read path in G6.)
+ * (A respondent's own upload previews from a local `blob:` URL, so G6 has no guest read path. A note's image
+ * has one since M130, `GuestContentImageController`, and it never comes through this policy.)
  *
  * ── WHY THE GATE READS THE KIND (M29) ───────────────────────────────────────────────────────────────────
  * G6 wrote this as a flat `submissions.view` check that never touched its `$attachment` argument. That was
@@ -99,8 +99,8 @@ final class AttachmentPolicy
 
             // M129, `D58` = B. A note's image belongs to the FORM, so the people who may see it are the people who may
             // open that form's hub — `viewOverview`, the hub's own gate — which reads the same for the editor composing
-            // the note and a viewer reading the form. A respondent never comes here: the renderer's guest read is
-            // `R-c9f50df2`'s. An image held by anything but a form fails closed.
+            // the note and a viewer reading the form. A respondent never comes here: the guest read is
+            // `GuestContentImageController`'s (M130). An image held by anything but a form fails closed.
             AttachmentKind::FormContentImage => $attachment->attachable_type === 'form'
                 && $this->mayOpenForm($user, $attachment->attachable_id),
 

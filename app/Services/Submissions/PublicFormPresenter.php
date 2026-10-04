@@ -56,8 +56,8 @@ final class PublicFormPresenter
                 // pins against, so interpolating server-side would break that pin; and the respondent picks
                 // their locale client-side and reactively, so the server does not know which variant to
                 // resolve. §4's normative order (resolve the locale, THEN render) can only be honoured on
-                // the client. H6b builds that renderer; until then the runtime keeps its hardcoded default
-                // when this is null.
+                // the client, which renders it (H6b) and shows its own built-in message when this is
+                // null.
                 'confirmation_message' => $form->confirmation_message,
                 'confirmation_message_translations' => $form->confirmation_message_translations,
                 // Scheduled-form window + response cap (Increment H12a). Advisory: the runtime (H12b) reads

@@ -543,7 +543,9 @@ for (const theme of themes) {
 // AFTER the click, matching that test.
 for (const theme of themes) {
     test(`Audit change detail (${theme}) — accessible & no horizontal overflow`, async ({ page }) => {
-        await page.goto('/audit-log', { waitUntil: 'networkidle' });
+        // Filtered to the event, so the row is on page one however many newer entries a run has written (M130:
+        // the seeded rows fell off page one in CI's last project, and on every long-lived local database).
+        await page.goto('/audit-log?event=permission_changed', { waitUntil: 'networkidle' });
         await page
             .locator('tr')
             .filter({ hasText: 'Permission changed' })

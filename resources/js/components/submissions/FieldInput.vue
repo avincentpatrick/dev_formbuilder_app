@@ -2,7 +2,8 @@
 /**
  * One manual-encoding input (Increment F4b). Maps a published field descriptor onto the matching shared
  * design-system control and binds its value + per-field 422 error. "Render-supported, mark-the-rest": the
- * ~14 Phase-1 scalar types render a real control; `note` renders as static prose; anything else (advanced
+ * ~14 Phase-1 scalar types render a real control; `note` renders its content blocks (`NoteContent`, M130) or, with
+ * none, its label as static prose; anything else (advanced
  * types, or a field inside a repeatable section) shows a read-only "not available for manual entry" notice
  * rather than being silently dropped.
  *
@@ -12,16 +13,21 @@
  * grouping semantics.
  */
 import {
+    MdsButton,
     MdsCheckbox,
     MdsFormField,
     MdsNumberInput,
+    MdsRadio,
     MdsSegmentedControl,
     MdsSelect,
     MdsTextarea,
     MdsTextInput,
 } from '@meridian/design-system';
-import { computed, defineAsyncComponent } from 'vue';
+import { computed, defineAsyncComponent, nextTick, ref, useId } from 'vue';
 import MatrixGrid from './MatrixGrid.vue';
+import NoteContent from './NoteContent.vue';
+import { choiceLayoutFor } from './choice-layout';
+import { renderableBlocks } from './note-content';
 
 // Geospatial capture (Increment G5b2) is lazy-loaded so its Leaflet dependency + CSS only ship in the chunk a
 // geo-bearing form actually mounts — geo-free forms pay zero bundle cost.
@@ -129,6 +135,12 @@ export interface EncodeField {
     prefill?: 'fixed' | 'url' | 'none' | null;
     // The server-set value displayed beside a `'fixed'` row, so a blank is never unexplained.
     prefill_value?: string | null;
+    // The author's layout for a list question's choices (M130), read by `choiceLayoutFor()`; any other stored
+    // appearance — an XLSForm import's — is carried and ignored.
+    appearance?: string | null;
+    // A note's content blocks (M130, `R-c9f50df2`), carried RAW from `config.content` and read by
+    // `renderableBlocks()`; null for every other type. With blocks, the note's label is the author's alone (`D69`).
+    content?: unknown[] | null;
     supported: boolean;
 }
 
@@ -207,6 +219,7 @@ const control = computed<
     | 'textarea'
     | 'number'
     | 'select'
+    | 'radios'
     | 'checkboxes'
     | 'yesno'
     | 'scale'
@@ -237,7 +250,9 @@ const control = computed<
     if (['short_text', 'email', 'phone', 'url', 'date', 'time', 'datetime'].includes(t)) return 'text';
     if (t === 'long_text') return 'textarea';
     if (t === 'integer' || t === 'decimal') return 'number';
-    if (t === 'single_select' || t === 'dropdown') return 'select';
+    // M130 (`D77`): a single choice is round buttons, as in ODK and on the printed form; Dropdown stays the dropdown.
+    if (t === 'single_select') return 'radios';
+    if (t === 'dropdown') return 'select';
     if (t === 'multi_select') return 'checkboxes';
     if (t === 'yes_no') return 'yesno';
     if (t === 'likert_scale') return 'scale';
@@ -276,6 +291,41 @@ const listValue = computed<string[]>(() => (Array.isArray(props.modelValue) ? (p
 function toggleOption(value: string, checked: boolean): void {
     const current = listValue.value;
     emit('update:modelValue', checked ? [...current, value] : current.filter((v) => v !== value));
+}
+
+// ── The group controls' wiring (M130) ───────────────────────────────────────────────────────────────
+// ⛔ ONE NAME PER RENDERED COPY, NEVER THE FIELD KEY. Every instance of a repeat carries the same member key,
+// so a radio group named after it joined every instance into one group: choosing in the second cleared the
+// first on screen while its stored answer stayed (`R-de624bb1`, the likert scale's old `scale-<key>` name).
+const groupName = useId();
+// The fieldset's description, which `MdsFormField` supplies for a single control and nothing supplied here:
+// a summary jump lands on the first (or checked) radio, and without these ids its error was never read out.
+const hintId = useId();
+const errorId = useId();
+const groupDescribedby = computed<string | undefined>(() => {
+    const ids = [props.field.hint ? hintId : null, props.error ? errorId : null].filter((id): id is string => id !== null);
+    return ids.length > 0 ? ids.join(' ') : undefined;
+});
+
+// A note's drawable content blocks (`R-c9f50df2`); empty for any other type, and for a note with none.
+const noteBlocks = computed(() => (props.field.field_type === 'note' ? renderableBlocks(props.field.content) : []));
+
+// The author's layout for a list question's choices (`R-048a3286`); one per line unless they chose otherwise.
+const layoutClass = computed<Record<string, boolean>>(() => {
+    const layout = choiceLayoutFor(props.field.field_type, props.field.appearance);
+    return { 'encode-choices--pack': layout === 'pack', 'encode-choices--columns': layout === 'columns' };
+});
+
+// A chosen radio cannot be un-chosen, so an optional single choice offers to clear it. `''` is what an untouched
+// question holds and what the engine reads as empty — and it also clears a value that is no longer an option.
+const groupEl = ref<HTMLFieldSetElement | null>(null);
+const canClear = computed<boolean>(() => stringValue.value !== '' && marker.value !== 'required');
+
+async function clearChoice(): Promise<void> {
+    emit('update:modelValue', '');
+    // The button disappears with the value, so focus moves to the first radio rather than to the page.
+    await nextTick();
+    groupEl.value?.querySelector<HTMLInputElement>('input[type="radio"]')?.focus();
 }
 
 // ── Cascading select (Increment G4a) ────────────────────────────────────────────────────────────
@@ -361,24 +411,42 @@ function setCascadeLevel(index: number, value: string): void {
 
     <!-- Group controls: real fieldset/legend + their own aria-live error region -->
     <fieldset
-        v-else-if="control === 'checkboxes' || control === 'yesno' || control === 'scale' || control === 'cascading'"
+        v-else-if="control === 'checkboxes' || control === 'radios' || control === 'yesno' || control === 'scale' || control === 'cascading'"
+        ref="groupEl"
         class="encode-field"
+        :aria-describedby="groupDescribedby"
     >
         <legend class="encode-field__legend">
             {{ field.label
             }}<span v-if="showRequiredMarker" class="encode-field__required"> (required)</span
             ><span v-else-if="showOptionalMarker" class="encode-field__required"> (optional)</span>
         </legend>
-        <p v-if="field.hint" class="encode-field__help">{{ field.hint }}</p>
+        <p v-if="field.hint" :id="hintId" class="encode-field__help">{{ field.hint }}</p>
 
-        <div v-if="control === 'checkboxes'" class="encode-field__checks">
+        <div v-if="control === 'checkboxes'" class="encode-field__checks" :class="layoutClass" data-choice-list>
             <MdsCheckbox
                 v-for="opt in field.options"
                 :key="opt.value"
                 :label="opt.label"
                 :model-value="listValue.includes(opt.value)"
                 :invalid="Boolean(error)"
+                :describedby="error ? errorId : undefined"
                 @update:model-value="toggleOption(opt.value, $event)"
+            />
+        </div>
+        <!-- M130 (`D77`): a single choice is a list of round buttons; native radios sharing one name, so the
+             arrow keys move within the question and nowhere else. -->
+        <div v-else-if="control === 'radios'" class="encode-choices" :class="layoutClass" data-choice-list>
+            <MdsRadio
+                v-for="opt in field.options"
+                :key="opt.value"
+                :name="groupName"
+                :value="opt.value"
+                :label="opt.label"
+                :model-value="stringValue"
+                :invalid="Boolean(error)"
+                :describedby="error ? errorId : undefined"
+                @update:model-value="emit('update:modelValue', $event)"
             />
         </div>
         <!-- Likert scale: a single-choice radio group (native radios share a name, so arrow keys move within
@@ -393,7 +461,7 @@ function setCascadeLevel(index: number, value: string): void {
                 <input
                     type="radio"
                     class="encode-scale__radio"
-                    :name="`scale-${field.key}`"
+                    :name="groupName"
                     :value="opt.value"
                     :checked="stringValue === opt.value"
                     @change="emit('update:modelValue', opt.value)"
@@ -427,8 +495,11 @@ function setCascadeLevel(index: number, value: string): void {
             :ariaLabel="field.label"
             @update:model-value="emit('update:modelValue', $event)"
         />
+        <MdsButton v-if="control === 'radios' && canClear" class="encode-choices__clear" size="sm" variant="tertiary" @click="clearChoice">
+            Clear selection
+        </MdsButton>
 
-        <div class="encode-field__error" aria-live="polite">
+        <div :id="errorId" class="encode-field__error" aria-live="polite">
             <template v-if="error">
                 <svg class="encode-field__error-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
                     <path
@@ -502,7 +573,9 @@ function setCascadeLevel(index: number, value: string): void {
         </p>
     </div>
 
-    <!-- Display-only note -->
+    <!-- Display-only note: its content blocks when it has any (M130 — the label is then the author's alone, `D69`),
+         else its label, as before. -->
+    <NoteContent v-else-if="control === 'note' && noteBlocks.length > 0" :blocks="noteBlocks" />
     <p v-else-if="control === 'note'" class="encode-note">{{ field.label }}</p>
 
     <!-- Hidden field with a server-set value (Increment H7): shown so the keyer knows it exists and what
@@ -757,5 +830,40 @@ function setCascadeLevel(index: number, value: string): void {
     font-size: var(--mds-type-body-sm-font-size);
     line-height: var(--mds-type-body-sm-line-height);
     color: var(--mds-color-status-danger-fg);
+}
+
+/* M130 — a single choice's round buttons, one per line by default (`D77`). Appended at the end because this file
+   is cited by line from the backlog. */
+.encode-choices {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mds-space-1);
+    min-width: 0;
+}
+
+/* The author's layout (`R-048a3286`), for the round buttons and the multiple-choice checkboxes alike. Side by
+   side WRAPS, so a long list never forces horizontal page overflow; in columns, each column is at least 12rem
+   but never wider than the question, so a narrow screen falls back to one column on its own. */
+.encode-choices--pack {
+    flex-direction: row;
+    flex-wrap: wrap;
+    column-gap: var(--mds-space-4);
+}
+
+.encode-choices--columns {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 12rem), 1fr));
+    column-gap: var(--mds-space-4);
+}
+
+/* A long choice wraps inside its own option instead of widening the row or the grid track past the question. */
+.encode-choices--pack > *,
+.encode-choices--columns > * {
+    min-width: 0;
+    max-width: 100%;
+}
+
+.encode-choices__clear {
+    align-self: flex-start;
 }
 </style>

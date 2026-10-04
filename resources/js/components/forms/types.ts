@@ -52,8 +52,23 @@ export interface FormSettingsForm {
     max_responses: number | null;
     confirmation_message: string | null;
     confirmation_message_translations: Record<string, string>;
+    // M130 (`R-db169c29`, `D76`) — where a respondent goes after the thank-you screen, and where they could.
+    redirect_kind: RedirectKind;
+    redirect_form_id: string | null;
+    redirect_url: string | null;
+    redirect_targets: RedirectTargetOption[];
     default_locale: string;
     supported_locales: string[];
+}
+
+/** Where a respondent goes after the thank-you screen (`D76`): nowhere, another form, or a web address. */
+export type RedirectKind = 'none' | 'form' | 'url';
+
+/** A form an author may send respondents to; `live` is whether its public link takes responses now. */
+export interface RedirectTargetOption {
+    id: string;
+    title: string;
+    live: boolean;
 }
 
 /**

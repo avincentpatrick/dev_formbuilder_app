@@ -42,6 +42,8 @@ it('ships a valid OpenAPI 3.1 contract covering the /api/v1 surface', function (
         // Increment H9b — the save-and-resume surface (guest draft upsert + resume-read + encoder promote).
         '/public/f/{shareToken}/draft',
         '/public/drafts/{resumeToken}',
+        // M130 — a note's image, read by a respondent (outside the `f/` prefix the schema cache holds).
+        '/public/content-images/{shareToken}/{image}',
         '/submissions/{submission}/promote',
         // Increment G8b — the authenticated offline-sync surface.
         '/sync/manifest',
@@ -126,7 +128,9 @@ it('ships a valid OpenAPI 3.1 contract covering the /api/v1 surface', function (
         ->and($spec['paths']['/public/f/{shareToken}/submissions']['post']['security'])->toBe([])
         // H9b: the guest draft-save + resume-read are equally unauthenticated (token, not bearer).
         ->and($spec['paths']['/public/f/{shareToken}/draft']['post']['security'])->toBe([])
-        ->and($spec['paths']['/public/drafts/{resumeToken}']['get']['security'])->toBe([]);
+        ->and($spec['paths']['/public/drafts/{resumeToken}']['get']['security'])->toBe([])
+        // M130: the image read is authorised by the share token in its path, exactly as the schema read is.
+        ->and($spec['paths']['/public/content-images/{shareToken}/{image}']['get']['security'])->toBe([]);
 });
 
 it('keeps the published event_types enum in step with DomainEventType', function (): void {
@@ -480,4 +484,15 @@ it('publishes the in-body authorization 403 through the shared component, not an
             strtoupper($verb)." {$path} publishes a 403 that is not a plain \$ref to the shared AuthorizationException component. An inline body here would fork the /api/v1 error envelope that ApiAuthorizationErrorResponse exists to keep single."
         );
     }
+});
+
+it('documents a note image as image bytes, never as the JSON object Scramble infers (M130)', function (): void {
+    // The controller returns a `Storage::response()` stream, which Scramble documents as a JSON object;
+    // AppServiceProvider rewrites the 200, and this holds the rewrite in the committed document.
+    /** @var array<string, mixed> $spec */
+    $spec = json_decode((string) file_get_contents(base_path('openapi.json')), true, flags: JSON_THROW_ON_ERROR);
+    $ok = $spec['paths']['/public/content-images/{shareToken}/{image}']['get']['responses']['200'];
+
+    expect(array_keys($ok['content']))->toBe(['image/*'])
+        ->and($ok['content']['image/*']['schema']['format'])->toBe('binary');
 });

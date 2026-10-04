@@ -51,6 +51,12 @@ use Symfony\Component\HttpFoundation\Response;
  *
  * The Permissions-Policy grants `camera`/`microphone` to `self` so the native `<input capture>` (and a
  * future in-page getUserMedia recorder) keeps working when the form is embedded in an iframe (Increment G6).
+ *
+ * `Referrer-Policy: strict-origin-when-cross-origin` is set EXPLICITLY (M130, `R-db169c29`), not left to the
+ * browser's default. Since `D76` this page sends a respondent to an address the author chose, and the resume
+ * page's URL carries a resume token (`/f/resume/{token}`): a looser policy, or an older browser's
+ * `no-referrer-when-downgrade`, would hand that token to the destination in a Referer header. With this one a
+ * cross-origin destination sees the origin only.
  */
 final class PublicRuntimeSecurityHeaders
 {
@@ -66,6 +72,10 @@ final class PublicRuntimeSecurityHeaders
 
         if (! $response->headers->has('Permissions-Policy')) {
             $response->headers->set('Permissions-Policy', 'camera=(self), microphone=(self)');
+        }
+
+        if (! $response->headers->has('Referrer-Policy')) {
+            $response->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');
         }
 
         return $response;

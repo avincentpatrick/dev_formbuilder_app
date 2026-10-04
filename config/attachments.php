@@ -100,9 +100,9 @@ return [
     | A note's content image (M129, `R-f0c5b682`)
     |--------------------------------------------------------------------------
     |
-    | The brand logo's allowlist, for the brand logo's reason: once the note
-    | renderer ships (`R-c9f50df2`) these bytes are shown same-origin to every
-    | respondent of the form, so SVG (stored XSS) and GIF (WCAG 2.2.2) are out.
+    | The brand logo's allowlist, for the brand logo's reason: the note
+    | renderer (M130) shows these bytes same-origin to every respondent of
+    | the form, so SVG (stored XSS) and GIF (WCAG 2.2.2) are out.
     |
     | 2 MB against the logo's 1 MB: an illustration, or a photo of a reference
     | card, is larger than a mark — and still an order of magnitude under the

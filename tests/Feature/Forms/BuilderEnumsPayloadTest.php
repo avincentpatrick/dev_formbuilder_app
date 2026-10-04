@@ -222,3 +222,25 @@ it('marks the four palette variants, one primary per group, and nothing else', f
     $grouped = array_filter($variantByType, fn (?array $variant): bool => $variant !== null);
     expect(array_keys($grouped))->toEqualCanonicalizing(['short_text', 'long_text', 'integer', 'decimal']);
 });
+
+it('gives every palette entry the layouts an author may choose, and only the two list types any', function (): void {
+    // M130 (R-6c76bed2). Written out, for the same reason as above: the list is what the Options tab offers, and a
+    // census computed by FieldAppearance::for() itself could not fail.
+    $layoutsByType = [];
+    foreach ($this->payload['palette'] as $group) {
+        foreach ($group['types'] as $type) {
+            $layoutsByType[$type['value']] = $type['appearances'];
+        }
+    }
+
+    $offered = [['value' => 'columns-pack', 'label' => 'Side by side'], ['value' => 'columns', 'label' => 'In columns']];
+
+    expect($layoutsByType)->toHaveCount(count(FieldType::cases()))
+        ->and($layoutsByType['single_select'])->toBe($offered)
+        ->and($layoutsByType['multi_select'])->toBe($offered)
+        // Dropdown is the one that matters most: `minimal` is forced on its export, so a layout here would be lost.
+        ->and($layoutsByType['dropdown'])->toBe([]);
+
+    $withLayouts = array_filter($layoutsByType, fn (array $layouts): bool => $layouts !== []);
+    expect(array_keys($withLayouts))->toEqualCanonicalizing(['single_select', 'multi_select']);
+});

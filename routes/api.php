@@ -26,6 +26,7 @@ use App\Http\Controllers\Api\V1\WebhookDeliveryController;
 use App\Http\Controllers\Api\V1\WebhookEndpointController;
 use App\Http\Controllers\Public\GuestAttachmentController;
 use App\Http\Controllers\Public\GuestChallengeController;
+use App\Http\Controllers\Public\GuestContentImageController;
 use App\Http\Controllers\Public\GuestDraftController;
 use App\Http\Controllers\Public\GuestDraftResumeController;
 use App\Http\Controllers\Public\GuestSubmissionController;
@@ -564,6 +565,16 @@ Route::prefix('api/v1/public')
         // must not be obstructed, and a rate-limited draft save degrades to a local-only draft.
         Route::post('f/{shareToken}/draft', [GuestDraftController::class, 'store'])
             ->middleware(['feature:save_and_resume', EnforceGuestFormRateLimit::class])->name('drafts.store');
+
+        // A note's image (M130, `R-c9f50df2`) — the one guest read of a stored file, served only when the token's own
+        // published version shows it (`GuestContentImageController`). ⚠️ NOT UNDER `f/`: sw.ts caches every GET
+        // under `/api/v1/public/f/` as a schema, so an image there would evict cached schemas, and
+        // `ServiceWorkerCachePrefixRouteTest` holds that prefix to the schema route alone. ⚠️ ITS OWN LIMITER, for
+        // the challenge route's reason (`config/guest.php`). Regenerate openapi.json after touching this route.
+        Route::get('content-images/{shareToken}/{image}', [GuestContentImageController::class, 'show'])
+            ->withoutMiddleware('throttle:guest')
+            ->middleware('throttle:guest-content-image')
+            ->name('content-images.show');
     });
 
 // ── Group C (resume): guest draft RESUME — UNAUTHENTICATED; tenant + the target draft submissions.id resolved ─

@@ -4,8 +4,9 @@
  * an error terminal — around one long-lived, stateful `ApiClient`. It fetches the schema once, hosts the fill
  * session (re-keyed on a version-drift `reschema` so the store rebuilds cleanly), and shows the confirmation.
  */
-import { onMounted, provide, ref, shallowRef } from 'vue';
+import { onMounted, provide, ref, shallowRef, watch } from 'vue';
 import { MdsEmptyState, MdsSpinner } from '@meridian/design-system';
+import { ContentImageUrlKey } from '@/components/submissions/note-content';
 import ConfirmationScreen from './components/ConfirmationScreen.vue';
 import OfflineIndicator from './components/OfflineIndicator.vue';
 import RuntimeSession from './components/RuntimeSession.vue';
@@ -21,6 +22,7 @@ import {
 import { useOnline } from './composables/useOnline';
 import { createSyncOutbox } from './composables/useSyncOutbox';
 import { createApiClient, resumeDraft } from './lib/api-client';
+import { contentImageUrl, warmContentImages } from './lib/content-images';
 import { conflictCopy } from './lib/conflict-notice';
 import { draftBelongsToVisit, openDb } from './lib/db';
 import { localMediaRefId, stash } from './lib/media-queue';
@@ -31,7 +33,7 @@ import { ApiError } from './lib/error-normalizer';
 import { deriveReference } from './lib/reference-number';
 import { formatInstantInZone, scheduleStateCopy, type ScheduleStateCopy } from './lib/schedule';
 import { isoClock } from './lib/schema-mapping';
-import type { AnswerMap, Bootstrap, ScheduleAcceptance, ScheduleBlock, SchemaResponse } from './lib/types';
+import type { AnswerMap, Bootstrap, ScheduleAcceptance, ScheduleBlock, SchemaResponse, SubmitRedirect } from './lib/types';
 
 const props = defineProps<{ bootstrap: Bootstrap }>();
 
@@ -70,6 +72,17 @@ const unavailableCopy = ref<ScheduleStateCopy | null>(null);
 // reached the server); `queueTag` is a device-local label for one that has not. See ConfirmationScreen.
 const reference = ref<string | null>(null);
 const queueTag = ref<string | null>(null);
+// M130 (`R-db169c29`, `D76`) — where the respondent goes after the thank-you screen, from the submit response.
+const redirectTarget = ref<SubmitRedirect | null>(null);
+// Whether this page is inside a frame. Comparing the two windows is allowed across origins; reading anything
+// else on `top` is not, so an exception means framed by somebody else.
+const framed = ((): boolean => {
+    try {
+        return window.self !== window.top;
+    } catch {
+        return true;
+    }
+})();
 const confirmationMessage = ref(CONFIRM_MESSAGE);
 const sessionKey = ref(0);
 const retainedAnswers = shallowRef<AnswerMap | undefined>(undefined);
@@ -148,6 +161,21 @@ provide(ConflictReviewKey, beginConflictReview);
 // Media uploads (Increment G6) POST to the same token-scoped guest surface, resolved live so a re-minted token
 // is picked up. The manual-encode channel instead gets its form-scoped URL from EncodeFormPresenter.
 provide(UploadUrlKey, () => `/api/v1/public/f/${encodeURIComponent(client.token())}/attachments`);
+
+// M130 (`R-c9f50df2`) — a note's content images, read through the guest route with the CURRENT token (resolved
+// per image, so a re-minted one is used), and asked for once whenever a schema arrives online so a step reached
+// offline still shows them: the service worker caches each one keyed WITHOUT the token. Watched rather than
+// called, because four paths below set a schema (load, resume, conflict review, version drift).
+const contentImageUrlFor = (attachmentId: string): string => contentImageUrl(client.token(), attachmentId);
+provide(ContentImageUrlKey, contentImageUrlFor);
+watch(schema, (loaded) => {
+    if (loaded === null || typeof window === 'undefined' || !navigator.onLine) return;
+    void warmContentImages(loaded, contentImageUrlFor, {
+        origin: window.location.origin,
+        fetch: (url) => fetch(url, { credentials: 'same-origin' }),
+        caches: typeof caches === 'undefined' ? null : caches,
+    });
+});
 
 // Offline media staging (Increment G8b): when a pick can't upload, keep the blob in the Dexie media queue and
 // hand back a `local:` placeholder ref that the outbox replay swaps for a real attachment id on reconnect.
@@ -308,7 +336,7 @@ async function loadResume(resumeToken: string): Promise<void> {
     phase.value = 'ready';
 }
 
-function onSubmitted(id: string, submittedReference: string, authored: string | null = null): void {
+function onSubmitted(id: string, submittedReference: string, authored: string | null = null, redirect: SubmitRedirect | null = null): void {
     // Increment G8c — a resolved conflict: drop the parked row now that its reviewed answers are recorded.
     const resolved = resolvingUuid.value !== null;
     if (resolved) {
@@ -319,6 +347,9 @@ function onSubmitted(id: string, submittedReference: string, authored: string | 
     // those characters are a uuidv7 timestamp prefix, so the code was not a lookup for anybody.
     reference.value = submittedReference;
     queueTag.value = null;
+    // M130 (`D76`) — never after a resolved conflict: that respondent came back to review a parked answer, and the
+    // destination was chosen for a fresh fill.
+    redirectTarget.value = resolved ? null : redirect;
     // Increment H6b — the author's message (already locale-resolved and hole-filled by RuntimeSession,
     // which still had the store when it emitted) replaces the hardcoded copy on BOTH terminal success
     // states. Null — no message, or one whose every hole was unanswered — keeps the default.
@@ -541,6 +572,10 @@ function onRestart(): void {
             :reference="reference"
             :queue-tag="queueTag"
             :message="confirmationMessage"
+            :redirect="redirectTarget"
+            :unsent="syncOutbox.pending.value"
+            :framed="framed"
+            @leave="rotateRespondentSession"
             @restart="onRestart"
         />
         <RuntimeSession

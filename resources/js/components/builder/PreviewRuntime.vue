@@ -40,6 +40,7 @@ import { AnnouncerKey, RuntimeKey } from '../../../public-runtime/composables/co
 import { createFormRuntime } from '../../../public-runtime/composables/useFormRuntime';
 import type { RuntimeStep } from '../../../public-runtime/composables/useFormRuntime';
 import type { RenderField, RenderModel, RenderSection, SchemaResponse } from '../../../public-runtime/lib/types';
+import { ContentHeadingBaseKey } from '../submissions/note-content';
 import type { ProjectionIssue } from './draft-snapshot';
 import { engineKnows, isCaptureField, previewFieldsFor, previewPendingFields, previewRenderedSteps, previewSectionFor, previewStepLabels } from './preview-model';
 import PreviewStepStrip from './PreviewStepStrip.vue';
@@ -78,6 +79,9 @@ const runtime = createFormRuntime(props.snapshot, {
 
 provide(RuntimeKey, runtime);
 provide(AnnouncerKey, { message: computed(() => ''), announce: () => {} });
+// M130 — this pane titles each section with an h3 (the guest page and the encode page use an h2), so a note's
+// relative content headings start one level deeper here. Images read through the staff route, the default.
+provide(ContentHeadingBaseKey, 3);
 
 const steps = computed(() => runtime.visibleSteps.value);
 const step = computed(() => runtime.currentStep.value);

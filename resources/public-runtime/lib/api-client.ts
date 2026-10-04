@@ -19,6 +19,7 @@ import type {
     SaveDraftPayload,
     SaveDraftResult,
     SchemaResponse,
+    SubmitRedirect,
     SubmitResult,
 } from './types';
 
@@ -82,6 +83,31 @@ async function parseBody(response: Response): Promise<unknown> {
 
 function toError(response: Response, body: unknown): ApiError {
     return new ApiError(normalizeError(response.status, body, response.headers.get('Retry-After')));
+}
+
+/**
+ * M130 (`R-db169c29`, `D76`) — the destination a submit response names, checked again here because the page will
+ * NAVIGATE to it: an https address, or one on this page's own origin (a form destination is built from the app's
+ * URL, which is plain http on a local stack), with a label to say it by. The server already refuses anything else
+ * at the write; this is the second lock on a navigation sink, and anything that fails it means stay.
+ */
+export function parseRedirect(raw: unknown, origin: string): SubmitRedirect | null {
+    if (typeof raw !== 'object' || raw === null) {
+        return null;
+    }
+    const { url, label } = raw as { url?: unknown; label?: unknown };
+    if (typeof url !== 'string' || typeof label !== 'string' || label.trim() === '') {
+        return null;
+    }
+
+    let parsed: URL;
+    try {
+        parsed = new URL(url, origin === '' ? undefined : origin);
+    } catch {
+        return null;
+    }
+
+    return parsed.protocol === 'https:' || (origin !== '' && parsed.origin === origin) ? { url: parsed.href, label } : null;
 }
 
 export function createApiClient(options: { token: string; slug: string; fetch?: typeof fetch }): ApiClient {
@@ -226,8 +252,16 @@ export function createApiClient(options: { token: string; slug: string; fetch?: 
             if (!response.ok) {
                 throw toError(response, body);
             }
-            const data = (body as { data: { id: string; reference: string; status: string } }).data;
-            return { id: data.id, reference: data.reference, status: data.status, created: response.status === 201 };
+            const data = (body as { data: { id: string; reference: string; status: string; redirect?: unknown } }).data;
+            // M130 — present only when there is somewhere to go; absent reads as null (`SubmitResult.redirect`).
+            const redirect = parseRedirect(data.redirect, globalThis.location?.origin ?? '');
+            return {
+                id: data.id,
+                reference: data.reference,
+                status: data.status,
+                created: response.status === 201,
+                ...(redirect !== null ? { redirect } : {}),
+            };
         },
 
         async saveDraft(payload: SaveDraftPayload): Promise<SaveDraftResult> {

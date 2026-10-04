@@ -36,7 +36,10 @@ async function jumpTo(item: BannerItem): Promise<void> {
         return;
     }
     el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    const focusable = el.querySelector<HTMLElement>('input, select, textarea, button, [tabindex]');
+    // M130: the CHECKED control first, as Tab would land — a single choice is round buttons now, and the first
+    // radio of an answered question is not the one its answer is on.
+    const focusable =
+        el.querySelector<HTMLElement>('input:checked') ?? el.querySelector<HTMLElement>('input, select, textarea, button, [tabindex]');
     focusable?.focus();
 }
 

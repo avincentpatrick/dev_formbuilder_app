@@ -24,10 +24,10 @@ uses(RefreshDatabase::class);
 |--------------------------------------------------------------------------
 | M129 — where a note's content blocks go today, and where they do not (R-6dedc3a9's editor half).
 |--------------------------------------------------------------------------
-| The editor ships before the renderer (`R-c9f50df2`), so content an author composes today reaches NONE of the
-| outputs a respondent or an analyst sees: the printed form, the response PDF, the XLSForm export and the CSV export
-| each still show the note by its label, or not at all. `docs/piping-output-encoding-design.md` §5 records it per
-| surface; these cases are what hold that record true, and the renderer row is what will change one of them.
+| Since M130 (`R-c9f50df2`) the screens render the content — the guest page, the encode page, the preview — and
+| these four outputs still do not: the printed form, the response PDF, the XLSForm export and the CSV export each
+| show the note by its label, or not at all. `docs/piping-output-encoding-design.md` §5 records it per surface;
+| these cases hold that record true, and the printed form's half is `R-c083b711`.
 |
 | ⚠️ EVERY ABSENCE IS PAIRED WITH A PRESENCE FROM THE SAME OUTPUT. "The sentinel is not in it" is also what an empty
 | or broken output says, so each case first shows the output carries something it must.

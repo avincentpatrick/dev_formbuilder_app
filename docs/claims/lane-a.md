@@ -192,6 +192,12 @@ Files:
   pre-M130 front-end. The cause is older than M130: after an offline submit, `registerBackgroundSync()` also asks the
   service worker to replay at once, the attempt fails offline, and the row reads "Retrying" instead of "Saved on this
   device"; the heavier page (round buttons) only widened the race. The immediate request is skipped while offline.
+- **Extension 6, pushed with item 5's server half in progress and before the file was edited:**
+  `app/Http/Controllers/Tenant/FormBuilderController.php`, for one argument. Item 5's destination picker lists the
+  forms the author may open, so the settings block needs the viewer; `FormSettingsPresenter::form()` takes none and
+  the builder page reaches it through `BuilderPresenter::present()`, which the builder controller calls without the
+  user it already holds. The plan's "no hub edit" premise missed that; nothing in this codebase reads the user
+  inside a presenter, so the controller passes it.
 
 Shared artefacts taken: `docs/**` (the files above), `openapi.json`, the top-level `tests/e2e/*.spec.ts` named above
 (one new), and `PROGRESS.md` (own block only).

@@ -16,187 +16,83 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M131`, the Oct 7 slot: forms-list folders, per-form preset themes and all/any rule groups, with the validation editor no longer offering what publish refuses (`m131-folders-themes-andor`)
+## Status: NO ACTIVE CLAIM — `M131` is merged; the forms list has folders, a form can wear a preset theme, and a rule list combines with all or any
 
-Taken 2026-10-04. Branch `m131-folders-themes-andor`, cut from `origin/main` at `a22458a5`, PR into `main`.
-The fourth Oct 12 increment under `D72` and the second under `D75`: one increment for the whole plan slot, each row its
-own commits, in this order, so a red run bisects to one row.
-1. **`R-9e634897`** (`docs/feature-backlog.md:11644`) — folders: flat, one per form, workspace-wide; the list filters by
-   folder and by Unfiled (`D78`, `D79`).
-2. **`R-6017d6d8`** (`:11614`) — per-form preset themes (`D65` = A, `D81`).
-3. **`R-57711a3a`** (`:12490`) — the validation editor stops offering conditions publish refuses. Not named by the user:
-   the approved Oct 12 plan folds a builder bug into the increment that touches its files, and this row edits the same
-   `ValidationEditor.vue`, `builder/types.ts` and `BuilderPresenter.php` as row 4. It lands first because row 4 builds
-   on its `setRuleType()`.
-4. **`R-799d60f5`** (`:11731`) — compound rules become authorable: one all/any switch per rule list (`D80`).
+## RELEASED — `M131`, the Oct 7 slot: forms-list folders, per-form preset themes, and all/any rule groups (merged as PR #324, `1b7f22fe`, 6/6 green with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 
-`D78`–`D81` were answered by the user in chat on 2026-10-04, each the recommendation. Also in this push: seven rows
-filed, and a verification note appended to each of the four rows, line-neutral.
+Shipped 2026-10-04. Branch `m131-folders-themes-andor`, cut from `origin/main` at `a22458a5`. The claim commit is
+`bcdb1064`; extensions 1 and 2 are `c5e53b8c` and `ec62597e`, each built with plumbing on `origin/main` and merged back.
 
-### Evidence verified
+**The fourth Oct 12 increment under `D72`, the second under `D75`** — four rows in their own commits, in the stated
+order: item 1 `f26e08c0` (follow-up `32974dd0`), item 2 `b81f7be7` (follow-ups `86a7778f`, `7cccc76c`), item 3 `3669cc80`,
+item 4 `0f0724cb` (follow-up `2da2b027`); the line `3816d931`; the closures `db6c9103`.
+- **Closed:** `R-9e634897` (folders), `R-6017d6d8` (themes), `R-57711a3a` (the editor's compared question, folded in
+  because it edits the same editor as the AND/OR row), `R-799d60f5` (all/any rule groups).
+- **Filed:** seven rows in the claim push and one during the build — in dark mode every generated ramp puts a hovered
+  secondary button's text at about 3.35:1 (`fg` on `tint`, a pairing the engine never measures; tenant ramps too).
+- **Decisions:** `D78`–`D81`, answered in chat at claim time.
+- **Namespaces spent:** migration prefixes `2026_08_17_000119` and `2026_08_17_000120`; decisions `D78`–`D81`. No ADR
+  (`0010` stays reserved).
+- **Claimed and not needed:** `app/Support/Forms/FormListFacets.php`, `app/Support/Tenancy/ConstraintBoundaries.php`,
+  `docs/ACCESS-MATRIX.md` (it lists pages, and folders add none).
+- **Tracker:** no surgery owed.
 
-**`R-9e634897`**, against `a22458a5`:
-- **Held:** `FormPresenter::list()` (`FormPresenter.php:38`) applies `visibleTo()`, the keyword over
-  `forms.search_vector`, and sorts by rank then `updated_at`. Re-grepped migrations, models, `app` and `resources/js`:
-  no folder, collection, project or tag schema; the only `group` is `form_field_validations.logic_group`.
-- **Moved:** the facet is not inside `list()`. `FormController::index` applies `FormListFacets` in PHP to the rows
-  `list()` returned.
-- **Held:** `scope_node_id` is an authorization input (`FormService::assignScope()`'s docblock; `ScopeNode`'s
-  materialized `path`); `Form::scopeVisibleTo()` is `Form.php:215-241`.
+### What an author and a respondent see now
+- **Folders** on the forms list: a Folder filter (All folders, Unfiled, each folder with its count), Manage folders, Move
+  to folder, and the folder name on each card. A count never includes a form the viewer cannot already see. Deleting a
+  folder moves its forms to Unfiled; none is deleted.
+- **A Theme section** in form settings: five presets, each contrast-checked in light and dark, some changing the type or
+  the corners. The guest page, its browser colour and its installed-app colour follow, and so does the builder preview.
+  Every plan.
+- **Rules:** the compared-question list offers only questions the rule can be judged by; "Required when [all/any] of
+  these hold" and "The answer must pass [all/any] of these rules"; a template's grouping the switch cannot show is kept
+  and explained until "Ungroup these rules". Publish refuses a group that would fail every submission.
 
-**`R-6017d6d8`:**
-- **Held only as "in use":** nothing reads or writes `forms.theme`, but the column exists — `jsonb`, nullable
-  (`2026_07_06_000201_create_forms_table.php:51`), in `Form::$fillable` and cast to `array` — and the data dictionary
-  already calls it a per-form branding override. Nothing on `form_versions`; `BuilderPageProps` carries no styling.
-- **Held:** `BrandRampGenerator.php` and its byte-parity twin `brand-ramp.ts` (`tests/fixtures/brand-ramp.json`);
-  `BrandingCard.vue` renders both themes with a contrast table; `brand-ramp.blade.php:25-26` says "Only these SIX
-  properties"; `GuestBrandingPresenter::forGuest()` is the single reader for the guest style block, the `theme-color`
-  meta and the per-form manifest.
+### How the prediction fared
 
-**`R-57711a3a`:**
-- **Held:** the compared-question select patches only `related_field_key` (`ValidationEditor.vue:304`);
-  `relatedOptionsFor()` (`:127-137`) filters nothing; "is answered" is offered whenever `operator_may_be_empty` holds,
-  with no shape check (`:154`); `setRuleType()` (`:217-227`) keeps `related_field_key` across every kind that takes one.
-- **Held:** `ValidationRuleType::relatedComparison()` (`:175-184`) is the fact the client lacks, and
-  `BuilderPresenter::enums()` emits the rule list without it.
-
-**`R-799d60f5`:**
-- **Held:** the two columns; `StructuredRuleEvaluator::conditionGroupHolds()` (`:125`); `BuilderValidation`
-  (`types.ts:15-23`) has no group member.
-- **Moved:** `SemanticValidator::toUnits()` is `:243-262`; `BuilderPresenter::field()` is `:141-178`;
-  `FormBuilderService::replaceValidations()` is `:739-810`, rewritten by `M126` to keep rows by content — but a kept row
-  updates only `error_message` and `sequence`, and an insert never sets the group columns.
-- **False:** the XLSForm importer writes no group (`XlsformImporter.php:132-139`; `ValidationSpec` has no member for
-  one). `SchemaBlueprintMaterializer.php:185-203` is the only writer that mints one; clone-forward, duplicate and type
-  conversion carry rows through.
-- **Partly false:** the serializer's ordinal remap is real (`SchemaSnapshotSerializer.php:195-221`), but
-  `SchemaSnapshotSerializerTest` has no group case; the coverage is indirect (`SchemaBlueprintMaterializerTest`,
-  `TemplateRoundTripTest`).
-
-### Premise verified
-
-**`R-9e634897`:** "`scope_node_id` must not be used" holds — and collides with a written decision the row does not cite:
-ADR-0011 §D6, "The grouping axis is `forms.scope_node_id`; no tag model is coined." Its revisit trigger is one form in
-two programs, which a single-valued folder does not meet, so the folder is a FILING axis, not an analytics one, and the
-ADR gains a dated note rather than a reversal. The isolation premise is met by construction: the facet already runs over
-rows `visibleTo()` admitted, and a folder filter and count done the same way see nothing more. No workspace-level
-"manage forms" permission exists; `D79` reuses `forms.create` and `forms.edit.any` and mints none. **New:** a tenth row
-action overflows the collapsed card at 375px, invisibly to the `scrollWidth` assertion (`overflow-x: clip`), because
-`Index.vue`'s `nowrap` applies in both views.
-
-**`R-6017d6d8`:** `D65` = A holds. Moved under it: no webfont loads on the guest page (`fonts.css`, deliberately), so a
-font pair is two system stacks; personalization never reaches the guest page, so a preset's font meets the dyslexia
-font only in the builder preview; `--mds-radius-sm` stays 6px on purpose (a checkbox must not look like a radio), so a
-radius scale moves `md`, `lg` and `xl` only; `brand-cache.ts` keeps ONE device-wide `brand_version`, so a per-form
-preset folded into that fingerprint would re-sweep every cached shell on every switch between two forms; and the E2E
-tenant is unbranded, so no axe scan has ever run on a generated ramp. `M130` keeps settings columns out of
-`$fillable`; `theme` is in it.
-
-**`R-57711a3a`:** the file set measured at the row holds: `ConfigPanel.vue` passes the rule list and `comparableFields`
-(which already carries `value_shape`) through whole, and is not edited.
-
-**`R-799d60f5`:** "invisible and uneditable" holds, and the consequence is sharper: the save request strips any
-`validations.*` key it has no rule for, and `ruleIdentity()` ignores grouping, so a regroup alone would be silently
-dropped. ⛔ **No publish gate inspects a group:** a later member with no operator publishes, then throws
-`malformed_logic_group` on every submission. Latent while only templates and the library mint groups; reachable the
-moment the builder authors them, so its gate lands in this row. Both engines fold a group flat, left to right by each
-row's own operator; required and skip units combine as ANY, constraint units as ALL — which is why one all/any switch
-per list maps onto the stored shape with no new column.
-
-### Remedy verdict
-
-**`R-9e634897`:** none offered beyond the isolation test. Designed: `form_folders` (strict RLS, a case-insensitive unique
-name) and a nullable `forms.folder_id` whose composite foreign key sets it null on delete, so the database unfiles;
-`?folder=<id>|none` filtered and counted in PHP after `visibleTo()`, each filter's counts applying the other; rights
-through a policy, with no new permission key.
-
-**`R-6017d6d8`:** works as `D65` = A, with four corrections. A preset's ramp is PINNED literals, asserted equal to
-`BrandRampGenerator::generate(seed)` — never re-derived on read (ADR-0014 §D8). The documented extras are
-`--mds-font-family-display`, `--mds-font-family-body-default` (never `-body`, which the dyslexia rule owns) and
-`--mds-radius-md/-lg/-xl`. `data-brand-version` stays the tenant's fingerprint while the manifest's `?b=` gets a
-per-form one. The two six-property pins stay unedited and go on meaning the tenant block.
-
-**`R-57711a3a`:** works, with the two gaps `M126` recorded and a third: the compared list filters by the shapes of every
-operator the rule can take (so an `_if` rule hides a note), else by its `related_comparison` operator; `setRuleType()`
-clears an incompatible key; and re-pointing clears an incompatible operator AND the value it compared against.
-
-**`R-799d60f5`:** "extend the serializer rather than writing a second path" works for the preview, whose projection
-mirrors the serializer's ordinal remap. The write path needs a token per row rather than one combinator per list, so a
-grouping the switch cannot show travels untouched; a new token maps to a uuid derived from the field id and the token,
-so repeated saves keep one uuid (the conversion fingerprint hashes it).
-
-Files:
-- **1 (`R-9e634897`):** new `database/migrations/2026_08_17_000119_create_form_folders_table.php`,
-  `2026_08_17_000120_add_folder_id_to_forms_table.php`, `app/Models/FormFolder.php`,
-  `database/factories/FormFolderFactory.php`, `app/Policies/FormFolderPolicy.php`,
-  `app/Http/Requests/Forms/StoreFormFolderRequest.php`, `UpdateFormFolderRequest.php`, `AssignFormFolderRequest.php`,
-  `app/Http/Controllers/Tenant/FormFolderController.php`, `FormFolderAssignmentController.php`,
-  `app/Services/Forms/FormFolderService.php`, `app/Support/Forms/FormListFolders.php`,
-  `resources/js/components/forms/ManageFoldersModal.vue`, `MoveToFolderModal.vue` and their tests,
-  `tests/Feature/Forms/FormFolderTest.php`, `FormListFolderFilterTest.php`, `FormFolderAssignmentTest.php`,
-  `tests/e2e/forms-folders-axe.spec.ts`; edited `app/Models/Form.php` (hub), `app/Services/Forms/FormPresenter.php`,
-  `app/Http/Controllers/Tenant/FormController.php`, `app/Support/Forms/FormListFacets.php`,
-  `app/Services/Forms/FormService.php` (hub), `routes/tenant.php` (hub), `app/Providers/AppServiceProvider.php` (hub),
-  `app/Support/Tenancy/TenantScopedTables.php`, `app/Support/Tenancy/ConstraintBoundaries.php`,
-  `app/Support/Audit/AuditableTypes.php`, `resources/js/Pages/forms/Index.vue`, `resources/js/Pages/forms/index.test.ts`,
-  `resources/js/components/forms/FormRowActions.vue`, `FormCard.vue`, `resources/js/types/forms.ts`,
-  `packages/design-system/src/components/Icon/icons.ts` (hub), `database/seeders/E2eSeeder.php` (hub),
-  `tests/Feature/Tenancy/TenantExtractColumnDriftTest.php`, `ConstraintBoundaryDriftTest.php`,
-  `tests/e2e/list-layout.spec.ts`, `docs/data-dictionary.md` (hub), `docs/adr/0011-analytics-substrate.md`,
-  `docs/audit-compliance-logging-spec.md`, `docs/multi-tenancy-rbac-design.md`, `docs/ACCESS-MATRIX.md`.
-- **2 (`R-6017d6d8`):** new `app/Enums/FormThemePreset.php`, `FormFontPair.php`, `FormRadiusScale.php`,
-  `app/Http/Requests/Forms/UpdateFormThemeRequest.php`, `app/Http/Controllers/Tenant/FormThemeController.php`,
-  `resources/js/components/builder/ThemePanel.vue` and its test, `resources/js/components/builder/preset-scope.ts` and
-  its test, `tests/Unit/Branding/FormThemePresetTest.php`, `tests/Feature/Branding/FormThemeGuestRenderTest.php`,
-  `tests/Feature/Forms/FormThemeRouteTest.php`; edited `app/Models/Form.php` (hub), `app/Services/Forms/FormService.php`
-  (hub), `routes/tenant.php` (hub), `app/Services/Branding/GuestBrandingPresenter.php`,
-  `app/Http/Controllers/Public/GuestFormController.php`, `app/Http/Controllers/Public/PwaManifestController.php`,
-  `resources/views/partials/brand-ramp.blade.php`, `resources/views/public-runtime.blade.php`,
-  `app/Support/Branding/BrandRampGenerator.php`, `app/Services/Forms/FormSettingsPresenter.php`,
-  `resources/js/components/forms/types.ts`, `resources/js/components/forms/FormSettingsSections.vue`,
-  `resources/js/components/builder/types.ts` (hub), `PreviewPane.vue` and its test, `builder-store-fixtures.ts`,
-  `FormSettingsModal.test.ts`, `ConfirmationPanel.test.ts`, `builderClient.test.ts`, `save-state.test.ts`,
-  `resources/js/Pages/forms/settings.test.ts`, `database/seeders/E2eSeeder.php` (hub),
-  `tests/e2e/public-runtime-axe.spec.ts`, `tests/e2e/form-settings-axe.spec.ts`, `docs/adr/0014-tenant-brand-ramp-generation.md`,
-  `docs/ux/design-system-reference.md`, `docs/data-dictionary.md` (hub), `docs/offline-first-sync-design.md`.
-- **3 (`R-57711a3a`):** new `resources/js/components/builder/validation-options.ts` and its test; edited
-  `app/Services/Forms/BuilderPresenter.php` (hub), `resources/js/components/builder/types.ts` (hub),
-  `ValidationEditor.vue` and its test, `builder-store-fixtures.ts`, `tests/Feature/Forms/BuilderEnumsPayloadTest.php`.
-- **4 (`R-799d60f5`):** new `resources/js/components/builder/rule-grouping.ts` and its test; edited
-  `app/Enums/ValidationRuleType.php`, `app/Services/Forms/BuilderPresenter.php` (hub),
-  `app/Http/Requests/Forms/UpdateFieldRequest.php`, `app/Services/Forms/FormBuilderService.php`,
-  `app/Services/Forms/StructuralValidationGate.php`, `app/Exceptions/Forms/PublishValidationException.php`,
-  `resources/js/components/builder/types.ts` (hub), `ValidationEditor.vue` and its test, `ConfigPanel.vue` (hub) and its
-  test, `useBuilderStore.ts` (hub), `draft-snapshot.ts` and its test, `builder-store-fixtures.ts`,
-  `tests/Feature/Forms/BuilderEnumsPayloadTest.php`, `FieldValidationRetentionTest.php`,
-  `StructuralValidationGateTest.php`, `tests/golden/validation/conditional.json`, `tests/golden/validation/manifest.json`,
-  `docs/data-dictionary.md` (hub), `docs/architecture/technical-architecture.md`.
-
-Shared artefacts taken: `docs/feature-backlog.md`, `docs/claims/decisions.md`, `docs/pipeline.md`,
-`docs/backlog-triage.md`, `docs/gate-baselines.md`, `PROGRESS.md` (own block), the docs named above, and the top-level
-`tests/e2e/*.spec.ts` named above.
-Paired files taken: `brand-ramp.ts` is READ, never edited — the preset pins are PHP literals checked against the PHP
-engine, so the parity fixture does not move. The golden corpus is run by both engines and changes once, for both.
-Namespaces spent: migration prefixes `2026_08_17_000119` and `2026_08_17_000120`; decisions `D78`–`D81`. No ADR (`0010`
-stays reserved).
-Prediction:
-
-| Gate | Expected |
+| Predicted | Actual |
 |---|---|
-| CI | 6/6 after the local gates, on the first run |
-| Most likely red | ⚠️ **item 2's themed guest scan in dark mode** — the first axe scan of any generated ramp; the likeliest failure is the dark `fg` on `tint` (a selected choice), a pairing the seventeen do not measure. Run locally before the presets are pinned. |
-| Second | the citation lint, after insertions into `Form.php`, `FormController.php`, `FormBuilderService.php` and the brand partial |
-| Third | an E2E layout check on the forms list, from the folder caption on each card and the tenth row action |
-| ⚠️ Most likely wrong | that both engines agree on the five new golden vectors on the first run — the mixed required-ALL plus constraint-ANY vector has no precedent in either corpus |
+| CI goes 6/6 after the local gates, on the first run | **Wrong once before it was right.** Run 1 failed Pest and nothing else: `E2eSeederIdempotencyTest` counts the seeded published forms, and item 2's "Themed Intake" made ten, not nine — the only red of 5,997, in a folder no local directory run reached. Extension 2 updated the count; run 2 went 6/6 with real step counts, and the post-merge run on `main` is the baseline source. |
+| Most likely red: item 2's themed guest scan in dark mode | **Wrong:** the first axe scan of any generated ramp passed in light and dark at every viewport (6/6). The suspected pairing is real but invisible to axe: in dark mode `fg` on `tint` is about 3.35:1, and it appears only on a hovered secondary button — measured with the engine and filed. |
+| Second: the citation lint | **Right in kind, never reached a push:** it went red four times locally — the route and provider insertions (five ledger citations), the fixture and route insertions (three), and my own claim-time note citing `ValidationEditor.vue` by line — each fixed in the commit that caused it by dropping the number. The data dictionary and two ADRs were kept line-neutral on purpose. |
+| Third: an E2E layout check on the forms list | **Wrong, and the premise behind it was false:** ten row actions are 293px in a 341px cell at 375px, so nothing overflowed. Writing the check exposed its own blind spot first — a right-edge-only measurement stayed green over a forced 62px overflow, because the cluster is right-aligned and grows left. It now reads both edges and that mutant reddens it. |
+| ⚠️ Most likely wrong: both engines agree on the new golden vectors on the first run | **The engines agreed; my vector was wrong.** Both failed the same mixed vector identically: the `pattern` rule is a full match, so `^X` accepts only "X". The vector now says `X.*`. Six vectors, not five: the mixed case needed a failing twin to pin which rule's message a failed OR group shows. |
 
-**Claim extension 1 (2026-10-04, pushed before the file was edited):** `tests/Feature/Forms/FormSettingsPageTest.php` —
-it pins the builder form block's keys in order, and item 2's `theme_preset` and `theme_presets` (from
-`FormSettingsPresenter::form()`, which the builder spreads) extend that block. Found by the local `tests/Feature/Forms`
-directory run, the only red of 761.
+### Mutations: every new gate red first
+Every red set was written down before its run. Item 1: 6 server + 4 client, all caught. Item 2: 7 + 4. Item 3: 1 + 6.
+Item 4: 5 + 5, plus the two engines (PHP `groupConnective`, TypeScript lowering) against the new goldens.
+- ⚠️ **Two red counts differed from the prediction, and both were the prediction:** V2 (Manage folders rights on
+  `can.create`) reddened three cases, not one — the rename and delete cases mount with `create: false`; P7 (a
+  `feature:branding` gate on the theme route) reddened three, not one — every case in that file runs on a Free plan.
 
-**Claim extension 2 (2026-10-04, after the PR's first CI run, pushed before the file was edited):**
-`tests/Feature/Seeders/E2eSeederIdempotencyTest.php` — it counts the seeded published forms (9), and item 2's
-"Themed Intake" makes ten. CI's Pest job found it, the only red of 5,997; no local directory run reached that folder.
+### ⛔ Found by this increment's own runs, and fixed in it
+- **"RenameClinics":** Vue's whitespace handling dropped the space before a visually-hidden name, so every Rename and
+  Delete button in Manage folders would have been announced as one run-together word. The name is now interpolated.
+- **A preview that never rebuilt on a regroup:** the engine's shape key omitted grouping, so the builder preview would
+  have folded a template's AND group as ANY until an unrelated edit. The key now includes it.
+- **A payload no test read:** nothing asserted that the field save carries the group keys, or omits them for a row that
+  never had them (an explicit null would ungroup a template's rules). Pinned through the real store.
+
+### ✅ Seen in a real browser (`.playwright/m131-probe/`)
+On "Themed Intake"'s draft: two length rules, "any one of these rules", a reload — still "any". The stored rows carried
+one group equal to `uuid5(field id, 'new-constraint')`, joined by `or`; the probe's second phase then restored the draft
+to no rules.
+
+### ⚠️ Deviations, recorded rather than smoothed
+- **`R-57711a3a` was taken without the user naming it,** under the approved plan's rule that a builder bug folds into
+  the increment touching its files.
+- **The AND/OR members are optional on the client type,** so a row built by code that knows nothing of groups (the
+  negative-number floor in `field-conversion.ts`, unclaimed) omits them and the server keeps what is stored. This kept
+  that file out of the increment and is the same rule the server applies to an older client.
+- **No enum-catalogue row for `FormThemePreset`:** inserting one high in the data dictionary would have moved every
+  cited line below it; the presets are listed in the `forms.theme` row instead.
+- **Two claim extensions,** each pushed before its file was edited: `FormSettingsPageTest.php` (it pins the builder
+  form block's keys) and `E2eSeederIdempotencyTest.php` (it counts the seeded published forms), the second after the PR's
+  first CI run.
+- **E2E run locally, one spec at a time:** `forms-folders-axe` 18, `list-layout` 18 (+9 skipped by design), the Forms
+  cases of `responsive-axe` 18 and `personalization-axe` 9, `templates-axe` 15, `public-runtime-axe` 63,
+  `public-runtime-offline` 12, `form-settings-axe` 18 (five tablet cases timed out under host load and passed 6/6 on a
+  quiet rerun), `builder-axe` 60.
 
 ## RELEASED — `M130`, the Oct 6 slot: content blocks render, a real choice layout with round buttons, and a redirect after submit (merged as PR #323, `e5f6245f`, 6/6 green with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

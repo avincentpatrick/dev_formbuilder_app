@@ -11693,7 +11693,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   is a translations map — which is also what lets an XLSForm export emit that column correctly rather than
   guessing. ⚠️ **Kobo's filename namespace is shared between form media and data links**, and that is worth
   copying: one uniqueness constraint covering both, not two that can collide. **Live.** Filed by `M110`.
-  **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-03 by `M127`: it is one of the user's 19 builder comments, wanted for the Oct 12 testing (`D72`).** **`D61` answered 2026-10-03 (`M127`): B — frozen per published version, with byte dedupe.** **v1 for the Oct 12 testing (`D72`):** PDF and image reference files per form, shown to respondents, frozen per published version with byte dedupe. What v1 leaves is its own `during-testing` row, filed next.
+  **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-03 by `M127`: it is one of the user's 19 builder comments, wanted for the Oct 12 testing (`D72`).** **`D61` answered 2026-10-03 (`M127`): B — frozen per published version, with byte dedupe.** **v1 for the Oct 12 testing (`D72`):** PDF and image reference files per form, shown to respondents, frozen per published version with byte dedupe. What v1 leaves is its own `during-testing` row, filed next. **Verified by `M132` (2026-10-04), which takes it:** a form-level kind now exists for note images (`form_content_image`, `M129`) and the `form` alias is global, so the blocker the row names has moved; `D61`'s per-version row becomes a per-version join row, because the storage gauge sums attachment rows and the snapshot holds only sections and fields. `D84` (in chat): available offline once opened. The measurements are in the `M132` claim.
 
 - **`minor` · Form attachments carry no audio, video or per-language media, and the XLSForm export has no media
   column — the part of form attachments left after their Oct 12 v1.** Filed 2026-10-03 by `M127`, split from the
@@ -11701,7 +11701,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   reference files per form, frozen per published version with byte dedupe (`D61` answered B). Left here: audio and
   video, per-language media through a translations map, the XLSForm export's media column, and populating
   `form_templates.cover_image_attachment_id`, a real foreign key that nothing writes.
-  **Live.** Filed by `M127`. **Tier: during-testing.**
+  **Live.** Filed by `M127`. **Tier: during-testing.** **Also left by `M132`'s v1:** reordering a form's reference files, and showing them on the encode page and in the builder preview — v1 shows them on the guest page only.
 
 - **`minor` · There is no author-configurable automation — no "when this happens, do that" — only four fixed,
   non-composable mechanisms.** Filed 2026-09-25 by `M110` from the report *"in fillout.com, there is this thing
@@ -11718,7 +11718,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   ⚠️ **`NotificationType` is closed and its ORDER is load-bearing** (DB CHECKs are generated from `values()`), so
   an automation that notifies must reuse a type or **append** — never insert. ⚠️ Fillout documents no else/default
   path on its Branch; that is a defect to improve on, not a shape to copy. **Live.** Filed by `M110`.
-  **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-03 by `M127`: it is one of the user's 19 builder comments, wanted for the Oct 12 testing (`D72`).** **`D62` answered 2026-10-03 (`M127`): A — queue only.** **v1 for the Oct 12 testing (`D72`):** an on-submit trigger with email and webhook actions, queue only. What v1 leaves is its own `during-testing` row, filed next.
+  **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-03 by `M127`: it is one of the user's 19 builder comments, wanted for the Oct 12 testing (`D72`).** **`D62` answered 2026-10-03 (`M127`): A — queue only.** **v1 for the Oct 12 testing (`D72`):** an on-submit trigger with email and webhook actions, queue only. What v1 leaves is its own `during-testing` row, filed next. **Verified by `M132` (2026-10-04), which takes it:** `SubmissionCreated` already fires once after commit for every channel, so v1 adds no event and no `DomainEventType` case. `D82` (the email is a notice and a link, no answers) and `D83` (the web address receives the answers, gated to `webhooks.manage`) were answered in chat at claim time.
 
 - **`minor` · A form automation has no Slack, Delay, Filter or Branch action and no form-abandoned trigger — the
   part of form automations left after their Oct 12 v1.** Filed 2026-10-03 by `M127`, split from the automations
@@ -11726,7 +11726,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   webhook actions, queue only (`D62` answered A). Left here: Slack (reusing the existing `Connection` provider),
   Delay, Filter, Branch with an else path, and the form-abandoned trigger, which needs a sweeper
   (`FormScheduleSweeper` is the precedent). "Run AI" stays refused.
-  **Live.** Filed by `M127`. **Tier: during-testing.**
+  **Live.** Filed by `M127`. **Tier: during-testing.** **Also left by `M132`'s v1:** redelivering a failed run by hand, retrying past the queue's six-hour window, and pruning the run history, which grows by one row per automation per response.
 
 - ✅ **CLOSED BY `M131` (2026-10-04) — **`minor` · Compound AND/OR validation rules are supported by the database, the serializer and both evaluators,
   and cannot be authored anywhere.** Filed 2026-09-25 by `M110` while designing the inline `required_if` editor,
@@ -13038,3 +13038,14 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   literals re-pinned — or an eighteenth pairing that the search must satisfy. Measured with the engine, not in a
   browser. **Latent.** It needs a branded or themed form, dark mode and a pointer over the button.
   Filed by `M131`. **Tier: during-testing.**
+
+- **`minor` · The outbound address check resolves a webhook's host, then the request resolves it again, so a host that
+  answers differently the second time reaches a private address.** Found by `M132` while reusing `OutboundUrlGuard`
+  for form automations. `OutboundUrlGuard::assertPublic()` resolves the host with `gethostbynamel()` and refuses any
+  private or reserved address; the request that follows — `DeliverWebhookJob`, the Slack connector, and now the
+  automation webhook — hands Guzzle the hostname, which resolves it again. Nothing pins the checked address (no
+  `CURLOPT_RESOLVE` anywhere), so a DNS answer that changes between the two lookups passes the check and connects
+  inside. The guard's docblock calls the per-attempt re-check the DNS-rebinding defence; it narrows the window rather
+  than closing it. The remedy is to connect to the address the guard approved, through one helper every caller uses.
+  **Live.** It needs someone who may manage webhooks and a host whose DNS they control. Filed by `M132`.
+  **Tier: before-launch.**

@@ -1466,6 +1466,41 @@ The matcher reads a sheet against the version it was printed from, superseded on
 
 ---
 
+### D82 — A form automation can send an email when a response arrives. What does the email carry, and to whom? **A — a notice and a link: the form, the reference number and the time, with a link that opens the response for members who may see it. No answers. Up to five addresses the author types.**
+
+**Filed and answered 2026-10-04 (user decision, in chat), recorded by Lane A during `M132` — A, the recommendation.** Put to the user under `D66`'s rule, because `R-b7bc5149` — an `early-testing` work row taken by `M132` — builds a different email under each answer. Measured: nothing in the app emails an arbitrary address or sends answers by email today. Every email is a queued notification to a member, or to one address the respondent typed (the resume link).
+
+- **A — a notice and a link.** The answers stay behind the app's own access check (`submissions.show`, `can:view,submission`), and the email still says that something arrived and where.
+- **B — the answers in the body,** leaving out questions marked personal or sensitive. Most like Fillout, but answers then travel by email to any address the author types, and those two flags are author-set and default to off.
+- **C — members only, picked from a list,** with a notice and a link.
+
+**Recommendation: A.** These forms carry health data. A link keeps it where access is checked, and B's exclusion depends on flags nobody is made to set.
+
+---
+
+### D83 — A form automation can call a web address when a response arrives. What does it send? **A — the answers, keyed by question, with the form and the reference number, signed with a secret shown once. Only someone who may manage webhooks can set one up, on a plan that includes webhooks, behind the same address check.**
+
+**Filed and answered 2026-10-04 (user decision, in chat), recorded by Lane A during `M132` — A, the recommendation.** Put to the user under `D66`'s rule, because `R-b7bc5149` builds a different action under each answer. Measured: the workspace webhooks send IDs only — `SubmissionCreated`'s payload excludes the answers by design — and `routes/api.php` has no route that returns a response's answers. So an IDs-only action would add nothing a form-scoped webhook does not already do, and its receiver could not fetch what it was told about. The per-endpoint `include_answers` opt-in on workspace webhooks stays its own row.
+
+- **A — the answers.** Built from the same projection the Sheets and Airtable connectors write, signed like a webhook, gated to `webhooks.manage` and the `webhooks` plan feature.
+- **B — IDs only, reusing the workspace webhook machinery.** Retries and the delivery log come for free, but the receiver cannot get the answers.
+
+**Recommendation: A.** An automation exists to move a response somewhere. The permission and the plan gate stay exactly where webhooks put them, because a URL that receives answers is a channel out of the workspace.
+
+---
+
+### D84 — A form's reference files: should they work offline on a respondent's phone? **A — once opened: a file opened while online stays on the device; nothing downloads in advance.**
+
+**Filed and answered 2026-10-04 (user decision, in chat), recorded by Lane A during `M132` — A, the recommendation.** Put to the user under `D66`'s rule, because `R-bf49e4c1` — an `early-testing` work row taken by `M132` — either warms its files with the form or does not. Measured: content pictures are warmed with the form (`M130`), and capped at 2 MB; a reference PDF may be five times that.
+
+- **A — once opened.** The service worker keeps a copy of what the respondent opened; nothing is fetched they did not ask for.
+- **B — downloaded with the form,** like content pictures. Best offline, but every respondent pays the mobile data for every file.
+- **C — online only.**
+
+**Recommendation: A.** A field worker who reads the guide once keeps it, and nobody downloads a large file they never open.
+
+---
+
 ### D15 — `D13`'s one-hub-row cap is now the binding constraint on batch composition, and it is stricter than its own purpose. **ANSWERED — option 4: the cap reads the files a row REMEDY EDITS, excluding the close-out artefacts.** **Tier: early-testing.**
 
 **Filed 2026-09-05 by Lane A, during `M72`, at the moment the cap decided a batch that value had not.**

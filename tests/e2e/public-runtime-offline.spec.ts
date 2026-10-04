@@ -467,3 +467,66 @@ test('Public runtime — a note’s picture still renders offline', async ({ pag
 
     await context.setOffline(false);
 });
+
+// M132 (`R-bf49e4c1`, `D84`) — a reference file opens offline ONCE IT HAS BEEN OPENED, and only then. Nothing is
+// fetched in advance: the map is opened online (the worker keeps it in `guest-reference-files`, keyed without the
+// token), the page goes offline and reloads from the cached shell, and the map opens again; the checklist, never
+// opened, says to open it once online. Proved locally only: CI's origin has no service worker (the M130 row).
+test('Public runtime — a reference file opened once opens again offline, and one never opened says so', async ({ page, context }) => {
+    await page.goto('/f/visit-guide', { waitUntil: 'networkidle' });
+    await page
+        .getByRole('heading', { name: 'Before Your Visit', level: 1 })
+        .waitFor({ state: 'visible', timeout: 15_000 });
+
+    const swAvailable = await page.evaluate(() => 'serviceWorker' in navigator);
+    test.skip(!swAvailable, 'No service worker on this origin, so nothing can render offline.');
+
+    await page.evaluate(async () => {
+        await Promise.race([navigator.serviceWorker.ready, new Promise((resolve) => setTimeout(resolve, 10_000))]);
+    });
+    await page.reload({ waitUntil: 'networkidle' });
+    await page
+        .getByRole('heading', { name: 'Before Your Visit', level: 1 })
+        .waitFor({ state: 'visible', timeout: 15_000 });
+
+    // Nothing in advance: the reference-file cache holds no entry before a file is opened.
+    const before = await page.evaluate(async () =>
+        (await caches.keys()).includes('guest-reference-files') ? (await (await caches.open('guest-reference-files')).keys()).length : 0,
+    );
+    expect(before).toBe(0);
+
+    const files = page.getByRole('list', { name: 'Reference files' });
+    await files.getByRole('button', { name: /Clinic map\.png/ }).click();
+    const map = page.getByRole('dialog', { name: 'Clinic map.png' }).getByRole('img', { name: 'Clinic map.png' });
+    await expect.poll(() => map.evaluate((img: HTMLImageElement) => (img.complete ? img.naturalWidth : 0))).toBe(240);
+    // Escape: the dialog has two buttons named Close (its own and the actions one).
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog', { name: 'Clinic map.png' })).toBeHidden();
+
+    const keys = await page.evaluate(async () =>
+        (await (await caches.open('guest-reference-files')).keys()).map((request) => new URL(request.url).pathname),
+    );
+    expect(keys).toHaveLength(1);
+    expect(keys[0]).toMatch(/^\/api\/v1\/public\/reference-files\/[0-9a-f-]{36}$/);
+
+    await context.setOffline(true);
+    await page.reload({ waitUntil: 'commit' });
+    await page
+        .getByRole('heading', { name: 'Before Your Visit', level: 1 })
+        .waitFor({ state: 'visible', timeout: 15_000 });
+
+    await page.getByRole('list', { name: 'Reference files' }).getByRole('button', { name: /Clinic map\.png/ }).click();
+    const offlineMap = page.getByRole('dialog', { name: 'Clinic map.png' }).getByRole('img', { name: 'Clinic map.png' });
+    await expect
+        .poll(() => offlineMap.evaluate((img: HTMLImageElement) => (img.complete ? img.naturalWidth : 0)), { timeout: 10_000 })
+        .toBe(240);
+    // Escape: the dialog has two buttons named Close (its own and the actions one).
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog', { name: 'Clinic map.png' })).toBeHidden();
+
+    await page.getByRole('list', { name: 'Reference files' }).getByRole('button', { name: /Visit checklist\.pdf/ }).click();
+    // The visible line, not the text: the same words also go to the page's one live region for screen readers.
+    await expect(page.locator('.reference-files__message')).toHaveText('Open this file once while you are online to keep it on this device.');
+
+    await context.setOffline(false);
+});

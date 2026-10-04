@@ -7,11 +7,16 @@ namespace App\Http\Controllers\Tenant;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Attachments\StoreAttachmentRequest;
 use App\Http\Requests\Forms\StoreFormContentImageRequest;
+use App\Http\Requests\Forms\StoreFormReferenceFileRequest;
+use App\Http\Requests\Forms\UpdateFormReferenceFileRequest;
 use App\Models\Attachment;
 use App\Models\Form;
 use App\Models\FormVersion;
+use App\Models\User;
 use App\Services\Attachments\AttachmentStorageService;
+use App\Services\Forms\FormReferenceFileService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -31,6 +36,9 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  * Since M129 it also takes a form author's image for a note's content (`POST /forms/{form}/content-images`, gated
  * `can:update,form` — `R-f0c5b682`). The image belongs to the FORM, not a version (`D58` = B), and staff read it
  * back through the same `show()`, under `AttachmentPolicy`'s `FormContentImage` arm.
+ *
+ * Since M132 it also keeps a form's reference files (`/forms/{form}/reference-files`, gated `can:update,form` —
+ * `R-bf49e4c1`): list, attach, rename and remove on the draft, through `FormReferenceFileService`.
  */
 final class AttachmentController extends Controller
 {
@@ -68,6 +76,40 @@ final class AttachmentController extends Controller
             'width' => $attachment->width,
             'height' => $attachment->height,
         ]], 201);
+    }
+
+    /**
+     * The draft's reference files (M132, `R-bf49e4c1`), as the settings panel lists them — read again while a new
+     * file's virus check is still running, so the panel can say when it is ready.
+     */
+    public function indexReferenceFiles(Form $form, FormReferenceFileService $service): JsonResponse
+    {
+        $draft = $form->draft_version_id === null ? null : FormVersion::query()->whereKey($form->draft_version_id)->first();
+
+        return response()->json(['data' => $draft === null ? [] : $service->forAuthor($draft)]);
+    }
+
+    /** Attach one reference file to the form's draft: 201 with the file as the panel shows it. */
+    public function storeReferenceFile(StoreFormReferenceFileRequest $request, Form $form, FormReferenceFileService $service): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        return response()->json(['data' => $service->attach($form, $request->uploadedReferenceFile(), $user)], 201);
+    }
+
+    /** Rename one of the draft's reference files, addressed by its attachment id (stable across publishes). */
+    public function updateReferenceFile(UpdateFormReferenceFileRequest $request, Form $form, string $file, FormReferenceFileService $service): JsonResponse
+    {
+        return response()->json(['data' => $service->relabel($form, $file, $request->referenceLabel())]);
+    }
+
+    /** Remove one of the draft's reference files. A published version that shows it keeps it. */
+    public function destroyReferenceFile(Form $form, string $file, FormReferenceFileService $service): Response
+    {
+        $service->detach($form, $file);
+
+        return response()->noContent();
     }
 
     public function show(Attachment $attachment): StreamedResponse

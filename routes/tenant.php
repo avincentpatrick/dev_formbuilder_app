@@ -1071,6 +1071,42 @@ Route::middleware([
     Route::post('/forms/{form}/content-images', [AttachmentController::class, 'storeFormContentImage'])
         ->middleware(['can:update,form', 'throttle:30,1'])
         ->name('forms.content-images.store');
+    // M132, `R-bf49e4c1`: the reference files a form shows its respondents, kept on the draft and frozen into each
+    // published version (`D61` = B). Whoever may edit the form may attach to it; the upload is throttled like an
+    // upload. A file is addressed by its attachment id, which a publish never changes.
+    Route::get('/forms/{form}/reference-files', [AttachmentController::class, 'indexReferenceFiles'])
+        ->middleware('can:update,form')
+        ->name('forms.reference-files.index');
+    Route::post('/forms/{form}/reference-files', [AttachmentController::class, 'storeReferenceFile'])
+        ->middleware(['can:update,form', 'throttle:30,1'])
+        ->name('forms.reference-files.store');
+    Route::patch('/forms/{form}/reference-files/{file}', [AttachmentController::class, 'updateReferenceFile'])
+        ->middleware('can:update,form')
+        ->whereUuid('file')
+        ->name('forms.reference-files.update');
+    Route::delete('/forms/{form}/reference-files/{file}', [AttachmentController::class, 'destroyReferenceFile'])
+        ->middleware('can:update,form')
+        ->whereUuid('file')
+        ->name('forms.reference-files.destroy');
+    // M132, `R-b7bc5149`: a form's automations — "when a response is submitted, send an email or the answers to a web
+    // address" (`D82`, `D83`), run on the queue only (`D62`). On the already-imported FormController, for the `use`-line
+    // reason above. A change is `can:manage,automation` too: a web-address automation is `webhooks.manage`'s alone. The
+    // test send is the webhooks plan feature's, and throttled because each one is a real outbound request.
+    Route::post('/forms/{form}/automations', [FormController::class, 'storeAutomation'])
+        ->middleware(['can:update,form', 'throttle:30,1'])
+        ->name('forms.automations.store');
+    Route::patch('/forms/{form}/automations/{automation}', [FormController::class, 'updateAutomation'])
+        ->middleware(['can:update,form', 'can:manage,automation'])
+        ->scopeBindings()
+        ->name('forms.automations.update');
+    Route::delete('/forms/{form}/automations/{automation}', [FormController::class, 'destroyAutomation'])
+        ->middleware(['can:update,form', 'can:manage,automation'])
+        ->scopeBindings()
+        ->name('forms.automations.destroy');
+    Route::post('/forms/{form}/automations/{automation}/test', [FormController::class, 'testAutomation'])
+        ->middleware(['can:update,form', 'can:manage,automation', 'feature:webhooks', 'throttle:6,1'])
+        ->scopeBindings()
+        ->name('forms.automations.test');
 });
 
 /*

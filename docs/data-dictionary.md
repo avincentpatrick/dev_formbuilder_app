@@ -38,7 +38,7 @@ This document is the source of truth for column-level shape; it will be kept in 
 | `SubmissionStatus` | `submissions.status` | — none | `draft`, `submitted`, `screened_out`, `under_review`, `approved`, `returned`, `archived` (adapted from legacy's 5-value lookup: `under_review` replaces "Pending Validation", `archived` is a new terminal state added for retention workflows — reasonable, noted extension). **`screened_out` added in I9a** (Doc #27 §4.1): the respondent finalized having been shown no questions at all, derived server-side from `StepProjection::isEmpty()`. It is the one finalized status that does **not** consume a `max_responses` slot (`Submission::scopeConsumesCapacity()`), and it is terminal — no review transition accepts it, because `archived` *does* consume and the conversion would retroactively overfill a paid cap. **No CHECK constraint exists on this column**, so adding a value is an enum change only. |
 | `SubmissionSource` | `submissions.source` | — none | `manual`, `guest`, `ocr_single`, `ocr_linelist`, `offline_sync`, `api_import` (the six channels named explicitly in plan §2.2/§2.4) |
 | `IndexedDataType` | `form_fields.indexed_data_type` | — none | `text`, `number`, `boolean`, `date`, `datetime` |
-| `AttachmentKind` | `attachments.kind` | — none | `submission_file`, `ocr_source_scan`, `field_media_sample`, `signature_capture`, `avatar`, `branding_logo`, `feedback_screenshot` *(added I7a)*, `export_artifact`, `webhook_payload_archive`, `form_content_image` *(added M129 — an image in a note's content, owned by its form, `D58` = B)* |
+| `AttachmentKind` | `attachments.kind` | — none | `submission_file`, `ocr_source_scan`, `field_media_sample`, `signature_capture`, `avatar`, `branding_logo`, `feedback_screenshot` *(added I7a)*, `export_artifact`, `webhook_payload_archive`, `form_content_image` *(added M129 — an image in a note's content, owned by its form, `D58` = B)*, `form_reference_file` *(added M132 — a PDF or image a form shows its respondents, owned by its form and frozen into each published version by `form_version_reference_files`, §35, `D61` = B)* |
 | — | — | — | **H17 note:** `export_artifact` has a writer for the first time — the submission PDF (`SubmissionPdfStorage`). It uses a DETERMINISTIC storage key, `tenants/{tenant}/export_artifact/submissions/{submission}.pdf`, rather than the `{yyyymm}/{uuid}` leaf the two older writers use, so regenerating a PDF overwrites in place and one submission can only ever hold one. That is deliberate: `storage_bytes` is a hard-block gauge summed over non-trashed `attachments` rows and NOTHING in the codebase reclaims storage, so an accumulating key would charge a tenant permanently for every click of "Regenerate". |
 | `ScanStatus` | `attachments.virus_scan_status` | — none | `pending`, `clean`, `infected`, `skipped` |
 | `AuditEvent` | `audits.event` | `audits_event_check` | `created`, `updated`, `deleted`, `restored`, `published`, `archived`, `exported`, `permission_changed`, `impersonation_started`, `impersonation_ended`, `two_factor_reset` — **eleven cases** (extends legacy's 4 base events with 7 domain events the plan's versioning/export/RBAC model, I11b's platform-operator boundary and M107's account-recovery boundary need tracked — noted extension). ✅ **`two_factor_reset` added by Increment M107 (2026-09-20), `D37`** — an administrative clearing of somebody's two-factor enrolment, written from the workspace roster and from the platform console alike. Like the two impersonation boundaries it records an ACCESS decision rather than a model change and carries no `old_values`/`new_values`; unlike them it carries no `acting_as_user_id` either, because the actor acts in their own name. ⚠️ **This row listed eight from I11b until Increment M46 (2026-08-29)**, omitting the two impersonation boundaries; §13's `event` column row and its design note carried the same undercount, so the dictionary was internally consistent and externally wrong in three places at once. The database pins the full set via `audits_event_check`, which is generated from `AuditEvent::values()` at the migration that creates it and therefore needs its own migration to widen — adding a case to the PHP enum alone leaves an existing database rejecting it with `SQLSTATE 23514`. |
@@ -524,7 +524,7 @@ One unified polymorphic table replacing legacy's `image_path`/`file_path`/`excel
 | `tenant_id` | `uuid` | No | — | No | FK to `tenants.id`. |
 | `attachable_type` | `varchar(100)` | No | — | No | Polymorphic morph type. Every value written: `form_field` (an answer file staged before its submission exists), `submission` (respondent media, a submission PDF, and a confirmed scan's pages), `webhook_delivery` (an archived envelope), `tenant` (the brand logo), `feedback_report` (a screenshot), `ocr_scan` (a scan's pages until it is confirmed), and since M129 `form` (a note's content image, `D58` = B). |
 | `attachable_id` | `uuid` | No | — | No | Polymorphic morph id — no hard FK constraint (standard, accepted trade-off of polymorphic associations; see Design Notes). |
-| `kind` | `varchar(30)` — PHP enum: `AttachmentKind` | No | — | No | See the 10-value catalog above. |
+| `kind` | `varchar(30)` — PHP enum: `AttachmentKind` | No | — | No | See the 11-value catalog above. |
 | `disk` | `varchar(30)` | No | `'local'` | No | Laravel filesystem disk name. **Phase-1 deviation (Increment G6):** the column default is `'local'` (the initial on-server backing store, deployment §7), not the aspirational `'s3'`; the write path (`AttachmentStorageService`) sets `disk` per-write from `config('filesystems.default')`, so an S3 swap is config-only. |
 | `path` | `varchar(500)` | No | — | No | Object storage key, namespaced `tenants/{tenant_id}/...` per plan §2.1. |
 | `original_filename` | `varchar(255)` | Yes | `NULL` | **Yes** | May contain a respondent's or staff member's name (e.g. `john_smith_id_scan.jpg`). |
@@ -1353,6 +1353,89 @@ A folder the forms list files forms into (M131, `R-9e634897`, `D78`) — flat, s
 
 ---
 
+## 35. `form_version_reference_files`
+
+The reference files a form version shows its respondents (M132, `R-bf49e4c1`) — a PDF or an image an author attaches for respondents to read while they answer: a guide, a consent form, a map. **Frozen per published version, and the bytes are not copied (`D61` = B):** a row says that THIS version shows THAT file under THIS label. The file itself is one `attachments` row of kind `form_reference_file` (§10), owned by the form (`attachable_type = 'form'`) and stored **once per distinct SHA-256 per form** — uploading identical bytes again reuses the stored file and charges no storage. Publishing copies these rows into the next draft (`SchemaTreeCloner`, beside the version's fields), so the same file shown by five versions is one attachment and five rows, and the storage gauge, which sums attachment rows, counts it once.
+
+**Writers:** `App\Services\Forms\FormReferenceFileService` (attach, rename, remove — on the DRAFT only) behind `/forms/{form}/reference-files` (`can:update,form`), and `SchemaTreeCloner` on publish and restore. Every writer takes the `forms` row lock first, which `PublishService` relies on. Not audited: these are draft edits (`docs/form-versioning-schema-migration.md` §1), and the publish that freezes them is the audited event. **Readers:** the form settings' Reference files section; `PublicFormPresenter` (`version.reference_files` on the guest schema, beside `schema` and outside its checksum, listing only files past their virus check); `GET /api/v1/public/reference-files/{shareToken}/{file}`, which serves a file only when the token's own version lists it.
+
+| Column | Type | Nullable | Default | PII? | Description |
+|---|---|---|---|---|---|
+| `id` | `uuid` | No | application-generated (`HasUuidv7`) | No | Primary key. A new id per version: a publish copies the row. |
+| `tenant_id` | `uuid` | No | — | No | FK to `tenants.id`, `ON DELETE CASCADE`. |
+| `form_version_id` | `uuid` | No | — | No | The version that shows the file. Composite FK `(tenant_id, form_version_id)` → `form_versions (tenant_id, id)`, `ON DELETE CASCADE` — archiving a form deletes its draft version, and the draft's list goes with it. |
+| `attachment_id` | `uuid` | No | — | No | The file: an `attachments` row of kind `form_reference_file`. Composite FK `(tenant_id, attachment_id)` → `attachments (tenant_id, id)`, `NO ACTION` — a file a version still shows cannot be hard-deleted. The id never changes across publishes, so the settings section addresses a file by it. |
+| `label` | `varchar(120)` | No | — | No | What respondents see in place of the file: the original file name until the author renames it. |
+| `position` | `smallint` | No | — | No | Display order within the version: the order the files were attached in. |
+| `created_at` / `updated_at` | `timestamptz` | No | set by Eloquent | No | — |
+
+**Indexes**: `UNIQUE (tenant_id, form_version_id, attachment_id)` (`form_version_reference_files_unique`) — one file once per version; `(tenant_id, attachment_id)`.
+
+> **Design Notes**
+> - **RLS**: `draft_child`, the shape of `form_sections`/`form_fields`/`form_field_validations`: anyone in the tenant reads; an INSERT, UPDATE or DELETE is accepted only while the row's version is a draft, so a published version's files cannot be changed by any path. Listed in `TenantScopedTables::STRICT`; nothing is withheld from the tenant extract.
+> - **A removed file is kept while any version shows it.** Removing a file deletes the draft's row only; the attachment is soft-deleted (freeing its storage) once no version of any status references it (`FormReferenceFileService::collectOrphans()`, also run after a restore).
+> - **At most ten per version** (`config('attachments.form_reference_file.max_per_version')`); PDF, PNG, JPEG or WebP, 10 MB each, the type sniffed from the bytes. A PDF is always served as a download, never rendered in the app's origin.
+> - **Offline once opened (`D84`).** The guest page fetches a file rather than navigating to it, so the service worker keeps a copy in `guest-reference-files`; nothing is downloaded in advance.
+> - Requires `(tenant_id, id)` uniques on `form_versions` and `attachments` (`2026_08_17_000121`), the targets of the two composite keys.
+
+---
+
+## 36. `form_automations`
+
+A form's automations (M132, `R-b7bc5149`): "when a response is submitted, do this". One trigger and one action per row; a form may have up to ten (`FormAutomationService::MAX_PER_FORM`). They run on the queue only, after the response is stored (`D62` = A), so an automation never delays or refuses a respondent. ⛔ An automation runs an **action**, never a "step" — the respondent's step is a projection with no table (`docs/workflow-branching-design.md` §2).
+
+**Writers:** `App\Services\Automations\FormAutomationService` (create, update, delete — each audited under the `form_automation` alias) behind `/forms/{form}/automations` (`can:update,form`; a change also `can:manage,automation`). **Readers:** the form settings' Automations section (`FormAutomationPresenter`), and `FormAutomationDispatcher`, which `RunFormAutomationsForSubmissionCreated` calls once per `SubmissionCreated` event.
+
+| Column | Type | Nullable | Default | PII? | Description |
+|---|---|---|---|---|---|
+| `id` | `uuid` | No | application-generated (`HasUuidv7`) | No | Primary key. |
+| `tenant_id` | `uuid` | No | — | No | FK to `tenants.id`, `ON DELETE CASCADE`. |
+| `form_id` | `uuid` | No | — | No | The form. Composite FK `(tenant_id, form_id)` → `forms (tenant_id, id)`, `ON DELETE CASCADE`. |
+| `name` | `varchar(80)` | No | — | No | The author's name for it. |
+| `trigger` | `varchar(40)` — PHP enum: `FormAutomationTrigger` | No | `'submission.created'` | No | When it fires. One value in v1: `submission.created`, the domain event raised once after commit for every accepted response (guest, staff encoding, offline sync, a scanned paper form, a promoted draft). Pinned by `form_automations_trigger_check`. |
+| `action` | `varchar(20)` — PHP enum: `FormAutomationAction` | No | — | No | What it does: `email` (a notice and a link, `D82`) or `webhook` (the answers to a web address, `D83`). Pinned by `form_automations_action_check`. |
+| `recipients` | `jsonb` | Yes | `NULL` | **Yes** | Email only: up to five addresses, each validated `email:rfc`. Redacted from the audit log as PII. |
+| `url` | `varchar(2048)` | Yes | `NULL` | No | Web address only: where the answers go. Must be public (`PublicHttpUrl`), and is checked again before every send (`OutboundUrlGuard`). Shown whole only to holders of `webhooks.manage`; anyone else sees its host. |
+| `secret` | `text` (encrypted cast) | Yes | `NULL` | No | Web address only: the HMAC signing secret (`whsec_…`), shown to the author once at creation and never again. Withheld from the tenant extract; never in an audit row. |
+| `enabled` | `boolean` | No | `true` | No | Whether it fires. A run queued before it was switched off is recorded `skipped`. |
+| `created_by` | `uuid` | Yes | `NULL` | No | Who added it. FK to `users.id`, `ON DELETE SET NULL`. |
+| `created_at` / `updated_at` | `timestamptz` | No | set by Eloquent | No | — |
+
+**Constraints**: `form_automations_shape_check` — an `email` row has `recipients` and no `url` or `secret`; a `webhook` row has `url` and `secret` and no `recipients`. `UNIQUE (tenant_id, id)` (`form_automations_tenant_id_id_unique`), the target of `form_automation_runs_automation_fk`.
+
+> **Design Notes**
+> - **RLS**: `strict`. Listed in `TenantScopedTables::STRICT`; `secret` is withheld from the tenant extract (`TenantExtractColumns::WITHHELD`).
+> - **A web address receives the answers, so it is `webhooks.manage`'s alone** (`FormAutomationPolicy`), on a plan that includes `webhooks` — the workspace webhooks' own rules. An email automation is the form's editors' to manage.
+> - **Hard delete.** There is no restore, and a soft-deleted row would keep a live secret at rest for nothing.
+
+## 37. `form_automation_runs`
+
+One automation's run for one response (M132, `R-b7bc5149`): the ledger the Automations section reads to say what happened, and the idempotency key that makes a re-raised event do nothing. **It stores no payload and no response body** — the web-address job rebuilds the body from the stored response at send time — so no answer sits in a table nothing prunes (pruning the runs themselves is filed on the automations remainder row).
+
+**Writers:** `FormAutomationDispatcher` (one row per enabled automation per event, `firstOrCreate` on the event id), `DeliverFormAutomationWebhookJob` and `SendFormAutomationEmailJob`.
+
+| Column | Type | Nullable | Default | PII? | Description |
+|---|---|---|---|---|---|
+| `id` | `uuid` | No | application-generated (`HasUuidv7`) | No | Primary key. |
+| `tenant_id` | `uuid` | No | — | No | FK to `tenants.id`, `ON DELETE CASCADE`. |
+| `form_automation_id` | `uuid` | No | — | No | The automation. Composite FK `(tenant_id, form_automation_id)` → `form_automations (tenant_id, id)`, `ON DELETE CASCADE`. |
+| `submission_id` | `uuid` | No | — | No | The response it ran for. No foreign key, as `ocr_scans.submission_id` has none: a run is history and outlives a deleted response. |
+| `event_id` | `uuid` | No | — | No | The `SubmissionCreated` event's id — stable, so a second raise finds this row. |
+| `status` | `varchar(20)` — PHP enum: `FormAutomationRunStatus` | No | `'pending'` | No | `pending`, `retrying`, `succeeded`, `failed` or `skipped`. Pinned by `form_automation_runs_status_check`. |
+| `attempt_count` | `smallint` | No | `0` | No | Attempts made. A web address is tried at most five times on the shared retry ladder (1, 5, 30 and 120 minutes apart). |
+| `response_status` | `smallint` | Yes | `NULL` | No | The web address's HTTP status on the last attempt. |
+| `error_code` | `varchar(40)` | Yes | `NULL` | No | Why the last attempt did not succeed: `http_<status>`, `transport_error`, `blocked_url`, `quota_exceeded`, `plan_feature`, `submission_missing` or `disabled`. Never a response body. |
+| `last_attempted_at` | `timestamptz` | Yes | `NULL` | No | When it was last attempted. |
+| `created_at` / `updated_at` | `timestamptz` | No | set by Eloquent | No | — |
+
+**Index**: `UNIQUE (tenant_id, form_automation_id, event_id)` (`form_automation_runs_event_unique`); `(tenant_id, form_automation_id, created_at)` for the section's recent runs.
+
+> **Design Notes**
+> - **RLS**: `strict`. Listed in `TenantScopedTables::STRICT`; nothing withheld.
+> - **Its own ledger, not `webhook_deliveries`:** that table's one-owner CHECK and its sweeper's two-way branch would misroute a third owner, an email has no place in it, and it stores payloads, which here would be answers.
+
+---
+
 ## Foreign Key Relationship Summary
 
 ```
@@ -1389,6 +1472,16 @@ form_field_validations.tenant_id           -> tenants.id
 form_field_validations.form_version_id     -> form_versions.id
 form_field_validations.form_field_id       -> form_fields.id
 form_field_validations.related_form_field_id -> form_fields.id
+
+form_version_reference_files.tenant_id -> tenants.id
+form_version_reference_files.(tenant_id, form_version_id) -> form_versions.(tenant_id, id)  (composite, CASCADE — see §35)
+form_version_reference_files.(tenant_id, attachment_id)   -> attachments.(tenant_id, id)    (composite, NO ACTION — see §35)
+
+form_automations.tenant_id -> tenants.id
+form_automations.(tenant_id, form_id) -> forms.(tenant_id, id)  (composite, CASCADE — see §36)
+form_automations.created_by -> users.id  (external, SET NULL)
+form_automation_runs.tenant_id -> tenants.id
+form_automation_runs.(tenant_id, form_automation_id) -> form_automations.(tenant_id, id)  (composite, CASCADE — see §37)
 
 submissions.tenant_id                  -> tenants.id
 submissions.form_id                    -> forms.id

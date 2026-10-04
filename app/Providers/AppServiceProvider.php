@@ -616,6 +616,26 @@ class AppServiceProvider extends ServiceProvider
                         $response->setDescription('The image as stored: a PNG, JPEG or WebP the virus check has passed.');
                     }
                 }
+
+                // M132 (`R-bf49e4c1`) — a form's reference file, the same stream for the same reason, and as loud when
+                // its path moves. A PDF or an image, so the media type is whichever the file is.
+                $filePath = collect($openApi->paths)
+                    ->first(static fn (Path $path): bool => $path->path === 'public/reference-files/{shareToken}/{file}');
+                $fileRead = $filePath?->operations['get'] ?? null;
+
+                if ($fileRead === null) {
+                    throw new \LogicException('openapi: the guest reference-file read is gone; update AppServiceProvider.');
+                }
+
+                foreach ($fileRead->responses ?? [] as $response) {
+                    if ($response instanceof OpenApiResponse && (int) $response->code === 200) {
+                        $response->content = [
+                            'application/pdf' => Schema::fromType((new StringType)->format('binary')->contentMediaType('application/pdf')),
+                            'image/*' => Schema::fromType((new StringType)->format('binary')->contentMediaType('image/*')),
+                        ];
+                        $response->setDescription('The file as stored: a PDF (sent as a download) or a PNG, JPEG or WebP image, past its virus check.');
+                    }
+                }
             });
         }
     }

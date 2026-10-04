@@ -174,6 +174,37 @@ for (const theme of themes) {
     });
 }
 
+// A form's reference files (M132, `R-bf49e4c1`). "Before Your Visit" (E2eSeeder) shows a PDF checklist and a map under
+// its description. The map opens in a dialog from the token-scoped route — and MUST load, for the image-scan reason
+// above — and the PDF is fetched by the page and saved, never navigated to (the worker's scope is `/f/`).
+for (const theme of themes) {
+    test(`Public runtime reference files (${theme}) — accessible & no horizontal overflow`, async ({ page }) => {
+        await page.goto('/f/visit-guide', { waitUntil: 'networkidle' });
+        await page
+            .getByRole('heading', { name: 'Before Your Visit', level: 1 })
+            .waitFor({ state: 'visible', timeout: 15_000 });
+        await forceTheme(page, theme);
+
+        const files = page.getByRole('list', { name: 'Reference files' });
+        await expect(files.getByRole('button')).toHaveCount(2);
+        await expect(files.getByRole('button', { name: /Visit checklist\.pdf/ })).toContainText('PDF');
+        await assertClean(page, 'Before Your Visit (reference files)');
+
+        await files.getByRole('button', { name: /Clinic map\.png/ }).click();
+        const dialog = page.getByRole('dialog', { name: 'Clinic map.png' });
+        const map = dialog.getByRole('img', { name: 'Clinic map.png' });
+        await expect.poll(() => map.evaluate((img: HTMLImageElement) => (img.complete ? img.naturalWidth : 0))).toBe(240);
+        await assertClean(page, 'Before Your Visit (reference file dialog)');
+        // Escape, not a name: the dialog has two buttons named Close (its own and the actions one).
+        await page.keyboard.press('Escape');
+        await expect(dialog).toBeHidden();
+
+        const download = page.waitForEvent('download');
+        await files.getByRole('button', { name: /Visit checklist\.pdf/ }).click();
+        expect((await download).suggestedFilename()).toBe('Visit checklist.pdf');
+        await expect(page).toHaveURL(/\/f\/visit-guide$/);
+    });
+}
 // After the thank-you (M130, `R-db169c29`, `D76`). "Before Your Visit" (E2eSeeder) sends a respondent on to
 // https://visit.example.org/next: the screen names it, counts down from 20 seconds, and offers Stay. The scan runs
 // WHILE it counts — the countdown is the new surface — and Stay comes straight after, well inside the 20 seconds.

@@ -39,6 +39,7 @@ final class AuditableTypes
         'form' => 'Form',
         'form_version' => 'Form version',
         'form_folder' => 'Form folder',
+        'form_automation' => 'Form automation',
         'submission' => 'Submission',
         'settings' => 'Settings',
         'domain' => 'Custom domain',

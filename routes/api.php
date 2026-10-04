@@ -575,6 +575,14 @@ Route::prefix('api/v1/public')
             ->withoutMiddleware('throttle:guest')
             ->middleware('throttle:guest-content-image')
             ->name('content-images.show');
+
+        // A form's reference files (M132, `R-bf49e4c1`), on the image read's boundary and for its reasons: off `f/`
+        // (the schema cache's prefix) and off `throttle:guest` (the budget a respondent submits with). It shares the
+        // image limiter — a form's own material, read by the same page. Regenerate openapi.json after touching it.
+        Route::get('reference-files/{shareToken}/{file}', [GuestContentImageController::class, 'referenceFile'])
+            ->withoutMiddleware('throttle:guest')
+            ->middleware('throttle:guest-content-image')
+            ->name('reference-files.show');
     });
 
 // ── Group C (resume): guest draft RESUME — UNAUTHENTICATED; tenant + the target draft submissions.id resolved ─

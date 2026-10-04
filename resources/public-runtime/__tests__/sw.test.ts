@@ -151,20 +151,21 @@ function apiGet(path: string): MatchArg {
 }
 
 describe('sw.ts runtime cache route table', () => {
-    it('registers the four runtime caches', () => {
+    it('registers the five runtime caches', () => {
         // A floor on the table itself. Without it, a route deleted outright would take its own
         // status assertion with it and the file would stay green while covering nothing — the
-        // vacuous-success shape this repository gates everywhere else. M130 added the fourth.
-        expect(routes).toHaveLength(4);
+        // vacuous-success shape this repository gates everywhere else. M130 added the fourth, M132 the fifth.
+        expect(routes).toHaveLength(5);
         expect(routes.map((r) => r.strategy.cacheName)).toEqual([
             'guest-shell-assets',
             'guest-schema',
             'guest-shell-html',
             'guest-content-images',
+            'guest-reference-files',
         ]);
     });
 
-    it.each(['guest-shell-assets', 'guest-schema', 'guest-shell-html', 'guest-content-images'])(
+    it.each(['guest-shell-assets', 'guest-schema', 'guest-shell-html', 'guest-content-images', 'guest-reference-files'])(
         'caches a 200 on %s',
         async (cacheName) => {
             // The control arm. If this ever goes red the filter is too strict, not too loose, and
@@ -173,7 +174,7 @@ describe('sw.ts runtime cache route table', () => {
         },
     );
 
-    it.each(['guest-shell-assets', 'guest-schema', 'guest-shell-html', 'guest-content-images'])(
+    it.each(['guest-shell-assets', 'guest-schema', 'guest-shell-html', 'guest-content-images', 'guest-reference-files'])(
         'refuses an opaque (status 0) response on %s',
         async (cacheName) => {
             // ⛔ THE DISCRIMINATOR, AND THE ONLY ARM THAT WAS RED BEFORE M77. Delete the
@@ -223,6 +224,7 @@ describe('sw.ts route matchers — which URLs enter a cache at all', () => {
         expect(matcherFor('guest-shell-html')(resumeRead)).toBe(false);
         expect(matcherFor('guest-shell-assets')(resumeRead)).toBe(false);
         expect(matcherFor('guest-content-images')(resumeRead)).toBe(false);
+        expect(matcherFor('guest-reference-files')(resumeRead)).toBe(false);
     });
 
     it('claims a content image for the image cache only, and keys it without the share token (M130)', async () => {
@@ -245,6 +247,30 @@ describe('sw.ts route matchers — which URLs enter a cache at all', () => {
 
         // A token minted on the next visit must find the same entry, or every visit re-downloads every image.
         expect(await keyFor('token-a')).toBe('https://acme.test/api/v1/public/content-images/att-1');
+        expect(await keyFor('token-b')).toBe(await keyFor('token-a'));
+    });
+
+    it('claims a reference file for its own cache only, and keys it without the share token (M132, D84)', async () => {
+        const file = apiGet('/api/v1/public/reference-files/token-a/att-9');
+
+        expect(matcherFor('guest-reference-files')(file)).toBe(true);
+        // Off the schema prefix and off the image prefix: each cache holds one kind of thing.
+        expect(matcherFor('guest-schema')(file)).toBe(false);
+        expect(matcherFor('guest-content-images')(file)).toBe(false);
+        expect(matcherFor('guest-reference-files')(apiGet('/api/v1/public/content-images/token-a/att-1'))).toBe(false);
+        expect(matcherFor('guest-reference-files')(apiGet('/api/v1/public/f/some-share-token'))).toBe(false);
+
+        const plugins = (routeFor('guest-reference-files').plugins ?? []) as Array<{
+            cacheKeyWillBeUsed?: (o: { request: Request; mode: string }) => Promise<Request | string>;
+        }>;
+        const keyPlugin = plugins.find((plugin) => typeof plugin.cacheKeyWillBeUsed === 'function');
+        expect(keyPlugin, 'the reference-file route has no cache-key plugin').toBeDefined();
+
+        const keyFor = (token: string) =>
+            keyPlugin!.cacheKeyWillBeUsed!({ request: new Request(`https://acme.test/api/v1/public/reference-files/${token}/att-9`), mode: 'read' });
+
+        // Opened under one visit's token, it must be found under the next visit's, offline.
+        expect(await keyFor('token-a')).toBe('https://acme.test/api/v1/public/reference-files/att-9');
         expect(await keyFor('token-b')).toBe(await keyFor('token-a'));
     });
 

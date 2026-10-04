@@ -66,6 +66,10 @@ final class TenantExtractColumns
                 .'it is how a domain reaches `verified`, so it is a credential for the routing layer, not a '
                 .'record of the tenant\'s data.',
         ],
+        'form_automations' => [
+            'secret' => 'A form automation\'s live HMAC signing secret (M132). A reader holding it can forge a request '
+                .'that the receiving system will verify as one of this form\'s responses.',
+        ],
         'forms' => [
             'search_vector' => 'A derived tsvector maintained by trigger from columns that ARE extracted. Not '
                 .'portable across PostgreSQL text-search configurations and reproducible by reindexing.',

@@ -92,4 +92,14 @@ class FormVersion extends Model implements TenantScoped
     {
         return $this->hasMany(FormFieldValidation::class);
     }
+
+    /**
+     * The reference files this version shows its respondents (M132, `R-bf49e4c1`), frozen with it (`D61` = B).
+     *
+     * @return HasMany<FormVersionReferenceFile, $this>
+     */
+    public function referenceFiles(): HasMany
+    {
+        return $this->hasMany(FormVersionReferenceFile::class);
+    }
 }

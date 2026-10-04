@@ -177,6 +177,17 @@ class Form extends Model implements TenantScoped
     }
 
     /**
+     * The form's automations (M132, `R-b7bc5149`): what runs when a response is submitted. The route binding's
+     * `scopeBindings()` resolves `{automation}` through this, so another form's automation is a 404.
+     *
+     * @return HasMany<FormAutomation, $this>
+     */
+    public function automations(): HasMany
+    {
+        return $this->hasMany(FormAutomation::class);
+    }
+
+    /**
      * Per-instance access grants naming THIS form directly (Increment G10a — replaces `collaborators()`).
      * Note a user may also reach this form through a grant on its {@see scopeNode()}; only
      * {@see ResourceGrantResolver} answers "who can do what here" completely.

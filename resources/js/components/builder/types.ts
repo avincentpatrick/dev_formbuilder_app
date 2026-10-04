@@ -8,7 +8,7 @@
 
 import type { BreadcrumbItem } from '@meridian/design-system';
 
-import type { OcrScanningProps, RedirectKind, RedirectTargetOption, ShareProps, ThemePresetOption } from '@/components/forms/types';
+import type { AutomationsProps, OcrScanningProps, RedirectKind, RedirectTargetOption, ReferenceFileRow, ShareProps, ThemePresetOption } from '@/components/forms/types';
 
 export type Uid = string;
 
@@ -252,6 +252,10 @@ export interface BuilderPageProps {
      * applies to it with `!= null`.
      */
     ocr_scanning?: OcrScanningProps | null;
+    /** M132 — the Reference files section's list: the draft's files. Optional, so a fixture without it type-checks. */
+    reference_files?: ReferenceFileRow[];
+    /** M132 — the Automations section. Optional, so a fixture without it type-checks. */
+    automations?: AutomationsProps;
     /**
      * The toolbar's path trail, resolved SERVER-SIDE by `CrumbTrail` (Increment J2d).
      *

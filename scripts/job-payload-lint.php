@@ -130,7 +130,7 @@ const EXEMPT_JOBS = [
     // J3a. The one email in this application that asks for nothing — sent on `Verified`, not `Registered`,
     // so it does not land beside the verification link it is the reward for. Three builtin scalars, product
     // palette (the QueuedVerifyEmail argument verbatim), on-demand notifiable. Same shape as every sibling.
-    'App\Notifications\Auth\WelcomeNotification',
+    'App\Notifications\Auth\WelcomeNotification', 'App\Notifications\Automations\FormAutomationNotification',
 ];
 
 $root = dirname(__DIR__);

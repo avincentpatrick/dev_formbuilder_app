@@ -112,3 +112,55 @@ export interface ScopeSectionProps {
     current_node_id: string | null;
     options: ScopeOption[];
 }
+
+/**
+ * One reference file on the form's draft, as the Files section lists it (M132, `R-bf49e4c1`). `id` is the
+ * attachment's id, which a publish never changes; `scan` is the virus check's state — a `checking` file is not shown
+ * to respondents yet, and a `refused` one never will be.
+ */
+export interface ReferenceFileRow {
+    id: string;
+    label: string;
+    file_name: string;
+    mime_type: string;
+    size_bytes: number;
+    scan: 'checking' | 'ready' | 'refused';
+    /** Where staff open it: `GET /attachments/{id}`. */
+    url: string;
+}
+
+/** What an automation does (M132, `R-b7bc5149`): a notice by email (`D82`), or the answers to a web address (`D83`). */
+export type AutomationAction = 'email' | 'webhook';
+
+/** One automation's recent run, as the Automations section lists it. `error_code` says why it did not succeed. */
+export interface AutomationRunRow {
+    id: string;
+    status: 'pending' | 'retrying' | 'succeeded' | 'failed' | 'skipped';
+    label: string;
+    at: string | null;
+    response_status: number | null;
+    error_code: string | null;
+}
+
+/**
+ * One of a form's automations. `url` is sent whole only to a reader who may manage webhooks — anyone else gets `host`;
+ * `manageable` is whether this reader may change it.
+ */
+export interface AutomationRow {
+    id: string;
+    name: string;
+    action: AutomationAction;
+    enabled: boolean;
+    recipients: string[] | null;
+    url: string | null;
+    host: string | null;
+    manageable: boolean;
+    runs: AutomationRunRow[];
+}
+
+/** The Automations section (M132): the form's automations, and whether this reader may add a web address. */
+export interface AutomationsProps {
+    can_webhook: boolean;
+    max: number;
+    items: AutomationRow[];
+}

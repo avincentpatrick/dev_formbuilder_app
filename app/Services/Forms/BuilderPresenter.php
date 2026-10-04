@@ -94,6 +94,10 @@ final class BuilderPresenter
             // M129 — the Scanning section's facts, or null where this workspace cannot scan (the PATCH route's
             // gates). An OPTIONAL prop on the client, so a builder fixture without it still type-checks.
             'ocr_scanning' => $this->settings->ocrScanning($form),
+            // M132 (`R-bf49e4c1`) — the Files section's list: the draft's reference files. Optional on the client too.
+            'reference_files' => $this->settings->referenceFiles($form),
+            // M132 (`R-b7bc5149`) — the Automations section, as this viewer may see it.
+            'automations' => $this->settings->automations($form, $viewer),
         ];
     }
 

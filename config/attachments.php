@@ -117,6 +117,27 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | A form's reference files (M132, `R-bf49e4c1`)
+    |--------------------------------------------------------------------------
+    |
+    | What an author attaches for respondents to read before they answer: a
+    | PDF, or an image under the content image's rules (SVG and GIF out, for
+    | the same reasons). A PDF is always served as a download, never inline
+    | (`InlineAttachmentResponse`), so it is never rendered in the app's origin.
+    |
+    | 10 MB: a scanned guideline runs to several megabytes. `max_per_version`
+    | caps how many one version shows, so the list stays a list.
+    |
+    */
+
+    'form_reference_file' => [
+        'accepted_types' => ['application/pdf', 'image/png', 'image/jpeg', 'image/webp'],
+        'max_bytes' => 10 * 1024 * 1024,
+        'max_per_version' => 10,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Virus scanning
     |--------------------------------------------------------------------------
     |

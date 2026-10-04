@@ -177,15 +177,23 @@ it('never falls back to the guest limiter\'s IP arm on a route that is actually 
 
 // ── The guest content-image limiter (M130, `R-c9f50df2`) ──────────────────────────────────────
 
-it('binds the content-image limiter to the image route alone, and that route is off the guest limiter', function (): void {
+it('binds the content-image limiter to the image and reference-file routes alone, both off the guest limiter', function (): void {
     // ⚠️ THE CASES ABOVE CANNOT SEE THIS ROUTE: it leaves `throttle:guest` on purpose (a note's images would
     // otherwise spend the per-token budget a respondent submits with), so `routesThrottledBy('guest')` skips it.
     $routes = routesThrottledBy('guest-content-image');
 
+    // M132 (`R-bf49e4c1`): a form's reference files share it — the form's own material, read by the same page.
     expect(array_map(static fn (RoutingRoute $r): string => $r->uri(), $routes))
-        ->toBe(['api/v1/public/content-images/{shareToken}/{image}'])
+        ->toBe(['api/v1/public/content-images/{shareToken}/{image}', 'api/v1/public/reference-files/{shareToken}/{file}'])
         ->and(array_map(static fn (RoutingRoute $r): string => $r->uri(), routesThrottledBy('guest')))
-        ->not->toContain('api/v1/public/content-images/{shareToken}/{image}');
+        ->not->toContain('api/v1/public/content-images/{shareToken}/{image}')
+        ->and(array_map(static fn (RoutingRoute $r): string => $r->uri(), routesThrottledBy('guest')))
+        ->not->toContain('api/v1/public/reference-files/{shareToken}/{file}');
+
+    // The bucket is per token on the reference-file route too: it declares the `shareToken` the limiter keys on.
+    $files = $routes[1];
+    expect(limiterKeysFor('guest-content-image', $files, 'token-aaaaaaaaaaaaaaaa'))
+        ->not->toBe(limiterKeysFor('guest-content-image', $files, 'token-bbbbbbbbbbbbbbbb'));
 });
 
 it('gives the image route its own bucket per token, never the one an undeclared parameter would share', function (): void {

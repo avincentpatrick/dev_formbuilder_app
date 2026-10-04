@@ -54,6 +54,9 @@ final class AuditRedactor
         'sso_connection' => ['idp_certificates'],
         'tenant_users' => ['invite_token'],
         'personal_access_tokens' => ['token'],
+        // M132. A form automation's signing secret, and its web address, which receives the answers and is often its own
+        // credential (`D83`). Registered in the SAME increment that creates the table; the service records only the host.
+        'form_automation' => ['secret', 'url'],
     ];
 
     /**
@@ -76,6 +79,8 @@ final class AuditRedactor
         'submission' => ['guest_ip', 'guest_user_agent', 'guest_contact_email', 'remarks'],
         'attachment' => ['original_filename'],
         'feedback_reports' => ['remarks', 'browser_info'],
+        // M132. The addresses an email automation sends to, typed by an author.
+        'form_automation' => ['recipients'],
     ];
 
     /**

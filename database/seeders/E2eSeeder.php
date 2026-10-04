@@ -32,6 +32,7 @@ use App\Models\Form;
 use App\Models\FormField;
 use App\Models\FormFolder;
 use App\Models\FormVersion;
+use App\Models\FormVersionReferenceFile;
 use App\Models\Notification;
 use App\Models\OcrScan;
 use App\Models\Plan;
@@ -50,6 +51,7 @@ use App\Models\WebhookEndpoint;
 use App\Services\Attachments\AttachmentStorageService;
 use App\Services\Authorization\ResourceGrantService;
 use App\Services\Forms\FormBuilderService;
+use App\Services\Forms\FormReferenceFileService;
 use App\Services\Forms\FormService;
 use App\Services\Forms\PublishService;
 use App\Services\Notifications\NotificationPreferenceResolver;
@@ -673,6 +675,24 @@ class E2eSeeder extends Seeder
                     RedirectTarget::url(self::VISIT_GUIDE_NEXT),
                     $owner,
                 );
+            }
+
+            // M132 (`R-bf49e4c1`) — "Before Your Visit" shows two reference files, a PDF checklist and a map, so
+            // `public-runtime-axe.spec.ts` can scan the list and the image dialog and `public-runtime-offline.spec.ts`
+            // can reopen the map offline once opened (`D84`). Converged like the redirect above: a database whose
+            // published version shows none gets them through the real write path, and one publish freezes them. A
+            // second run finds them on the published version and does nothing.
+            $guideForm = Form::query()->where('title', 'Before Your Visit')->first();
+            if ($guideForm instanceof Form && $guideForm->current_published_version_id !== null
+                && FormVersionReferenceFile::query()->where('form_version_id', $guideForm->current_published_version_id)->doesntExist()) {
+                $referenceFiles = app(FormReferenceFileService::class);
+                $referenceFiles->attach($guideForm, UploadedFile::fake()->createWithContent('Visit checklist.pdf', self::VISIT_GUIDE_CHECKLIST_PDF), $owner);
+                $referenceFiles->attach(
+                    $guideForm->refresh(),
+                    UploadedFile::fake()->createWithContent('Clinic map.png', (string) base64_decode(self::VISIT_GUIDE_ENTRANCE_PNG)),
+                    $owner,
+                );
+                app(PublishService::class)->publish($guideForm->refresh(), $owner);
             }
 
             // A guest-enabled but CLOSED scheduled form (Increment H12b) — reached at /f/closed-survey. Its
@@ -2207,6 +2227,12 @@ class E2eSeeder extends Seeder
 
     /** Where "Before Your Visit" sends a respondent after the thank-you (M130, `D76`); the E2E spec intercepts it. */
     private const VISIT_GUIDE_NEXT = 'https://visit.example.org/next';
+
+    /** The checklist "Before Your Visit" offers its respondents (M132): the smallest PDF a reader opens. */
+    private const VISIT_GUIDE_CHECKLIST_PDF = "%PDF-1.4\n1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj\n"
+        ."2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj\n"
+        ."3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 200 100] >> endobj\n"
+        ."trailer << /Root 1 0 R >>\n%%EOF\n";
 
     /** The entrance picture on the seeded "Before Your Visit" note (M130): 240×135, drawn in four flat colours. */
     private const VISIT_GUIDE_ENTRANCE_PNG = 'iVBORw0KGgoAAAANSUhEUgAAAPAAAACHBAMAAADaXMnYAAAAD1BMVEXo8f2aqLoOb+j////ZLSDp4q8yAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAApElEQVRo3u3XwQ2DMAxAUVboBpXFBO0GyPvPVJXSay4kGMH7CzzZQiGZJkmSJEnSzmJHT3A3OHMpgTPb8ih4/sJZAK9ua+RB8G/g1siD4M1tjHwx+L/pxq7BYF+1A+RsZ3UZXPZbrIPLbiBRCldc9tZdx63gsgt9HTxn3AyOxfv40vB76wUGg8FgMBgMBoPPCqtjj6LAYDAYDAaDwQfAkiRJUvc+qre8eV3EZrUAAAAASUVORK5CYII=';

@@ -438,6 +438,95 @@ final class AttachmentStorageService
     }
 
     /**
+     * Store a FORM'S REFERENCE FILE (M132, `R-bf49e4c1`) — a PDF or an image an author attaches for respondents to
+     * read. The sixth sibling, owned by the form under the `form` alias like a note's image, with the same
+     * discipline: content-sniffed type, server-generated key, sniffed extension, queued virus scan, quota.
+     *
+     * ── IDENTICAL BYTES ARE STORED ONCE PER FORM (`D61` = B) ─────────────────────────────────────────────
+     * The SHA-256 every upload already computes is read here for the first time: when this form already holds a
+     * live reference file with the same digest, that row is returned and nothing is written — no object, no row,
+     * and no quota, because the storage gauge sums attachment rows and these bytes are already counted. A version
+     * that shows the file says so in `form_version_reference_files`, so the same file in five versions is one row
+     * here and five there. Scoped to the form and the kind: a digest match on another form's file, or on a note's
+     * image, is a different owner's file.
+     *
+     * @return array{0: Attachment, 1: bool} the file, and whether it was already stored
+     *
+     * @throws AttachmentException on a rejected type or an over-size file
+     */
+    public function storeFormReferenceFile(UploadedFile $file, string $tenantId, string $formId, string $uploadedBy): array
+    {
+        $mime = $file->getMimeType() ?? 'application/octet-stream';
+
+        /** @var list<string> $accepted */
+        $accepted = config('attachments.form_reference_file.accepted_types');
+
+        if (! $this->mimeAllowed($mime, $accepted)) {
+            throw AttachmentException::mimeRejected($mime);
+        }
+
+        $maxBytes = (int) config('attachments.form_reference_file.max_bytes');
+
+        if ((int) $file->getSize() > $maxBytes) {
+            throw AttachmentException::tooLarge($maxBytes);
+        }
+
+        $digest = hash_file('sha256', (string) $file->getRealPath()) ?: null;
+
+        $stored = $digest === null ? null : Attachment::query()
+            ->where('kind', AttachmentKind::FormReferenceFile->value)
+            ->where('attachable_type', 'form')
+            ->where('attachable_id', $formId)
+            ->where('checksum_sha256', $digest)
+            ->oldest()
+            ->first();
+
+        if ($stored !== null) {
+            return [$stored, true];
+        }
+
+        $this->quota->assertCanCreate(UsageMetric::StorageBytes, (int) $file->getSize());
+
+        $kind = AttachmentKind::FormReferenceFile;
+        $disk = (string) config('filesystems.default');
+
+        $uuid = Uuid::uuid7()->toString();
+        $extension = $file->extension() ?: 'bin';
+        $directory = "tenants/{$tenantId}/{$kind->value}/".date('Ym');
+        $storedPath = Storage::disk($disk)->putFileAs($directory, $file, "{$uuid}.{$extension}");
+
+        if ($storedPath === false) {
+            throw AttachmentException::storeFailed();
+        }
+
+        [$width, $height] = $this->imageDimensions($file, $mime);
+
+        $attachment = Attachment::create([
+            'id' => $uuid,
+            'attachable_type' => 'form',
+            'attachable_id' => $formId,
+            'kind' => $kind,
+            'disk' => $disk,
+            'path' => $storedPath,
+            'original_filename' => $file->getClientOriginalName(),
+            'mime_type' => $mime,
+            'size_bytes' => (int) $file->getSize(),
+            'checksum_sha256' => $digest,
+            'width' => $width,
+            'height' => $height,
+            'duration_seconds' => null,
+            'is_encrypted_at_rest' => false,
+            'is_pii' => false,
+            'virus_scan_status' => ScanStatus::Pending,
+            'uploaded_by' => $uploadedBy,
+        ]);
+
+        ScanAttachmentJob::dispatch($attachment->id, $tenantId);
+
+        return [$attachment, false];
+    }
+
+    /**
      * @throws AttachmentException
      */
     private function resolveMediaField(FormVersion $version, string $fieldKey): FormField

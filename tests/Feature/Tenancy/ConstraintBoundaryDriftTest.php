@@ -266,6 +266,13 @@ it('keeps the composite shape it recommends, so the remedy in every failure mess
         'connection_subscriptions_connection_fk',
         'connection_subscriptions_form_fk',
         // M131: a form's folder, pinned to the form's own tenant; deleting the folder unfiles, never deletes.
+        // M132: an automation's form, and a run's automation, each pinned to its own tenant.
+        'form_automation_runs_automation_fk',
+        'form_automations_form_fk',
+        'form_version_reference_files_attachment_fk',
+        // M132: a version's reference file, pinned to the version's and the file's own tenant. Deleting a draft
+        // version takes its list; a file a version still shows cannot be hard-deleted at all.
+        'form_version_reference_files_version_fk',
         'forms_folder_fk',
         'forms_redirect_form_fk',
         'forms_scope_node_fk',

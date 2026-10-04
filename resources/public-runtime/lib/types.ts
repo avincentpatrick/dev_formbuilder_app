@@ -144,7 +144,7 @@ export interface SchemaResponse {
         id: string;
         version_number: number;
         checksum: string;
-        schema: RawSchemaSnapshot;
+        schema: RawSchemaSnapshot; reference_files?: GuestReferenceFile[]; // M132 — optional: an older cached schema has none
     };
 }
 
@@ -429,4 +429,17 @@ export interface ResumeDraftResult {
      * session a first-class writer rather than one that clobbers whatever arrived while it was away.
      */
     contentChecksum: string | null;
+}
+
+/**
+ * One reference file a form version shows its respondents (M132, `R-bf49e4c1`): listed under the form's description
+ * and fetched through `lib/reference-files.ts`. Only files past their virus check are sent. Declared on
+ * `SchemaResponse.version` on the same line as `schema`, because a line inserted there would move lines of this file
+ * that documents cite by number.
+ */
+export interface GuestReferenceFile {
+    id: string;
+    label: string;
+    mime_type: string;
+    size_bytes: number;
 }

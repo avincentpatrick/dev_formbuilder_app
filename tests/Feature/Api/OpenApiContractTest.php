@@ -44,6 +44,8 @@ it('ships a valid OpenAPI 3.1 contract covering the /api/v1 surface', function (
         '/public/drafts/{resumeToken}',
         // M130 — a note's image, read by a respondent (outside the `f/` prefix the schema cache holds).
         '/public/content-images/{shareToken}/{image}',
+        // M132 — a form's reference file, read by a respondent (the image read's boundary).
+        '/public/reference-files/{shareToken}/{file}',
         '/submissions/{submission}/promote',
         // Increment G8b — the authenticated offline-sync surface.
         '/sync/manifest',
@@ -130,7 +132,9 @@ it('ships a valid OpenAPI 3.1 contract covering the /api/v1 surface', function (
         ->and($spec['paths']['/public/f/{shareToken}/draft']['post']['security'])->toBe([])
         ->and($spec['paths']['/public/drafts/{resumeToken}']['get']['security'])->toBe([])
         // M130: the image read is authorised by the share token in its path, exactly as the schema read is.
-        ->and($spec['paths']['/public/content-images/{shareToken}/{image}']['get']['security'])->toBe([]);
+        ->and($spec['paths']['/public/content-images/{shareToken}/{image}']['get']['security'])->toBe([])
+        // M132: the reference-file read likewise.
+        ->and($spec['paths']['/public/reference-files/{shareToken}/{file}']['get']['security'])->toBe([]);
 });
 
 it('keeps the published event_types enum in step with DomainEventType', function (): void {
@@ -494,5 +498,15 @@ it('documents a note image as image bytes, never as the JSON object Scramble inf
     $ok = $spec['paths']['/public/content-images/{shareToken}/{image}']['get']['responses']['200'];
 
     expect(array_keys($ok['content']))->toBe(['image/*'])
+        ->and($ok['content']['image/*']['schema']['format'])->toBe('binary');
+});
+
+it('documents a reference file as PDF or image bytes, never as a JSON object (M132)', function (): void {
+    /** @var array<string, mixed> $spec */
+    $spec = json_decode((string) file_get_contents(base_path('openapi.json')), true, flags: JSON_THROW_ON_ERROR);
+    $ok = $spec['paths']['/public/reference-files/{shareToken}/{file}']['get']['responses']['200'];
+
+    expect(array_keys($ok['content']))->toBe(['application/pdf', 'image/*'])
+        ->and($ok['content']['application/pdf']['schema']['format'])->toBe('binary')
         ->and($ok['content']['image/*']['schema']['format'])->toBe('binary');
 });

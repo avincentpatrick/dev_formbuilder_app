@@ -1071,6 +1071,23 @@ Route::middleware([
     Route::post('/forms/{form}/content-images', [AttachmentController::class, 'storeFormContentImage'])
         ->middleware(['can:update,form', 'throttle:30,1'])
         ->name('forms.content-images.store');
+    // M132, `R-bf49e4c1`: the reference files a form shows its respondents, kept on the draft and frozen into each
+    // published version (`D61` = B). Whoever may edit the form may attach to it; the upload is throttled like an
+    // upload. A file is addressed by its attachment id, which a publish never changes.
+    Route::get('/forms/{form}/reference-files', [AttachmentController::class, 'indexReferenceFiles'])
+        ->middleware('can:update,form')
+        ->name('forms.reference-files.index');
+    Route::post('/forms/{form}/reference-files', [AttachmentController::class, 'storeReferenceFile'])
+        ->middleware(['can:update,form', 'throttle:30,1'])
+        ->name('forms.reference-files.store');
+    Route::patch('/forms/{form}/reference-files/{file}', [AttachmentController::class, 'updateReferenceFile'])
+        ->middleware('can:update,form')
+        ->whereUuid('file')
+        ->name('forms.reference-files.update');
+    Route::delete('/forms/{form}/reference-files/{file}', [AttachmentController::class, 'destroyReferenceFile'])
+        ->middleware('can:update,form')
+        ->whereUuid('file')
+        ->name('forms.reference-files.destroy');
 });
 
 /*

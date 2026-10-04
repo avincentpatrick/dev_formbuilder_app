@@ -48,5 +48,16 @@ final class SchemaTreeCloner
                 : null;
             $new->save();
         }
+
+        // M132 (`R-bf49e4c1`, `D61` = B) — the reference files the version shows. A pure copy, like everything above:
+        // each row names an attachment the FORM owns, so the id carries over unchanged and no byte is duplicated —
+        // there is nothing inside the tree to re-point. A plain read, never a locking one: this runs after
+        // PublishService has flipped the source to `published`, and a locking read is filtered by the draft-only
+        // UPDATE policy and would silently copy nothing (PublishService's step-0 note).
+        foreach ($source->referenceFiles()->get() as $referenceFile) {
+            $new = $referenceFile->replicate();
+            $new->form_version_id = $target->id;
+            $new->save();
+        }
     }
 }

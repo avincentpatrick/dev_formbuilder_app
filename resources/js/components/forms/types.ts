@@ -112,3 +112,19 @@ export interface ScopeSectionProps {
     current_node_id: string | null;
     options: ScopeOption[];
 }
+
+/**
+ * One reference file on the form's draft, as the Files section lists it (M132, `R-bf49e4c1`). `id` is the
+ * attachment's id, which a publish never changes; `scan` is the virus check's state — a `checking` file is not shown
+ * to respondents yet, and a `refused` one never will be.
+ */
+export interface ReferenceFileRow {
+    id: string;
+    label: string;
+    file_name: string;
+    mime_type: string;
+    size_bytes: number;
+    scan: 'checking' | 'ready' | 'refused';
+    /** Where staff open it: `GET /attachments/{id}`. */
+    url: string;
+}

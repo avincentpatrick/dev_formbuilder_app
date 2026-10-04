@@ -20,7 +20,7 @@ import { MdsBreadcrumb, MdsCard, MdsTabNav, type BreadcrumbItem, type TabNavItem
 import PageHeader from '@/components/shell/PageHeader.vue';
 import FormSettingsSections from '@/components/forms/FormSettingsSections.vue';
 import { useEntitlements } from '@/composables/useEntitlements';
-import type { FormSettingsForm, OcrScanningProps, ScopeSectionProps, ShareProps } from '@/components/forms/types';
+import type { FormSettingsForm, OcrScanningProps, ReferenceFileRow, ScopeSectionProps, ShareProps } from '@/components/forms/types';
 
 defineProps<{
     form: FormSettingsForm & { id: string };
@@ -28,6 +28,8 @@ defineProps<{
     timezones: string[];
     /** Null where the workspace cannot scan — decided by the server, from the Scanning route's own gates. */
     ocr_scanning: OcrScanningProps | null;
+    /** The Reference files section (M132): the draft's files. */
+    reference_files: ReferenceFileRow[];
     /** Null unless the reader holds `scopes.manage`. */
     scope: ScopeSectionProps | null;
     /** The form's tab strip, resolved server-side by `FormTabSet`. */
@@ -67,6 +69,7 @@ const { feature } = useEntitlements();
                 :share="share"
                 :save-resume-available="feature('save_and_resume')"
                 :ocr-scanning="ocr_scanning"
+                :reference-files="reference_files"
                 :scope="scope"
             />
         </MdsCard>

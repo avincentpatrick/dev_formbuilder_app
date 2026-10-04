@@ -28,6 +28,7 @@ final class RestoreService
     public function __construct(
         private readonly SchemaTreeCloner $cloner,
         private readonly AuditLogger $audit,
+        private readonly FormReferenceFileService $referenceFiles,
     ) {}
 
     /**
@@ -59,8 +60,13 @@ final class RestoreService
             $draft->validations()->delete();
             $draft->fields()->delete();
             $draft->sections()->delete();
+            // M132 — and its reference files, which the clone replaces with the source's.
+            $draft->referenceFiles()->delete();
 
             $this->cloner->clone($source, $draft);
+
+            // A file only the overwritten draft showed is shown by no version now, so its storage is freed.
+            $this->referenceFiles->collectOrphans($locked);
 
             // `auditable_type = 'form'`, not `form_version`: spec §1 assigns `restored` to `form` and gives
             // `form_version` only `published`. The row names the draft that was overwritten and the version

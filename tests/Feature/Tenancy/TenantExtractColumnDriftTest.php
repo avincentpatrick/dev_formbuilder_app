@@ -50,6 +50,7 @@ const EXTRACTED_COLUMN_CENSUS = [
     'form_folders' => 'created_at created_by id name tenant_id updated_at',
     'form_sections' => 'color created_at description description_translations form_version_id icon id is_repeatable key label label_translations max_instances min_instances relevant_expression sequence tenant_id updated_at',
     'form_templates' => 'category cover_image_attachment_id created_at created_by deleted_at description id is_public name schema_blueprint source_form_version_id tenant_id updated_at usage_count',
+    'form_version_reference_files' => 'attachment_id created_at form_version_id id label position tenant_id updated_at',
     'form_versions' => 'change_summary checksum created_at description form_id id published_at published_by schema_snapshot status superseded_at tenant_id title updated_at version_number',
     'forms' => 'allow_api_import allow_guest_submissions allow_manual_encoding allow_ocr_linelist allow_ocr_single allow_offline_sync archived_at bot_challenge capability_flags closes_at confirmation_message confirmation_message_translations created_at created_by current_published_version_id default_locale deleted_at description draft_version_id folder_id guest_rate_limit_per_minute id max_responses opens_at owner_user_id public_slug published_at redirect_form_id redirect_url save_and_resume schedule_state scope_node_id search_vector single_page_mode status supported_locales tenant_id theme timezone title updated_at updated_by',
     'global_probes' => 'created_at id note tenant_id updated_at',

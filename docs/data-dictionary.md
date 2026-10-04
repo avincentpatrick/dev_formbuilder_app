@@ -38,7 +38,7 @@ This document is the source of truth for column-level shape; it will be kept in 
 | `SubmissionStatus` | `submissions.status` | — none | `draft`, `submitted`, `screened_out`, `under_review`, `approved`, `returned`, `archived` (adapted from legacy's 5-value lookup: `under_review` replaces "Pending Validation", `archived` is a new terminal state added for retention workflows — reasonable, noted extension). **`screened_out` added in I9a** (Doc #27 §4.1): the respondent finalized having been shown no questions at all, derived server-side from `StepProjection::isEmpty()`. It is the one finalized status that does **not** consume a `max_responses` slot (`Submission::scopeConsumesCapacity()`), and it is terminal — no review transition accepts it, because `archived` *does* consume and the conversion would retroactively overfill a paid cap. **No CHECK constraint exists on this column**, so adding a value is an enum change only. |
 | `SubmissionSource` | `submissions.source` | — none | `manual`, `guest`, `ocr_single`, `ocr_linelist`, `offline_sync`, `api_import` (the six channels named explicitly in plan §2.2/§2.4) |
 | `IndexedDataType` | `form_fields.indexed_data_type` | — none | `text`, `number`, `boolean`, `date`, `datetime` |
-| `AttachmentKind` | `attachments.kind` | — none | `submission_file`, `ocr_source_scan`, `field_media_sample`, `signature_capture`, `avatar`, `branding_logo`, `feedback_screenshot` *(added I7a)*, `export_artifact`, `webhook_payload_archive`, `form_content_image` *(added M129 — an image in a note's content, owned by its form, `D58` = B)* |
+| `AttachmentKind` | `attachments.kind` | — none | `submission_file`, `ocr_source_scan`, `field_media_sample`, `signature_capture`, `avatar`, `branding_logo`, `feedback_screenshot` *(added I7a)*, `export_artifact`, `webhook_payload_archive`, `form_content_image` *(added M129 — an image in a note's content, owned by its form, `D58` = B)*, `form_reference_file` *(added M132 — a PDF or image a form shows its respondents, owned by its form and frozen into each published version by `form_version_reference_files`, §35, `D61` = B)* |
 | — | — | — | **H17 note:** `export_artifact` has a writer for the first time — the submission PDF (`SubmissionPdfStorage`). It uses a DETERMINISTIC storage key, `tenants/{tenant}/export_artifact/submissions/{submission}.pdf`, rather than the `{yyyymm}/{uuid}` leaf the two older writers use, so regenerating a PDF overwrites in place and one submission can only ever hold one. That is deliberate: `storage_bytes` is a hard-block gauge summed over non-trashed `attachments` rows and NOTHING in the codebase reclaims storage, so an accumulating key would charge a tenant permanently for every click of "Regenerate". |
 | `ScanStatus` | `attachments.virus_scan_status` | — none | `pending`, `clean`, `infected`, `skipped` |
 | `AuditEvent` | `audits.event` | `audits_event_check` | `created`, `updated`, `deleted`, `restored`, `published`, `archived`, `exported`, `permission_changed`, `impersonation_started`, `impersonation_ended`, `two_factor_reset` — **eleven cases** (extends legacy's 4 base events with 7 domain events the plan's versioning/export/RBAC model, I11b's platform-operator boundary and M107's account-recovery boundary need tracked — noted extension). ✅ **`two_factor_reset` added by Increment M107 (2026-09-20), `D37`** — an administrative clearing of somebody's two-factor enrolment, written from the workspace roster and from the platform console alike. Like the two impersonation boundaries it records an ACCESS decision rather than a model change and carries no `old_values`/`new_values`; unlike them it carries no `acting_as_user_id` either, because the actor acts in their own name. ⚠️ **This row listed eight from I11b until Increment M46 (2026-08-29)**, omitting the two impersonation boundaries; §13's `event` column row and its design note carried the same undercount, so the dictionary was internally consistent and externally wrong in three places at once. The database pins the full set via `audits_event_check`, which is generated from `AuditEvent::values()` at the migration that creates it and therefore needs its own migration to widen — adding a case to the PHP enum alone leaves an existing database rejecting it with `SQLSTATE 23514`. |
@@ -524,7 +524,7 @@ One unified polymorphic table replacing legacy's `image_path`/`file_path`/`excel
 | `tenant_id` | `uuid` | No | — | No | FK to `tenants.id`. |
 | `attachable_type` | `varchar(100)` | No | — | No | Polymorphic morph type. Every value written: `form_field` (an answer file staged before its submission exists), `submission` (respondent media, a submission PDF, and a confirmed scan's pages), `webhook_delivery` (an archived envelope), `tenant` (the brand logo), `feedback_report` (a screenshot), `ocr_scan` (a scan's pages until it is confirmed), and since M129 `form` (a note's content image, `D58` = B). |
 | `attachable_id` | `uuid` | No | — | No | Polymorphic morph id — no hard FK constraint (standard, accepted trade-off of polymorphic associations; see Design Notes). |
-| `kind` | `varchar(30)` — PHP enum: `AttachmentKind` | No | — | No | See the 10-value catalog above. |
+| `kind` | `varchar(30)` — PHP enum: `AttachmentKind` | No | — | No | See the 11-value catalog above. |
 | `disk` | `varchar(30)` | No | `'local'` | No | Laravel filesystem disk name. **Phase-1 deviation (Increment G6):** the column default is `'local'` (the initial on-server backing store, deployment §7), not the aspirational `'s3'`; the write path (`AttachmentStorageService`) sets `disk` per-write from `config('filesystems.default')`, so an S3 swap is config-only. |
 | `path` | `varchar(500)` | No | — | No | Object storage key, namespaced `tenants/{tenant_id}/...` per plan §2.1. |
 | `original_filename` | `varchar(255)` | Yes | `NULL` | **Yes** | May contain a respondent's or staff member's name (e.g. `john_smith_id_scan.jpg`). |
@@ -1353,6 +1353,33 @@ A folder the forms list files forms into (M131, `R-9e634897`, `D78`) — flat, s
 
 ---
 
+## 35. `form_version_reference_files`
+
+The reference files a form version shows its respondents (M132, `R-bf49e4c1`) — a PDF or an image an author attaches for respondents to read while they answer: a guide, a consent form, a map. **Frozen per published version, and the bytes are not copied (`D61` = B):** a row says that THIS version shows THAT file under THIS label. The file itself is one `attachments` row of kind `form_reference_file` (§10), owned by the form (`attachable_type = 'form'`) and stored **once per distinct SHA-256 per form** — uploading identical bytes again reuses the stored file and charges no storage. Publishing copies these rows into the next draft (`SchemaTreeCloner`, beside the version's fields), so the same file shown by five versions is one attachment and five rows, and the storage gauge, which sums attachment rows, counts it once.
+
+**Writers:** `App\Services\Forms\FormReferenceFileService` (attach, rename, remove — on the DRAFT only) behind `/forms/{form}/reference-files` (`can:update,form`), and `SchemaTreeCloner` on publish and restore. Every writer takes the `forms` row lock first, which `PublishService` relies on. Not audited: these are draft edits (`docs/form-versioning-schema-migration.md` §1), and the publish that freezes them is the audited event. **Readers:** the form settings' Reference files section; `PublicFormPresenter` (`version.reference_files` on the guest schema, beside `schema` and outside its checksum, listing only files past their virus check); `GET /api/v1/public/reference-files/{shareToken}/{file}`, which serves a file only when the token's own version lists it.
+
+| Column | Type | Nullable | Default | PII? | Description |
+|---|---|---|---|---|---|
+| `id` | `uuid` | No | application-generated (`HasUuidv7`) | No | Primary key. A new id per version: a publish copies the row. |
+| `tenant_id` | `uuid` | No | — | No | FK to `tenants.id`, `ON DELETE CASCADE`. |
+| `form_version_id` | `uuid` | No | — | No | The version that shows the file. Composite FK `(tenant_id, form_version_id)` → `form_versions (tenant_id, id)`, `ON DELETE CASCADE` — archiving a form deletes its draft version, and the draft's list goes with it. |
+| `attachment_id` | `uuid` | No | — | No | The file: an `attachments` row of kind `form_reference_file`. Composite FK `(tenant_id, attachment_id)` → `attachments (tenant_id, id)`, `NO ACTION` — a file a version still shows cannot be hard-deleted. The id never changes across publishes, so the settings section addresses a file by it. |
+| `label` | `varchar(120)` | No | — | No | What respondents see in place of the file: the original file name until the author renames it. |
+| `position` | `smallint` | No | — | No | Display order within the version: the order the files were attached in. |
+| `created_at` / `updated_at` | `timestamptz` | No | set by Eloquent | No | — |
+
+**Indexes**: `UNIQUE (tenant_id, form_version_id, attachment_id)` (`form_version_reference_files_unique`) — one file once per version; `(tenant_id, attachment_id)`.
+
+> **Design Notes**
+> - **RLS**: `draft_child`, the shape of `form_sections`/`form_fields`/`form_field_validations`: anyone in the tenant reads; an INSERT, UPDATE or DELETE is accepted only while the row's version is a draft, so a published version's files cannot be changed by any path. Listed in `TenantScopedTables::STRICT`; nothing is withheld from the tenant extract.
+> - **A removed file is kept while any version shows it.** Removing a file deletes the draft's row only; the attachment is soft-deleted (freeing its storage) once no version of any status references it (`FormReferenceFileService::collectOrphans()`, also run after a restore).
+> - **At most ten per version** (`config('attachments.form_reference_file.max_per_version')`); PDF, PNG, JPEG or WebP, 10 MB each, the type sniffed from the bytes. A PDF is always served as a download, never rendered in the app's origin.
+> - **Offline once opened (`D84`).** The guest page fetches a file rather than navigating to it, so the service worker keeps a copy in `guest-reference-files`; nothing is downloaded in advance.
+> - Requires `(tenant_id, id)` uniques on `form_versions` and `attachments` (`2026_08_17_000121`), the targets of the two composite keys.
+
+---
+
 ## Foreign Key Relationship Summary
 
 ```
@@ -1389,6 +1416,10 @@ form_field_validations.tenant_id           -> tenants.id
 form_field_validations.form_version_id     -> form_versions.id
 form_field_validations.form_field_id       -> form_fields.id
 form_field_validations.related_form_field_id -> form_fields.id
+
+form_version_reference_files.tenant_id -> tenants.id
+form_version_reference_files.(tenant_id, form_version_id) -> form_versions.(tenant_id, id)  (composite, CASCADE — see §35)
+form_version_reference_files.(tenant_id, attachment_id)   -> attachments.(tenant_id, id)    (composite, NO ACTION — see §35)
 
 submissions.tenant_id                  -> tenants.id
 submissions.form_id                    -> forms.id

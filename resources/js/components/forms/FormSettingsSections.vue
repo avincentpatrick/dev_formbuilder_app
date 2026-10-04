@@ -64,15 +64,16 @@ import { computed, ref, watch } from 'vue';
 import ConfirmationPanel from '@/components/builder/ConfirmationPanel.vue';
 import GeneralPanel from '@/components/builder/GeneralPanel.vue';
 import PageModePanel from '@/components/builder/PageModePanel.vue';
+import ReferenceFilesPanel from '@/components/forms/ReferenceFilesPanel.vue';
 import SaveResumePanel from '@/components/builder/SaveResumePanel.vue';
 import SchedulePanel from '@/components/builder/SchedulePanel.vue';
 import ThemePanel from '@/components/builder/ThemePanel.vue';
 import ScanningPanel from '@/components/forms/ScanningPanel.vue';
 import ScopePanel from '@/components/forms/ScopePanel.vue';
 import SharePanel from '@/components/forms/SharePanel.vue';
-import type { FormSettingsForm, OcrScanningProps, ScopeSectionProps, ShareProps } from '@/components/forms/types';
+import type { FormSettingsForm, OcrScanningProps, ReferenceFileRow, ScopeSectionProps, ShareProps } from '@/components/forms/types';
 
-type SectionKey = 'general' | 'pages' | 'theme' | 'share' | 'scanning' | 'schedule' | 'confirmation' | 'save-resume' | 'scope';
+type SectionKey = 'general' | 'pages' | 'theme' | 'files' | 'share' | 'scanning' | 'schedule' | 'confirmation' | 'save-resume' | 'scope';
 
 const props = defineProps<{
     /** Whether the settings are open: the modal's state, or always true on the hub page. */
@@ -85,6 +86,8 @@ const props = defineProps<{
     saveResumeAvailable: boolean;
     /** The Scanning section (M129), or null/absent where the workspace cannot scan — decided by the server. */
     ocrScanning?: OcrScanningProps | null;
+    /** The Reference files section (M132): the draft's files, or absent where the host sends none. */
+    referenceFiles?: ReferenceFileRow[] | null;
     /** The hub-only Scope section (M129), sent only to a holder of `scopes.manage`. */
     scope?: ScopeSectionProps | null;
 }>();
@@ -101,6 +104,9 @@ const sections = computed<{ key: SectionKey; label: string }[]>(() => {
         // M131 (`D81`): every plan. "Theme", never "Appearance" — that word names the member's OWN section in
         // /settings, and this one is about what respondents see.
         { key: 'theme', label: 'Theme', available: true },
+        // M132 (`R-bf49e4c1`): what respondents can open while they answer. Beside Theme, the other section about
+        // what a respondent sees; never just "Files", which reads as a file-upload question.
+        { key: 'files', label: 'Reference files', available: props.referenceFiles != null },
         { key: 'share', label: 'Share', available: props.share != null },
         { key: 'scanning', label: 'Scanning', available: props.ocrScanning != null },
         { key: 'schedule', label: 'Schedule', available: true },
@@ -184,6 +190,11 @@ watch(
                             :preset="props.form.theme_preset"
                             :presets="props.form.theme_presets"
                         />
+                    </div>
+                </template>
+                <template v-if="props.referenceFiles != null && mounted.has('files')">
+                    <div v-show="active === 'files'" class="form-settings__section" :data-section="'files'">
+                        <ReferenceFilesPanel :open="props.open" :form-id="props.formId" :files="props.referenceFiles" />
                     </div>
                 </template>
                 <template v-if="props.share != null && mounted.has('share')">

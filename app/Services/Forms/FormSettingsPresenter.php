@@ -38,6 +38,7 @@ final class FormSettingsPresenter
         private readonly ScopeNodePresenter $scopes,
         private readonly EntitlementService $entitlements,
         private readonly TenantSettingRegistry $settings,
+        private readonly FormReferenceFileService $referenceFileService,
     ) {}
 
     /**
@@ -146,6 +147,20 @@ final class FormSettingsPresenter
     }
 
     /**
+     * The Files section's list (M132, `R-bf49e4c1`): the reference files the form's DRAFT shows, which respondents
+     * see once it is published. Beside the `form` block rather than inside it, because that block's keys are what
+     * the builder spreads and `FormSettingsPageTest` pins. Empty for a form with no draft (an archived one).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function referenceFiles(Form $form): array
+    {
+        $draft = $form->draft_version_id === null ? null : FormVersion::query()->whereKey($form->draft_version_id)->first();
+
+        return $draft === null ? [] : $this->referenceFileService->forAuthor($draft);
+    }
+
+    /**
      * The form hub's Settings tab: every section the builder offers, plus Scope.
      *
      * Scope lives on the hub and not in the builder because it confers capacity rather than describing the
@@ -161,6 +176,7 @@ final class FormSettingsPresenter
             'share' => $this->share->present($form),
             'timezones' => DateTimeZone::listIdentifiers(),
             'ocr_scanning' => $this->ocrScanning($form),
+            'reference_files' => $this->referenceFiles($form),
             'scope' => $user->can('viewAny', ScopeNode::class)
                 ? ['current_node_id' => $form->scope_node_id, 'options' => $this->scopes->pickerOptions()]
                 : null,

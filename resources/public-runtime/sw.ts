@@ -17,7 +17,7 @@ import { CacheFirst, NetworkFirst, StaleWhileRevalidate } from 'workbox-strategi
 import { CacheableResponsePlugin } from 'workbox-cacheable-response';
 import { ExpirationPlugin } from 'workbox-expiration';
 import { clientsClaim } from 'workbox-core';
-import { CONTENT_IMAGE_CACHE, contentImageCacheKey } from './lib/content-images';
+import { CONTENT_IMAGE_CACHE, contentImageCacheKey } from './lib/content-images'; import { REFERENCE_FILE_CACHE, referenceFileCacheKey } from './lib/reference-files';
 import { openDb } from './lib/db';
 import { replayOutbox } from './lib/replay';
 import { SHELL_CACHE, SHELL_EXPIRATION } from './lib/shell-cache';
@@ -108,6 +108,23 @@ registerRoute(
             { cacheKeyWillBeUsed: async ({ request }) => contentImageCacheKey(request.url) },
             new CacheableResponsePlugin({ statuses: [200] }),
             new ExpirationPlugin({ maxEntries: 120, maxAgeSeconds: 30 * DAY }),
+        ],
+    }),
+    'GET',
+);
+
+// M132 (`R-bf49e4c1`, `D84`) — a form's reference files, kept once OPENED so they open again offline; nothing is
+// fetched before the respondent asks for it. CacheFirst and keyed without the share token, for the image route's
+// reasons. The page fetches these rather than navigating to them, because this worker's scope is `/f/`. The prefix is a
+// literal on purpose: `ServiceWorkerCachePrefixRouteTest` reads every cached prefix out of this file.
+registerRoute(
+    ({ url, sameOrigin }) => sameOrigin && url.pathname.startsWith('/api/v1/public/reference-files/'),
+    new CacheFirst({
+        cacheName: REFERENCE_FILE_CACHE,
+        plugins: [
+            { cacheKeyWillBeUsed: async ({ request }) => referenceFileCacheKey(request.url) },
+            new CacheableResponsePlugin({ statuses: [200] }),
+            new ExpirationPlugin({ maxEntries: 30, maxAgeSeconds: 30 * DAY, purgeOnQuotaError: true }),
         ],
     }),
     'GET',

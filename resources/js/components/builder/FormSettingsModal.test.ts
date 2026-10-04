@@ -308,3 +308,40 @@ group('the Scanning section (M129)', () => {
         expect(wrapper.find('[data-section="scanning"]').text()).toContain('Accept scans of paper copies');
     });
 });
+
+group('the Reference files section (M132)', () => {
+    function mountWith(referenceFiles: unknown) {
+        return mount(FormSettingsModal, {
+            props: {
+                open: true,
+                formId: 'form-1',
+                form,
+                timezones: ['UTC'],
+                share,
+                saveResumeAvailable: true,
+                referenceFiles,
+                teleport: false,
+            } as never,
+            global: { stubs: { teleport: true } },
+        });
+    }
+
+    it('is absent when the host sends no list, whether null or absent', () => {
+        expect(railLabels(mountWith(null))).not.toContain('Reference files');
+        expect(railLabels(mountWith(undefined))).not.toContain('Reference files');
+        expect(railLabels(mountWith(undefined))).toContain('Theme');
+    });
+
+    it('sits beside Theme whenever the list is sent, an empty one included, and opens with the publish notice first', async () => {
+        const wrapper = mountWith([]);
+
+        expect(railLabels(wrapper)).toEqual([
+            'Details', 'Pages', 'Theme', 'Reference files', 'Share', 'Schedule', 'Thank-you message', 'Save and finish later',
+        ]);
+
+        await railButton(wrapper, 'Reference files').trigger('click');
+        const section = wrapper.find('[data-section="files"]');
+        expect(section.find('[data-reference-notice="publish"]').text()).toBe('Respondents see these changes after you publish the form.');
+        expect(section.text()).toContain('No reference files yet.');
+    });
+});

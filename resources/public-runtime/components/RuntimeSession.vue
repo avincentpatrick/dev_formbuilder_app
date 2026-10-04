@@ -619,6 +619,8 @@ const description = computed(() => runtime.renderModel.form.description);
         :description="description"
         :saving="autosave.saving.value"
         :saved-at="autosave.savedAt.value"
+        :reference-files="schema.version.reference_files ?? []"
+        :share-token="() => client.token()"
     >
         <template #notice>
             <WelcomeBackBanner

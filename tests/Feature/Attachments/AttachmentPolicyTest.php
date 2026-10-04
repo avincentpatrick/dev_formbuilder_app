@@ -110,7 +110,7 @@ function memberWithStoredObject(string $roleName, string $kind): array
  * The submission's respondent is deliberately NULL — otherwise `SubmissionPolicy`'s respondent arm could
  * satisfy a case meant to be decided by collaboration, and the test would pass for the wrong reason.
  *
- * @param  'submission_media'|'export_artifact'|'webhook_envelope'|'branding_logo'|'staged_field'|'form_content_image'  $kind
+ * @param  'submission_media'|'export_artifact'|'webhook_envelope'|'branding_logo'|'staged_field'|'form_content_image'|'form_reference_file'  $kind
  * @return array{0: User, 1: Attachment, 2: Form}
  */
 function callerWithScopedObject(string $roleName, bool $collaborates, string $kind = 'submission_media'): array
@@ -134,6 +134,12 @@ function callerWithScopedObject(string $roleName, bool $collaborates, string $ki
             'attachable_id' => $form->id,
             'kind' => AttachmentKind::FormContentImage,
             'mime_type' => 'image/png',
+        ]),
+        'form_reference_file' => Attachment::factory()->clean()->create([
+            'attachable_type' => 'form',
+            'attachable_id' => $form->id,
+            'kind' => AttachmentKind::FormReferenceFile,
+            'mime_type' => 'application/pdf',
         ]),
         default => Attachment::factory()->forSubmission($submission)->clean()->create(),
     };
@@ -274,6 +280,14 @@ it('scopes a note’s image to whoever may open the form that owns it', function
     // M129, `D58` = B. The image belongs to the FORM, not to a submission, so `submissions.view` is not the floor:
     // the arm asks `FormPolicy::viewOverview`, which a form_editor passes only with a grant on that form.
     [$caller, $attachment] = callerWithScopedObject('form_editor', $collaborates, 'form_content_image');
+
+    $this->actingAs($caller)->get(attachmentUrl($attachment))->assertStatus($status);
+})->with([[false, 403], [true, 200]]);
+
+it('scopes a form’s reference file to whoever may open the form that owns it', function (bool $collaborates, int $status): void {
+    // M132 (`R-bf49e4c1`): the content image's arm, for the content image's reason — material the author attaches to
+    // the form, read by whoever may open the form's hub.
+    [$caller, $attachment] = callerWithScopedObject('form_editor', $collaborates, 'form_reference_file');
 
     $this->actingAs($caller)->get(attachmentUrl($attachment))->assertStatus($status);
 })->with([[false, 403], [true, 200]]);

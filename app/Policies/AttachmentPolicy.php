@@ -101,7 +101,10 @@ final class AttachmentPolicy
             // open that form's hub — `viewOverview`, the hub's own gate — which reads the same for the editor composing
             // the note and a viewer reading the form. A respondent never comes here: the guest read is
             // `GuestContentImageController`'s (M130). An image held by anything but a form fails closed.
-            AttachmentKind::FormContentImage => $attachment->attachable_type === 'form'
+            // M132 (`R-bf49e4c1`): a reference file is the same kind of thing — material the author attaches to the
+            // form for respondents to read — so the same people may open it, by the same gate.
+            AttachmentKind::FormContentImage,
+            AttachmentKind::FormReferenceFile => $attachment->attachable_type === 'form'
                 && $this->mayOpenForm($user, $attachment->attachable_id),
 
             // Wired by nothing today. It fails closed rather than falling into the submission arm, whose

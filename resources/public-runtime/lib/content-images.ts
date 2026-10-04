@@ -52,7 +52,13 @@ export function contentImageCacheKey(absoluteUrl: string): string {
  */
 export function contentImagesIn(schema: SchemaResponse): string[] {
     const ids: string[] = [];
-    for (const field of schema.version.schema.fields) {
+    // Read defensively: the warm-up is fire-and-forget, so a shape it does not expect must mean "nothing to
+    // warm" rather than a rejection nobody handles (measured: `resume-boot.test.ts`'s schema stub has no fields).
+    const fields: unknown = (schema as { version?: { schema?: { fields?: unknown } } }).version?.schema?.fields;
+    if (!Array.isArray(fields)) {
+        return ids;
+    }
+    for (const field of fields as SchemaResponse['version']['schema']['fields']) {
         const content = field.field_type === 'note' ? field.config?.content : undefined;
         if (!Array.isArray(content)) {
             continue;

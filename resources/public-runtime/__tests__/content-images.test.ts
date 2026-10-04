@@ -88,3 +88,14 @@ describe('content images on the guest page', () => {
         expect(fetchSpy).not.toHaveBeenCalled();
     });
 });
+
+describe('content images — a schema the warm-up does not expect', () => {
+    it('warms nothing, and never rejects, when the schema carries no fields', async () => {
+        const odd = { form: {}, version: { id: 'v' } } as unknown as Parameters<typeof contentImagesIn>[0];
+        const fetchSpy = vi.fn(async () => undefined);
+
+        expect(contentImagesIn(odd)).toEqual([]);
+        await expect(warmContentImages(odd, () => 'x', { origin: 'https://acme.test', caches: null, fetch: fetchSpy })).resolves.toBe(0);
+        expect(fetchSpy).not.toHaveBeenCalled();
+    });
+});

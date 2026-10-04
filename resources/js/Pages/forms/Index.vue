@@ -774,12 +774,13 @@ function submitRestore(): void {
     above the cards, which is the affordance this view exists for.
 */
 /*
-    ⚠️ M131 SCOPED THIS TO THE UNCOLLAPSED TABLE, AND THE EXCEPTION ABOVE IS WHY. Below `MdsDataTable`'s
-    56em container threshold each row IS a card with no scroll region, and a one-line cluster had nothing to
-    fall into — a tenth action ("Move to folder") made the Owner's cluster wider than a 375px card, clipped
-    by `.app-shell` and invisible to the e2e `scrollWidth` assertion. The query matches the table's own
+    ⚠️ M131 SCOPED THIS TO THE UNCOLLAPSED TABLE, CLOSING THE EXCEPTION THE PARAGRAPH ABOVE ADMITS. Below
+    `MdsDataTable`'s 56em container threshold each row IS a card with no scroll region, so a one-line cluster
+    wider than its card has nothing to fall into — clipped by `.app-shell`, invisible to `scrollWidth`. With
+    M131's tenth action ("Move to folder") it still fits — 293px in a 341px cell at 375px, measured — so this
+    is the guard for the next action rather than a fix for this one. The query matches the table's own
     (`DataTable.vue`'s container block, on `.mds-table__frame`), so the two cannot disagree about which
-    layout is showing; `list-layout.spec.ts` now measures the cluster against its card.
+    layout is showing; `list-layout.spec.ts` measures the cluster against its card, at both edges.
 */
 @container not (max-width: 56em) {
     :deep(.mds-table .form-actions) {

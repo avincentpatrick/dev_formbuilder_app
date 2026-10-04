@@ -221,7 +221,8 @@ it('audits every change without the secret, the full address or the addresses in
 
     enterTenant($this->tenant->id, $this->owner->id);
     $audits = Audit::query()->where('auditable_type', 'form_automation')->get();
-    $json = $audits->map(fn (Audit $audit) => json_encode([$audit->old_values, $audit->new_values]))->implode(' ');
+    // Unescaped slashes: json_encode writes `/` as `\/` by default, and a search for the address would then pass blind.
+    $json = $audits->map(fn (Audit $audit) => json_encode([$audit->old_values, $audit->new_values], JSON_UNESCAPED_SLASHES))->implode(' ');
 
     expect($audits)->toHaveCount(2)
         ->and($json)->toContain('8.8.8.8')

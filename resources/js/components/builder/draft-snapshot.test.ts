@@ -126,6 +126,17 @@ group('the eight draft-only states', () => {
         expect(issues.map((i) => i.code)).toContain('empty_option_list');
     });
 
+    it('4b. does not call a question with choices from another form empty, and still flags a typed one (M133)', () => {
+        const linked = projectDraft(
+            input([field({ uid: 'u1', field_type: 'dropdown', config: { options: [], options_source: { form_id: 'f-2', field_key: 'name' } } })]),
+        );
+        expect(linked.issues.map((i) => i.code)).not.toContain('empty_option_list');
+
+        // A link REMOVED is a null key, and the typed list is empty again — that is the defect, and it is flagged.
+        const unlinked = projectDraft(input([field({ uid: 'u1', field_type: 'dropdown', config: { options: [], options_source: null } })]));
+        expect(unlinked.issues.map((i) => i.code)).toContain('empty_option_list');
+    });
+
     it('5. NEVER hands an unparsable expression to the engine', () => {
         // ⛔ THE LOAD-BEARING CASE. A throw from the engine's parser latches engineFailed for the whole
         // session, so a half-typed condition — the normal state of a field being edited — must be

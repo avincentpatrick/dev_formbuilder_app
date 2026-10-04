@@ -250,5 +250,8 @@ export function previewLimitations(): string[] {
         // shares with the real form is not one. `M120` had already taken its other clause, once
         // `single_page_mode` gained a writer.
         'Inside a repeatable section, wording updates on the next structural change.',
+        // M133 (`R-5da4a30f`): the list is read live from the other form's answers and served to the live form only;
+        // the preview has no respondent link to fetch it with. The remainder row owns showing it here.
+        'Choices taken from another form appear on the live form, not here.',
     ];
 }

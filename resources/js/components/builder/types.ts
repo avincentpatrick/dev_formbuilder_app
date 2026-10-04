@@ -179,6 +179,22 @@ export interface BuilderEnums {
     indexed_data_types: EnumOption[];
     validation_rule_types: RuleTypeOption[];
     comparison_operators: OperatorOption[];
+    // M133 (`R-5da4a30f`) — the question types that may take their choices from another form,
+    // `LinkedChoiceService::LINKABLE_TYPES` transmitted. Optional: a hand-built enum block in a test offers none.
+    linked_choice_types?: string[];
+}
+
+/** A choice question's link to another form's answers (M133) — `config.options_source`; either half may be unpicked yet. */
+export interface OptionsSource {
+    form_id: string | null;
+    field_key: string | null;
+}
+
+/** A form a choice question may take its choices from, with the questions it shares (M133, `linkable_sources`). */
+export interface LinkableSource {
+    id: string;
+    title: string;
+    questions: { key: string; label: string }[];
 }
 
 // A sibling field a validation row may name (M115) — for the six rule types that compare against a second
@@ -258,6 +274,8 @@ export interface BuilderPageProps {
     automations?: AutomationsProps;
     /** M133 — the Data sharing section, or null for a reader who cannot read the responses (`D87`). Optional. */
     data_sharing?: DataSharingProps | null;
+    /** M133 — the forms a choice question may take its choices from. Optional, so a fixture without it offers none. */
+    linkable_sources?: LinkableSource[];
     /**
      * The toolbar's path trail, resolved SERVER-SIDE by `CrumbTrail` (Increment J2d).
      *

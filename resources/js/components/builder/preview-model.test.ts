@@ -309,6 +309,10 @@ group('the debounce and the limitation list are stated, not implied', () => {
     // and neither paginates a repeatable section — so no page-break wording belongs on a list of what the
     // preview does NOT do. A substring check, because a narrowed entry ("…inside a repeatable section") would
     // still be the false claim this case exists to refuse.
+    it('says choices taken from another form show on the live form only (M133)', () => {
+        expect(previewLimitations().join(' ')).toContain('Choices taken from another form appear on the live form');
+    });
+
     it('no longer claims page breaks are missing, because the preview shows them', () => {
         expect(previewLimitations().join(' ').toLowerCase()).not.toContain('page break');
     });

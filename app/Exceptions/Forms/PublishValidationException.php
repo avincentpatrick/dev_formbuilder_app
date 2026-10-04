@@ -9,6 +9,7 @@ use App\Exceptions\Expressions\ExpressionException;
 use App\Exceptions\Submissions\SubmissionValidationException;
 use App\Exceptions\Templates\TemplateSyntaxException;
 use App\Services\Expressions\StructuredRuleLowering;
+use App\Services\Forms\LinkedChoiceGate;
 use App\Services\Templates\TemplateScopeResolver;
 use App\Services\Validation\SemanticValidator;
 use App\Support\Forms\GuestReachability;
@@ -111,6 +112,27 @@ final class PublishValidationException extends RuntimeException
     public static function choiceOptionsInvalid(string $fieldKey, string $detail): self
     {
         return self::one($fieldKey, 'choice_options_invalid', "The choices on “{$fieldKey}” are invalid ({$detail}).");
+    }
+
+    /**
+     * A choice question that takes its choices from another form (M133, `R-5da4a30f` — Connect project v1) whose link
+     * cannot serve. `$code` is the stable slug {@see LinkedChoiceGate} found; each says what the
+     * author can do about it.
+     */
+    public static function linkedChoicesInvalid(string $fieldKey, string $code): self
+    {
+        $message = match ($code) {
+            'linked_choices_wrong_type' => "“{$fieldKey}” cannot take its choices from another form: only a single-choice or dropdown question can.",
+            'linked_choices_incomplete' => "Choose the form and the question that “{$fieldKey}” takes its choices from.",
+            'linked_choices_with_typed_options' => "“{$fieldKey}” takes its choices from another form, so it cannot also have choices typed here.",
+            'linked_choices_self' => "“{$fieldKey}” cannot take its choices from this same form.",
+            'linked_choices_source_missing' => "The form “{$fieldKey}” takes its choices from no longer exists.",
+            'linked_choices_not_shared' => "The form “{$fieldKey}” takes its choices from does not share that question. Its owner can share it in the form's Data sharing settings.",
+            'linked_choices_owner_cannot_read' => "This form's owner cannot see the responses of the form “{$fieldKey}” takes its choices from, so its answers cannot be offered here.",
+            default => "The choices on “{$fieldKey}” cannot be taken from another form ({$code}).",
+        };
+
+        return self::one($fieldKey, $code, $message);
     }
 
     /** A cascading-select field (Increment G4a) whose level/option hierarchy does not resolve. */

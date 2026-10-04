@@ -37,6 +37,7 @@ final class BuilderPresenter
     public function __construct(
         private readonly FormSharePresenter $share,
         private readonly FormSettingsPresenter $settings,
+        private readonly LinkedChoiceService $linkedChoices,
     ) {}
 
     /**
@@ -100,6 +101,9 @@ final class BuilderPresenter
             'automations' => $this->settings->automations($form, $viewer),
             // M133 (`R-5da4a30f`) — the Data sharing section, or null for a viewer who cannot read the responses (`D87`).
             'data_sharing' => $this->settings->dataSharing($form, $viewer),
+            // M133 (`R-5da4a30f`) — the forms a choice question may take its choices from, each with the questions it
+            // shares, as this author may read them. Optional on the client: a fixture without it offers none.
+            'linkable_sources' => $this->linkedChoices->linkableSources($form, $viewer),
         ];
     }
 
@@ -260,7 +264,7 @@ final class BuilderPresenter
      * is not. The field's own shape rides on the palette entry ({@see palette()}), which is where the
      * panel already derives its per-type facts.
      *
-     * @return array<string, list<array<string, mixed>>>
+     * @return array<string, list<array<string, mixed>>|list<string>>
      */
     private function enums(): array
     {
@@ -318,6 +322,9 @@ final class BuilderPresenter
                 ],
                 ComparisonOperator::cases(),
             ),
+            // M133 (`R-5da4a30f`) — the types a link to another form's answers may feed, transmitted so the Options
+            // tab never keeps its own list.
+            'linked_choice_types' => array_map(static fn (FieldType $type): string => $type->value, LinkedChoiceService::LINKABLE_TYPES),
         ];
     }
 

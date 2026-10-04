@@ -19,6 +19,7 @@ use App\Models\FormField;
 use App\Models\FormFieldValidation;
 use App\Services\Expressions\Coercion;
 use App\Services\Forms\FormBuilderService;
+use App\Services\Forms\LinkedChoiceService;
 use App\Services\Forms\StructuralValidationGate;
 use LogicException;
 
@@ -202,7 +203,8 @@ final class FieldTypeConversion
             // The choice family shares one config arm (`UpdateFieldRequest`'s `choices`), so the options —
             // with every option's `label_translations` and any key no rule enumerates — carry verbatim.
             ConversionFamily::Text, ConversionFamily::Number, ConversionFamily::Temporal,
-            ConversionFamily::Choice, ConversionFamily::Geo => array_replace($targetDefault, $source),
+            ConversionFamily::Geo => array_replace($targetDefault, $source),
+            ConversionFamily::Choice => self::choiceConfig($to, $source, $targetDefault),
             ConversionFamily::Attachment => self::mediaConfig($to, $source),
             ConversionFamily::Grid => self::gridConfig($to, $source, $targetDefault),
             ConversionFamily::Isolated, ConversionFamily::Parking, ConversionFamily::Fixed => throw new LogicException("No in-family conversion exists from {$from->value}."),
@@ -227,6 +229,26 @@ final class FieldTypeConversion
 
         if (($config['capture_source'] ?? null) !== null && ! in_array($to, self::CAPTURE_TYPES, true)) {
             unset($config['capture_source']);
+        }
+
+        return $config;
+    }
+
+    /**
+     * M133 (`R-5da4a30f`): a link to another form's answers survives only onto a type that can take one — a single
+     * choice or a dropdown. Onto a multi-select or a Likert question it is dropped, and the plan reports the drop; the
+     * target then has no choices, which the plan's "unfinished" warning already says.
+     *
+     * @param  array<string, mixed>  $source
+     * @param  array<string, mixed>  $targetDefault
+     * @return array<string, mixed>
+     */
+    private static function choiceConfig(FieldType $to, array $source, array $targetDefault): array
+    {
+        $config = array_replace($targetDefault, $source);
+
+        if (! in_array($to, LinkedChoiceService::LINKABLE_TYPES, true)) {
+            unset($config['options_source']);
         }
 
         return $config;
@@ -453,7 +475,8 @@ final class FieldTypeConversion
     private static function incomplete(FieldType $type, array $config): bool
     {
         return match (true) {
-            ValueShape::for($type)->carriesOptionList() => self::emptyList($config['options'] ?? null),
+            // M133: a question that takes its choices from another form has none typed here, and is finished.
+            ValueShape::for($type)->carriesOptionList() => self::emptyList($config['options'] ?? null) && ! LinkedChoiceService::declaresLink($config),
             $type === FieldType::CascadingSelect => self::emptyList($config['levels'] ?? null) || self::emptyList($config['options'] ?? null),
             $type === FieldType::Matrix => self::emptyList($config['rows'] ?? null) || self::emptyList($config['columns'] ?? null)
                 || self::emptyList($config['cells'] ?? null),

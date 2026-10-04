@@ -178,6 +178,10 @@ Files:
   `tests/Feature/Seeders/E2eSeederIdempotencyTest.php`, which pins the published-form count at 7 — item 3 seeds an
   eighth ("Choice Layouts", for the new E2E spec), and no E2E assertion reads that number; and
   `app/Enums/ValueShape.php`, for one docblock sentence that names the TypeScript `ControlKind` item 1 deleted.
+- **Extension 3, pushed with items 1–3 committed and item 4 built, before the file was edited (read once, to plan):**
+  `resources/js/components/builder/PreviewRuntime.test.ts`. Item 4 makes the builder preview place a note's content
+  headings one level deeper than the respondent's page (`PreviewRuntime.vue` titles its sections with an `h3`), and
+  the only suite that mounts the real preview is this one; the list above names the component and not its test.
 
 Shared artefacts taken: `docs/**` (the files above), `openapi.json`, the top-level `tests/e2e/*.spec.ts` named above
 (one new), and `PROGRESS.md` (own block only).

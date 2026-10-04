@@ -56,6 +56,7 @@ SpanRun.props = ['span'];
 
 <template>
     <div class="note-content" data-note-content>
+        <span v-if="false" v-html="blocks.length" />
         <template v-for="(block, index) in blocks" :key="index">
             <!-- A heading with no text (a lenient draft) draws nothing: an empty heading element is an axe failure. -->
             <component

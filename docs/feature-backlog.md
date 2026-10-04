@@ -11546,7 +11546,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   form renders.** Filed 2026-09-25 by `M110`, answering the report *"can you also clarify to me what the
   appearance hint do?"* — measured answer: at render time, nothing. `ConfigPanel.vue:433-439` writes
   `form_fields.appearance` as unguided free text with no help and no vocabulary; `public-runtime/lib/types.ts:67`
-  declares it on the render model and `toRenderField()` (`schema-mapping.ts:451-479`) never reads it, so it
+  declares it on the render model and `toRenderField()` (in `schema-mapping.ts`) never reads it, so it
   reaches neither `FieldRow.vue` nor `FieldControl.vue` nor the encode channel. An author who types `vertical` or
   `minimal` sees no effect anywhere. ⛔ **BUT IT IS NOT DEAD WEIGHT AND MUST NOT SIMPLY BE DELETED.** It is
   load-bearing for XLSForm interop in **both** directions: `XlsformTypeMap.php:50,52,69,87,92` forces appearances
@@ -11559,12 +11559,12 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - **`minor` · No renderer honours a per-field layout hint, so a typed appearance vocabulary would have an author
   surface and no effect.** Filed 2026-09-25 by `M110` as the second half of the appearance work, split because it
-  lands in a different hub file and after the vocabulary exists. `toRenderField()` (`schema-mapping.ts:451-479`)
-  builds the render model without reading `appearance`, and both control switches — `schema-mapping.ts:78-118`
+  lands in a different hub file and after the vocabulary exists. `toRenderField()` (in `schema-mapping.ts`)
+  builds the render model without reading `appearance`, and both control switches — `controlFor()` in `schema-mapping.ts`
   and the independent copy at `FieldInput.vue:205-250` — dispatch on field type alone. ⚠️ **Two switches, not
   one**, and neither has a parity test today, so a layout branch added to one and forgotten in the other would
   give the guest runtime and the encode page different forms. That is the same class of drift the client-mirror
-  census exists to catch, and it should land first. **Live.** Filed by `M110`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-03 by `M127`: it is one of the user's 19 builder comments, wanted for the Oct 12 testing (`D72`).** ⚠️ **VERIFIED BY `M130` (2026-10-04), TAKEN — THE "TWO SWITCHES" PREMISE IS FALSE.** `controlFor()` (`schema-mapping.ts:78-122`) fills `RenderField.control`, which no production code reads; every channel renders through `FieldInput.vue`'s own `control`. What can drift is the three adapters that build the field `FieldInput` receives — `EncodeFormPresenter::field()`, `FieldControl.vue` and `InstanceField.vue` — so the parity gate that lands first is a census of those three, and the unread switch is deleted rather than pinned. One branch was already pinned, against this row's "neither has a parity test": `FieldTypeMirrorDriftTest`'s text-type arm. Single choice and Dropdown rendered the same native select in every channel; `D77` makes a single choice round buttons.
+  census exists to catch, and it should land first. **Live.** Filed by `M110`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-03 by `M127`: it is one of the user's 19 builder comments, wanted for the Oct 12 testing (`D72`).** ⚠️ **VERIFIED BY `M130` (2026-10-04), TAKEN — THE "TWO SWITCHES" PREMISE IS FALSE.** `controlFor()` in `schema-mapping.ts` filled `RenderField.control`, which no production code reads; every channel renders through `FieldInput.vue`'s own `control`. What can drift is the three adapters that build the field `FieldInput` receives — `EncodeFormPresenter::field()`, `FieldControl.vue` and `InstanceField.vue` — so the parity gate that lands first is a census of those three, and the unread switch is deleted rather than pinned. One branch was already pinned, against this row's "neither has a parity test": `FieldTypeMirrorDriftTest`'s text-type arm. Single choice and Dropdown rendered the same native select in every channel; `D77` makes a single choice round buttons.
 
 - ✅ **CLOSED BY `M129` (2026-10-04) — `minor` · A form can hold no author-composed content — no welcome page, no instructions, no image, no
   divider — because `note` renders one line of plain text and has no config editor.** Filed 2026-09-25 by `M110`,

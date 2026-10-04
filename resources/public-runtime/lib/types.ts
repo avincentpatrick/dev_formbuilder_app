@@ -157,27 +157,6 @@ export interface MintResponse {
 
 // ── 2. RENDER ────────────────────────────────────────────────────────────────────────────────
 
-/** The control kinds the reused F4b `FieldInput.vue` renders (derived exactly as its own `control` computed). */
-export type ControlKind =
-    | 'text'
-    | 'textarea'
-    | 'number'
-    | 'select'
-    | 'checkboxes'
-    | 'yesno'
-    // Increment G4a: a single-choice rating scale (radio group) + an N-level dependent select.
-    | 'scale'
-    | 'cascading'
-    // Increment G4b: the object-valued grids — a likert grid (radio-group per row) + a full matrix (per-cell select).
-    | 'likert_matrix'
-    | 'matrix'
-    // Increment G5b2: geospatial capture (geopoint / geotrace / geoshape) — a coordinate/vertex control + map.
-    | 'geo'
-    // Increment G6: media capture (file / image / audio / video) — a file input + progressive-enhancement capture.
-    | 'media'
-    | 'note'
-    | 'unsupported';
-
 export interface RenderOption {
     value: string;
     label: string;
@@ -245,7 +224,6 @@ export interface RenderField {
     key: string;
     sectionKey: string | null;
     fieldType: string;
-    control: ControlKind;
     supported: boolean;
     isRequired: RequiredMode;
     /** True when a validation rule (`required_if`/`required_with`) can make this field conditionally required. */

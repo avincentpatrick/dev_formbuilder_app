@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import {
     buildEngineSchema,
     buildRenderModel,
-    controlFor,
     resolveOptional,
     resolveText,
 } from '../lib/schema-mapping';
@@ -52,26 +51,6 @@ describe('buildEngineSchema', () => {
     });
 });
 
-describe('controlFor', () => {
-    it('derives the control kind for each supported type (mirrors FieldInput)', () => {
-        expect(controlFor('short_text', true)).toBe('text');
-        expect(controlFor('email', true)).toBe('text');
-        expect(controlFor('long_text', true)).toBe('textarea');
-        expect(controlFor('integer', true)).toBe('number');
-        expect(controlFor('single_select', true)).toBe('select');
-        expect(controlFor('multi_select', true)).toBe('checkboxes');
-        expect(controlFor('yes_no', true)).toBe('yesno');
-        expect(controlFor('likert_matrix', true)).toBe('likert_matrix');
-        expect(controlFor('matrix', true)).toBe('matrix');
-        // Increment G5b2: all three geo types share the one 'geo' control kind.
-        expect(controlFor('geopoint', true)).toBe('geo');
-        expect(controlFor('geotrace', true)).toBe('geo');
-        expect(controlFor('geoshape', true)).toBe('geo');
-        expect(controlFor('note', false)).toBe('note');
-        expect(controlFor('signature', false)).toBe('unsupported');
-    });
-});
-
 describe('buildRenderModel', () => {
     it('normalizes options and marks advanced types unsupported', () => {
         const schema = schemaResponse({
@@ -91,7 +70,6 @@ describe('buildRenderModel', () => {
         });
         const model = buildRenderModel(schema);
         const gender = model.fields.find((f) => f.key === 'gender')!;
-        expect(gender.control).toBe('select');
         expect(gender.options).toEqual([
             { value: 'f', label: 'Female', labelTranslations: { es: 'Femenino' } },
             { value: 'm', label: 'm', labelTranslations: null },
@@ -118,7 +96,6 @@ describe('buildRenderModel', () => {
         const model = buildRenderModel(schema);
 
         const loc = model.fields.find((f) => f.key === 'loc')!;
-        expect(loc.control).toBe('geo');
         expect(loc.supported).toBe(true);
         expect(loc.geo).toEqual({
             captureAltitude: true,
@@ -129,7 +106,6 @@ describe('buildRenderModel', () => {
 
         // A geo field with no author config still resolves to a complete, defaulted RenderGeo.
         const route = model.fields.find((f) => f.key === 'route')!;
-        expect(route.control).toBe('geo');
         expect(route.geo).toEqual({
             captureAltitude: false,
             accuracyThreshold: null,

@@ -178,7 +178,7 @@ describe('the runtime store', () => {
             {},
         );
 
-        // Before H7 all three fell through to `controlFor()`'s 'unsupported' branch and rendered the encode
+        // Before H7 all three fell through to `FieldInput.vue`'s 'unsupported' branch and rendered the encode
         // channel's "Not available for manual entry yet (Phase 2)" notice on a respondent's form.
         expect(runtime.visibleSteps.value.flatMap((s) => s.fieldKeys)).toEqual(['full_name']);
     });

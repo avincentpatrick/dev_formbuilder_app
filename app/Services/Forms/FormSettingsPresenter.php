@@ -8,15 +8,18 @@ use App\Enums\FormStatus;
 use App\Enums\FormThemePreset;
 use App\Exceptions\Ocr\OcrException;
 use App\Models\Form;
+use App\Models\FormField;
 use App\Models\FormVersion;
 use App\Models\ScopeNode;
 use App\Models\User;
+use App\Services\Authorization\ResponseReadAccess;
 use App\Services\Automations\FormAutomationPresenter;
 use App\Services\Entitlements\EntitlementService;
 use App\Services\Scoping\ScopeNodePresenter;
 use App\Services\Settings\TenantSettingRegistry;
 use App\Support\Entitlements\FeatureAdmission;
 use App\Support\Forms\GuestReachability;
+use App\Support\Forms\ShareableQuestions;
 use DateTimeZone;
 
 /**
@@ -41,6 +44,7 @@ final class FormSettingsPresenter
         private readonly TenantSettingRegistry $settings,
         private readonly FormReferenceFileService $referenceFileService,
         private readonly FormAutomationPresenter $automationPresenter,
+        private readonly ResponseReadAccess $responseAccess,
     ) {}
 
     /**
@@ -174,6 +178,56 @@ final class FormSettingsPresenter
     }
 
     /**
+     * The Data sharing section (M133, `R-5da4a30f` — Connect project v1's source key), or null for a viewer whose
+     * save would be refused: `D87` lets only someone who can read this form's responses share them, and the PATCH
+     * route asks exactly {@see ResponseReadAccess::canRead()}'s two gates. Beside the `form` block, for the
+     * Reference files section's reason.
+     *
+     * `questions` are the shareable questions of the CURRENT PUBLISHED version ({@see ShareableQuestions}) — a
+     * draft-only question has no answers. `used_by` lists the forms whose published version takes choices from this
+     * one and that this viewer may open; `used_by_others` counts the rest, so a form is never named to someone who
+     * cannot see it and the count still tells the author the switch is in use.
+     *
+     * @return array{enabled: bool, field_keys: list<string>|null, published: bool, questions: list<array{key: string, label: string}>, used_by: list<array{id: string, title: string}>, used_by_others: int}|null
+     */
+    public function dataSharing(Form $form, ?User $viewer): ?array
+    {
+        if ($viewer === null || ! $this->responseAccess->canRead($viewer, $form)) {
+            return null;
+        }
+
+        $snapshot = $form->current_published_version_id === null
+            ? null
+            : FormVersion::query()->whereKey($form->current_published_version_id)->value('schema_snapshot');
+        $snapshot = is_array($snapshot) ? $snapshot : null;
+
+        $chosen = $form->data_sharing_field_keys;
+
+        $linking = Form::query()
+            ->whereKeyNot($form->id)
+            ->whereIn('current_published_version_id', FormField::query()
+                ->select('form_version_id')
+                ->where('config->options_source->form_id', $form->id))
+            ->orderBy('title');
+
+        $readable = array_values((clone $linking)->readableBy($viewer)->get(['id', 'title'])
+            ->map(static fn (Form $source): array => ['id' => (string) $source->id, 'title' => (string) $source->title])
+            ->all());
+
+        return [
+            'enabled' => $form->data_sharing_enabled === true,
+            'field_keys' => is_array($chosen) ? array_values(array_map('strval', $chosen)) : null,
+            'published' => $snapshot !== null,
+            'questions' => array_map(
+                static fn (array $q): array => ['key' => $q['key'], 'label' => $q['label']],
+                ShareableQuestions::fromSnapshot($snapshot),
+            ),
+            'used_by' => $readable,
+            'used_by_others' => max(0, $linking->count() - count($readable)),
+        ];
+    }
+
+    /**
      * The form hub's Settings tab: every section the builder offers, plus Scope.
      *
      * Scope lives on the hub and not in the builder because it confers capacity rather than describing the
@@ -191,6 +245,7 @@ final class FormSettingsPresenter
             'ocr_scanning' => $this->ocrScanning($form),
             'reference_files' => $this->referenceFiles($form),
             'automations' => $this->automations($form, $user),
+            'data_sharing' => $this->dataSharing($form, $user),
             'scope' => $user->can('viewAny', ScopeNode::class)
                 ? ['current_node_id' => $form->scope_node_id, 'options' => $this->scopes->pickerOptions()]
                 : null,

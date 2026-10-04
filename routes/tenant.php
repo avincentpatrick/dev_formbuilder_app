@@ -1107,6 +1107,12 @@ Route::middleware([
         ->middleware(['can:update,form', 'can:manage,automation', 'feature:webhooks', 'throttle:6,1'])
         ->scopeBindings()
         ->name('forms.automations.test');
+    // M133, `R-5da4a30f`: whether other forms may use this form's answers as their choices — Connect project's source
+    // key. `D87`: whoever may edit the form AND read its responses, the hub responses route's own two gates, because
+    // nobody shares what they cannot see. On the already-imported FormController, for the `use`-line reason above.
+    Route::patch('/forms/{form}/data-sharing', [FormController::class, 'updateDataSharing'])
+        ->middleware(['can:update,form', 'can:viewOverview,form', 'can:viewAny,'.Submission::class])
+        ->name('forms.data-sharing');
 });
 
 /*

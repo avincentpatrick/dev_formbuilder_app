@@ -8,7 +8,7 @@
 
 import type { BreadcrumbItem } from '@meridian/design-system';
 
-import type { AutomationsProps, OcrScanningProps, RedirectKind, RedirectTargetOption, ReferenceFileRow, ShareProps, ThemePresetOption } from '@/components/forms/types';
+import type { AutomationsProps, DataSharingProps, OcrScanningProps, RedirectKind, RedirectTargetOption, ReferenceFileRow, ShareProps, ThemePresetOption } from '@/components/forms/types';
 
 export type Uid = string;
 
@@ -256,6 +256,8 @@ export interface BuilderPageProps {
     reference_files?: ReferenceFileRow[];
     /** M132 — the Automations section. Optional, so a fixture without it type-checks. */
     automations?: AutomationsProps;
+    /** M133 — the Data sharing section, or null for a reader who cannot read the responses (`D87`). Optional. */
+    data_sharing?: DataSharingProps | null;
     /**
      * The toolbar's path trail, resolved SERVER-SIDE by `CrumbTrail` (Increment J2d).
      *

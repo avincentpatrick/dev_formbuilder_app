@@ -67,6 +67,8 @@ function props(overrides: Record<string, unknown> = {}): Record<string, unknown>
         // M132: the hub always sends the draft's reference files, an empty list included.
         reference_files: [],
         automations: { can_webhook: false, max: 10, items: [] },
+        // M133: sent to a reader who can read the responses (`D87`).
+        data_sharing: { enabled: false, field_keys: null, published: true, questions: [], used_by: [], used_by_others: 0 },
         scope: { current_node_id: null, options: [] },
         tabs: [
             { key: 'overview', label: 'Overview', href: '/forms/form-1', icon: 'forms' },
@@ -97,7 +99,7 @@ describe('forms/Settings', () => {
 
         expect(railLabels(wrapper)).toEqual([
             'Details', 'Pages', 'Theme', 'Reference files', 'Share', 'Scanning', 'Schedule', 'Thank-you message',
-            'Save and finish later', 'Automations', 'Scope',
+            'Save and finish later', 'Automations', 'Data sharing', 'Scope',
         ]);
     });
 

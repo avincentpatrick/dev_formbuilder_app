@@ -13,7 +13,7 @@
  */
 import { MdsButton, MdsModal } from '@meridian/design-system';
 import FormSettingsSections from '@/components/forms/FormSettingsSections.vue';
-import type { AutomationsProps, FormSettingsForm, OcrScanningProps, ReferenceFileRow, ShareProps } from '@/components/forms/types';
+import type { AutomationsProps, DataSharingProps, FormSettingsForm, OcrScanningProps, ReferenceFileRow, ShareProps } from '@/components/forms/types';
 
 const props = defineProps<{
     open: boolean;
@@ -29,6 +29,8 @@ const props = defineProps<{
     referenceFiles?: ReferenceFileRow[] | null;
     /** The Automations section (M132). */
     automations?: AutomationsProps | null;
+    /** The Data sharing section (M133), or null/absent for a reader who cannot read the responses. */
+    dataSharing?: DataSharingProps | null;
 }>();
 
 const emit = defineEmits<{ 'update:open': [value: boolean] }>();
@@ -51,6 +53,7 @@ const emit = defineEmits<{ 'update:open': [value: boolean] }>();
             :ocr-scanning="props.ocrScanning"
             :reference-files="props.referenceFiles"
             :automations="props.automations"
+            :data-sharing="props.dataSharing"
         />
 
         <template #actions>

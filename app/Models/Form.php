@@ -143,8 +143,23 @@ class Form extends Model implements TenantScoped
             'closes_at' => 'datetime',
             'max_responses' => 'integer',
             'schedule_state' => FormScheduleState::class,
+            // M133 (`R-5da4a30f`) — the source half of Connect project's two-key consent. Deliberately NOT in
+            // $fillable: the only writer is FormService::setDataSharing(), behind its own route and gate (`D87`).
+            'data_sharing_enabled' => 'boolean',
+            'data_sharing_field_keys' => 'array',
         ];
     }
+
+    /**
+     * M133: a fresh model carries the column's default rather than null. `FormService::create()` never names the
+     * key, and a missing key is how a new form once published `null` into a prop the client declares boolean
+     * (`single_page_mode`, M120).
+     *
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'data_sharing_enabled' => false,
+    ];
 
     /** @return HasMany<FormVersion, $this> */
     public function versions(): HasMany

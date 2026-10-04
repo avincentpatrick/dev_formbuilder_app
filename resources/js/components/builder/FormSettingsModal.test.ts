@@ -379,3 +379,44 @@ group('the Automations section (M132)', () => {
         expect(wrapper.find('[data-section="automations"]').text()).toContain('No automations yet.');
     });
 });
+group('the Data sharing section (M133)', () => {
+    function mountWith(dataSharing: unknown) {
+        return mount(FormSettingsModal, {
+            props: {
+                open: true,
+                formId: 'form-1',
+                form,
+                timezones: ['UTC'],
+                share,
+                saveResumeAvailable: true,
+                automations: { can_webhook: false, max: 10, items: [] },
+                dataSharing,
+                teleport: false,
+            } as never,
+            global: { stubs: { teleport: true } },
+        });
+    }
+
+    it('is absent for a reader who cannot read the responses, whether null or absent (D87)', () => {
+        expect(railLabels(mountWith(null))).not.toContain('Data sharing');
+        expect(railLabels(mountWith(undefined))).not.toContain('Data sharing');
+    });
+
+    it('sits after Automations, and never borrows the public link section\'s name', async () => {
+        const wrapper = mountWith({
+            enabled: false,
+            field_keys: null,
+            published: true,
+            questions: [{ key: 'facility_name', label: 'Facility name' }],
+            used_by: [],
+            used_by_others: 0,
+        });
+
+        expect(railLabels(wrapper)).toEqual([
+            'Details', 'Pages', 'Theme', 'Share', 'Schedule', 'Thank-you message', 'Save and finish later', 'Automations', 'Data sharing',
+        ]);
+
+        await railButton(wrapper, 'Data sharing').trigger('click');
+        expect(wrapper.find('[data-section="sharing"]').text()).toContain('Facility name');
+    });
+});

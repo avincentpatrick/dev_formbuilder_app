@@ -98,6 +98,8 @@ final class BuilderPresenter
             'reference_files' => $this->settings->referenceFiles($form),
             // M132 (`R-b7bc5149`) — the Automations section, as this viewer may see it.
             'automations' => $this->settings->automations($form, $viewer),
+            // M133 (`R-5da4a30f`) — the Data sharing section, or null for a viewer who cannot read the responses (`D87`).
+            'data_sharing' => $this->settings->dataSharing($form, $viewer),
         ];
     }
 

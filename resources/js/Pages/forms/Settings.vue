@@ -20,7 +20,7 @@ import { MdsBreadcrumb, MdsCard, MdsTabNav, type BreadcrumbItem, type TabNavItem
 import PageHeader from '@/components/shell/PageHeader.vue';
 import FormSettingsSections from '@/components/forms/FormSettingsSections.vue';
 import { useEntitlements } from '@/composables/useEntitlements';
-import type { AutomationsProps, FormSettingsForm, OcrScanningProps, ReferenceFileRow, ScopeSectionProps, ShareProps } from '@/components/forms/types';
+import type { AutomationsProps, DataSharingProps, FormSettingsForm, OcrScanningProps, ReferenceFileRow, ScopeSectionProps, ShareProps } from '@/components/forms/types';
 
 defineProps<{
     form: FormSettingsForm & { id: string };
@@ -32,6 +32,8 @@ defineProps<{
     reference_files: ReferenceFileRow[];
     /** The Automations section (M132). */
     automations: AutomationsProps;
+    /** The Data sharing section (M133), or null for a reader who cannot read the responses (`D87`). */
+    data_sharing: DataSharingProps | null;
     /** Null unless the reader holds `scopes.manage`. */
     scope: ScopeSectionProps | null;
     /** The form's tab strip, resolved server-side by `FormTabSet`. */
@@ -73,6 +75,7 @@ const { feature } = useEntitlements();
                 :ocr-scanning="ocr_scanning"
                 :reference-files="reference_files"
                 :automations="automations"
+                :data-sharing="data_sharing"
                 :scope="scope"
             />
         </MdsCard>

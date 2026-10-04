@@ -198,6 +198,10 @@ Files:
   the builder page reaches it through `BuilderPresenter::present()`, which the builder controller calls without the
   user it already holds. The plan's "no hub edit" premise missed that; nothing in this codebase reads the user
   inside a presenter, so the controller passes it.
+- **Extension 7, pushed with item 5 built and before the file was edited:**
+  `tests/Feature/Tenancy/ConstraintBoundaryDriftTest.php`, whose composite-FK census went red on `forms_redirect_form_fk`
+  and nothing else — item 5's migration adds that FK, exactly as M129's `ocr_scans_form_fk` did. The census gains the
+  one name.
 
 Shared artefacts taken: `docs/**` (the files above), `openapi.json`, the top-level `tests/e2e/*.spec.ts` named above
 (one new), and `PROGRESS.md` (own block only).

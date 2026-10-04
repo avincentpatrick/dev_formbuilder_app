@@ -12950,3 +12950,12 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   forms out of the list, so responses arrive on a form its author can no longer find. Either archiving closes
   the link (and the guest routes refuse an archived form with the 404 they give a disabled one), or the list
   shows archived forms that still collect. **Live.** Filed by `M130`. **Tier: during-testing.**
+
+- **`minor` · An offline submit shows "Retrying" at once, because the page asks the service worker to send while
+  the device is known to be offline.** Found by `M130` in its own E2E run: `public-runtime-offline.spec.ts`'s
+  offline-submit case failed in 4 of 21 runs on M130's front-end and 0 of 12 on the one before it.
+  `RuntimeSession`'s offline arm calls `registerBackgroundSync()`, which registers the Background Sync tag AND posts
+  `replay-outbox` to the worker; the worker's pass fails offline, `attempts` becomes 1, and the row the respondent
+  was just told is saved reads "Retrying — Couldn't send yet" (`outbox-status.ts`) with a Retry button that cannot
+  work. The race is older than M130; the heavier page only widened it. **Live.** Filed by `M130`.
+  **Tier: during-testing.**

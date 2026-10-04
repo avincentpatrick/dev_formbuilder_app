@@ -362,7 +362,13 @@ export function createSyncOutbox(db: MeridianDb, options: SyncOutboxOptions = {}
                 if (sync !== undefined && typeof sync.register === 'function') {
                     void sync.register('outbox-sync').catch(() => undefined);
                 }
-                registration.active?.postMessage('replay-outbox');
+                // M130 — the immediate pass is for browsers without Background Sync, and it can only help when a
+                // send can succeed. Offline (`onLine === false` is the one reading that is never wrong) it fails,
+                // spends an attempt, and turns "Saved on this device — will send when you're back online" into
+                // "Retrying" for a respondent who has lost nothing. The `online` listener replays instead.
+                if (nav.onLine !== false) {
+                    registration.active?.postMessage('replay-outbox');
+                }
             })
             .catch(() => undefined);
     }

@@ -107,3 +107,29 @@ it('does not clobber a Permissions-Policy another layer already set', function (
 
     expect($response->headers->get('Permissions-Policy'))->toBe('camera=()');
 });
+
+// M130 (`R-db169c29`, `D76`) — the guest page now sends a respondent to an address an author chose, and the resume
+// page's URL carries a resume token: the referrer policy is set explicitly so a cross-origin destination sees the
+// origin only, whatever the browser's own default is.
+it('sends only the origin to a cross-origin destination, never the page address', function (): void {
+    $response = (new PublicRuntimeSecurityHeaders)->handle(
+        Request::create('/f/resume/a-resume-token'),
+        fn (): Response => new Response('ok'),
+    );
+
+    expect($response->headers->get('Referrer-Policy'))->toBe('strict-origin-when-cross-origin');
+});
+
+it('does not clobber a Referrer-Policy another layer already set', function (): void {
+    $response = (new PublicRuntimeSecurityHeaders)->handle(
+        Request::create('/f/demo'),
+        function (): Response {
+            $response = new Response('ok');
+            $response->headers->set('Referrer-Policy', 'no-referrer');
+
+            return $response;
+        },
+    );
+
+    expect($response->headers->get('Referrer-Policy'))->toBe('no-referrer');
+});

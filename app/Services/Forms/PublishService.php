@@ -31,6 +31,7 @@ final class PublishService
         private readonly StructuralValidationGate $gate,
         private readonly ExpressionValidationGate $expressionGate,
         private readonly TemplateValidationGate $templateGate,
+        private readonly RedirectValidationGate $redirectGate,
         private readonly SchemaChangeClassifier $classifier,
         private readonly SchemaSnapshotSerializer $serializer,
         private readonly SchemaTreeCloner $cloner,
@@ -126,6 +127,8 @@ final class PublishService
             $this->gate->assertPublishable($draft);
             $this->expressionGate->assertExpressionsResolve($draft);
             $this->templateGate->assertTemplatesResolve($draft, $locked);
+            // M130 (`D76`) — the after-submit destination lives on the form too, so it is checked here as well.
+            $this->redirectGate->assertRedirectResolves($locked);
             // 2. Classify the change.
             $classification = $this->classifier->classify($draft, $currentPublished);
 

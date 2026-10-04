@@ -22,6 +22,7 @@ use App\Services\Authorization\ResourceGrantResolver;
 use App\Services\Entitlements\QuotaGuard;
 use App\Support\Audit\AuditLogger;
 use App\Support\Forms\FormSchedule;
+use App\Support\Forms\RedirectTarget;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
@@ -326,8 +327,8 @@ final class FormService
      * unrelated edit. Centralizing it here is what keeps that structural rather than a review convention.
      *
      * THIS IS THE FIRST AUDITED FORM-CONFIG WRITE, and it is deliberately first. Nothing else on this service
-     * emits an audit row — `updateMetadata`, `assignScope`, `setSaveAndResume`, `setConfirmationMessage`,
-     * `setSchedule` and `archive` are all silent, and Increment I2 closes that as a set. This one does not
+     * emitted an audit row then — `updateMetadata`, `assignScope`, `setSaveAndResume`, `setConfirmationMessage`,
+     * `setSchedule` and `archive` were all silent until Increment I2 closed that as a set. This one did not
      * wait for I2 because it is the highest-blast-radius toggle a form has: it is the difference between a
      * private draft and an open collection endpoint, and "who turned guest access on, and when" is the first
      * question anyone asks about an unexpected submission. It establishes `auditable_type = 'form'`, which I2
@@ -434,11 +435,15 @@ final class FormService
      * `SchemaChangeClassifier` hole-diffing: DELETING a field after the message was saved still dangles it
      * silently, because nothing re-validates this column on a schema change.
      *
+     * M130 (`R-db169c29`, `D76`) — and where a respondent goes after the thank-you screen, in the same save and the
+     * same audit row: one section, one act. `$redirect` is REQUIRED and nullable, and null leaves the destination
+     * as it is, so a caller that edits only the message ("Reset to default") cannot clear it by omission.
+     *
      * @param  array<string, string>|null  $translations
      */
-    public function setConfirmationMessage(Form $form, ?string $message, ?array $translations, ?User $actor = null): Form
+    public function setConfirmationMessage(Form $form, ?string $message, ?array $translations, ?RedirectTarget $redirect, ?User $actor = null): Form
     {
-        return DB::transaction(function () use ($form, $message, $translations, $actor): Form {
+        return DB::transaction(function () use ($form, $message, $translations, $redirect, $actor): Form {
             $normalized = $translations === null || $translations === [] ? null : $translations;
 
             // The audit records which LOCALES carry a translation, never the translations themselves:
@@ -454,10 +459,18 @@ final class FormService
                 'confirmation_message_locales' => array_keys($normalized ?? []),
             ];
 
-            $form->forceFill([
+            $fill = [
                 'confirmation_message' => $message,
                 'confirmation_message_translations' => $normalized,
-            ])->save();
+            ];
+
+            if ($redirect !== null) {
+                $old += ['redirect_form_id' => $form->redirect_form_id, 'redirect_url' => $form->redirect_url];
+                $new += ['redirect_form_id' => $redirect->formId, 'redirect_url' => $redirect->url];
+                $fill += ['redirect_form_id' => $redirect->formId, 'redirect_url' => $redirect->url];
+            }
+
+            $form->forceFill($fill)->save();
 
             $this->recordFormUpdate($form, $old, $new, $actor);
 

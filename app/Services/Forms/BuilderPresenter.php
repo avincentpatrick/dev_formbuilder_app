@@ -17,6 +17,7 @@ use App\Models\FormField;
 use App\Models\FormFieldValidation;
 use App\Models\FormSection;
 use App\Models\FormVersion;
+use App\Models\User;
 use DateTimeZone;
 use Illuminate\Support\Collection;
 
@@ -41,7 +42,7 @@ final class BuilderPresenter
     /**
      * @return array<string, mixed>
      */
-    public function present(Form $form): array
+    public function present(Form $form, ?User $viewer = null): array
     {
         $draft = $form->draft_version_id !== null
             ? FormVersion::query()->whereKey($form->draft_version_id)->first()
@@ -62,7 +63,8 @@ final class BuilderPresenter
                 ->all()
             : [];
 
-        $settings = $this->settings->form($form);
+        // M130 — the viewer, for the destination picker's list of forms they may open (FormSettingsPresenter).
+        $settings = $this->settings->form($form, $viewer);
 
         return [
             // `id` and `status` are the builder's own. Every other key belongs to a settings section and comes

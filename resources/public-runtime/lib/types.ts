@@ -346,6 +346,18 @@ export interface SubmitResult {
     reference: string;
     status: string;
     created: boolean;
+    /**
+     * M130 (`R-db169c29`, `D76`) — where to send the respondent after the thank-you screen, or null to stay.
+     * Only a submit the server ACCEPTED has one: a response queued offline never gets this answer, so it can
+     * never move. Optional so a test double that predates it still type-checks; absent reads as null.
+     */
+    redirect?: SubmitRedirect | null;
+}
+
+/** A destination after the thank-you screen (M130, `D76`): where, and a name the screen can say it by. */
+export interface SubmitRedirect {
+    url: string;
+    label: string;
 }
 
 // ── H10 save-and-resume ────────────────────────────────────────────────────────────────────────

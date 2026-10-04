@@ -97,7 +97,7 @@ describe('RuntimeSession (component wiring)', () => {
         expect(client.submit).toHaveBeenCalledWith(expect.objectContaining({ answers: { name: 'Ada' } }));
         // The second payload is Increment H6b's rendered confirmation copy — null here because this form
         // sets no `confirmation_message`, which is what keeps App.vue's hardcoded default in place.
-        expect(wrapper.emitted('submitted')?.[0]).toEqual([SUBMISSION_ID, SUBMISSION_REFERENCE, null]);
+        expect(wrapper.emitted('submitted')?.[0]).toEqual([SUBMISSION_ID, SUBMISSION_REFERENCE, null, null]);
 
         wrapper.unmount();
     });
@@ -607,7 +607,7 @@ describe('RuntimeSession — piping (Increment H6b, Doc #26)', () => {
         await wrapper.find('form').trigger('submit');
         await settle();
 
-        expect(wrapper.emitted('submitted')?.[0]).toEqual([SUBMISSION_ID, SUBMISSION_REFERENCE, 'Thanks, Ada!']);
+        expect(wrapper.emitted('submitted')?.[0]).toEqual([SUBMISSION_ID, SUBMISSION_REFERENCE, 'Thanks, Ada!', null]);
         wrapper.unmount();
     });
 
@@ -624,7 +624,7 @@ describe('RuntimeSession — piping (Increment H6b, Doc #26)', () => {
         await wrapper.find('form').trigger('submit');
         await settle();
 
-        expect(wrapper.emitted('submitted')?.[0]).toEqual([SUBMISSION_ID, SUBMISSION_REFERENCE, 'Salamat, Ada!']);
+        expect(wrapper.emitted('submitted')?.[0]).toEqual([SUBMISSION_ID, SUBMISSION_REFERENCE, 'Salamat, Ada!', null]);
         wrapper.unmount();
     });
 
@@ -635,7 +635,7 @@ describe('RuntimeSession — piping (Increment H6b, Doc #26)', () => {
         await wrapper.find('form').trigger('submit');
         await settle();
 
-        expect(wrapper.emitted('submitted')?.[0]).toEqual([SUBMISSION_ID, SUBMISSION_REFERENCE, null]);
+        expect(wrapper.emitted('submitted')?.[0]).toEqual([SUBMISSION_ID, SUBMISSION_REFERENCE, null, null]);
         wrapper.unmount();
     });
 
@@ -649,7 +649,7 @@ describe('RuntimeSession — piping (Increment H6b, Doc #26)', () => {
         await wrapper.find('form').trigger('submit');
         await settle();
 
-        expect(wrapper.emitted('submitted')?.[0]).toEqual([SUBMISSION_ID, SUBMISSION_REFERENCE, null]);
+        expect(wrapper.emitted('submitted')?.[0]).toEqual([SUBMISSION_ID, SUBMISSION_REFERENCE, null, null]);
         wrapper.unmount();
     });
 
@@ -1854,6 +1854,24 @@ describe('RuntimeSession — a note with content is announced by what it says (M
         expect(wrapper.find('[data-repeat-instance] [data-note-content]').text()).toBe('Ask for their health card.');
         expect(wrapper.text()).not.toContain('Member note (for the team)');
 
+        wrapper.unmount();
+    });
+});
+
+describe('RuntimeSession — the destination after the thank-you (M130, D76)', () => {
+    it('passes the destination the server answered with up to the app, beside the reference', async () => {
+        const next = { url: 'https://health.example.org/next', label: 'health.example.org' };
+        const client = fakeClient({
+            submit: vi.fn(async () => ({ id: SUBMISSION_ID, reference: SUBMISSION_REFERENCE, status: 'submitted', created: true, redirect: next })),
+        });
+        const wrapper = mount(RuntimeSession, {
+            props: { schema: schemaResponse({ fields: [field({ key: 'name', label: 'Full name' })] }), bootstrap, client },
+        });
+
+        await wrapper.find('form').trigger('submit');
+        await settle();
+
+        expect(wrapper.emitted('submitted')?.[0]).toEqual([SUBMISSION_ID, SUBMISSION_REFERENCE, null, next]);
         wrapper.unmount();
     });
 });

@@ -143,10 +143,10 @@ final class GuestDraftController extends Controller
      * are RLS-exempt, so this reads under the guest tenant context). The web shell at `/f/resume/{token}`
      * opens the SPA.
      *
-     * {@see TenantUrl::toPublic()} — the PUBLIC arm, and the ONLY caller of it. A resume link is the one
-     * outbound URL in the application that a RESPONDENT receives, and the guest runtime is the one route
+     * {@see TenantUrl::toPublic()} — the PUBLIC arm, which the share link, its QR and (M130) a form destination
+     * also use. A resume link is the outbound URL a RESPONDENT receives in mail, and the guest runtime is the route
      * group a tenant's custom domain serves (ADR-0009 §D2), so this is exactly where a tenant's own
-     * hostname should appear. Every other builder uses the app arm.
+     * hostname should appear. Links for signed-in members use the app arm.
      *
      * H22a fixed two live defects here: this used to interpolate `domains.domain` — the SUBDOMAIN LABEL —
      * straight into `"https://{$host}/…"`, emitting `https://acme/f/resume/…` in every resume email, with

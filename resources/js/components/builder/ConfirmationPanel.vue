@@ -23,10 +23,18 @@
  *
  * One message box per supported locale, driven by `form.supported_locales`. Blank leaves the runtime's
  * built-in default standing, which is what makes the whole column additive for every existing form.
+ *
+ * ── AFTER THE THANK-YOU (M130, `R-db169c29`, `D76`) ──────────────────────────────────────────────────
+ * Below the message: where a respondent goes next — stay, another form of this workspace, or a web address —
+ * saved by the same button into the same audit row. "Reset to default" sends the message alone and so never
+ * clears a destination. The list of forms comes from the server: only forms this author may open, each with
+ * `live`, the predicate the submit response resolves with, so the warning here is exactly the case in which a
+ * respondent would stay instead.
  */
-import { computed, watch } from 'vue';
+import { computed, useId, watch } from 'vue';
 import { useForm } from '@inertiajs/vue3';
-import { MdsButton, MdsFormField, MdsTextarea } from '@meridian/design-system';
+import { MdsButton, MdsFormField, MdsRadio, MdsSelect, MdsTextarea, MdsTextInput } from '@meridian/design-system';
+import type { RedirectKind, RedirectTargetOption } from '@/components/forms/types';
 
 const props = defineProps<{
     /**
@@ -40,6 +48,10 @@ const props = defineProps<{
     form: {
         confirmation_message: string | null;
         confirmation_message_translations: Record<string, string>;
+        redirect_kind: RedirectKind;
+        redirect_form_id: string | null;
+        redirect_url: string | null;
+        redirect_targets: RedirectTargetOption[];
         default_locale: string;
         supported_locales: string[];
     };
@@ -48,10 +60,54 @@ const props = defineProps<{
 const form = useForm<{
     confirmation_message: string;
     confirmation_message_translations: Record<string, string>;
+    redirect_kind: RedirectKind;
+    redirect_form_id: string;
+    redirect_url: string;
 }>({
     confirmation_message: '',
     confirmation_message_translations: {},
+    redirect_kind: 'none',
+    redirect_form_id: '',
+    redirect_url: '',
 });
+
+const REDIRECT_KINDS: ReadonlyArray<{ value: RedirectKind; label: string }> = [
+    { value: 'none', label: 'Stay on the thank-you screen' },
+    { value: 'form', label: 'Go to another form' },
+    { value: 'url', label: 'Go to a web address' },
+];
+const kindName = useId();
+const kindHelpId = useId();
+
+/**
+ * A SAVED destination this author cannot open — set by someone who could. It is shown as kept rather than by
+ * name, and a save that leaves it alone does not send it: the request would refuse the id on this author's
+ * behalf, and a message edit must not be blocked by a destination the author never touched.
+ */
+const savedUnseen = computed(
+    () =>
+        props.form.redirect_kind === 'form' &&
+        props.form.redirect_form_id !== null &&
+        !props.form.redirect_targets.some((target) => target.id === props.form.redirect_form_id),
+);
+const keptUnseen = computed(
+    () => savedUnseen.value && form.redirect_kind === 'form' && form.redirect_form_id === props.form.redirect_form_id,
+);
+const targetOptions = computed(() => [
+    ...(savedUnseen.value ? [{ value: props.form.redirect_form_id ?? '', label: 'A form you cannot open (kept as it is)' }] : []),
+    ...props.form.redirect_targets.map((target) => ({
+        value: target.id,
+        label: target.live ? target.title : `${target.title} (not open to respondents)`,
+    })),
+]);
+const chosenTarget = computed(() => props.form.redirect_targets.find((target) => target.id === form.redirect_form_id) ?? null);
+const targetHelp = computed(() =>
+    chosenTarget.value !== null && !chosenTarget.value.live
+        ? 'This form is not open to respondents yet — it needs a public link, guest access and a published version. Until then respondents stay on the thank-you screen, and publishing this form is refused.'
+        : keptUnseen.value
+          ? 'Respondents go to a form you cannot open. Choose another to change it.'
+          : 'Only forms you can open are listed.',
+);
 
 /** Every supported locale except the default, which the base message already covers. */
 const variantLocales = computed(() =>
@@ -65,6 +121,9 @@ watch(
     (open) => {
         if (!open) return;
         form.confirmation_message = props.form.confirmation_message ?? '';
+        form.redirect_kind = props.form.redirect_kind;
+        form.redirect_form_id = props.form.redirect_form_id ?? '';
+        form.redirect_url = props.form.redirect_url ?? '';
         form.confirmation_message_translations = Object.fromEntries(
             variantLocales.value.map((locale) => [locale, props.form.confirmation_message_translations[locale] ?? '']),
         );
@@ -86,6 +145,7 @@ watch(
 function submit(clear: boolean): void {
     form
         .transform((data) => {
+            // The message alone: the request leaves the destination as it is when it is not mentioned (M130).
             if (clear) {
                 return { confirmation_message: null, confirmation_message_translations: null };
             }
@@ -94,9 +154,21 @@ function submit(clear: boolean): void {
                 Object.entries(data.confirmation_message_translations).filter(([, value]) => value.trim() !== ''),
             );
 
-            return {
+            const message = {
                 confirmation_message: data.confirmation_message.trim() === '' ? null : data.confirmation_message,
                 confirmation_message_translations: Object.keys(variants).length > 0 ? variants : null,
+            };
+
+            // An untouched destination the author cannot open travels as no destination at all: left as it is.
+            if (keptUnseen.value) {
+                return message;
+            }
+
+            return {
+                ...message,
+                redirect_kind: data.redirect_kind,
+                ...(data.redirect_kind === 'form' ? { redirect_form_id: data.redirect_form_id } : {}),
+                ...(data.redirect_kind === 'url' ? { redirect_url: data.redirect_url.trim() } : {}),
             };
         })
         .patch(`/forms/${props.formId}/confirmation`, {
@@ -148,12 +220,63 @@ function submit(clear: boolean): void {
             />
         </MdsFormField>
 
+        <fieldset class="confirmation__next" :aria-describedby="kindHelpId" data-redirect-settings>
+            <legend class="confirmation__legend">After the thank-you screen</legend>
+            <p :id="kindHelpId" class="confirmation__help">
+                Respondents see the thank-you first, then go on after 20 seconds unless they choose to stay. A response
+                saved on a device while offline never moves, and an embedded form only offers the link.
+            </p>
+            <div class="confirmation__kinds">
+                <MdsRadio
+                    v-for="kind in REDIRECT_KINDS"
+                    :key="kind.value"
+                    v-model="form.redirect_kind"
+                    :value="kind.value"
+                    :label="kind.label"
+                    :name="kindName"
+                />
+            </div>
+
+            <MdsFormField
+                v-if="form.redirect_kind === 'form'"
+                v-slot="{ id, describedby, invalid }"
+                label="Form"
+                :help="targetHelp"
+                :error="form.errors.redirect_form_id"
+            >
+                <MdsSelect
+                    :id="id"
+                    v-model="form.redirect_form_id"
+                    :options="targetOptions"
+                    placeholder="Choose a form"
+                    :describedby="describedby"
+                    :invalid="invalid"
+                />
+            </MdsFormField>
+            <MdsFormField
+                v-else-if="form.redirect_kind === 'url'"
+                v-slot="{ id, describedby, invalid }"
+                label="Web address"
+                help="A full address that starts with https://."
+                :error="form.errors.redirect_url"
+            >
+                <MdsTextInput
+                    :id="id"
+                    v-model="form.redirect_url"
+                    type="url"
+                    placeholder="https://"
+                    :describedby="describedby"
+                    :invalid="invalid"
+                />
+            </MdsFormField>
+        </fieldset>
+
         <div class="settings-panel__actions">
             <MdsButton variant="tertiary" :disabled="form.processing" @click="submit(true)">
-                Reset to default
+                Reset message to default
             </MdsButton>
             <MdsButton variant="primary" icon-left="check" :loading="form.processing" @click="submit(false)">
-                Save message
+                Save thank-you screen
             </MdsButton>
         </div>
     </div>
@@ -175,6 +298,37 @@ function submit(clear: boolean): void {
 
 /* ⚠️ RE-DECLARED, NOT INHERITED — the same note `AccessCard.vue` carries. `<style scoped>` reaches a child
    SFC's ROOT node only, so the settings modal cannot style this footer for its sections. */
+/* M130 (`D76`) — the destination, a group of its own under the message. */
+.confirmation__next {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mds-space-3);
+    min-width: 0;
+    margin: var(--mds-space-6) 0 0;
+    padding: 0;
+    border: 0;
+}
+
+.confirmation__legend {
+    padding: 0;
+    font-family: var(--mds-font-family-body);
+    font-size: var(--mds-type-label-font-size);
+    line-height: var(--mds-type-label-line-height);
+    font-weight: var(--mds-font-weight-medium);
+    color: var(--mds-color-text-body);
+}
+
+.confirmation__help {
+    margin: 0;
+    font-size: var(--mds-type-body-sm-font-size);
+    color: var(--mds-color-text-secondary);
+}
+
+.confirmation__kinds {
+    display: flex;
+    flex-direction: column;
+}
+
 .settings-panel__actions {
     display: flex;
     flex-wrap: wrap;

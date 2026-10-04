@@ -10,6 +10,7 @@ use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Forms\BuilderPresenter;
 use App\Services\Forms\FormService;
+use App\Services\Forms\FormSettingsPresenter;
 use App\Services\Forms\PublishService;
 use App\Services\Settings\TenantSettingRegistry;
 use App\Support\Tenancy\TenantContext;
@@ -93,7 +94,8 @@ it('hands the page exactly the settings block the builder\'s modal receives', fu
         ->viewData('page')['props']['form'];
 
     enterTenant($this->tenant->id, $this->owner->id);
-    $builder = app(BuilderPresenter::class)->present($this->form->refresh())['form'];
+    // The viewer too (M130): the destination picker lists the forms this author may open, on both surfaces.
+    $builder = app(BuilderPresenter::class)->present($this->form->refresh(), $this->owner)['form'];
 
     // The builder's own two keys are `id` and `status`; every other key is a settings section's.
     $builderSettings = array_diff_key($builder, ['id' => true, 'status' => true]);
@@ -109,6 +111,8 @@ it('keeps the builder\'s form block in the order and with the keys it always had
     expect(array_keys($builder))->toBe([
         'id', 'title', 'description', 'status', 'save_and_resume', 'single_page_mode', 'opens_at', 'closes_at',
         'timezone', 'max_responses', 'confirmation_message', 'confirmation_message_translations',
+        // M130 (`D76`) — the after-submit destination, with the Thank-you section it is saved from.
+        'redirect_kind', 'redirect_form_id', 'redirect_url', 'redirect_targets',
         'default_locale', 'supported_locales',
     ]);
 });
@@ -188,4 +192,29 @@ it('hands the builder the same Scanning facts, so both entry points show one sec
     $builder = app(BuilderPresenter::class)->present($this->form);
 
     expect($builder['ocr_scanning'])->toBe(['enabled' => false, 'eligible' => true, 'reason' => null]);
+});
+
+it('offers as destinations the other forms the author may open, each marked live or not (M130)', function (): void {
+    $draft = app(FormService::class)->create($this->tenant, $this->owner, 'Another form');
+    $live = settingsPageForm($this->tenant, $this->owner, 'Live form');
+    $live->update(['public_slug' => 'live-form', 'allow_guest_submissions' => true]);
+    $archived = app(FormService::class)->create($this->tenant, $this->owner, 'Archived form');
+    app(FormService::class)->archive($archived, $this->owner);
+
+    // By title, never this form, never an archived one; `live` is the predicate the submit response uses.
+    expect(app(FormSettingsPresenter::class)->form($this->form->refresh(), $this->owner)['redirect_targets'])->toBe([
+        ['id' => $draft->id, 'title' => 'Another form', 'live' => false],
+        ['id' => $live->id, 'title' => 'Live form', 'live' => true],
+    ]);
+});
+
+it('lists a Form Editor only their own forms as destinations, and nobody without a viewer (M130)', function (): void {
+    $editor = User::factory()->create();
+    enterTenant($this->tenant->id, $editor->id);
+    makeActiveMember($editor, 'form_editor');
+    $mine = app(FormService::class)->create($this->tenant, $editor, 'My intake');
+    $alsoMine = app(FormService::class)->create($this->tenant, $editor, 'My follow-up');
+
+    expect(array_column(app(FormSettingsPresenter::class)->form($mine, $editor)['redirect_targets'], 'id'))->toBe([$alsoMine->id])
+        ->and(app(FormSettingsPresenter::class)->form($mine)['redirect_targets'])->toBe([]);
 });

@@ -8,7 +8,7 @@
 
 import type { BreadcrumbItem } from '@meridian/design-system';
 
-import type { OcrScanningProps, ShareProps } from '@/components/forms/types';
+import type { OcrScanningProps, RedirectKind, RedirectTargetOption, ShareProps } from '@/components/forms/types';
 
 export type Uid = string;
 
@@ -214,6 +214,11 @@ export interface BuilderPageProps {
         // which case the runtime's built-in default stands.
         confirmation_message: string | null;
         confirmation_message_translations: Record<string, string>;
+        // M130 (`D76`) — where a respondent goes after the thank-you screen (FormSettingsForm says the rest).
+        redirect_kind: RedirectKind;
+        redirect_form_id: string | null;
+        redirect_url: string | null;
+        redirect_targets: RedirectTargetOption[];
         default_locale: string;
         supported_locales: string[];
     };

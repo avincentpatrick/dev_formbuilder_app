@@ -58,6 +58,7 @@ use App\Services\Webhooks\WebhookEndpointService;
 use App\Support\Analytics\AnalyticsQuery;
 use App\Support\Audit\AuditLogger;
 use App\Support\Audit\AuditRedactor;
+use App\Support\Forms\RedirectTarget;
 use App\Support\Mapping\ColumnFingerprint;
 use App\Support\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
@@ -624,6 +625,22 @@ class E2eSeeder extends Seeder
                     'supported_locales' => ['en'],
                     'single_page_mode' => true,
                 ]);
+            }
+
+            // M130 (`R-db169c29`, `D76`) — "Before Your Visit" sends a respondent on to a web address after the
+            // thank-you, so `public-runtime-axe.spec.ts` can scan the countdown, Stay and Continue (which intercepts the
+            // address). A web address, not a form: a form's link is built from APP_URL, which only CI makes the same
+            // origin as the page under test. Set outside the create guard, and converged, so an existing database gets
+            // it too; no other spec submits this form.
+            $guideForm = Form::query()->where('title', 'Before Your Visit')->first();
+            if ($guideForm instanceof Form && $guideForm->redirect_url !== self::VISIT_GUIDE_NEXT) {
+                app(FormService::class)->setConfirmationMessage(
+                    $guideForm,
+                    $guideForm->confirmation_message,
+                    $guideForm->confirmation_message_translations,
+                    RedirectTarget::url(self::VISIT_GUIDE_NEXT),
+                    $owner,
+                );
             }
 
             // A guest-enabled but CLOSED scheduled form (Increment H12b) — reached at /f/closed-survey. Its
@@ -2129,6 +2146,9 @@ class E2eSeeder extends Seeder
 
     /** Deterministic id for the seeded scan (M129), so re-seeding finds it rather than adding a second. */
     private const OCR_SCAN_FIXTURE_ID = '0192e2e0-0000-7000-8000-00000000c501';
+
+    /** Where "Before Your Visit" sends a respondent after the thank-you (M130, `D76`); the E2E spec intercepts it. */
+    private const VISIT_GUIDE_NEXT = 'https://visit.example.org/next';
 
     /** The entrance picture on the seeded "Before Your Visit" note (M130): 240×135, drawn in four flat colours. */
     private const VISIT_GUIDE_ENTRANCE_PNG = 'iVBORw0KGgoAAAANSUhEUgAAAPAAAACHBAMAAADaXMnYAAAAD1BMVEXo8f2aqLoOb+j////ZLSDp4q8yAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAApElEQVRo3u3XwQ2DMAxAUVboBpXFBO0GyPvPVJXSay4kGMH7CzzZQiGZJkmSJEnSzmJHT3A3OHMpgTPb8ih4/sJZAK9ua+RB8G/g1siD4M1tjHwx+L/pxq7BYF+1A+RsZ3UZXPZbrIPLbiBRCldc9tZdx63gsgt9HTxn3AyOxfv40vB76wUGg8FgMBgMBoPPCqtjj6LAYDAYDAaDwQfAkiRJUvc+qre8eV3EZrUAAAAASUVORK5CYII=';

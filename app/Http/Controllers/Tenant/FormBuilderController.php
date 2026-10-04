@@ -59,7 +59,7 @@ final class FormBuilderController extends Controller
         $user = $request->user();
 
         return Inertia::render('forms/Builder', [
-            ...$this->presenter->present($form),
+            ...$this->presenter->present($form, $user),
             'crumbs' => CrumbTrail::forms($user)->form($form)->current('Builder'),
         ]);
     }

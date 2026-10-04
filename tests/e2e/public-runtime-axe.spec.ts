@@ -142,6 +142,45 @@ for (const theme of themes) {
     });
 }
 
+// After the thank-you (M130, `R-db169c29`, `D76`). "Before Your Visit" (E2eSeeder) sends a respondent on to
+// https://visit.example.org/next: the screen names it, counts down from 20 seconds, and offers Stay. The scan runs
+// WHILE it counts — the countdown is the new surface — and Stay comes straight after, well inside the 20 seconds.
+for (const theme of themes) {
+    test(`Public runtime after-submit destination (${theme}) — accessible & no horizontal overflow`, async ({ page }) => {
+        await page.goto('/f/visit-guide', { waitUntil: 'networkidle' });
+        await page
+            .getByRole('heading', { name: 'Before Your Visit', level: 1 })
+            .waitFor({ state: 'visible', timeout: 15_000 });
+        await forceTheme(page, theme);
+
+        await page.getByRole('button', { name: 'Submit' }).click();
+        // Exact: the screen-reader announcement begins with the same words.
+        await expect(page.getByText('Next: visit.example.org', { exact: true })).toBeVisible({ timeout: 15_000 });
+        await expect(page.getByText(/Continuing in \d+ seconds?\./)).toBeVisible();
+        await assertClean(page, 'After-submit destination, counting');
+
+        await page.getByRole('button', { name: 'Stay on this page' }).click();
+        await expect(page.getByText(/Continuing in/)).toHaveCount(0);
+        await expect(page.getByRole('link', { name: 'Continue now' })).toBeFocused();
+        await assertClean(page, 'After-submit destination, stayed');
+    });
+}
+
+test('Public runtime — Continue now goes on to the destination', async ({ page }) => {
+    // The destination is outside the test's world, so it is answered here: arriving is the assertion.
+    await page.route('https://visit.example.org/**', (route) =>
+        route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>Next</title><h1>After your visit</h1>' }),
+    );
+    await page.goto('/f/visit-guide', { waitUntil: 'networkidle' });
+    await page.getByRole('heading', { name: 'Before Your Visit', level: 1 }).waitFor({ state: 'visible', timeout: 15_000 });
+
+    await page.getByRole('button', { name: 'Submit' }).click();
+    await page.getByRole('link', { name: 'Continue now' }).click();
+
+    await page.waitForURL('https://visit.example.org/next', { timeout: 15_000 });
+    await expect(page.getByRole('heading', { name: 'After your visit', level: 1 })).toBeVisible();
+});
+
 // A full guest submit (Clinic Intake's fields are all optional) drives the F5 guest submit endpoint end-to-end
 // and lands on the post-submit confirmation, which is itself scanned for accessibility.
 test('Public runtime — submit reaches an accessible confirmation', async ({ page }) => {

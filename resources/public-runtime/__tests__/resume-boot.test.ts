@@ -1,6 +1,11 @@
 import { mount } from '@vue/test-utils';
 import App from '../App.vue';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { defineComponent, inject } from 'vue';
+import { ConflictReviewKey } from '../composables/context';
+import { openDb } from '../lib/db';
+import { enqueue, markConflict } from '../lib/outbox';
+import { respondentSession } from '../lib/respondent-session';
 
 /**
  * Increment M76 — THE RESUME BOOT FETCHES ITS SCHEMA AT THE DRAFT'S VERSION, NOT AT THE PUBLISHED ONE.
@@ -138,6 +143,98 @@ describe('resume boot — which version the schema is fetched at', () => {
         expect(resumeDraft).not.toHaveBeenCalled();
         expect(adoptToken).not.toHaveBeenCalled();
 
+        wrapper.unmount();
+    });
+});
+
+/**
+ * M130 (`R-db169c29`, `D76`) — the destination reaches the confirmation screen only from an ANSWERED submit. This is
+ * App.vue's half, so it is here, in the one suite that mounts App: a queued response never had an answer, and a
+ * resolved conflict was a review of a parked response rather than the fresh fill the destination was set for.
+ */
+describe('after a submit — where the respondent goes next (M130, D76)', () => {
+    const NEXT = { url: 'https://health.example.org/next', label: 'health.example.org' };
+    let review: ((uuid?: string) => void) | undefined;
+    const SyncStatusProbe = defineComponent({
+        name: 'SyncStatus',
+        setup() {
+            review = inject(ConflictReviewKey);
+            return () => null;
+        },
+    });
+
+    function mountOrdinary() {
+        return mount(App, {
+            props: { bootstrap: bootstrap({ resumeToken: '' }) as never },
+            global: {
+                stubs: {
+                    RuntimeSession: true,
+                    ConfirmationScreen: true,
+                    SyncStatus: SyncStatusProbe,
+                    OfflineIndicator: true,
+                    MdsEmptyState: true,
+                    MdsSpinner: true,
+                },
+            },
+        });
+    }
+
+    async function session(wrapper: ReturnType<typeof mountOrdinary>) {
+        await vi.waitFor(() => expect(wrapper.findComponent({ name: 'RuntimeSession' }).exists()).toBe(true));
+        return wrapper.findComponent({ name: 'RuntimeSession' });
+    }
+
+    async function confirmation(wrapper: ReturnType<typeof mountOrdinary>) {
+        await vi.waitFor(() => expect(wrapper.findComponent({ name: 'ConfirmationScreen' }).exists()).toBe(true));
+        return wrapper.findComponent({ name: 'ConfirmationScreen' });
+    }
+
+    it('hands the confirmation screen the destination the server answered with', async () => {
+        const wrapper = mountOrdinary();
+        (await session(wrapper)).vm.$emit('submitted', 'sub-1', '7K4M-2QXB', null, NEXT);
+
+        expect((await confirmation(wrapper)).props('redirect')).toEqual(NEXT);
+        wrapper.unmount();
+    });
+
+    it('never gives a response queued on the device a destination', async () => {
+        const wrapper = mountOrdinary();
+        (await session(wrapper)).vm.$emit('queued', '0192f1a2-b3c4-7d5e-8f90-0000000000c1');
+
+        const screen = await confirmation(wrapper);
+        expect(screen.props('redirect')).toBeNull();
+        expect(screen.props('reference')).toBeNull();
+        wrapper.unmount();
+    });
+
+    it('never sends on a respondent who has just resolved a parked conflict', async () => {
+        const db = openDb();
+        await enqueue(db, {
+            client_submission_uuid: '0192f1a2-b3c4-7d5e-8f90-0000000000c2',
+            slug: 'my-form',
+            form_version_id: 'version-OLD',
+            checksum: 'c',
+            answers: {},
+            locale: 'en',
+            device_id: 'device',
+            app_version: 'test',
+            respondent_session_id: respondentSession(),
+            base_content_checksum: null,
+        });
+        await markConflict(db, '0192f1a2-b3c4-7d5e-8f90-0000000000c2', 'form_updated', 'form_updated');
+
+        const wrapper = mountOrdinary();
+        await session(wrapper);
+        const fetchedBefore = fetchSchema.mock.calls.length;
+        expect(review).toBeTypeOf('function');
+        review?.();
+        // The review re-fetches the schema for the parked response; wait for that, not for a count.
+        await vi.waitFor(() => expect(fetchSchema.mock.calls.length).toBeGreaterThan(fetchedBefore));
+
+        (await session(wrapper)).vm.$emit('submitted', 'sub-2', '7K4M-2QXC', null, NEXT);
+
+        // The positive half is the first case above; this one is the same emit after a review.
+        expect((await confirmation(wrapper)).props('redirect')).toBeNull();
         wrapper.unmount();
     });
 });

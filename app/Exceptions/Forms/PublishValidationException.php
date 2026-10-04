@@ -11,6 +11,7 @@ use App\Exceptions\Templates\TemplateSyntaxException;
 use App\Services\Expressions\StructuredRuleLowering;
 use App\Services\Templates\TemplateScopeResolver;
 use App\Services\Validation\SemanticValidator;
+use App\Support\Forms\GuestReachability;
 use RuntimeException;
 
 /**
@@ -89,6 +90,21 @@ final class PublishValidationException extends RuntimeException
     public static function templateInvalid(string $ownerKey, string $column, string $detail): self
     {
         return self::one($ownerKey, $detail, "The {$column} on “{$ownerKey}” has an invalid reference ({$detail}).");
+    }
+
+    /**
+     * M130 (`R-db169c29`, `D76`) — the form respondents go to after submitting is not one they can open: it needs a
+     * public link, guest access and a published version ({@see GuestReachability}).
+     */
+    public static function redirectTargetUnavailable(): self
+    {
+        return self::one('redirect_form_id', 'redirect_target_unavailable', 'The form respondents go to after submitting is not open to them: it needs a public link, guest access and a published version.');
+    }
+
+    /** M130 (`R-db169c29`, `D76`) — the web address respondents go to after submitting is one the redirect rule refuses. */
+    public static function redirectUrlInvalid(): self
+    {
+        return self::one('redirect_url', 'redirect_url_invalid', 'The web address respondents go to after submitting must be a full address that starts with https://.');
     }
 
     /** A choice field (Increment G4a) with no options or duplicate option values — unanswerable / ambiguous. */

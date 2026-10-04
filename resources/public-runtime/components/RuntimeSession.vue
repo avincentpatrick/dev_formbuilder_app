@@ -44,7 +44,7 @@ import { getDeviceId } from '../lib/device';
 import { touchRespondentSession } from '../lib/respondent-session';
 import { APP_VERSION } from '../lib/app-version';
 import type { ApiClient } from '../lib/api-client';
-import type { AnswerMap, Bootstrap, ScheduleAcceptance, SchemaResponse } from '../lib/types';
+import type { AnswerMap, Bootstrap, ScheduleAcceptance, SchemaResponse, SubmitRedirect } from '../lib/types';
 
 const props = defineProps<{
     schema: SchemaResponse;
@@ -95,7 +95,8 @@ const emit = defineEmits<{
     // the emit. See {@link authoredConfirmation}.
     // Increment J2e — the SERVER-issued reference rides along, so App.vue prints the code the tenant can
     // find rather than one derived on the device from the id.
-    submitted: [id: string, reference: string, confirmation: string | null];
+    // M130 (`D76`) — and where the respondent goes after the thank-you screen, from the same response.
+    submitted: [id: string, reference: string, confirmation: string | null, redirect: SubmitRedirect | null];
     queued: [clientUuid: string];
     // Increment M14 — `conflictCode` names WHICH 409 caused the remount (null = the ordinary republish
     // drift), so App.vue can pick a true sentence instead of asserting a republish for all five causes.
@@ -494,7 +495,7 @@ async function submit(): Promise<SubmitOutcome> {
         await discardRow(db, uuid);
         void sync?.refresh();
         await autosave.clear();
-        emit('submitted', result.id, result.reference, authoredConfirmation());
+        emit('submitted', result.id, result.reference, authoredConfirmation(), result.redirect ?? null);
         return 'success';
     } catch (error) {
         return await handleSubmitError(error, uuid);

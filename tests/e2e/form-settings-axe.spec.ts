@@ -58,3 +58,28 @@ for (const theme of themes) {
         await assertClean(page, `form settings tab, scanning ineligible (${theme})`);
     });
 }
+
+// M130 (`R-db169c29`, `D76`) — the Thank-you section's second half, in each kind. Picking a kind is local to the
+// page and is never saved, so the STATE note above still holds.
+for (const theme of themes) {
+    test(`Form settings tab — where a respondent goes next, in each kind (${theme})`, async ({ page }) => {
+        await openSettings(page, 'Clinic Intake');
+        await forceTheme(page, theme);
+        await page.getByRole('group', { name: 'Settings section' }).getByRole('button', { name: 'Thank-you message', exact: true }).click();
+
+        const next = page.getByRole('group', { name: 'After the thank-you screen' });
+        await expect(next.getByRole('radio', { name: 'Stay on the thank-you screen' })).toBeChecked();
+
+        // The label, as a person clicks it: the native input is visually hidden under the drawn circle.
+        await next.getByText('Go to another form', { exact: true }).click();
+        await expect(next.getByRole('radio', { name: 'Go to another form' })).toBeChecked();
+        await expect(next.getByRole('combobox', { name: 'Form' })).toBeVisible();
+        await assertClean(page, `form settings tab, destination: a form (${theme})`);
+
+        // The label, as a person clicks it: the native input is visually hidden under the drawn circle.
+        await next.getByText('Go to a web address', { exact: true }).click();
+        await expect(next.getByRole('radio', { name: 'Go to a web address' })).toBeChecked();
+        await expect(next.getByRole('textbox', { name: 'Web address' })).toBeVisible();
+        await assertClean(page, `form settings tab, destination: a web address (${theme})`);
+    });
+}

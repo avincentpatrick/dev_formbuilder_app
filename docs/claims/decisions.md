@@ -1385,6 +1385,41 @@ The matcher reads a sheet against the version it was printed from, superseded on
 
 ---
 
+### D75 — Every Oct 12 increment so far has broken `D13`'s batching rule for the same reason, and `M130` would be the third. How are the Oct 12 increments batched? **A — one increment per plan slot until the Oct 12 session, each row its own commits in a stated order; `D13` applies as written again afterwards.**
+
+**Filed and answered 2026-10-04 (user decision, in chat), recorded by Lane A during `M130` — A, the recommendation.** Put to the user under `D66`'s rule, because the `early-testing` rows named for `M130` could not be batched without an answer. All four edit hub files, and two of them — the content-block renderer (`R-c9f50df2`) and the appearance renderer (`R-048a3286`) — edit the same six files: `FieldInput.vue`, `FieldControl.vue`, `InstanceField.vue`, `schema-mapping.ts`, `resources/public-runtime/lib/types.ts` and `EncodeFormPresenter.php`. `D13`'s exception log already held #4 (`M128`) and #5 (`M129`) for the Oct 12 reason, and #5 said that a third for that reason means the rule needs an answer rather than a sixth exception.
+
+- **A — one increment per plan slot until Oct 12.** Each row lands as its own commits in a stated order, so a red run still points at one row. `M130` takes all four rows.
+- **B — split rows that share files.** Lift only the one-hub limit until Oct 12; rows that edit the same file go in separate increments. This slot becomes three increments, about half a day more.
+- **C — keep `D13` as written.** One hub-editing row per increment: four increments for this slot, and the Oct 12 plan slips by days.
+
+**Recommendation: A.** It keeps what both clauses exist for — a red run bisects to one row, by commit rather than by batch — and it matches the plan's day slots. It expires with the Oct 12 session: from then on `D13` and `D15` govern batching exactly as written, and a deviation goes back into `D13`'s numbered log.
+
+---
+
+### D76 — A form can now send respondents on to another form or a web address once they finish. When does it take them there? **A — thanks first, then go: the thank-you and its reference show first, with "Continue now" and "Stay on this page", and it moves on after 20 seconds. A response saved offline to send later never redirects.**
+
+**Filed and answered 2026-10-04 (user decision, in chat), recorded by Lane A during `M130` — A, the recommendation.** Put to the user under `D66`'s rule, because `R-db169c29` — an `early-testing` work row taken by `M130` — builds a different screen under each answer. The confirmation screen prints the server-issued reference, which `ConfirmationScreen.vue` calls the string a respondent should write down, and nothing in `docs/` said anything about automatic navigation or WCAG 2.2.1 before this.
+
+- **A — thanks first, then go.** The thank-you and the reference show first, with "Continue now" and "Stay on this page"; after 20 seconds it moves on by itself. 20 seconds is the accessibility minimum for an automatic move (WCAG 2.2.1).
+- **B — go straight there.** As Typeform, Tally and Jotform do; the thank-you screen and the reference are skipped.
+- **C — a Continue button only.** The thank-you shows with its reference and a "Continue" button; nothing moves automatically.
+
+**Recommendation: A.** It keeps the reference in front of the respondent and meets WCAG 2.2.1 without a setting, while still taking them on. Verification added three rules, recorded at the row: no countdown inside a frame or while the device still holds unsent responses; the timer stops on Continue, Stay, "Submit another response" and `pagehide`; and a page restored by the Back button never restarts it.
+
+---
+
+### D77 — With a layout setting for choices, what does a single-choice question show by default? **A — round buttons: a list of radio buttons, one per line. The Dropdown type stays a dropdown.**
+
+**Filed and answered 2026-10-04 (user decision, in chat), recorded by Lane A during `M130` — A, the recommendation.** Put to the user under `D66`'s rule, because `R-048a3286` — an `early-testing` work row taken by `M130` — renders a single choice differently under each answer. Measured: `single_select` and `dropdown` both render the same native select (`MdsSelect`) in every channel, so the two palette types look identical to a respondent, while ODK, the XLSForm export (`select_one` with no appearance) and the printed blank form all mean a list of round buttons.
+
+- **A — round buttons.** Matches ODK, the printed form and the separate Dropdown type. Every existing single-choice question changes look; layouts such as side by side become options, and an author who wants a dropdown uses the Dropdown type.
+- **B — keep the dropdown.** Nothing existing changes, and the list layouts become opt-in choices in the new setting.
+
+**Recommendation: A.** A visible change on testers' forms before Oct 12, accepted as the price of a single choice meaning what it means everywhere else.
+
+---
+
 ### D15 — `D13`'s one-hub-row cap is now the binding constraint on batch composition, and it is stricter than its own purpose. **ANSWERED — option 4: the cap reads the files a row REMEDY EDITS, excluding the close-out artefacts.** **Tier: early-testing.**
 
 **Filed 2026-09-05 by Lane A, during `M72`, at the moment the cap decided a batch that value had not.**
@@ -2549,6 +2584,10 @@ half that works.
 **Why:** the Oct 12 deadline (`D72`), as for #4. The plan the user approved puts all three in one day's slot, and the user named them together in the prompt.
 
 **Disposition:** the user chose to keep all three, in chat on 2026-10-03, asked by name because the batch named in the prompt breached the clause. Each item is its own commit, and an item that runs long moves to `M130` rather than squeezing verification. Recorded in both places this log requires: inline at the closed rows and in `PROGRESS.md`'s release paragraph. ⚠️ **This is the second exception for the Oct 12 reason.** The escalation rule above is not engaged yet. A third for the same reason means the rule, not the batch, needs an answer: file a decision about the rule rather than writing #6.
+
+##### There is no #6 — `M130` (2026-10-04) tripped the escalation, and `D75` is the answer
+
+The third Oct 12 batch broke the second clause again, and the first as well: two of its rows edit the same six files. As #5 said it should, `M130` filed a decision about the rule instead of a sixth exception. **`D75` (user decision, in chat): until the Oct 12 session, a plan slot is one increment, and each row lands as its own commits in a stated order.** The log resumes at #6 for any deviation after that.
 
 ---
 

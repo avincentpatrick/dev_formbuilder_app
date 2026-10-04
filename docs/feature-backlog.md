@@ -11555,7 +11555,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the synthetic one the exporter wrote. ✅ **The user has chosen to wire it up** as a typed, per-field layout
   vocabulary the renderers honour. ⚠️ **The test that matters is the round trip** — an imported `minimal` must
   survive an edit and re-export, because the type map disambiguates on exactly those strings. **Live.**
-  Filed by `M110`. **Tier: early-testing.**
+  Filed by `M110`. **Tier: early-testing.** ⚠️ **VERIFIED BY `M130` (2026-10-04), TAKEN.** The input moved to `ConfigPanel.vue:585-591`, on the Advanced tab. An imported `minimal` survives an edit through the TYPE, not through this column: `select_one` with `minimal` imports as a Dropdown with the column left null, and the export forces it back, because a forced appearance REPLACES the stored one (`XlsformExporter::appearance()`). A stored value arrives only on `select_multiple` or as a multi-token string, and no test edited one and exported it again. The vocabulary is the two ODK names that round-trip verbatim on the two list types, `columns-pack` and `columns`, and never `minimal`, which would re-import a single choice as a Dropdown. The save request also accepts the field's stored value unchanged, so an imported string survives its first edit. A single choice now shows round buttons by default (`D77`).
 
 - **`minor` · No renderer honours a per-field layout hint, so a typed appearance vocabulary would have an author
   surface and no effect.** Filed 2026-09-25 by `M110` as the second half of the appearance work, split because it
@@ -11564,7 +11564,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   and the independent copy at `FieldInput.vue:205-250` — dispatch on field type alone. ⚠️ **Two switches, not
   one**, and neither has a parity test today, so a layout branch added to one and forgotten in the other would
   give the guest runtime and the encode page different forms. That is the same class of drift the client-mirror
-  census exists to catch, and it should land first. **Live.** Filed by `M110`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-03 by `M127`: it is one of the user's 19 builder comments, wanted for the Oct 12 testing (`D72`).**
+  census exists to catch, and it should land first. **Live.** Filed by `M110`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-03 by `M127`: it is one of the user's 19 builder comments, wanted for the Oct 12 testing (`D72`).** ⚠️ **VERIFIED BY `M130` (2026-10-04), TAKEN — THE "TWO SWITCHES" PREMISE IS FALSE.** `controlFor()` (`schema-mapping.ts:78-122`) fills `RenderField.control`, which no production code reads; every channel renders through `FieldInput.vue`'s own `control`. What can drift is the three adapters that build the field `FieldInput` receives — `EncodeFormPresenter::field()`, `FieldControl.vue` and `InstanceField.vue` — so the parity gate that lands first is a census of those three, and the unread switch is deleted rather than pinned. One branch was already pinned, against this row's "neither has a parity test": `FieldTypeMirrorDriftTest`'s text-type arm. Single choice and Dropdown rendered the same native select in every channel; `D77` makes a single choice round buttons.
 
 - ✅ **CLOSED BY `M129` (2026-10-04) — `minor` · A form can hold no author-composed content — no welcome page, no instructions, no image, no
   divider — because `note` renders one line of plain text and has no config editor.** Filed 2026-09-25 by `M110`,
@@ -11594,7 +11594,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   surface rather than the repository. Once authors can compose content, a census over all of `resources/` is what
   keeps a well-meaning future edit from turning a block renderer into a sink. ⚠️ **A gate written here proves
   nothing while green** — it needs a committed mutation that adds a `v-html` and turns it red. **Live.**
-  Filed by `M110`. **Tier: early-testing.** ⚠️ **NOT BUILDABLE BEFORE `R-6dedc3a9` FIXES THE BLOCK SHAPE — recorded by `M121`, 2026-10-01.** It reads `ready` because the line cannot express that ordering (filed below). ⚠️ **The render path is wider than this row says:** `EncodeFormPresenter::field()` carries no config at all, and `InstanceField.vue` builds its own `encodeField` for repeat instances (reached from the builder preview through `RepeatGroup`), so the honest file list is six — three of them census hubs (`FieldInput.vue`, `FieldControl.vue`, `schema-mapping.ts`). It needs its own split. ✅ **`D69` ANSWERED 2026-10-01 (`M122`) — B: once a note has blocks, its label is for the author only** — it names the note in the canvas, the logic rail and the PDF, and the respondent sees the blocks alone. ⛔ **STILL NOT BUILDABLE BEFORE `R-6dedc3a9`** (the block shape this renders), whatever the line now says: it has no grammar for one row waiting on another's code (`R-6175d935`). ✅ **`M125` (2026-10-02) shipped the block shape this renders** (`R-6dedc3a9`'s shape half), so the precondition above now holds. ⚠️ Two facts the renderer inherits: span text may arrive `null` (`ConvertEmptyStringsToNull`), and the render-time link re-check is a TypeScript twin of `ContentBlocks::linkIsSafe()` — which wants a drift test, or it is one more unguarded mirror. ⚠️ **`M129` (2026-10-03) hands this row two pieces of `R-f0c5b682`, because this row is their only consumer.** (1) The GUEST read route for a content-block image: publicly readable for a published form, gated on `ScanStatus::servable()` (an unservable image renders as its alt text), and same-origin with the guest page, whose CSP is `img-src 'self'`. (2) The service worker's caching of those images: `sw.ts`'s network-first `guest-schema` cache holds 20 entries under `/api/v1/public/f/`, so an image routed there would evict a cached schema. It also inherits two things from `M129`'s editor: the Content tab's "respondents do not see this yet" notice, which this row removes, and the shared link-vector fixture that `linkLooksSafe()` and `linkIsSafe()` both read — the drift test asked for above.
+  Filed by `M110`. **Tier: early-testing.** ⚠️ **NOT BUILDABLE BEFORE `R-6dedc3a9` FIXES THE BLOCK SHAPE — recorded by `M121`, 2026-10-01.** It reads `ready` because the line cannot express that ordering (filed below). ⚠️ **The render path is wider than this row says:** `EncodeFormPresenter::field()` carries no config at all, and `InstanceField.vue` builds its own `encodeField` for repeat instances (reached from the builder preview through `RepeatGroup`), so the honest file list is six — three of them census hubs (`FieldInput.vue`, `FieldControl.vue`, `schema-mapping.ts`). It needs its own split. ✅ **`D69` ANSWERED 2026-10-01 (`M122`) — B: once a note has blocks, its label is for the author only** — it names the note in the canvas, the logic rail and the PDF, and the respondent sees the blocks alone. ⛔ **STILL NOT BUILDABLE BEFORE `R-6dedc3a9`** (the block shape this renders), whatever the line now says: it has no grammar for one row waiting on another's code (`R-6175d935`). ✅ **`M125` (2026-10-02) shipped the block shape this renders** (`R-6dedc3a9`'s shape half), so the precondition above now holds. ⚠️ Two facts the renderer inherits: span text may arrive `null` (`ConvertEmptyStringsToNull`), and the render-time link re-check is a TypeScript twin of `ContentBlocks::linkIsSafe()` — which wants a drift test, or it is one more unguarded mirror. ⚠️ **`M129` (2026-10-03) hands this row two pieces of `R-f0c5b682`, because this row is their only consumer.** (1) The GUEST read route for a content-block image: publicly readable for a published form, gated on `ScanStatus::servable()` (an unservable image renders as its alt text), and same-origin with the guest page, whose CSP is `img-src 'self'`. (2) The service worker's caching of those images: `sw.ts`'s network-first `guest-schema` cache holds 20 entries under `/api/v1/public/f/`, so an image routed there would evict a cached schema. It also inherits two things from `M129`'s editor: the Content tab's "respondents do not see this yet" notice, which this row removes, and the shared link-vector fixture that `linkLooksSafe()` and `linkIsSafe()` both read — the drift test asked for above. ⚠️ **VERIFIED BY `M130` (2026-10-04), TAKEN.** `components.test.ts:549` is a comment, not a check, and the only `v-html` assertion pins one file (`ContentBlocksEditor.test.ts:58-66`), so the census covers `resources/` and `packages/design-system/src`, which the guest bundle also ships. Five of the six render files are hubs now, not three. The encode page already receives `config.content` inside `version.schema`; it simply never reached `FieldInput`. The guest image route goes OUTSIDE `/api/v1/public/f/` and on its own limiter: under that prefix the schema cache would claim it and `ServiceWorkerCachePrefixRouteTest` refuses it, and on `throttle:guest` a note's 50 images would spend the per-token submit budget. Its offline cache key drops the share token, which is minted on every visit and lives 24 hours. The author-only label still reached screen readers through the "New question" announcement (`FieldRow.vue:61`, `InstanceField.vue:76`). `MdsAlert` is a live status region, so a static `MdsCallout` joins the design system rather than a local exception.
 
 - ✅ **CLOSED BY `M129` (2026-10-04) — `minor` · A content-block image has nowhere to live, and the surfaces that must escape block text are not in
   the output-encoding contract.** Filed 2026-09-25 by `M110` as the third and last content-block row, split off
@@ -11639,7 +11639,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `javascript:` explicitly, and make the publish gate refuse a redirect that points at an unpublished form.
   ⚠️ **One runtime case is easy to get wrong:** the confirmation screen renders a server-issued reference **or** a
   device-local queue tag when the response is still in the offline outbox — a redirect must not fire on the queued
-  path, because nothing has been accepted yet. **Live.** Filed by `M110`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-03 by `M127`: it is one of the user's 19 builder comments, wanted for the Oct 12 testing (`D72`).**
+  path, because nothing has been accepted yet. **Live.** Filed by `M110`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-03 by `M127`: it is one of the user's 19 builder comments, wanted for the Oct 12 testing (`D72`).** ⚠️ **VERIFIED BY `M130` (2026-10-04), TAKEN.** The grep now finds nothing at all, and the editor is `ConfirmationPanel.vue` (since `M117`). The migration records the consequence of living on `forms`, not a reason for it. Because the value changes without a publish, the write path validates it too, and a target form is checked again when a response is accepted. The redirect travels in the SUBMIT RESPONSE rather than in the schema, which the service worker may serve for seven days, so a queued response, which receives no response, cannot redirect. "Refuse anything not `https://`" applies to typed addresses only: a form target's server-built address is http locally and in E2E. `D76` decided the timing.
 
 - **`minor` · The forms list is one flat list per workspace; there is no folder, project, collection or tag
   grouping anywhere in the schema or the UI.** Filed 2026-09-25 by `M110`, from the report asking for
@@ -12853,3 +12853,80 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   an `@container` block of the same file. Measured: such a scan flags the pre-fix file and passes all seven
   components that declare a container today. The remedy is that scan as a host lint gate beside
   `component-import-lint.php`. **Not live**. Filed by `M129`. **Tier: after-launch.**
+
+- **`minor` · An XLSForm appearance longer than 60 characters fails the whole import at the database.** Found by
+  `M130` while verifying `R-6c76bed2`. `XlsformImportParser::resolveAppearance()` keeps an author appearance
+  verbatim, `XlsformImporter` writes it as given, and `form_fields.appearance` is `varchar(60)`, so one long
+  appearance cell aborts the insert. ODK appearances are space-separated tokens and its `search(...)` calls run
+  long. The remedy is to refuse the cell as a row error the import reports, or to widen the column. Read, not run.
+  **Live.** Filed by `M130`. **Tier: during-testing.**
+
+- **`minor` · An XLSForm appearance is matched as one whole string on import, so `minimal autocomplete` makes a
+  Single choice rather than a Dropdown.** Found by `M130` while verifying `R-6c76bed2`.
+  `XlsformTypeMap::toFieldType()` compares the trimmed, lower-cased cell with a `match` on `multiline`, `numbers`,
+  `hidden`, `minimal` and `signature`, while ODK appearances are space-separated tokens. The export side has the
+  mirror limit: a forced appearance replaces the stored one outright (`XlsformExporter::appearance()`), so a
+  Dropdown's own extra tokens are dropped on export. Token matching on import has to land before any change that
+  merges the two on export, or `minimal columns` would come back as a Single choice. **Live.**
+  Filed by `M130`. **Tier: during-testing.**
+
+- **`nit` · `docs/xlsform-interop-spec.md` says `likert_scale` round-trips with full fidelity, and its own import
+  notes say it does not.** Found by `M130`. The type table (`likert_scale` row) and the "Honest summary" (27 of 31
+  types full) both claim it, while the as-built import notes list `likert_scale` among the type narrowings, and
+  `XlsformImportTest` asserts that `rating` comes back as `single_select`. The remedy is to move `likert_scale` into
+  the summary's lossy list and say so in its table row. **Not live**. Filed by `M130`. **Tier: during-testing.**
+
+- **`nit` · Saving a question to the field library drops its appearance.** Found by `M130` while verifying
+  `R-6c76bed2`. `FieldLibrary::toBlueprintField()` writes `appearance` as null, so a choice question saved with a
+  layout comes back from the library one per line. **Live.** Filed by `M130`. **Tier: during-testing.**
+
+- **`minor` · The sync manifest's `media_refs` stays empty although a form can now carry images that must be cached
+  to render offline.** Found by `M130` while verifying `R-c9f50df2`. `SyncManifestResource` emits `media_refs` as
+  an empty list because "there is no static form-level media feature yet", and `docs/offline-first-sync-design.md`
+  defines it as exactly the static media a schema needs offline. Note images are that media. `M130` caches them
+  for the guest page through its own warm-up and corrects both sentences, but a client of the sync API still
+  receives nothing. **Live.** Filed by `M130`. **Tier: during-testing.**
+
+- **`minor` · The printed blank form shows a note's label, while every screen now shows its content blocks.** Found
+  by `M130` while verifying `R-c9f50df2`. `D69` makes a note's label author-only once it has blocks, and `M130`
+  renders the blocks on the guest page, the encode page and the builder preview; the printed blank form and the
+  response PDF still print the label, pinned by `NoteContentSurfacesTest`. A keyer transcribing paper sees one
+  thing on the sheet and another on the screen, and a respondent filling paper never sees the content. The remedy
+  is to print the blocks, or to decide that paper keeps the label. **Live.**
+  Filed by `M130`. **Tier: during-testing.**
+
+- **`nit` · `docs/api-specification.md` says the guest API allows 100 requests a minute per IP; the configured
+  default is 60.** Found by `M130`. Its rate-limit table against `config/guest.php`'s `submit_per_ip` default.
+  **Not live**. Filed by `M130`. **Tier: during-testing.**
+
+- **`nit` · `openapi.json` publishes the guest schema's `save_and_resume` as a string; it is a boolean.** Found by
+  `M130`. Scramble infers it from `PublicFormPresenter`'s `&&` expression and gets the type wrong, so a client
+  generated from the contract types the flag as text. An explicit array-shape docblock on the presenter fixes the
+  inference. **Live.** Filed by `M130`. **Tier: during-testing.**
+
+- **`minor` · No test checks the guest schema's real response against `openapi.json`.** Found by `M130`. CI
+  byte-diffs a fresh export against the committed file, which proves the document matches the code's inference,
+  not the response, and `GuestRuntimeTest` checks a subset of keys. The sync API has the paired check this lacks
+  (`SyncApiTest`). **Not live**. Filed by `M130`. **Tier: during-testing.**
+
+- **`minor` · `docs/ux/form-filling-ux-flow.md` §3.3 specifies an embed mode that does not exist.** Found by `M130`
+  while verifying `R-db169c29`. It specifies minimal chrome and a postMessage auto-height for a form inside an
+  iframe. The runtime never checks `window.top` or posts to its parent, while `frame-ancestors *`
+  (`PublicRuntimeSecurityHeaders`) and the share panel's iframe snippet invite embedding. Either build the mode or
+  mark the section as not built. **Not live**. Filed by `M130`. **Tier: during-testing.**
+
+- **`minor` · A Likert scale inside a repeatable section shares one radio group across every instance.** Found by
+  `M130` while verifying `R-048a3286`. `FieldInput.vue` names the scale's radios `scale-` plus the field key, and
+  every instance of a repeat carries the same member key, so on the guest page (`InstanceField.vue`) and on the
+  encode page (its own repeat loop) the instances' radios form one group: choosing in the second instance clears
+  the first on screen while its stored answer stays. `likert_scale` is not among the types
+  `StructuralValidationGate` keeps out of a repeatable section. `MdsSegmentedControl` already names its group
+  with `useId()`. **Live.** Filed by `M130`. **Tier: early-testing.**
+
+- **`minor` · The guest runtime never updates the page's `lang` when a respondent switches language, and nothing
+  marks text left in the default language.** Found by `M130` while verifying `R-c9f50df2`. The guest shell sets
+  `lang` once, from the form's locale, and the runtime never changes it, so after a language switch every label is
+  announced in the old language's voice; and under `D70` = A a note's content stays in the default language with
+  no `lang` of its own (WCAG 3.1.1, 3.1.2). Reachable only once a form has a second language, which nothing in the
+  product can give it yet (`forms.supported_locales` has no writer). **Latent.**
+  Filed by `M130`. **Tier: during-testing.**

@@ -16,212 +16,97 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M130`, the Oct 6 slot: content blocks render, the appearance hint becomes a real choice layout with round buttons by default, and a finished form can send respondents on (`m130-content-appearance-redirect`)
+## Status: NO ACTIVE CLAIM — `M130` is merged; a note shows its content, a single choice is round buttons in the author's layout, and a finished form can send respondents on
 
-Taken 2026-10-04. Branch `m130-content-appearance-redirect`, cut from `origin/main` at `dd68ada9`, PR into `main`.
-The third Oct 12 increment under `D72`, named by the user, and the first under `D75`: one increment for the whole plan
-slot, each row its own commits, in this order, so a red run bisects to one row.
-1. **`R-048a3286`, part 1** (`docs/feature-backlog.md:11560`) — a census that every adapter building the field
-   `FieldInput` receives carries every member, landing first, and the unread second control switch deleted.
-2. **`R-6c76bed2`** (`:11545`) — a typed choice-layout vocabulary and its author control.
-3. **`R-048a3286`, part 2** — the renderers honour it; a single choice shows round buttons by default (`D77`), on a new
-   shared `MdsRadio`; and the filed likert repeat-group row is closed with it.
-4. **`R-c9f50df2`** (`:11587`) — content blocks render to respondents, keyers and the preview, on a new shared
-   `MdsCallout`; the guest image route and its offline cache; a raw-HTML census over `resources/` and the design system.
-5. **`R-db169c29`** (`:11629`) — a redirect after submit (`D76`).
+## RELEASED — `M130`, the Oct 6 slot: content blocks render, a real choice layout with round buttons, and a redirect after submit (merged as PR #323, `e5f6245f`, 6/6 green with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 
-⛔ **`D75`, answered by the user in chat on 2026-10-04, replaces what would have been `D13` exception #6.** Every row
-edits hubs, and rows 1/3 and 4 edit the same six files. `D76` (the redirect's timing) and `D77` (round buttons by
-default) were answered in the same exchange. Also in this push: twelve rows filed, and a verification note appended to
-each of the four rows above, line-neutral.
+Shipped 2026-10-04. Branch `m130-content-appearance-redirect`, cut from `origin/main` at `dd68ada9`. The claim commit is
+`a42e19a3`; extensions 1–8 are `f6749675`, `655ef4f8`, `da71aac7`, `4946f989`, `09855f10`, `6e06a475`, `d1a73539` and
+`ceee2511` (1–2 from a temporary branch, 3–8 built with plumbing on `origin/main`, so the working tree was never switched).
 
-### Evidence verified
+**The third Oct 12 increment under `D72`, and the first under `D75`** — one increment per plan slot until the Oct 12
+session, each row in its own commits in the stated order, so a red run bisects to one row. After the rebase onto
+extension 8: item 1 `38f18526`, item 2 `edf651e5`, item 3 `cfa41fc5`, item 4 `48d17a54` (follow-ups `92792205`,
+`2375b7b8`, `edf1984e`; the census's committed sink `ea129b05` and its revert `436016c1`), item 5 `e1b0ce58`
+(follow-up `38ba91e6`), and the audit scan's filter `2463c621`.
+- **Closed:** `R-048a3286` (items 1 and 3), `R-6c76bed2` (item 2), `R-c9f50df2` (item 4), `R-db169c29` (item 5),
+  `R-de624bb1` (filed in the claim push, closed by item 3), `R-36676046` (filed and closed by item 4's follow-up).
+- **Filed:** twelve rows in the claim push (one closed here) and six during the build — content headings skip a level in
+  a block with no heading; an archived form keeps collecting through its public link while the list hides it (`major`);
+  the single-response-only form the UX flow specifies; the submit success body missing from `openapi.json`; and the two
+  closed above. One more at close-out: CI's E2E job proves no service-worker behaviour, because the secure-origin launch
+  flag does not take on its origin (found by reading why the post-merge run's skips rose from 15 to 18).
+- **Decisions:** `D75`, `D76`, `D77`, all answered in chat at claim time.
+- **Namespaces spent:** migration prefix `2026_08_17_000118`; decisions `D75`–`D77`. No ADR (`0010` stays reserved).
+- **Claimed and not needed:** `resources/public-runtime/composables/context.ts` — the image address is provided from
+  `App.vue` with the existing injection keys.
+- **Tracker:** no surgery owed.
 
-**`R-6c76bed2`**, against `dd68ada9`:
-- **Moved:** the input is at `ConfigPanel.vue:585-591` (Advanced tab); `:433-439` now holds Help text and Placeholder.
-- **Held, but mis-described:** `public-runtime/lib/types.ts:67` declares `appearance` on `RawField`, the wire shape —
-  not on the render model; `RenderField` has no such member. `toRenderField()` is `schema-mapping.ts:451-478`.
-- **Held:** `XlsformTypeMap.php:50,52,69,87,92` force appearances on export; `:107-154` disambiguate on import — by
-  whole-string `match` (`:130-135`, `:142`, `:148`); `XlsformImportParser::resolveAppearance()` is `:257-269`.
+### What a respondent, a keyer and an author see now
+- **A single choice is round buttons** (`D77`), in the author's layout — one per line, side by side or in columns — with
+  Clear selection; a Dropdown question stays a dropdown. The author picks the layout on the Options tab ("Choice layout").
+- **A note shows its content** — headings, paragraphs with bold, italic, code and links, callouts, dividers and pictures —
+  on the guest page, the encode page and the builder preview, and its label stays the author's (`D69`). A link opens in
+  a new tab and is re-checked when drawn. Pictures come from a token-scoped guest route and are cached for offline use.
+- **After the thank-you**, a form can send the respondent on (`D76`): "Next: …", Continue now and Stay on this page; it
+  goes on after 20 seconds, never when embedded, while responses wait to send, or for a response queued offline.
 
-**`R-048a3286`:**
-- **Held:** `FieldInput.vue:205-250` exactly; `toRenderField()` never reads `appearance`.
-- **Moved:** `controlFor()` is `schema-mapping.ts:78-122`, not `:78-118`.
-- **False:** "neither has a parity test" — `FieldTypeMirrorDriftTest.php:221-229` already pins the text branch.
+### How the prediction fared
 
-**`R-c9f50df2`:**
-- **Held:** `FieldControl.vue:9` imports `FieldInput.vue`; `FieldInput.vue:506` is still the note renderer;
-  `TwoFactorSetup.vue:216` is the only `v-html` directive in `resources/`; `EncodeFormPresenter::field()`
-  (`:402-441`) emits no config; `InstanceField.vue:39-52` builds its own field; `sw.ts:70-81` caches 20 schemas
-  NetworkFirst under `/api/v1/public/f/`.
-- **Held, but not what it claims:** `components.test.ts:549` is a COMMENT inside the piped-answer test, not an
-  assertion. The only `v-html` assertion is `ContentBlocksEditor.test.ts:58-66`, and it reads one file.
-- **The notice `M129` left for this row** is `ContentBlocksEditor.vue:312-314` — "Respondents do not see this content
-  yet — until they do, they see the note's label." — pinned by `ContentBlocksEditor.test.ts:47-56` and
-  `builder-content-axe.spec.ts:60`. The Label field has no help text to change (`ConfigPanel.vue:411-413`).
+| Predicted | Actual |
+|---|---|
+| CI goes 6/6 after the local gates | **Wrong once before it was right.** Run 1 failed E2E on "Audit change detail" (desktop, both themes) and nothing else: this increment's own seeded forms and guest submissions pushed the seeded `permission_changed` rows off page one by the time the last project ran — the `M128` row's fragility, reaching CI for the first time. Extension 8 filtered the scan by event; run 2 went 6/6 with real step counts. |
+| Most likely red: the citation lint | **Right in kind, and it never reached a push.** It went red locally after items 1, 3, 4 and 5 — tier 1 twice (`docs/workflow-branching-design.md` past the end of `schema-mapping.ts`, and ADR-0007's limiter range, which had pointed at the share-token service for a long time) and the ledger at 18–23 — and each was repaired in the commit that caused it. |
+| Second: the Contract job | **Did not go red:** `openapi.json` was regenerated in items 4 and 5 and Redocly run locally. Scramble could not see the image route's bytes (a `Storage::response()` stream reads as a JSON object), so the 200 is rewritten in `AppServiceProvider` and pinned by `OpenApiContractTest`. |
+| ⚠️ Most likely wrong: the new E2E scans pass axe and the 375px check on their first run | **Wrong, in the good direction:** every new scan passed axe and the 375px check on its first run — choice layouts 9/9, the note content, the countdown screen in both themes. The first failures were the SPECS' own locators (a substring matching the screen-reader announcement; `.check()` on a radio drawn under its circle). |
 
-**`R-db169c29`:**
-- **Stronger than stated:** the grep for `redirect_url`, `thank_you` and `post_submit` now finds nothing at all.
-- **Moved:** `ConfirmationModal.vue` is `ConfirmationPanel.vue` since `M117`, mounted by `FormSettingsSections.vue`.
-- **Held:** `TemplateValidationGate.php:108-119` validates the message; `ConfirmationScreen.vue:42-52` renders the
-  reference, the queue tag and "Submit another response"; the columns live on `forms`
-  (`2026_07_30_000002_add_confirmation_message_to_forms.php:23-25`).
+### Mutations: every new gate red first
+Every red set was written down before its run. Item 1: 5/5. Item 2: 7/7. Item 3: 13/13. Item 4: 36/36, plus the
+follow-up guard. Item 5: 34 — 33 caught on the first run.
+- ⚠️ **The survivor was dead code:** the panel trimmed a typed address that a `type=url` input already strips by its own
+  value sanitization. The trim went.
+- ⚠️ **Four red counts differed from the prediction, and two of them were a test lying.** The framed-page case clicked a
+  real `target="_top"` link and happy-dom followed it, so every later case in the file ran with the destination as the
+  page's origin — a `parseRedirect()` mutant then passed the real-client cases by matching it. Fixed and re-run: exactly
+  as re-predicted. The other two were predictions that missed a test (`RedirectUrlRuleTest`'s message case uses an http
+  address) or counted one that could not fire (a draft with no public link is unreachable either way).
+- The raw-HTML census was also proved the way the row asked: a committed `v-html` in `NoteContent.vue` turned it red,
+  naming the file, and the revert turned it green.
 
-### Premise verified
+### ⛔ Found by this increment's own runs, and fixed in it
+- **An offline submit showed "Retrying" at once** (`R-36676046`): `public-runtime-offline` failed in 4 of 21 runs on
+  M130's front-end against 0 of 12 before it. The cause is older — the page asks the service worker to replay while the
+  browser reports offline — and the heavier page only widened the race. The request is skipped while offline; 12/12.
+- **Vitest would have failed CI on item 4:** the one suite that mounts `App.vue` stubs a schema without fields, and the
+  image warm-up threw inside a fire-and-forget promise. Reading the shape defensively fixed it; the whole suite (184
+  files) is now run before every push, not only the files a change reaches.
+- **The real-browser probe saw "(opens in a new tab)" drawn on the guest page:** `SpanRun` builds its elements with `h()`
+  in a functional component, which carry no scope id, so none of their scoped styles applied. `:deep()` fixed it; the
+  new E2E clip assertion was red on the unfixed build.
+- **`RateLimiterBindingTest` measured the wrong limiter:** its helper read DECLARED middleware, which ignores
+  `withoutMiddleware()`, so it counted the challenge route — and now the image route — as `throttle:guest`-bound. It now
+  reads the router's resolved stack.
+- **The panel could block a message edit:** a saved destination the author cannot open was shown as the first form in
+  the list and resent on save, which the request refuses on the author's behalf. It is shown as kept and left out of a
+  save that does not change it.
 
-**`R-6c76bed2`:** "an imported `minimal` must survive an edit and re-export" — it survives through the TYPE:
-`select_one` with `minimal` imports as a Dropdown with the column null, and the export forces it back, because a
-forced appearance REPLACES the stored one (`XlsformExporter.php:528-535`, no merge). Stored values arrive only on
-`select_multiple` or as multi-token strings, and no test edits one and exports again. **New premise found:** single
-choice and Dropdown render the same native select (`MdsSelect`) in every channel — hence `D77`.
+### ✅ Seen in a real browser (`.playwright/m130-probe/`)
+The encode page shows a keyer the note with its picture from the staff route, headings under the block's h2; the guest
+page draws the note at 375px and 1280px; after submit the countdown, Stay (still on the page at 21 seconds) and the
+automatic departure (between 18 and 23 seconds) behave as `D76` says; the settings panel offers each kind, with
+"(not open to respondents)" on the forms that are not. The real server answered `data.redirect` and sent
+`Referrer-Policy: strict-origin-when-cross-origin`.
 
-**`R-048a3286`:** "two switches … would give the guest runtime and the encode page different forms" — **false**.
-`RenderField.control` has no production reader (only `schema-mapping.test.ts` reads it); every channel dispatches
-through `FieldInput.vue`'s `control`. What can drift is the three ADAPTERS: `EncodeFormPresenter::field()` (encode,
-resume, edit and OCR review), `FieldControl.vue` (guest and preview) and `InstanceField.vue` (guest and preview
-repeats; `Encode.vue` runs its own repeat loop over presenter rows). `FieldTypeMirrorDriftTest.php:29-32` and
-`:211-213` carry the same misframing, and `:63` names a `controlKind()` that does not exist.
-
-**`R-c9f50df2`:** `D69` = B holds, and both preconditions exist (the shape, `M125`; the editor, `M129`). Moved under it:
-five of the six render files are hubs now, not three; the encode page already receives `config.content` in
-`version.schema` (`EncodeFormPresenter.php:229`); the author-only label still reaches screen readers through the
-"New question" announcement (`FieldRow.vue:61`, `InstanceField.vue:76`); `MdsAlert` is a live `status` region, and no
-static callout exists in the design system; the printed blank form keeps the label (`NoteContentSurfacesTest`), so
-paper and screen now differ (filed). The CSP is `img-src 'self' data: blob:` plus the tile origins, not `'self'` alone
-— the same-origin conclusion holds.
-
-**`R-db169c29`:** the columns live on `forms`, so a redirect changes without a publish — a publish-gate refusal alone
-cannot hold the line, and the write path and the acceptance moment must both check. "Refuse anything not `https://`"
-would refuse the server-built address of a form target locally and in E2E (`TenantUrl::scheme()` follows
-`APP_URL`), so it governs typed addresses only. The migration records the CONSEQUENCE of living on `forms`, not a
-reason. The `:16` refusal is about folding into `FormMetadataRequest`; it does not forbid fields on this request.
-
-### Remedy verdict
-
-**`R-6c76bed2`:** works, narrowed. The vocabulary is the two ODK names that round-trip verbatim on the two list types —
-`columns-pack` and `columns` — and never `minimal` (it re-imports a single choice as a Dropdown); the request accepts
-null, an allowed value, or the stored value unchanged (else an imported field 422s on its first edit); the list rides
-on each palette entry, the precedent `value_shape` set.
-
-**`R-048a3286`:** **wrong target.** A parity test between the two switches would pin dead code. Instead: a census of
-the three adapters (green on arrival, with exemptions named), the unread switch deleted, then the renderers. `D77`
-moves single choice into `FieldInput`'s fieldset branch, which carries **no** `aria-describedby` for its hint or error
-today (`:363-442`), so that branch gains them and both jump helpers (`SummaryBanner.vue:39`, `Encode.vue:519`)
-focus the checked radio first — measured by the review, not inherited.
-
-**`R-c9f50df2`:** works, with three corrections. The guest image route goes OUTSIDE `/api/v1/public/f/` (the schema
-cache would claim it, and `ServiceWorkerCachePrefixRouteTest` refuses it) and on its own limiter (on `throttle:guest`
-a note's 50 images spend the per-token submit budget); its offline cache key drops the share token, which is minted
-per visit and lives 24 hours; its 404 uses the API error envelope, and `openapi.json` moves in its own commit. The
-census must cover `packages/design-system/src` too; a committed `v-html` mutation proves it.
-
-**`R-db169c29`:** works, moved. The redirect travels in the SUBMIT RESPONSE, resolved at acceptance — fresh where the
-schema may be seven days old, and structurally absent from the queued path, which never gets a response. One
-reachability predicate serves the panel, the gate and the resolver.
-
-Files:
-- **1 (`R-048a3286`, census):** new `tests/Unit/Forms/EncodeFieldAdapterParityTest.php`; edited
-  `resources/public-runtime/lib/schema-mapping.ts` (hub), `resources/public-runtime/lib/types.ts`,
-  `resources/public-runtime/__tests__/schema-mapping.test.ts`, `prefill.test.ts` (a comment),
-  `tests/Unit/Forms/FieldTypeMirrorDriftTest.php`.
-- **2 (`R-6c76bed2`):** new `app/Enums/FieldAppearance.php` and its tests (enum, request, XLSForm round trip); edited
-  `app/Services/Forms/BuilderPresenter.php` (hub), `app/Http/Requests/Forms/UpdateFieldRequest.php`,
-  `resources/js/components/builder/ConfigPanel.vue` (hub), `ConfigPanel.test.ts`, `builder/types.ts`,
-  `field-save-errors.ts` and its test, `tests/Feature/Forms/BuilderEnumsPayloadTest.php`, `docs/data-dictionary.md`
-  (hub), `docs/xlsform-interop-spec.md`, `docs/domain-glossary.md`.
-- **3 (`R-048a3286`, renderers):** new `packages/design-system/src/components/Radio/*`,
-  `resources/js/components/submissions/choice-layout.ts` and its test, `tests/e2e/choice-layout-axe.spec.ts`; edited
-  `packages/design-system/src/index.ts`, `resources/js/components/submissions/FieldInput.vue` (hub) and its test,
-  `resources/public-runtime/lib/schema-mapping.ts` (hub), `types.ts`, `components/FieldControl.vue` (hub),
-  `components/InstanceField.vue` (hub), `components/SummaryBanner.vue`, `resources/js/Pages/submissions/Encode.vue`
-  (hub; the jump helper), `app/Services/Submissions/EncodeFormPresenter.php` (hub),
-  `tests/Feature/Docs/DocumentedEnumMirrorDriftTest.php`, `database/seeders/E2eSeeder.php`, and the runtime, encode
-  and preview Vitest files that assert a single choice.
-- **4 (`R-c9f50df2`):** new `resources/js/components/submissions/NoteContent.vue`, `note-content.ts`,
-  `packages/design-system/src/components/Callout/*`, `app/Http/Controllers/Public/GuestContentImageController.php`,
-  `resources/public-runtime/lib/content-images.ts`, a raw-HTML census under `resources/js/__tests__/`, and tests
-  beside each; edited `FieldInput.vue` (hub), `FieldControl.vue` (hub), `InstanceField.vue` (hub), `FieldRow.vue`,
-  `schema-mapping.ts` (hub), `types.ts`, `EncodeFormPresenter.php` (hub), `PreviewRuntime.vue`,
-  `resources/public-runtime/App.vue`, `composables/context.ts`, `sw.ts` (hub), `__tests__/sw.test.ts`,
-  `routes/api.php` (hub), `app/Providers/AppServiceProvider.php` (hub), `config/guest.php`,
-  `ContentBlocksEditor.vue` and its test, `content-markup.ts`, `GuestAttachmentController.php`,
-  `app/Policies/AttachmentPolicy.php` and `config/attachments.php` (hub) — comments only —,
-  `app/Http/Resources/Api/V1/SyncManifestResource.php` (docblock), `ServiceWorkerCachePrefixRouteTest.php`,
-  `RateLimiterBindingTest.php`, `OpenApiContractTest.php`, `NoteContentSurfacesTest.php` (header),
-  `packages/design-system/src/index.ts`, `E2eSeeder.php`, `openapi.json` (hub), `tests/e2e/public-runtime-axe.spec.ts`,
-  `tests/e2e/public-runtime-offline.spec.ts` (hub), `tests/e2e/builder-content-axe.spec.ts`,
-  `docs/piping-output-encoding-design.md`, `docs/security-threat-model.md` (hub),
-  `docs/offline-first-sync-design.md` (hub), `docs/ux/design-system-reference.md` (hub; the Callout entry).
-- **5 (`R-db169c29`):** new `database/migrations/2026_08_17_000118_add_redirect_to_forms_table.php`,
-  `app/Rules/RedirectUrl.php`, `app/Support/Forms/GuestReachability.php`, `app/Support/Forms/RedirectTarget.php`,
-  `app/Services/Forms/FormRedirectResolver.php`, `app/Services/Forms/RedirectValidationGate.php`, their tests,
-  `ConfirmationScreen.test.ts` and `ConfirmationPanel.test.ts`; edited `app/Models/Form.php`,
-  `UpdateConfirmationMessageRequest.php`, `FormConfirmationMessageController.php`, `app/Services/Forms/FormService.php`
-  (hub), `FormSettingsPresenter.php`, `app/Services/Forms/PublishService.php` (hub), `PublishValidationException.php`,
-  `app/Http/Controllers/Public/GuestSubmissionController.php`, `GuestDraftController.php` and
-  `PublicFormPresenter.php` (comments), `PublicRuntimeSecurityHeaders.php`, `ConfirmationPanel.vue`,
-  `components/forms/types.ts`, `builder/types.ts`, the five settings fixtures, `lib/api-client.ts`,
-  `RuntimeSession.vue`, `App.vue`, `ConfirmationScreen.vue`, `__tests__/fixtures.ts`,
-  `FormConfirmationMessageTest.php`, `TenantExtractColumnDriftTest.php`, `FormSettingsPageTest.php`,
-  `AuditCoverageTest.php`, the security-headers test, `E2eSeeder.php`, `tests/e2e/public-runtime-axe.spec.ts`,
-  `tests/e2e/form-settings-axe.spec.ts`, `docs/data-dictionary.md` (hub), `docs/security-threat-model.md` (hub),
-  `docs/piping-output-encoding-design.md`, `docs/ux/form-filling-ux-flow.md`, `openapi.json` (hub).
-- **Close-out:** `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/backlog-triage.md`, `docs/claims/decisions.md`,
-  `docs/claims/lane-a.md`, `docs/gate-baselines.md`, and `PROGRESS.md` (own block and hand-off line).
-- **Extension 1, pushed with item 1 built and uncommitted, before the file was opened:**
-  `docs/workflow-branching-design.md`, for one citation. Item 1's deletion moved `toSemanticInput()` far above the
-  `schema-mapping.ts:604-606` that document cites by line (tier 1, zero tolerance: the line is now past the end of
-  the file), and items 3 and 4 move that file again, so the citation names the function instead of a line. Also
-  named, because the list above gives them only by kind: `resources/public-runtime/__tests__/components.test.ts`,
-  `resume-boot.test.ts` and `fixtures.ts`.
-- **Extension 2, pushed with items 1 and 2 committed and item 3 built, before either file was opened:**
-  `tests/Feature/Seeders/E2eSeederIdempotencyTest.php`, which pins the published-form count at 7 — item 3 seeds an
-  eighth ("Choice Layouts", for the new E2E spec), and no E2E assertion reads that number; and
-  `app/Enums/ValueShape.php`, for one docblock sentence that names the TypeScript `ControlKind` item 1 deleted.
-- **Extension 3, pushed with items 1–3 committed and item 4 built, before the file was edited (read once, to plan):**
-  `resources/js/components/builder/PreviewRuntime.test.ts`. Item 4 makes the builder preview place a note's content
-  headings one level deeper than the respondent's page (`PreviewRuntime.vue` titles its sections with an `h3`), and
-  the only suite that mounts the real preview is this one; the list above names the component and not its test.
-- **Extension 4, pushed with item 4 built and before the file was edited:** `docs/adr/0007-async-execution-substrate.md`,
-  for two citations. Both cite `app/Providers/AppServiceProvider.php:105-127` as where every limiter is keyed, and that
-  range has held the share-token service, not the limiters, for a long time; item 4 adds four import lines above it, so
-  the tier-1 lint now sees the first line blank. The citations will name the `RateLimiter::for()` registrations instead.
-- **Extension 5, pushed with item 4 committed and before either file was edited:**
-  `resources/public-runtime/composables/useSyncOutbox.ts` and `resources/public-runtime/__tests__/sync-outbox.test.ts`.
-  Item 4's E2E run found `public-runtime-offline`'s offline-submit case red in 4 of 21 runs against 0 of 12 on the
-  pre-M130 front-end. The cause is older than M130: after an offline submit, `registerBackgroundSync()` also asks the
-  service worker to replay at once, the attempt fails offline, and the row reads "Retrying" instead of "Saved on this
-  device"; the heavier page (round buttons) only widened the race. The immediate request is skipped while offline.
-- **Extension 6, pushed with item 5's server half in progress and before the file was edited:**
-  `app/Http/Controllers/Tenant/FormBuilderController.php`, for one argument. Item 5's destination picker lists the
-  forms the author may open, so the settings block needs the viewer; `FormSettingsPresenter::form()` takes none and
-  the builder page reaches it through `BuilderPresenter::present()`, which the builder controller calls without the
-  user it already holds. The plan's "no hub edit" premise missed that; nothing in this codebase reads the user
-  inside a presenter, so the controller passes it.
-- **Extension 7, pushed with item 5 built and before the file was edited:**
-  `tests/Feature/Tenancy/ConstraintBoundaryDriftTest.php`, whose composite-FK census went red on `forms_redirect_form_fk`
-  and nothing else — item 5's migration adds that FK, exactly as M129's `ocr_scans_form_fk` did. The census gains the
-  one name.
-- **Extension 8, pushed after PR #323's first CI run and before the file was edited:** `tests/e2e/responsive-axe.spec.ts`.
-  CI's E2E failed on "Audit change detail" (light and dark, desktop project) and nothing else: the scan clicks the first
-  "Permission changed" row on page one of `/audit-log`, and this increment's seeded forms and new guest submissions
-  push the seeded rows off page one by the time the last project runs. The scan now asks the page for that event,
-  the remedy the M128 row names.
-
-Shared artefacts taken: `docs/**` (the files above), `openapi.json`, the top-level `tests/e2e/*.spec.ts` named above
-(one new), and `PROGRESS.md` (own block only).
-Paired files taken: none.
-Namespaces spent: migration prefix `2026_08_17_000118`; decision ids `D75`, `D76`, `D77`. No ADR (`0010` stays
-reserved).
-Prediction:
-- **CI goes 6/6** after the local gates.
-- **Most likely red:** the citation lint — `schema-mapping.ts`, `App.vue`, `PublishService.php`,
-  `EncodeFormPresenter.php` and `public-runtime/lib/types.ts` are cited by line from
-  `docs/piping-output-encoding-design.md` and `docs/workflow-branching-design.md`, and every item shifts one of them.
-- **Second:** the Contract job, if a guest-API change reaches a push without its regenerated `openapi.json`. The two
-  service-worker pin tests go red by design and move in the same commit.
-- **Most likely wrong:** that the new E2E scans pass axe and the 375px check on their first run — round buttons in a
-  columns grid at 375px with the largest text, and the countdown screen in dark mode, are surfaces no spec has seen.
+### ⚠️ Deviations, recorded rather than smoothed
+- **A form destination is not E2E-covered locally:** a form's link is built from `APP_URL`, which only CI makes the same
+  origin as the page under test, so the seeded destination is a web address the spec intercepts. The form path is held
+  by Pest (`GuestSubmissionRedirectTest`) and the client's same-origin rule by Vitest.
+- **The settings presenter needed the viewer,** which the plan's "no hub edit" premise missed: `BuilderPresenter::present()`
+  and `FormSettingsPresenter::form()` take it, and the builder controller passes it (extension 6).
+- **Eight claim extensions**, each pushed before its file was edited; extension 3's file had been read once to plan,
+  and extension 8 came after the PR's first CI run.
+- **The offline-picture E2E case is proved by local runs only:** CI's origin has no service worker, so the case skips
+  there in all three viewports, as the older mis-cased-entry case always has. Filed at close-out rather than fixed here.
 
 ## RELEASED — `M129`, a scanned paper form is reviewed, corrected and saved as a response, the form hub gains a Settings tab, and a note gains a Content tab with images (merged as PR #322, `8f50a220`, 6/6 green with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

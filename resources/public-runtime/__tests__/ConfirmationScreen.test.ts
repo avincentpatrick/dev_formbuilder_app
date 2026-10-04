@@ -103,10 +103,24 @@ describe('ConfirmationScreen — after the thank-you (M130, D76)', () => {
 
         const link = wrapper.find('a');
         expect(link.attributes('target')).toBe('_top');
+        // The browser follows the link itself — so the screen must not prevent it — but the test environment must
+        // not: following it moves this file's `window.location` to the destination, and every later case then reads
+        // that origin (measured: it let a mutant in `parseRedirect()` pass the real-client cases below).
+        let preventedByScreen: boolean | null = null;
+        document.addEventListener(
+            'click',
+            (event) => {
+                preventedByScreen = event.defaultPrevented;
+                event.preventDefault();
+            },
+            { once: true },
+        );
         await link.trigger('click');
-        // The browser follows the link itself; the page only rotates the session first.
+
+        expect(preventedByScreen).toBe(false);
         expect(navigate).not.toHaveBeenCalled();
         expect(wrapper.emitted('leave')).toHaveLength(1);
+        expect(window.location.origin).not.toBe('https://health.example.org');
     });
 
     it('never counts while responses wait to send, and starts once the device reports none', async () => {

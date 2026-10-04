@@ -89,7 +89,7 @@ describe('ConfirmationPanel — where a respondent goes after the thank-you (M13
         const wrapper = panel();
 
         await radio(wrapper, 'Go to a web address').setValue(true);
-        await wrapper.find('input[type="url"]').setValue('  https://health.example.org/next  ');
+        await wrapper.find('input[type="url"]').setValue('https://health.example.org/next');
         const sent = await save(wrapper, 'Save thank-you screen');
 
         expect(sent.url).toBe('/forms/form-1/confirmation');

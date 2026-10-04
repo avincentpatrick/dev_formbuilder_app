@@ -168,7 +168,7 @@ function submit(clear: boolean): void {
                 ...message,
                 redirect_kind: data.redirect_kind,
                 ...(data.redirect_kind === 'form' ? { redirect_form_id: data.redirect_form_id } : {}),
-                ...(data.redirect_kind === 'url' ? { redirect_url: data.redirect_url.trim() } : {}),
+                ...(data.redirect_kind === 'url' ? { redirect_url: data.redirect_url } : {}),
             };
         })
         .patch(`/forms/${props.formId}/confirmation`, {

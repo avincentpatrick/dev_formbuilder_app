@@ -127,7 +127,7 @@ SpanRun.props = ['span'];
     margin: 0;
 }
 
-.note-content__code {
+.note-content :deep(.note-content__code) {
     padding: 0 var(--mds-space-1);
     border-radius: var(--mds-radius-sm);
     background-color: var(--mds-color-bg-sunken);
@@ -135,22 +135,24 @@ SpanRun.props = ['span'];
 }
 
 /* Inside a callout the link takes the tone's own foreground, which is paired against its background; the
-   underline is the link's non-colour signifier either way. */
-.note-content__link {
+   underline is the link's non-colour signifier either way.
+   ⚠️ `:deep()` on everything `SpanRun` draws: elements made by `h()` in a functional component carry no scope id,
+   so a plain scoped selector matched nothing and "(opens in a new tab)" showed (the M130 probe saw it). */
+.note-content :deep(.note-content__link) {
     color: var(--mds-color-action-primary-fg);
     text-decoration: underline;
 }
 
-.note-content__callout .note-content__link {
+.note-content__callout :deep(.note-content__link) {
     color: inherit;
 }
 
-.note-content__link:focus-visible {
+.note-content :deep(.note-content__link:focus-visible) {
     outline: 2px solid var(--mds-color-focus-ring);
     outline-offset: 2px;
 }
 
-.note-content__sr {
+.note-content :deep(.note-content__sr) {
     position: absolute;
     width: 1px;
     height: 1px;

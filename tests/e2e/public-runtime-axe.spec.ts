@@ -130,6 +130,10 @@ for (const theme of themes) {
         await expect(page.getByRole('heading', { name: 'Finding the entrance', level: 4 })).toBeVisible();
         await expect(page.getByRole('note')).toContainText('do not eat for 8 hours');
         await expect(page.getByRole('link', { name: /Read the clinic guide/ })).toHaveAttribute('target', '_blank');
+        // "(opens in a new tab)" is for screen readers only. Measured in M130: the styles that clip it never reached
+        // the elements the renderer draws with `h()`, and the words showed; now they must be clipped to one pixel.
+        await expect(page.locator('.note-content__sr').first()).toHaveCSS('position', 'absolute');
+        await expect(page.locator('.note-content__sr').first()).toHaveCSS('width', '1px');
         // The note's label is the author's alone (`D69`).
         await expect(page.getByText('Visit guide (for the team)')).toHaveCount(0);
 

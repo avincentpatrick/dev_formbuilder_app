@@ -174,6 +174,10 @@ Files:
   the file), and items 3 and 4 move that file again, so the citation names the function instead of a line. Also
   named, because the list above gives them only by kind: `resources/public-runtime/__tests__/components.test.ts`,
   `resume-boot.test.ts` and `fixtures.ts`.
+- **Extension 2, pushed with items 1 and 2 committed and item 3 built, before either file was opened:**
+  `tests/Feature/Seeders/E2eSeederIdempotencyTest.php`, which pins the published-form count at 7 — item 3 seeds an
+  eighth ("Choice Layouts", for the new E2E spec), and no E2E assertion reads that number; and
+  `app/Enums/ValueShape.php`, for one docblock sentence that names the TypeScript `ControlKind` item 1 deleted.
 
 Shared artefacts taken: `docs/**` (the files above), `openapi.json`, the top-level `tests/e2e/*.spec.ts` named above
 (one new), and `PROGRESS.md` (own block only).

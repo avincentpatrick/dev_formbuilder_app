@@ -12754,7 +12754,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   reconnected before anything is delivered". CI seeds a fresh database for every run, so neither fails there, and a
   local failure of either reads like a real regression. The remedy is to make each scan reach its row directly (a
   filter on the audit event, a fixture connection that cannot lapse), or to say in the spec that both need a fresh
-  seed. **Live.** Filed by `M128`. **Tier: during-testing.**
+  seed. **Live.** Filed by `M128`. **Tier: during-testing.** ⚠️ **`M130` (2026-10-04) FIXED THE AUDIT HALF, AFTER IT WENT RED IN CI TOO** — so "neither fails there" no longer held: the increment's seeded forms and new guest submissions pushed the seeded `permission_changed` rows off page one by the time CI's last project ran. The scan now opens `/audit-log?event=permission_changed` and passes on every viewport, here and against a long-lived database. **The drift half remains.**
 
 - **`nit` · The printed blank form says "Scans of this form can be read automatically" even when the form does not
   accept scans.** Found by `M129` while adding the accept-scans setting. The footer of

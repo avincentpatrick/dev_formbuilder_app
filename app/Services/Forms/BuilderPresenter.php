@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Forms;
 
 use App\Enums\ComparisonOperator;
+use App\Enums\FieldAppearance;
 use App\Enums\FieldType;
 use App\Enums\IndexedDataType;
 use App\Enums\RequiredMode;
@@ -220,6 +221,12 @@ final class BuilderPresenter
                 'value_shape' => ValueShape::for($type)->value,
                 // Increment M125 — additive: the palette shows ONE entry per group, and all 31 entries stay.
                 'variant' => $type->variantGroup()?->paletteVariant($type),
+                // Increment M130 — the layouts an author may choose for this type (`FieldAppearance::for()`),
+                // transmitted rather than listed in the client; empty for every type with no layout setting.
+                'appearances' => array_map(
+                    static fn (FieldAppearance $appearance): array => ['value' => $appearance->value, 'label' => $appearance->label()],
+                    FieldAppearance::for($type),
+                ),
             ];
         }
 

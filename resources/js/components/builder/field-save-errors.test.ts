@@ -75,6 +75,7 @@ describe('describeSavePath', () => {
         expect(describeSavePath('config.rows.0.value')).toBe('Row 1');
         expect(describeSavePath('config.prefill_source')).toBe('Settings');
         expect(describeSavePath('relevant_expression')).toBe('Show this question when');
+        expect(describeSavePath('appearance')).toBe('Choice layout');
         expect(describeSavePath('mystery_path')).toBe('mystery_path');
     });
 

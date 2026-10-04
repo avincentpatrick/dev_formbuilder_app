@@ -41,7 +41,8 @@ const NAMES: Record<string, string> = {
     hint: 'Help text',
     placeholder: 'Placeholder',
     key: 'Field key',
-    appearance: 'Appearance hint',
+    // M130: the free-text "Appearance hint" became the Options tab's choice layout.
+    appearance: 'Choice layout',
     default_value: 'Default value',
     indexed_data_type: 'Indexed data type',
     'config.calculated_formula': 'Calculation formula',

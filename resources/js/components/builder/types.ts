@@ -103,6 +103,9 @@ export interface PaletteType {
     // The palette shows ONE entry per group (its primary) and the Basics tab switches between the members.
     // Optional: a hand-built palette in a test may carry none, and absent reads as ungrouped.
     variant?: PaletteVariant | null;
+    // The layouts an author may choose for this type (M130) — `FieldAppearance::for()` via BuilderPresenter. Empty
+    // for a type with no layout setting; optional for the same reason as `variant`, and absent reads as empty.
+    appearances?: EnumOption[];
 }
 
 export interface PaletteVariant {

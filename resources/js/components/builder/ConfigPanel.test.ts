@@ -79,7 +79,20 @@ const PALETTE: PaletteGroup[] = [
         icon: 'type',
         types: [
             { value: 'short_text', label: 'Short text', advanced: false, has_options: false, config_editor: null, value_shape: 'text' },
-            { value: 'single_select', label: 'Single select', advanced: false, has_options: true, config_editor: 'choices', value_shape: 'choice' },
+            // M130 — `appearances` is what makes the Options tab's choice layout LOAD-BEARING here; `short_text` keeps
+            // none, so it reads as "no layout setting", the absent-member path a hand-built palette relies on.
+            {
+                value: 'single_select',
+                label: 'Single select',
+                advanced: false,
+                has_options: true,
+                config_editor: 'choices',
+                value_shape: 'choice',
+                appearances: [
+                    { value: 'columns-pack', label: 'Side by side' },
+                    { value: 'columns', label: 'In columns' },
+                ],
+            },
             // M115 — a type that carries NO ANSWER, so the Validation tab must not exist for it. It is in
             // the fixture rather than only in a comment because that is what makes value_shape LOAD-BEARING
             // here: no type-checker reads this file (tsconfig excludes **/*.test.ts), so a required member
@@ -233,6 +246,77 @@ describe('ConfigPanel — the tab set it hands the shared widget', () => {
 
         expect(wrapper.find('[role="tablist"]').exists()).toBe(false);
         expect(wrapper.text()).toContain('Select a field or section to configure it.');
+    });
+});
+
+describe('ConfigPanel — the choice layout that replaced the free-text appearance hint (M130)', () => {
+    async function openTab(wrapper: ReturnType<typeof mountPanel>, name: string): Promise<void> {
+        await wrapper.findAll('[role="tab"]').find((tab) => tab.text() === name)!.trigger('click');
+    }
+
+    function layoutSelect(wrapper: ReturnType<typeof mountPanel>) {
+        const label = wrapper.findAll('label').find((node) => node.text().includes('Choice layout'));
+        expect(label, 'no "Choice layout" control on this tab').toBeDefined();
+        return wrapper.find(`#${label!.attributes('for')}`);
+    }
+
+    it('offers the transmitted layouts on the Options tab, defaulting to one per line', async () => {
+        const wrapper = mountPanel(makeStore({ field: field({ field_type: 'single_select' }) }));
+        await openTab(wrapper, 'Options');
+
+        const select = layoutSelect(wrapper);
+        expect(select.findAll('option').map((option) => option.text())).toEqual(['One per line (default)', 'Side by side', 'In columns']);
+        expect((select.element as HTMLSelectElement).value).toBe('');
+    });
+
+    it('writes the chosen layout, and null for the default', async () => {
+        const touch = vi.fn();
+        const choice = field({ field_type: 'single_select' });
+        const wrapper = mountPanel(makeStore({ field: choice, touch }));
+        await openTab(wrapper, 'Options');
+
+        await layoutSelect(wrapper).setValue('columns');
+        expect(choice.appearance).toBe('columns');
+
+        await layoutSelect(wrapper).setValue('');
+        expect(choice.appearance).toBeNull();
+        expect(touch).toHaveBeenCalledTimes(2);
+        expect(touch).toHaveBeenLastCalledWith('f1', 'field');
+    });
+
+    it('shows a stored value outside the list as kept, selected, and never as an editable string', async () => {
+        // An XLSForm import's `likert`: the save request accepts it only unchanged, so the panel offers keep or replace.
+        const wrapper = mountPanel(makeStore({ field: field({ field_type: 'single_select', appearance: 'likert' }) }));
+        await openTab(wrapper, 'Options');
+
+        const select = layoutSelect(wrapper);
+        expect(select.findAll('option').map((option) => option.text())).toContain('Kept from an earlier setting or an import: likert');
+        expect((select.element as HTMLSelectElement).value).toBe('likert');
+    });
+
+    it('shows a type with no layout setting its stored appearance in Advanced, with a way to remove it', async () => {
+        const touch = vi.fn();
+        const text = field({ appearance: 'numbers' });
+        const wrapper = mountPanel(makeStore({ field: text, touch }));
+        await openTab(wrapper, 'Advanced');
+
+        const kept = wrapper.find('[data-kept-appearance]');
+        expect(kept.exists()).toBe(true);
+        expect(kept.text()).toContain('numbers');
+        expect(kept.text()).toContain('does not change how this form looks');
+
+        await kept.findAll('button').find((button) => button.text() === 'Remove appearance')!.trigger('click');
+        expect(text.appearance).toBeNull();
+        expect(touch).toHaveBeenCalledWith('f1', 'field');
+    });
+
+    it('offers no free-text appearance anywhere, and nothing at all for a type with no layout and no stored value', async () => {
+        const wrapper = mountPanel(makeStore({ field: field() }));
+        await openTab(wrapper, 'Advanced');
+
+        expect(wrapper.text()).not.toContain('Appearance hint');
+        expect(wrapper.find('[data-kept-appearance]').exists()).toBe(false);
+        expect(wrapper.findAll('label').some((node) => node.text().includes('Choice layout'))).toBe(false);
     });
 });
 

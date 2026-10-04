@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Requests\Forms;
 
 use App\Enums\ComparisonOperator;
+use App\Enums\FieldAppearance;
 use App\Enums\FieldType;
 use App\Enums\IndexedDataType;
 use App\Enums\RequiredMode;
@@ -59,7 +60,7 @@ final class UpdateFieldRequest extends FormRequest
             'placeholder' => ['nullable', 'string', 'max:255'],
             'is_required' => ['required', Rule::enum(RequiredMode::class)],
             'relevant_expression' => ['nullable', 'string', 'max:2000'],
-            'appearance' => ['nullable', 'string', 'max:60'],
+            'appearance' => ['nullable', 'string', 'max:60', Rule::in($this->allowedAppearances($field))],
             'config' => ['present', 'array'],
             'default_value' => ['nullable', 'string', 'max:2000'],
             'is_pii' => ['boolean'],
@@ -230,6 +231,29 @@ final class UpdateFieldRequest extends FormRequest
         }
 
         return [];
+    }
+
+    /**
+     * The appearances this save may write (M130, `R-6c76bed2`): a layout the stored type offers
+     * (`FieldAppearance::for()`), or the value the field already holds, unchanged.
+     *
+     * ⛔ THE SECOND HALF IS WHAT KEEPS AN IMPORTED FORM EDITABLE. XLSForm import stores ODK appearances
+     * verbatim (`likert`, `quick`, `minimal` on a multiple choice …) and the builder sends the whole field
+     * back on every save, so refusing anything outside the vocabulary would refuse an imported question's
+     * FIRST edit — the failure `FieldCreateRoundTripTest` records for M125. A stored value may be kept or
+     * replaced; it can never be typed in fresh, because nothing in the builder types one any more.
+     *
+     * @return list<string>
+     */
+    private function allowedAppearances(FormField $field): array
+    {
+        $allowed = array_map(static fn (FieldAppearance $layout): string => $layout->value, FieldAppearance::for($field->field_type));
+
+        if (is_string($field->appearance) && $field->appearance !== '') {
+            $allowed[] = $field->appearance;
+        }
+
+        return $allowed;
     }
 
     public function withValidator(Validator $validator): void

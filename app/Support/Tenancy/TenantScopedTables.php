@@ -61,6 +61,8 @@ final class TenantScopedTables
         'feedback_reports',
         'form_field_validations',
         'form_fields',
+        // M131. Nothing withheld: a folder is a name the workspace typed, and who typed it.
+        'form_folders',
         'form_sections',
         'form_versions',
         'forms',

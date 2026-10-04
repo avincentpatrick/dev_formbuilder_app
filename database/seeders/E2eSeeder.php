@@ -30,6 +30,7 @@ use App\Models\Domain;
 use App\Models\FeedbackReport;
 use App\Models\Form;
 use App\Models\FormField;
+use App\Models\FormFolder;
 use App\Models\FormVersion;
 use App\Models\Notification;
 use App\Models\OcrScan;
@@ -901,6 +902,8 @@ class E2eSeeder extends Seeder
 
             $this->seedScopingHierarchy($owner, $reviewer);
 
+            $this->seedFormFolders($owner);
+
             // K1c. After every submission block above, so the fixture's own collection and review history
             // reaches the ledger — nothing here drives `SubmissionPipeline`, so no `SubmissionCreated` was
             // ever raised for any of it. Announcements are suppressed, which is what keeps the notification
@@ -1228,6 +1231,30 @@ class E2eSeeder extends Seeder
      * FormService::assignScope, so the fixture exercises the same writers the UI does rather than raw
      * inserts that could drift from them.
      */
+    /**
+     * Forms-list folders (M131, `R-9e634897`): two holding a form each and one empty, so the folder filter,
+     * the card caption, "Manage folders" and "Move to folder" all have something to render for the axe scans.
+     *
+     * ⚠️ WRITTEN DIRECTLY, NOT THROUGH `FormFolderService` OR `FormService::assignFolder()`, AND ON PURPOSE. Both
+     * write audit rows, and the audit scans count and page this ledger; `assignFolder()` also bumps the form's
+     * `updated_at`, which reorders a list several specs read top-down. A raw update moves neither.
+     */
+    private function seedFormFolders(User $owner): void
+    {
+        if (FormFolder::query()->where('name', 'Clinics')->exists()) {
+            return;
+        }
+
+        foreach (['Clinics' => 'Clinic Intake', 'Field surveys' => 'Household Roster', 'Archive' => null] as $name => $title) {
+            $folder = new FormFolder(['name' => $name]);
+            $folder->forceFill(['created_by' => $owner->getKey()])->save();
+
+            if ($title !== null) {
+                DB::table('forms')->where('title', $title)->update(['folder_id' => $folder->getKey()]);
+            }
+        }
+    }
+
     private function seedScopingHierarchy(User $owner, User $reviewer): void
     {
         if (ScopeNode::query()->where('name', 'Luzon')->exists()) {

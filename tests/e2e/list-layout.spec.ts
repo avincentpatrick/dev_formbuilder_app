@@ -57,6 +57,40 @@ for (const p of listPages) {
     });
 }
 
+// ── M131 — THE FORMS TABLE'S ACTION CLUSTER, COLLAPSED TO CARDS ─────────────────────────────────────────
+// The same clip, one element deeper. Below the 56em threshold each table row IS a card with no scroll region,
+// and `Index.vue` used to keep the action cluster on one line in BOTH layouts — so when M131 added a tenth
+// action ("Move to folder"), the Owner's cluster grew wider than a 375px card and ran past its edge. The
+// scroll-wrapper check above cannot see that (the wrapper is not a scroll container down here) and neither
+// can `assertClean` (the shell clips). Measuring each cluster against its own row card is what can.
+test('Forms (table view) — no row action runs past its card below the collapse threshold', async ({ page }, info) => {
+    test.skip(info.project.name === 'desktop', 'Above the threshold the row is a table row and scrolls by design.');
+
+    await page.goto('/forms?view=table', { waitUntil: 'networkidle' });
+    await settlePaint(page);
+
+    const rows = page.locator('.mds-table__frame--stackable .mds-table__row');
+    const count = await rows.count();
+    expect(count, 'the forms table rendered no rows').toBeGreaterThan(0);
+
+    let measured = 0;
+    for (let i = 0; i < count; i++) {
+        const spill = await rows.nth(i).evaluate((row) => {
+            const cluster = row.querySelector('.form-actions');
+            if (cluster === null) return null;
+
+            return cluster.getBoundingClientRect().right - row.getBoundingClientRect().right;
+        });
+        if (spill === null) continue;
+
+        measured++;
+        expect(spill, `row ${i}'s action cluster runs past its card`).toBeLessThanOrEqual(1);
+    }
+
+    // Anti-vacuity: the seeded Owner sees every action on most rows, so a renamed class must fail here.
+    expect(measured, 'no row carried an action cluster to measure').toBeGreaterThan(0);
+});
+
 test('the wide column fills a 1600px window, and a form page still does not', async ({ page }, info) => {
     test.skip(info.project.name !== 'desktop', 'Sets its own viewport — running it three times proves nothing.');
 

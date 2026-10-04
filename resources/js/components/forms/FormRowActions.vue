@@ -55,6 +55,7 @@ defineEmits<{
     template: [row: FormRow];
     rename: [row: FormRow];
     scope: [row: FormRow];
+    folder: [row: FormRow];
     publish: [row: FormRow];
     archive: [row: FormRow];
 }>();
@@ -118,6 +119,15 @@ const publishing = computed(() => props.publishingId === props.row.id);
             label="Rename form"
             size="sm"
             @click="$emit('rename', row)"
+        />
+        <!-- M131 (`D79`) — the TENTH action. Gated on `row.can.edit`, unlike "Set form scope" below: filing a
+             form grants nothing, so its editor files it, and the route is `can:update,form` alone. -->
+        <MdsIconButton
+            v-if="row.can.edit"
+            icon="folder"
+            label="Move to folder"
+            size="sm"
+            @click="$emit('folder', row)"
         />
         <!-- Gated on manageScopes, not row.can.edit: assigning a form to a scope hands everyone holding a
              grant on that branch access to the form AND its submissions, so it is an Owner/Admin act. The

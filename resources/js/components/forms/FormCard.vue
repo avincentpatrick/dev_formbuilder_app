@@ -16,11 +16,15 @@
  */
 import { computed } from 'vue';
 import { Link } from '@inertiajs/vue3';
-import { MdsBadge, MdsCard, MdsProgress, statusVariant } from '@meridian/design-system';
+import { MdsBadge, MdsCard, MdsIcon, MdsProgress, statusVariant } from '@meridian/design-system';
 import { relativeTime } from '@/components/notifications/relative-time';
 import { formIdentityVar, type FormRow } from '@/types/forms';
 
-const props = defineProps<{ row: FormRow }>();
+const props = defineProps<{
+    row: FormRow;
+    /** The forms-list folder the row is filed in (M131, `D78`), resolved by the page; null when Unfiled. */
+    folderName?: string | null;
+}>();
 
 /** Spelled out rather than interpolated — see `FORM_IDENTITY_VARS` for why the token guard needs that. */
 const identityVar = computed(() => formIdentityVar(props.row.identity));
@@ -143,6 +147,12 @@ function untilLabel(iso: string): string {
                 a sentence, and one line of a sentence is often worse than none.
             -->
             <p v-if="row.description" class="form-card__desc">{{ row.description }}</p>
+            <!-- M131: where the form is filed. Nothing for Unfiled — a caption on every card saying so would be
+                 noise on the workspace that uses no folders at all. The word "Folder" is read, not shown. -->
+            <p v-if="folderName" class="form-card__folder">
+                <MdsIcon name="folder" size="sm" />
+                <span class="form-card__sr">Folder: </span>{{ folderName }}
+            </p>
         </template>
 
         <dl class="form-card__stats">
@@ -281,6 +291,32 @@ function untilLabel(iso: string): string {
        single unbreakable word of arbitrary length, and the line clamp would hide the overflow ROWS
        without doing anything about the overflow WIDTH. */
     overflow-wrap: anywhere;
+}
+
+.form-card__folder {
+    display: flex;
+    align-items: center;
+    gap: var(--mds-space-1);
+    margin: var(--mds-space-2) 0 0;
+    min-width: 0;
+    font-size: var(--mds-type-caption-font-size);
+    line-height: var(--mds-type-caption-line-height);
+    color: var(--mds-color-text-secondary);
+    /* A folder name is typed by a person and can be one long word. */
+    overflow-wrap: anywhere;
+}
+
+/* "Folder:" for a screen reader only — the icon says it to everyone else, and the icon is aria-hidden. */
+.form-card__sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
 }
 
 .form-card__stats {

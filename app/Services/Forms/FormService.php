@@ -13,6 +13,7 @@ use App\Enums\UsageMetric;
 use App\Events\FormCreated;
 use App\Exceptions\Forms\FormException;
 use App\Models\Form;
+use App\Models\FormFolder;
 use App\Models\FormVersion;
 use App\Models\ResourceGrant;
 use App\Models\ScopeNode;
@@ -232,6 +233,34 @@ final class FormService
             $new = ['scope_node_id' => $node?->getKey()];
 
             $form->forceFill($new)->save();
+
+            $this->recordFormUpdate($form, $old, $new, $actor);
+
+            return $form->refresh();
+        });
+    }
+
+    /**
+     * File a form into a forms-list folder, or unfile it (M131, `R-9e634897`) — the only writer of
+     * `forms.folder_id`.
+     *
+     * Unlike {@see self::assignScope()}, this grants nothing: a folder is a FILING axis, and the route gates it
+     * `can:update,form` alone. It is still an explicit `forceFill` behind its own route rather than a field on
+     * the metadata edit, so the column is never mass-assignable and every move leaves an audit row. The
+     * folder is resolved again under the workspace's RLS, so another workspace's id 404s here even if a
+     * caller skipped the request's `exists` rule.
+     */
+    public function assignFolder(Form $form, ?string $folderId, ?User $actor = null): Form
+    {
+        $folder = $folderId === null ? null : FormFolder::query()->whereKey($folderId)->firstOrFail();
+
+        return DB::transaction(function () use ($form, $folder, $actor): Form {
+            $current = $form->folder_id === null ? null : FormFolder::query()->whereKey($form->folder_id)->first();
+
+            $old = ['folder_id' => $form->folder_id, 'folder_name' => $current?->name];
+            $new = ['folder_id' => $folder?->getKey(), 'folder_name' => $folder?->name];
+
+            $form->forceFill(['folder_id' => $folder?->getKey()])->save();
 
             $this->recordFormUpdate($form, $old, $new, $actor);
 

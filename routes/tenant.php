@@ -23,6 +23,8 @@ use App\Http\Controllers\Tenant\FormBuilderController;
 use App\Http\Controllers\Tenant\FormConfirmationMessageController;
 use App\Http\Controllers\Tenant\FormController;
 use App\Http\Controllers\Tenant\FormFieldConversionController;
+use App\Http\Controllers\Tenant\FormFolderAssignmentController;
+use App\Http\Controllers\Tenant\FormFolderController;
 use App\Http\Controllers\Tenant\FormHubController;
 use App\Http\Controllers\Tenant\FormPageModeController;
 use App\Http\Controllers\Tenant\FormPrintController;
@@ -70,6 +72,7 @@ use App\Http\Middleware\PublicRuntimeSecurityHeaders;
 use App\Models\Audit;
 use App\Models\Connection;
 use App\Models\Form;
+use App\Models\FormFolder;
 use App\Models\ResourceGrant;
 use App\Models\SavedReportView;
 use App\Models\ScopeNode;
@@ -494,6 +497,16 @@ Route::middleware([
     Route::post('/forms', [FormController::class, 'store'])
         ->middleware('can:create,'.Form::class)->name('forms.store');
 
+    // Forms-list folders (M131, `R-9e634897`, `D78`/`D79`): anyone who may create forms creates one; only
+    // `forms.edit.any` renames or deletes one (FormFolderPolicy). `/form-folders`, not `/forms/folders`, so the
+    // static segment can never be captured as a {form} binding. Deleting unfiles the folder's forms, at the FK.
+    Route::post('/form-folders', [FormFolderController::class, 'store'])
+        ->middleware('can:create,'.FormFolder::class)->name('form-folders.store');
+    Route::patch('/form-folders/{formFolder}', [FormFolderController::class, 'update'])
+        ->middleware('can:update,formFolder')->name('form-folders.update');
+    Route::delete('/form-folders/{formFolder}', [FormFolderController::class, 'destroy'])
+        ->middleware('can:delete,formFolder')->name('form-folders.destroy');
+
     // Form templates (Increment G9a) — the onboarding gallery + instantiate. Registered before the
     // /forms/{form} patterns so the static `templates` segment is never captured as a {form} binding.
     // Both gate on can:create,Form (the gallery exists to create a form from a template); instantiate
@@ -637,6 +650,11 @@ Route::middleware([
     // stacked on top. Both gates must pass; the write itself is FormService::assignScope (never mass-assignment).
     Route::patch('/forms/{form}/scope', [FormScopeController::class, 'update'])
         ->middleware(['can:update,form', 'can:viewAny,'.ScopeNode::class])->name('forms.scope');
+
+    // File a form into a forms-list folder (M131). Unlike the scope route above this grants nothing, so
+    // `can:update,form` alone gates it; the write is still FormService::assignFolder, never mass-assignment.
+    Route::patch('/forms/{form}/folder', [FormFolderAssignmentController::class, 'update'])
+        ->middleware('can:update,form')->name('forms.folder');
 
     // Per-form save-and-resume opt-in (Increment H10, UX §5.2). Like the scope route, its own endpoint with a
     // guarded FormService write. `feature:save_and_resume` stacks on `can:update,form` so a form owner can only

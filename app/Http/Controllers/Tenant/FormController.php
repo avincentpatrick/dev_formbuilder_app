@@ -16,6 +16,7 @@ use App\Services\Forms\FormPresenter;
 use App\Services\Forms\FormService;
 use App\Services\Scoping\ScopeNodePresenter;
 use App\Support\Forms\FormListFacets;
+use App\Support\Forms\FormListFolders;
 use App\Support\Search\ListEmptyReason;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -41,13 +42,16 @@ final class FormController extends Controller
 
         $terms = $this->keyword($request);
         $facet = FormListFacets::parse($request->query('state'));
+        $folders = FormListFolders::load();
+        $folder = $folders->parse($request->query('folder'));
         $rows = $presenter->list($user, $terms);
 
-        // Counted BEFORE the facet narrows the set, so every chip keeps showing its own total while one
-        // of them is active — a chip that reported 0 for the thing you are not looking at would make the
-        // bar unusable as a way back.
-        $facets = FormListFacets::counts($rows);
-        $forms = FormListFacets::apply($rows, $facet);
+        // Each filter is counted with the OTHER one applied and never its own, so every chip and every folder
+        // keeps showing its own total while it is the one selected — a chip that reported 0 for the thing you
+        // are not looking at would make the bar unusable as a way back (JR3; the folder half is M131's).
+        $facets = FormListFacets::counts(FormListFolders::apply($rows, $folder));
+        $folderProp = $folders->present(FormListFacets::apply($rows, $facet), $user);
+        $forms = FormListFacets::apply(FormListFolders::apply($rows, $folder), $facet);
 
         return Inertia::render('forms/Index', [
             'forms' => $forms,
@@ -58,7 +62,9 @@ final class FormController extends Controller
             // ⚠️ THE CLAMPED STRING, NOT THE REQUEST'S. `SearchTerms::raw()` is what the server actually
             // acted on, so a 300-character paste re-renders as the 200 that ran; echoing the input back
             // would put a box on screen disagreeing with the list beneath it (J1e).
-            'filters' => ['applied' => ['q' => $terms->raw(), 'state' => $facet], 'facets' => $facets],
+            'filters' => ['applied' => ['q' => $terms->raw(), 'state' => $facet, 'folder' => $folder], 'facets' => $facets],
+            // The folder filter's options with their counts, and who may create or manage folders (M131, `D79`).
+            'folders' => $folderProp,
             // Presentational, not a filter, so it sits outside `filters` — it changes how the same rows are
             // drawn and nothing about which rows they are. In the URL rather than in a stored preference
             // (user decision, JR3): it is SSR-safe with no hydration guard, shareable, and it reuses this
@@ -73,7 +79,8 @@ final class FormController extends Controller
             // was `! $terms->isEmpty()` alone; shipping the facet chips without widening it would have
             // reproduced that exact defect one filter over — a tenant clicking "Draft" with no drafts
             // would be told it had never made a form, and offered to make its first.
-            'empty_reason' => ListEmptyReason::for($forms !== [], ! $terms->isEmpty() || $facet !== null),
+            // M131 widened it again, for the folder: an empty folder says "no matches".
+            'empty_reason' => ListEmptyReason::for($forms !== [], ! $terms->isEmpty() || $facet !== null || $folder !== null),
         ]);
     }
 

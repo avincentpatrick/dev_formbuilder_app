@@ -37,6 +37,8 @@ export const icons = {
     'external-link': 'M14 4h6v6 M20 4l-9 9 M18 13v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h6',
     'chevron-right': 'M9 6l6 6-6 6',
     'chevron-left': 'M15 6l-6 6 6 6',
+    // M131 — the forms list's folders (filing a form, and the folder caption on its card).
+    folder: 'M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z',
 
     // ── People & places ──────────────────────────────────────────────────────
     users: 'M8 9a3.2 3.2 0 1 0 6.4 0a3.2 3.2 0 1 0-6.4 0 M2.5 20c.8-3.2 2.9-4.8 5.7-4.8s4.9 1.6 5.7 4.8 M17 5.4a3.2 3.2 0 0 1 0 6.2 M18.5 20c-.4-2.1-1.3-3.6-2.7-4.5',

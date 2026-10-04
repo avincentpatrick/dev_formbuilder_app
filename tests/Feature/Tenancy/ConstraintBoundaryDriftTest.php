@@ -265,6 +265,8 @@ it('keeps the composite shape it recommends, so the remedy in every failure mess
     expect(boundarySorted(array_map(static fn (object $r): string => (string) $r->conname, $rows)))->toBe([
         'connection_subscriptions_connection_fk',
         'connection_subscriptions_form_fk',
+        // M131: a form's folder, pinned to the form's own tenant; deleting the folder unfiles, never deletes.
+        'forms_folder_fk',
         'forms_redirect_form_fk',
         'forms_scope_node_fk',
         // M128: a scan's form, pinned to the scan's own tenant — the shape this case exists to demonstrate.

@@ -38,6 +38,7 @@ final class AuditableTypes
     private const array LABELS = [
         'form' => 'Form',
         'form_version' => 'Form version',
+        'form_folder' => 'Form folder',
         'submission' => 'Submission',
         'settings' => 'Settings',
         'domain' => 'Custom domain',

@@ -186,6 +186,12 @@ Files:
   for two citations. Both cite `app/Providers/AppServiceProvider.php:105-127` as where every limiter is keyed, and that
   range has held the share-token service, not the limiters, for a long time; item 4 adds four import lines above it, so
   the tier-1 lint now sees the first line blank. The citations will name the `RateLimiter::for()` registrations instead.
+- **Extension 5, pushed with item 4 committed and before either file was edited:**
+  `resources/public-runtime/composables/useSyncOutbox.ts` and `resources/public-runtime/__tests__/sync-outbox.test.ts`.
+  Item 4's E2E run found `public-runtime-offline`'s offline-submit case red in 4 of 21 runs against 0 of 12 on the
+  pre-M130 front-end. The cause is older than M130: after an offline submit, `registerBackgroundSync()` also asks the
+  service worker to replay at once, the attempt fails offline, and the row reads "Retrying" instead of "Saved on this
+  device"; the heavier page (round buttons) only widened the race. The immediate request is skipped while offline.
 
 Shared artefacts taken: `docs/**` (the files above), `openapi.json`, the top-level `tests/e2e/*.spec.ts` named above
 (one new), and `PROGRESS.md` (own block only).

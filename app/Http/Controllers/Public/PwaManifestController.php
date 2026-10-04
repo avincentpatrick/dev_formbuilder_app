@@ -79,7 +79,8 @@ final class PwaManifestController extends Controller
             'scope' => $scope,
             'display' => 'standalone',
             'orientation' => 'portrait',
-            'theme_color' => $branding->forGuest()['theme_color'],
+            // The FORM's colour when it has a preset theme (M131), so the installed app agrees with the shell.
+            'theme_color' => $branding->forGuest($form)['theme_color'],
             'background_color' => self::BACKGROUND_COLOR,
             'icons' => [
                 ['src' => '/icons/icon-192.png', 'sizes' => '192x192', 'type' => 'image/png', 'purpose' => 'any'],

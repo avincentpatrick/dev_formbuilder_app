@@ -155,6 +155,25 @@ enum ValidationRuleType: string
     }
 
     /**
+     * Whether this rule is one of the two that make a field IRRELEVANT — the skip family (M131, `R-799d60f5`).
+     *
+     * With {@see self::governsRequiredness()} it partitions the eleven rules the way both engines group them
+     * (`SemanticValidator::family()` and its TypeScript twin): required, skip, and every other rule a constraint.
+     * A rule group is folded WITHIN one family, so the builder's all/any switch must know which family a row is
+     * in, and a client literal naming the skip pair would be the mirror `M115` spent an increment removing. It
+     * rides as `governs_relevance`; `BuilderEnumsPayloadTest` holds it to the validator's own split.
+     */
+    public function governsRelevance(): bool
+    {
+        return match ($this) {
+            self::SkipIf, self::SkipWith => true,
+            self::RequiredIf, self::RequiredWith,
+            self::MinValue, self::MaxValue, self::MinLength, self::MaxLength, self::Pattern,
+            self::GreaterThanField, self::LessThanField => false,
+        };
+    }
+
+    /**
      * The comparison this rule makes against its RELATED question's answer, or null when it makes none the
      * publish gate can judge (Increment M123, `R-2c172882`).
      *

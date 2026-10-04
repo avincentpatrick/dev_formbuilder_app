@@ -66,6 +66,8 @@ const form = {
     redirect_form_id: null,
     redirect_url: null,
     redirect_targets: [],
+    theme_preset: null,
+    theme_presets: [],
     default_locale: 'en',
     supported_locales: ['en'],
     opens_at: null,
@@ -136,12 +138,14 @@ group('FormSettingsModal — the rail', () => {
         wrapper.unmount();
     });
 
-    it('offers exactly the six sections, and names none of them after a builder pane', () => {
+    it('offers exactly the seven sections, and names none of them after a builder pane', () => {
         const wrapper = mountModal();
 
+        // M131 added Theme, after Pages: the other section about how the form looks to a respondent.
         expect(railLabels(wrapper)).toEqual([
             'Details',
             'Pages',
+            'Theme',
             'Share',
             'Schedule',
             'Thank-you message',
@@ -209,19 +213,20 @@ group('FormSettingsModal — gated sections', () => {
         const wrapper = mountModal({ saveResumeAvailable: false });
 
         expect(railLabels(wrapper)).not.toContain('Save and finish later');
-        expect(railLabels(wrapper)).toHaveLength(5);
+        expect(railLabels(wrapper)).toHaveLength(6);
 
         wrapper.unmount();
     });
 
-    it('keeps Pages in the rail with every plan feature off, because no entitlement gates it', () => {
+    it('keeps Pages and Theme in the rail with every plan feature off, because no entitlement gates either', () => {
         // ⚠️ THE ASSERTION IS THE ABSENCE OF A GATE. `share` and `save-resume` are filtered by a server
         // answer; presentation mode has no entitlement key at all, which is why its route carries
         // `can:update,form` alone. Mutating the rail entry to `available: props.saveResumeAvailable`
         // reddens exactly here and nowhere else.
         const wrapper = mountModal({ saveResumeAvailable: false, share: null });
 
-        expect(railLabels(wrapper)).toEqual(['Details', 'Pages', 'Schedule', 'Thank-you message']);
+        // Theme too: `D81` puts presets on every plan, so its route carries `can:update,form` alone.
+        expect(railLabels(wrapper)).toEqual(['Details', 'Pages', 'Theme', 'Schedule', 'Thank-you message']);
 
         wrapper.unmount();
     });
@@ -296,7 +301,7 @@ group('the Scanning section (M129)', () => {
         const wrapper = mountWith({ enabled: false, eligible: true, reason: null });
 
         expect(railLabels(wrapper)).toEqual([
-            'Details', 'Pages', 'Share', 'Scanning', 'Schedule', 'Thank-you message', 'Save and finish later',
+            'Details', 'Pages', 'Theme', 'Share', 'Scanning', 'Schedule', 'Thank-you message', 'Save and finish later',
         ]);
 
         await railButton(wrapper, 'Scanning').trigger('click');

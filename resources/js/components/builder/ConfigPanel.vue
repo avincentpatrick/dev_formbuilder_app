@@ -472,7 +472,7 @@ watch(librarySaved, (value) => {
                             <fieldset v-if="isConditionalRequired" class="config__when">
                                 <legend class="config__when-legend">Required when…</legend>
                                 <ValidationEditor
-                                    :validations="requiredRules"
+                                    :validations="requiredRules" :field-validations="field.validations" combinator-family="required"
                                     :rule-types="enums.validation_rule_types"
                                     :operators="enums.comparison_operators"
                                     :value-shape="valueShape"
@@ -582,7 +582,7 @@ watch(librarySaved, (value) => {
 
                     <template v-else-if="activeTab === 'validation'">
                         <ValidationEditor
-                            :validations="field.validations"
+                            :validations="field.validations" combinator-family="constraint"
                             :rule-types="enums.validation_rule_types"
                             :operators="enums.comparison_operators"
                             :value-shape="valueShape"

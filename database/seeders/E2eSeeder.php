@@ -30,6 +30,7 @@ use App\Models\Domain;
 use App\Models\FeedbackReport;
 use App\Models\Form;
 use App\Models\FormField;
+use App\Models\FormFolder;
 use App\Models\FormVersion;
 use App\Models\Notification;
 use App\Models\OcrScan;
@@ -413,6 +414,37 @@ class E2eSeeder extends Seeder
                     // than behind a Next step — the public-runtime repeat axe scan interacts with it directly.
                     'single_page_mode' => true,
                 ]);
+            }
+
+            // M131 (`R-6017d6d8`) — a guest form wearing a PRESET THEME, so the public-runtime axe scan measures a
+            // generated ramp on a real page in light and dark: the E2E workspace is deliberately unbranded, so until
+            // this form no scan had ever met one. Graphite, because it moves all three documented additions at once
+            // (serif headings, crisp corners) alongside the colours. The theme is written directly rather than through
+            // `FormService::setTheme()`, whose audit row would move the counts the audit scans read.
+            if (Form::query()->where('title', 'Themed Intake')->doesntExist()) {
+                $themed = app(FormService::class)->create(
+                    $tenant, $owner, 'Themed Intake', 'A guest form in the Graphite preset theme (M131).'
+                );
+                $tb = app(FormBuilderService::class);
+                $section = $tb->addSection($themed);
+                $tb->addField($themed, $owner, FieldType::ShortText, $section->id)->update(['label' => 'Full name']);
+                $tb->addField($themed, $owner, FieldType::SingleSelect, $section->id)->update([
+                    'label' => 'Preferred clinic day',
+                    'config' => ['options' => [
+                        ['value' => 'weekday', 'label' => 'Weekday'],
+                        ['value' => 'weekend', 'label' => 'Weekend'],
+                    ]],
+                ]);
+                $tb->addField($themed, $owner, FieldType::YesNo, $section->id)->update(['label' => 'First visit?']);
+                app(PublishService::class)->publish($themed->refresh(), $owner);
+
+                $themed->forceFill([
+                    'public_slug' => 'themed-intake',
+                    'allow_guest_submissions' => true,
+                    'supported_locales' => ['en'],
+                    'single_page_mode' => true,
+                    'theme' => ['preset' => 'graphite'],
+                ])->save();
             }
 
             // A guest-enabled form showcasing the Increment G4a/G4b controls — a Likert rating scale (radio
@@ -901,6 +933,8 @@ class E2eSeeder extends Seeder
 
             $this->seedScopingHierarchy($owner, $reviewer);
 
+            $this->seedFormFolders($owner);
+
             // K1c. After every submission block above, so the fixture's own collection and review history
             // reaches the ledger — nothing here drives `SubmissionPipeline`, so no `SubmissionCreated` was
             // ever raised for any of it. Announcements are suppressed, which is what keeps the notification
@@ -1228,6 +1262,30 @@ class E2eSeeder extends Seeder
      * FormService::assignScope, so the fixture exercises the same writers the UI does rather than raw
      * inserts that could drift from them.
      */
+    /**
+     * Forms-list folders (M131, `R-9e634897`): two holding a form each and one empty, so the folder filter,
+     * the card caption, "Manage folders" and "Move to folder" all have something to render for the axe scans.
+     *
+     * ⚠️ WRITTEN DIRECTLY, NOT THROUGH `FormFolderService` OR `FormService::assignFolder()`, AND ON PURPOSE. Both
+     * write audit rows, and the audit scans count and page this ledger; `assignFolder()` also bumps the form's
+     * `updated_at`, which reorders a list several specs read top-down. A raw update moves neither.
+     */
+    private function seedFormFolders(User $owner): void
+    {
+        if (FormFolder::query()->where('name', 'Clinics')->exists()) {
+            return;
+        }
+
+        foreach (['Clinics' => 'Clinic Intake', 'Field surveys' => 'Household Roster', 'Archive' => null] as $name => $title) {
+            $folder = new FormFolder(['name' => $name]);
+            $folder->forceFill(['created_by' => $owner->getKey()])->save();
+
+            if ($title !== null) {
+                DB::table('forms')->where('title', $title)->update(['folder_id' => $folder->getKey()]);
+            }
+        }
+    }
+
     private function seedScopingHierarchy(User $owner, User $reviewer): void
     {
         if (ScopeNode::query()->where('name', 'Luzon')->exists()) {

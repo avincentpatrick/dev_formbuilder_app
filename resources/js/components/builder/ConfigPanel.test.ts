@@ -56,10 +56,10 @@ const ENUMS: BuilderEnums = {
     ],
     indexed_data_types: [],
     validation_rule_types: [
-        { value: 'min_length', label: 'Minimum length', shapes: ['text'], takes_operator: false, takes_related_field: false, operator_may_be_empty: false, governs_requiredness: false },
-        { value: 'required_if', label: 'Required when a condition holds', shapes: ['text', 'choice'], takes_operator: true, takes_related_field: true, operator_may_be_empty: false, governs_requiredness: true },
-        { value: 'required_with', label: 'Required with another question', shapes: ['text', 'choice'], takes_operator: true, takes_related_field: true, operator_may_be_empty: true, governs_requiredness: true },
-        { value: 'skip_if', label: 'Skipped when a condition holds', shapes: ['text', 'choice'], takes_operator: true, takes_related_field: true, operator_may_be_empty: false, governs_requiredness: false },
+        { value: 'min_length', label: 'Minimum length', shapes: ['text'], takes_operator: false, takes_related_field: false, operator_may_be_empty: false, governs_relevance: false, governs_requiredness: false },
+        { value: 'required_if', label: 'Required when a condition holds', shapes: ['text', 'choice'], takes_operator: true, takes_related_field: true, operator_may_be_empty: false, governs_relevance: false, governs_requiredness: true },
+        { value: 'required_with', label: 'Required with another question', shapes: ['text', 'choice'], takes_operator: true, takes_related_field: true, operator_may_be_empty: true, governs_relevance: false, governs_requiredness: true },
+        { value: 'skip_if', label: 'Skipped when a condition holds', shapes: ['text', 'choice'], takes_operator: true, takes_related_field: true, operator_may_be_empty: false, governs_relevance: true, governs_requiredness: false },
     ],
     comparison_operators: [
         { value: 'eq', label: 'equals (=)', shapes: ['text', 'choice'] },

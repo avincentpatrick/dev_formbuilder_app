@@ -8,6 +8,7 @@ use App\Enums\ComparisonOperator;
 use App\Enums\FieldAppearance;
 use App\Enums\FieldType;
 use App\Enums\IndexedDataType;
+use App\Enums\LogicOperator;
 use App\Enums\RequiredMode;
 use App\Enums\ValidationRuleType;
 use App\Models\Form;
@@ -75,6 +76,10 @@ final class UpdateFieldRequest extends FormRequest
             'validations.*.expression' => ['nullable', 'string', 'max:2000'],
             'validations.*.error_message' => ['nullable', 'string', 'max:500'],
             'validations.*.related_field_key' => ['nullable', 'string', 'max:150'],
+            // M131 (`R-799d60f5`) — a rule's group: an existing group's uuid, or a token the builder minted for a
+            // new one (`FormBuilderService::replaceValidations()` maps it). Ruled, or `validated()` strips them.
+            'validations.*.logic_group' => ['nullable', 'string', 'max:64', 'regex:/^[A-Za-z0-9-]+$/'],
+            'validations.*.logic_operator' => ['nullable', Rule::enum(LogicOperator::class)],
         ];
     }
 

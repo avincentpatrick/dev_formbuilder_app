@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Enums\ComparisonOperator;
 use App\Enums\FieldType;
 use App\Enums\IndexedDataType;
+use App\Enums\LogicOperator;
 use App\Enums\RequiredMode;
 use App\Enums\ValidationRuleType;
 use App\Exceptions\Forms\PublishValidationException;
@@ -952,4 +953,64 @@ it('leaves a compared question from another version to the foreign-version arm, 
     ]);
 
     expect(relatedKindRefusal($this->gate, $version)['codes'])->toBe(['validation_references_foreign_version']);
+});
+
+// ── M131 (`R-799d60f5`) — a rule group whose later member says nothing about how it joins ───────────────────────
+
+/** Two length rules on one text field, in one group; `$connectives` are the two rows' `logic_operator`s. */
+function groupedLengthRules(FormVersion $version, User $user, array $connectives): void
+{
+    $name = addFormField($version, $user, 'name', FieldType::ShortText, 0);
+    $group = '0190f0f0-0000-7000-8000-000000000131';
+
+    foreach ([[ValidationRuleType::MinLength, '3'], [ValidationRuleType::MaxLength, '10']] as $i => [$type, $value]) {
+        FormFieldValidation::create([
+            'form_version_id' => $version->id,
+            'form_field_id' => $name->id,
+            'rule_type' => $type,
+            'rule_value' => $value,
+            'logic_group' => $group,
+            'logic_operator' => $connectives[$i],
+            'sequence' => $i,
+        ]);
+    }
+}
+
+it('refuses a group whose later member has no connective, once, naming the field', function (): void {
+    // Both engines throw `malformed_logic_group` on this row at EVERY submission; nothing said so at publish.
+    $version = makeDraftVersion(makeForm($this->user));
+    groupedLengthRules($version, $this->user, [LogicOperator::Or, null]);
+
+    $refusal = relatedKindRefusal($this->gate, $version);
+
+    expect($refusal['codes'])->toBe(['logic_group_missing_operator'])
+        ->and($refusal['fields'])->toBe(['name']);
+});
+
+it('publishes a group whose FIRST member has no connective, because the first is never read', function (): void {
+    $version = makeDraftVersion(makeForm($this->user));
+    groupedLengthRules($version, $this->user, [null, LogicOperator::Or]);
+
+    expect(relatedKindRefusal($this->gate, $version)['codes'])->toBe([]);
+});
+
+it('publishes a group that spans two families, which both engines split per family', function (): void {
+    $version = makeDraftVersion(makeForm($this->user));
+    $age = addFormField($version, $this->user, 'age', FieldType::Integer, 0);
+    $name = addFormField($version, $this->user, 'name', FieldType::ShortText, 1);
+    $group = '0190f0f0-0000-7000-8000-000000000132';
+
+    FormFieldValidation::create([
+        'form_version_id' => $version->id, 'form_field_id' => $name->id, 'related_form_field_id' => $age->id,
+        'rule_type' => ValidationRuleType::RequiredIf, 'operator' => ComparisonOperator::Gt, 'rule_value' => '17',
+        'logic_group' => $group, 'logic_operator' => null, 'sequence' => 0,
+    ]);
+    FormFieldValidation::create([
+        'form_version_id' => $version->id, 'form_field_id' => $name->id,
+        'rule_type' => ValidationRuleType::MinLength, 'rule_value' => '2',
+        'logic_group' => $group, 'logic_operator' => null, 'sequence' => 1,
+    ]);
+
+    // Each family's half is a one-member group, so nothing is missing a connective.
+    expect(relatedKindRefusal($this->gate, $version)['codes'])->toBe([]);
 });

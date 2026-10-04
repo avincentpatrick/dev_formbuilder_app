@@ -108,7 +108,7 @@ final class GuestFormController extends Controller
             // two are always equal, so this is defence-in-depth rather than the fix.
             'slug' => $form->public_slug,
             'locale' => $form->default_locale,
-            'brand' => $branding->forGuest(),
+            'brand' => $branding->forGuest($form),
         ]);
     }
 
@@ -146,7 +146,7 @@ final class GuestFormController extends Controller
             ],
             'slug' => $form->public_slug,
             'locale' => $form->default_locale,
-            'brand' => $branding->forGuest(),
+            'brand' => $branding->forGuest($form),
         ]);
     }
 }

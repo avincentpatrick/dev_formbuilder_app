@@ -66,12 +66,13 @@ import GeneralPanel from '@/components/builder/GeneralPanel.vue';
 import PageModePanel from '@/components/builder/PageModePanel.vue';
 import SaveResumePanel from '@/components/builder/SaveResumePanel.vue';
 import SchedulePanel from '@/components/builder/SchedulePanel.vue';
+import ThemePanel from '@/components/builder/ThemePanel.vue';
 import ScanningPanel from '@/components/forms/ScanningPanel.vue';
 import ScopePanel from '@/components/forms/ScopePanel.vue';
 import SharePanel from '@/components/forms/SharePanel.vue';
 import type { FormSettingsForm, OcrScanningProps, ScopeSectionProps, ShareProps } from '@/components/forms/types';
 
-type SectionKey = 'general' | 'pages' | 'share' | 'scanning' | 'schedule' | 'confirmation' | 'save-resume' | 'scope';
+type SectionKey = 'general' | 'pages' | 'theme' | 'share' | 'scanning' | 'schedule' | 'confirmation' | 'save-resume' | 'scope';
 
 const props = defineProps<{
     /** Whether the settings are open: the modal's state, or always true on the hub page. */
@@ -97,6 +98,9 @@ const sections = computed<{ key: SectionKey; label: string }[]>(() => {
     const all: { key: SectionKey; label: string; available: boolean }[] = [
         { key: 'general', label: 'Details', available: true },
         { key: 'pages', label: 'Pages', available: true },
+        // M131 (`D81`): every plan. "Theme", never "Appearance" — that word names the member's OWN section in
+        // /settings, and this one is about what respondents see.
+        { key: 'theme', label: 'Theme', available: true },
         { key: 'share', label: 'Share', available: props.share != null },
         { key: 'scanning', label: 'Scanning', available: props.ocrScanning != null },
         { key: 'schedule', label: 'Schedule', available: true },
@@ -169,6 +173,16 @@ watch(
                             :open="props.open"
                             :form-id="props.formId"
                             :single-page-mode="props.form.single_page_mode"
+                        />
+                    </div>
+                </template>
+                <template v-if="mounted.has('theme')">
+                    <div v-show="active === 'theme'" class="form-settings__section" :data-section="'theme'">
+                        <ThemePanel
+                            :open="props.open"
+                            :form-id="props.formId"
+                            :preset="props.form.theme_preset"
+                            :presets="props.form.theme_presets"
                         />
                     </div>
                 </template>

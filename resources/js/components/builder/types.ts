@@ -8,7 +8,7 @@
 
 import type { BreadcrumbItem } from '@meridian/design-system';
 
-import type { OcrScanningProps, RedirectKind, RedirectTargetOption, ShareProps } from '@/components/forms/types';
+import type { OcrScanningProps, RedirectKind, RedirectTargetOption, ShareProps, ThemePresetOption } from '@/components/forms/types';
 
 export type Uid = string;
 
@@ -19,6 +19,11 @@ export interface BuilderValidation {
     expression: string | null;
     error_message: string | null;
     related_field_key: string | null;
+    // M131 (`R-799d60f5`) — the rule's group (an existing uuid, or a `new-<family>` token) and how it joins it.
+    // OPTIONAL ON PURPOSE: a row built by code that knows nothing of groups has neither, the payload then omits
+    // both, and the server keeps what is stored. `rule-grouping.ts` reads them with `?? null`.
+    logic_group?: string | null;
+    logic_operator?: 'and' | 'or' | null;
     sequence: number;
 }
 
@@ -142,12 +147,19 @@ export interface RuleTypeOption extends EnumOption {
     // Whether an ABSENT operator is itself a condition ("when that question is answered at all"), which is
     // true for `required_with`/`skip_with` and a broken row for `required_if`/`skip_if`.
     operator_may_be_empty: boolean;
+    // M131 (`R-57711a3a`) — the operator a compared question is judged by when the row stores none
+    // (`ValidationRuleType::relatedComparison(null)`): `gt`/`lt` for the field comparisons, `is_null` for an
+    // empty `_with`, null otherwise. `validation-options.ts` filters the compared-question list by it.
+    related_comparison: string | null;
     // Whether this rule is what makes `Conditional` requiredness mean something (M116) — the `required`
     // bucket of `SemanticValidator::family()`, which is `required_if`/`required_with` and NOT the skip pair:
     // a skip rule makes a field irrelevant, never required. The Basics tab's "Required when…" reveal shows
     // exactly the rows where this is true, so it and `requiredState()` cannot disagree about which rows
     // count. ⚠️ Read it; never re-state the two names here.
     governs_requiredness: boolean;
+    // M131 (`R-799d60f5`) — the skip pair. With `governs_requiredness` it splits the rules into the three families
+    // both engines fold a group within; `rule-grouping.ts` reads the two, never a list of names.
+    governs_relevance: boolean;
 }
 
 // One comparison operator as a rule row shows it (M115). `label` carries its symbol inside the string
@@ -219,6 +231,9 @@ export interface BuilderPageProps {
         redirect_form_id: string | null;
         redirect_url: string | null;
         redirect_targets: RedirectTargetOption[];
+        // M131 — the preset theme (FormSettingsForm says the rest); `PreviewPane` paints it on the preview.
+        theme_preset: string | null;
+        theme_presets: ThemePresetOption[];
         default_locale: string;
         supported_locales: string[];
     };

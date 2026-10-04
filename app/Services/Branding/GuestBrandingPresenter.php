@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Services\Branding;
 
+use App\Enums\FormThemePreset;
 use App\Http\Controllers\Public\PwaManifestController;
+use App\Models\Form;
 use App\Support\Branding\BrandRampGenerator;
 
 /**
@@ -55,7 +57,20 @@ final class GuestBrandingPresenter
 
     /**
      * The guest runtime's branding: the twelve tokens (or null), a change fingerprint, and the one hex
-     * the browser chrome takes.
+     * the browser chrome takes — for the workspace, or for one FORM when it has a preset theme.
+     *
+     * ── A FORM'S PRESET REPLACES THE WORKSPACE RAMP ON THAT FORM (M131, `R-6017d6d8`, `D65`, `D81`) ──
+     * `tokens` are the preset's pinned literals instead of the tenant's ramp, `style_id` names the block
+     * (`form-theme` rather than `tenant-brand`, so a reader of the page can tell which painted it), and `lines`
+     * carries the preset's DOCUMENTED extra properties — its font pair and radius scale, never anything outside
+     * `FormThemePreset::DOCUMENTED_PROPERTIES`. A preset renders on every plan (`D81`); the workspace's own
+     * ramp stays behind `isActive()`.
+     *
+     * ⛔ `version` STAYS THE WORKSPACE'S FINGERPRINT, EVEN ON A THEMED FORM. It rides the mount node and keys ONE
+     * IndexedDB entry per device (`lib/brand-cache.ts`), and a mismatch re-fetches every OTHER cached shell. A
+     * per-form value there would make a respondent moving between two forms re-sweep the device's shell cache
+     * on every visit. So the per-form fingerprint is `manifest_version`, which only the manifest link carries —
+     * the manifest is per form already. Without a preset the two are the same string.
      *
      * `tokens` comes from {@see TenantBrandingService::sharedRamp()}, which is already gated on
      * `isActive()` — STORED and ACTIVE are different questions, and reading `Tenant::hasBrandRamp()`
@@ -63,16 +78,25 @@ final class GuestBrandingPresenter
      * fail-closed off-tenant, which costs nothing here (the guest group runs
      * `InitializeTenancyByPublicHost`, so a tenant is always bound) but keeps this method total.
      *
-     * @return array{tokens: ?array<string, array<string, string>>, version: string, theme_color: string}
+     * @return array{tokens: ?array<string, array<string, string>>, version: string, theme_color: string, style_id: string, lines: array<string, string>, manifest_version: string}
      */
-    public function forGuest(): array
+    public function forGuest(?Form $form = null): array
     {
-        $tokens = $this->branding->sharedRamp();
+        $workspace = $this->branding->sharedRamp();
+        $preset = $form === null ? null : FormThemePreset::fromTheme($form->theme);
+
+        $tokens = $preset?->tokens() ?? $workspace;
+        $lines = $preset?->lines() ?? [];
 
         return [
             'tokens' => $tokens,
-            'version' => $this->version($tokens),
+            'version' => $this->version($workspace),
             'theme_color' => $tokens['light']['bg'] ?? self::DEFAULT_THEME_COLOR,
+            'style_id' => $preset === null ? 'tenant-brand' : 'form-theme',
+            'lines' => $lines,
+            'manifest_version' => $preset === null
+                ? $this->version($workspace)
+                : $this->version(['tokens' => $tokens, 'lines' => $lines]),
         ];
     }
 
@@ -95,7 +119,7 @@ final class GuestBrandingPresenter
      *  - **A literal `'none'` when unbranded**, never an empty string, so "this tenant has no brand" is
      *    a value the SPA can store and compare like any other rather than a falsy special case.
      *
-     * @param  ?array<string, array<string, string>>  $tokens
+     * @param  ?array<string, mixed>  $tokens
      */
     private function version(?array $tokens): string
     {

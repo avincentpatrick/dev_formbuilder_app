@@ -304,6 +304,41 @@ final class StructuralValidationGate
             }
         }
 
+        // M131 (`R-799d60f5`): a rule GROUP whose later member says nothing about how it joins. Both engines fold
+        // a group left to right by each later member's own `logic_operator`, and THROW `malformed_logic_group` on
+        // a missing one — on every submission, with nothing at publish to say so. The builder now authors groups,
+        // so the refusal lands here. Grouped per field, per family (both engines split a group by family first:
+        // required, skip, constraint) and per group, in [sequence, id] order; the first member's operator is
+        // never read, so only a LATER member is held to it. One refusal per group.
+        $groups = [];
+
+        foreach ($validations as $validation) {
+            if ($validation->logic_group === null) {
+                continue;
+            }
+
+            $family = match (true) {
+                $validation->rule_type?->governsRequiredness() === true => 'required',
+                $validation->rule_type?->governsRelevance() === true => 'skip',
+                default => 'constraint',
+            };
+            $groups[$validation->form_field_id.'|'.$family.'|'.$validation->logic_group][] = $validation;
+        }
+
+        foreach ($groups as $members) {
+            usort($members, static fn ($a, $b): int => [$a->sequence, $a->id] <=> [$b->sequence, $b->id]);
+
+            foreach (array_slice($members, 1) as $member) {
+                if ($member->logic_operator === null) {
+                    $violations[] = PublishValidationException::logicGroupMissingOperator(
+                        (string) $fieldKeyById->get($member->form_field_id, '(unknown)'),
+                    );
+
+                    break;
+                }
+            }
+        }
+
         return array_values(array_filter($violations));
     }
 

@@ -52,8 +52,8 @@ final class FormPresenter
             // every form in the tenant. The proof this extraction moved nothing is that
             // `FormListScopingTest` passes unedited.
             ->visibleTo($user)
-            // The keyword predicate, in the SAME composition `FormSearchArm::builder()` uses (J1e), so a
-            // `?q=` on this page and the same word in global search cannot return different forms.
+            // The keyword predicate, the SAME `KeywordFilter::apply()` call `FormSearchArm::builder()` makes (J1e);
+            // that arm's VISIBILITY differs since J2d (`readableBy()`, a wider audience), its keyword does not.
             // `FormListKeywordTest` asserts the two row sets are equal rather than trusting that.
             // ⚠️ M92 — the name this carried has never existed, and the arm that DOES exist asserts LESS
             // than the sentence above implies: it compares the two id lists on a
@@ -109,6 +109,9 @@ final class FormPresenter
             // The scope picker's current value (G10b2). The picker itself is gated on `scopes.manage`; this
             // is just the form's own column, already visible to anyone who can see the row.
             'scope_node_id' => $form->scope_node_id !== null ? (string) $form->scope_node_id : null,
+            // The forms-list folder (M131, `D78`). Filing only — the folder filter and its counts read it here,
+            // after `visibleTo()`, which is what keeps a folder from revealing a form the viewer cannot see.
+            'folder_id' => $form->folder_id !== null ? (string) $form->folder_id : null,
             'current_version' => $this->versionNumber($versions, $form->current_published_version_id),
             'draft_version' => $this->versionNumber($versions, $form->draft_version_id),
             'updated_at' => $form->updated_at?->toIso8601String(),

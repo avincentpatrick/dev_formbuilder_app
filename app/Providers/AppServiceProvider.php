@@ -9,6 +9,7 @@ use App\Models\Connection;
 use App\Models\ConnectionSubscription;
 use App\Models\Form;
 use App\Models\FormField;
+use App\Models\FormFolder;
 use App\Models\Notification;
 use App\Models\PersonalAccessToken;
 use App\Models\PointAward;
@@ -22,6 +23,7 @@ use App\Policies\AttachmentPolicy;
 use App\Policies\AuditPolicy;
 use App\Policies\ConnectionPolicy;
 use App\Policies\ConnectionSubscriptionPolicy;
+use App\Policies\FormFolderPolicy;
 use App\Policies\FormPolicy;
 use App\Policies\NotificationPolicy;
 use App\Policies\PointAwardPolicy;
@@ -288,6 +290,9 @@ class AppServiceProvider extends ServiceProvider
         // Per-form `.any`/`.own` authorization (Increment D2). Registered explicitly rather than relying
         // on auto-discovery so the mapping is greppable alongside the other RBAC wiring.
         Gate::policy(Form::class, FormPolicy::class);
+
+        // Forms-list folders (M131, `D79`): create on `forms.create`, rename and delete on `forms.edit.any`.
+        Gate::policy(FormFolder::class, FormFolderPolicy::class);
 
         // Manual-encoding authorization (Increment F4b): `create` is gated per-form (permission + collaborator
         // scope + published) — the `can:create,<Submission>,form` route middleware resolves this policy from

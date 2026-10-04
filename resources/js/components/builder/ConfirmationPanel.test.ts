@@ -54,6 +54,8 @@ function panel(overrides: Record<string, unknown> = {}) {
                 redirect_form_id: null,
                 redirect_url: null,
                 redirect_targets: TARGETS,
+                theme_preset: null,
+                theme_presets: [],
                 default_locale: 'en',
                 supported_locales: ['en'],
                 ...overrides,

@@ -58,10 +58,14 @@ const FormsIndex = (await import('./Index.vue')).default;
 type Props = {
     forms: unknown[];
     scopes: unknown[];
-    filters: { applied: { q: string | null; state: string | null }; facets: unknown[] };
+    filters: { applied: { q: string | null; state: string | null; folder?: string | null }; facets: unknown[] };
+    folders: { options: { id: string; name: string; count: number }[]; unfiled_count: number; can: { create: boolean; manage: boolean } };
     empty_reason: 'no_matches' | 'no_rows' | null;
     view: string;
 };
+
+/** No folders, and the rights a Form Editor holds (`D79`): may create, may not manage. */
+const NO_FOLDERS = { options: [], unfiled_count: 0, can: { create: true, manage: false } };
 
 const FACETS = [
     { value: null, label: 'All', count: 0 },
@@ -82,7 +86,8 @@ function render(overrides: Partial<Props> = {}): VueWrapper {
         props: {
             forms: [],
             scopes: [],
-            filters: { applied: { q: null, state: null }, facets: FACETS },
+            filters: { applied: { q: null, state: null, folder: null }, facets: FACETS },
+            folders: NO_FOLDERS,
             empty_reason: 'no_rows',
             view: 'grid',
             ...overrides,
@@ -108,6 +113,7 @@ const row = (canEdit: boolean) => ({
     draft_version: null,
     updated_at: '2026-08-01T00:00:00+00:00',
     scope_node_id: null,
+    folder_id: null,
     identity: 3,
     stats: { responses: 42, drafts: 7, last_response_at: '2026-08-01T00:00:00+00:00' },
     schedule: {
@@ -122,10 +128,10 @@ const row = (canEdit: boolean) => ({
     can: { edit: canEdit, publish: false, delete: false, analytics: false, encode: false, template: false },
 });
 
-/** The nine row actions, by accessible name — the single list both view-parity tests read. */
+/** The ten row actions, by accessible name — the single list both view-parity tests read. M131 added the tenth. */
 const ACTION_LABELS = [
     'Open builder', 'Response statistics', 'New submission', 'Version history',
-    'Save as template', 'Rename form', 'Set form scope', 'Publish form', 'Archive form',
+    'Save as template', 'Rename form', 'Move to folder', 'Set form scope', 'Publish form', 'Archive form',
 ];
 
 beforeEach(() => {
@@ -274,7 +280,7 @@ describe('forms list — the card grid (JR3)', () => {
         for (const label of ACTION_LABELS) {
             expect(wrapper.find(`[aria-label="${label}"]`).exists(), label).toBe(true);
         }
-        expect(ACTION_LABELS).toHaveLength(9);
+        expect(ACTION_LABELS).toHaveLength(10);
 
         wrapper.unmount();
     });
@@ -405,5 +411,95 @@ describe('forms list — the keyword filter', () => {
         expect(mocks.get.mock.calls[0][1]).toEqual({});
 
         wrapper.unmount();
+    });
+});
+
+/**
+ * M131 (`R-9e634897`, `D78`/`D79`) — the folder filter, the two folder dialogs and the card caption.
+ */
+describe('forms list — folders (M131)', () => {
+    const FOLDERS = {
+        options: [
+            { id: 'folder-a', name: 'Clinics', count: 3 },
+            { id: 'folder-b', name: 'Archive', count: 0 },
+        ],
+        unfiled_count: 2,
+        can: { create: true, manage: false },
+    };
+
+    it('offers All folders, Unfiled and each folder with the server counts', () => {
+        const wrapper = render({ forms: [row(true)], empty_reason: null, folders: FOLDERS });
+
+        const select = wrapper.get('select');
+        const labels = select.findAll('option').map((o) => o.text());
+        expect(labels).toEqual(['All folders', 'Unfiled (2)', 'Clinics (3)', 'Archive (0)']);
+        expect((select.element as HTMLSelectElement).value).toBe('');
+
+        wrapper.unmount();
+    });
+
+    it('navigates with the chosen folder and drops the key again for All folders', async () => {
+        const wrapper = render({ forms: [row(true)], empty_reason: null, folders: FOLDERS });
+
+        await wrapper.get('select').setValue('folder-a');
+        expect(mocks.get.mock.calls[0][1]).toEqual({ folder: 'folder-a' });
+        wrapper.unmount();
+
+        const filtered = render({
+            forms: [row(true)],
+            empty_reason: null,
+            folders: FOLDERS,
+            filters: { applied: { q: null, state: null, folder: 'folder-a' }, facets: FACETS },
+        });
+        await filtered.get('select').setValue('');
+        expect(mocks.get.mock.calls[1][1]).toEqual({});
+
+        filtered.unmount();
+    });
+
+    it('clears every filter from the "no matches" state, the folder included', async () => {
+        const wrapper = render({
+            empty_reason: 'no_matches',
+            folders: FOLDERS,
+            filters: { applied: { q: 'clinic', state: 'draft', folder: 'none' }, facets: FACETS },
+        });
+
+        const clear = wrapper.findAll('button').find((b) => b.text() === 'Clear filters');
+        expect(clear).toBeDefined();
+        await clear!.trigger('click');
+
+        expect(mocks.get.mock.calls[0][1]).toEqual({});
+
+        wrapper.unmount();
+    });
+
+    it('shows Manage folders to anyone who may create one, and hides it from everyone else', () => {
+        const author = render({ folders: FOLDERS });
+        expect(author.findAll('button').some((b) => b.text() === 'Manage folders')).toBe(true);
+        author.unmount();
+
+        const reader = render({ folders: { ...FOLDERS, can: { create: false, manage: false } } });
+        expect(reader.findAll('button').some((b) => b.text() === 'Manage folders')).toBe(false);
+        reader.unmount();
+    });
+
+    it('offers Move to folder only to a row its viewer may edit', () => {
+        const editable = render({ forms: [row(true)], empty_reason: null, folders: FOLDERS });
+        expect(editable.find('[aria-label="Move to folder"]').exists()).toBe(true);
+        editable.unmount();
+
+        const readOnly = render({ forms: [row(false)], empty_reason: null, folders: FOLDERS });
+        expect(readOnly.find('[aria-label="Move to folder"]').exists()).toBe(false);
+        readOnly.unmount();
+    });
+
+    it('captions a filed card with its folder, and an unfiled card with nothing', () => {
+        const filed = render({ forms: [{ ...row(true), folder_id: 'folder-a' }], empty_reason: null, folders: FOLDERS });
+        expect(filed.get('.form-card__folder').text()).toBe('Folder: Clinics');
+        filed.unmount();
+
+        const loose = render({ forms: [row(true)], empty_reason: null, folders: FOLDERS });
+        expect(loose.find('.form-card__folder').exists()).toBe(false);
+        loose.unmount();
     });
 });

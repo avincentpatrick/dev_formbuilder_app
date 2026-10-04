@@ -33,7 +33,7 @@
  * `BuilderPresenter` emits no `*_translations` key at all, so `ServerField` carries no
  * `label_translations`/`hint_translations`, `ServerSection` carries no
  * `label_translations`/`description_translations`, and `BuilderValidation` carries no
- * `error_message_translations`/`logic_group_ordinal`/`logic_operator`. They are synthesized as `null`
+ * `error_message_translations` (its group fields since M131: see `projectValidations()`). It is synthesized as `null`
  * here, which has one honest consequence worth stating out loud rather than discovering in `B7`:
  * **the preview renders the default locale only.** Widening `BuilderPresenter` to carry them is filed as
  * its own row.
@@ -148,7 +148,25 @@ function labelOf(
     return UNTITLED_LABEL;
 }
 
-function projectValidation(v: BuilderValidation): RawValidation {
+/**
+ * A field's rules, with each distinct group numbered by first appearance in sequence order — the remap the
+ * server's `SchemaSnapshotSerializer` makes, so the preview's engine folds a group exactly as the published form
+ * will (M131, `R-799d60f5`). Until M131 every row projected ungrouped, so a template's AND group previewed as ANY.
+ */
+function projectValidations(rows: BuilderValidation[]): RawValidation[] {
+    const ordinals = new Map<string, number>();
+
+    for (const v of [...rows].sort((a, b) => a.sequence - b.sequence)) {
+        const group = v.logic_group ?? null;
+        if (group !== null && !ordinals.has(group)) ordinals.set(group, ordinals.size);
+    }
+
+    return rows.map((v) => projectValidation(v, ordinals));
+}
+
+function projectValidation(v: BuilderValidation, ordinals: Map<string, number>): RawValidation {
+    const group = v.logic_group ?? null;
+
     // mirror:RawValidation
     return {
         rule_type: v.rule_type,
@@ -159,8 +177,8 @@ function projectValidation(v: BuilderValidation): RawValidation {
         // Absent from the builder's model — see the module docblock.
         error_message_translations: null,
         related_field_key: v.related_field_key,
-        logic_group_ordinal: null,
-        logic_operator: null,
+        logic_group_ordinal: group === null ? null : (ordinals.get(group) ?? null),
+        logic_operator: group === null ? null : (v.logic_operator ?? null),
         sequence: v.sequence,
     };
 }
@@ -277,7 +295,7 @@ export function projectDraft(input: DraftProjectionInput): DraftProjection {
             section_sequence: f.section_sequence,
             // State 6: a half-built cascade or grid passes through as-is. The renderers already handle a
             // partial config, and second-guessing it here would diverge the preview from the real runtime.
-            validations: f.validations.map(projectValidation),
+            validations: projectValidations(f.validations),
         });
     }
 
@@ -337,7 +355,8 @@ export function shapeOf(snapshot: RawSchemaSnapshot): string {
         f.relevant_expression,
         f.default_value,
         optionValuesOf(f.config),
-        f.validations.map((v) => [v.rule_type, v.operator, v.rule_value, v.expression, v.related_field_key, v.sequence]),
+        // M131: the grouping too — a regroup changes what the engine folds, so it must rebuild the runtime.
+        f.validations.map((v) => [v.rule_type, v.operator, v.rule_value, v.expression, v.related_field_key, v.sequence, v.logic_group_ordinal, v.logic_operator]),
     ]);
 
     return JSON.stringify({ sections, fields });

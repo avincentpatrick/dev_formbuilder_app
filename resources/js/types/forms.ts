@@ -42,6 +42,8 @@ export type FormRow = {
     description: string | null;
     status: string;
     scope_node_id: string | null;
+    /** The forms-list folder (M131, `D78`), or null for Unfiled. Filing only; grants nothing. */
+    folder_id: string | null;
     current_version: number | null;
     draft_version: number | null;
     updated_at: string | null;
@@ -94,3 +96,23 @@ export type FormListFacet = {
     label: string;
     count: number;
 };
+
+/** One forms-list folder with how many of the forms the viewer can see it holds (M131, `D78`). */
+export type FolderOption = {
+    id: string;
+    name: string;
+    count: number;
+};
+
+/**
+ * The forms list's `folders` prop. `count`s cover only forms the viewer can already see, under the other
+ * filters but never under the folder filter itself. `can.manage` is rename and delete together (`D79`).
+ */
+export type FormListFolders = {
+    options: FolderOption[];
+    unfiled_count: number;
+    can: { create: boolean; manage: boolean };
+};
+
+/** The `?folder=` value meaning Unfiled — mirrored from `FormListFolders::UNFILED`. */
+export const UNFILED_FOLDER = 'none';

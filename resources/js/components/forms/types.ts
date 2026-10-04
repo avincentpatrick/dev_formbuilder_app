@@ -57,8 +57,25 @@ export interface FormSettingsForm {
     redirect_form_id: string | null;
     redirect_url: string | null;
     redirect_targets: RedirectTargetOption[];
+    // M131 (`R-6017d6d8`, `D65`, `D81`) — the form's preset theme (null = the workspace brand), and every preset.
+    theme_preset: string | null;
+    theme_presets: ThemePresetOption[];
     default_locale: string;
     supported_locales: string[];
+}
+
+/**
+ * One preset theme, as `FormThemePreset::catalogue()` transmits it — the client keeps no copy of a colour. `tokens`
+ * are the six colour roles per theme; `lines` the documented extra properties (font pair, radius scale).
+ */
+export interface ThemePresetOption {
+    value: string;
+    label: string;
+    description: string;
+    font: string;
+    radius: string;
+    tokens: Record<'light' | 'dark', { bg: string; bg_hover: string; bg_active: string; fg: string; tint: string; ring: string }>;
+    lines: Record<string, string>;
 }
 
 /** Where a respondent goes after the thank-you screen (`D76`): nowhere, another form, or a web address. */

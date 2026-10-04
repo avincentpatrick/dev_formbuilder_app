@@ -172,6 +172,10 @@ final class BuilderPresenter
                 'related_field_key' => $v->related_form_field_id !== null
                     ? $fieldKeyById->get($v->related_form_field_id)
                     : null,
+                // M131 (`R-799d60f5`) — a rule's group and its connective, so the editor can SHOW a grouping
+                // (the all/any switch, or a notice for one it cannot express) and send it back untouched.
+                'logic_group' => $v->logic_group,
+                'logic_operator' => $v->logic_operator?->value,
                 'sequence' => $v->sequence,
             ])->values()->all(),
         ];
@@ -279,6 +283,13 @@ final class BuilderPresenter
                     // requiredness setting reads. Transmitted rather than mirrored for the same reason
                     // `shapes` is: a client-side list of two rule names is a second source that drifts.
                     'governs_requiredness' => $t->governsRequiredness(),
+                    // M131 (`R-57711a3a`) — the operator a compared question is judged by when the row stores none:
+                    // `gt`/`lt` for the two field comparisons, `is_null` for an empty `_with`, null otherwise. The
+                    // editor filters the compared-question list by it, and publish refuses by the same method.
+                    'related_comparison' => $t->relatedComparison(null)?->value,
+                    // M131 (`R-799d60f5`) — the skip pair, so the all/any switch can tell the three families a
+                    // group is folded within apart without a client list of rule names.
+                    'governs_relevance' => $t->governsRelevance(),
                 ],
                 ValidationRuleType::cases(),
             ),

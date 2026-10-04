@@ -25,8 +25,9 @@
  * a label edit — the child would mount against a schema newer than the shape that keyed it, which is
  * precisely the class of drift this whole design exists to avoid.
  */
-import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import { computed, h, onBeforeUnmount, ref, watch, type FunctionalComponent } from 'vue';
 import PreviewRuntime from './PreviewRuntime.vue';
+import { PRESET_PREVIEW_ATTR, presetScopeCss } from './preset-scope';
 import { PREVIEW_REBUILD_DEBOUNCE_MS, buildPreviewModel, previewLimitations } from './preview-model';
 import type { BuilderStore } from './useBuilderStore';
 import type { BuilderPageProps } from './types';
@@ -133,6 +134,18 @@ const stepKey = ref<string | null>(null);
 
 const selectedKey = computed(() => props.store.selectedField.value?.key ?? null);
 
+/**
+ * The form's preset theme on the preview (M131, `R-6017d6d8`), scoped to this pane — see `preset-scope.ts` for
+ * why it is three selector blocks rather than inline properties, and why a member's dyslexia font still wins.
+ * Read off the LIVE `form` prop, so choosing a theme in the settings repaints the preview on the next render.
+ */
+const presetCss = computed(() =>
+    presetScopeCss(props.form.theme_presets.find((preset) => preset.value === props.form.theme_preset) ?? null),
+);
+
+/** A `<style>` element from a render function: a template may not contain one. */
+const PresetStyle: FunctionalComponent<{ css: string }> = (p) => h('style', p.css);
+
 function onSelect(key: string): void {
     const uid = model.value.projection.uidByKey[key];
 
@@ -143,7 +156,8 @@ function onSelect(key: string): void {
 </script>
 
 <template>
-    <div class="builder-preview">
+    <div class="builder-preview" v-bind="presetCss === '' ? {} : { [PRESET_PREVIEW_ATTR]: '' }">
+        <PresetStyle v-if="presetCss !== ''" :css="presetCss" />
         <PreviewRuntime
             v-if="engine"
             :key="engine.shape"

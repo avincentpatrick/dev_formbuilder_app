@@ -226,9 +226,10 @@ The durable, logical form record — the stable identity that a `public_slug` an
 | `default_locale` | `varchar(10)` | No | — | No | Defaults from the owning tenant's `default_locale` at creation time. |
 | `supported_locales` | `jsonb` | No | `'[]'` | No | Locales this specific form has translations for. |
 | `capability_flags` | `jsonb` | No | `'{}'` | No | Computed, explicit capability flags derived from form composition (e.g. `{"has_geofields": true, "ocr_compatible": false}`) — recomputed on every publish, generalizing legacy's OCR-compatibility guard (plan §5). Three keys: `has_geofields`, `has_media`, `ocr_compatible`. Written by `App\Services\Forms\CapabilityFlags::forSnapshot()` from the just-published version's `form_versions.schema_snapshot`, so the value describes the **currently published version** — not the form, and not any older version. Treat it as a display/list cache: it is stale until the next publish, so a gate must re-derive rather than read it (Increment H8). A specific version's value, including a superseded one, is recovered exactly from that version's own snapshot via `CapabilityFlags::isOcrCompatible()`; there is deliberately no per-version column. The `ocr_compatible` rule is `docs/ocr-pipeline-design.md` §2. |
-| `theme` | `jsonb` | Yes | `NULL` | No | Per-form branding override (Phase 3 custom branding), falls back to tenant-level branding when `NULL`. |
+| `theme` | `jsonb` | Yes | `NULL` | No | The form's PRESET theme (M131, `R-6017d6d8`; user decisions `D65` = A, `D81`): `{"preset": "<value>"}`, one of `App\Enums\FormThemePreset` — `forest`, `lagoon`, `plum`, `rosewood`, `graphite`. `NULL` is the workspace's own brand (or the product default). A preset sets the brand ramp's six colour roles plus its documented extra properties — a font pair and a radius scale, never more (`FormThemePreset::DOCUMENTED_PROPERTIES`) — on the guest page, its `theme-color` and its manifest, and on the builder preview. Its ramp is PINNED literals held equal to the engine's output (ADR-0014's 2026-10-04 addendum). Every plan (`D81`). Written only by `FormService::setTheme()`; not mass-assignable since M131. An unknown value reads as `NULL`. |
 | `owner_user_id` | `uuid` | No | — | No | FK to `users.id` (external). The form's business owner (dashboard scoping, plan §Main Features #4). |
 | `scope_node_id` | `uuid` | Yes | `NULL` | No | FK → `scope_nodes` as a **composite** `(tenant_id, scope_node_id)` (ADR-0002 §D5), `ON DELETE SET NULL (scope_node_id)`. Which node of the tenant's own hierarchy this form belongs to — the basis for subtree-scoped access grants (`multi-tenancy-rbac-design.md` §8) and, per ADR-0011 §D6, the **only** grouping axis available to cross-form analytics. NULL means the form is reachable only by a direct grant, which is every form's state after the G10a backfill; assignment is a separate `PATCH /forms/{form}/scope` gated on `scopes.manage`. Added by `2026_07_20_000002_add_scope_node_id_to_forms`. *(Filed here 2026-08-03 — this row was previously misfiled under §1 `tenants`, though its own text said "this form"; `tenants` has no such column.)* |
+| `folder_id` | `uuid` | Yes | `NULL` | No | The forms-list folder this form is filed in (M131, `D78`) — at most one, `NULL` is Unfiled. **Composite** FK `(tenant_id, folder_id)` → `form_folders (tenant_id, id)`, `ON DELETE SET NULL (folder_id)` (`forms_folder_fk`), so deleting a folder unfiles its forms and never deletes one (`D79`). A FILING axis: it grants nothing, unlike `scope_node_id` above, and the list filters and counts by it only among the forms the viewer can already see (§34). Written only by `FormService::assignFolder()`; not mass-assignable. Index `(tenant_id, folder_id)`. |
 | `save_and_resume` | `boolean` | No | `false` | No | Per-form opt-in for partial-submission save-and-resume (H10). The guest draft endpoint requires **both** this flag and the tenant's `save_and_resume` entitlement. Added by `2026_07_23_000010`. |
 | `bot_challenge` | `varchar(20)` | No | `'off'` | No | The spam check a guest must clear before this form accepts a submission (I8b, PRD Feature #3) — `off` \| `proof_of_work`, backed by `App\Enums\FormBotChallenge`. Enforced by `VerifyGuestBotChallenge` on the submit route ONLY (not schema reads, attachments or draft autosave). **Not in `$fillable`** — written solely by `FormService::setShareSettings()` via `forceFill`, and audited. ⚠️ Deliberately NOT the `require_captcha` boolean the threat model suggested in passing: nothing squiggly ships, and an enum is what lets a future third-party provider be a case rather than a second column. Added by `2026_08_08_000001`. |
 | `guest_rate_limit_per_minute` | `smallint` | Yes | `NULL` | No | Per-form guest submission ceiling, keyed **per IP within this form** (I8b). `NULL` means no per-form ceiling — the deployment-wide `throttle:guest*` limiters still apply — and is distinct from `0`, which would mean "accept nothing" (the request enforces `min:1`). ⚠️ Deliberately not a form-wide bucket: that would be a self-DoS lever, letting one attacker at one IP lock the form for every legitimate respondent. Not in `$fillable`; same audited writer as `bot_challenge`. Added by `2026_08_08_000001`. |
@@ -245,7 +246,6 @@ The durable, logical form record — the stable identity that a `public_slug` an
 | `updated_at` | `timestamptz` | No | set by Eloquent | No | — |
 | `deleted_at` | `timestamptz` | Yes | `NULL` | No | Soft-delete. |
 | `search_vector` | `tsvector` — **generated, `STORED`** | No | *derived* | No | The forms arm of global search (J1b, PRD §3.7). `setweight(to_tsvector('simple', title),'A') \|\| setweight(…description…,'B') \|\| setweight(…replace(public_slug,'-',' ')…,'C')` — so `clinic-intake` is findable by "intake", and `ts_rank` is meaningful without a second ORDER BY heuristic. **`'simple'`, never `'english'`**: the corpus is multilingual by construction, and English stopword-stripping would make a form titled "The A Team" unfindable by its own title. Recomputed by PostgreSQL on every UPDATE of its three source columns, so it cannot drift and needs no writer, no backfill and no job. **Not in `$fillable`, never selected by any query** — a bare `SELECT *` would hydrate a multi-kilobyte lexeme blob onto every model and ship it to the browser in the page props. Added by `2026_08_11_000001`. |
-
 > **Indexes:** nothing on `search_vector`, **deliberately and by measurement** — see the migration's "THERE IS NO GIN INDEX" section and `SearchIndexUsageTest`. PostgreSQL will not promote a non-leakproof clause to an index qual on a relation carrying RLS quals, and `@@` is not leakproof, so a GIN index here is unreachable rather than merely unused. The tenant predicate *is* promotable and is what bounds the scan.
 
 > **Design Notes**
@@ -397,8 +397,8 @@ Was `indicator_validations`. Structured rules or an expression, modeled on XLSFo
 | `expression` | `text` | Yes | `NULL` | No | Full XLSForm-style expression string. When present, **supersedes** `rule_type`/`operator`/`rule_value`/`related_form_field_id` entirely — see Design Notes. |
 | `error_message` | `varchar(500)` | Yes | `NULL` | No | — |
 | `error_message_translations` | `jsonb` | Yes | `NULL` | No | — |
-| `logic_group` | `uuid` | Yes | `NULL` | No | Groups multiple rule rows under one compound condition. |
-| `logic_operator` | `varchar(3)` — PHP enum: `LogicOperator` | Yes | `NULL` | No | Only meaningful when `logic_group` is set. |
+| `logic_group` | `uuid` | Yes | `NULL` | No | Groups rule rows under one compound condition. Both engines fold a group WITHIN its family (required, skip, constraint) flat and left to right; required and skip units then combine as ANY, constraint units as ALL. Authored by the builder since M131 (`R-799d60f5`, `D80`) as one all/any switch per rule list; a builder-minted token becomes `uuid5(field id, token)`, so it is stable across saves (`FormBuilderService::replaceValidations()`). Also written by the blueprint materializer; never by the XLSForm importer. |
+| `logic_operator` | `varchar(3)` — PHP enum: `LogicOperator` | Yes | `NULL` | No | How a LATER member joins its group (`and`/`or`); the first member's is never read. Only meaningful when `logic_group` is set, and stored null without one. A later member with none is refused at publish since M131 (`logic_group_missing_operator`) — both engines throw on it at every submission. |
 | `sequence` | `integer` | No | `0` | No | Evaluation order within the field. |
 | `created_at` | `timestamptz` | No | set by Eloquent | No | — |
 | `updated_at` | `timestamptz` | No | set by Eloquent | No | — |
@@ -1329,6 +1329,30 @@ One uploaded scan of a printed blank form, and what reading it produced (M128, s
 
 ---
 
+## 34. `form_folders`
+
+A folder the forms list files forms into (M131, `R-9e634897`, `D78`) — flat, shared by the whole workspace, one per form. The form side is `forms.folder_id` (§2). **A filing axis, not an authorization one and not an analytics one:** `forms.scope_node_id` must not be reused for this, because a scope node is what a grant is made against, and filing a form there would change who may read it. `docs/adr/0011-analytics-substrate.md` §D6 coined no tag model and carries a dated note on why a single-valued folder does not meet its trigger for one.
+
+**Writers:** `App\Services\Forms\FormFolderService` (create, rename, delete — each audited under the `form_folder` alias) behind `POST`/`PATCH`/`DELETE /form-folders`. Who may do what is `D79`, in `App\Policies\FormFolderPolicy`: anyone holding `forms.create` creates a folder; only `forms.edit.any` (Owners and Admins) renames or deletes one. Filing a form is an edit of the form (`PATCH /forms/{form}/folder`, `can:update,form`).
+
+| Column | Type | Nullable | Default | PII? | Description |
+|---|---|---|---|---|---|
+| `id` | `uuid` | No | application-generated (`HasUuidv7`) | No | Primary key. |
+| `tenant_id` | `uuid` | No | — | No | FK to `tenants.id`, `ON DELETE CASCADE`. |
+| `name` | `varchar(80)` | No | — | No | The folder's name, unique per workspace **ignoring case** (`form_folders_tenant_name_unique`, an expression index on `(tenant_id, lower(name))`). A duplicate is a field error, turned from SQLSTATE 23505 by the service. "Unfiled" and "All folders" are refused: the list uses them as its own options. |
+| `created_by` | `uuid` | Yes | `NULL` | No | Who created it. FK to `users.id`, `ON DELETE SET NULL` — a departed member does not take a workspace's folders with them. |
+| `created_at` / `updated_at` | `timestamptz` | No | set by Eloquent | No | — |
+
+**Index**: `UNIQUE (tenant_id, id)` (`form_folders_tenant_id_id_unique`) — the target of `forms_folder_fk`.
+
+> **Design Notes**
+> - **RLS**: `strict`. Listed in `TenantScopedTables::STRICT`; every column goes into the tenant extract.
+> - **Deleting a folder unfiles its forms, at the database.** `forms_folder_fk` is `ON DELETE SET NULL (folder_id)`, so archived and soft-deleted forms move too, and no code path can forget one. The audit row records how many forms the delete unfiled.
+> - **A folder's count never reveals a form.** The forms list counts and filters in PHP over the rows `Form::scopeVisibleTo()` already admitted (`App\Support\Forms\FormListFolders`), so an Editor sees "Clinics (0)" for a folder holding only an Owner's forms. Names are workspace-shared; every folder is listed.
+> - **No position column.** The list sorts by `lower(name)`.
+
+---
+
 ## Foreign Key Relationship Summary
 
 ```
@@ -1346,6 +1370,7 @@ resource_grants.granted_by             -> users.id           (external, nullable
 scope_nodes.tenant_id                  -> tenants.id         (external table — see RBAC doc §8)
 scope_nodes.(tenant_id, parent_id)     -> scope_nodes.(tenant_id, id)  (nullable; COMPOSITE, ADR-0002 §D5)
 forms.(tenant_id, scope_node_id)       -> scope_nodes.(tenant_id, id)  (nullable; COMPOSITE)
+forms.(tenant_id, folder_id)          -> form_folders.(tenant_id, id)      (composite, SET NULL (folder_id) — see §34)
 
 form_versions.tenant_id                -> tenants.id
 form_versions.form_id                  -> forms.id
@@ -1481,6 +1506,8 @@ badge_awards.user_id                   -> users.id                          (ext
 ocr_scans.tenant_id                    -> tenants.id                        (CASCADE)
 ocr_scans.(tenant_id, form_id)         -> forms.(tenant_id, id)             (composite, CASCADE — see §33)
 ocr_scans.uploaded_by                  -> users.id           (external, nullable, SET NULL)
+form_folders.tenant_id                 -> tenants.id                        (CASCADE)
+form_folders.created_by                -> users.id           (external, nullable, SET NULL)
                                           (form_version_id carries NO db-level FK — see §33)
 ```
 

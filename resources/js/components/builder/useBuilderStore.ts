@@ -1132,6 +1132,8 @@ function fieldPayload(field: LocalField): Record<string, unknown> {
             expression: v.expression,
             error_message: v.error_message,
             related_field_key: v.related_field_key,
+            // M131: the group keys only when the row carries them — absent tells the server to keep what it stores.
+            ...(v.logic_group === undefined ? {} : { logic_group: v.logic_group, logic_operator: v.logic_operator ?? null }),
         })),
     };
 }

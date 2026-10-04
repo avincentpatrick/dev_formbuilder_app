@@ -26,6 +26,7 @@ import {
     MdsModal,
     MdsSearchField,
     MdsSegmentedControl,
+    MdsSelect,
     MdsTextInput,
     MdsTextarea,
     statusVariant,
@@ -35,10 +36,12 @@ import PageHeader from '@/components/shell/PageHeader.vue';
 import CreateFormModal from '@/components/forms/CreateFormModal.vue';
 import SaveAsTemplateModal from '@/components/forms/SaveAsTemplateModal.vue';
 import AssignScopeModal from '@/components/forms/AssignScopeModal.vue';
+import ManageFoldersModal from '@/components/forms/ManageFoldersModal.vue';
+import MoveToFolderModal from '@/components/forms/MoveToFolderModal.vue';
 import FormCard from '@/components/forms/FormCard.vue';
 import FormRowActions from '@/components/forms/FormRowActions.vue';
 import { useEntitlements } from '@/composables/useEntitlements';
-import type { FormListFacet, FormRow, FormVersionRow } from '@/types/forms';
+import { UNFILED_FOLDER, type FormListFacet, type FormListFolders, type FormRow, type FormVersionRow } from '@/types/forms';
 
 // Hide the form_templates affordances when the plan doesn't include them (H5c) — the /forms/templates and
 // save-as-template routes are server-gated (feature:form_templates), so this only spares a 402 click.
@@ -49,7 +52,9 @@ type ScopeOption = { id: string; name: string; parent_id: string | null; is_acti
 const props = defineProps<{
     forms: FormRow[];
     scopes: ScopeOption[];
-    filters: { applied: { q: string | null; state: string | null }; facets: FormListFacet[] };
+    filters: { applied: { q: string | null; state: string | null; folder: string | null }; facets: FormListFacet[] };
+    /** The folder filter's options and who may create or manage folders (M131, `D78`/`D79`). */
+    folders: FormListFolders;
     /** Server-computed (J1e). See the `#empty` slot for what this page used to claim without it. */
     empty_reason: 'no_matches' | 'no_rows' | null;
     /** `grid` | `table` — presentational, and server-echoed so SSR and the client agree on first paint. */
@@ -60,10 +65,11 @@ const props = defineProps<{
 const selected = reactive({ q: props.filters.applied.q ?? '' });
 const busy = ref(false);
 
-/** Every navigation on this page goes through here, so the three URL keys can never drift apart. */
-function go(overrides: { q?: string | null; state?: string | null; view?: string } = {}): void {
+/** Every navigation on this page goes through here, so the four URL keys can never drift apart. */
+function go(overrides: { q?: string | null; state?: string | null; folder?: string | null; view?: string } = {}): void {
     const q = overrides.q !== undefined ? overrides.q : selected.q;
     const state = overrides.state !== undefined ? overrides.state : props.filters.applied.state;
+    const folder = overrides.folder !== undefined ? overrides.folder : props.filters.applied.folder;
     const view = overrides.view !== undefined ? overrides.view : props.view;
 
     router.get(
@@ -71,6 +77,7 @@ function go(overrides: { q?: string | null; state?: string | null; view?: string
         {
             ...(q ? { q } : {}),
             ...(state ? { state } : {}),
+            ...(folder ? { folder } : {}),
             // Absent for the default, so the plain `/forms` URL stays clean and a shared link only
             // carries the view when it was actually chosen.
             ...(view === 'table' ? { view } : {}),
@@ -94,9 +101,10 @@ function applyFilters(): void {
     go();
 }
 
+/** Clears EVERY filter, not only the keyword: the "no matches" state can be reached through any of them. */
 function clearFilters(): void {
     selected.q = '';
-    go({ q: '' });
+    go({ q: '', state: null, folder: null });
 }
 
 /**
@@ -119,6 +127,32 @@ const viewOptions = [
 function setFacet(value: string | null): void {
     go({ state: props.filters.applied.state === value ? null : value });
 }
+
+// ── Folders (M131, `D78`) ─────────────────────────────────────────────────
+/**
+ * The folder filter's options. '' is "All folders" — the ABSENCE of `?folder`, as "All" is for the chips —
+ * because `MdsSelect` models a plain string. Counts are the server's, and cover only forms this viewer can
+ * already see.
+ */
+const folderOptions = computed(() => [
+    { value: '', label: 'All folders' },
+    { value: UNFILED_FOLDER, label: `Unfiled (${props.folders.unfiled_count})` },
+    ...props.folders.options.map((folder) => ({ value: folder.id, label: `${folder.name} (${folder.count})` })),
+]);
+
+function setFolder(value: string): void {
+    if (value !== (props.filters.applied.folder ?? '')) go({ folder: value === '' ? null : value });
+}
+
+/** id → name, for the folder caption on each card. */
+const folderNames = computed(() => new Map(props.folders.options.map((folder) => [folder.id, folder.name])));
+
+function folderNameOf(row: FormRow): string | null {
+    return row.folder_id === null ? null : (folderNames.value.get(row.folder_id) ?? null);
+}
+
+const manageFoldersOpen = ref(false);
+const moveTarget = ref<FormRow | null>(null);
 
 /** Shared by both views, so neither can render its own idea of "nothing here". */
 const isEmpty = computed(() => props.forms.length === 0);
@@ -317,6 +351,14 @@ function submitRestore(): void {
                 <Link v-if="feature('form_templates')" href="/forms/templates">
                     <MdsButton variant="tertiary" icon-left="layout">New from template</MdsButton>
                 </Link>
+                <MdsButton
+                    v-if="folders.can.create || folders.can.manage"
+                    variant="tertiary"
+                    icon-left="folder"
+                    @click="manageFoldersOpen = true"
+                >
+                    Manage folders
+                </MdsButton>
                 <MdsButton variant="primary" icon-left="plus" @click="openCreate">New form</MdsButton>
             </template>
         </PageHeader>
@@ -329,6 +371,15 @@ function submitRestore(): void {
                 placeholder="Title, description or slug"
                 @submit="applyFilters"
             />
+            <!-- M131 (`D78`): one folder, Unfiled, or all. A filter, so it sits in the bar beside the search. -->
+            <MdsFormField v-slot="{ id }" label="Folder">
+                <MdsSelect
+                    :id="id"
+                    :model-value="filters.applied.folder ?? ''"
+                    :options="folderOptions"
+                    @update:model-value="setFolder"
+                />
+            </MdsFormField>
         </MdsFilterBar>
 
         <!--
@@ -375,10 +426,10 @@ function submitRestore(): void {
                 v-if="empty_reason === 'no_matches'"
                 illustration="search"
                 headline="No matching forms"
-                description="No form's title, description or slug matches that. Try fewer words, or clear the search."
+                description="No form here matches. Try fewer words, another folder or state, or clear the filters."
             >
                 <template #action>
-                    <MdsButton variant="secondary" @click="clearFilters">Clear search</MdsButton>
+                    <MdsButton variant="secondary" @click="clearFilters">Clear filters</MdsButton>
                 </template>
             </MdsEmptyState>
             <MdsEmptyState
@@ -421,7 +472,7 @@ function submitRestore(): void {
             aria-label="Forms"
         >
             <li v-for="row in forms" :key="row.id" class="forms__cell" data-form-entry>
-                <FormCard :row="row">
+                <FormCard :row="row" :folder-name="folderNameOf(row)">
                     <template #actions>
                         <FormRowActions
                             :row="row"
@@ -430,6 +481,7 @@ function submitRestore(): void {
                             @template="openSaveAsTemplate"
                             @rename="openEdit"
                             @scope="scopeTarget = $event"
+                            @folder="moveTarget = $event"
                             @publish="publish"
                             @archive="archiveTarget = $event"
                         />
@@ -488,6 +540,7 @@ function submitRestore(): void {
                     @template="openSaveAsTemplate"
                     @rename="openEdit"
                     @scope="scopeTarget = $event"
+                    @folder="moveTarget = $event"
                     @publish="publish"
                     @archive="archiveTarget = $event"
                 />
@@ -611,6 +664,18 @@ function submitRestore(): void {
             @update:open="scopeTarget = null"
         />
 
+        <!-- Folders (M131) -->
+        <ManageFoldersModal v-model:open="manageFoldersOpen" :folders="folders" />
+        <MoveToFolderModal
+            v-if="moveTarget"
+            :open="true"
+            :form-id="moveTarget.id"
+            :form-title="moveTarget.title"
+            :current-folder-id="moveTarget.folder_id"
+            :folders="folders.options"
+            @update:open="moveTarget = null"
+        />
+
         <SaveAsTemplateModal
             v-if="templateTarget"
             v-model:open="templateOpen"
@@ -708,8 +773,19 @@ function submitRestore(): void {
     The sort control survives the collapse: `MdsDataTable` renders its sortable columns as a chip row
     above the cards, which is the affordance this view exists for.
 */
-:deep(.mds-table .form-actions) {
-    flex-wrap: nowrap;
+/*
+    ⚠️ M131 SCOPED THIS TO THE UNCOLLAPSED TABLE, CLOSING THE EXCEPTION THE PARAGRAPH ABOVE ADMITS. Below
+    `MdsDataTable`'s 56em container threshold each row IS a card with no scroll region, so a one-line cluster
+    wider than its card has nothing to fall into — clipped by `.app-shell`, invisible to `scrollWidth`. With
+    M131's tenth action ("Move to folder") it still fits — 293px in a 341px cell at 375px, measured — so this
+    is the guard for the next action rather than a fix for this one. The query matches the table's own
+    (`DataTable.vue`'s container block, on `.mds-table__frame`), so the two cannot disagree about which
+    layout is showing; `list-layout.spec.ts` measures the cluster against its card, at both edges.
+*/
+@container not (max-width: 56em) {
+    :deep(.mds-table .form-actions) {
+        flex-wrap: nowrap;
+    }
 }
 
 .forms__facets {

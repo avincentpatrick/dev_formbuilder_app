@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 import RuntimeSession from '../components/RuntimeSession.vue';
+import SummaryBanner from '../components/SummaryBanner.vue';
 import type { ApiClient } from '../lib/api-client';
 import { ApiError } from '../lib/api-client';
 import { normalizeError } from '../lib/error-normalizer';
@@ -1741,5 +1742,51 @@ describe('RuntimeSession — non-rendering members of a repeatable section (M123
         expect(announced(wrapper)).toContain('New question: Age');
 
         wrapper.unmount();
+    });
+});
+
+// ── M130 (`D77`) — the error summary's jump lands on the CHECKED round button, as Tab would ───────────────
+describe('SummaryBanner — jumping to a question answered with round buttons', () => {
+    function radioGroup(checked: string | null): HTMLElement {
+        const anchor = document.createElement('div');
+        anchor.id = 'field-colour';
+        for (const value of ['red', 'blue', 'green']) {
+            const radio = document.createElement('input');
+            radio.type = 'radio';
+            radio.name = 'colour-group';
+            radio.value = value;
+            radio.checked = value === checked;
+            anchor.appendChild(radio);
+        }
+        document.body.appendChild(anchor);
+
+        return anchor;
+    }
+
+    async function jump(): Promise<void> {
+        const wrapper = mount(SummaryBanner, {
+            props: { items: [{ address: 'colour', label: 'Favourite colour', stepKey: 's1' }] },
+            attachTo: document.body,
+        });
+        await wrapper.find('button').trigger('click');
+        await flushPromises();
+        wrapper.unmount();
+    }
+
+    it('focuses the chosen radio, not the first one', async () => {
+        const anchor = radioGroup('blue');
+        await jump();
+
+        expect((document.activeElement as HTMLInputElement | null)?.value).toBe('blue');
+        anchor.remove();
+    });
+
+    it('focuses the first radio when nothing is chosen yet', async () => {
+        // The positive control for the line above: the same anchor with no answer still gets focus at all.
+        const anchor = radioGroup(null);
+        await jump();
+
+        expect((document.activeElement as HTMLInputElement | null)?.value).toBe('red');
+        anchor.remove();
     });
 });

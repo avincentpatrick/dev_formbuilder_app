@@ -44,6 +44,8 @@ const encodeField = computed<EncodeField>(() => ({
         props.field.media !== null && resolveUploadUrl !== null
             ? { url: resolveUploadUrl(), ...(stashOffline !== null ? { stashOffline } : {}) }
             : null,
+    // M130 — the author's choice layout, read by FieldInput; carried by all three adapters (EncodeFieldAdapterParityTest).
+    appearance: props.field.appearance,
     supported: props.field.supported,
 }));
 

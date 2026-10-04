@@ -242,6 +242,8 @@ export interface RenderField {
     geo: RenderGeo | null;
     /** Media capture config (Increment G6: file / image / audio / video); null for every other field type. */
     media: RenderMedia | null;
+    /** The author's layout for a list question's choices (M130), carried raw; `FieldInput` reads it. */
+    appearance: string | null;
     sequence: number;
     sectionSequence: number | null;
 }

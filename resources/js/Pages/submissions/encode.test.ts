@@ -602,6 +602,36 @@ describe('encode page — the server error summary', () => {
         wrapper.unmount();
     });
 
+    it('lands on the chosen round button of an answered single choice, as Tab would (M130)', async () => {
+        // `D77` made a single choice a group of radios; the first focusable in its anchor is the FIRST radio,
+        // which is not where the answer is. The jump prefers `input:checked`, as `SummaryBanner.vue` does.
+        mocks.pageProps.errors = { 'answers.colour': 'Choose a colour this clinic stocks.' };
+        const options = [
+            { value: 'red', label: 'Red' },
+            { value: 'blue', label: 'Blue' },
+        ];
+        const wrapper = mount(Encode, {
+            props: payload({
+                fields: [field({ key: 'colour', label: 'Favourite colour', field_type: 'single_select', sequence: 1, config: { options } })],
+                blocks: [{ key: null, label: null, fields: [{ ...blockField({ key: 'colour', field_type: 'single_select', label: 'Favourite colour' }), options }] }],
+                singlePage: true,
+                editing: { id: 'sub-1', answers: { colour: 'blue' }, status: 'submitted', baseline: 'checksum-baseline-1', demotes_on_save: false },
+                update_url: '/submissions/sub-1/answers',
+                draft_url: null,
+            }) as never,
+            attachTo: document.body,
+        });
+
+        await wrapper.findAll('button').find((b) => b.text().trim() === 'Favourite colour')!.trigger('click');
+        await nextTick();
+
+        const focused = document.activeElement as HTMLInputElement | null;
+        expect(focused?.type).toBe('radio');
+        expect(focused?.value).toBe('blue');
+
+        wrapper.unmount();
+    });
+
     it('says nothing when the pipeline raised nothing', async () => {
         const wrapper = mountEncode(routerPayload({ singlePage: false }));
         await typeInto(wrapper, 'Role', 'staff');

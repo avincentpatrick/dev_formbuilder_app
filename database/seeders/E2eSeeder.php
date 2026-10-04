@@ -516,6 +516,60 @@ class E2eSeeder extends Seeder
                 ]);
             }
 
+            // M130 (`R-048a3286`, `D77`) — a guest-enabled form holding every choice layout: a single choice in
+            // each of its three layouts (round buttons one per line, side by side, in columns) and a multiple
+            // choice in the two it can take. One page, all optional, so an empty load is axe-clean, and one long
+            // label so the 375px check meets a choice that must wrap. Reached at /f/choice-layouts by
+            // `choice-layout-axe.spec.ts`.
+            if (Form::query()->where('title', 'Choice Layouts')->doesntExist()) {
+                $layouts = app(FormService::class)->create(
+                    $tenant, $owner, 'Choice Layouts', 'Round buttons, side by side and in columns (M130 demo).'
+                );
+                $layoutBuilder = app(FormBuilderService::class);
+                $layoutSection = $layoutBuilder->addSection($layouts);
+                $layoutChoices = static fn (array $labels): array => array_map(
+                    static fn (string $label): array => ['value' => strtolower(str_replace(' ', '_', $label)), 'label' => $label],
+                    $labels,
+                );
+                $layoutBuilder->addField($layouts, $owner, FieldType::SingleSelect, $layoutSection->id)->update([
+                    'key' => 'contact_by',
+                    'label' => 'How should we contact you?',
+                    'config' => ['options' => $layoutChoices(['Phone', 'Email', 'Text message', 'In person'])],
+                ]);
+                $layoutBuilder->addField($layouts, $owner, FieldType::SingleSelect, $layoutSection->id)->update([
+                    'key' => 'visit_type',
+                    'label' => 'Visit type',
+                    'appearance' => 'columns-pack',
+                    'config' => ['options' => $layoutChoices(['Walk-in', 'Appointment', 'Referral', 'Follow-up'])],
+                ]);
+                $layoutBuilder->addField($layouts, $owner, FieldType::SingleSelect, $layoutSection->id)->update([
+                    'key' => 'clinic',
+                    'label' => 'Which clinic?',
+                    'appearance' => 'columns',
+                    'config' => ['options' => $layoutChoices(['Main clinic', 'North annex', 'South annex', 'Mobile unit', 'Telehealth', 'Home visit'])],
+                ]);
+                $layoutBuilder->addField($layouts, $owner, FieldType::MultiSelect, $layoutSection->id)->update([
+                    'key' => 'services',
+                    'label' => 'Services used',
+                    'appearance' => 'columns-pack',
+                    'config' => ['options' => $layoutChoices(['Check-up', 'Laboratory', 'Pharmacy', 'Dental', 'Counselling'])],
+                ]);
+                $layoutBuilder->addField($layouts, $owner, FieldType::MultiSelect, $layoutSection->id)->update([
+                    'key' => 'symptoms',
+                    'label' => 'Symptoms',
+                    'appearance' => 'columns',
+                    'config' => ['options' => $layoutChoices(['Fever', 'Cough', 'Headache', 'Fatigue', 'Shortness of breath or difficulty breathing when lying down', 'None of these'])],
+                ]);
+                app(PublishService::class)->publish($layouts->refresh(), $owner);
+
+                $layouts->update([
+                    'public_slug' => 'choice-layouts',
+                    'allow_guest_submissions' => true,
+                    'supported_locales' => ['en'],
+                    'single_page_mode' => true,
+                ]);
+            }
+
             // A guest-enabled but CLOSED scheduled form (Increment H12b) — reached at /f/closed-survey. Its
             // window has passed (closes_at in the past), so the public runtime renders the full-screen "This
             // form is closed" state INSTEAD of the fill session (the schema is still served — H12a). Gives the

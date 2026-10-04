@@ -48,6 +48,8 @@ const encodeField = computed<EncodeField>(() => ({
         label: resolveText(o.label, o.labelTranslations, runtime.locale.value),
     })),
     cascade: resolveCascade(props.field.cascade, runtime.locale.value),
+    // M130 — the author's choice layout, as FieldControl carries it (EncodeFieldAdapterParityTest).
+    appearance: props.field.appearance,
     supported: props.field.supported,
 }));
 

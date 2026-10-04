@@ -95,6 +95,8 @@ export type { MenuItem } from './components/Menu/Menu.vue';
 // once the stack is pushed, the opener is inert, so focus left on it is dropped to the body.
 export { useInertBackground, type InertBackgroundOptions } from './components/Modal/useInertBackground';
 export { default as MdsCheckbox } from './components/Checkbox/Checkbox.vue';
+// M130 — a single choice's round buttons. The caller owns the fieldset and the shared `name`.
+export { default as MdsRadio } from './components/Radio/Radio.vue';
 export { default as MdsSwitch } from './components/Switch/Switch.vue';
 export { default as MdsSkeleton } from './components/Skeleton/Skeleton.vue';
 export { default as MdsModal } from './components/Modal/Modal.vue';

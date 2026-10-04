@@ -427,6 +427,7 @@ function toRenderField(field: RawField): RenderField {
         matrix: buildMatrix(field),
         geo: buildGeo(field),
         media: buildMedia(field),
+        appearance: field.appearance ?? null,
         sequence: field.sequence,
         sectionSequence: field.section_sequence,
     };

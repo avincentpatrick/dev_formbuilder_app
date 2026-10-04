@@ -8,6 +8,7 @@ use App\Enums\AnalyticsFormSelection;
 use App\Enums\AnalyticsGranularity;
 use App\Enums\ComparisonOperator;
 use App\Enums\DomainVerificationFailure;
+use App\Enums\FieldAppearance;
 use App\Enums\FontSizeScale;
 use App\Enums\FormBotChallenge;
 use App\Enums\GraphNoticeKind;
@@ -116,6 +117,9 @@ const ENUM_MIRRORS = [
     ['resources/js/components/submissions/FieldInput.vue', 'RequiredMarker', RequiredMode::class, 'type'],
     ['resources/public-runtime/composables/useFormRuntime.ts', 'Marker', RequiredMode::class, 'type'],
     ['resources/js/Pages/submissions/show.test.ts', 'ALL_STATUSES', SubmissionStatus::class, 'const'],
+    // M130 — the choice layouts the renderer honours, declared in a `.ts` beside FieldInput.vue on purpose:
+    // `appearance` is also a CSS property, and the `property` grammar is first-match-wins across an SFC.
+    ['resources/js/components/submissions/choice-layout.ts', 'ChoiceAppearance', FieldAppearance::class, 'type'],
 ];
 
 /**

@@ -504,7 +504,7 @@ function anchorFor(address: string): string {
  *
  * Focus goes to the first focusable INSIDE the anchor, not to the anchor: the wrapper is a plain `div` with
  * no `tabindex`, so `.focus()` on it is a silent no-op — the same reason `SummaryBanner.vue` reaches for
- * `querySelector('input, select, textarea, button, [tabindex]')`.
+ * `querySelector('input, select, textarea, button, [tabindex]')` — after `input:checked` since M130 (round buttons).
  */
 async function jumpTo(item: { address: string; stepKey: string }): Promise<void> {
     if (!props.form.single_page_mode && item.stepKey !== runtime.currentStepKey.value) {
@@ -516,7 +516,7 @@ async function jumpTo(item: { address: string; stepKey: string }): Promise<void>
         return;
     }
     target.scrollIntoView({ block: 'center' });
-    target.querySelector<HTMLElement>('input, select, textarea, button, [tabindex]')?.focus();
+    (target.querySelector<HTMLElement>('input:checked') ?? target.querySelector<HTMLElement>('input, select, textarea, button, [tabindex]'))?.focus();
 }
 
 // ── Autosave (Increment I9b) ─────────────────────────────────────────────────────────────────────────────

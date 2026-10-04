@@ -299,3 +299,40 @@ group('a condition edit rides the existing optimistic-concurrency path', () => {
         expect(mock).not.toHaveBeenCalled();
     });
 });
+
+// ── M131 (`R-799d60f5`) — a rule's group rides the field save ───────────────────────────────────────────────────
+
+group('a rule group rides the field save', () => {
+    beforeEach(() => {
+        vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
+    const RULE = { operator: null, rule_value: '3', expression: null, error_message: null, related_field_key: null };
+
+    it('sends a row’s group and connective, and omits both for a row that never carried them', async () => {
+        // Absent tells the server to keep what it stores — the older-client rule `replaceValidations()` applies — so
+        // a row built by code that knows nothing of groups must never send an explicit null and ungroup a template.
+        const mock = fetchMock().mockResolvedValue(jsonResponse(200, serverField({ version: 'v2' })));
+        const store = useBuilderStore(pageProps());
+        const field = store.fields.value[0];
+
+        field.validations = [
+            { ...RULE, rule_type: 'min_length', sequence: 0, logic_group: 'new-constraint', logic_operator: 'or' },
+            { ...RULE, rule_type: 'max_length', sequence: 1 },
+        ];
+        store.touch(field.uid, 'field');
+
+        await store.whenIdle();
+        await flushPromises();
+
+        const sent = JSON.parse((mock.mock.calls[0] as [string, RequestInit])[1].body as string).validations as Record<string, unknown>[];
+
+        expect(sent[0]).toMatchObject({ logic_group: 'new-constraint', logic_operator: 'or' });
+        expect('logic_group' in sent[1]).toBe(false);
+        expect('logic_operator' in sent[1]).toBe(false);
+    });
+});

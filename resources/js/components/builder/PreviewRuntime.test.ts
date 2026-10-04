@@ -118,3 +118,44 @@ describe('PreviewRuntime — page breaks paginate a stepped preview (M124)', () 
         wrapper.unmount();
     });
 });
+
+/**
+ * M130 (`R-c9f50df2`) — a note's content in the preview, one heading level deeper than on the respondent's page,
+ * because the preview titles its sections with an `h3` (`ContentHeadingBaseKey`, provided by `PreviewRuntime.vue`).
+ */
+describe('PreviewRuntime — a note with content blocks (M130)', () => {
+    it('renders the blocks under the preview’s own section heading, and never the note’s label', async () => {
+        const snapshot = schemaResponse({
+            sections: [section({ key: 's1', label: 'Welcome' })],
+            fields: [
+                field({
+                    key: 'intro',
+                    label: 'Intro note (for the team)',
+                    field_type: 'note',
+                    section_key: 's1',
+                    section_sequence: 0,
+                    config: {
+                        content: [
+                            { type: 'heading', level: 1, text: 'Before you begin' },
+                            { type: 'heading', level: 2, text: 'What to bring' },
+                            { type: 'paragraph', spans: [{ text: 'Your clinic card.' }] },
+                        ],
+                    },
+                }),
+            ],
+        });
+
+        const wrapper = mount(PreviewRuntime, {
+            props: { snapshot, model: buildRenderModel(snapshot), issuesByKey: {}, selectedKey: null, initialStepKey: null },
+        });
+        await flushPromises();
+
+        expect(wrapper.find('h3').text()).toBe('Welcome');
+        expect(wrapper.find('[data-note-content] h4').text()).toBe('Before you begin');
+        expect(wrapper.find('[data-note-content] h5').text()).toBe('What to bring');
+        expect(wrapper.text()).toContain('Your clinic card.');
+        expect(wrapper.text()).not.toContain('Intro note (for the team)');
+
+        wrapper.unmount();
+    });
+});

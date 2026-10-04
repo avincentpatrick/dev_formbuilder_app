@@ -428,6 +428,7 @@ function toRenderField(field: RawField): RenderField {
         geo: buildGeo(field),
         media: buildMedia(field),
         appearance: field.appearance ?? null,
+        content: field.field_type === 'note' && Array.isArray(field.config?.content) ? (field.config.content as unknown[]) : null,
         sequence: field.sequence,
         sectionSequence: field.section_sequence,
     };
@@ -464,8 +465,8 @@ export function buildRenderModel(schema: SchemaResponse): RenderModel {
  * `config`, which is what `displayValue()` reads to resolve a choice code to its author-defined label.
  *
  * Built from `version.schema.fields` rather than from the render model ON PURPOSE, and this is the trap
- * Doc #26 §3.2 names by hand: `toRenderField()` has already projected `config` into five presentation
- * shapes and dropped the original, and `buildOptions()` only runs for `HAS_OPTIONS` types — so a
+ * Doc #26 §3.2 names by hand: `toRenderField()` has already projected `config` into six presentation
+ * shapes (a note's raw `content` since M130) and dropped the rest, and `buildOptions()` only runs for `HAS_OPTIONS` types — so a
  * `cascading_select`'s options are not on `RenderField` at all, and a renderer fed from there would emit
  * "ncr; manila" where PHP emits "Metro Manila; Manila". Re-deriving `config` would also be a SECOND
  * normalisation of the one input the two engines must agree on byte for byte.

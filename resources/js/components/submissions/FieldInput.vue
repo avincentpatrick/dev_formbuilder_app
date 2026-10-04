@@ -2,7 +2,8 @@
 /**
  * One manual-encoding input (Increment F4b). Maps a published field descriptor onto the matching shared
  * design-system control and binds its value + per-field 422 error. "Render-supported, mark-the-rest": the
- * ~14 Phase-1 scalar types render a real control; `note` renders as static prose; anything else (advanced
+ * ~14 Phase-1 scalar types render a real control; `note` renders its content blocks (`NoteContent`, M130) or, with
+ * none, its label as static prose; anything else (advanced
  * types, or a field inside a repeatable section) shows a read-only "not available for manual entry" notice
  * rather than being silently dropped.
  *
@@ -24,7 +25,9 @@ import {
 } from '@meridian/design-system';
 import { computed, defineAsyncComponent, nextTick, ref, useId } from 'vue';
 import MatrixGrid from './MatrixGrid.vue';
+import NoteContent from './NoteContent.vue';
 import { choiceLayoutFor } from './choice-layout';
+import { renderableBlocks } from './note-content';
 
 // Geospatial capture (Increment G5b2) is lazy-loaded so its Leaflet dependency + CSS only ship in the chunk a
 // geo-bearing form actually mounts — geo-free forms pay zero bundle cost.
@@ -135,6 +138,9 @@ export interface EncodeField {
     // The author's layout for a list question's choices (M130), read by `choiceLayoutFor()`; any other stored
     // appearance — an XLSForm import's — is carried and ignored.
     appearance?: string | null;
+    // A note's content blocks (M130, `R-c9f50df2`), carried RAW from `config.content` and read by
+    // `renderableBlocks()`; null for every other type. With blocks, the note's label is the author's alone (`D69`).
+    content?: unknown[] | null;
     supported: boolean;
 }
 
@@ -300,6 +306,9 @@ const groupDescribedby = computed<string | undefined>(() => {
     const ids = [props.field.hint ? hintId : null, props.error ? errorId : null].filter((id): id is string => id !== null);
     return ids.length > 0 ? ids.join(' ') : undefined;
 });
+
+// A note's drawable content blocks (`R-c9f50df2`); empty for any other type, and for a note with none.
+const noteBlocks = computed(() => (props.field.field_type === 'note' ? renderableBlocks(props.field.content) : []));
 
 // The author's layout for a list question's choices (`R-048a3286`); one per line unless they chose otherwise.
 const layoutClass = computed<Record<string, boolean>>(() => {
@@ -564,7 +573,9 @@ function setCascadeLevel(index: number, value: string): void {
         </p>
     </div>
 
-    <!-- Display-only note -->
+    <!-- Display-only note: its content blocks when it has any (M130 — the label is then the author's alone, `D69`),
+         else its label, as before. -->
+    <NoteContent v-else-if="control === 'note' && noteBlocks.length > 0" :blocks="noteBlocks" />
     <p v-else-if="control === 'note'" class="encode-note">{{ field.label }}</p>
 
     <!-- Hidden field with a server-set value (Increment H7): shown so the keyer knows it exists and what

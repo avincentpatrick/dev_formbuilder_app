@@ -310,6 +310,14 @@ describe('ConfigPanel — the choice layout that replaced the free-text appearan
         expect(touch).toHaveBeenCalledWith('f1', 'field');
     });
 
+    it("tells the author a note's label stops reaching respondents once the note has content (M130, D69)", () => {
+        const note = mountPanel(makeStore({ field: field({ field_type: 'note' }) }));
+        const text = mountPanel(makeStore({ field: field() }));
+
+        expect(note.text()).toContain('Respondents see this label only while the note has no content.');
+        expect(text.text()).not.toContain('Respondents see this label only while the note has no content.');
+    });
+
     it('offers no free-text appearance anywhere, and nothing at all for a type with no layout and no stored value', async () => {
         const wrapper = mountPanel(makeStore({ field: field() }));
         await openTab(wrapper, 'Advanced');

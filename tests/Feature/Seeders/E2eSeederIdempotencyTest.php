@@ -112,7 +112,7 @@ it('converges on exactly the shape the analytics page needs, however many times 
     // The numbers `/analytics` and `/dashboard` actually render in Playwright, written down HERE so a
     // fixture change reddens the file that names the shape rather than an axe assertion three files away
     // that only knows a chart looks different.
-    expect($first['published'])->toBe(8);        // seven legacy (M130 added Choice Layouts) + Programme Uptake → the form axis OVERFLOWS top-5
+    expect($first['published'])->toBe(9);        // eight legacy (M130 added Choice Layouts and Before Your Visit) + Programme Uptake → the form axis OVERFLOWS top-5
     expect($first['countable'])->toBe(30);       // 27 new + the 3 legacy Clinic Intake rows
     expect($first['submissions'])->toBe(33);     // the 3 unconverted drafts scopeCountable() excludes
     expect($first['views'])->toBe(2);            // one working, one deliberately unreadable (`v: 99`)

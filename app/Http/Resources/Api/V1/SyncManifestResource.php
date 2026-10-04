@@ -11,9 +11,9 @@ use Illuminate\Support\Carbon;
 /**
  * The offline sync manifest for a pinned form version (Increment G8b, docs/offline-first-sync-design.md §2):
  * the renderable, id-free schema snapshot + its checksum, which a device caches before collecting offline.
- * `choice_lists` and `media_refs` are forward-compatible: choice lists are inline in each field's `config`
- * (the snapshot carries them), and there is no static form-level media feature yet — both are emitted empty so
- * the contract shape is stable for future clients.
+ * `choice_lists` and `media_refs` are emitted empty so the contract shape is stable: choice lists are inline in each
+ * field's `config` (the snapshot carries them). ⚠️ A note's images ARE form-level media since M130, and filling
+ * `media_refs` with them is `R-0924ab3b`; the guest page warms them into its own cache meanwhile.
  *
  * @mixin FormVersion
  */

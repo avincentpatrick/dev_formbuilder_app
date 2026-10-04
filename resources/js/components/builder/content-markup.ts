@@ -282,9 +282,9 @@ function byteLength(text: string): number {
 }
 
 /**
- * The TS twin of `ContentBlocks::linkIsSafe()`, so the editor can refuse a link before a save is refused for it.
- * Both read `tests/fixtures/content-block-links.json`, and each suite fails if its half disagrees with a vector —
- * which is the drift test `R-c9f50df2` asked for.
+ * The TS twin of `ContentBlocks::linkIsSafe()`, so the editor can refuse a link before a save is refused for it, and
+ * — since M130 — so `NoteContent.vue` re-checks every link at render. Both read `tests/fixtures/content-block-links.json`,
+ * and each suite fails if its half disagrees with a vector, the drift test `R-c9f50df2` asked for.
  *
  * ⚠️ The host check is written out rather than left to `new URL()`, because the WHATWG parser repairs input
  * PHP's `parse_url()` refuses (`http:/x` gains a host), and the two halves must refuse the same links. What follows

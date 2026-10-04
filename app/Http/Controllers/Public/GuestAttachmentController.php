@@ -20,7 +20,7 @@ use Illuminate\Http\JsonResponse;
  * enabled and the token must target the current published version — then hands the file to the same
  * {@see AttachmentStorageService} the authenticated channel uses, with a null uploader.
  *
- * There is no guest read-back: a just-captured file previews from a local `blob:` URL, so no server round-trip.
+ * No guest read-back of an upload: a `blob:` URL previews it. (A note's image is {@see GuestContentImageController}.)
  */
 final class GuestAttachmentController extends Controller
 {

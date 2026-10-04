@@ -4,8 +4,9 @@
  * an error terminal — around one long-lived, stateful `ApiClient`. It fetches the schema once, hosts the fill
  * session (re-keyed on a version-drift `reschema` so the store rebuilds cleanly), and shows the confirmation.
  */
-import { onMounted, provide, ref, shallowRef } from 'vue';
+import { onMounted, provide, ref, shallowRef, watch } from 'vue';
 import { MdsEmptyState, MdsSpinner } from '@meridian/design-system';
+import { ContentImageUrlKey } from '@/components/submissions/note-content';
 import ConfirmationScreen from './components/ConfirmationScreen.vue';
 import OfflineIndicator from './components/OfflineIndicator.vue';
 import RuntimeSession from './components/RuntimeSession.vue';
@@ -21,6 +22,7 @@ import {
 import { useOnline } from './composables/useOnline';
 import { createSyncOutbox } from './composables/useSyncOutbox';
 import { createApiClient, resumeDraft } from './lib/api-client';
+import { contentImageUrl, warmContentImages } from './lib/content-images';
 import { conflictCopy } from './lib/conflict-notice';
 import { draftBelongsToVisit, openDb } from './lib/db';
 import { localMediaRefId, stash } from './lib/media-queue';
@@ -148,6 +150,21 @@ provide(ConflictReviewKey, beginConflictReview);
 // Media uploads (Increment G6) POST to the same token-scoped guest surface, resolved live so a re-minted token
 // is picked up. The manual-encode channel instead gets its form-scoped URL from EncodeFormPresenter.
 provide(UploadUrlKey, () => `/api/v1/public/f/${encodeURIComponent(client.token())}/attachments`);
+
+// M130 (`R-c9f50df2`) — a note's content images, read through the guest route with the CURRENT token (resolved
+// per image, so a re-minted one is used), and asked for once whenever a schema arrives online so a step reached
+// offline still shows them: the service worker caches each one keyed WITHOUT the token. Watched rather than
+// called, because four paths below set a schema (load, resume, conflict review, version drift).
+const contentImageUrlFor = (attachmentId: string): string => contentImageUrl(client.token(), attachmentId);
+provide(ContentImageUrlKey, contentImageUrlFor);
+watch(schema, (loaded) => {
+    if (loaded === null || typeof window === 'undefined' || !navigator.onLine) return;
+    void warmContentImages(loaded, contentImageUrlFor, {
+        origin: window.location.origin,
+        fetch: (url) => fetch(url, { credentials: 'same-origin' }),
+        caches: typeof caches === 'undefined' ? null : caches,
+    });
+});
 
 // Offline media staging (Increment G8b): when a pick can't upload, keep the blob in the Dexie media queue and
 // hand back a `local:` placeholder ref that the outbox replay swaps for a real attachment id on reconnect.

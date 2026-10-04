@@ -57,7 +57,7 @@ for (const theme of themes) {
             await page.getByRole('tab', { name: 'Content' }).click();
 
             const editor = page.locator('.cbe');
-            await expect(editor.locator('[data-content-notice="not-shown-yet"]')).toBeVisible();
+            await expect(editor.locator('[data-content-notice="replaces-label"]')).toBeVisible();
             const add = editor.getByRole('group', { name: 'Add a block' });
 
             await add.getByRole('button', { name: 'Heading' }).click();

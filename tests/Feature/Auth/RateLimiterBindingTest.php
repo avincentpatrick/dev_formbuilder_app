@@ -38,29 +38,34 @@ use Illuminate\Support\Facades\Route;
 /**
  * Every live route whose middleware resolves to `ThrottleRequests` bound to this limiter name.
  *
- * ⚠️ RESOLVED THROUGH THE ROUTER'S OWN ALIAS MAP, never matched on the printed string — `GroupBPolicyGateTest`
- * lost a first draft to exactly that difference. `route:list` PRINTS
- * `Illuminate\Routing\Middleware\ThrottleRequests:guest` while `gatherMiddleware()` RETURNS the declared
- * alias `throttle:guest`, so a check written against the command's output finds nothing and reports every
- * route as unthrottled. Asking the router to resolve keeps this correct whichever spelling a route used.
+ * ⚠️ RESOLVED THROUGH THE ROUTER'S OWN PIPELINE, never matched on a declared string — `GroupBPolicyGateTest`
+ * lost a first draft to the spelling difference: `gatherMiddleware()` RETURNS the declared alias
+ * `throttle:guest` while a request runs `Illuminate\Routing\Middleware\ThrottleRequests:guest`.
+ *
+ * ⛔ AND UNTIL M130 IT READ THE DECLARED LIST, WHICH IGNORES `withoutMiddleware()`. The challenge route leaves
+ * `throttle:guest` for its own limiter, and this helper still counted it as bound to `guest` — so the cases below
+ * checked the guest limiter's keys for a route that limiter never sees. M130's image route, which leaves it too,
+ * is what showed it. `gatherRouteMiddleware()` is the stack a request actually passes through: aliases resolved,
+ * groups expanded, exclusions applied.
  *
  * @return list<RoutingRoute>
  */
 function routesThrottledBy(string $limiter): array
 {
-    $aliases = app('router')->getMiddleware();
+    $router = app('router');
 
     return array_values(array_filter(
         Route::getRoutes()->getRoutes(),
-        static function (RoutingRoute $route) use ($aliases, $limiter): bool {
-            return array_any($route->gatherMiddleware(), static function (mixed $middleware) use ($aliases, $limiter): bool {
+        static function (RoutingRoute $route) use ($router, $limiter): bool {
+            return array_any($router->gatherRouteMiddleware($route), static function (mixed $middleware) use ($limiter): bool {
                 if (! is_string($middleware)) {
-                    return false; // a closure or an instance — never a `throttle:` alias
+                    return false; // a closure or an instance — never a throttle
                 }
 
-                [$name, $parameters] = array_pad(explode(':', $middleware, 2), 2, '');
+                [$class, $parameters] = array_pad(explode(':', $middleware, 2), 2, '');
 
-                return ($aliases[$name] ?? $name) === ThrottleRequests::class && $parameters === $limiter;
+                // `is_a`, so `ThrottleRequestsWithRedis` (the alias under a Redis cache) counts as well.
+                return is_a($class, ThrottleRequests::class, true) && $parameters === $limiter;
             });
         },
     ));
@@ -168,4 +173,34 @@ it('never falls back to the guest limiter\'s IP arm on a route that is actually 
             .'parameter the limiter reads, so its per-token bound has quietly become a second per-IP one.',
         );
     }
+});
+
+// ── The guest content-image limiter (M130, `R-c9f50df2`) ──────────────────────────────────────
+
+it('binds the content-image limiter to the image route alone, and that route is off the guest limiter', function (): void {
+    // ⚠️ THE CASES ABOVE CANNOT SEE THIS ROUTE: it leaves `throttle:guest` on purpose (a note's images would
+    // otherwise spend the per-token budget a respondent submits with), so `routesThrottledBy('guest')` skips it.
+    $routes = routesThrottledBy('guest-content-image');
+
+    expect(array_map(static fn (RoutingRoute $r): string => $r->uri(), $routes))
+        ->toBe(['api/v1/public/content-images/{shareToken}/{image}'])
+        ->and(array_map(static fn (RoutingRoute $r): string => $r->uri(), routesThrottledBy('guest')))
+        ->not->toContain('api/v1/public/content-images/{shareToken}/{image}');
+});
+
+it('gives the image route its own bucket per token, never the one an undeclared parameter would share', function (): void {
+    $route = routesThrottledBy('guest-content-image')[0];
+    $first = limiterKeysFor('guest-content-image', $route, 'token-aaaaaaaaaaaaaaaa');
+    $second = limiterKeysFor('guest-content-image', $route, 'token-bbbbbbbbbbbbbbbb');
+
+    expect($first)->not->toBe(
+        $second,
+        'The image route produces the SAME bucket key for two different tokens, so every respondent shares one limit.',
+    );
+
+    // A parameter the route does not declare reads back null, and `hash('sha256', '')` is one constant bucket.
+    $constant = hash('sha256', '');
+    expect(array_any($first, static fn (string $key): bool => str_contains($key, $constant)))->toBeFalse(
+        'The image limiter keys on a parameter the route does not declare, so every request shares one bucket.',
+    );
 });

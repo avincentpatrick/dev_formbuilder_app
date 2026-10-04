@@ -244,6 +244,8 @@ export interface RenderField {
     media: RenderMedia | null;
     /** The author's layout for a list question's choices (M130), carried raw; `FieldInput` reads it. */
     appearance: string | null;
+    /** A note's content blocks (M130), carried raw from `config.content`; null for every other type. */
+    content: unknown[] | null;
     sequence: number;
     sectionSequence: number | null;
 }

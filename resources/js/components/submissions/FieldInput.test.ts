@@ -171,3 +171,39 @@ describe('FieldInput — a single choice is round buttons (M130, D77)', () => {
         }
     });
 });
+
+describe('FieldInput — a note with content blocks (M130, R-c9f50df2, D69)', () => {
+    function noteField(content: unknown[] | null): EncodeField {
+        return { key: 'intro', field_type: 'note', label: 'Intro note (for the team)', hint: null, placeholder: null, required: false, options: [], content, supported: false };
+    }
+
+    it('renders the blocks and keeps the author-only label off the page', () => {
+        const wrapper = mount(FieldInput, {
+            props: { field: noteField([{ type: 'heading', level: 1, text: 'Before you begin' }, { type: 'paragraph', spans: [{ text: 'Bring your card.' }] }]), modelValue: null },
+        });
+
+        expect(wrapper.find('[data-note-content]').exists()).toBe(true);
+        expect(wrapper.text()).toContain('Before you begin');
+        expect(wrapper.text()).toContain('Bring your card.');
+        expect(wrapper.text()).not.toContain('Intro note (for the team)');
+    });
+
+    it('renders the label as before when the note has no content', () => {
+        for (const content of [null, []]) {
+            const wrapper = mount(FieldInput, { props: { field: noteField(content), modelValue: null } });
+
+            expect(wrapper.find('[data-note-content]').exists()).toBe(false);
+            expect(wrapper.find('.encode-note').text()).toBe('Intro note (for the team)');
+        }
+    });
+
+    it('renders markup-shaped content as text, on the one component every channel shares', () => {
+        const wrapper = mount(FieldInput, {
+            props: { field: noteField([{ type: 'paragraph', spans: [{ text: '<script>alert(1)</script>', link: 'javascript:alert(1)' }] }]), modelValue: null },
+        });
+
+        expect(wrapper.find('script').exists()).toBe(false);
+        expect(wrapper.find('a').exists()).toBe(false);
+        expect(wrapper.text()).toContain('<script>alert(1)</script>');
+    });
+});

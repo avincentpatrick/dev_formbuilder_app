@@ -116,6 +116,9 @@ const SHAPE_NO_ANSWER = 'no_answer';
 /** `RequiredMode::Conditional`. `ServerField.is_required` is a bare string here, so the literal needs a home. */
 const REQUIRED_MODE_CONDITIONAL = 'conditional';
 
+/** M130 (`D69`): once a note has content blocks, respondents see those instead, and the label is the author's alone. */
+const NOTE_LABEL_HELP = 'Respondents see this label only while the note has no content. Once it has content, the label names the note here and in the PDF.';
+
 const requiredOptions = enums.required_modes;
 const sectionOptions = computed<EnumOption[]>(() => [
     { value: '', label: 'No section (top level)' },
@@ -424,7 +427,7 @@ watch(librarySaved, (value) => {
 
                     <template v-if="activeTab === 'basics'">
                         <FieldTypeControl :store="store" />
-                        <MdsFormField label="Label" :error="fieldSaveErrors.inline.label" v-slot="{ id, describedby, invalid }">
+                        <MdsFormField label="Label" :help="field.field_type === 'note' ? NOTE_LABEL_HELP : undefined" :error="fieldSaveErrors.inline.label" v-slot="{ id, describedby, invalid }">
                             <MdsTextInput :id="id" :describedby="describedby" :invalid="invalid" :model-value="field.label" @update:model-value="setField('label', $event)" />
                         </MdsFormField>
                         <MdsFormField

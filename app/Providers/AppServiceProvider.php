@@ -63,9 +63,13 @@ use App\Support\Tenancy\DnsTxtResolver;
 use App\Support\Tenancy\SystemDnsTxtResolver;
 use Dedoc\Scramble\Scramble;
 use Dedoc\Scramble\Support\Generator\OpenApi;
+use Dedoc\Scramble\Support\Generator\Path;
+use Dedoc\Scramble\Support\Generator\Response as OpenApiResponse;
+use Dedoc\Scramble\Support\Generator\Schema;
 use Dedoc\Scramble\Support\Generator\SecurityScheme;
 use Dedoc\Scramble\Support\Generator\Server;
 use Dedoc\Scramble\Support\Generator\ServerVariable;
+use Dedoc\Scramble\Support\Generator\Types\StringType;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Contracts\Cache\Repository as CacheRepository;
 use Illuminate\Database\Eloquent\Relations\Relation;
@@ -426,6 +430,17 @@ class AppServiceProvider extends ServiceProvider
                 ->by('gchip:'.$request->ip()),
         ]);
 
+        // A note's images on the guest page (M130, `R-c9f50df2`). ⚠️ ITS OWN LIMITER, NOT `guest`, for the
+        // challenge's reason one step further: a form can show dozens of images and the page warms every one for
+        // offline use, so on `throttle:guest` a respondent would spend the budget they submit with on pictures.
+        // Keyed per token like `guest`, and per IP for the clinic network many tablets share one address behind.
+        RateLimiter::for('guest-content-image', fn (Request $request): array => [
+            Limit::perMinute((int) config('guest.rate_limit.content_image_per_token'))
+                ->by('gci:'.hash('sha256', (string) $request->route('shareToken'))),
+            Limit::perMinute((int) config('guest.rate_limit.content_image_per_ip'))
+                ->by('gciip:'.$request->ip()),
+        ]);
+
         // Native-connector OAuth callback (H15a / ADR-0009). An unauthenticated public endpoint on the
         // central domain: a real tenant reaches it once per connection, so a per-IP ceiling this low costs
         // nothing legitimate while bounding an attacker grinding forged `state` values against it.
@@ -575,6 +590,27 @@ class AppServiceProvider extends ServiceProvider
                         ->setDescription('Per-tenant API base — replace {tenant} with your workspace subdomain slug.')
                         ->variables(['tenant' => new ServerVariable('acme')]),
                 ];
+
+                // M130 (`R-c9f50df2`) — a note's image is BYTES, and Scramble cannot see that: the controller returns a
+                // `Storage::response()` stream, an object it does not know, so it documents a JSON object. The 200 is
+                // rewritten to what the route sends. ⛔ LOUDLY: a renamed route must not leave a JSON 200 behind
+                // unseen, so a missing path throws (`OpenApiContractTest` pins the result).
+                $imagePath = collect($openApi->paths)
+                    ->first(static fn (Path $path): bool => $path->path === 'public/content-images/{shareToken}/{image}');
+                $imageRead = $imagePath?->operations['get'] ?? null;
+
+                if ($imageRead === null) {
+                    throw new \LogicException('openapi: the guest content-image read is gone; update AppServiceProvider.');
+                }
+
+                foreach ($imageRead->responses ?? [] as $response) {
+                    if ($response instanceof OpenApiResponse && (int) $response->code === 200) {
+                        $response->content = [
+                            'image/*' => Schema::fromType((new StringType)->format('binary')->contentMediaType('image/*')),
+                        ];
+                        $response->setDescription('The image as stored: a PNG, JPEG or WebP the virus check has passed.');
+                    }
+                }
             });
         }
     }

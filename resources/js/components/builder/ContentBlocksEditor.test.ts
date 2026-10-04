@@ -45,12 +45,13 @@ afterEach(() => {
 });
 
 describe('what the tab says before anything is composed', () => {
-    it('says that respondents do not see the content yet, and that it is shown in one language', () => {
+    it('says that respondents see the content in place of the label, and that it is shown in one language', () => {
+        // M130: the renderer shipped (`R-c9f50df2`), so the notice M129 put here — "respondents do not see this
+        // yet" — became false and now states `D69` instead.
         const wrapper = mountControlled();
 
-        expect(wrapper.find('[data-content-notice="not-shown-yet"]').text()).toBe(
-            "Respondents do not see this content yet — until they do, they see the note's label.",
-        );
+        expect(wrapper.find('[data-content-notice="replaces-label"]').text()).toBe("Respondents see this content in place of the note's label.");
+        expect(wrapper.find('[data-content-notice="not-shown-yet"]').exists()).toBe(false);
         expect(wrapper.text()).toContain("Shown in the form's default language only.");
         expect(wrapper.find('[data-content-empty]').exists()).toBe(true);
     });

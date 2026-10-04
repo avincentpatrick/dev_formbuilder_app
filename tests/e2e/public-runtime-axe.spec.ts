@@ -114,6 +114,34 @@ for (const theme of themes) {
     });
 }
 
+// A note's content blocks (M130, `R-c9f50df2`). "Before Your Visit" (E2eSeeder) holds one note with every block —
+// two heading levels, every mark, a link, a callout, a divider and a picture read from the token-scoped image route.
+// ⚠️ THE PICTURE MUST ACTUALLY LOAD. A refused image is replaced by its description, which also scans clean, so a
+// scan alone proves nothing about the route; the natural width does.
+for (const theme of themes) {
+    test(`Public runtime note content (${theme}) — accessible & no horizontal overflow`, async ({ page }) => {
+        await page.goto('/f/visit-guide', { waitUntil: 'networkidle' });
+        await page
+            .getByRole('heading', { name: 'Before Your Visit', level: 1 })
+            .waitFor({ state: 'visible', timeout: 15_000 });
+
+        // The blocks, at the levels the page gives them: the section title is an h2.
+        await expect(page.getByRole('heading', { name: 'Before you arrive', level: 3 })).toBeVisible();
+        await expect(page.getByRole('heading', { name: 'Finding the entrance', level: 4 })).toBeVisible();
+        await expect(page.getByRole('note')).toContainText('do not eat for 8 hours');
+        await expect(page.getByRole('link', { name: /Read the clinic guide/ })).toHaveAttribute('target', '_blank');
+        // The note's label is the author's alone (`D69`).
+        await expect(page.getByText('Visit guide (for the team)')).toHaveCount(0);
+
+        const picture = page.getByRole('img', { name: /a blue building facing the road/ });
+        await picture.scrollIntoViewIfNeeded();
+        await expect.poll(() => picture.evaluate((img: HTMLImageElement) => (img.complete ? img.naturalWidth : 0))).toBe(240);
+
+        await forceTheme(page, theme);
+        await assertClean(page, 'Before Your Visit (note content)');
+    });
+}
+
 // A full guest submit (Clinic Intake's fields are all optional) drives the F5 guest submit endpoint end-to-end
 // and lands on the post-submit confirmation, which is itself scanned for accessibility.
 test('Public runtime — submit reaches an accessible confirmation', async ({ page }) => {

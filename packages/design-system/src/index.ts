@@ -97,6 +97,8 @@ export { useInertBackground, type InertBackgroundOptions } from './components/Mo
 export { default as MdsCheckbox } from './components/Checkbox/Checkbox.vue';
 // M130 — a single choice's round buttons. The caller owns the fieldset and the shared `name`.
 export { default as MdsRadio } from './components/Radio/Radio.vue';
+// M130 — a static, toned note in page content (a form's content blocks); unlike MdsAlert, never a live region.
+export { default as MdsCallout } from './components/Callout/Callout.vue';
 export { default as MdsSwitch } from './components/Switch/Switch.vue';
 export { default as MdsSkeleton } from './components/Skeleton/Skeleton.vue';
 export { default as MdsModal } from './components/Modal/Modal.vue';

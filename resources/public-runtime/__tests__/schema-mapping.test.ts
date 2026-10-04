@@ -123,6 +123,26 @@ describe('buildRenderModel', () => {
         expect(model.sections.map((s) => s.key)).toEqual(['a', 'b']);
         expect(model.fields.map((f) => f.key)).toEqual(['x', 'y']);
     });
+
+    it('carries the choice layout, and a note’s content blocks while no other question gets any (M130)', () => {
+        const blocks = [{ type: 'paragraph', spans: [{ text: 'Bring your card.' }] }];
+        const schema = schemaResponse({
+            fields: [
+                field({ key: 'clinic', field_type: 'single_select', appearance: 'columns', config: { options: [{ value: 'a', label: 'A' }] } }),
+                field({ key: 'intro', field_type: 'note', config: { content: blocks } }),
+                field({ key: 'plain', field_type: 'note' }),
+                field({ key: 'name', field_type: 'short_text', config: { content: blocks } }),
+            ],
+        });
+        const byKey = Object.fromEntries(buildRenderModel(schema).fields.map((f) => [f.key, f]));
+
+        expect(byKey.clinic.appearance).toBe('columns');
+        expect(byKey.intro.appearance).toBeNull();
+        expect(byKey.intro.content).toEqual(blocks);
+        expect(byKey.plain.content).toBeNull();
+        // Only a note draws content, so a stray `content` on any other type is not carried at all.
+        expect(byKey.name.content).toBeNull();
+    });
 });
 
 describe('translation resolver', () => {

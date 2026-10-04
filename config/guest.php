@@ -47,6 +47,14 @@ return [
         // we pay for issuing.
         'challenge_per_token' => (int) env('GUEST_CHALLENGE_PER_TOKEN', 60),
         'challenge_per_ip' => (int) env('GUEST_CHALLENGE_PER_IP', 90),
+
+        // A note's images (M130) get their OWN limiter too, for the challenge's reason: a form may show dozens and
+        // the guest page warms every one for offline use, so sharing `throttle:guest` would spend the respondent's
+        // submit budget on pictures. Per token well above any one form's images (the warm-up and the page's own
+        // image requests can both ask in the first minute); per IP for the many tablets one clinic network puts
+        // behind a single address.
+        'content_image_per_token' => (int) env('GUEST_CONTENT_IMAGE_PER_TOKEN', 300),
+        'content_image_per_ip' => (int) env('GUEST_CONTENT_IMAGE_PER_IP', 1200),
     ],
 
     // The proof-of-work bot challenge (Increment I8b, App\Support\Guest\GuestChallengeService) — PRD

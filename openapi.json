@@ -3268,6 +3268,84 @@
                 "security": []
             }
         },
+        "/public/content-images/{shareToken}/{image}": {
+            "get": {
+                "operationId": "v1.public.content-images.show",
+                "summary": "Read one image a note on this shared form shows",
+                "tags": [
+                    "GuestContentImage"
+                ],
+                "parameters": [
+                    {
+                        "name": "shareToken",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "image",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The image as stored: a PNG, JPEG or WebP the virus check has passed.",
+                        "content": {
+                            "image/*": {
+                                "schema": {
+                                    "type": "string",
+                                    "format": "binary",
+                                    "contentMediaType": "image/*"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "error": {
+                                            "type": "object",
+                                            "properties": {
+                                                "code": {
+                                                    "type": "string",
+                                                    "const": "image_not_found"
+                                                },
+                                                "message": {
+                                                    "type": "string",
+                                                    "const": "This image is not available."
+                                                },
+                                                "details": {
+                                                    "type": "null"
+                                                }
+                                            },
+                                            "required": [
+                                                "code",
+                                                "message",
+                                                "details"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "error"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": []
+            }
+        },
         "/public/f/{shareToken}/draft": {
             "post": {
                 "operationId": "v1.public.drafts.store",

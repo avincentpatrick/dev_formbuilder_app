@@ -1790,3 +1790,70 @@ describe('SummaryBanner — jumping to a question answered with round buttons', 
         anchor.remove();
     });
 });
+
+describe('RuntimeSession — a note with content is announced by what it says (M130, R-c9f50df2, D69)', () => {
+    it('announces the content when a note appears, never its author-only label', async () => {
+        const schema = schemaResponse({
+            fields: [
+                field({ key: 'gate', label: 'Gate', sequence: 0 }),
+                field({
+                    key: 'fasting',
+                    label: 'Fasting note (for the team)',
+                    field_type: 'note',
+                    sequence: 1,
+                    config: { content: [{ type: 'paragraph', spans: [{ text: 'Bring your ' }, { text: 'card', bold: true }, { text: '.' }] }] },
+                    relevant_expression: "${gate} = 'go'",
+                }),
+                field({ key: 'age', label: 'Age', field_type: 'integer', sequence: 2, relevant_expression: "${gate} = 'age'" }),
+            ],
+        });
+        const wrapper = mount(RuntimeSession, { props: { schema, bootstrap, client: fakeClient() } });
+        await settle();
+
+        await wrapper.find('input').setValue('go');
+        await settle();
+        expect(announced(wrapper)).toBe('New information: Bring your card.');
+        // The guest page draws the blocks through `FieldControl`, and the label nowhere — the presence first, since
+        // an empty render would satisfy the absence too.
+        expect(wrapper.find('[data-note-content]').text()).toBe('Bring your card.');
+        expect(wrapper.text()).not.toContain('Fasting note (for the team)');
+
+        // The positive control: an ordinary question is still announced by its label.
+        await wrapper.find('input').setValue('age');
+        await settle();
+        expect(announced(wrapper)).toBe('New question: Age');
+
+        wrapper.unmount();
+    });
+
+    it('draws and announces a note inside a repeated section the same way (InstanceField)', async () => {
+        const schema = schemaResponse({
+            sections: [section({ key: 'hh', label: 'People', is_repeatable: true, min_instances: 0, max_instances: 3 })],
+            fields: [
+                field({ key: 'member_name', label: 'Member name', section_key: 'hh', section_sequence: 0 }),
+                field({
+                    key: 'member_note',
+                    label: 'Member note (for the team)',
+                    field_type: 'note',
+                    section_key: 'hh',
+                    section_sequence: 1,
+                    config: { content: [{ type: 'paragraph', spans: [{ text: 'Ask for their health card.' }] }] },
+                    relevant_expression: "${member_name} = 'z'",
+                }),
+            ],
+        });
+        const wrapper = mount(RuntimeSession, { props: { schema, bootstrap, client: fakeClient() } });
+        await settle();
+        await wrapper.findAll('button').find((b) => b.text().includes('Add People'))!.trigger('click');
+        await settle();
+
+        await wrapper.find('[data-repeat-instance] input').setValue('z');
+        await settle();
+
+        expect(announced(wrapper)).toBe('New information: Ask for their health card.');
+        expect(wrapper.find('[data-repeat-instance] [data-note-content]').text()).toBe('Ask for their health card.');
+        expect(wrapper.text()).not.toContain('Member note (for the team)');
+
+        wrapper.unmount();
+    });
+});

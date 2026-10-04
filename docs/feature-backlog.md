@@ -1106,7 +1106,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `:275-282` call site).
   ⚠️ **THE ROWS NAME TWO FOLD SITES AND A SWEEP OF `resources/public-runtime/` FOUND TWELVE** — nine on the
   409 path (`error-normalizer.ts:101` · `RuntimeSession.vue:160/182/354` · `replay.ts:223/291` ·
-  `App.vue:43` · `outbox-status.ts:130` · `outbox.ts:160`) plus three consumers. **Grepping the shape rather
+  `App.vue` · `outbox-status.ts:130` · `outbox.ts:160`) plus three consumers. **Grepping the shape rather
   than trusting the row's count is six-for-six** (M8, M9, M11, M12, M13, M14).
   **As built:** the classifier reads `error.code` on a 409 exactly as it has read it on a 403 since I8b, and
   four causes gained four `ErrorKind`s — `draft_stale`, `conflict`, `uuid_claimed`, `finalized`. `refresh`
@@ -7775,7 +7775,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   named eight limiter sites; the tree actually holds **26** `RateLimiter::for()` registrations across three
   providers — 14 in `app/Providers/AppServiceProvider.php`, 10 in `app/Providers/FortifyServiceProvider.php`
   and one job limiter at `app/Providers/QueueServiceProvider.php:64` that the sweep never named. The
-  representative case is `app/Providers/AppServiceProvider.php:377` (`api`, 600/min); every other
+  representative case is `app/Providers/AppServiceProvider.php`'s `api` limiter (600/min); every other
   registration was read for its per-minute value and none is 300, none is user-keyed at that figure.
   ⚠️ **"The only throttle on an authenticated tenant route" is likewise too strong** —
   `routes/tenant.php`'s `throttle:120,1` was the only *numeric-literal* throttle in the `auth` group (`M128` added `throttle:20,1`),
@@ -11297,7 +11297,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `whenIdle()` returns the commit queue, and that queue is built with `.catch(() => undefined)` (`:127`) while
   `guard()` (`:188-201`) swallows a rejection into `save.error` and returns `null`. So `whenIdle()` **resolves on
   failure**, and `Builder.vue:144-148` posts to `/publish` regardless. Because the POST re-renders the page, the
-  `saveError` alert at `ConfigPanel.vue:260` is torn down with the store: the author sees a publish outcome and
+  `saveError` alert at `ConfigPanel.vue` is torn down with the store: the author sees a publish outcome and
   never sees that their last edit did not save. ⚠️ **A second surface is built and unused:** `builderClient.ts:61-72`
   parses the 422 body into an `errors` map, and `useBuilderStore.ts:196-198` keeps only `.message` — a grep finds
   no consumer of `errors` anywhere outside the file that builds it. Per-field save errors are already on the wire
@@ -11594,7 +11594,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   surface rather than the repository. Once authors can compose content, a census over all of `resources/` is what
   keeps a well-meaning future edit from turning a block renderer into a sink. ⚠️ **A gate written here proves
   nothing while green** — it needs a committed mutation that adds a `v-html` and turns it red. **Live.**
-  Filed by `M110`. **Tier: early-testing.** ⚠️ **NOT BUILDABLE BEFORE `R-6dedc3a9` FIXES THE BLOCK SHAPE — recorded by `M121`, 2026-10-01.** It reads `ready` because the line cannot express that ordering (filed below). ⚠️ **The render path is wider than this row says:** `EncodeFormPresenter::field()` carries no config at all, and `InstanceField.vue` builds its own `encodeField` for repeat instances (reached from the builder preview through `RepeatGroup`), so the honest file list is six — three of them census hubs (`FieldInput.vue`, `FieldControl.vue`, `schema-mapping.ts`). It needs its own split. ✅ **`D69` ANSWERED 2026-10-01 (`M122`) — B: once a note has blocks, its label is for the author only** — it names the note in the canvas, the logic rail and the PDF, and the respondent sees the blocks alone. ⛔ **STILL NOT BUILDABLE BEFORE `R-6dedc3a9`** (the block shape this renders), whatever the line now says: it has no grammar for one row waiting on another's code (`R-6175d935`). ✅ **`M125` (2026-10-02) shipped the block shape this renders** (`R-6dedc3a9`'s shape half), so the precondition above now holds. ⚠️ Two facts the renderer inherits: span text may arrive `null` (`ConvertEmptyStringsToNull`), and the render-time link re-check is a TypeScript twin of `ContentBlocks::linkIsSafe()` — which wants a drift test, or it is one more unguarded mirror. ⚠️ **`M129` (2026-10-03) hands this row two pieces of `R-f0c5b682`, because this row is their only consumer.** (1) The GUEST read route for a content-block image: publicly readable for a published form, gated on `ScanStatus::servable()` (an unservable image renders as its alt text), and same-origin with the guest page, whose CSP is `img-src 'self'`. (2) The service worker's caching of those images: `sw.ts`'s network-first `guest-schema` cache holds 20 entries under `/api/v1/public/f/`, so an image routed there would evict a cached schema. It also inherits two things from `M129`'s editor: the Content tab's "respondents do not see this yet" notice, which this row removes, and the shared link-vector fixture that `linkLooksSafe()` and `linkIsSafe()` both read — the drift test asked for above. ⚠️ **VERIFIED BY `M130` (2026-10-04), TAKEN.** `components.test.ts:549` is a comment, not a check, and the only `v-html` assertion pins one file (`ContentBlocksEditor.test.ts:58-66`), so the census covers `resources/` and `packages/design-system/src`, which the guest bundle also ships. Five of the six render files are hubs now, not three. The encode page already receives `config.content` inside `version.schema`; it simply never reached `FieldInput`. The guest image route goes OUTSIDE `/api/v1/public/f/` and on its own limiter: under that prefix the schema cache would claim it and `ServiceWorkerCachePrefixRouteTest` refuses it, and on `throttle:guest` a note's 50 images would spend the per-token submit budget. Its offline cache key drops the share token, which is minted on every visit and lives 24 hours. The author-only label still reached screen readers through the "New question" announcement (`FieldRow.vue:61`, `InstanceField.vue:76`). `MdsAlert` is a live status region, so a static `MdsCallout` joins the design system rather than a local exception.
+  Filed by `M110`. **Tier: early-testing.** ⚠️ **NOT BUILDABLE BEFORE `R-6dedc3a9` FIXES THE BLOCK SHAPE — recorded by `M121`, 2026-10-01.** It reads `ready` because the line cannot express that ordering (filed below). ⚠️ **The render path is wider than this row says:** `EncodeFormPresenter::field()` carries no config at all, and `InstanceField.vue` builds its own `encodeField` for repeat instances (reached from the builder preview through `RepeatGroup`), so the honest file list is six — three of them census hubs (`FieldInput.vue`, `FieldControl.vue`, `schema-mapping.ts`). It needs its own split. ✅ **`D69` ANSWERED 2026-10-01 (`M122`) — B: once a note has blocks, its label is for the author only** — it names the note in the canvas, the logic rail and the PDF, and the respondent sees the blocks alone. ⛔ **STILL NOT BUILDABLE BEFORE `R-6dedc3a9`** (the block shape this renders), whatever the line now says: it has no grammar for one row waiting on another's code (`R-6175d935`). ✅ **`M125` (2026-10-02) shipped the block shape this renders** (`R-6dedc3a9`'s shape half), so the precondition above now holds. ⚠️ Two facts the renderer inherits: span text may arrive `null` (`ConvertEmptyStringsToNull`), and the render-time link re-check is a TypeScript twin of `ContentBlocks::linkIsSafe()` — which wants a drift test, or it is one more unguarded mirror. ⚠️ **`M129` (2026-10-03) hands this row two pieces of `R-f0c5b682`, because this row is their only consumer.** (1) The GUEST read route for a content-block image: publicly readable for a published form, gated on `ScanStatus::servable()` (an unservable image renders as its alt text), and same-origin with the guest page, whose CSP is `img-src 'self'`. (2) The service worker's caching of those images: `sw.ts`'s network-first `guest-schema` cache holds 20 entries under `/api/v1/public/f/`, so an image routed there would evict a cached schema. It also inherits two things from `M129`'s editor: the Content tab's "respondents do not see this yet" notice, which this row removes, and the shared link-vector fixture that `linkLooksSafe()` and `linkIsSafe()` both read — the drift test asked for above. ⚠️ **VERIFIED BY `M130` (2026-10-04), TAKEN.** `components.test.ts:549` is a comment, not a check, and the only `v-html` assertion pins one file (`ContentBlocksEditor.test.ts`), so the census covers `resources/` and `packages/design-system/src`, which the guest bundle also ships. Five of the six render files are hubs now, not three. The encode page already receives `config.content` inside `version.schema`; it simply never reached `FieldInput`. The guest image route goes OUTSIDE `/api/v1/public/f/` and on its own limiter: under that prefix the schema cache would claim it and `ServiceWorkerCachePrefixRouteTest` refuses it, and on `throttle:guest` a note's 50 images would spend the per-token submit budget. Its offline cache key drops the share token, which is minted on every visit and lives 24 hours. The author-only label still reached screen readers through the "New question" announcement (`FieldRow.vue:61`, `InstanceField.vue:76`). `MdsAlert` is a live status region, so a static `MdsCallout` joins the design system rather than a local exception.
 
 - ✅ **CLOSED BY `M129` (2026-10-04) — `minor` · A content-block image has nowhere to live, and the surfaces that must escape block text are not in
   the output-encoding contract.** Filed 2026-09-25 by `M110` as the third and last content-block row, split off
@@ -11901,7 +11901,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   rewrite:** it is already correct, already typed and already on the error object, so this is a consumption
   row and touches no producer. ⚠️ **It wants the field marked inline, not another banner.** `M113` gave the
   page a publish-refusal banner; a save failure is a different event with a different owner — it belongs on
-  the offending row in the config panel, beside the existing `saveError` alert at `ConfigPanel.vue:260`, which
+  the offending row in the config panel, beside the existing `saveError` alert at `ConfigPanel.vue`, which
   is the one surface the store's verdict already drives. ⚠️ **Widening `save.error` from `string|null` is the
   likely first step** (`useBuilderStore.ts`'s `guard()` keeps only `.message`), and
   `ConfigPanel.test.ts:110-124`'s hand-rolled store double must gain any new member or the mount throws.
@@ -12434,7 +12434,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - **`nit` · The builder's draft projection checks a calculated question's formula under a key nothing writes, so its
   "no formula yet" issue fires for every calculated question and a blank formula reaches the preview engine.** Measured
   by `M122` while closing `R-244d53dc`. `draft-snapshot.ts`'s state 7 reads `config.formula` (`:248-251`), but the
-  builder writes `config.calculated_formula` (`ConfigPanel.vue:162`, `:393`) and nothing maps one to the other — so the
+  builder writes `config.calculated_formula` (`ConfigPanel.vue`) and nothing maps one to the other — so the
   guard's `delete` never removes a blank formula, and `missing_formula` is recorded for every calculated question,
   formula or not. `draft-snapshot.test.ts:166-174` pins the wrong key, which is why it is green. ⚠️ **Invisible today:**
   an issue renders only beside its field's own control (`PreviewRuntime.vue:161`), a calculated question renders nothing
@@ -12930,3 +12930,23 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   no `lang` of its own (WCAG 3.1.1, 3.1.2). Reachable only once a form has a second language, which nothing in the
   product can give it yet (`forms.supported_locales` has no writer). **Latent.**
   Filed by `M130`. **Tier: during-testing.**
+
+- **`minor` · A note's content headings skip a level when the note sits in a block that has no heading.** Found by
+  `M130` while building `R-c9f50df2`. `NoteContent.vue` places a content heading one or two levels under the
+  heading its surface gives it (`ContentHeadingBaseKey`: 2 on the guest and encode pages, 3 in the builder
+  preview), and each surface leaves the section heading out when a block has no title — the guest page's block
+  of section-less questions (`SectionView.vue`), the encode page's untitled block (`Encode.vue`) and the
+  preview's (`PreviewRuntime.vue`). A note there puts an `h3` straight under the page's `h1`. An XLSForm import
+  leaves top-level questions in no section (`XlsformImporter`), so an author who adds a heading to an imported
+  note reaches it. The base belongs to whatever renders, or leaves out, the section heading. **Latent.**
+  Filed by `M130`. **Tier: during-testing.**
+
+- **`major` · An archived form keeps collecting responses through its public link while the forms list hides it.**
+  Found by `M130` while verifying `R-db169c29`. `FormService::archive()` discards the draft and leaves
+  `allow_guest_submissions` and `current_published_version_id` as they were
+  (`docs/form-versioning-schema-migration.md` §9 keeps the published version "addressable for historical
+  reporting"), and neither `GuestFormController::mint()` nor `GuestSubmissionController::store()` reads the
+  form's status, so `/f/{slug}` still mints, renders and accepts. Meanwhile `FormPresenter` leaves archived
+  forms out of the list, so responses arrive on a form its author can no longer find. Either archiving closes
+  the link (and the guest routes refuse an archived form with the 404 they give a disabled one), or the list
+  shows archived forms that still collect. **Live.** Filed by `M130`. **Tier: during-testing.**

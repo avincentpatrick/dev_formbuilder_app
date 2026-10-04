@@ -13,10 +13,11 @@
 
 import { cleanupOutdatedCaches, precacheAndRoute } from 'workbox-precaching';
 import { registerRoute } from 'workbox-routing';
-import { NetworkFirst, StaleWhileRevalidate } from 'workbox-strategies';
+import { CacheFirst, NetworkFirst, StaleWhileRevalidate } from 'workbox-strategies';
 import { CacheableResponsePlugin } from 'workbox-cacheable-response';
 import { ExpirationPlugin } from 'workbox-expiration';
 import { clientsClaim } from 'workbox-core';
+import { CONTENT_IMAGE_CACHE, contentImageCacheKey } from './lib/content-images';
 import { openDb } from './lib/db';
 import { replayOutbox } from './lib/replay';
 import { SHELL_CACHE, SHELL_EXPIRATION } from './lib/shell-cache';
@@ -92,6 +93,24 @@ registerRoute(
         networkTimeoutSeconds: 5,
         plugins: [new CacheableResponsePlugin({ statuses: [200] }), new ExpirationPlugin({ ...SHELL_EXPIRATION })],
     }),
+);
+
+// M130 (`R-c9f50df2`) — a note's content images, so a loaded form shows its pictures offline. CacheFirst
+// because an attachment id never changes what it names; keyed WITHOUT the share token (`contentImageCacheKey`),
+// because a token is minted on every visit and lives a day, so a token-keyed cache would re-download every
+// image per visit and miss them all once the tab's token expired. On its own prefix, deliberately: under
+// `/api/v1/public/f/` the schema route above would claim it and an image would evict a cached schema.
+registerRoute(
+    ({ url, sameOrigin }) => sameOrigin && url.pathname.startsWith('/api/v1/public/content-images/'),
+    new CacheFirst({
+        cacheName: CONTENT_IMAGE_CACHE,
+        plugins: [
+            { cacheKeyWillBeUsed: async ({ request }) => contentImageCacheKey(request.url) },
+            new CacheableResponsePlugin({ statuses: [200] }),
+            new ExpirationPlugin({ maxEntries: 120, maxAgeSeconds: 30 * DAY }),
+        ],
+    }),
+    'GET',
 );
 
 self.skipWaiting();

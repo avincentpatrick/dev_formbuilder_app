@@ -570,6 +570,62 @@ class E2eSeeder extends Seeder
                 ]);
             }
 
+            // M130 (`R-c9f50df2`) — a guest-enabled form whose note carries every content block: two heading levels,
+            // a paragraph with every mark and a link, a callout, a divider and a picture of the entrance, stored
+            // through the real upload path so its virus check runs as an author's would. Reached at /f/visit-guide
+            // by `public-runtime-axe.spec.ts` (the blocks render and scan clean) and `public-runtime-offline.spec.ts`
+            // (the picture still renders offline).
+            if (Form::query()->where('title', 'Before Your Visit')->doesntExist()) {
+                $guide = app(FormService::class)->create(
+                    $tenant, $owner, 'Before Your Visit', 'A note with every content block and a picture (M130 demo).'
+                );
+                $guideBuilder = app(FormBuilderService::class);
+                $guideSection = $guideBuilder->addSection($guide);
+                $guideSection->update(['label' => 'Your visit']);
+                $entrance = app(AttachmentStorageService::class)->storeFormContentImage(
+                    UploadedFile::fake()->createWithContent('clinic-entrance.png', (string) base64_decode(self::VISIT_GUIDE_ENTRANCE_PNG)),
+                    (string) $tenant->id,
+                    $guide->id,
+                    (string) $owner->id,
+                );
+                $guideBuilder->addField($guide, $owner, FieldType::Note, $guideSection->id)->update([
+                    'key' => 'visit_guide',
+                    'label' => 'Visit guide (for the team)',
+                    'config' => ['content' => [
+                        ['type' => 'heading', 'level' => 1, 'text' => 'Before you arrive'],
+                        ['type' => 'paragraph', 'spans' => [
+                            ['text' => 'Bring your '],
+                            ['text' => 'clinic card', 'bold' => true],
+                            ['text' => ' and '],
+                            ['text' => 'any medicines you take', 'italic' => true],
+                            ['text' => '. Your visit code starts with '],
+                            ['text' => 'PH-', 'code' => true],
+                            ['text' => '. '],
+                            ['text' => 'Read the clinic guide', 'link' => 'https://example.org/clinic-guide'],
+                            ['text' => '.'],
+                        ]],
+                        ['type' => 'callout', 'tone' => 'warning', 'spans' => [
+                            ['text' => 'For a blood test, do not eat for 8 hours before your visit.'],
+                        ]],
+                        ['type' => 'divider'],
+                        ['type' => 'heading', 'level' => 2, 'text' => 'Finding the entrance'],
+                        ['type' => 'image', 'attachment_id' => $entrance->id, 'alt' => 'The clinic: a blue building facing the road, its door under a red pin.'],
+                    ]],
+                ]);
+                $guideBuilder->addField($guide, $owner, FieldType::ShortText, $guideSection->id)->update([
+                    'key' => 'visitor_name',
+                    'label' => 'Your name',
+                ]);
+                app(PublishService::class)->publish($guide->refresh(), $owner);
+
+                $guide->update([
+                    'public_slug' => 'visit-guide',
+                    'allow_guest_submissions' => true,
+                    'supported_locales' => ['en'],
+                    'single_page_mode' => true,
+                ]);
+            }
+
             // A guest-enabled but CLOSED scheduled form (Increment H12b) — reached at /f/closed-survey. Its
             // window has passed (closes_at in the past), so the public runtime renders the full-screen "This
             // form is closed" state INSTEAD of the fill session (the schema is still served — H12a). Gives the
@@ -2073,6 +2129,9 @@ class E2eSeeder extends Seeder
 
     /** Deterministic id for the seeded scan (M129), so re-seeding finds it rather than adding a second. */
     private const OCR_SCAN_FIXTURE_ID = '0192e2e0-0000-7000-8000-00000000c501';
+
+    /** The entrance picture on the seeded "Before Your Visit" note (M130): 240×135, drawn in four flat colours. */
+    private const VISIT_GUIDE_ENTRANCE_PNG = 'iVBORw0KGgoAAAANSUhEUgAAAPAAAACHBAMAAADaXMnYAAAAD1BMVEXo8f2aqLoOb+j////ZLSDp4q8yAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAApElEQVRo3u3XwQ2DMAxAUVboBpXFBO0GyPvPVJXSay4kGMH7CzzZQiGZJkmSJEnSzmJHT3A3OHMpgTPb8ih4/sJZAK9ua+RB8G/g1siD4M1tjHwx+L/pxq7BYF+1A+RsZ3UZXPZbrIPLbiBRCldc9tZdx63gsgt9HTxn3AyOxfv40vB76wUGg8FgMBgMBoPPCqtjj6LAYDAYDAaDwQfAkiRJUvc+qre8eV3EZrUAAAAASUVORK5CYII=';
 
     /** A 1×1 PNG: the page image. The review screen needs a page to show, not a legible one. */
     private const OCR_SCAN_FIXTURE_PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';

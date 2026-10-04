@@ -1258,3 +1258,32 @@ describe('encode page — Submit does not race its own draft channel (M68)', () 
         expect(draftWrites()).toHaveLength(1);
     });
 });
+
+describe('encode page — a note with content blocks (M130, `R-c9f50df2`)', () => {
+    it('shows the keyer what a respondent sees, under the section heading, and never the note’s label', () => {
+        const content = [
+            { type: 'heading', level: 1, text: 'Consent' },
+            { type: 'paragraph', spans: [{ text: 'Read this aloud before you begin.' }] },
+        ];
+        const wrapper = mountEncode(
+            payload({
+                sections: [section({ key: 's1', label: 'Before you begin', sequence: 1 })],
+                fields: [field({ key: 'intro', label: 'Intro (for the team)', field_type: 'note', section_key: 's1', sequence: 1, config: { content } })],
+                blocks: [
+                    {
+                        key: 's1',
+                        label: 'Before you begin',
+                        fields: [{ ...blockField({ key: 'intro', field_type: 'note', label: 'Intro (for the team)' }), content, supported: false }],
+                    },
+                ],
+                singlePage: true,
+            }),
+        );
+
+        // The page titles the block with an h2, so the note's major heading is an h3.
+        expect(wrapper.find('h2.encode__block-title').text()).toBe('Before you begin');
+        expect(wrapper.find('[data-note-content] h3').text()).toBe('Consent');
+        expect(wrapper.text()).toContain('Read this aloud before you begin.');
+        expect(wrapper.text()).not.toContain('Intro (for the team)');
+    });
+});

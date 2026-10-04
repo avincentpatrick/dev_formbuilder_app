@@ -19,9 +19,9 @@
  * unsafe link would refuse the label and every other edit with it. Such a link is kept as plain text and the block
  * says why, asked through `linkLooksSafe()`, which agrees with `ContentBlocks::linkIsSafe()` on a shared fixture.
  *
- * ⚠️ RESPONDENTS DO NOT SEE THIS CONTENT YET, AND THE TAB SAYS SO. The approved Oct 12 plan builds this editor
- * before the renderer (`R-c9f50df2`), the reverse of the order the row's step (f) chose. Until the renderer ships,
- * a respondent sees the note's label; the renderer row removes the notice.
+ * ⚠️ THE TAB SAYS WHAT RESPONDENTS SEE. Until M130 it said they saw none of this (the editor shipped a day before the
+ * renderer); since `R-c9f50df2` they see these blocks IN PLACE of the note's label (`D69`), and the notice says that,
+ * so an author knows the label is now theirs alone.
  *
  * ⚠️ THE IMAGE PICKER IS A NATIVE FILE INPUT, because the design system has no file input — the `BrandingCard.vue`
  * and `ocr/Scans.vue` precedent. A real `<input type="file">` keeps the operating system's picker, the keyboard and
@@ -309,8 +309,8 @@ function blockLabel(index: number, block: ContentBlock): string {
 <template>
     <div class="cbe">
         <!-- Two facts an author needs before composing anything, so both are there from first paint. -->
-        <p class="cbe__notice" data-content-notice="not-shown-yet">
-            Respondents do not see this content yet — until they do, they see the note's label.
+        <p class="cbe__notice" data-content-notice="replaces-label">
+            Respondents see this content in place of the note's label.
         </p>
         <p class="cbe__hint">Shown in the form's default language only.</p>
 

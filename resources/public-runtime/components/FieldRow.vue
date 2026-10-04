@@ -7,6 +7,7 @@
  * control never loses the answer.
  */
 import { computed, nextTick, ref, watch } from 'vue';
+import { announcementFor } from '@/components/submissions/note-content';
 import { Coercion, type EngineValue } from '../engine';
 import FieldControl from './FieldControl.vue';
 import RelevanceNote from './RelevanceNote.vue';
@@ -57,8 +58,10 @@ watch(relevant, (isRelevant, wasRelevant) => {
             noteTimer = setTimeout(dismissNote, 6000);
         }
     } else if (!wasRelevant && isRelevant) {
-        // Newly shown — announce but do NOT steal focus (§10.2).
-        announcer.announce(`New question: ${runtime.labelFor(props.field)}`);
+        // Newly shown — announce but do NOT steal focus (§10.2). A note with content blocks is announced by what it
+        // says, never by its author-only label (M130, `D69`).
+        const message = announcementFor(props.field.fieldType, props.field.content, runtime.labelFor(props.field));
+        if (message !== null) announcer.announce(message);
     }
 });
 

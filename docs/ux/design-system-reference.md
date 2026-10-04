@@ -696,6 +696,10 @@ Governing rule: **help text occupies its layout slot even when absent from a hid
 >
 > **Which control to reach for.** `MdsSwitch` for "is this capability on for me/my organisation" — a setting whose effect is immediate. `MdsCheckbox` stays correct for choosing items out of a set, for consent ("I accept the terms"), and for anything inside a form that is submitted by a button. `MdsSwitch` deliberately mirrors `MdsCheckbox`'s prop and event contract over a real `<input type="checkbox">` (with `role="switch"`), so the two are interchangeable at a call site — which is how I5 swapped fifteen live controls with the existing test locators untouched.
 
+> **Implementation status (M130): `MdsRadio` is BUILT**, for `D77` — a single-choice question now renders as round buttons by default (ODK's and the printed form's meaning), and only a Dropdown question is a dropdown. It mirrors `MdsCheckbox`: a real `<input type="radio">` visually hidden inside its `<label>`, a 44 px target (§4.4), the focus ring on the circle, and the **inner dot as the non-colour signifier**; `describedby` and `invalid` pass through as on the checkbox.
+>
+> **The group is the caller's, and it carries the description.** `FieldInput.vue` renders the radios in a `<fieldset>` whose `<legend>` is the question, gives every radio of one rendering a `useId()` name (so a repeated section's instances never share a group — the likert scale had that defect until the same increment), and wires the hint and the error onto the fieldset with `aria-describedby`, which no group control did before M130. A question that is not required offers **Clear selection**, because a radio group cannot otherwise return to unanswered.
+
 ### 3.3 Lists & Tables
 
 The data table is the single most-used composite component (submissions inbox, forms list, webhook delivery log, audit log). One component covers all of these, configured per use, not re-implemented per page.
@@ -1100,6 +1104,21 @@ The in-flow contextual message: something happened, and the page is telling you 
 **Tones reuse `--mds-color-status-{info|success|warning|danger}-{bg,fg}` exactly as Banner does**, so `theme-overrides.test.ts`'s existing measurements cover this component in both themes. A hand-picked hex here would be unmeasured by anything.
 
 > **As-built adoption (J4a):** thirteen surfaces. Five admin error banners that were **byte-identical apart from a class name** (`assertive`, because each is a thing that just failed under the operator's hand), and eight that carried **no `role` at all** — `webhooks/Show`, `integrations/RuleShow` ×2, `domains/Index`, `Settings/Sso`, `integrations/Index` ×3. ⚠️ Roughly twenty further hand-rolled notices remain in the app tree and are a recorded backlog row, **not** an oversight: several carry deliberate, individually-argued `role` choices (`Encode.vue` has five, each with its own rationale) and migrating them is a per-site decision rather than a sweep.
+
+### 3.7b Callouts — toned content that is part of the page *(**AS-BUILT since M130** — `MdsCallout`)*
+
+A callout is a toned box an **author** placed in content — today, the callout block in a note's content (`R-c9f50df2`). It is not a message from the system, so it is neither of §3.7a's two components:
+
+| | `MdsBanner` | `MdsAlert` | `MdsCallout` |
+|---|---|---|---|
+| Who is speaking? | the product, about a standing condition | the product, about an event | the author of the content |
+| Live region? | `role="status"` | `status`, or `alert` when assertive | **none** — `role="note"` |
+| Dismissible? | no | yes | no — it is content |
+| Content | `message: string` | a slot | a slot |
+
+⚠️ **NO LIVE REGION, AND THAT IS THE WHOLE REASON IT EXISTS.** A note can appear mid-form when a question's relevance reveals it; an `MdsAlert` there would be announced over whatever the respondent was doing, and the runtime already says "New information: …" once through its own announcer. A callout is read when the reader reaches it in order, like the paragraph beside it.
+
+**Tones reuse `--mds-color-status-{info|success|warning|danger}-{bg,fg}` exactly as Alert and Banner do**, so a tone means one thing across the product and `theme-overrides.test.ts`'s measurements cover it in both themes. The icon is the non-colour channel (WCAG 1.4.1), with Alert's default glyphs, so `warning` and `danger` share a glyph here too — and the words carry the difference, as §3.7a records. The slot is rendered as given: the component adds no markup sink, and its one consumer, `NoteContent.vue`, puts only text nodes in it (the raw-HTML census in `resources/js/__tests__/` holds both to that).
 
 ### 3.8 Badges / Status Pills
 

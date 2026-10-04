@@ -11624,7 +11624,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   derived its own answer they could disagree. A preset that sets a font pairing and a radius scale sets more than
   six, so it must compose with that presenter rather than fork it. ⚠️ **The gate worth writing is totality across
   modes** — a preset legible in light and unreadable in dark is the failure this buys protection against.
-  **Live.** Filed by `M110`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-03 by `M127`: it is one of the user's 19 builder comments, wanted for the Oct 12 testing (`D72`).** **`D65` answered 2026-10-03 (`M127`): A — confine the preset, each added property documented and contrast-checked.**
+  **Live.** Filed by `M110`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-03 by `M127`: it is one of the user's 19 builder comments, wanted for the Oct 12 testing (`D72`).** **`D65` answered 2026-10-03 (`M127`): A — confine the preset, each added property documented and contrast-checked.** ⚠️ **VERIFIED BY `M131` (2026-10-04), TAKEN.** `forms.theme` already exists — `jsonb`, nullable, in `Form::$fillable` — and nothing reads or writes it, so it is used rather than added (and taken out of `$fillable`, as `M130` did for its settings columns). No webfont loads on the guest page, so a font pair is two system stacks; `--mds-radius-sm` stays fixed (a checkbox must not look like a radio), so a radius scale moves `md`, `lg` and `xl` only; and the guest device keeps ONE `brand_version`, so it stays the workspace's fingerprint and a per-form preset cannot re-sweep the cached shells on every switch between forms. A preset's ramp is pinned literals checked against the engine, never re-derived on read. **`D81` answered 2026-10-04 (`M131`): A — presets on every plan.**
 
 - ✅ **CLOSED BY `M130` (2026-10-04) — `minor` · A respondent who finishes a form cannot be sent anywhere; there is a thank-you message and no
   redirect of any kind.** Filed 2026-09-25 by `M110`, from the report that a finished form *"can be configured to
@@ -11652,7 +11652,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   purpose is who may see a form, not where an author filed it. Overloading it would make a filing decision change
   who can read the form. ⚠️ **The isolation case is the test that matters:** a collection must not leak the
   existence of a form the viewer cannot already see, so the facet has to compose with `Form::scopeVisibleTo()`
-  rather than sit beside it. **Live.** Filed by `M110`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-03 by `M127`: it is one of the user's 19 builder comments, wanted for the Oct 12 testing (`D72`).**
+  rather than sit beside it. **Live.** Filed by `M110`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-03 by `M127`: it is one of the user's 19 builder comments, wanted for the Oct 12 testing (`D72`).** ⚠️ **VERIFIED BY `M131` (2026-10-04), TAKEN.** The facet is applied in `FormController::index`, not inside `FormPresenter::list()`, over the rows `visibleTo()` admitted — so a folder filter and its counts done the same way are isolated by construction. `docs/adr/0011-analytics-substrate.md` §D6 ("no tag model is coined") is the decision this row meets; its trigger, one form in two programs, is not met by a single-valued folder, so the folder is a filing axis and the ADR gains a dated note. **`D78` and `D79` answered 2026-10-04 (`M131`): folders, one per form, workspace-wide; authors create them, Owners and Admins rename and delete.**
 
 - **`minor` · There is no way to use another form's responses inside a form, which is KoboToolbox's "Connect
   project" and the single largest gap against it.** Filed 2026-09-25 by `M110` from the report
@@ -11739,7 +11739,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   template and then be invisible and uneditable in the builder that owns the form — which is worse than not
   supporting it, because an author cannot see why their field behaves as it does. ⚠️ `SchemaSnapshotSerializer`
   already remaps the group ordinal and has a test; extend it to a builder-authored group rather than writing a
-  second path. **Live.** Filed by `M110`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-03 by `M127`: it is one of the user's 19 builder comments, wanted for the Oct 12 testing (`D72`).**
+  second path. **Live.** Filed by `M110`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-03 by `M127`: it is one of the user's 19 builder comments, wanted for the Oct 12 testing (`D72`).** ⚠️ **VERIFIED BY `M131` (2026-10-04), TAKEN.** The importer writes no group (`M126` said so at its own row); the materializer is the only writer that mints one. A regroup alone would be dropped twice over: `UpdateFieldRequest` strips keys it has no rule for, and `replaceValidations()`'s row identity ignores grouping. ⛔ **No publish gate inspects a group,** so a later member with no operator publishes and then throws on every submission; the gate lands with this row, because the builder is about to author groups. **`D80` answered 2026-10-04 (`M131`): A — one all/any switch per rule list.**
 
 - ✅ **CLOSED BY `M113` (2026-09-26) — `minor` · Five of the six client-side copies of the field-type catalogue have no parity test, and the one that
   does proves the technique works.** Filed 2026-09-25 by `M110` while designing the per-type validation model,
@@ -12492,7 +12492,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   patches only `related_field_key` — so a valid row silently becomes one the new related-kind refusal rejects, and
   nothing says so until publish; "is answered" is offered for a note, which is never answered; and the compared-question
   list for `greater_than_field` / `less_than_field` includes notes, dates and choices. The gate is the backstop; the
-  editor should not build what it refuses. **Live.** Filed by `M123`. **Tier: early-testing.** ⛔ **RE-VERIFIED BY `M125` (2026-10-02), NOT TAKEN — ITS EXACT FIX EDITS `BuilderPresenter.php`, WHICH `M125`'s PALETTE ROW SPENT.** Evidence held: the compared-question select patches only `related_field_key`, "is answered" is offered whenever `operator_may_be_empty` holds with no shape check, and `relatedOptionsFor()` filters nothing. ⚠️ **Understated:** the field-comparison list also offers text, yes/no, cascading, geo, attachment, grid and page-break questions, and an `_if` rule can pick a note and is then left with no operator at all. ⚠️ **Overstated:** a stale explicit operator IS shown, as a disabled "not available for this question" option — weakly, and nothing resets or flags it. **Remedy, measured:** the client already has each field's shape and each operator's shapes; what it lacks is `ValidationRuleType::relatedComparison()` (an empty `_with` operator is judged as `is_null`, the two field comparisons as `gt` / `lt`). Transmit it as a `related_comparison` rule fact from `BuilderPresenter::enums()` — the hub — pinned by a census in `BuilderEnumsPayloadTest`; a client literal would be an unguarded mirror, and filtering by the rule's own `shapes` wrongly hides a likert scale that publish accepts. Re-pointing should clear an operator the new question cannot take, as `setRuleType()` does, and a saved key the filter hides must stay visible as a disabled option. ⛔ **RE-VERIFIED BY `M126` (2026-10-02), NOT TAKEN — `M126` spent its one hub on `R-86a0426d`, which was silent data loss. This is `M127`'s hub row.** Evidence held as `M125` recorded it. **The file set, measured:** `BuilderPresenter.php` (the hub), `resources/js/components/builder/types.ts` (`RuleTypeOption`), `ValidationEditor.vue` and its test, `builder-store-fixtures.ts` (type-checked, so it must gain any required new member) and `BuilderEnumsPayloadTest` — and NOT `ConfigPanel.vue`, which passes `enums.validation_rule_types` through whole. ⚠️ **Two gaps in the remedy above:** a `related_comparison` fact alone still lets an `_if` rule pick a note, because its operator is not stored yet and the fact is then null — the compared list must also hide any question whose shape no operator's `shapes` allows; and `setRuleType()` keeps `related_field_key` across rule kinds, so `required_if` → `greater_than_field` keeps a text question publish refuses — the clearing belongs there as well as on re-pointing.
+  editor should not build what it refuses. **Live.** Filed by `M123`. **Tier: early-testing.** ⛔ **RE-VERIFIED BY `M125` (2026-10-02), NOT TAKEN — ITS EXACT FIX EDITS `BuilderPresenter.php`, WHICH `M125`'s PALETTE ROW SPENT.** Evidence held: the compared-question select patches only `related_field_key`, "is answered" is offered whenever `operator_may_be_empty` holds with no shape check, and `relatedOptionsFor()` filters nothing. ⚠️ **Understated:** the field-comparison list also offers text, yes/no, cascading, geo, attachment, grid and page-break questions, and an `_if` rule can pick a note and is then left with no operator at all. ⚠️ **Overstated:** a stale explicit operator IS shown, as a disabled "not available for this question" option — weakly, and nothing resets or flags it. **Remedy, measured:** the client already has each field's shape and each operator's shapes; what it lacks is `ValidationRuleType::relatedComparison()` (an empty `_with` operator is judged as `is_null`, the two field comparisons as `gt` / `lt`). Transmit it as a `related_comparison` rule fact from `BuilderPresenter::enums()` — the hub — pinned by a census in `BuilderEnumsPayloadTest`; a client literal would be an unguarded mirror, and filtering by the rule's own `shapes` wrongly hides a likert scale that publish accepts. Re-pointing should clear an operator the new question cannot take, as `setRuleType()` does, and a saved key the filter hides must stay visible as a disabled option. ⛔ **RE-VERIFIED BY `M126` (2026-10-02), NOT TAKEN — `M126` spent its one hub on `R-86a0426d`, which was silent data loss. This is `M127`'s hub row.** Evidence held as `M125` recorded it. **The file set, measured:** `BuilderPresenter.php` (the hub), `resources/js/components/builder/types.ts` (`RuleTypeOption`), `ValidationEditor.vue` and its test, `builder-store-fixtures.ts` (type-checked, so it must gain any required new member) and `BuilderEnumsPayloadTest` — and NOT `ConfigPanel.vue`, which passes `enums.validation_rule_types` through whole. ⚠️ **Two gaps in the remedy above:** a `related_comparison` fact alone still lets an `_if` rule pick a note, because its operator is not stored yet and the fact is then null — the compared list must also hide any question whose shape no operator's `shapes` allows; and `setRuleType()` keeps `related_field_key` across rule kinds, so `required_if` → `greater_than_field` keeps a text question publish refuses — the clearing belongs there as well as on re-pointing. ⚠️ **VERIFIED BY `M131` (2026-10-04), TAKEN with `R-799d60f5`, which edits the same editor.** Evidence held at `ValidationEditor.vue:304`, `:127-137` and `:154`; the file set `M126` measured holds, and `ConfigPanel.vue` is not edited. Re-pointing also clears the value the cleared operator compared against.
 
 - **`minor` · After a rule the server cannot evaluate refuses a Submit on the encode resume page, the page cannot be
   reopened.** Measured by `M123` at the code while closing `R-d8780a8b`, not run. The Submit's draft branch saves the
@@ -12985,3 +12985,44 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   does not take (unmeasured candidates: the headless shell ignores it, or the spec's `test.use` launch options are
   replaced), or serve CI's E2E on a `*.localhost` origin; then make a skip in CI fail rather than pass quietly.
   **Live.** Filed by `M130`. **Tier: during-testing.**
+
+- **`minor` · Saving a question to the field library drops its cross-field rules but keeps their group, so an "any of
+  these" group comes back stricter.** Found by `M131` while verifying `R-799d60f5`. `FieldLibrary::fromField()` drops
+  every rule that names another question and keeps the remaining rows' group ordinals, so an OR group that loses a
+  field comparison offers fewer alternatives and refuses answers the original accepted. Reachable once the builder
+  authors groups. The remedy is to drop a group whole when any member goes, or to ungroup the survivors and say so.
+  Read, not run. **Live.** Filed by `M131`. **Tier: during-testing.**
+
+- **`minor` · A form's preset theme reaches the guest page and the builder preview and nothing else.** Found by `M131`
+  while verifying `R-6017d6d8`. Mail and the response PDF read `BrandPalette`, not the brand partial, and the encode
+  page and OCR review render inside the admin shell in the member's own accent, so a respondent's emails and a
+  keyer's screen keep the workspace look. **Live.** Filed by `M131`. **Tier: during-testing.**
+
+- **`minor` · Rules cannot be nested, so "(A and B) or C" cannot be built in the editor.** Filed 2026-10-04 under
+  `D80`, which ships one all/any switch per rule list for the Oct 12 testing. Both engines already evaluate several
+  groups per family (required and skip units combine as ANY, constraint units as ALL), so what remains is the editor:
+  groups inside a list, as the visibility editor's "Add group" does, and an editable view of a template's mixed
+  grouping where `M131` shows a notice. **Live.** Filed by `M131`. **Tier: during-testing.**
+
+- **`minor` · `GET /api/v1/forms` lists a form to anyone holding an Editor grant on it, without the `forms.edit.own`
+  check the web list applies.** Found by `M131` while verifying `R-9e634897`. `FormApiController::index()` repeats
+  the grant check inline instead of calling `Form::scopeVisibleTo()`, and omits the second conjunct that scope's own
+  comment calls load-bearing, so a Reviewer or Viewer holding an Editor grant could list forms the web list and the
+  builder refuse them. The remedy is to call the scope. Not measured: whether either role can hold a token carrying
+  `read:forms`. **Latent.** Filed by `M131`. **Tier: during-testing.**
+
+- **`minor` · A malformed rule group that is already published is found by no census, and two write paths still
+  accept one.** Found by `M131` while verifying `R-799d60f5`. The refusal `M131` adds at publish is prospective:
+  `forms:audit-published-rules` does not look at groups, so a published version holding a later member with no
+  operator keeps throwing `malformed_logic_group` on submission. `BlueprintValidator` and `StoreFieldLibraryRequest`,
+  which stores `default_validations` as given, both accept one; publish is the backstop. Only a template or a library
+  item can carry one today, and none seeded does. **Latent.** Filed by `M131`. **Tier: during-testing.**
+
+- **`nit` · `form_field_validations.logic_operator` has no CHECK, and nothing in the database ties an operator to a
+  group.** Found by `M131`. The column is `varchar(3)` with no value-domain constraint (the table's one CHECK is the
+  rule/expression XOR), and an operator on an ungrouped row is stored and never read.
+  **Not live**. Filed by `M131`. **Tier: before-launch.**
+
+- **`nit` · A form created while the list is filtered to a folder lands in Unfiled.** Found by `M131` while designing
+  `R-9e634897`. Creating a form does not take the folder in view, so the new form is missing from the filtered list it
+  was started from. **Live.** Filed by `M131`. **Tier: during-testing.**

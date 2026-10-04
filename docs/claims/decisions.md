@@ -1420,6 +1420,52 @@ The matcher reads a sheet against the version it was printed from, superseded on
 
 ---
 
+### D78 — The forms list gains a grouping. What is the model? **A — folders, one per form, shared by the whole workspace; the list filters by folder and by Unfiled.**
+
+**Filed and answered 2026-10-04 (user decision, in chat), recorded by Lane A during `M131` — A, the recommendation.** Put to the user under `D66`'s rule, because `R-9e634897` — an `early-testing` work row taken by `M131` — builds a different schema under each answer. Measured: the list has no pagination and filters in PHP over the rows `FormPresenter::list()` admitted after `visibleTo()`, so a folder filter and its counts done the same way can never reveal a form the viewer cannot already see. `docs/adr/0011-analytics-substrate.md` §D6 coined no tag model and named its trigger — one form in two programs — which a single-valued folder does not meet.
+
+- **A — folders, one per form.** A nullable `forms.folder_id`; the list filters by folder and by Unfiled.
+- **B — tags, several per form.** A join table; the list filters by one tag. About half a day more, and it meets that ADR's tag trigger.
+- **C — nested folders.** Folders inside folders; the most to build, and likely past the Oct 7 slot.
+
+**Recommendation: A.** It answers "a workspace grouping in the form list (filtering option)" with the least to learn, and fits the slot. Tags stay possible later as a second axis.
+
+---
+
+### D79 — Who may create, rename and delete a folder? **A — anyone who can create forms creates folders and files the forms they can edit; only Owners and Admins rename or delete a folder, and deleting one unfiles its forms rather than deleting them.**
+
+**Filed and answered 2026-10-04 (user decision, in chat), recorded by Lane A during `M131` — A, the recommendation.** Put to the user under `D66`'s rule, because `R-9e634897`'s policy differs under each answer. Measured: no workspace-level "manage forms" permission exists; Owners and Admins hold `forms.edit.any`, Form Editors hold `forms.create` and `forms.edit.own`. Every answer reuses those keys, so none mints a permission or a backfill migration.
+
+- **A — authors create, admins tidy.** Create: `forms.create`. Rename and delete: `forms.edit.any`. Filing a form: whoever may edit it.
+- **B — any author does everything.** Rename and delete also on `forms.create`.
+- **C — admins only.** Create, rename and delete on `forms.edit.any`; authors only file their forms.
+
+**Recommendation: A.** An author can organise without waiting for an admin, and a folder other people's forms sit in cannot be renamed or removed from under them by any author.
+
+---
+
+### D80 — How much AND/OR should the rule editor offer for the Oct 12 testing? **A — one all/any switch per rule list: "Required when ALL / ANY of these hold" and "The answer must pass ALL / ANY of these rules". Nesting is filed for after Oct 12, and a grouping a template made that the switch cannot show is shown with a notice and kept untouched.**
+
+**Filed and answered 2026-10-04 (user decision, in chat), recorded by Lane A during `M131` — A, the recommendation.** Put to the user under `D66`'s rule, because `R-799d60f5` — an `early-testing` work row taken by `M131` — builds a different editor under each answer. Measured: both engines fold a group flat, left to right by each row's own operator, with no precedence; units of the required and skip families combine as ANY and constraint units as ALL. So "Required when ALL" is one `and` group, and "Must pass ANY" is one `or` group, with no new column.
+
+- **A — one all/any switch per list.** Covers "required when A and B" and "valid if X or Y"; nesting is its own `during-testing` row.
+- **B — groups inside a list,** like the visibility editor's "Add group", so (A and B) or C can be built. About half a day more.
+
+**Recommendation: A.** The common cases for the Oct 12 testing, built in the slot; a template's deeper grouping stays visible and intact rather than flattened.
+
+---
+
+### D81 — Which plans may give a form a preset theme? **A — every plan. A workspace's own brand colour stays Starter+.**
+
+**Filed and answered 2026-10-04 (user decision, in chat), recorded by Lane A during `M131` — A, the recommendation.** Put to the user under `D66`'s rule, because `R-6017d6d8` — an `early-testing` work row taken by `M131` — either carries a `feature:branding` gate or does not. The tenant brand is gated at Starter+ (`docs/adr/0008-entitlement-and-metering.md` §D7, restated by `docs/adr/0014-tenant-brand-ramp-generation.md`); `M120` declined to mint a gate for the page-mode setting because that is a pricing decision.
+
+- **A — every plan.** Presets are made and contrast-checked by the product, not the workspace's own colour.
+- **B — Starter+ only, like branding.** A Free workspace sees the picker locked.
+
+**Recommendation: A.** A preset is a product look, not a brand; the paid line stays where `0008-entitlement-and-metering.md` drew it.
+
+---
+
 ### D15 — `D13`'s one-hub-row cap is now the binding constraint on batch composition, and it is stricter than its own purpose. **ANSWERED — option 4: the cap reads the files a row REMEDY EDITS, excluding the close-out artefacts.** **Tier: early-testing.**
 
 **Filed 2026-09-05 by Lane A, during `M72`, at the moment the cap decided a batch that value had not.**

@@ -16,7 +16,113 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M132` is merged; a form shows reference files frozen per published version, and a submitted response can email a notice or send its answers to a web address
+## Status: ACTIVE CLAIM — `M133`, the Oct 9 slot: Connect project v1 — a choice question takes its choices from another form's responses, under two-key consent (`m133-connect-project`)
+
+Taken 2026-10-05. Branch `m133-connect-project`, cut from `origin/main` at `d2ea2349`, PR into `main`.
+The sixth Oct 12 increment under `D72` and the fourth under `D75`: one row, in four commits in this order, so a red run
+bisects to one part — (1) the source form shares, (2) the author links a choice question and publish checks it,
+(3) the list reaches the guest page, the encode page and the scan reader, (4) the hub documents.
+- **`R-5da4a30f`** (`docs/feature-backlog.md:11657`) — Connect project v1: link another form in the same workspace under
+  two-key consent and feed a `single_select`/`dropdown`'s choices from its responses; nothing may break offline
+  submission; `D60` = A, the list rides beside the schema checksum with its own stamp and cache key.
+
+The OCR provider comparison, the slot's other item, is NOT taken: the samples are due 2026-10-08 and have not arrived.
+`D85`–`D87` were answered by the user in chat on 2026-10-05, each the recommendation. Also in this push: a verification
+note on the row, what v1 leaves appended to the remainder row, and one row filed — a repeat group exports as empty cells
+(`major`, `during-testing`), measured with a probe through the real projector.
+
+### Evidence verified
+
+Against `d2ea2349`:
+- **Held:** there is no way to use another form's responses: no config key, table or route reads one form's answers
+  into another form's runtime. The nearest pickers are the redirect target (`FormSettingsPresenter::redirectTargets()`)
+  and the automation webhook payload (`FormAutomationWebhookPayload`), neither of which feeds a question.
+- **Held, by design rather than measurement:** the row says "nothing here is measured against this tree"; the
+  measurements below are what the design rests on.
+- **Held:** choice options are `config.options` lists of `{value, label, label_translations?}` (`UpdateFieldRequest.php:222-229`),
+  and `config` is part of the version snapshot and its checksum (`SchemaSnapshotSerializer::field()`), so a list inside it
+  would move the checksum every offline client pins — the failure `D60` exists to prevent.
+
+### Premise verified
+
+- **No `forms.view` permission exists.** Reading a form is `FormPolicy::viewOverview()` (`dashboard.form.view` and
+  org-wide or a grant), reading its responses `SubmissionPolicy::viewAny()` (`submissions.view`); the hub's responses
+  route requires both (`routes/tenant.php:776-778`). Key 2 is that conjunction, asked of a user who is not the actor —
+  which nothing does today; `NotificationPresenter` uses `Gate::forUser()` and is the precedent.
+- **`forms.owner_user_id` is set once by `FormService::create()` and read by no policy.** It is still the right key-2
+  subject (Kobo's rule: the destination's owner, not the acting user), checked with active membership because a removed
+  member keeps the column.
+- **Nothing stamps a form's responses.** A plain answer edit saves no dirty column on `submissions`
+  (`SubmissionAnswerEditService::edit()`), and no code soft-deletes a response. So the list's stamp is a hash of the
+  list itself, computed when served.
+- **Both engines already skip the membership check when the snapshot lists no options**
+  (`SemanticValidator::collectMembershipErrors()`, `semantic-validator.ts`), so a linked answer chosen from an older list
+  submits after the source changes. The publish gate's empty-options refusal
+  (`StructuralValidationGate::assertChoiceOptionsResolve()`) is the one thing in the way.
+- **The service worker reserves `/api/v1/public/f/` for the schema** (`routes/api.php:569-572`), so the list's route
+  goes elsewhere, with its own cache — `D60`'s "own cache key", literally.
+- **A blank print already gives a choice question with no options a write-in box** (`BlankFormPrintPresenter` — the
+  template's empty branch), and the scan reader then reports the writing as unreadable rather than read
+  (`OcrAnswerReader::choices()`); one arm reads it as writing.
+- **Guest requests run with no user and tenant-wide row security**, so the list route's own check — the version is the
+  token's, and only fields that version links are served — is the isolation, as for reference files.
+
+### Remedy verdict
+
+The row offers a design sketch, not a remedy. Measured against it:
+- **Holds:** two-key consent; the source's shared columns as a nullable list that refuses `[]`; one name minted once.
+- **Does not transfer:** Kobo's XML-external filename and its `select_one_from_file` gap — options here are JSON, so the
+  link feeds the choice question directly.
+- **The measured design:** `forms.data_sharing_enabled` + `forms.data_sharing_field_keys` (null = all, CHECK refuses
+  `[]`); `PATCH /forms/{form}/data-sharing` on `FormController`; `config.options_source = {form_id, field_key}` on a
+  `single_select`/`dropdown`; a publish refusal for every broken link; `GET /api/v1/public/linked-choices/{shareToken}/{version}`
+  with its own limiter and service-worker cache; the runtime merges the list into a COPY of the schema before the engine
+  is built. The server never checks a linked answer against the live list, and a golden vector pins that.
+
+Files:
+- **1 (source sharing):** new `database/migrations/2026_08_17_000125_add_data_sharing_to_forms_table.php`,
+  `app/Http/Requests/Forms/UpdateDataSharingRequest.php`, `app/Support/Forms/ShareableQuestions.php`,
+  `app/Services/Authorization/ResponseReadAccess.php`, `app/Services/Forms/LinkedChoiceService.php`,
+  `resources/js/components/forms/DataSharingPanel.vue` and its test, `tests/Feature/Forms/DataSharingSettingsTest.php`;
+  edited `app/Models/Form.php`, `app/Services/Forms/FormService.php` (hub), `app/Http/Controllers/Tenant/FormController.php`,
+  `routes/tenant.php` (hub), `app/Services/Forms/FormSettingsPresenter.php`, `BuilderPresenter.php`,
+  `app/Support/Tenancy/TenantExtractColumns.php`, `resources/js/components/forms/FormSettingsSections.vue`,
+  `resources/js/components/forms/types.ts`, `resources/js/components/builder/types.ts`,
+  `resources/js/components/builder/FormSettingsModal.vue` and its test, `resources/js/Pages/forms/Builder.vue` (hub),
+  `Settings.vue`, `settings.test.ts`, `tests/Feature/Tenancy/TenantExtractColumnDriftTest.php`,
+  `tests/Feature/Forms/FormSettingsPageTest.php`, `database/factories/FormFactory.php`.
+- **2 (authoring):** new `resources/js/components/builder/LinkedChoicesEditor.vue` and its test,
+  `tests/Feature/Forms/LinkedChoicePublishGateTest.php`; edited `app/Http/Requests/Forms/UpdateFieldRequest.php`,
+  `app/Services/Forms/StructuralValidationGate.php`, `app/Support/Forms/FieldTypeConversion.php`, `tests/Feature/Forms/FieldConversionServiceTest.php`,
+  `resources/js/components/builder/ConfigPanel.vue` (hub), `draft-snapshot.ts`, `preview-model.ts` and their tests,
+  `resources/js/components/builder/useBuilderStore.ts`, `app/Exceptions/Forms/FormException.php`.
+- **3 (delivery):** new `resources/public-runtime/lib/linked-choices.ts` and its test,
+  `tests/Feature/Guest/GuestLinkedChoicesTest.php`, `tests/Feature/Submissions/LinkedChoiceSubmitTest.php`; edited
+  `app/Http/Controllers/Public/PublicFormSchemaController.php`, `routes/api.php` (hub),
+  `app/Providers/AppServiceProvider.php` (hub), `config/guest.php`, `resources/public-runtime/sw.ts` (hub),
+  `lib/types.ts`, `lib/api-client.ts`, `components/RuntimeSession.vue`, `components/FieldControl.vue`,
+  `resources/public-runtime/__tests__/sw.test.ts`, `app/Services/Submissions/EncodeFormPresenter.php`,
+  `app/Services/Ocr/OcrAnswerReader.php`, `tests/Feature/Ocr/PrintedFormMatcherTest.php`, `tests/golden/validation/membership.json`,
+  `database/seeders/E2eSeeder.php`, `tests/Feature/Seeders/E2eSeederIdempotencyTest.php`, `tests/Feature/Http/ServiceWorkerCachePrefixRouteTest.php`,
+  `tests/Feature/Auth/RateLimiterBindingTest.php`, `tests/Feature/Api/OpenApiContractTest.php`, `tests/Feature/Submissions/EncodeStepPayloadTest.php`, `tests/e2e/public-runtime-offline.spec.ts`, `public-runtime-axe.spec.ts`, `form-settings-axe.spec.ts`,
+  `builder-axe.spec.ts`.
+- **4 (docs):** `docs/data-dictionary.md` (hub), `docs/offline-first-sync-design.md` (hub), `openapi.json` (hub),
+  `docs/ocr-pipeline-design.md`.
+
+Shared artefacts taken: `docs/data-dictionary.md`, `docs/offline-first-sync-design.md`, `docs/ocr-pipeline-design.md`,
+`openapi.json`, `docs/feature-backlog.md`, `docs/claims/decisions.md`, `docs/pipeline.md`, `docs/backlog-triage.md`,
+`PROGRESS.md` (own block), the four E2E specs above.
+Paired files taken: `SemanticValidator.php` ↔ `semantic-validator.ts` through the golden corpus — neither engine is
+edited; the corpus gains a vector both must pass.
+Namespaces spent: migration prefix `2026_08_17_000125`; decisions `D85`–`D87`. No ADR (`0010` stays reserved).
+Prediction:
+- CI goes 6/6 on the first run, because PHPStan runs in the container over the new `app/` files before the push (the
+  one thing that reddened `M132`).
+- Most likely red locally first: `FormSettingsPageTest`'s pinned `form` block and the E2E seeder count — both are
+  avoided by placing the new props beside the block and counting the new seeded forms.
+- ⚠️ **Most likely wrong:** the serve-time key-2 check. A guest request has no user and may not set the permission
+  team id, so `Gate::forUser($owner)` could answer from no roles at all — I expect the first owner-loses-access case to
+  pass for the wrong reason, and set the team id explicitly, as `AnalyticsExporter` does.
 
 ## RELEASED — `M132`, the Oct 8 slot: reference files frozen per published version, and form automations (merged as PR #325, `56ff1427`, 6/6 green with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

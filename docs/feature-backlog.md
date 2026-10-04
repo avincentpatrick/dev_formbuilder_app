@@ -11670,14 +11670,14 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   paired data emits `<root><data>` while select-from-file expects `<root><item>`; here options are JSON config, so
   a link can feed a choice field directly. ⚠️ **Nothing here is measured against this tree** — this is a design
   sketch from vendor documentation and published source, deliberately not buildable as written. **Live.**
-  Filed by `M110`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-03 by `M127`: it is one of the user's 19 builder comments, wanted for the Oct 12 testing (`D72`).** **`D60` answered 2026-10-03 (`M127`): A — the linked data rides beside the schema checksum, with its own version stamp and cache key.** **v1 for the Oct 12 testing (`D72`):** link another form in the same workspace under the two-key consent above, and feed a `single_select`/`dropdown`'s options from its responses. ⛔ Nothing in v1 may break offline submission. What v1 leaves is its own `during-testing` row, filed next.
+  Filed by `M110`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-03 by `M127`: it is one of the user's 19 builder comments, wanted for the Oct 12 testing (`D72`).** **`D60` answered 2026-10-03 (`M127`): A — the linked data rides beside the schema checksum, with its own version stamp and cache key.** **v1 for the Oct 12 testing (`D72`):** link another form in the same workspace under the two-key consent above, and feed a `single_select`/`dropdown`'s options from its responses. ⛔ Nothing in v1 may break offline submission. What v1 leaves is its own `during-testing` row, filed next. **Verified by `M133` (2026-10-05), which takes it:** the Kobo traps hold in kind, and the filename one does not arise — the link is one `config.options_source` on the choice question, so there is one name. Three premises the sketch assumed are absent here: there is no `forms.view` permission (reading a form is `FormPolicy::viewOverview()`, reading its responses `SubmissionPolicy::viewAny()`), `forms.owner_user_id` is read by no policy, and nothing stamps when a form's responses last changed — a plain answer edit does not move `submissions.updated_at` — so the list's stamp is a hash of the list. Both engines skip the choice membership check when the snapshot lists no options (`SemanticValidator::collectMembershipErrors()`), which is what lets a list chosen offline submit after the source changes; the publish gate's empty-options refusal is the one thing in the way. `D85`, `D86` and `D87` (in chat): the answer saves the text shown, questions marked personal or sensitive are never shared, and sharing is switched by an editor who can see the responses.
 
 - **`minor` · A form cannot use another form's responses in a calculation or a lookup — the part of Connect project
   left after its Oct 12 v1.** Filed 2026-10-03 by `M127`, split from the Connect project row above under `D72`,
   which trims that row to a v1 for the Oct 12 testing: a linked form feeds a `single_select`/`dropdown`'s options.
   Left here: pulldata-style lookups and calculations over linked data, and whatever of `D60`'s separate freshness
   channel (answered A — beside the schema checksum) v1 does not need.
-  **Live.** Filed by `M127`. **Tier: during-testing.**
+  **Live.** Filed by `M127`. **Tier: during-testing.** **Also left by `M133`'s v1:** the linked list in the builder preview (it says the choices show on the live form), `select_one_from_file` in the XLSForm export, the sync manifest's empty `choice_lists`, linked choices for multi-select and Likert questions, a source question inside a repeat group, more than 1,000 choices, and a server-side cache of the list.
 
 - ✅ **CLOSED BY `M132` (2026-10-05) — ****`minor` · An author cannot attach a reference file to a form, and the attachment model has no form-level kind
   to hang one on.** Filed 2026-09-25 by `M110` from the report *"there is also a attachments in kobotoolbox that
@@ -13049,3 +13049,16 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   than closing it. The remedy is to connect to the address the guard approved, through one helper every caller uses.
   **Live.** It needs someone who may manage webhooks and a host whose DNS they control. Filed by `M132`.
   **Tier: before-launch.**
+
+- **`major` · An export, a Google Sheets sync and an Airtable sync write every answer inside a repeat group as an
+  empty cell.** Found by `M133` while mapping the readers of a form's answers. `SubmissionRowProjector::resolveColumns()`
+  makes a column for every data field of each version, repeat members included, and `answerValues()` reads each one at
+  the top level of the stored answers (`$answers[$key]`). A repeat group's answers are stored under the SECTION key as a
+  list of instances (`StructuralAnswerNormalizer`, which refuses a member sent at the top level), so the lookup always
+  misses. Measured with a probe through the real projector on the seeded "Household Roster": a response holding
+  `section_1: [{field_2: "Kid A"}, {field_2: "Kid B"}]` projects to `field_2: ""`. Every caller inherits it —
+  `SubmissionExporter`, `GoogleSheetsConnector`, `AirtableConnector` and the `M132` automation webhook payload — and
+  no test covers an export of a repeat group. The seeders write repeat answers flat, at the top level, which is why the
+  dev data shows values. The remedy is a shape decision as much as a fix: one row per response with the instances
+  joined into one cell, or one row per instance. **Live.** It needs a published form with a repeatable section and a
+  response to it. Filed by `M133`. **Tier: during-testing.**

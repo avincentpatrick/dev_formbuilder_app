@@ -1501,6 +1501,39 @@ The matcher reads a sheet against the version it was printed from, superseded on
 
 ---
 
+### D85 — A choice question can take its choices from another form's responses. What does a respondent's answer save? **A — the text shown. Two responses giving the same text are one choice.**
+
+**Filed and answered 2026-10-05 (user decision, in chat), recorded by Lane A during `M133` — A, the recommendation.** Put to the user under `D66`'s rule, because `R-5da4a30f` — the Connect project row, an `early-testing` work row taken by `M133` — stores a different answer under each option. Measured: every reader of a choice answer — the inbox, the submission PDF, the export, the Sheets and Airtable connectors and piping — turns a stored value into a label through `config.options` alone (`SchemaValueFormatter::options()`), and a linked question's snapshot holds no options.
+
+- **A — the text shown.** The answer reads correctly on every surface with no change, and duplicates collapse into one choice.
+- **B — the source response's reference number.** Each response is its own choice even when names repeat, but every reader shows the number until each learns the linked list.
+
+**Recommendation: A.** It is what the respondent saw and chose, and it reads correctly everywhere today. Telling two same-named sources apart belongs with lookups, in the remainder row.
+
+---
+
+### D86 — May a question marked personal or sensitive be shared with other forms? **A — no. Those questions are never offered for sharing.**
+
+**Filed and answered 2026-10-05 (user decision, in chat), recorded by Lane A during `M133` — A, the recommendation.** Put to the user under `D66`'s rule, because `R-5da4a30f` builds a different share list under each answer. Measured: a shared question's answers reach every respondent of a form that links it, including anonymous ones through the public link, and no other read path in the app filters on `is_pii` or `is_sensitive` — those flags drive only audit redaction today.
+
+- **A — never shareable.** The share list leaves them out, and the check runs again at the linking form's publish and on every serve.
+- **B — shareable after the acknowledgement,** like any other question.
+
+**Recommendation: A.** These forms carry health data, and a shared list is readable by anyone with the link.
+
+---
+
+### D87 — Who may switch on sharing for a form? **A — anyone who can edit the form and can also see its responses.**
+
+**Filed and answered 2026-10-05 (user decision, in chat), recorded by Lane A during `M133` — A, the recommendation.** Put to the user under `D66`'s rule, because `R-5da4a30f` gates the switch under each answer. Measured: every form-settings route is `can:update,form`, which an Editor grant satisfies without any right to read responses (`SubmissionPolicy::viewAny()` is `submissions.view`), and `forms.owner_user_id` is read by no policy.
+
+- **A — editors who see the responses.** `can:update,form`, and the person must also be able to read the form's responses — nobody shares what they cannot see.
+- **B — workspace Owners and Admins only.**
+
+**Recommendation: A.** It keeps the setting with the people who run the form, and closes the one hole: an editor who cannot read the answers cannot hand them out.
+
+---
+
 ### D15 — `D13`'s one-hub-row cap is now the binding constraint on batch composition, and it is stricter than its own purpose. **ANSWERED — option 4: the cap reads the files a row REMEDY EDITS, excluding the close-out artefacts.** **Tier: early-testing.**
 
 **Filed 2026-09-05 by Lane A, during `M72`, at the moment the cap decided a batch that value had not.**

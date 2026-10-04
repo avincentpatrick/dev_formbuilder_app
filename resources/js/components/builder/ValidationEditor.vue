@@ -30,10 +30,20 @@
  * would be editing a rule they cannot see. Same posture as `ConditionRow.vue`'s disabled `selected()`
  * options, and the same reason.
  */
-import { MdsButton, MdsIconButton, MdsSelect, MdsTextInput, MdsTextarea } from '@meridian/design-system';
+import { MdsButton, MdsCallout, MdsFormField, MdsIconButton, MdsSelect, MdsTextInput, MdsTextarea } from '@meridian/design-system';
 import { computed } from 'vue';
 import type { BuilderValidation, ComparableField, EnumOption, OperatorOption, RuleTypeOption } from './types';
 import { mayCompare, operatorReads, repointPatch, ruleChangePatch } from './validation-options';
+import {
+    FAMILY_DEFAULT,
+    applyCombinator,
+    combinatorOf,
+    describeGrouping,
+    familyOf,
+    joinFamily,
+    type Combinator,
+    type RuleFamily,
+} from './rule-grouping';
 
 const props = withDefaults(
     defineProps<{
@@ -63,6 +73,16 @@ const props = withDefaults(
         addLabel?: string;
         /** The empty-state sentence. The default describes constraints, which is wrong under a condition. */
         emptyText?: string;
+        /**
+         * M131 (`R-799d60f5`, `D80`) — which family's all/any switch this instance shows: `required` for the Basics
+         * "Required when…" reveal, `constraint` for the Validation tab. Undefined shows none.
+         */
+        combinatorFamily?: RuleFamily;
+        /**
+         * The field's WHOLE rule array, when `validations` is a subset (the Basics reveal), so a group reaching into
+         * another family is seen and no token another family holds is reused. Defaults to `validations`.
+         */
+        fieldValidations?: BuilderValidation[];
     }>(),
     {
         addLabel: 'Add rule',
@@ -71,6 +91,73 @@ const props = withDefaults(
 );
 
 const emit = defineEmits<{ 'update:validations': [value: BuilderValidation[]] }>();
+
+// ── M131 (`R-799d60f5`, `D80`) — one all/any switch per rule list ─────────────────────────────────────────
+// `rule-grouping.ts` holds the mapping onto the engines' groups and says why it is a token per row. This block
+// only decides what to show and routes every change through that module, touching no other family's rows.
+
+const allRows = computed<BuilderValidation[]>(() => props.fieldValidations ?? props.validations);
+
+const grouping = computed(() =>
+    props.combinatorFamily === undefined ? null : describeGrouping(allRows.value, props.combinatorFamily, props.ruleTypes),
+);
+
+/** The switch appears once there is something to combine: two or more rules of its family in this list. */
+const showCombinator = computed<boolean>(
+    () =>
+        props.combinatorFamily !== undefined &&
+        props.validations.filter((row) => familyOf(row, props.ruleTypes) === props.combinatorFamily).length >= 2,
+);
+
+const COMBINE_COPY: Record<RuleFamily, { label: string; all: string; any: string }> = {
+    required: { label: 'Required when', all: 'all of these hold', any: 'any of these holds' },
+    skip: { label: 'Skipped when', all: 'all of these hold', any: 'any of these holds' },
+    constraint: { label: 'The answer must pass', all: 'all of these rules', any: 'any one of these rules' },
+};
+
+const combineCopy = computed(() => COMBINE_COPY[props.combinatorFamily ?? 'constraint']);
+
+const combineOptions = computed<EnumOption[]>(() => {
+    const family = props.combinatorFamily ?? 'constraint';
+    const first: Combinator = FAMILY_DEFAULT[family];
+    const second: Combinator = first === 'all' ? 'any' : 'all';
+
+    // The family's default first: it is what the rules already do with no group at all.
+    return [first, second].map((value) => ({ value, label: combineCopy.value[value] }));
+});
+
+/** Emit `rows` regrouped over the WHOLE array, mapped back onto the rows this instance edits by identity. */
+function emitRegrouped(regrouped: BuilderValidation[]): void {
+    const byRow = new Map(allRows.value.map((row, i) => [row, regrouped[i]] as const));
+
+    emit('update:validations', props.validations.map((row) => byRow.get(row) ?? row));
+}
+
+function setCombinator(value: Combinator): void {
+    if (props.combinatorFamily === undefined) return;
+    emitRegrouped(applyCombinator(allRows.value, props.combinatorFamily, value, props.ruleTypes));
+}
+
+/** The only way out of a grouping the switch cannot show — explicit, never a side effect of another edit (`D80`). */
+function ungroup(): void {
+    if (props.combinatorFamily === undefined) return;
+    emitRegrouped(applyCombinator(allRows.value, props.combinatorFamily, FAMILY_DEFAULT[props.combinatorFamily], props.ruleTypes));
+}
+
+/**
+ * A row that has just changed family leaves its old group and joins the new family's, when that one is grouped.
+ * `rest` is every other row, so the row's own stale group cannot decide what it joins.
+ */
+function regroupFor(row: BuilderValidation, patched: BuilderValidation): Partial<BuilderValidation> {
+    const before = familyOf(row, props.ruleTypes);
+    const after = familyOf(patched, props.ruleTypes);
+
+    if (before === after) return {};
+
+    const rest = allRows.value.filter((candidate) => candidate !== row);
+
+    return joinFamily(rest, after, props.ruleTypes);
+}
 
 /** `value: ''` on a native <select> is the placeholder slot, so an "is answered" choice reads as empty. */
 const OPERATOR_ANSWERED = '';
@@ -237,7 +324,10 @@ function setRuleType(index: number, value: string): void {
     // M131: the compared question survives only if the NEW kind can be judged by it, and the operator only if
     // the new kind reads one that can read that question — `required_if` on text → `greater_than_field` used to
     // keep the text question, which publish refuses.
-    update(index, { ...ruleChangePatch(props.validations[index], rule, props.comparableFields, props.operators), rule_type: value });
+    const current = props.validations[index];
+    const patch = { ...ruleChangePatch(current, rule, props.comparableFields, props.operators), rule_type: value };
+
+    update(index, { ...patch, ...regroupFor(current, { ...current, ...patch }) });
 }
 
 /** Re-pointing clears an operator the new question cannot take, and the value it compared against (M131). */
@@ -246,27 +336,31 @@ function setRelated(index: number, key: string | null): void {
 }
 
 function setMode(index: number, next: 'rule' | 'expression'): void {
-    update(
-        index,
+    const current = props.validations[index];
+    const patch: Partial<BuilderValidation> =
         next === 'expression'
             ? { expression: '', rule_type: null, operator: null, rule_value: null, related_field_key: null }
-            : { expression: null, rule_type: allowedRuleTypes.value[0]?.value ?? null },
-    );
+            : { expression: null, rule_type: allowedRuleTypes.value[0]?.value ?? null };
+
+    // An expression row is a constraint whatever it was before (M131) — `familyOf` reads `expression` first.
+    update(index, { ...patch, ...regroupFor(current, { ...current, ...patch, expression: next === 'expression' ? '.' : null }) });
 }
 
 function addRule(): void {
-    emit('update:validations', [
-        ...props.validations,
-        {
-            rule_type: allowedRuleTypes.value[0]?.value ?? null,
-            operator: null,
-            rule_value: null,
-            expression: null,
-            error_message: null,
-            related_field_key: null,
-            sequence: props.validations.length,
-        },
-    ]);
+    const added: BuilderValidation = {
+        rule_type: allowedRuleTypes.value[0]?.value ?? null,
+        operator: null,
+        rule_value: null,
+        expression: null,
+        error_message: null,
+        related_field_key: null,
+        logic_group: null,
+        logic_operator: null,
+        sequence: props.validations.length,
+    };
+
+    // A new rule joins its family's group when that family is grouped (M131), so "all" stays all.
+    emit('update:validations', [...props.validations, { ...added, ...joinFamily(allRows.value, familyOf(added, props.ruleTypes), props.ruleTypes) }]);
 }
 
 function remove(index: number): void {
@@ -284,6 +378,29 @@ const modeOptions: EnumOption[] = [
 
 <template>
     <div class="validations">
+        <!-- M131 (`D80`) — how this list's rules combine, or why they cannot be shown as one switch. -->
+        <MdsCallout v-if="grouping?.kind === 'custom'" tone="info" class="validations__custom">
+            <p class="validations__custom-text">
+                These rules were grouped by a template or the question library in a way this editor cannot show:
+                {{ grouping.reason }}. They are kept exactly as they are.
+            </p>
+            <MdsButton variant="secondary" size="sm" :disabled="disabled" @click="ungroup">Ungroup these rules</MdsButton>
+        </MdsCallout>
+        <div v-else-if="showCombinator" class="validations__combine">
+            <MdsFormField v-slot="{ id }" :label="combineCopy.label">
+                <MdsSelect
+                    :id="id"
+                    :model-value="grouping === null ? '' : (combinatorOf(grouping) ?? '')"
+                    :options="combineOptions"
+                    :disabled="disabled"
+                    @update:model-value="setCombinator($event as Combinator)"
+                />
+            </MdsFormField>
+            <p v-if="combinatorFamily === 'constraint' && grouping !== null && combinatorOf(grouping) === 'any'" class="validations__combine-note">
+                If the answer passes none of them, respondents see the first rule's message.
+            </p>
+        </div>
+
         <div v-for="(row, i) in validations" :key="i" class="validations__row">
             <div class="validations__head">
                 <MdsSelect
@@ -376,6 +493,25 @@ const modeOptions: EnumOption[] = [
 </template>
 
 <style scoped>
+.validations__combine {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mds-space-1);
+}
+
+.validations__combine-note,
+.validations__custom-text {
+    margin: 0;
+    color: var(--mds-color-text-secondary);
+    font-size: var(--mds-type-body-sm-font-size);
+    line-height: var(--mds-type-body-sm-line-height);
+}
+
+.validations__custom-text {
+    margin-bottom: var(--mds-space-2);
+    color: var(--mds-color-text-body);
+}
+
 .validations {
     display: flex;
     flex-direction: column;

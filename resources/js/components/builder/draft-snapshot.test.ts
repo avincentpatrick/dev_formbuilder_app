@@ -212,6 +212,29 @@ group('the wire shape', () => {
         expect(f.validations[0].rule_value).toBe('a+');
     });
 
+    it('numbers each group by first appearance, as the server snapshot does, so the preview folds it (M131)', () => {
+        const base = { operator: null, rule_value: '1', expression: null, error_message: null, related_field_key: null };
+        const validations = [
+            { ...base, rule_type: 'min_length', sequence: 0, logic_group: 'new-constraint', logic_operator: 'or' as const },
+            { ...base, rule_type: 'max_length', sequence: 1, logic_group: 'new-constraint', logic_operator: 'or' as const },
+            { ...base, rule_type: 'pattern', sequence: 2, logic_group: 'uuid-b', logic_operator: 'and' as const },
+            { ...base, rule_type: 'pattern', sequence: 3 },
+        ];
+        const { schema } = projectDraft(input([field({ uid: 'u1', validations })]));
+        const projected = schema.version.schema.fields[0].validations;
+
+        expect(projected.map((v) => [v.logic_group_ordinal, v.logic_operator])).toEqual([
+            [0, 'or'],
+            [0, 'or'],
+            [1, 'and'],
+            [null, null],
+        ]);
+
+        // A regroup changes what the engine folds, so the shape key must move with it.
+        const ungrouped = projectDraft(input([field({ uid: 'u1', validations: validations.map((v) => ({ ...v, logic_group: null, logic_operator: null })) })]));
+        expect(shapeOf(ungrouped.schema.version.schema)).not.toBe(shapeOf(schema.version.schema));
+    });
+
     it('resolves a field’s section by key, and flags one that points nowhere', () => {
         const s = section({ uid: 's1', id: 'sid-1', key: 'demographics' });
         const ok = projectDraft(input([field({ uid: 'u1', form_section_id: 'sid-1' })], [s]));

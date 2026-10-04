@@ -275,6 +275,23 @@ final class PublishValidationException extends RuntimeException
     }
 
     /**
+     * A rule group with a later member that does not say how it joins (M131, `R-799d60f5`).
+     *
+     * Both engines fold a group left to right, each later member joining by its own `logic_operator`, and throw
+     * `malformed_logic_group` when one is missing — so every submission would fail, and nothing said so before
+     * the builder could author groups. The builder's all/any switch writes the connective on every member; a row
+     * can still arrive without one from a template or the question library.
+     */
+    public static function logicGroupMissingOperator(string $fieldKey): self
+    {
+        return self::one(
+            $fieldKey,
+            'logic_group_missing_operator',
+            "Rules on “{$fieldKey}” are grouped, but one of them does not say whether it joins the others with AND or OR, so every submission would be refused. Choose all or any for the group, or ungroup the rules.",
+        );
+    }
+
+    /**
      * Conditional requiredness that nothing can ever trigger (Increment M116).
      *
      * ⛔ REFUSED BECAUSE THE ALTERNATIVE IS SILENCE, WHICH IS THE SAME REASON

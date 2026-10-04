@@ -19,12 +19,12 @@ import ValidationEditor from './ValidationEditor.vue';
 import type { BuilderValidation, ComparableField, OperatorOption, RuleTypeOption } from './types';
 
 const RULE_TYPES: RuleTypeOption[] = [
-    { value: 'min_length', label: 'Minimum length', shapes: ['text'], takes_operator: false, takes_related_field: false, operator_may_be_empty: false, related_comparison: null },
-    { value: 'pattern', label: 'Must match a pattern', shapes: ['text'], takes_operator: false, takes_related_field: false, operator_may_be_empty: false, related_comparison: null },
-    { value: 'min_value', label: 'Minimum value', shapes: ['number', 'duration', 'scale'], takes_operator: false, takes_related_field: false, operator_may_be_empty: false, related_comparison: null },
-    { value: 'greater_than_field', label: 'Greater than another question', shapes: ['number', 'duration'], takes_operator: false, takes_related_field: true, operator_may_be_empty: false, related_comparison: 'gt' },
-    { value: 'required_if', label: 'Required when a condition holds', shapes: ['text', 'number', 'temporal'], takes_operator: true, takes_related_field: true, operator_may_be_empty: false, related_comparison: null },
-    { value: 'required_with', label: 'Required with another question', shapes: ['text', 'number', 'temporal'], takes_operator: true, takes_related_field: true, operator_may_be_empty: true, related_comparison: 'is_null' },
+    { value: 'min_length', label: 'Minimum length', shapes: ['text'], takes_operator: false, takes_related_field: false, operator_may_be_empty: false, governs_relevance: false, related_comparison: null },
+    { value: 'pattern', label: 'Must match a pattern', shapes: ['text'], takes_operator: false, takes_related_field: false, operator_may_be_empty: false, governs_relevance: false, related_comparison: null },
+    { value: 'min_value', label: 'Minimum value', shapes: ['number', 'duration', 'scale'], takes_operator: false, takes_related_field: false, operator_may_be_empty: false, governs_relevance: false, related_comparison: null },
+    { value: 'greater_than_field', label: 'Greater than another question', shapes: ['number', 'duration'], takes_operator: false, takes_related_field: true, operator_may_be_empty: false, governs_relevance: false, related_comparison: 'gt' },
+    { value: 'required_if', label: 'Required when a condition holds', shapes: ['text', 'number', 'temporal'], takes_operator: true, takes_related_field: true, operator_may_be_empty: false, governs_relevance: false, related_comparison: null },
+    { value: 'required_with', label: 'Required with another question', shapes: ['text', 'number', 'temporal'], takes_operator: true, takes_related_field: true, operator_may_be_empty: true, governs_relevance: false, related_comparison: 'is_null' },
 ];
 
 const OPERATORS: OperatorOption[] = [
@@ -397,5 +397,118 @@ describe('ValidationEditor — the compared question publish will accept', () =>
         // The fixture's `is_null` does not read a scale, so an empty comparison against one is not offered.
         const unreadable = mountWith([row({ rule_type: 'required_with', related_field_key: 'pain' })], [...FIELDS, PAIN]);
         expect(optionLabels(unreadable, 'Rule 1 operator')).not.toContain('is answered');
+    });
+});
+
+/**
+ * M131 (`R-799d60f5`, `D80`) — one all/any switch per rule list: what it shows, what it emits, that it never
+ * touches another family's rows, and that a grouping it cannot show is shown as a notice and kept.
+ */
+describe('ValidationEditor — the all/any switch', () => {
+    const GROUP_RULES = RULE_TYPES.map((r) => (r.value === 'required_if' || r.value === 'required_with' ? { ...r, governs_requiredness: true } : r));
+
+    function mountGrouped(validations: BuilderValidation[], family: 'required' | 'constraint', fieldValidations?: BuilderValidation[]) {
+        return mount(ValidationEditor, {
+            props: {
+                validations,
+                ruleTypes: GROUP_RULES,
+                operators: OPERATORS,
+                valueShape: 'number',
+                comparableFields: FIELDS,
+                combinatorFamily: family,
+                ...(fieldValidations ? { fieldValidations } : {}),
+            },
+        });
+    }
+
+    const combineSelect = (wrapper: ReturnType<typeof mountGrouped>) => wrapper.get('.validations__combine select');
+    const lastEmit = (wrapper: ReturnType<typeof mountGrouped>) => wrapper.emitted('update:validations')!.at(-1)![0] as BuilderValidation[];
+
+    it('shows the constraint default, ALL, and groups the constraints under OR when ANY is chosen', async () => {
+        const wrapper = mountGrouped([row({ rule_type: 'min_value', rule_value: '1' }), row({ rule_type: 'min_value', rule_value: '2', sequence: 1 })], 'constraint');
+
+        expect(wrapper.text()).toContain('The answer must pass');
+        expect((combineSelect(wrapper).element as HTMLSelectElement).value).toBe('all');
+
+        await combineSelect(wrapper).setValue('any');
+
+        expect(lastEmit(wrapper).map((r) => [r.logic_group, r.logic_operator])).toEqual([
+            ['new-constraint', 'or'],
+            ['new-constraint', 'or'],
+        ]);
+    });
+
+    it('says which message a respondent sees when ANY is set', () => {
+        const wrapper = mountGrouped(
+            [row({ rule_type: 'min_value', logic_group: 'g', logic_operator: 'or' }), row({ rule_type: 'min_value', sequence: 1, logic_group: 'g', logic_operator: 'or' })],
+            'constraint',
+        );
+
+        expect((combineSelect(wrapper).element as HTMLSelectElement).value).toBe('any');
+        expect(wrapper.text()).toContain('respondents see the first rule');
+    });
+
+    it('groups only the required rules on the Basics reveal, leaving the other rules as they are', async () => {
+        const constraint = row({ rule_type: 'min_value', rule_value: '1', logic_group: 'c', logic_operator: 'or' });
+        const r1 = row({ rule_type: 'required_if', related_field_key: 'age', operator: 'gt', rule_value: '1', sequence: 1 });
+        const r2 = row({ rule_type: 'required_if', related_field_key: 'age', operator: 'gt', rule_value: '5', sequence: 2 });
+        const wrapper = mountGrouped([r1, r2], 'required', [constraint, r1, r2]);
+
+        expect(wrapper.text()).toContain('Required when');
+        await combineSelect(wrapper).setValue('all');
+
+        // The Basics surface emits ITS rows only; ConfigPanel substitutes them back positionally.
+        expect(lastEmit(wrapper).map((r) => [r.rule_type, r.logic_group, r.logic_operator])).toEqual([
+            ['required_if', 'new-required', 'and'],
+            ['required_if', 'new-required', 'and'],
+        ]);
+    });
+
+    it('shows a grouping it cannot express as a notice, keeps it, and ungroups only on request', async () => {
+        const rows = [
+            row({ rule_type: 'min_value', logic_group: 'a' }),
+            row({ rule_type: 'min_value', sequence: 1, logic_group: 'a', logic_operator: 'or' }),
+            row({ rule_type: 'min_value', sequence: 2, logic_group: 'a', logic_operator: 'and' }),
+        ];
+        const wrapper = mountGrouped(rows, 'constraint');
+
+        expect(wrapper.find('.validations__combine').exists()).toBe(false);
+        expect(wrapper.text()).toContain('they mix AND and OR');
+        expect(wrapper.emitted('update:validations')).toBeUndefined();
+
+        await wrapper.findAll('button').find((b) => b.text() === 'Ungroup these rules')!.trigger('click');
+
+        expect(lastEmit(wrapper).every((r) => r.logic_group === null && r.logic_operator === null)).toBe(true);
+    });
+
+    it('adds a new rule into a grouped family', async () => {
+        const wrapper = mountGrouped(
+            [row({ rule_type: 'min_value', logic_group: 'g', logic_operator: 'or' }), row({ rule_type: 'min_value', sequence: 1, logic_group: 'g', logic_operator: 'or' })],
+            'constraint',
+        );
+
+        await wrapper.findAll('button').find((b) => b.text().includes('Add rule'))!.trigger('click');
+
+        expect(lastEmit(wrapper).at(-1)).toMatchObject({ logic_group: 'g', logic_operator: 'or' });
+    });
+
+    it('takes a rule out of its group when it becomes a rule of another kind', async () => {
+        const wrapper = mountGrouped(
+            [
+                row({ rule_type: 'min_value', logic_group: 'g', logic_operator: 'or' }),
+                row({ rule_type: 'min_value', sequence: 1, logic_group: 'g', logic_operator: 'or' }),
+            ],
+            'constraint',
+        );
+
+        await control(wrapper, 'Rule 2 check').setValue('required_if');
+
+        expect(lastEmit(wrapper)[1]).toMatchObject({ rule_type: 'required_if', logic_group: null, logic_operator: null });
+    });
+
+    it('shows no switch for a single rule', () => {
+        const wrapper = mountGrouped([row({ rule_type: 'min_value' })], 'constraint');
+
+        expect(wrapper.find('.validations__combine').exists()).toBe(false);
     });
 });

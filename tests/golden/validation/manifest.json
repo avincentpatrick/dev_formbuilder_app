@@ -1,12 +1,12 @@
 {
   "grammar_version": "2.0",
-  "total": 135,
+  "total": 141,
   "files": {
     "relevance": 7,
     "required": 8,
     "constraints": 12,
     "patterns": 5,
-    "conditional": 6,
+    "conditional": 12,
     "repeats": 9,
     "calculated": 8,
     "membership": 9,

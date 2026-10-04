@@ -6,10 +6,12 @@ use App\Enums\ComparisonOperator;
 use App\Enums\FieldType;
 use App\Enums\ValidationRuleType;
 use App\Enums\ValueShape;
+use App\Models\FormFieldValidation;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Forms\BuilderPresenter;
 use App\Services\Forms\FormService;
+use App\Services\Validation\SemanticValidator;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -164,6 +166,25 @@ it('ships the related comparison of each rule exactly as the gate judges a compa
         ->and($options['required_with']['related_comparison'])->toBe('is_null')
         ->and($options['required_if']['related_comparison'])->toBeNull()
         ->and($options['min_length']['related_comparison'])->toBeNull();
+});
+
+it('marks exactly the skip pair as governing relevance, and partitions the rules as the validator folds them', function (): void {
+    // M131 (`R-799d60f5`). A rule group is folded WITHIN one family, so the all/any switch must know which family
+    // a row is in. Held to `SemanticValidator::family()` itself, read by reflection, so the payload cannot drift
+    // from the engine it describes.
+    $options = ruleTypeOptions($this->payload);
+    $family = new ReflectionMethod(SemanticValidator::class, 'family');
+    $validator = app(SemanticValidator::class);
+
+    $relevance = array_keys(array_filter($options, static fn (array $o): bool => $o['governs_relevance'] === true));
+    expect($relevance)->toEqualCanonicalizing(['skip_if', 'skip_with']);
+
+    foreach (ValidationRuleType::cases() as $type) {
+        $option = $options[$type->value];
+        $fromPayload = $option['governs_requiredness'] ? 'required' : ($option['governs_relevance'] ? 'skip' : 'constraint');
+
+        expect($family->invoke($validator, new FormFieldValidation(['rule_type' => $type])))->toBe($fromPayload, $type->value);
+    }
 });
 
 it('ships every operator with the row rendering and the shapes it may compare', function (): void {

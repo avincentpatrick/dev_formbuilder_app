@@ -16,6 +16,7 @@ use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
+use Ramsey\Uuid\Uuid;
 use Spatie\Permission\PermissionRegistrar;
 
 uses(RefreshDatabase::class);
@@ -32,6 +33,10 @@ uses(RefreshDatabase::class);
 |
 | ⛔ EVERY PATCH BELOW IS BUILT FROM THE BUILDER'S OWN VIEW OF THE FIELD, KEY FOR KEY, the way `fieldPayload()` builds
 | it (the `FieldCreateRoundTripTest` pattern). A payload that carried the three columns would pass in both worlds.
+|
+| ⚠️ M131 (`R-799d60f5`) CHANGED ONE PREMISE ABOVE: the builder now emits and sends `logic_group`/`logic_operator`, so
+| a group is AUTHORED, not only kept. `ruleRetentionPayload()` still sends the six keys — which is now the older-client
+| case, where an absent group key must keep the stored group — and the M131 cases below send the two keys explicitly.
 |
 | ⚠️ Helpers are prefixed `ruleRetention*`: Pest loads every test file into one process.
 */
@@ -313,4 +318,116 @@ it('keeps a rule an importer stored with an empty value, which the request turns
     expect($rows)->toHaveCount(1)
         ->and($rows[0]->id)->toBe($rule->id)
         ->and($rows[0]->error_message_translations)->toBe(['es' => 'Cuéntenos más']);
+});
+
+// ── M131 (`R-799d60f5`) — groups the builder AUTHORS ─────────────────────────────────────────────────────────────
+
+/** Two length rules on one text field, ungrouped, each with a translation that must survive a regroup. */
+function ruleRetentionTwoRules(User $admin, Form $form): FormField
+{
+    $field = ruleRetentionAddField($admin, $form, 'short_text');
+    ruleRetentionRule($field, 0, [
+        'rule_type' => ValidationRuleType::MinLength, 'rule_value' => '3', 'error_message' => 'Too short',
+        'error_message_translations' => ['es' => 'Demasiado corto'],
+    ]);
+    ruleRetentionRule($field, 1, [
+        'rule_type' => ValidationRuleType::MaxLength, 'rule_value' => '10', 'error_message' => 'Too long',
+    ]);
+
+    return $field;
+}
+
+/** @return callable(list<array<string, mixed>>): list<array<string, mixed>> every rule given one group token and connective */
+function ruleRetentionGroupAll(?string $token, ?string $operator): callable
+{
+    return static fn (array $rules): array => array_map(
+        static fn (array $rule): array => [...$rule, 'logic_group' => $token, 'logic_operator' => $operator],
+        $rules,
+    );
+}
+
+it('writes a regroup alone, keeping each row and its translation', function (): void {
+    [$admin, $form] = ruleRetentionForm();
+    $field = ruleRetentionTwoRules($admin, $form);
+    $ids = array_map(fn (FormFieldValidation $v): string => $v->id, ruleRetentionRows($field));
+
+    ruleRetentionPatch($admin, $form, $field, ruleRetentionPayload($field, 'Name', ruleRetentionGroupAll('new-constraint', 'or')));
+
+    $rows = ruleRetentionRows($field);
+    $expected = Uuid::uuid5((string) $field->id, 'new-constraint')->toString();
+
+    expect(array_map(fn (FormFieldValidation $v): string => $v->id, $rows))->toBe($ids)
+        ->and($rows[0]->logic_group)->toBe($expected)
+        ->and($rows[1]->logic_group)->toBe($expected)
+        ->and($rows[0]->logic_operator)->toBe(LogicOperator::Or)
+        ->and($rows[1]->logic_operator)->toBe(LogicOperator::Or)
+        ->and($rows[0]->error_message_translations)->toBe(['es' => 'Demasiado corto']);
+});
+
+it('gives the same group uuid to the same token on every save', function (): void {
+    // The builder keeps its own token across saves without re-reading the field: a random uuid would mint a new
+    // group every save and churn the conversion fingerprint, which hashes the raw uuid.
+    [$admin, $form] = ruleRetentionForm();
+    $field = ruleRetentionTwoRules($admin, $form);
+
+    ruleRetentionPatch($admin, $form, $field, ruleRetentionPayload($field, 'Name', ruleRetentionGroupAll('new-constraint', 'or')));
+    $first = ruleRetentionRows($field)[0]->logic_group;
+
+    ruleRetentionPatch($admin, $form, $field, ruleRetentionPayload($field, 'Name again', ruleRetentionGroupAll('new-constraint', 'or')));
+
+    expect(ruleRetentionRows($field)[0]->logic_group)->toBe($first)->not->toBeNull();
+});
+
+it('keeps a group uuid the field already holds, exactly as the builder sends it back', function (): void {
+    [$admin, $form] = ruleRetentionForm();
+    $field = ruleRetentionTwoRules($admin, $form);
+    $group = (string) Str::uuid();
+    $field->validations()->update(['logic_group' => $group, 'logic_operator' => LogicOperator::Or->value]);
+
+    ruleRetentionPatch($admin, $form, $field, ruleRetentionPayload($field, 'Name', ruleRetentionGroupAll($group, 'and')));
+
+    $rows = ruleRetentionRows($field);
+    expect($rows[0]->logic_group)->toBe($group)
+        ->and($rows[1]->logic_operator)->toBe(LogicOperator::And);
+});
+
+it('ungroups when the payload names no group, and stores no connective', function (): void {
+    [$admin, $form] = ruleRetentionForm();
+    $field = ruleRetentionTwoRules($admin, $form);
+    $field->validations()->update(['logic_group' => (string) Str::uuid(), 'logic_operator' => LogicOperator::Or->value]);
+
+    ruleRetentionPatch($admin, $form, $field, ruleRetentionPayload($field, 'Name', ruleRetentionGroupAll(null, 'or')));
+
+    foreach (ruleRetentionRows($field) as $row) {
+        expect($row->logic_group)->toBeNull()
+            ->and($row->logic_operator)->toBeNull();
+    }
+});
+
+it('makes another field\'s group uuid into this field\'s own', function (): void {
+    [$admin, $form] = ruleRetentionForm();
+    $field = ruleRetentionTwoRules($admin, $form);
+    $foreign = (string) Str::uuid();
+
+    ruleRetentionPatch($admin, $form, $field, ruleRetentionPayload($field, 'Name', ruleRetentionGroupAll($foreign, 'or')));
+
+    expect(ruleRetentionRows($field)[0]->logic_group)
+        ->toBe(Uuid::uuid5((string) $field->id, $foreign)->toString())
+        ->not->toBe($foreign);
+});
+
+it('writes the group on a rule the save inserts', function (): void {
+    [$admin, $form] = ruleRetentionForm();
+    $field = ruleRetentionTwoRules($admin, $form);
+
+    ruleRetentionPatch($admin, $form, $field, ruleRetentionPayload($field, 'Name', static fn (array $rules): array => [
+        ...ruleRetentionGroupAll('new-constraint', 'or')($rules),
+        ['rule_type' => 'pattern', 'operator' => null, 'rule_value' => '^[A-Z]', 'expression' => null, 'error_message' => 'Capital',
+            'related_field_key' => null, 'logic_group' => 'new-constraint', 'logic_operator' => 'or'],
+    ]));
+
+    $rows = ruleRetentionRows($field);
+    expect($rows)->toHaveCount(3)
+        ->and($rows[2]->logic_group)->toBe($rows[0]->logic_group)
+        ->and($rows[2]->logic_operator)->toBe(LogicOperator::Or);
 });

@@ -397,8 +397,8 @@ Was `indicator_validations`. Structured rules or an expression, modeled on XLSFo
 | `expression` | `text` | Yes | `NULL` | No | Full XLSForm-style expression string. When present, **supersedes** `rule_type`/`operator`/`rule_value`/`related_form_field_id` entirely — see Design Notes. |
 | `error_message` | `varchar(500)` | Yes | `NULL` | No | — |
 | `error_message_translations` | `jsonb` | Yes | `NULL` | No | — |
-| `logic_group` | `uuid` | Yes | `NULL` | No | Groups multiple rule rows under one compound condition. |
-| `logic_operator` | `varchar(3)` — PHP enum: `LogicOperator` | Yes | `NULL` | No | Only meaningful when `logic_group` is set. |
+| `logic_group` | `uuid` | Yes | `NULL` | No | Groups rule rows under one compound condition. Both engines fold a group WITHIN its family (required, skip, constraint) flat and left to right; required and skip units then combine as ANY, constraint units as ALL. Authored by the builder since M131 (`R-799d60f5`, `D80`) as one all/any switch per rule list; a builder-minted token becomes `uuid5(field id, token)`, so it is stable across saves (`FormBuilderService::replaceValidations()`). Also written by the blueprint materializer; never by the XLSForm importer. |
+| `logic_operator` | `varchar(3)` — PHP enum: `LogicOperator` | Yes | `NULL` | No | How a LATER member joins its group (`and`/`or`); the first member's is never read. Only meaningful when `logic_group` is set, and stored null without one. A later member with none is refused at publish since M131 (`logic_group_missing_operator`) — both engines throw on it at every submission. |
 | `sequence` | `integer` | No | `0` | No | Evaluation order within the field. |
 | `created_at` | `timestamptz` | No | set by Eloquent | No | — |
 | `updated_at` | `timestamptz` | No | set by Eloquent | No | — |

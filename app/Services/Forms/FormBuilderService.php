@@ -24,6 +24,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Ramsey\Uuid\Uuid;
 
 /**
  * The interactive builder's fine-grained mutation surface (Increment D4a; form-versioning-schema-migration
@@ -143,8 +144,8 @@ final class FormBuilderService
             // is a PHPStan error rather than a silent "no defaults".
             //
             // ⚠️ It writes through the same columns as replaceValidations(), deliberately not through it:
-            // that method DELETES every existing row first, which is right for a save and wrong for a
-            // create. A new field has none to replace.
+            // that method matches what it is sent against the field's existing rows (M126), which is right
+            // for a save and pointless for a create. A new field has none to match.
             foreach (DefaultFieldRules::for($type) as $index => $row) {
                 FormFieldValidation::create([
                     'form_version_id' => $draft->id,
@@ -392,9 +393,9 @@ final class FormBuilderService
      * a plan that needs no confirmation (a lossless flip such as short text to long text); anything else
      * refuses with the same 409 a stale token gets, because the remedy is the same: read the plans again.
      *
-     * ⛔ IT NEVER GOES THROUGH writeField()/replaceValidations(). That path deletes every rule and re-inserts
-     * the ones the builder sent, which drops `error_message_translations`, `logic_group` and
-     * `logic_operator` — the builder never round-trips them. A conversion that claims to keep a rule keeps
+     * ⛔ IT NEVER GOES THROUGH writeField()/replaceValidations(). That path rebuilds the rules from what the
+     * builder sent, matching rows by content (M126) and carrying groups since M131 — but a conversion must
+     * keep each ROW it claims to keep, by id, untouched. A conversion that claims to keep a rule keeps
      * the ROW. It also means no row naming a sibling is inserted, so the M92 sibling lock set is not needed:
      * the one field row is the whole lock, taken before any validation row, in the M91 order.
      *
@@ -715,12 +716,19 @@ final class FormBuilderService
      * Make the field's rule rows what the builder sent, KEEPING every row whose rule is unchanged (`M126`,
      * `R-86a0426d`).
      *
-     * ⛔ WHY NOT DELETE AND RE-INSERT, WHICH THIS USED TO DO. Three columns never reach the builder —
-     * `error_message_translations` (the XLSForm importer and the blueprint materializer write it),
-     * `logic_group` and `logic_operator` (the materializer) — because `BuilderPresenter::field()` emits none of
-     * them and `fieldPayload()` sends six keys per rule. Every field save sends its rules, so every save — a
-     * label edit included — deleted all three, with a 200. Both engines read the grouping, and translated
-     * messages render at runtime and re-export to XLSForm.
+     * ⛔ WHY NOT DELETE AND RE-INSERT, WHICH THIS USED TO DO. `error_message_translations` never reaches the
+     * builder (the XLSForm importer and the blueprint materializer write it), and until M131 neither did
+     * `logic_group` and `logic_operator`. Every field save sends its rules, so every save — a label edit
+     * included — deleted them, with a 200. Both engines read the grouping, and translated messages render at
+     * runtime and re-export to XLSForm.
+     *
+     * ⛔ GROUPS ARE WRITTEN WHEN THE PAYLOAD CARRIES THEM (M131, `R-799d60f5`), AND ONLY THEN. The rule IDENTITY
+     * below ignores grouping on purpose — a regroup is the same rule in a different group, and keeps its
+     * translations — so a kept row takes its group columns from the payload when the `logic_group` key is
+     * present, and keeps the stored ones when it is absent (an older client). A group token is an existing group
+     * uuid ON THIS FIELD, kept as it is, or a token the builder minted, mapped to `uuid5(field id, token)`: the
+     * builder keeps its own token across saves without re-reading the field, so a random uuid would mint a new
+     * group on every save and churn the conversion fingerprint, which hashes the raw uuid.
      *
      * ⚠️ A RULE IS MATCHED BY WHAT IT IS, because no row id reaches the client and position cannot identify
      * one (the validation editor renumbers on a removal). Two rows are the same rule when their type, operator,
@@ -740,6 +748,8 @@ final class FormBuilderService
     {
         /** @var array<string, list<FormFieldValidation>> $existingByRule */
         $existingByRule = [];
+        /** @var array<string, true> $existingGroups the group uuids this field already holds */
+        $existingGroups = [];
 
         foreach ($field->validations()->orderBy('sequence')->orderBy('id')->get() as $existing) {
             $existingByRule[self::ruleIdentity(
@@ -749,9 +759,13 @@ final class FormBuilderService
                 $existing->expression,
                 $existing->related_form_field_id,
             )][] = $existing;
+
+            if ($existing->logic_group !== null) {
+                $existingGroups[$existing->logic_group] = true;
+            }
         }
 
-        /** @var list<array{row: FormFieldValidation, error_message: ?string, sequence: int}> $kept */
+        /** @var list<array{row: FormFieldValidation, error_message: ?string, sequence: int, grouping: ?array{logic_group: ?string, logic_operator: ?string}}> $kept */
         $kept = [];
         /** @var list<array<string, mixed>> $inserts */
         $inserts = [];
@@ -769,8 +783,11 @@ final class FormBuilderService
 
             $match = isset($existingByRule[$identity]) ? array_shift($existingByRule[$identity]) : null;
 
+            // Null when the payload says nothing about grouping, which keeps a kept row's stored group.
+            $grouping = array_key_exists('logic_group', $row) ? self::grouping($field, $row, $existingGroups) : null;
+
             if ($match !== null) {
-                $kept[] = ['row' => $match, 'error_message' => $row['error_message'] ?? null, 'sequence' => $index];
+                $kept[] = ['row' => $match, 'error_message' => $row['error_message'] ?? null, 'sequence' => $index, 'grouping' => $grouping];
 
                 continue;
             }
@@ -784,6 +801,8 @@ final class FormBuilderService
                 'rule_value' => $row['rule_value'] ?? null,
                 'expression' => $row['expression'] ?? null,
                 'error_message' => $row['error_message'] ?? null,
+                'logic_group' => $grouping['logic_group'] ?? null,
+                'logic_operator' => $grouping['logic_operator'] ?? null,
                 'sequence' => $index,
             ];
         }
@@ -801,12 +820,38 @@ final class FormBuilderService
         }
 
         foreach ($kept as $keep) {
-            $keep['row']->fill(['error_message' => $keep['error_message'], 'sequence' => $keep['sequence']])->save();
+            $keep['row']->fill(['error_message' => $keep['error_message'], 'sequence' => $keep['sequence'], ...($keep['grouping'] ?? [])])->save();
         }
 
         foreach ($inserts as $insert) {
             FormFieldValidation::create($insert);
         }
+    }
+
+    /**
+     * A row's group columns from the payload — see replaceValidations(). A token that is already a group on this
+     * field is kept; any other maps to `uuid5(field id, token)`, so a builder token and another field's uuid both
+     * become this field's own, the same one on every save. No group means no connective: an operator on an
+     * ungrouped row is never read, and storing one would read as intent.
+     *
+     * @param  array<string, mixed>  $row
+     * @param  array<string, true>  $existingGroups
+     * @return array{logic_group: ?string, logic_operator: ?string}
+     */
+    private static function grouping(FormField $field, array $row, array $existingGroups): array
+    {
+        $token = $row['logic_group'] ?? null;
+
+        if (! is_string($token) || $token === '') {
+            return ['logic_group' => null, 'logic_operator' => null];
+        }
+
+        $operator = $row['logic_operator'] ?? null;
+
+        return [
+            'logic_group' => isset($existingGroups[$token]) ? $token : Uuid::uuid5((string) $field->id, $token)->toString(),
+            'logic_operator' => is_string($operator) && $operator !== '' ? $operator : null,
+        ];
     }
 
     /**

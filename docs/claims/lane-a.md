@@ -202,6 +202,11 @@ Files:
   `tests/Feature/Tenancy/ConstraintBoundaryDriftTest.php`, whose composite-FK census went red on `forms_redirect_form_fk`
   and nothing else — item 5's migration adds that FK, exactly as M129's `ocr_scans_form_fk` did. The census gains the
   one name.
+- **Extension 8, pushed after PR #323's first CI run and before the file was edited:** `tests/e2e/responsive-axe.spec.ts`.
+  CI's E2E failed on "Audit change detail" (light and dark, desktop project) and nothing else: the scan clicks the first
+  "Permission changed" row on page one of `/audit-log`, and this increment's seeded forms and new guest submissions
+  push the seeded rows off page one by the time the last project runs. The scan now asks the page for that event,
+  the remedy the M128 row names.
 
 Shared artefacts taken: `docs/**` (the files above), `openapi.json`, the top-level `tests/e2e/*.spec.ts` named above
 (one new), and `PROGRESS.md` (own block only).

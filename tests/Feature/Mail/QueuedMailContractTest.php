@@ -7,6 +7,7 @@ use App\Mail\TenantMail;
 use App\Notifications\Auth\QueuedResetPassword;
 use App\Notifications\Auth\QueuedVerifyEmail;
 use App\Notifications\Auth\WelcomeNotification;
+use App\Notifications\Automations\FormAutomationNotification;
 use App\Notifications\Concerns\CarriesTenantBrand;
 use App\Notifications\Connectors\ConnectionRevokedNotification;
 use App\Notifications\Connectors\ConnectorRulePausedNotification;
@@ -63,6 +64,9 @@ $queuedMailNotifications = [
     // M66 — the eleventh, and the one that proves the sentence above. It has been in EXEMPT_JOBS since
     // H16a and absent here ever since, which is why it reached production without CarriesTenantBrand.
     ConnectorRulePausedNotification::class,
+    // M132 — a form automation's notice (`D82`). Twinned in EXEMPT_JOBS on its last entry's line, which keeps the
+    // lines the defect ledger cites in that script where they were.
+    FormAutomationNotification::class,
 ];
 
 it('implements ShouldQueue on every queued mail notification', function (string $class): void {

@@ -345,3 +345,37 @@ group('the Reference files section (M132)', () => {
         expect(section.text()).toContain('No reference files yet.');
     });
 });
+
+group('the Automations section (M132)', () => {
+    function mountWith(automations: unknown) {
+        return mount(FormSettingsModal, {
+            props: {
+                open: true,
+                formId: 'form-1',
+                form,
+                timezones: ['UTC'],
+                share,
+                saveResumeAvailable: true,
+                automations,
+                teleport: false,
+            } as never,
+            global: { stubs: { teleport: true } },
+        });
+    }
+
+    it('is absent when the host sends no automations, whether null or absent', () => {
+        expect(railLabels(mountWith(null))).not.toContain('Automations');
+        expect(railLabels(mountWith(undefined))).not.toContain('Automations');
+    });
+
+    it('comes after the sections about collecting a response, and opens on what automations do', async () => {
+        const wrapper = mountWith({ can_webhook: false, max: 10, items: [] });
+
+        expect(railLabels(wrapper)).toEqual([
+            'Details', 'Pages', 'Theme', 'Share', 'Schedule', 'Thank-you message', 'Save and finish later', 'Automations',
+        ]);
+
+        await railButton(wrapper, 'Automations').trigger('click');
+        expect(wrapper.find('[data-section="automations"]').text()).toContain('No automations yet.');
+    });
+});

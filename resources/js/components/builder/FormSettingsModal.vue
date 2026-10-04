@@ -13,7 +13,7 @@
  */
 import { MdsButton, MdsModal } from '@meridian/design-system';
 import FormSettingsSections from '@/components/forms/FormSettingsSections.vue';
-import type { FormSettingsForm, OcrScanningProps, ReferenceFileRow, ShareProps } from '@/components/forms/types';
+import type { AutomationsProps, FormSettingsForm, OcrScanningProps, ReferenceFileRow, ShareProps } from '@/components/forms/types';
 
 const props = defineProps<{
     open: boolean;
@@ -27,6 +27,8 @@ const props = defineProps<{
     ocrScanning?: OcrScanningProps | null;
     /** The Reference files section (M132): the draft's files. */
     referenceFiles?: ReferenceFileRow[] | null;
+    /** The Automations section (M132). */
+    automations?: AutomationsProps | null;
 }>();
 
 const emit = defineEmits<{ 'update:open': [value: boolean] }>();
@@ -48,6 +50,7 @@ const emit = defineEmits<{ 'update:open': [value: boolean] }>();
             :save-resume-available="props.saveResumeAvailable"
             :ocr-scanning="props.ocrScanning"
             :reference-files="props.referenceFiles"
+            :automations="props.automations"
         />
 
         <template #actions>

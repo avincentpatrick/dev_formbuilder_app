@@ -128,3 +128,39 @@ export interface ReferenceFileRow {
     /** Where staff open it: `GET /attachments/{id}`. */
     url: string;
 }
+
+/** What an automation does (M132, `R-b7bc5149`): a notice by email (`D82`), or the answers to a web address (`D83`). */
+export type AutomationAction = 'email' | 'webhook';
+
+/** One automation's recent run, as the Automations section lists it. `error_code` says why it did not succeed. */
+export interface AutomationRunRow {
+    id: string;
+    status: 'pending' | 'retrying' | 'succeeded' | 'failed' | 'skipped';
+    label: string;
+    at: string | null;
+    response_status: number | null;
+    error_code: string | null;
+}
+
+/**
+ * One of a form's automations. `url` is sent whole only to a reader who may manage webhooks — anyone else gets `host`;
+ * `manageable` is whether this reader may change it.
+ */
+export interface AutomationRow {
+    id: string;
+    name: string;
+    action: AutomationAction;
+    enabled: boolean;
+    recipients: string[] | null;
+    url: string | null;
+    host: string | null;
+    manageable: boolean;
+    runs: AutomationRunRow[];
+}
+
+/** The Automations section (M132): the form's automations, and whether this reader may add a web address. */
+export interface AutomationsProps {
+    can_webhook: boolean;
+    max: number;
+    items: AutomationRow[];
+}

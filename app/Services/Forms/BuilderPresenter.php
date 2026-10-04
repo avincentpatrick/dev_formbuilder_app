@@ -96,6 +96,8 @@ final class BuilderPresenter
             'ocr_scanning' => $this->settings->ocrScanning($form),
             // M132 (`R-bf49e4c1`) — the Files section's list: the draft's reference files. Optional on the client too.
             'reference_files' => $this->settings->referenceFiles($form),
+            // M132 (`R-b7bc5149`) — the Automations section, as this viewer may see it.
+            'automations' => $this->settings->automations($form, $viewer),
         ];
     }
 

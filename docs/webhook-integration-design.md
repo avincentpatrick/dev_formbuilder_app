@@ -173,3 +173,26 @@ land?* is a read of the destination.
 - The dedicated Zapier App, Slack App, and Sheets/Airtable OAuth connectors' own detailed design (auth flow screens, field mapping UI) — Phase 3 work, not designed here beyond the phasing decision (§4).
 - Webhook payload signing library choice (a Laravel package vs. hand-rolled HMAC) — an implementation detail, not an architectural one.
 - Per-plan-tier webhook endpoint count/rate limits → Doc #24.
+
+---
+
+## 7. Form automations — a web address per form (M132, as built)
+
+A form automation (`R-b7bc5149`) can send each new response's **answers** to a web address (`D83`). It is configured on
+the form, not in the workspace's webhook settings, and it is a separate mechanism from §1–§5's workspace webhooks — but it
+keeps their contract wherever a receiver could tell the difference:
+
+- **The same signature.** `X-Webhook-Signature: sha256=<hex>` over `"{timestamp}.{rawBody}"`, with `X-Webhook-Timestamp`
+  (= the body's `occurred_at`) and `X-Webhook-Event-Id`, under the automation's own `whsec_` secret, shown to the author
+  once. A receiver that verifies a workspace webhook verifies this.
+- **The same address rules.** Public addresses only (`PublicHttpUrl` on save, `OutboundUrlGuard` before every attempt),
+  no redirect followed, the same timeouts, and the month's `webhook_deliveries` quota checked and metered on the first
+  attempt. Configured only by `webhooks.manage`, on a plan that includes `webhooks`.
+- **A different body.** The envelope names are §3's (`event_id`, `event_type: submission.created`, `occurred_at`,
+  `api_version`), plus `automation`, `form`, `submission` (id, reference, status, source, submitted_at) and `answers`,
+  keyed by question key and formatted as the export and the Sheets connector format them. Unlike §3's payload, the
+  answers ARE included — that is what `D83` decided — and they are rebuilt at send time, never stored.
+- **Its own ledger.** `form_automation_runs`, not `webhook_deliveries` — one row per automation per event, no payload, at
+  most five attempts on §2's shared retry ladder. There is no manual redeliver in v1 (filed on the remainder row).
+
+An email automation (`D82`) sends a notice and a link, never an answer, and is described in `docs/data-dictionary.md` §36.

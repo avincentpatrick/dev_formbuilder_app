@@ -4,24 +4,35 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Tenant;
 
+use App\Enums\FormAutomationAction;
+use App\Exceptions\Entitlements\FeatureGateException;
 use App\Http\Controllers\Concerns\ReadsKeywordFilter;
 use App\Http\Controllers\Concerns\ResolvesTenant;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Forms\FormMetadataRequest;
+use App\Http\Requests\Forms\StoreFormAutomationRequest;
+use App\Http\Requests\Forms\UpdateFormAutomationRequest;
 use App\Http\Requests\Forms\UpdateOcrScanningRequest;
 use App\Models\Form;
+use App\Models\FormAutomation;
 use App\Models\ScopeNode;
 use App\Models\User;
+use App\Services\Automations\FormAutomationPresenter;
+use App\Services\Automations\FormAutomationService;
+use App\Services\Entitlements\EntitlementService;
 use App\Services\Forms\FormPresenter;
 use App\Services\Forms\FormService;
 use App\Services\Scoping\ScopeNodePresenter;
+use App\Support\Entitlements\FeatureAdmission;
 use App\Support\Forms\FormListFacets;
 use App\Support\Forms\FormListFolders;
 use App\Support\Search\ListEmptyReason;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\Response as HttpResponse;
 
 /**
  * Form CRUD + lifecycle (Increment D3). Authorization is the `can:` route middleware (FormPolicy
@@ -152,5 +163,48 @@ final class FormController extends Controller
         $this->forms->archive($form, $user);
 
         return back()->with('toast', ['type' => 'success', 'message' => 'Form archived.']);
+    }
+
+    /**
+     * Add an automation to the form (M132, `R-b7bc5149`). A web address (`D83`) also needs the plan to include webhooks — the
+     * 402 every other plan gate answers with — and its new secret is in this response and nowhere else, ever.
+     */
+    public function storeAutomation(StoreFormAutomationRequest $request, Form $form, FormAutomationService $automations, FormAutomationPresenter $presenter, EntitlementService $entitlements): JsonResponse
+    {
+        $action = $request->automationAction();
+
+        if ($action === FormAutomationAction::Webhook && ! FeatureAdmission::admits($entitlements, 'webhooks')) {
+            throw FeatureGateException::forKey('webhooks');
+        }
+
+        /** @var User $user */
+        $user = $request->user();
+        [$automation, $secret] = $automations->create($form, $request->automationName(), $action, $request->recipientList(), $request->webhookUrl(), $user);
+
+        return response()->json(['data' => $presenter->item($automation, $user), 'secret' => $secret], 201);
+    }
+
+    /** Change an automation's name, its on/off state, or its addresses. Its action never changes. */
+    public function updateAutomation(UpdateFormAutomationRequest $request, Form $form, FormAutomation $automation, FormAutomationService $automations, FormAutomationPresenter $presenter): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        return response()->json(['data' => $presenter->item($automations->update($automation, $request->changes(), $user), $user)]);
+    }
+
+    public function destroyAutomation(Request $request, Form $form, FormAutomation $automation, FormAutomationService $automations): HttpResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+        $automations->delete($automation, $user);
+
+        return response()->noContent();
+    }
+
+    /** Send one signed test request to a web-address automation, now, and say what came back. */
+    public function testAutomation(Form $form, FormAutomation $automation, FormAutomationService $automations): JsonResponse
+    {
+        return response()->json(['data' => $automations->test($automation)]);
     }
 }

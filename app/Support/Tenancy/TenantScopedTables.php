@@ -59,6 +59,10 @@ final class TenantScopedTables
         'connection_subscriptions',
         'connections',
         'feedback_reports',
+        // M132. A form's automations and their runs. `form_automations.secret` is withheld from the extract
+        // (`TenantExtractColumns::WITHHELD`); a run holds no payload and no response body.
+        'form_automation_runs',
+        'form_automations',
         'form_field_validations',
         'form_fields',
         // M131. Nothing withheld: a folder is a name the workspace typed, and who typed it.

@@ -11,6 +11,7 @@ use App\Models\Form;
 use App\Models\FormVersion;
 use App\Models\ScopeNode;
 use App\Models\User;
+use App\Services\Automations\FormAutomationPresenter;
 use App\Services\Entitlements\EntitlementService;
 use App\Services\Scoping\ScopeNodePresenter;
 use App\Services\Settings\TenantSettingRegistry;
@@ -39,6 +40,7 @@ final class FormSettingsPresenter
         private readonly EntitlementService $entitlements,
         private readonly TenantSettingRegistry $settings,
         private readonly FormReferenceFileService $referenceFileService,
+        private readonly FormAutomationPresenter $automationPresenter,
     ) {}
 
     /**
@@ -161,6 +163,17 @@ final class FormSettingsPresenter
     }
 
     /**
+     * The Automations section (M132, `R-b7bc5149`): the form's automations as THIS viewer may see them — a web address
+     * whole only to whoever may manage webhooks. Beside the `form` block, for the Reference files section's reason.
+     *
+     * @return array{can_webhook: bool, max: int, items: list<array<string, mixed>>}
+     */
+    public function automations(Form $form, ?User $viewer): array
+    {
+        return $this->automationPresenter->forForm($form, $viewer);
+    }
+
+    /**
      * The form hub's Settings tab: every section the builder offers, plus Scope.
      *
      * Scope lives on the hub and not in the builder because it confers capacity rather than describing the
@@ -177,6 +190,7 @@ final class FormSettingsPresenter
             'timezones' => DateTimeZone::listIdentifiers(),
             'ocr_scanning' => $this->ocrScanning($form),
             'reference_files' => $this->referenceFiles($form),
+            'automations' => $this->automations($form, $user),
             'scope' => $user->can('viewAny', ScopeNode::class)
                 ? ['current_node_id' => $form->scope_node_id, 'options' => $this->scopes->pickerOptions()]
                 : null,

@@ -20,7 +20,8 @@ function refusal(json: unknown, fallback: string): string {
     return firstError ?? body.error?.message ?? body.message ?? fallback;
 }
 
-async function send(url: string, init: { method: string; body?: BodyInit; json?: unknown }, fallback: string): Promise<unknown> {
+/** One settings request (M132: the Automations section uses it too). Rejects with the server's own sentence. */
+export async function sendSettingsRequest(url: string, init: { method: string; body?: BodyInit; json?: unknown }, fallback: string): Promise<unknown> {
     const headers: Record<string, string> = { Accept: 'application/json' };
     const xsrf = readCookie('XSRF-TOKEN');
     if (xsrf !== null) {
@@ -63,7 +64,7 @@ function rowOf(json: unknown): ReferenceFileRow {
 
 /** The draft's files, in display order — read again while a new file's virus check is still running. */
 export async function listReferenceFiles(formId: string): Promise<ReferenceFileRow[]> {
-    const json = (await send(base(formId), { method: 'GET' }, FALLBACK)) as { data?: unknown } | null;
+    const json = (await sendSettingsRequest(base(formId), { method: 'GET' }, FALLBACK)) as { data?: unknown } | null;
     return Array.isArray(json?.data) ? (json.data as ReferenceFileRow[]) : [];
 }
 
@@ -71,17 +72,17 @@ export async function listReferenceFiles(formId: string): Promise<ReferenceFileR
 export async function uploadReferenceFile(formId: string, file: File): Promise<ReferenceFileRow> {
     const body = new FormData();
     body.append('file', file);
-    return rowOf(await send(base(formId), { method: 'POST', body }, 'The file was not accepted. Please try another file.'));
+    return rowOf(await sendSettingsRequest(base(formId), { method: 'POST', body }, 'The file was not accepted. Please try another file.'));
 }
 
 /** Rename one of the draft's files — what respondents see in its place. */
 export async function renameReferenceFile(formId: string, fileId: string, label: string): Promise<ReferenceFileRow> {
-    return rowOf(await send(`${base(formId)}/${encodeURIComponent(fileId)}`, { method: 'PATCH', json: { label } }, 'The name was not saved.'));
+    return rowOf(await sendSettingsRequest(`${base(formId)}/${encodeURIComponent(fileId)}`, { method: 'PATCH', json: { label } }, 'The name was not saved.'));
 }
 
 /** Remove one of the draft's files. A published version that shows it keeps it. */
 export async function removeReferenceFile(formId: string, fileId: string): Promise<void> {
-    await send(`${base(formId)}/${encodeURIComponent(fileId)}`, { method: 'DELETE' }, 'The file was not removed.');
+    await sendSettingsRequest(`${base(formId)}/${encodeURIComponent(fileId)}`, { method: 'DELETE' }, 'The file was not removed.');
 }
 
 /** "PDF, 1.2 MB" — the kind a respondent will get, and its size, in the units a person reads. */

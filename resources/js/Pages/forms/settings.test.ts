@@ -66,6 +66,7 @@ function props(overrides: Record<string, unknown> = {}): Record<string, unknown>
         ocr_scanning: { enabled: false, eligible: true, reason: null },
         // M132: the hub always sends the draft's reference files, an empty list included.
         reference_files: [],
+        automations: { can_webhook: false, max: 10, items: [] },
         scope: { current_node_id: null, options: [] },
         tabs: [
             { key: 'overview', label: 'Overview', href: '/forms/form-1', icon: 'forms' },
@@ -96,7 +97,7 @@ describe('forms/Settings', () => {
 
         expect(railLabels(wrapper)).toEqual([
             'Details', 'Pages', 'Theme', 'Reference files', 'Share', 'Scanning', 'Schedule', 'Thank-you message',
-            'Save and finish later', 'Scope',
+            'Save and finish later', 'Automations', 'Scope',
         ]);
     });
 

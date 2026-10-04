@@ -1380,6 +1380,62 @@ The reference files a form version shows its respondents (M132, `R-bf49e4c1`) �
 
 ---
 
+## 36. `form_automations`
+
+A form's automations (M132, `R-b7bc5149`): "when a response is submitted, do this". One trigger and one action per row; a form may have up to ten (`FormAutomationService::MAX_PER_FORM`). They run on the queue only, after the response is stored (`D62` = A), so an automation never delays or refuses a respondent. ⛔ An automation runs an **action**, never a "step" — the respondent's step is a projection with no table (`docs/workflow-branching-design.md` §2).
+
+**Writers:** `App\Services\Automations\FormAutomationService` (create, update, delete — each audited under the `form_automation` alias) behind `/forms/{form}/automations` (`can:update,form`; a change also `can:manage,automation`). **Readers:** the form settings' Automations section (`FormAutomationPresenter`), and `FormAutomationDispatcher`, which `RunFormAutomationsForSubmissionCreated` calls once per `SubmissionCreated` event.
+
+| Column | Type | Nullable | Default | PII? | Description |
+|---|---|---|---|---|---|
+| `id` | `uuid` | No | application-generated (`HasUuidv7`) | No | Primary key. |
+| `tenant_id` | `uuid` | No | — | No | FK to `tenants.id`, `ON DELETE CASCADE`. |
+| `form_id` | `uuid` | No | — | No | The form. Composite FK `(tenant_id, form_id)` → `forms (tenant_id, id)`, `ON DELETE CASCADE`. |
+| `name` | `varchar(80)` | No | — | No | The author's name for it. |
+| `trigger` | `varchar(40)` — PHP enum: `FormAutomationTrigger` | No | `'submission.created'` | No | When it fires. One value in v1: `submission.created`, the domain event raised once after commit for every accepted response (guest, staff encoding, offline sync, a scanned paper form, a promoted draft). Pinned by `form_automations_trigger_check`. |
+| `action` | `varchar(20)` — PHP enum: `FormAutomationAction` | No | — | No | What it does: `email` (a notice and a link, `D82`) or `webhook` (the answers to a web address, `D83`). Pinned by `form_automations_action_check`. |
+| `recipients` | `jsonb` | Yes | `NULL` | **Yes** | Email only: up to five addresses, each validated `email:rfc`. Redacted from the audit log as PII. |
+| `url` | `varchar(2048)` | Yes | `NULL` | No | Web address only: where the answers go. Must be public (`PublicHttpUrl`), and is checked again before every send (`OutboundUrlGuard`). Shown whole only to holders of `webhooks.manage`; anyone else sees its host. |
+| `secret` | `text` (encrypted cast) | Yes | `NULL` | No | Web address only: the HMAC signing secret (`whsec_…`), shown to the author once at creation and never again. Withheld from the tenant extract; never in an audit row. |
+| `enabled` | `boolean` | No | `true` | No | Whether it fires. A run queued before it was switched off is recorded `skipped`. |
+| `created_by` | `uuid` | Yes | `NULL` | No | Who added it. FK to `users.id`, `ON DELETE SET NULL`. |
+| `created_at` / `updated_at` | `timestamptz` | No | set by Eloquent | No | — |
+
+**Constraints**: `form_automations_shape_check` — an `email` row has `recipients` and no `url` or `secret`; a `webhook` row has `url` and `secret` and no `recipients`. `UNIQUE (tenant_id, id)` (`form_automations_tenant_id_id_unique`), the target of `form_automation_runs_automation_fk`.
+
+> **Design Notes**
+> - **RLS**: `strict`. Listed in `TenantScopedTables::STRICT`; `secret` is withheld from the tenant extract (`TenantExtractColumns::WITHHELD`).
+> - **A web address receives the answers, so it is `webhooks.manage`'s alone** (`FormAutomationPolicy`), on a plan that includes `webhooks` — the workspace webhooks' own rules. An email automation is the form's editors' to manage.
+> - **Hard delete.** There is no restore, and a soft-deleted row would keep a live secret at rest for nothing.
+
+## 37. `form_automation_runs`
+
+One automation's run for one response (M132, `R-b7bc5149`): the ledger the Automations section reads to say what happened, and the idempotency key that makes a re-raised event do nothing. **It stores no payload and no response body** — the web-address job rebuilds the body from the stored response at send time — so no answer sits in a table nothing prunes (pruning the runs themselves is filed on the automations remainder row).
+
+**Writers:** `FormAutomationDispatcher` (one row per enabled automation per event, `firstOrCreate` on the event id), `DeliverFormAutomationWebhookJob` and `SendFormAutomationEmailJob`.
+
+| Column | Type | Nullable | Default | PII? | Description |
+|---|---|---|---|---|---|
+| `id` | `uuid` | No | application-generated (`HasUuidv7`) | No | Primary key. |
+| `tenant_id` | `uuid` | No | — | No | FK to `tenants.id`, `ON DELETE CASCADE`. |
+| `form_automation_id` | `uuid` | No | — | No | The automation. Composite FK `(tenant_id, form_automation_id)` → `form_automations (tenant_id, id)`, `ON DELETE CASCADE`. |
+| `submission_id` | `uuid` | No | — | No | The response it ran for. No foreign key, as `ocr_scans.submission_id` has none: a run is history and outlives a deleted response. |
+| `event_id` | `uuid` | No | — | No | The `SubmissionCreated` event's id — stable, so a second raise finds this row. |
+| `status` | `varchar(20)` — PHP enum: `FormAutomationRunStatus` | No | `'pending'` | No | `pending`, `retrying`, `succeeded`, `failed` or `skipped`. Pinned by `form_automation_runs_status_check`. |
+| `attempt_count` | `smallint` | No | `0` | No | Attempts made. A web address is tried at most five times on the shared retry ladder (1, 5, 30 and 120 minutes apart). |
+| `response_status` | `smallint` | Yes | `NULL` | No | The web address's HTTP status on the last attempt. |
+| `error_code` | `varchar(40)` | Yes | `NULL` | No | Why the last attempt did not succeed: `http_<status>`, `transport_error`, `blocked_url`, `quota_exceeded`, `plan_feature`, `submission_missing` or `disabled`. Never a response body. |
+| `last_attempted_at` | `timestamptz` | Yes | `NULL` | No | When it was last attempted. |
+| `created_at` / `updated_at` | `timestamptz` | No | set by Eloquent | No | — |
+
+**Index**: `UNIQUE (tenant_id, form_automation_id, event_id)` (`form_automation_runs_event_unique`); `(tenant_id, form_automation_id, created_at)` for the section's recent runs.
+
+> **Design Notes**
+> - **RLS**: `strict`. Listed in `TenantScopedTables::STRICT`; nothing withheld.
+> - **Its own ledger, not `webhook_deliveries`:** that table's one-owner CHECK and its sweeper's two-way branch would misroute a third owner, an email has no place in it, and it stores payloads, which here would be answers.
+
+---
+
 ## Foreign Key Relationship Summary
 
 ```
@@ -1420,6 +1476,12 @@ form_field_validations.related_form_field_id -> form_fields.id
 form_version_reference_files.tenant_id -> tenants.id
 form_version_reference_files.(tenant_id, form_version_id) -> form_versions.(tenant_id, id)  (composite, CASCADE — see §35)
 form_version_reference_files.(tenant_id, attachment_id)   -> attachments.(tenant_id, id)    (composite, NO ACTION — see §35)
+
+form_automations.tenant_id -> tenants.id
+form_automations.(tenant_id, form_id) -> forms.(tenant_id, id)  (composite, CASCADE — see §36)
+form_automations.created_by -> users.id  (external, SET NULL)
+form_automation_runs.tenant_id -> tenants.id
+form_automation_runs.(tenant_id, form_automation_id) -> form_automations.(tenant_id, id)  (composite, CASCADE — see §37)
 
 submissions.tenant_id                  -> tenants.id
 submissions.form_id                    -> forms.id

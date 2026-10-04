@@ -16,154 +16,72 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M132`, the Oct 8 slot: reference files a form shows its respondents, frozen per published version, and automations that email or call a web address when a response arrives (`m132-attachments-automations`)
+## Status: NO ACTIVE CLAIM — `M132` is merged; a form shows reference files frozen per published version, and a submitted response can email a notice or send its answers to a web address
 
-Taken 2026-10-04. Branch `m132-attachments-automations`, cut from `origin/main` at `46c78b99`, PR into `main`.
-The fifth Oct 12 increment under `D72` and the third under `D75`: one increment for the whole plan slot, each row its
-own commits, in this order, so a red run bisects to one row.
-1. **`R-bf49e4c1`** (`docs/feature-backlog.md:11682`) — form attachments v1: PDF and image reference files per form,
-   shown to respondents, frozen per published version with byte dedupe (`D61` = B), available offline once opened (`D84`).
-2. **`R-b7bc5149`** (`:11706`) — form automations v1: when a response is submitted, send an email (a notice and a link,
-   `D82`) or call a web address with the answers (`D83`), on the queue only (`D62` = A).
+## RELEASED — `M132`, the Oct 8 slot: reference files frozen per published version, and form automations (merged as PR #325, `56ff1427`, 6/6 green with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 
-`D82`–`D84` were answered by the user in chat on 2026-10-04, each the recommendation. Also in this push: one row filed
-(the outbound address check resolves a host twice), a verification note on each of the two rows, and what v1 leaves
-appended to each row's `during-testing` remainder — all line-neutral.
+Shipped 2026-10-05. Branch `m132-attachments-automations`, cut from `origin/main` at `46c78b99`. The claim commit is
+`eef26544`; no claim extension was needed.
 
-### Evidence verified
+**The fifth Oct 12 increment under `D72`, the third under `D75`** — two rows in their own commits, in the stated order:
+item 1 `185ce74b` (follow-up `ef09f4dd`), item 2 `545256ca` (follow-up `a533bece`), the closures `3d185ab4`, and one
+follow-up across both items for CI's static analysis, `d3a9682b`.
+- **Closed:** `R-bf49e4c1` (reference files), `R-b7bc5149` (automations v1).
+- **Filed:** one row in the claim push — the outbound address check resolves a host, then the request resolves it
+  again, so nothing pins the checked address (`before-launch`). What v1 leaves was appended to each remainder row.
+- **Decisions:** `D82`, `D83`, `D84`, answered in chat at claim time, each the recommendation.
+- **Namespaces spent:** migration prefixes `2026_08_17_000121` to `2026_08_17_000124`; decisions `D82`–`D84`. No ADR
+  (`0010` stays reserved).
+- **Claimed and not needed:** `database/factories/FormVersionReferenceFileFactory.php` and the two automation factories
+  (the services are the only writers, and the tests go through them), `app/Models/Attachment.php`,
+  `app/Services/Forms/FormService.php` and `PublishService.php` (the `forms` lock makes publish need no edit; archive's
+  cascade takes a discarded draft's list with it), `app/Exceptions/Forms/FormException.php`, `FormHubController.php`,
+  `FormBuilderController.php`, `config/guest.php`, `lib/content-images.ts`, `App.vue` (cited by line; the list is
+  passed as props instead), `resources/js/components/forms/automations.ts`'s own test (the panel test covers it),
+  `GuestContentImageTest.php`, `FormSettingsPageTest.php` (the new keys sit beside the pinned `form` block),
+  `TenantTableClassificationDriftTest.php`, and `docs/ACCESS-MATRIX.md` (it lists pages; neither item adds one).
+- **Tracker:** no surgery owed.
 
-**`R-bf49e4c1`**, against `46c78b99`:
-- **Moved:** "`AttachmentKind` has no form-level kind" — `M129` added `form_content_image` (`AttachmentKind.php:33`),
-  owned by the form. It is image-only (`config/attachments.php:113-116`, 2 MB); nothing else is form-level.
-- **Partly false:** "`form` and `scope_node` appear only for `resource_grants`" — the `form` alias is global
-  (`ResourceScopeable::morphMap()`, registered in `AppServiceProvider`), and `M129`'s images store
-  `attachable_type = 'form'`. `form_version` is no alias at all.
-- **Held:** `form_templates.cover_image_attachment_id` is a real foreign key whose one writer is
-  `PlatformTemplateSeeder.php:55`, writing null, with no upload route. It belongs to the remainder row, not to v1.
-- **Held:** every label-bearing column carries `*_translations`; per-language media belongs to the remainder row.
-- **Held, and sharper than the row says:** every upload computes a SHA-256 (`AttachmentStorageService` — five
-  `hash_file('sha256', …)` sites) and nothing reads it. No dedupe exists anywhere, and the column is unindexed.
+### What an author and a respondent see now
+- **Reference files** in form settings (builder and hub): attach a PDF or an image, rename it, remove it; a file still
+  being checked says so and is not shown to respondents yet. "Respondents see these changes after you publish the form."
+- **Respondents** see the files under the form's description on every page: an image opens in a dialog, a PDF is saved
+  to the device; a file opened once opens again offline, and one never opened says to open it once online.
+- **Automations** in form settings: "When a response is submitted", send an email (a notice and a link, never an
+  answer) or — for Owners and Admins, on a plan with webhooks — send the answers to a web address, signed with a secret
+  shown once; switch one off, edit, delete, send a test, and read its recent runs with the reason a run did not succeed.
 
-**`R-b7bc5149`:**
-- **Held:** four fixed mechanisms — the review lifecycle, `NotificationType` (closed; its order is load-bearing,
-  `NotificationType.php:20`), webhooks, and connectors through the eight `DispatchConnectorsFor*.php`. None is authored
-  by a form's author, and none composes with another.
-- **Held:** `docs/workflow-branching-design.md:36` — "There is no `steps` table … and this document adds none." v1 says
-  *automation* and *action*, never *step*.
-- **Held:** `NotificationType` is closed. v1 adds no case — the email is its own notification class sent to an
-  on-demand address, as `ResumeLinkNotification` is.
+### How the prediction fared
 
-### Premise verified
-
-**`R-bf49e4c1`:** `D61` = B pictured attachment rows per version. Two facts change the shape. The storage gauge is a
-live `sum(size_bytes)` over non-trashed attachment rows (`EntitlementService.php:273`), so a copied row per publish
-would bill one file once per version. The version snapshot holds only `sections` and `fields`
-(`SchemaSnapshotSerializer::snapshot()`), so a list inside it would change the checksum every offline client pins.
-So `D61`'s "reference row" is a **join row per version** (`form_version_reference_files`), frozen by the same
-`draft_child` RLS shape as a version's fields, and the bytes are **one attachment per distinct SHA-256 per form**.
-Publish copies join rows through `SchemaTreeCloner`, which already copies the three child tables and stays a pure copy —
-no re-pointing, so `D58`'s objection does not arise. Every join-row write takes the `forms` lock first, which
-`PublishService` relies on (its step-0 note: "every insert path into these tables takes the `forms` lock first").
-`form_versions` and `attachments` carry no `(tenant_id, id)` unique, so the composite foreign keys need one each. The
-row's Kobo point (one filename namespace shared by media and data links) does not transfer: nothing here names a file
-from an expression, and Connect project v1 (`R-5da4a30f`) feeds a choice list, not a lookup. **`D84`:** the service
-worker's scope is `/f/` (`sw.ts:9`), so a file opened in a new tab would never reach it. The page fetches the file
-instead: an image opens in a dialog, and a PDF is saved from what was fetched.
-
-**`R-b7bc5149`:** `SubmissionCreated` already fires once, after commit, for every accepted response — guest, encode,
-offline sync and OCR (`SubmissionPipeline.php:188`) and draft promotion (`SubmissionDraftService.php:336-339`). v1
-needs no new event and no `DomainEventType` case, whose CHECK and `openapi.json` enum would move. The webhooks that
-exist send IDs only (`SubmissionCreated` excludes answers by design), and `routes/api.php` has no route that returns
-answers, which is why `D83` matters. `webhook_deliveries` is not reused, for three reasons:
-- its exactly-one-owner CHECK and the retry sweeper's two-way branch would misroute a third owner;
-- an email has no place in it;
-- it stores payloads, which here would be answers.
-
-`TenantAwareJob::failed()` is final, and a job body runs inside a transaction, so a failed attempt is recorded and
-`release()`d, as `ReadOcrScanJob` does, never thrown. Outbound mail has no rate limit (`config/queue-fairness.php`).
-
-### Remedy verdict
-
-**`R-bf49e4c1`:** the row prescribes a new kind and a new morph entry. **The kind is right**
-(`form_reference_file`). **The morph entry is not needed:** `form` exists, and a `form_version` alias is avoided by
-the join table. `AttachmentPolicy::view()` is an exhaustive `match` with no default, so the kind joins the content-image
-arm. **The row understates removal:** a file removed from a draft can still be shown by a published version, so its
-attachment is soft-deleted only when no version references it.
-
-**`R-b7bc5149`:** no remedy offered beyond the v1 scope. The measured design:
-- `form_automations` — one trigger, one action (email or webhook);
-- `form_automation_runs` — one row per automation per event, unique, so a second dispatch does nothing;
-- a synchronous listener on `SubmissionCreated` that never lets a failure reach the respondent;
-- two `TenantAwareJob`s. The webhook job reuses `OutboundUrlGuard` before each attempt, `WebhookSigner`'s raw-secret
-  headers and the `WebhookDeliveries` quota. The email job sends one queued notification per address, linking to
-  `submissions.show` through `TenantUrl`, with no answer in it.
-
-Files:
-- **1 (`R-bf49e4c1`):** new `database/migrations/2026_08_17_000121_add_tenant_id_id_unique_to_form_versions_and_attachments.php`,
-  `2026_08_17_000122_create_form_version_reference_files_table.php`, `app/Models/FormVersionReferenceFile.php`,
-  `database/factories/FormVersionReferenceFileFactory.php`, `app/Services/Forms/FormReferenceFileService.php`,
-  `app/Http/Requests/Forms/StoreFormReferenceFileRequest.php`, `UpdateFormReferenceFileRequest.php`,
-  `resources/js/components/forms/ReferenceFilesPanel.vue` and its test, `resources/js/components/forms/reference-files.ts`
-  and its test, `resources/public-runtime/lib/reference-files.ts`, `resources/public-runtime/components/ReferenceFileList.vue`,
-  their tests under `resources/public-runtime/__tests__/`, `tests/Feature/Forms/FormReferenceFileUploadTest.php`,
-  `FormReferenceFileLifecycleTest.php`, `tests/Feature/Guest/GuestReferenceFileTest.php`; edited
-  `app/Enums/AttachmentKind.php` (hub), `config/attachments.php` (hub), `app/Policies/AttachmentPolicy.php`,
-  `app/Services/Attachments/AttachmentStorageService.php`, `app/Models/FormVersion.php`, `app/Models/Attachment.php`,
-  `app/Services/Forms/SchemaTreeCloner.php`, `RestoreService.php`, `FormService.php` (hub), `PublishService.php`,
-  `app/Exceptions/Forms/FormException.php`, `app/Http/Controllers/Tenant/AttachmentController.php`,
-  `FormHubController.php`, `FormBuilderController.php`, `routes/tenant.php` (hub), `routes/api.php` (hub),
-  `app/Http/Controllers/Public/GuestContentImageController.php`, `app/Services/Submissions/PublicFormPresenter.php` (hub),
-  `app/Services/Forms/FormSettingsPresenter.php`, `BuilderPresenter.php`, `app/Providers/AppServiceProvider.php` (hub),
-  `config/guest.php`, `app/Support/Tenancy/TenantScopedTables.php`, `ConstraintBoundaries.php`,
-  `resources/public-runtime/sw.ts` (hub), `lib/types.ts`, `lib/content-images.ts`, `components/RuntimeSession.vue`,
-  `RuntimeShell.vue`, `FormHeader.vue`, `App.vue`, `resources/js/components/forms/FormSettingsSections.vue`,
-  `resources/js/components/forms/types.ts`, `resources/js/components/builder/FormSettingsModal.vue` and its test,
-  `resources/js/components/builder/types.ts`, `resources/js/Pages/forms/Builder.vue` (hub), `Settings.vue`,
-  `resources/js/Pages/forms/settings.test.ts`, `resources/public-runtime/__tests__/sw.test.ts`, `components.test.ts`,
-  `database/seeders/E2eSeeder.php`, `tests/Feature/Tenancy/TenantExtractColumnDriftTest.php`,
-  `ConstraintBoundaryDriftTest.php`, `TenantTableClassificationDriftTest.php`,
-  `tests/Feature/Http/ServiceWorkerCachePrefixRouteTest.php`, `tests/Feature/Auth/RateLimiterBindingTest.php`,
-  `tests/Feature/Api/OpenApiContractTest.php`, `tests/Feature/Attachments/AttachmentPolicyTest.php`,
-  `tests/Feature/Forms/FormSettingsPageTest.php`, `tests/Feature/Guest/GuestContentImageTest.php`,
-  `tests/e2e/form-settings-axe.spec.ts`, `public-runtime-axe.spec.ts`, `public-runtime-offline.spec.ts`,
-  `builder-axe.spec.ts`, `openapi.json` (hub), `docs/data-dictionary.md` (hub), `docs/offline-first-sync-design.md`
-  (hub), `docs/ACCESS-MATRIX.md` (hub).
-- **2 (`R-b7bc5149`):** new `database/migrations/2026_08_17_000123_create_form_automations_table.php`,
-  `2026_08_17_000124_create_form_automation_runs_table.php`, `app/Enums/FormAutomationAction.php`,
-  `FormAutomationTrigger.php`, `FormAutomationRunStatus.php`, `app/Models/FormAutomation.php`, `FormAutomationRun.php`,
-  their factories, `app/Policies/FormAutomationPolicy.php`, `app/Services/Automations/FormAutomationService.php`,
-  `FormAutomationDispatcher.php`, `FormAutomationPresenter.php`, `FormAutomationWebhookPayload.php`,
-  `app/Listeners/Automations/RunFormAutomationsForSubmissionCreated.php`,
-  `app/Jobs/Automations/DeliverFormAutomationWebhookJob.php`, `SendFormAutomationEmailJob.php`,
-  `app/Notifications/Automations/FormAutomationNotification.php`, `app/Http/Requests/Forms/StoreFormAutomationRequest.php`,
-  `UpdateFormAutomationRequest.php`, `resources/js/components/forms/AutomationsPanel.vue` and its test,
-  `resources/js/components/forms/automations.ts` and its test, `tests/Feature/Automations/FormAutomationTest.php`,
-  `FormAutomationDispatchTest.php`, `FormAutomationWebhookJobTest.php`, `FormAutomationEmailJobTest.php`; edited
-  `app/Models/Form.php`, `app/Http/Controllers/Tenant/FormController.php`, `routes/tenant.php` (hub),
-  `app/Support/Audit/AuditRedactor.php`, `AuditableTypes.php`, `app/Support/Tenancy/TenantExtractColumns.php`,
-  `TenantScopedTables.php`, `ConstraintBoundaries.php`, `scripts/job-payload-lint.php`,
-  `tests/Feature/Mail/QueuedMailContractTest.php`, `app/Services/Forms/FormSettingsPresenter.php`,
-  `BuilderPresenter.php`, `resources/js/Pages/forms/Builder.vue` (hub), `Settings.vue`, `settings.test.ts`,
-  `FormSettingsSections.vue`, both `types.ts`, `FormSettingsModal.vue` and its test, the three tenancy drift tests above,
-  `tests/e2e/form-settings-axe.spec.ts`, `docs/data-dictionary.md` (hub), `docs/webhook-integration-design.md` (hub),
-  `docs/audit-compliance-logging-spec.md`, `docs/ACCESS-MATRIX.md` (hub).
-
-Shared artefacts taken: `docs/feature-backlog.md`, `docs/claims/decisions.md`, `docs/pipeline.md`,
-`docs/backlog-triage.md`, `docs/gate-baselines.md`, `PROGRESS.md` (own block), `openapi.json`, the docs named above,
-and the top-level `tests/e2e/*.spec.ts` named above.
-Paired files taken: `resources/public-runtime/lib/types.ts` with `PublicFormPresenter.php` (the guest schema's two
-halves move together); `sw.ts` with `ServiceWorkerCachePrefixRouteTest.php` and `sw.test.ts`.
-Namespaces spent: migration prefixes `2026_08_17_000121` to `2026_08_17_000124`; decisions `D82`–`D84`. No ADR (`0010`
-stays reserved).
-Prediction:
-
-| Gate | Expected |
+| Predicted | Actual |
 |---|---|
-| CI | 6/6 after the local gates, on the first run |
-| Most likely red | ⚠️ **the citation lint**, after appends to `routes/tenant.php`, `routes/api.php`, `AppServiceProvider.php` and `Builder.vue` with the ledger at its ceiling (17/17) |
-| Second | the Contract job: the new guest route reaches `openapi.json`, where Scramble documents a file stream as a JSON object |
-| Third | the offline E2E case for a reference file — a page-side fetch under a `/f/` worker scope, a path no spec has run |
-| ⚠️ Most likely wrong | that the `draft_child` RLS shape refuses a write to a published version's join rows on the first try — it has only ever guarded the three content child tables |
+| CI goes 6/6 after the local gates, on the first run | **Wrong once before it was right.** Run 1 failed static analysis and nothing else: two PHPStan findings in new code (a redundant `array_values()` over a list; a filtered collection lookup read as nullable). PHPStan runs only in the container, and the new `app/` files were never put through it before the push — the local gates I ran do not include it. Fixed in `d3a9682b`; run 2 went 6/6. |
+| Most likely red: the citation lint after appends to four cited files, with the ledger at 17/17 | **Never went red**, because every insertion was placed below the cited lines or on the same line. It nearly did: two `use` lines in `PublicFormPresenter.php` would have shifted three ledger citations (`:38-44`) — caught by checking the citers before running anything, and replaced by reading through the relation. The audit spec's new row needed a removed blank line above it to keep ADR-0009's `:29-35` in place. |
+| Second: the Contract job, where Scramble documents a file stream as a JSON object | **Passed, and the risk was elsewhere:** the 200 rewrite worked, but Scramble published my internal method docblock and a `//` comment above an array key verbatim as API documentation. Read in the export's diff and rewritten for an API reader before the first push. |
+| Third: the offline E2E case for a reference file | **Wrong in the good direction:** the page-side fetch under the `/f/` scope worked first time in all three viewports (the map reopened offline; nothing was cached before it was opened). The first E2E failures were the spec's own locator — the dialog holds two buttons named Close. |
+| ⚠️ Most likely wrong: the `draft_child` RLS shape refuses a write to a published version's join rows on the first try | **The shape held on the first run**, and making it strict reddened exactly the RLS case (M16). |
+
+### Mutations: every new gate red first
+Every red set was written down before its run. Item 1: 19 Pest, 19 caught; 8 Vitest, 8 caught. Item 2: 19 Pest, 18
+caught on the first run; 5 Vitest, 5 caught. Every red set matched its prediction, case for case.
+- ⚠️ **The survivor was a test lying (A15, the full web address written into the audit row):** the audit case searched
+  the rows' `json_encode`, which writes `/` as `\/`, so a search for the address could never find it and the case was
+  green over the leak it exists to catch. It now encodes with `JSON_UNESCAPED_SLASHES`, and the mutant is caught
+  (`a533bece`).
+
+### ✅ Seen in a real browser (`.playwright/m132-probe/`)
+On "Before Your Visit": the Reference files section listed the two seeded files, ready and linked. An email automation
+added through the page, a guest submission, and the REAL queue worker delivered "New response to Before Your Visit" to
+Mailpit with a `/submissions/` link and without the respondent's name; the section then showed the run as sent, and the
+probe deleted its automation.
+
+### ⚠️ Deviations, recorded rather than smoothed
+- **No enum-catalogue rows for the three automation enums:** the catalogue sits above a tier-1 citation in the data
+  dictionary; the values are documented in the §36 and §37 rows and pinned by CHECK constraints.
+- **The `job-payload-lint.php` exempt entry shares its neighbour's line,** so the lines the ledger cites in that script
+  (`:269-270`) did not move; `QueuedMailContractTest` harvests every quoted name in the block either way.
+- **E2E run locally, one spec at a time:** `form-settings-axe` 18, `builder-axe` 60, `public-runtime-axe` 63 + 6 new,
+  `public-runtime-offline` 12 + 3 new (the offline cases are proved locally only: CI's origin has no service worker).
 
 ## RELEASED — `M131`, the Oct 7 slot: forms-list folders, per-form preset themes, and all/any rule groups (merged as PR #324, `1b7f22fe`, 6/6 green with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

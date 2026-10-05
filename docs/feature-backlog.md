@@ -11888,7 +11888,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `ExpressionValidationGate.php:189-191`'s `non_numeric_threshold` arm must stop refusing a date-shaped
   threshold on a temporal field, and `ValueShapeTest`'s case titled *"refuses min_value and greater_than_field
   on a temporal shape, because both fail CLOSED"* INVERTS. **Live.** Filed by `M113`.
-  **Tier: during-testing.**
+  **Tier: during-testing.** ⚠️ **`M134` (2026-10-05) SHIPPED THIS ROW'S ENGINE HALF THROUGH `R-62b638e1`; THE STRUCTURED HALF STAYS OPEN.** Both engines now order ISO dates, times and date-times through a separate `Temporal` path reached only from `numericCompare()`'s NaN branch (`Coercion` untouched, as this row asked), and the three sub-questions are answered there: no time zone (a naive answer never orders against the UTC `now()`, `D89`), a time orders only against a time while a date reads as its midnight beside a date-time, and a partial or malformed value is not a date. So an EXPRESSION `. > ${start_date}` now publishes and holds, while the STRUCTURED `greater_than_field` / `min_value` on a temporal shape is still refused by `ValueShape` — and a `greater_than_field` between dates on a version published before `M113` now orders chronologically at runtime. What remains is the `ValueShape`/`allowsOperator()` flip, the `non_numeric_threshold` arm and `StructuredRuleEvaluator`'s `MinValue`/`MaxValue` arms, which use `Coercion` directly and so do not reach the new path.
 
 - ✅ **CLOSED BY `M128` (2026-10-03) — `minor` · The per-field 422 error map is built on every builder save failure and still has no consumer, so
   a rejected field edit reports one sentence with nothing marked.** Found by `M113` (2026-09-26) while closing

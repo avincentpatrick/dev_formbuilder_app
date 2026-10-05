@@ -265,14 +265,14 @@ it('leaves a formula with surrounding whitespace, and every non-calculated quest
 /*
 |--------------------------------------------------------------------------
 | M126 — an expression that reads a question as a NUMBER is refused when that question's answers never are one
-| (`R-87160c81`, sub-claim 2).
+| (`R-87160c81`, sub-claim 2). M134 — a date or a time is judged against what it is compared WITH (`R-62b638e1`).
 |
-| Ordering is numeric-only in both engines (`ExpressionEvaluator::numericCompare()`): an operand that is not
-| numeric-like makes `> < >= <=` false, and arithmetic on one is NaN. So `${remark} > 3` on a note, `${dob} <=
-| today()` on a date and `${hobbies} > 2` on a multi-select all published clean and then never changed with the
-| answer — in a constraint, every answer was refused. Refused only where the TYPE guarantees it: text, hidden,
-| calculated and single choice can hold numeric strings and stay allowed. A date gets its own code, because the
-| answer to it is "not supported yet" rather than "never" (`D71`).
+| An operand that is not numeric-like makes `> < >= <=` false and arithmetic NaN. So `${remark} > 3` on a note and
+| `${hobbies} > 2` on a multi-select published clean and then never changed with the answer — in a constraint,
+| every answer was refused. Refused only where the TYPE guarantees it: text, hidden, calculated and single choice
+| can hold numeric strings and stay allowed. Since M134 both engines ORDER dates and times chronologically, so a
+| date orders against a date, a date-time, `today()` or a date literal, and a time against a time; arithmetic,
+| `now()` (`D89`) and every pair of different kinds stay refused, each by name.
 |--------------------------------------------------------------------------
 */
 
@@ -288,7 +288,19 @@ function orderingGateRefusals(ExpressionValidationGate $gate, FormVersion $draft
     }
 }
 
-it('refuses a relevance that reads a never-numeric question as a number, naming the question it governs', function (FieldType $type, string $expression, string $code): void {
+/** The refusal messages the gate gives the draft, or [] when it passes. */
+function orderingGateMessages(ExpressionValidationGate $gate, FormVersion $draft): array
+{
+    try {
+        $gate->assertExpressionsResolve($draft->refresh());
+
+        return [];
+    } catch (PublishValidationException $e) {
+        return array_column($e->violations(), 'message');
+    }
+}
+
+it('refuses a relevance whose comparison can never change with the answer, naming the question it governs', function (FieldType $type, string $expression, string $code): void {
     $form = $this->forms->create($this->tenant, $this->user, 'Survey');
     $draft = $form->draftVersion;
     addFormField($draft, $this->user, 'subject', $type);
@@ -302,45 +314,108 @@ it('refuses a relevance that reads a never-numeric question as a number, naming 
     'a multi-select' => [FieldType::MultiSelect, '${subject} > 2', 'expression_orders_non_number'],
     'a cascading select' => [FieldType::CascadingSelect, '${subject} < 1', 'expression_orders_non_number'],
     'a photo' => [FieldType::ImageCapture, '${subject} > 0', 'expression_orders_non_number'],
-    'a date against today()' => [FieldType::Date, '${subject} <= today()', 'expression_orders_date'],
-    'a time' => [FieldType::Time, "\${subject} > '09:00'", 'expression_orders_date'],
-    'a datetime' => [FieldType::Datetime, '${subject} >= now()', 'expression_orders_date'],
     'a date through arithmetic' => [FieldType::Date, '${subject} + 1 > 3', 'expression_orders_date'],
     'a date through int()' => [FieldType::Date, 'int(${subject}) > 3', 'expression_orders_date'],
-    'a date on the right' => [FieldType::Date, "'2020-01-01' < \${subject}", 'expression_orders_date'],
+    'a date against now()' => [FieldType::Date, '${subject} < now()', 'expression_orders_date'],
+    'a time against now()' => [FieldType::Time, '${subject} > now()', 'expression_orders_date'],
+    'a date-time against now()' => [FieldType::Datetime, '${subject} >= now()', 'expression_orders_date'],
+    'a date against a value with a time zone' => [FieldType::Date, "\${subject} > '2026-01-01T00:00Z'", 'expression_orders_date'],
+    'a date against a number' => [FieldType::Date, '${subject} > 5', 'expression_orders_temporal_mismatch'],
+    'a date against a number on the left' => [FieldType::Date, '5 < ${subject}', 'expression_orders_temporal_mismatch'],
+    'a date against text that is not a date' => [FieldType::Date, "\${subject} > '01/02/2026'", 'expression_orders_temporal_mismatch'],
+    'a date against a date that does not exist' => [FieldType::Date, "\${subject} > '2026-02-30'", 'expression_orders_temporal_mismatch'],
+    'a date against a time' => [FieldType::Date, "\${subject} > '09:00'", 'expression_orders_temporal_mismatch'],
+    'a date against int()' => [FieldType::Date, '${subject} > int(5)', 'expression_orders_temporal_mismatch'],
+    'a date against a calculation' => [FieldType::Date, '${subject} > 1 + 1', 'expression_orders_temporal_mismatch'],
+    'a time against today()' => [FieldType::Time, '${subject} <= today()', 'expression_orders_temporal_mismatch'],
+    'a time against a date' => [FieldType::Time, "\${subject} > '2026-01-01'", 'expression_orders_temporal_mismatch'],
 ]);
 
-it('refuses a date constraint written against the question itself, as ODK writes it', function (): void {
+it('accepts a date constraint written against the question itself, as ODK writes it, and refuses one against now()', function (): void {
     $form = $this->forms->create($this->tenant, $this->user, 'Survey');
     $draft = $form->draftVersion;
     $dob = addFormField($draft, $this->user, 'dob', FieldType::Date);
+    $seen = addFormField($draft, $this->user, 'seen', FieldType::Datetime, 1);
     FormFieldValidation::create(['form_version_id' => $draft->id, 'form_field_id' => $dob->id, 'expression' => '. <= today()']);
+
+    expect(orderingGateRefusals($this->gate, $draft))->toBe([]);
+
+    FormFieldValidation::create(['form_version_id' => $draft->id, 'form_field_id' => $seen->id, 'expression' => '. <= now()']);
 
     try {
         $this->gate->assertExpressionsResolve($draft->refresh());
-        $this->fail('a date ordering against itself passed the gate');
+        $this->fail('a date-time ordered against now() passed the gate');
     } catch (PublishValidationException $e) {
-        expect(array_map(static fn (array $v): array => [$v['field'], $v['code']], $e->violations()))->toBe([['dob', 'expression_orders_date']])
+        expect(array_map(static fn (array $v): array => [$v['field'], $v['code']], $e->violations()))->toBe([['seen', 'expression_orders_date']])
             ->and($e->getMessage())->toContain('not supported yet')
-            ->and($e->getMessage())->toContain('dob');
+            ->and($e->getMessage())->toContain('time zone')
+            ->and($e->getMessage())->toContain('today()')
+            ->and($e->getMessage())->toContain('“seen”');
     }
 });
 
-it('refuses the same use in a section condition and in a calculated formula', function (): void {
+it('names what a date was compared with, and what it can be compared with instead', function (): void {
+    $form = $this->forms->create($this->tenant, $this->user, 'Survey');
+    $draft = $form->draftVersion;
+    addFormField($draft, $this->user, 'dob', FieldType::Date);
+    addFormField($draft, $this->user, 'opens', FieldType::Time, 1);
+    addFormField($draft, $this->user, 'a', FieldType::ShortText, 2, ['relevant_expression' => "\${dob} > '01/02/2026'"]);
+    addFormField($draft, $this->user, 'b', FieldType::ShortText, 3, ['relevant_expression' => '${opens} > 9']);
+
+    expect(orderingGateMessages($this->gate, $draft))->toBe([
+        'The expression on “a” compares the '.FieldType::Date->label().' question “dob” with the text “01/02/2026”, which it can never be ordered against, so the comparison never holds. Compare it with another date question, a date typed as YYYY-MM-DD, or today().',
+        'The expression on “b” compares the '.FieldType::Time->label().' question “opens” with the number 9, which it can never be ordered against, so the comparison never holds. Compare it with another time question or a time typed as HH:MM.',
+    ]);
+});
+
+it('reports two date or time questions of different kinds once, from either side of the comparison', function (string $expression): void {
+    $form = $this->forms->create($this->tenant, $this->user, 'Survey');
+    $draft = $form->draftVersion;
+    addFormField($draft, $this->user, 'dob', FieldType::Date);
+    addFormField($draft, $this->user, 'opens', FieldType::Time, 1);
+    addFormField($draft, $this->user, 'shown', FieldType::ShortText, 2, ['relevant_expression' => $expression]);
+
+    expect(orderingGateRefusals($this->gate, $draft))->toBe([['shown', 'expression_orders_temporal_mismatch']]);
+})->with([
+    'date first' => ['${dob} > ${opens}'],
+    'time first' => ['${opens} < ${dob}'],
+]);
+
+it('refuses a date ordered against a number question, once, from either side', function (string $expression): void {
+    $form = $this->forms->create($this->tenant, $this->user, 'Survey');
+    $draft = $form->draftVersion;
+    addFormField($draft, $this->user, 'dob', FieldType::Date);
+    addFormField($draft, $this->user, 'age', FieldType::Integer, 1);
+    addFormField($draft, $this->user, 'shown', FieldType::ShortText, 2, ['relevant_expression' => $expression]);
+
+    expect(orderingGateRefusals($this->gate, $draft))->toBe([['shown', 'expression_orders_temporal_mismatch']]);
+})->with([
+    'date first' => ['${dob} > ${age}'],
+    'number first' => ['${age} < ${dob}'],
+]);
+
+it('refuses the same uses in a section condition, a calculated formula and a constraint', function (): void {
     $form = $this->forms->create($this->tenant, $this->user, 'Survey');
     $draft = $form->draftVersion;
     addFormField($draft, $this->user, 'consent', FieldType::YesNo);
     addFormField($draft, $this->user, 'dob', FieldType::Date, 1);
     addFormField($draft, $this->user, 'age_next_year', FieldType::Calculated, 2, ['config' => ['calculated_formula' => '${dob} + 1']]);
+    addFormField($draft, $this->user, 'overdue', FieldType::Calculated, 3, ['config' => ['calculated_formula' => 'if(${dob} < now(), 1, 0)']]);
+    $opens = addFormField($draft, $this->user, 'opens', FieldType::Time, 4);
+    FormFieldValidation::create(['form_version_id' => $draft->id, 'form_field_id' => $opens->id, 'expression' => '. >= ${dob}']);
     $section = $draft->sections()->create(['key' => 'followup', 'label' => 'Follow-up', 'sequence' => 1, 'relevant_expression' => '${consent} > 0']);
+    $later = $draft->sections()->create(['key' => 'later', 'label' => 'Later', 'sequence' => 2, 'relevant_expression' => '${dob} > 5']);
 
     expect(orderingGateRefusals($this->gate, $draft))->toEqualCanonicalizing([
         ['age_next_year', 'expression_orders_date'],
+        ['overdue', 'expression_orders_date'],
+        ['opens', 'expression_orders_temporal_mismatch'],
         [$section->key, 'expression_orders_non_number'],
+        [$later->key, 'expression_orders_temporal_mismatch'],
     ]);
 });
 
-it('leaves every use that can hold, and every question that can hold a number, alone', function (string $expression): void {
+it('leaves every use that can hold, and every question that can hold a number or a date, alone', function (string $expression): void {
     $form = $this->forms->create($this->tenant, $this->user, 'Survey');
     $draft = $form->draftVersion;
     addFormField($draft, $this->user, 'age', FieldType::Integer);
@@ -351,7 +426,11 @@ it('leaves every use that can hold, and every question that can hold a number, a
     addFormField($draft, $this->user, 'consent', FieldType::YesNo, 5);
     addFormField($draft, $this->user, 'took', FieldType::Duration, 6);
     addFormField($draft, $this->user, 'secret', FieldType::Hidden, 7);
-    addFormField($draft, $this->user, 'shown', FieldType::ShortText, 8, ['relevant_expression' => $expression]);
+    addFormField($draft, $this->user, 'until', FieldType::Date, 8);
+    addFormField($draft, $this->user, 'visit', FieldType::Datetime, 9);
+    addFormField($draft, $this->user, 'opens', FieldType::Time, 10);
+    addFormField($draft, $this->user, 'total', FieldType::Calculated, 11, ['config' => ['calculated_formula' => '1']]);
+    addFormField($draft, $this->user, 'shown', FieldType::ShortText, 12, ['relevant_expression' => $expression]);
 
     expect(orderingGateRefusals($this->gate, $draft))->toBe([]);
 })->with([
@@ -365,6 +444,19 @@ it('leaves every use that can hold, and every question that can hold a number, a
     'a date tested for an answer' => ["\${dob} != ''"],
     'a membership test' => ["selected(\${hobbies}, 'a')"],
     'a yes/no compared for equality' => ["\${consent} = 'yes'"],
+    'a date against today()' => ['${dob} <= today()'],
+    'a date against a date' => ["\${dob} > '2020-01-01'"],
+    'a date on the right' => ["'2020-01-01' < \${dob}"],
+    'a date against another date question' => ['${dob} < ${until}'],
+    'a date against a date-time question' => ['${dob} < ${visit}'],
+    'a date-time against today()' => ['${visit} >= today()'],
+    'a date-time against a date-time without a time zone' => ["\${visit} > '2026-01-01T08:00'"],
+    'a time against a time' => ["\${opens} > '09:00'"],
+    'a time against a time with seconds' => ["\${opens} <= '17:30:00'"],
+    'a date against text that may hold a date' => ['${dob} > ${name}'],
+    'a date against a hidden prefill' => ['${dob} > ${secret}'],
+    'a date against a calculation question' => ['${dob} > ${total}'],
+    'a date against if()' => ["\${dob} > if(\${consent} = 'yes', '2020-01-01', '2021-01-01')"],
 ]);
 
 it('reports a grid reference and an unparseable expression once each, never as an ordering as well', function (): void {
@@ -374,10 +466,12 @@ it('reports a grid reference and an unparseable expression once each, never as a
     addFormField($draft, $this->user, 'dob', FieldType::Date, 1);
     addFormField($draft, $this->user, 'a', FieldType::ShortText, 2, ['relevant_expression' => '${grid} > 1']);
     addFormField($draft, $this->user, 'b', FieldType::ShortText, 3, ['relevant_expression' => '${dob} >']);
+    addFormField($draft, $this->user, 'c', FieldType::ShortText, 4, ['relevant_expression' => '${dob} > ${grid}']);
 
     expect(orderingGateRefusals($this->gate, $draft))->toEqualCanonicalizing([
         ['a', 'expression_references_composite'],
         ['b', 'unexpected_token'],
+        ['c', 'expression_references_composite'],
     ]);
 });
 
@@ -388,7 +482,7 @@ it('classifies every field type an ordering may name', function (FieldType $type
     addFormField($draft, $this->user, 'shown', FieldType::ShortText, 1, ['relevant_expression' => '${subject} > 1']);
 
     $expected = match ($type) {
-        FieldType::Date, FieldType::Time, FieldType::Datetime => [['shown', 'expression_orders_date']],
+        FieldType::Date, FieldType::Time, FieldType::Datetime => [['shown', 'expression_orders_temporal_mismatch']],
         FieldType::Note, FieldType::PageBreak, FieldType::YesNo, FieldType::MultiSelect, FieldType::CascadingSelect,
         FieldType::FileUpload, FieldType::ImageCapture, FieldType::AudioCapture, FieldType::VideoCapture,
         FieldType::Signature => [['shown', 'expression_orders_non_number']],

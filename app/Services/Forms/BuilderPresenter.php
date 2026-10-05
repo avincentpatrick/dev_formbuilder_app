@@ -8,6 +8,7 @@ use App\Enums\ComparisonOperator;
 use App\Enums\FieldAppearance;
 use App\Enums\FieldType;
 use App\Enums\IndexedDataType;
+use App\Enums\OperandKind;
 use App\Enums\RequiredMode;
 use App\Enums\ValidationRuleType;
 use App\Enums\ValueShape;
@@ -235,6 +236,9 @@ final class BuilderPresenter
                 // in `enums()` because the panel already builds its per-type maps from this list, and
                 // because a per-type key in `enums()` would be a thirty-one-entry copy of a thirteen-row table.
                 'value_shape' => ValueShape::for($type)->value,
+                // Increment M134 (`R-910d2286`) — what an EXPRESSION may compare this type's answer with, the kind the
+                // publish gate judges it by; the condition editor reads its capabilities from `enums()['operand_kinds']`.
+                'operand_kind' => OperandKind::for($type)->value,
                 // Increment M125 — additive: the palette shows ONE entry per group, and all 31 entries stay.
                 'variant' => $type->variantGroup()?->paletteVariant($type),
                 // Increment M130 — the layouts an author may choose for this type (`FieldAppearance::for()`),
@@ -325,6 +329,17 @@ final class BuilderPresenter
             // M133 (`R-5da4a30f`) — the types a link to another form's answers may feed, transmitted so the Options
             // tab never keeps its own list.
             'linked_choice_types' => array_map(static fn (FieldType $type): string => $type->value, LinkedChoiceService::LINKABLE_TYPES),
+            // M134 (`R-910d2286`) — what a condition may compare a question of each kind with, from `OperandKind`'s own
+            // methods: the condition editor offers a subset of what the publish gate accepts, and never restates it.
+            'operand_kinds' => array_map(static fn (OperandKind $kind): array => [
+                'value' => $kind->value,
+                'offered' => $kind->offered(),
+                'orders' => $kind->orders(),
+                'equals' => $kind->equals(),
+                'includes' => $kind->includes(),
+                'orders_with' => array_map(static fn (OperandKind $other): string => $other->value, $kind->ordersWith()),
+                'literal_input' => $kind->literalInput(),
+            ], OperandKind::cases()),
         ];
     }
 

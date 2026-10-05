@@ -296,3 +296,49 @@ it('gives every palette entry the layouts an author may choose, and only the two
     $withLayouts = array_filter($layoutsByType, fn (array $layouts): bool => $layouts !== []);
     expect(array_keys($withLayouts))->toEqualCanonicalizing(['single_select', 'multi_select']);
 });
+
+it('gives every palette entry the kind an expression reads it as, written out type by type (M134)', function (): void {
+    $kindByType = [];
+    foreach ($this->payload['palette'] as $group) {
+        foreach ($group['types'] as $type) {
+            $kindByType[$type['value']] = $type['operand_kind'];
+        }
+    }
+
+    // Transcribed independently of OperandKind::for(), so this census can fail.
+    expect($kindByType)->toEqualCanonicalizing([
+        'short_text' => 'value', 'long_text' => 'value', 'email' => 'value', 'phone' => 'value', 'url' => 'value',
+        'hidden' => 'value', 'single_select' => 'value', 'dropdown' => 'value',
+        'integer' => 'number', 'decimal' => 'number', 'duration' => 'number', 'likert_scale' => 'number',
+        'calculated' => 'computed',
+        'date' => 'date', 'time' => 'time', 'datetime' => 'datetime',
+        'yes_no' => 'boolean',
+        'multi_select' => 'list', 'cascading_select' => 'list',
+        'file_upload' => 'attachment', 'image_capture' => 'attachment', 'audio_capture' => 'attachment',
+        'video_capture' => 'attachment', 'signature' => 'attachment',
+        'matrix' => 'object', 'likert_matrix' => 'object', 'geopoint' => 'object', 'geotrace' => 'object', 'geoshape' => 'object',
+        'note' => 'none', 'page_break' => 'none',
+    ]);
+});
+
+it('transmits what a condition may compare each kind with, written out row by row (M134)', function (): void {
+    $row = static fn (string $value, bool $offered, bool $orders, bool $equals, bool $includes, array $ordersWith, ?string $literal): array => [
+        'value' => $value, 'offered' => $offered, 'orders' => $orders, 'equals' => $equals,
+        'includes' => $includes, 'orders_with' => $ordersWith, 'literal_input' => $literal,
+    ];
+    $numbers = ['number', 'computed', 'value'];
+
+    expect($this->payload['enums']['operand_kinds'])->toBe([
+        $row('number', true, true, true, false, $numbers, null),
+        $row('computed', true, true, true, false, $numbers, null),
+        $row('date', true, true, true, false, ['date', 'datetime'], 'date'),
+        $row('time', true, true, true, false, ['time'], 'time'),
+        $row('datetime', true, true, true, false, ['date', 'datetime'], 'datetime-local'),
+        $row('value', true, true, true, true, $numbers, null),
+        $row('boolean', true, false, true, true, [], null),
+        $row('list', true, false, false, true, [], null),
+        $row('attachment', true, false, false, false, [], null),
+        $row('object', false, false, false, false, [], null),
+        $row('none', false, false, false, false, [], null),
+    ]);
+});

@@ -74,6 +74,69 @@ enum OperandKind: string
         return $this === self::Date || $this === self::Time || $this === self::Datetime;
     }
 
+    // ── What the CONDITION EDITOR may offer (Increment M134, `R-910d2286`) ─────────────────────────────────────
+    // Transmitted by `BuilderPresenter::enums()` as `operand_kinds`, so the editor offers a SUBSET of what the
+    // publish gate accepts and never restates it (`ConditionOffersPublishTest` holds the subset). Narrower than the
+    // gate on purpose: the gate lets a date order against text that MAY hold a date; the editor offers only dates.
+
+    /** Whether a condition may name such a question at all. Never a note or a page break (no answer), a grid or a point. */
+    public function offered(): bool
+    {
+        return match ($this) {
+            self::Number, self::Computed, self::Date, self::Time, self::Datetime, self::Value,
+            self::Boolean, self::List, self::Attachment => true,
+            self::Object, self::None => false,
+        };
+    }
+
+    /** more than / less than / at least / at most. */
+    public function orders(): bool
+    {
+        return $this->ordersWith() !== [];
+    }
+
+    /** is / is not — never a list or a file, whose answer never equals one value. */
+    public function equals(): bool
+    {
+        return match ($this) {
+            self::Number, self::Computed, self::Date, self::Time, self::Datetime, self::Value, self::Boolean => true,
+            self::List, self::Attachment, self::Object, self::None => false,
+        };
+    }
+
+    /** includes / does not include — `selected()`. */
+    public function includes(): bool
+    {
+        return $this === self::Value || $this === self::Boolean || $this === self::List;
+    }
+
+    /**
+     * The kinds an ordering may compare a question of this kind with, in the editor.
+     *
+     * @return list<self>
+     */
+    public function ordersWith(): array
+    {
+        return match ($this) {
+            self::Number, self::Computed, self::Value => [self::Number, self::Computed, self::Value],
+            self::Date, self::Datetime => [self::Date, self::Datetime],
+            self::Time => [self::Time],
+            self::Boolean, self::List, self::Attachment, self::Object, self::None => [],
+        };
+    }
+
+    /** The browser input a fixed value beside such a question uses: a date, time or date-and-time picker, or null. */
+    public function literalInput(): ?string
+    {
+        return match ($this) {
+            self::Date => 'date',
+            self::Time => 'time',
+            self::Datetime => 'datetime-local',
+            self::Number, self::Computed, self::Value, self::Boolean, self::List,
+            self::Attachment, self::Object, self::None => null,
+        };
+    }
+
     /**
      * Can two temporal kinds be ordered against each other? A date and a date-time can (a date is its midnight); a
      * time only against a time — the engines' `Temporal` reads every other pair as never holding.

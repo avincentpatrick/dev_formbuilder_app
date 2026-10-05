@@ -28,7 +28,7 @@ uses(RefreshDatabase::class);
 | ⛔ THE EXPECTED SETS BELOW ARE WRITTEN OUT RATHER THAN DERIVED, AND THAT IS THE WHOLE POINT. The payload
 | is built from `ValueShape::allows()` / `allowsOperator()`, so asserting it by calling those same methods
 | would be a tautology that no mutation could redden — it would pass just as happily if the table were
-| wrong. An independent census can fail. These sets are also the readable form of a 12×11 table, which is
+| wrong. An independent census can fail. These sets are also the readable form of a 13×11 table, which is
 | the reason `ValueShape` is keyed on a shape and not on 31 field types.
 |
 | ⚠️ A CHANGE HERE IS EITHER A DELIBERATE PRODUCT DECISION OR A BUG, NEVER A FIXTURE CHORE. Widening a rule
@@ -49,7 +49,7 @@ beforeEach(function (): void {
 /** Every shape that can hold an answer — the conditional family's domain. */
 function answerableShapes(): array
 {
-    return ['text', 'number', 'temporal', 'duration', 'choice', 'scale', 'boolean', 'hierarchy', 'geo', 'attachment', 'grid'];
+    return ['text', 'number', 'temporal', 'duration', 'choice', 'multiple_choice', 'scale', 'boolean', 'hierarchy', 'geo', 'attachment', 'grid'];
 }
 
 /**
@@ -211,13 +211,15 @@ it('ships every operator with the row rendering and the shapes it may compare', 
         ->and($byValue['neq']['label'])->toContain('≠')
         ->and($byValue['lte']['label'])->toContain('at most');
 
-    // Ordered comparison carries the same fail-closed restriction as the value bounds; equality and
-    // emptiness are value-agnostic; `contains` is meaningful only where the answer is text or a list.
+    // Ordered comparison carries the same fail-closed restriction as the value bounds; emptiness applies wherever
+    // there is an answer; equality only where the answer is ONE value (M134 — a list or an object never equals one);
+    // `contains` is meaningful only where the answer is text or a list.
     expect($byValue['gt']['shapes'])->toEqualCanonicalizing(['number', 'duration', 'scale'])
         ->and($byValue['lte']['shapes'])->toEqualCanonicalizing(['number', 'duration', 'scale'])
-        ->and($byValue['eq']['shapes'])->toEqualCanonicalizing(answerableShapes())
+        ->and($byValue['eq']['shapes'])->toEqualCanonicalizing(['text', 'number', 'temporal', 'duration', 'choice', 'scale', 'boolean'])
+        ->and($byValue['neq']['shapes'])->toEqualCanonicalizing(['text', 'number', 'temporal', 'duration', 'choice', 'scale', 'boolean'])
         ->and($byValue['is_null']['shapes'])->toEqualCanonicalizing(answerableShapes())
-        ->and($byValue['contains']['shapes'])->toEqualCanonicalizing(['text', 'choice', 'hierarchy']);
+        ->and($byValue['contains']['shapes'])->toEqualCanonicalizing(['text', 'choice', 'multiple_choice', 'hierarchy']);
 });
 
 it('gives every palette entry its value shape, so the panel can filter without a second table', function (): void {
@@ -240,6 +242,8 @@ it('gives every palette entry its value shape, so the panel can filter without a
         ->and($shapeByType['duration'])->toBe('duration')
         ->and($shapeByType['yes_no'])->toBe('boolean')
         ->and($shapeByType['likert_scale'])->toBe('scale')
+        ->and($shapeByType['single_select'])->toBe('choice')
+        ->and($shapeByType['multi_select'])->toBe('multiple_choice')
         ->and($shapeByType['cascading_select'])->toBe('hierarchy')
         ->and($shapeByType['note'])->toBe('no_answer')
         ->and($shapeByType['page_break'])->toBe('no_answer');

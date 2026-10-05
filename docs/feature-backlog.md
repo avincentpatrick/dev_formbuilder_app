@@ -11910,7 +11910,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - **`minor` · The builder and PHP disagree about whether a duration field takes an ordered comparison, and the
   disagreement is now pinned rather than resolved.** Found by `M113` (2026-09-26) while building the client
   field-type mirror census. `ConfigPanel.vue:178`'s `NUMERIC_TYPES` is `['integer', 'decimal', 'calculated',
-  'likert_scale']` — four members. `ValueShape::allowsOperator()` (`ValueShape.php:205-223`) permits
+  'likert_scale']` — four members. `ValueShape::allowsOperator()` (`ValueShape.php:218-242`) permits
   `gt`/`lt`/`gte`/`lte` for `Number`, `Duration` and `Scale`, which is **five** types: the same four plus
   `duration`. ⛔ **`R-09f73330` SAYS THIS SET "MIRRORS NOTHING", AND THAT STOPPED BEING TRUE IN THE INCREMENT
   THAT FILED IT** — `M112` shipped `allowsOperator()` the same day, so there is now a PHP predicate answering

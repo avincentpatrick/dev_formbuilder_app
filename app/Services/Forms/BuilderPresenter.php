@@ -233,7 +233,7 @@ final class BuilderPresenter
                 'config_editor' => $type->configEditor(),
                 // Increment M115 — what may be ASSERTED about this type's value. It rides here rather than
                 // in `enums()` because the panel already builds its per-type maps from this list, and
-                // because a per-type key in `enums()` would be a thirty-one-entry copy of a twelve-row table.
+                // because a per-type key in `enums()` would be a thirty-one-entry copy of a thirteen-row table.
                 'value_shape' => ValueShape::for($type)->value,
                 // Increment M125 — additive: the palette shows ONE entry per group, and all 31 entries stay.
                 'variant' => $type->variantGroup()?->paletteVariant($type),
@@ -260,7 +260,7 @@ final class BuilderPresenter
      * exactly the defect `R-e878d49a` filed.
      *
      * ⚠️ KEYED ON A SHAPE RATHER THAN ON A FIELD TYPE, for the reason {@see ValueShape}'s docblock
-     * gives: twelve shapes by eleven rule types is a table a person can read, and thirty-one by eleven
+     * gives: thirteen shapes by eleven rule types is a table a person can read, and thirty-one by eleven
      * is not. The field's own shape rides on the palette entry ({@see palette()}), which is where the
      * panel already derives its per-type facts.
      *

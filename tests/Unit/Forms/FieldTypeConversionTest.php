@@ -531,6 +531,16 @@ it('warns that a reportable single choice cannot be indexed as a multiple choice
         ->and(fieldConversionPlan($field, [], FieldType::Dropdown)->warnings)->toBe([]);
 });
 
+it('warns that an index type chosen on a multiple choice may not suit a single choice (M134)', function (): void {
+    // Since M134 a multi-select is its own ValueShape (MultipleChoice), so leaving it for a single choice changes the
+    // kind of value the author's index type was chosen for; before the split the two shared one shape, and no
+    // warning was given. The reverse direction is not indexable at all, so it says nothing more than it did.
+    $field = makeSchemaField(['field_type' => FieldType::MultiSelect, 'is_queryable' => true, 'indexed_data_type' => IndexedDataType::Text, 'config' => ['options' => [['value' => 'a', 'label' => 'A']]]]);
+
+    expect(fieldConversionWarningCodes(fieldConversionPlan($field, [], FieldType::SingleSelect)))->toContain(ConversionWarning::IndexedTypeMayNotSuit->value)
+        ->and(fieldConversionWarningCodes(fieldConversionPlan($field, [], FieldType::Dropdown)))->toContain(ConversionWarning::IndexedTypeMayNotSuit->value);
+});
+
 it('does not repeat an indexing warning the source already deserved', function (): void {
     $field = makeSchemaField(['field_type' => FieldType::Geopoint, 'is_queryable' => true, 'config' => []]);
 

@@ -11701,7 +11701,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   reference files per form, frozen per published version with byte dedupe (`D61` answered B). Left here: audio and
   video, per-language media through a translations map, the XLSForm export's media column, and populating
   `form_templates.cover_image_attachment_id`, a real foreign key that nothing writes.
-  **Live.** Filed by `M127`. **Tier: during-testing.** **Also left by `M132`'s v1:** reordering a form's reference files, and showing them on the encode page and in the builder preview — v1 shows them on the guest page only.
+  **Live.** Filed by `M127`. **Tier: during-testing.** **Also left by `M132`'s v1:** reordering a form's reference files, and showing them on the encode page and in the builder preview — v1 shows them on the guest page only. **Also left, found by `M135` (2026-10-05):** Excel and Word reference files — the user's comment 11 named them (*"we can attach excel, photos, word file, pdf etc"*), while v1 accepts PDF, PNG, JPEG and WebP only and nothing else in this row or the ledger carried them.
 
 - ✅ **CLOSED BY `M132` (2026-10-05) — ****`minor` · There is no author-configurable automation — no "when this happens, do that" — only four fixed,
   non-composable mechanisms.** Filed 2026-09-25 by `M110` from the report *"in fillout.com, there is this thing
@@ -13129,3 +13129,11 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   so staging keeps the old rows. The remedy is one supervised step on the box, beside the OCR key on Oct 11:
   `php artisan db:seed --class=PlatformTemplateSeeder --force`, then the same for `PlatformFieldLibrarySeeder`; both
   refresh content idempotently and keep `usage_count`. **Live.** Filed by `M134`. **Tier: early-testing.**
+
+- **`minor` · A form's sections cannot be laid out as a table, the third presentation the user's comment 16 asked for.**
+  Found by `M135` while mapping the 19 builder comments for the staging smoke test. Comment 16 asked whether a form is
+  *"a pager but sectioned, … a tabular layout or a per page setup"*; `D57` (answered A now, C next) shipped the first and
+  the last — step by step, one page, and page breaks — and its option A said to *file "tabular" as a product idea*, which
+  no row did until now. `D57`'s recommendation also says a tabular mode should be asked for again on its own evidence,
+  because nothing has described what it would show; the first step is that description from the user. **Live.**
+  Filed by `M135`. **Tier: during-testing.**

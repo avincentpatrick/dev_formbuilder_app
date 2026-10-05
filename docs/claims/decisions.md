@@ -1557,6 +1557,17 @@ The matcher reads a sheet against the version it was printed from, superseded on
 
 ---
 
+### D90 — `M135` takes the plan's Oct 11 slot six days early, and that slot says "freeze". The testing server deploys every merge to `main`. How long does the freeze last? **A — fixes only until the Oct 12 session.**
+
+**Filed and answered 2026-10-05 (user decision, in chat), recorded by Lane A during `M135` — A, the recommendation.** Asked because the user's own instruction for `M135` began *"freeze"*, and the plan wrote that word for Oct 11, the day before testing; taken on Oct 5 it either holds for a week or ends with the increment. Measured: `deploy.yml` deploys every green push to `main` to the testing server, so anything merged reaches staging, where testers have been working since 2026-09-19.
+
+- **A — fixes only until the Oct 12 session.** From `M135` until the session, only fixes from the staging smoke test and the OCR samples work (`ocr-provider-bakeoff`, samples due 2026-10-08) are merged. Nothing new reaches staging before testing. `during-testing` work resumes after the session.
+- **B — this increment only.** `M135` is fixes-only; afterwards the `during-testing` work resumes and deploys to staging as usual.
+
+**Recommendation: A.** The point of the slot is that what testers see on Oct 12 is what was smoke-tested. It expires with the session, as `D75` does.
+
+---
+
 ### D15 — `D13`'s one-hub-row cap is now the binding constraint on batch composition, and it is stricter than its own purpose. **ANSWERED — option 4: the cap reads the files a row REMEDY EDITS, excluding the close-out artefacts.** **Tier: early-testing.**
 
 **Filed 2026-09-05 by Lane A, during `M72`, at the moment the cap decided a batch that value had not.**

@@ -170,7 +170,7 @@ final class OcrBakeoffCommand extends Command
 
         $meta = [
             'title' => $layout->form->title,
-            'generated_at' => now()->format('Y-m-d H:i'),
+            'generated_at' => now()->format('Y-m-d H:i T'),
             'provider' => 'google_vision',
             'folder' => $folder,
             'versions' => array_map(static fn ($v): string => 'v'.$v->version_number, $layout->versions),

@@ -47,8 +47,12 @@ final class OcrBakeoffReport
         } else {
             $out[] = '**'.self::int($headline['needs_correction']).' of '.self::int($headline['fields']).' scored fields ('.self::pct($headline['rate']).') across '
                 .self::int($headline['scans']).' scan(s) needed manual correction — '.(($headline['g9_pass'] ?? false) === true ? 'PASS' : 'FAIL')
-                .' against G9\'s bar of under '.self::pct(OcrBakeoffScorer::G9_BAR).'.** G9 is stated for a clear, well-lit single-page scan; read the `condition` rows for that subset.';
+                .' against G9\'s bar of under '.round(100 * OcrBakeoffScorer::G9_BAR).'%.** G9 is stated for a clear, well-lit single-page scan; read the `condition` rows for that subset.';
             $out[] = '';
+            if (($headline['day_swapped'] ?? 0) !== 0) {
+                $out[] = '⚠️ **'.self::int($headline['day_swapped']).' wrong date(s) would be right with the day and month swapped.** Either the respondent wrote the month in the DD boxes, or the answer sheet was typed month first — a spreadsheet reads a typed date that way. Check those rows in `fields.csv` against the paper; a sheet typo is fixed by typing the date as `2026-10-08` and running again.';
+                $out[] = '';
+            }
             $out[] = 'At auto '.$thresholds['auto'].' / review '.$thresholds['review'].': **'.self::int($headline['silent']).' silent error(s)** (a wrong value filled with no flag) and '
                 .self::int($headline['flagged']).' field(s) flagged for review.';
             $out[] = '';

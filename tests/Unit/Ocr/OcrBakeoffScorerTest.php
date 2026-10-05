@@ -72,6 +72,7 @@ it('counts a field as needing correction exactly when the reviewer is shown some
         ->and($headline['g9_pass'])->toBeFalse()
         ->and($headline['silent'])->toBe(3)    // e, j, k
         ->and($headline['flagged'])->toBe(2)   // b, f
+        ->and($headline['day_swapped'])->toBe(1) // k
         ->and($headline['causes'])->toBe([
             'not_found' => 1, 'unreadable' => 1, 'skipped' => 0, 'missed' => 1, 'withheld_right' => 1,
             'withheld_wrong' => 0, 'unexpected' => 1, 'wrong_flagged' => 1, 'wrong_unflagged' => 2,

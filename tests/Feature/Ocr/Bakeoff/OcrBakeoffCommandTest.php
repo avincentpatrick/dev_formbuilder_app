@@ -209,7 +209,8 @@ it('reads a folder offline and scores it: corrections, silent errors and the day
 
     $report = (string) file_get_contents("{$samples}/_bakeoff/report.md");
     expect($report)
-        ->toContain('**3 of 21 scored fields (14.3%) across 3 scan(s) needed manual correction — PASS')
+        ->toContain('**3 of 21 scored fields (14.3%) across 3 scan(s) needed manual correction — PASS against G9\'s bar of under 15%.**')
+        ->toContain('⚠️ **1 wrong date(s) would be right with the day and month swapped.**')
         ->toContain('| photo | 1 | 7 | 3 | 42.9% | FAIL | 2 | 0 |')
         ->toContain('| clean | 2 | 14 | 0 | 0.0% | pass | 0 | 0 |')
         ->toContain('| withheld below the review threshold, though it was right | 1 |')
@@ -243,6 +244,7 @@ it('fails, and says why, when an answer cannot be understood or names no scan �
 
     $report = (string) file_get_contents("{$this->dir}/samples/_bakeoff/report.md");
     expect($report)->toContain('**0 of 6 scored fields')
+        ->not->toContain('day and month swapped')
         ->and(ocrBakeoffFieldsCsv("{$this->dir}/samples/_bakeoff/fields.csv")['sheet1.png/age']['verdict'])->toBe('not scored');
 });
 

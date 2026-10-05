@@ -208,10 +208,7 @@ final class OcrBakeoffScorer
     {
         $cause = $o['cause'];
         if (is_string($cause)) {
-            $swapped = in_array($cause, ['wrong_flagged', 'wrong_unflagged', 'withheld_wrong'], true)
-                && OcrBakeoffAnswers::daySwapped($o['type'], $o['expected'], $o['value']);
-
-            return self::CAUSES[$cause].($swapped ? ' — day and month swapped? check the answer sheet' : '');
+            return self::CAUSES[$cause].($this->isDaySwapped($o) ? ' — day and month swapped? check the paper and the answer sheet' : '');
         }
 
         if (OcrBakeoffAnswers::canonical($o['type'], $o['expected']) === null) {
@@ -219,6 +216,18 @@ final class OcrBakeoffScorer
         }
 
         return $this->tierAt($o, $configured) === 'review' ? 'right, flagged for review' : 'right';
+    }
+
+    /**
+     * A wrong date that would be right with its day and month swapped: the respondent wrote the month in the DD boxes,
+     * or the answer sheet was typed month first. Either way the reader is not the suspect.
+     *
+     * @param  array<string, mixed>  $o
+     */
+    private function isDaySwapped(array $o): bool
+    {
+        return in_array($o['cause'], ['wrong_flagged', 'wrong_unflagged', 'withheld_wrong'], true)
+            && OcrBakeoffAnswers::daySwapped($o['type'], $o['expected'], $o['value']);
     }
 
     /**
@@ -231,9 +240,11 @@ final class OcrBakeoffScorer
         $causes = array_fill_keys(array_keys(self::CAUSES), 0);
         $flagged = 0;
         $silent = 0;
+        $swapped = 0;
         foreach ($observations as $o) {
             if (is_string($o['cause'])) {
                 $causes[$o['cause']]++;
+                $swapped += $this->isDaySwapped($o) ? 1 : 0;
             }
             if ($o['state'] !== 'read') {
                 continue;
@@ -260,6 +271,7 @@ final class OcrBakeoffScorer
             'g9_pass' => $rate === null ? null : $rate < self::G9_BAR,
             'silent' => $silent,
             'flagged' => $flagged,
+            'day_swapped' => $swapped,
             'causes' => $causes,
         ];
     }

@@ -1,6 +1,6 @@
 {
   "grammar_version": "2.0",
-  "total": 146,
+  "total": 155,
   "files": {
     "relevance": 7,
     "required": 8,
@@ -16,6 +16,7 @@
     "geo": 12,
     "media": 6,
     "hidden": 8,
-    "yes_no": 21
+    "yes_no": 21,
+    "temporal": 9
   }
 }

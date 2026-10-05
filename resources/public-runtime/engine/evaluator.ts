@@ -17,7 +17,7 @@ import { ExpressionEvaluationError } from './errors';
 import { ExpressionLexer } from './lexer';
 import { ExpressionParser } from './parser';
 import { FunctionRegistry } from './function-registry';
-
+import { ordersTemporally } from './temporal';
 export const GRAMMAR_VERSION = '2.0';
 
 export class ExpressionEvaluator {
@@ -104,13 +104,13 @@ export class ExpressionEvaluator {
         }
     }
 
-    /** Numeric-only ordering: a non-numeric (or NaN) operand makes any of `> < >= <=` false. */
+    /** Ordering: two numbers numerically; otherwise only two comparable ISO dates/times (temporal.ts, M134), else false. */
     private numericCompare(left: MaybeAbsent, right: MaybeAbsent, op: 'gt' | 'lt' | 'gte' | 'lte'): boolean {
         const a = toNumber(left);
         const b = toNumber(right);
 
         if (Number.isNaN(a) || Number.isNaN(b)) {
-            return false;
+            return ordersTemporally(left, right, op);
         }
 
         switch (op) {

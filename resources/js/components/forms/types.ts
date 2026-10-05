@@ -164,3 +164,24 @@ export interface AutomationsProps {
     max: number;
     items: AutomationRow[];
 }
+
+/** One question another form may take its choices from (M133, `R-5da4a30f`), as `ShareableQuestions` lists it. */
+export interface ShareableQuestion {
+    key: string;
+    label: string;
+}
+
+/**
+ * The Data sharing section (M133, `R-5da4a30f` — Connect project v1's source key). Absent for a reader who cannot
+ * read this form's responses (`D87`). `field_keys` null means every shareable question — never an empty list.
+ * `used_by` names the forms that take choices from this one and that this reader may open; `used_by_others` counts
+ * the rest.
+ */
+export interface DataSharingProps {
+    enabled: boolean;
+    field_keys: string[] | null;
+    published: boolean;
+    questions: ShareableQuestion[];
+    used_by: { id: string; title: string }[];
+    used_by_others: number;
+}

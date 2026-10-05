@@ -1048,6 +1048,8 @@ export function useBuilderStore(props: BuilderPageProps) {
         enums: props.enums,
         // M129: the note's Content tab uploads images against the form, and the panel takes no page props.
         formId: props.form.id,
+        // M133: the forms a choice question may take its choices from — the Options tab reads it, and takes no page props.
+        linkableSources: props.linkable_sources ?? [],
         library,
         librarySaved,
         // actions

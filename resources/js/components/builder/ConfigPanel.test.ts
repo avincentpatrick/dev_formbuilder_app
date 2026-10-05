@@ -1,5 +1,5 @@
 import { mount } from '@vue/test-utils';
-import { computed, ref } from 'vue';
+import { computed, reactive, ref } from 'vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import ConfigPanel from './ConfigPanel.vue';
 import type { BuilderStore } from './useBuilderStore';
@@ -591,5 +591,49 @@ describe('ConfigPanel — a refused save marks the field (M128, R-d001de0c)', ()
 
         expect(wrapper.find('[aria-invalid="true"]').exists()).toBe(false);
         expect(wrapper.find('[role="alert"]').exists()).toBe(false);
+    });
+});
+
+describe('ConfigPanel — choices from another form (M133)', () => {
+    function linkingStore(choice: LocalField, touch: (uid: string, kind: string) => void, types: string[] = ['single_select', 'dropdown']): BuilderStore {
+        const base = makeStore({ field: choice, touch }) as unknown as Record<string, unknown>;
+
+        return {
+            ...base,
+            enums: { ...ENUMS, linked_choice_types: types },
+            linkableSources: [{ id: 'src-1', title: 'Facility Register', questions: [{ key: 'facility_name', label: 'Facility name' }] }],
+        } as unknown as BuilderStore;
+    }
+
+    async function openOptions(wrapper: ReturnType<typeof mountPanel>): Promise<void> {
+        await wrapper.findAll('[role="tab"]').find((tab) => tab.text() === 'Options')!.trigger('click');
+    }
+
+    it('offers the link only for a transmitted type, and keeps the typed list beside it until a link is made', async () => {
+        const choice = field({ field_type: 'single_select', config: { options: [] } });
+        const wrapper = mountPanel(linkingStore(choice, () => undefined));
+        await openOptions(wrapper);
+
+        expect(wrapper.find('[data-linked-choices]').exists()).toBe(true);
+        expect(wrapper.findComponent({ name: 'ChoicesEditor' }).exists()).toBe(true);
+
+        const untransmitted = mountPanel(linkingStore(field({ field_type: 'single_select', config: { options: [] } }), () => undefined, []));
+        await openOptions(untransmitted);
+        expect(untransmitted.find('[data-linked-choices]').exists()).toBe(false);
+    });
+
+    it('writes the link and clears the typed list in ONE assignment and one touch, then hides the typed list', async () => {
+        const touch = vi.fn();
+        // Reactive, as the store's rows are: the typed list hides on the RE-RENDER the assignment causes.
+        const choice = reactive(field({ field_type: 'single_select', config: { options: [] } })) as LocalField;
+        const wrapper = mountPanel(linkingStore(choice, touch));
+        await openOptions(wrapper);
+
+        await wrapper.find('[data-linked-choices] input[type="radio"][value="form"]').setValue(true);
+
+        expect(choice.config).toEqual({ options: [], options_source: { form_id: null, field_key: null } });
+        expect(touch).toHaveBeenCalledTimes(1);
+        expect(touch).toHaveBeenLastCalledWith('f1', 'field');
+        expect(wrapper.findComponent({ name: 'ChoicesEditor' }).exists()).toBe(false);
     });
 });

@@ -100,5 +100,59 @@
       "errors": [],
       "effective_answers": { "gate": "stop" }
     }
+  },
+  {
+      "name": "single_select with no typed options (a question that takes its choices from another form, M133) accepts any answer",
+      "grammar_version": "2.0",
+      "schema": {
+          "fields": [
+              {
+                  "key": "facility",
+                  "field_type": "single_select",
+                  "options": []
+              }
+          ]
+      },
+      "answers": {
+          "facility": "San Jose RHU"
+      },
+      "expected": {
+          "relevance": {
+              "fields": {
+                  "facility": true
+              }
+          },
+          "errors": [],
+          "effective_answers": {
+              "facility": "San Jose RHU"
+          }
+      }
+  },
+  {
+      "name": "dropdown with no typed options (a question that takes its choices from another form, M133) accepts any answer",
+      "grammar_version": "2.0",
+      "schema": {
+          "fields": [
+              {
+                  "key": "facility",
+                  "field_type": "dropdown",
+                  "options": []
+              }
+          ]
+      },
+      "answers": {
+          "facility": "Mabini RHU"
+      },
+      "expected": {
+          "relevance": {
+              "fields": {
+                  "facility": true
+              }
+          },
+          "errors": [],
+          "effective_answers": {
+              "facility": "Mabini RHU"
+          }
+      }
   }
 ]

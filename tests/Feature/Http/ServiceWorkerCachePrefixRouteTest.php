@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Route;
 | R-aa133bab (M121) — no GET route may answer under a service-worker cache prefix unless it is meant to.
 |--------------------------------------------------------------------------
 | The service worker (resources/public-runtime/sw.ts) caches by PATH PREFIX: `/build/`, `/api/v1/public/f/`,
-| `/f/`, since M130 `/api/v1/public/content-images/` and since M132 `/api/v1/public/reference-files/`. The resume READ — `api.v1.public.drafts.resume`, which answers with a respondent's saved
+| `/f/`, since M130 `/api/v1/public/content-images/` and since M132 `/api/v1/public/reference-files/` and since M133 `/api/v1/public/linked-choices/`. The resume READ — `api.v1.public.drafts.resume`, which answers with a respondent's saved
 | answers — escapes that cache only because its path begins `drafts/` rather than `f/`. `D20` was answered to
 | keep it out, and until now the only thing keeping it out was a comment beside the route.
 |
@@ -64,6 +64,9 @@ function swCachedGetAllowList(): array
         'api/v1/public/content-images/' => ['api.v1.public.content-images.show'],
         // A form's reference files (M132, `R-bf49e4c1`): their own cache, `guest-reference-files`, kept once opened (`D84`).
         'api/v1/public/reference-files/' => ['api.v1.public.reference-files.show'],
+        // The choices a form takes from another form's answers (M133, `R-5da4a30f`): their own cache, `guest-linked-choices`,
+        // the schema's second freshness channel (`D60` = A) — beside its prefix, never under it.
+        'api/v1/public/linked-choices/' => ['api.v1.public.linked-choices.show'],
     ];
 }
 
@@ -107,7 +110,7 @@ it('parses one startsWith prefix per runtime-cache route out of sw.ts, and every
 
     // The floor: a cache route whose matcher is not a `startsWith` literal would otherwise pass unseen.
     expect($prefixes)->toHaveCount(substr_count($source, 'registerRoute('))
-        ->and($prefixes)->toHaveCount(5)
+        ->and($prefixes)->toHaveCount(6)
         ->and($prefixes)->toBe($expected);
 });
 

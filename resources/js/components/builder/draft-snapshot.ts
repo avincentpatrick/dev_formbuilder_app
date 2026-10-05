@@ -256,7 +256,9 @@ export function projectDraft(input: DraftProjectionInput): DraftProjection {
         // select with no options renders an empty control to every respondent — and papering over it with
         // a placeholder option would hide exactly what the author needs to see.
         const config: Record<string, unknown> = { ...f.config };
-        if (Array.isArray(config.options) && config.options.length === 0) {
+        // M133: a question that takes its choices from another form has none typed here by design — the live form
+        // serves its list, and `previewLimitations()` says the preview does not.
+        if (Array.isArray(config.options) && config.options.length === 0 && config.options_source == null) {
             add(f.uid, key, 'empty_option_list', 'This question has no choices yet.');
         }
 

@@ -226,6 +226,10 @@ final class UpdateFieldRequest extends FormRequest
                 'config.options.*.label' => ['nullable', 'string', 'max:500'],
                 'config.options.*.label_translations' => ['sometimes', 'array'],
                 'config.options.*.label_translations.*' => ['nullable', 'string', 'max:500'],
+                // M133: choices taken from another form's answers — shape only; whether the link can serve is publish's.
+                'config.options_source' => ['sometimes', 'nullable', 'array:form_id,field_key'],
+                'config.options_source.form_id' => ['nullable', 'uuid'],
+                'config.options_source.field_key' => ['nullable', 'string', 'max:255'],
             ];
         }
 

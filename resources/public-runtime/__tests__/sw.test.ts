@@ -151,21 +151,22 @@ function apiGet(path: string): MatchArg {
 }
 
 describe('sw.ts runtime cache route table', () => {
-    it('registers the five runtime caches', () => {
+    it('registers the six runtime caches', () => {
         // A floor on the table itself. Without it, a route deleted outright would take its own
         // status assertion with it and the file would stay green while covering nothing — the
-        // vacuous-success shape this repository gates everywhere else. M130 added the fourth, M132 the fifth.
-        expect(routes).toHaveLength(5);
+        // vacuous-success shape this repository gates everywhere else. M130 added the fourth, M132 the fifth, M133 the sixth.
+        expect(routes).toHaveLength(6);
         expect(routes.map((r) => r.strategy.cacheName)).toEqual([
             'guest-shell-assets',
             'guest-schema',
             'guest-shell-html',
             'guest-content-images',
             'guest-reference-files',
+            'guest-linked-choices',
         ]);
     });
 
-    it.each(['guest-shell-assets', 'guest-schema', 'guest-shell-html', 'guest-content-images', 'guest-reference-files'])(
+    it.each(['guest-shell-assets', 'guest-schema', 'guest-shell-html', 'guest-content-images', 'guest-reference-files', 'guest-linked-choices'])(
         'caches a 200 on %s',
         async (cacheName) => {
             // The control arm. If this ever goes red the filter is too strict, not too loose, and
@@ -174,7 +175,7 @@ describe('sw.ts runtime cache route table', () => {
         },
     );
 
-    it.each(['guest-shell-assets', 'guest-schema', 'guest-shell-html', 'guest-content-images', 'guest-reference-files'])(
+    it.each(['guest-shell-assets', 'guest-schema', 'guest-shell-html', 'guest-content-images', 'guest-reference-files', 'guest-linked-choices'])(
         'refuses an opaque (status 0) response on %s',
         async (cacheName) => {
             // ⛔ THE DISCRIMINATOR, AND THE ONLY ARM THAT WAS RED BEFORE M77. Delete the
@@ -225,6 +226,7 @@ describe('sw.ts route matchers — which URLs enter a cache at all', () => {
         expect(matcherFor('guest-shell-assets')(resumeRead)).toBe(false);
         expect(matcherFor('guest-content-images')(resumeRead)).toBe(false);
         expect(matcherFor('guest-reference-files')(resumeRead)).toBe(false);
+        expect(matcherFor('guest-linked-choices')(resumeRead)).toBe(false);
     });
 
     it('claims a content image for the image cache only, and keys it without the share token (M130)', async () => {
@@ -272,6 +274,31 @@ describe('sw.ts route matchers — which URLs enter a cache at all', () => {
         // Opened under one visit's token, it must be found under the next visit's, offline.
         expect(await keyFor('token-a')).toBe('https://acme.test/api/v1/public/reference-files/att-9');
         expect(await keyFor('token-b')).toBe(await keyFor('token-a'));
+    });
+
+    it('claims a linked-choices read for its own cache only, and keys it by VERSION without the share token (M133, D60)', async () => {
+        const lists = apiGet('/api/v1/public/linked-choices/token-a/ver-7');
+
+        expect(matcherFor('guest-linked-choices')(lists)).toBe(true);
+        // Beside the schema, never under it: a list there would be cached AS a schema and evict one.
+        expect(matcherFor('guest-schema')(lists)).toBe(false);
+        expect(matcherFor('guest-reference-files')(lists)).toBe(false);
+        expect(matcherFor('guest-linked-choices')(apiGet('/api/v1/public/f/some-share-token'))).toBe(false);
+
+        const plugins = (routeFor('guest-linked-choices').plugins ?? []) as Array<{
+            cacheKeyWillBeUsed?: (o: { request: Request; mode: string }) => Promise<Request | string>;
+        }>;
+        const keyPlugin = plugins.find((plugin) => typeof plugin.cacheKeyWillBeUsed === 'function');
+        expect(keyPlugin, 'the linked-choices route has no cache-key plugin').toBeDefined();
+
+        const keyFor = (token: string, version = 'ver-7') =>
+            keyPlugin!.cacheKeyWillBeUsed!({ request: new Request(`https://acme.test/api/v1/public/linked-choices/${token}/${version}`), mode: 'read' });
+
+        // Fetched under one visit's token, the list must be found under the next visit's, offline — and a
+        // republished version is a different list.
+        expect(await keyFor('token-a')).toBe('https://acme.test/api/v1/public/linked-choices/ver-7');
+        expect(await keyFor('token-b')).toBe(await keyFor('token-a'));
+        expect(await keyFor('token-a', 'ver-8')).not.toBe(await keyFor('token-a'));
     });
 
     it('⚠️ RECORDS THAT THE RESUME SHELL *IS* CACHED TODAY — a pinned exposure, not an endorsement', () => {

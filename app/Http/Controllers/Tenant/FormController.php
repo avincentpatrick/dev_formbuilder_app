@@ -11,6 +11,7 @@ use App\Http\Controllers\Concerns\ResolvesTenant;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Forms\FormMetadataRequest;
 use App\Http\Requests\Forms\StoreFormAutomationRequest;
+use App\Http\Requests\Forms\UpdateDataSharingRequest;
 use App\Http\Requests\Forms\UpdateFormAutomationRequest;
 use App\Http\Requests\Forms\UpdateOcrScanningRequest;
 use App\Models\Form;
@@ -153,6 +154,25 @@ final class FormController extends Controller
         return back()->with('toast', [
             'type' => 'success',
             'message' => $enabled ? 'This form now accepts scans of its paper copies.' : 'This form no longer accepts scans.',
+        ]);
+    }
+
+    /**
+     * The Data sharing settings section (M133, `R-5da4a30f`): whether other forms of the workspace may use this
+     * form's answers as their choices, and which questions. On this controller for {@see self::updateOcrScanning()}'s
+     * `use`-line reason; its own route and FormRequest all the same.
+     */
+    public function updateDataSharing(UpdateDataSharingRequest $request, Form $form): RedirectResponse
+    {
+        $enabled = $request->boolean('enabled');
+
+        /** @var User $user */
+        $user = $request->user();
+        $this->forms->setDataSharing($form, $enabled, $request->fieldKeys(), $user);
+
+        return back()->with('toast', [
+            'type' => 'success',
+            'message' => $enabled ? 'Other forms can now use answers from this form.' : 'This form no longer shares its answers.',
         ]);
     }
 

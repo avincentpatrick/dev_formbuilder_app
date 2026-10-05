@@ -46,6 +46,7 @@ import ContentBlocksEditor from './ContentBlocksEditor.vue';
 import FieldTypeControl from './FieldTypeControl.vue';
 import GeoEditor from './GeoEditor.vue';
 import LikertMatrixEditor from './LikertMatrixEditor.vue';
+import LinkedChoicesEditor from './LinkedChoicesEditor.vue';
 import MatrixEditor from './MatrixEditor.vue';
 import MediaEditor from './MediaEditor.vue';
 import PrefillEditor from './PrefillEditor.vue';
@@ -68,7 +69,6 @@ interface CascadeOption {
     level: string;
     parent: string | null;
 }
-
 const props = defineProps<{ store: BuilderStore }>();
 
 const field = props.store.selectedField;
@@ -488,7 +488,7 @@ watch(librarySaved, (value) => {
                     </template>
 
                     <template v-else-if="activeTab === 'options'">
-                        <ChoicesEditor :options="choices" @update:options="setConfig('options', $event)" />
+                        <LinkedChoicesEditor v-if="enums.linked_choice_types?.includes(field.field_type)" :config="field.config" :sources="props.store.linkableSources" @update:config="field.config = $event; props.store.touch(field.uid, 'field')" /><ChoicesEditor v-if="field.config.options_source == null" :options="choices" @update:options="setConfig('options', $event)" />
                         <MdsFormField
                             v-if="layoutOptions.length > 0"
                             label="Choice layout"

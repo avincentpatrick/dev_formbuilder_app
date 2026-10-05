@@ -11,7 +11,7 @@
  */
 
 import { encodeSolution, solveChallenge, type Challenge } from './challenge';
-import { ApiError, normalizeError } from './error-normalizer';
+import { ApiError, normalizeError } from './error-normalizer'; import { hasLinkedChoices, linkedChoicesUrl, mergeLinkedChoices, type LinkedChoiceLists } from './linked-choices';
 import type {
     AnswerMap,
     MintResponse,
@@ -173,6 +173,23 @@ export function createApiClient(options: { token: string; slug: string; fetch?: 
         return body as T;
     }
 
+    /**
+     * A version's linked-choice lists, or null when they cannot be read. NEVER THROWS: a list that fails to load costs
+     * the respondent that question's choices, never the form. Read through the service worker, which keeps the last
+     * list per version for offline use.
+     */
+    async function fetchLinkedChoices(versionId: string): Promise<LinkedChoiceLists | null> {
+        try {
+            const response = await doFetch(linkedChoicesUrl(currentToken, versionId), { headers: { Accept: 'application/json' } });
+            if (!response.ok) return null;
+            const body = (await response.json()) as { data?: { lists?: LinkedChoiceLists } };
+
+            return body.data?.lists ?? null;
+        } catch {
+            return null;
+        }
+    }
+
     return {
         token: () => currentToken,
         remint,
@@ -191,7 +208,9 @@ export function createApiClient(options: { token: string; slug: string; fetch?: 
             // 403 regardless, which is what covers rows 2..n of a drain reusing a cached schema.
             challengeRequired = body.data.form.bot_challenge === 'proof_of_work';
 
-            return body.data;
+            // M133 (`R-5da4a30f`): a question that takes its choices from another form gets them here, from their own
+            // read (`D60` = A), merged into a copy — so every path that sets a schema gets them, and none can forget.
+            return hasLinkedChoices(body.data) ? mergeLinkedChoices(body.data, await fetchLinkedChoices(body.data.version.id)) : body.data;
         },
 
         async submit(payload: SubmitPayload): Promise<SubmitResult> {

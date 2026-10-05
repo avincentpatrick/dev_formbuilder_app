@@ -639,4 +639,38 @@ final class FormService
             return $locked->refresh();
         });
     }
+
+    /**
+     * Let other forms of the workspace use this form's answers as their choices, and name which questions (M133,
+     * `R-5da4a30f` — Connect project v1's source key) — the only writer of `forms.data_sharing_enabled` and
+     * `forms.data_sharing_field_keys`.
+     *
+     * `$fieldKeys` null means every shareable question (`D60`'s note), never `[]` — the request and the column's
+     * CHECK both refuse the empty list. Read under the row lock and audited from the locked copy, for
+     * {@see self::archive()}'s reason: the old value recorded is the one this write replaced. Placed last in the
+     * file because this file is cited by line.
+     *
+     * @param  list<string>|null  $fieldKeys
+     */
+    public function setDataSharing(Form $form, bool $enabled, ?array $fieldKeys, ?User $actor = null): Form
+    {
+        return DB::transaction(function () use ($form, $enabled, $fieldKeys, $actor): Form {
+            $locked = Form::query()->whereKey($form->id)->lockForUpdate()->firstOrFail();
+
+            $old = [
+                'data_sharing_enabled' => $locked->data_sharing_enabled,
+                'data_sharing_field_keys' => $locked->data_sharing_field_keys,
+            ];
+            $new = [
+                'data_sharing_enabled' => $enabled,
+                'data_sharing_field_keys' => $fieldKeys,
+            ];
+
+            $locked->forceFill($new)->save();
+
+            $this->recordFormUpdate($locked, $old, $new, $actor);
+
+            return $locked->refresh();
+        });
+    }
 }

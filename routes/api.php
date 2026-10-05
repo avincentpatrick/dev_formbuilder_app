@@ -583,6 +583,15 @@ Route::prefix('api/v1/public')
             ->withoutMiddleware('throttle:guest')
             ->middleware('throttle:guest-content-image')
             ->name('reference-files.show');
+
+        // The choices a form takes from another form's answers (M133, `R-5da4a30f` — Connect project v1), BESIDE the
+        // schema and never inside it (`D60` = A): its own response, its own stamp, its own service-worker cache, keyed
+        // by `{version}` with the token stripped. Off `f/` and off `throttle:guest` for the reference files' reasons,
+        // sharing their limiter — one read per page load, by the same page. Regenerate openapi.json after touching it.
+        Route::get('linked-choices/{shareToken}/{version}', [PublicFormSchemaController::class, 'linkedChoices'])
+            ->withoutMiddleware('throttle:guest')
+            ->middleware('throttle:guest-content-image')
+            ->name('linked-choices.show');
     });
 
 // ── Group C (resume): guest draft RESUME — UNAUTHENTICATED; tenant + the target draft submissions.id resolved ─

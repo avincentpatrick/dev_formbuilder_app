@@ -187,6 +187,11 @@ final class StructuralValidationGate
             }
         }
 
+        // M133 (`R-5da4a30f`): choice questions that take their choices from another form. Resolved from the container
+        // rather than injected, because this gate is built with `new` across the suite and a constructor argument
+        // would break every one of those.
+        array_push($violations, ...app(LinkedChoiceGate::class)->collect($version, $fields));
+
         // Every validation's owning + comparison field belongs to the same version.
         foreach ($validations as $validation) {
             $ownerKey = $fieldKeyById->get($validation->form_field_id, '(unknown)');
@@ -418,6 +423,12 @@ final class StructuralValidationGate
      */
     private function assertChoiceOptionsResolve(FormField $field): void
     {
+        // M133 (`R-5da4a30f`): a question that takes its choices from another form has none typed here, by design —
+        // its link is {@see LinkedChoiceGate}'s to judge, and typed choices beside it are refused there.
+        if (LinkedChoiceService::declaresLink($field->config) && data_get($field->config, 'options', []) === []) {
+            return;
+        }
+
         $values = [];
         foreach ((array) data_get($field->config, 'options', []) as $option) {
             if (! is_array($option) || ! array_key_exists('value', $option) || $option['value'] === null || $option['value'] === '') {

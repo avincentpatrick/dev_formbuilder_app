@@ -20,7 +20,7 @@ import { assertClean, forceTheme } from './support/axe';
 const themes = ['light', 'dark'] as const;
 
 /** Every section the Owner of a Business workspace is offered, in rail order. */
-const SECTIONS = ['Details', 'Pages', 'Theme', 'Reference files', 'Share', 'Scanning', 'Schedule', 'Thank-you message', 'Save and finish later', 'Automations', 'Scope'];
+const SECTIONS = ['Details', 'Pages', 'Theme', 'Reference files', 'Share', 'Scanning', 'Schedule', 'Thank-you message', 'Save and finish later', 'Automations', 'Data sharing', 'Scope'];
 
 async function openSettings(page: Page, formTitle: string): Promise<void> {
     await page.goto('/forms', { waitUntil: 'networkidle' });
@@ -56,6 +56,23 @@ for (const theme of themes) {
         await expect(page.getByText(/cannot be read automatically/)).toBeVisible();
 
         await assertClean(page, `form settings tab, scanning ineligible (${theme})`);
+    });
+}
+
+// M133 (`R-5da4a30f`) — the Data sharing section where it is ON: "Programme Uptake" (E2eSeeder) shares its District answers
+// with "Field Visit Referral", so the chosen-questions state and the forms using it are both on screen. Opened and
+// scanned only — the STATE note above holds.
+for (const theme of themes) {
+    test(`Form settings tab — data sharing, switched on and in use (${theme})`, async ({ page }) => {
+        await openSettings(page, 'Programme Uptake');
+        await forceTheme(page, theme);
+
+        await page.getByRole('group', { name: 'Settings section' }).getByRole('button', { name: 'Data sharing', exact: true }).click();
+        const section = page.locator('[data-section="sharing"]');
+        await expect(section.getByRole('checkbox', { name: 'Let other forms use answers from this form' })).toBeChecked();
+        await expect(section.locator('[data-sharing-used-by]')).toContainText('Field Visit Referral');
+
+        await assertClean(page, `form settings tab, data sharing on (${theme})`);
     });
 }
 

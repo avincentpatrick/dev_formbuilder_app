@@ -1,6 +1,6 @@
 {
   "grammar_version": "2.0",
-  "total": 141,
+  "total": 143,
   "files": {
     "relevance": 7,
     "required": 8,
@@ -9,7 +9,7 @@
     "conditional": 12,
     "repeats": 9,
     "calculated": 8,
-    "membership": 9,
+    "membership": 11,
     "cascading": 8,
     "matrix": 8,
     "likert_matrix": 8,

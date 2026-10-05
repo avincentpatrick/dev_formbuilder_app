@@ -65,6 +65,7 @@ import ConfirmationPanel from '@/components/builder/ConfirmationPanel.vue';
 import GeneralPanel from '@/components/builder/GeneralPanel.vue';
 import PageModePanel from '@/components/builder/PageModePanel.vue';
 import AutomationsPanel from '@/components/forms/AutomationsPanel.vue';
+import DataSharingPanel from '@/components/forms/DataSharingPanel.vue';
 import ReferenceFilesPanel from '@/components/forms/ReferenceFilesPanel.vue';
 import SaveResumePanel from '@/components/builder/SaveResumePanel.vue';
 import SchedulePanel from '@/components/builder/SchedulePanel.vue';
@@ -72,9 +73,9 @@ import ThemePanel from '@/components/builder/ThemePanel.vue';
 import ScanningPanel from '@/components/forms/ScanningPanel.vue';
 import ScopePanel from '@/components/forms/ScopePanel.vue';
 import SharePanel from '@/components/forms/SharePanel.vue';
-import type { AutomationsProps, FormSettingsForm, OcrScanningProps, ReferenceFileRow, ScopeSectionProps, ShareProps } from '@/components/forms/types';
+import type { AutomationsProps, DataSharingProps, FormSettingsForm, OcrScanningProps, ReferenceFileRow, ScopeSectionProps, ShareProps } from '@/components/forms/types';
 
-type SectionKey = 'general' | 'pages' | 'theme' | 'files' | 'share' | 'scanning' | 'schedule' | 'confirmation' | 'save-resume' | 'automations' | 'scope';
+type SectionKey = 'general' | 'pages' | 'theme' | 'files' | 'share' | 'scanning' | 'schedule' | 'confirmation' | 'save-resume' | 'automations' | 'sharing' | 'scope';
 
 const props = defineProps<{
     /** Whether the settings are open: the modal's state, or always true on the hub page. */
@@ -91,6 +92,8 @@ const props = defineProps<{
     referenceFiles?: ReferenceFileRow[] | null;
     /** The Automations section (M132): the form's automations, or absent where the host sends none. */
     automations?: AutomationsProps | null;
+    /** The Data sharing section (M133): absent for a reader who cannot read this form's responses (`D87`). */
+    dataSharing?: DataSharingProps | null;
     /** The hub-only Scope section (M129), sent only to a holder of `scopes.manage`. */
     scope?: ScopeSectionProps | null;
 }>();
@@ -117,6 +120,9 @@ const sections = computed<{ key: SectionKey; label: string }[]>(() => {
         { key: 'save-resume', label: 'Save and finish later', available: props.saveResumeAvailable },
         // M132 (`R-b7bc5149`): what happens after a response arrives, so it sits after the sections about collecting one.
         { key: 'automations', label: 'Automations', available: props.automations != null },
+        // M133 (`R-5da4a30f`): whether other forms may take their choices from this form's answers — about where answers
+        // go after they arrive, so it sits beside Automations. "Data sharing", never "Share": that section is the public link.
+        { key: 'sharing', label: 'Data sharing', available: props.dataSharing != null },
         { key: 'scope', label: 'Scope', available: props.scope != null },
     ];
 
@@ -244,6 +250,11 @@ watch(
                 <template v-if="props.automations != null && mounted.has('automations')">
                     <div v-show="active === 'automations'" class="form-settings__section" :data-section="'automations'">
                         <AutomationsPanel :open="props.open" :form-id="props.formId" :automations="props.automations" />
+                    </div>
+                </template>
+                <template v-if="props.dataSharing != null && mounted.has('sharing')">
+                    <div v-show="active === 'sharing'" class="form-settings__section" :data-section="'sharing'">
+                        <DataSharingPanel :open="props.open" :form-id="props.formId" :sharing="props.dataSharing" />
                     </div>
                 </template>
                 <template v-if="props.scope != null && mounted.has('scope')">

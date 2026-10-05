@@ -13122,13 +13122,13 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   browser's own date controls send canonical values; the API, the sync batch and an import can send anything.
   Filed by `M134`. **Tier: during-testing.**
 
-- **`minor` · The testing server's template gallery and field library still make email, web-address and phone
+- ✅ **CLOSED BY `M135` (2026-10-05) — **`minor` · The testing server's template gallery and field library still make email, web-address and phone
   questions without a format check, until their two catalog seeders are re-run there.** Found by `M134` while closing
   `R-b21da9f3`. `M134` gave the platform templates and the field library's items `DefaultFieldRules`' pattern rows
   (`D88`), but a deploy does not re-run the catalog seeders — the runbook's first-boot order seeds them by class, once —
   so staging keeps the old rows. The remedy is one supervised step on the box, beside the OCR key on Oct 11:
   `php artisan db:seed --class=PlatformTemplateSeeder --force`, then the same for `PlatformFieldLibrarySeeder`; both
-  refresh content idempotently and keep `usage_count`. **Live.** Filed by `M134`. **Tier: early-testing.**
+  refresh content idempotently and keep `usage_count`. **Live.** Filed by `M134`. **Tier: early-testing.** ✅ **CLOSED BY `M135` (2026-10-05) — BOTH CATALOG SEEDERS RE-RUN ON THE TESTING SERVER.** First measured on this PC (both seeders twice: 9 of 9 after the first run, nothing changed by the second), then on the box in one supervised block: a `pg_dump` of both tables (`C:\meridian\backups\m135-catalog-before-reseed.dump`, 15,696 bytes), a read-only census reading **9** platform email and phone questions (seven across five templates, and the library's "Email address" and "Phone number") with **0** carrying the format check, both seeders `DONE`, and the census again: **9 of 9**, totals unchanged (10 templates, 6 library items) and `usage_count` sums kept (2 and 3).
 
 - **`minor` · A form's sections cannot be laid out as a table, the third presentation the user's comment 16 asked for.**
   Found by `M135` while mapping the 19 builder comments for the staging smoke test. Comment 16 asked whether a form is

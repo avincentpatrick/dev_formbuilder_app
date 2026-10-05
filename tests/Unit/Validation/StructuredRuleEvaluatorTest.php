@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Enums\ComparisonOperator;
 use App\Enums\LogicOperator;
 use App\Enums\ValidationRuleType;
+use App\Exceptions\Expressions\ExpressionEvaluationException;
 use App\Models\FormFieldValidation;
 use App\Services\Expressions\EvaluationContext;
 use App\Services\Validation\StructuredRuleEvaluator;
@@ -93,6 +94,27 @@ it('evaluates greater_than_field / less_than_field against the related field', f
 
     expect($rules->passesConstraint($row, 'a', 5, new EvaluationContext(['a' => 5, 'b' => 3]), $map))->toBeTrue();
     expect($rules->passesConstraint($row, 'a', 2, new EvaluationContext(['a' => 2, 'b' => 3]), $map))->toBeFalse();
+});
+
+it('passes a field comparison while the COMPARED answer is blank, and still throws for an unresolvable one (M134)', function (): void {
+    $rules = makeStructuredRuleEvaluator();
+    $map = ['fa' => 'a', 'fb' => 'b'];
+    $greater = makeValidationRow(['id' => 'r', 'form_field_id' => 'fa', 'related_form_field_id' => 'fb', 'rule_type' => ValidationRuleType::GreaterThanField]);
+    $less = makeValidationRow(['id' => 'r', 'form_field_id' => 'fa', 'related_form_field_id' => 'fb', 'rule_type' => ValidationRuleType::LessThanField]);
+
+    // Absent, null, '' and [] are all blank — the owner's answer is not judged until there is something to compare.
+    foreach ([[], ['b' => null], ['b' => ''], ['b' => []]] as $other) {
+        expect($rules->passesConstraint($greater, 'a', 5, new EvaluationContext(['a' => 5, ...$other]), $map))->toBeTrue()
+            ->and($rules->passesConstraint($less, 'a', 5, new EvaluationContext(['a' => 5, ...$other]), $map))->toBeTrue();
+    }
+
+    // A compared answer that is present but not a number still fails, as before: only BLANK passes.
+    expect($rules->passesConstraint($greater, 'a', 5, new EvaluationContext(['a' => 5, 'b' => 'abc']), $map))->toBeFalse();
+
+    // An unresolvable compared key is a broken rule, never a blank answer.
+    $dangling = makeValidationRow(['id' => 'r', 'form_field_id' => 'fa', 'related_form_field_id' => 'gone', 'rule_type' => ValidationRuleType::GreaterThanField]);
+    expect(fn () => $rules->passesConstraint($dangling, 'a', 5, new EvaluationContext(['a' => 5]), $map))
+        ->toThrow(ExpressionEvaluationException::class);
 });
 
 it('evaluates a free-text constraint expression with the field answer as self', function (): void {

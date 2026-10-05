@@ -59,8 +59,8 @@ final class StructuredRuleEvaluator
         }
 
         return match ($row->rule_type) {
-            ValidationRuleType::GreaterThanField, ValidationRuleType::LessThanField => Coercion::toBool(
-                $this->evaluator->evaluateNode($this->lowering->lower($row, $fieldKeysById), $context),
+            ValidationRuleType::GreaterThanField, ValidationRuleType::LessThanField => $this->passesFieldComparison(
+                $row, $context, $fieldKeysById,
             ),
             ValidationRuleType::MinValue => Coercion::isEmpty($answer)
                 || (Coercion::isNumericLike($answer) && Coercion::toNumber($answer) >= Coercion::toNumber($this->ruleValue($row))),
@@ -170,5 +170,30 @@ final class StructuredRuleEvaluator
     private function groupConnective(?LogicOperator $operator, string $rowId): LogicOperator
     {
         return $operator ?? throw ExpressionEvaluationException::malformedLogicGroup($rowId);
+    }
+
+    /**
+     * `greater_than_field` / `less_than_field` PASS while the COMPARED answer is blank (Increment M134,
+     * `R-6202e694`) — as every other constraint here passes an empty answer. Until the other question is
+     * answered there is nothing to compare against, and the lowered `${owner} > ${related}` read `''` as NaN,
+     * so it refused every answer to the owner. The owner's own emptiness is {@see SemanticValidator}'s skip; an
+     * irrelevant compared question is pruned from the context, so it reads as blank too.
+     *
+     * ⛔ LOWERED FIRST, ON PURPOSE: an UNRESOLVABLE compared key is a broken rule, not a blank answer, and
+     * `lower()` throws `missing_related_field` for it — reading the key before lowering would swallow that
+     * throw. The pass lives here rather than in the lowering because `ConversionCensus` walks the lowering.
+     *
+     * ⚠️ APPENDED, and the arm in passesConstraint() replaced in place, because `DefaultFieldRules` and the
+     * ledger cite this file by line.
+     *
+     * @param  array<string, string>  $fieldKeysById
+     */
+    private function passesFieldComparison(FormFieldValidation $row, EvaluationContext $context, array $fieldKeysById): bool
+    {
+        $comparison = $this->lowering->lower($row, $fieldKeysById);
+        $relatedKey = $fieldKeysById[$row->related_form_field_id ?? ''] ?? null;
+
+        return ($relatedKey !== null && Coercion::isEmpty($context->get($relatedKey)))
+            || Coercion::toBool($this->evaluator->evaluateNode($comparison, $context));
     }
 }

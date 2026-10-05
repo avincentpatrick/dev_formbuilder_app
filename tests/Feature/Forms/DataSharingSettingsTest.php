@@ -194,8 +194,8 @@ it('refuses a member who cannot edit the form', function (): void {
 });
 
 it('refuses someone who may edit the form but cannot read its responses (D87), and shows them no section', function (array $permissions): void {
-    // Two shapes, because the route stacks two gates and each must refuse on its own: one member cannot open the form's
-    // overview at all; the other can, and holds every dashboard key, but not `submissions.view`.
+    // Two shapes, because the route stacks two gates and each must refuse on its own: one member may read responses but cannot open the
+    // form's overview; the other can, and holds every dashboard key, but not `submissions.view`.
     $editorOnly = memberHoldingOnly(...$permissions);
 
     $this->actingAs($editorOnly)
@@ -206,7 +206,7 @@ it('refuses someone who may edit the form but cannot read its responses (D87), a
     expect(app(FormSettingsPresenter::class)->dataSharing(Form::findOrFail($this->form->id), $editorOnly))->toBeNull();
     expect(dataSharingReload($this->form, $this->admin)->data_sharing_enabled)->toBeFalse();
 })->with([
-    'no overview' => [['forms.edit.any']],
+    'the responses, but no overview' => [['forms.edit.any', 'submissions.view']],
     'the overview, but no responses' => [['forms.edit.any', 'dashboard.form.view', 'dashboard.org.view']],
 ]);
 

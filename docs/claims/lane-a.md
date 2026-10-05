@@ -16,7 +16,68 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M135` is merged; OCR reads for real on the testing server, its catalog carries the format checks, and the staging smoke test waits on the user
+## Status: ACTIVE CLAIM — `M136`, the OCR bake-off harness: a tool that reads a folder of scans and scores the reader against a sheet of correct answers (m136-ocr-bakeoff-harness)
+
+Taken 2026-10-06. Branch `m136-ocr-bakeoff-harness`, cut from `origin/main` at `d4a1521d`, PR into `main`.
+The ninth Oct 12 increment under `D72` and the seventh under `D75`, taken under `D90` as OCR samples work, by the
+user's choice at `M135`'s close. One row:
+- **`ocr-bakeoff-harness`** (`docs/ocr-pipeline-design.md:250`, a marker) — H1d prep without the samples: run the reader
+  over a folder of scans, score it against a sheet of correct answers (fields needing correction, PRD G9), per confidence
+  threshold, so the samples due 2026-10-08 are judged in hours.
+
+It ships two artisan commands and no route, no page, no migration: a merge reaches staging (every green push to `main`
+deploys), and testers see nothing new. `staging-smoke-test` stays queued; when the user says it is finished, the marks are
+read first (https://claude.ai/artifact/2PF4Wdcp8UcNDTTveAJEWX, collection `results`). The provider comparison itself
+(`ocr-provider-bakeoff`, ADR-0010) is NOT taken: it waits on the samples.
+
+### Evidence verified
+
+Against `d4a1521d`:
+- **The marker — held.** `docs/ocr-pipeline-design.md:250` reads `state=ready tier=early-testing`; `docs/pipeline.md`
+  names it first in the early-testing Next section.
+- **G9 — held.** `docs/PRD.md:152`: "Field-level extraction requiring manual correction — < 15% of fields on a clear,
+  well-lit single-page scan". `docs/PRD.md:498` says the figure is unmeasured against real documents.
+- **"The reader" — held, and it is three classes.** `PrintedFormMatcher::match()` (layout and anchoring) over
+  `VisionDocumentParser::pages()` (provider answer to `OcrPage`) and `OcrAnswerReader::read()` (one answer per area), with
+  `GoogleVisionClient::annotate()` as the only provider call. The 90/70 tiers are `config/ocr.php`'s `confidence`.
+
+### Premise verified
+
+- ⚠️ **The matcher WITHHOLDS a value below the review threshold** (`PrintedFormMatcher::result()` nulls `value` when the
+  tier is `manual`), so the harness cannot sweep thresholds over the matcher's output as it stands; it needs the value
+  un-withheld. A `thresholds` argument on `match()` gives it that, and the tier rule moves into one public function so the
+  sweep and the matcher cannot disagree.
+- ⚠️ **This laptop's Vision key still has billing off** (`M135`), and only the testing server's key reads. **Where the
+  sample form lives is unknown** — the user may print from staging, whose versions this database does not hold. So the
+  harness is split: a layout export that runs where the form lives, and a bake-off that needs no database at all.
+- **The layout half is pure — measured, not assumed.** `BlankFormPrintPresenter::present()`, `SchemaValueFormatter` and
+  `CapabilityFlags::isOcrCompatible()` hold no query. A probe (`storage/app/m136/transient-probe.php`, gitignored) built
+  an UNSAVED `Form` and `FormVersion` from the local `acme` workspace's "Field Visit Referral" v2, typeset a page with
+  the test typesetter and ran `present()`, `match()` and `resolveVersion()`: **0 queries**, the version resolved `by
+  stamp`.
+- **Host PHP runs artisan** (Laravel 13.30.1 on PHP 8.4.14, with `fileinfo`, `gd`, `curl`), so the bake-off reads a
+  folder anywhere on this PC; the app container cannot see a folder outside the repo.
+- **`openspout` is already a dependency** (`XlsformWorkbookReader`), so the answer sheet may be `.xlsx` or `.csv` — the
+  user was asked for "a simple spreadsheet" (the Oct 12 plan, step 2).
+- **ADR `0010` stays reserved** for H1d. This increment writes no ADR.
+
+### Remedy verdict
+
+None prescribed beyond the title. The design's one load-bearing assumption — that the matcher runs on unsaved models
+with no database — is measured above: works.
+
+Files: `app/Services/Ocr/PrintedFormMatcher.php`, `app/Console/Commands/OcrBakeoffLayoutCommand.php` (new),
+`app/Console/Commands/OcrBakeoffCommand.php` (new), `app/Services/Ocr/Bakeoff/*` (new), `tests/Feature/Ocr/Bakeoff/*`
+(new), `tests/Unit/Ocr/OcrBakeoffScorerTest.php` (new), `tests/Feature/Ocr/PrintedFormMatcherTest.php`,
+`docs/ocr-pipeline-design.md`, and the close-out artefacts.
+Shared artefacts taken: `docs/ocr-pipeline-design.md`, `PROGRESS.md` (own block), `docs/pipeline.md`,
+`docs/backlog-triage.md`, `docs/gate-baselines.md`.
+Paired files taken: none (no gate reads `app/Console/Commands` or `app/Services/Ocr`).
+Namespaces spent: nothing from either namespace — no migration, no ADR, no decision.
+Prediction: CI 6/6 on the first run, because the diff is PHP only and every new file is under test. ⚠️ **Most expected
+WRONG:** PHPStan on the new commands — openspout's cell values and `json_decode` output are `mixed`, and level 8 has
+caught every new file that parses outside data so far. Second: a Pest case that writes a temp folder and passes on this
+host's paths but not on CI's Linux paths.
 
 ## RELEASED — `M135`, the Oct 11 slot: OCR reads for real on the testing server and its catalog is re-seeded; the smoke test is queued (merged as PR #328, `5517ee95`, 6/6 green with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

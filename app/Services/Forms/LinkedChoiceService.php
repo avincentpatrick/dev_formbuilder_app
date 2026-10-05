@@ -123,12 +123,7 @@ final class LinkedChoiceService
             return [];
         }
 
-        $chosen = $source->data_sharing_field_keys;
-
-        return ShareableQuestions::sharedKeys(
-            $this->publishedSnapshot($source),
-            is_array($chosen) ? array_values(array_map('strval', $chosen)) : null,
-        );
+        return ShareableQuestions::sharedKeys($this->publishedSnapshot($source), $source->dataSharingFieldKeys());
     }
 
     /**

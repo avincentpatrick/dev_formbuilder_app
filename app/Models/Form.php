@@ -161,6 +161,22 @@ class Form extends Model implements TenantScoped
         'data_sharing_enabled' => false,
     ];
 
+    /**
+     * M133: the questions this form shares — null for every shareable one, never `[]` (the column's CHECK). Read
+     * through here rather than off the property: static analysis types the column from its migration (`jsonb` as a
+     * string) and not from the `array` cast, so a caller testing `is_array()` on the property reads as dead code.
+     *
+     * @return list<string>|null
+     */
+    public function dataSharingFieldKeys(): ?array
+    {
+        $keys = $this->getAttribute('data_sharing_field_keys');
+
+        return is_array($keys)
+            ? array_values(array_map(static fn (mixed $key): string => is_scalar($key) ? (string) $key : '', $keys))
+            : null;
+    }
+
     /** @return HasMany<FormVersion, $this> */
     public function versions(): HasMany
     {

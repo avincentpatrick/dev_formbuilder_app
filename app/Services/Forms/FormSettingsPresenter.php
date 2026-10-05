@@ -201,8 +201,6 @@ final class FormSettingsPresenter
             : FormVersion::query()->whereKey($form->current_published_version_id)->value('schema_snapshot');
         $snapshot = is_array($snapshot) ? $snapshot : null;
 
-        $chosen = $form->data_sharing_field_keys;
-
         $linking = Form::query()
             ->whereKeyNot($form->id)
             ->whereIn('current_published_version_id', FormField::query()
@@ -216,7 +214,7 @@ final class FormSettingsPresenter
 
         return [
             'enabled' => $form->data_sharing_enabled === true,
-            'field_keys' => is_array($chosen) ? array_values(array_map('strval', $chosen)) : null,
+            'field_keys' => $form->dataSharingFieldKeys(),
             'published' => $snapshot !== null,
             'questions' => array_map(
                 static fn (array $q): array => ['key' => $q['key'], 'label' => $q['label']],

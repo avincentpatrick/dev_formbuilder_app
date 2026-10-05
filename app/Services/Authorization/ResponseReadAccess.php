@@ -33,7 +33,11 @@ use Spatie\Permission\PermissionRegistrar;
  * ⚠️ TWO PIECES OF CONTEXT THE GATE DOES NOT SUPPLY FOR A PERSON WHO IS NOT THE ACTOR:
  *   - **membership.** A removed or suspended member can still carry a role (`NotificationRecipientResolver`
  *     records the same gap), and `forms.owner_user_id` outlives the owner's membership. So an ACTIVE `tenant_users`
- *     row is required first — RLS scopes that read to the current workspace;
+ *     row is required first — RLS scopes that read to the current workspace. ⚠️ HONESTY NOTE, measured in M133: a
+ *     mutation that drops this check stays GREEN, because row security on `users` (`users_users_visibility`) already
+ *     hides anyone who is not an active member of the current workspace, so `ownerCanRead()` finds no owner to ask
+ *     about on either path, authenticated or guest. It is kept as defence in depth, for a caller that hands this
+ *     class a `User` it loaded some other way;
  *   - **the permissions team.** Spatie resolves roles against the team id `EstablishTenantDatabaseContext` sets,
  *     and the guest middleware sets none: in a guest request every role lookup would answer from no roles, and an
  *     owner who CAN read would read as one who cannot. The team id is set from the tenant context when it is

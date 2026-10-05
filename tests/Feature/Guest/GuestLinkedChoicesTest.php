@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 use App\Enums\FieldType;
 use App\Enums\SubmissionStatus;
+use App\Enums\TenantUserStatus;
 use App\Models\Form;
 use App\Models\FormVersion;
 use App\Models\Submission;
 use App\Models\Tenant;
+use App\Models\TenantUser;
 use App\Models\User;
 use App\Services\Forms\FormService;
 use App\Services\Forms\LinkedChoiceService;
@@ -162,6 +164,31 @@ it('empties the list when the source stops sharing, stops sharing that question,
     enterTenant($this->tenant->id, $this->owner->id);
     $this->owner->syncRoles([]);
     app(PermissionRegistrar::class)->forgetCachedPermissions();
+    expect($this->getJson(linkedGuestUrl($this->destination))->json('data.lists.facility'))
+        ->toMatchArray(['available' => false, 'options' => []]);
+});
+
+it('reads the owner\'s roles in a guest request, which starts with no permissions team', function (): void {
+    // ⚠️ IN A FEATURE TEST THE REQUEST SHARES THIS PROCESS, so the team id `enterTenant()` set would leak into it and
+    // hide the production path: a guest request is a fresh process, and only `EstablishTenantDatabaseContext` (never on
+    // the guest group) sets a team. Cleared here, as production has it; without `ResponseReadAccess` setting one, every
+    // role lookup answers from no roles and an owner who can read reads as one who cannot.
+    linkedGuestResponse($this->source, ['facility_name' => 'San Jose RHU']);
+    app(PermissionRegistrar::class)->setPermissionsTeamId(null);
+
+    expect($this->getJson(linkedGuestUrl($this->destination))->json('data.lists.facility'))
+        ->toMatchArray(['available' => true, 'options' => [['value' => 'San Jose RHU', 'label' => 'San Jose RHU']]]);
+});
+
+it('stops serving once the owner is no longer an active member, though their role remains', function (): void {
+    // A guest request has no acting user, so the `users` row-security join that hides a non-active co-member from an
+    // AUTHOR does not apply here: the active-membership check is what refuses.
+    linkedGuestResponse($this->source, ['facility_name' => 'San Jose RHU']);
+    expect($this->getJson(linkedGuestUrl($this->destination))->json('data.lists.facility.available'))->toBeTrue();
+
+    enterTenant($this->tenant->id, $this->owner->id);
+    TenantUser::query()->where('user_id', $this->owner->id)->update(['status' => TenantUserStatus::Suspended]);
+
     expect($this->getJson(linkedGuestUrl($this->destination))->json('data.lists.facility'))
         ->toMatchArray(['available' => false, 'options' => []]);
 });

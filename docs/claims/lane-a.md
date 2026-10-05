@@ -16,133 +16,92 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M134`, the Oct 10 slot: the six remaining `early-testing` builder rows — date ordering, constant conditions, the condition editor's operators, a blank compared answer, the undo of a formula default, and the staff entry page's browser checks (`m134-builder-rows`)
+## Status: NO ACTIVE CLAIM — `M134` is merged; dates and times order, the condition editor offers only what holds, a blank compared answer passes, a formula default survives undo, and the staff entry page leaves its checks to the engines
 
-Taken 2026-10-05. Branch `m134-builder-rows`, cut from `origin/main` at `5746a482`, PR into `main`.
-The seventh Oct 12 increment under `D72` and the fifth under `D75`: six rows, each in its own commits, in this order, so a
-red run bisects to one row — (1) `R-6202e694`, (2) `R-62b638e1` (engines, then the gate), (3) `R-87160c81` (`ValueShape`,
-then the expression arm), (4) `R-910d2286` (server, then the editor), (5) `R-6d7b9ff7`, (6) `R-b21da9f3` (`novalidate`,
-the whole-number check, the template and library defaults, the encode spec). Row 4 follows 2 and 3 so the editor never
-offers what they refuse.
-- **`R-6202e694`** (`docs/feature-backlog.md:12628`) — a field comparison against a blank question refuses every answer.
-- **`R-62b638e1`** (`:12611`) — dates and times cannot be ordered, so ODK's common date checks cannot publish (`D71`).
-- **`R-87160c81`** (`:12480`) — a condition can be constant while every operator suits the compared kind (its headline).
-- **`R-910d2286`** (`:12620`) — the condition editor offers orderings publish refuses.
-- **`R-6d7b9ff7`** (`:12647`) — undoing a conversion to a note brings an expression default back as text.
-- **`R-b21da9f3`** (`:12048`) — the encode page enforces native browser validation the guest runtime does not.
+## RELEASED — `M134`, the Oct 10 slot: the six remaining `early-testing` builder rows (merged as PR #327, `57e745f2`, 6/6 green with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 
-The OCR provider comparison is NOT taken: its samples are due 2026-10-08 and no folder has been sent. `R-551873af` is
-blocked (latent). `D88` and `D89` were answered by the user in chat on 2026-10-05, each the recommendation. Also in this
-push: nine rows filed (below).
+Shipped 2026-10-05. Branch `m134-builder-rows`, cut from `origin/main` at `5746a482`. The claim commit is `547e9ed3`; no
+claim extension was needed.
 
-### Evidence verified
+**The seventh Oct 12 increment under `D72`, the fifth under `D75`** — six rows, each in its own commits, in the stated
+order: row 1 `81584fe6`; row 2 `05818d40` (engines) and `385801a5` (gate); row 3 `af24a003` (`ValueShape`) and
+`f9e50119` (expression arm); row 4 `fc95a9f3` (server) and `2bf77692` (editor); row 5 `abb6bcfa`; row 6 `8358c635`
+(`novalidate`), `36aaded0` (whole number), `b5b4d906` (templates and library) and `fac29a46` (encode spec); then
+`d3eac6e1`, the line and census regenerated after the ledger's in-place amendments. CI went 6/6 on its FIRST run.
+- **Closed:** `R-6202e694`, `R-62b638e1`, `R-87160c81`, `R-910d2286`, `R-6d7b9ff7`, `R-b21da9f3`. `R-af395416` amended in
+  place: its engine half shipped, its structured half stays open.
+- **Filed:** nine rows in the claim push (a workspace time zone, the XLSForm export of a field comparison, `contains` on a
+  single choice, a note compared with a value, a date/time conversion with no census warning, the `NUMERIC_RE` newline
+  divergence, a formula default shown as text, `today()` not writable in condition rows, API dates stored unchecked),
+  and one at close-out: the testing server's catalog seeders must be re-run (`early-testing`, the Oct 11 step).
+- **Decisions:** `D88` (no backfill; templates and the library carry the check) and `D89` (ordering against `now()` stays
+  refused), answered in chat at claim time, each the recommendation.
+- **Not taken:** the OCR provider comparison — its samples are due 2026-10-08 and had not arrived.
+- **Namespaces spent:** `D88`, `D89`. No migration, no ADR (`0010` stays reserved).
+- **Claimed and not needed:** `FieldInput.vue` and `GeoInput.vue` (a `step="any"` would need a design-system edit —
+  `NumberInput`'s `step` is typed `number` — and `novalidate` alone ends the false refusals, because the component marks
+  invalidity by class, not `:invalid`); `ExpressionEvaluatorTest.php`, `engine.test.ts` and `SemanticValidatorTest.php`
+  (the golden vectors and the new unit files carry those cases).
+- **Tracker:** no surgery owed.
 
-Against `5746a482`, opened by hand or by a read-only mapper and re-opened where the design turns on it:
-- **`R-6202e694` — held.** `StructuredRuleEvaluator.php:62-64` and `structured-rule-evaluator.ts:71-73` evaluate the
-  lowered `${owner} > ${related}` with no check on the compared answer; `numericCompare()` (`ExpressionEvaluator.php:152-153`)
-  returns false on NaN, and only the owner's emptiness is skipped (`SemanticValidator` `collectFieldErrors()`). No
-  validation vector pins a blank compared answer (`constraints.json` has `field_vs_field_pass`/`_fail` only).
-- **`R-62b638e1` — held.** Ordering is numeric-only in both engines; `today()` returns `'YYYY-MM-DD'` and `now()` the
-  injected clock, which both engines stamp in UTC (`isoClock()`, `SemanticValidator::validate()`). Publish refuses a
-  temporal ordering as `expression_orders_date` (`ExpressionValidationGate::numberNeverHeldBy()`).
-- **`R-87160c81` — held, with the cause `M126` corrected.** `ValueShape::allowsOperator()` allows `eq`/`neq`/`is_null`
-  on every shape but `NoAnswer`, and `equals()` rule 3 makes an array on either side false (`ExpressionEvaluator.php:197-200`,
-  `evaluator.ts:162-165`). ⚠️ **Understated:** the same constant lives in EXPRESSIONS — `${hobbies} = 'reading'` is
-  classified a `list` use by `ExpressionKeyUse::comparisonUse()` and refused by nothing, and the condition editor offers
-  "is" on a multi-select. Taken here as the row's expression half.
-- **`R-910d2286` — held.** `ConditionRow.vue:191-210` offers every comparator for every subject; `retype()` forces a
-  number literal under any ordering. The editor's `numeric` flag is `ConfigPanel.vue`'s `NUMERIC_TYPES` (four types, no
-  duration) and is pinned by `FieldTypeMirrorDriftTest` as a declared divergence, so it is not reused.
-- **`R-6d7b9ff7` — held.** `default_value_is_expression` is in no `BuilderPresenter::field()` key, no `UpdateFieldRequest`
-  rule, no `ServerField` member and no `fieldPayload()`; undo's lossy branch re-PATCHes the snapshot (`restoreSnapshot()`).
-- **`R-b21da9f3` — held, two citations moved:** the encode `<form>` is `Encode.vue:1348` (not `:1191`), the step form's
-  `novalidate` is `StepView.vue:217` (not `:203`); the `GeoInput` ranges and `responsive-axe.spec.ts:375-434` hold.
-  Vitest runs happy-dom, not jsdom; the point stands — no test submits through constraint validation.
+### What an author, a respondent and a keyer see now
+- **Dates and times order.** `. <= today()`, `${end} >= ${start}` and `${opens} > '09:00'` publish and hold, in the
+  browser and on the server alike. Publish refuses, by name, a date or time ordered against a number, against text that
+  is not an ISO date, or a time against a date; arithmetic on a date and any ordering against `now()` stay "not
+  supported yet" (`D89`).
+- **Nothing equals a list.** "Hobbies is Reading" is refused at publish — in a rule and in an expression — with
+  `selected()` and the blank test offered instead.
+- **The condition editor** offers only what holds: no ordering on a yes/no, a list or a file; no "is" on a list or a
+  file; never a note as a subject; a date compared only with dates, typed in a date picker. A saved condition it would not
+  offer is shown, disabled, as it is.
+- **A comparison against a blank question** no longer refuses every answer to the question that owns it.
+- **Undo** after converting a question with an imported `today()` default to a note brings it back as a formula.
+- **The staff entry page** accepts a decimal and a captured altitude it used to block; a whole number refuses 2.5 in words
+  on every page; template and library email, web-address and phone questions check their format.
 
-### Premise verified
+### How the prediction fared
 
-- **`R-6202e694`:** the lowering is walked by `ConversionCensus::lowered()`, so the pass belongs in the evaluators, as
-  the row says. The `missing_related_field` throw is pinned in three places and must survive — an UNRESOLVABLE compared
-  key is not blank.
-- **`R-62b638e1`:** a date-time answer is the native `datetime-local` value, wall-clock with NO offset, while `now()` is
-  UTC with `+00:00` — so ordering against `now()` cannot be right without a time zone: **`D89`**. Every existing
-  ordering vector has a number, an absent value or a non-temporal string on one side, so a temporal path reached only
-  from the NaN branch changes none of them. `R-af395416`'s rule holds: `Coercion` is not widened.
-- **`R-87160c81`:** splitting the shape moves one conversion warning — a queryable multi-select converted to a single
-  choice now warns `IndexedTypeMayNotSuit` (the queryable checkbox is not gated by type). No seeder, template, E2E spec or
-  golden vector equals a list question against a value; the seeded multi-selects use `selected()`.
-- **`R-910d2286`:** the never-numeric set is private to the gate today; nothing transmits it. `today()` cannot be authored
-  through condition rows (`condition-model.ts` `operandOf()` takes a field or a literal), so it stays a text edit.
-- **`R-6d7b9ff7`:** no author UI sets the flag; it arrives only by XLSForm import (`calculation` on a non-calculated row)
-  and is carried by publish, restore, templates and duplication. ⚠️ **Understated:** `writeField()` never resets it, so an
-  author who types over an imported `today()` keeps a field flagged as a formula. A create response would carry `null`
-  for the flag unless the model declares it (`M125`'s defect, same mechanism).
-- **`R-b21da9f3` — the premise moved in three places.** (a) **The server DOES refuse an out-of-range geo point**
-  (`geo_out_of_range`, both engines); the row says nothing replaces it. (b) **The encode page refuses VALID answers
-  today:** a decimal's number input has no `step`, so the browser's default step of 1 blocks 2.5, and a captured
-  altitude carries six decimals against `step=0.1`. (c) **Email and web-address fields still arrive without the default
-  pattern today**, not only from before `M112`: the platform templates and the field library's "Email address" carry no
-  validation rows. `required` is NOT a fifth family (`MdsFormField` never passes it to the input). Published versions
-  cannot be backfilled at all (the immutability trigger) — **`D88`: no backfill.**
+| Predicted | Actual |
+|---|---|
+| The golden corpora change only by additions, and `ConversionCensusTest` stays green unedited | **Right on both.** No existing vector moved (numeric-like and ISO strings are disjoint), and the walker's split flags left the census's three reads byte-identical. |
+| Most likely red first: the ledger's citation tier (17/17) and the hand-built Vitest fixtures when the new members became required | **Neither went red.** Every edit to a cited file was line-neutral or re-pointed in place (17/17 throughout), and the editor's rows were made optional with "no row filters nothing", so hand-built fixtures pass unchanged. What did go red first: `vue-tsc` (`literal_input: string` against `MdsTextInput`'s type union) and host PHPStan (an unreachable `NoAnswer` arm in the nested equality match). |
+| ⚠️ Most likely WRONG: CI's static analysis goes green first time | **Wrong in the good direction.** CI went 6/6 on its first run; host PHPStan before every commit caught its one finding earlier. |
+| The encode spec's two refusal cases are red without `novalidate` | **Half wrong.** Rebuilt without the attribute, only the point case went red (3 of 3 viewports); the whole-number case stayed green, because the browser engine shows a touched question's error before any submit. The spec's header now says what each case proves. |
 
-### Remedy verdict
+### Mutations: every new gate red first
+Every red set was written down before its run. **Pest: 30 mutants, all caught; Vitest: 13, all caught.** Exact except:
+`r1m2` (blank checked before lowering) reddened five `ExpressionRefusalTest` cases where one or two were predicted;
+`r3m3` four where "three, maybe up to two more" was written; `r4v1` four where two were predicted (the re-point and
+operator-list cases see it too); `g9` 29, the predicted 27 plus the two cases added after the prediction. **Writing the
+mutation set exposed one gap before any run:** no case ordered a date against a NUMBER QUESTION, so `g5` would have
+survived — the case was added first. Red-first measured separately for the editor (7 of 7 against the old components),
+row 5 (8 Pest against the old server, 3 Vitest against the old store and panel) and the seed census (2).
 
-- **`R-6202e694` — works.** A `passesFieldComparison()` helper appended to both classes, called from the arm in place.
-- **`R-62b638e1` — works, scoped by `D89`.** New `Temporal` (PHP) and `temporal.ts`: a strict ISO parse (calendar-valid,
-  `\A…\z` in PHP), integer keys, reached only from `numericCompare()`'s NaN branch. Date~date, time~time, naive
-  datetimes, date~naive datetime at midnight, zoned~zoned; naive~zoned and time~other are false. Equality unchanged. The
-  gate lifts the date arm for ORDERING only, judging each pair through `ExpressionKeyUse` (one walker) and a new
-  `OperandKind` enum: `now()`, arithmetic and `int()` stay "not supported yet"; a kind mismatch is refused by name.
-- **`R-87160c81` — works as `M126` corrected it:** split `Choice`, refuse `eq`/`neq` on the list and object shapes, keep
-  `is_null`; the validation editor and `M123`'s arm follow. Plus the expression arm (`expression_equals_list`).
-- **`R-910d2286` — works, transmitted:** `operand_kind` per palette type and `operand_kinds` capabilities from
-  `BuilderPresenter`, one server source (`OperandKind`), a census, and a test that every offer publishes.
-- **`R-6d7b9ff7` — works:** the flag joins the round trip (presenter, request, writer, payload, model default), and an
-  edit of the default box clears it.
-- **`R-b21da9f3` — works with the audit done:** `novalidate`; `step="any"` for decimals and altitude; a whole-number
-  check for `integer` in both engines' Stage 3 (as geo's range is), since nothing checks it server-side today; the
-  default checks on template and library email fields; the first encode functional spec.
+### ✅ Seen in a real browser (`.playwright/m134-probe/`)
+A form whose date carries `. <= today()` and whose follow-up is shown when `${visit} <= today()` PUBLISHED through the
+real gate. On the guest page, tomorrow hid the follow-up and today showed it and submitted. In the builder, a note was not
+offered as a subject, a date was offered no "includes", the value box was a date picker, the condition saved as "Shown
+when Visit date is more than “2026-01-01”.", and a list was offered only the blank and membership tests. Converting the
+`today()`-default question to a note and pressing Undo left it `short_text`, `today()`, `default_value_is_expression = true`
+in the database. The probe form was removed after.
 
-Files:
-- **1:** `app/Services/Validation/StructuredRuleEvaluator.php`, `resources/public-runtime/engine/structured-rule-evaluator.ts`,
-  `tests/Unit/Validation/StructuredRuleEvaluatorTest.php`, `resources/public-runtime/engine/__tests__/engine.test.ts`.
-- **2:** new `app/Services/Expressions/Temporal.php`, `resources/public-runtime/engine/temporal.ts`,
-  `tests/Unit/Expressions/TemporalTest.php`, `resources/public-runtime/engine/__tests__/temporal.test.ts`,
-  `app/Enums/OperandKind.php`, `app/Services/Forms/ExpressionOperandJudge.php`, `tests/Unit/Forms/OperandKindTest.php`,
-  `tests/Unit/Forms/ExpressionKeyUseTest.php`; `app/Services/Expressions/ExpressionEvaluator.php`,
-  `resources/public-runtime/engine/evaluator.ts`, `app/Services/Forms/ExpressionKeyUse.php`,
-  `app/Services/Forms/ExpressionValidationGate.php`, `app/Exceptions/Forms/PublishValidationException.php`,
-  `tests/Feature/Forms/ExpressionValidationGateTest.php`, `tests/Unit/Expressions/ExpressionEvaluatorTest.php`,
-  `resources/public-runtime/__tests__/clock.test.ts`.
-- **3:** `app/Enums/ValueShape.php`, `app/Services/Forms/ConversionCensus.php` (docblock), `app/Services/Forms/BuilderPresenter.php`
-  (docblocks), `tests/Unit/Forms/ValueShapeTest.php`, `tests/Feature/Forms/BuilderEnumsPayloadTest.php`,
-  `tests/Feature/Forms/StructuralValidationGateTest.php`, `tests/Unit/Forms/FieldTypeConversionTest.php`.
-- **4:** `app/Services/Forms/BuilderPresenter.php`, new `tests/Feature/Forms/ConditionOffersPublishTest.php`,
-  `resources/js/components/builder/types.ts`, `builder-store-fixtures.ts`, `ConfigPanel.vue`, `ConfigPanel.test.ts`,
-  new `condition-operands.ts` + `condition-operands.test.ts`, `ConditionRow.vue`, `ConditionRows.vue`,
-  `ConditionEditor.test.ts`, `condition-describer.test.ts` (comment).
-- **5:** `app/Models/FormField.php`, `app/Http/Requests/Forms/UpdateFieldRequest.php`, `app/Services/Forms/FormBuilderService.php`,
-  `resources/js/components/builder/useBuilderStore.ts`, `conversion-store.test.ts`, `tests/Feature/Forms/FieldCreateRoundTripTest.php`,
-  new `tests/Feature/Forms/FieldDefaultExpressionTest.php` (plus `BuilderPresenter.php`, `types.ts`, the fixtures and
-  `ConfigPanel.vue`, already listed).
-- **6:** `resources/js/Pages/submissions/Encode.vue`, `resources/js/components/submissions/FieldInput.vue`,
-  `resources/js/components/submissions/GeoInput.vue`, `resources/js/__tests__/native-form-submission.test.ts`,
-  `app/Services/Validation/SemanticValidator.php`, `resources/public-runtime/engine/semantic-validator.ts`,
-  `tests/Unit/Validation/SemanticValidatorTest.php`, `database/seeders/Data/PlatformTemplateBlueprints.php`,
-  `database/seeders/Data/PlatformFieldLibraryItems.php`, `tests/Feature/Forms/PlatformTemplateSeedTest.php`,
-  `tests/Feature/Forms/PlatformFieldLibrarySeedTest.php`.
-Shared artefacts taken: `docs/feature-backlog.md`, `docs/claims/decisions.md`, `docs/architecture/technical-architecture.md`
-(lines 322 and 520, in place), `docs/workflow-branching-design.md`, `tests/golden/expressions/**`, `tests/golden/validation/**`,
-new `tests/e2e/encode-validation.spec.ts`, `docs/pipeline.md`, `docs/backlog-triage.md`, `PROGRESS.md` (own block).
-Paired files taken: both expression engines and both structured-rule evaluators and semantic validators, each pair in one
-commit.
-Namespaces spent: `D88`, `D89`. No migration, no ADR (`0010` stays reserved).
-Prediction: the golden corpora stay byte-identical (only additions) and `ConversionCensusTest` stays green unedited. Most
-likely red first: the ledger's citation tier — it sits at 17 of 17, and four files with ledger anchors move
-(`ValueShape.php`, `ConfigPanel.vue`, `UpdateFieldRequest.php`, `semantic-validator.ts`) — and the hand-built Vitest
-fixtures that are not type-checked (`ConditionEditor.test.ts`, `ConfigPanel.test.ts`) when `kind`/`operand_kind` become
-required. ⚠️ Most likely WRONG: that CI's static analysis goes green first time — `M132` and `M133` both went red there,
-and two new enums and a `PREG_UNMATCHED_AS_NULL` parse are new surface; PHPStan is run on the HOST before every push.
+### ⚠️ Deviations, recorded rather than smoothed
+- **`ValueShape.php` was edited while row 2's gate mutation batch was running**, and some gate tests publish through it.
+  Every red set matched exactly, and the one re-run (`g3`) ran on a stashed-clean tree with a fresh baseline (161, as before).
+- **The TypeScript whole-number helper landed above three ledger anchors** rather than appended, so they were re-pointed in
+  place (646/793/821 → 659/806/834) instead of kept by position.
+- **Four tests failed first for my own reasons:** row 5's route test (a version token built from `updated_at`, then a
+  refresh with no tenant re-entered — `M122`'s lesson), a panel case calling a helper scoped inside another `describe`
+  (so its first red-first measurement was red for the wrong reason, re-measured after the fix), and the probe's first three
+  runs (labels end "(optional)"; a hidden logic-rail copy of the sentence).
+- **The container's full Pest run collected 40 fewer files** (the bind-mount truncation `SuiteCollectionFloorTest` names,
+  all in `tests/Feature/Forms`); that directory was run explicitly — 876 passed.
+- **E2E, run locally one spec at a time:** `encode-validation` 9, `builder-axe` (condition editor + logic view) 12,
+  `responsive-axe` (Encode + condition editor) 30, `public-runtime-axe` 75.
+- **Live forms change on deploy:** date orderings on versions published before `M126` and structured date comparisons
+  published before `M113`/`M123` now hold; a field comparison stops refusing while its compared question is blank; an
+  answer of 2.5 in a whole-number question is refused; a guest page cached by the service worker runs the old engine until
+  it reloads.
 
 ## RELEASED — `M133`, the Oct 9 slot: Connect project v1 — a choice question takes its choices from another form's answers (merged as PR #326, `5baedc97`, 6/6 green with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

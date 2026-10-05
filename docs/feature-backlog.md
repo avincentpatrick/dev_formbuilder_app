@@ -10917,7 +10917,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   — and the other three edit `docs/api-specification.md` lines 63, 73 and 75, two of those inside one markdown table
   at `:69-75`. ⛔ **`D13`'s file-overlap rule forbids grouping rows that cite the same non-hub file, while the
   citation cascade requires moving them together:** both documents are citation tier 1 with zero tolerance
-  (`scripts/citation-liveness-lint.php:77-78`, run at `.github/workflows/ci.yml:242`), and `docs/pipeline.md:50` —
+  (`scripts/citation-liveness-lint.php:77-78`, run at `.github/workflows/ci.yml:242`), and line 50 of `docs/pipeline.md` —
   itself tier 1 — cites `docs/api-specification.md:63` by line. ⚠️ `D38`'s answer (`C`, annotate in place) makes
   this far cheaper than a trim would have, because an in-place annotation shifts no line; but it does not dissolve
   the grouping question, and the next taker needs a recorded `D13` exception rather than a judgement call.
@@ -10943,7 +10943,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   live in `docs/pipeline.md`, which is GENERATED, so the repair there is `php scripts/pipeline.php` and not an edit.
   ⚠️ **And the gate the row leans on is weaker than it treats it:** `.github/workflows/ci.yml:238` states the
   citation lint *"checks that a cited line is ALIVE, never that it says what the citing sentence claims"* — so a
-  one-line shift leaves a citation green and silently wrong. ⚠️ The row's `docs/pipeline.md:50` citation had itself
+  one-line shift leaves a citation green and silently wrong. ⚠️ The row's citation of line 50 of `docs/pipeline.md` had itself
   already moved to `:48`, with a second citer at `:70` it never named; that shape is filed below.
   **The six `D38` rows are pre-cleared to be batched together under exception #1's reasoning**, which is what the row
   existed to obtain.
@@ -11191,7 +11191,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - **`minor` · `docs/pipeline.md` is cited BY LINE in at least two places, it is regenerated every increment, and the
   citation gate cannot see the rot.** Filed 2026-09-24 by `M108` while verifying `R-4346557c`, whose own citation of
-  it had already moved. That row cites `docs/pipeline.md:50`; the line is now `:48`, and a second citer it never named
+  it had already moved. That row cites line 50 of `docs/pipeline.md`; the line is now `:48`, and a second citer it never named
   sits at `:70`. The identical stale citation sits inside `D38` in `docs/claims/decisions.md`. ⛔ **NEITHER COPY CAN
   EVER GO RED.** `docs/claims/**` is excluded from `scripts/citation-liveness-lint.php`'s tier 1 by design, and the
   gate only checks that a cited line is ALIVE — `.github/workflows/ci.yml:238` says so in capitals — never that it
@@ -12045,7 +12045,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `takesOperator()` reddens only the `greater_than_field` case (proving the arm is the six, not the four),
   and swapping `governsRequiredness()` for "owns any validation row" reddens only the `skip_if`-only case.
 
-- **`minor` · The encode page still enforces four families of native browser validation the guest runtime does
+- ✅ **CLOSED BY `M134` (2026-10-05) — **`minor` · The encode page still enforces four families of native browser validation the guest runtime does
   not, and nothing in the repository can turn that difference red.** Filed 2026-09-27 by `M115`, split out of
   `R-e878d49a` on the user's decision when the blast radius measured wider than that row's framing. `Encode.vue:1191`
   has no `novalidate` while `PageView.vue:144` and `StepView.vue:203` do, so one form rejects an answer from a
@@ -12061,7 +12061,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   Submit. So this row owes three things before a line changes: an audit of what the SERVER re-checks for each of
   the four families, a decision on the legacy-field backfill, and the first encode functional spec that can prove
   the alignment either way. ⚠️ **The pairing direction from the original row still holds** — `novalidate` must not
-  precede the `pattern` defaults, which landed in `M112`. **Live.** Filed by `M115`. **Tier: early-testing.**
+  precede the `pattern` defaults, which landed in `M112`. **Live.** Filed by `M115`. **Tier: early-testing.** ✅ **CLOSED BY `M134` (2026-10-05) — THE STAFF ENTRY PAGE LEAVES EVERY ANSWER CHECK TO THE ENGINES.** `Encode.vue`'s form carries `novalidate`, pinned by a source scan over all three answer-entry forms. The audit: the server DID refuse an out-of-range point (the row's premise was wrong) and did NOT check a whole number, so both engines' Stage 3 now refuse 2.5 in a whole-number question (`not_a_whole_number`, six vectors); a decimal question and a captured altitude, which the browser refused there before, now save. `D88`: no backfill — the platform templates and the field library now carry `DefaultFieldRules`' checks (staging needs the two catalog seeders re-run). `tests/e2e/encode-validation.spec.ts` is the first spec to press Submit on that page; without `novalidate` its point case went red at all three viewports. ⚠️ Live forms change on deploy: an answer of 2.5 in a whole-number question is refused at submit.
 
 - **`minor` · `tsconfig.json` excludes every `*.test.ts`, so a required member added to a shared interface rots
   the Vitest fixtures silently and no gate can see it.** Found by `M115` (2026-09-27) by predicting the opposite
@@ -12477,7 +12477,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   yes/no-aware equality on both engines (with golden vectors), so `yes`/`no`/`true`/`false` compare against the boolean.
   **Live.** Filed by `M123`. **Tier: early-testing.** ✅ **CLOSED BY `M124` (2026-10-02) — AND THE ROW UNDERSTATED ITSELF IN THE DANGEROUS DIRECTION.** The browser does NOT fail the same way: its Yes/No control emits the strings `'yes'`/`'no'` and nothing converted them, so in the browser `= 'yes'` HELD while the server, holding a boolean, said it did not — a question shown and answered there had its answer PRUNED by the server at submit (silent data loss), `!= 'yes'` was constant-true on the server, nothing matched a No (`false` stringified to `''`), and a resumed draft (booleans) disagreed with a fresh one (strings) inside the browser itself. **Fixed on both sides of the wire and in both engines:** `equals()` gained rule 3b — a boolean compares by meaning, through a STRICT `Coercion::yesNoLiteral()` (`yes`/`true`/`1`, `no`/`false`/`0`, PHP-trimmed and ASCII-lowercased in both languages), so an unanswered side equals neither — and `selected()`/the internal `contains` read a boolean the same way; Stage 3 in BOTH engines reads every non-empty scalar yes/no answer through `Coercion::yesNoAnswer()`, the normalizer's own table moved out of `StructuralAnswerNormalizer`, so the browser evaluates the boolean the server stores (idempotent on the server; a form with no yes/no question takes a fast path, so every older vector is byte-identical); and `FieldInput.vue`'s Yes/No control shows a stored boolean, which fixes the blank Yes/No on resume and on the staff edit page and prevents a new one on offline conflict review. ✅ 33 expression and 21 validation golden vectors (the corpora extended deliberately, noted in `docs/architecture/technical-architecture.md`), a pipeline test that is `M123`'s probe made permanent, and unit, runtime and component tests; 14 mutations CAUGHT, eight through `scripts/mutate.php` and six in Vitest by hand, every red set exactly as written down beforehand — including two pre-existing browser cases that now reach rule 3b, because the browser's `'yes'` is read as a boolean. ⚠️ **Live forms change on deploy, without a republish:** answers the server used to prune are kept, `neq` rules stop being constant, and a submission PDF that replays relevance now shows yes-gated questions it used to drop. ⛔ **`D13` exception #3:** this row edited three hub files, allowed by the user in chat.
 
-- **`minor` · A condition can still be constant while every operator suits the compared question's kind, and publish
+- ✅ **CLOSED BY `M134` (2026-10-05) — **`minor` · A condition can still be constant while every operator suits the compared question's kind, and publish
   cannot see it.** Measured by `M123` at the code while closing `R-2c172882`, not run. `ValueShape` puts single and
   multiple choice in one Choice shape, so `equals`/`does not equal` against a multiple-choice, cascading or attachment
   answer is allowed — yet the engines compare a list with `=` as false (`ExpressionEvaluator::equals()`'s third rule), so
@@ -12485,7 +12485,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   constraint EXPRESSION is never checked against its operand's kind (`ExpressionValidationGate` checks only that keys
   resolve, so `${note} > 3` publishes clean); `greater_than_field` against a BLANK compared answer fails closed, so the
   owner cannot be answered while the other question is empty; and Grid/Geo `contains` disagrees between the engines —
-  membership in PHP, an empty string in TypeScript. **Live.** Filed by `M123`. **Tier: early-testing.** ✅ **`M126` (2026-10-02) SHIPPED THE SECOND SIBLING; THE ROW STAYS OPEN FOR ITS HEADLINE.** `ExpressionValidationGate` now refuses an expression that reads a question as a NUMBER — an ordering, arithmetic or `int()`, classified by the conversion census's own walker, moved verbatim into `ExpressionKeyUse` so both read one — when that question's answers are never numeric-like: a note, page break, yes/no or any list type (`expression_orders_non_number`), or a date, time or datetime (`expression_orders_date`, worded "not supported yet" on the user's answer to `D71`). A constraint's `.` counts as its own question. Text, hidden, calculated and single choice stay allowed, because they can hold numeric strings; grid and geo stay refused as operands outright, once. Placed at zero line shift, because this ledger and two design documents cite the gate by line. ⚠️ Prospective only: an already-published expression is untouched until the next publish. ⛔ **The headline's cause is mis-stated above:** the Choice merge is incidental — `ValueShape::allowsOperator()` allows `eq`, `neq` and `is_null` on every shape but `NoAnswer`, so equality against a cascading, attachment, grid or geo answer is allowed too. The remedy is splitting Choice and refusing equality on the list and object shapes in `ValueShape.php` (a hub), which the validation editor and `M123`'s arm then follow without further edits; a gate arm alone would recreate `R-57711a3a`'s defect. The blank-comparison and grid/geo `contains` siblings are filed below as their own rows, with the condition editor's gap and date comparison (`D71`). ✅ 56 gate cases, including a census over all 31 field types, and `ConversionCensusTest` unedited and green across the move. Five mutations CAUGHT, every red set as predicted: the call removed (27), a date treated as numeric (7), arithmetic not classified (3, one of them a census case), the constraint's `.` ignored (1), and the date code never chosen (11). A real-browser probe saw the builder's refusal banner name the question and say "not supported yet".
+  membership in PHP, an empty string in TypeScript. **Live.** Filed by `M123`. **Tier: early-testing.** ✅ **`M126` (2026-10-02) SHIPPED THE SECOND SIBLING; THE ROW STAYS OPEN FOR ITS HEADLINE.** `ExpressionValidationGate` now refuses an expression that reads a question as a NUMBER — an ordering, arithmetic or `int()`, classified by the conversion census's own walker, moved verbatim into `ExpressionKeyUse` so both read one — when that question's answers are never numeric-like: a note, page break, yes/no or any list type (`expression_orders_non_number`), or a date, time or datetime (`expression_orders_date`, worded "not supported yet" on the user's answer to `D71`). A constraint's `.` counts as its own question. Text, hidden, calculated and single choice stay allowed, because they can hold numeric strings; grid and geo stay refused as operands outright, once. Placed at zero line shift, because this ledger and two design documents cite the gate by line. ⚠️ Prospective only: an already-published expression is untouched until the next publish. ⛔ **The headline's cause is mis-stated above:** the Choice merge is incidental — `ValueShape::allowsOperator()` allows `eq`, `neq` and `is_null` on every shape but `NoAnswer`, so equality against a cascading, attachment, grid or geo answer is allowed too. The remedy is splitting Choice and refusing equality on the list and object shapes in `ValueShape.php` (a hub), which the validation editor and `M123`'s arm then follow without further edits; a gate arm alone would recreate `R-57711a3a`'s defect. The blank-comparison and grid/geo `contains` siblings are filed below as their own rows, with the condition editor's gap and date comparison (`D71`). ✅ 56 gate cases, including a census over all 31 field types, and `ConversionCensusTest` unedited and green across the move. Five mutations CAUGHT, every red set as predicted: the call removed (27), a date treated as numeric (7), arithmetic not classified (3, one of them a census case), the constraint's `.` ignored (1), and the date code never chosen (11). A real-browser probe saw the builder's refusal banner name the question and say "not supported yet". ✅ **CLOSED BY `M134` (2026-10-05) — NOTHING EQUALS A LIST, IN A RULE OR IN AN EXPRESSION.** `ValueShape` splits `MultipleChoice` out of `Choice` and refuses `eq`/`neq` on every list and object shape (multiple choice, cascade, file, grid, point) while `is_null` stays; `M123`'s arm, the transmitted operator shapes and the validation editor follow with no edit. The row's expression half, which it understated: `${hobbies} = 'reading'` is refused at publish as `expression_equals_list`, offering `selected()` and `= ''`. The wrong M112 comment is corrected. A queryable multi-select converted to a single choice now warns `IndexedTypeMayNotSuit` (measured, pinned). ✅ Six mutations caught. The single-choice `contains` substring test and a note compared with a value are filed as rows.
 
 - ✅ **CLOSED BY `M131` (2026-10-04) — **`minor` · The validation editor still offers conditions that publish now refuses.** Measured by `M123` at the code
   while closing `R-2c172882`. Re-pointing a rule at another question keeps the old operator — `ValidationEditor.vue`
@@ -12608,24 +12608,24 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   and was red on all five before the fix. ⚠️ `M125`'s label seed is what surfaced it: seeding "Text" saves a new field
   with no user action, so without this fix every Text or Number add would have shown a save error at once.
 
-- **`minor` · Dates and times cannot be compared with "more than" or "less than", so ODK's common date checks cannot
+- ✅ **CLOSED BY `M134` (2026-10-05) — **`minor` · Dates and times cannot be compared with "more than" or "less than", so ODK's common date checks cannot
   be published.** Queued on the user's answer to `D71` (refuse now, build soon). Ordering is numeric-only in
   both engines (`ExpressionEvaluator::numericCompare()` and its TypeScript twin), so `${dob} <= today()` and
   `. >= ${start_date}` never hold. Since `M126`, publish refuses them (`expression_orders_date`) rather than letting a
   constraint refuse every answer. The remedy is chronological ordering of ISO dates, times and datetimes in both engines,
   with golden vectors and the corpus note in `docs/architecture/technical-architecture.md` (a hub, which today records
   the ordering as deferred), and then lifting the gate's date arm. ⚠️ It changes the pinned "a non-numeric operand is
-  false" contract, and live forms change on deploy. **Live.** Filed by `M126`. **Tier: early-testing.**
+  false" contract, and live forms change on deploy. **Live.** Filed by `M126`. **Tier: early-testing.** ✅ **CLOSED BY `M134` (2026-10-05) — DATES AND TIMES ORDER CHRONOLOGICALLY IN BOTH ENGINES, AND PUBLISH JUDGES THE PAIR.** `Temporal` (PHP) and `engine/temporal.ts`: a strict ISO parse (calendar-valid, years 0001–9999, `\A…\z` in PHP) into integer keys, reached only from `numericCompare()`'s NaN branch, so `Coercion` is untouched and no existing vector changed. A date orders with a date and a naive date-time (a date is its midnight), a time with a time, zoned with zoned; naive against zoned never holds (`D89`), so no answer orders against `now()`. Equality is untouched. The gate's date arm is lifted for ORDERING: `ExpressionKeyUse` (the one walker) records the other side of each ordering, `OperandKind` is the one server source, and `ExpressionOperandJudge` refuses arithmetic/`int()` and `now()` as "not supported yet" (`expression_orders_date`) and any kind mismatch by name (`expression_orders_temporal_mismatch`). ✅ 37 expression + 9 validation vectors (22 red first, exact); 17 mutations caught, all exact or explained. `R-af395416` amended: its engine half shipped here, its structured half stays open. ⚠️ Live forms change on deploy (date orderings on versions published before `M126`, and structured date comparisons published before `M113`/`M123`, now hold).
 
-- **`minor` · The condition editor offers "is more than" and "is less than" on questions whose answers are never
+- ✅ **CLOSED BY `M134` (2026-10-05) — **`minor` · The condition editor offers "is more than" and "is less than" on questions whose answers are never
   numbers, and publish now refuses what it builds.** Measured by `M126`. `ConditionRow.vue` offers the ordering
   operators for every question, and its question list includes notes, dates, yes/no and multi-selects; since `M126`
   `ExpressionValidationGate` refuses the expression that results. The editor's own `numeric` flag cannot be reused as it
   stands: `ConfigPanel.vue` builds it from four types and leaves out duration, which is orderable. The remedy transmits
   the never-numeric set from the server and filters the operators by it — a hub edit to `ConfigPanel.vue`. The same class
-  as `R-57711a3a`, on the other editor. **Live.** Filed by `M126`. **Tier: early-testing.**
+  as `R-57711a3a`, on the other editor. **Live.** Filed by `M126`. **Tier: early-testing.** ✅ **CLOSED BY `M134` (2026-10-05) — THE CONDITION EDITOR OFFERS ONLY WHAT HOLDS AND PUBLISHES.** `BuilderPresenter` transmits `operand_kind` per palette entry and `operand_kinds` capability rows from `OperandKind`; `condition-operands.ts` filters `ConditionRow`'s operators, subjects and compared questions by them — no ordering on a yes/no, a list or a file, no "is" on a list or a file, never a note as a subject, a date only against dates in a date picker (and a typed date is no longer turned into a number) — with a saved choice it would not offer shown disabled, a re-pointed subject dropping an operator it cannot take, and a new condition starting on the first question that takes a value. A catalogue with no kinds filters nothing. `ConditionOffersPublishTest` runs every offer through the real gate. ✅ Seven rendered cases red first against the old components (exact); seven mutations caught. `today()` in condition rows is filed.
 
-- **`minor` · A field comparison against a question left blank refuses every answer to the question that owns it.**
+- ✅ **CLOSED BY `M134` (2026-10-05) — **`minor` · A field comparison against a question left blank refuses every answer to the question that owns it.**
   Measured by `M126` while verifying `R-87160c81`, which carried it as a sibling. `greater_than_field` and
   `less_than_field` lower to `${owner} > ${related}`, and both evaluators' field-comparison arms run it with no check on
   the compared answer — so while the other question is blank, `toNumber('')` is NaN, the comparison is false, and every
@@ -12634,7 +12634,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   answer. The remedy is an emptiness pass for the compared answer in both arms (not in the lowering, which the
   conversion census walks), with a validation golden vector — so it carries the corpus note in
   `docs/architecture/technical-architecture.md`, a hub. ⚠️ Live forms change on deploy. **Live.** Filed by `M126`.
-  **Tier: early-testing.**
+  **Tier: early-testing.** ✅ **CLOSED BY `M134` (2026-10-05) — A FIELD COMPARISON PASSES WHILE THE COMPARED QUESTION IS BLANK, IN BOTH ENGINES.** `greater_than_field`/`less_than_field` now go through a `passesFieldComparison()` helper appended to `StructuredRuleEvaluator` and its TypeScript twin (the arm replaced in place, line-neutral): it LOWERS FIRST, so an unresolvable compared key still throws `missing_related_field`, then passes when the compared answer is blank — absent, null, `''`, `[]`, or pruned as irrelevant — and otherwise evaluates as before. The pass is not in the lowering, which `ConversionCensus` walks. ✅ Three validation golden vectors, red first in both engines; four mutations caught (one wider than predicted: five `ExpressionRefusalTest` cases use a dangling compared key). ⚠️ Live forms change on deploy. The XLSForm export's `. > ${related}` is filed as its own row.
 
 - **`nit` · A structured "contains" on a grid or geo answer means membership in PHP and an empty-string search in
   TypeScript.** Measured by `M126` while verifying `R-87160c81`, which carried it as a sibling. PHP walks the object's
@@ -12644,12 +12644,12 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   needs golden vectors, and so the `technical-architecture.md` hub. **Latent.** Filed by `M126`.
   **Tier: during-testing.**
 
-- **`minor` · Undoing a conversion to a note brings an expression default back as literal text.** Carried in
+- ✅ **CLOSED BY `M134` (2026-10-05) — **`minor` · Undoing a conversion to a note brings an expression default back as literal text.** Carried in
   `R-86a0426d`'s prose since `M123` and split out by `M126`, which closed that row's other half. Converting to a note
   clears `default_value` and sets `default_value_is_expression` to false; the builder's undo then PATCHes the old default
   back, but `default_value_is_expression` is in no client payload, no presenter field and no request rule, so a
   `today()` default returns as the text `today()`. Reachable only through undo after converting a question with an
-  expression default to a note. **Live.** Filed by `M126`. **Tier: early-testing.**
+  expression default to a note. **Live.** Filed by `M126`. **Tier: early-testing.** ✅ **CLOSED BY `M134` (2026-10-05) — A FORMULA DEFAULT SURVIVES THE UNDO OF A CONVERSION.** `default_value_is_expression` rides the builder's row both ways: the presenter sends it, `UpdateFieldRequest` takes it (`sometimes|boolean`), `writeField()` writes it only when sent, `FormField::$attributes` defaults it, and the store's `fieldPayload()` sends it — so the undo's restoring PATCH carries `today()` with its flag. Sibling found: typing over the Default value box now clears the flag (an overwritten imported formula stayed flagged). ✅ 8 Pest + 3 Vitest red first (exact); six mutations caught. The builder showing a formula default as plain text is filed.
 
 - **`minor` · A field edit the server refuses still becomes the builder's new baseline and its undo entry, so the
   refused value is never sent again.** Found by `M128` while giving the 422 map a reader (`R-d001de0c`).
@@ -13121,3 +13121,11 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   engines' strict temporal parse reads such a value as not a date, so a condition on it does not hold. **Latent.** The
   browser's own date controls send canonical values; the API, the sync batch and an import can send anything.
   Filed by `M134`. **Tier: during-testing.**
+
+- **`minor` · The testing server's template gallery and field library still make email, web-address and phone
+  questions without a format check, until their two catalog seeders are re-run there.** Found by `M134` while closing
+  `R-b21da9f3`. `M134` gave the platform templates and the field library's items `DefaultFieldRules`' pattern rows
+  (`D88`), but a deploy does not re-run the catalog seeders — the runbook's first-boot order seeds them by class, once —
+  so staging keeps the old rows. The remedy is one supervised step on the box, beside the OCR key on Oct 11:
+  `php artisan db:seed --class=PlatformTemplateSeeder --force`, then the same for `PlatformFieldLibrarySeeder`; both
+  refresh content idempotently and keep `usage_count`. **Live.** Filed by `M134`. **Tier: early-testing.**

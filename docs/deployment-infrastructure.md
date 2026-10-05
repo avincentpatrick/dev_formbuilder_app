@@ -680,3 +680,4 @@ under-disclose at the same time.
      shifts every line beneath it, and this repository cites documents as `path:N` — 25 such
      citations point into the files that carry markers. End-of-file shifts nothing. -->
 <!-- pipeline: id=track-b-deployment title="Track B — stand up the ADR-0005 self-hosted production host" phase=4 state=held size=XL blocker="user: deferred until app development is done, and needs the host itself" tier=before-launch -->
+<!-- pipeline: id=staging-smoke-test title="Smoke-test the 19 builder comments and one OCR scan on the testing server before the Oct 12 session, from the db-backed checklist M135 published; each failure is fixed under D90 or filed" phase=n/a state=blocked size=M blocker="user: clicks through the 21 checks at https://claude.ai/artifact/2PF4Wdcp8UcNDTTveAJEWX (6 passed on 2026-10-05, none failed); Claude reads the marks with ArtifactData and fixes or files each failure" tier=early-testing -->

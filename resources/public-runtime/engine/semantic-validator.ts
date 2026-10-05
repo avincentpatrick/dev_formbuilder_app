@@ -17,7 +17,7 @@
  * field and a same-instance sibling). Instance count is enforced against min/max on the relevant section.
  */
 
-import { ABSENT, isEmpty, toNumber, toStr, yesNoAnswer, type EngineValue, type MaybeAbsent } from './coercion';
+import { ABSENT, isEmpty, isNumericLike, toNumber, toStr, yesNoAnswer, type EngineValue, type MaybeAbsent } from './coercion';
 import { EvaluationContext, type Answers } from './context';
 import { ExpressionEvaluator, makeExpressionEvaluator } from './evaluator';
 import { rendersNothing } from './field-roles';
@@ -523,6 +523,19 @@ export class SemanticValidator {
         }
 
         this.collectMembershipErrors(field, answer, errors, sectionKey, instanceIndex);
+        this.collectWholeNumberError(field, answer, errors, sectionKey, instanceIndex);
+    }
+
+    /**
+     * A whole-number question holds a whole number (Increment M134, `R-b21da9f3`) — the mirror of PHP
+     * `SemanticValidator::collectWholeNumberError`. `"7.0"` is whole; a non-number is Stage 2's refusal on the server.
+     */
+    private collectWholeNumberError(field: SchemaField, answer: MaybeAbsent, errors: SemanticError[], sectionKey: string | null, instanceIndex: number | null): void {
+        if (field.field_type !== 'integer' || !isNumericLike(answer)) return;
+
+        if (!Number.isInteger(toNumber(answer))) {
+            errors.push({ fieldKey: field.key, rule: 'not_a_whole_number', message: 'Enter a whole number.', sectionKey, instanceIndex });
+        }
     }
 
     /**

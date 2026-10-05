@@ -11929,7 +11929,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   field-type literal in `resources/` while building the census, rather than by trusting either filing row's
   count. Beyond the ten declarations `R-09f73330` names and the already-gated `RENDERS_NOTHING`, the same type
   strings appear as bare inline disjunctions at `schema-mapping.ts:91,94,115,118,377,400,424,553`,
-  `FieldInput.vue:239,240,247,248`, `semantic-validator.ts:468,474,480,646,793,821`, `MediaEditor.vue:37`,
+  `FieldInput.vue:239,240,247,248`, `semantic-validator.ts:468,474,480,659,806,834`, `MediaEditor.vue:37`,
   `GeoInput.vue:38-43` and `ConfigPanel.vue`'s `config_editor` comparisons (cited as `:113` until `M116`, where that was a bare `);` and went blank — number DROPPED, not repaired). ⛔ **Two of them are ADDITIONAL COPIES of sets the census
   already guards** — `schema-mapping.ts:424` is a fourth four-member media disjunction, and `:115` and `:400`
   are a second and third geo triple — so the census's own equality assertions can be green while a sibling

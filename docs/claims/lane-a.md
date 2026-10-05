@@ -16,74 +16,69 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M135`, the Oct 11 slot: freeze; OCR switched on for the testing server (billing, a server key), the catalog seeders re-run there, and a staging smoke test of the 19 builder comments and one OCR scan (m135-oct11-slot)
+## Status: NO ACTIVE CLAIM — `M135` is merged; OCR reads for real on the testing server, its catalog carries the format checks, and the staging smoke test waits on the user
 
-Taken 2026-10-05. Branch `m135-oct11-slot`, cut from `origin/main` at `d3bf4d26`, PR into `main`.
-The eighth Oct 12 increment under `D72` and the sixth under `D75` — the plan's Oct 11 slot, taken six days early. Most of
-its work is supervised steps in chat on the testing server and in the Google Cloud console, then a smoke test the user
-clicks through from a checklist page while I read the marks back. Rows, in this order:
-- **`ocr-testing-server-key`** (`docs/ocr-pipeline-design.md:249`, a marker) — billing on for the key's Google project, a
-  new server-only key in the testing server's `.env`, proved by a real read on the box.
-- **`R-9a4b8e6d`** (`docs/feature-backlog.md:13125`) — the testing server's catalog seeders re-run.
-- **The smoke test** — not a row: the plan's Oct 11 verification. Each failure becomes a fix (its own claim extension and
-  commits, per `D90`) or a filed row.
+## RELEASED — `M135`, the Oct 11 slot: OCR reads for real on the testing server and its catalog is re-seeded; the smoke test is queued (merged as PR #328, `5517ee95`, 6/6 green with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 
-The OCR provider comparison is NOT taken: its samples are due 2026-10-08. `R-551873af` stays blocked (latent). Also in
-this push: **`D90`** (the freeze: fixes only until the Oct 12 session — the user's answer in chat), a row for the
-unbuilt tabular section layout (`D57` A said to file it; nothing did), and Excel and Word reference files added to the
-attachments remainder row (comment 11 named them; nothing carried them). The user also chose, in chat, a NEW
-server-only key limited to the Cloud Vision API with a budget alert, and a click-through smoke test rather than a
-scripted one.
+Shipped 2026-10-05. Branch `m135-oct11-slot`, cut from `origin/main` at `d3bf4d26`. The claim commit is `5f7c29c9`; no claim
+extension was needed, because no file outside the claim was opened.
 
-### Evidence verified
+**The eighth Oct 12 increment under `D72`, the sixth under `D75` — docs only.** The work itself ran in chat, one guarded
+block at a time, on the testing server and in the Google Cloud console. Commits: row 1 `2df2aab4` (and `86b9184c`, which
+says the budget alert is still owed), row 2 `a04a1206`, the line `a6c5b09d`, the two markers `ac9e9c4e`.
+- **Closed:** `ocr-testing-server-key` (marker `done`) and `R-9a4b8e6d`.
+- **Filed:** in the claim push, the tabular section layout (`D57` A said to file it and nothing had), and Excel and Word
+  files on the attachments remainder row (comment 11 named them). At close, two markers: `staging-smoke-test` (blocked
+  on the user) and `ocr-bakeoff-harness` (ready, the next session's work by the user's choice).
+- **Decisions:** `D90` — fixes only until the Oct 12 session — answered in chat. Also chosen in chat, not decisions: a new
+  server-only key, a click-through smoke test read back from a db-backed page, and the OCR prep as the next work.
+- ⛔ **Not done in `M135`: the smoke test.** The user had to stop after 6 of 21 checks, all passing (comments 1, 4, 5,
+  8, 9 and 15), none failing. One lane means one session at a time, so the increment closes with its two server rows and
+  the smoke test is queued as `staging-smoke-test` at its point of truth. The marks stay on the page
+  (https://claude.ai/artifact/2PF4Wdcp8UcNDTTveAJEWX, collection `results`); whichever session holds the lane when the
+  user returns reads them and fixes (under `D90`) or files each failure.
+- **Owed by the user:** a monthly budget alert on the key's project, and deleting `C:\meridian\env.pre-M135.bak` (it
+  holds every secret) once the smoke scan is proved.
+- **Namespaces spent:** `D90`. No migration, no ADR (`0010` stays reserved).
+- **Tracker:** no surgery owed.
 
-Against `d3bf4d26`:
-- **`ocr-testing-server-key` — held.** `config/ocr.php:35` reads only `OCR_GOOGLE_VISION_KEY`; `GoogleVisionClient::annotate()`
-  sends it in `X-Goog-Api-Key` and maps `403 BILLING_DISABLED` to `provider_billing_disabled` before the status. The
-  marker's claim that billing is off is **re-measured today**, not inherited: a throwaway tinker probe through the real
-  client on this PC (key length 39) answered `provider_billing_disabled`.
-- **`R-9a4b8e6d` — held.** `b5b4d906` gave `PlatformTemplateBlueprints` and `PlatformFieldLibraryItems` their rows from
-  `DefaultFieldRules::for()`; the seeders write NULL-tenant rows on `pgsql_privileged`, matched on `name`, and the update
-  arm never touches `usage_count`.
+### What happened on the box
+1. **Read-only checks:** `vision.googleapis.com:443` reachable (`TcpTestSucceeded True`); no `OCR_GOOGLE_VISION_KEY`
+   line; the worker's `AppParameters` include `ocr-processing`; `db:seed --help` lists no `--tenants`.
+2. **The key:** `.env` backed up outside the app tree; the key read through `Read-Host -AsSecureString`, shape-checked,
+   and APPENDED with a comment line (never a rewrite: re-decoding the whole file would corrupt any non-ASCII byte);
+   `Compare-Object` read 2 lines added. `config:cache`, `queue:restart`, worker `Running`; `bootstrap\cache\config.php`
+   keeps NETWORK SERVICE `(I)(M)`, so a deploy can still replace it. A 759-byte PNG went through the real
+   `GoogleVisionClient` and came back as "MERIDIAN OCR 135" — **the first real Vision read anywhere.**
+3. **The catalog:** `pg_dump` of `form_templates` and `field_library` (15,696 bytes); a read-only census read 9 platform
+   email and phone questions with 0 carrying the check; both seeders `DONE`; the census again read 9 of 9, totals 10 and 6
+   unchanged, `usage_count` sums 2 and 3 kept.
 
-### Premise verified
+### The Google side, which the plan did not predict
+The laptop's key (ends `O1CSmo`) is NOT in the project the user could find. That project, "My First Project", was linked
+to a **closed** billing account — a free trial that had ended — which is why every read since 2026-10-03 answered
+`BILLING_DISABLED`. The user created a new billing account, moved the project to it, enabled the Cloud Vision API and made
+`meridian-staging-ocr` restricted to it (the newer console has no "Restrict key" button; ticking the API in the list is
+the restriction). The laptop key's project still has billing off, so a local real read still fails.
 
-- **A deploy never seeds:** `deploy.ps1` contains no `seed` at all, so staging still holds the pre-`M134` catalog. The
-  local dev database was in the same state — measured by a read-only census (`storage/app/m135/catalog-census.php`,
-  gitignored): **9** platform questions that should carry the format check, **0** carrying it (seven email and phone
-  questions across five templates, and the library's "Email address" and "Phone number").
-- **`db:seed` is Laravel's own:** `composer.lock` pins stancl/tenancy `v3.10.1` (the `M121` clobber is fixed); locally
-  `db:seed --help` lists no `--tenants`. Re-checked on the box before the run.
-- **The key is read only by the worker** (`ReadOcrScanJob` → `GoogleVisionClient`), so a `.env` edit needs `config:cache`
-  then `queue:restart` and no php-cgi restart. ⚠️ **Runbook §8.2 item 9 is wrong in one clause:** "or simply re-run
-  `deploy.ps1`" — with nothing new to deploy the script returns before `config:cache`. Fixed in this increment.
-- ⚠️ **`vision.googleapis.com` is not in the runbook's outbound allow-list** (§8.2 item 1). Measured on the box before the
-  key goes in; added to the list in this increment.
-- **The worker listens on `ocr-processing`** per the runbook's `nssm install` line — confirmed on the box with
-  `nssm get`, not inherited.
-- **OCR on an Enterprise workspace** is gated only by the per-form Scanning switch (off by default); `D73` (open,
-  `before-launch`) says scans leave for Google, so the smoke scan carries made-up data only.
+### How the prediction fared
 
-### Remedy verdict
+| Predicted | Actual |
+|---|---|
+| CI 6/6 on the first run (docs only) | **Right.** 6/6 on the first run. |
+| The first thing to go wrong on the box: the outbound reach to `vision.googleapis.com`, which no document listed | **Wrong.** Reachable on the first check. What went wrong first was upstream of the box: the key's project could not be found from the key, and its billing account was closed. Five chat turns in the Google console, none of them foreseen. |
+| Second: billing taking minutes to propagate | **Wrong.** The server's first probe read correctly minutes after the project was moved. |
+| ⚠️ Most expected WRONG: the smoke test passes all 19 comments with no fix | **Unresolved.** 6 of 21 checks passed before the user had to stop; the rest is queued. |
 
-- **`R-9a4b8e6d` — works, measured locally before the box.** Both seeders run twice in the dev container: after the first
-  run the census reads **9 of 9** carrying the check, platform totals unchanged (10 templates, 6 library items) and the
-  `usage_count` sums unchanged (6 and 3); the second run changes nothing. The same census runs on the box before and after.
-- **`ocr-testing-server-key` — works once billing is on; the probe is built.** A 759-byte PNG reading "MERIDIAN OCR 135"
-  (`storage/app/m135/vision-probe.php`) goes through the real client: a real read prints the text back, a refusal prints
-  its error code. Run on this PC after billing is switched on, then on the box after the key goes in. A scan that failed
-  before the key is final and must be re-uploaded (`OcrScanStatus`).
+Unpredicted, all on the box's console and recorded in the harness-traps memory: `artisan tinker <file>` stays in the Psy
+Shell on an interactive console (the first block never printed its end line; pipe `'exit'` in), PowerShell printed the
+`Get-Service` row as a blank line, and the app container has no GD (the probe image was built with the host's PHP).
 
-Files: `docs/claims/lane-a.md`, `docs/claims/decisions.md`, `docs/feature-backlog.md`, `docs/ocr-pipeline-design.md`,
-`docs/deployment-infrastructure.md`, `docs/pipeline.md`, `docs/backlog-triage.md`, `docs/gate-baselines.md`, `PROGRESS.md`.
-Any fix the smoke test calls for is claimed by its own pushed extension first.
-Shared artefacts taken: `docs/**` files above, `PROGRESS.md` (own block only).
-Paired files taken: none.
-Namespaces spent: `D90`. No migration, no ADR (`0010` stays reserved for the bake-off).
-Prediction: CI 6/6 on the first run (docs only). On the box, the step most likely to go wrong first is the outbound
-reach to `vision.googleapis.com`, which no document lists; second, billing taking minutes to propagate after it is
-switched on. ⚠️ The one I most expect to be WRONG: that the smoke test passes all 19 comments with no fix — a real
-browser on the real server has found something every time one was used (`M125`, `M132`).
+### Runbook corrections, line-neutral
+`docs/deployment-infrastructure.md` §8.2 item 9 said re-running `deploy.ps1` applies a `.env` edit — false when nothing
+new is deployed, because the script returns before its cache step; it now says to run `config:cache` and `queue:restart`.
+Item 1's outbound list names `vision.googleapis.com`. §4 records the server-only key and the owed budget alert. Every edit
+kept the line count, because six lines of the file are cited from elsewhere.
 
 ## RELEASED — `M134`, the Oct 10 slot: the six remaining `early-testing` builder rows (merged as PR #327, `57e745f2`, 6/6 green with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

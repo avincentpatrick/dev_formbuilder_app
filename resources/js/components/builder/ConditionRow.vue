@@ -18,7 +18,7 @@
  */
 import { MdsIconButton, MdsNumberInput, MdsSelect, MdsTextInput } from '@meridian/design-system';
 import { computed } from 'vue';
-
+import { defaultOperator, literalInput, objectFieldOptions, offeredOperators, offers, orderingWantsNumber, subjectFieldOptions, subjectKindRow } from './condition-operands';
 import type { Comparator, Condition, Operand } from './condition-model';
 import type { ConditionCatalogue, ConditionFieldOption, EnumOption } from './types';
 
@@ -109,7 +109,7 @@ const LITERAL = 'literal';
 
 const subjectGroups = computed(() => {
     const groups = [
-        { label: 'Questions', options: props.catalogue.fields.map((f) => ({ value: `field:${f.key}`, label: f.label })) },
+        { label: 'Questions', options: subjectFieldOptions(props.catalogue, parts.value.subject.kind === 'field' ? parts.value.subject.key : null) },
     ];
 
     if (props.catalogue.repeatables.length > 0) {
@@ -127,7 +127,7 @@ const subjectGroups = computed(() => {
 /** The right-hand side of a comparison is a question or a fixed value — never a count, per `countClause`. */
 const objectGroups = computed(() => [
     { label: 'Other', options: [{ value: LITERAL, label: 'A fixed value' }] },
-    { label: 'Questions', options: props.catalogue.fields.map((f) => ({ value: `field:${f.key}`, label: f.label })) },
+    { label: 'Questions', options: objectFieldOptions(props.catalogue, subjectRow.value, parts.value.op, parts.value.right.kind === 'field' ? parts.value.right.key : null) },
 ]);
 
 const subjectValue = computed<string>(() => {
@@ -141,7 +141,7 @@ function setSubject(value: string): void {
     const previous = parts.value.subject;
 
     if (value.startsWith('field:')) {
-        patch({ subject: { kind: 'field', key: value.slice(6) } });
+        patch(repointed({ kind: 'field', key: value.slice(6) }));
 
         return;
     }
@@ -206,7 +206,7 @@ const operatorOptions = computed<OperatorOption[]>(() => {
         { value: 'excludes', label: 'does not include', disabled: literalSubject },
     );
 
-    return options;
+    return offeredOperators(options, subjectRow.value, parts.value.op);
 });
 
 function setOperator(value: string): void {
@@ -220,9 +220,9 @@ function fieldFor(key: string): ConditionFieldOption | undefined {
 }
 
 /**
- * Whether a NEW fixed value should be a number literal. Ordering is numeric-only in both engines (Doc #27
- * amendment A1), so an ordering operator always wants a number; equality follows the subject field's own
- * type, because `${code} = '007'` and `${code} = 7` are genuinely different questions (Eq rule 4 vs rule 5).
+ * Whether a NEW fixed value should be a number literal. An ordering wants a number, except beside a date or a time,
+ * which orders an ISO value (M134, `R-62b638e1`) typed in a date or time picker; equality follows the subject field's
+ * own type, because `${code} = '007'` and `${code} = 7` are genuinely different questions (Eq rule 4 vs rule 5).
  *
  * A LOADED operand never passes through here — its kind is preserved exactly as parsed.
  */
@@ -230,10 +230,10 @@ function retype(operand: Operand, next: RowParts): Operand {
     if (operand.kind === 'field') return operand;
 
     const wantsNumber =
-        next.op === 'gt' ||
+        (orderingWantsNumber(subjectKindRow(props.catalogue, next.subject)) && (next.op === 'gt' ||
         next.op === 'lt' ||
         next.op === 'gte' ||
-        next.op === 'lte' ||
+        next.op === 'lte')) ||
         (next.subject.kind === 'field' && (fieldFor(next.subject.key)?.numeric ?? false));
 
     if (wantsNumber && operand.kind === 'text') {
@@ -269,6 +269,25 @@ const objectNumber = computed<number | null>(() => {
 
 function name(suffix: string): string {
     return `Condition ${props.ordinal} ${suffix}`;
+}
+
+// ── M134 (`R-910d2286`): what the subject question can be compared with ─────────────────────────────
+
+/** The subject question's capability row — null for a fixed value, a count, or a question the palette did not classify. */
+const subjectRow = computed(() => subjectKindRow(props.catalogue, parts.value.subject));
+
+/** A fixed value beside a date, time or date-time question is typed in that picker. */
+const literalType = computed(() => literalInput(subjectRow.value) ?? 'text');
+
+/**
+ * Pointing the subject at another question keeps the operator only if the new question can take it; otherwise the
+ * row falls back to its kind's default, and the fixed value is retyped for it — the validation editor's re-point rule.
+ */
+function repointed(subject: Subject): Partial<RowParts> {
+    const row = subjectKindRow(props.catalogue, subject);
+    const op: RowOperator = offers(row, parts.value.op) ? parts.value.op : defaultOperator(row);
+
+    return { subject, op, right: retype(parts.value.right, { ...parts.value, subject, op }) };
 }
 </script>
 
@@ -323,6 +342,7 @@ function name(suffix: string): string {
             <MdsTextInput
                 v-else-if="parts.right.kind === 'text'"
                 :model-value="parts.right.value"
+                :type="literalType"
                 :disabled="disabled"
                 :aria-label="name('value')"
                 @update:model-value="patch({ right: { kind: 'text', value: $event } })"

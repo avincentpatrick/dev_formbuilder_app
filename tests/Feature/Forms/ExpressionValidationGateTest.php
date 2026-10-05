@@ -495,3 +495,48 @@ it('classifies every field type an ordering may name', function (FieldType $type
 
     expect(orderingGateRefusals($this->gate, $draft))->toBe($expected);
 })->with(FieldType::cases());
+
+it('refuses an equality between a list question and one value, which never changes with the answer (M134)', function (FieldType $type, string $expression): void {
+    $form = $this->forms->create($this->tenant, $this->user, 'Survey');
+    $draft = $form->draftVersion;
+    addFormField($draft, $this->user, 'subject', $type);
+    addFormField($draft, $this->user, 'shown', FieldType::ShortText, 1, ['relevant_expression' => $expression]);
+
+    expect(orderingGateRefusals($this->gate, $draft))->toBe([['shown', 'expression_equals_list']]);
+})->with([
+    'a multi-select, equals' => [FieldType::MultiSelect, "\${subject} = 'reading'"],
+    'a multi-select, does not equal' => [FieldType::MultiSelect, "\${subject} != 'reading'"],
+    'a multi-select, on the right' => [FieldType::MultiSelect, "'reading' = \${subject}"],
+    'a cascading select' => [FieldType::CascadingSelect, "\${subject} = 'north'"],
+    'a photo' => [FieldType::ImageCapture, "\${subject} = 'x'"],
+]);
+
+it('names the list question and offers selected() and the emptiness test instead', function (): void {
+    $form = $this->forms->create($this->tenant, $this->user, 'Survey');
+    $draft = $form->draftVersion;
+    addFormField($draft, $this->user, 'hobbies', FieldType::MultiSelect);
+    addFormField($draft, $this->user, 'shown', FieldType::ShortText, 1, ['relevant_expression' => "\${hobbies} = 'reading'"]);
+
+    expect(orderingGateMessages($this->gate, $draft))->toBe([
+        'The expression on “shown” compares the '.FieldType::MultiSelect->label().' question “hobbies” with a single value using = or !=, but its answer is a list, so the comparison never changes with the answer. Use selected(${hobbies}, \'value\') to ask whether a choice was picked, or = \'\' to ask whether it was answered.',
+    ]);
+});
+
+it('still lets an expression test a list for an answer, for a choice, or for how many', function (string $expression): void {
+    $form = $this->forms->create($this->tenant, $this->user, 'Survey');
+    $draft = $form->draftVersion;
+    addFormField($draft, $this->user, 'hobbies', FieldType::MultiSelect);
+    addFormField($draft, $this->user, 'photo', FieldType::ImageCapture, 1);
+    addFormField($draft, $this->user, 'colour', FieldType::SingleSelect, 2);
+    addFormField($draft, $this->user, 'shown', FieldType::ShortText, 3, ['relevant_expression' => $expression]);
+
+    expect(orderingGateRefusals($this->gate, $draft))->toBe([]);
+})->with([
+    'answered' => ["\${hobbies} != ''"],
+    'unanswered' => ["\${hobbies} = ''"],
+    'a choice picked' => ["selected(\${hobbies}, 'reading')"],
+    'a choice not picked' => ["not(selected(\${hobbies}, 'reading'))"],
+    'how many' => ['count(${hobbies}) >= 2'],
+    'a photo taken' => ["\${photo} != ''"],
+    'a single choice still equals one value' => ["\${colour} = 'red'"],
+]);

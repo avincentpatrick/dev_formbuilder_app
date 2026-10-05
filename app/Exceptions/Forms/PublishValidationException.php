@@ -483,6 +483,21 @@ final class PublishValidationException extends RuntimeException
     }
 
     /**
+     * An expression that compares a list question — a multi-select, a cascade, a file — with one value using `=` or
+     * `!=` (Increment M134, `R-87160c81`). `equals()` makes a list on either side false, so `=` never holds and `!=`
+     * always does, whatever the respondent picks. `selected()` asks whether a choice was picked; `= ''` whether the
+     * question was answered.
+     */
+    public static function expressionEqualsList(string $ownerKey, string $listKey, string $kind): self
+    {
+        return self::one(
+            $ownerKey,
+            'expression_equals_list',
+            "The expression on “{$ownerKey}” compares the {$kind} question “{$listKey}” with a single value using = or !=, but its answer is a list, so the comparison never changes with the answer. Use selected(\${{$listKey}}, 'value') to ask whether a choice was picked, or = '' to ask whether it was answered.",
+        );
+    }
+
+    /**
      * @param  list<array{field: ?string, code: string, message: string}>  $violations
      */
     private function __construct(string $message, private readonly array $violations)

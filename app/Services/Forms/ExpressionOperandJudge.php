@@ -51,6 +51,13 @@ final class ExpressionOperandJudge
             return PublishValidationException::expressionOrdersNonNumber($ownerKey, $key, $type->label());
         }
 
+        // A list never equals one value (`equals()` rule 3), so `${hobbies} = 'reading'` never holds and its `!=`
+        // always does — M134, `R-87160c81`'s expression half. `= ''` is an emptiness test and `selected()` the
+        // membership one; neither is an `equality` use.
+        if (($kind === OperandKind::List || $kind === OperandKind::Attachment) && $use['equality']) {
+            return PublishValidationException::expressionEqualsList($ownerKey, $key, $type->label());
+        }
+
         return null;
     }
 

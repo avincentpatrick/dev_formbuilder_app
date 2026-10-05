@@ -7,6 +7,7 @@ use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Forms\BlueprintValidator;
 use App\Services\Forms\SchemaBlueprintMaterializer;
+use App\Support\Forms\DefaultFieldRules;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\PlatformTemplateSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -71,4 +72,24 @@ it('is idempotent — re-running the seeder never duplicates', function (): void
 
     $count = DB::connection('pgsql_privileged')->table('form_templates')->whereNull('tenant_id')->count();
     expect($count)->toBe(10);
+});
+
+it('gives every email, web-address and phone question in the gallery the check one added by hand gets (M134, D88)', function (): void {
+    (new PlatformTemplateSeeder)->run();
+    $checked = 0;
+
+    foreach (DB::connection('pgsql_privileged')->table('form_templates')->whereNull('tenant_id')->get() as $row) {
+        foreach (json_decode($row->schema_blueprint, true)['fields'] as $field) {
+            $expected = array_map(
+                static fn (array $rule): array => [$rule['rule_type']->value, $rule['rule_value']],
+                DefaultFieldRules::for(FieldType::from($field['field_type'])),
+            );
+            $actual = array_map(static fn (array $v): array => [$v['rule_type'], $v['rule_value']], $field['validations'] ?? []);
+
+            expect($actual)->toBe($expected, "{$row->name} → {$field['key']}");
+            $checked += $expected === [] ? 0 : 1;
+        }
+    }
+
+    expect($checked)->toBeGreaterThanOrEqual(5); // anti-vacuity: four email questions and at least one phone today
 });

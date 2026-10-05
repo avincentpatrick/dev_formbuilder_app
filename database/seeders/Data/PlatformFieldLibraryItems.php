@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Database\Seeders\Data;
 
 use App\Enums\FieldType;
+use App\Support\Forms\DefaultFieldRules;
 use Illuminate\Support\Str;
 
 /**
@@ -47,8 +48,26 @@ final class PlatformFieldLibraryItems
             'field_type' => $type->value,
             'default_label' => $label,
             'default_config' => isset($opts['options']) ? self::options($opts['options']) : [],
-            'default_validations' => [],
+            // M134 (`R-b21da9f3`, `D88`) — the "Email address" and "Phone number" items arrive with the format check
+            // a question added by hand gets; `DefaultFieldRules` is the one source.
+            'default_validations' => self::defaultValidations($type),
         ];
+    }
+
+    /**
+     * `DefaultFieldRules::for()` in the serializer's validation shape, which the materializer writes.
+     *
+     * @return list<array{rule_type: string, rule_value: string, error_message: string, sequence: int}>
+     */
+    private static function defaultValidations(FieldType $type): array
+    {
+        $rows = [];
+
+        foreach (DefaultFieldRules::for($type) as $sequence => $rule) {
+            $rows[] = ['rule_type' => $rule['rule_type']->value, 'rule_value' => $rule['rule_value'], 'error_message' => $rule['error_message'], 'sequence' => $sequence];
+        }
+
+        return $rows;
     }
 
     /**

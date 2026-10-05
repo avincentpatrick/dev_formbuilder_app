@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Services\Forms\BlueprintValidator;
 use App\Services\Forms\FormService;
 use App\Services\Forms\SchemaBlueprintMaterializer;
+use App\Support\Forms\DefaultFieldRules;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\PlatformFieldLibrarySeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -74,4 +75,22 @@ it('is idempotent — re-running the seeder never duplicates', function (): void
 
     $count = DB::connection('pgsql_privileged')->table('field_library')->whereNull('tenant_id')->count();
     expect($count)->toBe(6);
+});
+
+it('gives the library email and phone questions the check one added by hand gets (M134, D88)', function (): void {
+    (new PlatformFieldLibrarySeeder)->run();
+    $checked = 0;
+
+    foreach (DB::connection('pgsql_privileged')->table('field_library')->whereNull('tenant_id')->get() as $row) {
+        $expected = array_map(
+            static fn (array $rule): array => [$rule['rule_type']->value, $rule['rule_value']],
+            DefaultFieldRules::for(FieldType::from($row->field_type)),
+        );
+        $actual = array_map(static fn (array $v): array => [$v['rule_type'], $v['rule_value']], json_decode($row->default_validations ?? '[]', true));
+
+        expect($actual)->toBe($expected, $row->name);
+        $checked += $expected === [] ? 0 : 1;
+    }
+
+    expect($checked)->toBe(2); // "Email address" and "Phone number"
 });

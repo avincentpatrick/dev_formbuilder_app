@@ -13062,3 +13062,62 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   dev data shows values. The remedy is a shape decision as much as a fix: one row per response with the instances
   joined into one cell, or one row per instance. **Live.** It needs a published form with a repeatable section and a
   response to it. Filed by `M133`. **Tier: during-testing.**
+
+- **`minor` · There is no workspace time zone, so `today()` is the UTC calendar day and a date or time cannot be
+  compared with `now()`.** Queued on the user's answer to `D89`. Both engines stamp the clock in UTC
+  (`isoClock()`, `SemanticValidator::validate()`), so in the Philippines `today()` is still yesterday until 08:00 local:
+  a date constraint `. <= today()` refuses today's local date for the first eight hours of the day, and `${d} = today()`
+  misses it. A date-time answer is the browser's `datetime-local` value, wall-clock with no offset, so it cannot be
+  ordered against the UTC `now()` at all — publish refuses that ordering as "not supported yet" (`D89`). The remedy is a
+  workspace time-zone setting that the clock stamp, `today()` and the reading of a date-time answer all honour, in both
+  engines with golden vectors, then lifting the `now()` refusal. **Live.** Filed by `M134`. **Tier: during-testing.**
+
+- **`minor` · An XLSForm export of "greater than another question" refuses every answer in ODK while the other question
+  is blank.** Found by `M134` while closing `R-6202e694`. `XlsformExporter` writes a `greater_than_field` or
+  `less_than_field` row as the constraint `. > ${related}`, and ODK evaluates it with the other question empty, so the
+  exported form refuses the very answers the platform now accepts. The faithful export guards the compared answer —
+  `${related} = '' or . > ${related}`. **Live.** It needs an export of a form carrying such a rule. Filed by `M134`.
+  **Tier: during-testing.**
+
+- **`nit` · A structured "contains" on a single choice is a substring test.** Found by `M134` while splitting
+  `ValueShape`'s choice shape for `R-87160c81`. `ValueShape::allowsOperator()` keeps `contains` on a single choice or
+  dropdown, and the lowering reads it as text containment, so "required if colour contains `re`" holds for `red` and
+  `green` alike. Kept rather than refused, because refusing it would block publishing forms that use it on purpose;
+  `ConversionCensusTest` already calls it a substring test. The remedy is a decision: refuse it, or relabel it in the
+  editor. **Live.** Filed by `M134`. **Tier: during-testing.**
+
+- **`nit` · An expression may compare a note with a value, which never holds.** Found by `M134` while classifying
+  operands for `R-87160c81`. A note is never answered, so `${remark} = 'x'` is constant false and `${remark} != 'x'`
+  constant true; publish refuses only a NUMERIC use of a note (`expression_orders_non_number`). The condition editor stops
+  offering notes in `M134`, so this is reached only by typing the expression. **Live.** Filed by `M134`.
+  **Tier: during-testing.**
+
+- **`minor` · Converting a date question to a time question, or back, does not warn that an ordering on it stops
+  holding.** Found by `M134` while designing `R-62b638e1`. After `M134` a date orders against dates and `today()`, a time
+  against times; `ConversionCensus` flags a re-meant numeric use through `ValueShape::allowsOperator(Gt)`, which refuses
+  every temporal shape, so the type-change dialog says nothing, and the next publish refuses the ordering as a kind
+  mismatch. The remedy is a census judge for a temporal kind change. **Live.** Filed by `M134`. **Tier: during-testing.**
+
+- **`minor` · `"5\n"` is a number on the server and not in the browser.** Found by `M134` while designing the temporal
+  parse. `Coercion::NUMERIC_RE` is anchored with `$`, which in PCRE also matches before a final newline, so
+  `preg_match()` accepts `"5\n"`; the TypeScript twin's `$` does not. An answer with a trailing newline therefore orders
+  and compares as a number on the server and as text in the browser. `tests/golden/expressions/coercion.json` pins the
+  contract without that case. The remedy is `\z` in PHP and a golden vector for it. **Latent.** No first-party control
+  sends a trailing newline in a number; the API and an import can. Filed by `M134`. **Tier: during-testing.**
+
+- **`nit` · The builder shows a formula default as plain text.** Found by `M134` while closing `R-6d7b9ff7`. A default
+  imported from an XLSForm `calculation` column — `today()` — sits in the Default value box with nothing saying it is a
+  formula, and since `M134` editing the box makes it plain text. **Live.** It needs an imported formula default.
+  Filed by `M134`. **Tier: during-testing.**
+
+- **`nit` · The condition editor cannot write `today()`.** Found by `M134` while building `R-910d2286`. A condition row
+  compares a question with another question or a typed value (`condition-model.ts` `operandOf()`), so "date of birth is
+  on or before today" is written only through "Edit as text"; the row editor then shows the condition as text it cannot
+  edit. **Live.** Filed by `M134`. **Tier: during-testing.**
+
+- **`minor` · A date, time or date-time sent through the API is stored whatever it says.** Found by `M134` while
+  auditing `R-b21da9f3`. `StructuralAnswerNormalizer` stores a date, time or date-time answer as any scalar string, and
+  Stage 3 has no format check, so `"next tuesday"` is saved; the answer index then skips it silently. Since `M134` the
+  engines' strict temporal parse reads such a value as not a date, so a condition on it does not hold. **Latent.** The
+  browser's own date controls send canonical values; the API, the sync batch and an import can send anything.
+  Filed by `M134`. **Tier: during-testing.**

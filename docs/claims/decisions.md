@@ -1534,6 +1534,29 @@ The matcher reads a sheet against the version it was printed from, superseded on
 
 ---
 
+### D88 — Older email and web-address questions have no format check, and the staff entry page is the only place the browser still checks them. Once that page matches the public page, what do those questions get? **A — leave them as they are; no backfill.**
+
+**Filed and answered 2026-10-05 (user decision, in chat), recorded by Lane A during `M134` — A, the recommendation.** Put to the user under `D66`'s rule, because `R-b21da9f3` — an `early-testing` work row taken by `M134` — owed "a decision on the legacy-field backfill" before a line changed. Measured: the server accepts any string for an email or URL answer unless the question carries a `pattern` row; `DefaultFieldRules` seeds one only on a question ADDED or CONVERTED since `M112`; the platform templates and the field library's "Email address" carry none; and a published version cannot be changed at all (the immutability trigger), so a backfill could reach only drafts.
+
+- **A — leave them as they are.** The same as the public page today. New questions keep their check, and the templates and the field library start carrying it too.
+- **B — add the check to drafts.** Every unpublished email or web-address question without one gets the default; a published form gets it when next published. A check an author removed on purpose comes back, since nothing tells the two apart.
+- **C — always check, built in.** The server and both pages check the format of every such question whatever its rules say; authors can no longer turn it off.
+
+**Recommendation: A.** The public page — the main channel — already behaves this way, the published forms cannot be reached anyway, and closing the two creators that still make unchecked questions stops the gap growing.
+
+---
+
+### D89 — A date-and-time answer has no time zone, but `now()` runs in UTC — eight hours behind the Philippines. How does "is after now" work on a date or time question? **A — refuse it at publish for now; dates and times order against each other and against `today()`.**
+
+**Filed and answered 2026-10-05 (user decision, in chat), recorded by Lane A during `M134` — A, the recommendation.** Put to the user under `D66`'s rule, because `R-62b638e1` — an `early-testing` work row taken by `M134` — orders a date-time against `now()` differently under each answer. Measured: a date-time answer is the browser's `datetime-local` value, wall-clock with no offset (`FieldInput.vue`'s `textType`), while both engines stamp the clock in UTC with `+00:00` (`isoClock()`, `SemanticValidator::validate()`), and nothing in the app holds a workspace time zone.
+
+- **A — refuse it for now.** Comparing a date, time or date-time question with `now()` is refused at publish as "not supported yet", and the message offers `today()`. A workspace time zone is filed for after Oct 12.
+- **B — read the answer as UTC.** Works everywhere at once, but near "now" the result is silently wrong by the device's offset.
+
+**Recommendation: A.** A refusal that names the question and offers `today()` costs an author one edit; a silent eight-hour error costs a respondent a refused answer nobody can explain. The filed time-zone row also fixes `today()` being the UTC calendar day.
+
+---
+
 ### D15 — `D13`'s one-hub-row cap is now the binding constraint on batch composition, and it is stricter than its own purpose. **ANSWERED — option 4: the cap reads the files a row REMEDY EDITS, excluding the close-out artefacts.** **Tier: early-testing.**
 
 **Filed 2026-09-05 by Lane A, during `M72`, at the moment the cap decided a batch that value had not.**

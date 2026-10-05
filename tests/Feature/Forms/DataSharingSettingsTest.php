@@ -103,6 +103,10 @@ it('starts every new form not sharing, in the model AND in the row', function ()
         ->and($form->data_sharing_field_keys)->toBeNull();
 
     expect(dataSharingReload($form, $this->admin)->data_sharing_enabled)->toBeFalse();
+
+    // And a model built anywhere else — a factory, `makeForm()` — before any row exists. `create()` re-reads its row,
+    // so only this line can see the model default (measured: dropping it left the case above green).
+    expect((new Form)->data_sharing_enabled)->toBeFalse();
 });
 
 it('switches sharing on only with the acknowledgement, and records who changed what', function (): void {

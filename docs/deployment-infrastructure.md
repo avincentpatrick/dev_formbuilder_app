@@ -51,7 +51,7 @@ Single-box Windows self-hosting has **no managed zero-downtime deploy**. `deploy
 ---
 
 ## 4. Secrets Management
-- **Environment secrets** (DB credentials, Stripe keys, the OCR-provider key, mail credentials, `APP_KEY`) live in the server's **`.env` file on the Windows Server**, git-ignored — created and maintained on the server by hand, never committed. `deploy.ps1` never overwrites `.env`. On the testing server the OCR key (`OCR_GOOGLE_VISION_KEY`) is a key of its own, restricted to the Cloud Vision API, in a Google Cloud project with billing on and a monthly budget alert; the laptop keeps a separate key (`M135`, 2026-10-05).
+- **Environment secrets** (DB credentials, Stripe keys, the OCR-provider key, mail credentials, `APP_KEY`) live in the server's **`.env` file on the Windows Server**, git-ignored — created and maintained on the server by hand, never committed. `deploy.ps1` never overwrites `.env`. On the testing server the OCR key (`OCR_GOOGLE_VISION_KEY`) is a key of its own, restricted to the Cloud Vision API, in a Google Cloud project with billing on (a budget alert is still owed); the laptop keeps a separate key (`M135`, 2026-10-05).
 - **Committed-secret prevention**: `gitleaks` runs in CI (stage 1) as a backstop against a credential ever reaching the repository.
 - **Per-tenant secrets** (webhook signing secrets) are application data — encrypted in the database (Laravel encrypted cast, `docs/data-dictionary.md` §14), a distinct concern from the server `.env`.
 - **Rotation**: server secrets rotated annually at minimum and immediately on suspected compromise (a manual runbook step; no automated rotation in Phase 1).

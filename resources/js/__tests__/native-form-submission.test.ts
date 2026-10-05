@@ -160,3 +160,28 @@ describe('resources/**/*.vue — a native form submission must be a GET', () => 
         expect(forms.filter((form) => form.file === banner)).toEqual([]);
     });
 });
+
+/*
+ * M134 (`R-b21da9f3`) — THE THREE FORMS AN ANSWER IS ENTERED THROUGH NEVER LET THE BROWSER REFUSE IT.
+ *
+ * The guest page and its stepped view carried `novalidate`; the staff entry page did not, so one form refused an
+ * answer from a keyer that it accepted from a respondent — a decimal (a number input with no `step` steps by 1),
+ * a captured altitude with six decimals, an out-of-range point — through a browser bubble no test could see. The
+ * engines are the authority on every page: the server refuses an out-of-range point (`geo_out_of_range`) and, since
+ * M134, a non-whole number in a whole-number question, both shown in place. `tests/e2e/encode-validation.spec.ts`
+ * proves it in a real browser; this pins the attribute where a rendered test cannot reach.
+ */
+describe('the answer-entry forms leave every check to the engines', () => {
+    const answerForms = [
+        'resources/js/Pages/submissions/Encode.vue',
+        'resources/public-runtime/components/PageView.vue',
+        'resources/public-runtime/components/StepView.vue',
+    ];
+
+    it.each(answerForms)('%s carries novalidate on its form', (file) => {
+        const forms = formsIn(join(process.cwd(), file));
+
+        expect(forms.length, `${file} no longer has a form element`).toBeGreaterThan(0);
+        expect(forms.map((form) => /\bnovalidate\b/i.test(form.tag))).toEqual(forms.map(() => true));
+    });
+});

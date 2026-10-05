@@ -1345,7 +1345,7 @@ function onConflictKeydown(event: KeyboardEvent): void {
             <ScanPages :pages="scan!.pages" />
         </div>
 
-        <form class="encode__form" @submit.prevent="submit">
+        <form class="encode__form" novalidate @submit.prevent="submit">
             <!-- Form-WIDE error summary (H21c). Doc #27 §5.5: Submit reports across the whole form, because a
                  step-scoped banner on a multi-step form announces "0 fields need your attention" while the
                  submit is refused elsewhere. Each jump changes step before it focuses. -->

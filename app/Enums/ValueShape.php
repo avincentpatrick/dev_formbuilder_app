@@ -12,8 +12,8 @@ use App\Services\Forms\StructuralValidationGate;
  * existing enum expresses it.
  *
  * ⛔ WHY IT IS KEYED ON A SHAPE AND NOT ON `FieldType`. Thirty-one types by eleven rule types is not a
- * table anybody can read or keep right; twelve by eleven is. The row that filed this said so, and the
- * saving is real rather than cosmetic: eleven of the twelve shapes answer every rule type identically
+ * table anybody can read or keep right; thirteen by eleven is. The row that filed this said so, and the
+ * saving is real rather than cosmetic: twelve of the thirteen shapes answer every rule type identically
  * for every member type.
  *
  * ⛔ SO IT IS A `match` WITH NO `default`, AND THAT IS THE WHOLE POINT RATHER THAN A STYLE CHOICE.
@@ -32,7 +32,7 @@ use App\Services\Forms\StructuralValidationGate;
  * them answers "what may be asserted about this value", which is why this one exists — but a reader
  * reaching for an eighth should check those six first.
  *
- * ⛔ THE TWO SPLITS THAT LOOK ARBITRARY ARE THE TWO THAT WERE MEASURED, AND BOTH PROTECT AN AUTHOR FROM
+ * ⛔ THE THREE SPLITS THAT LOOK ARBITRARY ARE THE THREE THAT WERE MEASURED, AND EACH PROTECTS AN AUTHOR FROM
  * BUILDING A FORM NOBODY CAN SUBMIT.
  *
  *   - `Temporal` vs `Duration`. `duration` is grouped with the date/time types by every other registry
@@ -49,6 +49,9 @@ use App\Services\Forms\StructuralValidationGate;
  *     returns true for both. They differ on `min_value`/`max_value`: a `likert_scale`'s option values
  *     are a numeric score by construction, while a `single_select`'s are arbitrary strings — where the
  *     same fail-closed comparison above would make the field unanswerable.
+ *   - `Choice` vs `MultipleChoice` (Increment M134, `R-87160c81`). One value against a list: `equals()` makes an
+ *     array on either side false, so "required if hobbies = reading" on a multi-select can never hold — and
+ *     `!=` always does. {@see allowsOperator()} refuses `eq`/`neq` there; `contains` is the membership test.
  *
  * ⛔ AND `yes_no` IS `Boolean`, NOT `Choice`. Its two options are fixed and are stored nowhere, so a
  * gate that asserts `Choice` fields resolve an option list would refuse EVERY yes/no field in the
@@ -64,14 +67,17 @@ enum ValueShape: string
     /** A number the evaluator can order: `integer`, `decimal`, `calculated`. */
     case Number = 'number';
 
-    /** A date/time instant. NOT orderable by the current evaluator — see the class docblock. */
+    /** A date or time. Ordered by an EXPRESSION since M134, but never by a structured rule — see the class docblock. */
     case Temporal = 'temporal';
 
     /** An elapsed quantity, stored as a number and therefore orderable. */
     case Duration = 'duration';
 
-    /** One or more values from an author-defined option list of arbitrary strings. */
+    /** One value from an author-defined option list of arbitrary strings: `single_select`, `dropdown`. */
     case Choice = 'choice';
+
+    /** Any number of values from an author-defined option list: `multi_select`. A LIST, never one value. */
+    case MultipleChoice = 'multiple_choice';
 
     /** One value from an author-defined option list of numeric scores. */
     case Scale = 'scale';
@@ -106,7 +112,9 @@ enum ValueShape: string
 
             FieldType::Duration => self::Duration,
 
-            FieldType::SingleSelect, FieldType::MultiSelect, FieldType::Dropdown => self::Choice,
+            FieldType::SingleSelect, FieldType::Dropdown => self::Choice,
+
+            FieldType::MultiSelect => self::MultipleChoice,
 
             FieldType::LikertScale => self::Scale,
 
@@ -141,7 +149,7 @@ enum ValueShape: string
     public function carriesOptionList(): bool
     {
         return match ($this) {
-            self::Choice, self::Scale => true,
+            self::Choice, self::MultipleChoice, self::Scale => true,
             self::Text, self::Number, self::Temporal, self::Duration, self::Boolean,
             self::Hierarchy, self::Geo, self::Attachment, self::Grid, self::NoAnswer => false,
         };
@@ -188,9 +196,11 @@ enum ValueShape: string
      * ⛔ THE ORDERED FOUR CARRY THE SAME FAIL-CLOSED DEFECT AS `min_value`, BY THE SAME ROUTE.
      * `StructuredRuleLowering::conditionForOperator()` lowers `gt`/`lt`/`gte`/`lte` to
      * `AstBuilders::comparison()`, and `ExpressionEvaluator` takes `Coercion::toNumber()` of both sides and
-     * returns **false** on a NaN operand. So `required_if visit_date > '2026-01-01'` is not a condition that
-     * sometimes holds — it is a condition that can never hold, and the field it guards silently never
-     * becomes required. Confined to the three shapes whose stored answer really is a number.
+     * returns **false** on a NaN operand. So `required_if score > 'high'` is not a condition that sometimes
+     * holds — it can never hold, and the field it guards silently never becomes required. Confined to the
+     * three shapes whose stored answer really is a number. ⚠️ Since M134 the engines DO order two ISO dates
+     * (`Temporal`), so for `Temporal` this refusal is now a scope choice rather than a guard: the structured
+     * editor's value is free text nobody checks is a date. Lifting it is `R-af395416`'s structured half.
      *
      * ⚠️ `contains` IS SAFE WHERE IT IS OFFERED AND MEANINGLESS WHERE IT IS NOT.
      * `ExpressionEvaluator::evalMembershipFunction()` branches on the value: an array is a membership test,
@@ -199,8 +209,11 @@ enum ValueShape: string
      * a number or a date reads as a range test and is not one, and an object-valued answer would be searched
      * as whatever `toStr()` happens to make of it.
      *
-     * ⚠️ `eq`, `neq` and `is_null` are value-agnostic: `equals()` has its own emptiness and array rules and
-     * never coerces through `toNumber()`, so they apply wherever there is an answer at all.
+     * ⚠️ `is_null` applies wherever there is an answer at all: `= ''` is an emptiness test, decided before
+     * `equals()` looks at a list. `eq` and `neq` are NOT value-agnostic (Increment M134, `R-87160c81`, correcting
+     * M112): `equals()` rule 3 makes an array or object on either side false — so against a multi-select, a cascade,
+     * a file, a grid or a point, `eq` never holds and `neq` always does — rule 5 compares two numeric-like sides
+     * through `toNumber()`, and rule 3b reads a yes/no by meaning. Offered only where the answer is one value.
      */
     public function allowsOperator(ComparisonOperator $operator): bool
     {
@@ -209,7 +222,12 @@ enum ValueShape: string
         }
 
         return match ($operator) {
-            ComparisonOperator::Eq, ComparisonOperator::Neq, ComparisonOperator::IsNull => true,
+            ComparisonOperator::IsNull => true,
+
+            ComparisonOperator::Eq, ComparisonOperator::Neq => match ($this) {
+                self::Text, self::Number, self::Temporal, self::Duration, self::Choice, self::Scale, self::Boolean => true,
+                self::MultipleChoice, self::Hierarchy, self::Geo, self::Attachment, self::Grid => false,
+            },
 
             ComparisonOperator::Gt, ComparisonOperator::Lt,
             ComparisonOperator::Gte, ComparisonOperator::Lte => $this === self::Number
@@ -218,6 +236,7 @@ enum ValueShape: string
 
             ComparisonOperator::Contains => $this === self::Text
                 || $this === self::Choice
+                || $this === self::MultipleChoice
                 || $this === self::Hierarchy,
         };
     }

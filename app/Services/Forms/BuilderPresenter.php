@@ -8,6 +8,7 @@ use App\Enums\ComparisonOperator;
 use App\Enums\FieldAppearance;
 use App\Enums\FieldType;
 use App\Enums\IndexedDataType;
+use App\Enums\OperandKind;
 use App\Enums\RequiredMode;
 use App\Enums\ValidationRuleType;
 use App\Enums\ValueShape;
@@ -166,6 +167,8 @@ final class BuilderPresenter
             'appearance' => $field->appearance,
             'config' => (object) ($field->config ?? []),
             'default_value' => $field->default_value,
+            // M134 (`R-6d7b9ff7`) — so the builder's undo can PATCH a formula default back AS a formula.
+            'default_value_is_expression' => $field->default_value_is_expression,
             'is_pii' => $field->is_pii,
             'is_sensitive' => $field->is_sensitive,
             'is_queryable' => $field->is_queryable,
@@ -233,8 +236,11 @@ final class BuilderPresenter
                 'config_editor' => $type->configEditor(),
                 // Increment M115 — what may be ASSERTED about this type's value. It rides here rather than
                 // in `enums()` because the panel already builds its per-type maps from this list, and
-                // because a per-type key in `enums()` would be a thirty-one-entry copy of a twelve-row table.
+                // because a per-type key in `enums()` would be a thirty-one-entry copy of a thirteen-row table.
                 'value_shape' => ValueShape::for($type)->value,
+                // Increment M134 (`R-910d2286`) — what an EXPRESSION may compare this type's answer with, the kind the
+                // publish gate judges it by; the condition editor reads its capabilities from `enums()['operand_kinds']`.
+                'operand_kind' => OperandKind::for($type)->value,
                 // Increment M125 — additive: the palette shows ONE entry per group, and all 31 entries stay.
                 'variant' => $type->variantGroup()?->paletteVariant($type),
                 // Increment M130 — the layouts an author may choose for this type (`FieldAppearance::for()`),
@@ -260,7 +266,7 @@ final class BuilderPresenter
      * exactly the defect `R-e878d49a` filed.
      *
      * ⚠️ KEYED ON A SHAPE RATHER THAN ON A FIELD TYPE, for the reason {@see ValueShape}'s docblock
-     * gives: twelve shapes by eleven rule types is a table a person can read, and thirty-one by eleven
+     * gives: thirteen shapes by eleven rule types is a table a person can read, and thirty-one by eleven
      * is not. The field's own shape rides on the palette entry ({@see palette()}), which is where the
      * panel already derives its per-type facts.
      *
@@ -325,6 +331,17 @@ final class BuilderPresenter
             // M133 (`R-5da4a30f`) — the types a link to another form's answers may feed, transmitted so the Options
             // tab never keeps its own list.
             'linked_choice_types' => array_map(static fn (FieldType $type): string => $type->value, LinkedChoiceService::LINKABLE_TYPES),
+            // M134 (`R-910d2286`) — what a condition may compare a question of each kind with, from `OperandKind`'s own
+            // methods: the condition editor offers a subset of what the publish gate accepts, and never restates it.
+            'operand_kinds' => array_map(static fn (OperandKind $kind): array => [
+                'value' => $kind->value,
+                'offered' => $kind->offered(),
+                'orders' => $kind->orders(),
+                'equals' => $kind->equals(),
+                'includes' => $kind->includes(),
+                'orders_with' => array_map(static fn (OperandKind $other): string => $other->value, $kind->ordersWith()),
+                'literal_input' => $kind->literalInput(),
+            ], OperandKind::cases()),
         ];
     }
 

@@ -423,18 +423,18 @@ final class PublishValidationException extends RuntimeException
     }
 
     /**
-     * An expression that compares a date, time or date-and-time question with more than / less than, or does
-     * arithmetic on one (Increment M126, `R-87160c81`). Ordering is numeric-only in both engines, so it never
-     * changes with the answer — and in a constraint, every answer is refused. ⚠️ "NOT SUPPORTED YET", because it
-     * is: `D71` queued date comparison as its own row, and this refusal lifts when that ships. `$ownerKey` is the
-     * question or section the expression belongs to; `$kind` is the compared type's own label.
+     * An expression that does arithmetic on a date, time or date-and-time question, or turns one into a number with
+     * `int()` (Increment M126, `R-87160c81`; narrowed by M134). Since `M134` both engines ORDER dates and times
+     * chronologically (`R-62b638e1`), so this code no longer refuses `>`/`<`; date arithmetic is still NaN in both
+     * engines, so the expression never changes with the answer. ⚠️ "NOT SUPPORTED YET", because it is.
+     * `$ownerKey` is the question or section the expression belongs to; `$kind` is the compared type's own label.
      */
     public static function expressionOrdersDate(string $ownerKey, string $dateKey, string $kind): self
     {
         return self::one(
             $ownerKey,
             'expression_orders_date',
-            "The expression on “{$ownerKey}” compares the {$kind} question “{$dateKey}” using more than, less than or arithmetic. Comparing dates and times that way is not supported yet, so the expression never changes with the answer. Compare with “=” or remove the comparison.",
+            "The expression on “{$ownerKey}” does arithmetic with the {$kind} question “{$dateKey}”, or turns it into a number with int(). Arithmetic on dates and times is not supported yet, so the expression never changes with the answer. Compare it with more than or less than instead, or remove the calculation.",
         );
     }
 
@@ -449,6 +449,51 @@ final class PublishValidationException extends RuntimeException
             $ownerKey,
             'expression_orders_non_number',
             "The expression on “{$ownerKey}” uses the {$kind} question “{$otherKey}” as a number, with more than, less than or arithmetic, but its answers are never numbers, so the expression never changes with the answer. Compare a number question, or remove the comparison.",
+        );
+    }
+
+    /**
+     * An expression that orders a date, time or date-and-time question against `now()`, or against a value carrying
+     * a time zone (Increment M134, `D89`). An answer is wall-clock with no zone and `now()` is UTC, so the engines
+     * never compare them — "not supported yet", because a workspace time zone is filed. Same code as
+     * {@see expressionOrdersDate()}: both lift when the work behind them ships.
+     */
+    public static function expressionOrdersDateAgainstClock(string $ownerKey, string $dateKey, string $kind): self
+    {
+        return self::one(
+            $ownerKey,
+            'expression_orders_date',
+            "The expression on “{$ownerKey}” compares the {$kind} question “{$dateKey}” with now(), or with a time that carries a time zone. An answer has no time zone and now() is in UTC, so comparing them is not supported yet. Compare a date with today(), or a time with a fixed time such as '09:00'.",
+        );
+    }
+
+    /**
+     * An expression that orders a date, time or date-and-time question against something that is never one of its
+     * kind — a number, a time against a date, text that is not written as an ISO date (Increment M134,
+     * `R-62b638e1`). Both engines read the pair as never holding, so the expression never changes with the answer.
+     * `$other` names what it was compared with; `$accepts` says what it can be compared with instead.
+     */
+    public static function expressionOrdersTemporalMismatch(string $ownerKey, string $dateKey, string $kind, string $other, string $accepts): self
+    {
+        return self::one(
+            $ownerKey,
+            'expression_orders_temporal_mismatch',
+            "The expression on “{$ownerKey}” compares the {$kind} question “{$dateKey}” with {$other}, which it can never be ordered against, so the comparison never holds. Compare it with {$accepts}.",
+        );
+    }
+
+    /**
+     * An expression that compares a list question — a multi-select, a cascade, a file — with one value using `=` or
+     * `!=` (Increment M134, `R-87160c81`). `equals()` makes a list on either side false, so `=` never holds and `!=`
+     * always does, whatever the respondent picks. `selected()` asks whether a choice was picked; `= ''` whether the
+     * question was answered.
+     */
+    public static function expressionEqualsList(string $ownerKey, string $listKey, string $kind): self
+    {
+        return self::one(
+            $ownerKey,
+            'expression_equals_list',
+            "The expression on “{$ownerKey}” compares the {$kind} question “{$listKey}” with a single value using = or !=, but its answer is a list, so the comparison never changes with the answer. Use selected(\${{$listKey}}, 'value') to ask whether a choice was picked, or = '' to ask whether it was answered.",
         );
     }
 

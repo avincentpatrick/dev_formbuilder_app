@@ -1014,3 +1014,65 @@ it('publishes a group that spans two families, which both engines split per fami
     // Each family's half is a one-member group, so nothing is missing a connective.
     expect(relatedKindRefusal($this->gate, $version)['codes'])->toBe([]);
 });
+
+/*
+|--------------------------------------------------------------------------
+| M134 (`R-87160c81`) — an equality against a list or an object never holds.
+|--------------------------------------------------------------------------
+| `equals()` rule 3 makes an array or an object on either side false, so "required if hobbies = reading" against a
+| multi-select can never hold and its `!=` always does. `ValueShape` split the multi-select out of `Choice` and
+| refuses `eq`/`neq` on every list and object shape; `M123`'s related-shape arm follows with no edit of its own.
+*/
+
+it('refuses an equality against a question whose answer is a list or an object (M134)', function (FieldType $type): void {
+    $version = makeDraftVersion(makeForm($this->user));
+    $subject = addFormField($version, $this->user, 'subject', $type, 0, $type->hasOptions()
+        ? ['config' => ['options' => [['value' => 'a', 'label' => 'A'], ['value' => 'b', 'label' => 'B']]]]
+        : []);
+    $reason = addFormField($version, $this->user, 'reason', FieldType::ShortText, 1);
+
+    foreach ([ComparisonOperator::Eq, ComparisonOperator::Neq] as $sequence => $operator) {
+        FormFieldValidation::create([
+            'form_version_id' => $version->id, 'form_field_id' => $reason->id, 'related_form_field_id' => $subject->id,
+            'rule_type' => ValidationRuleType::RequiredIf, 'operator' => $operator, 'rule_value' => 'a', 'sequence' => $sequence,
+        ]);
+    }
+
+    $codes = relatedKindRefusal($this->gate, $version)['codes'];
+
+    expect(array_values(array_filter($codes, static fn (string $c): bool => $c === 'rule_operator_not_allowed_for_related_shape')))
+        ->toHaveCount(2);
+})->with([
+    'a multi-select' => [FieldType::MultiSelect],
+    'a cascading select' => [FieldType::CascadingSelect],
+    'a photo' => [FieldType::ImageCapture],
+    'a grid' => [FieldType::Matrix],
+    'a point' => [FieldType::Geopoint],
+]);
+
+it('still lets a condition test a multi-select for an answer, or for a choice it includes (M134)', function (): void {
+    $version = makeDraftVersion(makeForm($this->user));
+    $hobbies = addFormField($version, $this->user, 'hobbies', FieldType::MultiSelect, 0, [
+        'config' => ['options' => [['value' => 'reading', 'label' => 'Reading'], ['value' => 'music', 'label' => 'Music']]],
+    ]);
+    $colour = addFormField($version, $this->user, 'colour', FieldType::SingleSelect, 1, [
+        'config' => ['options' => [['value' => 'red', 'label' => 'Red'], ['value' => 'blue', 'label' => 'Blue']]],
+    ]);
+    $reason = addFormField($version, $this->user, 'reason', FieldType::ShortText, 2);
+
+    $rows = [
+        [$hobbies, ValidationRuleType::RequiredWith, null, null],
+        [$hobbies, ValidationRuleType::RequiredIf, ComparisonOperator::IsNull, null],
+        [$hobbies, ValidationRuleType::RequiredIf, ComparisonOperator::Contains, 'reading'],
+        [$colour, ValidationRuleType::RequiredIf, ComparisonOperator::Eq, 'red'],
+    ];
+
+    foreach ($rows as $sequence => [$related, $rule, $operator, $value]) {
+        FormFieldValidation::create([
+            'form_version_id' => $version->id, 'form_field_id' => $reason->id, 'related_form_field_id' => $related->id,
+            'rule_type' => $rule, 'operator' => $operator, 'rule_value' => $value, 'sequence' => $sequence,
+        ]);
+    }
+
+    expect(relatedKindRefusal($this->gate, $version)['codes'])->not->toContain('rule_operator_not_allowed_for_related_shape');
+});

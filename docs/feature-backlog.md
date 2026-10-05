@@ -11888,7 +11888,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `ExpressionValidationGate.php:189-191`'s `non_numeric_threshold` arm must stop refusing a date-shaped
   threshold on a temporal field, and `ValueShapeTest`'s case titled *"refuses min_value and greater_than_field
   on a temporal shape, because both fail CLOSED"* INVERTS. **Live.** Filed by `M113`.
-  **Tier: during-testing.**
+  **Tier: during-testing.** ⚠️ **`M134` (2026-10-05) SHIPPED THIS ROW'S ENGINE HALF THROUGH `R-62b638e1`; THE STRUCTURED HALF STAYS OPEN.** Both engines now order ISO dates, times and date-times through a separate `Temporal` path reached only from `numericCompare()`'s NaN branch (`Coercion` untouched, as this row asked), and the three sub-questions are answered there: no time zone (a naive answer never orders against the UTC `now()`, `D89`), a time orders only against a time while a date reads as its midnight beside a date-time, and a partial or malformed value is not a date. So an EXPRESSION `. > ${start_date}` now publishes and holds, while the STRUCTURED `greater_than_field` / `min_value` on a temporal shape is still refused by `ValueShape` — and a `greater_than_field` between dates on a version published before `M113` now orders chronologically at runtime. What remains is the `ValueShape`/`allowsOperator()` flip, the `non_numeric_threshold` arm and `StructuredRuleEvaluator`'s `MinValue`/`MaxValue` arms, which use `Coercion` directly and so do not reach the new path.
 
 - ✅ **CLOSED BY `M128` (2026-10-03) — `minor` · The per-field 422 error map is built on every builder save failure and still has no consumer, so
   a rejected field edit reports one sentence with nothing marked.** Found by `M113` (2026-09-26) while closing
@@ -11910,7 +11910,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - **`minor` · The builder and PHP disagree about whether a duration field takes an ordered comparison, and the
   disagreement is now pinned rather than resolved.** Found by `M113` (2026-09-26) while building the client
   field-type mirror census. `ConfigPanel.vue:178`'s `NUMERIC_TYPES` is `['integer', 'decimal', 'calculated',
-  'likert_scale']` — four members. `ValueShape::allowsOperator()` (`ValueShape.php:205-223`) permits
+  'likert_scale']` — four members. `ValueShape::allowsOperator()` (`ValueShape.php:218-242`) permits
   `gt`/`lt`/`gte`/`lte` for `Number`, `Duration` and `Scale`, which is **five** types: the same four plus
   `duration`. ⛔ **`R-09f73330` SAYS THIS SET "MIRRORS NOTHING", AND THAT STOPPED BEING TRUE IN THE INCREMENT
   THAT FILED IT** — `M112` shipped `allowsOperator()` the same day, so there is now a PHP predicate answering
@@ -11929,7 +11929,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   field-type literal in `resources/` while building the census, rather than by trusting either filing row's
   count. Beyond the ten declarations `R-09f73330` names and the already-gated `RENDERS_NOTHING`, the same type
   strings appear as bare inline disjunctions at `schema-mapping.ts:91,94,115,118,377,400,424,553`,
-  `FieldInput.vue:239,240,247,248`, `semantic-validator.ts:468,474,480,646,793,821`, `MediaEditor.vue:37`,
+  `FieldInput.vue:239,240,247,248`, `semantic-validator.ts:468,474,480,659,806,834`, `MediaEditor.vue:37`,
   `GeoInput.vue:38-43` and `ConfigPanel.vue`'s `config_editor` comparisons (cited as `:113` until `M116`, where that was a bare `);` and went blank — number DROPPED, not repaired). ⛔ **Two of them are ADDITIONAL COPIES of sets the census
   already guards** — `schema-mapping.ts:424` is a fourth four-member media disjunction, and `:115` and `:400`
   are a second and third geo triple — so the census's own equality assertions can be green while a sibling

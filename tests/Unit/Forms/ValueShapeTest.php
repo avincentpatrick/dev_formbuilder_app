@@ -9,12 +9,12 @@ use App\Enums\ValueShape;
 
 // The M112 value-shape partition, locked type by type (no database, no container — tests/Pest.php binds
 // TestCase to Feature only). The totality test below is what makes a 32nd FieldType case impossible to
-// add without a decision, and the named cases below it are what make the two MEASURED splits impossible
+// add without a decision, and the named cases below it are what make the three MEASURED splits impossible
 // to collapse by accident.
 
 /**
  * The partition, transcribed independently of the enum — the point is that the two are written
- * separately and must agree. Twelve shapes over thirty-one types.
+ * separately and must agree. Thirteen shapes over thirty-one types.
  *
  * @return array<string, list<string>>
  */
@@ -25,7 +25,8 @@ function valueShapeTable(): array
         'number' => ['integer', 'decimal', 'calculated'],
         'temporal' => ['date', 'time', 'datetime'],
         'duration' => ['duration'],
-        'choice' => ['single_select', 'multi_select', 'dropdown'],
+        'choice' => ['single_select', 'dropdown'],
+        'multiple_choice' => ['multi_select'],
         'scale' => ['likert_scale'],
         'boolean' => ['yes_no'],
         'hierarchy' => ['cascading_select'],
@@ -77,7 +78,7 @@ it('partitions all thirty-one field types exactly once, with no shape left empty
         ));
 });
 
-// ── The two measured splits, each pinned by name ────────────────────────────────────────────────
+// ── The three measured splits, each pinned by name ────────────────────────────────────────────────
 
 it('keeps yes_no OUT of Choice, because folding it in makes every yes/no field unpublishable', function (): void {
     // `yes_no`'s two options are fixed and stored nowhere, so a gate asserting that Choice fields resolve
@@ -85,6 +86,16 @@ it('keeps yes_no OUT of Choice, because folding it in makes every yes/no field u
     // passes either way, which is exactly why this one is written separately.
     expect(ValueShape::for(FieldType::YesNo))->toBe(ValueShape::Boolean)
         ->and(ValueShape::for(FieldType::YesNo)->carriesOptionList())->toBeFalse();
+});
+
+it('keeps multi_select OUT of Choice, because an equality against a list never holds (M134)', function (): void {
+    // equals() rule 3 makes an array on either side false, so `required_if hobbies = reading` on a multi-select can
+    // never hold and its `!=` always does. The shapes are split so allowsOperator() can refuse the equality there.
+    expect(ValueShape::for(FieldType::MultiSelect))->toBe(ValueShape::MultipleChoice)
+        ->and(ValueShape::for(FieldType::SingleSelect))->toBe(ValueShape::Choice)
+        ->and(ValueShape::MultipleChoice->allowsOperator(ComparisonOperator::Eq))->toBeFalse()
+        ->and(ValueShape::Choice->allowsOperator(ComparisonOperator::Eq))->toBeTrue()
+        ->and(ValueShape::MultipleChoice->carriesOptionList())->toBeTrue();
 });
 
 it('separates duration from the other temporal types, because only duration stores a number', function (): void {
@@ -118,9 +129,9 @@ it('names the four option-bearing types, so the set cannot silently empty', func
 // ── allows(): what may be asserted about a value of each shape ──────────────────────────────────
 
 it('refuses min_value and greater_than_field on a temporal shape, because both fail CLOSED', function (): void {
-    // StructuredRuleEvaluator's MinValue arm is `isEmpty($answer) || (isNumericLike($answer) && …)` and
-    // ExpressionEvaluator's ordered comparison returns false on a NaN operand. A date is not numeric-like,
-    // so either rule makes EVERY non-empty answer invalid — the field becomes unanswerable.
+    // StructuredRuleEvaluator's MinValue arm is `isEmpty($answer) || (isNumericLike($answer) && …)`, so a date makes
+    // EVERY non-empty answer invalid. Since M134 the engines order two ISO dates, so greater_than_field between dates
+    // would now hold at runtime — it stays refused until R-af395416's structured half, which this case then inverts.
     expect(ValueShape::Temporal->allows(ValidationRuleType::MinValue))->toBeFalse()
         ->and(ValueShape::Temporal->allows(ValidationRuleType::MaxValue))->toBeFalse()
         ->and(ValueShape::Temporal->allows(ValidationRuleType::GreaterThanField))->toBeFalse()
@@ -190,24 +201,31 @@ it('leaves no rule type unanswered by any shape', function (): void {
 
 // ── allowsOperator(): which comparisons a CONDITION may make against each shape ─────────────────
 
-it('refuses the ordered operators on a temporal shape, because a condition would never hold', function (): void {
-    // StructuredRuleLowering lowers gt/lt/gte/lte to AstBuilders::comparison(), and ExpressionEvaluator
-    // returns false on a NaN operand — so `required_if visit_date > '2026-01-01'` is not a condition that
-    // sometimes holds, it is one that can NEVER hold, and the field it guards never becomes required.
+it('refuses the ordered operators on a temporal shape until its structured half ships', function (): void {
+    // Before M134 `required_if visit_date > '2026-01-01'` could NEVER hold. The engines now order two ISO dates,
+    // but the structured editor's value is unchecked free text, so Temporal stays refused here until R-af395416's
+    // structured half checks it; this case inverts then.
     foreach ([ComparisonOperator::Gt, ComparisonOperator::Lt, ComparisonOperator::Gte, ComparisonOperator::Lte] as $op) {
         expect(ValueShape::Temporal->allowsOperator($op))->toBeFalse("Temporal should not allow {$op->value}");
         expect(ValueShape::Number->allowsOperator($op))->toBeTrue("Number should allow {$op->value}");
     }
 });
 
-it('allows equality and blankness everywhere there is an answer at all', function (): void {
-    foreach ([ComparisonOperator::Eq, ComparisonOperator::Neq, ComparisonOperator::IsNull] as $op) {
-        foreach (ValueShape::cases() as $shape) {
-            expect($shape->allowsOperator($op))->toBe(
-                $shape !== ValueShape::NoAnswer,
-                "{$shape->value} disagrees about {$op->value}",
-            );
-        }
+it('allows a blankness test everywhere there is an answer at all', function (): void {
+    foreach (ValueShape::cases() as $shape) {
+        expect($shape->allowsOperator(ComparisonOperator::IsNull))->toBe($shape !== ValueShape::NoAnswer, $shape->value);
+    }
+});
+
+it('allows equality only where the answer is ONE value, never a list or an object (M134)', function (): void {
+    // equals() rule 3: an array or an object on either side is false, so eq never holds and neq always does.
+    foreach ([ComparisonOperator::Eq, ComparisonOperator::Neq] as $op) {
+        $allowed = array_values(array_map(
+            static fn (ValueShape $s): string => $s->value,
+            array_filter(ValueShape::cases(), static fn (ValueShape $s): bool => $s->allowsOperator($op)),
+        ));
+
+        expect($allowed)->toEqualCanonicalizing(['text', 'number', 'temporal', 'duration', 'choice', 'scale', 'boolean'], $op->value);
     }
 });
 
@@ -217,6 +235,7 @@ it('offers contains only where a value is a list or a string', function (): void
     // where a substring match reads as a range test and is not one.
     expect(ValueShape::Text->allowsOperator(ComparisonOperator::Contains))->toBeTrue()
         ->and(ValueShape::Choice->allowsOperator(ComparisonOperator::Contains))->toBeTrue()
+        ->and(ValueShape::MultipleChoice->allowsOperator(ComparisonOperator::Contains))->toBeTrue()
         ->and(ValueShape::Hierarchy->allowsOperator(ComparisonOperator::Contains))->toBeTrue()
         ->and(ValueShape::Number->allowsOperator(ComparisonOperator::Contains))->toBeFalse()
         ->and(ValueShape::Temporal->allowsOperator(ComparisonOperator::Contains))->toBeFalse()

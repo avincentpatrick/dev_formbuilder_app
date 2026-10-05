@@ -225,16 +225,17 @@ final class ExpressionValidationGate
      * Every expression that reads a question as a NUMBER when that question's answers never are one (Increment
      * M126, `R-87160c81`).
      *
-     * ⛔ THE EXPRESSION IS CONSTANT, AND NEITHER ENGINE SAYS SO. Ordering is numeric-only in both engines
-     * (`ExpressionEvaluator::numericCompare()`): an operand that is not numeric-like makes `> < >= <=` false,
-     * and arithmetic on one is NaN. So `${remark} > 3` on a note, `${dob} <= today()` on a date and
-     * `${hobbies} > 2` on a multi-select published clean and then never changed with the answer — and in a
-     * constraint, every answer was refused. {@see check()} only resolves keys; `M123`'s arms in
-     * {@see StructuralValidationGate} judge structured rule rows, never an expression.
+     * ⛔ THE EXPRESSION IS CONSTANT, AND NEITHER ENGINE SAYS SO. An operand that is not numeric-like makes
+     * `> < >= <=` false unless both sides are comparable ISO dates or times (`Temporal`, since `M134`), and
+     * arithmetic on one is NaN. So `${remark} > 3` on a note and `${hobbies} > 2` on a multi-select published
+     * clean and then never changed with the answer — and in a constraint, every answer was refused. {@see check()}
+     * only resolves keys; `M123`'s arms in {@see StructuralValidationGate} judge structured rule rows, never an
+     * expression.
      *
-     * A use is NUMERIC exactly as the conversion census reads it ({@see ExpressionKeyUse}, the one walker both
-     * share): an ordering, arithmetic, or `int()`. A constraint's `.` names its own question. A question whose
-     * answer is refused outright as an operand (grid, geo) is left to {@see check()}, so it is reported once.
+     * A use is read exactly as the conversion census reads it ({@see ExpressionKeyUse}, the one walker both
+     * share), and judged by {@see ExpressionOperandJudge} against the question's `OperandKind` — for a date or a
+     * time, against what it is compared WITH (`M134`, `D89`). A constraint's `.` names its own question. A question
+     * whose answer is refused outright as an operand (grid, geo) is left to {@see check()}, so it is reported once.
      * An expression that does not parse is skipped for the same reason.
      *
      * ⚠️ APPENDED HERE, AND ITS CALL SITE REPLACED THE COLLECTION LINE IN PLACE, for the reason
@@ -296,46 +297,16 @@ final class ExpressionValidationGate
 
             foreach ($keys as $key) {
                 $type = $typeByKey[$key] ?? null;
-                $kind = $type !== null ? self::numberNeverHeldBy($type) : null;
 
-                if ($type === null || $kind === null || ! ExpressionKeyUse::of($ast, $key, $key === $site['self'])['numeric']) {
-                    continue;
+                if ($type === null) {
+                    continue; // check() has already refused an unknown key
                 }
 
-                $violations[] = $kind === 'date'
-                    ? PublishValidationException::expressionOrdersDate($site['owner'], $key, $type->label())
-                    : PublishValidationException::expressionOrdersNonNumber($site['owner'], $key, $type->label());
+                $use = ExpressionKeyUse::of($ast, $key, $key === $site['self']);
+                $violations[] = ExpressionOperandJudge::judge($site['owner'], $key, $type, $use, $site['self'], $typeByKey);
             }
         }
 
-        return $violations;
-    }
-
-    /**
-     * Why a question's answer can never be numeric-like — `date` for the three temporal types, whose ordering is
-     * not supported YET (`D71`: date comparison is its own row), `non_number` for every other — or null when it
-     * can be. Text, hidden, calculated and the single choices can hold a numeric string, so they stay allowed;
-     * grid and geo are refused as operands outright by {@see check()}.
-     *
-     * ⛔ A `match` ON THE ENUM WITH NO `default` ARM — a thirty-second field type is a PHPStan error here.
-     *
-     * @return 'date'|'non_number'|null
-     */
-    private static function numberNeverHeldBy(FieldType $type): ?string
-    {
-        return match ($type) {
-            FieldType::Date, FieldType::Time, FieldType::Datetime => 'date',
-
-            FieldType::Note, FieldType::PageBreak, FieldType::YesNo,
-            FieldType::MultiSelect, FieldType::CascadingSelect,
-            FieldType::FileUpload, FieldType::ImageCapture, FieldType::AudioCapture,
-            FieldType::VideoCapture, FieldType::Signature => 'non_number',
-
-            FieldType::ShortText, FieldType::LongText, FieldType::Email, FieldType::Phone, FieldType::Url,
-            FieldType::Hidden, FieldType::Integer, FieldType::Decimal, FieldType::Calculated, FieldType::Duration,
-            FieldType::SingleSelect, FieldType::Dropdown, FieldType::LikertScale,
-            FieldType::Geopoint, FieldType::Geotrace, FieldType::Geoshape,
-            FieldType::Matrix, FieldType::LikertMatrix => null,
-        };
+        return array_values(array_filter($violations));
     }
 }

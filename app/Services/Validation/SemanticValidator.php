@@ -593,6 +593,7 @@ final class SemanticValidator
         }
 
         $this->collectMembershipErrors($field, $answer, $errors, $sectionKey, $instanceIndex);
+        $this->collectWholeNumberError($field, $answer, $errors, $sectionKey, $instanceIndex);
     }
 
     /**
@@ -1532,5 +1533,29 @@ final class SemanticValidator
         $scalar = is_string($value) || is_int($value) || is_float($value) || is_bool($value);
 
         return $scalar && ! Coercion::isEmpty($value) ? Coercion::yesNoAnswer($value) : $value;
+    }
+
+    private const WHOLE_NUMBER_MESSAGE = 'Enter a whole number.';
+
+    /**
+     * A whole-number question holds a whole number (Increment M134, `R-b21da9f3`). Until M134 only the staff
+     * entry page's browser refused 2.5 (`step="1"`), and every other channel — the guest page, the sync API, an
+     * import — stored it; the engines are now the one check, on every page and on the server, golden-pinned by
+     * `tests/golden/validation/whole_number.json`. `"7.0"` is whole. A non-number is Stage 2's refusal
+     * (`not_a_number`), never this one.
+     *
+     * @param  list<SemanticError>  $errors
+     */
+    private function collectWholeNumberError(FormField $field, mixed $answer, array &$errors, ?string $sectionKey, ?int $instanceIndex): void
+    {
+        if ($field->field_type !== FieldType::Integer || ! Coercion::isNumericLike($answer)) {
+            return;
+        }
+
+        $number = Coercion::toNumber($answer);
+
+        if (floor($number) !== $number) {
+            $errors[] = new SemanticError($field->key, 'not_a_whole_number', self::WHOLE_NUMBER_MESSAGE, $sectionKey, $instanceIndex);
+        }
     }
 }

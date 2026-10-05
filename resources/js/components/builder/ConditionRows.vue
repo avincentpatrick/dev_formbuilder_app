@@ -10,7 +10,7 @@
  * budget, through `serialize()`'s self-check — rather than guessed at here.
  */
 import { MdsButton, MdsSelect } from '@meridian/design-system';
-
+import { firstSeedableField, seedRow } from './condition-operands';
 import ConditionRow from './ConditionRow.vue';
 import type { Condition } from './condition-model';
 import type { ConditionCatalogue, EnumOption } from './types';
@@ -36,17 +36,17 @@ function remove(index: number): void {
 }
 
 function addCondition(): void {
-    const first = props.catalogue.fields[0];
+    const first = firstSeedableField(props.catalogue);
 
     emit('update:group', {
         ...props.group,
         children: [
             ...props.group.children,
-            // Seeded with the first question and an EMPTY value, which makes the row incomplete
+            // Seeded with the first question that takes a value (M134) and an EMPTY value — the row is incomplete
             // (`isComplete()` refuses an empty operand) — so adding a row writes nothing until the author
             // has actually said something. A default that happened to be complete would write a condition
             // they never chose.
-            { kind: 'compare', op: 'eq', left: { kind: 'field', key: first?.key ?? '' }, right: { kind: 'text', value: '' } },
+            seedRow(props.catalogue, first?.key ?? ''),
         ],
     });
 }

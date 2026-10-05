@@ -1,0 +1,67 @@
+[
+  {
+    "name": "temporal_constraint_on_or_before_today_passes",
+    "grammar_version": "2.0",
+    "now": "2026-07-11T09:30:00+00:00",
+    "schema": {"fields": [{"key": "dob", "field_type": "date", "rules": [{"expression": ". <= today()"}]}]},
+    "answers": {"dob": "1990-04-17"},
+    "expected": {"relevance": {"fields": {"dob": true}, "sections": {}}, "errors": [], "effective_answers": {"dob": "1990-04-17"}, "computed": {}}
+  },
+  {
+    "name": "temporal_constraint_on_or_before_today_refuses_tomorrow",
+    "grammar_version": "2.0",
+    "now": "2026-07-11T09:30:00+00:00",
+    "schema": {"fields": [{"key": "dob", "field_type": "date", "rules": [{"expression": ". <= today()"}]}]},
+    "answers": {"dob": "2026-07-12"},
+    "expected": {"relevance": {"fields": {"dob": true}, "sections": {}}, "errors": [{"field": "dob", "rule": "constraint"}], "effective_answers": {"dob": "2026-07-12"}, "computed": {}}
+  },
+  {
+    "name": "temporal_end_on_or_after_start_refused",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "start", "field_type": "date"}, {"key": "end", "field_type": "date", "rules": [{"expression": ". >= ${start}"}]}]},
+    "answers": {"start": "2026-02-01", "end": "2026-01-31"},
+    "expected": {"relevance": {"fields": {"start": true, "end": true}, "sections": {}}, "errors": [{"field": "end", "rule": "constraint"}], "effective_answers": {"start": "2026-02-01", "end": "2026-01-31"}, "computed": {}}
+  },
+  {
+    "name": "temporal_relevance_after_a_date",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "visit", "field_type": "date"}, {"key": "followup", "relevant": "${visit} >= '2026-01-01'"}]},
+    "answers": {"visit": "2025-12-31", "followup": "x"},
+    "expected": {"relevance": {"fields": {"visit": true, "followup": false}, "sections": {}}, "errors": [], "effective_answers": {"visit": "2025-12-31"}, "computed": {}}
+  },
+  {
+    "name": "temporal_time_window_refuses_outside",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "arrived", "field_type": "time", "rules": [{"expression": ". >= '08:00' and . <= '17:00'"}]}]},
+    "answers": {"arrived": "18:30"},
+    "expected": {"relevance": {"fields": {"arrived": true}, "sections": {}}, "errors": [{"field": "arrived", "rule": "constraint"}], "effective_answers": {"arrived": "18:30"}, "computed": {}}
+  },
+  {
+    "name": "temporal_end_on_or_after_start_accepts_same_day",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "start", "field_type": "date"}, {"key": "end", "field_type": "date", "rules": [{"expression": ". >= ${start}"}]}]},
+    "answers": {"start": "2026-02-01", "end": "2026-02-01"},
+    "expected": {"relevance": {"fields": {"start": true, "end": true}, "sections": {}}, "errors": [], "effective_answers": {"start": "2026-02-01", "end": "2026-02-01"}, "computed": {}}
+  },
+  {
+    "name": "temporal_relevance_after_a_date_shows",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "visit", "field_type": "date"}, {"key": "followup", "relevant": "${visit} >= '2026-01-01'"}]},
+    "answers": {"visit": "2026-03-01", "followup": "x"},
+    "expected": {"relevance": {"fields": {"visit": true, "followup": true}, "sections": {}}, "errors": [], "effective_answers": {"visit": "2026-03-01", "followup": "x"}, "computed": {}}
+  },
+  {
+    "name": "temporal_time_window_accepts_inside",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "arrived", "field_type": "time", "rules": [{"expression": ". >= '08:00' and . <= '17:00'"}]}]},
+    "answers": {"arrived": "12:00"},
+    "expected": {"relevance": {"fields": {"arrived": true}, "sections": {}}, "errors": [], "effective_answers": {"arrived": "12:00"}, "computed": {}}
+  },
+  {
+    "name": "temporal_greater_than_field_between_dates",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "start", "field_type": "date"}, {"key": "end", "field_type": "date", "rules": [{"rule_type": "greater_than_field", "related": "start"}]}]},
+    "answers": {"start": "2026-02-01", "end": "2026-03-01"},
+    "expected": {"relevance": {"fields": {"start": true, "end": true}, "sections": {}}, "errors": [], "effective_answers": {"start": "2026-02-01", "end": "2026-03-01"}, "computed": {}}
+  }
+]

@@ -59,8 +59,8 @@ group('a condition it understands', () => {
     it('reads a comparison of two fields, which is an ordinary date-range shape', () => {
         // Written first as an opaque case and CORRECTED: `${end} > ${start}` is both legitimate and
         // unambiguous in prose, and refusing it would have hidden a common condition behind raw text for no
-        // gain. (It is worth knowing that ordering is numeric-only in both engines, so a date comparison is
-        // always false — Doc #27 amendment A1 — but that is the engine's story to tell, not the reader's.)
+        // gain. (Until M134 ordering was numeric-only in both engines, so a date comparison was always false —
+        // Doc #27 amendment A1; it now orders chronologically. Either way that is the engine's story, not the reader's.)
         expect(prose('${age} > ${tier}')).toBe('Shown when Your age is more than Membership tier.');
     });
 

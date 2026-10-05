@@ -23,16 +23,22 @@ use App\Services\Expressions\Ast\SelfReferenceNode;
  * census — which asks what a type change would re-mean — and {@see ExpressionValidationGate} — which refuses an
  * ordering that can never hold — classify a use the same way. A second copy of this walk in the gate would be one
  * more unguarded mirror.
+ *
+ * `M134` (`R-62b638e1`, `R-87160c81`) split the two coarse flags without changing them, because the census reads
+ * only `present`, `numeric` and `list`: `numeric` is still exactly `ordering` or `arithmetic` (an ordering, or
+ * arithmetic / `int()`), and `list` still includes `equality` (an `=` or `!=` against anything but `''`). `against`
+ * holds the OTHER side of every ordering that names the key, so the gate can judge a date against what it is
+ * compared with — the one place a pair, not a position, decides.
  */
 final class ExpressionKeyUse
 {
     /**
      * @param  bool  $selfIsKey  whether `.` names $key too — true only on that field's own constraint
-     * @return array{present: bool, numeric: bool, list: bool}
+     * @return array{present: bool, numeric: bool, list: bool, ordering: bool, arithmetic: bool, equality: bool, against: list<Node>}
      */
     public static function of(Node $node, string $key, bool $selfIsKey): array
     {
-        $use = ['present' => false, 'numeric' => false, 'list' => false];
+        $use = ['present' => false, 'numeric' => false, 'list' => false, 'ordering' => false, 'arithmetic' => false, 'equality' => false, 'against' => []];
         self::walk($node, $key, $selfIsKey, $use);
 
         return $use;
@@ -42,39 +48,40 @@ final class ExpressionKeyUse
      * Mark how $node uses the key. A direct use is classified by the position it sits in; anything else is
      * walked, so `${k} + 1 > 3` is a numeric use through the arithmetic, and parentheses are already gone.
      *
-     * @param  array{present: bool, numeric: bool, list: bool}  $use
+     * @param  array{present: bool, numeric: bool, list: bool, ordering: bool, arithmetic: bool, equality: bool, against: list<Node>}  $use
      */
     private static function walk(Node $node, string $key, bool $selfIsKey, array &$use): void
     {
         if ($node instanceof ComparisonNode) {
-            self::classify($node->left, self::comparisonUse($node->op, $node->right), $key, $selfIsKey, $use);
-            self::classify($node->right, self::comparisonUse($node->op, $node->left), $key, $selfIsKey, $use);
+            self::classify($node->left, self::comparisonUse($node->op, $node->right), $key, $selfIsKey, $use, $node->right);
+            self::classify($node->right, self::comparisonUse($node->op, $node->left), $key, $selfIsKey, $use, $node->left);
         } elseif ($node instanceof ArithmeticNode) {
-            self::classify($node->left, 'numeric', $key, $selfIsKey, $use);
-            self::classify($node->right, 'numeric', $key, $selfIsKey, $use);
+            self::classify($node->left, ['numeric', 'arithmetic'], $key, $selfIsKey, $use);
+            self::classify($node->right, ['numeric', 'arithmetic'], $key, $selfIsKey, $use);
         } elseif ($node instanceof FunctionCallNode) {
-            $kind = match ($node->name) {
-                'contains', 'count' => 'list',
-                'int' => 'numeric',
-                default => null, // `selected()` reads a list and a value alike; `if()` passes its value through
+            $kinds = match ($node->name) {
+                'contains', 'count' => ['list'],
+                'int' => ['numeric', 'arithmetic'],
+                default => [], // `selected()` reads a list and a value alike; `if()` passes its value through
             };
 
             foreach ($node->args as $arg) {
-                self::classify($arg, $kind, $key, $selfIsKey, $use);
+                self::classify($arg, $kinds, $key, $selfIsKey, $use);
             }
         } elseif ($node instanceof LogicalNode) {
-            self::classify($node->left, null, $key, $selfIsKey, $use);
-            self::classify($node->right, null, $key, $selfIsKey, $use);
+            self::classify($node->left, [], $key, $selfIsKey, $use);
+            self::classify($node->right, [], $key, $selfIsKey, $use);
         } elseif ($node instanceof NotNode) {
-            self::classify($node->operand, null, $key, $selfIsKey, $use);
+            self::classify($node->operand, [], $key, $selfIsKey, $use);
         }
     }
 
     /**
-     * @param  'numeric'|'list'|null  $kind
-     * @param  array{present: bool, numeric: bool, list: bool}  $use
+     * @param  list<'numeric'|'list'|'ordering'|'arithmetic'|'equality'>  $kinds
+     * @param  array{present: bool, numeric: bool, list: bool, ordering: bool, arithmetic: bool, equality: bool, against: list<Node>}  $use
+     * @param  Node|null  $other  the other side, when $operand is one side of a comparison
      */
-    private static function classify(Node $operand, ?string $kind, string $key, bool $selfIsKey, array &$use): void
+    private static function classify(Node $operand, array $kinds, string $key, bool $selfIsKey, array &$use, ?Node $other = null): void
     {
         $named = ($operand instanceof FieldReferenceNode && $operand->key === $key)
             || ($selfIsKey && $operand instanceof SelfReferenceNode);
@@ -87,8 +94,12 @@ final class ExpressionKeyUse
 
         $use['present'] = true;
 
-        if ($kind !== null) {
+        foreach ($kinds as $kind) {
             $use[$kind] = true;
+        }
+
+        if ($other !== null && in_array('ordering', $kinds, true)) {
+            $use['against'][] = $other;
         }
     }
 
@@ -97,16 +108,18 @@ final class ExpressionKeyUse
      * list and a value alike (`ExpressionEvaluator` decides emptiness before its array rule), so only an
      * equality against something else reads a list differently from one value.
      *
-     * @return 'numeric'|'list'|null
+     * @return list<'numeric'|'list'|'ordering'|'equality'>
      */
-    private static function comparisonUse(ComparisonOperator $operator, Node $other): ?string
+    private static function comparisonUse(ComparisonOperator $operator, Node $other): array
     {
+        $againstEmpty = $other instanceof LiteralNode && $other->isEmptyStringLiteral();
+
         return match ($operator) {
             ComparisonOperator::Gt, ComparisonOperator::Lt,
-            ComparisonOperator::Gte, ComparisonOperator::Lte => 'numeric',
-            ComparisonOperator::Eq, ComparisonOperator::Neq,
-            ComparisonOperator::Contains => $other instanceof LiteralNode && $other->isEmptyStringLiteral() ? null : 'list',
-            ComparisonOperator::IsNull => null,
+            ComparisonOperator::Gte, ComparisonOperator::Lte => ['numeric', 'ordering'],
+            ComparisonOperator::Eq, ComparisonOperator::Neq => $againstEmpty ? [] : ['list', 'equality'],
+            ComparisonOperator::Contains => $againstEmpty ? [] : ['list'],
+            ComparisonOperator::IsNull => [],
         };
     }
 }

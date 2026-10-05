@@ -92,6 +92,8 @@ class FormField extends Model implements TenantScoped
         'is_pii' => false,
         'is_sensitive' => false,
         'is_queryable' => false,
+        // M134 (`R-6d7b9ff7`) — the builder now sends this key back on every save, so a fresh row must hold it too.
+        'default_value_is_expression' => false,
     ];
 
     /**

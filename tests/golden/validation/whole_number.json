@@ -1,0 +1,44 @@
+[
+  {
+    "name": "whole_number_accepts_a_whole_number",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "age", "field_type": "integer"}]},
+    "answers": {"age": 42},
+    "expected": {"relevance": {"fields": {"age": true}, "sections": {}}, "errors": [], "effective_answers": {"age": 42}, "computed": {}}
+  },
+  {
+    "name": "whole_number_refuses_a_fraction",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "age", "field_type": "integer"}]},
+    "answers": {"age": 2.5},
+    "expected": {"relevance": {"fields": {"age": true}, "sections": {}}, "errors": [{"field": "age", "rule": "not_a_whole_number"}], "effective_answers": {"age": 2.5}, "computed": {}}
+  },
+  {
+    "name": "whole_number_refuses_a_fraction_sent_as_text",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "age", "field_type": "integer"}]},
+    "answers": {"age": "-0.5"},
+    "expected": {"relevance": {"fields": {"age": true}, "sections": {}}, "errors": [{"field": "age", "rule": "not_a_whole_number"}], "effective_answers": {"age": "-0.5"}, "computed": {}}
+  },
+  {
+    "name": "whole_number_accepts_a_whole_number_written_with_a_point",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "age", "field_type": "integer"}]},
+    "answers": {"age": "7.0"},
+    "expected": {"relevance": {"fields": {"age": true}, "sections": {}}, "errors": [], "effective_answers": {"age": "7.0"}, "computed": {}}
+  },
+  {
+    "name": "whole_number_leaves_a_decimal_question_alone",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "weight", "field_type": "decimal"}]},
+    "answers": {"weight": 2.5},
+    "expected": {"relevance": {"fields": {"weight": true}, "sections": {}}, "errors": [], "effective_answers": {"weight": 2.5}, "computed": {}}
+  },
+  {
+    "name": "whole_number_skips_an_unanswered_question",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "age", "field_type": "integer"}]},
+    "answers": {},
+    "expected": {"relevance": {"fields": {"age": true}, "sections": {}}, "errors": [], "effective_answers": {}, "computed": {}}
+  }
+]

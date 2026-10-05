@@ -1122,6 +1122,7 @@ function fieldPayload(field: LocalField): Record<string, unknown> {
         appearance: field.appearance,
         config: field.config,
         default_value: field.default_value,
+        default_value_is_expression: field.default_value_is_expression,
         is_pii: field.is_pii,
         is_sensitive: field.is_sensitive,
         is_queryable: field.is_queryable,

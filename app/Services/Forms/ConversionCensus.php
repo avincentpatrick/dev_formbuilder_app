@@ -288,7 +288,7 @@ final class ConversionCensus
      * not a list, and any expression reference to one is already refused at publish.
      *
      * ⛔ A `match` ON THE ENUM WITH NO `default` ARM — a thirty-second field type is a PHPStan error here. Kept
-     * out of `ValueShape`, which puts the multi-select and the single choice in one shape on purpose.
+     * out of `ValueShape`, which partitions what a RULE may assert: the list answers span three of its shapes.
      */
     private static function isList(FieldType $type): bool
     {

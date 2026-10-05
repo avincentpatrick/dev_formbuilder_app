@@ -361,3 +361,106 @@ group('an outside change is adopted, not fought', () => {
         expect((control(wrapper, 'Condition 1 value').element as HTMLInputElement).value).toBe('21');
     });
 });
+
+/*
+ * M134 (`R-910d2286`) — the editor offers only what publish accepts and what can hold, read from the transmitted
+ * `operand_kinds` rows. The catalogue above carries none, which is exactly the "filters nothing" path every test
+ * above exercises; this one is classified the way ConfigPanel classifies a real form.
+ */
+const KINDS: NonNullable<ConditionCatalogue['kinds']> = [
+    { value: 'number', offered: true, orders: true, equals: true, includes: false, orders_with: ['number', 'computed', 'value'], literal_input: null },
+    { value: 'date', offered: true, orders: true, equals: true, includes: false, orders_with: ['date', 'datetime'], literal_input: 'date' },
+    { value: 'time', offered: true, orders: true, equals: true, includes: false, orders_with: ['time'], literal_input: 'time' },
+    { value: 'datetime', offered: true, orders: true, equals: true, includes: false, orders_with: ['date', 'datetime'], literal_input: 'datetime-local' },
+    { value: 'value', offered: true, orders: true, equals: true, includes: true, orders_with: ['number', 'computed', 'value'], literal_input: null },
+    { value: 'boolean', offered: true, orders: false, equals: true, includes: true, orders_with: [], literal_input: null },
+    { value: 'list', offered: true, orders: false, equals: false, includes: true, orders_with: [], literal_input: null },
+    { value: 'attachment', offered: true, orders: false, equals: false, includes: false, orders_with: [], literal_input: null },
+    { value: 'none', offered: false, orders: false, equals: false, includes: false, orders_with: [], literal_input: null },
+];
+
+const classified: ConditionCatalogue = {
+    fields: [
+        { key: 'remark', label: 'A note', numeric: false, options: [], operand_kind: 'none' },
+        { key: 'age', label: 'Your age', numeric: true, options: [], operand_kind: 'number' },
+        { key: 'dob', label: 'Date of birth', numeric: false, options: [], operand_kind: 'date' },
+        { key: 'visit', label: 'Visit', numeric: false, options: [], operand_kind: 'datetime' },
+        { key: 'opens', label: 'Opening time', numeric: false, options: [], operand_kind: 'time' },
+        { key: 'consent', label: 'Consent', numeric: false, options: [], operand_kind: 'boolean' },
+        { key: 'hobbies', label: 'Hobbies', numeric: false, options: [{ value: 'reading', label: 'Reading' }], operand_kind: 'list' },
+        { key: 'photo', label: 'Photo', numeric: false, options: [], operand_kind: 'attachment' },
+        { key: 'name', label: 'Name', numeric: false, options: [], operand_kind: 'value' },
+    ],
+    repeatables: [],
+    kinds: KINDS,
+};
+
+function mountClassified(expression: string | null) {
+    return mount(ConditionEditor, { props: { expression, catalogue: classified, legend: 'Show this question only when…' } });
+}
+
+function optionValues(wrapper: ReturnType<typeof mountClassified>, label: string, enabledOnly = true): string[] {
+    return control(wrapper, label)
+        .findAll('option')
+        .filter((option) => !enabledOnly || option.attributes('disabled') === undefined)
+        .map((option) => option.attributes('value') ?? '');
+}
+
+group('M134 — what the editor offers is what can hold and publish', () => {
+    it('offers no ordering on a yes/no, a list or a file, and no "is" on a list or a file', () => {
+        expect(optionValues(mountClassified("${consent} = 'yes'"), 'Condition 1 operator')).toEqual(['eq', 'neq', 'blank', 'not_blank', 'includes', 'excludes']);
+        expect(optionValues(mountClassified("selected(${hobbies}, 'reading')"), 'Condition 1 operator')).toEqual(['blank', 'not_blank', 'includes', 'excludes']);
+        expect(optionValues(mountClassified("${photo} != ''"), 'Condition 1 operator')).toEqual(['blank', 'not_blank']);
+        expect(optionValues(mountClassified('${age} > 18'), 'Condition 1 operator')).toEqual(['eq', 'neq', 'gt', 'lt', 'gte', 'lte', 'blank', 'not_blank']);
+    });
+
+    it('never offers a note as the question a condition is about', () => {
+        const subjects = optionValues(mountClassified('${age} > 18'), 'Condition 1 subject');
+
+        expect(subjects).not.toContain('field:remark');
+        expect(subjects).toContain('field:age');
+    });
+
+    it('orders a date only against dates, with a date picker for the fixed value', () => {
+        const wrapper = mountClassified("${dob} <= '2026-01-01'");
+        const compared = optionValues(wrapper, 'Condition 1 compared with');
+
+        expect(compared).toEqual(expect.arrayContaining(['literal', 'field:dob', 'field:visit']));
+        expect(compared).not.toContain('field:age');
+        expect(compared).not.toContain('field:opens');
+        expect(compared).not.toContain('field:name');
+        expect(control(wrapper, 'Condition 1 value').attributes('type')).toBe('date');
+    });
+
+    it('keeps a typed date when "is" becomes "is after", rather than turning it into a number', async () => {
+        const wrapper = mountClassified("${dob} = '2026-01-01'");
+        await control(wrapper, 'Condition 1 operator').setValue('gt');
+
+        expect(emitted(wrapper)).toEqual(["${dob} > '2026-01-01'"]);
+    });
+
+    it('shows a saved comparison it would not offer, disabled, rather than rewriting it', () => {
+        const wrapper = mountClassified("${hobbies} = 'reading'");
+        const operator = control(wrapper, 'Condition 1 operator');
+        const saved = operator.findAll('option').find((option) => option.attributes('value') === 'eq');
+
+        expect((operator.element as HTMLSelectElement).value).toBe('eq');
+        expect(saved?.attributes('disabled')).toBeDefined();
+        expect(saved?.text()).toContain('not available for this question');
+        expect(wrapper.emitted('update:expression')).toBeUndefined();
+    });
+
+    it('drops an operator the new question cannot take when the subject changes', async () => {
+        const wrapper = mountClassified('${age} > 18');
+        await control(wrapper, 'Condition 1 subject').setValue('field:hobbies');
+
+        expect((control(wrapper, 'Condition 1 operator').element as HTMLSelectElement).value).toBe('includes');
+    });
+
+    it('starts a new condition on the first question that takes a value, not on a note', async () => {
+        const wrapper = mountClassified(null);
+        await button(wrapper, 'Add condition').trigger('click');
+
+        expect((control(wrapper, 'Condition 1 subject').element as HTMLSelectElement).value).toBe('field:age');
+    });
+});

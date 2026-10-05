@@ -64,6 +64,8 @@ final class UpdateFieldRequest extends FormRequest
             'appearance' => ['nullable', 'string', 'max:60', Rule::in($this->allowedAppearances($field))],
             'config' => ['present', 'array'],
             'default_value' => ['nullable', 'string', 'max:2000'],
+            // M134 (`R-6d7b9ff7`) — optional: absent keeps the stored flag, so an older client cannot clear it by omission.
+            'default_value_is_expression' => ['sometimes', 'boolean'],
             'is_pii' => ['boolean'],
             'is_sensitive' => ['boolean'],
             'is_queryable' => ['boolean'],

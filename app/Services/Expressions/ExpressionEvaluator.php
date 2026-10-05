@@ -143,14 +143,14 @@ final class ExpressionEvaluator
         };
     }
 
-    /** Numeric-only ordering: a non-numeric (or NaN) operand makes any of `> < >= <=` false. */
+    /** Ordering: two numbers numerically; otherwise only two comparable ISO dates/times ({@see Temporal}, M134), else false. */
     private function numericCompare(mixed $left, mixed $right, ComparisonOperator $op): bool
     {
         $a = Coercion::toNumber($left);
         $b = Coercion::toNumber($right);
 
         if (is_nan($a) || is_nan($b)) {
-            return false;
+            return Temporal::orders($left, $right, $op);
         }
 
         return match ($op) {

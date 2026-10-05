@@ -40,6 +40,8 @@ export interface ServerField {
     appearance: string | null;
     config: Record<string, unknown>;
     default_value: string | null;
+    // M134 (`R-6d7b9ff7`) — whether `default_value` is a formula (an XLSForm `calculation`), so undo restores it as one.
+    default_value_is_expression: boolean;
     is_pii: boolean;
     is_sensitive: boolean;
     is_queryable: boolean;
@@ -85,11 +87,35 @@ export interface ConditionFieldOption {
     // The field's own choices, so a `selected()` row offers a dropdown instead of asking an author to
     // retype an option value. Empty for a field that has none.
     options: EnumOption[];
+    // M134 (`R-910d2286`) — `OperandKind::for()` of the field's type, from its palette entry: what an expression may
+    // compare it with. Optional: a hand-built catalogue carries none, and absent reads as "offer everything".
+    operand_kind?: string;
 }
 
 export interface ConditionCatalogue {
     fields: ConditionFieldOption[];
     repeatables: { key: string; label: string }[];
+    // M134 — the capability row of every operand kind, `BuilderEnums.operand_kinds` passed through. Optional, as above.
+    kinds?: OperandKindOption[];
+}
+
+// What a question of one operand kind may be compared with in a condition (M134, `R-910d2286`) — transmitted from
+// `OperandKind`'s methods, the same enum the publish gate judges an expression by, so the condition editor offers a
+// subset of what publish accepts and never restates which types order or equal what.
+export interface OperandKindOption {
+    value: string;
+    // Whether a condition may name such a question at all — never a note, a page break, a grid or a point.
+    offered: boolean;
+    // more than / less than / at least / at most.
+    orders: boolean;
+    // is / is not — never for a list or a file, whose answer never equals one value.
+    equals: boolean;
+    // includes / does not include — `selected()`.
+    includes: boolean;
+    // The kinds an ordering may compare it with — a date only with a date or a date-time, a time only with a time.
+    orders_with: string[];
+    // The input a fixed value beside it uses — `date`, `time` or `datetime-local` — or null for the default.
+    literal_input: 'date' | 'time' | 'datetime-local' | null;
 }
 
 export interface PaletteType {
@@ -100,10 +126,12 @@ export interface PaletteType {
     // The dedicated config editor this type needs beyond the shared tabs (G4a), or null. Mirrors
     // FieldType::configEditor(), which holds the list of values; the config panel keys its editor tab off this.
     config_editor: string | null;
-    // What may be ASSERTED about this type's value (M115) — `ValueShape::for()`'s twelve-member partition,
+    // What may be ASSERTED about this type's value (M115) — `ValueShape::for()`'s thirteen-member partition,
     // not a thirty-first field-type special case. The config panel matches it against each rule type's
     // `shapes` to decide what the Validation tab may offer, and hides that tab entirely for 'no_answer'.
     value_shape: string;
+    // M134 (`R-910d2286`) — what an EXPRESSION may compare this type's answer with, `OperandKind::for()` transmitted.
+    operand_kind: string;
     // The palette group this type is one variant of (M125) — `FieldVariantGroup` via BuilderPresenter, or null.
     // The palette shows ONE entry per group (its primary) and the Basics tab switches between the members.
     // Optional: a hand-built palette in a test may carry none, and absent reads as ungrouped.
@@ -182,6 +210,9 @@ export interface BuilderEnums {
     // M133 (`R-5da4a30f`) — the question types that may take their choices from another form,
     // `LinkedChoiceService::LINKABLE_TYPES` transmitted. Optional: a hand-built enum block in a test offers none.
     linked_choice_types?: string[];
+    // M134 (`R-910d2286`) — one row per `OperandKind`, what the condition editor may offer. Optional: a hand-built
+    // enum block in a test offers none, and the editor then filters nothing.
+    operand_kinds?: OperandKindOption[];
 }
 
 /** A choice question's link to another form's answers (M133) — `config.options_source`; either half may be unpicked yet. */

@@ -298,7 +298,7 @@ describe('ConfigPanel — the choice layout that replaced the free-text appearan
         const touch = vi.fn();
         const text = field({ appearance: 'numbers' });
         const wrapper = mountPanel(makeStore({ field: text, touch }));
-        await openTab(wrapper, 'Advanced');
+        await wrapper.findAll('[role="tab"]').find((tab) => tab.text() === 'Advanced')!.trigger('click');
 
         const kept = wrapper.find('[data-kept-appearance]');
         expect(kept.exists()).toBe(true);
@@ -320,7 +320,7 @@ describe('ConfigPanel — the choice layout that replaced the free-text appearan
 
     it('offers no free-text appearance anywhere, and nothing at all for a type with no layout and no stored value', async () => {
         const wrapper = mountPanel(makeStore({ field: field() }));
-        await openTab(wrapper, 'Advanced');
+        await wrapper.findAll('[role="tab"]').find((tab) => tab.text() === 'Advanced')!.trigger('click');
 
         expect(wrapper.text()).not.toContain('Appearance hint');
         expect(wrapper.find('[data-kept-appearance]').exists()).toBe(false);
@@ -635,5 +635,22 @@ describe('ConfigPanel — choices from another form (M133)', () => {
         expect(touch).toHaveBeenCalledTimes(1);
         expect(touch).toHaveBeenLastCalledWith('f1', 'field');
         expect(wrapper.findComponent({ name: 'ChoicesEditor' }).exists()).toBe(false);
+    });
+});
+
+describe('ConfigPanel — a formula default (M134, R-6d7b9ff7)', () => {
+    it('makes an imported formula default plain text the moment the author types over it', async () => {
+        const touch = vi.fn();
+        const visit = field({ default_value: 'today()', default_value_is_expression: true } as Partial<LocalField>);
+        const wrapper = mountPanel(makeStore({ field: visit, touch }));
+        await wrapper.findAll('[role="tab"]').find((tab) => tab.text() === 'Advanced')!.trigger('click');
+
+        const box = wrapper.findAll('input').find((input) => (input.element as HTMLInputElement).value === 'today()');
+        expect(box).toBeDefined();
+        await box!.setValue('2026-01-01');
+
+        expect(visit.default_value).toBe('2026-01-01');
+        expect((visit as LocalField & { default_value_is_expression: boolean }).default_value_is_expression).toBe(false);
+        expect(touch).toHaveBeenLastCalledWith('f1', 'field');
     });
 });

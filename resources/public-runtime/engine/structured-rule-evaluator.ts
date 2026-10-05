@@ -14,7 +14,7 @@
  * A false result is a validation RESULT, never a throw; only a structurally-impossible rule raises.
  */
 
-import { isEmpty, isNumericLike, toBool, toNumber, toStr, type MaybeAbsent } from './coercion';
+import { ABSENT, isEmpty, isNumericLike, toBool, toNumber, toStr, type MaybeAbsent } from './coercion';
 import type { EvaluationContext } from './context';
 import type { LogicOperator } from './enums';
 import { ExpressionEvaluationError } from './errors';
@@ -70,7 +70,7 @@ export class StructuredRuleEvaluator {
         switch (row.rule_type) {
             case 'greater_than_field':
             case 'less_than_field':
-                return toBool(this.evaluator.evaluateNode(this.lowering.lower(row, fieldKeysById), context));
+                return this.passesFieldComparison(row, context, fieldKeysById);
             case 'min_value':
                 return isEmpty(answer) || (isNumericLike(answer) && toNumber(answer) >= toNumber(this.ruleValue(row)));
             case 'max_value':
@@ -147,5 +147,19 @@ export class StructuredRuleEvaluator {
 
     private sortRows(rows: ValidationRow[]): ValidationRow[] {
         return [...rows].sort((a, b) => (a.sequence - b.sequence) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+    }
+
+    /**
+     * `greater_than_field` / `less_than_field` PASS while the COMPARED answer is blank (Increment M134) — the
+     * mirror of StructuredRuleEvaluator::passesFieldComparison. Lowered FIRST so an unresolvable compared key
+     * still throws `missing_related_field` rather than reading as blank. Appended, with the arm replaced in
+     * place, because this file is cited by line.
+     */
+    private passesFieldComparison(row: ValidationRow, context: EvaluationContext, fieldKeysById: FieldKeysById): boolean {
+        const comparison = this.lowering.lower(row, fieldKeysById);
+        const relatedKey = row.related_form_field_id !== null ? (fieldKeysById[row.related_form_field_id] ?? null) : null;
+
+        return (relatedKey !== null && isEmpty(context.has(relatedKey) ? context.answers[relatedKey] : ABSENT))
+            || toBool(this.evaluator.evaluateNode(comparison, context));
     }
 }

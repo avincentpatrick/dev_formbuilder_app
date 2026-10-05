@@ -247,11 +247,11 @@ const catalogue = computed<ConditionCatalogue>(() => {
             .map((f) => ({
                 key: f.key,
                 label: f.label.trim() === '' ? f.key : f.label,
-                numeric: NUMERIC_TYPES.has(f.field_type),
+                numeric: NUMERIC_TYPES.has(f.field_type), operand_kind: props.store.palette.flatMap((g) => g.types).find((t) => t.value === f.field_type)?.operand_kind,
                 options: choicesOf(f),
             })),
-        // `count()` is only meaningful against a repeatable section — a non-repeating one has no instances
-        // to count, and H21a seeds the reference at both scopes for repeatables only.
+        kinds: enums.operand_kinds, // M134 (`R-910d2286`) — what each question may be compared with, transmitted
+        // `count()` needs a repeatable section: a non-repeating one has no instances (H21a seeds repeatables only).
         repeatables: props.store.sections.value
             .filter((s) => s.is_repeatable && s.key !== '' && s.key !== ownKey)
             .map((s) => ({ key: s.key, label: s.label.trim() === '' ? s.key : s.label })),
@@ -626,7 +626,7 @@ watch(librarySaved, (value) => {
                             <MdsTextInput
                                 :id="id" :describedby="describedby" :invalid="invalid"
                                 :model-value="field.default_value ?? ''"
-                                @update:model-value="setField('default_value', $event || null)"
+                                @update:model-value="setField('default_value_is_expression', false); setField('default_value', $event || null)"
                             />
                         </MdsFormField>
                         <div class="config__checks">

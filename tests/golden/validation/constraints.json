@@ -82,5 +82,26 @@
     "schema": {"fields": [{"key": "start", "field_type": "integer"}, {"key": "end", "field_type": "integer", "rules": [{"rule_type": "greater_than_field", "related": "start"}]}]},
     "answers": {"start": 5, "end": 1},
     "expected": {"relevance": {"fields": {"start": true, "end": true}, "sections": {}}, "errors": [{"field": "end", "rule": "greater_than_field"}], "effective_answers": {"start": 5, "end": 1}, "computed": {}}
+  },
+  {
+    "name": "field_vs_field_compared_blank_passes",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "start", "field_type": "integer"}, {"key": "end", "field_type": "integer", "rules": [{"rule_type": "greater_than_field", "related": "start"}]}]},
+    "answers": {"end": 5},
+    "expected": {"relevance": {"fields": {"start": true, "end": true}, "sections": {}}, "errors": [], "effective_answers": {"end": 5}, "computed": {}}
+  },
+  {
+    "name": "less_than_field_compared_blank_passes",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "limit", "field_type": "integer"}, {"key": "used", "field_type": "integer", "rules": [{"rule_type": "less_than_field", "related": "limit"}]}]},
+    "answers": {"used": 5},
+    "expected": {"relevance": {"fields": {"limit": true, "used": true}, "sections": {}}, "errors": [], "effective_answers": {"used": 5}, "computed": {}}
+  },
+  {
+    "name": "field_vs_field_compared_irrelevant_passes",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "flag"}, {"key": "start", "field_type": "integer", "relevant": "${flag} = 'y'"}, {"key": "end", "field_type": "integer", "rules": [{"rule_type": "greater_than_field", "related": "start"}]}]},
+    "answers": {"start": 9, "end": 5},
+    "expected": {"relevance": {"fields": {"flag": true, "start": false, "end": true}, "sections": {}}, "errors": [], "effective_answers": {"end": 5}, "computed": {}}
   }
 ]

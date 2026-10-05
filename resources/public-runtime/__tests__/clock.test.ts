@@ -17,9 +17,9 @@
  *    would render a step the server then prunes — silently, with a 201, because an irrelevant field is never
  *    required-checked.
  *
- * Recorded honestly (amendment A1): this buys LESS than Doc #27 §3.4 implied. `${d} >= today()` was already
- * always-false in BOTH engines — `numericCompare` is numeric-only and `NUMERIC_RE` rejects `'2026-08-01'` —
- * so what actually moves is equality against the clock, `count()`, and `if()`.
+ * Recorded honestly (amendment A1): at H21a this bought LESS than Doc #27 §3.4 implied — `${d} >= today()` was
+ * always-false in BOTH engines then, because ordering was numeric-only. Since M134 (`R-62b638e1`) it orders
+ * chronologically in both engines (`engine/temporal.ts`); ordering against `now()` still never holds (`D89`).
  */
 
 import { describe, expect, it } from 'vitest';

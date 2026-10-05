@@ -1950,6 +1950,14 @@ class E2eSeeder extends Seeder
             // is exactly the column §D5 reads as "first save". The tests/Pest.php seedCountableAt() device.
             $submission->forceFill(['created_at' => $createdAt])->saveQuietly();
 
+            $answers = $this->sampleAnswers($version);
+            if ($form->is($uptake)) {
+                // M133: the stored District is the one the index projects (`UPTAKE_VALUES`). Until now the document held
+                // the sample text while the index held a district, so the two disagreed — invisible while only the
+                // explorer read this field, and the very list "Field Visit Referral" takes its choices from now.
+                $answers['district'] = self::UPTAKE_VALUES[$index % count(self::UPTAKE_VALUES)]['district'];
+            }
+
             SubmissionAnswer::updateOrCreate(
                 ['submission_id' => $submission->id],
                 [
@@ -1957,7 +1965,7 @@ class E2eSeeder extends Seeder
                     // Empty for `screened_out` (I9a) — that state MEANS the respondent was shown no
                     // questions, so a populated document would contradict it on the detail page. The 1:1
                     // answer row is still written, because the inbox and PDF presenters read through it.
-                    'answers' => $row['status'] === SubmissionStatus::ScreenedOut ? [] : $this->sampleAnswers($version),
+                    'answers' => $row['status'] === SubmissionStatus::ScreenedOut ? [] : $answers,
                     'attachment_refs' => [],
                 ],
             );
@@ -2086,20 +2094,25 @@ class E2eSeeder extends Seeder
      * One row's `district` is deliberately LEFT EMPTY, so coverage reads 4 of 5. A 100% coverage figure
      * proves nothing about §D3(iii)'s disclosure, which is the thing the page must be able to render.
      */
+    /**
+     * The Programme Uptake answers the explorer and the M133 linked list both read — one table, so the index and the
+     * stored document cannot disagree again.
+     *
+     * @var list<array<string, mixed>>
+     */
+    private const UPTAKE_VALUES = [
+        ['district' => 'Malate', 'households_reached' => 12, 'visited_on' => '2026-06-02', 'follow_up_needed' => true],
+        ['district' => 'Sampaloc', 'households_reached' => 34, 'visited_on' => '2026-06-09', 'follow_up_needed' => false],
+        ['district' => null, 'households_reached' => 34, 'visited_on' => '2026-06-16', 'follow_up_needed' => true],
+        ['district' => 'Tondo', 'households_reached' => 51, 'visited_on' => '2026-06-23', 'follow_up_needed' => true],
+        ['district' => 'Sampaloc', 'households_reached' => 88, 'visited_on' => '2026-06-30', 'follow_up_needed' => false],
+    ];
+
     private function projectUptakeIndex(Submission $submission, FormVersion $version, int $index): void
     {
         $projector = app(AnswerIndexProjector::class);
 
-        /** @var array<int, array<string, mixed>> $values */
-        $values = [
-            ['district' => 'Malate', 'households_reached' => 12, 'visited_on' => '2026-06-02', 'follow_up_needed' => true],
-            ['district' => 'Sampaloc', 'households_reached' => 34, 'visited_on' => '2026-06-09', 'follow_up_needed' => false],
-            ['district' => null, 'households_reached' => 34, 'visited_on' => '2026-06-16', 'follow_up_needed' => true],
-            ['district' => 'Tondo', 'households_reached' => 51, 'visited_on' => '2026-06-23', 'follow_up_needed' => true],
-            ['district' => 'Sampaloc', 'households_reached' => 88, 'visited_on' => '2026-06-30', 'follow_up_needed' => false],
-        ];
-
-        $answers = $values[$index % count($values)];
+        $answers = self::UPTAKE_VALUES[$index % count(self::UPTAKE_VALUES)];
 
         foreach ($version->fields()->get() as $field) {
             $projected = $projector->project($field, $answers[$field->key] ?? null);

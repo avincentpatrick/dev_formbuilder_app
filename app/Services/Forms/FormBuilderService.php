@@ -290,6 +290,8 @@ final class FormBuilderService
                 'appearance' => $data['appearance'] ?? null,
                 'config' => $data['config'] ?? [],
                 'default_value' => $data['default_value'] ?? null,
+                // M134 (`R-6d7b9ff7`) — written only when sent: the builder's undo restores a formula default with it.
+                ...(array_key_exists('default_value_is_expression', $data) ? ['default_value_is_expression' => (bool) $data['default_value_is_expression']] : []),
                 'is_pii' => (bool) ($data['is_pii'] ?? false),
                 'is_sensitive' => (bool) ($data['is_sensitive'] ?? false),
                 'is_queryable' => (bool) ($data['is_queryable'] ?? false),

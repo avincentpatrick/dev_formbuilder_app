@@ -361,3 +361,47 @@ describe('older history across a type that moved elsewhere', () => {
         expect(store.saveError.value).toContain('can’t be undone');
     });
 });
+
+describe('a formula default survives the undo of a conversion to a note (M134, R-6d7b9ff7)', () => {
+    it('PATCHes the default back WITH its formula flag, so today() does not return as text (CS15)', async () => {
+        const mock = fetchMock().mockResolvedValueOnce(
+            jsonResponse(200, serverField({ field_type: 'note', default_value: null, default_value_is_expression: false, version: 'v2' })),
+        );
+        const store = storeWith({ field_type: 'short_text', default_value: 'today()', default_value_is_expression: true });
+        await store.convertField(
+            store.fields.value[0].uid,
+            conversionPlan({
+                from: 'short_text',
+                to: 'note',
+                lossless: false,
+                requires_confirmation: true,
+                changes: [
+                    { column: 'default_value', from: 'today()', to: null },
+                    { column: 'default_value_is_expression', from: true, to: false },
+                ],
+            }),
+        );
+        expect(store.fields.value[0].default_value_is_expression).toBe(false);
+
+        mock.mockResolvedValueOnce(plansResponse(conversionPlan({ from: 'note', to: 'short_text', lossless: true, requires_confirmation: false })))
+            .mockResolvedValueOnce(jsonResponse(200, serverField({ field_type: 'short_text', default_value: null, default_value_is_expression: false, version: 'v3' })))
+            .mockResolvedValueOnce(jsonResponse(200, serverField({ field_type: 'short_text', default_value: 'today()', default_value_is_expression: true, version: 'v4' })));
+
+        await store.undo();
+
+        const log = requestLog(mock).slice(1);
+        expect(log.map((r) => r.method)).toEqual(['GET', 'POST', 'PATCH']);
+        const patch = log[2].body as { default_value: string | null; default_value_is_expression: boolean };
+        expect(patch.default_value).toBe('today()');
+        expect(patch.default_value_is_expression).toBe(true);
+    });
+
+    it('sends the flag on every field save, so a save never clears it by omission', async () => {
+        const mock = fetchMock().mockResolvedValueOnce(jsonResponse(200, serverField({ label: 'Visit', default_value: 'today()', default_value_is_expression: true, version: 'v2' })));
+        const store = storeWith({ default_value: 'today()', default_value_is_expression: true });
+        typeLabel(store, 'Visit');
+        await settle(store);
+
+        expect((requestLog(mock)[0].body as { default_value_is_expression: boolean }).default_value_is_expression).toBe(true);
+    });
+});

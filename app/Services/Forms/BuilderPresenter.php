@@ -167,6 +167,8 @@ final class BuilderPresenter
             'appearance' => $field->appearance,
             'config' => (object) ($field->config ?? []),
             'default_value' => $field->default_value,
+            // M134 (`R-6d7b9ff7`) — so the builder's undo can PATCH a formula default back AS a formula.
+            'default_value_is_expression' => $field->default_value_is_expression,
             'is_pii' => $field->is_pii,
             'is_sensitive' => $field->is_sensitive,
             'is_queryable' => $field->is_queryable,

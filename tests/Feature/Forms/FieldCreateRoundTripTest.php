@@ -51,6 +51,7 @@ function createRoundTripPayload(array $row, string $label): array
         'appearance' => $row['appearance'],
         'config' => $row['config'],
         'default_value' => $row['default_value'],
+        'default_value_is_expression' => $row['default_value_is_expression'], // M134
         'is_pii' => $row['is_pii'],
         'is_sensitive' => $row['is_sensitive'],
         'is_queryable' => $row['is_queryable'],
@@ -74,7 +75,8 @@ it('answers a create with real booleans, and takes its own answer straight back'
 
     expect($created->json('is_pii'))->toBeFalse()
         ->and($created->json('is_sensitive'))->toBeFalse()
-        ->and($created->json('is_queryable'))->toBeFalse();
+        ->and($created->json('is_queryable'))->toBeFalse()
+        ->and($created->json('default_value_is_expression'))->toBeFalse(); // M134 — the builder now sends it back
 
     test()->actingAs($admin)
         ->patchJson("http://acme.meridian.test/forms/{$form->id}/fields/{$created->json('id')}", createRoundTripPayload($created->json(), 'Renamed'))

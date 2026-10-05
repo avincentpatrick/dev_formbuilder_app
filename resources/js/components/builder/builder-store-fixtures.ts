@@ -63,7 +63,7 @@ export function serverField(overrides: Partial<ServerField> = {}): ServerField {
         relevant_expression: null,
         appearance: null,
         config: {},
-        default_value: null,
+        default_value: null, default_value_is_expression: false,
         is_pii: false,
         is_sensitive: false,
         is_queryable: false,

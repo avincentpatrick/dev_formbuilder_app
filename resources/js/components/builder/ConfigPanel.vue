@@ -626,7 +626,7 @@ watch(librarySaved, (value) => {
                             <MdsTextInput
                                 :id="id" :describedby="describedby" :invalid="invalid"
                                 :model-value="field.default_value ?? ''"
-                                @update:model-value="setField('default_value', $event || null)"
+                                @update:model-value="setField('default_value_is_expression', false); setField('default_value', $event || null)"
                             />
                         </MdsFormField>
                         <div class="config__checks">

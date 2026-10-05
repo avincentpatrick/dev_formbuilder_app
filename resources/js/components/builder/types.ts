@@ -40,6 +40,8 @@ export interface ServerField {
     appearance: string | null;
     config: Record<string, unknown>;
     default_value: string | null;
+    // M134 (`R-6d7b9ff7`) — whether `default_value` is a formula (an XLSForm `calculation`), so undo restores it as one.
+    default_value_is_expression: boolean;
     is_pii: boolean;
     is_sensitive: boolean;
     is_queryable: boolean;

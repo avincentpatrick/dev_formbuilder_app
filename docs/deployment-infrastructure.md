@@ -51,7 +51,7 @@ Single-box Windows self-hosting has **no managed zero-downtime deploy**. `deploy
 ---
 
 ## 4. Secrets Management
-- **Environment secrets** (DB credentials, Stripe keys, the OCR-provider key, mail credentials, `APP_KEY`) live in the server's **`.env` file on the Windows Server**, git-ignored — created and maintained on the server by hand, never committed. `deploy.ps1` never overwrites `.env`.
+- **Environment secrets** (DB credentials, Stripe keys, the OCR-provider key, mail credentials, `APP_KEY`) live in the server's **`.env` file on the Windows Server**, git-ignored — created and maintained on the server by hand, never committed. `deploy.ps1` never overwrites `.env`. On the testing server the OCR key (`OCR_GOOGLE_VISION_KEY`) is a key of its own, restricted to the Cloud Vision API, in a Google Cloud project with billing on (a budget alert is still owed); the laptop keeps a separate key (`M135`, 2026-10-05).
 - **Committed-secret prevention**: `gitleaks` runs in CI (stage 1) as a backstop against a credential ever reaching the repository.
 - **Per-tenant secrets** (webhook signing secrets) are application data — encrypted in the database (Laravel encrypted cast, `docs/data-dictionary.md` §14), a distinct concern from the server `.env`.
 - **Rotation**: server secrets rotated annually at minimum and immediately on suspected compromise (a manual runbook step; no automated rotation in Phase 1).
@@ -273,7 +273,7 @@ refuse to create an account without a console.
      - your DNS provider's API and `acme-v02.api.letsencrypt.org` (step 8);
      - `github.com`, `api.github.com`, `codeload.github.com`, `repo.packagist.org` and `registry.npmjs.org`,
        which `deploy.ps1` fetches from on every run, plus the hosts GitHub lists for self-hosted runners;
-     - a connector provider's API (Slack, Google, Airtable) only if you configure that connector (§4.1).
+     - a connector provider's API (Slack, Google, Airtable) only if you configure that connector (§4.1); `vision.googleapis.com` over HTTPS reads scanned forms (OCR) — reachable from the testing server, measured 2026-10-05.
    - The app trusts no proxy. If a proxy or tunnel ever fronts nginx, every guest shares the proxy's address in
      the per-address limits of item 3.
 
@@ -373,8 +373,8 @@ refuse to create an account without a console.
      use that address, never the central one.
 
 9. **After any later `.env` edit** (the guest limits included), run `php artisan config:cache` and then
-   `php artisan queue:restart`, or simply re-run `deploy.ps1`. A deploy caches the config and a cached config
-   ignores `.env`, so an edit without this changes nothing.
+   `php artisan queue:restart`. Re-running `deploy.ps1` is NOT enough: when nothing new is deployed it returns before
+   its cache step (`M135`). A cached config ignores `.env`, so an edit without both commands changes nothing.
 
 10. **Expose the site.** Publish the `A` record for the site's host name — and `*.<CENTRAL_DOMAIN>` too **only**
     if the site serves workspaces as subdomains. **Open inbound 443.**
@@ -680,3 +680,4 @@ under-disclose at the same time.
      shifts every line beneath it, and this repository cites documents as `path:N` — 25 such
      citations point into the files that carry markers. End-of-file shifts nothing. -->
 <!-- pipeline: id=track-b-deployment title="Track B — stand up the ADR-0005 self-hosted production host" phase=4 state=held size=XL blocker="user: deferred until app development is done, and needs the host itself" tier=before-launch -->
+<!-- pipeline: id=staging-smoke-test title="Smoke-test the 19 builder comments and one OCR scan on the testing server before the Oct 12 session, from the db-backed checklist M135 published; each failure is fixed under D90 or filed" phase=n/a state=blocked size=M blocker="user: clicks through the 21 checks at https://claude.ai/artifact/2PF4Wdcp8UcNDTTveAJEWX (6 passed on 2026-10-05, none failed); Claude reads the marks with ArtifactData and fixes or files each failure" tier=early-testing -->

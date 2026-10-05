@@ -9,6 +9,7 @@ use App\Http\Controllers\Public\Concerns\ReadsGuestShareToken;
 use App\Http\Middleware\EstablishGuestTenantContext;
 use App\Models\Form;
 use App\Models\FormVersion;
+use App\Services\Forms\LinkedChoiceService;
 use App\Services\Submissions\PublicFormPresenter;
 use App\Support\Api\ApiErrorResponse;
 use Illuminate\Http\JsonResponse;
@@ -44,5 +45,33 @@ final class PublicFormSchemaController extends Controller
         $version = FormVersion::query()->whereKey($token->formVersionId)->firstOrFail();
 
         return response()->json(['data' => $presenter->present($form, $version)]);
+    }
+
+    /**
+     * Fetch the choices this shared form takes from another form's answers.
+     *
+     * One list per question that takes its choices from another form, keyed by that question's key. A list the
+     * other form no longer shares comes back empty with `available: false`. `stamp` changes whenever the list
+     * does. `version` must be the share token's own form version; any other request answers the same 404.
+     *
+     * @unauthenticated
+     */
+    public function linkedChoices(Request $request, string $shareToken, string $version, LinkedChoiceService $links): JsonResponse
+    {
+        $token = $this->shareToken($request);
+        $form = Form::query()->whereKey($token->formId)->first();
+
+        if ($form === null || ! $form->allow_guest_submissions || $version !== $token->formVersionId) {
+            return ApiErrorResponse::make(404, 'linked_choices_not_found', 'These choices are not available.');
+        }
+
+        $pinned = FormVersion::query()->whereKey($token->formVersionId)->first();
+        if ($pinned === null) {
+            return ApiErrorResponse::make(404, 'linked_choices_not_found', 'These choices are not available.');
+        }
+
+        return response()
+            ->json(['data' => ['version_id' => $pinned->id, 'lists' => $links->listsFor($form, $pinned)]])
+            ->header('Cache-Control', 'private, no-cache');
     }
 }

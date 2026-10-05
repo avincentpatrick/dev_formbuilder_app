@@ -5,11 +5,14 @@ declare(strict_types=1);
 namespace App\Services\Forms;
 
 use App\Enums\FieldType;
+use App\Enums\SubmissionStatus;
 use App\Models\Form;
 use App\Models\FormVersion;
 use App\Models\User;
 use App\Services\Authorization\ResponseReadAccess;
+use App\Services\Submissions\SchemaValueFormatter;
 use App\Support\Forms\ShareableQuestions;
+use Illuminate\Support\Facades\DB;
 
 /**
  * A choice question that takes its choices from another form's answers (M133, `R-5da4a30f` — Connect project v1).
@@ -35,7 +38,21 @@ final class LinkedChoiceService
     /** The two question types a link may feed. Multi-select and Likert are the remainder row's. */
     public const LINKABLE_TYPES = [FieldType::SingleSelect, FieldType::Dropdown];
 
-    public function __construct(private readonly ResponseReadAccess $access) {}
+    /** The most choices one list carries (v1). More is the remainder row's; the builder says so. */
+    public const MAX_CHOICES = 1000;
+
+    /**
+     * The responses whose answers become choices: every one a respondent or a keyer finished, except those screened
+     * out or archived. A draft is nobody's answer yet.
+     *
+     * @var list<SubmissionStatus>
+     */
+    public const EXCLUDED_STATUSES = [SubmissionStatus::Draft, SubmissionStatus::ScreenedOut, SubmissionStatus::Archived];
+
+    public function __construct(
+        private readonly ResponseReadAccess $access,
+        private readonly SchemaValueFormatter $formatter,
+    ) {}
 
     /**
      * The link a question's config holds, or null when it holds none or holds a malformed one.
@@ -158,6 +175,129 @@ final class LinkedChoiceService
         }
 
         return $sources;
+    }
+
+    /**
+     * Every linked question's list for one published version of a form — what the guest page and the encode page
+     * show (`D60` = A: beside the schema, never inside it). Keyed by the linking question's key.
+     *
+     * A list whose link cannot serve right now ({@see refusal()}) is `available: false` and empty: the page says the
+     * choices are not available, and an offline device keeps whatever it last fetched. `stamp` is a hash of the
+     * list, because nothing records when a form's responses last changed — a plain answer edit moves no column on
+     * `submissions` — so the list is its own version.
+     *
+     * ⚠️ THE SERVER NEVER CHECKS AN ANSWER AGAINST THIS LIST. A device may answer from a list fetched yesterday, and
+     * the snapshot holds no typed options, so both engines skip the membership check — which is what keeps an
+     * offline response submittable after the source changes. `tests/golden/validation/membership.json` pins it.
+     *
+     * @return array<string, array{stamp: string, available: bool, truncated: bool, options: list<array{value: string, label: string}>}>
+     */
+    public function listsFor(Form $destination, FormVersion $version): array
+    {
+        $snapshot = $version->schema_snapshot;
+        $lists = [];
+        $memo = [];
+
+        foreach ((array) ($snapshot['fields'] ?? []) as $field) {
+            if (! is_array($field) || ! is_string($field['key'] ?? null)) {
+                continue;
+            }
+
+            $type = FieldType::tryFrom((string) ($field['field_type'] ?? ''));
+            $link = self::linkOf(is_array($field['config'] ?? null) ? $field['config'] : null);
+            if ($type === null || $link === null || ! in_array($type, self::LINKABLE_TYPES, true)) {
+                continue;
+            }
+
+            $memoKey = $link['form_id'].'|'.$link['field_key'];
+            $lists[$field['key']] = $memo[$memoKey] ??= $this->listFor($destination, $link);
+        }
+
+        return $lists;
+    }
+
+    /**
+     * @param  array{form_id: string, field_key: string}  $link
+     * @return array{stamp: string, available: bool, truncated: bool, options: list<array{value: string, label: string}>}
+     */
+    private function listFor(Form $destination, array $link): array
+    {
+        $source = $this->refusal($destination, $link) === null ? Form::query()->whereKey($link['form_id'])->first() : null;
+        if ($source === null) {
+            return ['stamp' => hash('sha256', '[]'), 'available' => false, 'truncated' => false, 'options' => []];
+        }
+
+        $labels = $this->labelsFor($source, $link['field_key']);
+        $texts = [];
+        foreach ($this->distinctAnswers($source, $link['field_key']) as $raw) {
+            $text = trim($labels[$raw] ?? $raw);
+            if ($text !== '') {
+                $texts[$text] = true;
+            }
+        }
+
+        $texts = array_map('strval', array_keys($texts));
+        usort($texts, static fn (string $a, string $b): int => [mb_strtolower($a), $a] <=> [mb_strtolower($b), $b]);
+
+        $truncated = count($texts) > self::MAX_CHOICES;
+        // `D85`: the answer saves the text shown, so a choice's value IS its label.
+        $options = array_map(
+            static fn (string $text): array => ['value' => $text, 'label' => $text],
+            array_slice($texts, 0, self::MAX_CHOICES),
+        );
+
+        return [
+            'stamp' => hash('sha256', (string) json_encode($options, JSON_UNESCAPED_UNICODE)),
+            'available' => true,
+            'truncated' => $truncated,
+            'options' => $options,
+        ];
+    }
+
+    /**
+     * The distinct non-blank answers to one top-level question, as text — one more than the cap, so truncation is
+     * known. Rooted on `submissions`, so a soft-deleted response is out, and filtered to finished statuses.
+     *
+     * @return list<string>
+     */
+    private function distinctAnswers(Form $source, string $key): array
+    {
+        $answers = DB::table('submissions')
+            ->join('submission_answers', 'submission_answers.submission_id', '=', 'submissions.id')
+            ->where('submissions.form_id', $source->id)
+            ->whereNull('submissions.deleted_at')
+            ->whereNotIn('submissions.status', array_map(static fn (SubmissionStatus $s): string => $s->value, self::EXCLUDED_STATUSES))
+            ->whereRaw("jsonb_typeof(submission_answers.answers -> ?) IN ('string', 'number')", [$key])
+            ->whereRaw("btrim(submission_answers.answers ->> ?) <> ''", [$key])
+            ->selectRaw('DISTINCT btrim(submission_answers.answers ->> ?) AS answer', [$key]);
+
+        return array_values(DB::query()->fromSub($answers, 'distinct_answers')
+            ->orderByRaw('lower(answer), answer')
+            ->limit(self::MAX_CHOICES + 1)
+            ->pluck('answer')
+            ->map(static fn (mixed $value): string => is_scalar($value) ? (string) $value : '')
+            ->all());
+    }
+
+    /**
+     * For a choice question, its stored values' labels in the source's current version (base language), so a
+     * respondent sees "North" rather than `north`. Empty for any other question.
+     *
+     * @return array<string, string>
+     */
+    private function labelsFor(Form $source, string $key): array
+    {
+        $field = ShareableQuestions::find($this->publishedSnapshot($source), $key);
+        if ($field === null || ! in_array(FieldType::tryFrom((string) ($field['field_type'] ?? '')), self::LINKABLE_TYPES, true)) {
+            return [];
+        }
+
+        $labels = [];
+        foreach ($this->formatter->options(is_array($field['config'] ?? null) ? $field['config'] : []) as $option) {
+            $labels[$option['value']] = $option['label'];
+        }
+
+        return $labels;
     }
 
     /** @return array<string, mixed>|null */

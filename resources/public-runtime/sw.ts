@@ -18,7 +18,7 @@ import { CacheableResponsePlugin } from 'workbox-cacheable-response';
 import { ExpirationPlugin } from 'workbox-expiration';
 import { clientsClaim } from 'workbox-core';
 import { CONTENT_IMAGE_CACHE, contentImageCacheKey } from './lib/content-images'; import { REFERENCE_FILE_CACHE, referenceFileCacheKey } from './lib/reference-files';
-import { openDb } from './lib/db';
+import { openDb } from './lib/db'; import { LINKED_CHOICE_CACHE, linkedChoicesCacheKey } from './lib/linked-choices';
 import { replayOutbox } from './lib/replay';
 import { SHELL_CACHE, SHELL_EXPIRATION } from './lib/shell-cache';
 
@@ -125,6 +125,25 @@ registerRoute(
             { cacheKeyWillBeUsed: async ({ request }) => referenceFileCacheKey(request.url) },
             new CacheableResponsePlugin({ statuses: [200] }),
             new ExpirationPlugin({ maxEntries: 30, maxAgeSeconds: 30 * DAY, purgeOnQuotaError: true }),
+        ],
+    }),
+    'GET',
+);
+
+// M133 (`R-5da4a30f`, `D60` = A) — the choices a form takes from another form's answers: the schema's SECOND freshness
+// channel, beside it rather than inside it. NetworkFirst like the schema, because the list changes whenever the source
+// form gets a response and an online respondent should see today's; the cached copy is what an offline one answers
+// from. Keyed by VERSION with the share token stripped (`linkedChoicesCacheKey`), for the image route's token reason.
+// The prefix is a literal on purpose: `ServiceWorkerCachePrefixRouteTest` reads every cached prefix out of this file.
+registerRoute(
+    ({ url, sameOrigin }) => sameOrigin && url.pathname.startsWith('/api/v1/public/linked-choices/'),
+    new NetworkFirst({
+        cacheName: LINKED_CHOICE_CACHE,
+        networkTimeoutSeconds: 5,
+        plugins: [
+            { cacheKeyWillBeUsed: async ({ request }) => linkedChoicesCacheKey(request.url) },
+            new CacheableResponsePlugin({ statuses: [200] }),
+            new ExpirationPlugin({ maxEntries: 20, maxAgeSeconds: 7 * DAY }),
         ],
     }),
     'GET',

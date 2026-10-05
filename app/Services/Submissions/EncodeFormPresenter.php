@@ -13,6 +13,7 @@ use App\Models\FormField;
 use App\Models\FormSection;
 use App\Models\FormVersion;
 use App\Models\Submission;
+use App\Services\Forms\LinkedChoiceService;
 use App\Services\Forms\StepGraphInspector;
 use App\Services\Templates\TemplateRenderer;
 use App\Services\Templates\TemplateSources;
@@ -28,12 +29,11 @@ use Illuminate\Support\Collection;
  * render-ready schema the Encode.vue page walks. Fields are grouped into their sections (ungrouped fields
  * lead as a section-less block), in document order.
  *
- * "Render-supported, mark-the-rest" (confirmed scope decision): the ~14 Phase-1 scalar field types render a
- * real input; everything else (advanced geo/media/matrix/likert/cascading, duration, signature) is emitted
- * with `supported = false` so the page shows a read-only "not available for manual entry (Phase 2)" notice
- * rather than silently dropping it. Display-only `note` fields render as static prose. `page_break` and
- * `calculated` are structural/derived and are omitted from the encode surface entirely (they are never a
- * manually-entered answer).
+ * * "Render-supported, mark-the-rest" (confirmed scope decision): the ~14 Phase-1 scalar field types render a real
+ * input; everything else (advanced geo/media/matrix/likert/cascading, duration, signature) is emitted with `supported
+ * = false` so the page shows a read-only "not available for manual entry (Phase 2)" notice rather than silently
+ * dropping it. Display-only `note` fields render as static prose. `page_break` and `calculated` are
+ * structural/derived and are omitted from the encode surface entirely (they are never a manually-entered answer).
  *
  * Hidden fields (Increment H7) are NOT omitted, and this channel is deliberately asymmetric with the guest
  * SPA on that point. A respondent must never see a hidden field — that is what the type means. A keyer is
@@ -601,6 +601,32 @@ final class EncodeFormPresenter
             return [];
         }
 
+        if (LinkedChoiceService::declaresLink($field->config) && in_array($field->field_type, LinkedChoiceService::LINKABLE_TYPES, true)) {
+            return $this->linkedOptions($field);
+        }
+
         return $this->formatter->options($field->config ?? []);
+    }
+
+    /**
+     * M133 (`R-5da4a30f`): a question that takes its choices from another form shows that form's answers as they read
+     * now — a keyer is online, and transcribes what the paper says. Read through the same service the guest page's list
+     * comes from, so the two channels show one list; the server accepts any text for it on both.
+     *
+     * Resolved from the container rather than injected, because this file is cited by line and a constructor argument
+     * would move every cited line below it.
+     *
+     * @return list<array{value: string, label: string}>
+     */
+    private function linkedOptions(FormField $field): array
+    {
+        $version = FormVersion::query()->whereKey($field->form_version_id)->first();
+        $form = $version === null ? null : Form::query()->whereKey($version->form_id)->first();
+
+        if ($version === null || $form === null) {
+            return [];
+        }
+
+        return app(LinkedChoiceService::class)->listsFor($form, $version)[$field->key]['options'] ?? [];
     }
 }

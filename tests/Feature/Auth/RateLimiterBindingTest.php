@@ -177,18 +177,29 @@ it('never falls back to the guest limiter\'s IP arm on a route that is actually 
 
 // ── The guest content-image limiter (M130, `R-c9f50df2`) ──────────────────────────────────────
 
-it('binds the content-image limiter to the image and reference-file routes alone, both off the guest limiter', function (): void {
+it('binds the content-image limiter to the image, reference-file and linked-choices routes alone, all off the guest limiter', function (): void {
     // ⚠️ THE CASES ABOVE CANNOT SEE THIS ROUTE: it leaves `throttle:guest` on purpose (a note's images would
     // otherwise spend the per-token budget a respondent submits with), so `routesThrottledBy('guest')` skips it.
     $routes = routesThrottledBy('guest-content-image');
 
-    // M132 (`R-bf49e4c1`): a form's reference files share it — the form's own material, read by the same page.
+    // M132 (`R-bf49e4c1`): a form's reference files share it — the form's own material, read by the same page. M133
+    // (`R-5da4a30f`): so does the linked-choices read, once per page load, beside the schema.
     expect(array_map(static fn (RoutingRoute $r): string => $r->uri(), $routes))
-        ->toBe(['api/v1/public/content-images/{shareToken}/{image}', 'api/v1/public/reference-files/{shareToken}/{file}'])
+        ->toBe([
+            'api/v1/public/content-images/{shareToken}/{image}',
+            'api/v1/public/reference-files/{shareToken}/{file}',
+            'api/v1/public/linked-choices/{shareToken}/{version}',
+        ])
         ->and(array_map(static fn (RoutingRoute $r): string => $r->uri(), routesThrottledBy('guest')))
         ->not->toContain('api/v1/public/content-images/{shareToken}/{image}')
         ->and(array_map(static fn (RoutingRoute $r): string => $r->uri(), routesThrottledBy('guest')))
-        ->not->toContain('api/v1/public/reference-files/{shareToken}/{file}');
+        ->not->toContain('api/v1/public/reference-files/{shareToken}/{file}')
+        ->and(array_map(static fn (RoutingRoute $r): string => $r->uri(), routesThrottledBy('guest')))
+        ->not->toContain('api/v1/public/linked-choices/{shareToken}/{version}');
+
+    // Per token on the linked-choices route as well.
+    expect(limiterKeysFor('guest-content-image', $routes[2], 'token-aaaaaaaaaaaaaaaa'))
+        ->not->toBe(limiterKeysFor('guest-content-image', $routes[2], 'token-bbbbbbbbbbbbbbbb'));
 
     // The bucket is per token on the reference-file route too: it declares the `shareToken` the limiter keys on.
     $files = $routes[1];

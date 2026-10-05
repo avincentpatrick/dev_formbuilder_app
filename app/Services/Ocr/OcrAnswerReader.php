@@ -343,6 +343,14 @@ final class OcrAnswerReader
             return $this->ruled($type, $this->answerLines($lines, $static, []));
         }
 
+        // M133 (`R-5da4a30f`): a single choice or dropdown that takes its choices from another form prints no boxes — its
+        // list is live, so the blank sheet gives it a write-in box — and what was written IS the answer (`D85`: the text
+        // shown). Read as writing, so the reviewer sees it found rather than unreadable; publish refuses any other
+        // choice question with no choices, so an empty list here can only mean a linked one.
+        if ($options === [] && ($type === FieldType::SingleSelect || $type === FieldType::Dropdown)) {
+            return $this->ruled($type, $this->answerLines($lines, $static, []));
+        }
+
         if ($optionLines === []) {
             return $this->blankOrUnreadable($this->answerLines($lines, $static, []));
         }

@@ -205,6 +205,24 @@ for (const theme of themes) {
         await expect(page).toHaveURL(/\/f\/visit-guide$/);
     });
 }
+// A question that takes its choices from another form (M133, `R-5da4a30f`). "Field Visit Referral" (E2eSeeder) offers the
+// districts "Programme Uptake" responses name, read beside the schema (`D60` = A): distinct, sorted, the empty answer
+// left out. A district is chosen first, so the scan covers the control with a value in it.
+for (const theme of themes) {
+    test(`Public runtime linked choices (${theme}) — accessible & no horizontal overflow`, async ({ page }) => {
+        await page.goto('/f/visit-referral', { waitUntil: 'networkidle' });
+        await page
+            .getByRole('heading', { name: 'Field Visit Referral', level: 1 })
+            .waitFor({ state: 'visible', timeout: 15_000 });
+        await forceTheme(page, theme);
+
+        const district = page.getByLabel('District visited');
+        await expect(district.locator('option:not([disabled])')).toHaveText(['Malate', 'Sampaloc', 'Tondo']);
+        await district.selectOption('Sampaloc');
+        await assertClean(page, 'Field Visit Referral (linked choices)');
+    });
+}
+
 // After the thank-you (M130, `R-db169c29`, `D76`). "Before Your Visit" (E2eSeeder) sends a respondent on to
 // https://visit.example.org/next: the screen names it, counts down from 20 seconds, and offers Stay. The scan runs
 // WHILE it counts — the countdown is the new surface — and Stay comes straight after, well inside the 20 seconds.

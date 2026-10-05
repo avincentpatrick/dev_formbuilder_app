@@ -908,6 +908,8 @@ class E2eSeeder extends Seeder
 
             $this->seedAnalyticsFixture($owner, $tenant);
 
+            $this->seedLinkedChoices($owner, $tenant); // M133 — after the fixture whose answers it shares
+
             // A handful of submissions against Clinic Intake so the inbox (Increment F7) has rows in a spread
             // of review states (Badge variety) and the detail page has answers to render for the axe gate.
             $intakeForm = Form::query()->where('title', 'Clinic Intake')->first();
@@ -1979,6 +1981,52 @@ class E2eSeeder extends Seeder
      *
      * `notes` is deliberately left UNFLAGGED so the picker's two groups are both non-empty on one screen.
      */
+    /**
+     * M133 (`R-5da4a30f` — Connect project v1): a guest form whose question takes its choices from another form.
+     *
+     * The SOURCE is "Programme Uptake", whose `district` answers the analytics fixture already seeds — so no response is
+     * added and every count the analytics and dashboard scans read stays where it was. Its sharing is written directly
+     * rather than through `FormService::setDataSharing()`, whose audit row would move the counts the audit scans read
+     * (the Themed Intake precedent). The DESTINATION, "Field Visit Referral" at `/f/visit-referral`, is published through
+     * the real path, so the link passes the real publish gate. `public-runtime-axe.spec.ts` scans the list and
+     * `public-runtime-offline.spec.ts` answers it offline. Converged: a second run changes nothing.
+     */
+    private function seedLinkedChoices(User $owner, Tenant $tenant): void
+    {
+        $uptake = Form::query()->where('title', 'Programme Uptake')->whereNotNull('current_published_version_id')->first();
+        if ($uptake === null) {
+            return; // a database seeded before the analytics fixture existed — degrade, never fatal
+        }
+
+        if ($uptake->data_sharing_enabled !== true) {
+            $uptake->forceFill(['data_sharing_enabled' => true, 'data_sharing_field_keys' => ['district']])->save();
+        }
+
+        if (Form::query()->where('title', 'Field Visit Referral')->exists()) {
+            return;
+        }
+
+        $referral = app(FormService::class)->create(
+            $tenant, $owner, 'Field Visit Referral', 'A district list taken from Programme Uptake answers (M133 demo).'
+        );
+        $builder = app(FormBuilderService::class);
+        $section = $builder->addSection($referral);
+        $builder->addField($referral, $owner, FieldType::ShortText, $section->id)->update(['key' => 'visitor_name', 'label' => 'Your name']);
+        $builder->addField($referral, $owner, FieldType::Dropdown, $section->id)->update([
+            'key' => 'district',
+            'label' => 'District visited',
+            'config' => ['options' => [], 'options_source' => ['form_id' => $uptake->id, 'field_key' => 'district']],
+        ]);
+        app(PublishService::class)->publish($referral->refresh(), $owner);
+
+        $referral->update([
+            'public_slug' => 'visit-referral',
+            'allow_guest_submissions' => true,
+            'supported_locales' => ['en'],
+            'single_page_mode' => true,
+        ]);
+    }
+
     private function seedProgrammeUptakeForm(User $owner, Tenant $tenant): Form
     {
         $existing = Form::query()->where('title', 'Programme Uptake')->first();

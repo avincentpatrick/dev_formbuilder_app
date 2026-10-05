@@ -530,3 +530,48 @@ test('Public runtime — a reference file opened once opens again offline, and o
 
     await context.setOffline(false);
 });
+
+// M133 (`R-5da4a30f`, `D60` = A) — a question that takes its choices from another form is answered OFFLINE from the list
+// the device last fetched. The list is its own read, beside the schema, kept by the worker in `guest-linked-choices`
+// under the VERSION with the token stripped; the offline reload's fresh `fetchSchema()` finds both, merges them, and a
+// response chosen from it queues like any other. Proved locally only: CI's origin has no service worker (the M130 row).
+test('Public runtime — a question with choices from another form is answered offline from the list it last fetched', async ({ page, context }) => {
+    await page.goto('/f/visit-referral', { waitUntil: 'networkidle' });
+    await page
+        .getByRole('heading', { name: 'Field Visit Referral', level: 1 })
+        .waitFor({ state: 'visible', timeout: 15_000 });
+
+    const swAvailable = await page.evaluate(() => 'serviceWorker' in navigator);
+    test.skip(!swAvailable, 'No service worker on this origin, so nothing can render offline.');
+
+    await page.evaluate(async () => {
+        await Promise.race([navigator.serviceWorker.ready, new Promise((resolve) => setTimeout(resolve, 10_000))]);
+    });
+    await page.reload({ waitUntil: 'networkidle' });
+    await page
+        .getByRole('heading', { name: 'Field Visit Referral', level: 1 })
+        .waitFor({ state: 'visible', timeout: 15_000 });
+
+    // One entry, and its key names the version and no token.
+    const keys = await page.evaluate(async () =>
+        (await caches.keys()).includes('guest-linked-choices')
+            ? (await (await caches.open('guest-linked-choices')).keys()).map((request) => new URL(request.url).pathname)
+            : [],
+    );
+    expect(keys).toHaveLength(1);
+    expect(keys[0]).toMatch(/^\/api\/v1\/public\/linked-choices\/[0-9a-f-]{36}$/);
+
+    await context.setOffline(true);
+    await page.reload({ waitUntil: 'commit' });
+    await page
+        .getByRole('heading', { name: 'Field Visit Referral', level: 1 })
+        .waitFor({ state: 'visible', timeout: 15_000 });
+
+    const district = page.getByLabel('District visited');
+    await expect(district.locator('option:not([disabled])')).toHaveText(['Malate', 'Sampaloc', 'Tondo']);
+    await district.selectOption('Tondo');
+    await page.getByRole('button', { name: 'Submit' }).click();
+    await expect(page.getByText(/Saved on this device — will send/i)).toBeVisible({ timeout: 15_000 });
+
+    await context.setOffline(false);
+});

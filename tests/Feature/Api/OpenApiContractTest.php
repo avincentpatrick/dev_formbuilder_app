@@ -46,6 +46,8 @@ it('ships a valid OpenAPI 3.1 contract covering the /api/v1 surface', function (
         '/public/content-images/{shareToken}/{image}',
         // M132 — a form's reference file, read by a respondent (the image read's boundary).
         '/public/reference-files/{shareToken}/{file}',
+        // M133 — the choices a form takes from another form's answers, beside the schema (`D60` = A).
+        '/public/linked-choices/{shareToken}/{version}',
         '/submissions/{submission}/promote',
         // Increment G8b — the authenticated offline-sync surface.
         '/sync/manifest',
@@ -134,7 +136,9 @@ it('ships a valid OpenAPI 3.1 contract covering the /api/v1 surface', function (
         // M130: the image read is authorised by the share token in its path, exactly as the schema read is.
         ->and($spec['paths']['/public/content-images/{shareToken}/{image}']['get']['security'])->toBe([])
         // M132: the reference-file read likewise.
-        ->and($spec['paths']['/public/reference-files/{shareToken}/{file}']['get']['security'])->toBe([]);
+        ->and($spec['paths']['/public/reference-files/{shareToken}/{file}']['get']['security'])->toBe([])
+        // M133: the linked-choices read likewise.
+        ->and($spec['paths']['/public/linked-choices/{shareToken}/{version}']['get']['security'])->toBe([]);
 });
 
 it('keeps the published event_types enum in step with DomainEventType', function (): void {

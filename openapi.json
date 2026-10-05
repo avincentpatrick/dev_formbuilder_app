@@ -4140,6 +4140,141 @@
                 "security": []
             }
         },
+        "/public/linked-choices/{shareToken}/{version}": {
+            "get": {
+                "operationId": "v1.public.linked-choices.show",
+                "description": "One list per question that takes its choices from another form, keyed by that question's key. A list the\nother form no longer shares comes back empty with `available: false`. `stamp` changes whenever the list\ndoes. `version` must be the share token's own form version; any other request answers the same 404.",
+                "summary": "Fetch the choices this shared form takes from another form's answers",
+                "tags": [
+                    "PublicFormSchema"
+                ],
+                "parameters": [
+                    {
+                        "name": "shareToken",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "version",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "version_id": {
+                                                    "type": "string"
+                                                },
+                                                "lists": {
+                                                    "type": "object",
+                                                    "additionalProperties": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "stamp": {
+                                                                "type": "string"
+                                                            },
+                                                            "available": {
+                                                                "type": "boolean"
+                                                            },
+                                                            "truncated": {
+                                                                "type": "boolean"
+                                                            },
+                                                            "options": {
+                                                                "type": "array",
+                                                                "items": {
+                                                                    "type": "object",
+                                                                    "properties": {
+                                                                        "value": {
+                                                                            "type": "string"
+                                                                        },
+                                                                        "label": {
+                                                                            "type": "string"
+                                                                        }
+                                                                    },
+                                                                    "required": [
+                                                                        "value",
+                                                                        "label"
+                                                                    ]
+                                                                }
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "stamp",
+                                                            "available",
+                                                            "truncated",
+                                                            "options"
+                                                        ]
+                                                    }
+                                                }
+                                            },
+                                            "required": [
+                                                "version_id",
+                                                "lists"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "error": {
+                                            "type": "object",
+                                            "properties": {
+                                                "code": {
+                                                    "type": "string",
+                                                    "const": "linked_choices_not_found"
+                                                },
+                                                "message": {
+                                                    "type": "string",
+                                                    "const": "These choices are not available."
+                                                },
+                                                "details": {
+                                                    "type": "null"
+                                                }
+                                            },
+                                            "required": [
+                                                "code",
+                                                "message",
+                                                "details"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "error"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": []
+            }
+        },
         "/resource-grants": {
             "get": {
                 "operationId": "v1.resource-grants.index",

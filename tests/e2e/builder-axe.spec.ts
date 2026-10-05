@@ -246,6 +246,24 @@ for (const theme of themes) {
         await scan(page, 'form settings — section rail');
     });
 
+    // M133 (`R-5da4a30f`) — the Options tab of a question that takes its choices from another form. "Field Visit
+    // Referral" (E2eSeeder) links its District question to "Programme Uptake", so the tab opens on the linked mode with
+    // the form and the question picked and no typed list. Opened and scanned only; nothing is changed.
+    test(`Builder — choices from another form (${theme})`, async ({ page }) => {
+        await openBuilder(page, 'Field Visit Referral');
+        await showBuilderPane(page, 'canvas');
+        // The row's main button, not its grip: both carry the label, and only this one selects.
+        await page.locator('.canvas__field-main', { hasText: 'District visited' }).click();
+        await showBuilderPane(page, 'settings');
+        await page.getByRole('tab', { name: 'Options' }).click();
+
+        const linked = page.locator('[data-linked-choices]');
+        await expect(linked.getByRole('radio', { name: "Another form's answers" })).toBeChecked({ timeout: 10_000 });
+        await expect(linked.getByLabel('Question')).toHaveValue('district');
+        await forceTheme(page, theme);
+        await scan(page, 'options tab, choices from another form');
+    });
+
     test(`Builder — empty canvas (${theme})`, async ({ page }) => {
         await openBuilder(page, 'Blank Intake Form');
         await expect(page.getByText('An empty form')).toBeVisible({ timeout: 10_000 });

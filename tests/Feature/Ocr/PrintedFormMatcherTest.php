@@ -12,7 +12,9 @@ use App\Services\Forms\FormService;
 use App\Services\Forms\PublishService;
 use App\Services\Ocr\PrintedFormMatcher;
 use App\Support\Tenancy\TenantContext;
+use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Spatie\Permission\PermissionRegistrar;
 use Tests\Feature\Ocr\Support\PrintedPageTypesetter;
 
 uses(RefreshDatabase::class);
@@ -231,4 +233,42 @@ it('reads the version off the page stamp, a superseded one included, and says wh
     expect($exact['version'])->toBe($v1)->and($exact['matched_by'])->toBe('stamp')
         ->and($near['version'])->toBe($v1)->and($near['matched_by'])->toBe('stamp_near')
         ->and($none['version'])->toBe($v2)->and($none['matched_by'])->toBe('unconfirmed');
+});
+
+it('reads what was written for a question that takes its choices from another form, as the answer (M133, D85)', function (): void {
+    // A linked list is live, so the blank sheet prints no boxes for it — the template's empty branch draws a write-in
+    // box — and what the enumerator writes IS the answer: `D85`, the text shown. Before M133 that writing came back
+    // `unreadable`, because the choices reader found no option labels to look for.
+    (new RolePermissionSeeder)->run();
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+    enterTenant($this->tenant->id, $this->user->id);
+    makeActiveMember($this->user, 'admin');
+
+    $source = app(FormService::class)->create($this->tenant, $this->user, 'Facility Register');
+    addFormField($source->draftVersion, $this->user, 'facility_name', FieldType::ShortText, 1);
+    app(PublishService::class)->publish($source->refresh(), $this->user);
+    app(FormService::class)->setDataSharing($source->refresh(), true, null, $this->user);
+
+    $form = app(FormService::class)->create($this->tenant, $this->user, 'Referral');
+    addFormField($form->draftVersion, $this->user, 'patient_name', FieldType::ShortText, 1, ['label' => 'Patient name']);
+    addFormField($form->draftVersion, $this->user, 'facility', FieldType::Dropdown, 2, ['label' => 'Facility', 'config' => [
+        'options' => [], 'options_source' => ['form_id' => $source->id, 'field_key' => 'facility_name'],
+    ]]);
+    $version = app(PublishService::class)->publish($form->refresh(), $this->user);
+    $model = app(BlankFormPrintPresenter::class)->present($form->refresh(), $version);
+
+    // The paper as printed: the linked question's area is a write-in box.
+    $printed = $model;
+    foreach ($printed['blocks'] as $b => $block) {
+        foreach ($block['fields'] as $i => $row) {
+            if ($row['key'] === 'facility') {
+                expect($row['options'])->toBe([]);
+                $printed['blocks'][$b]['fields'][$i] = [...$row, 'area' => 'ruled'];
+            }
+        }
+    }
+
+    $fields = ocrMatchFields($this->matcher, $form->refresh(), $version, $printed, ['patient_name' => 'ANA REYES', 'facility' => 'SAN JOSE RHU']);
+
+    expect($fields['facility'])->toMatchArray(['state' => 'read', 'value' => 'SAN JOSE RHU']);
 });

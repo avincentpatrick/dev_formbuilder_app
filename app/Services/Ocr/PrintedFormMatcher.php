@@ -38,8 +38,11 @@ use App\Services\Forms\BlankFormPrintPresenter;
  */
 final class PrintedFormMatcher
 {
-    /** Printed areas that hold no answer: they are anchors for the questions around them, and nothing more. */
-    private const array NOT_A_QUESTION = ['prose', 'page_break', 'omitted'];
+    /**
+     * Printed areas that hold no answer: they are anchors for the questions around them, and nothing more. Public because
+     * the bake-off harness's answer template lists exactly the questions this class reads (M136).
+     */
+    public const array NOT_A_QUESTION = ['prose', 'page_break', 'omitted'];
 
     public function __construct(
         private readonly BlankFormPrintPresenter $presenter,
@@ -88,10 +91,14 @@ final class PrintedFormMatcher
     /**
      * The extraction for one scan against one version.
      *
+     * `$thresholds` defaults to `config/ocr.php`. The bake-off harness (M136) passes zero for both, so that no value is
+     * withheld and it can apply every threshold it sweeps itself, through {@see tier()}.
+     *
      * @param  list<OcrPage>  $pages
+     * @param  array{auto: int, review: int}|null  $thresholds
      * @return array{fields: array<string, array<string, mixed>>, counts: array<string, int>, pages: int}
      */
-    public function match(Form $form, FormVersion $version, array $pages): array
+    public function match(Form $form, FormVersion $version, array $pages, ?array $thresholds = null): array
     {
         $model = $this->presenter->present($form, $version);
         $snapshotFields = $this->snapshotFields($version);
@@ -132,7 +139,7 @@ final class PrintedFormMatcher
 
         $fields = [];
         $counts = ['read' => 0, 'blank' => 0, 'unreadable' => 0, 'not_found' => 0, 'skipped' => 0];
-        $thresholds = $this->thresholds();
+        $thresholds ??= self::configuredThresholds();
 
         foreach ($rows as $i => $row) {
             $key = (string) $row['key'];
@@ -288,12 +295,7 @@ final class PrintedFormMatcher
         $value = $read['value'];
 
         if ($read['state'] === 'read') {
-            $confidence = $read['confidence'] ?? 0;
-            $tier = match (true) {
-                $confidence >= $thresholds['auto'] => 'auto',
-                $confidence >= $thresholds['review'] => 'review',
-                default => 'manual',
-            };
+            $tier = self::tier($read['confidence'] ?? 0, $thresholds);
             if ($tier === 'manual') {
                 $value = null;
             }
@@ -311,8 +313,24 @@ final class PrintedFormMatcher
         ];
     }
 
+    /**
+     * How a reviewer treats a value read at `$confidence`: `auto` at or above the auto threshold, `review` at or above
+     * the review one, `manual` (withheld) below both. The one copy of the rule — the matcher and the bake-off harness's
+     * threshold sweep both call it, so they cannot disagree about a boundary.
+     *
+     * @param  array{auto: int, review: int}  $thresholds
+     */
+    public static function tier(int $confidence, array $thresholds): string
+    {
+        return match (true) {
+            $confidence >= $thresholds['auto'] => 'auto',
+            $confidence >= $thresholds['review'] => 'review',
+            default => 'manual',
+        };
+    }
+
     /** @return array{auto: int, review: int} */
-    private function thresholds(): array
+    public static function configuredThresholds(): array
     {
         return [
             'auto' => (int) config('ocr.confidence.auto', 90),

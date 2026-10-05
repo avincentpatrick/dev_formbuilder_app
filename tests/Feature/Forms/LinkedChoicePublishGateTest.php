@@ -217,6 +217,13 @@ it('offers the builder the sharing forms this author can read, with the question
         'questions' => [['key' => 'facility_name', 'label' => 'Facility name']],
     ]]);
 
+    // An author who cannot read the source's responses is offered nothing from it, sharing or not.
+    $editor = User::factory()->create();
+    enterTenant($this->tenant->id, $editor->id);
+    makeActiveMember($editor, 'form_editor');
+    expect(app(BuilderPresenter::class)->present($destination, $editor)['linkable_sources'])->toBe([]);
+    enterTenant($this->tenant->id, $this->admin->id);
+
     // Sharing off: nothing to offer.
     app(FormService::class)->setDataSharing($this->source, false, null, $this->admin);
     expect(app(BuilderPresenter::class)->present($destination, $this->admin)['linkable_sources'])->toBe([]);

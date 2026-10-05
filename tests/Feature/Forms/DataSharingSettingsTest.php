@@ -193,8 +193,10 @@ it('refuses a member who cannot edit the form', function (): void {
     expect(dataSharingReload($this->form, $this->admin)->data_sharing_enabled)->toBeFalse();
 });
 
-it('refuses someone who may edit the form but cannot read its responses (D87), and shows them no section', function (): void {
-    $editorOnly = memberHoldingOnly('forms.edit.any');
+it('refuses someone who may edit the form but cannot read its responses (D87), and shows them no section', function (array $permissions): void {
+    // Two shapes, because the route stacks two gates and each must refuse on its own: one member cannot open the form's
+    // overview at all; the other can, and holds every dashboard key, but not `submissions.view`.
+    $editorOnly = memberHoldingOnly(...$permissions);
 
     $this->actingAs($editorOnly)
         ->patch(dataSharingUrl($this->form), ['enabled' => true, 'acknowledged' => true, 'field_keys' => null])
@@ -203,7 +205,10 @@ it('refuses someone who may edit the form but cannot read its responses (D87), a
     enterTenant($this->tenant->id, $editorOnly->id);
     expect(app(FormSettingsPresenter::class)->dataSharing(Form::findOrFail($this->form->id), $editorOnly))->toBeNull();
     expect(dataSharingReload($this->form, $this->admin)->data_sharing_enabled)->toBeFalse();
-});
+})->with([
+    'no overview' => [['forms.edit.any']],
+    'the overview, but no responses' => [['forms.edit.any', 'dashboard.form.view', 'dashboard.org.view']],
+]);
 
 it('lists only the shareable questions of the published version, in the order the form asks them', function (): void {
     $section = app(FormSettingsPresenter::class)->dataSharing($this->form, $this->admin);

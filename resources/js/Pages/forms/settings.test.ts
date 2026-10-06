@@ -99,7 +99,7 @@ describe('forms/Settings', () => {
         const wrapper = mount(Settings, { props: props() as never });
 
         expect(railLabels(wrapper)).toEqual([
-            'Details', 'Pages', 'Theme', 'Reference files', 'Share', 'Scanning', 'Schedule', 'Thank-you message',
+            'Details', 'Pages', 'Theme', 'Reference files', 'Choice lists', 'Share', 'Scanning', 'Schedule', 'Thank-you message',
             'Save and finish later', 'Automations', 'Data sharing', 'Scope',
         ]);
     });

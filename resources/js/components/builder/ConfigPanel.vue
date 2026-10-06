@@ -509,6 +509,7 @@ watch(librarySaved, (value) => {
                         <CascadingEditor
                             :levels="cascadeLevels"
                             :options="cascadeOptions"
+                            :form-id="store.formId"
                             @update:levels="setConfig('levels', $event)"
                             @update:options="setConfig('options', $event)"
                         />

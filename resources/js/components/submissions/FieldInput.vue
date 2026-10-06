@@ -332,17 +332,27 @@ async function clearChoice(): Promise<void> {
 // The value is an ordered string[] — one chosen value per level. Each level's select is filtered by the
 // parent level's current choice; choosing a value drops every deeper level (its parent changed).
 const cascadeLevels = computed<CascadeLevel[]>(() => props.field.cascade?.levels ?? []);
-const cascadeOptions = computed<CascadeOption[]>(() => props.field.cascade?.options ?? []);
 const cascadeValue = computed<string[]>(() => (Array.isArray(props.modelValue) ? (props.modelValue as string[]) : []));
+
+// M141 (`R-f69aab42`) — indexed ONCE by level and parent. A CSV choice list can hold 42,000 options, and each level's
+// select used to filter the whole list on every render. A root option is keyed by an empty parent.
+const cascadeIndex = computed<Map<string, { value: string; label: string }[]>>(() => {
+    const index = new Map<string, { value: string; label: string }[]>();
+    for (const option of (props.field.cascade?.options ?? []) as CascadeOption[]) {
+        const key = `${option.level}\u0000${option.parent ?? ''}`;
+        const group = index.get(key) ?? [];
+        if (group.length === 0) index.set(key, group);
+        group.push({ value: option.value, label: option.label });
+    }
+    return index;
+});
 
 function cascadeOptionsAt(index: number): { value: string; label: string }[] {
     const level = cascadeLevels.value[index];
     if (!level) return [];
-    const parent = index === 0 ? null : cascadeValue.value[index - 1] ?? '';
-    if (index > 0 && (parent === '' || parent === undefined)) return []; // no parent chosen yet
-    return cascadeOptions.value
-        .filter((o) => o.level === level.key && (index === 0 ? o.parent === null : o.parent === parent))
-        .map((o) => ({ value: o.value, label: o.label }));
+    const parent = index === 0 ? '' : cascadeValue.value[index - 1] ?? '';
+    if (index > 0 && parent === '') return []; // no parent chosen yet
+    return cascadeIndex.value.get(`${level.key}\u0000${parent}`) ?? [];
 }
 
 function cascadeDisabled(index: number): boolean {

@@ -11,7 +11,7 @@
  */
 
 import { encodeSolution, solveChallenge, type Challenge } from './challenge';
-import { ApiError, normalizeError } from './error-normalizer'; import { hasLinkedChoices, linkedChoicesUrl, mergeLinkedChoices, type LinkedChoiceLists } from './linked-choices';
+import { ApiError, normalizeError } from './error-normalizer'; import { hasLinkedChoices, linkedChoicesUrl, mergeLinkedChoices, type LinkedChoiceLists } from './linked-choices'; import { choiceListsUrl, hasChoiceLists, mergeChoiceLists, type ChoiceLists } from './choice-lists';
 import type {
     AnswerMap,
     MintResponse,
@@ -196,6 +196,24 @@ export function createApiClient(options: { token: string; slug: string; fetch?: 
         }
     }
 
+    /**
+     * A version's CSV choice lists (M141), or null when they cannot be read. NEVER THROWS, as `fetchLinkedChoices()`.
+     * Read through the service worker, which keeps them per version for offline use.
+     */
+    async function fetchChoiceLists(versionId: string): Promise<ChoiceLists | null> {
+        try {
+            const response = await doFetch(choiceListsUrl(currentToken, versionId), { headers: { Accept: 'application/json' } });
+            if (!response.ok) return null;
+            const body = (await response.json()) as { data?: { lists?: ChoiceLists | unknown[] } };
+            const lists = body.data?.lists;
+
+            // An empty PHP array arrives as `[]`; it means no lists, the same as `{}`.
+            return lists === undefined ? null : Array.isArray(lists) ? {} : lists;
+        } catch {
+            return null;
+        }
+    }
+
     return {
         token: () => currentToken,
         remint,
@@ -216,7 +234,11 @@ export function createApiClient(options: { token: string; slug: string; fetch?: 
 
             // M133 (`R-5da4a30f`): a question that takes its choices from another form gets them here, from their own
             // read (`D60` = A), merged into a copy — so every path that sets a schema gets them, and none can forget.
-            return hasLinkedChoices(body.data) ? mergeLinkedChoices(body.data, await fetchLinkedChoices(body.data.version.id)) : body.data;
+            const linked = hasLinkedChoices(body.data) ? mergeLinkedChoices(body.data, await fetchLinkedChoices(body.data.version.id)) : body.data;
+
+            // M141 (`R-f69aab42`, `D95`): a cascade whose levels take their choices from CSV files gets its list here, from its
+            // own read beside the schema, frozen per version — merged into a copy the same way.
+            return hasChoiceLists(linked) ? mergeChoiceLists(linked, await fetchChoiceLists(linked.version.id)) : linked;
         },
 
         async submit(payload: SubmitPayload): Promise<SubmitResult> {

@@ -156,8 +156,9 @@ describe('sw.ts runtime cache route table', () => {
         // A floor on the table itself. Without it, a route deleted outright would take its own
         // status assertion with it and the file would stay green while covering nothing — the
         // vacuous-success shape this repository gates everywhere else. M130 added the fourth, M132 the fifth, M133 the sixth.
-        // M140 added a seventh ROUTE but no cache: resume links write the shell cache under one token-free key.
-        expect(routes).toHaveLength(7);
+        // M140 added a seventh ROUTE but no cache: resume links write the shell cache under one token-free key. M141 the
+        // eighth, the CSV choice lists.
+        expect(routes).toHaveLength(8);
         expect(routes.map((r) => r.strategy.cacheName)).toEqual([
             'guest-shell-assets',
             'guest-schema',
@@ -166,10 +167,11 @@ describe('sw.ts runtime cache route table', () => {
             'guest-content-images',
             'guest-reference-files',
             'guest-linked-choices',
+            'guest-choice-lists',
         ]);
     });
 
-    it.each(['guest-shell-assets', 'guest-schema', 'guest-shell-html', 'guest-content-images', 'guest-reference-files', 'guest-linked-choices'])(
+    it.each(['guest-shell-assets', 'guest-schema', 'guest-shell-html', 'guest-content-images', 'guest-reference-files', 'guest-linked-choices', 'guest-choice-lists'])(
         'caches a 200 on %s',
         async (cacheName) => {
             // The control arm. If this ever goes red the filter is too strict, not too loose, and
@@ -178,7 +180,7 @@ describe('sw.ts runtime cache route table', () => {
         },
     );
 
-    it.each(['guest-shell-assets', 'guest-schema', 'guest-shell-html', 'guest-content-images', 'guest-reference-files', 'guest-linked-choices'])(
+    it.each(['guest-shell-assets', 'guest-schema', 'guest-shell-html', 'guest-content-images', 'guest-reference-files', 'guest-linked-choices', 'guest-choice-lists'])(
         'refuses an opaque (status 0) response on %s',
         async (cacheName) => {
             // ⛔ THE DISCRIMINATOR, AND THE ONLY ARM THAT WAS RED BEFORE M77. Delete the
@@ -231,6 +233,7 @@ describe('sw.ts route matchers — which URLs enter a cache at all', () => {
         expect(matcherFor('guest-content-images')(resumeRead)).toBe(false);
         expect(matcherFor('guest-reference-files')(resumeRead)).toBe(false);
         expect(matcherFor('guest-linked-choices')(resumeRead)).toBe(false);
+        expect(matcherFor('guest-choice-lists')(resumeRead)).toBe(false);
     });
 
     it('claims a content image for the image cache only, and keys it without the share token (M130)', async () => {
@@ -305,6 +308,29 @@ describe('sw.ts route matchers — which URLs enter a cache at all', () => {
         expect(await keyFor('token-a', 'ver-8')).not.toBe(await keyFor('token-a'));
     });
 
+    it('claims a CSV choice-list read for its own cache only, keyed by VERSION without the share token (M141, D95)', async () => {
+        const lists = apiGet('/api/v1/public/choice-lists/token-a/ver-7');
+
+        expect(matcherFor('guest-choice-lists')(lists)).toBe(true);
+        // Beside the schema and beside the linked lists: a different freshness, so a different cache.
+        expect(matcherFor('guest-schema')(lists)).toBe(false);
+        expect(matcherFor('guest-linked-choices')(lists)).toBe(false);
+        expect(matcherFor('guest-choice-lists')(apiGet('/api/v1/public/linked-choices/token-a/ver-7'))).toBe(false);
+
+        const plugins = (routeFor('guest-choice-lists').plugins ?? []) as Array<{
+            cacheKeyWillBeUsed?: (o: { request: Request; mode: string }) => Promise<Request | string>;
+        }>;
+        const keyPlugin = plugins.find((plugin) => typeof plugin.cacheKeyWillBeUsed === 'function');
+        expect(keyPlugin, 'the choice-list route has no cache-key plugin').toBeDefined();
+
+        const keyFor = (token: string, version = 'ver-7') =>
+            keyPlugin!.cacheKeyWillBeUsed!({ request: new Request(`https://acme.test/api/v1/public/choice-lists/${token}/${version}`), mode: 'read' });
+
+        // Loaded under one visit's token, the list must be found under the next visit's, offline.
+        expect(await keyFor('token-a')).toBe('https://acme.test/api/v1/public/choice-lists/ver-7');
+        expect(await keyFor('token-b')).toBe(await keyFor('token-a'));
+        expect(await keyFor('token-a', 'ver-8')).not.toBe(await keyFor('token-a'));
+    });
 });
 
 /**

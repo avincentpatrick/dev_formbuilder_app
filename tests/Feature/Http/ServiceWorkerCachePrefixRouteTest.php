@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Route;
 | R-aa133bab (M121) — no GET route may answer under a service-worker cache prefix unless it is meant to.
 |--------------------------------------------------------------------------
 | The service worker (resources/public-runtime/sw.ts) caches by PATH PREFIX: `/build/`, `/api/v1/public/f/`,
-| `/f/`, since M130 `/api/v1/public/content-images/` and since M132 `/api/v1/public/reference-files/` and since M133 `/api/v1/public/linked-choices/`. The resume READ — `api.v1.public.drafts.resume`, which answers with a respondent's saved
+| `/f/`, since M130 `/api/v1/public/content-images/` and since M132 `/api/v1/public/reference-files/` and since M133 `/api/v1/public/linked-choices/`, and since M140 `/f/resume/` (the resume shell's own route, `D20` = 2). The resume READ — `api.v1.public.drafts.resume`, which answers with a respondent's saved
 | answers — escapes that cache only because its path begins `drafts/` rather than `f/`. `D20` was answered to
 | keep it out, and until now the only thing keeping it out was a comment beside the route.
 |
@@ -55,10 +55,16 @@ function swCachedGetAllowList(): array
         'build/' => [],
         // The pinned schema this cache exists for (sw.ts, the `guest-schema` cache).
         'api/v1/public/f/' => ['api.v1.public.forms.schema'],
-        // The shell. `guest.form.resume` IS the credential-bearing shell D20 = 2 decided to keep caching
-        // (R-68656155 owns that); the manifest is not a navigation, and is listed because this gate counts
-        // every GET under the prefix rather than modelling the navigate-only predicate.
+        // The shell. The manifest is not a navigation, and is listed because this gate counts every GET under the
+        // prefix rather than modelling the navigate-only predicate. `guest.form.resume` sits under this prefix too;
+        // since M140 the shell route leaves it to the route below by `isResumeShell()`, which this gate does not model.
         'f/' => ['guest.form.manifest', 'guest.form.mint', 'guest.form.resume'],
+        // The resume shell (M140, `R-68656155`, `D20` = 2): cached in the shell cache under ONE token-free key with
+        // the token blanked, so the device keeps the offline surface and holds no resume link. `guest.form.mint` and
+        // the manifest are listed because their URIs start with a parameter whose static head `f/` is a prefix of this
+        // one; `f/{slug}` cannot answer `/f/resume/x` (two segments, and `resume` is a reserved slug), but this gate
+        // counts conservatively rather than modelling either fact.
+        'f/resume/' => ['guest.form.manifest', 'guest.form.mint', 'guest.form.resume'],
         // A note's images (M130, `R-c9f50df2`): their own cache, `guest-content-images`, OUTSIDE the schema's prefix
         // so an image can neither evict a cached schema nor be mistaken for one.
         'api/v1/public/content-images/' => ['api.v1.public.content-images.show'],
@@ -110,7 +116,7 @@ it('parses one startsWith prefix per runtime-cache route out of sw.ts, and every
 
     // The floor: a cache route whose matcher is not a `startsWith` literal would otherwise pass unseen.
     expect($prefixes)->toHaveCount(substr_count($source, 'registerRoute('))
-        ->and($prefixes)->toHaveCount(6)
+        ->and($prefixes)->toHaveCount(7)
         ->and($prefixes)->toBe($expected);
 });
 

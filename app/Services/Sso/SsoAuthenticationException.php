@@ -206,7 +206,7 @@ final class SsoAuthenticationException extends RuntimeException
      * is locked out, and no backfill, per-connection mode or public-mailbox exclusion list is required. That
      * rests on an enumerated fact rather than a hopeful one — the only writers of `Active` are
      * `accept()` (an emailed token AND, since M8, either a fresh identity or the real person signed in as
-     * themselves), `joinOpenTenant()` (self-registration, an older door where nothing is forged),
+     * themselves), `joinOpenTenant()` (self-registration, since M140 only on its registrant's confirmation of the address — until then it ran on `Registered` and DID mint one for a stranger's address, `R-5ce75abf`),
      * `joinViaGoogle()` (Google verified the mailbox) and `joinViaSso()` (downstream of this check). None
      * mints an Active row for a stranger's address on an assertion alone.
      */

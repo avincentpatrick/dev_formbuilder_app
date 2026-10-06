@@ -356,9 +356,11 @@ rewriting its answers are different powers.
    Owner/Admin only — they are absent for a Viewer, which §6 step 12 already had you check.)
 2. **About** — **Expect:** the app version and build commit.
 3. **Access** — the demo workspace is set to *open* registration. Open a private window, go to
-   <http://demo.localhost:8080/register>, and create an account. **Expect:** it works, and the new account
-   lands in the workspace as a Viewer. Now switch Access to *invitation only* and try again. **Expect:** the
-   register page 404s.
+   <http://demo.localhost:8080/register>, and create an account. **Expect:** it works, you are asked to
+   confirm your email address, and the new account is **not** a member yet (the address is not yours until
+   you confirm it — decision D34). Open the confirmation email in Mailpit and follow its link. **Expect:** the
+   account now lands in the workspace as a Viewer, and a welcome email names the workspace. Now switch Access
+   to *invitation only* and try again. **Expect:** the register page 404s.
 4. **Modules** — turn **Webhooks** off. **Expect:** the Webhooks item disappears from the sidebar
    *immediately*, and visiting `/webhooks` directly is refused. Turn it back on and confirm it returns.
 5. **Maintenance** — turn it on with a message. In a private window, open

@@ -7,12 +7,18 @@ use App\Enums\TenantUserStatus;
 use App\Models\Audit;
 use App\Models\TenantUser;
 use App\Models\User;
+use App\Notifications\Auth\WelcomeNotification;
 use App\Services\Settings\PlatformSettings;
 use App\Services\Settings\TenantSettingRegistry;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
+use Illuminate\Auth\Events\Verified;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Str;
 use Ramsey\Uuid\Uuid;
 use Spatie\Permission\PermissionRegistrar;
 
@@ -115,7 +121,8 @@ it('404s /register on a tenant subdomain by default — invitation only', functi
     $this->assertGuest();
 });
 
-it('joins the workspace as a Viewer when it is open, and audits the door it came through', function (): void {
+it('joins the workspace as a Viewer when the registrant CONFIRMS the address, not before, and audits the door', function (): void {
+    Notification::fake();
     openTheWorkspace($this->tenant->id);
     $this->withoutVite();
 
@@ -129,6 +136,24 @@ it('joins the workspace as a Viewer when it is open, and audits the door it came
     ])->assertRedirect();
 
     $this->assertAuthenticated();
+    $userId = (string) Auth::id();
+
+    // ⛔ M140 (`D34` = A, `R-2dc95042`) — REGISTERING MINTS NOTHING. Until M140 a `Registered` listener made this
+    // membership here, before any link was clicked, so anyone could hold an Active membership for someone
+    // else's address. Re-enter: the GUC died with the request.
+    enterTenant($this->tenant->id);
+    expect(TenantUser::query()->exists())->toBeFalse();
+    TenantContext::flush();
+
+    // The emailed link, on the host it was requested from — the registration's.
+    URL::forceRootUrl('http://acme.meridian.test');
+    $link = URL::temporarySignedRoute('verification.verify', now()->addHour(), [
+        'id' => $userId,
+        'hash' => sha1('joiner@example.test'),
+    ]);
+    URL::forceRootUrl(null);
+
+    $this->get($link)->assertRedirect();
 
     // Re-enter: the GUC died with the request. `tenant_users` is strict-RLS on the TENANT alone, so it is
     // reachable with no user context — which is why the membership row, not `users`, is the way in here
@@ -148,6 +173,105 @@ it('joins the workspace as a Viewer when it is open, and audits the door it came
     // role, different door.
     expect($audit->new_values['via'])->toBe('self_registration');
     expect($audit->new_values['role'])->toBe('viewer');
+
+    // Joined FIRST and welcomed second, so the welcome names the workspace rather than none.
+    Notification::assertSentOnDemand(
+        WelcomeNotification::class,
+        fn (WelcomeNotification $notification): bool => $notification->tenantName === $this->tenant->name,
+    );
+});
+
+/*
+|--------------------------------------------------------------------------
+| M140 (`D34` = A) — the three conditions on a join at confirmation, one case each.
+|--------------------------------------------------------------------------
+| `JoinTenantOnRegistration::onConfirmation()` runs inside `SendWelcomeEmail`, the one `Verified` listener. Each
+| case fires `Verified` for a registrant-shaped account on the workspace's host and changes ONE thing from the
+| control, so each condition is shown to be the thing that refused.
+*/
+
+/** An account shaped like a fresh self-registration: unconfirmed, and its password stamped when it was made. */
+function registrantShaped(array $overrides = []): User
+{
+    $made = now()->startOfSecond();
+
+    return User::factory()->unverified()->create(array_merge([
+        'email' => Str::lower(Str::random(10)).'@registrant.test',
+        'password_set_at' => $made,
+        'created_at' => $made,
+        'updated_at' => $made,
+    ], $overrides));
+}
+
+function confirmOnHost(User $user, string $host): void
+{
+    app('request')->headers->set('host', $host);
+    app('request')->server->set('HTTP_HOST', $host);
+
+    event(new Verified($user));
+}
+
+function joinedAcme(string $tenantId, string $userId): bool
+{
+    enterTenant($tenantId);
+    $joined = TenantUser::query()->where('user_id', $userId)->where('status', TenantUserStatus::Active)->exists();
+    TenantContext::flush();
+
+    return $joined;
+}
+
+it('joins a registrant-shaped account on confirmation — the control for the three cases below', function (): void {
+    Notification::fake();
+    openTheWorkspace($this->tenant->id);
+    $user = registrantShaped();
+
+    confirmOnHost($user, 'acme.meridian.test');
+
+    expect(joinedAcme($this->tenant->id, $user->id))->toBeTrue();
+});
+
+it('joins nothing when the workspace has closed registration since the account was made', function (): void {
+    Notification::fake();
+    // No `openTheWorkspace()`: invitation-only, the default — the answer changed between POST and confirmation.
+    $user = registrantShaped();
+
+    confirmOnHost($user, 'acme.meridian.test');
+
+    expect(joinedAcme($this->tenant->id, $user->id))->toBeFalse();
+});
+
+it('joins nothing once the password has been reset — the owner reclaiming a squatted address', function (): void {
+    // ⛔ `R-5ce75abf`'s chain: a squatter registers the address on their own open workspace, the owner reclaims
+    // the account by password reset and then clicks a confirmation link the squatter re-sent from that host.
+    // Joining then would hand the squatter's workspace an Active membership for the owner.
+    Notification::fake();
+    openTheWorkspace($this->tenant->id);
+    $user = registrantShaped(['password_set_at' => now()->startOfSecond()->addMinutes(10)]);
+
+    confirmOnHost($user, 'acme.meridian.test');
+
+    expect(joinedAcme($this->tenant->id, $user->id))->toBeFalse();
+});
+
+it('joins nothing on a re-confirmation after an address change', function (): void {
+    // `Verified` fires again after every address change; only the first confirmation is a registration's.
+    Notification::fake();
+    openTheWorkspace($this->tenant->id);
+    $user = registrantShaped(['welcomed_at' => now()]);
+
+    confirmOnHost($user, 'acme.meridian.test');
+
+    expect(joinedAcme($this->tenant->id, $user->id))->toBeFalse();
+});
+
+it('joins nothing on the central host, where there is no workspace', function (): void {
+    Notification::fake();
+    openTheWorkspace($this->tenant->id);
+    $user = registrantShaped();
+
+    confirmOnHost($user, 'meridian.test');
+
+    expect(joinedAcme($this->tenant->id, $user->id))->toBeFalse();
 });
 
 it('leaves central-host registration exactly as it was — an account with no workspace', function (): void {

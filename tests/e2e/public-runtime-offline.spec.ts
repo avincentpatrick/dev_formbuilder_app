@@ -512,3 +512,92 @@ test('Public runtime — a question with choices from another form is answered o
 
     await context.setOffline(false);
 });
+
+// M140 (`R-68656155`, `D20` = 2) — every resume link is cached under ONE token-free key, and a resume link opened
+// offline still reaches the offline surface. Two links from two tabs, so "one key" is measured against two tokens
+// rather than one; read from the cache itself, keys AND body, because the defect was a credential in both.
+// ⚠️ CI's E2E origin has no service worker, so this case skips there (audibly) and runs locally only.
+test('Public runtime — resume links are cached under one key with no token in it, and one still opens offline', async ({
+    page,
+    context,
+}) => {
+    await page.goto('/f/clinic-intake', { waitUntil: 'networkidle' });
+    await page
+        .getByRole('heading', { name: 'Clinic Intake', level: 1 })
+        .waitFor({ state: 'visible', timeout: 15_000 });
+
+    const swAvailable = await page.evaluate(() => 'serviceWorker' in navigator);
+    test.skip(!swAvailable, 'no service worker on this origin — the secure-origin launch flag did not take');
+
+    await page.evaluate(async () => {
+        await Promise.race([
+            navigator.serviceWorker.ready,
+            new Promise((resolve) => setTimeout(resolve, 10_000)),
+        ]);
+    });
+
+    /** Save a draft from a fresh tab and return its resume link. A tab is its own visit, so each link is new. */
+    const saveDraft = async (): Promise<string> => {
+        const tab = await context.newPage();
+        await tab.goto('/f/clinic-intake', { waitUntil: 'networkidle' });
+        await tab.getByRole('button', { name: 'Save and finish later' }).click();
+        const link = tab.getByRole('textbox', { name: 'Your resume link' });
+        await link.waitFor({ state: 'visible', timeout: 15_000 });
+        // The link carries the app's configured host, which need not be this run's origin; its path is the link.
+        const path = new URL(await link.inputValue()).pathname;
+        await tab.close();
+
+        return path;
+    };
+
+    const linkA = await saveDraft();
+    const linkB = await saveDraft();
+    const tokenOf = (path: string) => path.replace('/f/resume/', '');
+    expect(tokenOf(linkA)).not.toBe('');
+    expect(tokenOf(linkB)).not.toBe(tokenOf(linkA));
+
+    // Both opened online through the controlled page, so both pass through the worker's resume route.
+    for (const link of [linkA, linkB]) {
+        await page.goto(link, { waitUntil: 'networkidle' });
+        await page
+            .getByRole('heading', { name: 'Clinic Intake', level: 1 })
+            .waitFor({ state: 'visible', timeout: 15_000 });
+    }
+
+    const cached = await page.waitForFunction(
+        async () => {
+            if (!(await caches.keys()).includes('guest-shell-html')) {
+                return false;
+            }
+            const cache = await caches.open('guest-shell-html');
+            const resume = (await cache.keys()).filter((request) => new URL(request.url).pathname.startsWith('/f/resume/'));
+            if (resume.length === 0) {
+                return false;
+            }
+            const bodies: string[] = [];
+            for (const request of resume) {
+                bodies.push((await (await cache.match(request))?.text()) ?? '');
+            }
+
+            return { paths: resume.map((request) => new URL(request.url).pathname), bodies };
+        },
+        null,
+        { timeout: 15_000 },
+    );
+    const { paths, bodies } = (await cached.jsonValue()) as { paths: string[]; bodies: string[] };
+
+    // ONE entry for two links, under a key with no token — and a body with no token either.
+    expect(paths).toEqual(['/f/resume/']);
+    for (const token of [tokenOf(linkA), tokenOf(linkB)]) {
+        expect(bodies.join('\n')).not.toContain(token);
+    }
+    expect(bodies[0]).toContain('data-resume-token=""');
+
+    // Offline, a resume link still opens the shell: the draft cannot be read, so the error shows, beside the
+    // offline pill — the surface `D20` kept.
+    await context.setOffline(true);
+    await page.goto(linkA, { waitUntil: 'commit' });
+    await expect(page.getByText('Offline — your answers are saved on this device')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('We could not restore your saved form. Please try again.')).toBeVisible();
+    await context.setOffline(false);
+});

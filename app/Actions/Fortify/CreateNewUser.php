@@ -46,12 +46,18 @@ class CreateNewUser implements CreatesNewUsers
         // with no exception and no log, and this door — self-registration — is the exact door that
         // manufactured the population the column exists to protect. One INSERT, not two.
         $user = new User;
+        // ⛔ ONE INSTANT FOR BOTH STAMPS (M140). `JoinTenantOnRegistration` joins a workspace at confirmation only
+        // while the password is still the registrant's, read as `password_set_at` EQUAL TO `created_at`; two
+        // `now()` calls could straddle a second.
+        $now = now();
 
         $user->forceFill([
             'name' => $input['name'],
             'email' => $input['email'],
             'password' => Hash::make($input['password']),
-            'password_set_at' => now(),
+            'password_set_at' => $now,
+            'created_at' => $now,
+            'updated_at' => $now,
         ])->save();
 
         return $user;

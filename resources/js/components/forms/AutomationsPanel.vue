@@ -14,8 +14,16 @@
  * the author says they have copied it, and is gone when the section is reopened.
  *
  * ⛔ The word "step" appears nowhere here: an automation runs an ACTION (`docs/workflow-branching-design.md` §2).
+ *
+ * ── A CONDITION ON EACH AUTOMATION (M142, `D93` = A step 1) ─────────────────────────────────────────────────
+ * "Only when…" is the builder's own condition editor, with `purpose="run"`, over the questions the server offers
+ * (`catalogue`, from the version a condition is checked against). Empty means every response. The row says the
+ * condition as a sentence, and a run it skipped says why.
  */
 import { computed, ref, watch } from 'vue';
+import ConditionEditor from '@/components/builder/ConditionEditor.vue';
+import { describe, type LabelLookup } from '@/components/builder/condition-describer';
+import type { ConditionCatalogue } from '@/components/builder/types';
 import { MdsButton, MdsFormField, MdsSegmentedControl, MdsSwitch, MdsTextarea, MdsTextInput } from '@meridian/design-system';
 import { createAutomation, deleteAutomation, parseRecipients, runReason, testAutomation, updateAutomation } from '@/components/forms/automations';
 import type { AutomationAction, AutomationRow, AutomationsProps } from '@/components/forms/types';
@@ -40,13 +48,23 @@ const recipientsText = ref('');
 const url = ref('');
 const formErrors = ref<Record<string, string>>({});
 const saving = ref(false);
+const condition = ref<string | null>(null);
 
 // The one row being edited, if any.
 const editing = ref<string | null>(null);
 const editName = ref('');
 const editRecipients = ref('');
 const editUrl = ref('');
+const editCondition = ref<string | null>(null);
 const editError = ref<string | null>(null);
+
+const catalogue = computed<ConditionCatalogue>(() => props.automations.catalogue ?? { fields: [], repeatables: [] });
+const labels = computed<LabelLookup>(() => {
+    const lookup: LabelLookup = {};
+    catalogue.value.repeatables.forEach((section) => (lookup[section.key] = section.label));
+    catalogue.value.fields.forEach((field) => (lookup[field.key] = field.label));
+    return lookup;
+});
 
 const atLimit = computed(() => items.value.length >= props.automations.max);
 const actionOptions = computed(() => [
@@ -76,6 +94,13 @@ function summary(row: AutomationRow): string {
     return `Sends the answers to ${row.url ?? row.host ?? 'a web address'}.`;
 }
 
+/** The automation's condition as a sentence — or as written, when the builder cannot say it in words. */
+function conditionLine(row: AutomationRow): string | null {
+    if (!row.condition || row.condition.trim() === '') return null;
+    const reading = describe(row.condition, labels.value, 'Runs only when');
+    return reading.status === 'described' ? reading.prose : `Runs only when: ${row.condition}`;
+}
+
 function runLine(run: AutomationRow['runs'][number]): string {
     const when = run.at === null ? '' : new Date(run.at).toLocaleString();
     const reason = runReason(run.error_code, run.response_status);
@@ -97,6 +122,7 @@ async function add(): Promise<void> {
             name: name.value,
             action: action.value,
             ...(action.value === 'email' ? { recipients: parseRecipients(recipientsText.value) } : { url: url.value }),
+            ...(condition.value !== null ? { condition: condition.value } : {}),
         });
         items.value = [...items.value, row];
         if (minted !== null) {
@@ -107,6 +133,7 @@ async function add(): Promise<void> {
         name.value = '';
         recipientsText.value = '';
         url.value = '';
+        condition.value = null;
     } catch (thrown) {
         formErrors.value = { form: fail(thrown, 'The automation was not saved.') };
     } finally {
@@ -130,6 +157,7 @@ function startEdit(row: AutomationRow): void {
     editName.value = row.name;
     editRecipients.value = (row.recipients ?? []).join(', ');
     editUrl.value = row.url ?? '';
+    editCondition.value = row.condition ?? null;
     editError.value = null;
 }
 
@@ -139,6 +167,7 @@ async function saveEdit(row: AutomationRow): Promise<void> {
         const updated = await updateAutomation(props.formId, row.id, {
             name: editName.value,
             ...(row.action === 'email' ? { recipients: parseRecipients(editRecipients.value) } : { url: editUrl.value }),
+            condition: editCondition.value,
         });
         items.value = items.value.map((item) => (item.id === updated.id ? updated : item));
         editing.value = null;
@@ -212,6 +241,13 @@ async function copySecret(): Promise<void> {
                     <MdsFormField v-else v-slot="{ id }" label="Web address">
                         <MdsTextInput :id="id" v-model="editUrl" type="url" />
                     </MdsFormField>
+                    <ConditionEditor
+                        :expression="editCondition"
+                        :catalogue="catalogue"
+                        legend="Only when…"
+                        purpose="run"
+                        @update:expression="editCondition = $event"
+                    />
                     <p v-if="editError" class="automations__error" role="alert">{{ editError }}</p>
                     <div class="automations__row-actions">
                         <MdsButton size="sm" variant="primary" @click="saveEdit(row)">Save</MdsButton>
@@ -231,6 +267,7 @@ async function copySecret(): Promise<void> {
                         <span v-else class="automations__meta">{{ row.enabled ? 'On' : 'Off' }}</span>
                     </div>
                     <p class="automations__summary">{{ summary(row) }}</p>
+                    <p v-if="conditionLine(row)" class="automations__meta" data-automation-condition>{{ conditionLine(row) }}</p>
                     <p v-if="!row.manageable" class="automations__meta">
                         Only Owners and Admins can change an automation that sends answers to a web address.
                     </p>
@@ -281,6 +318,13 @@ async function copySecret(): Promise<void> {
             >
                 <MdsTextInput :id="id" v-model="url" type="url" placeholder="https://" />
             </MdsFormField>
+            <ConditionEditor
+                :expression="condition"
+                :catalogue="catalogue"
+                legend="Only when…"
+                purpose="run"
+                @update:expression="condition = $event"
+            />
             <p v-if="formErrors.form" class="automations__error" role="alert">{{ formErrors.form }}</p>
             <MdsButton variant="primary" :loading="saving" @click="add">Add automation</MdsButton>
         </div>

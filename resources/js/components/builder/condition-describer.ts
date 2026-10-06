@@ -56,7 +56,7 @@ export type ConditionReading =
     /** Does not parse. `slug` is the engine's stable error slug; `reason` is its message. */
     | { status: 'invalid'; slug: string; reason: string };
 
-export function describe(expression: string | null, labels: LabelLookup = {}): ConditionReading {
+export function describe(expression: string | null, labels: LabelLookup = {}, lead = 'Shown when'): ConditionReading {
     if (expression === null || expression.trim() === '') {
         return { status: 'blank' };
     }
@@ -80,7 +80,7 @@ export function describe(expression: string | null, labels: LabelLookup = {}): C
 
     return condition === null
         ? { status: 'opaque', references }
-        : { status: 'described', prose: say(condition, labels), references };
+        : { status: 'described', prose: say(condition, labels, lead), references };
 }
 
 /** Every `${key}` the expression names, in first-appearance order and without duplicates. */
@@ -115,8 +115,8 @@ function collectReferences(node: Node): string[] {
     return found;
 }
 
-function say(condition: Condition, labels: LabelLookup): string {
-    return `Shown when ${clauseOf(condition, labels)}.`;
+function say(condition: Condition, labels: LabelLookup, lead = 'Shown when'): string {
+    return `${lead} ${clauseOf(condition, labels)}.`;
 }
 
 const COMPARATORS: Record<Comparator, string> = {

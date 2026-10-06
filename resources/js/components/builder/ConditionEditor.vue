@@ -53,7 +53,18 @@ const props = defineProps<{
     /** "Show this question only when…" / "Show this section only when…" — the fieldset's own name. */
     legend: string;
     disabled?: boolean;
+    /**
+     * M142 — what the condition decides: `show` a question or section (the default, checked at publish), or whether a form
+     * automation should `run` for a response (checked when it is saved).
+     */
+    purpose?: 'show' | 'run';
 }>();
+
+const COPY = {
+    show: { lead: 'Shown when', none: 'Always shown — no conditions yet.', checked: 'Checked when you publish.', refused: 'publishing will refuse it' },
+    run: { lead: 'Runs when', none: 'Runs for every response — no conditions yet.', checked: 'Checked when you save.', refused: 'it can’t be saved' },
+} as const;
+const copy = computed(() => COPY[props.purpose ?? 'show']);
 
 const emit = defineEmits<{ 'update:expression': [value: string | null] }>();
 
@@ -110,7 +121,7 @@ const labels = computed<LabelLookup>(() => {
     return lookup;
 });
 
-const reading = computed(() => describe(props.expression ?? null, labels.value));
+const reading = computed(() => describe(props.expression ?? null, labels.value, copy.value.lead));
 const representable = computed(() => reading.value.status === 'blank' || reading.value.status === 'described');
 const structured = computed(() => representable.value && !asText.value);
 const incomplete = computed(() => {
@@ -199,7 +210,7 @@ const note = computed<string | null>(() => {
         return 'This condition uses something the builder can’t show as rows — arithmetic, a nested function, or a negated group. It is shown exactly as you wrote it and is never rewritten.';
     }
     if (reading.value.status === 'invalid') {
-        return `This condition doesn’t parse, so publishing will refuse it: ${reading.value.reason}`;
+        return `This condition doesn’t parse, so ${copy.value.refused}: ${reading.value.reason}`;
     }
 
     return null;
@@ -218,7 +229,7 @@ const note = computed<string | null>(() => {
                 Finish every condition before this is saved — a question, a check and a value.
             </p>
             <p v-else-if="reading.status === 'described'" class="cond__reading">{{ reading.prose }}</p>
-            <p v-else class="cond__reading">Always shown — no conditions yet.</p>
+            <p v-else class="cond__reading">{{ copy.none }}</p>
 
             <div class="cond__actions">
                 <MdsButton variant="tertiary" size="sm" icon-left="edit" @click="toText">Edit as text</MdsButton>
@@ -237,7 +248,7 @@ const note = computed<string | null>(() => {
             />
             <p class="cond__help">
                 Supports ${question} references, and/or/not, = != &gt; &lt; &gt;= &lt;=, arithmetic, and
-                selected()/count(). Checked when you publish.
+                selected()/count(). {{ copy.checked }}
             </p>
 
             <div v-if="representable" class="cond__actions">

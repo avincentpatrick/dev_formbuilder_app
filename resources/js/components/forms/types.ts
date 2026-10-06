@@ -157,6 +157,8 @@ export interface AutomationRow {
     url: string | null;
     host: string | null;
     manageable: boolean;
+    /** M142 — the condition a response must match for this automation to run, or null for every response. */
+    condition: string | null;
     runs: AutomationRunRow[];
 }
 
@@ -165,6 +167,8 @@ export interface AutomationsProps {
     can_webhook: boolean;
     max: number;
     items: AutomationRow[];
+    /** M142 — the questions a condition may name, from the version a condition is checked against. */
+    catalogue?: import('@/components/builder/types').ConditionCatalogue;
 }
 
 /** One question another form may take its choices from (M133, `R-5da4a30f`), as `ShareableQuestions` lists it. */

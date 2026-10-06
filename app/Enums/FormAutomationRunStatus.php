@@ -11,8 +11,9 @@ namespace App\Enums;
  * - `retrying` — a web address failed and the next attempt is scheduled (`RetryLadder`).
  * - `succeeded` — a web address answered 2xx, or the emails were handed to the mail queue.
  * - `failed` — every attempt failed; nothing more will be tried.
- * - `skipped` — deliberately not run: the plan no longer includes webhooks, the month's delivery quota is spent, or the
- *   automation was switched off before its turn came.
+ * - `skipped` — deliberately not run: the plan no longer includes webhooks, the month's delivery quota is spent, the
+ *   automation was switched off before its turn came, or (M142) the response did not match the automation's condition
+ *   (`condition_not_met`) or the condition could not be read for it (`condition_error`).
  *
  * Pinned in the database by `form_automation_runs_status_check`, generated from {@see values()}.
  */

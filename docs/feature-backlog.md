@@ -13180,14 +13180,14 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   and stay as staff-only notes on the form; the Kobo-style uses are the three rows below. **Live.** Filed by `M137`.
   **Tier: early-testing.** ✅ **CLOSED BY `M138` (2026-10-06), PR #331.** The guest schema lists none, the guest page renders no list (`ReferenceFileList.vue` deleted), and the guest route stays registered for the Kobo-style rebuild and answers 404 to every file; staff keep the files and the frozen per-version rows, and the settings section says respondents do not see them. Proved by two deliberate defects, each caught.
 
-- **`minor` · Sections can be added only in Structure, and the preview offers no way to add a section or a question in
+- ✅ **CLOSED BY `M139` (2026-10-06) — ****`minor` · Sections can be added only in Structure, and the preview offers no way to add a section or a question in
   one.** Found by `M137` from the staging smoke test (comment 18, marked fail: *"section must be added in the structure
   before it shows on the preview. the preview page must have a capacity to have its own way to add section, add
   specific indicator in it. also in the structure, the indicators must be draggable to sections"*). The preview
   selects a question on click and adds nothing (`PreviewRuntime.vue`). ⚠️ **Structure already drags questions across
   sections** — `useCanvasReorder.ts`, by pointer and by keyboard grab mode — so the last clause is either unfound or
   failing in some case (an empty section is the first suspect); measure it in a real browser before building anything
-  for it. Taken before Oct 12 by `D91`. **Live.** Filed by `M137`. **Tier: early-testing.**
+  for it. Taken before Oct 12 by `D91`. **Live.** Filed by `M137`. **Tier: early-testing.** ✅ **CLOSED BY `M139` (2026-10-06), PR #332.** The preview adds a section, shows a section with no question yet to the author (the engine still drops it for respondents), and offers "Add a question to <section>" under each, which selects the section and opens the Fields palette with focus on it; Structure's empty section says a question can be dragged in and offers the same add. The drag clause was measured working by pointer before the build; the keyboard half is `R-c0857303`. Walked in a real browser at three viewports by `tests/e2e/builder-preview-authoring.spec.ts`.
 
 - **`minor` · A choice list cannot come from an uploaded CSV, so a long cascading list — region, province,
   city/municipality, barangay — must be typed into the form.** From `D92`'s research. Kobo's
@@ -13218,10 +13218,10 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   step, then a failure alert and each response's run history. ⚠️ Answers are health data: keep `D82`'s link-first
   email unless an answer is chosen deliberately. **Live.** Filed by `M137`. **Tier: during-testing.**
 
-- **`minor` · Keyboard grab cannot move a question into an empty section, and cannot move a section's only question at
+- ✅ **CLOSED BY `M139` (2026-10-06) — ****`minor` · Keyboard grab cannot move a question into an empty section, and cannot move a section's only question at
   all.** Found by `M139`'s premise probe, a real browser on a fresh form (`.playwright/m139-probe/`). Grab mode steps a
   question past its NEIGHBOURING QUESTION in the flattened order (`useBuilderStore.ts`'s `stepFieldAcross()`), so a
   section with no questions has no neighbour to step past, and a form's only question has none at all. Pointer drag
   reaches an empty section; the keyboard cannot. That breaks `useCanvasReorder.ts`'s own claim that both paths cross
   section boundaries (WCAG 2.5.7), and it is the same move comment 18 asked for (`R-598b9100`). **Live.** Filed by `M139`.
-  **Tier: early-testing.**
+  **Tier: early-testing.** ✅ **CLOSED BY `M139` (2026-10-06), PR #332.** Grab mode steps a question through every place it can sit — each group's slots, one for an empty section — so it reaches an empty section and moves a lone question. The first unit tests of the step (`reorder-store.test.ts`) are red on the old step, and the real-browser spec moves a section's only question out by keyboard.

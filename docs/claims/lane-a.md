@@ -16,64 +16,62 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M139`, smoke-test fixes 3 of 3: sections and their questions from the preview, and a question moved into a section by keyboard too (m139-sections-from-preview)
+## Status: NO ACTIVE CLAIM — `M139` is merged; every smoke-test failure and request is fixed or filed, and the early-testing line waits on the user (the OCR samples, the staging scan)
 
-Taken 2026-10-06. Branch `m139-sections-from-preview`, cut from `origin/main` at `39c940d4`, PR into `main`.
-The last of the three smoke-test increments (`D91`). Rows, each its own commits, in this order:
-1. **`R-c0857303`** (filed in this push) — keyboard grab cannot move a question into an empty section, nor a section's
-   only question at all.
-2. **`R-598b9100`** — sections can be added only in Structure, and the preview offers no way to add a section or a
-   question in one (comment 18).
+## RELEASED — `M139`, smoke-test fixes 3 of 3: sections and their questions from the preview, and a question moved into a section by keyboard too (merged as PR #332, `b4fba4e1`, 6/6 green on its FIRST run with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 
-### Evidence verified
+Shipped 2026-10-06. Branch `m139-sections-from-preview`, cut from `origin/main` at `39c940d4`. The claim commit is `bccff880`.
 
-Against `39c940d4`:
-- **`R-c0857303` — held, measured.** `useBuilderStore.ts`'s `stepFieldAcross()` moves to the NEIGHBOUR question's
-  position in `flattenedFields()`, so it has no step into a section that holds none. The probe grabbed a section's only
-  question and pressed Up, then Down; it stayed put both times.
-- **`R-598b9100` — held, and narrower than it reads.**
-  - The preview builds its blocks from the engine's steps (`PreviewRuntime.vue`), and a section with no questions is no
-    step — `StepProjection`'s rule, the respondent's own. That is why a new section appears nowhere in the preview.
-  - Clicking a preview row selects its question and adds nothing.
-  - ⚠️ **Dragging into a section already works:** the probe moved a top-level question into an empty section by pointer
-    (`useCanvasReorder.ts`). The empty section says only "No fields in this section yet.", and the grip is an
-    unlabelled 28px icon, so the drag clause is a discoverability gap. The keyboard half is row 1.
+Commits, in the stated order:
+- row 1 `fe3b59ea`;
+- row 2 `abfba084`;
+- one closed row's citation re-anchored by name `c085c22a`;
+- the line `a5497daf`.
 
-### Premise verified
+**Rows and namespaces:**
+- **Closed:** `R-c0857303` (filed in the claim push from the probe) and `R-598b9100`.
+- **Namespaces spent:** none.
+- **Outside the claim's list:** `resources/js/components/builder/reorder-store.test.ts` (new) and
+  `tests/e2e/builder-preview-authoring.spec.ts` (new). The claim named a store test and the builder spec; these are new
+  files beside them.
 
-- **The builder already adds a palette question to the selected section** (`Builder.vue`'s `targetSection()`). So "add
-  a question here" selects that section and opens the Fields palette (on a narrow screen, through the existing pane
-  switch), with no second add path.
-- **An empty section is invisible to respondents and stays so.** The preview shows it to the author only, says so, and
-  the engine is untouched.
-- **The preview's render model is read live and the engine only on shape changes** (the `M118`–`M120` lesson). The new
-  affordances read the live store and never the engine.
-- **`builder-axe.spec.ts` scans the preview at three viewports,** so the new buttons are scanned there.
+### What changed
+- **Keyboard grab reaches every place.** It steps a question through every place it can sit: each group's slots, one
+  for an empty section. It reaches an empty section and moves a lone question, as the pointer could.
+- **The preview adds sections and questions:**
+  - an **Add section** button at its end;
+  - a section with no question yet shows to the author as a placeholder (the engine still drops it for respondents);
+  - **Add a question to ⟨section⟩** under each section, which selects the section and opens the Fields palette with
+    focus on it, through the pane switch on a narrow screen.
+- **Structure's empty section** says a question can be dragged in by its handle, and offers the same add.
+- **Proof:**
+  - **Unit:** the new tests of the step are red on the old step; the empty-section list and the canvas emit were each
+    broken by hand, and each caught.
+  - **Real browser:** `builder-preview-authoring.spec.ts` walks the flow at three viewports, including the keyboard move;
+    `builder-axe` passes 69.
+  - **Vitest:** 200 files, 3,348 tests.
 
-### Remedy verdict
+### How the prediction fared
 
-- **Row 1:** step through the SLOTS of every group in order — n+1 per group of n other questions, one for an empty
-  group — so the keyboard reaches every place the pointer can.
-- **Row 2:** in the preview, an "Add a question here" under each section and in each empty-section placeholder, and
-  an "Add section" at the end. In Structure, the empty section says a question can be dragged in, and offers the same
-  add.
+| Predicted | Actual |
+|---|---|
+| CI 6/6 on the first run | **Right.** |
+| ⚠️ Most expected WRONG: an E2E builder scan, over the new buttons in the preview | **Wrong locally:** `builder-axe` 69 passed and the new spec 3 of 3 on their first runs. |
 
-Files:
-- `resources/js/components/builder/useBuilderStore.ts`, `PreviewRuntime.vue`, `PreviewPane.vue`,
-  `BuilderCanvas.vue`, with their tests;
-- `resources/js/Pages/forms/Builder.vue`;
-- `tests/e2e/builder-axe.spec.ts`;
-- the close-out artefacts.
+Unpredicted: the 14 lines added to `Builder.vue` moved a closed ledger row's `Builder.vue:287-387` onto a blank line,
+which the citation lint caught at 18 over its ceiling of 17. It is re-anchored by name. Like the M138 repairs, the line
+had already drifted on `main` (line 287 was the title row, not the toolbar).
 
-Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/backlog-triage.md`, `docs/gate-baselines.md`,
-`PROGRESS.md` (own block), `tests/e2e/builder-axe.spec.ts`.
+### The smoke-test work, all of it
+After the user's staging smoke test (16 of 21 passed), three increments closed every failure and every request riding
+on a pass:
+- `M137`: the image preview, the scroll, the settings window, the searchable list;
+- `M138`: the redirect delay, reference files hidden;
+- `M139`: sections from the preview, the keyboard move.
 
-Paired files taken: none known. `builder-layout.test.ts` reads `Builder.vue`'s source, and is run.
-
-Namespaces spent: nothing — no migration, no ADR, no decision.
-
-Prediction: CI 6/6 on the first run. ⚠️ **Most expected WRONG:** an E2E builder scan — new buttons inside the preview
-change what axe and the one-tablist count see, and the builder specs have flaked on host load before.
+`D92`'s and `D93`'s rebuilds (CSV choice lists, lookup pre-fill, media in questions, Workflows v2) are `during-testing`
+rows. The OCR scan the user could not check is `ocr-staging-scan`, and the provider bake-off waits on the samples due
+2026-10-08.
 
 ## RELEASED — `M138`, smoke-test fixes 2 of 3: the respondent's page (merged as PR #331, `7b7c03d3`, 6/6 green on its FIRST run with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

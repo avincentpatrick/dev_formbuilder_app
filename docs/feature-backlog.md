@@ -11720,13 +11720,13 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   path on its Branch; that is a defect to improve on, not a shape to copy. **Live.** Filed by `M110`.
   **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-03 by `M127`: it is one of the user's 19 builder comments, wanted for the Oct 12 testing (`D72`).** **`D62` answered 2026-10-03 (`M127`): A — queue only.** **v1 for the Oct 12 testing (`D72`):** an on-submit trigger with email and webhook actions, queue only. What v1 leaves is its own `during-testing` row, filed next. **Verified by `M132` (2026-10-04), which takes it:** `SubmissionCreated` already fires once after commit for every channel, so v1 adds no event and no `DomainEventType` case. `D82` (the email is a notice and a link, no answers) and `D83` (the web address receives the answers, gated to `webhooks.manage`) were answered in chat at claim time. ✅ **CLOSED BY `M132` (2026-10-05) — AUTOMATIONS v1: EMAIL A NOTICE AND A LINK (`D82`), OR SEND THE ANSWERS TO A WEB ADDRESS (`D83`), ON THE QUEUE ONLY (`D62`).** An "Automations" section of the form's settings, on both entry points: one trigger (`submission.created`) and one action per automation, up to ten per form. A synchronous listener on `SubmissionCreated` — raised once after commit for guest, encode, offline sync, OCR and promoted drafts — creates one `form_automation_runs` row per automation per event (unique on the event id) and queues a job, and never lets a failure reach the respondent. The email names the form, the reference and the time and links to the response on the app host; it never carries an answer. The web address receives the answers keyed by question (the export's projection), signed in the workspace webhooks' headers with a secret shown once, behind the public-address check before every attempt, no redirects and the `webhook_deliveries` quota; it is `webhooks.manage`'s alone, on a plan with webhooks, and is tried five times on the shared retry ladder. A run stores no payload and no response body. Audited as `form_automation`, without the address or the secret.
 
-- **`minor` · A form automation has no Slack, Delay, Filter or Branch action and no form-abandoned trigger — the
+- ✅ **CLOSED BY `M142` (2026-10-07) — ****`minor` · A form automation has no Slack, Delay, Filter or Branch action and no form-abandoned trigger — the
   part of form automations left after their Oct 12 v1.** Filed 2026-10-03 by `M127`, split from the automations
   row above under `D72`, which trims that row to a v1 for the Oct 12 testing: an on-submit trigger with email and
   webhook actions, queue only (`D62` answered A). Left here: Slack (reusing the existing `Connection` provider),
   Delay, Filter, Branch with an else path, and the form-abandoned trigger, which needs a sweeper
   (`FormScheduleSweeper` is the precedent). "Run AI" stays refused.
-  **Live.** Filed by `M127`. **Tier: during-testing.** **Also left by `M132`'s v1:** redelivering a failed run by hand, retrying past the queue's six-hour window, and pruning the run history, which grows by one row per automation per response. **`D93` (2026-10-06, `M137`) puts this row's Filter first in the Workflows order after Oct 12**; the rest of that order — recipients and answers from the form, a review/approval step, a failure alert — is the row `M137` filed beside the smoke-test results.
+  **Live.** Filed by `M127`. **Tier: during-testing.** **Also left by `M132`'s v1:** redelivering a failed run by hand, retrying past the queue's six-hour window, and pruning the run history, which grows by one row per automation per response. **`D93` (2026-10-06, `M137`) puts this row's Filter first in the Workflows order after Oct 12**; the rest of that order — recipients and answers from the form, a review/approval step, a failure alert — is the row `M137` filed beside the smoke-test results. ✅ **CLOSED BY `M142` (2026-10-07), PR #335 — THE FILTER, AND THE ROW SPLIT.** Each automation now has an optional condition, written in the form's own condition grammar with the builder's condition editor ("Only when…"), and checked on save against the published version's questions. A response that does not match records a `skipped` run (`condition_not_met`), and one whose condition cannot be read records `condition_error`. Slack, Delay, Branch, the form-abandoned trigger, and `M132`'s leftovers are filed again as their own row below, because this row's id is its first line, which names the Filter.
 
 - ✅ **CLOSED BY `M131` (2026-10-04) — **`minor` · Compound AND/OR validation rules are supported by the database, the serializer and both evaluators,
   and cannot be authored anywhere.** Filed 2026-09-25 by `M110` while designing the inline `required_if` editor,
@@ -13281,3 +13281,16 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   and the materializer writes a null parent. So `M141` left the gate alone, because tightening it would refuse a
   republish of any live form that already carries such an option. Count those forms before tightening.
   **Live.** Filed by `M141`. **Tier: during-testing.**
+
+- **`minor` · A form automation has no Slack, Delay or Branch action and no form-abandoned trigger — what is left of
+  form automations after their condition (`M142`).** Split from `R-b65bafca` by `M142`, which built that row's Filter
+  (an optional condition on each automation, `D93` = A step 1). Left here:
+  - Slack, reusing the existing `Connection` provider;
+  - Delay;
+  - Branch with an else path;
+  - the form-abandoned trigger, which needs a sweeper (`FormScheduleSweeper` is the precedent).
+
+  Also left from `M132`'s v1: redelivering a failed run by hand, retrying past the queue's six-hour window, and pruning
+  the run history, which grows by one row per automation per response. "Run AI" stays refused. The rest of `D93`'s
+  order (recipients and answers from the form, a review/approval step, a failure alert) is `R-1ceb198f`.
+  **Live.** Filed by `M142`. **Tier: during-testing.**

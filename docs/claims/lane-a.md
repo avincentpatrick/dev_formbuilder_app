@@ -16,83 +16,67 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M142`, a condition on each form automation: it runs only for a response that matches (m142-automation-condition)
+## Status: NO ACTIVE CLAIM — `M142` is merged; `D94`'s three items are done (security, CSV choice lists, automation conditions), and the early-testing line waits on the user (the OCR samples and a key, the staging scan)
 
-Taken 2026-10-07. Branch `m142-automation-condition`, cut from `origin/main` at `7cfadd4d`, PR into `main`.
-`D94`'s third item and `D93` = A's first step: an automation runs only for a response that matches a condition written in
-the form's own condition grammar, so an alert can fire on a danger sign alone. OCR goes ahead of this the moment its
-samples and a key arrive. One row:
-- **`R-b65bafca`'s Filter.** That row is the automations remainder: Slack, Delay, Filter, Branch, and the form-abandoned
-  trigger. At close it is split. The Filter half closes, and the rest is filed again as its own row, because the row's
-  id is its first line.
+## RELEASED — `M142`, a condition on each form automation: it runs only for a response that matches (merged as PR #335, `ec6a9ec9`, 6/6 green on its first COMPLETED run with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 
-### Evidence verified
+Shipped 2026-10-07. Branch `m142-automation-condition`, cut from `origin/main` at `7cfadd4d`. The claim commit is `6e723460`.
 
-Against `7cfadd4d`, by a read-only fan-out:
-- **Held.** `form_automations` has no condition column. `FormAutomationDispatcher::dispatchFor()` creates one run per
-  enabled automation per event (`firstOrCreate` on the event id) and queues the action, with no test of the response.
-- `FormAutomationRunStatus::Skipped` exists, with `error_code` up to 40 characters, and the dispatcher already writes
-  `skipped`/`plan_feature` the same way.
-- `SubmissionCreated` carries the submission's id, its version and its `submittedAt`, which the condition's clock needs.
+Commits, in order:
+- the server half `07548cdd`;
+- the browser half `4ef25380`;
+- the line `0ea39064`.
 
-### Premise verified
+The first push's run was cancelled 30 s later by the line fix, so the run that counts is the first to complete.
 
-- **The stored answers are already what the evaluator expects.**
-  - `submission_answers.answers` is `effectiveAnswers` plus computed values, relevance-pruned (`SubmissionPipeline`).
-    That is the input `EvaluationContext` documents.
-  - `ExpressionEvaluator::evaluateBoolean()` reads an unknown key as empty and never throws for one.
-  - It can throw `ExpressionEvaluationException` on an unevaluable operand.
-- **The dispatcher runs all of an event's automations inside ONE transaction** (`TenantContext::runFor`). A throw from
-  one condition would roll back every run for the event, and the listener swallows it. So each condition is evaluated
-  in its own try/catch.
-- **Which version's questions a condition may name.** Automations belong to the FORM, answers to a VERSION. A condition
-  is checked on save against the published version, or the draft when there is none, by parse and known keys
-  (`ExpressionParser`). Then:
-  - a later version that drops a question makes that reference empty, which is the evaluator's documented reading;
-  - the panel's question catalogue comes from the same version, server-built from its snapshot (`dataSharing()`'s
-    precedent), so the builder and the hub offer the same questions (`D63`).
-- **`ConditionEditor.vue` takes no store**, so it can sit in the Automations section. Its wording is about showing a
-  question ("Always shown", "Checked when you publish"), so it gains a purpose prop.
-- **A condition's literals may echo a respondent's words** (`${name} = 'Ada'`), so the audit records only whether there
-  is one, never its text.
+**Rows and namespaces:**
+- **Closed:** `R-b65bafca`, split. Its Filter is built; Slack, Delay, Branch, the form-abandoned trigger and `M132`'s
+  leftovers are filed again as their own row, `R-5bd493cf`, in the release push.
+- **Namespaces spent:** migration `2026_08_17_000128`.
+- **Outside the claim's list:**
+  - `app/Services/Automations/AutomationCondition.php` (new);
+  - `FormController.php` (one argument);
+  - `tests/Feature/Automations/FormAutomationTest.php`.
 
-### Remedy verdict
+  `condition-describer.ts` gained an optional lead on the lines it already had.
 
-`D93`'s step 1 as written **works**:
-- **Storage:** a nullable `condition` column (migration `2026_08_17_000128`).
-- **Writes:**
-  - create and update accept it, checked on save;
-  - the update whitelist names it, since it silently drops any key it does not.
-- **Running:**
-  - a matching response runs the automation as before;
-  - a non-matching one records a `skipped` run with `condition_not_met`;
-  - one the evaluator cannot read records `skipped` with `condition_error`;
-  - the runs list says why.
-- **The panel:** an "Only when…" condition editor in add and edit, and the condition's sentence on the row.
+### What changed
+- **For an author:** Settings → Automations has *Only when…*, the builder's own condition editor over the form's
+  questions (`purpose="run"`: "Runs for every response — no conditions yet.", "Checked when you save."). The row says the
+  condition as a sentence, and a skipped run says why.
+- **On save:** `AutomationCondition` checks that it parses and names only the published version's questions (the
+  draft's before the first publish). A refusal comes back under `condition`, with the reason.
+- **At run time:** the dispatcher evaluates it over the stored, relevance-pruned answers at the response's own time.
+  - No match records `skipped` / `condition_not_met`.
+  - An unreadable condition records `skipped` / `condition_error`, caught on its own, because every automation of an
+    event shares one transaction.
+- **Audit:** it records `has_condition`, never the text.
+- **Proof:**
+  - **Mutations:** 6 Pest mutants (`mutate.php`) and 3 Vitest mutants, each caught.
+  - **The full suites ran locally before the push**, as the claim promised: Pest 6,370 (green apart from the known
+    container-only case) and Vitest 205 files, 3,383 tests.
+  - **E2E, locally:** `form-settings-axe` 24.
 
-Files:
-- **New:** the migration.
-- **App:**
-  - `app/Models/FormAutomation.php`;
-  - `app/Services/Automations/FormAutomationService.php`, `FormAutomationDispatcher.php` and
-    `FormAutomationPresenter.php`;
-  - the two automation requests;
-  - `app/Enums/FormAutomationRunStatus.php` (its docblock).
-- **Frontend:** `resources/js/components/forms/AutomationsPanel.vue`, `automations.ts` and `types.ts`;
-  `resources/js/components/builder/ConditionEditor.vue` and `condition-describer.ts`.
-- **Tests:** `tests/Feature/Automations/*` and `TenantExtractColumnDriftTest.php`.
-- **Docs:** `docs/data-dictionary.md` §36–§37.
+### How the prediction fared
 
-Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/backlog-triage.md`, `docs/gate-baselines.md`,
-`PROGRESS.md` (own block), `docs/data-dictionary.md`.
+| Predicted | Actual |
+|---|---|
+| CI 6/6 on the first run | **Right**, on the first run to complete. |
+| ⚠️ Most expected WRONG: a Vitest settings or builder fixture lacking the new `catalogue` prop | **Wrong as stated, right in kind**. The prop is optional, so those fixtures passed. What broke was `AutomationsPanel.test.ts`'s rows lacking `condition`: `trim()` on undefined, caught locally. The panel now treats a missing condition as none. |
 
-Paired files taken: none known.
+**Unpredicted:**
+- **My command pushed through a preflight `[FAIL]`.** The chain `preflight | grep … && git push` continued because grep
+  succeeded on the FAIL line. The line had drifted only by its file count (a new migration), and it was regenerated and
+  pushed before CI got far.
 
-Namespaces spent: migration prefix `2026_08_17_000128`. No ADR, no decision.
+### `D94`'s three items, all done
+1. `M140`: the security rows, plus the two takeover routes found under them.
+2. `M141`: CSV choice lists, one file per level (`D95`).
+3. `M142`: a condition on each automation.
 
-Prediction: CI 6/6 on the first run. The suite this time is run in full locally before the push, for M141's
-`RateLimiterBindingTest` reason. ⚠️ **Most expected WRONG:** a Vitest settings or builder test whose automations
-fixture lacks the new `catalogue` prop (`FormSettingsModal.test.ts`, `settings.test.ts`).
+The rest of `D93`'s Workflows order is `R-1ceb198f`. What the early-testing line still waits on is the user's:
+- the OCR samples and a Vision key that reads (`ocr-provider-bakeoff`);
+- one real scan on staging (`ocr-staging-scan`).
 
 ## RELEASED — `M141`, choice lists from CSV files, one file per level in Kobo's format, feeding a cascading select (merged as PR #334, `e59d298d`, 6/6 green on its THIRD run with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

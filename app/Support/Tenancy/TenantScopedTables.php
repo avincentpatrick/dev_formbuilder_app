@@ -68,6 +68,9 @@ final class TenantScopedTables
         // M131. Nothing withheld: a folder is a name the workspace typed, and who typed it.
         'form_folders',
         'form_sections',
+        // M141. Nothing withheld: a list of codes and labels the author uploaded, frozen per version. Its SELECT is
+        // plain tenant equality; its writes carry the draft-child guard, as `form_version_reference_files` does.
+        'form_version_choice_lists',
         // M132. Nothing withheld: a label the author typed and two ids. Its SELECT is plain tenant equality; its
         // writes carry the draft-child guard, as `form_sections` and `form_fields` do.
         'form_version_reference_files',

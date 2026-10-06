@@ -13272,3 +13272,12 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   barangay list rides in the Inertia props on every encode load (a few MB). `M141` strips the engine's copy of the
   schema and leaves the render copy, which the page needs. The fix is the guest runtime's: fetch the lists beside the
   page, by version. **Live.** **Tier: during-testing.**
+
+- **`minor` · A typed cascade publishes a first-level choice that carries a parent, which no respondent is ever shown,
+  and a value repeated within a level, whose later parent silently wins.** Found by `M141`.
+  `StructuralValidationGate::assertCascadingResolves()` skips a first-level option's parent and never checks that a value
+  is unique within its level. `FieldInput.vue` shows first-level choices only when their parent is empty, and both
+  validation engines key a level's options by value. A CSV list cannot reach either: the parser refuses a repeated name,
+  and the materializer writes a null parent. So `M141` left the gate alone, because tightening it would refuse a
+  republish of any live form that already carries such an option. Count those forms before tightening.
+  **Live.** Filed by `M141`. **Tier: during-testing.**

@@ -65,6 +65,7 @@ import ConfirmationPanel from '@/components/builder/ConfirmationPanel.vue';
 import GeneralPanel from '@/components/builder/GeneralPanel.vue';
 import PageModePanel from '@/components/builder/PageModePanel.vue';
 import AutomationsPanel from '@/components/forms/AutomationsPanel.vue';
+import ChoiceListsPanel from '@/components/forms/ChoiceListsPanel.vue';
 import DataSharingPanel from '@/components/forms/DataSharingPanel.vue';
 import ReferenceFilesPanel from '@/components/forms/ReferenceFilesPanel.vue';
 import SaveResumePanel from '@/components/builder/SaveResumePanel.vue';
@@ -75,7 +76,7 @@ import ScopePanel from '@/components/forms/ScopePanel.vue';
 import SharePanel from '@/components/forms/SharePanel.vue';
 import type { AutomationsProps, DataSharingProps, FormSettingsForm, OcrScanningProps, ReferenceFileRow, ScopeSectionProps, ShareProps } from '@/components/forms/types';
 
-type SectionKey = 'general' | 'pages' | 'theme' | 'files' | 'share' | 'scanning' | 'schedule' | 'confirmation' | 'save-resume' | 'automations' | 'sharing' | 'scope';
+type SectionKey = 'general' | 'pages' | 'theme' | 'files' | 'choice-lists' | 'share' | 'scanning' | 'schedule' | 'confirmation' | 'save-resume' | 'automations' | 'sharing' | 'scope';
 
 const props = defineProps<{
     /** Whether the settings are open: the modal's state, or always true on the hub page. */
@@ -113,6 +114,9 @@ const sections = computed<{ key: SectionKey; label: string }[]>(() => {
         // M132 (`R-bf49e4c1`): what respondents can open while they answer. Beside Theme, the other section about
         // what a respondent sees; never just "Files", which reads as a file-upload question.
         { key: 'files', label: 'Reference files', available: props.referenceFiles != null },
+        // M141 (`R-f69aab42`, `D95`): the CSV files a cascading question takes its choices from. Offered wherever the
+        // reference files are — the same editors of the same draft.
+        { key: 'choice-lists', label: 'Choice lists', available: props.referenceFiles != null },
         { key: 'share', label: 'Share', available: props.share != null },
         { key: 'scanning', label: 'Scanning', available: props.ocrScanning != null },
         { key: 'schedule', label: 'Schedule', available: true },
@@ -206,6 +210,11 @@ watch(
                 <template v-if="props.referenceFiles != null && mounted.has('files')">
                     <div v-show="active === 'files'" class="form-settings__section" :data-section="'files'">
                         <ReferenceFilesPanel :open="props.open" :form-id="props.formId" :files="props.referenceFiles" />
+                    </div>
+                </template>
+                <template v-if="props.referenceFiles != null && mounted.has('choice-lists')">
+                    <div v-show="active === 'choice-lists'" class="form-settings__section" :data-section="'choice-lists'">
+                        <ChoiceListsPanel :open="props.open" :form-id="props.formId" />
                     </div>
                 </template>
                 <template v-if="props.share != null && mounted.has('share')">

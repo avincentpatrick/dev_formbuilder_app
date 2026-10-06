@@ -158,13 +158,45 @@ final class SchemaValueFormatter
      */
     private function optionLabels(array $config, ?string $locale = null): array
     {
+        $options = $config['options'] ?? null;
+        $large = is_array($options) && count($options) > self::LABEL_CACHE_FROM;
+
+        if ($large) {
+            foreach ($this->labelCache as [$cachedOptions, $cachedLocale, $cachedMap]) {
+                // `===` on the same array is a pointer comparison in PHP, so an export passing one version's config
+                // for every row pays nothing here; an equal copy is compared in C, still far cheaper than the loop.
+                if ($cachedLocale === $locale && $cachedOptions === $options) {
+                    return $cachedMap;
+                }
+            }
+        }
+
         $map = [];
         foreach ($this->options($config, $locale) as $option) {
             $map[$option['value']] = $option['label'];
         }
 
+        if ($large) {
+            $this->labelCache[] = [$options, $locale, $map];
+            if (count($this->labelCache) > self::LABEL_CACHE_SIZE) {
+                array_shift($this->labelCache);
+            }
+        }
+
         return $map;
     }
+
+    /**
+     * M141 (`R-f69aab42`) — a CSV choice list makes a cascade's options a PSGC-sized list (about 43,000), and rebuilding its
+     * value ⇒ label map cost 15.6 ms per exported cell: two and a half minutes for 10,000 responses. The last few large
+     * maps are kept, keyed by the options array itself; a typed list below the threshold is rebuilt as before.
+     */
+    private const int LABEL_CACHE_FROM = 200;
+
+    private const int LABEL_CACHE_SIZE = 8;
+
+    /** @var list<array{0: array<mixed>, 1: ?string, 2: array<string, string>}> */
+    private array $labelCache = [];
 
     private function boolLabel(mixed $answer): string
     {

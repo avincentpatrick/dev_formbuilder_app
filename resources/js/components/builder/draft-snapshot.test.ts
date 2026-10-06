@@ -137,6 +137,16 @@ group('the eight draft-only states', () => {
         expect(unlinked.issues.map((i) => i.code)).toContain('empty_option_list');
     });
 
+    it('4c. does not call a cascade whose every level names a CSV list empty, and still flags one that names some (M141)', () => {
+        const levels = [{ key: 'region', label: 'Region', list: 'regions' }, { key: 'province', label: 'Province', list: 'provinces' }];
+        const listed = projectDraft(input([field({ uid: 'u1', field_type: 'cascading_select', config: { levels, options: [] } })]));
+        expect(listed.issues.map((i) => i.code)).not.toContain('empty_option_list');
+
+        // Publishing refuses a cascade that names lists on some levels only, so the preview still calls it empty.
+        const partial = projectDraft(input([field({ uid: 'u1', field_type: 'cascading_select', config: { levels: [levels[0], { key: 'province', label: 'Province' }], options: [] } })]));
+        expect(partial.issues.map((i) => i.code)).toContain('empty_option_list');
+    });
+
     it('5. NEVER hands an unparsable expression to the engine', () => {
         // ⛔ THE LOAD-BEARING CASE. A throw from the engine's parser latches engineFailed for the whole
         // session, so a half-typed condition — the normal state of a field being edited — must be

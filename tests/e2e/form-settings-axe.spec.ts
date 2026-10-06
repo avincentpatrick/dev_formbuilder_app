@@ -20,7 +20,7 @@ import { assertClean, forceTheme } from './support/axe';
 const themes = ['light', 'dark'] as const;
 
 /** Every section the Owner of a Business workspace is offered, in rail order. */
-const SECTIONS = ['Details', 'Pages', 'Theme', 'Reference files', 'Share', 'Scanning', 'Schedule', 'Thank-you message', 'Save and finish later', 'Automations', 'Data sharing', 'Scope'];
+const SECTIONS = ['Details', 'Pages', 'Theme', 'Reference files', 'Choice lists', 'Share', 'Scanning', 'Schedule', 'Thank-you message', 'Save and finish later', 'Automations', 'Data sharing', 'Scope'];
 
 async function openSettings(page: Page, formTitle: string): Promise<void> {
     await page.goto('/forms', { waitUntil: 'networkidle' });

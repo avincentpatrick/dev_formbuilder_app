@@ -4028,8 +4028,8 @@
                                                             ]
                                                         },
                                                         "schema": {
-                                                            "type": "array",
-                                                            "items": {}
+                                                            "type": "object",
+                                                            "additionalProperties": {}
                                                         }
                                                     },
                                                     "required": [
@@ -4201,6 +4201,137 @@
                                                 "code": {
                                                     "type": "string",
                                                     "const": "linked_choices_not_found"
+                                                },
+                                                "message": {
+                                                    "type": "string",
+                                                    "const": "These choices are not available."
+                                                },
+                                                "details": {
+                                                    "type": "null"
+                                                }
+                                            },
+                                            "required": [
+                                                "code",
+                                                "message",
+                                                "details"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "error"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": []
+            }
+        },
+        "/public/choice-lists/{shareToken}/{version}": {
+            "get": {
+                "operationId": "v1.public.choice-lists.show",
+                "description": "One entry per cascading question whose levels take their choices from CSV files, keyed by the question's key:\nits level keys in order, and each choice as `[level index, value, label, parent]` with the parent null at the\nfirst level. The lists are frozen with the form version, so a response never changes for a given `version`, which\nmust be the share token's own; any other request answers the same 404.",
+                "summary": "Fetch the choice lists this shared form's cascading questions take from uploaded CSV files",
+                "tags": [
+                    "PublicFormSchema"
+                ],
+                "parameters": [
+                    {
+                        "name": "shareToken",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "version",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "version_id": {
+                                                    "type": "string"
+                                                },
+                                                "lists": {
+                                                    "type": "object",
+                                                    "additionalProperties": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "levels": {
+                                                                "type": "array",
+                                                                "items": {
+                                                                    "type": "string"
+                                                                }
+                                                            },
+                                                            "options": {
+                                                                "type": "array",
+                                                                "items": {
+                                                                    "type": "array",
+                                                                    "items": {
+                                                                        "anyOf": [
+                                                                            {
+                                                                                "type": "integer"
+                                                                            },
+                                                                            {
+                                                                                "type": "string"
+                                                                            },
+                                                                            {
+                                                                                "type": "null"
+                                                                            }
+                                                                        ]
+                                                                    }
+                                                                }
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "levels",
+                                                            "options"
+                                                        ]
+                                                    }
+                                                }
+                                            },
+                                            "required": [
+                                                "version_id",
+                                                "lists"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "error": {
+                                            "type": "object",
+                                            "properties": {
+                                                "code": {
+                                                    "type": "string",
+                                                    "const": "choice_lists_not_found"
                                                 },
                                                 "message": {
                                                     "type": "string",

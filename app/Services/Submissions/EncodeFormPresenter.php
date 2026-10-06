@@ -226,7 +226,9 @@ final class EncodeFormPresenter
                 // reason it does on the guest channel: the snapshot is the frozen contract, and the pair
                 // must be read together.
                 'checksum' => $version->checksum,
-                'schema' => $version->schema_snapshot,
+                // M141 — without a CSV-backed cascade's list: the engine copy needs no options (the server checks the
+                // answer), and the render copy in `blocks` already carries them (`R-7a2f4a13` is that copy's weight).
+                'schema' => $version->schemaWithoutListOptions(),
                 'now' => $now,
             ],
             'blocks' => $blocks,

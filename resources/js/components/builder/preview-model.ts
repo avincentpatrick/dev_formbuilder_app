@@ -253,5 +253,8 @@ export function previewLimitations(): string[] {
         // M133 (`R-5da4a30f`): the list is read live from the other form's answers and served to the live form only;
         // the preview has no respondent link to fetch it with. The remainder row owns showing it here.
         'Choices taken from another form appear on the live form, not here.',
+        // M141 (`R-f69aab42`): a cascade's CSV lists become its choices when the form is published; the draft holds only
+        // the lists' names, so the preview has none to show.
+        'Choices from CSV files appear on the live form once it is published, not here.',
     ];
 }

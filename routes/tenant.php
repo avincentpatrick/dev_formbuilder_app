@@ -1088,6 +1088,19 @@ Route::middleware([
         ->middleware('can:update,form')
         ->whereUuid('file')
         ->name('forms.reference-files.destroy');
+    // M141, `R-f69aab42` (`D92` = A, `D95`): a form's choice lists, uploaded as CSV files in Kobo's format — one per
+    // cascade level — kept on the draft and frozen into each published version. Uploading a list's file again
+    // replaces it. A list is addressed by its name, the file's name without `.csv`.
+    Route::get('/forms/{form}/choice-lists', [AttachmentController::class, 'indexChoiceLists'])
+        ->middleware('can:update,form')
+        ->name('forms.choice-lists.index');
+    Route::post('/forms/{form}/choice-lists', [AttachmentController::class, 'storeChoiceList'])
+        ->middleware(['can:update,form', 'throttle:30,1'])
+        ->name('forms.choice-lists.store');
+    Route::delete('/forms/{form}/choice-lists/{list}', [AttachmentController::class, 'destroyChoiceList'])
+        ->middleware('can:update,form')
+        ->where('list', '[a-z0-9_-]{1,64}')
+        ->name('forms.choice-lists.destroy');
     // M132, `R-b7bc5149`: a form's automations — "when a response is submitted, send an email or the answers to a web
     // address" (`D82`, `D83`), run on the queue only (`D62`). On the already-imported FormController, for the `use`-line
     // reason above. A change is `can:manage,automation` too: a web-address automation is `webhooks.manage`'s alone. The

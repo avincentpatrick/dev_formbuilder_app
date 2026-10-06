@@ -18,7 +18,7 @@ import { CacheableResponsePlugin } from 'workbox-cacheable-response';
 import { ExpirationPlugin } from 'workbox-expiration';
 import { clientsClaim } from 'workbox-core';
 import { CONTENT_IMAGE_CACHE, contentImageCacheKey } from './lib/content-images'; import { REFERENCE_FILE_CACHE, referenceFileCacheKey } from './lib/reference-files';
-import { openDb } from './lib/db'; import { LINKED_CHOICE_CACHE, linkedChoicesCacheKey } from './lib/linked-choices';
+import { openDb } from './lib/db'; import { LINKED_CHOICE_CACHE, linkedChoicesCacheKey } from './lib/linked-choices'; import { CHOICE_LIST_CACHE, choiceListsCacheKey } from './lib/choice-lists';
 import { replayOutbox } from './lib/replay';
 import { SHELL_CACHE, SHELL_EXPIRATION } from './lib/shell-cache'; import { isResumeShell } from './lib/brand-cache'; import { purgeTokenKeyedResumeShells, resumeShellCacheKey, tokenFreeShell } from './lib/resume-shell';
 
@@ -167,6 +167,23 @@ registerRoute(
             { cacheKeyWillBeUsed: async ({ request }) => linkedChoicesCacheKey(request.url) },
             new CacheableResponsePlugin({ statuses: [200] }),
             new ExpirationPlugin({ maxEntries: 20, maxAgeSeconds: 7 * DAY }),
+        ],
+    }),
+    'GET',
+);
+
+// M141 (`R-f69aab42`, `D95`) — the choice lists a form's cascading questions take from CSV files, beside the schema for a
+// barangay list's size. CacheFirst, unlike linked choices: a version's lists are frozen with it, so the copy kept is never
+// stale, and a respondent who loaded the form once answers offline from it. Keyed by VERSION with the share token
+// stripped (`choiceListsCacheKey`). The prefix is a literal on purpose: `ServiceWorkerCachePrefixRouteTest` reads it.
+registerRoute(
+    ({ url, sameOrigin }) => sameOrigin && url.pathname.startsWith('/api/v1/public/choice-lists/'),
+    new CacheFirst({
+        cacheName: CHOICE_LIST_CACHE,
+        plugins: [
+            { cacheKeyWillBeUsed: async ({ request }) => choiceListsCacheKey(request.url) },
+            new CacheableResponsePlugin({ statuses: [200] }),
+            new ExpirationPlugin({ maxEntries: 10, maxAgeSeconds: 30 * DAY, purgeOnQuotaError: true }),
         ],
     }),
     'GET',

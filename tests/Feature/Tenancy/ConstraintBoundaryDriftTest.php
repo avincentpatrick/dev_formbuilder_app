@@ -269,6 +269,8 @@ it('keeps the composite shape it recommends, so the remedy in every failure mess
         // M132: an automation's form, and a run's automation, each pinned to its own tenant.
         'form_automation_runs_automation_fk',
         'form_automations_form_fk',
+        // M141: a version's CSV choice list, pinned to the version's own tenant; deleting a draft version takes its lists.
+        'form_version_choice_lists_version_fk',
         'form_version_reference_files_attachment_fk',
         // M132: a version's reference file, pinned to the version's and the file's own tenant. Deleting a draft
         // version takes its list; a file a version still shows cannot be hard-deleted at all.

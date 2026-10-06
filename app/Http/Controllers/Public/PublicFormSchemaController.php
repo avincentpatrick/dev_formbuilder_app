@@ -9,6 +9,7 @@ use App\Http\Controllers\Public\Concerns\ReadsGuestShareToken;
 use App\Http\Middleware\EstablishGuestTenantContext;
 use App\Models\Form;
 use App\Models\FormVersion;
+use App\Services\Forms\ChoiceListMaterializer;
 use App\Services\Forms\LinkedChoiceService;
 use App\Services\Submissions\PublicFormPresenter;
 use App\Support\Api\ApiErrorResponse;
@@ -73,5 +74,34 @@ final class PublicFormSchemaController extends Controller
         return response()
             ->json(['data' => ['version_id' => $pinned->id, 'lists' => $links->listsFor($form, $pinned)]])
             ->header('Cache-Control', 'private, no-cache');
+    }
+
+    /**
+     * Fetch the choice lists this shared form's cascading questions take from uploaded CSV files.
+     *
+     * One entry per cascading question whose levels take their choices from CSV files, keyed by the question's key:
+     * its level keys in order, and each choice as `[level index, value, label, parent]` with the parent null at the
+     * first level. The lists are frozen with the form version, so a response never changes for a given `version`, which
+     * must be the share token's own; any other request answers the same 404.
+     *
+     * @unauthenticated
+     */
+    public function choiceLists(Request $request, string $shareToken, string $version): JsonResponse
+    {
+        $token = $this->shareToken($request);
+        $form = Form::query()->whereKey($token->formId)->first();
+
+        if ($form === null || ! $form->allow_guest_submissions || $version !== $token->formVersionId) {
+            return ApiErrorResponse::make(404, 'choice_lists_not_found', 'These choices are not available.');
+        }
+
+        $pinned = FormVersion::query()->whereKey($token->formVersionId)->first();
+        if ($pinned === null) {
+            return ApiErrorResponse::make(404, 'choice_lists_not_found', 'These choices are not available.');
+        }
+
+        return response()
+            ->json(['data' => ['version_id' => $pinned->id, 'lists' => ChoiceListMaterializer::listsForBrowser($pinned)]])
+            ->header('Cache-Control', 'private, max-age=86400');
     }
 }

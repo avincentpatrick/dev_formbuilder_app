@@ -13201,13 +13201,13 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   (`support.kobotoolbox.org/pull_data_kobotoolbox.html`); ODK Central's Entity Lists do the same from data. ⛔ **A
   lookup over patient-level data must not ship as a file the form downloads:** on a public form every respondent
   receives the whole table (`docs.getodk.org/central-entities/`), so it is a server-side lookup or a filtered set. The
-  second Kobo-style use under `D92` A. **Live.** Filed by `M137`. **Tier: during-testing.**
+  second Kobo-style use under `D92` A. A lookup over another form's RESPONSES is the Connect project remainder row's (pulldata-style lookups over linked data); this row is the attached-table half. **Live.** Filed by `M137`. **Tier: during-testing.**
 
 - **`minor` · A question or a choice cannot carry a picture or an audio clip; only a note can show an image.** Filed by
   `M137` from `D92`'s research. Kobo puts `image`, `audio` and `video` on questions, notes and choices
   (`support.kobotoolbox.org/media.html`), which helps respondents with low literacy; `M130` gave notes images and
   nothing else. The third Kobo-style use under `D92` A; audio and video as attachments are on the form-attachments
-  remainder row. **Live.** Filed by `M137`. **Tier: during-testing.**
+  remainder row, and the choice half is the §1 table's "Image / picture choice (per-option images)" item. **Live.** Filed by `M137`. **Tier: during-testing.**
 
 - **`minor` · An automation cannot send to an address taken from an answer, put answers into its message, ask a
   reviewer to approve, or say when it failed.** Filed by `M137` from `D93`'s research. Fillout Workflows insert

@@ -188,6 +188,16 @@ submission printed its form's title as an unlinked heading. This section is that
 12. *(J2c)* Still on `/submissions`, open the **Form** dropdown. **Expect:** the form you created in step 9
    is listed **even though it has no responses**. Until J2c the dropdown was derived from submissions, so
    the one form you most want to check on was the one form you could not select.
+13. *(M141)* **Choices from CSV files.** Make two files in a spreadsheet and save each as CSV:
+   `regions.csv` with columns `name,label` (rows `01,Ilocos Region` and `13,NCR`), and `provinces.csv` with
+   columns `name,label,region` (rows `0128,Ilocos Norte,01` and `1339,Manila,13`). Add a **Cascading
+   select**, open its **Levels** tab, name the first level `region` and the second `province`, upload both
+   files there, and choose `regions` on the first level and `provinces` on the second.
+   **Expect:** the option editor gives way to *"Every level takes its choices from a CSV file"* and each
+   list's size. Rename the first level to `reg`. **Expect:** *"provinces has no “reg” column"*. Rename it
+   back, publish, and open the public link. **Expect:** picking *Ilocos Region* offers only *Ilocos Norte*.
+   The form's **Settings → Choice lists** shows both files and removes one. A file with the same code twice
+   is refused, naming both rows.
 
 ---
 

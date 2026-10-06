@@ -1439,6 +1439,34 @@ One automation's run for one response (M132, `R-b7bc5149`): the ledger the Autom
 
 ---
 
+## 38. `form_version_choice_lists`
+
+The choice lists a form version takes from uploaded CSV files (M141, `R-f69aab42`, `D92` = A, `D95`) — KoboToolbox's `select_one_from_file`, one file per cascade level: a `name` column (a code, used once in the file) and a `label` column (`label::…` counts when there is no plain `label`), and below the first level a column named after the level above. A list is named after its file (`provinces.csv` is `provinces`); a cascading question's level names the list it takes its choices from (`form_fields.config.levels[].list`). **Frozen per published version, and turned into options at publish**: the draft's cascade holds the lists' names and no options, `ChoiceListMaterializer` writes the options into the field it publishes — so validation, export labels and OCR read an ordinary cascade — and `SchemaTreeCloner` carries the lists forward and strips the options from the next draft.
+
+**Writers:** `App\Services\Forms\FormChoiceListService` (upload — which replaces a list of the same name — and remove, on the DRAFT only) behind `/forms/{form}/choice-lists` (`can:update,form`), and `SchemaTreeCloner` on publish and restore. Every writer takes the `forms` row lock first. The file is parsed at upload (`ChoiceListCsvParser`: a byte-order mark dropped, Windows-1252 read as Excel writes it, a comma, semicolon or tab delimiter) and never kept. Not audited: these are draft edits, as `form_version_reference_files` are.
+
+| Column | Type | Nullable | Default | PII? | Description |
+|---|---|---|---|---|---|
+| `id` | `uuid` | No | application-generated (`HasUuidv7`) | No | Primary key. A new id per version: a publish copies the row. |
+| `tenant_id` | `uuid` | No | — | No | FK to `tenants.id`, `ON DELETE CASCADE`. |
+| `form_version_id` | `uuid` | No | — | No | The version that holds the list. Composite FK `(tenant_id, form_version_id)` → `form_versions (tenant_id, id)`, `ON DELETE CASCADE`. |
+| `name` | `varchar(64)` | No | — | No | The list's name, from its file's: lower-case letters, digits, `_` and `-`. What a cascade level's `list` names. |
+| `file_name` | `varchar(255)` | No | — | No | The uploaded file's own name, for the settings list. |
+| `columns` | `jsonb` | No | — | No | The header, lower-cased and trimmed, in file order. |
+| `rows` | `jsonb` | No | — | No | Every data row, each a list of strings in `columns` order. A PSGC barangay list is about 42,000 rows. |
+| `row_count` | `integer` | No | — | No | The number of rows. |
+| `created_at` / `updated_at` | `timestamptz` | No | set by Eloquent | No | — |
+
+**Indexes**: `UNIQUE (tenant_id, form_version_id, name)` (`form_version_choice_lists_unique`) — one list per name per version.
+
+> **Design Notes**
+> - **RLS**: `draft_child`, as `form_version_reference_files`: anyone in the tenant reads; a write is accepted only while the version is a draft. Listed in `TenantScopedTables::STRICT`; nothing is withheld from the tenant extract.
+> - **A name is unique in its file, and that is not tidiness**: both validation engines key a level's options by value, and barangay NAMES repeat across cities, so `name` must be a code and a repeat is refused at upload, naming both rows.
+> - **Beside the schema, for a browser.** The public schema leaves a CSV-backed cascade's options out (`FormVersion::schemaWithoutListOptions()`); the runtime reads `GET /api/v1/public/choice-lists/{token}/{version}` (each choice a tuple `[level index, value, label, parent]`), and the service worker keeps it by version in `guest-choice-lists`. The staff encode page still renders the list from its props (`R-7a2f4a13`).
+> - **At most twenty lists per version**, 60,000 rows and 30 columns each, 10 MB a file.
+
+---
+
 ## Foreign Key Relationship Summary
 
 ```
@@ -1479,6 +1507,8 @@ form_field_validations.related_form_field_id -> form_fields.id
 form_version_reference_files.tenant_id -> tenants.id
 form_version_reference_files.(tenant_id, form_version_id) -> form_versions.(tenant_id, id)  (composite, CASCADE — see §35)
 form_version_reference_files.(tenant_id, attachment_id)   -> attachments.(tenant_id, id)    (composite, NO ACTION — see §35)
+form_version_choice_lists.tenant_id -> tenants.id
+form_version_choice_lists.(tenant_id, form_version_id) -> form_versions.(tenant_id, id)  (composite, CASCADE — see §38)
 
 form_automations.tenant_id -> tenants.id
 form_automations.(tenant_id, form_id) -> forms.(tenant_id, id)  (composite, CASCADE — see §36)

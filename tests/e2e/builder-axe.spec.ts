@@ -473,3 +473,27 @@ for (const theme of themes) {
         await scan(page, 'condition editor — opaque fallback');
     });
 }
+
+// M137 (`R-ef4334b1`) — the preview SCROLLS when its questions are taller than the window. Found by the user's staging
+// smoke test: `.builder-preview` scrolled by `flex: 1` inside a parent that is not a flex container, so it grew to its
+// content and `.builder__pane`'s `overflow: hidden` clipped the rest, with no way down. Layout is not computed in
+// happy-dom, so only a real browser can see it. Theme-independent, so it runs once per viewport rather than per theme.
+test('Builder — the preview scrolls when its questions are taller than the window', async ({ page }) => {
+    const width = page.viewportSize()?.width ?? 1280;
+    await page.setViewportSize({ width, height: 520 });
+    await openBuilder(page, 'Logic Notices Demo');
+    await showBuilderPane(page, 'canvas');
+    await page.locator('.builder__centre-tabs').getByText('Preview').click();
+    await expect(page.locator('[data-builder-preview]')).toBeVisible({ timeout: 15_000 });
+
+    const pane = page.locator('.builder-preview');
+    const { clientHeight, scrollHeight } = await pane.evaluate((el) => ({ clientHeight: el.clientHeight, scrollHeight: el.scrollHeight }));
+    // The positive control first: a form that fits would make the scroll assertion pass for nothing.
+    expect(scrollHeight).toBeGreaterThan(clientHeight);
+
+    await pane.evaluate((el) => el.scrollTo({ top: el.scrollHeight }));
+    await expect.poll(() => pane.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
+    // And the bottom is reachable, not merely some of the way down. A row is the wrong witness: measured, the last
+    // `[data-preview-field]` (`age`) stayed at viewport ratio 0 after a full scroll, so it is not a row on screen.
+    await expect.poll(() => pane.evaluate((el) => el.scrollHeight - el.clientHeight - el.scrollTop)).toBeLessThanOrEqual(1);
+});

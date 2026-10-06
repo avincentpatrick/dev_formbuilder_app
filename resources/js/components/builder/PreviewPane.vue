@@ -191,6 +191,10 @@ function onSelect(key: string): void {
     flex: 1;
     flex-direction: column;
     min-height: 0;
+    /* M137 (`R-ef4334b1`): `flex: 1` alone sized nothing — `.builder__centre-body` is not a flex container — so the
+       pane grew to its content and `.builder__pane` clipped the rest with no way down. The height is what makes this
+       the scroll container, as `.canvas` and `.rail` beside it already are. */
+    height: 100%;
     /* Each centre view owns its own scroll — `.builder__centre-body` sets none. */
     overflow-y: auto;
 }

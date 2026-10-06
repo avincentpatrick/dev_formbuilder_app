@@ -260,3 +260,30 @@ describe('object-valued answers (M74)', function (): void {
             ->and($f->displayValue(FieldType::YesNo, true, []))->toBe('Yes');
     });
 });
+
+describe('a large list keeps its own labels (M141, the label-map cache)', function (): void {
+    /** @return array<string, mixed> a cascade config of 300 options whose option 150 is labelled $middle */
+    function svfLargeConfig(string $middle): array
+    {
+        $options = [];
+        for ($i = 0; $i < 300; $i++) {
+            $options[] = ['level' => 'a', 'value' => "v{$i}", 'label' => $i === 150 ? $middle : "Label {$i}", 'parent' => null,
+                'label_translations' => ['fil' => "Tatak {$i}"]];
+        }
+
+        return ['levels' => [['key' => 'a', 'label' => 'A']], 'options' => $options];
+    }
+
+    it('never answers one list from another list’s map, nor one language from another’s', function (): void {
+        // Two versions of one CSV list that differ in a single middle label, read by ONE formatter as an export does.
+        $f = new SchemaValueFormatter;
+        $old = svfLargeConfig('Poblacion');
+        $new = svfLargeConfig('Poblacion (renamed)');
+
+        expect($f->displayValue(FieldType::CascadingSelect, ['v150'], $old))->toBe('Poblacion')
+            ->and($f->displayValue(FieldType::CascadingSelect, ['v150'], $new))->toBe('Poblacion (renamed)')
+            ->and($f->displayValue(FieldType::CascadingSelect, ['v150'], $old))->toBe('Poblacion')
+            ->and($f->displayValue(FieldType::CascadingSelect, ['v150'], $old, 'fil'))->toBe('Tatak 150')
+            ->and($f->displayValue(FieldType::CascadingSelect, ['v150'], $old))->toBe('Poblacion');
+    });
+});

@@ -1568,6 +1568,64 @@ The matcher reads a sheet against the version it was printed from, superseded on
 
 ---
 
+### D91 — The staging smoke test passed 16 of 21 checks, and four of the passes came with a request for something new, which `D90` freezes until the Oct 12 session. Which go in before testing? **All four, beside the fixes: a bigger settings window, sections from the preview, a redirect delay the builder sets, and a searchable question list.**
+
+**Filed and answered 2026-10-06 (user decision, in chat), recorded by Lane A during `M137`.** Asked because the smoke test (`staging-smoke-test`, marks read from https://claude.ai/artifact/2PF4Wdcp8UcNDTTveAJEWX) came back with four fails and four requests riding on passes, and `D90` admits only fixes until the session. The options were each request on its own, with *not picked* meaning after Oct 12. The user picked all four. **This is an exception to `D90` for these four only**; everything else still waits for the session.
+
+- **Comment 13 — the form settings window is too small.** It grows: `MdsModal` gains a wider size.
+- **Comment 18 — sections only from Structure.** The preview gains its own way to add a section and a question in it, and questions move into a section by dragging in Structure.
+- **Comment 14 — the 20-second redirect.** ⚠️ **This amends `D76`:** the form builder chooses the delay — 5, 10, 20 (the default) or 30 seconds — and "Continue now" and "Stay on this page" stay. Under 20 seconds a respondent has less time to stop the move than WCAG 2.2.1 asks for, and the setting says so.
+- **Comment 10 — the "Only the questions I choose" list in Data sharing scrolls when a form has many questions.** It gains a search.
+
+---
+
+### D92 — Reference files show respondents a list of downloads, and the user's smoke test says that is not what Kobo does. How are they rebuilt? **A — hide them from respondents now; after Oct 12 rebuild them Kobo-style, starting with choice lists from a CSV.**
+
+**Filed and answered 2026-10-06 (user decision, in chat), recorded by Lane A during `M137` — A, the recommendation.** Asked because the smoke test failed comment 11: *"how can we use this in the form builder? … the reference must be used to create form. Please research how Kobo uses that."* Researched against Kobo's and ODK's own documentation (`support.kobotoolbox.org/media.html`, `select_from_file_xls.html`, `pull_data_kobotoolbox.html`, `dynamic_data_attachment.html`; `docs.getodk.org/form-datasets/`). Three findings:
+
+- **In Kobo an attached file is always used by the form, and something in the form names it by filename.** It can be:
+  - a picture, audio clip or video inside a question, note or choice;
+  - a choice list kept in a CSV (`select_one_from_file`), filtered by an earlier answer for cascading lists;
+  - a lookup table that pre-fills details from an ID (`pulldata()`);
+  - another project's data (Connect Projects).
+- **Nothing is ever offered to respondents as a download.** ODK Central accepts only files whose names the form refers to.
+- **PDF, Word and Excel are not accepted media.** For data it takes `.csv`, `.xml` and `.geojson`; `.xlsx` is the form definition itself.
+
+The options:
+
+- **A — hide now, CSV lists next.** Before Oct 12, reference files stop showing on the respondent's form and stay as staff-only notes on the form. After Oct 12 they are rebuilt in order:
+  1. choice lists from a CSV with cascading filters (region → province → city/municipality → barangay);
+  2. pre-filling by an ID;
+  3. pictures and audio in questions and choices.
+- **B — build CSV lists before Oct 12.** About 2–3 days, competing with `D91`'s four.
+- **C — remove reference files.** Take the feature out and plan the Kobo-style uses after testing.
+
+**Recommendation: A.** It stops the wrong behaviour before testers see it, and puts the most valuable use first. Health geography and facility lists are too long to type, and a cascading select already exists to receive them. ⚠️ **A lookup over patient-level data must not ship as a plain CSV:** on a public form every respondent receives the whole table.
+
+---
+
+### D93 — Automations send one email or one web call per response, and the user's smoke test says Fillout's workflows are something else. What do testers see, and what comes next? **A — keep v1 for the Oct 12 testing; build Fillout-style Workflows after it.**
+
+**Filed and answered 2026-10-06 (user decision, in chat), recorded by Lane A during `M137` — A, the recommendation.** Asked because the smoke test failed comment 12: *"I don't think this is the automation Fillout or KoboToolbox uses. Please conduct a research on its use."* Researched against Fillout's and Kobo's own documentation (`fillout.com/help/workflows`, `filter-branch-workflows`, `approval-workflows`, `delay-workflows`; `support.kobotoolbox.org/rest_services.html`). Three findings:
+
+- **v1 is not Workflows.** It is one action per automation, on submit, with a runs list. That is Fillout's simpler notifications and integrations layer, and close to Kobo's REST Services, which retries three times and sends no emails at all.
+- **Fillout Workflows is a chain.** One trigger, then ordered steps: Filter, Branch by answer, a custom email with answers inserted by `@`, a webhook, Delay, Slack, AI, and an approval step whose approvers act from the results page. Each response shows its own run history.
+- **The remainder row already holds part of it.** Filter, Branch, Delay and Slack sit on the automations remainder row.
+
+The options:
+
+- **A — keep v1, Workflows after.** Testers use today's automations. After Oct 12, in order:
+  1. a condition on each automation;
+  2. the recipient taken from an answer, and answers inserted into the message;
+  3. a review/approval step;
+  4. a failure alert and each response's run history.
+- **B — add conditions before Oct 12.** About a day, competing with `D91`'s four.
+- **C — hide automations until v2.** So testers do not judge the wrong model.
+
+**Recommendation: A.** v1 works and is safe, and the chain is too big for the days left. Its order is the research's ranking for a health department: alert only on a danger sign first, then route by facility.
+
+---
+
 ### D15 — `D13`'s one-hub-row cap is now the binding constraint on batch composition, and it is stricter than its own purpose. **ANSWERED — option 4: the cap reads the files a row REMEDY EDITS, excluding the close-out artefacts.** **Tier: early-testing.**
 
 **Filed 2026-09-05 by Lane A, during `M72`, at the moment the cap decided a batch that value had not.**

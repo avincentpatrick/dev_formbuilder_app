@@ -11701,7 +11701,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   reference files per form, frozen per published version with byte dedupe (`D61` answered B). Left here: audio and
   video, per-language media through a translations map, the XLSForm export's media column, and populating
   `form_templates.cover_image_attachment_id`, a real foreign key that nothing writes.
-  **Live.** Filed by `M127`. **Tier: during-testing.** **Also left by `M132`'s v1:** reordering a form's reference files, and showing them on the encode page and in the builder preview — v1 shows them on the guest page only. **Also left, found by `M135` (2026-10-05):** Excel and Word reference files — the user's comment 11 named them (*"we can attach excel, photos, word file, pdf etc"*), while v1 accepts PDF, PNG, JPEG and WebP only and nothing else in this row or the ledger carried them.
+  **Live.** Filed by `M127`. **Tier: during-testing.** **Also left by `M132`'s v1:** reordering a form's reference files, and showing them on the encode page and in the builder preview — v1 shows them on the guest page only. **Also left, found by `M135` (2026-10-05):** Excel and Word reference files — the user's comment 11 named them (*"we can attach excel, photos, word file, pdf etc"*), while v1 accepts PDF, PNG, JPEG and WebP only and nothing else in this row or the ledger carried them. **Amended by `D92` (2026-10-06, `M137`):** reference files stop showing on the guest page before Oct 12 and become staff-only notes on the form, so this row's encode page and builder preview are the staff side and stay; Excel and Word stay as staff-only reference types, since Kobo accepts neither as form media. The Kobo-style uses of an attached file are their own rows, filed by `M137`.
 
 - ✅ **CLOSED BY `M132` (2026-10-05) — ****`minor` · There is no author-configurable automation — no "when this happens, do that" — only four fixed,
   non-composable mechanisms.** Filed 2026-09-25 by `M110` from the report *"in fillout.com, there is this thing
@@ -11726,7 +11726,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   webhook actions, queue only (`D62` answered A). Left here: Slack (reusing the existing `Connection` provider),
   Delay, Filter, Branch with an else path, and the form-abandoned trigger, which needs a sweeper
   (`FormScheduleSweeper` is the precedent). "Run AI" stays refused.
-  **Live.** Filed by `M127`. **Tier: during-testing.** **Also left by `M132`'s v1:** redelivering a failed run by hand, retrying past the queue's six-hour window, and pruning the run history, which grows by one row per automation per response.
+  **Live.** Filed by `M127`. **Tier: during-testing.** **Also left by `M132`'s v1:** redelivering a failed run by hand, retrying past the queue's six-hour window, and pruning the run history, which grows by one row per automation per response. **`D93` (2026-10-06, `M137`) puts this row's Filter first in the Workflows order after Oct 12**; the rest of that order — recipients and answers from the form, a review/approval step, a failure alert — is the row `M137` filed beside the smoke-test results.
 
 - ✅ **CLOSED BY `M131` (2026-10-04) — **`minor` · Compound AND/OR validation rules are supported by the database, the serializer and both evaluators,
   and cannot be authored anywhere.** Filed 2026-09-25 by `M110` while designing the inline `required_if` editor,
@@ -13137,3 +13137,83 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   no row did until now. `D57`'s recommendation also says a tabular mode should be asked for again on its own evidence,
   because nothing has described what it would show; the first step is that description from the user. **Live.**
   Filed by `M135`. **Tier: during-testing.**
+
+- **`minor` · An image added to a note does not appear in the builder's preview until the page is reloaded.** Found by
+  `M137` from the staging smoke test (comment 17, marked fail: *"image did not reflect in the preview instantly, i
+  needed to refresh the page"*). An uploaded image is served only after its virus check, so its first request answers
+  409; `NoteContent.vue` records that error in a component-local `failedImages` set and never asks again, and the
+  preview's runtime is remounted only when the form's shape changes, which an edited note's content is not. The
+  content editor's own thumbnail already retries (`ContentBlocksEditor.vue`'s `wait()`), so the two disagree for up
+  to a minute and then for good. **Live.** Filed by `M137`. **Tier: early-testing.**
+
+- **`minor` · The builder's preview cannot be scrolled when its questions are longer than the window.** Found by `M137`
+  from the staging smoke test (comment 17: *"when the indicators is many and did not fit in the page, there is no way
+  to scroll down"*). `.builder-preview` scrolls with `flex: 1` inside `.builder__centre-body`, which is not a flex
+  container, so the pane grows to its content and `.builder__pane`'s `overflow: hidden` clips it; Structure
+  (`.canvas`) and Logic (`.rail`) scroll because they take `height: 100%`. **Live.** Filed by `M137`.
+  **Tier: early-testing.**
+
+- **`nit` · The form settings window is too small for its ten sections.** Found by `M137` from the staging smoke test
+  (comment 13, a pass with the note *"can you make the modal for the form settings, larger? its too small"*).
+  `MdsModal` is capped at 520 pixels and has no size; `FormSettingsModal.vue` opens every section in it. Taken before
+  Oct 12 by `D91`. **Live.** Filed by `M137`. **Tier: early-testing.**
+
+- **`minor` · Data sharing's "Only the questions I choose" list cannot be searched, so a form with many questions is a
+  long scroll of checkboxes.** Found by `M137` from the staging smoke test (comment 10, a pass with the note *"for the
+  only the questions i chose, can that be searchable? so when columns are many, we dont need to use the scroll"*).
+  `DataSharingPanel.vue` renders every shareable question as a checkbox with no filter. Taken before Oct 12 by `D91`.
+  **Live.** Filed by `M137`. **Tier: early-testing.**
+
+- **`minor` · The move after the thank-you screen always waits 20 seconds; the form builder cannot choose the delay.**
+  Found by `M137` from the staging smoke test (comment 14, a pass with the note *"20 seconds to redirect is too long.
+  there must be a way that users/form builders can configure that"*). The delay is the constant `DELAY_SECONDS` in
+  `ConfirmationScreen.vue`, fixed by `D76`; nothing stores one per form. `D91` amends `D76`: the builder chooses 5,
+  10, 20 (the default) or 30 seconds, "Continue now" and "Stay on this page" stay, and below 20 the setting says it
+  gives respondents less time than WCAG 2.2.1 asks. Taken before Oct 12. **Live.** Filed by `M137`.
+  **Tier: early-testing.**
+
+- **`minor` · Reference files are offered to respondents as downloads, which no tool the user compared does.** Found by
+  `M137` from the staging smoke test (comment 11, marked fail: *"upon publishing the form, the references became
+  downloadable in the form response page. it doesnt work that way. the reference must be use to create form"*). `M132`
+  lists a form's PDF and image reference files under its description on the guest page. Kobo and ODK use an attached
+  file only inside the form, and never as a download (`D92`). `D92` A: before Oct 12 they stop showing to respondents
+  and stay as staff-only notes on the form; the Kobo-style uses are the three rows below. **Live.** Filed by `M137`.
+  **Tier: early-testing.**
+
+- **`minor` · Sections can be added only in Structure, and the preview offers no way to add a section or a question in
+  one.** Found by `M137` from the staging smoke test (comment 18, marked fail: *"section must be added in the structure
+  before it shows on the preview. the preview page must have a capacity to have its own way to add section, add
+  specific indicator in it. also in the structure, the indicators must be draggable to sections"*). The preview
+  selects a question on click and adds nothing (`PreviewRuntime.vue`). ⚠️ **Structure already drags questions across
+  sections** — `useCanvasReorder.ts`, by pointer and by keyboard grab mode — so the last clause is either unfound or
+  failing in some case (an empty section is the first suspect); measure it in a real browser before building anything
+  for it. Taken before Oct 12 by `D91`. **Live.** Filed by `M137`. **Tier: early-testing.**
+
+- **`minor` · A choice list cannot come from an uploaded CSV, so a long cascading list — region, province,
+  city/municipality, barangay — must be typed into the form.** Filed by `M137` from `D92`'s research. Kobo's
+  `select_one_from_file` reads a CSV with `name` and `label` columns, and extra columns drive a cascading filter
+  (`support.kobotoolbox.org/select_from_file_xls.html`, `docs.getodk.org/form-datasets/`). The first Kobo-style use
+  of an attached file under `D92` A, and the most valuable: health geography and facility lists. `cascading_select`
+  already exists to receive the options. **Live.** Filed by `M137`. **Tier: during-testing.**
+
+- **`minor` · A form cannot pre-fill details from a lookup table by an ID or code.** Filed by `M137` from `D92`'s
+  research. Kobo's `pulldata()` fills answers from a CSV row matched on a typed key
+  (`support.kobotoolbox.org/pull_data_kobotoolbox.html`); ODK Central's Entity Lists do the same from data. ⛔ **A
+  lookup over patient-level data must not ship as a file the form downloads:** on a public form every respondent
+  receives the whole table (`docs.getodk.org/central-entities/`), so it is a server-side lookup or a filtered set. The
+  second Kobo-style use under `D92` A. **Live.** Filed by `M137`. **Tier: during-testing.**
+
+- **`minor` · A question or a choice cannot carry a picture or an audio clip; only a note can show an image.** Filed by
+  `M137` from `D92`'s research. Kobo puts `image`, `audio` and `video` on questions, notes and choices
+  (`support.kobotoolbox.org/media.html`), which helps respondents with low literacy; `M130` gave notes images and
+  nothing else. The third Kobo-style use under `D92` A; audio and video as attachments are on the form-attachments
+  remainder row. **Live.** Filed by `M137`. **Tier: during-testing.**
+
+- **`minor` · An automation cannot send to an address taken from an answer, put answers into its message, ask a
+  reviewer to approve, or say when it failed.** Filed by `M137` from `D93`'s research. Fillout Workflows insert
+  answers with `@`, route by answer, and have an approval step whose approvers act from the results page
+  (`fillout.com/help/workflows`, `approval-workflows`); Kobo's REST Services retry and email a failure report
+  (`support.kobotoolbox.org/rest_services.html`). `D93` A orders the work after Oct 12: a condition on each
+  automation (the remainder row's Filter) first, then recipients and answers from the form, then a review/approval
+  step, then a failure alert and each response's run history. ⚠️ Answers are health data: keep `D82`'s link-first
+  email unless an answer is chosen deliberately. **Live.** Filed by `M137`. **Tier: during-testing.**

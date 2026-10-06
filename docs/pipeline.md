@@ -189,8 +189,8 @@ may touch a hub. The close-out artefacts every increment touches by procedure ar
 | 133 | `R-fa3223d9` | The builder shows a formula default as plain text. | during-testing | `docs/feature-backlog.md:13108` | — | ready | — | — |
 | 134 | `R-0a7275ce` | A form's sections cannot be laid out as a table, the third presentation the user's comment 16 asked for. | during-testing | `docs/feature-backlog.md:13133` | — | ready | — | — |
 | 135 | `R-f69aab42` | A choice list cannot come from an uploaded CSV, so a long cascading list — region, province, city/municipality, barangay — must be typed into the for… | during-testing | `docs/feature-backlog.md:13192` | — | ready | — | — |
-| 136 | `R-86bc3575` | A form cannot pre-fill details from a lookup table by an ID or code. | during-testing | `docs/feature-backlog.md:13199` | — | ready | — | — |
-| 137 | `R-84b4314d` | A question or a choice cannot carry a picture or an audio clip; only a note can show an image. | during-testing | `docs/feature-backlog.md:13206` | — | ready | — | — |
+| 136 | `R-12e3bf50` | A form cannot pre-fill details from a lookup table by an ID or code. | during-testing | `docs/feature-backlog.md:13199` | — | ready | — | — |
+| 137 | `R-3faef64a` | A question or a choice cannot carry a picture or an audio clip; only a note can show an image. | during-testing | `docs/feature-backlog.md:13206` | — | ready | — | — |
 | 138 | `R-1ceb198f` | An automation cannot send to an address taken from an answer, put answers into its message, ask a reviewer to approve, or say when it failed. | during-testing | `docs/feature-backlog.md:13212` | — | ready | — | — |
 | 139 | `ocr-linelist` | PRD Feature #2 — the linelist OCR channel | during-testing | `docs/ocr-pipeline-design.md:296` | 3 | blocked | user: needs 2–3 scanned linelist sheets and their blank templates (D72 puts it after Oct 12) | L |
 | 140 | `R-e2d4a90c` | One `forceFill` writes `closes_at` and `max_responses` together, and the acceptance guard treats one as authoritative-under-lock and the other as ign… | during-testing | `docs/feature-backlog.md:8901` | — | blocked | decision: D27 | — |

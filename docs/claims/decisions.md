@@ -1568,6 +1568,22 @@ The matcher reads a sheet against the version it was printed from, superseded on
 
 ---
 
+### D94 — Every Oct 12 row left is OCR, and both OCR rows wait on the user until the morning of Oct 7. Does other work merge before the session? **Yes — `D90` is lifted for non-OCR work from 2026-10-06: security first, then the Kobo-style choice lists, then automation conditions.**
+
+**Filed and answered 2026-10-06 (user decision, in chat), recorded by Lane A after `M139`.** Asked because the early-testing tier holds only `ocr-provider-bakeoff` (the samples, due 2026-10-08), `ocr-staging-scan` (one real scan by the user) and `R-551873af` (latent). `D90` admitted nothing else until the session. The user's words: *"start other tasks that are not blocked by ocr … tonight, lets develop what we can develop on new session."*
+
+- **What changes.**
+  - `during-testing` work merges before the Oct 12 session, one green increment per PR, as usual.
+  - Every merge still deploys to the testing server, so testers see each change as it lands.
+  - `D75` (one increment per slot) expires with the session as written.
+- **The order, recommended at the decision and not the line's own.** The line orders a tier by readiness, which puts tracker housekeeping first:
+  1. the two security rows the Oct 12 plan already put at the head of the after-testing work — `R-68656155` (the service worker caches a credential-bearing resume shell) and `R-2dc95042` (self-registration can occupy an address in a domain the workspace does not control);
+  2. `D92`'s first Kobo-style use: choice lists from an uploaded CSV, with cascading filters (region → province → city/municipality → barangay);
+  3. `D93`'s first step: a condition on each automation.
+- **OCR stays first whenever its inputs arrive.** The samples and a Vision key that reads come from the user on the morning of 2026-10-07; `ocr-provider-bakeoff` then goes ahead of everything above.
+
+---
+
 ### D91 — The staging smoke test passed 16 of 21 checks, and four of the passes came with a request for something new, which `D90` freezes until the Oct 12 session. Which go in before testing? **All four, beside the fixes: a bigger settings window, sections from the preview, a redirect delay the builder sets, and a searchable question list.**
 
 **Filed and answered 2026-10-06 (user decision, in chat), recorded by Lane A during `M137`.** Asked because the smoke test (`staging-smoke-test`, marks read from https://claude.ai/artifact/2PF4Wdcp8UcNDTTveAJEWX) came back with four fails and four requests riding on passes, and `D90` admits only fixes until the session. The options were each request on its own, with *not picked* meaning after Oct 12. The user picked all four. **This is an exception to `D90` for these four only**; everything else still waits for the session.

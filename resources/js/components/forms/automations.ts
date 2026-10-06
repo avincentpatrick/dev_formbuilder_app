@@ -25,6 +25,8 @@ export interface NewAutomation {
     action: AutomationAction;
     recipients?: string[];
     url?: string;
+    /** M142 — the condition a response must match, or null/absent for every response. */
+    condition?: string | null;
 }
 
 /** Add an automation; a web address's signing secret is returned here, once. */
@@ -37,7 +39,7 @@ export async function createAutomation(formId: string, automation: NewAutomation
 export async function updateAutomation(
     formId: string,
     automationId: string,
-    changes: { name?: string; enabled?: boolean; recipients?: string[]; url?: string },
+    changes: { name?: string; enabled?: boolean; recipients?: string[]; url?: string; condition?: string | null },
 ): Promise<AutomationRow> {
     return rowOf(await sendSettingsRequest(`${base(formId)}/${encodeURIComponent(automationId)}`, { method: 'PATCH', json: changes }, 'The change was not saved.'));
 }
@@ -82,6 +84,10 @@ export function runReason(code: string | null, responseStatus: number | null): s
             return 'The response no longer exists.';
         case 'disabled':
             return 'The automation was switched off.';
+        case 'condition_not_met':
+            return 'The response did not match the condition.';
+        case 'condition_error':
+            return 'The condition could not be checked for this response.';
         default:
             return null;
     }

@@ -139,3 +139,41 @@ describe('reading the runs', () => {
         expect(parseRecipients(' a@example.org,b@example.org;\nc@example.org ,, ')).toEqual(['a@example.org', 'b@example.org', 'c@example.org']);
     });
 });
+
+describe('a condition on each automation (M142)', () => {
+    const catalogue = { fields: [{ key: 'age', label: 'Age', numeric: true, options: [] }], repeatables: [] };
+
+    it('says an automation’s condition as a sentence on its row, and nothing for one without', () => {
+        const wrapper = mountPanel({ catalogue, items: [emailRow({ condition: '${age} > 60' }), hookRow({ condition: null })] });
+
+        expect(wrapper.find('[data-automation="auto-1"] [data-automation-condition]').text()).toBe('Runs only when Age is more than 60.');
+        expect(wrapper.find('[data-automation="auto-2"] [data-automation-condition]').exists()).toBe(false);
+    });
+
+    it('offers “Only when…”, for every response until a condition is written, and sends the condition', async () => {
+        const fetchMock = vi.fn(() => respond({ data: emailRow({ condition: '${age} > 60' }), secret: null }, 201));
+        vi.stubGlobal('fetch', fetchMock);
+        const wrapper = mountPanel({ catalogue });
+        const add = wrapper.find('.automations__add');
+
+        expect(add.findAll('legend').map((legend) => legend.text())).toContain('Only when…');
+        expect(add.text()).toContain('Runs for every response — no conditions yet.');
+
+        await add.findAll('button').find((b) => b.text() === 'Edit as text')!.trigger('click');
+        await add.find('textarea[aria-label="Condition expression"]').setValue('${age} > 60');
+        expect(add.text()).toContain('Checked when you save.');
+
+        await add.find('input').setValue('Over sixty');
+        await add.find('textarea').setValue('nurse@example.org');
+        await add.findAll('button').find((b) => b.text() === 'Add automation')!.trigger('click');
+        await flushPromises();
+
+        const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+        expect(JSON.parse(init.body as string)).toMatchObject({ name: 'Over sixty', condition: '${age} > 60' });
+    });
+
+    it('says why a run was skipped for its condition', () => {
+        expect(runReason('condition_not_met', null)).toBe('The response did not match the condition.');
+        expect(runReason('condition_error', null)).toBe('The condition could not be checked for this response.');
+    });
+});

@@ -13190,27 +13190,27 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   for it. Taken before Oct 12 by `D91`. **Live.** Filed by `M137`. **Tier: early-testing.**
 
 - **`minor` · A choice list cannot come from an uploaded CSV, so a long cascading list — region, province,
-  city/municipality, barangay — must be typed into the form.** Filed by `M137` from `D92`'s research. Kobo's
+  city/municipality, barangay — must be typed into the form.** From `D92`'s research. Kobo's
   `select_one_from_file` reads a CSV with `name` and `label` columns, and extra columns drive a cascading filter
   (`support.kobotoolbox.org/select_from_file_xls.html`, `docs.getodk.org/form-datasets/`). The first Kobo-style use
   of an attached file under `D92` A, and the most valuable: health geography and facility lists. `cascading_select`
   already exists to receive the options. **Live.** Filed by `M137`. **Tier: during-testing.**
 
-- **`minor` · A form cannot pre-fill details from a lookup table by an ID or code.** Filed by `M137` from `D92`'s
+- **`minor` · A form cannot pre-fill details from a lookup table by an ID or code.** From `D92`'s
   research. Kobo's `pulldata()` fills answers from a CSV row matched on a typed key
   (`support.kobotoolbox.org/pull_data_kobotoolbox.html`); ODK Central's Entity Lists do the same from data. ⛔ **A
   lookup over patient-level data must not ship as a file the form downloads:** on a public form every respondent
   receives the whole table (`docs.getodk.org/central-entities/`), so it is a server-side lookup or a filtered set. The
   second Kobo-style use under `D92` A. A lookup over another form's RESPONSES is the Connect project remainder row's (pulldata-style lookups over linked data); this row is the attached-table half. **Live.** Filed by `M137`. **Tier: during-testing.**
 
-- **`minor` · A question or a choice cannot carry a picture or an audio clip; only a note can show an image.** Filed by
-  `M137` from `D92`'s research. Kobo puts `image`, `audio` and `video` on questions, notes and choices
+- **`minor` · A question or a choice cannot carry a picture or an audio clip; only a note can show an image.** From
+  `D92`'s research. Kobo puts `image`, `audio` and `video` on questions, notes and choices
   (`support.kobotoolbox.org/media.html`), which helps respondents with low literacy; `M130` gave notes images and
   nothing else. The third Kobo-style use under `D92` A; audio and video as attachments are on the form-attachments
   remainder row, and the choice half is the §1 table's "Image / picture choice (per-option images)" item. **Live.** Filed by `M137`. **Tier: during-testing.**
 
 - **`minor` · An automation cannot send to an address taken from an answer, put answers into its message, ask a
-  reviewer to approve, or say when it failed.** Filed by `M137` from `D93`'s research. Fillout Workflows insert
+  reviewer to approve, or say when it failed.** From `D93`'s research. Fillout Workflows insert
   answers with `@`, route by answer, and have an approval step whose approvers act from the results page
   (`fillout.com/help/workflows`, `approval-workflows`); Kobo's REST Services retry and email a failure report
   (`support.kobotoolbox.org/rest_services.html`). `D93` A orders the work after Oct 12: a condition on each

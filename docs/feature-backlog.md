@@ -12436,7 +12436,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   by `M122` while closing `R-244d53dc`. `draft-snapshot.ts`'s state 7 reads `config.formula` (`:248-251`), but the
   builder writes `config.calculated_formula` (`ConfigPanel.vue`) and nothing maps one to the other — so the
   guard's `delete` never removes a blank formula, and `missing_formula` is recorded for every calculated question,
-  formula or not. `draft-snapshot.test.ts:166-174` pins the wrong key, which is why it is green. ⚠️ **Invisible today:**
+  formula or not. `draft-snapshot.test.ts`'s case 7 (“omits a calculated field’s formula KEY…”) pins the wrong key, which is why it is green. ⚠️ **Invisible today:**
   an issue renders only beside its field's own control (`PreviewRuntime.vue:161`), a calculated question renders nothing
   in the preview, nothing counts the issues, and the engine skips a blank formula anyway. It becomes visible the moment
   the preview summarises its issues or shows a calculated value. A hub file, so filed rather than taken. **Latent.**
@@ -13189,12 +13189,12 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   failing in some case (an empty section is the first suspect); measure it in a real browser before building anything
   for it. Taken before Oct 12 by `D91`. **Live.** Filed by `M137`. **Tier: early-testing.** ✅ **CLOSED BY `M139` (2026-10-06), PR #332.** The preview adds a section, shows a section with no question yet to the author (the engine still drops it for respondents), and offers "Add a question to <section>" under each, which selects the section and opens the Fields palette with focus on it; Structure's empty section says a question can be dragged in and offers the same add. The drag clause was measured working by pointer before the build; the keyboard half is `R-c0857303`. Walked in a real browser at three viewports by `tests/e2e/builder-preview-authoring.spec.ts`.
 
-- **`minor` · A choice list cannot come from an uploaded CSV, so a long cascading list — region, province,
+- ✅ **CLOSED BY `M141` (2026-10-07) — ****`minor` · A choice list cannot come from an uploaded CSV, so a long cascading list — region, province,
   city/municipality, barangay — must be typed into the form.** From `D92`'s research. Kobo's
   `select_one_from_file` reads a CSV with `name` and `label` columns, and extra columns drive a cascading filter
   (`support.kobotoolbox.org/select_from_file_xls.html`, `docs.getodk.org/form-datasets/`). The first Kobo-style use
   of an attached file under `D92` A, and the most valuable: health geography and facility lists. `cascading_select`
-  already exists to receive the options. **Live.** Filed by `M137`. **Tier: during-testing.**
+  already exists to receive the options. **Live.** Filed by `M137`. **Tier: during-testing.** ✅ **CLOSED BY `M141` (2026-10-07), PR #334 — ONE FILE PER LEVEL IN KOBO'S FORMAT (`D95`).** An author uploads `regions.csv` (`name,label`) and `provinces.csv` (`name,label,region`) in a cascade's Levels tab or in Settings → Choice lists, and picks each level's list. The lists are parsed at upload into `form_version_choice_lists`, held on the draft and frozen per version. Publishing turns them into the published field's ordinary options (`ChoiceListMaterializer`), so the server's membership check, export labels, OCR and the encode page read a plain cascade. The public schema leaves them out, and the guest page reads them beside it (`public/choice-lists/{token}/{version}`, cached by version). Measured at PSGC size (43,739 options): upload 0.36 s, publish 0.87 s, the guest read 318 KB gzipped, an export label 0.3 ms with a small map cache. Left: the encode page's props (`R-7a2f4a13`), and the gate's typed-cascade gaps (`R-bbf03029`).
 
 - **`minor` · A form cannot pre-fill details from a lookup table by an ID or code.** From `D92`'s
   research. Kobo's `pulldata()` fills answers from a CSV row matched on a typed key

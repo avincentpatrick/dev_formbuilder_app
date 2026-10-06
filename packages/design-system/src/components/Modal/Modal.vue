@@ -92,8 +92,15 @@ const props = withDefaults(
          * surface still owns the page, and only if none does is it left alone.
          */
         returnFocus?: readonly string[];
+        /**
+         * How wide the panel may grow (M137, `R-581cb07b`). `md` is the 520px dialog every confirmation was built
+         * for and stays the default, so no existing call site changes; `lg` (880px) is for a dialog that holds a
+         * whole settings surface — the form settings window, whose ten sections the user found cramped. At 480px
+         * and below both are the same full-screen sheet.
+         */
+        size?: 'md' | 'lg';
     }>(),
-    { closeLabel: 'Close', teleport: true },
+    { closeLabel: 'Close', teleport: true, size: 'md' },
 );
 
 const emit = defineEmits<{ close: []; 'update:open': [value: boolean] }>();
@@ -334,6 +341,7 @@ onBeforeUnmount(closePage);
                 <div
                     ref="panel"
                     class="mds-modal__panel"
+                    :class="{ 'mds-modal__panel--lg': size === 'lg' }"
                     role="dialog"
                     aria-modal="true"
                     :aria-labelledby="titleId"
@@ -390,6 +398,11 @@ onBeforeUnmount(closePage);
     border-radius: var(--mds-radius-xl);
     box-shadow: var(--mds-shadow-4);
     color: var(--mds-color-text-body);
+}
+
+/* Declared before the 480px block on purpose: same specificity, so the full-screen sheet below still wins on a phone. */
+.mds-modal__panel--lg {
+    max-width: 880px;
 }
 
 .mds-modal__panel:focus-visible {

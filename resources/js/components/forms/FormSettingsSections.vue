@@ -33,8 +33,8 @@
  *     in the panel body, which is the shape it is for — carrying `D28`'s `flex-wrap` host guard, as every
  *     other host of it does. The refusal here stands; it is not a ban on the component.
  *   - It has no vertical orientation and no `aria-orientation` anywhere in the package.
- *   - `MdsModal` is hard-capped at `max-width: 520px` with no size prop, so in the modal the rail must fit
- *     inside 520px; on the hub it sits in the page.
+ *   - `MdsModal` was capped at 520px; since M137 (`R-581cb07b`) the builder opens it at `size="lg"` (880px), and
+ *     the rail must still fit the full-screen sheet below 480px. On the hub it sits in the page.
  *
  * ✅ SO IT FOLLOWS THE PRECEDENT THE BUILDER ALREADY SHIPS: `.builder__left-tabs` in `Pages/forms/Builder.vue`
  * is a local `role="group"` of `aria-pressed` buttons for the Fields⇄Library switch, for the same reason —
@@ -273,9 +273,9 @@ watch(
 </template>
 
 <style scoped>
-/* Rail + body. In the modal's 520px shell the body gets ~340px, a width the heaviest section is already proved
-   at: below 480px `MdsModal` becomes a full-screen sheet, so SharePanel renders at roughly that width on a
-   phone today. On the hub the same grid sits in the page. */
+/* Rail + body. In the modal's 880px shell (M137) the body gets about twice its old width; the narrowest is the full-screen
+   sheet below 480px, where SharePanel already renders at about 340px on a phone. On the hub the same grid sits
+   in the page. */
 .form-settings {
     display: grid;
     grid-template-columns: 140px minmax(0, 1fr);

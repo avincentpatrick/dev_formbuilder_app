@@ -44,6 +44,8 @@ use Illuminate\Support\Facades\Notification;
  */
 final class SendWelcomeEmail
 {
+    public function __construct(private readonly JoinTenantOnRegistration $registrations) {}
+
     public function handle(Verified $event): void
     {
         if (! $event->user instanceof User) {
@@ -56,6 +58,10 @@ final class SendWelcomeEmail
         if ($email === '') {
             return;
         }
+
+        // ⛔ M140 (`D34` = A) — A SELF-REGISTRATION JOINS ITS WORKSPACE HERE, AT CONFIRMATION, AND FIRST: the
+        // membership read below must see it. The conditions are `JoinTenantOnRegistration`'s.
+        $this->registrations->onConfirmation($user, request());
 
         // ⛔ ONCE PER PERSON, NOT ONCE PER EVENT (M103, R-4f23d9c7). The docblock above has always said
         // "once"; nothing enforced it. `Verified` repeats for a real, ordinary reason —

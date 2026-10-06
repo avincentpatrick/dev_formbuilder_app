@@ -23,10 +23,16 @@ use App\Services\Sso\SsoCertificateInspector;
 use App\Services\Sso\SsoMetadataParser;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
+use Illuminate\Auth\Events\Registered;
+use Illuminate\Auth\Events\Verified;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
+use Ramsey\Uuid\Uuid;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\Support\Sso\FakeIdp;
 
@@ -1129,6 +1135,65 @@ it('signs an ACTIVE member in from a domain the workspace never verified — the
         ->assertRedirect('/dashboard');
 
     $this->assertAuthenticatedAs($member);
+});
+
+it('grandfathers nothing for an address self-registered here and reclaimed by its owner (M140, R-5ce75abf)', function (): void {
+    // ⛔ THE CHAIN `M140`'s ADVERSARIAL CHECK FOUND, AND THE CASE ABOVE IS WHY IT WAS A TAKEOVER. The grandfather
+    // is safe only while no writer of `Active` mints one for a stranger's address — and until M140 a
+    // `Registered` listener did exactly that for anyone who registered on an open workspace. So: this
+    // SSO-entitled workspace opens its own registration, its admin registers the victim's address here, the
+    // owner reclaims the account by password reset and clicks a confirmation link re-sent from this host, and
+    // this workspace's identity provider asserts the address. Before M140 the membership minted at
+    // registration skipped the domain check and signed the identity provider in as the owner.
+    Notification::fake();
+
+    enterTenant($this->tenant->id, $this->admin->id);
+    DB::table('settings')->insert([
+        'id' => Uuid::uuid7()->toString(),
+        'tenant_id' => $this->tenant->id,
+        'key' => SettingKey::RegistrationInviteOnly->value,
+        'value' => json_encode(false),
+        'updated_by' => null,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+    TenantContext::flush();
+    app(TenantSettingRegistry::class)->forget();
+
+    // Committed, so the provisioner's `pgsql_auth` read sees it; shaped as `CreateNewUser` makes an account.
+    $made = now()->startOfSecond();
+    /** @var User $victim */
+    $victim = User::on('pgsql_privileged')->forceCreate([
+        'name' => 'Address Owner',
+        'email' => Str::lower(Str::random(12)).'@othercompany.test',
+        'password' => Hash::make('Squatter-Chosen-Pass-9'),
+        'password_set_at' => $made,
+        'created_at' => $made,
+        'updated_at' => $made,
+    ]);
+    $victim->setConnection((string) config('database.default'));
+
+    app('request')->headers->set('host', 'acme.meridian.test');
+    app('request')->server->set('HTTP_HOST', 'acme.meridian.test');
+
+    // (1) The squatter's registration, on this workspace's host.
+    event(new Registered($victim));
+
+    // (2) The owner reclaims the account by password reset, then confirms through a link re-sent from this host.
+    $victim->forceFill(['password_set_at' => $made->copy()->addMinutes(10), 'email_verified_at' => now()]);
+    event(new Verified($victim));
+
+    // (3) This workspace's identity provider asserts the owner's address.
+    $request = startLogin($this->tenant, $this->admin);
+
+    $this->post(ACME_ACS, ['SAMLResponse' => answering($request)->as($victim->email)->response()])
+        ->assertNotFound();
+
+    $this->assertGuest();
+
+    enterTenant($this->tenant->id, $this->admin->id);
+    expect(TenantUser::query()->where('user_id', $victim->id)->exists())->toBeFalse()
+        ->and(SsoAuthFailure::query()->latest('occurred_at')->first()?->reason)->toBe(SsoFailureReason::DomainNotVerified);
 });
 
 it('asks the domain question BEFORE the adoption one, so an unproven workspace learns nothing', function (): void {

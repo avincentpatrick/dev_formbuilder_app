@@ -5211,7 +5211,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   now use `array_key_exists()` with `toBeTrue()`, and the reason is written beside them.
   ⚠️ **`docs/data-dictionary.md`'s line count is unchanged**, so no citation into it rotted.
   **`minor` · §20's `settings.key` catalog omits `security.require_two_factor`.**
-  `docs/data-dictionary.md:838`, rewritten in this branch — the key is live
+  `docs/data-dictionary.md` §20, rewritten in this branch — the key is live
   (`app/Enums/SettingKey.php:42`, tenant-scoped at `:85`, written by `UpdateAccessSettingsRequest.php:60`,
   enforced by `EnforceTenantTwoFactor`'s `settings->get(SettingKey::SecurityRequireTwoFactor)` read). Anyone inventorying tenant configuration from the
   dictionary omits a tenant-scoped security policy. **Live.** Filed by `M1`.

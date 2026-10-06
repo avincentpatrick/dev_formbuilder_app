@@ -44,10 +44,7 @@ final class EndOtherSessionsOnPasswordChange
 
     public function handlePasswordUpdated(PasswordUpdatedViaController $event): void
     {
-        if (! $event->user instanceof User) {
-            return;
-        }
-
+        // Fortify types this event's user as `App\Models\User` (its constructor), unlike `PasswordReset`'s contract.
         $request = request();
         $this->endSessions($event->user, keep: $request->hasSession() ? $request->session()->getId() : null);
 

@@ -38,6 +38,8 @@ type Story = StoryObj<typeof meta>;
 
 export const Confirm: Story = {};
 export const ConfirmDark: Story = { decorators: [dark] };
+// M137 (`R-581cb07b`): the wide panel the form settings window uses, scanned like the default one.
+export const Wide: Story = { args: { size: 'lg', title: 'Form settings' } };
 
 /**
  * Increment I10a — the modal beside the page it is covering, so the design system documents the composition

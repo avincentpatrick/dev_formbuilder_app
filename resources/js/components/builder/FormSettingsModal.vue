@@ -40,6 +40,7 @@ const emit = defineEmits<{ 'update:open': [value: boolean] }>();
     <MdsModal
         :open="props.open"
         title="Form settings"
+        size="lg"
         initial-focus=".form-settings__rail-button"
         @close="emit('update:open', false)"
     >

@@ -19,7 +19,7 @@
  */
 import { computed, ref, useId, watch } from 'vue';
 import { router } from '@inertiajs/vue3';
-import { MdsButton, MdsCheckbox, MdsRadio } from '@meridian/design-system';
+import { MdsButton, MdsCheckbox, MdsRadio, MdsSearchField } from '@meridian/design-system';
 import type { DataSharingProps } from '@/components/forms/types';
 
 const props = defineProps<{
@@ -129,6 +129,26 @@ function cancelShare(): void {
     confirming.value = false;
 }
 
+// M137 (`R-16912370`, `D91`): with many questions "Only the questions I choose" was a long scroll of checkboxes, so a
+// search narrows the list. It only HIDES rows: a chosen question that the search hides stays chosen, and the count
+// says how many are. A form with a handful of questions keeps its plain list.
+const SEARCH_FROM = 7;
+const query = ref('');
+const searchable = computed(() => props.sharing.questions.length >= SEARCH_FROM);
+const shownQuestions = computed(() => {
+    const needle = query.value.trim().toLowerCase();
+    if (!searchable.value || needle === '') return props.sharing.questions;
+
+    return props.sharing.questions.filter((q) => q.label.toLowerCase().includes(needle) || q.key.toLowerCase().includes(needle));
+});
+
+watch(
+    () => props.open,
+    (open) => {
+        if (open) query.value = '';
+    },
+);
+
 function toggleQuestion(key: string, on: boolean): void {
     chosen.value = on ? [...chosen.value.filter((k) => k !== key), key] : chosen.value.filter((k) => k !== key);
 }
@@ -191,13 +211,22 @@ function saveQuestions(): void {
                     <li v-for="question in sharing.questions" :key="question.key">{{ question.label }}</li>
                 </ul>
                 <div v-else class="data-sharing__choices">
+                    <template v-if="searchable">
+                        <MdsSearchField v-model="query" label="Search questions" />
+                        <p class="data-sharing__help" aria-live="polite" data-sharing-search-summary>
+                            {{ chosen.length }} chosen · showing {{ shownQuestions.length }} of {{ sharing.questions.length }}
+                        </p>
+                    </template>
                     <MdsCheckbox
-                        v-for="question in sharing.questions"
+                        v-for="question in shownQuestions"
                         :key="question.key"
                         :model-value="chosen.includes(question.key)"
                         :label="question.label"
                         @update:model-value="toggleQuestion(question.key, $event)"
                     />
+                    <p v-if="shownQuestions.length === 0" class="data-sharing__help" data-sharing-no-match>
+                        No question matches “{{ query.trim() }}”.
+                    </p>
                 </div>
                 <div class="data-sharing__actions">
                     <MdsButton

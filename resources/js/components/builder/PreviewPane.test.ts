@@ -1,5 +1,6 @@
 import { flushPromises, mount } from '@vue/test-utils';
-import { computed, ref } from 'vue';
+import { computed, defineComponent, h, inject, ref } from 'vue';
+import { ContentImageRetryKey } from '../submissions/note-content';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /*
@@ -382,6 +383,24 @@ describe('what the author reads', () => {
         const text = wrapper.text();
         expect(text).toContain('not interactive');
         expect(text).toContain('default language');
+    });
+
+    it('asks a note\'s rows to retry an image that is not ready yet, which no other surface does (M137)', async () => {
+        // A probe in FieldRow's place reads what the row would inject: the policy reaches the rows, and NoteContent
+        // (under FieldRow) is where it is used — `NoteContent.test.ts` covers that half.
+        const Probe = defineComponent({
+            setup() {
+                const retry = inject(ContentImageRetryKey, null);
+                return () => h('span', { 'data-retry': JSON.stringify(retry) });
+            },
+        });
+        const wrapper = mount(PreviewPane, {
+            props: { store: twoSections().store, form: formProp(), draft: { id: 'ver-1', version_number: 1 }, active: true },
+            global: { stubs: { FieldRow: Probe, RepeatGroup: true } },
+        });
+        await flushPromises();
+
+        expect(wrapper.find('[data-retry]').attributes('data-retry')).toBe(JSON.stringify({ delayMs: 3000, maxAttempts: 10 }));
     });
 
     it('marks the row the config panel has selected', async () => {

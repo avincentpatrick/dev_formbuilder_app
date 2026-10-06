@@ -106,6 +106,36 @@ describe('DataSharingPanel', () => {
         expect(lastPatch()[1]).toEqual({ enabled: true, acknowledged: true, field_keys: ['district'] });
     });
 
+    it('searches a long chosen list, keeping a hidden choice chosen (M137, R-16912370)', async () => {
+        const questions = ['Facility name', 'District', 'Barangay', 'Province', 'Region', 'Health unit', 'Catchment area', 'District hospital'].map(
+            (label) => ({ key: label.toLowerCase().replace(/ /g, '_'), label }),
+        );
+        const wrapper = mountPanel({ enabled: true, field_keys: ['barangay'], questions });
+        const labels = () => wrapper.findAll('.data-sharing__choices input[type="checkbox"]').map((c) => c.element.closest('label')?.textContent?.trim());
+        const search = wrapper.find('input[type="search"]');
+
+        expect(labels()).toHaveLength(8);
+        await search.setValue('district');
+        expect(labels()).toEqual(['District', 'District hospital']);
+        expect(wrapper.find('[data-sharing-search-summary]').text()).toBe('1 chosen · showing 2 of 8');
+
+        // Ticking a match while Barangay is hidden keeps Barangay: the search hides rows, it does not unchoose them.
+        await wrapper.findAll('.data-sharing__choices input[type="checkbox"]')[0].setValue(true);
+        await wrapper.findAll('button').find((b) => b.text() === 'Save questions')!.trigger('click');
+        expect(lastPatch()[1]).toEqual({ enabled: true, acknowledged: true, field_keys: ['barangay', 'district'] });
+
+        await search.setValue('zzz');
+        expect(labels()).toHaveLength(0);
+        expect(wrapper.find('[data-sharing-no-match]').text()).toBe('No question matches “zzz”.');
+    });
+
+    it('keeps a short list plain, with no search', async () => {
+        const wrapper = mountPanel({ enabled: true, field_keys: ['district'] });
+
+        expect(wrapper.find('input[type="search"]').exists()).toBe(false);
+        expect(wrapper.find('[data-sharing-no-match]').exists()).toBe(false);
+    });
+
     it('sends null, never a list, for every question', async () => {
         const wrapper = mountPanel({ enabled: true, field_keys: ['district'] });
 

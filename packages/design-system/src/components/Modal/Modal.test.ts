@@ -744,3 +744,21 @@ describe('MdsModal — returnFocus, because an opener can die while the dialog i
         popModalRoot(drawer);
     });
 });
+
+describe('MdsModal — size (M137, `R-581cb07b`)', () => {
+    it('stays the 520px dialog unless a wide one is asked for, so no existing call site changes', async () => {
+        openModal();
+        await flushPromises();
+
+        const panel = document.body.querySelector('.mds-modal__panel');
+        expect(panel).not.toBeNull();
+        expect(panel!.classList.contains('mds-modal__panel--lg')).toBe(false);
+    });
+
+    it('grows to the wide panel when `size="lg"` is asked for', async () => {
+        openModal({ size: 'lg' });
+        await flushPromises();
+
+        expect(document.body.querySelector('.mds-modal__panel')!.classList.contains('mds-modal__panel--lg')).toBe(true);
+    });
+});

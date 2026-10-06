@@ -1,7 +1,7 @@
 import { mount } from '@vue/test-utils';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import NoteContent from './NoteContent.vue';
-import { ContentHeadingBaseKey, ContentImageUrlKey, renderableBlocks, type ContentBlock } from './note-content';
+import { ContentHeadingBaseKey, ContentImageRetryKey, ContentImageUrlKey, renderableBlocks, withAttempt, type ContentBlock } from './note-content';
 
 /**
  * M130 (`R-c9f50df2`) — a note's content blocks as a respondent sees them, with no raw-HTML sink anywhere.
@@ -86,6 +86,56 @@ describe('NoteContent', () => {
 
         expect(wrapper.find('img').exists()).toBe(false);
         expect(wrapper.text()).toContain('The clinic entrance');
+    });
+
+    it('asks again for an image that is still being checked, where the page asks it to (M137, the builder preview)', async () => {
+        vi.useFakeTimers();
+        try {
+            const wrapper = render([{ type: 'image', attachment_id: 'att-5', alt: null }], {
+                [ContentImageRetryKey]: { delayMs: 3000, maxAttempts: 2 },
+            });
+
+            // The first load fails (409 while the virus check runs): the image waits, and says so.
+            await wrapper.find('img').trigger('error');
+            expect(wrapper.find('img').exists()).toBe(false);
+            expect(wrapper.find('[data-image-checking]').text()).toContain('still being checked');
+
+            // After the delay it is asked for again under a fresh address — the browser keeps a failure per URL.
+            await vi.advanceTimersByTimeAsync(3000);
+            expect(wrapper.find('img').attributes('src')).toBe('/attachments/att-5?attempt=1');
+
+            // Once it loads, nothing else happens; had it failed for good, the tries run out and it says what to do.
+            await wrapper.find('img').trigger('error');
+            await vi.advanceTimersByTimeAsync(3000);
+            expect(wrapper.find('img').attributes('src')).toBe('/attachments/att-5?attempt=2');
+            await wrapper.find('img').trigger('error');
+            expect(wrapper.find('img').exists()).toBe(false);
+            expect(wrapper.find('[data-image-checking]').exists()).toBe(false);
+            expect(wrapper.find('[data-image-gave-up]').text()).toContain('Reload the page');
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('never asks again where the page does not ask it to — the guest and encode pages', async () => {
+        vi.useFakeTimers();
+        try {
+            const wrapper = render([{ type: 'image', attachment_id: 'att-6', alt: null }]);
+
+            await wrapper.find('img').trigger('error');
+            await vi.advanceTimersByTimeAsync(60_000);
+
+            expect(wrapper.find('img').exists()).toBe(false);
+            expect(wrapper.find('[data-image-checking]').exists()).toBe(false);
+            expect(wrapper.find('[data-image-gave-up]').exists()).toBe(false);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('adds the attempt to an address that already carries a query', () => {
+        expect(withAttempt('/api/v1/public/content-images/t/att-7', 0)).toBe('/api/v1/public/content-images/t/att-7');
+        expect(withAttempt('/attachments/att-7?size=small', 3)).toBe('/attachments/att-7?size=small&attempt=3');
     });
 
     it('reads images from the address the page provides', () => {

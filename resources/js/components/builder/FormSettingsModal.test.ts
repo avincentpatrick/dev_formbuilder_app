@@ -119,6 +119,14 @@ function railButton(wrapper: ReturnType<typeof mountModal>, label: string) {
 }
 
 group('FormSettingsModal — the rail', () => {
+    it('opens as the wide dialog, because ten sections do not fit the 520px one (M137, R-581cb07b)', () => {
+        const wrapper = mountModal();
+
+        expect(wrapper.find('.mds-modal__panel').classes()).toContain('mds-modal__panel--lg');
+
+        wrapper.unmount();
+    });
+
     it('uses NO tab/tablist role anywhere, which is the whole reason it is a local control', () => {
         // Mutation: give `.form-settings__rail` role="tablist" and its buttons role="tab". Reddens here and
         // — far more expensively — sends four existing e2e loops clicking into this modal.

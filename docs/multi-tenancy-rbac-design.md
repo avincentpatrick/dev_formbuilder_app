@@ -399,7 +399,7 @@ only place the answer survives. ⚠️ **The founding Owner is not a door (`M95`
 | Door | `via` | Entry point | Gate on a NEW membership |
 |---|---|---|---|
 | Invitation | *(no `attachMember()` call — see step 2 above)* | `InvitationController` | The invite itself; an admin named this person |
-| Self-registration on a workspace subdomain | `self_registration` | `JoinTenantOnRegistration` (a `Registered` listener) | `RegistrationGate` (via the `GateRegistration` middleware on `/register`) |
+| Self-registration on a workspace subdomain | `self_registration` | `JoinTenantOnRegistration::onConfirmation()`, called by `SendWelcomeEmail` on `Verified` — since M140 (`D34` = A) the join waits for the registrant's first confirmation of the address, with the password still the registration's | `RegistrationGate` (via the `GateRegistration` middleware on `/register`, and asked again at confirmation) |
 | SAML JIT provisioning (P1b) | `sso_jit` | `SsoUserProvisioner` | `sso_connections.jit_provisioning_enabled` |
 | **First-party Google sign-in (J3c2)** | **`google_sign_in`** | `GoogleSignInProvisioner` | **`RegistrationGate`** |
 

@@ -398,7 +398,7 @@ than assumed:
 | writer | what it demanded of the person |
 |---|---|
 | `accept()` | the emailed token **and**, since M8, either a never-used identity or the real person signed in as themselves |
-| `joinOpenTenant()` | a self-registration, with a password they chose |
+| `joinOpenTenant()` | a self-registration, with a password they chose — and, since M140, its registrant's confirmation of the address |
 | `joinViaGoogle()` | Google's own verification of mailbox control (ADR-0019 §D4) |
 | `joinViaSso()` | runs **downstream of this very check** |
 
@@ -406,6 +406,15 @@ than assumed:
 self-registration remains a way to occupy an address in a domain you do not control. That is an older and
 separate door where nothing is forged and the registrant's own password is the only credential — this
 decision narrows the SSO reach, and does not claim to be the last word on address squatting.
+
+⛔ **Amended by M140 (`R-5ce75abf`): the second row of that table was wrong when it was written.** A
+self-registration demanded only a password, and the membership was minted on `Registered` — so a workspace
+that opened its own registration could register a stranger's address and hold the Active row this check
+grandfathers, with no assertion at all; once the owner reclaimed the account by password reset, the
+workspace's identity provider was signed in as them. Since M140 (`D34` = A) a self-registration joins only on
+its registrant's FIRST confirmation of the address, while the password is still the one the registration
+chose (`JoinTenantOnRegistration`). The squat on the ADDRESS itself is unchanged, and remains the boundary
+above.
 
 **BEFORE both adoption refusals, which closes a second defect the row does not name.** The failures panel
 renders `existing_account_not_member` as *"Address already has an account elsewhere"* and `jit_disabled` as

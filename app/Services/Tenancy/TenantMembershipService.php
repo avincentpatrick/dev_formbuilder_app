@@ -219,12 +219,12 @@ final class TenantMembershipService
     }
 
     /**
-     * Join an OPEN workspace by having just registered on its subdomain (Increment I5, PRD Feature #10's
-     * "whether new members can self-register or must be invited").
+     * Join an OPEN workspace by having registered on its subdomain and CONFIRMED the address (Increment I5, PRD
+     * Feature #10's "whether new members can self-register or must be invited"; confirmation since M140, `D34`).
      *
      * This is the only membership write in the file that runs with **no ambient tenant context**: it is
-     * called from a `Registered` listener on Fortify's `/register`, whose middleware list carries no
-     * tenancy middleware at all. So it borrows the tenant's context itself — inside `DB::transaction`,
+     * called on `Verified` (`JoinTenantOnRegistration`, from Fortify's verification route — until M140 from a
+     * `Registered` listener), whose route carries no tenant identification. So it borrows the tenant's context itself — inside `DB::transaction`,
      * because {@see TenantContext::applyLocal()} is `SET LOCAL` and a silent no-op outside one, and
      * `tenant_users` is strict-RLS: without the GUC the INSERT is REFUSED, not mis-scoped. Both the DB GUC
      * and Spatie's permissions team id are restored in `finally`, the {@see SuperAdminService}
@@ -857,13 +857,13 @@ final class TenantMembershipService
      * ADR-0016 §D22 already records for its own fork. *"Has a usable password"* is the question everyone
      * reaches for first and it is unanswerable from this schema.
      *
-     * ⚠️ **AND HERE IS WHAT THIS PREDICATE STILL DOES NOT CATCH, SO NOBODY HAS TO REDISCOVER IT.** An account
-     * created by central-host registration and then never used reads FALSE on every arm: `CreateNewUser`
-     * does not stamp `email_verified_at`, that door creates no membership, and the other two columns are
-     * NULL. Such a person is still handed the password-setting arm. It is strictly narrower than what this
-     * method closed, it is filed as a `minor` in `docs/feature-backlog.md` and as residual 30 in
-     * `docs/security-threat-model.md`, and the fix is the one column this schema lacks — a positive
-     * `users.password_set_at`, which would also retire ADR-0016 §D22's indistinguishability for good.
+     * ✅ **WHAT THIS PREDICATE ONCE COULD NOT CATCH, CLOSED BY M76.** An account created by central-host
+     * registration and never used read FALSE on every proxy arm: `CreateNewUser` does not stamp
+     * `email_verified_at`, that door creates no membership, and the other two columns are NULL — so such a
+     * person was handed the password-setting arm. M76 added the positive column this schema lacked,
+     * `users.password_set_at`, which `CreateNewUser` stamps; it is the first arm below, residual 30 in
+     * `docs/security-threat-model.md` records the closure, and ADR-0016 §D22's indistinguishability is
+     * retired with it. (This note read as still open until M140 corrected it.)
      *
      * ⛔ `tos_accepted_at` LOOKS like an *"this account has been used"* stamp and is the trap. Its only
      * writer in the entire application is `InvitationController` itself, so a self-registered member has it

@@ -78,7 +78,7 @@ final class GoogleSessionStarter
         // ⚠️ `Verified`, NOT `Registered`, AND ONLY FOR A NEW ACCOUNT. `SendWelcomeEmail` listens here.
         // `Registered` would additionally trigger the framework's own
         // `SendEmailVerificationNotification` — a verification email for an address Google has already
-        // proved — and `JoinTenantOnRegistration`, which joins at `viewer` with no Suspended refusal and
+        // proved — and, until M140, `JoinTenantOnRegistration`, which joins at `viewer` with no Suspended refusal and
         // no Invited-role arm, i.e. a second and weaker implementation of ADR-0016 §D20 running beside the
         // one this flow deliberately reuses. The row is already stamped `email_verified_at`, so this
         // announces a fact rather than establishing one.

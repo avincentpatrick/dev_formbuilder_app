@@ -15,7 +15,7 @@ use App\Models\User;
  *
  * ⚠️ AND THE EVENT IS `Verified`, NEVER `Registered`. The framework registers
  * `SendEmailVerificationNotification` on `Registered` unconditionally, so firing it would email a
- * verification link for an address Google has already proved — and `JoinTenantOnRegistration` would then
+ * verification link for an address Google has already proved — and, until M140, `JoinTenantOnRegistration` would then
  * join the person at `viewer` with no Suspended refusal and no Invited-role arm, i.e. a second and weaker
  * implementation of ADR-0016 §D20 running beside the one this flow deliberately reuses.
  */

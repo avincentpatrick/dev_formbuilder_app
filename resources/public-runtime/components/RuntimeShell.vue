@@ -6,16 +6,12 @@
  */
 import FormHeader from './FormHeader.vue';
 import { useAnnouncer } from '../composables/context';
-import type { GuestReferenceFile } from '../lib/types';
 
 defineProps<{
     title: string;
     description: string | null;
     saving: boolean;
     savedAt: string | null;
-    /** M132 — passed through to the header. */
-    referenceFiles?: GuestReferenceFile[];
-    shareToken?: () => string;
 }>();
 
 const announcer = useAnnouncer();
@@ -29,8 +25,6 @@ const announcer = useAnnouncer();
                 :description="description"
                 :saving="saving"
                 :saved-at="savedAt"
-                :reference-files="referenceFiles"
-                :share-token="shareToken"
             />
             <main class="runtime__main" data-runtime-main tabindex="-1">
                 <slot name="notice" />

@@ -3349,8 +3349,8 @@
         "/public/reference-files/{shareToken}/{file}": {
             "get": {
                 "operationId": "v1.public.reference-files.show",
-                "description": "Served only when the share token's own form version lists the file and it has passed its virus check. An image\nis sent inline; a PDF is sent as a download. Any other request answers the same 404.",
-                "summary": "Read one reference file this shared form shows",
+                "description": "Every request answers 404. Reference files are notes for the people who build the form, not files a respondent\ndownloads.",
+                "summary": "A reference file of a shared form \u2014 no longer served to respondents",
                 "tags": [
                     "GuestContentImage"
                 ],
@@ -3373,25 +3373,6 @@
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": "The file as stored: a PDF (sent as a download) or a PNG, JPEG or WebP image, past its virus check.",
-                        "content": {
-                            "application/pdf": {
-                                "schema": {
-                                    "type": "string",
-                                    "format": "binary",
-                                    "contentMediaType": "application/pdf"
-                                }
-                            },
-                            "image/*": {
-                                "schema": {
-                                    "type": "string",
-                                    "format": "binary",
-                                    "contentMediaType": "image/*"
-                                }
-                            }
-                        }
-                    },
                     "404": {
                         "description": "",
                         "content": {
@@ -4049,41 +4030,13 @@
                                                         "schema": {
                                                             "type": "array",
                                                             "items": {}
-                                                        },
-                                                        "reference_files": {
-                                                            "type": "array",
-                                                            "description": "The files respondents can open while they answer, in the author's order. Only files that have passed\ntheir virus check are listed.",
-                                                            "items": {
-                                                                "type": "object",
-                                                                "properties": {
-                                                                    "id": {
-                                                                        "type": "string"
-                                                                    },
-                                                                    "label": {
-                                                                        "type": "string"
-                                                                    },
-                                                                    "mime_type": {
-                                                                        "type": "string"
-                                                                    },
-                                                                    "size_bytes": {
-                                                                        "type": "integer"
-                                                                    }
-                                                                },
-                                                                "required": [
-                                                                    "id",
-                                                                    "label",
-                                                                    "mime_type",
-                                                                    "size_bytes"
-                                                                ]
-                                                            }
                                                         }
                                                     },
                                                     "required": [
                                                         "id",
                                                         "version_number",
                                                         "checksum",
-                                                        "schema",
-                                                        "reference_files"
+                                                        "schema"
                                                     ]
                                                 }
                                             },

@@ -14,7 +14,9 @@ use App\Services\Submissions\PublicFormPresenter;
 use App\Support\Forms\RedirectTarget;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Spatie\Permission\PermissionRegistrar;
 
 uses(RefreshDatabase::class);
@@ -275,6 +277,48 @@ it('saves each kind of destination with the message, in one audit row', function
     expect($form->redirect_url)->toBeNull()
         ->and($form->redirect_form_id)->toBeNull()
         ->and(confirmationRedirectLatestAudit($form->id)->old_values)->toMatchArray(['redirect_url' => 'https://health.example.org/next']);
+});
+
+it('saves the delay the builder chose with its destination, keeps it when a save names none, and audits it (M138, D91)', function (): void {
+    enterTenant($this->tenant->id, $this->owner->id);
+    expect(Form::findOrFail($this->form->id)->redirect_delay_seconds)->toBe(20);
+
+    confirmationRedirectPatch($this, $this->owner, $this->form, [
+        'confirmation_message' => 'Thanks!',
+        'redirect_kind' => 'url',
+        'redirect_url' => 'https://health.example.org/next',
+        'redirect_delay_seconds' => 5,
+    ])->assertSessionHasNoErrors();
+
+    enterTenant($this->tenant->id, $this->owner->id);
+    $form = Form::findOrFail($this->form->id);
+    expect($form->redirect_delay_seconds)->toBe(5)
+        ->and(confirmationRedirectLatestAudit($form->id)->old_values)->toMatchArray(['redirect_delay_seconds' => 20])
+        ->and(confirmationRedirectLatestAudit($form->id)->new_values)->toMatchArray(['redirect_delay_seconds' => 5]);
+
+    // A destination saved without a delay keeps the stored one; "stay" carries none at all.
+    confirmationRedirectPatch($this, $this->owner, $this->form, ['redirect_kind' => 'url', 'redirect_url' => 'https://health.example.org/other'])
+        ->assertSessionHasNoErrors();
+    confirmationRedirectPatch($this, $this->owner, $this->form, ['redirect_kind' => 'none', 'redirect_delay_seconds' => 30])
+        ->assertSessionHasNoErrors();
+
+    enterTenant($this->tenant->id, $this->owner->id);
+    expect(Form::findOrFail($this->form->id)->redirect_delay_seconds)->toBe(5);
+});
+
+it('refuses a delay outside the four the respondent\'s page is built for, in the request and in the database', function (): void {
+    confirmationRedirectPatch($this, $this->owner, $this->form, ['redirect_kind' => 'url', 'redirect_url' => 'https://health.example.org/next', 'redirect_delay_seconds' => 10])
+        ->assertSessionHasNoErrors();
+
+    foreach ([0, 3, 15, 60, 'soon'] as $delay) {
+        confirmationRedirectPatch($this, $this->owner, $this->form, ['redirect_kind' => 'url', 'redirect_url' => 'https://health.example.org/next', 'redirect_delay_seconds' => $delay])
+            ->assertSessionHasErrors('redirect_delay_seconds');
+    }
+
+    enterTenant($this->tenant->id, $this->owner->id);
+    expect(Form::findOrFail($this->form->id)->redirect_delay_seconds)->toBe(10);
+    expect(fn () => DB::table('forms')->where('id', $this->form->id)->update(['redirect_delay_seconds' => 15]))
+        ->toThrow(QueryException::class, 'forms_redirect_delay_seconds_check');
 });
 
 it('leaves the destination as it is when a save does not mention it, as Reset to default does', function (): void {

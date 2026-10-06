@@ -83,6 +83,8 @@ final class FormSettingsPresenter
             'redirect_form_id' => $form->redirect_form_id,
             'redirect_url' => $form->redirect_url,
             'redirect_targets' => $this->redirectTargets($form, $viewer),
+            // M138 (`R-df7f4b62`, `D91`): how long the thank-you screen waits before the move.
+            'redirect_delay_seconds' => $form->redirect_delay_seconds,
             // M131 (`R-6017d6d8`, `D81`) — the form's preset theme, and every preset as the Theme section and the
             // builder preview draw it. Transmitted from `FormThemePreset`, so no client file holds a colour.
             'theme_preset' => FormThemePreset::fromTheme($form->theme)?->value,

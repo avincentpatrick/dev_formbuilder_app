@@ -71,43 +71,8 @@ final class PublicFormPresenter
                 'version_number' => $version->version_number,
                 'checksum' => $version->checksum,
                 'schema' => $version->schema_snapshot,
-                // The files respondents can open while they answer, in the author's order. Only files that have passed
-                // their virus check are listed.
-                'reference_files' => $this->referenceFiles($version),
             ],
         ];
-    }
-
-    /**
-     * The respondent's list (M132, `R-bf49e4c1`, `D61` = B): what the guest page shows under the form's description,
-     * in the author's order. The read route serves exactly these (`GuestContentImageController::referenceFile()`).
-     *
-     * BESIDE `schema` in the payload, never inside it: the snapshot travels under a checksum every offline client
-     * pins, and the list is already frozen with the version by its own table. Filtered at read time, so a file still
-     * being checked appears once it is ready and one the check refused never does. The comment above the key in
-     * {@see present()} is published as API documentation by Scramble, so the reasoning lives here.
-     *
-     * @return list<array{id: string, label: string, mime_type: string, size_bytes: int}>
-     */
-    private function referenceFiles(FormVersion $version): array
-    {
-        // Through the relation, so this file gains no import: its lines are cited by the defect ledger.
-        $rows = $version->referenceFiles()->with('attachment')->orderBy('position')->orderBy('created_at')->get();
-
-        $files = [];
-        foreach ($rows as $row) {
-            $attachment = $row->attachment;
-            if ($attachment !== null && $attachment->virus_scan_status->servable()) {
-                $files[] = [
-                    'id' => $attachment->id,
-                    'label' => $row->label,
-                    'mime_type' => (string) $attachment->mime_type,
-                    'size_bytes' => (int) $attachment->size_bytes,
-                ];
-            }
-        }
-
-        return $files;
     }
 
     /**

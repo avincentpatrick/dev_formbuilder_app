@@ -278,6 +278,8 @@ export interface BuilderPageProps {
         redirect_form_id: string | null;
         redirect_url: string | null;
         redirect_targets: RedirectTargetOption[];
+        /** M138 (`R-df7f4b62`, `D91`): how long the thank-you screen waits before the move — 5, 10, 20 or 30. */
+        redirect_delay_seconds: number;
         // M131 — the preset theme (FormSettingsForm says the rest); `PreviewPane` paints it on the preview.
         theme_preset: string | null;
         theme_presets: ThemePresetOption[];

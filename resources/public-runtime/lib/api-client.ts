@@ -91,11 +91,15 @@ function toError(response: Response, body: unknown): ApiError {
  * URL, which is plain http on a local stack), with a label to say it by. The server already refuses anything else
  * at the write; this is the second lock on a navigation sink, and anything that fails it means stay.
  */
+/** The delays a form builder may choose (`RedirectTarget::DELAYS`); any other number waits `D76`'s 20 (M138, `D91`). */
+export const REDIRECT_DELAYS: readonly number[] = [5, 10, 20, 30];
+export const DEFAULT_REDIRECT_DELAY = 20;
+
 export function parseRedirect(raw: unknown, origin: string): SubmitRedirect | null {
     if (typeof raw !== 'object' || raw === null) {
         return null;
     }
-    const { url, label } = raw as { url?: unknown; label?: unknown };
+    const { url, label, delay_seconds: delay } = raw as { url?: unknown; label?: unknown; delay_seconds?: unknown };
     if (typeof url !== 'string' || typeof label !== 'string' || label.trim() === '') {
         return null;
     }
@@ -107,7 +111,9 @@ export function parseRedirect(raw: unknown, origin: string): SubmitRedirect | nu
         return null;
     }
 
-    return parsed.protocol === 'https:' || (origin !== '' && parsed.origin === origin) ? { url: parsed.href, label } : null;
+    const delaySeconds = typeof delay === 'number' && REDIRECT_DELAYS.includes(delay) ? delay : DEFAULT_REDIRECT_DELAY;
+
+    return parsed.protocol === 'https:' || (origin !== '' && parsed.origin === origin) ? { url: parsed.href, label, delaySeconds } : null;
 }
 
 export function createApiClient(options: { token: string; slug: string; fetch?: typeof fetch }): ApiClient {

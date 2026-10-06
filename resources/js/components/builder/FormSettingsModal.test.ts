@@ -66,6 +66,7 @@ const form = {
     redirect_form_id: null,
     redirect_url: null,
     redirect_targets: [],
+    redirect_delay_seconds: 20,
     theme_preset: null,
     theme_presets: [],
     default_locale: 'en',
@@ -340,7 +341,7 @@ group('the Reference files section (M132)', () => {
         expect(railLabels(mountWith(undefined))).toContain('Theme');
     });
 
-    it('sits beside Theme whenever the list is sent, an empty one included, and opens with the publish notice first', async () => {
+    it('sits beside Theme whenever the list is sent, an empty one included, and opens with the staff-only notice first', async () => {
         const wrapper = mountWith([]);
 
         expect(railLabels(wrapper)).toEqual([
@@ -349,7 +350,7 @@ group('the Reference files section (M132)', () => {
 
         await railButton(wrapper, 'Reference files').trigger('click');
         const section = wrapper.find('[data-section="files"]');
-        expect(section.find('[data-reference-notice="publish"]').text()).toBe('Respondents see these changes after you publish the form.');
+        expect(section.find('[data-reference-notice="staff-only"]').text()).toBe('Respondents do not see these files. Using a file inside the form itself, as KoboToolbox does, comes later.');
         expect(section.text()).toContain('No reference files yet.');
     });
 });

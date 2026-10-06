@@ -174,37 +174,22 @@ for (const theme of themes) {
     });
 }
 
-// A form's reference files (M132, `R-bf49e4c1`). "Before Your Visit" (E2eSeeder) shows a PDF checklist and a map under
-// its description. The map opens in a dialog from the token-scoped route — and MUST load, for the image-scan reason
-// above — and the PDF is fetched by the page and saved, never navigated to (the worker's scope is `/f/`).
-for (const theme of themes) {
-    test(`Public runtime reference files (${theme}) — accessible & no horizontal overflow`, async ({ page }) => {
-        await page.goto('/f/visit-guide', { waitUntil: 'networkidle' });
-        await page
-            .getByRole('heading', { name: 'Before Your Visit', level: 1 })
-            .waitFor({ state: 'visible', timeout: 15_000 });
-        await forceTheme(page, theme);
+// M138 (`R-10c9e1bc`, `D92` = A) — a form's reference files are NOT shown to respondents. "Before Your Visit" (E2eSeeder)
+// still holds a PDF checklist and a map for staff; neither the schema nor the page carries them (the read route's 404 is
+// pinned by GuestReferenceFileTest). The page itself is scanned above (note content), so this asserts absence only.
+test('Public runtime — a form\'s reference files are not shown to respondents', async ({ page }) => {
+    const schema = page.waitForResponse((response) => response.url().includes('/api/v1/public/f/') && response.request().method() === 'GET');
+    await page.goto('/f/visit-guide', { waitUntil: 'networkidle' });
+    await page
+        .getByRole('heading', { name: 'Before Your Visit', level: 1 })
+        .waitFor({ state: 'visible', timeout: 15_000 });
 
-        const files = page.getByRole('list', { name: 'Reference files' });
-        await expect(files.getByRole('button')).toHaveCount(2);
-        await expect(files.getByRole('button', { name: /Visit checklist\.pdf/ })).toContainText('PDF');
-        await assertClean(page, 'Before Your Visit (reference files)');
-
-        await files.getByRole('button', { name: /Clinic map\.png/ }).click();
-        const dialog = page.getByRole('dialog', { name: 'Clinic map.png' });
-        const map = dialog.getByRole('img', { name: 'Clinic map.png' });
-        await expect.poll(() => map.evaluate((img: HTMLImageElement) => (img.complete ? img.naturalWidth : 0))).toBe(240);
-        await assertClean(page, 'Before Your Visit (reference file dialog)');
-        // Escape, not a name: the dialog has two buttons named Close (its own and the actions one).
-        await page.keyboard.press('Escape');
-        await expect(dialog).toBeHidden();
-
-        const download = page.waitForEvent('download');
-        await files.getByRole('button', { name: /Visit checklist\.pdf/ }).click();
-        expect((await download).suggestedFilename()).toBe('Visit checklist.pdf');
-        await expect(page).toHaveURL(/\/f\/visit-guide$/);
-    });
-}
+    await expect(page.getByRole('list', { name: 'Reference files' })).toHaveCount(0);
+    await expect(page.locator('[data-reference-files]')).toHaveCount(0);
+    const body = (await (await schema).json()) as { data?: { version?: Record<string, unknown> } };
+    expect(body.data?.version).toBeDefined();
+    expect(body.data?.version).not.toHaveProperty('reference_files');
+});
 // A question that takes its choices from another form (M133, `R-5da4a30f`). "Field Visit Referral" (E2eSeeder) offers the
 // districts "Programme Uptake" responses name, read beside the schema (`D60` = A): distinct, sorted, the empty answer
 // left out. A district is chosen first, so the scan covers the control with a value in it.

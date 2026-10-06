@@ -677,9 +677,9 @@ class E2eSeeder extends Seeder
                 );
             }
 
-            // M132 (`R-bf49e4c1`) — "Before Your Visit" shows two reference files, a PDF checklist and a map, so
-            // `public-runtime-axe.spec.ts` can scan the list and the image dialog and `public-runtime-offline.spec.ts`
-            // can reopen the map offline once opened (`D84`). Converged like the redirect above: a database whose
+            // M132 (`R-bf49e4c1`) — "Before Your Visit" holds two reference files, a PDF checklist and a map. Since M138
+            // (`D92`) respondents are not shown them, and `public-runtime-axe.spec.ts` asserts the guest page lists neither
+            // while the version still holds both. Converged like the redirect above: a database whose
             // published version shows none gets them through the real write path, and one publish freezes them. A
             // second run finds them on the published version and does nothing.
             $guideForm = Form::query()->where('title', 'Before Your Visit')->first();

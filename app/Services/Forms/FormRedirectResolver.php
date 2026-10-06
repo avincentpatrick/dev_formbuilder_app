@@ -22,7 +22,10 @@ use App\Support\Tenancy\TenantUrl;
 final class FormRedirectResolver
 {
     /**
-     * @return array{url: string, label: string}|null
+     * `delay_seconds` (M138, `R-df7f4b62`, `D91`) is how long the thank-you screen waits before the move — one of
+     * `RedirectTarget::DELAYS`, which the respondent's page also checks.
+     *
+     * @return array{url: string, label: string, delay_seconds: int}|null
      */
     public function resolve(Form $form): ?array
     {
@@ -39,6 +42,7 @@ final class FormRedirectResolver
             return [
                 'url' => TenantUrl::toPublic($tenant, 'f/'.$target->public_slug),
                 'label' => $target->title,
+                'delay_seconds' => $form->redirect_delay_seconds,
             ];
         }
 
@@ -46,6 +50,7 @@ final class FormRedirectResolver
             return [
                 'url' => $form->redirect_url,
                 'label' => (string) parse_url($form->redirect_url, PHP_URL_HOST),
+                'delay_seconds' => $form->redirect_delay_seconds,
             ];
         }
 

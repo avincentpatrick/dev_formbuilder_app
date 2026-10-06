@@ -64,6 +64,8 @@ final class UpdateConfirmationMessageRequest extends FormRequest
             'redirect_kind' => ['sometimes', 'string', Rule::in(['none', 'form', 'url'])],
             'redirect_form_id' => ['exclude_unless:redirect_kind,form', 'required', 'string', 'uuid', $this->anotherFormTheAuthorMayOpen()],
             'redirect_url' => ['exclude_unless:redirect_kind,url', 'required', 'string', 'max:'.RedirectUrl::MAX_LENGTH, new RedirectUrl],
+            // M138 (`R-df7f4b62`, `D91`): only beside a destination; absent keeps the stored delay.
+            'redirect_delay_seconds' => ['exclude_unless:redirect_kind,form,url', 'sometimes', 'integer', Rule::in(RedirectTarget::DELAYS)],
         ];
     }
 
@@ -74,11 +76,19 @@ final class UpdateConfirmationMessageRequest extends FormRequest
     public function redirectTarget(): ?RedirectTarget
     {
         return match ($this->validated('redirect_kind')) {
-            'form' => RedirectTarget::form((string) $this->validated('redirect_form_id')),
-            'url' => RedirectTarget::url((string) $this->validated('redirect_url')),
+            'form' => RedirectTarget::form((string) $this->validated('redirect_form_id'), $this->delaySeconds()),
+            'url' => RedirectTarget::url((string) $this->validated('redirect_url'), $this->delaySeconds()),
             'none' => RedirectTarget::none(),
             default => null,
         };
+    }
+
+    /** The delay this save asks for, or null to keep the stored one. */
+    private function delaySeconds(): ?int
+    {
+        $delay = $this->validated('redirect_delay_seconds');
+
+        return is_int($delay) || is_string($delay) ? (int) $delay : null;
     }
 
     /**

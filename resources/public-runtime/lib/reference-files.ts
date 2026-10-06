@@ -1,6 +1,7 @@
 /**
- * A form's reference files on the guest page (M132, `R-bf49e4c1`) — where they are read from, and the key the service
- * worker caches each under once it has been opened (`D84`: offline once opened; nothing is fetched in advance).
+ * A form's reference files on the guest route (M132, `R-bf49e4c1`) — where they are read from, and the key the service
+ * worker caches each under (`D84`). ⚠️ Since M138 (`D92` = A) the page lists and fetches none and the route refuses every
+ * file; the URL and key stay because the route and the worker's cache route stay, for the Kobo-style rebuild.
  *
  * ⚠️ ONE MODULE FOR BOTH SIDES, `content-images.ts`'s precedent: `sw.ts` stores each file under a key and the page
  * asks for the same URL, so the key is computed in one place. It imports nothing that touches the DOM, because
@@ -41,13 +42,4 @@ export function referenceFileCacheKey(absoluteUrl: string): string {
     }
 
     return `${url.origin}${REFERENCE_FILE_PREFIX}${segments[1]}`;
-}
-
-/** "Visit guide.pdf" — the name a saved PDF is given: the author's label, with the extension it needs. */
-export function referenceFileDownloadName(label: string, mimeType: string): string {
-    const name = label.trim() === '' ? 'Reference file' : label.trim();
-    if (mimeType === 'application/pdf' && !name.toLowerCase().endsWith('.pdf')) {
-        return `${name}.pdf`;
-    }
-    return name;
 }

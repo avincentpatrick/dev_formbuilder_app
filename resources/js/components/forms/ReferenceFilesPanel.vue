@@ -1,14 +1,14 @@
 <script setup lang="ts">
 /**
- * The Reference files settings section (M132, `R-bf49e4c1`): the PDFs and images a form shows its respondents to read
- * while they answer — a guide, a consent form, a map. Kept on the DRAFT and frozen into each published version
- * (`D61` = B), so a change here reaches respondents only when the form is published, and the section says so first.
+ * The Reference files settings section (M132, `R-bf49e4c1`): PDFs and images kept with a form for the people who build
+ * and run it — a guide, a consent form, a map. Since M138 (`D92` = A) respondents are not shown them, and the section
+ * says so first; `D92` rebuilds attached files Kobo-style, used inside the form. Frozen per version (`D61` = B).
  *
  * Its requests are `reference-files.ts`'s — JSON `fetch`, not Inertia visits, because the section is mounted in the
  * builder too, which never makes one, and an upload is multipart. The list it holds is the server's answer to the
  * last request, never a local guess.
  *
- * ⚠️ A NEW FILE IS "CHECKING" UNTIL ITS VIRUS CHECK HAS RUN, and respondents are not shown it until then. The list is
+ * ⚠️ A NEW FILE IS "CHECKING" UNTIL ITS VIRUS CHECK HAS RUN, and it cannot be opened until then. The list is
  * read again every few seconds while any file is checking, a bounded number of times, the content-image editor's
  * retry; after the last try the section says what is happening instead of polling for ever.
  */
@@ -137,7 +137,7 @@ async function remove(file: ReferenceFileRow): Promise<void> {
     try {
         await removeReferenceFile(props.formId, file.id);
         files.value = files.value.filter((existing) => existing.id !== file.id);
-        status.value = `Removed ${file.label}. Respondents keep seeing it until you publish.`;
+        status.value = `Removed ${file.label}.`;
     } catch (thrown) {
         actionError.value = thrown instanceof Error ? thrown.message : 'The file was not removed.';
     }
@@ -149,19 +149,19 @@ function scanNote(file: ReferenceFileRow): string | null {
             ? 'Still being checked for viruses. Reopen these settings in a minute.'
             : 'Checking this file for viruses…';
     }
-    return file.scan === 'refused' ? 'The virus check refused this file. Respondents will not see it; remove it.' : null;
+    return file.scan === 'refused' ? 'The virus check refused this file. It cannot be opened; remove it.' : null;
 }
 </script>
 
 <template>
     <div class="reference-files">
         <p class="reference-files__prose">
-            Files respondents can open while they fill in the form, such as a guide, a consent form or a map. They are
-            listed under the form's description on every page.
+            Files kept with this form for the people who build and run it, such as a guide, a consent form or a map.
+            They open from this list.
         </p>
-        <!-- First, because it is the one fact about this section that surprises: the list is frozen per version. -->
-        <p class="reference-files__notice" data-reference-notice="publish">
-            Respondents see these changes after you publish the form.
+        <!-- First, because it is the one fact about this section that surprises: respondents never see these (D92). -->
+        <p class="reference-files__notice" data-reference-notice="staff-only">
+            Respondents do not see these files. Using a file inside the form itself, as KoboToolbox does, comes later.
         </p>
 
         <ul v-if="files.length > 0" class="reference-files__list" aria-label="Reference files">
@@ -170,7 +170,7 @@ function scanNote(file: ReferenceFileRow): string | null {
                     <template v-if="editing === file.id">
                         <MdsFormField
                             v-slot="{ id, describedby, invalid }"
-                            label="Name respondents see"
+                            label="File name"
                             :error="renameError ?? undefined"
                         >
                             <MdsTextInput

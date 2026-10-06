@@ -57,6 +57,8 @@ export interface FormSettingsForm {
     redirect_form_id: string | null;
     redirect_url: string | null;
     redirect_targets: RedirectTargetOption[];
+    /** M138 (`R-df7f4b62`, `D91`): how long the thank-you screen waits before the move — 5, 10, 20 or 30. */
+    redirect_delay_seconds: number;
     // M131 (`R-6017d6d8`, `D65`, `D81`) — the form's preset theme (null = the workspace brand), and every preset.
     theme_preset: string | null;
     theme_presets: ThemePresetOption[];

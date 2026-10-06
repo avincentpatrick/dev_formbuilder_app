@@ -52,6 +52,8 @@ const props = defineProps<{
         redirect_form_id: string | null;
         redirect_url: string | null;
         redirect_targets: RedirectTargetOption[];
+        /** M138 (`R-df7f4b62`, `D91`): how long the thank-you screen waits before the move. */
+        redirect_delay_seconds: number;
         default_locale: string;
         supported_locales: string[];
     };
@@ -63,12 +65,14 @@ const form = useForm<{
     redirect_kind: RedirectKind;
     redirect_form_id: string;
     redirect_url: string;
+    redirect_delay_seconds: string;
 }>({
     confirmation_message: '',
     confirmation_message_translations: {},
     redirect_kind: 'none',
     redirect_form_id: '',
     redirect_url: '',
+    redirect_delay_seconds: '20',
 });
 
 const REDIRECT_KINDS: ReadonlyArray<{ value: RedirectKind; label: string }> = [
@@ -76,6 +80,19 @@ const REDIRECT_KINDS: ReadonlyArray<{ value: RedirectKind; label: string }> = [
     { value: 'form', label: 'Go to another form' },
     { value: 'url', label: 'Go to a web address' },
 ];
+// M138 (`R-df7f4b62`, `D91` amending `D76`): the four delays the respondent's page is built for. 20 is `D76`'s figure —
+// the time WCAG 2.2.1 gives a person to stop a move — so a shorter one says what it costs.
+const DELAY_OPTIONS = [
+    { value: '5', label: '5 seconds' },
+    { value: '10', label: '10 seconds' },
+    { value: '20', label: '20 seconds (recommended)' },
+    { value: '30', label: '30 seconds' },
+];
+const delayHelp = computed(() =>
+    Number(form.redirect_delay_seconds) < 20
+        ? 'Shorter than 20 seconds gives respondents less time than the accessibility guideline (WCAG 2.2.1) asks for to read the thank-you and choose to stay.'
+        : 'Respondents can also go on at once, or choose to stay.',
+);
 const kindName = useId();
 const kindHelpId = useId();
 
@@ -124,6 +141,7 @@ watch(
         form.redirect_kind = props.form.redirect_kind;
         form.redirect_form_id = props.form.redirect_form_id ?? '';
         form.redirect_url = props.form.redirect_url ?? '';
+        form.redirect_delay_seconds = String(props.form.redirect_delay_seconds ?? 20);
         form.confirmation_message_translations = Object.fromEntries(
             variantLocales.value.map((locale) => [locale, props.form.confirmation_message_translations[locale] ?? '']),
         );
@@ -169,6 +187,7 @@ function submit(clear: boolean): void {
                 redirect_kind: data.redirect_kind,
                 ...(data.redirect_kind === 'form' ? { redirect_form_id: data.redirect_form_id } : {}),
                 ...(data.redirect_kind === 'url' ? { redirect_url: data.redirect_url } : {}),
+                ...(data.redirect_kind !== 'none' ? { redirect_delay_seconds: Number(data.redirect_delay_seconds) } : {}),
             };
         })
         .patch(`/forms/${props.formId}/confirmation`, {
@@ -223,8 +242,8 @@ function submit(clear: boolean): void {
         <fieldset class="confirmation__next" :aria-describedby="kindHelpId" data-redirect-settings>
             <legend class="confirmation__legend">After the thank-you screen</legend>
             <p :id="kindHelpId" class="confirmation__help">
-                Respondents see the thank-you first, then go on after 20 seconds unless they choose to stay. A response
-                saved on a device while offline never moves, and an embedded form only offers the link.
+                Respondents see the thank-you first, then go on after the wait you choose unless they choose to stay. A
+                response saved on a device while offline never moves, and an embedded form only offers the link.
             </p>
             <div class="confirmation__kinds">
                 <MdsRadio
@@ -267,6 +286,22 @@ function submit(clear: boolean): void {
                     placeholder="https://"
                     :describedby="describedby"
                     :invalid="invalid"
+                />
+            </MdsFormField>
+            <MdsFormField
+                v-if="form.redirect_kind !== 'none' && !keptUnseen"
+                v-slot="{ id, describedby, invalid }"
+                label="Wait before moving on"
+                :help="delayHelp"
+                :error="form.errors.redirect_delay_seconds"
+            >
+                <MdsSelect
+                    :id="id"
+                    v-model="form.redirect_delay_seconds"
+                    :options="DELAY_OPTIONS"
+                    :describedby="describedby"
+                    :invalid="invalid"
+                    data-redirect-delay
                 />
             </MdsFormField>
         </fieldset>

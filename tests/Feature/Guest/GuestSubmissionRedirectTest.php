@@ -72,7 +72,15 @@ it('sends a typed web address as given, named by its host', function (): void {
 
     submitRedirectPost($this, $this->form)
         ->assertCreated()
-        ->assertJsonPath('data.redirect', ['url' => 'https://health.example.org/next?from=intake', 'label' => 'health.example.org']);
+        ->assertJsonPath('data.redirect', ['url' => 'https://health.example.org/next?from=intake', 'label' => 'health.example.org', 'delay_seconds' => 20]);
+});
+
+it('tells the respondent\'s page how long to wait, as the builder chose it (M138, D91)', function (): void {
+    app(FormService::class)->setConfirmationMessage($this->form, null, null, RedirectTarget::url('https://health.example.org/next', 10), $this->owner);
+
+    submitRedirectPost($this, $this->form)
+        ->assertCreated()
+        ->assertJsonPath('data.redirect.delay_seconds', 10);
 });
 
 it('answers the same destination when the device replays a response the server already has', function (): void {

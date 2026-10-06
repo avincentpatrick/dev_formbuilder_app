@@ -113,6 +113,8 @@ it('keeps the builder\'s form block in the order and with the keys it always had
         'timezone', 'max_responses', 'confirmation_message', 'confirmation_message_translations',
         // M130 (`D76`) — the after-submit destination, with the Thank-you section it is saved from.
         'redirect_kind', 'redirect_form_id', 'redirect_url', 'redirect_targets',
+        // M138 (`R-df7f4b62`, `D91`) — how long the thank-you screen waits before the move.
+        'redirect_delay_seconds',
         // M131 (`R-6017d6d8`) — the preset theme and the transmitted catalogue, for the Theme section and the preview.
         'theme_preset', 'theme_presets',
         'default_locale', 'supported_locales',

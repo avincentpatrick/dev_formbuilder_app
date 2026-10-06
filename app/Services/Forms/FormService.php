@@ -520,6 +520,13 @@ final class FormService
                 $old += ['redirect_form_id' => $form->redirect_form_id, 'redirect_url' => $form->redirect_url];
                 $new += ['redirect_form_id' => $redirect->formId, 'redirect_url' => $redirect->url];
                 $fill += ['redirect_form_id' => $redirect->formId, 'redirect_url' => $redirect->url];
+
+                // M138 (`R-df7f4b62`, `D91`): a destination may carry its delay; null keeps the stored one.
+                if ($redirect->delaySeconds !== null) {
+                    $old += ['redirect_delay_seconds' => $form->redirect_delay_seconds];
+                    $new += ['redirect_delay_seconds' => $redirect->delaySeconds];
+                    $fill += ['redirect_delay_seconds' => $redirect->delaySeconds];
+                }
             }
 
             $form->forceFill($fill)->save();

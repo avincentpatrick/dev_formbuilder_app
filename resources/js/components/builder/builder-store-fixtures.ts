@@ -173,6 +173,7 @@ export function pageProps(overrides: Partial<BuilderPageProps> = {}): BuilderPag
             redirect_form_id: null,
             redirect_url: null,
             redirect_targets: [],
+            redirect_delay_seconds: 20,
             theme_preset: null,
             theme_presets: [],
             default_locale: 'en',

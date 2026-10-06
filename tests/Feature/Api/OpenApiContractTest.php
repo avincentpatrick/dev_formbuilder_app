@@ -505,12 +505,13 @@ it('documents a note image as image bytes, never as the JSON object Scramble inf
         ->and($ok['content']['image/*']['schema']['format'])->toBe('binary');
 });
 
-it('documents a reference file as PDF or image bytes, never as a JSON object (M132)', function (): void {
+it('documents the reference-file read as refusing every request, and serving none (M138, D92)', function (): void {
     /** @var array<string, mixed> $spec */
     $spec = json_decode((string) file_get_contents(base_path('openapi.json')), true, flags: JSON_THROW_ON_ERROR);
-    $ok = $spec['paths']['/public/reference-files/{shareToken}/{file}']['get']['responses']['200'];
+    $responses = $spec['paths']['/public/reference-files/{shareToken}/{file}']['get']['responses'];
 
-    expect(array_keys($ok['content']))->toBe(['application/pdf', 'image/*'])
-        ->and($ok['content']['application/pdf']['schema']['format'])->toBe('binary')
-        ->and($ok['content']['image/*']['schema']['format'])->toBe('binary');
+    // PHP reads the JSON key as the integer 404.
+    expect(array_keys($responses))->toBe([404])
+        // Notes kept outside what Scramble publishes: the description is the docblock's, never the method's comments.
+        ->and($spec['paths']['/public/reference-files/{shareToken}/{file}']['get']['description'])->not->toContain('AppServiceProvider');
 });

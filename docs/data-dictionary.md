@@ -1401,6 +1401,7 @@ A form's automations (M132, `R-b7bc5149`): "when a response is submitted, do thi
 | `url` | `varchar(2048)` | Yes | `NULL` | No | Web address only: where the answers go. Must be public (`PublicHttpUrl`), and is checked again before every send (`OutboundUrlGuard`). Shown whole only to holders of `webhooks.manage`; anyone else sees its host. |
 | `secret` | `text` (encrypted cast) | Yes | `NULL` | No | Web address only: the HMAC signing secret (`whsec_…`), shown to the author once at creation and never again. Withheld from the tenant extract; never in an audit row. |
 | `enabled` | `boolean` | No | `true` | No | Whether it fires. A run queued before it was switched off is recorded `skipped`. |
+| `condition` | `text` | Yes | `NULL` | Possibly | M142 (`D93` = A step 1): the condition a response must match for the automation to run, in the form's own condition grammar (`${age} > 60`), checked on save against the published version's questions (or the draft's, before the first publish). Null is every response. A response that does not match records a `skipped` run (`condition_not_met`). Its values can echo a respondent's words, so the audit records only `has_condition`. |
 | `created_by` | `uuid` | Yes | `NULL` | No | Who added it. FK to `users.id`, `ON DELETE SET NULL`. |
 | `created_at` / `updated_at` | `timestamptz` | No | set by Eloquent | No | — |
 
@@ -1427,7 +1428,7 @@ One automation's run for one response (M132, `R-b7bc5149`): the ledger the Autom
 | `status` | `varchar(20)` — PHP enum: `FormAutomationRunStatus` | No | `'pending'` | No | `pending`, `retrying`, `succeeded`, `failed` or `skipped`. Pinned by `form_automation_runs_status_check`. |
 | `attempt_count` | `smallint` | No | `0` | No | Attempts made. A web address is tried at most five times on the shared retry ladder (1, 5, 30 and 120 minutes apart). |
 | `response_status` | `smallint` | Yes | `NULL` | No | The web address's HTTP status on the last attempt. |
-| `error_code` | `varchar(40)` | Yes | `NULL` | No | Why the last attempt did not succeed: `http_<status>`, `transport_error`, `blocked_url`, `quota_exceeded`, `plan_feature`, `submission_missing` or `disabled`. Never a response body. |
+| `error_code` | `varchar(40)` | Yes | `NULL` | No | Why the last attempt did not succeed: `http_<status>`, `transport_error`, `blocked_url`, `quota_exceeded`, `plan_feature`, `submission_missing`, `disabled`, or (M142, with `skipped`) `condition_not_met` / `condition_error` — the response did not match the automation's condition, or the condition could not be read for it. Never a response body. |
 | `last_attempted_at` | `timestamptz` | Yes | `NULL` | No | When it was last attempted. |
 | `created_at` / `updated_at` | `timestamptz` | No | set by Eloquent | No | — |
 

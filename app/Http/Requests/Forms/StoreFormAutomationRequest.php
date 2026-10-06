@@ -39,6 +39,8 @@ final class StoreFormAutomationRequest extends FormRequest
             'recipients' => ['required_if:action,email', 'prohibited_unless:action,email', 'array', 'min:1', 'max:5'],
             'recipients.*' => ['required', 'string', 'max:255', 'email:rfc', 'distinct:ignore_case'],
             'url' => ['required_if:action,webhook', 'prohibited_unless:action,webhook', 'string', 'max:2048', new PublicHttpUrl],
+            // M142 — the response must match it to run; checked against the form's questions by the service.
+            'condition' => ['sometimes', 'nullable', 'string', 'max:2000'],
         ];
     }
 
@@ -83,5 +85,13 @@ final class StoreFormAutomationRequest extends FormRequest
         $url = $this->validated('url');
 
         return is_string($url) ? trim($url) : null;
+    }
+
+    /** The condition the response must match (M142), or null for every response. */
+    public function automationCondition(): ?string
+    {
+        $condition = $this->validated('condition');
+
+        return is_string($condition) ? $condition : null;
     }
 }

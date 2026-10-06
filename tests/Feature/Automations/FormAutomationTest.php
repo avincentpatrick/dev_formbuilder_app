@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\FieldType;
 use App\Enums\FormAutomationAction;
 use App\Enums\PlanTier;
 use App\Enums\ResourceCapacity;
@@ -266,4 +267,72 @@ it('gates every route on editing the form, the changes on the policy, and the te
 it('names a web-address automation’s action for what it sends', function (): void {
     expect(FormAutomationAction::Webhook->label())->toBe('Send to a web address')
         ->and(FormAutomationService::MAX_PER_FORM)->toBe(10);
+});
+
+/*
+|--------------------------------------------------------------------------
+| M142 (`R-b65bafca`'s Filter, `D93` = A step 1) — a condition on each automation, checked on save.
+|--------------------------------------------------------------------------
+*/
+
+it('saves a condition naming the form’s questions, shows it on the row, and clears it with null (M142)', function (): void {
+    addFormField($this->form->draftVersion, $this->owner, 'age', FieldType::Integer, 1);
+
+    $response = $this->actingAs($this->owner)
+        ->postJson(automationUrl($this->form), automationEmail(['condition' => '  ${age} > 60 ']))
+        ->assertCreated();
+    $id = (string) $response->json('data.id');
+
+    expect($response->json('data.condition'))->toBe('${age} > 60');
+
+    $this->actingAs($this->owner)->patchJson(automationUrl($this->form, $id), ['condition' => null])
+        ->assertOk()->assertJsonPath('data.condition', null);
+
+    enterTenant($this->tenant->id, $this->owner->id);
+    expect(FormAutomation::query()->sole()->condition)->toBeNull();
+});
+
+it('refuses a condition that names a question the form does not have, or does not parse, with the reason (M142)', function (): void {
+    addFormField($this->form->draftVersion, $this->owner, 'age', FieldType::Integer, 1);
+
+    // The positive control: the same request with a condition the form can answer is accepted.
+    $this->actingAs($this->owner)->postJson(automationUrl($this->form), automationEmail(['condition' => '${age} > 60']))->assertCreated();
+
+    $this->actingAs($this->owner)->postJson(automationUrl($this->form), automationEmail(['condition' => '${weight} > 60']))
+        ->assertUnprocessable()
+        ->assertJsonPath('errors.condition.0', 'This condition can’t be used: Expression references an unknown field “weight”.');
+
+    $this->actingAs($this->owner)->postJson(automationUrl($this->form), automationEmail(['condition' => '${age} >']))
+        ->assertUnprocessable()->assertJsonValidationErrors('condition');
+
+    enterTenant($this->tenant->id, $this->owner->id);
+    expect(FormAutomation::query()->count())->toBe(1);
+});
+
+it('offers the form’s answerable questions to the condition editor, with their choices (M142)', function (): void {
+    addFormField($this->form->draftVersion, $this->owner, 'age', FieldType::Integer, 1);
+    addFormField($this->form->draftVersion, $this->owner, 'sex', FieldType::Dropdown, 2, ['config' => ['options' => [
+        ['value' => 'f', 'label' => 'Female'], ['value' => 'm', 'label' => 'Male'],
+    ]]]);
+    addFormField($this->form->draftVersion, $this->owner, 'consent_note', FieldType::Note, 3);
+
+    $catalogue = app(FormAutomationPresenter::class)->forForm($this->form->refresh(), $this->owner)['catalogue'];
+
+    expect(collect($catalogue['fields'])->pluck('key')->all())->toBe(['age', 'sex'])
+        ->and($catalogue['fields'][0]['numeric'])->toBeTrue()
+        ->and($catalogue['fields'][1]['options'])->toBe([['value' => 'f', 'label' => 'Female'], ['value' => 'm', 'label' => 'Male']]);
+});
+
+it('audits whether an automation has a condition, never the condition itself (M142)', function (): void {
+    addFormField($this->form->draftVersion, $this->owner, 'full_name', FieldType::ShortText, 1);
+
+    $this->actingAs($this->owner)
+        ->postJson(automationUrl($this->form), automationEmail(['condition' => '${full_name} = \'Ada Lovelace\'']))
+        ->assertCreated();
+
+    enterTenant($this->tenant->id, $this->owner->id);
+    $audit = Audit::query()->where('auditable_type', 'form_automation')->sole();
+
+    expect($audit->new_values['has_condition'])->toBeTrue()
+        ->and(str_contains((string) json_encode($audit->new_values), 'Ada Lovelace'))->toBeFalse();
 });

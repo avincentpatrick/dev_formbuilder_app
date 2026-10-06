@@ -30,6 +30,8 @@ final class UpdateFormAutomationRequest extends FormRequest
             'recipients' => ['sometimes', 'array', 'min:1', 'max:5'],
             'recipients.*' => ['required', 'string', 'max:255', 'email:rfc', 'distinct:ignore_case'],
             'url' => ['sometimes', 'string', 'max:2048', new PublicHttpUrl],
+            // M142 — null clears it: the automation runs for every response again.
+            'condition' => ['sometimes', 'nullable', 'string', 'max:2000'],
         ];
     }
 
@@ -50,7 +52,7 @@ final class UpdateFormAutomationRequest extends FormRequest
     /**
      * Only what was sent, so a toggle never rewrites the addresses.
      *
-     * @return array{name?: string, enabled?: bool, recipients?: list<string>, url?: string}
+     * @return array{name?: string, enabled?: bool, recipients?: list<string>, url?: string, condition?: string|null}
      */
     public function changes(): array
     {
@@ -68,6 +70,9 @@ final class UpdateFormAutomationRequest extends FormRequest
         }
         if (array_key_exists('url', $validated)) {
             $changes['url'] = trim((string) $validated['url']);
+        }
+        if (array_key_exists('condition', $validated)) {
+            $changes['condition'] = is_string($validated['condition']) ? $validated['condition'] : null;
         }
 
         return $changes;

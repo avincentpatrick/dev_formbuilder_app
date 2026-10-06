@@ -40,17 +40,20 @@ final class FormAutomationService
     /** The most automations one form may have — a list, not a programme. The settings section reads it. */
     public const int MAX_PER_FORM = 10;
 
-    public function __construct(private readonly AuditLogger $audit) {}
+    public function __construct(
+        private readonly AuditLogger $audit,
+        private readonly AutomationCondition $conditions,
+    ) {}
 
     /**
      * @param  list<string>|null  $recipients
      * @return array{0: FormAutomation, 1: string|null} the automation, and the secret to show once (web address only)
      *
-     * @throws ValidationException when the form already has the most automations it may
+     * @throws ValidationException when the form already has the most automations it may, or the condition (M142) cannot be used
      */
-    public function create(Form $form, string $name, FormAutomationAction $action, ?array $recipients, ?string $url, User $actor): array
+    public function create(Form $form, string $name, FormAutomationAction $action, ?array $recipients, ?string $url, User $actor, ?string $condition = null): array
     {
-        return DB::transaction(function () use ($form, $name, $action, $recipients, $url, $actor): array {
+        return DB::transaction(function () use ($form, $name, $action, $recipients, $url, $actor, $condition): array {
             // The form row lock serializes two tabs adding the tenth and the eleventh at once.
             $locked = Form::query()->whereKey($form->id)->lockForUpdate()->firstOrFail();
             $max = self::MAX_PER_FORM;
@@ -70,6 +73,7 @@ final class FormAutomationService
                 'recipients' => $action === FormAutomationAction::Email ? $recipients : null,
                 'url' => $action === FormAutomationAction::Webhook ? $url : null,
                 'enabled' => true,
+                'condition' => $this->conditions->normalize($locked, $condition),
             ]);
             $automation->forceFill([
                 'form_id' => $locked->id,
@@ -84,10 +88,10 @@ final class FormAutomationService
     }
 
     /**
-     * Change an automation's name, its on/off state, its recipients (email) or its address (web address). The action
-     * itself never changes: that is a different automation.
+     * Change an automation's name, its on/off state, its condition (M142), its recipients (email) or its address (web
+     * address). The action itself never changes: that is a different automation.
      *
-     * @param  array{name?: string, enabled?: bool, recipients?: list<string>, url?: string}  $changes
+     * @param  array{name?: string, enabled?: bool, recipients?: list<string>, url?: string, condition?: string|null}  $changes
      */
     public function update(FormAutomation $automation, array $changes, User $actor): FormAutomation
     {
@@ -95,6 +99,10 @@ final class FormAutomationService
             $old = $this->auditValues($automation);
 
             $fill = array_intersect_key($changes, array_flip(['name', 'enabled']));
+            // M142 — named here, because this whitelist silently drops any key it does not name.
+            if (array_key_exists('condition', $changes)) {
+                $fill['condition'] = $this->conditions->normalize($automation->form()->firstOrFail(), $changes['condition']);
+            }
             if ($automation->action === FormAutomationAction::Email && array_key_exists('recipients', $changes)) {
                 $fill['recipients'] = $changes['recipients'];
             }
@@ -183,6 +191,8 @@ final class FormAutomationService
             'enabled' => $automation->enabled,
             'recipients' => $automation->recipients,
             'host' => $automation->host(),
+            // M142 — whether there is one, never its text: a condition's values can echo a respondent's own words.
+            'has_condition' => $automation->condition !== null,
         ];
     }
 

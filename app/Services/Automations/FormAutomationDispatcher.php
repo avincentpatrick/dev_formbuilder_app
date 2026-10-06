@@ -8,10 +8,12 @@ use App\Enums\FormAutomationAction;
 use App\Enums\FormAutomationRunStatus;
 use App\Enums\FormAutomationTrigger;
 use App\Events\SubmissionCreated;
+use App\Exceptions\Expressions\ExpressionException;
 use App\Jobs\Automations\DeliverFormAutomationWebhookJob;
 use App\Jobs\Automations\SendFormAutomationEmailJob;
 use App\Models\FormAutomation;
 use App\Models\FormAutomationRun;
+use App\Models\SubmissionAnswer;
 use App\Services\Entitlements\EntitlementService;
 use App\Services\Webhooks\WebhookEventDispatcher;
 use App\Support\Entitlements\FeatureAdmission;
@@ -32,10 +34,21 @@ use App\Support\Tenancy\TenantContext;
  *
  * A web-address automation on a plan that no longer includes webhooks is recorded `skipped` rather than sent, so the
  * section shows why nothing arrived; the check is {@see FeatureAdmission}'s, the predicate the routes use.
+ *
+ * ── A CONDITION IS CHECKED HERE, PER AUTOMATION (M142, `D93` = A step 1) ────────────────────────────────────
+ * An automation with a condition runs only for a response that matches it; one that does not is recorded `skipped` with
+ * `condition_not_met`, so the runs list says why nothing was sent ({@see AutomationCondition}). ⛔ Every automation of an
+ * event shares ONE transaction (`TenantContext::runFor`), so a condition that cannot be read is caught HERE, around the
+ * evaluator alone, and recorded `condition_error`: thrown, it would roll back every other automation's run with it, and
+ * the listener would swallow the throw. A database error is not caught, deliberately — Postgres refuses every later
+ * statement of a transaction that failed, so recording it would fail too.
  */
 final class FormAutomationDispatcher
 {
-    public function __construct(private readonly EntitlementService $entitlements) {}
+    public function __construct(
+        private readonly EntitlementService $entitlements,
+        private readonly AutomationCondition $conditions,
+    ) {}
 
     public function dispatchFor(SubmissionCreated $event): void
     {
@@ -47,6 +60,9 @@ final class FormAutomationDispatcher
                 ->orderBy('created_at')
                 ->get();
 
+            /** @var array<string, mixed>|null $answers the response's stored answers, read once if any condition asks */
+            $answers = null;
+
             foreach ($automations as $automation) {
                 $run = FormAutomationRun::query()->firstOrCreate(
                     ['form_automation_id' => $automation->id, 'event_id' => $event->eventId],
@@ -55,6 +71,24 @@ final class FormAutomationDispatcher
 
                 if (! $run->wasRecentlyCreated) {
                     continue;
+                }
+
+                if ($automation->condition !== null) {
+                    $answers ??= (array) (SubmissionAnswer::query()->find($event->submissionId)->answers ?? []);
+
+                    $skip = null;
+                    try {
+                        $skip = $this->conditions->matches($automation->condition, $answers, $event->submittedAt) ? null : 'condition_not_met';
+                    } catch (ExpressionException $e) {
+                        report($e);
+                        $skip = 'condition_error';
+                    }
+
+                    if ($skip !== null) {
+                        $run->forceFill(['status' => FormAutomationRunStatus::Skipped, 'error_code' => $skip])->save();
+
+                        continue;
+                    }
                 }
 
                 if ($automation->action === FormAutomationAction::Email) {

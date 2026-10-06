@@ -199,7 +199,7 @@ final class FormController extends Controller
 
         /** @var User $user */
         $user = $request->user();
-        [$automation, $secret] = $automations->create($form, $request->automationName(), $action, $request->recipientList(), $request->webhookUrl(), $user);
+        [$automation, $secret] = $automations->create($form, $request->automationName(), $action, $request->recipientList(), $request->webhookUrl(), $user, $request->automationCondition());
 
         return response()->json(['data' => $presenter->item($automation, $user), 'secret' => $secret], 201);
     }

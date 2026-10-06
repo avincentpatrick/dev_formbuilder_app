@@ -34,6 +34,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $url
  * @property string|null $secret
  * @property bool $enabled
+ * @property string|null $condition the response must match it to run (M142); null is every response
  * @property string|null $created_by
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
@@ -50,6 +51,7 @@ class FormAutomation extends Model implements TenantScoped
         'recipients',
         'url',
         'enabled',
+        'condition',
     ];
 
     /** The signing secret never leaves the model by serialization: it is shown once, by the service, at creation. */

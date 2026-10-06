@@ -29,10 +29,15 @@ final class FormAutomationPresenter
     /** How many recent runs each automation shows. */
     private const int RECENT_RUNS = 5;
 
-    public function __construct(private readonly EntitlementService $entitlements) {}
+    public function __construct(
+        private readonly EntitlementService $entitlements,
+        private readonly AutomationCondition $conditions,
+    ) {}
 
     /**
-     * @return array{can_webhook: bool, max: int, items: list<array<string, mixed>>}
+     * `catalogue` is the questions a condition may name (M142), from the version a condition is checked against.
+     *
+     * @return array{can_webhook: bool, max: int, items: list<array<string, mixed>>, catalogue: array<string, mixed>}
      */
     public function forForm(Form $form, ?User $viewer): array
     {
@@ -42,6 +47,7 @@ final class FormAutomationPresenter
             'can_webhook' => $viewer !== null && $viewer->can('webhooks.manage') && FeatureAdmission::admits($this->entitlements, 'webhooks'),
             'max' => FormAutomationService::MAX_PER_FORM,
             'items' => array_values($automations->map(fn (FormAutomation $automation): array => $this->item($automation, $viewer))->all()),
+            'catalogue' => $this->conditions->catalogueFor($form),
         ];
     }
 
@@ -68,6 +74,7 @@ final class FormAutomationPresenter
             'url' => $isWebhook && $mayManage ? $automation->url : null,
             'host' => $automation->host(),
             'manageable' => $mayManage,
+            'condition' => $automation->condition,
             'runs' => array_values($runs->map(static fn (FormAutomationRun $run): array => [
                 'id' => $run->id,
                 'status' => $run->status->value,

@@ -140,3 +140,50 @@ it('never fails the respondent: an automation that cannot be read still leaves t
     expect(Submission::query()->whereKey($submissionId)->exists())->toBeTrue();
     Queue::assertPushed(SendFormAutomationEmailJob::class, 1);
 });
+
+/*
+|--------------------------------------------------------------------------
+| M142 (`R-b65bafca`'s Filter, `D93` = A step 1) — a condition on each automation, read at run time.
+|--------------------------------------------------------------------------
+| The response below answers `age` 36 and `full_name` "Ada Lovelace" (`automationDispatchSubmit()`).
+*/
+
+function automationDispatchAddWhen(Form $form, User $owner, string $name, string $condition): FormAutomation
+{
+    [$automation] = app(FormAutomationService::class)->create($form, $name, FormAutomationAction::Email, ['team@example.org'], null, $owner, $condition);
+
+    return $automation;
+}
+
+it('runs an automation only for a response that matches its condition, and says why it skipped one that does not (M142)', function (): void {
+    Queue::fake([SendFormAutomationEmailJob::class]);
+    $older = automationDispatchAddWhen($this->form, $this->owner, 'Over sixty', '${age} > 60');
+    $adult = automationDispatchAddWhen($this->form, $this->owner, 'Adults with a name', '${age} >= 18 and ${full_name} != \'\'');
+
+    automationDispatchSubmit($this->form);
+
+    enterTenant($this->tenant->id, $this->owner->id);
+    $skipped = $older->runs()->sole();
+    $queued = $adult->runs()->sole();
+    expect($skipped->status)->toBe(FormAutomationRunStatus::Skipped)
+        ->and($skipped->error_code)->toBe('condition_not_met')
+        ->and($queued->status)->toBe(FormAutomationRunStatus::Pending);
+    Queue::assertPushed(SendFormAutomationEmailJob::class, 1);
+    Queue::assertPushed(SendFormAutomationEmailJob::class, fn ($job) => $job->runId === $queued->id);
+});
+
+it('records a condition it cannot read as skipped, and still runs the response’s other automations (M142)', function (): void {
+    Queue::fake([SendFormAutomationEmailJob::class]);
+    $broken = automationDispatchAddWhen($this->form, $this->owner, 'Broken', '${age} > 1');
+    // Past the save-time check, as a row written before it existed, or by hand, could be.
+    $broken->forceFill(['condition' => '${age} >'])->save();
+    $plain = automationDispatchAdd($this->form, $this->owner, FormAutomationAction::Email, 'Everyone');
+
+    automationDispatchSubmit($this->form);
+
+    enterTenant($this->tenant->id, $this->owner->id);
+    expect($broken->runs()->sole()->error_code)->toBe('condition_error')
+        ->and($broken->runs()->sole()->status)->toBe(FormAutomationRunStatus::Skipped)
+        ->and($plain->runs()->sole()->status)->toBe(FormAutomationRunStatus::Pending);
+    Queue::assertPushed(SendFormAutomationEmailJob::class, 1);
+});

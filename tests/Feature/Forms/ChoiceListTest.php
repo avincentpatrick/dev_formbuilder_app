@@ -203,6 +203,9 @@ it('builds the cascade’s options from its lists into the published version, an
 
     expect($options)->toHaveCount(8)
         ->and($options->firstWhere('value', '01'))->toEqual(['level' => 'region', 'value' => '01', 'label' => 'Ilocos Region', 'parent' => null])
+        // ⚠️ `toEqual` (jsonb reorders keys) calls an empty string equal to null, and the runtime shows a first-level
+        // choice only when its parent IS null — so that is asserted on its own (a mutant writing '' survived without it).
+        ->and($options->firstWhere('value', '01')['parent'])->toBeNull()
         ->and($options->firstWhere('value', '133901'))->toEqual(['level' => 'city', 'value' => '133901', 'label' => 'Tondo', 'parent' => '1339'])
         // The frozen snapshot carries them too, so a version's export labels are its own list's.
         ->and(collect(FormVersion::query()->findOrFail($draftId)->schema_snapshot['fields'])->firstWhere('key', 'address')['config']['options'])->toHaveCount(8);

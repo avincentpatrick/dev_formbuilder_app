@@ -617,8 +617,8 @@ class AppServiceProvider extends ServiceProvider
                     }
                 }
 
-                // M132 (`R-bf49e4c1`) — a form's reference file, the same stream for the same reason, and as loud when
-                // its path moves. A PDF or an image, so the media type is whichever the file is.
+                // M132 (`R-bf49e4c1`) — a form's reference file, as loud when its path moves. Since M138 (`D92`) it answers only
+                // 404, so there is no 200 to rewrite until the Kobo-style rebuild serves form media through it again.
                 $filePath = collect($openApi->paths)
                     ->first(static fn (Path $path): bool => $path->path === 'public/reference-files/{shareToken}/{file}');
                 $fileRead = $filePath?->operations['get'] ?? null;

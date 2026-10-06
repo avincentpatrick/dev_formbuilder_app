@@ -22,13 +22,16 @@ uses(RefreshDatabase::class);
 
 /*
 |--------------------------------------------------------------------------
-| M132 — a form's reference files, read by a respondent (R-bf49e4c1): `GET /api/v1/public/reference-files/{shareToken}/{file}`
+| M138 — a form's reference files are NOT served to respondents (R-10c9e1bc, D92 = A)
 |--------------------------------------------------------------------------
-| The guest page lists the files the token's version shows (`version.reference_files` on the schema) and fetches
-| each from this route. It serves a file only when that version shows it; every other case is the same enveloped
-| 404, so the route says nothing about what exists.
+| M132 listed a form's PDFs and images on the guest schema (`version.reference_files`) and served each from
+| `GET /api/v1/public/reference-files/{shareToken}/{file}`. The user's staging smoke test found that no tool they
+| compared offers attached files to respondents — Kobo and ODK use an attached file only inside the form — so D92
+| hides them: the schema lists none, and the route, kept registered for the Kobo-style rebuild, refuses every file
+| with the same enveloped 404. Staff keep the files (FormReferenceFileLifecycleTest, FormReferenceFileUploadTest).
 |
-| ⚠️ EVERY REFUSAL RUNS ITS POSITIVE CONTROL FIRST, in the same test, and then changes ONE fact (M122).
+| ⚠️ The positive control is every fact M132 served on: the file is the form's own, clean, and frozen into the very
+| version the token was minted for. Each still holds, and the answer is still 404.
 |
 | ⚠️ Helpers are prefixed `guestReferenceFile*`: Pest loads every test file into one process.
 */
@@ -95,98 +98,34 @@ function guestReferenceFileForm(Tenant $tenant, User $owner, string $slug = 'int
     return [$form->refresh(), $file];
 }
 
-it('serves a PDF the token’s version shows as a download, never sniffed, and keeps it a day', function (): void {
-    [$form, $file] = guestReferenceFileForm($this->tenant, $this->owner);
-
-    $response = $this->get(guestReferenceFileUrl(shareTokenFor($form), $file->id));
-
-    $response->assertOk()
-        ->assertHeader('Content-Type', 'application/pdf')
-        ->assertHeader('X-Content-Type-Options', 'nosniff');
-    expect($response->streamedContent())->toBe('%PDF-BYTES')
-        // A PDF never renders in this origin: it is always a download.
-        ->and($response->headers->get('Content-Disposition'))->toStartWith('attachment')
-        ->and($response->headers->getCacheControlDirective('private'))->toBeTrue()
-        ->and($response->headers->getCacheControlDirective('max-age'))->toBe('86400');
-});
-
-it('serves an image the token’s version shows inline', function (): void {
+it('refuses every reference file with one enveloped 404, a clean file the token’s own version lists included', function (string $mime): void {
     $form = app(FormService::class)->create($this->tenant, $this->owner, 'Clinic Intake');
     addFormField($form->draftVersion, $this->owner, 'full_name', FieldType::ShortText, 0);
-    $image = guestReferenceFileStored($form, 'Map', ['mime_type' => 'image/png', 'original_filename' => 'map.png']);
+    $file = guestReferenceFileStored($form, 'Visit guide', ['mime_type' => $mime]);
     app(PublishService::class)->publish($form->refresh(), $this->owner);
     $form->refresh()->update(['public_slug' => 'intake', 'allow_guest_submissions' => true]);
+    $form->refresh();
 
-    $response = $this->get(guestReferenceFileUrl(shareTokenFor($form->refresh()), $image->id));
+    // Every fact M132 served on still holds.
+    expect($file->refresh()->virus_scan_status->servable())->toBeTrue()
+        ->and(FormVersionReferenceFile::query()
+            ->where('form_version_id', $form->current_published_version_id)
+            ->where('attachment_id', $file->id)
+            ->exists())->toBeTrue();
 
-    $response->assertOk()->assertHeader('Content-Type', 'image/png');
-    expect($response->headers->get('Content-Disposition'))->toStartWith('inline');
-});
-
-it('refuses with one enveloped 404 each file the token’s version does not show, after serving the one it does', function (string $case): void {
-    [$form, $file] = guestReferenceFileForm($this->tenant, $this->owner);
-    $token = shareTokenFor($form);
-
-    // The positive control: this exact request is served before the one fact under test changes.
-    $this->get(guestReferenceFileUrl($token, $file->id))->assertOk();
-    enterTenant($this->tenant->id, $this->owner->id);
-
-    $requested = match ($case) {
-        // Attached after the publish: the DRAFT shows it, the token's version does not.
-        'a file only the draft shows' => guestReferenceFileStored($form, 'Later')->id,
-        'a file of another kind' => tap($file)->update(['kind' => AttachmentKind::FormContentImage])->id,
-        'a file held by something other than a form' => tap($file)->update(['attachable_type' => 'form_field'])->id,
-        'a file another form owns' => tap($file)->update([
-            'attachable_id' => app(FormService::class)->create($this->tenant, $this->owner, 'Another form')->id,
-        ])->id,
-        'a file still being checked' => tap($file)->update(['virus_scan_status' => ScanStatus::Pending])->id,
-        'a file the check refused' => tap($file)->update(['virus_scan_status' => ScanStatus::Infected])->id,
-        'a form whose guest access is off' => tap($file, fn () => $form->update(['allow_guest_submissions' => false]))->id,
-        'an id that is not a uuid' => 'not-a-uuid',
-    };
-
-    $this->getJson(guestReferenceFileUrl($token, $requested))
+    $this->getJson(guestReferenceFileUrl(shareTokenFor($form), $file->id))
         ->assertNotFound()
         ->assertExactJson(['error' => ['code' => 'file_not_found', 'message' => 'This file is not available.']]);
-})->with([
-    'a file only the draft shows',
-    'a file of another kind',
-    'a file held by something other than a form',
-    'a file another form owns',
-    'a file still being checked',
-    'a file the check refused',
-    'a form whose guest access is off',
-    'an id that is not a uuid',
-]);
+})->with(['a PDF' => 'application/pdf', 'an image' => 'image/png']);
 
-it('lists on the schema the files the version shows, past their check, in the author’s order', function (): void {
+it('lists no reference files on the schema, while the version still holds them for staff', function (): void {
     [$form, $file] = guestReferenceFileForm($this->tenant, $this->owner);
-    enterTenant($this->tenant->id, $this->owner->id);
-    // Next version: a second file, plus one still being checked and one the check refused.
-    $image = guestReferenceFileStored($form, 'Map', ['mime_type' => 'image/png']);
-    guestReferenceFileStored($form, 'Pending', ['virus_scan_status' => ScanStatus::Pending]);
-    guestReferenceFileStored($form, 'Refused', ['virus_scan_status' => ScanStatus::Infected]);
-    app(PublishService::class)->publish($form->refresh(), $this->owner);
 
-    $files = $this->getJson('http://acme.meridian.test/api/v1/public/f/'.shareTokenFor($form->refresh()))
+    $this->getJson('http://acme.meridian.test/api/v1/public/f/'.shareTokenFor($form))
         ->assertOk()
-        ->json('data.version.reference_files');
+        ->assertJsonPath('data.version.id', $form->current_published_version_id)
+        ->assertJsonMissingPath('data.version.reference_files');
 
-    expect($files)->toBe([
-        ['id' => $file->id, 'label' => 'Visit guide', 'mime_type' => 'application/pdf', 'size_bytes' => $file->size_bytes],
-        ['id' => $image->id, 'label' => 'Map', 'mime_type' => 'image/png', 'size_bytes' => $image->size_bytes],
-    ]);
-});
-
-it('keeps an older token on the version it was minted for, after the newer version shows a different file', function (): void {
-    [$form, $file] = guestReferenceFileForm($this->tenant, $this->owner);
-    $oldToken = shareTokenFor($form);
     enterTenant($this->tenant->id, $this->owner->id);
-    $later = guestReferenceFileStored($form, 'Later');
-    app(PublishService::class)->publish($form->refresh(), $this->owner);
-    $newToken = shareTokenFor($form->refresh());
-
-    $this->get(guestReferenceFileUrl($newToken, $later->id))->assertOk();
-    $this->get(guestReferenceFileUrl($oldToken, $file->id))->assertOk();
-    $this->getJson(guestReferenceFileUrl($oldToken, $later->id))->assertNotFound();
+    expect(FormVersionReferenceFile::query()->where('attachment_id', $file->id)->count())->toBeGreaterThan(0);
 });

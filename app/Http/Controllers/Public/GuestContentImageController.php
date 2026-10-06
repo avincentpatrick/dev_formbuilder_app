@@ -10,7 +10,6 @@ use App\Http\Controllers\Public\Concerns\ReadsGuestShareToken;
 use App\Models\Attachment;
 use App\Models\Form;
 use App\Models\FormVersion;
-use App\Models\FormVersionReferenceFile;
 use App\Support\Api\ApiErrorResponse;
 use App\Support\Attachments\InlineAttachmentResponse;
 use Illuminate\Http\Request;
@@ -96,51 +95,24 @@ final class GuestContentImageController extends Controller
         return $response;
     }
 
+    // M138 (`R-10c9e1bc`, `D92` = A). M132 served a form's listed reference files to anyone holding its share token;
+    // the user's staging smoke test found that no tool they compared offers attached files to respondents — Kobo and
+    // ODK use an attached file only INSIDE the form — and `D92` hides them now and rebuilds them Kobo-style later.
+    // ⛔ THE ROUTE STAYS REGISTERED, REFUSING EVERYTHING, ON PURPOSE: `AppServiceProvider` throws if its path disappears,
+    // `sw.ts` and `ServiceWorkerCachePrefixRouteTest` pin its prefix, and the rebuild will serve form media through a
+    // guest route again. A device that cached a schema before M138 may still ask for a file it listed; it gets this 404.
+    // These notes sit outside the docblock and the method body because Scramble publishes both.
     /**
-     * Read one reference file this shared form shows.
+     * A reference file of a shared form — no longer served to respondents.
      *
-     * Served only when the share token's own form version lists the file and it has passed its virus check. An image
-     * is sent inline; a PDF is sent as a download. Any other request answers the same 404.
+     * Every request answers 404. Reference files are notes for the people who build the form, not files a respondent
+     * downloads.
      *
      * @unauthenticated
      */
     public function referenceFile(Request $request, string $shareToken, string $file): Response
     {
-        // M132 (`R-bf49e4c1`). The image read's boundary for a form's reference files: a `form_reference_file` owned
-        // by the token's form, listed by the token's own version (`form_version_reference_files`, frozen with it —
-        // `D61` = B), and servable. The guest page fetches it rather than navigating to it, so the service worker can
-        // keep a copy once opened (`D84`). On this controller rather than its own because a new controller is a new
-        // `use` line in `routes/api.php`, whose lines are cited by number. This docblock is published; keep notes here.
-        $token = $this->shareToken($request);
-        $form = Form::query()->whereKey($token->formId)->first();
-
-        if ($form === null || ! $form->allow_guest_submissions || ! Str::isUuid($file)) {
-            return $this->fileNotFound();
-        }
-
-        $attachment = Attachment::query()->whereKey($file)->first();
-
-        if ($attachment === null
-            || $attachment->kind !== AttachmentKind::FormReferenceFile
-            || $attachment->attachable_type !== 'form'
-            || $attachment->attachable_id !== $form->id
-            || ! $attachment->virus_scan_status->servable()) {
-            return $this->fileNotFound();
-        }
-
-        $shown = FormVersionReferenceFile::query()
-            ->where('form_version_id', $token->formVersionId)
-            ->where('attachment_id', $attachment->id)
-            ->exists();
-
-        if (! $shown) {
-            return $this->fileNotFound();
-        }
-
-        $response = InlineAttachmentResponse::for($attachment);
-        $response->headers->set('Cache-Control', 'private, max-age=86400');
-
-        return $response;
+        return $this->fileNotFound();
     }
 
     private function notFound(): Response

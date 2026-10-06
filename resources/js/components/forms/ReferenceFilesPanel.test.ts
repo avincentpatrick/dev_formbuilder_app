@@ -46,10 +46,10 @@ afterEach(() => {
 });
 
 describe('the list', () => {
-    it('says first that respondents see changes after a publish, and offers the types the server accepts', () => {
+    it('says first that respondents do not see these files (M138, D92), and offers the types the server accepts', () => {
         const wrapper = mountPanel();
 
-        expect(wrapper.find('[data-reference-notice="publish"]').text()).toBe('Respondents see these changes after you publish the form.');
+        expect(wrapper.find('[data-reference-notice="staff-only"]').text()).toBe('Respondents do not see these files. Using a file inside the form itself, as KoboToolbox does, comes later.');
         expect(wrapper.text()).toContain('No reference files yet.');
         expect(wrapper.find('input[type="file"]').attributes('accept')).toBe('application/pdf,image/png,image/jpeg,image/webp');
     });
@@ -154,7 +154,7 @@ describe('renaming and removing', () => {
         expect(wrapper.find('a.reference-files__name').text()).toBe('Visit guide (English)');
     });
 
-    it('removes a file and says respondents keep it until the next publish', async () => {
+    it('removes a file and says so', async () => {
         const fetchMock = vi.fn(() => respond(null, 204));
         vi.stubGlobal('fetch', fetchMock);
         const wrapper = mountPanel([row()]);
@@ -166,6 +166,7 @@ describe('renaming and removing', () => {
         expect(url).toBe(`/forms/${FORM_ID}/reference-files/att-1`);
         expect(init.method).toBe('DELETE');
         expect(wrapper.findAll('[data-reference-file]')).toHaveLength(0);
-        expect(wrapper.text()).toContain('Removed Visit guide.pdf. Respondents keep seeing it until you publish.');
+        expect(wrapper.text()).toContain('Removed Visit guide.pdf.');
+        expect(wrapper.text()).not.toContain('Respondents keep');
     });
 });

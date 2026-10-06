@@ -1,21 +1,16 @@
 <script setup lang="ts">
 /**
- * The form's banner: title (h1), the language switcher (UX §6, hidden for single-locale forms), the form's reference
- * files (M132), and the ambient autosave indicator (UX §5.1).
+ * The form's banner: title (h1), the language switcher (UX §6, hidden for single-locale forms) and the ambient autosave
+ * indicator (UX §5.1). M132's reference-file list left it in M138 (`D92`): respondents are not shown a form's files.
  */
 import LanguageSwitcher from './LanguageSwitcher.vue';
-import ReferenceFileList from './ReferenceFileList.vue';
 import SavedIndicator from './SavedIndicator.vue';
-import type { GuestReferenceFile } from '../lib/types';
 
 defineProps<{
     title: string;
     description: string | null;
     saving: boolean;
     savedAt: string | null;
-    /** M132 (`R-bf49e4c1`) — the files the version shows, under the description on every page. */
-    referenceFiles?: GuestReferenceFile[];
-    shareToken?: () => string;
 }>();
 </script>
 
@@ -26,7 +21,6 @@ defineProps<{
             <LanguageSwitcher />
         </div>
         <p v-if="description" class="form-header__desc">{{ description }}</p>
-        <ReferenceFileList v-if="referenceFiles && referenceFiles.length > 0 && shareToken" :files="referenceFiles" :share-token="shareToken" />
         <SavedIndicator :saving="saving" :saved-at="savedAt" />
     </header>
 </template>

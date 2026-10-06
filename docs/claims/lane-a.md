@@ -16,79 +16,72 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M138`, smoke-test fixes 2 of 3: the form builder chooses the redirect delay, and reference files stop showing to respondents (m138-delay-reference-files)
+## Status: NO ACTIVE CLAIM — `M138` is merged; the form builder chooses the redirect delay and respondents no longer see reference files; M139 (sections from the preview) is next
 
-Taken 2026-10-06. Branch `m138-delay-reference-files`, cut from `origin/main` at `dc2b7bfd`, PR into `main`.
-The second of the three smoke-test increments (`D91`, `D92`; split under `D75` so a red run points at one change).
-Both rows touch the respondent's page, which is why they travel together. Rows, each its own commits, in this order:
-1. **`R-df7f4b62`** — the move after the thank-you screen always waits 20 seconds (`D91` amends `D76`: 5, 10, 20 by
-   default, or 30, chosen by the form builder).
-2. **`R-10c9e1bc`** — reference files are offered to respondents as downloads (`D92` A: hidden now, staff-only notes,
-   rebuilt Kobo-style after Oct 12).
+## RELEASED — `M138`, smoke-test fixes 2 of 3: the respondent's page (merged as PR #331, `7b7c03d3`, 6/6 green on its FIRST run with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 
-### Evidence verified
+Shipped 2026-10-06. Branch `m138-delay-reference-files`, cut from `origin/main` at `dc2b7bfd`. The claim commit is `94f01c3b`.
 
-Against `dc2b7bfd`:
-- **`R-df7f4b62` — held.** `ConfirmationScreen.vue:54` is `const DELAY_SECONDS = 20;`. `ConfirmationPanel.vue:226`
-  tells the author "after 20 seconds", and nothing stores a delay per form (`forms` has `redirect_url` and
-  `redirect_form_id` only, migration `2026_08_17_000118`).
-- **`R-10c9e1bc` — held.** The respondent path is:
-  - `PublicFormPresenter.php:76` puts `reference_files` in the guest schema;
-  - `FormHeader.vue:29` renders `ReferenceFileList` under the description;
-  - `GuestContentImageController::referenceFile` (`:107`) serves a listed file to any holder of the share token.
+Commits, in the stated order:
+- row 1 `4ee7a4bc`;
+- row 2 `5bc92ccf`;
+- two citations repaired, and the hand-off regenerated, `ed0fb49f`.
 
-### Premise verified
+**Rows and namespaces:**
+- **Closed:** `R-df7f4b62`, `R-10c9e1bc`.
+- **Filed:** nothing new.
+- **Namespaces spent:** migration `2026_08_17_000126`. No ADR, no decision.
+- **Outside the claim's list:**
+  - the two citation repairs (`docs/adr/0008-entitlement-and-metering.md`, one ledger row);
+  - `app/Providers/AppServiceProvider.php` (one comment, in place);
+  - `tests/Feature/Api/OpenApiContractTest.php`;
+  - `resources/public-runtime/lib/reference-files.ts` and its test.
 
-- **The redirect reaches the respondent ONLY in the submit response.** `GuestSubmissionController` builds it through
-  `FormRedirectResolver::resolve()`. The guest schema carries none, and `api-client.ts`'s `parseRedirect()` rebuilds only
-  `{url, label}`, so a new member must be parsed there or it is dropped silently.
-- **`openapi.json` describes the submit body as a bare string,** so the contract job's export diff should not move.
-  The job re-exports and diffs regardless.
-- **An offline-queued response still never redirects (`D76`)** — unchanged.
-- **`E2eSeeder` keeps the default 20.** `public-runtime-axe.spec.ts` scans the countdown, and a 5-second seed would
-  race the scan.
-- ⚠️ **A device that cached the guest schema before this ships still holds `reference_files`.** So the client stops
-  rendering the list whatever the payload says, and the server stops serving the files.
-- **The guest file route STAYS registered and refuses every file.** `AppServiceProvider` throws if its documented path
-  disappears; `sw.ts` and `ServiceWorkerCachePrefixRouteTest` pin its prefix; and `D92`'s Kobo-style rebuild will serve
-  form media through a guest route. Deleting it now would be churn reversed within weeks.
-- **Staff keep everything:** the settings section, its four routes, the frozen per-version rows (`D61` B) and the staff
-  read through `attachments.show`. Only the respondent-facing words in `ReferenceFilesPanel.vue` change.
+  Each followed from the claimed change; no extension was pushed first.
 
-### Remedy verdict
+### What changed
+- **The redirect delay** (`D91` amending `D76`). The form builder chooses 5, 10, 20 (the default) or 30 seconds beside the
+  destination, and below 20 the setting says what that costs.
+  - `forms.redirect_delay_seconds` sits under a CHECK of the four.
+  - It rides on `RedirectTarget`, so no caller of `setConfirmationMessage()` changed, and it is audited with the
+    destination.
+  - The submit response carries `delay_seconds`; the respondent's parser accepts only the four and otherwise waits 20.
+- **Reference files are hidden** (`D92` = A).
+  - The guest schema lists none, and the guest page renders no list (`ReferenceFileList.vue` deleted, with the dead
+    download-name helper).
+  - The guest route stays registered and refuses every file, and `openapi.json` documents only its 404.
+  - Staff keep the files, the frozen rows and the settings section, whose words now say respondents do not see them.
+- **Proof — six deliberate defects, each CAUGHT:**
+  - the delay not written (`mutate.php`);
+  - the delay not sent (`mutate.php`);
+  - the countdown ignoring the delay (by hand);
+  - the parser accepting any number (by hand);
+  - the list sent again (`mutate.php`);
+  - a file served again (`mutate.php`).
+- **Local gates:**
+  - E2E: `public-runtime-axe` 72, `public-runtime-offline` 15, `form-settings-axe` 24;
+  - Vitest: 198 files, 3,339 tests;
+  - PHPStan 0.
 
-- **`R-df7f4b62`:** `D91` names the values. The delay rides on `RedirectTarget`, so the five call sites of
-  `setConfirmationMessage()` keep their signature. A NOT NULL `smallint` defaults to 20 with a CHECK of (5, 10, 20, 30),
-  and the respondent's client accepts only those values and falls back to 20.
-- **`R-10c9e1bc`:** `D92` A, as above.
+### How the prediction fared
 
-Files:
-- **Row 1 — the delay:**
-  - `database/migrations/2026_08_17_000126_add_redirect_delay_to_forms_table.php` (new);
-  - `app/Models/Form.php`, `app/Support/Forms/RedirectTarget.php`, `UpdateConfirmationMessageRequest.php`,
-    `FormService.php`, `FormSettingsPresenter.php`, `FormRedirectResolver.php`;
-  - `resources/js/components/builder/ConfirmationPanel.vue`, `resources/js/components/forms/types.ts`,
-    `resources/js/components/builder/types.ts`;
-  - `resources/public-runtime/lib/{api-client,types}.ts`, `ConfirmationScreen.vue`.
-- **Row 2 — reference files:**
-  - `PublicFormPresenter.php`, `GuestContentImageController.php`;
-  - `resources/public-runtime/components/{FormHeader,RuntimeShell,RuntimeSession}.vue` and `ReferenceFileList.vue`
-    (deleted);
-  - `resources/js/components/forms/ReferenceFilesPanel.vue`.
-- **Tests:** the tests of each, and the fixtures typed `FormSettingsForm`.
-- **E2E:** `tests/e2e/public-runtime-axe.spec.ts` and `public-runtime-offline.spec.ts`.
-- **Docs and data:** `docs/data-dictionary.md`, `docs/ux/form-filling-ux-flow.md`, `openapi.json` (re-exported), and
-  `database/seeders/E2eSeeder.php` (a comment).
+| Predicted | Actual |
+|---|---|
+| CI 6/6 on the first run | **Right.** |
+| ⚠️ Most expected WRONG: a census or drift test over `forms`' columns that the map did not find | **Wrong in kind, and the miss was elsewhere.** The three named census tests were updated and passed. What went red locally was the citation lint: ADR-0008 and one ledger row cited data-dictionary lines that the new row shifted onto blank lines. Both had already pointed at the wrong line on `main`, and both are repaired by section rather than line. |
 
-Shared artefacts taken: `docs/**` as listed, `openapi.json`, the two E2E specs, and the close-out artefacts.
+Unpredicted:
+- **Scramble publishes a comment that sits directly above a `return`** as that response's description. The controller's
+  internal notes surfaced in `openapi.json` as the 404's text, so they moved outside the method.
+- **PHP turns the JSON key `"404"` into the integer 404** in `array_keys()`.
 
-Paired files taken: none known. A red gate naming a file this diff does not touch is read as one.
+### For M139, measured before the claim
+A real-browser probe (`.playwright/m139-probe/`, gitignored) on a fresh form found:
+- **Pointer drag already moves a question from the top level into an empty section.**
+- **The grip is an unlabelled 28 px icon,** and an empty section says only "No fields in this section yet."
+- **Keyboard grab did not move the section's only question back out,** a secondary finding to check in M139.
 
-Namespaces spent: migration prefix `2026_08_17_000126`. No ADR, no decision.
-
-Prediction: CI 6/6 on the first run. ⚠️ **Most expected WRONG:** a census or drift test over the `forms` columns
-(`TenantExtractColumnDriftTest`, `DocumentedDefaultDriftTest`, `FormSettingsPageTest`'s key order). The map names
-three; a fourth it did not find is the likeliest red.
+So comment 18's drag clause is a discoverability gap, not a missing feature.
 
 ## RELEASED — `M137`, smoke-test fixes 1 of 3: the builder side (merged as PR #330, `8108b638`, 6/6 green on its THIRD run with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

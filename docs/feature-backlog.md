@@ -13164,21 +13164,21 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `DataSharingPanel.vue` renders every shareable question as a checkbox with no filter. Taken before Oct 12 by `D91`.
   **Live.** Filed by `M137`. **Tier: early-testing.** ✅ **CLOSED BY `M137` (2026-10-06), PR #330.** From seven questions up the list gains a search with a count of chosen and shown; a question the search hides stays chosen. Pinned by `DataSharingPanel.test.ts`, turned red by a hand mutation.
 
-- **`minor` · The move after the thank-you screen always waits 20 seconds; the form builder cannot choose the delay.**
+- ✅ **CLOSED BY `M138` (2026-10-06) — ****`minor` · The move after the thank-you screen always waits 20 seconds; the form builder cannot choose the delay.**
   Found by `M137` from the staging smoke test (comment 14, a pass with the note *"20 seconds to redirect is too long.
   there must be a way that users/form builders can configure that"*). The delay is the constant `DELAY_SECONDS` in
   `ConfirmationScreen.vue`, fixed by `D76`; nothing stores one per form. `D91` amends `D76`: the builder chooses 5,
   10, 20 (the default) or 30 seconds, "Continue now" and "Stay on this page" stay, and below 20 the setting says it
   gives respondents less time than WCAG 2.2.1 asks. Taken before Oct 12. **Live.** Filed by `M137`.
-  **Tier: early-testing.**
+  **Tier: early-testing.** ✅ **CLOSED BY `M138` (2026-10-06), PR #331.** The form builder chooses 5, 10, 20 (default) or 30 seconds beside the destination; `forms.redirect_delay_seconds` holds it under a CHECK of the four (migration `2026_08_17_000126`), the submit response carries `delay_seconds`, and the respondent's page accepts only the four and otherwise waits 20. Below 20 the setting says it gives less time than WCAG 2.2.1 asks. Proved by four deliberate defects, each caught.
 
-- **`minor` · Reference files are offered to respondents as downloads, which no tool the user compared does.** Found by
+- ✅ **CLOSED BY `M138` (2026-10-06) — ****`minor` · Reference files are offered to respondents as downloads, which no tool the user compared does.** Found by
   `M137` from the staging smoke test (comment 11, marked fail: *"upon publishing the form, the references became
   downloadable in the form response page. it doesnt work that way. the reference must be use to create form"*). `M132`
   lists a form's PDF and image reference files under its description on the guest page. Kobo and ODK use an attached
   file only inside the form, and never as a download (`D92`). `D92` A: before Oct 12 they stop showing to respondents
   and stay as staff-only notes on the form; the Kobo-style uses are the three rows below. **Live.** Filed by `M137`.
-  **Tier: early-testing.**
+  **Tier: early-testing.** ✅ **CLOSED BY `M138` (2026-10-06), PR #331.** The guest schema lists none, the guest page renders no list (`ReferenceFileList.vue` deleted), and the guest route stays registered for the Kobo-style rebuild and answers 404 to every file; staff keep the files and the frozen per-version rows, and the settings section says respondents do not see them. Proved by two deliberate defects, each caught.
 
 - **`minor` · Sections can be added only in Structure, and the preview offers no way to add a section or a question in
   one.** Found by `M137` from the staging smoke test (comment 18, marked fail: *"section must be added in the structure

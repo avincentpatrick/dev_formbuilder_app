@@ -240,11 +240,59 @@ The footer states, per version and re-derived from that version's own frozen byt
 - Printing a blank form in a locale other than the form's default; content-aware answer-area sizing; fiducial/registration marks — all §2.5.8, deferred with their reasons rather than dropped.
 - OCR-specific field-level audit trail beyond what `docs/audit-compliance-logging-spec.md` already covers for ordinary submission review actions.
 
+---
+
+## 9. The Bake-off Harness (M136)
+
+H1d chooses the provider and calibrates §3's 90/70 thresholds on real samples, scored against PRD G9 (under 15% of fields needing manual correction on a clear, well-lit single-page scan). The harness turns that judgement into two commands, built before the samples existed so they are judged in hours.
+
+- **`php artisan ocr:bakeoff-layout {tenant} {form} {dir}`** runs where the form lives and changes nothing. It writes two files:
+  - `layout.json`: the form and its published and superseded versions, the rows the matcher reads a scan against;
+  - `answers-template.xlsx`: a `file` column, a `condition` column (clean / photo / bad), one column per question the reader answers, and a second row saying how to type each answer.
+- **`php artisan ocr:bakeoff {folder} --layout= --answers= [--out=] [--offline]`** runs anywhere, with no database.
+  - It rebuilds the versions from the layout file as unsaved models and hands them to the same `PrintedFormMatcher` the reading job uses. §2.5's presenter and `CapabilityFlags` hold no query, which the M136 claim measured.
+  - Each top-level image or PDF is one scan, and each subfolder one scan of several pages. The upload's own type and size rules apply, and a file the app would refuse is listed, not read.
+  - Each page's provider answer is cached beside it (`<file>.google_vision.json`), so a re-run after a matcher change or a corrected sheet costs nothing. `--offline` never calls the provider.
+  - A refused credential stops further calls for the run.
+  - It writes `report.md` and `fields.csv` (one row per scan and question) into `_bakeoff`.
+
+**What it measures.** Each scan is matched once with nothing withheld. Every threshold is then applied with `PrintedFormMatcher::tier()`, the review screen's own rule.
+- **Needs correction** (G9) means what the reviewer is shown is not the correct answer:
+  - a right answer withheld below the review threshold counts;
+  - a withheld value whose correct answer is blank does not;
+  - only scans that were read are scored.
+- **Silent error** means a value filled with no flag (at or above the auto threshold) that is not the answer.
+- **The report shows:**
+  - both measures swept (review 0–100, auto 50–100);
+  - the corrections by cause (not found, unreadable, missed, withheld, unexpected, wrong) and by the sheet's `condition`;
+  - right and wrong values by confidence, in tens.
+- **The comparison's leniency is printed in the report:**
+  - text ignores letter case and repeated spaces;
+  - a phone number is compared by its digits;
+  - several choices compare as a set.
+- **A wrong date that is right with day and month swapped is labelled and counted.** Either the respondent wrote the month in the DD boxes, or the answer sheet was typed month first; either way the reader is not the suspect.
+- **The command exits with a failure when the figure is not the whole measure:**
+  - an answer cell it cannot understand (listed, never guessed at, and not scored);
+  - a row naming no scan in the folder;
+  - nothing scored;
+  - nothing read.
+
+**The samples, step by step.**
+1. Export the layout where the form was printed from. On the testing server that is one guarded block in chat, and `layout.json` comes back to the laptop.
+2. Fill the template for the scans that have correct answers. Type dates as `2026-10-08`.
+3. Run `ocr:bakeoff` with the host's PHP, which can see any folder. The app container sees only the repository.
+   - A real read needs a Vision key whose Google Cloud project has billing on.
+   - This laptop's key does not (M135).
+   - The cheapest fix is a second key in the billing-enabled project, restricted to the Cloud Vision API.
+   - Otherwise run this step on the server.
+
+**The provider seam.** The cache file and the report name the provider. If the samples call for Document AI, it is a second client plus a parser that produces `OcrPage`s; the scorer and the report do not change.
+
 <!-- The pipeline markers below are DELIBERATELY at end-of-file. A marker inserted mid-document
      shifts every line beneath it, and this repository cites documents as `path:N` — 25 such
      citations point into the files that carry markers. End-of-file shifts nothing. -->
 <!-- pipeline: id=ocr-single-form title="PRD Feature #1 — single-form OCR, groundwork 2: the per-form accept-scans setting, the upload and review-and-correct screen with its 90/70 colours, and the save into SubmissionPipeline (groundwork 1, the reading path, shipped in M128)" phase=3 state=done size=XL tier=early-testing done="M129 — the scans page, the review-and-correct screen with its 90/70 notes and the save into SubmissionPipeline, with the accept-scans setting as the hub Settings tab's Scanning section; recorded in docs/claims/lane-a.md's M129 release. The live read waits on ocr-testing-server-key" -->
-<!-- pipeline: id=ocr-provider-bakeoff title="H1d — choose the OCR provider (Cloud Vision or Document AI) on real samples, calibrate the 90/70 thresholds, and write the reserved ADR-0010" phase=3 state=blocked size=M blocker="user: needs 10–20 hand-filled Print blank copies, scanned and photographed, with correct answers for five — due 2026-10-08 (D72)" tier=early-testing -->
+<!-- pipeline: id=ocr-provider-bakeoff title="H1d — choose the OCR provider (Cloud Vision or Document AI) on real samples, calibrate the 90/70 thresholds, and write the reserved ADR-0010" phase=3 state=blocked size=M blocker="user: needs 10–20 hand-filled Print blank copies, scanned and photographed, with correct answers for five — due 2026-10-08 (D72) — and a Vision key that reads where ocr:bakeoff runs (this laptop's key has billing off; the testing server's reads; §9)" tier=early-testing -->
 <!-- pipeline: id=ocr-linelist title="PRD Feature #2 — the linelist OCR channel" phase=3 state=blocked size=L blocker="user: needs 2–3 scanned linelist sheets and their blank templates (D72 puts it after Oct 12)" tier=during-testing -->
 <!-- pipeline: id=ocr-testing-server-key title="Single-form OCR on the testing server: the Cloud Vision key in the server .env, and billing switched on for the Google Cloud project that owns it. Without both every scan fails with a message (billing measured off on 2026-10-03, 403 BILLING_DISABLED)" phase=3 state=done size=S tier=early-testing done="M135 — billing on (the closed trial account replaced by a new one), a server-only key restricted to the Cloud Vision API in the testing server .env, config cached and the worker restarted, and a real read on the box (a test image read back as MERIDIAN OCR 135); recorded in docs/claims/lane-a.md's M135 release" -->
-<!-- pipeline: id=ocr-bakeoff-harness title="H1d prep, sample-free: a harness that runs the reader over a folder of scans and scores it against a ground-truth sheet (fields needing correction, PRD G9), per confidence threshold, so the Oct 8 samples are judged in hours rather than a day" phase=3 state=ready size=M tier=early-testing -->
+<!-- pipeline: id=ocr-bakeoff-harness title="H1d prep, sample-free: a harness that runs the reader over a folder of scans and scores it against a ground-truth sheet (fields needing correction, PRD G9), per confidence threshold, so the Oct 8 samples are judged in hours rather than a day" phase=3 state=done size=M tier=early-testing done="M136 — ocr:bakeoff-layout writes the form's versions and a blank answer sheet; ocr:bakeoff reads a folder with the real reader, no database needed, caches each page's provider answer, and reports fields needing correction and silent errors per threshold (§9); recorded in docs/claims/lane-a.md's M136 release" -->

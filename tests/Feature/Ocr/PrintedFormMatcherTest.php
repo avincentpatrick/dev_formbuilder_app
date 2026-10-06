@@ -195,6 +195,20 @@ it('puts a value at exactly a threshold on the side the design names: 90 is auto
         ->and($fields['notes'])->toMatchArray(['confidence' => 69, 'tier' => 'manual', 'value' => null]);
 });
 
+it('applies thresholds handed to it instead of the configured ones, so zero withholds nothing (M136, the bake-off)', function (): void {
+    $page = PrintedPageTypesetter::fromModel($this->model, ocrMatchAnswers(), ['confidence' => ['notes' => 0.40, 'age' => 0.92]])->page();
+
+    $configured = $this->matcher->match($this->form, $this->version, [$page])['fields'];
+    $zero = $this->matcher->match($this->form, $this->version, [$page], ['auto' => 0, 'review' => 0])['fields'];
+    $strict = $this->matcher->match($this->form, $this->version, [$page], ['auto' => 95, 'review' => 91])['fields'];
+
+    expect($configured['notes'])->toMatchArray(['confidence' => 40, 'tier' => 'manual', 'value' => null])
+        ->and($zero['notes'])->toMatchArray(['confidence' => 40, 'tier' => 'auto', 'value' => 'MILD FEVER FOR TWO DAYS'])
+        ->and($configured['age'])->toMatchArray(['tier' => 'auto', 'value' => '34'])
+        ->and($strict['age'])->toMatchArray(['confidence' => 92, 'tier' => 'review', 'value' => '34'])
+        ->and($strict['notes'])->toMatchArray(['tier' => 'manual', 'value' => null]);
+});
+
 it('reads a letter O in a number box as a zero, and flags it for review whatever its confidence', function (): void {
     $fields = ocrMatchFields($this->matcher, $this->form, $this->version, $this->model, ['age' => '3O']);
 

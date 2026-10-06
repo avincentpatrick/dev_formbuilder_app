@@ -587,18 +587,33 @@ export function useBuilderStore(props: BuilderPageProps) {
         for (const g of order) for (const f of buckets.get(g) ?? []) f.sequence = seq++;
     }
 
-    /** One step up/down in the flattened visual order, crossing section boundaries (local). */
+    /**
+     * One step up/down through every PLACE a field can sit, crossing section boundaries (local).
+     *
+     * M139 (`R-c0857303`): the places are each group's slots in visual order — n+1 for a group holding n other fields,
+     * so an empty section is one slot — and a step moves to the next one. Stepping past the NEIGHBOURING field, as
+     * this did before, could never enter a section with no fields, nor move a form's only field at all, while the
+     * pointer could drop into either (WCAG 2.5.7: the keyboard must reach what the drag reaches).
+     */
     function stepFieldAcross(uid: Uid, direction: -1 | 1): boolean {
-        const flat = flattenedFields();
-        const i = flat.findIndex((f) => f.uid === uid);
-        const j = i + direction;
-        if (i < 0 || j < 0 || j >= flat.length) return false;
+        const field = findField(uid);
+        if (!field) return false;
 
-        const neighbor = flat[j];
-        const targetGroup = neighbor.form_section_id;
-        const groupFields = flat.filter((f) => f.uid !== uid && f.form_section_id === targetGroup);
-        const ni = groupFields.findIndex((f) => f.uid === neighbor.uid);
-        placeField(uid, targetGroup, direction === 1 ? ni + 1 : ni);
+        const slots: Array<{ group: string | null; index: number }> = [];
+        let current = -1;
+        for (const g of orderedGroupIds()) {
+            const members = groups.value.find((group) => (group.section?.id ?? null) === g)?.fields ?? [];
+            const others = members.filter((f) => f.uid !== uid);
+            if (g === field.form_section_id) {
+                current = slots.length + members.findIndex((f) => f.uid === uid);
+            }
+            for (let index = 0; index <= others.length; index++) slots.push({ group: g, index });
+        }
+
+        const next = slots[current + direction];
+        if (current < 0 || next === undefined) return false;
+
+        placeField(uid, next.group, next.index);
         return true;
     }
 

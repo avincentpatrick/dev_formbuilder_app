@@ -61,9 +61,15 @@ const props = defineProps<{
      * and arrives here as a prop.
      */
     initialStepKey: string | null;
+    /**
+     * M139 (`R-598b9100`): sections that hold no question yet, from the LIVE store. The engine drops them — a section
+     * with nothing to answer is no step, for the respondent too — so the preview shows them to the author only.
+     */
+    emptySections?: Array<{ key: string; label: string }>;
 }>();
 
-const emit = defineEmits<{ select: [key: string]; step: [key: string] }>();
+// M139: the author's own controls in the preview. The pane turns them into a selection and an opened palette.
+const emit = defineEmits<{ select: [key: string]; step: [key: string]; 'add-question': [sectionKey: string | null]; 'add-section': [] }>();
 
 const runtime = createFormRuntime(props.snapshot, {
     initialLocale: props.snapshot.form.default_locale,
@@ -286,6 +292,19 @@ function go(delta: number): void {
                         </ul>
                     </div>
                 </div>
+
+                <div class="preview__author" data-preview-author>
+                    <MdsButton
+                        type="button"
+                        variant="tertiary"
+                        size="sm"
+                        icon-left="plus"
+                        data-preview-add-question
+                        @click="emit('add-question', block.step.sectionKey)"
+                    >
+                        {{ block.title ? `Add a question to ${block.title}` : 'Add a question here' }}
+                    </MdsButton>
+                </div>
             </section>
         </template>
 
@@ -300,6 +319,33 @@ function go(delta: number): void {
                 </li>
             </ul>
         </section>
+
+        <section
+            v-for="empty in emptySections ?? []"
+            :key="`empty-${empty.key}`"
+            class="preview__step preview__step--empty"
+            data-preview-empty-section
+            :data-empty-section-key="empty.key"
+        >
+            <header class="preview__head">
+                <h3 class="preview__title">{{ empty.label }}</h3>
+            </header>
+            <p class="preview__empty">No questions yet. Respondents do not see this section until it has one.</p>
+            <div class="preview__author">
+                <MdsButton type="button" variant="tertiary" size="sm" icon-left="plus" @click="emit('add-question', empty.key)">
+                    Add a question to {{ empty.label }}
+                </MdsButton>
+            </div>
+        </section>
+
+        <div class="preview__author preview__author--end" data-preview-author-end>
+            <MdsButton v-if="steps.length === 0" type="button" variant="tertiary" size="sm" icon-left="plus" @click="emit('add-question', null)">
+                Add a question
+            </MdsButton>
+            <MdsButton type="button" variant="secondary" size="sm" icon-left="layout" data-preview-add-section @click="emit('add-section')">
+                Add section
+            </MdsButton>
+        </div>
     </div>
 </template>
 
@@ -321,6 +367,25 @@ function go(delta: number): void {
     font-family: var(--mds-font-family-body);
     font-size: var(--mds-type-label-font-size);
     color: var(--mds-color-text-secondary);
+}
+
+/* M139 (`R-598b9100`): the author's controls, set off from what a respondent sees by a dashed rule. */
+.preview__author {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--mds-space-2);
+    padding-top: var(--mds-space-2);
+    border-top: 1px dashed var(--mds-color-border-default);
+}
+
+.preview__author--end {
+    border-top: none;
+}
+
+.preview__step--empty {
+    padding: var(--mds-space-3);
+    border: 1px dashed var(--mds-color-border-default);
+    border-radius: var(--mds-radius-md);
 }
 
 .preview__empty {

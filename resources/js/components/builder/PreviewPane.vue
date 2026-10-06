@@ -152,6 +152,28 @@ const presetCss = computed(() =>
 /** A `<style>` element from a render function: a template may not contain one. */
 const PresetStyle: FunctionalComponent<{ css: string }> = (p) => h('style', p.css);
 
+// M139 (`R-598b9100`): the author adds a section or a question from here. A question goes to the section through the
+// builder's own path — select the section, open the palette — so there is no second way to add one.
+const emit = defineEmits<{ 'add-question': [sectionUid: string | null] }>();
+
+/** Sections with no question yet, in order — read off the LIVE store, because the engine never makes them a step. */
+const emptySections = computed(() =>
+    props.store.sections.value
+        .slice()
+        .sort((a, b) => a.sequence - b.sequence)
+        .filter((section) => !props.store.fields.value.some((field) => field.form_section_id === section.id))
+        .map((section) => ({ key: section.key, label: section.label || section.key })),
+);
+
+function onAddQuestion(sectionKey: string | null): void {
+    const section = sectionKey === null ? undefined : props.store.sections.value.find((s) => s.key === sectionKey);
+    emit('add-question', section?.uid ?? null);
+}
+
+function onAddSection(): void {
+    void props.store.addSection();
+}
+
 function onSelect(key: string): void {
     const uid = model.value.projection.uidByKey[key];
 
@@ -172,8 +194,11 @@ function onSelect(key: string): void {
             :issues-by-key="model.issuesByKey"
             :selected-key="selectedKey"
             :initial-step-key="stepKey"
+            :empty-sections="emptySections"
             @select="onSelect"
             @step="stepKey = $event"
+            @add-question="onAddQuestion"
+            @add-section="onAddSection"
         />
 
         <footer class="builder-preview__limits">

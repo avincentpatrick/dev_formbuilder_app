@@ -146,6 +146,7 @@ function makeStore(fields: LocalField[], sections: LocalSection[]): Double {
             return s?.kind === 'field' ? (fieldsRef.value.find((f) => f.uid === s.uid) ?? null) : null;
         }),
         select: (next: Selection) => (selection.value = next),
+        addSection: vi.fn(() => Promise.resolve()),
     } as unknown as BuilderStore;
 
     return { store, fields: fieldsRef, sections: sectionsRef, selected: () => selection.value };
@@ -413,6 +414,48 @@ describe('what the author reads', () => {
         await flushPromises();
 
         expect(wrapper.find('[data-preview-field="q1"]').classes()).toContain('preview__row--selected');
+    });
+});
+
+describe('the author adds a section or a question from the preview (M139, R-598b9100)', () => {
+    it('offers each shown section its own add, named for it, and hands the builder that section', async () => {
+        const double = twoSections();
+        const wrapper = mountPane(double, true);
+        await flushPromises();
+
+        const add = wrapper.find('[data-preview-add-question]');
+        expect(add.text()).toBe('Add a question to S1');
+        await add.trigger('click');
+
+        const s1 = double.sections.value!.find((s) => s.key === 's1')!;
+        expect(wrapper.emitted('add-question')).toEqual([[s1.uid]]);
+    });
+
+    it('shows the author a section with no question yet — which the engine never makes a step — and its add', async () => {
+        const double = twoSections();
+        double.sections.value = [...double.sections.value!, section('s3', { sequence: 2 })];
+        const wrapper = mountPane(double, true);
+        await flushPromises();
+
+        const empty = wrapper.find('[data-preview-empty-section]');
+        expect(empty.find('h3').text()).toBe('S3');
+        expect(empty.text()).toContain('Respondents do not see this section until it has one.');
+        await empty.find('button').trigger('click');
+
+        const s3 = double.sections.value!.find((s) => s.key === 's3')!;
+        expect(wrapper.emitted('add-question')).toEqual([[s3.uid]]);
+        // Only the empty one: the two sections with a question are steps, not placeholders.
+        expect(wrapper.findAll('[data-preview-empty-section]')).toHaveLength(1);
+    });
+
+    it('adds a section through the store, from the end of the preview', async () => {
+        const double = twoSections();
+        const wrapper = mountPane(double, true);
+        await flushPromises();
+
+        await wrapper.find('[data-preview-add-section]').trigger('click');
+
+        expect(double.store.addSection).toHaveBeenCalledTimes(1);
     });
 });
 

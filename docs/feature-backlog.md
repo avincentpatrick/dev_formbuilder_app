@@ -11529,7 +11529,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   no settings surface anywhere.** Filed 2026-09-25 by `M110`, from the report *"the form itself doesn't have a
   settings section"*. Title, save-and-resume, schedule, confirmation message, share, scope and save-as-template
   each have their own route and their own FormRequest, and the builder toolbar carries nine ungrouped buttons
-  (`Builder.vue:287-387`). ⛔ **THE OBVIOUS FIX IS ALREADY REFUSED, IN WRITING, THREE TIMES.** Folding the routes
+  (`Builder.vue`'s toolbar, at the time). ⛔ **THE OBVIOUS FIX IS ALREADY REFUSED, IN WRITING, THREE TIMES.** Folding the routes
   together was declined at `UpdateFormScheduleRequest.php:15`, `UpdateSaveResumeRequest.php:13` and
   `UpdateConfirmationMessageRequest.php:16`; and the builder deliberately has no tab strip, recorded at
   `FormBuilderController.php:50-54` and `Builder.vue:256-259` because a second header row costs the one screen

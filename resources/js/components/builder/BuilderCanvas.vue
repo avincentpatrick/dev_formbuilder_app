@@ -14,6 +14,8 @@ import type { BuilderStore } from './useBuilderStore';
 import { useCanvasReorder } from './useCanvasReorder';
 
 const props = defineProps<{ store: BuilderStore; fieldTypeLabels: Record<string, string> }>();
+// M139 (`R-598b9100`): "Add a question here" on an empty section — the builder selects it and opens the palette.
+const emit = defineEmits<{ 'add-question': [sectionUid: string | null] }>();
 
 const store = props.store;
 const groups = store.groups;
@@ -144,8 +146,12 @@ const hasContent = (): boolean => groups.value.some((g) => g.fields.length > 0) 
                             </div>
                         </div>
                     </li>
-                    <li v-if="group.section && group.fields.length === 0" class="canvas__section-empty">
-                        No fields in this section yet.
+                    <!-- M139 (R-598b9100): the drag into an empty section always worked; the words never said so. -->
+                    <li v-if="group.section && group.fields.length === 0" class="canvas__section-empty" data-section-empty>
+                        <span>No questions in this section yet. Drag one in by its handle, or add one.</span>
+                        <MdsButton variant="tertiary" size="sm" icon-left="plus" @click="emit('add-question', group.section.uid)">
+                            Add a question here
+                        </MdsButton>
                     </li>
                 </ul>
             </div>
@@ -342,6 +348,10 @@ li[data-dragging='true'] .canvas__field {
 }
 
 .canvas__section-empty {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--mds-space-2);
     padding: var(--mds-space-2) var(--mds-space-3);
     color: var(--mds-color-text-secondary);
     font-size: var(--mds-type-body-sm-font-size);

@@ -13225,3 +13225,43 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   reaches an empty section; the keyboard cannot. That breaks `useCanvasReorder.ts`'s own claim that both paths cross
   section boundaries (WCAG 2.5.7), and it is the same move comment 18 asked for (`R-598b9100`). **Live.** Filed by `M139`.
   **Tier: early-testing.** ✅ **CLOSED BY `M139` (2026-10-06), PR #332.** Grab mode steps a question through every place it can sit — each group's slots, one for an empty section — so it reaches an empty section and moves a lone question. The first unit tests of the step (`reorder-store.test.ts`) are red on the old step, and the real-browser spec moves a section's only question out by keyboard.
+
+- **`major` · A password reset leaves every other session of the account signed in, so whoever registered an address
+  first keeps the account after its owner reclaims it.** Found by `M140`'s adversarial check of `R-2dc95042`. Fortify's
+  `CompletePasswordReset` rotates `remember_token` and fires `PasswordReset`, and nothing listens: the user's rows in
+  the `sessions` table (`SESSION_DRIVER=database`) survive, and `AuthenticatesSessions` sits only in
+  `bootstrap/app.php`'s priority list, mounted on no route. A password change from the profile
+  (`PasswordUpdatedViaController`) leaves them too. The chain: register `victim@x` while platform sign-up is open (it
+  is on by default, `docs/deployment-infrastructure.md`), keep that session alive, and once the owner resets the
+  password and confirms the address, `PUT /user/profile-information` (only `auth`) moves the account to an address the
+  holder controls; a reset there takes the account everywhere. **Live** — reachable wherever platform sign-up is
+  open; `D31` keeps it shut on the testing server. Filed by `M140`. **Tier: during-testing.**
+
+- **`major` · A workspace's SSO sign-in trusts a membership that self-registration minted for an address nobody
+  confirmed, so that workspace's identity provider can sign in as the address's real owner.** Found by `M140`'s
+  adversarial check of `R-2dc95042`, which that row owed before being built. `JoinTenantOnRegistration` makes an Active
+  membership on `Registered`, before any confirmation. `SsoUserProvisioner::provision()` returns a user with an Active
+  membership BEFORE its domain check (`SsoDomainService::isVerifiedFor()`), and `SsoAuthenticationException`'s docblock
+  and `docs/adr/0016-saml-sso.md` justify that by saying no writer of an Active membership mints one for a stranger's
+  address; self-registration does. So an admin of an SSO-entitled workspace with its own registration open registers
+  `victim@x` there. Once the owner reclaims the address by password reset (which neither confirms it nor touches any
+  membership), the workspace's identity provider asserts `victim@x`, is signed in as the owner, and moves the email as
+  in the row above. **Live** — reachable wherever platform sign-up is open and an SSO workspace opens its own
+  registration; `D31` keeps it shut on the testing server. Filed by `M140`. **Tier: during-testing.**
+
+- **`minor` · Changing the account's email address asks for no current password.** Found by `M140`.
+  `PUT /user/profile-information` carries only `auth` (`FortifyServiceProvider.php`), and
+  `UpdateUserProfileInformation` clears `email_verified_at` and mails the new address, so any live session can move an
+  account to an address its holder controls and then reset the password there. It is the last step of both takeover
+  chains above. Ending other sessions on a reset and joining only on confirmation take away the sessions those chains
+  need, so what is left is defence in depth: ask for the password again, or mail the OLD address a link that reverses
+  the change. ⚠️ The verify page's correction form uses the same route while unconfirmed, for a typo fix, and must keep
+  working. **Live.** Filed by `M140`. **Tier: before-launch.**
+
+- **`minor` · An account whose address is never confirmed is never expired, so a squatted address stays held until its
+  owner resets the password.** Found by `M140`; it is the third of `R-2dc95042`'s moved premises. Joining only on
+  confirmation (`D34` A) stops a squat from minting anything, but the account still holds the address: the owner
+  cannot register it, and Google sign-in refuses an unconfirmed local account (`GoogleSignInProvisioner`'s
+  `localAccountUnverified`, threat-model residual 14), so a password reset is their only way in. No scheduled job and
+  no `Prunable` touches users. A sweep of accounts never confirmed after a set number of days, holding no membership
+  and no submission, would free the address. **Live.** Filed by `M140`. **Tier: before-launch.**

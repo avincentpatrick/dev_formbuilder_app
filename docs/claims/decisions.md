@@ -1642,6 +1642,18 @@ The options:
 
 ---
 
+### D95 — `D92`'s CSV choice lists feed a four-level cascade (region → province → city/municipality → barangay). What shape of file does the author upload? **A — one file per level, in Kobo's own format.**
+
+**Filed and answered 2026-10-06 (user decision, in chat), recorded by Lane A in `M140`'s claim — A, the recommendation.** Asked while planning `M140`, so `R-f69aab42` (the `M141` row under `D94`) does not stop on it. Kobo's `select_one_from_file` reads a CSV with `name` and `label` columns, and a cascade filters each level by a column naming its parent (`support.kobotoolbox.org/select_from_file_xls.html`).
+
+- **A — one file per level.** Each file has `name` and `label` columns, and every level below the first adds a column naming its parent, for example `provinces.csv`: `name,label,region`. Kobo's existing CSVs work as they are. Four uploads for four levels.
+- **B — one wide file.** One row per barangay, with a code column and a name column for each level. One upload, the way a master list usually sits in Excel, but not Kobo's format.
+- **C — accept both.** The upload detects which shape it is. About half a day more to build and test.
+
+**Recommendation: A.** `D92` asks for Kobo-style, and Kobo's own files then need no conversion. ⚠️ **The `name` column must be a unique code at its level** (for example a PSGC code), not a place name: both engines key a cascade's options by value at each level (`SemanticValidator.php`'s cascade check and its TS mirror), and barangay names such as "Poblacion" repeat across cities.
+
+---
+
 ### D15 — `D13`'s one-hub-row cap is now the binding constraint on batch composition, and it is stricter than its own purpose. **ANSWERED — option 4: the cap reads the files a row REMEDY EDITS, excluding the close-out artefacts.** **Tier: early-testing.**
 
 **Filed 2026-09-05 by Lane A, during `M72`, at the moment the cap decided a batch that value had not.**

@@ -16,7 +16,120 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M139` is merged; every smoke-test failure and request is fixed or filed, and the early-testing line waits on the user (the OCR samples, the staging scan)
+## Status: ACTIVE CLAIM — `M140`, security first under `D94`: the resume page cached under one token-free key, an address that is not the account's own until confirmed, and a password reset that signs out every other session (m140-security-first)
+
+Taken 2026-10-06. Branch `m140-security-first`, cut from `origin/main` at `8e50a5b9`, PR into `main`.
+`D94` lifts `D90` for non-OCR work and puts the two security rows first; OCR goes ahead of everything the moment its
+samples and a key arrive. Rows, each its own commits, in this order:
+1. **`R-68656155`** — the service worker caches a credential-bearing resume shell (`D20` = 2, a token-free key).
+2. **`R-2dc95042`** — self-registration occupies an address the registrant does not control (`D34` = A, confirm
+   first). It also closes **`R-5ce75abf`** (filed in this push, `major`): an SSO workspace's identity provider signs in
+   as an address self-registered into it, even after the owner reclaims the account.
+3. **`R-d060bb77`** (filed in this push, `major`) — a password reset leaves every other session signed in.
+
+Also filed in this push and **not taken**: `R-a2bfe18b` (an email change asks for no current password) and
+`R-afa35a60` (an unconfirmed account never expires), both `before-launch`. **`D95`** records the user's answer in chat
+on `M141`'s CSV file shape.
+
+### Evidence verified
+
+Against `8e50a5b9`, by a read-only fan-out and then by hand:
+- **`R-68656155` — held.** The `/f/` navigation route (`sw.ts`, `NetworkFirst`, 5-second timeout, `SHELL_CACHE` =
+  `guest-shell-html`) caches `/f/resume/{token}` under its own URL. `refreshCachedShells()` skips resume shells by
+  `isResumeShell()` (`lib/brand-cache.ts`). The blade puts `data-resume-token` on `#app`. `sw.test.ts` pins the match
+  as an exposure. ⚠️ **The row understates itself:** Workbox's expiry store (IndexedDB `workbox-expiration`, keyed by
+  URL) lists every resume token too, a second place to enumerate them.
+- **`R-2dc95042` — held.** Fortify's `RegisteredUserController` fires `Registered`. The auto-discovered
+  `JoinTenantOnRegistration` calls `joinOpenTenant()` straight away, and its own docblock says it does not re-check
+  `RegistrationGate`. `CreateNewUser` stamps `password_set_at` and leaves `email_verified_at` null.
+- **The adversarial check the row owed: LIVE, by reading.** Filed as `R-5ce75abf` and `R-d060bb77`.
+  - `SsoUserProvisioner::provision()` returns a user with an Active membership before `isVerifiedFor()`.
+  - `ResetUserPassword` stamps neither `email_verified_at` nor anything on a membership.
+  - Nothing listens to `PasswordReset`.
+  - `PUT /user/profile-information` carries only `auth`.
+
+### Premise verified
+
+- **`D20`'s owed measurement: a single cached copy BREAKS the resume boot, online.**
+  - The boot reads the token only from `data-resume-token` (`main.ts`'s `readBootstrap()`), never from the address.
+  - The shell route's 5-second timeout serves the cached copy while still online.
+  - So under one shared key, a slow link B would boot with session A's token, read A's draft successfully, and take
+    A's write-capable share token.
+  - Offline, the draft read fails (`resumeDraft()` is a bare fetch no route caches) and the error state shows, as
+    today.
+- **The share token in the cached copy is not a draft credential.** `GuestFormController::resume()` mints the
+  ordinary per-version token that every `/f/{slug}` shell already caches. Only the resume token needs to leave the
+  copy.
+- **An unverified registrant with no membership is not refused before the verify page.** `RlsAwareUserProvider`
+  reads users on `pgsql_auth` under a permissive policy, the tenant group has no membership gate, and `verified`
+  bounces them to `/email/verify`. So no `RegisterResponse` is needed.
+- **Listener order.** `SendWelcomeEmail` is the only `Verified` listener. It reads `isMemberOf()`, so a separate join
+  listener would race it, which is why the join folds into it. `Verified` also fires:
+  - again after an email change (`UpdateUserProfileInformation`);
+  - for a NEW Google account, after `joinViaGoogle` has already joined.
+
+  `InvitationController` confirms an address and fires nothing.
+- **`password_set_at` and `created_at` are both `timestampTz` at whole seconds.** So "the password has not changed
+  since registration" can be exact, once `CreateNewUser` stamps both from one instant.
+- **Sessions are `SESSION_DRIVER=database`,** on the default connection with no row security, and no route mounts
+  `AuthenticatesSessions`. Fortify raises `PasswordReset` (`CompletePasswordReset`, which also rotates
+  `remember_token`) and `PasswordUpdatedViaController`. The other password writers — invitation accept,
+  `OperatorAccounts` — set a first password on an account with no session.
+- **The testing server holds no pre-fix squat.** Open signup is off (`D31`) and its one workspace is
+  invitation-only, so `joinOpenTenant()` has never run there. Production has not launched. Nothing to sweep.
+- **Batching.** Rows 1 and 2 each edit hub files (`sw.ts`, `offline-first-sync-design.md`;
+  `TenantMembershipService.php`, the threat model, the PRD, the testing guide). `D75` governs until the Oct 12
+  session, as it did for `M137`–`M139`: one increment, each row its own commits.
+
+### Remedy verdict
+
+- **Row 1 — `D20` option 2 as written is UNSAFE; it works with three additions.**
+  - A seventh route, registered ahead of the `/f/` route: `/f/resume/` navigations, `NetworkFirst` with **no**
+    timeout, in `SHELL_CACHE`.
+  - Its key is rewritten to the constant `/f/resume/`, which closes both Cache Storage and the expiry store.
+  - The stored copy has `data-resume-token` blanked.
+  - `readBootstrap()` takes the token from the path when the attribute is blank.
+  - Old token-keyed entries are purged on `activate`, if Workbox 7.4.1's expiry-store key can be pinned by a test;
+    otherwise the at-most-seven-day residue is filed as a row.
+- **Row 2 — the row's minimal remedy is right, and needs a fourth guard.**
+  - Join on `Verified` inside `SendWelcomeEmail`, before its membership read.
+  - Join only when all of these hold: `RegistrationGate` still allows this host; no `google_id`; no joined
+    membership anywhere; and **the password unchanged since registration**.
+  - The last guard binds the registrant to the confirmer: an owner who reclaims by reset and clicks a W-host link the
+    squatter re-sent joins nothing.
+  - Cost, recorded: a real registrant who resets before confirming is not auto-joined.
+- **Row 3 — delete the user's `sessions` rows.** On `PasswordReset`, all of them. On `PasswordUpdatedViaController`,
+  all but the current one.
+
+Files:
+- **Row 1:**
+  - `resources/public-runtime/sw.ts`, `main.ts` and `lib/shell-cache.ts`, with
+    `__tests__/sw.test.ts` and `__tests__/resume-boot.test.ts`;
+  - `tests/Feature/Http/ServiceWorkerCachePrefixRouteTest.php`;
+  - `tests/e2e/public-runtime-offline.spec.ts`;
+  - `docs/offline-first-sync-design.md`.
+- **Row 2:**
+  - `app/Listeners/Auth/SendWelcomeEmail.php`, `JoinTenantOnRegistration.php` and
+    `app/Actions/Fortify/CreateNewUser.php`;
+  - the docblocks of `app/Services/Tenancy/TenantMembershipService.php`, `app/Services/Sso/SsoUserProvisioner.php`
+    and `app/Services/Sso/SsoAuthenticationException.php`;
+  - `tests/Feature/Settings/OpenTenantRegistrationTest.php` and the auth/SSO tests it reaches;
+  - `docs/security-threat-model.md`, `docs/TESTING-GUIDE.md`, `docs/PRD.md`, `docs/adr/0016-saml-sso.md`,
+    `docs/multi-tenancy-rbac-design.md` and `docs/gamification-design.md`.
+- **Row 3:** a listener under `app/Listeners/Auth/`, and its test.
+- **Close-out:** the close-out artefacts.
+
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/backlog-triage.md`,
+`docs/gate-baselines.md`, `docs/claims/decisions.md` (`D95`), `PROGRESS.md` (own block), the docs above, and
+`tests/e2e/public-runtime-offline.spec.ts`.
+
+Paired files taken: none known. The prefix gate reads `sw.ts`'s source and is edited with it.
+
+Namespaces spent: one decision, `D95` (answered in chat). No migration, no ADR.
+
+Prediction: CI 6/6 on the first run; the service-worker E2E cases skip on CI, which has no service worker, and run
+locally only. ⚠️ **Most expected WRONG:** row 2 — a Pest or E2E test that registers and expects to be a member at once
+(beyond `OpenTenantRegistrationTest`), or one of the welcome tests, since the welcome listener now joins first.
 
 ## RELEASED — `M139`, smoke-test fixes 3 of 3: sections and their questions from the preview, and a question moved into a section by keyboard too (merged as PR #332, `b4fba4e1`, 6/6 green on its FIRST run with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

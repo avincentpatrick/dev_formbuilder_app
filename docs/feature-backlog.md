@@ -13138,31 +13138,31 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   because nothing has described what it would show; the first step is that description from the user. **Live.**
   Filed by `M135`. **Tier: during-testing.**
 
-- **`minor` · An image added to a note does not appear in the builder's preview until the page is reloaded.** Found by
+- ✅ **CLOSED BY `M137` (2026-10-06) — ****`minor` · An image added to a note does not appear in the builder's preview until the page is reloaded.** Found by
   `M137` from the staging smoke test (comment 17, marked fail: *"image did not reflect in the preview instantly, i
   needed to refresh the page"*). An uploaded image is served only after its virus check, so its first request answers
   409; `NoteContent.vue` records that error in a component-local `failedImages` set and never asks again, and the
   preview's runtime is remounted only when the form's shape changes, which an edited note's content is not. The
   content editor's own thumbnail already retries (`ContentBlocksEditor.vue`'s `wait()`), so the two disagree for up
-  to a minute and then for good. **Live.** Filed by `M137`. **Tier: early-testing.**
+  to a minute and then for good. **Live.** Filed by `M137`. **Tier: early-testing.** ✅ **CLOSED BY `M137` (2026-10-06), PR #330.** The builder preview asks again for an image still being checked, every 3 s up to ten times (the content editor's own schedule), and says so meanwhile; the guest and encode pages keep the description standing in, because only the preview opts in (`ContentImageRetryKey`). Pinned by `NoteContent.test.ts` and `PreviewPane.test.ts`, each turned red by a hand mutation.
 
-- **`minor` · The builder's preview cannot be scrolled when its questions are longer than the window.** Found by `M137`
+- ✅ **CLOSED BY `M137` (2026-10-06) — ****`minor` · The builder's preview cannot be scrolled when its questions are longer than the window.** Found by `M137`
   from the staging smoke test (comment 17: *"when the indicators is many and did not fit in the page, there is no way
   to scroll down"*). `.builder-preview` scrolls with `flex: 1` inside `.builder__centre-body`, which is not a flex
   container, so the pane grows to its content and `.builder__pane`'s `overflow: hidden` clips it; Structure
   (`.canvas`) and Logic (`.rail`) scroll because they take `height: 100%`. **Live.** Filed by `M137`.
-  **Tier: early-testing.**
+  **Tier: early-testing.** ✅ **CLOSED BY `M137` (2026-10-06), PR #330.** `.builder-preview` takes `height: 100%`, as `.canvas` and `.rail` do. A real-browser test in `tests/e2e/builder-axe.spec.ts` was red at all three viewports without it (607px of preview in a 520px window, unscrollable) and green with it.
 
-- **`nit` · The form settings window is too small for its ten sections.** Found by `M137` from the staging smoke test
+- ✅ **CLOSED BY `M137` (2026-10-06) — ****`nit` · The form settings window is too small for its ten sections.** Found by `M137` from the staging smoke test
   (comment 13, a pass with the note *"can you make the modal for the form settings, larger? its too small"*).
   `MdsModal` is capped at 520 pixels and has no size; `FormSettingsModal.vue` opens every section in it. Taken before
-  Oct 12 by `D91`. **Live.** Filed by `M137`. **Tier: early-testing.**
+  Oct 12 by `D91`. **Live.** Filed by `M137`. **Tier: early-testing.** ✅ **CLOSED BY `M137` (2026-10-06), PR #330.** `MdsModal` gained `size` — `md` (520px) stays the default, `lg` is 880px, and both are the full-screen sheet at 480px and below — and `FormSettingsModal` opens at `lg`. A `Wide` story puts it in the design-system axe scan.
 
-- **`minor` · Data sharing's "Only the questions I choose" list cannot be searched, so a form with many questions is a
+- ✅ **CLOSED BY `M137` (2026-10-06) — ****`minor` · Data sharing's "Only the questions I choose" list cannot be searched, so a form with many questions is a
   long scroll of checkboxes.** Found by `M137` from the staging smoke test (comment 10, a pass with the note *"for the
   only the questions i chose, can that be searchable? so when columns are many, we dont need to use the scroll"*).
   `DataSharingPanel.vue` renders every shareable question as a checkbox with no filter. Taken before Oct 12 by `D91`.
-  **Live.** Filed by `M137`. **Tier: early-testing.**
+  **Live.** Filed by `M137`. **Tier: early-testing.** ✅ **CLOSED BY `M137` (2026-10-06), PR #330.** From seven questions up the list gains a search with a count of chosen and shown; a question the search hides stays chosen. Pinned by `DataSharingPanel.test.ts`, turned red by a hand mutation.
 
 - **`minor` · The move after the thank-you screen always waits 20 seconds; the form builder cannot choose the delay.**
   Found by `M137` from the staging smoke test (comment 14, a pass with the note *"20 seconds to redirect is too long.

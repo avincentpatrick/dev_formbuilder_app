@@ -16,82 +16,76 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M137`, smoke-test fixes 1 of 3: the builder preview shows a new image and scrolls, the settings window grows, and Data sharing's question list is searchable (m137-smoke-fixes)
+## Status: NO ACTIVE CLAIM — `M137` is merged; the builder preview shows a new image and scrolls, the settings window is wide, Data sharing's list is searchable, and M138 (the redirect delay, reference files hidden) is next
 
-Taken 2026-10-06. Branch `m137-smoke-fixes`, cut from `origin/main` at `14e9d143`, PR into `main`.
-The user finished the staging smoke test today: 16 of 21 passed, 4 failed (comments 11, 12, 17, 18), and the OCR scan
-was not checked (now the marker `ocr-staging-scan`). The marks were read from the page first, and every failure and
-every request riding on a pass is filed in this push. Three decisions were answered in chat:
-- **`D91`** — comments 13, 18, 14 and 10 go in before Oct 12, an exception to `D90`;
-- **`D92`** A — reference files hidden from respondents now, rebuilt Kobo-style after Oct 12;
-- **`D93`** A — automations v1 stays for testing, Workflows after.
+## RELEASED — `M137`, smoke-test fixes 1 of 3: the builder side (merged as PR #330, `8108b638`, 6/6 green on its THIRD run with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 
-The work is split three ways under `D75` so a red run points at one change:
-- **`M137`** — this increment, the builder side;
-- **`M138`** — the redirect delay (`R-df7f4b62`, a migration) and hiding reference files (`R-10c9e1bc`), both on the
-  public form;
-- **`M139`** — sections from the preview (`R-598b9100`).
+Shipped 2026-10-06. Branch `m137-smoke-fixes`, cut from `origin/main` at `14e9d143`. The claim commit is `b43b7778`.
 
-Rows, each its own commits, in this order:
-1. **`R-ddb4fc26`** — an image added to a note shows in the preview only after a reload.
-2. **`R-ef4334b1`** — the preview cannot scroll.
-3. **`R-581cb07b`** — the form settings window is too small (`D91`).
-4. **`R-16912370`** — Data sharing's "Only the questions I choose" list cannot be searched (`D91`).
+**After the user's staging smoke test: 16 of 21 passed, 4 failed (comments 11, 12, 17, 18), and the OCR scan was not
+checked.** The marks were read from the page first. The claim filed every failure and every request riding on a pass,
+and recorded three decisions answered in chat:
+- **`D91`** — comments 13, 18, 14 and 10 go in before Oct 12, an exception to `D90`, amending `D76`;
+- **`D92`** A — reference files hidden from respondents now, rebuilt Kobo-style after;
+- **`D93`** A — automations v1 for testing, Workflows after.
 
-### Evidence verified
+Both D92 and D93 were researched against Kobo's, ODK's and Fillout's own documentation before they were asked.
 
-Against `14e9d143`:
-- **`R-ddb4fc26` — held.** `NoteContent.vue:35` keeps `failedImages` per component, and `:85` adds an id on the first
-  `@error` with no retry. The upload answers before the virus check, and `AttachmentController::show` answers 409 until
-  it passes. The content editor's thumbnail retries (`ContentBlocksEditor.vue:242-270`, 3 s × 10); the preview does not.
-- **`R-ef4334b1` — held.**
-  - `PreviewPane.vue:183-190` scrolls with `flex: 1`;
-  - its parent `.builder__centre-body` (`Builder.vue:924-927`) is not a flex container;
-  - `.builder__pane` (`:831-835`) clips with `overflow: hidden`.
-- **`R-581cb07b` — held.** `.mds-modal__panel` has `max-width: 520px` (`Modal.vue:382`), and `MdsModal` has no size prop.
-- **`R-16912370` — held.** `DataSharingPanel.vue:193-201` renders every shareable question as a checkbox, with no filter.
+Commits, in the stated order:
+- markers `c7dac4ad`;
+- row 1 `98ca5774`, row 2 `bc72b70e`, row 3 `0df8c417`, row 4 `99095bfc`;
+- ledger cross-references `ab685c0f`;
+- the trunk fix `9cca218f` and `465db11e`;
+- one filer per row `b5e39461`;
+- the line `19fa7049`.
 
-### Premise verified
+**Rows and decisions:**
+- **Closed:** `R-ddb4fc26`, `R-ef4334b1`, `R-581cb07b`, `R-16912370`, and the marker `staging-smoke-test`.
+- **Filed:** three early-testing rows for `M138`/`M139` — the redirect delay, hiding reference files, sections from the
+  preview.
+- **Filed, during-testing:** four rows queued by `D92`/`D93` — CSV choice lists, lookup pre-fill, media in questions,
+  Workflows v2.
+- **Filed, marker:** `ocr-staging-scan`, the OCR check the user could not do.
+- **Amended:** the two remainder rows.
+- **Decisions:** `D91`, `D92`, `D93`.
+- **Namespaces spent:** those three. No migration, no ADR.
 
-- ⚠️ **`NoteContent.vue` is not the builder's alone.** It renders notes on the guest page, the encode page and the builder
-  preview. A retry there would make respondents' pages ask the image route again, a route `content-images.ts` keeps off
-  `throttle:guest` on purpose. So the retry is opt-in: the builder preview provides it, and every other surface keeps
-  today's "the description stands in" behaviour.
-  - A query on the guest URL would be safe anyway: it is not signed, and the service worker keys the cache by path.
-- **`MdsModal` has other users,** so the new size defaults to today's 520 pixels. Only the form settings window asks for
-  the wide one. At 480 pixels and below it is still the full-screen sheet.
-- **The Data sharing panel has two homes.** It is the form page's Settings tab and the builder's settings window, both
-  through `FormSettingsSections.vue`, so one change reaches both.
-- **Comment 10's wording names this list.** *"for the only the questions i chose"* is the panel's own radio label,
-  "Only the questions I choose". The linked-choice picker in the builder shows only the questions already chosen here.
+**Files:**
+- **Outside the claim's list:** `package.json`, `package-lock.json` and the design system's two, for the trunk fix below.
+  No claim extension was pushed first; they are recorded here.
+- **Claimed and not needed:** `note-content.ts`'s test — the helper's case sits in `NoteContent.test.ts`.
 
-### Remedy verdict
+### What changed
+- **The builder preview asks again for a note's image that is still being checked.**
+  - Every 3 s, up to ten times, it asks again and says "still being checked" meanwhile.
+  - Only the preview opts in (`ContentImageRetryKey`); the guest and encode pages keep the description standing in.
+- **The preview scrolls.** It takes `height: 100%`, like Structure and Logic. Real-browser proof: red at all three
+  viewports without the fix, green with it.
+- **`MdsModal` has a size.** `lg` is 880px; `md` stays the 520px default, and both are the phone's full-screen sheet.
+  The form settings window opens wide.
+- **Data sharing's chosen-questions list has a search** from seven questions up, and a hidden choice stays chosen.
+- ⚠️ **A trunk-wide fix.** `npm audit` had turned the static-analysis job red on every branch with three high advisories:
+  - `vue`/`@vue/server-renderer` ≤ 3.5.41 (GHSA-g2v6-rqmx-r4w6, an SSR attribute XSS);
+  - `source-map-js` 1.2.1 (GHSA-68fv-2mgg-jv7q).
 
-- **`R-ddb4fc26`:** none prescribed. The editor's own retry is the precedent: same interval, same cap, and the description
-  or a "being checked" line while waiting.
-- **`R-ef4334b1`:** works by measurement of its siblings. `.canvas` and `.rail` take `height: 100%` and scroll. Proved in
-  a real browser, red then green, in `tests/e2e/builder-axe.spec.ts`.
-- **`R-581cb07b` and `R-16912370`:** none prescribed.
+  Both are fixed by raising `vue` to `^3.5.43` and taking `source-map-js` 1.2.2. `npm audit fix`'s wider sweep (Vitest,
+  browserslist and more) was refused. The design system's own dev Vue had to move too: CI installs it as a second copy
+  beside the root's, and two copies fail the type-check (`[RefSymbol]` missing between the two `Ref` types).
 
-Files:
-- `resources/js/components/submissions/NoteContent.vue` and `note-content.ts`, with their tests;
-- `resources/js/components/builder/PreviewPane.vue`, with its test;
-- `packages/design-system/src/components/Modal/Modal.vue`, with its test and story;
-- `resources/js/components/builder/FormSettingsModal.vue` and `resources/js/components/forms/FormSettingsSections.vue`;
-- `resources/js/components/forms/DataSharingPanel.vue`, with its test;
-- `tests/e2e/builder-axe.spec.ts`;
-- the close-out artefacts.
+### How the prediction fared
 
-Shared artefacts taken: `docs/feature-backlog.md`, `docs/claims/decisions.md`, `docs/deployment-infrastructure.md`,
-`docs/pipeline.md`, `docs/backlog-triage.md`, `docs/gate-baselines.md`, `PROGRESS.md` (own block), and
-`tests/e2e/builder-axe.spec.ts`.
+| Predicted | Actual |
+|---|---|
+| CI 6/6 on the first run | **Wrong — 6/6 on the THIRD run.** First run: static analysis red on the new `vue` advisories (not this diff), and Pest red on `BacklogProvenanceTest` — four of the new rows said "Filed by" twice. Second run: the type-check red on two Vue copies, which the root bump alone created. |
+| ⚠️ Most expected WRONG: the design-system axe job, or an E2E axe scan over the wider window | **Wrong.** Both green first time. |
 
-Paired files taken: none expected. A red gate naming a file this diff does not touch is read as a paired-file symptom.
-
-Namespaces spent: `D91`, `D92`, `D93`. No migration, no ADR.
-
-Prediction: CI 6/6 on the first run. ⚠️ **Most expected WRONG: the design-system axe job, or an E2E axe scan over the
-wider settings window.** A new modal width changes what the scans see, and the Storybook axe cannot run on this host.
+Unpredicted:
+- **The claim push was refused by the pre-push guard.** A marker file (`docs/deployment-infrastructure.md`) is not claim
+  protocol, so the marker moved into the PR's first commit.
+- **`builder-content-axe` timed out locally on host load,** 4 of 6 and then 1 of 2. The page snapshot showed the awaited
+  tabs rendered just after the 5 s wait, and CI ran the spec green.
+- **The local type-check did not show the two-Vue failure.** Whether the design system's nested Vue existed locally
+  before the bump was not measured; after it, both copies read 3.5.43 and the type-check reads 0 errors.
 
 ## RELEASED — `M136`, the OCR bake-off harness: `ocr:bakeoff-layout` and `ocr:bakeoff` score the reader against correct answers (merged as PR #329, `017b6fdc`, 6/6 green on its FIRST run with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

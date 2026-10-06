@@ -4283,26 +4283,19 @@
                                                                 "type": "array",
                                                                 "items": {
                                                                     "type": "array",
-                                                                    "prefixItems": [
-                                                                        {
-                                                                            "type": "integer"
-                                                                        },
-                                                                        {
-                                                                            "type": "string"
-                                                                        },
-                                                                        {
-                                                                            "type": "string"
-                                                                        },
-                                                                        {
-                                                                            "type": [
-                                                                                "string",
-                                                                                "null"
-                                                                            ]
-                                                                        }
-                                                                    ],
-                                                                    "minItems": 4,
-                                                                    "maxItems": 4,
-                                                                    "additionalItems": false
+                                                                    "items": {
+                                                                        "anyOf": [
+                                                                            {
+                                                                                "type": "integer"
+                                                                            },
+                                                                            {
+                                                                                "type": "string"
+                                                                            },
+                                                                            {
+                                                                                "type": "null"
+                                                                            }
+                                                                        ]
+                                                                    }
                                                                 }
                                                             }
                                                         },

@@ -75,7 +75,7 @@ final class ChoiceListMaterializer
      * parent]`, the parent null at the first level. Read from the frozen snapshot, so it is the list the version was
      * published with.
      *
-     * @return array<string, array{levels: list<string>, options: list<array{0: int, 1: string, 2: string, 3: string|null}>}>
+     * @return array<string, array{levels: list<string>, options: list<list<int|string|null>>}>
      */
     public static function listsForBrowser(FormVersion $version): array
     {

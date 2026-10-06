@@ -16,7 +16,109 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M140` is merged; both security rows `D94` put first are closed, with the two takeover routes found under them, and `D92`'s CSV choice lists are next (`R-f69aab42`, file shape `D95`)
+## Status: ACTIVE CLAIM — `M141`, choice lists from CSV files, one file per level in Kobo's format, feeding a cascading select (m141-csv-choice-lists)
+
+Taken 2026-10-07. Branch `m141-csv-choice-lists`, cut from `origin/main` at `4fbee86e`, PR into `main`.
+`D94`'s second item; `D92` = A's first Kobo-style use; the file shape is `D95` (one file per level). OCR goes ahead of this
+the moment its samples and a key arrive. One row:
+- **`R-f69aab42`** — a choice list cannot come from an uploaded CSV, so a long cascading list (region → province →
+  city/municipality → barangay) must be typed into the form.
+
+Also filed in this push and **not taken**: the staff encode page would carry a CSV-backed cascade's whole list in its page
+props (`minor`, `during-testing`).
+
+### Evidence verified
+
+Against `4fbee86e`, by a read-only fan-out and then by hand:
+- **Held.** `FieldType::CascadingSelect` stores `config.levels` (`{key,label}`) and a flat `config.options`
+  (`{level,value,parent,label}`), matched by value. Nothing reads a choice list from a file. The reference-files stack
+  (`FormReferenceFileService`, `config/attachments.php`) accepts PDF and images only; a CSV is refused by the sniffed
+  type (`text/csv`, or `text/plain` for a semicolon, tab or ragged file).
+- **The row understates the size.** A PSGC barangay list is about 42,000 rows, so the list cannot live in a draft field's
+  `config`:
+  - every builder PATCH sends the whole `config`, and `UpdateFieldRequest` validates `config.options.*` per option;
+  - `CascadingEditor.vue` renders a card per option with an O(n²) parent list;
+  - `SchemaSnapshotSerializer` copies `config` into the checksummed snapshot that `PublicFormPresenter` serves and
+    the service worker caches.
+
+### Premise verified
+
+- **`uploading-import` (held) does not cover this.** `D92`, `D94` and `D95` are the user's explicit signal for this
+  one feature.
+- **One seam validates every channel.** `SemanticValidator::validate()` reads the PUBLISHED version's `form_fields.config`
+  for guest, encode, offline sync, OCR, draft promote and answer edits. So do the label readers: `SchemaValueFormatter`
+  (export, inbox, PDF, connectors, the automation payload), OCR's `OcrAnswerReader` and `EncodeFormPresenter::cascade()`.
+  ⛔ So if a PUBLISHED version holds the list as ordinary `config.options`, every one of them is right with no change.
+  Only the DRAFT and the transport to browsers must stay list-free.
+- **The gate runs only at publish** (`PublishService` is `assertPublishable()`'s one caller). So the lists can be
+  turned into options inside the publish transaction, just before the gate, and the gate's parent check then proves
+  the files agree.
+- **The runtime never recomputes the checksum.** It compares the server's string (`App.vue`, `RuntimeSession.vue`), so
+  the public schema can leave the options out and the runtime can fetch them. That is the linked-choices precedent
+  (`D60` = A).
+- **Unlike linked choices, a list is frozen per version,** so the server's membership check cannot reject a stale
+  offline answer: the answer is pinned to the version whose list it was chosen from.
+- **Two gaps the gate does not catch, which a CSV would hit:**
+  - a root option whose `parent` is not null publishes and is never shown (`FieldInput.vue` shows roots by
+    `parent === null`);
+  - a duplicate value within a level publishes, and the later parent silently wins.
+- **Format (`D95`).** A file has `name` (a unique code at its level) and `label` columns. A file below the first adds a
+  column named after the level above. OpenSpout reads CSV and strips a BOM; the bake-off reader's delimiter detection
+  is the precedent.
+
+### Remedy verdict
+
+The row's remedy, a list from a CSV feeding the existing `cascading_select`, **works**. It is shaped as below.
+
+- **Storage.** A new table `form_version_choice_lists` holds the parsed rows per version. It uses draft-child row
+  security like `form_version_reference_files`, is cloned at publish and restore, and has no attachment. Upload,
+  replace and remove are form-settings endpoints taking the `forms` lock.
+- **Field config.** Each cascade level names a list (`config.levels[].list`). A cascade is list-backed when every
+  level does, and its draft `config.options` stays empty. The builder's level editor picks the list, and the option
+  editor gives way to a count.
+- **Publish.** Build the options from the lists before the gate, with the root `parent` null. Refuse:
+  - a missing list;
+  - a missing parent column;
+  - an unknown parent;
+  - a duplicate value.
+
+  The clone strips the options from the new draft.
+- **Transport.**
+  - The public schema leaves a list-backed field's options out.
+  - A new guest endpoint serves them per version, and the runtime merges them in, as it does linked choices.
+  - The service worker keeps them by version without the share token.
+  - The encode page's engine copy is stripped.
+- **Runtime.** `FieldInput.vue` indexes options by level and parent once, instead of filtering the whole list per
+  render.
+
+Files:
+- **New:**
+  - a migration (prefix `2026_08_17_000127`);
+  - `app/Models/FormVersionChoiceList.php`;
+  - a parser and a service under `app/Services/Forms/`;
+  - a controller with its requests, and the routes in `routes/tenant.php` and `routes/api.php`;
+  - `resources/public-runtime/lib/choice-lists.ts`;
+  - a builder panel and its API module under `resources/js/components/forms/`.
+- **Edited:**
+  - `PublishService`, `SchemaTreeCloner`, `RestoreService`, `StructuralValidationGate`, `UpdateFieldRequest`,
+    `PublicFormPresenter`, `EncodeFormPresenter`, `FormSettingsPresenter`, `BuilderPresenter`;
+  - `TenantScopedTables`, `TenantExtractColumns`;
+  - `sw.ts`, `api-client.ts`, `CascadingEditor.vue`, `ConfigPanel.vue`, `FormSettingsSections.vue`, `FieldInput.vue`,
+    `draft-snapshot.ts`, `preview-model.ts`;
+  - `openapi.json`, `docs/data-dictionary.md` (appended), `docs/offline-first-sync-design.md`, `docs/TESTING-GUIDE.md`;
+  - the tests for each.
+
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/backlog-triage.md`, `docs/gate-baselines.md`,
+`PROGRESS.md` (own block), `openapi.json`, `docs/data-dictionary.md`, `docs/offline-first-sync-design.md`,
+`docs/TESTING-GUIDE.md`.
+
+Paired files taken: `sw.ts` with `ServiceWorkerCachePrefixRouteTest.php`; `openapi.json` with the routes.
+
+Namespaces spent: migration prefix `2026_08_17_000127`. No ADR, no decision.
+
+Prediction: CI 6/6, but not on the first run. ⚠️ **Most expected WRONG:** the Contract job over the new guest endpoint
+(`openapi.json` and Scramble's reading of the response). The next most likely is a drift gate over the new table
+(`TenantExtractColumns`, the data dictionary, the constraint boundary).
 
 ## RELEASED — `M140`, security first under `D94`: the resume page cached under one token-free key, an address that is not the account's own until confirmed, and a password reset that signs out every other session (merged as PR #333, `3698e1e1`, 6/6 green on its FIRST run with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

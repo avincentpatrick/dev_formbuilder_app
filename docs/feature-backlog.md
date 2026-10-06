@@ -13265,3 +13265,10 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `localAccountUnverified`, threat-model residual 14), so a password reset is their only way in. No scheduled job and
   no `Prunable` touches users. A sweep of accounts never confirmed after a set number of days, holding no membership
   and no submission, would free the address. **Live.** Filed by `M140`. **Tier: before-launch.**
+
+- **`minor` · The staff encode page carries a CSV-backed cascade's whole list in its page props.** Filed by `M141`, which
+  turns a version's CSV choice lists into ordinary `config.options` at publish so every server-side reader stays
+  correct. `EncodeFormPresenter` renders a cascade from the published field's options (`cascade()`), so a 42,000-row
+  barangay list rides in the Inertia props on every encode load (a few MB). `M141` strips the engine's copy of the
+  schema and leaves the render copy, which the page needs. The fix is the guest runtime's: fetch the lists beside the
+  page, by version. **Live.** **Tier: during-testing.**

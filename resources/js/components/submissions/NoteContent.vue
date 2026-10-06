@@ -13,14 +13,16 @@
  * Content is NOT piped: it is not on the template-bearing list (§6), so a `${key}` in a paragraph is text.
  */
 import { MdsCallout } from '@meridian/design-system';
-import { h, inject, reactive, type FunctionalComponent, type VNodeChild } from 'vue';
+import { h, inject, onBeforeUnmount, reactive, type FunctionalComponent, type VNodeChild } from 'vue';
 import {
     ContentHeadingBaseKey,
+    ContentImageRetryKey,
     ContentImageUrlKey,
     headingTag,
     safeLink,
     spanText,
     staffContentImageUrl,
+    withAttempt,
     type ContentBlock,
     type ContentSpan,
 } from './note-content';
@@ -29,10 +31,42 @@ defineProps<{ blocks: ContentBlock[] }>();
 
 const headingBase = inject(ContentHeadingBaseKey, 2);
 const imageUrl = inject(ContentImageUrlKey, staffContentImageUrl);
+const retry = inject(ContentImageRetryKey, null);
 
 // An image the server will not serve yet (still being checked, or refused) cannot be known from the payload,
 // whose checksum is pinned; the browser's own load error is the signal, and the description stands in for it.
 const failedImages = reactive(new Set<string>());
+
+// M137 (`R-ddb4fc26`): where the page asks for it (the builder preview), a failed image is asked for again, each
+// time under a fresh address, until it loads or the tries run out. Meanwhile it says it is being checked.
+const attempts = reactive(new Map<string, number>());
+const waiting = reactive(new Set<string>());
+const timers = new Set<number>();
+
+function srcFor(attachmentId: string): string {
+    return withAttempt(imageUrl(attachmentId), attempts.get(attachmentId) ?? 0);
+}
+
+function onImageError(attachmentId: string): void {
+    const tried = attempts.get(attachmentId) ?? 0;
+    if (retry === null || tried >= retry.maxAttempts) {
+        failedImages.add(attachmentId);
+        return;
+    }
+
+    waiting.add(attachmentId);
+    const timer = window.setTimeout(() => {
+        timers.delete(timer);
+        attempts.set(attachmentId, tried + 1);
+        waiting.delete(attachmentId);
+    }, retry.delayMs);
+    timers.add(timer);
+}
+
+onBeforeUnmount(() => {
+    timers.forEach((timer) => window.clearTimeout(timer));
+    timers.clear();
+});
 
 /** One run of text, wrapped innermost-first: code, then italic, then bold, then the link around all of it. */
 const SpanRun: FunctionalComponent<{ span: ContentSpan }> = (props) => {
@@ -76,15 +110,22 @@ SpanRun.props = ['span'];
             </MdsCallout>
             <hr v-else-if="block.type === 'divider'" class="note-content__divider" />
             <figure v-else-if="block.type === 'image'" class="note-content__figure">
+                <p v-if="waiting.has(block.attachment_id)" class="note-content__alt" data-image-checking>
+                    This image is still being checked. It appears here once it passes.
+                </p>
                 <img
-                    v-if="!failedImages.has(block.attachment_id)"
+                    v-else-if="!failedImages.has(block.attachment_id)"
+                    :key="srcFor(block.attachment_id)"
                     class="note-content__image"
-                    :src="imageUrl(block.attachment_id)"
+                    :src="srcFor(block.attachment_id)"
                     :alt="block.alt ?? ''"
                     loading="lazy"
-                    @error="failedImages.add(block.attachment_id)"
+                    @error="onImageError(block.attachment_id)"
                 />
                 <p v-else-if="(block.alt ?? '') !== ''" class="note-content__alt">{{ block.alt }}</p>
+                <p v-else-if="retry !== null" class="note-content__alt" data-image-gave-up>
+                    This image is not ready yet. Reload the page to try again.
+                </p>
             </figure>
         </template>
     </div>

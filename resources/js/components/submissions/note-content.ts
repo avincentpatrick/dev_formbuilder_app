@@ -35,6 +35,27 @@ export function staffContentImageUrl(attachmentId: string): string {
     return `/attachments/${encodeURIComponent(attachmentId)}`;
 }
 
+/**
+ * How often an image that failed to load is asked for again, and how many times (M137, `R-ddb4fc26`).
+ *
+ * ⛔ OPT-IN, AND ONLY THE BUILDER PREVIEW OPTS IN. An image just uploaded there answers 409 until its virus check
+ * passes, so its first load fails by design and a minute later succeeds; without a retry the preview kept the failure
+ * until the page was reloaded. The guest page and the encode page provide nothing and keep "the description stands
+ * in": a respondent's page asking an image route again and again would spend requests on an image that, once a form
+ * is published, has long been checked.
+ */
+export interface ContentImageRetry {
+    delayMs: number;
+    maxAttempts: number;
+}
+
+export const ContentImageRetryKey: InjectionKey<ContentImageRetry | null> = Symbol('content-image-retry');
+
+/** The same address asked for afresh: the browser keeps a failed response per URL, so each try needs its own. */
+export function withAttempt(url: string, attempt: number): string {
+    return attempt === 0 ? url : `${url}${url.includes('?') ? '&' : '?'}attempt=${attempt}`;
+}
+
 const TONES = new Set(['info', 'success', 'warning', 'danger']);
 
 /** The HTML heading tag for a block: the context's level plus the block's relative level, never past `h6`. */

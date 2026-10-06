@@ -25,7 +25,8 @@
  * a label edit — the child would mount against a schema newer than the shape that keyed it, which is
  * precisely the class of drift this whole design exists to avoid.
  */
-import { computed, h, onBeforeUnmount, ref, watch, type FunctionalComponent } from 'vue';
+import { computed, h, onBeforeUnmount, provide, ref, watch, type FunctionalComponent } from 'vue';
+import { ContentImageRetryKey } from '../submissions/note-content';
 import PreviewRuntime from './PreviewRuntime.vue';
 import { PRESET_PREVIEW_ATTR, presetScopeCss } from './preset-scope';
 import { PREVIEW_REBUILD_DEBOUNCE_MS, buildPreviewModel, previewLimitations } from './preview-model';
@@ -40,6 +41,11 @@ const props = defineProps<{
     /** True while Preview is the selected centre view. Gates the rebuild, never the mounting. */
     active: boolean;
 }>();
+
+// M137 (`R-ddb4fc26`): an image the author has just added answers 409 until its virus check passes, so the preview
+// asks again on the content editor's own schedule (`ContentBlocksEditor.vue`, 3 s, ten tries) instead of keeping
+// the first failure until a reload. Only this surface opts in; see `ContentImageRetry`.
+provide(ContentImageRetryKey, { delayMs: 3000, maxAttempts: 10 });
 
 const model = computed(() =>
     buildPreviewModel({

@@ -54,6 +54,7 @@ function panel(overrides: Record<string, unknown> = {}) {
                 redirect_form_id: null,
                 redirect_url: null,
                 redirect_targets: TARGETS,
+                redirect_delay_seconds: 20,
                 theme_preset: null,
                 theme_presets: [],
                 default_locale: 'en',
@@ -100,6 +101,7 @@ describe('ConfirmationPanel — where a respondent goes after the thank-you (M13
             confirmation_message_translations: null,
             redirect_kind: 'url',
             redirect_url: 'https://health.example.org/next',
+            redirect_delay_seconds: 20,
         });
 
         await radio(wrapper, 'Go to another form').setValue(true);
@@ -156,8 +158,32 @@ describe('ConfirmationPanel — where a respondent goes after the thank-you (M13
 
         expect(group.find('legend').text()).toBe('After the thank-you screen');
         const help = wrapper.find(`#${group.attributes('aria-describedby')}`);
-        expect(help.text()).toContain('after 20 seconds unless they choose to stay');
+        expect(help.text()).toContain('after the wait you choose unless they choose to stay');
         expect(wrapper.find('select').exists()).toBe(false);
         expect(wrapper.find('input[type="url"]').exists()).toBe(false);
+    });
+
+    it('offers the four waits beside a destination, says what under 20 costs, and sends the choice (M138, D91)', async () => {
+        const wrapper = panel({ redirect_kind: 'url', redirect_url: 'https://health.example.org/next', redirect_delay_seconds: 10 });
+        const delay = wrapper.find('select[data-redirect-delay]');
+
+        expect(delay.findAll('option').map((o) => o.text())).toEqual(['5 seconds', '10 seconds', '20 seconds (recommended)', '30 seconds']);
+        expect((delay.element as HTMLSelectElement).value).toBe('10');
+        expect(wrapper.text()).toContain('less time than the accessibility guideline (WCAG 2.2.1) asks for');
+
+        await delay.setValue('30');
+        expect(wrapper.text()).not.toContain('WCAG 2.2.1');
+        expect((await save(wrapper, 'Save thank-you screen')).data).toMatchObject({ redirect_kind: 'url', redirect_delay_seconds: 30 });
+
+        // Staying has no wait to choose, and sends none.
+        await radio(wrapper, 'Stay on the thank-you screen').setValue(true);
+        expect(wrapper.find('select[data-redirect-delay]').exists()).toBe(false);
+        expect((await save(wrapper, 'Save thank-you screen')).data).not.toHaveProperty('redirect_delay_seconds');
+    });
+
+    it('offers no wait for a kept destination this author cannot open, which travels as no destination at all', () => {
+        const wrapper = panel({ redirect_kind: 'form', redirect_form_id: 'form-9' });
+
+        expect(wrapper.find('select[data-redirect-delay]').exists()).toBe(false);
     });
 });

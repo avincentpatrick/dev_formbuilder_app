@@ -358,6 +358,8 @@ export interface SubmitResult {
 export interface SubmitRedirect {
     url: string;
     label: string;
+    /** M138 (`R-df7f4b62`, `D91`): seconds the screen waits before moving — 5, 10, 20 or 30; anything else reads as 20. */
+    delaySeconds: number;
 }
 
 // ── H10 save-and-resume ────────────────────────────────────────────────────────────────────────

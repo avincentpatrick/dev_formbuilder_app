@@ -16,8 +16,9 @@
  *
  * ── AFTER THE THANK-YOU (M130, `R-db169c29`, `D76`) ─────────────────────────────────────────────────────
  * When the author set a destination and the server ACCEPTED the response, the screen names it and offers
- * "Continue now"; while the count runs it also offers "Stay on this page", and after 20 seconds it goes on
- * its own — WCAG 2.2.1 lets a timed move stand when the person can stop it, and 20 s is its floor.
+ * "Continue now"; while the count runs it also offers "Stay on this page", and after the form's delay it goes on
+ * its own — WCAG 2.2.1 lets a timed move stand when the person can stop it. The form builder chooses the delay
+ * (M138, `D91` amending `D76`): 20 s, WCAG's figure, by default, or 5, 10 or 30.
  *
  *   · The destination rides on the submit RESPONSE: a queued response never had one, so it cannot move, and
  *     App.vue drops it for a resolved conflict.
@@ -30,6 +31,7 @@
  */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { MdsButton } from '@meridian/design-system';
+import { DEFAULT_REDIRECT_DELAY } from '../lib/api-client';
 import type { SubmitRedirect } from '../lib/types';
 
 const props = withDefaults(
@@ -50,14 +52,14 @@ const props = withDefaults(
 );
 const emit = defineEmits<{ restart: []; leave: [] }>();
 
-/** WCAG 2.2.1's floor for a time limit the person can stop (`D76`). */
-const DELAY_SECONDS = 20;
 
 const heading = ref<HTMLElement | null>(null);
 const continueLink = ref<{ $el?: HTMLElement } | null>(null);
 // A queue tag means the server never answered, so there is nowhere to go.
 const destination = computed<SubmitRedirect | null>(() => (props.reference !== null ? props.redirect : null));
-const remaining = ref(DELAY_SECONDS);
+/** The wait the form builder chose; the parser has already reduced anything unexpected to 20 (M138). */
+const delaySeconds = computed(() => destination.value?.delaySeconds ?? DEFAULT_REDIRECT_DELAY);
+const remaining = ref(DEFAULT_REDIRECT_DELAY);
 const counting = ref(false);
 const announcement = ref('');
 // Once the respondent stays, leaves, starts again or comes Back to this page, the count never starts again.
@@ -110,8 +112,8 @@ function onRestart(): void {
 function startCount(): void {
     if (settled || counting.value || destination.value === null || props.framed || props.unsent > 0) return;
     counting.value = true;
-    remaining.value = DELAY_SECONDS;
-    announcement.value = `Next: ${destination.value.label}, in ${DELAY_SECONDS} seconds. Choose Stay on this page to remain here.`;
+    remaining.value = delaySeconds.value;
+    announcement.value = `Next: ${destination.value.label}, in ${delaySeconds.value} seconds. Choose Stay on this page to remain here.`;
     timer = setInterval(() => {
         remaining.value -= 1;
         if (remaining.value <= 0) go();

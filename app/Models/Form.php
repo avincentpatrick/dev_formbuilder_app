@@ -46,6 +46,7 @@ use Illuminate\Support\Carbon;
  * @property ?array<string, mixed> $confirmation_message_translations
  * @property ?string $redirect_url where a respondent goes after the thank-you screen (M130, `D76`); never with a form
  * @property ?string $redirect_form_id the other form a respondent goes to instead; written only by setConfirmationMessage()
+ * @property int $redirect_delay_seconds how long the thank-you screen waits before moving on: 5, 10, 20 (default) or 30 (M138, `D91`)
  * @property array<string, mixed> $capability_flags
  * @property string $default_locale
  * @property array<int, string> $supported_locales
@@ -147,6 +148,8 @@ class Form extends Model implements TenantScoped
             // $fillable: the only writer is FormService::setDataSharing(), behind its own route and gate (`D87`).
             'data_sharing_enabled' => 'boolean',
             'data_sharing_field_keys' => 'array',
+            // M138 (`R-df7f4b62`, `D91`): written only by setConfirmationMessage(), like the redirect it times.
+            'redirect_delay_seconds' => 'integer',
         ];
     }
 
@@ -159,6 +162,7 @@ class Form extends Model implements TenantScoped
      */
     protected $attributes = [
         'data_sharing_enabled' => false,
+        'redirect_delay_seconds' => 20,
     ];
 
     /**

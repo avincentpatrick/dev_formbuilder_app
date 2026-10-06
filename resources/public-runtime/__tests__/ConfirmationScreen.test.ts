@@ -8,7 +8,7 @@ import { createApiClient, parseRedirect } from '../lib/api-client';
  * M130 (`R-db169c29`, `D76`) — after the thank-you: the destination, a 20-second count the respondent can stop,
  * and every case in which nothing may count at all. Fake timers, so 20 seconds is a step rather than a wait.
  */
-const NEXT = { url: 'https://health.example.org/next', label: 'health.example.org' };
+const NEXT = { url: 'https://health.example.org/next', label: 'health.example.org', delaySeconds: 20 };
 
 const mounted: VueWrapper[] = [];
 
@@ -62,6 +62,19 @@ describe('ConfirmationScreen — after the thank-you (M130, D76)', () => {
         await tick(1_000);
         expect(navigate).toHaveBeenCalledExactlyOnceWith(NEXT.url);
         expect(wrapper.emitted('leave')).toHaveLength(1);
+    });
+
+    it('waits the delay the form builder chose instead (M138, D91)', async () => {
+        const { wrapper, navigate } = screen({ redirect: { ...NEXT, delaySeconds: 5 } });
+        await nextTick();
+
+        expect(wrapper.text()).toContain('Continuing in 5 seconds.');
+        expect(wrapper.find('[role="status"]').text()).toBe('Next: health.example.org, in 5 seconds. Choose Stay on this page to remain here.');
+
+        await tick(4_000);
+        expect(navigate).not.toHaveBeenCalled();
+        await tick(1_000);
+        expect(navigate).toHaveBeenCalledExactlyOnceWith(NEXT.url);
     });
 
     it('stays when asked: the count stops for good, and focus moves to the link that remains', async () => {
@@ -200,12 +213,22 @@ describe('parseRedirect — the client side of a navigation sink (M130)', () => 
     const origin = 'http://acme.localhost:8080';
 
     it('accepts an https destination, and an address on this page\'s own origin', () => {
-        expect(parseRedirect({ url: 'https://health.example.org/next', label: 'Next' }, origin)).toEqual({ url: 'https://health.example.org/next', label: 'Next' });
+        expect(parseRedirect({ url: 'https://health.example.org/next', label: 'Next', delay_seconds: 10 }, origin)).toEqual({ url: 'https://health.example.org/next', label: 'Next', delaySeconds: 10 });
         // A form destination is built from the app's URL, which is plain http on a local stack.
         expect(parseRedirect({ url: 'http://acme.localhost:8080/f/follow-up', label: 'Follow-up' }, origin)).toEqual({
             url: 'http://acme.localhost:8080/f/follow-up',
             label: 'Follow-up',
+            delaySeconds: 20,
         });
+    });
+
+    it('waits 20 seconds for any delay outside the four a builder may choose (M138), and never refuses over it', () => {
+        for (const delay of [5, 10, 20, 30]) {
+            expect(parseRedirect({ url: 'https://health.example.org', label: 'x', delay_seconds: delay }, origin)?.delaySeconds).toBe(delay);
+        }
+        for (const delay of [0, 1, 15, 60, -5, '5', null, undefined]) {
+            expect(parseRedirect({ url: 'https://health.example.org', label: 'x', delay_seconds: delay }, origin)?.delaySeconds, String(delay)).toBe(20);
+        }
     });
 
     it('refuses everything else, which means stay', () => {
@@ -236,7 +259,7 @@ describe('the destination through the real client (M130)', () => {
     }
 
     it('reads the destination off an accepted response', async () => {
-        const client = createApiClient({ token: 'tok', slug: 'intake', fetch: respond(NEXT) });
+        const client = createApiClient({ token: 'tok', slug: 'intake', fetch: respond({ url: NEXT.url, label: NEXT.label, delay_seconds: 20 }) });
 
         const result = await client.submit({ answers: {}, clientSubmissionUuid: '0192f1a2-b3c4-7d5e-8f90-0000000000d1', locale: 'en' });
 

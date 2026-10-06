@@ -6,32 +6,15 @@
  */
 import { createApp } from 'vue';
 import App from './App.vue';
-import type { Bootstrap } from './lib/types';
+import { readBootstrap } from './lib/bootstrap';
 import { registerServiceWorker } from './lib/register-sw';
 import { syncBrandedShellCache } from './lib/brand-cache';
 import { openDb } from './lib/db';
 import './public-runtime.css';
 
-function readBootstrap(el: HTMLElement): Bootstrap {
-    const data = el.dataset;
-    return {
-        shareToken: data.shareToken ?? '',
-        expiresAt: data.expiresAt ?? '',
-        formId: data.formId ?? '',
-        formTitle: data.formTitle ?? '',
-        slug: data.formSlug ?? '',
-        defaultLocale: data.defaultLocale || 'en',
-        // Increment H10 — populated by the `/f/resume/{token}` web shell; empty on a normal `/f/{slug}` entry.
-        resumeToken: data.resumeToken ?? '',
-        // Increment H23b — the tenant ramp's fingerprint, or 'none'. Never blank in practice; the fallback
-        // keeps a hand-built or pre-H23b cached shell from comparing `undefined` against a real value.
-        brandVersion: data.brandVersion ?? 'none',
-    };
-}
-
 const el = document.getElementById('app');
 if (el !== null) {
-    const bootstrap = readBootstrap(el);
+    const bootstrap = readBootstrap(el, window.location.pathname);
     createApp(App, { bootstrap }).mount(el);
     // Increment G8a — make the guest runtime installable + offline-capable. Only this entry registers a
     // service worker (scoped to /f/); the Inertia admin app (resources/js/app.ts) never does.

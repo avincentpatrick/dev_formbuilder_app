@@ -20,7 +20,7 @@ import { clientsClaim } from 'workbox-core';
 import { CONTENT_IMAGE_CACHE, contentImageCacheKey } from './lib/content-images'; import { REFERENCE_FILE_CACHE, referenceFileCacheKey } from './lib/reference-files';
 import { openDb } from './lib/db'; import { LINKED_CHOICE_CACHE, linkedChoicesCacheKey } from './lib/linked-choices';
 import { replayOutbox } from './lib/replay';
-import { SHELL_CACHE, SHELL_EXPIRATION } from './lib/shell-cache';
+import { SHELL_CACHE, SHELL_EXPIRATION } from './lib/shell-cache'; import { isResumeShell } from './lib/brand-cache'; import { purgeTokenKeyedResumeShells, resumeShellCacheKey, tokenFreeShell } from './lib/resume-shell';
 
 declare const self: ServiceWorkerGlobalScope & {
     __WB_MANIFEST: Array<string | { url: string; revision: string | null }>;
@@ -87,11 +87,34 @@ registerRoute(
 // that is the one route where it matters: `lib/brand-cache.ts` writes into this cache from the WINDOW
 // and renews this same clock, so a literal here would be one of two copies of a fact.
 registerRoute(
-    ({ request, url, sameOrigin }) => request.mode === 'navigate' && sameOrigin && url.pathname.startsWith('/f/'),
+    ({ request, url, sameOrigin }) => request.mode === 'navigate' && sameOrigin && url.pathname.startsWith('/f/') && !isResumeShell(url.href),
     new NetworkFirst({
         cacheName: SHELL_CACHE,
         networkTimeoutSeconds: 5,
         plugins: [new CacheableResponsePlugin({ statuses: [200] }), new ExpirationPlugin({ ...SHELL_EXPIRATION })],
+    }),
+);
+
+// M140 (`R-68656155`, `D20` = 2) — a resume link's shell, in the same cache under ONE token-free key, so the device
+// keeps the offline surface a resume link brings without holding the link. The key rewrite closes both places the
+// tokens could be listed (Cache Storage's keys and the expiry store); the stored copy has `data-resume-token` blanked;
+// the boot reads the token from the address (`lib/bootstrap.ts`). See `lib/resume-shell.ts`.
+//
+// ⛔ NO `networkTimeoutSeconds`, AND THAT IS THE LINE THAT MAKES ONE SHARED KEY SAFE. The route above answers from
+// the cache after 5 seconds while still ONLINE; here that would boot a slow link with another link's cached page. So
+// this cache answers only on a real network error. The shell route above leaves resume links to this one by
+// `isResumeShell()`, which also keeps the brand sweep off this entry. The prefix is a literal on purpose:
+// `ServiceWorkerCachePrefixRouteTest` reads every cached prefix out of this file.
+registerRoute(
+    ({ request, url, sameOrigin }) => request.mode === 'navigate' && sameOrigin && url.pathname.startsWith('/f/resume/'),
+    new NetworkFirst({
+        cacheName: SHELL_CACHE,
+        plugins: [
+            { cacheKeyWillBeUsed: async ({ request }) => resumeShellCacheKey(request.url) },
+            new CacheableResponsePlugin({ statuses: [200] }),
+            { cacheWillUpdate: async ({ response }) => tokenFreeShell(response) },
+            new ExpirationPlugin({ ...SHELL_EXPIRATION }),
+        ],
     }),
 );
 
@@ -167,4 +190,10 @@ self.addEventListener('message', (event) => {
     if ((event as ExtendableMessageEvent).data === 'replay-outbox') {
         event.waitUntil(replayOutbox(openDb(), self.fetch.bind(self)).then(() => undefined));
     }
+});
+
+// M140 (`R-68656155`) — a worker from before M140 cached each resume link under its own token-bearing URL. Delete
+// those entries and their expiry stamps once, when this worker takes over, rather than leave them for the clock.
+self.addEventListener('activate', (event) => {
+    (event as ExtendableEvent).waitUntil(purgeTokenKeyedResumeShells(self.caches, self.indexedDB));
 });

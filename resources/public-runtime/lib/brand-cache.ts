@@ -69,7 +69,7 @@ export interface BrandCacheDeps {
     currentUrl: string;
     caches?: CacheStorage;
     fetch?: typeof fetch;
-    navigator?: Navigator;
+    navigator?: { readonly onLine: boolean }; // structural: `sw.ts` imports `isResumeShell()`, and a worker has no DOM `Navigator`
 }
 
 /**

@@ -25,6 +25,7 @@
  */
 
 import { describe, expect, it, vi } from 'vitest';
+import { isResumeShell } from '../lib/brand-cache';
 
 /**
  * ⛔ THE MODULE IS IMPORTED STATICALLY, AT FILE SCOPE, AND THAT IS NOT A STYLE CHOICE — IT IS THE
@@ -151,14 +152,16 @@ function apiGet(path: string): MatchArg {
 }
 
 describe('sw.ts runtime cache route table', () => {
-    it('registers the six runtime caches', () => {
+    it('registers the six runtime caches, the shell cache by two routes', () => {
         // A floor on the table itself. Without it, a route deleted outright would take its own
         // status assertion with it and the file would stay green while covering nothing — the
         // vacuous-success shape this repository gates everywhere else. M130 added the fourth, M132 the fifth, M133 the sixth.
-        expect(routes).toHaveLength(6);
+        // M140 added a seventh ROUTE but no cache: resume links write the shell cache under one token-free key.
+        expect(routes).toHaveLength(7);
         expect(routes.map((r) => r.strategy.cacheName)).toEqual([
             'guest-shell-assets',
             'guest-schema',
+            'guest-shell-html',
             'guest-shell-html',
             'guest-content-images',
             'guest-reference-files',
@@ -223,6 +226,7 @@ describe('sw.ts route matchers — which URLs enter a cache at all', () => {
 
         expect(matcherFor('guest-schema')(resumeRead)).toBe(false);
         expect(matcherFor('guest-shell-html')(resumeRead)).toBe(false);
+        expect(resumeRoute().match(resumeRead)).toBe(false);
         expect(matcherFor('guest-shell-assets')(resumeRead)).toBe(false);
         expect(matcherFor('guest-content-images')(resumeRead)).toBe(false);
         expect(matcherFor('guest-reference-files')(resumeRead)).toBe(false);
@@ -301,21 +305,102 @@ describe('sw.ts route matchers — which URLs enter a cache at all', () => {
         expect(await keyFor('token-a', 'ver-8')).not.toBe(await keyFor('token-a'));
     });
 
-    it('⚠️ RECORDS THAT THE RESUME SHELL *IS* CACHED TODAY — a pinned exposure, not an endorsement', () => {
-        // ⚠️ THIS ARM ASSERTS A DEFECT, DELIBERATELY, AND IT MUST NOT BE "FIXED" BY EDITING THE EXPECTATION.
-        // `/f/resume/{token}` is a same-origin navigation under `/f/`, so the shell route takes it and the
-        // credential-bearing HTML sits in `guest-shell-html` for seven days. Worse, Cache Storage is
-        // ORIGIN-scoped rather than per-document, and the token is the cache KEY — so
-        // `caches.open('guest-shell-html').keys()` leaks every resume token on the device without reading a
-        // single body, which is why stripping `data-resume-token` from the HTML would not close it.
-        //
-        // It is pinned `true` rather than fixed because removing the write is a real product trade that is
-        // the user's call, not this increment's: for a respondent who only ever opened the emailed link
-        // this entry is their ONLY cached navigation, and it carries the always-visible "Sync now" that
-        // `docs/non-functional-requirements.md` §7 makes the iOS Background-Sync fallback. See the decision
-        // appended by M78 in `docs/claims/decisions.md`. Whoever answers it flips this arm to `false` and
-        // adds the predicate — and must also decide what happens to `isResumeShell()` in
-        // `lib/brand-cache.ts`, whose three cases go VACUOUSLY GREEN the moment no resume key can exist.
-        expect(matcherFor('guest-shell-html')(nav('/f/resume/eyJhbGciOi.some.token'))).toBe(true);
+});
+
+/**
+ * The resume shell's route: the one route that claims a resume navigation (M140).
+ *
+ * Found by what it CLAIMS rather than by its cache name, because it shares `guest-shell-html` with the shell route.
+ * Exactly one route may claim a resume link; two would leave which one wins to registration order.
+ */
+function resumeRoute(): { match: (o: MatchArg) => boolean; strategy: { cacheName?: string; plugins?: unknown[] } } {
+    const claiming = routes.filter((r) => (r.match as (o: MatchArg) => boolean)(nav('/f/resume/tok-a')));
+    expect(claiming, 'exactly one route claims a resume navigation').toHaveLength(1);
+
+    return claiming[0] as { match: (o: MatchArg) => boolean; strategy: { cacheName?: string; plugins?: unknown[] } };
+}
+
+/** What the strategy would write to the cache: each `cacheWillUpdate` in order, as Workbox runs them. */
+async function cachedCopy(strategy: { plugins?: unknown[] }, response: Response): Promise<Response | null> {
+    const plugins = (strategy.plugins ?? []) as Array<{
+        cacheWillUpdate?: (o: { response: Response }) => Promise<Response | null | undefined>;
+    }>;
+    let copy: Response | null = response;
+
+    for (const plugin of plugins) {
+        if (typeof plugin.cacheWillUpdate === 'function' && copy !== null) {
+            copy = (await plugin.cacheWillUpdate({ response: copy })) ?? null;
+        }
+    }
+
+    return copy;
+}
+
+describe('the resume shell — cached under one token-free key (M140, R-68656155, D20 = 2)', () => {
+    // Until M140 this file PINNED the exposure: `/f/resume/{token}` was a navigation under `/f/`, so the shell route
+    // cached it under its own token-bearing URL, and `caches.open('guest-shell-html').keys()` listed every resume link
+    // on the device. `D20` kept the offline surface such a link brings (the offline pill, and the "Sync now" that
+    // `docs/offline-first-sync-design.md` §7 makes the iOS Background-Sync fallback) and took the token out instead.
+
+    it('gives a resume link a route of its own, which the shell route leaves alone', () => {
+        const { match, strategy } = resumeRoute();
+
+        expect(strategy.cacheName).toBe('guest-shell-html');
+        expect(matcherFor('guest-shell-html')(nav('/f/resume/tok-a'))).toBe(false);
+        expect(match(nav('/f/resume/eyJhbGciOi.some.token'))).toBe(true);
+        // Its control: the ordinary shell is still the shell route's, and nothing else is this one's.
+        expect(match(nav('/f/clinic-intake'))).toBe(false);
+        expect(match(nav('/f/resumed/tok-a'))).toBe(false);
+        expect(match(apiGet('/f/resume/tok-a'))).toBe(false);
+    });
+
+    it('keys every resume link to ONE entry with no token in it, which the brand sweep still skips', async () => {
+        const plugins = (resumeRoute().strategy.plugins ?? []) as Array<{
+            cacheKeyWillBeUsed?: (o: { request: Request; mode: string }) => Promise<Request | string>;
+        }>;
+        const keyPlugin = plugins.find((plugin) => typeof plugin.cacheKeyWillBeUsed === 'function');
+        expect(keyPlugin, 'the resume route has no cache-key plugin').toBeDefined();
+
+        const keyFor = (token: string, mode = 'write') =>
+            keyPlugin!.cacheKeyWillBeUsed!({ request: new Request(`https://acme.test/f/resume/${token}`), mode });
+
+        // Written under one key and read back under the same one, whatever the token: nothing to list.
+        expect(await keyFor('tok-a')).toBe('https://acme.test/f/resume/');
+        expect(await keyFor('tok-b')).toBe(await keyFor('tok-a'));
+        expect(await keyFor('tok-b', 'read')).toBe(await keyFor('tok-a'));
+        // The sweep in `lib/brand-cache.ts` must never re-fetch it: there is no link to fetch.
+        expect(isResumeShell(String(await keyFor('tok-a')))).toBe(true);
+    });
+
+    it('writes a copy with the resume token blanked, and only for a 200', async () => {
+        const { strategy } = resumeRoute();
+        const page = '<div id="app" data-share-token="share-1" data-resume-token="tok-secret-1"></div>';
+        const copy = await cachedCopy(
+            strategy,
+            new Response(page, { status: 200, headers: { 'content-type': 'text/html', 'content-length': String(page.length) } }),
+        );
+
+        expect(copy).not.toBeNull();
+        const stored = await copy!.text();
+        expect(stored).not.toContain('tok-secret-1');
+        expect(stored).toContain('data-resume-token=""');
+        // The share token is the ordinary per-version one every `/f/{slug}` shell caches, not a draft credential.
+        expect(stored).toContain('data-share-token="share-1"');
+        expect(copy!.headers.get('content-type')).toBe('text/html');
+        expect(copy!.headers.get('content-length')).toBeNull();
+
+        expect(await cachedCopy(strategy, new Response('gone', { status: 404 }))).toBeNull();
+        expect(await cachedCopy(strategy, Response.error())).toBeNull();
+    });
+
+    it('⛔ answers from the cache only on a network error — no timeout, unlike the shell route', () => {
+        // ⛔ THE LINE THAT MAKES ONE SHARED KEY SAFE. NetworkFirst with a timeout serves the cached copy while still
+        // ONLINE once the timeout passes; under one key that boots a slow resume link with another link's page.
+        // Read from Workbox's own field (7.4.1, `NetworkFirst._networkTimeoutSeconds`), because the behaviour itself
+        // needs a FetchEvent this file cannot construct. The shell route's 5 is the control that the field is real.
+        const timeoutOf = (strategy: unknown) => (strategy as { _networkTimeoutSeconds: number })._networkTimeoutSeconds;
+
+        expect(timeoutOf(routeFor('guest-shell-html'))).toBe(5);
+        expect(timeoutOf(resumeRoute().strategy)).toBe(0);
     });
 });

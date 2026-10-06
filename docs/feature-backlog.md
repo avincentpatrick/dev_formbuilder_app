@@ -13217,3 +13217,11 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   automation (the remainder row's Filter) first, then recipients and answers from the form, then a review/approval
   step, then a failure alert and each response's run history. ⚠️ Answers are health data: keep `D82`'s link-first
   email unless an answer is chosen deliberately. **Live.** Filed by `M137`. **Tier: during-testing.**
+
+- **`minor` · Keyboard grab cannot move a question into an empty section, and cannot move a section's only question at
+  all.** Found by `M139`'s premise probe, a real browser on a fresh form (`.playwright/m139-probe/`). Grab mode steps a
+  question past its NEIGHBOURING QUESTION in the flattened order (`useBuilderStore.ts`'s `stepFieldAcross()`), so a
+  section with no questions has no neighbour to step past, and a form's only question has none at all. Pointer drag
+  reaches an empty section; the keyboard cannot. That breaks `useCanvasReorder.ts`'s own claim that both paths cross
+  section boundaries (WCAG 2.5.7), and it is the same move comment 18 asked for (`R-598b9100`). **Live.** Filed by `M139`.
+  **Tier: early-testing.**

@@ -16,7 +16,64 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M138` is merged; the form builder chooses the redirect delay and respondents no longer see reference files; M139 (sections from the preview) is next
+## Status: ACTIVE CLAIM — `M139`, smoke-test fixes 3 of 3: sections and their questions from the preview, and a question moved into a section by keyboard too (m139-sections-from-preview)
+
+Taken 2026-10-06. Branch `m139-sections-from-preview`, cut from `origin/main` at `39c940d4`, PR into `main`.
+The last of the three smoke-test increments (`D91`). Rows, each its own commits, in this order:
+1. **`R-c0857303`** (filed in this push) — keyboard grab cannot move a question into an empty section, nor a section's
+   only question at all.
+2. **`R-598b9100`** — sections can be added only in Structure, and the preview offers no way to add a section or a
+   question in one (comment 18).
+
+### Evidence verified
+
+Against `39c940d4`:
+- **`R-c0857303` — held, measured.** `useBuilderStore.ts`'s `stepFieldAcross()` moves to the NEIGHBOUR question's
+  position in `flattenedFields()`, so it has no step into a section that holds none. The probe grabbed a section's only
+  question and pressed Up, then Down; it stayed put both times.
+- **`R-598b9100` — held, and narrower than it reads.**
+  - The preview builds its blocks from the engine's steps (`PreviewRuntime.vue`), and a section with no questions is no
+    step — `StepProjection`'s rule, the respondent's own. That is why a new section appears nowhere in the preview.
+  - Clicking a preview row selects its question and adds nothing.
+  - ⚠️ **Dragging into a section already works:** the probe moved a top-level question into an empty section by pointer
+    (`useCanvasReorder.ts`). The empty section says only "No fields in this section yet.", and the grip is an
+    unlabelled 28px icon, so the drag clause is a discoverability gap. The keyboard half is row 1.
+
+### Premise verified
+
+- **The builder already adds a palette question to the selected section** (`Builder.vue`'s `targetSection()`). So "add
+  a question here" selects that section and opens the Fields palette (on a narrow screen, through the existing pane
+  switch), with no second add path.
+- **An empty section is invisible to respondents and stays so.** The preview shows it to the author only, says so, and
+  the engine is untouched.
+- **The preview's render model is read live and the engine only on shape changes** (the `M118`–`M120` lesson). The new
+  affordances read the live store and never the engine.
+- **`builder-axe.spec.ts` scans the preview at three viewports,** so the new buttons are scanned there.
+
+### Remedy verdict
+
+- **Row 1:** step through the SLOTS of every group in order — n+1 per group of n other questions, one for an empty
+  group — so the keyboard reaches every place the pointer can.
+- **Row 2:** in the preview, an "Add a question here" under each section and in each empty-section placeholder, and
+  an "Add section" at the end. In Structure, the empty section says a question can be dragged in, and offers the same
+  add.
+
+Files:
+- `resources/js/components/builder/useBuilderStore.ts`, `PreviewRuntime.vue`, `PreviewPane.vue`,
+  `BuilderCanvas.vue`, with their tests;
+- `resources/js/Pages/forms/Builder.vue`;
+- `tests/e2e/builder-axe.spec.ts`;
+- the close-out artefacts.
+
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/backlog-triage.md`, `docs/gate-baselines.md`,
+`PROGRESS.md` (own block), `tests/e2e/builder-axe.spec.ts`.
+
+Paired files taken: none known. `builder-layout.test.ts` reads `Builder.vue`'s source, and is run.
+
+Namespaces spent: nothing — no migration, no ADR, no decision.
+
+Prediction: CI 6/6 on the first run. ⚠️ **Most expected WRONG:** an E2E builder scan — new buttons inside the preview
+change what axe and the one-tablist count see, and the builder specs have flaked on host load before.
 
 ## RELEASED — `M138`, smoke-test fixes 2 of 3: the respondent's page (merged as PR #331, `7b7c03d3`, 6/6 green on its FIRST run with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

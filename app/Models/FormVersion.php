@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\FieldType;
 use App\Enums\FormVersionStatus;
 use App\Models\Concerns\BelongsToTenant;
 use App\Models\Concerns\HasUuidv7;
 use App\Models\Concerns\TenantScoped;
+use App\Services\Forms\ChoiceListMaterializer;
 use Database\Factories\FormVersionFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -101,5 +103,44 @@ class FormVersion extends Model implements TenantScoped
     public function referenceFiles(): HasMany
     {
         return $this->hasMany(FormVersionReferenceFile::class);
+    }
+
+    /**
+     * The choice lists this version takes from uploaded CSV files (M141, `R-f69aab42`, `D95`), frozen with it.
+     *
+     * @return HasMany<FormVersionChoiceList, $this>
+     */
+    public function choiceLists(): HasMany
+    {
+        return $this->hasMany(FormVersionChoiceList::class);
+    }
+
+    /**
+     * The frozen schema as a browser is sent it: a CSV-backed cascade's options left out (M141, `R-f69aab42`).
+     *
+     * A published list-backed cascade holds its whole list in `config.options` — about 42,000 rows for a barangay list —
+     * because every server-side reader needs it there ({@see ChoiceListMaterializer}). A browser fetches it beside the
+     * schema instead, once per version; the runtime never recomputes the checksum, so the payload may differ from the
+     * bytes it pins.
+     *
+     * @return array<string, mixed>
+     */
+    public function schemaWithoutListOptions(): array
+    {
+        $snapshot = $this->getAttribute('schema_snapshot');
+
+        if (! is_array($snapshot)) {
+            return [];
+        }
+
+        if (is_array($snapshot['fields'] ?? null)) {
+            foreach ($snapshot['fields'] as $index => $field) {
+                if (is_array($field) && ($field['field_type'] ?? null) === FieldType::CascadingSelect->value && is_array($field['config'] ?? null)) {
+                    $snapshot['fields'][$index]['config'] = ChoiceListMaterializer::withoutListOptions($field['config']);
+                }
+            }
+        }
+
+        return $snapshot;
     }
 }

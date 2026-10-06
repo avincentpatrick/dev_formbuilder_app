@@ -73,6 +73,8 @@ function swCachedGetAllowList(): array
         // The choices a form takes from another form's answers (M133, `R-5da4a30f`): their own cache, `guest-linked-choices`,
         // the schema's second freshness channel (`D60` = A) — beside its prefix, never under it.
         'api/v1/public/linked-choices/' => ['api.v1.public.linked-choices.show'],
+        // A form's CSV choice lists (M141, `R-f69aab42`): their own cache, `guest-choice-lists`, frozen per version.
+        'api/v1/public/choice-lists/' => ['api.v1.public.choice-lists.show'],
     ];
 }
 
@@ -116,7 +118,7 @@ it('parses one startsWith prefix per runtime-cache route out of sw.ts, and every
 
     // The floor: a cache route whose matcher is not a `startsWith` literal would otherwise pass unseen.
     expect($prefixes)->toHaveCount(substr_count($source, 'registerRoute('))
-        ->and($prefixes)->toHaveCount(7)
+        ->and($prefixes)->toHaveCount(8)
         ->and($prefixes)->toBe($expected);
 });
 

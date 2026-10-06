@@ -32,6 +32,9 @@ final class SchemaTreeCloner
         foreach ($source->fields()->get() as $field) {
             $new = $field->replicate();
             $new->form_version_id = $target->id;
+            // M141 — a cascade whose levels name CSV choice lists carries the lists' options only while PUBLISHED
+            // (`ChoiceListMaterializer`); the draft takes the lists themselves, below, and no options.
+            $new->config = ChoiceListMaterializer::withoutListOptions((array) $field->config);
             $new->form_section_id = $field->form_section_id !== null
                 ? ($sectionIdMap[$field->form_section_id] ?? null)
                 : null;
@@ -56,6 +59,14 @@ final class SchemaTreeCloner
         // UPDATE policy and would silently copy nothing (PublishService's step-0 note).
         foreach ($source->referenceFiles()->get() as $referenceFile) {
             $new = $referenceFile->replicate();
+            $new->form_version_id = $target->id;
+            $new->save();
+        }
+
+        // M141 (`R-f69aab42`, `D95`) — the version's CSV choice lists, copied whole, for the same reason and with the
+        // same plain read.
+        foreach ($source->choiceLists()->get() as $choiceList) {
+            $new = $choiceList->replicate();
             $new->form_version_id = $target->id;
             $new->save();
         }

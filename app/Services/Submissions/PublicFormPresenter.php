@@ -70,7 +70,7 @@ final class PublicFormPresenter
                 'id' => $version->id,
                 'version_number' => $version->version_number,
                 'checksum' => $version->checksum,
-                'schema' => $version->schema_snapshot,
+                'schema' => $version->schemaWithoutListOptions(),
             ],
         ];
     }

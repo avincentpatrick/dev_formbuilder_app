@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Tenant;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Attachments\StoreAttachmentRequest;
+use App\Http\Requests\Forms\StoreFormChoiceListRequest;
 use App\Http\Requests\Forms\StoreFormContentImageRequest;
 use App\Http\Requests\Forms\StoreFormReferenceFileRequest;
 use App\Http\Requests\Forms\UpdateFormReferenceFileRequest;
@@ -14,6 +15,7 @@ use App\Models\Form;
 use App\Models\FormVersion;
 use App\Models\User;
 use App\Services\Attachments\AttachmentStorageService;
+use App\Services\Forms\FormChoiceListService;
 use App\Services\Forms\FormReferenceFileService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
@@ -108,6 +110,29 @@ final class AttachmentController extends Controller
     public function destroyReferenceFile(Form $form, string $file, FormReferenceFileService $service): Response
     {
         $service->detach($form, $file);
+
+        return response()->noContent();
+    }
+
+    /**
+     * The draft's choice lists (M141, `R-f69aab42`, `D95`), as the settings panel and the cascade level editor list
+     * them: each list's name, file, row count and columns.
+     */
+    public function indexChoiceLists(Form $form, FormChoiceListService $service): JsonResponse
+    {
+        return response()->json(['data' => $service->forAuthor($form)]);
+    }
+
+    /** Add a choice list from a CSV file, or replace the list of the same name: 201 with the list. */
+    public function storeChoiceList(StoreFormChoiceListRequest $request, Form $form, FormChoiceListService $service): JsonResponse
+    {
+        return response()->json(['data' => $service->upload($form, $request->uploadedList())], 201);
+    }
+
+    /** Remove a choice list from the draft. A published version that uses it keeps it. */
+    public function destroyChoiceList(Form $form, string $list, FormChoiceListService $service): Response
+    {
+        $service->remove($form, $list);
 
         return response()->noContent();
     }

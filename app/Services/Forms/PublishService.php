@@ -36,6 +36,7 @@ final class PublishService
         private readonly SchemaSnapshotSerializer $serializer,
         private readonly SchemaTreeCloner $cloner,
         private readonly AuditLogger $audit,
+        private readonly ChoiceListMaterializer $choiceLists,
     ) {}
 
     public function publish(Form $form, User $publisher, ?string $note = null): FormVersion
@@ -124,6 +125,9 @@ final class PublishService
             //    from this transaction, not from the ordering. It takes the locked form too:
             //    `forms.confirmation_message` is a form-level column, so it is not frozen per version and
             //    its holes are validated against the version being published (Doc #26 §6.2 as amended).
+            // M141 (`D95`) — a cascade whose levels name CSV choice lists gets its options from them first, so the
+            // gate's parent check proves the files agree and every reader of the published field sees a plain cascade.
+            $this->choiceLists->materialize($draft);
             $this->gate->assertPublishable($draft);
             $this->expressionGate->assertExpressionsResolve($draft);
             $this->templateGate->assertTemplatesResolve($draft, $locked);

@@ -592,6 +592,15 @@ Route::prefix('api/v1/public')
             ->withoutMiddleware('throttle:guest')
             ->middleware('throttle:guest-content-image')
             ->name('linked-choices.show');
+
+        // The choice lists a form's cascading questions take from uploaded CSV files (M141, `R-f69aab42`, `D95`), beside
+        // the schema for linked choices' reasons — a barangay list is about 42,000 rows — and frozen per version, so the
+        // service worker keeps them by `{version}` with the token stripped. Off `f/` and off `throttle:guest`, sharing the
+        // same limiter. Regenerate openapi.json after touching it.
+        Route::get('choice-lists/{shareToken}/{version}', [PublicFormSchemaController::class, 'choiceLists'])
+            ->withoutMiddleware('throttle:guest')
+            ->middleware('throttle:guest-content-image')
+            ->name('choice-lists.show');
     });
 
 // ── Group C (resume): guest draft RESUME — UNAUTHENTICATED; tenant + the target draft submissions.id resolved ─

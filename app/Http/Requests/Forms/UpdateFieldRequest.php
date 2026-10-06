@@ -166,6 +166,8 @@ final class UpdateFieldRequest extends FormRequest
                 'config.levels.*.label' => ['nullable', 'string', 'max:255'],
                 'config.levels.*.label_translations' => ['sometimes', 'array'],
                 'config.levels.*.label_translations.*' => ['nullable', 'string', 'max:500'],
+                // M141 (`D95`) — the CSV choice list a level takes its choices from, by name (`FormChoiceListService::nameFor()`).
+                'config.levels.*.list' => ['nullable', 'string', 'max:64', 'regex:/^[a-z0-9_-]+$/'],
                 'config.options' => ['sometimes', 'array'],
                 'config.options.*.value' => ['nullable', 'string', 'max:255'],
                 'config.options.*.label' => ['nullable', 'string', 'max:500'],

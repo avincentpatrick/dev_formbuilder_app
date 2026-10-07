@@ -13,6 +13,7 @@ use App\Services\Forms\BlankFormPrintRenderer;
 use App\Services\Forms\FormService;
 use App\Services\Forms\PublishService;
 use App\Services\Submissions\SubmissionPdfRenderer;
+use App\Support\Branding\BrandPalette;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -266,9 +267,57 @@ it('prints a yes/no question as two tick boxes, and tells the respondent to mark
     expect(preg_match('#q__key">consented</span>(.*?)</section>#s', $html, $match))->toBe(1);
     $question = $match[1];
 
+    // Layout 2: each option is ONE inline span, its box immediately before its label with no
+    // whitespace between — the reader credits a mark to the label that follows it on the line.
     expect(substr_count($question, 'class="choice__box"'))->toBe(2)
-        ->and($question)->toContain('</span>Yes</div>')
-        ->and($question)->toContain('</span>No</div>')
+        ->and($question)->toContain('</span>Yes</span>')
+        ->and($question)->toContain('</span>No</span>')
         ->and(str_contains($question, 'class="ruled"'))->toBeFalse('a yes/no question must not print a write-in box')
-        ->and($html)->toContain('mark each choice with an X');
+        ->and($html)->toContain('Mark a choice with an X inside its box');
+});
+
+it('typesets layout 2: a numbered label, the layout token, the banner, an open box for text, and no brand colour (M143, D96)', function (): void {
+    [$form, $version] = printableForm($this->tenant, $this->user);
+    $html = $this->renderer->html($form, $version);
+
+    expect($html)
+        // The running head names the layout beside the stamp, so the reader can tell old paper from new.
+        ->toContain('class="runhead__layout">Layout 2</span>')
+        // The instruction banner, bold and boxed, with its worked example.
+        ->toContain('class="banner"')
+        ->toContain('THIS FORM IS READ BY A COMPUTER. Write in BLOCK CAPITALS.')
+        ->toContain('choice__box--sample">X</span>marked</span>')
+        // Questions are numbered in printed order; the number is its own span, never inside the label.
+        ->toContain('<span class="q__num">1.</span>')
+        ->toContain('<span class="q__num">2.</span>')
+        ->not->toContain('1. Full name')
+        // Short text gets one open box; long text keeps the taller ruled box; a comb stays for digits.
+        ->toContain('class="line"')
+        ->toContain('class="ruled"')
+        ->toContain('class="comb"')
+        // Monochrome: the tenant palette is nowhere on the paper.
+        ->not->toContain(BrandPalette::current()['bg'])
+        ->not->toContain(BrandPalette::current()['tint']);
+
+    // The header's old instruction moved into the banner; the meta line says only what version this is.
+    expect($html)->not->toContain('one character per box');
+});
+
+it('promises automatic reading only when the version can be read AND the form accepts scans (R-6bbf9d73)', function (): void {
+    // One yes/no question is OCR-eligible, so the version half holds; the form half is the Scanning
+    // setting, off on a fresh form. The geopoint fixture covers the third sentence in the case above.
+    $form = app(FormService::class)->create($this->tenant, $this->user, 'Consent Check');
+    addFormField($form->draftVersion, $this->user, 'consented', FieldType::YesNo, 0);
+    $published = app(PublishService::class)->publish($form->refresh(), $this->user);
+
+    expect($this->renderer->html($form->refresh(), $published))
+        ->toContain('Scanning is switched off for this form, so responses must be keyed in.')
+        ->not->toContain('can be read automatically');
+
+    $form->allow_ocr_single = true;
+    $form->save();
+
+    expect($this->renderer->html($form->refresh(), $published))
+        ->toContain('Scans of this form can be read automatically.')
+        ->not->toContain('switched off');
 });

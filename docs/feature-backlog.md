@@ -11974,7 +11974,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   next" half of `D57`, which the user accepted as separate queued work. ⛔ **`D57`'s own option C says the type
   *"today does nothing at all"* AND THAT IS FALSE** — measured before this row was written. It is already
   load-bearing in two renderers: `app/Enums/PrintAnswerArea.php:172` maps it to `PrintAnswerArea::PageBreak`,
-  `resources/views/pdf/blank-form.blade.php:83` emits the div and `resources/views/pdf/_blank-form-styles.blade.php:127`
+  `resources/views/pdf/blank-form.blade.php` emits the div and `resources/views/pdf/_blank-form-styles.blade.php`
   gives it `page-break-before: always`; `XlsformExporter::emitPageBreak()` (`:174-178`) writes a `begin group` /
   `end group` pair that IS a page in ODK Collect, round-tripped at `XlsformTypeMap.php:114`. **So the defect is that
   screen and paper disagree, not that nothing happens** — which makes this a reconciliation rather than a feature.

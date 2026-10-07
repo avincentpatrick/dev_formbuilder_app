@@ -7,7 +7,6 @@ namespace App\Services\Forms;
 use App\Models\Form;
 use App\Models\FormVersion;
 use App\Services\Submissions\SubmissionPdfRenderer;
-use App\Support\Branding\BrandPalette;
 use Dompdf\Dompdf;
 use Illuminate\Contracts\View\Factory as ViewFactory;
 use Illuminate\Support\Str;
@@ -37,9 +36,11 @@ use Illuminate\Support\Str;
  * a `position: fixed` block. That is also the only page-repeat mechanism available: dompdf's page
  * counters go through `page_text()`, which is its inline-PHP API, and `isPhpEnabled` is false.
  *
- * Tenant branding reaches the paper as COLOUR ONLY, on the same terms and for the same reasons as
- * the submission PDF (ADR-0014 §D8): dompdf implements CSS 2.1, so a `var(--mds-…)` custom property
- * is unparseable and `oklch()` likewise, and the palette is resolved to literal hexes in PHP.
+ * Tenant branding does NOT reach the paper (layout 2, `M143`, `D96`; ADR-0014 §D8's note of 2026-10-07).
+ * The first layout carried the palette as colour only, the submission PDF's terms; the paper is printed
+ * in monochrome most of the time, where a tenant colour dithers to a grey that helps neither the
+ * respondent nor the OCR reader, so the blank form is black and dark grey throughout and no palette is
+ * resolved for it.
  */
 final class BlankFormPrintRenderer
 {
@@ -67,17 +68,15 @@ final class BlankFormPrintRenderer
      * tenant-authored: the form title, its description, every section heading, every field label and
      * hint, and every option label on every choice list and grid axis.
      *
-     * The palette is resolved here rather than accepted as a parameter, deliberately unlike
-     * {@see SubmissionPdfRenderer::html()}. That one takes an optional `$brand` so a test can
-     * compare the branded and unbranded documents without standing up a subscription for each;
-     * nothing here needs that, and an optional parameter no caller passes and no test exercises is
-     * an untested branch pretending to be an API.
+     * No palette is passed, deliberately unlike {@see SubmissionPdfRenderer::html()}: the blank form is
+     * monochrome by design (layout 2, `D96`), and a `$brand` the template never reads would be an
+     * untested parameter pretending to be an API — the same reasoning that kept the first layout's
+     * palette out of this method's signature.
      */
     public function html(Form $form, FormVersion $version): string
     {
         return $this->views->make('pdf.blank-form', [
             'model' => $this->presenter->present($form, $version),
-            'brand' => BrandPalette::current(),
         ])->render();
     }
 

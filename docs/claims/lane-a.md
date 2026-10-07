@@ -78,8 +78,8 @@ Against `ff88fc03`, every file read in full:
   §2.5.2 begins two lines below it. `PrintAnswerArea.php:172` (the page-break arm) is cited by a closed row and this
   file; it is kept line-neutral by trimming comments. `BlankFormPrintPresenter.php:417-420` (cited by
   `FieldConfigRetentionTest.php`, two backlog rows) is ALREADY rotted — those lines are `cascadingGroups()`'s caption
-  paragraph, not the grid read they describe — so the numbers are dropped, never re-pointed. `blank-form.blade.php:83`,
-  `_blank-form-styles.blade.php:127` and `BlankFormPrintRenderer.php:80` will rot and are dropped the same way.
+  paragraph, not the grid read they describe — so the numbers are dropped, never re-pointed. `blank-form.blade.php`,
+  `_blank-form-styles.blade.php` and `BlankFormPrintRenderer.php` will rot and are dropped the same way.
 - **The review page needs no frontend change.** `OcrScanReviewPresenter::notices()` returns data and `Encode.vue`
   renders every notice by `v-for` keyed on `code`, so a new `layout_unconfirmed` notice renders as the others do.
   `OcrScanReader::match()` already has `fail()` and `warnings[]`.
@@ -2109,7 +2109,7 @@ Shipped 2026-09-26. Branch `m114-decisions-recorded`, cut from `origin/main` at 
 
 ### `D57`'s own option C is built on a false premise, and option C is the half that was filed
 
-`D57` says `page_break` *"today does nothing at all — which is its own latent defect."* **It is already load-bearing in two renderers.** On paper it is a literal hard page break (`app/Enums/PrintAnswerArea.php:172` → `PrintAnswerArea::PageBreak`, emitted at `resources/views/pdf/blank-form.blade.php:83`, styled `page-break-before: always` at `_blank-form-styles.blade.php:127`); on export it is an ODK group boundary (`XlsformExporter::emitPageBreak()` `:174-178`, round-tripped at `XlsformTypeMap.php:114`). **So the defect is that screen and paper disagree** — a reconciliation, not a missing feature — and `R-8c517fb6` was written that way rather than as the hand-off drafted it.
+`D57` says `page_break` *"today does nothing at all — which is its own latent defect."* **It is already load-bearing in two renderers.** On paper it is a literal hard page break (`app/Enums/PrintAnswerArea.php:172` → `PrintAnswerArea::PageBreak`, emitted at `resources/views/pdf/blank-form.blade.php`, styled `page-break-before: always` at `_blank-form-styles.blade.php`); on export it is an ODK group boundary (`XlsformExporter::emitPageBreak()` `:174-178`, round-tripped at `XlsformTypeMap.php:114`). **So the defect is that screen and paper disagree** — a reconciliation, not a missing feature — and `R-8c517fb6` was written that way rather than as the hand-off drafted it.
 
 Three more corrections went into that row before it was filed:
 1. ⛔ **On screen `page_break` is DELETED, not ignored.** `RENDERS_NOTHING` strips it at `useFormRuntime.ts:409` and `:434`, after which a section holding only page breaks fails the emptiness check at `:438` and **disappears entirely**. It is strictly less than inert.
@@ -4067,7 +4067,7 @@ per-tenant palette returns the product palette there — `BrandPalette.php:103` 
 current tenant context, and that listener runs on Fortify's verification route with no tenancy middleware. It
 must build from `TenantUrl::to($tenant, ...)`, the value it already computes at `:91`.
 **Shape hazard:** prefer a url-bearing variant over mutating the constant palette — the product palette also
-feeds `SubmissionPdfRenderer.php:104` and `BlankFormPrintRenderer.php:80`.
+feeds `SubmissionPdfRenderer.php:104` and `BlankFormPrintRenderer.php`.
 **The decision the row leaves open is taken here rather than re-asked:** link to the workspace host when the
 notification knows one, and render the logo or name **unlinked** when it does not. Under `D46` there is no
 correct central URL, and an unlinked logo is the only honest answer.

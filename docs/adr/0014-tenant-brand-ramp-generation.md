@@ -177,3 +177,14 @@ look on a themed form — filed as its own row.
   **This happened for the first time in JR1 (VERSION 1 → 2, 2026-08-12)** and is worth recording as a worked example, because the trigger was not what this bullet's phrasing suggests. Nobody edited a ground: a *re-skin* moved the neutral ramp, and four of the six grounds are copies of neutral primitives. The engine would have gone on certifying ratios against a canvas and an ink the product no longer painted, with no test failing and no screenshot looking wrong. Two consequences were adopted: `2026_08_12_000100_rederive_tenant_brand_ramps_for_engine_v2` re-derives every stored ramp from the tenant's saved `primary_color` (the input is what survives a bump — the tokens are the output of a search and have no v1→v2 mapping), and `BrandRampGroundParityTest` now pins all six literals to the token sources so the next re-skin fails a test instead of going quiet.
 - **WCAG 3 / APCA becomes the standard the product tests against.** The whole engine is built on WCAG 2.x relative luminance, which APCA replaces rather than refines; §4.1 and this ADR would move together.
 - **The first evidence that a generated ramp reads worse than a curated one in real use.** The structural→procedural trade in Consequences is the thing to re-examine, and a real screenshot beats every argument in this document.
+
+---
+
+## Note of 2026-10-07 (`M143`, `D96`) — the printed blank form leaves §D8's colour-only surface set
+
+The blank paper form (`BlankFormPrintRenderer`, `resources/views/pdf/blank-form.blade.php`) no longer takes the
+palette. It is printed in monochrome most of the time, where a tenant colour dithers to a grey that helps neither the
+respondent nor the OCR reader, so layout 2 is black and dark grey throughout and the renderer passes no `$brand`.
+§D8's storage argument stands unchanged on mail and the submission PDF, which still take the resolved hexes; the
+revisit triggers above are unaffected. Recorded here because §D8 names "the PDF" as a consuming surface, and from this
+date that means the submission PDF alone.

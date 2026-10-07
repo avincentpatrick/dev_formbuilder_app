@@ -1151,7 +1151,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `App.vue`'s own handling of the same `remint()` → `fetchSchema()` pair. The terminal arm keeps the original
   sentence **byte-identical**, which makes this a narrowing rather than a rewrite. Filed by `M14`.
   ✅ **THE ROW WAS RIGHT AND THE CODEBASE ALREADY AGREED WITH IT.** *"…no longer available"* has three
-  first-party sites and the other two are bound to a real 404 — `GuestDraftResumeController.php:48` emits it
+  first-party sites and the other two are bound to a real 404 — `GuestDraftResumeController.php` emits it
   as `404 draft_not_found`, and `App.vue:236-242` emits its variant only behind `kind === 'terminal'`. This
   was the sole site saying it without having established the cause, and the fix needed nothing new:
   `error instanceof ApiError` is the discriminator this component already uses 76 lines below the defect.

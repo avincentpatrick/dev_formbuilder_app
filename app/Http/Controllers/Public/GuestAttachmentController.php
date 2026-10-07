@@ -37,7 +37,7 @@ final class GuestAttachmentController extends Controller
 
         $form = Form::query()->whereKey($token->formId)->firstOrFail();
 
-        if (! $form->allow_guest_submissions) {
+        if (! $form->allowsGuestAccess()) {
             return ApiErrorResponse::make(403, 'guest_disabled', 'Guest submissions are disabled for this form.');
         }
 

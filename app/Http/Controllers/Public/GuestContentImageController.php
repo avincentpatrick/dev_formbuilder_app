@@ -65,7 +65,7 @@ final class GuestContentImageController extends Controller
         $form = Form::query()->whereKey($token->formId)->first();
 
         // A non-uuid id would be an invalid-input error from Postgres rather than a miss, so it is refused first.
-        if ($form === null || ! $form->allow_guest_submissions || ! Str::isUuid($image)) {
+        if ($form === null || ! $form->allowsGuestAccess() || ! Str::isUuid($image)) {
             return $this->notFound();
         }
 

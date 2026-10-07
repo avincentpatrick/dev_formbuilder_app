@@ -33,7 +33,7 @@ use Illuminate\Http\JsonResponse;
  * unchanged. Structural/semantic failures bubble as a {@see SubmissionValidationException}
  * to the central 422 envelope; a `422 submission_invalid` body is returned exactly as the manual channel's is.
  *
- * Two guest-only guards run before the pipeline: `allow_guest_submissions` is re-checked (the revocation
+ * Two guest-only guards run before the pipeline: `Form::allowsGuestAccess()` is re-checked (the revocation
  * lever), and a token minted against a version the form has since moved past (a republish) is rejected with
  * `409 form_updated` so the SPA re-mints and re-renders — the shared pipeline is never relaxed to accept a
  * non-current version.
@@ -86,7 +86,7 @@ final class GuestSubmissionController extends Controller
 
         $form = Form::query()->whereKey($token->formId)->firstOrFail();
 
-        if (! $form->allow_guest_submissions) {
+        if (! $form->allowsGuestAccess()) {
             return ApiErrorResponse::make(403, 'guest_disabled', 'Guest submissions are disabled for this form.');
         }
 

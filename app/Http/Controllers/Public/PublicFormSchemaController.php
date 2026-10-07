@@ -19,9 +19,9 @@ use Illuminate\Http\Request;
 /**
  * Returns the pinned published schema a guest renders (Increment F5). Tenant context is already set from
  * the verified share token by {@see EstablishGuestTenantContext}, so the form/version
- * are resolved from the token payload under RLS. The `allow_guest_submissions` re-check here is the coarse
- * revocation lever a stateless token otherwise lacks — flipping the flag off invalidates every outstanding
- * link immediately, before expiry. The pinned version is returned even once superseded (the `formVersionGuard`
+ * are resolved from the token payload under RLS. The `Form::allowsGuestAccess()` re-check here is the coarse
+ * revocation lever a stateless token otherwise lacks — flipping the flag off, or archiving the form (M146),
+ * invalidates every outstanding link immediately, before expiry. The pinned version is returned even once superseded (the `formVersionGuard`
  * SELECT policy is status-agnostic), so a guest who loaded the form keeps a consistent schema to answer.
  */
 final class PublicFormSchemaController extends Controller
@@ -39,7 +39,7 @@ final class PublicFormSchemaController extends Controller
 
         $form = Form::query()->whereKey($token->formId)->firstOrFail();
 
-        if (! $form->allow_guest_submissions) {
+        if (! $form->allowsGuestAccess()) {
             return ApiErrorResponse::make(403, 'guest_disabled', 'Guest submissions are disabled for this form.');
         }
 
@@ -62,7 +62,7 @@ final class PublicFormSchemaController extends Controller
         $token = $this->shareToken($request);
         $form = Form::query()->whereKey($token->formId)->first();
 
-        if ($form === null || ! $form->allow_guest_submissions || $version !== $token->formVersionId) {
+        if ($form === null || ! $form->allowsGuestAccess() || $version !== $token->formVersionId) {
             return ApiErrorResponse::make(404, 'linked_choices_not_found', 'These choices are not available.');
         }
 
@@ -91,7 +91,7 @@ final class PublicFormSchemaController extends Controller
         $token = $this->shareToken($request);
         $form = Form::query()->whereKey($token->formId)->first();
 
-        if ($form === null || ! $form->allow_guest_submissions || $version !== $token->formVersionId) {
+        if ($form === null || ! $form->allowsGuestAccess() || $version !== $token->formVersionId) {
             return ApiErrorResponse::make(404, 'choice_lists_not_found', 'These choices are not available.');
         }
 

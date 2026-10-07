@@ -21,8 +21,8 @@ uses(RefreshDatabase::class);
 | may be published, and what the settings panel warns about. Each case below drives the REAL `/f/{slug}` link
 | beside the predicate, so the day the route changes what it answers, this file says the predicate is behind.
 |
-| ⚠️ AN ARCHIVED FORM IS REACHABLE, AND THAT IS THE ROUTE'S ANSWER TODAY, NOT AN ENDORSEMENT: archiving leaves the
-| public link working (filed by M130 as a row). The predicate mirrors the route; the row decides the route.
+| ⚠️ AN ARCHIVED FORM IS NOT REACHABLE (M146, `R-f6567fc2`, `D99` A): archiving closes the public link, and the clause
+| lives in `Form::allowsGuestAccess()`, which every guest route and this predicate read. The real route is still driven here.
 |
 | ⚠️ Helpers are prefixed `reachability*`: Pest loads every test file into one process.
 */
@@ -77,7 +77,7 @@ it('agrees with the public link on every state a form can be in', function (stri
     'with guest access off' => ['guest access off', false],
     'never published' => ['never published', false],
     'in the bin' => ['in the bin', false],
-    'archived — the link still answers today' => ['archived', true],
+    'archived — archiving closes the link (D99 A)' => ['archived', false],
 ]);
 
 it('is not reachable without a public link, which nothing could send a respondent to', function (): void {

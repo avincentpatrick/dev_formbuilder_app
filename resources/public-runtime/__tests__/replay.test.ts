@@ -29,6 +29,8 @@ interface Handlers {
      * enqueues, so the ordinary cases replay unchanged; a drift test raises it (Increment H21b, Doc #27 §5.4).
      */
     schemaVersionId?: string;
+    /** The mint's answer (M146, `D99` A): a closed link answers 404, and the row must park before any POST. */
+    mint?: () => Response;
 }
 
 function makeFetch(h: Handlers = {}) {
@@ -37,7 +39,7 @@ function makeFetch(h: Handlers = {}) {
     const fetchFn = vi.fn(async (url: string, init?: RequestInit) => {
         // The mint is `/f/{slug}`; the schema read is `/api/v1/public/f/{token}` — hence startsWith, not includes.
         if (url.startsWith('/f/')) {
-            return res(200, { shareToken: 'tok', expiresAt: '', form: { id: 'f', title: 'T' } });
+            return h.mint ? h.mint() : res(200, { shareToken: 'tok', expiresAt: '', form: { id: 'f', title: 'T' } });
         }
         if (url.includes('/attachments')) {
             return h.attachment ? h.attachment() : res(201, { data: { id: 'att-1' } });
@@ -105,6 +107,35 @@ describe('replayOutbox', () => {
         expect(row?.status).toBe('synced');
         expect(row?.server_submission_id).toBeTruthy();
         expect(row?.answers).toEqual({});
+    });
+
+    it('parks a row whose form has closed its link (the mint answers 404) on the FIRST attempt, and never POSTs it', async () => {
+        // M146 (`R-f6567fc2`, `D99` A): an archived form answers its link with the 404 a form with guest access off
+        // gets, and `error-normalizer.ts` classes a mint 404 as `terminal`. This case PINS behaviour the runtime
+        // already had — it was green before the fix — because D99 A's offline clause ("a queued response to an
+        // archived form is parked") had no test naming it. The row never reaches the submit door, so the server is
+        // never asked to accept a response for a closed form, on this replay or any later one.
+        await enqueue(db, input('u1'));
+        const { fetchFn, submitBodies, schemaReads } = makeFetch({ mint: () => res(404, { message: 'Not Found' }) });
+
+        expect(await replayOutbox(db, fetchFn)).toMatchObject({ needsAttention: 1, retry: 0 });
+        expect((await db.outbox.get('u1'))?.status).toBe('needs_attention');
+        expect(submitBodies).toHaveLength(0);
+        expect(schemaReads).toHaveLength(0);
+
+        for (let i = 0; i < 4; i += 1) {
+            await replayOutbox(db, fetchFn);
+        }
+        expect(submitBodies).toHaveLength(0);
+    });
+
+    it('parks a row the submit door refuses as guest_disabled the same way — one attempt, then review', async () => {
+        await enqueue(db, input('u1'));
+        const { fetchFn, submitBodies } = makeFetch({ submit: () => res(403, errorBody('guest_disabled')) });
+
+        expect(await replayOutbox(db, fetchFn)).toMatchObject({ needsAttention: 1, retry: 0 });
+        expect((await db.outbox.get('u1'))?.status).toBe('needs_attention');
+        expect(submitBodies).toHaveLength(1);
     });
 
     it('treats a 200 idempotent replay as synced too', async () => {

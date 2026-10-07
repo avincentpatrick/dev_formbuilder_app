@@ -78,3 +78,92 @@ test('Builder — a section and its question added from the preview, and moved o
         await archive(page, formId);
     }
 });
+
+/*
+ * M145 (`R-551873af`) — a half-built rule row no longer turns the whole preview relevant.
+ *
+ * Basics → Requiredness "Conditional" → "Add condition" seeds a `required_if` with no operator and no compared
+ * question, and the server saves it as it is (the save door is `nullable` on purpose). Until M145 the engine's
+ * lowering threw on that row at mount, `safeEvaluate()` degraded the preview to everything-relevant, and the
+ * preview said nothing — a question hidden behind a condition simply appeared. Now the projection omits the row
+ * and the preview shows a chip under the question that owns it.
+ *
+ * The proof is the hidden question STAYING hidden after the seed: red on the unfixed bundle, where it shows.
+ */
+
+/** The autosave debounces 600 ms, so "All changes saved" read earlier than that is the PREVIOUS save's. */
+async function settled(page: Page): Promise<void> {
+    await page.waitForTimeout(800);
+    await saved(page);
+}
+
+async function configTab(page: Page, name: string): Promise<void> {
+    await showBuilderPane(page, 'settings');
+    await page.getByRole('tab', { name, exact: true }).click();
+}
+
+/** Add a Text question from the palette, then give it a label and a key so a condition can name it. */
+async function addText(page: Page, label: string, key: string): Promise<void> {
+    await showBuilderPane(page, 'fields');
+    await page.locator('.palette').getByRole('button', { name: 'Text', exact: true }).click();
+    await settled(page);
+
+    // Adding selects the new question, so the config panel is already on it.
+    await configTab(page, 'Basics');
+    await page.getByLabel('Label', { exact: true }).fill(label);
+    await configTab(page, 'Advanced');
+    await page.getByLabel('Field key', { exact: true }).fill(key);
+    await settled(page);
+}
+
+async function selectField(page: Page, label: string): Promise<void> {
+    await showBuilderPane(page, 'canvas');
+    await page.locator('.builder__centre-tabs').getByText('Structure').click();
+    await page.locator('.canvas__field-main', { hasText: label }).click();
+}
+
+async function openPreview(page: Page): Promise<void> {
+    await showBuilderPane(page, 'canvas');
+    await page.locator('.builder__centre-tabs').getByText('Preview').click();
+    await expect(page.locator('[data-builder-preview]')).toBeVisible({ timeout: 15_000 });
+}
+
+test('Builder — a half-built rule row leaves the other conditions working, and the preview says the rule is ignored', async ({ page }, info) => {
+    test.setTimeout(180_000);
+    const formId = await createForm(page, `Preview incomplete rule ${info.project.name} ${Date.now()}`);
+
+    try {
+        await addText(page, 'Trigger', 'trigger');
+        await addText(page, 'Dependent', 'dependent');
+
+        // Dependent shows only when Trigger says so — typed as text, the one-step way to a condition.
+        await selectField(page, 'Dependent');
+        await configTab(page, 'Advanced');
+        await page.getByRole('button', { name: 'Edit as text' }).click();
+        await page.getByLabel('Condition expression').fill("${trigger} = 'show'");
+        await settled(page);
+
+        // The engine works: Trigger is blank, so Dependent is not on the page.
+        await openPreview(page);
+        await expect(page.locator('[data-preview-field="trigger"]')).toBeVisible({ timeout: 15_000 });
+        // The row's wrapper always renders; only the CONTROL inside it is gated on relevance (`FieldRow.vue`).
+        await expect(page.locator('[data-preview-field="dependent"]').getByRole('textbox')).toHaveCount(0);
+
+        // The seed: Conditional requiredness on Trigger, one condition added and left unfinished. Saved as it is.
+        await selectField(page, 'Trigger');
+        await configTab(page, 'Basics');
+        await page.getByRole('group', { name: 'Requiredness' }).getByText('Conditional', { exact: true }).click();
+        await page.getByRole('button', { name: 'Add condition' }).click();
+        await settled(page);
+
+        // The proof: Dependent is STILL hidden, and the chip under Trigger says why its rule is ignored.
+        await openPreview(page);
+        await expect(page.locator('[data-preview-field="trigger"]')).toBeVisible({ timeout: 15_000 });
+        // The row's wrapper always renders; only the CONTROL inside it is gated on relevance (`FieldRow.vue`).
+        await expect(page.locator('[data-preview-field="dependent"]').getByRole('textbox')).toHaveCount(0);
+        await expect(page.locator('[data-preview-field="trigger"] .preview__issue')).toContainText('not finished');
+        await assertClean(page, 'builder preview with an ignored half-built rule');
+    } finally {
+        await archive(page, formId);
+    }
+});

@@ -16,7 +16,94 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M145` is merged; `M146` is the during-testing batch (`D99` and `D100` put to the user by name first, then `R-f6567fc2`, `R-6c0f0e56`, `R-cf423290`, `R-b2d4a2c5`), and the bake-off goes ahead of it the moment the layout-3 samples and a key that reads arrive
+## Status: ACTIVE CLAIM — `M146`, the during-testing batch: an archived form's link closes (`D99` A), repeat groups reach the spreadsheet (`D100` A), the inbox orders by when a response was sent, and a refused field save names the setting (closes `R-f6567fc2`, `R-6c0f0e56`, `R-cf423290`, `R-b2d4a2c5`) (`m146-during-testing-batch`)
+
+Taken 2026-10-08. Branch `m146-during-testing-batch`, cut from `origin/main` at `343c44d3`, PR into `main`. The hand-off's Next
+section held only the two early-testing rows blocked on the user (layout-3 samples, a key that reads); neither came with the prompt,
+so the fallback applied — the during-testing batch `M145` composed. `D99` and `D100` were put to the user by name first thing and
+both answered **A** in chat. Four rows of one tier, verified by three read-only explorers and one planner before the branch was cut;
+remedy sets pairwise disjoint under `D13`/`D15`, one hub row (`R-f6567fc2`), `tests/Pest.php` untouched by every row.
+Rows (`docs/feature-backlog.md`): the `major` starting *"An archived form keeps collecting responses through its public link"*
+(filed by `M130`, `**Awaits D99.**`); the `major` starting *"An export, a Google Sheets sync and an Airtable sync write every answer
+inside a repeat group as an empty cell"* (filed by `M133`, `**Awaits D100.**`); the `minor` starting *"The inbox orders a promoted
+draft by when it was started"* (filed by `M96`); the `nit` starting *"A refused builder save names the request path"* (filed by `M128`).
+
+### Evidence verified
+- **`R-f6567fc2` — held.** `FormService::archive()` sets `status`/`archived_at`, deletes the draft, leaves `allow_guest_submissions`
+  and `current_published_version_id`; neither `GuestFormController::mint()` nor `GuestSubmissionController::store()` reads `status`;
+  `FormPresenter` filters `status != archived`; `docs/form-versioning-schema-migration.md` §9 says "addressable for historical
+  reporting" (reporting, not a link).
+- **`R-6c0f0e56` — held.** `resolveColumns()` reads only `schema_snapshot['fields']` and `answerValues()` reads `$answers[$key]` at the
+  top level; `StructuralAnswerNormalizer` stores instances under the SECTION key as a list of objects and refuses a member at the top
+  level (`misplaced_repeat_field`); every named caller goes through the projector; no test holds a repeatable section.
+- **`R-cf423290` — held.** `SubmissionInboxPresenter` orders by `id` (`HasUuidv7`), offset-paginated at 25; `SubmissionDraftService`
+  promotes in place (the id kept, `submitted_at` set at promotion); `submitted_at` nullable, precision 0.
+- **`R-b2d4a2c5` — held.** `UpdateFieldRequest` declares neither `messages()` nor `attributes()`; no `lang/` directory exists.
+
+### Premise verified
+- **`R-f6567fc2` — two corrections.** (1) **There is no un-archive** — no method, route, policy arm or UI; the state diagram ends at
+  `Archived`; `RestoreService` and the importer refuse an archived form. `D99` A's "un-archiving reopens the link" has nothing to
+  attach to, so it is not built; filed as `D101`. (2) **A queued offline response parks on its FIRST replay** when the mint answers
+  404 (`terminal` → `needsAttention` in `lib/replay.ts`), which is MORE decisive than a form that closed mid-queue (five retries,
+  then parked); no replay test covers a mint 404 today. **And the row is a floor:** eleven guest-side reads of
+  `allow_guest_submissions` in eight files, one handler (`GuestDraftResumeController::show`) that checks nothing about the form,
+  and no shared predicate any route calls — `GuestReachability::reachable()` (redirect resolver, redirect publish gate, settings
+  `live` flag) documents that it mirrors the route and must follow it. The archive dialog says nothing about the link.
+- **`R-6c0f0e56` — held, two additions.** The seeders (`E2eSeeder` "Household Roster", `DemoSeeder` "Rooms surveyed") write repeat
+  members flat, a shape a real submit refuses, so the fixed projector shows seeded rows blank unless the seeders nest them (the inbox
+  and PDF already show them blank). A calculated question inside a repeat is never stored at all — already `R-1c31e7cf`. Mapping keys
+  are persisted in `connection_subscriptions.config`, so a member keeps ONE column under its raw key.
+- **`R-cf423290` — the row is a floor.** The same order sits in `FormHubPresenter::recent()` ("the ordering the inbox uses"),
+  `SubmissionSearchArm::search()` and `SubmissionExporter::stream()`; the `scopeMatchingKeyword()` docblock says both callers order
+  by id. Every caller today is `countable()` or filtered to drafts, so no list mixes null and non-null `submitted_at`.
+- **`R-b2d4a2c5` — one correction.** The row's example message cannot occur: an option label is `nullable`, so the real case is a
+  length overrun ("…must not be greater than 500 characters"). Scramble cannot publish this request (tenant web route; `api_path` is
+  `api/v1`), so `openapi.json` cannot move for it. The config panel (a hub) renders the server's message and is not edited.
+
+### Remedy verdict
+- **`R-f6567fc2` — works, as one predicate.** `Form::allowsGuestAccess()` = `allow_guest_submissions && status !== archived`, swapped
+  into all eleven reads (each route keeps its own refusal shape: web 404, API 403 `guest_disabled`, the three reads' own 404s), used by
+  `GuestReachability`, and added to the draft-resume handler before it mints. **That handler's new 403 changes the published
+  contract**, so `openapi.json` is regenerated and linted in this row. The dialog prose changes; `D101` is filed.
+- **`R-6c0f0e56` — works (`D100` A), positional join.** `resolveColumns()` records the repeat section per member in the field-meta
+  shape (`repeat: ?string`); `answerValues()` formats each instance through `displayValue()` (a multi-select keeps `; `) and joins
+  with ` | `, every instance contributing a part even when empty so columns stay aligned; all-empty → `''`. The widened shape
+  reaches `SubmissionExporter::row()`'s PHPDoc, so that file is Row 2's — **Row 3 therefore leaves the export's order alone** and
+  files it.
+- **`R-cf423290` — works, with two corrections to the prescription.** "Check the index" resolves to **no migration**:
+  `submissions_form_finalized_idx` and `submissions_analytics_series_idx` already serve the inbox's default filter, and
+  `AnalyticsIndexShapeTest` pins nine indexes under ADR-0011's budget — the queue entry that promised "an index migration" was wrong.
+  **No `NULLS LAST`:** a backward scan of a default btree yields `DESC NULLS FIRST`, so the clause would force a sort, and no caller
+  mixes nulls. One scope, `orderBySubmitted()`, for the inbox, the hub panel and the search arm; an `EXPLAIN` recorded at release.
+- **`R-b2d4a2c5` — works.** `attributes()` keyed by wildcard paths (Laravel resolves `config.options.0.label` against
+  `config.options.*.label`), covering every `rules()` key and all seven `configRules()` arms; a census case pins that.
+
+Files: `app/Models/Form.php`, `app/Support/Forms/GuestReachability.php`, `app/Http/Controllers/Public/{GuestFormController,
+PwaManifestController, PublicFormSchemaController, GuestSubmissionController, GuestAttachmentController, GuestDraftController,
+GuestContentImageController, GuestDraftResumeController}.php`, `app/Exceptions/Forms/PublishValidationException.php`, `openapi.json`,
+`resources/js/Pages/forms/Index.vue`, `resources/js/Pages/forms/index.test.ts`, `resources/public-runtime/__tests__/replay.test.ts`,
+`tests/Feature/Guest/GuestReachabilityTest.php`, `tests/Feature/Guest/ArchivedFormLinkTest.php` (new),
+`docs/form-versioning-schema-migration.md`, `docs/data-dictionary.md` — Row 1; `app/Services/Submissions/SubmissionRowProjector.php`,
+`app/Services/Submissions/SubmissionExporter.php` (PHPDoc), `app/Services/Submissions/SchemaValueFormatter.php` (a comment),
+`database/seeders/E2eSeeder.php`, `database/seeders/DemoSeeder.php`, `tests/Feature/Submissions/SubmissionExportTest.php`,
+`tests/Feature/Automations/FormAutomationWebhookJobTest.php`, `docs/piping-output-encoding-design.md` — Row 2;
+`app/Models/Submission.php`, `app/Services/Submissions/SubmissionInboxPresenter.php`, `app/Services/Forms/FormHubPresenter.php`,
+`app/Services/Search/Arms/SubmissionSearchArm.php`, `tests/Feature/Submissions/PromotedDraftOrderTest.php` (new) — Row 3;
+`app/Http/Requests/Forms/UpdateFieldRequest.php`, `tests/Feature/Forms/FieldSaveAttributeNamesTest.php` (new) — Row 4; and by
+procedure `docs/feature-backlog.md`, `docs/claims/decisions.md`, `docs/claims/lane-a.md`, `docs/pipeline.md`,
+`docs/backlog-triage.md`, `docs/gate-baselines.md`, `PROGRESS.md` (own block).
+Shared artefacts taken: `docs/**`, `openapi.json`, `PROGRESS.md` (own block).
+Paired files taken: none — the `.vue` change is dialog prose (no clipped node, no token), no notification type, no ability key
+(7(b-bis) read at claim time).
+Namespaces spent: `D99` and `D100` answered; `D101` filed. No migration, no ADR — `0010` stays reserved for the bake-off.
+Prediction: Row 1 — twelve post-archive assertions red before the fix and the controls green, the reachability flip red, the Vitest
+replay case GREEN (a pin, said so in its comment), both `mutate.php` runs CAUGHT first time, the Vitest hand mutation reds only the
+new case. Row 2 — the two-instance export case and the webhook case red, the two `''` cases green, three mutants CAUGHT. Row 3 —
+inbox, hub and search red, the tie case green, two mutants CAUGHT, `EXPLAIN` shows the partial index with an Incremental Sort.
+Row 4 — both cases red, the mutant CAUGHT. PHPStan 0 on the host; Pint clean; the whole Vitest suite green; `vue-tsc` clean; the
+ledger citation count unchanged unless `DemoSeeder.php`'s edit shifts its cited line; CI 6/6 on the first run. **Most expected
+wrong: the Contract job** — Scramble's rendering of the draft-resume route's new 403 has not been seen; second, whether PHPStan
+treats the field-meta shape as sealed (if not, the exporter PHPDoc edit is merely harmless).
 
 ## RELEASED — `M145`, the builder preview stops losing every condition when a rule row is half-built: the draft projection screens rule rows through the engine's own lowering (merged as PR #338, `6bfa810e`, 6/6 green on its FIRST run with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

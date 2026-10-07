@@ -64,18 +64,22 @@ use App\Services\Forms\BlankFormPrintPresenter;
 enum PrintAnswerArea: string
 {
     /**
-     * A row of separated character boxes ("comb" fields). The single biggest handwriting-recognition
-     * win available in a layout decision: segmentation is free when the characters are pre-separated,
-     * which is why every census and bank form in the world uses them. Decided with the user
-     * 2026-08-09 for exactly that reason — this layout is what H1d's ICR bake-off will be scored
-     * against.
+     * A row of separated character boxes ("comb" fields): numbers, a phone, a date or a time. Segmentation
+     * is free when the characters are pre-separated, which is why H1d's bake-off scores them. Text left
+     * this area in layout 2 (`M143`, `D96`): respondents found a box per letter limiting.
      */
     case Comb = 'comb';
+
+    /**
+     * One open box, written in block capitals (layout 2, `D96`): short text, email, url. The instruction
+     * banner now carries what the comb used to enforce; the reader takes the line as free text.
+     */
+    case Line = 'line';
 
     /** One multi-line bordered box. Free prose has no character count to comb. */
     case Ruled = 'ruled';
 
-    /** The option list, each with a drawn box to tick. */
+    /** The option list, boxes side by side since layout 2, each with a drawn box to mark with an X. */
     case Choices = 'choices';
 
     /** A real table: `config.rows` down the side, `config.columns` across, a drawn box per cell. */
@@ -104,21 +108,18 @@ enum PrintAnswerArea: string
     case Omitted = 'omitted';
 
     /**
-     * The TOTAL classification of the 31-case {@see FieldType} catalog: 11 comb / 1 ruled /
+     * The TOTAL classification of the 31-case {@see FieldType} catalog: 8 comb / 3 line / 1 ruled /
      * 5 choices / 2 grid / 1 signature / 1 prose / 7 unavailable / 1 page break / 2 omitted.
      * Deliberately a `match` with NO `default` arm — see the class docblock.
      */
     public static function for(FieldType $type): self
     {
         return match ($type) {
-            // ── Respondent-supplied scalars: a bounded run of characters on a line ───────────────
-            // `email`/`phone`/`url` are validated short text and comb exactly as well. The date and
-            // time types comb into FIXED groups (DD MM YYYY, HH MM) rather than a free run, which
-            // is what makes a handwritten date machine-readable at all — see the presenter's
-            // `combGroups()`. `duration` is a scalar written on a line, per ocr-pipeline §2.
-            FieldType::ShortText,
-            FieldType::Email, FieldType::Phone, FieldType::Url,
-            FieldType::Integer, FieldType::Decimal,
+            // ── Digits a pen prints into separated boxes: numbers, a phone, the calendar and clock ──
+            // The date and time types comb into FIXED groups (DD MM YYYY, HH MM) rather than a free
+            // run, which is what makes a handwritten date machine-readable at all — see the
+            // presenter's `combGroups()`. `duration` is a scalar written on a line, per ocr-pipeline §2.
+            FieldType::Phone, FieldType::Integer, FieldType::Decimal,
             FieldType::Date, FieldType::Time, FieldType::Datetime, FieldType::Duration,
 
             // ⚠️ `cascading_select` IS A COMB, NOT A CHOICE LIST, AND THE REASON IS CORRECTNESS
@@ -126,14 +127,13 @@ enum PrintAnswerArea: string
             // entry carrying its own `level` and `parent`
             // ({@see \App\Services\Forms\StructuralValidationGate::assertCascadingResolves()}).
             // Printing that list as a single tick-list would set "Manila" beside "NCR" as if they
-            // were siblings — a child option rendered as an alternative to its own parent, with a
-            // box next to each and no hierarchy anywhere on the page. The screen control never shows
-            // that shape, because it narrows each level by the level above.
-            //
-            // Paper has no way to narrow anything, so the answer is written rather than picked: one
-            // captioned comb run per declared level, which is exactly what a paper address block
-            // has always looked like. See {@see BlankFormPrintPresenter::combGroups()}.
+            // were siblings — a child option offered as an alternative to its own parent. Paper can
+            // narrow nothing, so the answer is WRITTEN per level, one captioned comb run each, the
+            // shape of a paper address block. See {@see BlankFormPrintPresenter::combGroups()}.
             FieldType::CascadingSelect => self::Comb,
+
+            // ── Short text in one open box (layout 2, `D96`): a box per letter limited respondents ──
+            FieldType::ShortText, FieldType::Email, FieldType::Url => self::Line,
 
             // ── Free prose: unbounded, so there is nothing to comb ───────────────────────────────
             FieldType::LongText => self::Ruled,
@@ -184,5 +184,15 @@ enum PrintAnswerArea: string
     public function isPrinted(): bool
     {
         return $this !== self::Omitted;
+    }
+
+    /**
+     * Whether this area asks the respondent something — numbered on the paper (layout 2) and read off a
+     * scan. Prose, a page break and an omitted field are not questions, and the matcher's
+     * `NOT_A_QUESTION` names the same three.
+     */
+    public function isQuestion(): bool
+    {
+        return ! in_array($this, [self::Prose, self::PageBreak, self::Omitted], true);
     }
 }

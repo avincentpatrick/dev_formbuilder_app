@@ -134,7 +134,7 @@ it('keeps grid label_translations through a matrix-field save', function (): voi
     [$fieldId, $key] = configRetentionField($admin, $form, 'matrix');
 
     // The read side already exists for these — XlsformExporter::pairs() via :196-199/:224-226,
-    // schema-mapping.ts:368 into buildMatrix(), BlankFormPrintPresenter.php:417-420 — so the author
+    // schema-mapping.ts:368 into buildMatrix(), BlankFormPrintPresenter.php — so the author
     // side dropping them is a live read against a write that cannot land.
     configRetentionPatch($admin, $form, $fieldId, $key, [
         'rows' => [['value' => 'q1', 'label' => 'Clean water', 'label_translations' => ['fil' => 'Malinis na tubig']]],

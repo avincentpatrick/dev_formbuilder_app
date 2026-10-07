@@ -12721,14 +12721,14 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   photo for a media field or an OCR scan therefore fails at PHP before the app sees it, and only locally. The remedy is
   one ini file in the image, matching the server. **Live.** Filed by `M128`. **Tier: during-testing.**
 
-- **`minor` · The printed form's stamp identifies the schema, not the layout, so a sheet printed before a layout
+- ✅ **CLOSED BY `M143` (2026-10-07) — **`minor` · The printed form's stamp identifies the schema, not the layout, so a sheet printed before a layout
   change and one printed after it are the same sheet to the reader.** Found by `M128`, whose own paper fix is the
   case. The running head prints the first eight characters of the version checksum (`docs/ocr-pipeline-design.md`
   §2.5.5), and that checksum covers the snapshot, not the template. `M128` changes how a yes/no question prints (a
   write-in box became two tick boxes) without changing any checksum, so a scan of an older print carries the same
   stamp and a different layout. `M128`'s matcher accepts both for that one change. The general remedy is a layout
   revision printed beside the stamp and read back, so a future template change cannot be confused for the current
-  one. **Latent.** Filed by `M128`. **Tier: during-testing.**
+  one. **Latent.** Filed by `M128`. **Tier: during-testing.** ✅ **CLOSED BY `M143` (2026-10-07), PR #336:** the running head prints `Layout 2` beside the stamp and `PrintedFormMatcher::layoutOf()` reads it back; a legible running head with no layout word, or a lower number, fails the scan `layout_outdated` with the way out in the job and lists it `old_layout` in the bake-off, while a garbled or unread head is a warning (`layout_unconfirmed`) the review page shows. Reading a layout-1 sheet is deliberately not built — no field paper existed — and is its own row.
 
 - ✅ **CLOSED BY `M128` (2026-10-03) — `minor` · A yes/no question printed on the blank form as a write-in box rather
   than as Yes and No boxes to mark.** Found by `M128` while measuring the printed layout before writing the OCR
@@ -12756,14 +12756,14 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   filter on the audit event, a fixture connection that cannot lapse), or to say in the spec that both need a fresh
   seed. **Live.** Filed by `M128`. **Tier: during-testing.** ⚠️ **`M130` (2026-10-04) FIXED THE AUDIT HALF, AFTER IT WENT RED IN CI TOO** — so "neither fails there" no longer held: the increment's seeded forms and new guest submissions pushed the seeded `permission_changed` rows off page one by the time CI's last project ran. The scan now opens `/audit-log?event=permission_changed` and passes on every viewport, here and against a long-lived database. **The drift half remains.**
 
-- **`nit` · The printed blank form says "Scans of this form can be read automatically" even when the form does not
+- ✅ **CLOSED BY `M143` (2026-10-07) — **`nit` · The printed blank form says "Scans of this form can be read automatically" even when the form does not
   accept scans.** Found by `M129` while adding the accept-scans setting. The footer of
   `resources/views/pdf/blank-form.blade.php` chooses its sentence from `BlankFormPrintPresenter`'s `ocr_compatible`
   alone, so a form whose scanning is switched off still promises it, and a scan of that paper is then refused with
   "Turn on scanning in the form's settings first." `M129` deliberately leaves the sentence alone. The footer prints
   inside the last question's region, `PrintedFormMatcher` skips only the sentences it knows, and the samples due
   2026-10-08 are printed from the `M128` build, so a third sentence must be taught to the matcher in the same change
-  that prints it. **Live.** Filed by `M129`. **Tier: during-testing.**
+  that prints it. **Live.** Filed by `M129`. **Tier: during-testing.** ✅ **CLOSED BY `M143` (2026-10-07), PR #336:** the footer promises automatic reading only when `CapabilityFlags::isOcrCompatible()` and `forms.allow_ocr_single` both hold, says "Scanning is switched off for this form" when only the version half does, and all three sentences are known to `PrintedFormMatcher` as printed text.
 
 - **`minor` · A duration or signature question can be published and never answered: neither the guest form nor
   manual entry has a control for it, and OCR reads a duration it cannot save.** Found by `M129` while building the
@@ -13295,7 +13295,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   order (recipients and answers from the form, a review/approval step, a failure alert) is `R-1ceb198f`.
   **Live.** Filed by `M142`. **Tier: during-testing.**
 
-- **`minor` · The printed blank form is hard to fill and hard to read back: every text answer in one-letter-per-box combs,
+- ✅ **CLOSED BY `M143` (2026-10-07) — **`minor` · The printed blank form is hard to fill and hard to read back: every text answer in one-letter-per-box combs,
   choices one per line, no question numbers, no instruction that a computer reads the sheet, and tenant colour on paper
   printed in monochrome.** Found by the user on 2026-10-07, reviewing the rendered "Survey Question Sampling" blank
   before printing the first OCR samples ("unorganized"; the boxes "limiting"), and confirmed against the ICR form-design
@@ -13306,7 +13306,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   title took `$brand['bg']`. The reader (`OcrAnswerReader::choices()`) reads one option per line and the OCR tests'
   fixture (`tests/Feature/Ocr/Support/PrintedPageTypesetter.php`) hand-codes the same geometry, so the layout, the
   reader and the fixture change together — the fixture first, measured red. `D96` decides the shape.
-  **Live.** Filed by `M143`. **Tier: early-testing.**
+  **Live.** Filed by `M143`. **Tier: early-testing.** ✅ **CLOSED BY `M143` (2026-10-07), PR #336 — LAYOUT 2 (`D96`).** One open box for short text, email and url; 18pt square combs for numbers, phones and dates, 23 at most, a number sized from its `max_value`; choices side by side with 14pt boxes; numbered questions; a boxed instruction banner with a worked example; monochrome; `Layout 2` beside the stamp. The reader follows (`OcrAnswerReader::choices()` credits a mark to the label it precedes; `layoutOf()` reads the running head), and the OCR tests' typesetter was rewritten first and measured red in eleven places before the reader changed. Six mutations caught. `docs/ocr-pipeline-design.md` §2.5.10.
 
 - **`nit` · A sheet printed from layout 1 is refused rather than read; reading it would need layout 1's geometry kept
   beside layout 2's.** Found by `M143` while adding the `Layout 2` word to the running head (`R-d6546409`).

@@ -22,6 +22,9 @@ final class OcrText
      */
     public const array MARKS = ['x', '×', '✓', '✔', '✗', '✘', 'v', '/', '\\', '*', '+'];
 
+    /** What a recognizer makes of a drawn box wall: a bar, a broken bar, a box-drawing line. */
+    private const array BORDER_ARTEFACTS = ['|', '¦', '│'];
+
     /**
      * A field key compared the way a 7pt stamp survives a scan: lower-cased, with everything but letters
      * and digits removed. The underscore is the character most often lost, so it is not required.
@@ -68,6 +71,15 @@ final class OcrText
      */
     public static function isBorderArtefact(string $text): bool
     {
-        return in_array($text, ['|', '¦', '│'], true);
+        return in_array($text, self::BORDER_ARTEFACTS, true);
+    }
+
+    /**
+     * The text with every border artefact removed — an open box's wall read as a character against the
+     * writing (layout 3, `D98`: a number or a phone written in an open box, up against its left edge).
+     */
+    public static function withoutBorderArtefacts(string $text): string
+    {
+        return str_replace(self::BORDER_ARTEFACTS, '', $text);
     }
 }

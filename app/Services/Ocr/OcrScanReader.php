@@ -172,10 +172,17 @@ final class OcrScanReader
         // Layout 2 (`M143`, closing `R-d6546409`): the stamp names the schema, the "Layout N" word beside it names
         // the template, and a sheet from an older template would be read against the wrong geometry. Refused
         // only on POSITIVE evidence — a legible running head with no layout word, or a lower number; a head
-        // that was not read is a warning, or every badly photographed new sheet would be refused too.
+        // that was not read is a warning, or every badly photographed new sheet would be refused too. The
+        // message names the two numbers rather than a date (`M144`): a date was false the day the next layout
+        // shipped, and the number is printed on the sheet for the user to check.
         $layout = $this->matcher->layoutOf($pages, $resolved['stamp']);
         if ($layout['evidence'] === 'absent' || ($layout['layout'] !== null && $layout['layout'] < BlankFormPrintPresenter::LAYOUT)) {
-            $this->fail($scan, 'layout_outdated', 'This sheet was printed from an older layout of the form, before 2026-10-07, and cannot be read automatically. Key the response in by hand, and print fresh copies for scanning.');
+            $printed = $layout['layout'] === null ? 'without a layout mark beside its stamp' : 'from layout '.$layout['layout'];
+            $this->fail($scan, 'layout_outdated', sprintf(
+                'This sheet was printed %s, an older layout of the form: the current paper is layout %d, and the answers on this sheet sit in other places than the reader expects. Key the response in by hand, and print fresh copies for scanning.',
+                $printed,
+                BlankFormPrintPresenter::LAYOUT,
+            ));
 
             return;
         }

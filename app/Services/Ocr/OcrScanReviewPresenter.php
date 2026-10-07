@@ -8,6 +8,7 @@ use App\Models\Attachment;
 use App\Models\Form;
 use App\Models\FormVersion;
 use App\Models\OcrScan;
+use App\Services\Forms\BlankFormPrintPresenter;
 use App\Services\Submissions\EncodeFormPresenter;
 
 /**
@@ -123,7 +124,7 @@ final class OcrScanReviewPresenter
             $notices[] = [
                 'code' => 'layout_unconfirmed',
                 'tone' => 'warning',
-                'message' => 'The layout mark on this paper could not be read. If the sheet was printed before 2026-10-07, its answers may sit in the wrong places; check each one against the paper.',
+                'message' => sprintf('The layout mark on this paper could not be read. If the sheet is not from the current paper (Layout %d beside the version stamp), its answers may sit in the wrong places; check each one against the paper.', BlankFormPrintPresenter::LAYOUT),
             ];
         }
 

@@ -10,13 +10,16 @@ use App\Services\Expressions\Coercion;
 /**
  * Reads ONE printed question's answer out of the lines between its label and the next question's (M128).
  *
- * The layout it reads is `docs/ocr-pipeline-design.md` §2.5 (layout 2 since `M143`), and each area has its
+ * The layout it reads is `docs/ocr-pipeline-design.md` §2.5 (layout 3 since `M144`), and each area has its
  * own rule:
  *   - `comb`    — characters in a row of boxes. A captioned comb (a date's DD / MM / YYYY, a time, a
  *     duration, a cascading select's levels) is split into its groups by WHERE each character sits under
  *     the captions, never by counting, because §2.5.3 is explicit that a date must be parsed positionally.
- *   - `line`    — free text written in one open box (short text, email, url since layout 2).
- *   - `ruled`   — free text in one taller box.
+ *     Since layout 3 (`D98`) every comb is captioned: a number and a phone moved to an open box.
+ *   - `line`    — free text written in one open box (short text, email, url since layout 2; a phone and a
+ *     number since layout 3, parsed out of the text with the same letter-for-digit fixes a comb got).
+ *   - `ruled`   — free text in one taller box, sized from the question's `max_length` since layout 3; its
+ *     lines are read top to bottom and joined with spaces. A box wall read as a bar is dropped from both.
  *   - `choices` — an X in the box before an option's label. Since layout 2 the options sit SIDE BY SIDE,
  *     several to a line, so each label is found as a span of words in printed order and the mark credited
  *     to it is the run of mark words immediately before that span — never a mark that belongs to an
@@ -37,7 +40,7 @@ use App\Services\Expressions\Coercion;
  */
 final class OcrAnswerReader
 {
-    /** OCR's usual letter-for-digit confusions, applied only inside numeric combs. */
+    /** OCR's usual letter-for-digit confusions, applied to a digit answer — combed, or in an open box since layout 3. */
     private const array DIGIT_LOOKALIKES = ['O' => '0', 'o' => '0', 'D' => '0', 'I' => '1', 'l' => '1', 'i' => '1'];
 
     /** A recognised substitution makes the value something a reviewer should see, whatever its confidence. */
@@ -288,10 +291,17 @@ final class OcrAnswerReader
      */
     private function ruled(?FieldType $type, array $answer): array
     {
+        // A box wall the recognizer read as a bar is dropped the way `combSymbols()` drops it (layout 3,
+        // `D98`): a number or a phone is now written in an open box, often up against its left edge, and a
+        // leading `|` would make the number unreadable and would be STORED in the phone.
         $symbols = [];
         foreach ($answer as $line) {
             foreach ($line->words as $word) {
-                array_push($symbols, ...$word->symbols);
+                foreach ($word->symbols as $symbol) {
+                    if (! OcrText::isBorderArtefact($symbol->text)) {
+                        $symbols[] = $symbol;
+                    }
+                }
             }
         }
 
@@ -299,7 +309,7 @@ final class OcrAnswerReader
             return $this->blank();
         }
 
-        $text = implode(' ', array_map(static fn (OcrLine $l): string => $l->text(), $answer));
+        $text = implode(' ', array_map(static fn (OcrLine $l): string => OcrText::withoutBorderArtefacts($l->text()), $answer));
 
         return $this->parsed($type, [], $text, null, $this->confidenceOf($symbols));
     }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\FieldType;
 use App\Models\Form;
+use App\Models\FormFieldValidation;
 use App\Models\FormVersion;
 use App\Models\Tenant;
 use App\Models\User;
@@ -49,7 +50,20 @@ beforeEach(function (): void {
     addFormField($draft, $this->user, 'symptoms', FieldType::MultiSelect, 7, ['label' => 'Presenting symptoms', 'config' => ['options' => [
         ['value' => 'fever', 'label' => 'Fever'], ['value' => 'cough', 'label' => 'Cough'], ['value' => 'fatigue', 'label' => 'Fatigue'],
     ]]]);
-    addFormField($draft, $this->user, 'notes', FieldType::LongText, 8, ['label' => 'Clinical notes']);
+    // Layout 3 (D98): a phone is an open box, read as written. It sits BEFORE the notes so the footer still lands in
+    // the last question's region, which the footer-sentence case below relies on.
+    addFormField($draft, $this->user, 'mobile', FieldType::Phone, 8, ['label' => 'Mobile number']);
+    $notes = addFormField($draft, $this->user, 'notes', FieldType::LongText, 9, ['label' => 'Clinical notes']);
+    // Layout 3 (R-d696ba9e): 200 capitals is a five-line box, so a paragraph has somewhere to go. A validation is a
+    // relation, not a column, so it is a row of its own (the serializer reads it into the snapshot).
+    FormFieldValidation::create([
+        'form_version_id' => $draft->id,
+        'form_field_id' => $notes->id,
+        'rule_type' => 'max_length',
+        'rule_value' => '200',
+        'error_message' => 'Keep it short.',
+        'sequence' => 0,
+    ]);
 
     $this->version = app(PublishService::class)->publish($form->refresh(), $this->user);
     $this->form = $form->refresh();
@@ -68,6 +82,7 @@ function ocrMatchAnswers(): array
         'consent' => ['Yes'],
         'sex' => ['Female'],
         'symptoms' => ['Fever', 'Cough'],
+        'mobile' => '0917 123 4567',
         'notes' => 'MILD FEVER FOR TWO DAYS',
     ];
 }
@@ -96,6 +111,8 @@ it('reads every printed area of a cleanly filled page, each anchored on its key 
         'consent' => true,
         'sex' => 'f',
         'symptoms' => ['fever', 'cough'],
+        // A phone in an open box (layout 3): what was written, spaces included — the pipeline's own rule accepts them.
+        'mobile' => '0917 123 4567',
         'notes' => 'MILD FEVER FOR TWO DAYS',
     ]);
 
@@ -199,9 +216,11 @@ it('reads the layout off the running head, and tells old paper from a head that 
     $pages = fn (array $options): array => [PrintedPageTypesetter::fromModel($this->model, [], $options)->page()];
     $stamp = strtolower((string) $this->model['schema_stamp']);
 
-    expect($this->matcher->layoutOf($pages([]), $stamp))->toBe(['layout' => 2, 'evidence' => 'token'])
-        // "Layout2" read as one word.
-        ->and($this->matcher->layoutOf($pages(['run_together' => ['runhead']]), $stamp))->toBe(['layout' => 2, 'evidence' => 'token'])
+    expect($this->matcher->layoutOf($pages([]), $stamp))->toBe(['layout' => 3, 'evidence' => 'token'])
+        // "Layout3" read as one word.
+        ->and($this->matcher->layoutOf($pages(['run_together' => ['runhead']]), $stamp))->toBe(['layout' => 3, 'evidence' => 'token'])
+        // Layout-2 paper, read for what it is; the job and the bake-off refuse it against the current number.
+        ->and($this->matcher->layoutOf($pages(['layout' => 2]), $stamp))->toBe(['layout' => 2, 'evidence' => 'token'])
         ->and($this->matcher->layoutOf($pages(['layout' => 1]), $stamp))->toBe(['layout' => 1, 'evidence' => 'token'])
         // Layout-1 paper: the stamp's own line was legibly read, and no layout word is on it.
         ->and($this->matcher->layoutOf($pages(['layout' => null]), $stamp))->toBe(['layout' => null, 'evidence' => 'absent'])
@@ -259,9 +278,36 @@ it('applies thresholds handed to it instead of the configured ones, so zero with
 });
 
 it('reads a letter O in a number box as a zero, and flags it for review whatever its confidence', function (): void {
+    // Since layout 3 the number is written in an open box; the same letter-for-digit fixes apply to the text.
     $fields = ocrMatchFields($this->matcher, $this->form, $this->version, $this->model, ['age' => '3O']);
 
     expect($fields['age'])->toMatchArray(['state' => 'read', 'value' => '30', 'tier' => 'review', 'confidence' => 89]);
+});
+
+it('drops a box wall read as a bar from an open-box answer, so a number or a phone written against the edge still reads (layout 3, D98)', function (): void {
+    // A comb always dropped the wall glyphs; an open box's single left wall is new ink beside a digit string.
+    // Without the drop the number would be unreadable and the phone would be STORED with its bar.
+    $fields = ocrMatchFields($this->matcher, $this->form, $this->version, $this->model, ['age' => '|34', 'mobile' => '|0917 123 4567|']);
+
+    expect($fields['age'])->toMatchArray(['state' => 'read', 'value' => '34', 'tier' => 'auto', 'confidence' => 98])
+        ->and($fields['mobile'])->toMatchArray(['state' => 'read', 'value' => '0917 123 4567']);
+});
+
+it('reads a paragraph written over several lines of the long-text box as one answer, the lines joined (layout 3, R-d696ba9e)', function (): void {
+    // `notes` has a max_length of 200, so its box is five lines tall; the pen uses four, then — on a second
+    // sheet — six, spilling below the box. The region runs to the next anchor (here the footer), so both read;
+    // the lines are joined with spaces, and the breaks are not kept (a nit filed by M144).
+    $notes = collect($this->model['blocks'][0]['fields'])->firstWhere('key', 'notes');
+    $four = "MILD FEVER FOR TWO DAYS\nNO COUGH\nAPPETITE NORMAL\nADVISED REST AND FLUIDS";
+    $six = $four."\nREVIEW IN THREE DAYS\nREFER IF FEVER PERSISTS";
+
+    $inside = ocrMatchFields($this->matcher, $this->form, $this->version, $this->model, [...ocrMatchAnswers(), 'notes' => $four]);
+    $spilled = ocrMatchFields($this->matcher, $this->form, $this->version, $this->model, [...ocrMatchAnswers(), 'notes' => $six]);
+
+    expect($notes['lines'])->toBe(5)
+        ->and($inside['notes'])->toMatchArray(['state' => 'read', 'value' => 'MILD FEVER FOR TWO DAYS NO COUGH APPETITE NORMAL ADVISED REST AND FLUIDS'])
+        ->and($spilled['notes']['value'])->toBe('MILD FEVER FOR TWO DAYS NO COUGH APPETITE NORMAL ADVISED REST AND FLUIDS REVIEW IN THREE DAYS REFER IF FEVER PERSISTS')
+        ->and($inside['mobile']['value'])->toBe('0917 123 4567');
 });
 
 it('reads a yes/no written as a word, the shape of a sheet printed before this increment', function (): void {

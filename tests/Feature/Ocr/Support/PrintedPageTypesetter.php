@@ -10,14 +10,15 @@ use App\Services\Ocr\OcrWord;
 
 /**
  * Lays out what a recognizer would read off a filled copy of a printed blank form (M128 tests; layout 2 since
- * M143).
+ * M143, layout 3 since M144).
  *
  * It takes the SAME render model the PDF is typeset from (`BlankFormPrintPresenter::present()`) and places
  * its text where `resources/views/pdf/blank-form.blade.php` puts it: the running head with the layout word
  * and the checksum stamp, the boxed instruction banner with its worked example, each question's number and
  * label at the left margin with its key stamp at the right one, comb characters one per cell with the
  * captions under their groups, the options of a choice question SIDE BY SIDE with an X before each marked
- * label, written text in an open box. Geometry is in page units (0–1 both ways), and a tilt rotates
+ * label, written text in an open box, and a long-text box as tall as the presenter's line count with the
+ * answer written one line per newline. Geometry is in page units (0–1 both ways), and a tilt rotates
  * everything about the page centre the way a phone held at an angle does.
  *
  * ⚠️ THIS FILE IS THE ONLY PLACE THE OCR TESTS SEE THE PAPER. A layout change that is not mirrored here leaves
@@ -34,7 +35,7 @@ final class PrintedPageTypesetter
     public const float HEIGHT = 1414.0;
 
     /** The banner's first line, exactly as the template prints it. */
-    public const string BANNER = 'THIS FORM IS READ BY A COMPUTER. Write in BLOCK CAPITALS. Where boxes are printed, write one letter or number in each box. Mark a choice with an X inside its box. Dates are day, month, year.';
+    public const string BANNER = 'THIS FORM IS READ BY A COMPUTER. Write in BLOCK CAPITALS. Where boxes are printed, write one letter or number in each box. Mark a choice with an X inside its box. Dates are day, month, year. If an answer needs more room, continue on another sheet and write the question number beside it.';
 
     private const float CHAR = 0.009;
 
@@ -61,7 +62,8 @@ final class PrintedPageTypesetter
 
     /**
      * @param  array<string, mixed>  $model  `BlankFormPrintPresenter::present()` output
-     * @param  array<string, string|list<string>>  $answers  key => a comb, line or ruled string, a list of comb
+     * @param  array<string, string|list<string>>  $answers  key => a comb, line or ruled string (a ruled one may
+     *                                                       carry newlines, one per written line), a list of comb
      *                                                       group strings, or for choices the labels marked
      * @param  array{omit_keys?: list<string>, omit_labels?: list<string>, omit_captions?: bool, omit_numbers?: bool,
      *               stamp?: string|null, layout?: int|string|null, run_together?: list<string>,
@@ -162,7 +164,7 @@ final class PrintedPageTypesetter
                     'comb' => $page->comb($row['comb'], $answer, $omitCaptions, $conf),
                     'choices' => $page->choices($row['options'], is_array($answer) ? $answer : [], $conf, in_array($key, $runTogether, true)),
                     'line' => $page->line(is_string($answer) ? $answer : null, $conf),
-                    'ruled' => $page->ruled(is_string($answer) ? $answer : null, $conf),
+                    'ruled' => $page->ruled(is_string($answer) ? $answer : null, (int) ($row['lines'] ?? 3), $conf),
                     default => $page->advance(),
                 };
                 $page->advance(0.6);
@@ -382,12 +384,22 @@ final class PrintedPageTypesetter
         $this->advance(1.6);
     }
 
-    private function ruled(?string $answer, float $confidence): void
+    /**
+     * The long-text box (layout 3): `$lines` tall — the presenter's count, three for a row that carries none
+     * (the stylesheet's 60pt) — with the answer written from the top, one line per newline. An answer longer
+     * than the box spills below it the way a pen does, still inside the question's region.
+     */
+    private function ruled(?string $answer, int $lines, float $confidence): void
     {
+        $written = 0;
         if ($answer !== null) {
-            $this->text($answer, self::LEFT + 0.004, $confidence);
+            foreach (explode("\n", $answer) as $line) {
+                $this->text($line, self::LEFT + 0.004, $confidence);
+                $this->advance();
+                $written++;
+            }
         }
-        $this->advance(3.0);
+        $this->advance(max(0, $lines - $written));
     }
 
     /**

@@ -252,7 +252,7 @@ it('says what the reading could not vouch for before the reviewer checks a singl
     expect($codes)->toContain('version_unconfirmed')
         // M143: the layout mark (R-d6546409) — a warning with words, never a refusal, when it was merely not read.
         ->and(in_array('layout_unconfirmed', $codes, true))->toBeTrue()
-        ->and($notices->firstWhere('code', 'layout_unconfirmed')['message'])->toContain('printed before 2026-10-07')
+        ->and($notices->firstWhere('code', 'layout_unconfirmed')['message'])->toContain('Layout 3 beside the version stamp')
         ->and(in_array('pages_beyond_limit', $codes, true))->toBeTrue()
         ->and(in_array('nothing_read', $codes, true))->toBeFalse();
 

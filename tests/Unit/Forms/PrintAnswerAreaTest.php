@@ -24,18 +24,19 @@ use App\Services\Ocr\PrintedFormMatcher;
 function printVerdictTable(): array
 {
     return [
-        // Digits a pen prints into separated boxes (8). `cascading_select` is here rather than in
-        // `choices` because its option pool is one FLAT list spanning every level — see the dedicated
-        // case below. Text left this set in layout 2 (M143, D96).
+        // Digits a pen prints into CAPTIONED groups (5): the calendar, the clock, a cascade's levels.
+        // `cascading_select` is here rather than in `choices` because its option pool is one FLAT list
+        // spanning every level — see the dedicated case below. Text left this set in layout 2 (M143,
+        // D96); a phone and a number left it in layout 3 (M144, D98), because the reader parses a digit
+        // string from an open box as well as from boxes and a comb bought only segmentation.
         'comb' => [
-            'phone',
-            'integer', 'decimal',
             'date', 'time', 'datetime', 'duration',
             'cascading_select',
         ],
-        // One open box, block capitals (3) — layout 2: a box per letter limited respondents.
-        'line' => ['short_text', 'email', 'url'],
-        // Free prose: nothing to comb (1).
+        // One open box, block capitals (6) — layout 2: a box per letter limited respondents; layout 3: a
+        // phone and a number too.
+        'line' => ['short_text', 'email', 'url', 'phone', 'integer', 'decimal'],
+        // Free prose: nothing to comb (1); the box is sized from max_length since layout 3.
         'ruled' => ['long_text'],
         // FLAT option lists whose entries are alternatives to one another (5).
         'choices' => [

@@ -13351,7 +13351,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   range. CI's `npm ci` tolerates it (every run since has been green), so the fix is one `npm install` committed on its
   own, in an increment that touches the frontend anyway. **Live.** Filed by `M143`. **Tier: during-testing.**
 
-- **`minor` · Layout 2 combs numbers, phones, dates and times one character per box while text has an open box; the user
+- ✅ **CLOSED BY `M144` (2026-10-07) — **`minor` · Layout 2 combs numbers, phones, dates and times one character per box while text has an open box; the user
   asks whether one open box should serve them all.** Found by the user on 2026-10-07, reviewing the merged layout 2 ("is it
   really relevant to have a per box per letter for other indicators?"), and deliberately not resolved in `M143`'s session.
   `PrintAnswerArea::for()` sends `phone`, `integer`, `decimal`, `date`, `time`, `datetime`, `duration` and `cascading_select`
@@ -13361,9 +13361,9 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   too. The remedy follows `D98`: with A, `integer`/`decimal`/`phone` move to `Line` (the enum's total match, its test table,
   the presenter's sizing, the typesetter), the captioned combs stay; with B, a date parser and a printed `DD/MM/YYYY` hint as
   well. Either is `LAYOUT` 3, which refuses layout-2 sheets — so it ships BEFORE the bake-off samples are printed, in one
-  increment with the paragraph row below. **Live.** Filed by `M143`. **Tier: early-testing.**
+  increment with the paragraph row below. **Live.** Filed by `M143`. **Tier: early-testing.** ✅ **CLOSED BY `M144` (2026-10-07), PR #337:** `D98` answered A — `PrintAnswerArea::for()` sends `phone`, `integer` and `decimal` to `Line`; the presenter's comb sizing for digits is gone; `LAYOUT` is 3 and a layout-2 sheet is refused with a message naming both numbers; `ruled()` drops a box wall read as a bar so a number or a phone against the edge still reads. Built with the paragraph row as one layout (`D13` exception #6, the user's hand-off).
 
-- **`minor` · A long-text answer gets a fixed 60pt box (about three lines) and a short-text answer a single 26pt line,
+- ✅ **CLOSED BY `M144` (2026-10-07) — **`minor` · A long-text answer gets a fixed 60pt box (about three lines) and a short-text answer a single 26pt line,
   whatever the question asks for — a paragraph has nowhere to go on the paper.** Found by the user on 2026-10-07 ("what if
   the response to an indicator is multiple lines like a paragraph?"), reviewing the merged layout 2; `docs/ocr-pipeline-design.md`
   §2.5.8 records "no answer-area sizing from content" as a known limitation. The heights are constants in
@@ -13373,7 +13373,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the authored `max_length` (about 70 block capitals to a 26pt line; a floor of one line for `line` and three for `ruled`; a
   cap of about ten so one question cannot swallow a page), or an author-chosen row count beside it, and print "continue on
   another sheet, with the question number" where the cap bites; mirror the height in `PrintedPageTypesetter` and add a case
-  where the answer runs to four lines. `LAYOUT` 3 with the row above. **Live.** Filed by `M143`. **Tier: early-testing.**
+  where the answer runs to four lines. `LAYOUT` 3 with the row above. **Live.** Filed by `M143`. **Tier: early-testing.** ✅ **CLOSED BY `M144` (2026-10-07), PR #337:** the long-text box is `clamp(ceil(max_length / 45), 3, 10)` lines at 20pt (3 without a `max_length`, so the default box is still 60pt), the template sets the height inline, the typesetter writes an answer one line per newline and a four-line and a six-line paragraph are read. TWO NARROWINGS, deliberate: an open `line` box stays one line whatever its `max_length` (a 255 cap on a short text, a phone or a number is a sanity limit, not a length promise), and the "continue on another sheet" sentence is in the banner once rather than under each capped box — the matcher's static list is one list for the whole form, and `isStatic()`'s substring rule would have blanked `MORE`, `ROOM`, `SHEET`, `NUMBER` and `WITH` as answer lines everywhere. 45 capitals a line rather than the row's 70: hand-printed, not typed. The lost line breaks are a `nit` filed by `M144`.
 
 - **`nit` · A paragraph written over several lines of the long-text box is saved as one line: `OcrAnswerReader::ruled()`
   joins the region's lines with spaces, so the line breaks a respondent wrote are lost.** Found by `M144` while sizing the

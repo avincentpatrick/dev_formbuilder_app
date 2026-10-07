@@ -16,106 +16,84 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M144`, Print blank layout 3: open boxes for numbers and phones (`D98` A), and a long-text box sized from its `max_length` (m144-print-blank-layout-3)
+## Status: NO ACTIVE CLAIM — `M144` is merged; `M145` (the bake-off on layout-3 samples, ADR-0010, the staging scan) waits on the user for the samples printed from layout 3 and a key that reads
 
-Taken 2026-10-07. Branch `m144-print-blank-layout-3`, cut from `origin/main` at `23b0ef54`, PR into `main`.
+## RELEASED — `M144`, Print blank layout 3: a phone and a number in one open box (`D98` A), and a long-text box sized from its `max_length` (merged as PR #337, `fe2591a0`, 6/6 green on its FIRST run with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 
-**Two rows and the decision between them, kept together as `D13` exception #6 by the user's instruction in the hand-off**
-("build R-d696ba9e and R-31fa2676 together as LAYOUT 3"): either row moves an answer area relative to its label, so either is
-a new `BlankFormPrintPresenter::LAYOUT`, and the reader refuses every sheet from an older layout — two increments would have
-refused the user's printed bake-off samples twice. `D98` was put to the user first this session and answered **A** in chat
-(open boxes for `integer`, `decimal` and `phone`; the captioned combs stay for `date`, `time`, `datetime`, `duration` and
-`cascading_select`); it is recorded under `## ANSWERED` in this increment's PR, with the row's `Awaits` token stripped in the
-same commit (M143's pattern for `D96`/`D97`).
-- **`R-31fa2676`** — Layout 2 combs numbers, phones, dates and times one character per box while text has an open box
-  (`docs/feature-backlog.md`, filed by `M143` from the user's comment). Awaits `D98`.
-- **`R-d696ba9e`** — a long-text answer gets a fixed 60pt box whatever the question asks for (the row beside it).
+Shipped 2026-10-07. Branch `m144-print-blank-layout-3`, cut from `origin/main` at `23b0ef54`. The claim is `466f5922`, pushed before
+any file was opened, after `D98` was put to the user first thing and answered **A** in chat. Commits, in the stated order: the
+render model `bb019725` (measured red before anything else moved), the paper `55673bf0`, the reader and the two messages
+`3e2191ae`, the typesetter and the tests `26b78559`, the docs, the decision and the rows `81d15c27`. No tracker surgery:
+`PROGRESS.md` had about 27 KB of headroom at the start (read it from `preflight`, never from here).
 
-### Evidence verified
-Against `23b0ef54`, every file read in full:
-- **`R-31fa2676`.** `PrintAnswerArea::for()` sends `phone`, `integer`, `decimal`, `date`, `time`, `datetime`, `duration` and
-  `cascading_select` to `Comb` (`app/Enums/PrintAnswerArea.php:122-133`) — **held.** `BlankFormPrintPresenter::combGroups()`
-  sizes them (:399-435; `numericCells()` :732-756, `combCells()` :504-521, `PHONE_CELLS` 13 at :84) — **held.**
-  `OcrAnswerReader::comb()` reads by position (:72-114) and `date()` parses only from the captioned groups (:544) — **held.**
-  `number()` already reads free text (:524-538: strips spaces, maps `O/o/D` to `0` and `I/l/i` to `1`, caps a substitution at
-  89) — **held.** The bake-off's answer sheet assumes day-first dates — **held** (`OcrBakeoffAnswers::canonical()` too).
-- **`R-d696ba9e`.** `.ruled` 60pt and `.line` 26pt are constants in `resources/views/pdf/_blank-form-styles.blade.php:131-132`
-  — **held**; the presenter's rows carry no height (`BlankFormPrintPresenter.php:362-379`) — **held**;
-  `OcrAnswerReader::ruled()` joins every line in the region top to bottom (:289-305) — **held**; §2.5.8 records "no answer-area
-  sizing from content" (`docs/ocr-pipeline-design.md:155`) — **held.**
+**Rows and namespaces:**
+- **Closed:** `R-31fa2676` (combs for numbers and phones — `D98` A) and `R-d696ba9e` (the paragraph box), kept together as
+  `D13` exception #6 by the user's instruction in the hand-off: either row is a new `LAYOUT`, and two layouts would have
+  refused the user's printed samples twice.
+- **Filed:** three `nit`s, all `during-testing`, all for the bake-off to measure — a paragraph's line breaks are lost
+  (`ruled()` joins with spaces); an integer with a thousands separator is unreadable in an open box; a wall read as `I` or
+  `l` becomes a leading `1`, flagged at 89 but shown as a plausible value.
+- **Decisions:** `D98` answered **A** (open boxes for `integer`, `decimal`, `phone`; the captioned combs stay), recorded under
+  `## ANSWERED` in the PR with the row's `Awaits` token stripped in the same commit. **Namespaces spent:** the one decision.
+  No migration, no ADR — `0010` stays reserved for `M145`.
+- **Outside the claim's list:** `app/Services/Ocr/OcrText.php` (a `BORDER_ARTEFACTS` constant and `withoutBorderArtefacts()`,
+  so the reader's two wall-dropping paths share one set) and `docs/deployment-infrastructure.md` (the `ocr-staging-scan`
+  marker's blocker, which named "the Oct 8 samples" — those will now be layout-3 sheets). Both named here because the claim
+  did not name them.
 
-### Premise verified
-- **`R-31fa2676`.** *The reader needs no new parser under A* — **true**: `read()` dispatches on the ROW'S AREA
-  (`OcrAnswerReader.php:55-60`); `'line','ruled'` go to `ruled()`, then `parsed()` by type — `number()` for Integer/Decimal,
-  `found($text)` for Phone (:519). *The typesetter follows the enum* — **true**: `PrintedPageTypesetter::fromModel()`
-  dispatches on `$row['area']` (:161-167) and prints `Layout {$model['layout']}` (:84-94), so the comb half needs no OCR
-  fixture edit and the seven `age` cases change path silently. *A layout-2 sheet is refused automatically* — **true**:
-  `OcrScanReader.php:177` and `OcrBakeoffCommand.php:140` compare the read number with `BlankFormPrintPresenter::LAYOUT`.
-  **Rotten beside it:** two user-facing messages hard-code *"before 2026-10-07"* (`OcrScanReader.php:178`,
-  `OcrScanReviewPresenter.php:126`, pinned by `OcrScanReviewTest.php:255`) — layout 3 ships on that same date, so the
-  sentence would be false on arrival; both go dateless. *A number can carry `max_length`* — **false for a real form**:
-  `ValueShape::allows()` (`app/Enums/ValueShape.php:181-186`) permits it on Text shapes only, so `numericCells()`'s first
-  branch was reachable only from hand-built snapshots. Nothing in `resources/js` or the bake-off's `layout.json` knows the
-  layout number or comb-vs-line (grep; `OcrBakeoffLayout::export()`).
-- **`R-d696ba9e`.** *The reader is not the problem* — **true**: a question's region runs from its anchor to the next anchor
-  on the same page (`PrintedFormMatcher::region()` :316-330), no height anywhere; `.q { page-break-inside: avoid }`
-  (`_blank-form-styles.blade.php:99`) keeps a question whole, so the cap must stay well under the ~728pt content height.
-  *`max_length` is the only author-side input* — **true**: `FieldType::configEditor()` is null for long text and
-  `DefaultFieldRules::for()` gives short and long text no default rules (`app/Support/Forms/DefaultFieldRules.php:72`), so
-  "no `max_length`" is the common case and the floor is what most forms get. **Rotten beside it:** the row's "print
-  'continue on another sheet' where the cap bites" would add a static string to the matcher's ONE form-wide list
-  (`PrintedFormMatcher::match()` :159-189), and `isStatic()`'s substring rule (`OcrAnswerReader.php:483`) would then blank
-  `MORE`, `ROOM`, `SHEET`, `NUMBER`, `WITH` as a 4+ character answer line on EVERY field — the sentence goes in the banner
-  instead, which sits above every anchor and is deliberately not static (:184-186). *A fixture can add a `max_length`* —
-  **not through `addFormField()`** (`tests/Pest.php:273-284` passes `$extra` into `FormField::create()`; `validations` is a
-  relation): a `FormFieldValidation` row is inserted before publish, as `tests/Feature/Xlsform/XlsformImportTest.php:90` does.
+### What changed
+- **The paper** (`docs/ocr-pipeline-design.md` §2.5.11): `PrintAnswerArea::for()` sends `phone`, `integer` and `decimal` to
+  `Line` (5 comb / 6 line now); the presenter's `LAYOUT` is 3; its comb sizing for digits (`PHONE_CELLS`, `INTEGER_CELLS`,
+  `DECIMAL_CELLS`, `numericCells()`, `combCells()`) is gone and `combGroups()` throws on anything but the five captioned types;
+  every `ruled` row carries `lines` — `clamp(ceil(max_length / 45), 3, 10)`, 3 without a `max_length` — and the template
+  prints `height: {lines × 20}pt` inline on the long-text box (the optionless choice list's write-in box keeps the
+  stylesheet's 60pt). The banner gained the overflow sentence; `PrintedPageTypesetter::BANNER` matches it.
+- **The reader:** `ruled()` drops `|`, `¦`, `│` from the symbols and the text of every open-box read; `OcrScanReader`'s
+  refusal and `OcrScanReviewPresenter`'s warning name the sheet's layout and `BlankFormPrintPresenter::LAYOUT` instead of a
+  date. A layout-2 sheet is now `layout_outdated` in the job and `old_layout` in the bake-off, automatically.
+- **The fixture:** `ruled()` writes an answer one line per newline into a box `$row['lines']` tall (3 when a rewritten row
+  carries none) and advances `max(lines, written)`.
+- **Proof:**
+  - **The render model first, measured red:** the enum and the presenter changed with the paper, the reader and the typesetter
+    untouched → **8 failed / 158 passed** across the print and OCR suites; then the rest, until **168 passed**.
+  - **Six deliberate defects through `scripts/mutate.php`, each CAUGHT on the first run:** `integer` back to the comb; the
+    ten-line cap removed; the three-line floor dropped to one; `LAYOUT` back to 2; the wall strip removed; the inline height
+    dropped from the template.
+  - The full Pest suite: 5,854 passed, 1 failed — `SuiteCollectionFloorTest`, the known container-only failure on the bind mount; `tests/Feature/Forms` run explicitly: 900 passed. PHPStan 0 on the host; Pint clean across the
+    tree; pipeline-lint green; the citation ledger unchanged at 16/17.
+  - A probe form rendered through the real renderer inside a rolled-back transaction and inspected page by page (rasterised
+    with `pypdfium2`, installed for the user on the host — the host has no Ghostscript): open boxes for the phone and the
+    numbers, the date and time combed, the 3-, 5- and 10-line boxes, the ten-line one moved whole to page 2, the banner
+    sentence, `Layout 3` in the running head.
+  - No frontend file changed; no Vitest or E2E spec reaches `/print` or the typesetter.
 
-### Remedy verdict
-- **`R-31fa2676`, A — works, measured by reading both paths:** the three types move to `Line` in the enum's total match;
-  the presenter loses `PHONE_CELLS`, `INTEGER_CELLS`, `DECIMAL_CELLS`, `numericCells()` and `combCells()` (dead —
-  `cascadingGroups()` divides `MAX_COMB_CELLS` itself at :476/:479, and `combCells()` is called only from :432 and :738);
-  `combGroups()` keeps the five dated/cascade arms behind a throwing default. **Added beyond the row:** `ruled()` drops the
-  comb-wall glyphs `|`, `¦`, `│` from the symbols and the text for every open-box read (a phone goes to `found()` untouched,
-  so a strip inside `number()` alone would store a leading wall); the two refusal messages name the layout numbers instead of
-  a date.
-- **`R-d696ba9e` — works, with two narrowings:** `lines = clamp(ceil(max_length / 45), 3, 10)`, 3 without a `max_length`, at
-  20pt per line, so the default box stays today's 60pt exactly and ten lines is 200pt. The row's "about 70 block capitals to a
-  26pt line" assumed typed density — 45 is about 4mm per hand-printed capital across 178mm. (1) `line` boxes stay ONE line
-  whatever `max_length` says: a 255 cap on a short text, a phone or a number is a sanity limit, not a length promise. (2) The
-  overflow sentence prints once in the banner rather than under each capped box, for the static-list reason above. The
-  typesetter's `ruled()` writes an answer carrying newlines as separate lines and advances `max(lines, written)`.
+### How the prediction fared
 
-Files (every one named; the two rows share them by the user's instruction — `D13` exception #6; none is a hub):
-`app/Enums/PrintAnswerArea.php`, `app/Services/Forms/BlankFormPrintPresenter.php`, `app/Services/Ocr/OcrAnswerReader.php`,
-`app/Services/Ocr/OcrScanReader.php`, `app/Services/Ocr/OcrScanReviewPresenter.php`, `resources/views/pdf/blank-form.blade.php`,
-`resources/views/pdf/_blank-form-styles.blade.php`, `tests/Feature/Ocr/Support/PrintedPageTypesetter.php`,
-`tests/Unit/Forms/PrintAnswerAreaTest.php`, `tests/Unit/Forms/FieldTypeMirrorDriftTest.php` (a comment),
-`tests/Feature/Forms/BlankFormPrintPresenterTest.php`, `tests/Feature/Forms/BlankFormPrintRendererTest.php`,
-`tests/Feature/Ocr/PrintedFormMatcherTest.php`, `tests/Feature/Ocr/ReadOcrScanJobTest.php`, `tests/Feature/Ocr/OcrScanReviewTest.php`.
-Shared artefacts taken: `docs/feature-backlog.md`, `docs/claims/decisions.md` (`D98` to ANSWERED), `docs/ocr-pipeline-design.md`
-(§2.5.2, §2.5.3, §2.5.7, §2.5.8, a new §2.5.11, §9 step 0, the bake-off marker's blocker), `docs/deployment-infrastructure.md`
-(the `ocr-staging-scan` marker's blocker), `docs/claims/lane-a.md`, `docs/pipeline.md`, `docs/backlog-triage.md`,
-`docs/gate-baselines.md`, `PROGRESS.md` (own block only). Not `openapi.json`, not `phpunit.xml`, no frontend file.
-Paired files taken: none known.
-Namespaces spent: `D98` answered; no migration; no ADR — `0010` stays reserved for `M145`, the bake-off.
+| Predicted | Actual |
+|---|---|
+| The enum-and-presenter commit alone reds **ten** cases, none of them an `age` case | **Eight**, and no `age` case — right in kind, over-counted by two: the review-page assertion (`OcrScanReviewTest`) is pinned to the message text, which only the reader commit changed, and the matcher's layout case was counted once per assertion. The `['comb'][0]` on a null comb surfaced as an `ErrorException`, as predicted. |
+| All six mutations are caught on the first run | **Right.** |
+| dompdf honours the inline `height`, and a 200pt question moves whole to the next page | **Right** — seen on the rasterised page 2. |
+| PHPStan 0 on the host; the container reports its usual noise | **Right** on the host (0). The container was not asked. |
+| ⚠️ Most expected WRONG: the count of ten | **Wrong, as expected, but in the other direction** — M143 undercounted, this one overcounted. The cause is the same: a prediction made by reading test NAMES rather than the assertion each one pins. |
+| CI 6/6 on the first run | **Right** — the first run, each job with real step counts. |
 
-Build order, each its own commit: the enum and the presenter FIRST, and the suite measured red against the unchanged paper,
-reader and fixture; the paper; the reader and the two messages; the typesetter and the tests; the docs, the decision and the
-rows. Then six deliberate defects through `scripts/mutate.php`: `integer` back to the comb; the ten-line cap removed; the
-three-line floor dropped to one; `LAYOUT` back to 2; the wall strip removed; the inline height dropped from the blade.
+**Unpredicted:**
+- **The critique found three defects in the plan before a file was opened:** the `.ruled` div is rendered twice (an inline
+  height on the optionless choice list's write-in box would have printed `height: 0pt`); `addFormField()` cannot take a
+  validation (a relation, so a `FormFieldValidation` row is inserted before publish); and the matcher's static list is ONE
+  list for the whole form, so the row's per-question "continue on another sheet" note would have blanked `MORE`, `ROOM`,
+  `SHEET`, `NUMBER` and `WITH` as answer lines everywhere — the sentence went to the banner instead.
+- **The probe rendered `layout=2` on its first run** — because the harness had the `LAYOUT` mutation applied in the working
+  tree at that instant. Harmless (re-rendered after the batch), and the clearest proof yet that `mutate.php` mutates the real
+  file: never render, lint or analyse beside a running mutation batch.
+- **The quoted heredoc failed on apostrophes again** (the M123 trap, met live); the claim block went in through the Write tool
+  and a line-index splice.
 
-Prediction, written before any file is opened:
-- The enum-and-presenter commit alone reds **ten** cases: the `PrintAnswerArea` table; presenter cases at :175 (phone comb
-  null), :200 (areas), :222 (number comb null), :280 and :548 (layout 2); renderer :285 (`Layout 2`); matcher :202/:204 (one
-  case); review :255 (the date text). **None of the seven `age` cases moves** — the open-box path reaches `number()` with the
-  same text.
-- All six mutations are caught on the first run.
-- dompdf honours the inline `height`, and a 200pt question moves whole to the next page.
-- PHPStan stays at 0 on the host; the container reports its usual migration-typed noise.
-- ⚠️ **Most expected WRONG: the count of ten.** M143 predicted four kinds and measured eleven cases for the same kind of
-  change; a presenter or renderer assertion the audit did not list is the likeliest surprise, and a test indexing
-  `['comb'][0]` on a now-null comb may surface as an error rather than a failure.
-- CI 6/6 on the first run; no Vitest or E2E spec reaches `/print` or the typesetter.
+### The queue
+`M145` is the bake-off on samples printed from layout 3 (`ocr-provider-bakeoff`, ADR-0010 with `D97`'s fallback and
+rejection written in) and `ocr-staging-scan`. Neither can open a file before the user prints about fifteen copies from a
+build at or after this one — the running head must read `Layout 3` — and brings a key that reads where `ocr:bakeoff` runs.
 
 ## RELEASED — `M143`, Print blank layout 2: the paper redesigned for a pen, a monochrome printer and the reader, and the reader made to follow it (merged as PR #336, `29c86eca`, 6/6 green on its FIRST run with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

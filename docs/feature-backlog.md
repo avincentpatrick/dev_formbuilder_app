@@ -13436,3 +13436,14 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `Submission::scopeOrderBySubmitted()`; the export was left out of that row because `SubmissionExporter.php` was
   another row's file in the same batch (`D13`). The remedy is one line, `->orderBySubmitted('asc')`, which the two
   partial indexes serve as they serve the inbox. **Live.** Filed by `M146`. **Tier: during-testing.**
+
+- **`nit` · `forms-folders-axe.spec.ts`'s empty-folder case fails about one run in six locally, on a different
+  project each time, waiting five seconds for "No matching forms" after the folder select.** Found by `M146` running
+  the spec locally at one worker: 17 of 18 passed, then 5 of 6 on a rerun of the case alone — light/tablet the first
+  time, dark/desktop the second, every other project green both times. The case selects *Archive (0)* and expects
+  the heading within Playwright's default 5 s; the select navigates through Inertia, and the dev stack's
+  single-threaded server under host load (the Vite dev server beside it) sometimes answers later than that — the app log
+  shows forms-list requests of 3 to 7 s during the run (`M125` recorded the same mechanism for focus waits). Not a product defect — the page is right when it arrives —
+  and not CI-visible so far. The remedy is the idiom the other cases use: wait for the URL to carry `folder=` before
+  asserting the heading, as the "filtered to a folder" case does. **Live** locally, under load. Filed by `M146`.
+  **Tier: during-testing.**

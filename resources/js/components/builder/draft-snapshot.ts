@@ -16,13 +16,23 @@
  *
  * That is also how "show the author what is wrong" gets delivered *before* publish rather than at it.
  *
- * ⛔ THE PRE-PARSE IS LOAD-BEARING AND IS NOT A TIDINESS MEASURE. `safeEvaluate()`
- * (`useFormRuntime.ts:310-319`) catches a parser throw by degrading the WHOLE FORM to
- * everything-relevant and setting `engineFailed` permanently true for the session — there is no recovery
- * short of a remount. A half-typed condition is the normal state of a field an author is editing, so one
- * keystroke would otherwise kill relevance for the rest of the session. Every `relevant_expression` is
- * therefore parsed HERE, with `condition-model.ts`'s already-exported `parseExpression`, and emitted as
- * `null` if it will not parse. No second parser is introduced.
+ * ⛔ THE PRE-PARSE IS LOAD-BEARING AND IS NOT A TIDINESS MEASURE. `safeEvaluate()` in
+ * `useFormRuntime.ts` catches an engine throw by degrading the WHOLE FORM to everything-relevant and
+ * setting `engineFailed` — a flag the respondent's `RuntimeSession` shows and the preview never reads, so
+ * here the degradation is SILENT. A half-typed condition is the normal state of a field an author is
+ * editing, so one keystroke would otherwise kill relevance until the next structural change remounts the
+ * engine. Every `relevant_expression` is therefore parsed HERE, with `condition-model.ts`'s
+ * already-exported `parseExpression`, and emitted as `null` if it will not parse. No second parser is
+ * introduced.
+ *
+ * ⛔ AND THE RULE ROWS GET THE SAME TREATMENT, MEASURED THE SAME WAY (M145, `R-551873af`). The "Add
+ * condition" seed is a `required_if` with no operator and no compared question; the save door keeps both
+ * columns `nullable` on purpose (the 600 ms autosave must not be 422'd mid-edit), so the server SAVES it
+ * and the publish gate is the first thing that refuses it. In between, the engine's lowering throws on it
+ * at mount. `screenValidations()` therefore runs every rule row through the engine's OWN
+ * `StructuredRuleLowering` and parser inside a try/catch, omits a row the engine would throw on, and records
+ * `incomplete_rule` — never a list of rule names, because `required_with` with no operator is a legitimate
+ * "is answered" condition and a hand list is the unguarded mirror the next paragraph warns about.
  *
  * ⚠️ IT IS A CLIENT MIRROR OF `SchemaSnapshotSerializer::field()`/`section()`, AND THIS REPOSITORY'S
  * MEASURED PATHOLOGY IS UNGUARDED HAND-MIRRORS. `tests/Feature/Docs/DraftProjectionMirrorDriftTest.php`
@@ -53,7 +63,7 @@ import type {
     RawValidation,
     SchemaResponse,
 } from '../../../public-runtime/lib/types';
-import type { RequiredMode } from '../../../public-runtime/engine';
+import { StructuredRuleLowering, type FieldKeysById, type RequiredMode, type ValidationRow } from '../../../public-runtime/engine';
 import { isListBacked } from '../../../public-runtime/lib/choice-lists';
 
 /** The placeholder a field with no label renders as, rather than an empty control nobody can identify. */
@@ -70,7 +80,8 @@ export type ProjectionIssueCode =
     | 'empty_option_list'
     | 'unparsable_expression'
     | 'missing_formula'
-    | 'unknown_section';
+    | 'unknown_section'
+    | 'incomplete_rule';
 
 export interface ProjectionIssue {
     /** The `uid` of the offending row, so the builder can select it without a key that may not exist. */
@@ -182,6 +193,121 @@ function projectValidation(v: BuilderValidation, ordinals: Map<string, number>):
         logic_operator: group === null ? null : (v.logic_operator ?? null),
         sequence: v.sequence,
     };
+}
+
+/** The chip under a question whose rule the engine cannot evaluate yet. One sentence, author-facing. */
+export const INCOMPLETE_RULE_MESSAGE = 'This question has a rule that is not finished yet, so it is being ignored in the preview.';
+
+/** The same chip when the rule names a question that is no longer in the draft — deleted or re-keyed. */
+export const STALE_RULE_MESSAGE =
+    'This question has a rule that compares with a question that no longer exists, so it is being ignored in the preview.';
+
+/** One instance: the lowering is stateless, and the engine itself builds one per runtime. */
+const lowering = new StructuredRuleLowering();
+
+/**
+ * The engine's row for a projected rule — the mirror of `buildEngineSchema()` in `schema-mapping.ts`, which is
+ * the ONE place the wire shape becomes a `ValidationRow`: the field's key is its id, and so is a compared
+ * question's. Built here only to be screened; the runtime builds its own from the projected schema.
+ */
+function engineRow(fieldKey: string, v: RawValidation, index: number): ValidationRow {
+    return {
+        id: `${fieldKey}:${index}`,
+        form_field_id: fieldKey,
+        sequence: v.sequence,
+        rule_type: (v.rule_type as ValidationRow['rule_type']) ?? null,
+        operator: (v.operator as ValidationRow['operator']) ?? null,
+        related_form_field_id: v.related_field_key,
+        rule_value: v.rule_value === null ? null : String(v.rule_value),
+        expression: v.expression,
+        logic_group: v.logic_group_ordinal === null ? null : String(v.logic_group_ordinal),
+        logic_operator: (v.logic_operator as ValidationRow['logic_operator']) ?? null,
+        error_message: v.error_message,
+        error_message_translations: v.error_message_translations,
+    };
+}
+
+/**
+ * Would the engine throw on this row? Asked of the engine, by dispatching exactly as `semantic-validator.ts`'s
+ * `family()` and the structured-rule evaluator do: a free-text `expression` goes to the parser (blank is a
+ * no-op there), the conditional four to `lowerCondition()`, the two field comparisons to `lower()`, and a
+ * self-vs-literal constraint to nothing — `passesConstraint()` has no throwing arm for one. The one arm
+ * written here rather than called is the row with NEITHER half, which `passesConstraint()`'s default arm
+ * throws `unlowerable_rule_type` on; it needs an answer and a context to call, and a `null`/`null` row is
+ * the one shape the save door's XOR check never sees.
+ */
+function engineRefuses(row: ValidationRow, keys: FieldKeysById): boolean {
+    try {
+        if (row.expression !== null) {
+            if (row.expression.trim() !== '') parseExpression(row.expression);
+
+            return false;
+        }
+
+        switch (row.rule_type) {
+            case 'required_if':
+            case 'required_with':
+            case 'skip_if':
+            case 'skip_with':
+                lowering.lowerCondition(row, keys);
+
+                return false;
+            case 'greater_than_field':
+            case 'less_than_field':
+                lowering.lower(row, keys);
+
+                return false;
+            case null:
+                return true;
+            default:
+                return false;
+        }
+    } catch {
+        return true;
+    }
+}
+
+/**
+ * The rows of one field the engine can evaluate, and whether any it cannot names a question that is gone.
+ *
+ * A grouped row after the first must carry its connective — both evaluators throw `malformed_logic_group`
+ * on a null one — so the groups are walked in the engine's own order (`sequence`, then `id`) and every
+ * later row with no `logic_operator` is omitted too. Omitting a row moves `shapeOf()`, which is what makes
+ * finishing the row rebuild the preview without anybody asking.
+ */
+function screenValidations(fieldKey: string, rows: RawValidation[], keys: FieldKeysById): { kept: RawValidation[]; omitted: number; stale: boolean } {
+    const engineRows = rows.map((v, index) => engineRow(fieldKey, v, index));
+    const refused = new Set<number>();
+
+    engineRows.forEach((row, index) => {
+        if (engineRefuses(row, keys)) refused.add(index);
+    });
+
+    const groups = new Map<string, number[]>();
+    engineRows.forEach((row, index) => {
+        if (row.logic_group === null) return;
+        const members = groups.get(row.logic_group) ?? [];
+        members.push(index);
+        groups.set(row.logic_group, members);
+    });
+    for (const members of groups.values()) {
+        const ordered = [...members].sort((a, b) => {
+            const [x, y] = [engineRows[a], engineRows[b]];
+
+            return (x.sequence - y.sequence) || (x.id < y.id ? -1 : x.id > y.id ? 1 : 0);
+        });
+        for (const index of ordered.slice(1)) {
+            if (engineRows[index].logic_operator === null) refused.add(index);
+        }
+    }
+
+    const stale = [...refused].some((index) => {
+        const related = rows[index].related_field_key;
+
+        return related !== null && !(related in keys);
+    });
+
+    return { kept: rows.filter((_, index) => !refused.has(index)), omitted: refused.size, stale };
 }
 
 export function projectDraft(input: DraftProjectionInput): DraftProjection {
@@ -301,6 +427,21 @@ export function projectDraft(input: DraftProjectionInput): DraftProjection {
             // partial config, and second-guessing it here would diverge the preview from the real runtime.
             validations: projectValidations(f.validations),
         });
+    }
+
+    // State 9 (M145): a rule row the engine would throw on is OMITTED, and the field gets ONE issue — one,
+    // because `PreviewRuntime.vue` keys a field's chips by code. This runs after the loop, not inside it, so a
+    // rule may name a question that comes LATER in the form: every key must be assigned before any is looked
+    // up, which is also why the lookup is over the projected keys rather than the builder's rows.
+    const keysById: FieldKeysById = {};
+    for (const f of fields) keysById[f.key] = f.key;
+
+    for (const f of fields) {
+        const verdict = screenValidations(f.key, f.validations, keysById);
+        if (verdict.omitted === 0) continue;
+
+        f.validations = verdict.kept;
+        add(uidByKey[f.key], f.key, 'incomplete_rule', verdict.stale ? STALE_RULE_MESSAGE : INCOMPLETE_RULE_MESSAGE);
     }
 
     const schemaSnapshot: RawSchemaSnapshot = { sections, fields };

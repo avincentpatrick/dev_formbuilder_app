@@ -13350,3 +13350,27 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   up modified: `M137`'s trunk-wide vue bump moved the workspace's `package.json` and not the lockfile's copy of its
   range. CI's `npm ci` tolerates it (every run since has been green), so the fix is one `npm install` committed on its
   own, in an increment that touches the frontend anyway. **Live.** Filed by `M143`. **Tier: during-testing.**
+
+- **`minor` · Layout 2 combs numbers, phones, dates and times one character per box while text has an open box; the user
+  asks whether one open box should serve them all.** Found by the user on 2026-10-07, reviewing the merged layout 2 ("is it
+  really relevant to have a per box per letter for other indicators?"), and deliberately not resolved in `M143`'s session.
+  `PrintAnswerArea::for()` sends `phone`, `integer`, `decimal`, `date`, `time`, `datetime`, `duration` and `cascading_select`
+  to `Comb`; `BlankFormPrintPresenter::combGroups()` sizes them; `OcrAnswerReader::comb()` reads them by position and
+  `date()` parses ONLY from the captioned groups, so a date in an open box needs a strict day-first text parser the reader
+  does not have, while `number()` already reads free text. The bake-off's answer sheet (`OcrAnswerSheet`) assumes day first
+  too. The remedy follows `D98`: with A, `integer`/`decimal`/`phone` move to `Line` (the enum's total match, its test table,
+  the presenter's sizing, the typesetter), the captioned combs stay; with B, a date parser and a printed `DD/MM/YYYY` hint as
+  well. Either is `LAYOUT` 3, which refuses layout-2 sheets — so it ships BEFORE the bake-off samples are printed, in one
+  increment with the paragraph row below. **Live.** Filed by `M143`. **Awaits D98.** **Tier: early-testing.**
+
+- **`minor` · A long-text answer gets a fixed 60pt box (about three lines) and a short-text answer a single 26pt line,
+  whatever the question asks for — a paragraph has nowhere to go on the paper.** Found by the user on 2026-10-07 ("what if
+  the response to an indicator is multiple lines like a paragraph?"), reviewing the merged layout 2; `docs/ocr-pipeline-design.md`
+  §2.5.8 records "no answer-area sizing from content" as a known limitation. The heights are constants in
+  `resources/views/pdf/_blank-form-styles.blade.php` (`.ruled` 60pt, `.line` 26pt) and the presenter's rows carry no height.
+  The reader is not the problem: `OcrAnswerReader::ruled()` joins every line in the question's region top to bottom, so writing
+  that spills below the box is still read (as one paragraph, line breaks lost) — the paper space is. Remedy: size the box from
+  the authored `max_length` (about 70 block capitals to a 26pt line; a floor of one line for `line` and three for `ruled`; a
+  cap of about ten so one question cannot swallow a page), or an author-chosen row count beside it, and print "continue on
+  another sheet, with the question number" where the cap bites; mirror the height in `PrintedPageTypesetter` and add a case
+  where the answer runs to four lines. `LAYOUT` 3 with the row above. **Live.** Filed by `M143`. **Tier: early-testing.**

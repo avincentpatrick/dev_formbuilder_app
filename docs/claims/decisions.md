@@ -1150,6 +1150,21 @@ end state and needs a disclosure-safe refusal designed first, which is a decisio
 **Recommendation: A**, with B added if the deploying agency's privacy officer asks for notice at collection. A is what the threat model owes in any case, and B is a printed sentence that can be added without touching the reading path.
 
 
+---
+
+### D98 — Layout 2 combs numbers, phones, dates and times one character per box and gives text an open box; the user asks whether one open box should serve numbers and text alike. Which answer areas keep a comb? **Tier: early-testing.**
+
+**Filed 2026-10-07 by `M143`, from the user's comment on the merged layout 2** ("is it really relevant to have a per box per letter for other indicators? can we just have 1 box for number and texts?"), deliberately not resolved in that session. The trade-off is real and it is not the same for every digit field:
+
+- a number or a phone in an open box reads as a digit string, and Cloud Vision reads a short run of handwritten digits well — the comb there buys segmentation, which the recognizer mostly does itself;
+- a DATE in an open box is "03/04/2026", and the reader cannot tell the 3rd of April from the 4th of March from the ink — the captioned `DD MM YYYY` groups are the one comb that buys correctness rather than convenience (`docs/ocr-pipeline-design.md` §2.5.3), and `OcrAnswerReader::date()` parses only from those groups today.
+
+- **A — open boxes for numbers and phones; keep the captioned comb for date, time, datetime and duration.** The reader needs no new parser: `number()` already reads free text, and the date groups stay positional. The paper loses most of its boxes and keeps the one kind that matters.
+- **B — open boxes for everything, dates written as DD/MM/YYYY in one box with a printed hint.** A free-text date parser (strict day-first, slashes or spaces) is new reader work, the bake-off's answer sheet already assumes day first, and a respondent who writes month first is undetectable.
+- **C — keep layout 2 as it is.**
+
+**Recommendation: A.** Either A or B is a new layout (`BlankFormPrintPresenter::LAYOUT` 3), and the reader refuses every sheet printed from layout 2 once it ships — so this is decided and built BEFORE the bake-off samples are printed, together with the paragraph-answer row filed beside it.
+
 ## ANSWERED
 ### D57 — Reported item 16 asks for three ways to present sections; `forms.single_page_mode` is a boolean that expresses two of them and "tabular" is not expressible at all. What is the model? **A now, C next — ship the two modes the boolean already expresses, then make "per page" real by honouring `page_break`.**
 

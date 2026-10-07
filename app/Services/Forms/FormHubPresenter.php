@@ -164,8 +164,8 @@ final class FormHubPresenter
                 ->where('form_id', $form->id)
                 ->visibleTo($user)
                 ->countable()
-                // uuidv7 → recency without needing a `submitted_at` index, the ordering the inbox uses.
-                ->orderByDesc('id')
+                // The ordering the inbox uses (M146): when the response was sent, then its id.
+                ->orderBySubmitted()
                 ->limit(self::RECENT_LIMIT)
                 ->get()
                 ->map(fn (Submission $s): array => [

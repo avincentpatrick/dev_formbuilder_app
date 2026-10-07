@@ -105,7 +105,7 @@ final class SubmissionInboxPresenter
             // change to Submission::scopeCountable() changes what a reviewer sees by default.
             ->when(empty($filters['status']), fn ($q) => $q->countable())
             ->when($filters['source'] ?? null, fn ($q, $v) => $q->where('source', $v))
-            ->orderByDesc('id') // uuidv7 → recency without a dedicated submitted_at index
+            ->orderBySubmitted() // sent-time, then id (M146) — the partial indexes serve it, see the scope
             ->paginate(self::PER_PAGE)
             ->withQueryString();
 

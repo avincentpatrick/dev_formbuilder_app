@@ -62,7 +62,7 @@ final readonly class SubmissionSearchArm implements SearchArm
         $rows = $this->builder($user, $terms)
             ->with(['form:id,title'])
             ->select(['submissions.id', 'submissions.form_id', 'submissions.reference', 'submissions.status', 'submissions.submitted_at'])
-            ->orderByDesc('submissions.id')
+            ->orderBySubmitted()
             ->limit($limit + 1)
             ->get()
             ->map(fn (Submission $s): array => [
@@ -116,8 +116,8 @@ final readonly class SubmissionSearchArm implements SearchArm
      * ⚠️ NO `ts_rank` ORDER BY HERE, AND THE ABSENCE IS DELIBERATE. Most matches in this arm come from the
      * form-title or reference clauses, which contribute nothing to `submissions.search_vector` — so ranking
      * on that vector would sort the majority of results by a score of zero and produce an order that looks
-     * meaningful and is not. Recency (`id DESC`, uuidv7) is the honest ordering for a submission list and is
-     * what the inbox already uses. The reasoning now lives on the scope, since both callers depend on it.
+     * meaningful and is not. Recency — when the response was sent, then its id (`Submission::scopeOrderBySubmitted()`,
+     * M146) — is the honest ordering for a submission list and is what the inbox uses; the reasoning lives on the scope.
      *
      * ⚠️ THE MATCH PREDICATE MOVED TO {@see Submission::scopeMatchingKeyword()} IN J1e, WHEN THE INBOX GAINED
      * A KEYWORD BOX. It is the same three branches, invoked AS A SCOPE so `Builder::callScope()` keeps

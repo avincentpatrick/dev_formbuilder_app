@@ -32,8 +32,8 @@ final class SchemaValueFormatter
     }
 
     /**
-     * Format one answer for display/export. Choice values resolve to their option labels; multi-select /
-     * repeat arrays join with "; "; yes/no renders Yes/No; everything else stringifies. Empty → ''.
+     * Format one answer for display/export. Choice values resolve to their option labels; multi-select arrays
+     * join with "; " (a repeat group joins per instance in SubmissionRowProjector); yes/no renders Yes/No; else stringifies. Empty → ''.
      *
      * `$locale` (Increment H6b, Doc #26 amendment A8) resolves a choice option's `label_translations`
      * variant before falling back to its base label. Null — the default every pre-H6b caller keeps — is

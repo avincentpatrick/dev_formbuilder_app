@@ -63,7 +63,7 @@ final class PwaManifestController extends Controller
         $form = Form::query()->where('public_slug', FormSlug::forLookup($slug))->first();
 
         abort_if($form === null, 404);
-        abort_unless($form->allow_guest_submissions, 404);
+        abort_unless($form->allowsGuestAccess(), 404);
         abort_if($form->current_published_version_id === null, 404);
         abort_if($entitlements->currentPlan() !== null && ! $entitlements->feature('offline_sync'), 404);
 

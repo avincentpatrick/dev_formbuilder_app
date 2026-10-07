@@ -210,7 +210,7 @@ The durable, logical form record — the stable identity that a `public_slug` an
 | `draft_version_id` | `uuid` | Yes | `NULL` | No | FK to `form_versions.id`; the single mutable draft being edited right now. Kept as an explicit pointer rather than derived by querying `form_versions WHERE status='draft'`, so "which draft is live" is never ambiguous under concurrent builder sessions. |
 | `title` | `varchar(255)` | No | — | No | Denormalized copy of the current draft's title, kept in sync on every draft save, so form lists/search can read it without touching JSONB (see Design Notes). |
 | `description` | `text` | Yes | `NULL` | No | Denormalized, same rationale as `title`. |
-| `status` | `varchar(20)` — PHP enum: `FormStatus` | No | `'draft'` | No | Top-level lifecycle: `draft` (never published), `published` (has an active published version and may be accepting responses), `archived` (owner retired the form regardless of version state). |
+| `status` | `varchar(20)` — PHP enum: `FormStatus` | No | `'draft'` | No | Top-level lifecycle: `draft` (never published), `published` (has an active published version and may be accepting responses), `archived` (owner retired the form regardless of version state; its public link is closed — `Form::allowsGuestAccess()`, `M146`). |
 | `public_slug` | `varchar(120)` | Yes | `NULL` | No | Unique per tenant; the `/f/{slug}`-style public URL segment (legacy pattern, carried forward per plan §Main Features #3). `NULL` until guest access is first enabled. |
 | `allow_guest_submissions` | `boolean` | No | `false` | No | Capability flag — Main Feature #3. |
 | `allow_manual_encoding` | `boolean` | No | `true` | No | Capability flag — Main Feature #7. |

@@ -304,6 +304,23 @@ describe('forms list — the card grid (JR3)', () => {
         table.unmount();
     });
 
+    it('tells the author that archiving closes the public link and cannot be undone (M146, D99 A)', async () => {
+        // The dialog used to mention only the draft and the kept versions, while the link went on collecting
+        // responses into a form the author could no longer find. Asserted on the plain sentences, not on the
+        // title line: Vue drops the whitespace around an inline element, so that one runs together in text().
+        const wrapper = render({
+            forms: [{ ...row(true), can: { ...row(true).can, delete: true } }],
+            empty_reason: null,
+        });
+
+        await wrapper.get('[aria-label="Archive form"]').trigger('click');
+
+        expect(wrapper.text()).toContain('public link');
+        expect(wrapper.text()).toContain('cannot be undone');
+
+        wrapper.unmount();
+    });
+
     it('renders a counted chip per facet and marks the active one pressed', () => {
         const wrapper = render({
             forms: [row(true)],

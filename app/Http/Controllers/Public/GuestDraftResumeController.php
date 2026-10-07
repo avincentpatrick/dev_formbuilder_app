@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Public;
 use App\Enums\SubmissionStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Public\Concerns\ReadsGuestResumeToken;
+use App\Models\Form;
 use App\Models\Submission;
 use App\Models\SubmissionAnswer;
 use App\Support\Api\ApiErrorResponse;
@@ -22,7 +23,7 @@ use Illuminate\Http\Request;
  * Returns the saved answers + completeness so the SPA can restore state, plus a freshly-minted short-lived
  * SHARE token for the pinned version — so from here the resumed session drives the ordinary guest schema /
  * draft-save / submit endpoints exactly like a first-time fill, and H9b needs no resume-token-keyed write
- * routes. A draft that has been promoted (finalized) or reaped is gone → 404 `draft_not_found`.
+ * routes. A promoted or reaped draft is gone → 404 `draft_not_found`; a closed link (M146) → 403 `guest_disabled`.
  *
  * Gated on `feature:save_and_resume` at the route, matching the draft-save channel.
  */
@@ -46,6 +47,12 @@ final class GuestDraftResumeController extends Controller
 
         if ($draft === null) {
             return ApiErrorResponse::make(404, 'draft_not_found', 'This draft is no longer available.');
+        }
+
+        $form = Form::query()->whereKey($token->formId)->first();
+
+        if ($form === null || ! $form->allowsGuestAccess()) {
+            return ApiErrorResponse::make(403, 'guest_disabled', 'Guest submissions are disabled for this form.');
         }
 
         // Increment P3a — the answers and the lost-update baseline are read in ONE query on purpose. Taking

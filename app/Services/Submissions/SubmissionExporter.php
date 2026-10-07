@@ -125,7 +125,7 @@ final class SubmissionExporter
      * rather than guessing at a value for a field this submission never had.
      *
      * @param  list<string>  $keys
-     * @param  array<string, array<string, array{type: FieldType, config: array<string, mixed>}>>  $fieldMeta
+     * @param  array<string, array<string, array{type: FieldType, config: array<string, mixed>, repeat: string|null}>>  $fieldMeta
      * @return list<string>
      */
     private function row(Submission $submission, array $keys, array $fieldMeta, string $locale): array

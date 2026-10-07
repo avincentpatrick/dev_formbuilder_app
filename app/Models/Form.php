@@ -374,4 +374,23 @@ class Form extends Model implements TenantScoped
             ->where('forms.status', '!=', FormStatus::Archived->value)
             ->whereNotNull('forms.current_published_version_id');
     }
+
+    /**
+     * Whether the form's public link answers at all (M146, `R-f6567fc2`, `D99` A) — THE one definition of what
+     * closes a link besides the author's switch: guest access is on AND the form is not archived. Every guest
+     * entry (`GuestFormController`, `PwaManifestController`, `PublicFormSchemaController`, `GuestSubmissionController`,
+     * `GuestAttachmentController`, `GuestDraftController`, `GuestContentImageController`, `GuestDraftResumeController`)
+     * and `GuestReachability::reachable()` read it, so archiving closes the link everywhere at once instead of in
+     * eleven copies of a flag read — which is how an archived form kept collecting through `/f/{slug}` while the
+     * forms list hid it.
+     *
+     * Deliberately NOT the schedule window (`opens_at`/`closes_at`): a scheduled-closed form still mints and renders
+     * its closed screen. NOT "has a published version" either — each route keeps its own
+     * `current_published_version_id` gate, and the resume route deliberately has none. A trashed form is excluded by
+     * the routes' own lookups and by `GuestReachability`, not here.
+     */
+    public function allowsGuestAccess(): bool
+    {
+        return $this->allow_guest_submissions && $this->status !== FormStatus::Archived;
+    }
 }

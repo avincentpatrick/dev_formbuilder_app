@@ -1149,7 +1149,22 @@ end state and needs a disclosure-safe refusal designed first, which is a decisio
 
 **Recommendation: A**, with B added if the deploying agency's privacy officer asks for notice at collection. A is what the threat model owes in any case, and B is a printed sentence that can be added without touching the reading path.
 
-### D99 — An archived form keeps collecting responses through its public link while the forms list hides it. What does archiving do to the link? **Tier: during-testing.**
+### D101 — Archiving is one-way and, since `M146`, closes the public link; there is no un-archive. Should a form be restorable from the archive? **Tier: during-testing.**
+
+**Filed 2026-10-08 by `M146`, silently under `D66`, from `D99` A's third clause** — "un-archiving reopens the link" — which named a feature that does not exist: no method, route, policy arm or UI un-archives a form, `RestoreService` and the XLSForm importer refuse an archived one, and the state diagram ends at `Archived`. `M146` built the two clauses that exist (the link closes; a queued offline response parks) and made the archive dialog say that archiving cannot be undone. No row is blocked on this; a tester who archives by mistake has no way back today beyond the database.
+
+- **A — no.** Archive stays terminal and the dialog says so (what `M146` ships). The form's versions and responses stay readable from the inbox, the exports and the analytics pages.
+- **B — a Restore action.** An *Archived* filter on the forms list and a Restore action that sets the form back to `published` (or `draft` when it was never published), reopens the link when guest access is still on, and cuts a new draft on demand — `FormPresenter`, `FormListFacets`, `FormService`, a policy arm and an audit event.
+- **C — B, with the link staying closed until the author reopens it by hand.**
+
+**Recommendation: A** for the testing window; **B** after it if a tester asks, with C's clause if a deliberate reopen is wanted.
+
+
+
+## ANSWERED
+### D99 — An archived form keeps collecting responses through its public link while the forms list hides it. What does archiving do to the link? **A — archiving closes the link.**
+
+**Answered 2026-10-08 (user decision, in chat), recorded by Lane A during `M146` — A, the recommendation.** Put to the user first thing that session because `R-f6567fc2` was blocked on it, and built in the same increment. ⚠️ **Two of A's three clauses held and one named nothing:** the guest routes answer an archived form as they answer one with guest access off (`Form::allowsGuestAccess()`, one predicate for every route and for `GuestReachability`); a queued offline response parks on its FIRST replay, which is stronger than "refused like any closed form" (a closed form is retried five times, then parked); and **"un-archiving reopens the link" has nothing to attach to — there is no un-archive anywhere**, so the archive dialog now says archiving cannot be undone and the question is `D101`.
 
 **Filed 2026-10-07 by `M145`, silently under `D66`, from `R-f6567fc2` (a `major`, `during-testing`), which reads `ready` while its remaining work is this choice.** `FormService::archive()` discards the draft and leaves `allow_guest_submissions` and `current_published_version_id` as they were; neither `GuestFormController::mint()` nor `GuestSubmissionController::store()` reads the form's status, so `/f/{slug}` still mints, renders and accepts; `FormPresenter` leaves archived forms out of the list. Responses arrive on a form its author can no longer find. The row carries `**Awaits D99.**`, so the line shows it blocked on this rather than ready.
 
@@ -1159,7 +1174,9 @@ end state and needs a disclosure-safe refusal designed first, which is a decisio
 
 **Recommendation: A.** It is what every tester will assume "archive" means, it is the smaller change, and B leaves the trap in place with a label on it. A changes nothing for a form that is not archived, and the testing server has no archived form collecting today.
 
-### D100 — An export, a Google Sheets sync and an Airtable sync write every answer inside a repeat group as an empty cell. What shape does a repeat group take in a spreadsheet? **Tier: during-testing.**
+### D100 — An export, a Google Sheets sync and an Airtable sync write every answer inside a repeat group as an empty cell. What shape does a repeat group take in a spreadsheet? **A — one row per response, each repeat question's instances joined into one cell, the same on every channel.**
+
+**Answered 2026-10-08 (user decision, in chat), recorded by Lane A during `M146` — A, the recommendation.** Put to the user first thing that session because `R-6c0f0e56` was blocked on it, and built in the same increment: `SubmissionRowProjector` joins a member's instances with ` | ` IN POSITION (an instance that left the member blank still contributes a part, so `Kid A | Kid B` beside ` | Cooking` says which kid cooks; all-empty is `''`), each instance formatted through `displayValue()` so a multi-select keeps its `; `. B (a Kobo-style sheet per repeat) would build on that cell format rather than replace it.
 
 **Filed 2026-10-07 by `M145`, silently under `D66`, from `R-6c0f0e56` (a `major`, `during-testing`), which reads `ready` while its remaining work is this choice.** `SubmissionRowProjector::resolveColumns()` makes a column for every data field, repeat members included, and `answerValues()` reads each at the top level of the stored answers — but a repeat group's answers are stored under the SECTION key as a list of instances, so the lookup always misses and every caller (`SubmissionExporter`, `GoogleSheetsConnector`, `AirtableConnector`, the automation webhook) writes blanks. The row carries `**Awaits D100.**`.
 
@@ -1169,8 +1186,6 @@ end state and needs a disclosure-safe refusal designed first, which is a decisio
 
 **Recommendation: A** for the testing window, because it fixes every channel at once and loses nothing a reviewer cannot read; B after testing if analysts ask for it, built on A's cell format.
 
-
-## ANSWERED
 ### D57 — Reported item 16 asks for three ways to present sections; `forms.single_page_mode` is a boolean that expresses two of them and "tabular" is not expressible at all. What is the model? **A now, C next — ship the two modes the boolean already expresses, then make "per page" real by honouring `page_break`.**
 
 **Answered 2026-09-26 (user decision, in chat), recorded by Lane A during `M114` — A now, C next.**

@@ -349,7 +349,7 @@ class Submission extends Model implements TenantScoped
      * ⚠️ NO `ts_rank` ORDERING GOES WITH THIS. Most matches come from the form-title or reference branches,
      * which contribute NOTHING to `submissions.search_vector` — ranking on that vector would sort the
      * majority of results by a score of zero and produce an order that looks meaningful and is not. Both
-     * callers order by `id DESC` (uuidv7 → recency), which is what the inbox has always shown.
+     * callers order through {@see scopeOrderBySubmitted()} (M146): when the response was sent, then its id.
      *
      * @param  Builder<Submission>  $query
      * @return Builder<Submission>
@@ -395,5 +395,35 @@ class Submission extends Model implements TenantScoped
                 $match->orWhere('submissions.id', $id);
             }
         });
+    }
+
+    /**
+     * Newest-sent first (M146, `R-cf423290`): `submitted_at`, then `id` for the same second — THE order every list
+     * that says "newest first" uses (the inbox, the form hub's recent panel, global search).
+     *
+     * ⚠️ NOT `id` ALONE, WHICH IS WHAT ALL THREE USED UNTIL M146. The id is a uuidv7 minted when the ROW is
+     * created, and `SubmissionDraftService::promote()` finalizes the same row — so a response resumed from a
+     * week-old draft sat a week down the list while its Submitted column said today. `submitted_at` is stored to
+     * the second, so ties are common and the id tie-break is what keeps offset paging stable.
+     *
+     * ⚠️ NO MIGRATION, AND NO `NULLS LAST`, BOTH MEASURED. `submissions_form_finalized_idx` and
+     * `submissions_analytics_series_idx` (both `… submitted_at … WHERE status <> 'draft'`) already serve this
+     * order for every caller — each is `countable()`, or filtered to drafts, whose `submitted_at` is uniformly
+     * null and falls through to id — so ADR-0011's index budget (`AnalyticsIndexShapeTest` pins the count) is
+     * not spent on a tie-break. `EXPLAIN` on the dev database: without `NULLS LAST`, an Index Scan Backward on
+     * the partial index with an Incremental Sort on id; WITH it, a Bitmap Heap Scan and a full Sort, because a
+     * backward scan of a default btree yields `DESC NULLS FIRST`. Qualified with the table, because the search
+     * arm joins `forms`.
+     *
+     * @param  Builder<Submission>  $query
+     * @return Builder<Submission>
+     */
+    public function scopeOrderBySubmitted(Builder $query, string $direction = 'desc'): Builder
+    {
+        $direction = $direction === 'asc' ? 'asc' : 'desc';
+
+        return $query
+            ->orderBy('submissions.submitted_at', $direction)
+            ->orderBy('submissions.id', $direction);
     }
 }

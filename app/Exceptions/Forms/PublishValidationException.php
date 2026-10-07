@@ -95,11 +95,11 @@ final class PublishValidationException extends RuntimeException
 
     /**
      * M130 (`R-db169c29`, `D76`) — the form respondents go to after submitting is not one they can open: it needs a
-     * public link, guest access and a published version ({@see GuestReachability}).
+     * public link, guest access and a published version, and must not be archived ({@see GuestReachability}).
      */
     public static function redirectTargetUnavailable(): self
     {
-        return self::one('redirect_form_id', 'redirect_target_unavailable', 'The form respondents go to after submitting is not open to them: it needs a public link, guest access and a published version.');
+        return self::one('redirect_form_id', 'redirect_target_unavailable', 'The form respondents go to after submitting is not open to them: it needs a public link, guest access and a published version, and must not be archived.');
     }
 
     /** M130 (`R-db169c29`, `D76`) — the web address respondents go to after submitting is one the redirect rule refuses. */

@@ -579,8 +579,9 @@ function submitRestore(): void {
         <!-- Archive -->
         <MdsModal :open="archiveTarget !== null" title="Archive form" @close="archiveTarget = null">
             <p class="forms__prose">
-                Archive <strong>{{ archiveTarget?.title }}</strong>? Its current draft is discarded. Every
-                published version and the responses collected against them are kept.
+                Archive <strong>{{ archiveTarget?.title }}</strong>? Its public link closes and stops accepting
+                responses, and its current draft is discarded. Every published version and the responses collected
+                against them are kept. Archiving cannot be undone.
             </p>
             <template #actions>
                 <MdsButton variant="tertiary" @click="archiveTarget = null">Cancel</MdsButton>

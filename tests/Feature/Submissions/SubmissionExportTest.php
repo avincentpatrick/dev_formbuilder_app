@@ -3,12 +3,17 @@
 declare(strict_types=1);
 
 use App\Enums\FieldType;
+use App\Enums\RequiredMode;
 use App\Enums\ResourceCapacity;
 use App\Enums\SubmissionStatus;
+use App\Models\Form;
+use App\Models\FormSection;
 use App\Models\FormVersion;
 use App\Models\Submission;
 use App\Models\SubmissionAnswer;
+use App\Models\Tenant;
 use App\Models\User;
+use App\Services\Forms\FormService;
 use App\Services\Forms\PublishService;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
@@ -262,4 +267,109 @@ it('leaves a negative number a number in the export', function (): void {
     $col = array_search('Full name', $rows[0], true);
 
     expect($rows[1][$col])->toBe('-5');
+});
+
+/*
+|--------------------------------------------------------------------------
+| M146 (`R-6c0f0e56`, `D100` A) — a repeat group's answers reach the spreadsheet.
+|--------------------------------------------------------------------------
+| Instances are stored under the SECTION key as a list of objects; until M146 the projector read every member at the
+| top level and wrote blanks on every channel (the export, Google Sheets, Airtable, the automation webhook). D100 A:
+| one row per response, each member's instances joined with ` | ` IN POSITION — an instance that left the member blank
+| still contributes a part, so `Kid A | Kid B` beside ` | Cooking` says which kid cooks — and a multi-select inside
+| one instance keeps its own `; `. A cell whose every part is empty is `''`. The column keys stay the raw member
+| keys: a Sheets or Airtable mapping persists them.
+|
+| ⚠️ Helpers are prefixed `exportRepeat*`: Pest loads every test file into one process.
+*/
+
+/** A published form: a required name, then a repeatable "Kids" section with a short-text and a multi-select member. */
+function exportRepeatForm(Tenant $tenant, User $owner): Form
+{
+    $form = app(FormService::class)->create($tenant, $owner, 'Household');
+    $draft = $form->draftVersion;
+    addFormField($draft, $owner, 'full_name', FieldType::ShortText, 0, ['is_required' => RequiredMode::Required]);
+    $kids = FormSection::create([
+        'form_version_id' => $draft->id, 'key' => 'kids', 'label' => 'Kids', 'sequence' => 1,
+        'is_repeatable' => true, 'min_instances' => 0, 'max_instances' => 5,
+    ]);
+    addFormField($draft, $owner, 'kid_name', FieldType::ShortText, 2, ['form_section_id' => $kids->id]);
+    addFormField($draft, $owner, 'kid_hobbies', FieldType::MultiSelect, 3, ['form_section_id' => $kids->id, 'config' => ['options' => [
+        ['value' => 'read', 'label' => 'Reading'], ['value' => 'run', 'label' => 'Running'], ['value' => 'cook', 'label' => 'Cooking'],
+    ]]]);
+    app(PublishService::class)->publish($form->refresh(), $owner);
+
+    return $form->refresh();
+}
+
+/**
+ * The export's data rows, each keyed by its header label, in the export's own order.
+ *
+ * @return list<array<string, string>>
+ */
+function exportRepeatRows(User $owner, Form $form): array
+{
+    $rows = csvRows(test()->actingAs($owner)
+        ->get("http://acme.meridian.test/forms/{$form->id}/submissions/export?format=csv")
+        ->assertOk()
+        ->streamedContent());
+    $header = array_shift($rows);
+
+    return array_map(fn (array $row): array => array_combine($header, $row), $rows);
+}
+
+it('joins a repeat group’s instances into one cell per member, keeping a multi-select’s own join inside each', function (): void {
+    $tenant = inboxTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    makeActiveMember($owner, 'owner');
+    $form = exportRepeatForm($tenant, $owner);
+    seedInboxSubmission($form, $owner, SubmissionStatus::Submitted, [
+        'full_name' => 'Ada Lovelace',
+        'kids' => [['kid_name' => 'Kid A', 'kid_hobbies' => ['read', 'run']], ['kid_name' => 'Kid B', 'kid_hobbies' => ['cook']]],
+    ]);
+
+    [$row] = exportRepeatRows($owner, $form);
+
+    expect($row['Full name'])->toBe('Ada Lovelace')
+        ->and($row['Kid name'])->toBe('Kid A | Kid B')
+        ->and($row['Kid hobbies'])->toBe('Reading; Running | Cooking');
+});
+
+it('keeps an instance’s position when it leaves a member blank, so the columns still line up', function (): void {
+    $tenant = inboxTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    makeActiveMember($owner, 'owner');
+    $form = exportRepeatForm($tenant, $owner);
+    seedInboxSubmission($form, $owner, SubmissionStatus::Submitted, [
+        'full_name' => 'Ada Lovelace',
+        'kids' => [['kid_name' => 'Kid A'], ['kid_name' => 'Kid B', 'kid_hobbies' => ['cook']]],
+    ]);
+
+    [$row] = exportRepeatRows($owner, $form);
+
+    expect($row['Kid name'])->toBe('Kid A | Kid B')
+        ->and($row['Kid hobbies'])->toBe(' | Cooking');
+});
+
+it('writes an empty cell for a member no instance answered, and for a response with no instances at all', function (): void {
+    $tenant = inboxTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    makeActiveMember($owner, 'owner');
+    $form = exportRepeatForm($tenant, $owner);
+    seedInboxSubmission($form, $owner, SubmissionStatus::Submitted, ['full_name' => 'No kids']);
+    seedInboxSubmission($form, $owner, SubmissionStatus::Submitted, [
+        'full_name' => 'Quiet kids', 'kids' => [['kid_name' => 'Kid A'], ['kid_name' => 'Kid B']],
+    ]);
+
+    [$none, $quiet] = exportRepeatRows($owner, $form);
+
+    // Not ' | ' for two blank parts: a cell with nothing in it is blank, as every other empty answer is.
+    expect($none['Full name'])->toBe('No kids')
+        ->and($none['Kid name'])->toBe('')
+        ->and($none['Kid hobbies'])->toBe('')
+        ->and($quiet['Kid name'])->toBe('Kid A | Kid B')
+        ->and($quiet['Kid hobbies'])->toBe('');
 });

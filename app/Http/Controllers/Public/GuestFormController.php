@@ -70,7 +70,7 @@ final class GuestFormController extends Controller
         $form = Form::query()->where('public_slug', FormSlug::forLookup($slug))->first();
 
         abort_if($form === null, 404);
-        abort_unless($form->allow_guest_submissions, 404);
+        abort_unless($form->allowsGuestAccess(), 404);
         abort_if($form->current_published_version_id === null, 404);
 
         if ($slug !== $form->public_slug) {
@@ -132,7 +132,7 @@ final class GuestFormController extends Controller
         $form = Form::query()->whereKey($token->formId)->first();
 
         abort_if($form === null, 404);
-        abort_unless($form->allow_guest_submissions, 404);
+        abort_unless($form->allowsGuestAccess(), 404);
 
         $minted = $tokens->mint($token->tenantId, $token->formId, $token->formVersionId);
 

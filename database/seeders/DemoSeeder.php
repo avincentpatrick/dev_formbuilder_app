@@ -727,7 +727,7 @@ class DemoSeeder extends Seeder
         // `completeness_percent` is 0, not 100. Empty rather than absent: the 1:1 answer row still exists,
         // because `SubmissionInboxPresenter::answerBlocks()` and the PDF presenter both read through it.
         $screenedOut = $status === SubmissionStatus::ScreenedOut;
-        $answers = $screenedOut ? [] : $this->demoAnswers($fields, $row['seq']);
+        $answers = $screenedOut ? [] : $this->demoAnswers($version, $fields, $row['seq']);
 
         SubmissionAnswer::updateOrCreate(
             ['submission_id' => $submission->id],
@@ -786,10 +786,13 @@ class DemoSeeder extends Seeder
      * @param  Collection<int, FormField>  $fields
      * @return array<string, mixed>
      */
-    private function demoAnswers(Collection $fields, int $seq): array
+    private function demoAnswers(FormVersion $version, Collection $fields, int $seq): array
     {
         $districts = ['Malate', 'Sampaloc', 'Tondo', 'Ermita', 'Paco'];
         $names = ['A. Reyes', 'B. Santos', 'C. Dela Cruz', 'D. Bautista', 'E. Ramos', 'F. Garcia'];
+        // M146 (`R-6c0f0e56`): a repeatable section's members are written under the SECTION key as one instance —
+        // the shape a real submit stores — so the export, the inbox and the PDF show the demo roster rather than blanks.
+        $repeatSections = $version->sections()->where('is_repeatable', true)->pluck('key', 'id')->all();
         $answers = [];
 
         foreach ($fields as $field) {
@@ -817,7 +820,13 @@ class DemoSeeder extends Seeder
                 default => null, // geo, media, matrices, notes and page breaks are left unanswered
             };
 
-            if ($value !== null) {
+            if ($value === null) {
+                continue;
+            }
+            $sectionKey = $field->form_section_id !== null ? ($repeatSections[$field->form_section_id] ?? null) : null;
+            if ($sectionKey !== null) {
+                $answers[$sectionKey][0][$field->key] = $value;
+            } else {
                 $answers[$field->key] = $value;
             }
         }

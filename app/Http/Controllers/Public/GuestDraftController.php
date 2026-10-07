@@ -32,7 +32,7 @@ use Illuminate\Support\Facades\Notification;
  *
  * Gated on `feature:save_and_resume` (Starter+) at the route — this is a paid convenience, not a respondent's
  * final answer, so gating it does not breach the never-block rule (final submit stays ungated). The same guest
- * guards as the submit channel run first: `allow_guest_submissions` (403 revocation lever) and a superseded
+ * guards as the submit channel run first: `Form::allowsGuestAccess()` (403 revocation lever) and a superseded
  * version (409 `form_updated` → the SPA re-mints and re-renders).
  */
 final class GuestDraftController extends Controller
@@ -66,7 +66,7 @@ final class GuestDraftController extends Controller
 
         $form = Form::query()->whereKey($token->formId)->firstOrFail();
 
-        if (! $form->allow_guest_submissions) {
+        if (! $form->allowsGuestAccess()) {
             return ApiErrorResponse::make(403, 'guest_disabled', 'Guest submissions are disabled for this form.');
         }
 

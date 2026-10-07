@@ -2256,10 +2256,20 @@ class E2eSeeder extends Seeder
      */
     private function sampleAnswers(FormVersion $version): array
     {
+        // M146 (`R-6c0f0e56`): a repeatable section's members live under the SECTION key as a list of instances —
+        // the shape a real submit stores and the only one the export, the inbox and the PDF read. Written flat,
+        // the dev data showed values in the export only because the projector read the wrong place.
+        $repeatSections = $version->sections()->where('is_repeatable', true)->pluck('key', 'id')->all();
         $answers = [];
         foreach ($version->fields()->get() as $field) {
             $value = $this->sampleValue($field);
-            if ($value !== null) {
+            if ($value === null) {
+                continue;
+            }
+            $sectionKey = $field->form_section_id !== null ? ($repeatSections[$field->form_section_id] ?? null) : null;
+            if ($sectionKey !== null) {
+                $answers[$sectionKey][0][$field->key] = $value;
+            } else {
                 $answers[$field->key] = $value;
             }
         }

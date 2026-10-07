@@ -2,21 +2,27 @@
 
 declare(strict_types=1);
 
+use App\Enums\FieldType;
 use App\Enums\FormAutomationAction;
 use App\Enums\FormAutomationRunStatus;
 use App\Enums\PlanTier;
+use App\Enums\RequiredMode;
 use App\Enums\UsageMetric;
 use App\Jobs\Automations\DeliverFormAutomationWebhookJob;
 use App\Models\Form;
 use App\Models\FormAutomation;
 use App\Models\FormAutomationRun;
+use App\Models\FormSection;
 use App\Models\Plan;
 use App\Models\Submission;
 use App\Models\Subscription;
+use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Automations\FormAutomationService;
 use App\Services\Entitlements\EntitlementService;
 use App\Services\Entitlements\UsageMeter;
+use App\Services\Forms\FormService;
+use App\Services\Forms\PublishService;
 use App\Support\Submissions\SubmissionReference;
 use App\Support\Tenancy\TenantContext;
 use App\Support\Webhooks\WebhookSigner;
@@ -177,4 +183,40 @@ it('fails a run whose response no longer exists, sending nothing', function (): 
     Http::assertNothingSent();
     enterTenant($this->tenant->id, $this->owner->id);
     expect($run->refresh()->status)->toBe(FormAutomationRunStatus::Failed)->and($run->error_code)->toBe('submission_missing');
+});
+
+// ── M146 (`R-6c0f0e56`, `D100` A) — a repeat group reaches the webhook as the export writes it ─────────────────
+
+/** A guest form at `roster`: the required name, then a repeatable "Kids" section with one short-text member. */
+function automationHookRepeatForm(Tenant $tenant, User $owner): Form
+{
+    $form = app(FormService::class)->create($tenant, $owner, 'Roster');
+    $draft = $form->draftVersion;
+    addFormField($draft, $owner, 'full_name', FieldType::ShortText, 0, ['is_required' => RequiredMode::Required]);
+    $kids = FormSection::create([
+        'form_version_id' => $draft->id, 'key' => 'kids', 'label' => 'Kids', 'sequence' => 1,
+        'is_repeatable' => true, 'min_instances' => 0, 'max_instances' => 5,
+    ]);
+    addFormField($draft, $owner, 'kid_name', FieldType::ShortText, 2, ['form_section_id' => $kids->id]);
+    app(PublishService::class)->publish($form->refresh(), $owner);
+    $form->refresh()->update(['public_slug' => 'roster', 'allow_guest_submissions' => true]);
+
+    return $form->refresh();
+}
+
+it('sends a repeat group’s instances joined into one value per member, keyed by the member and never by the section', function (): void {
+    $form = automationHookRepeatForm($this->tenant, $this->owner);
+    Queue::fake();
+    [$automation] = app(FormAutomationService::class)->create($form, 'To the registry', FormAutomationAction::Webhook, null, 'https://8.8.8.8/hook', $this->owner);
+    $this->postJson('http://acme.meridian.test/api/v1/public/f/'.shareTokenFor($form).'/submissions', [
+        'answers' => ['full_name' => 'Ada Lovelace', 'kids' => [['kid_name' => 'Kid A'], ['kid_name' => 'Kid B']]],
+    ])->assertCreated();
+    enterTenant($this->tenant->id, $this->owner->id);
+    $run = $automation->runs()->sole();
+    Http::fake(['https://8.8.8.8/*' => Http::response('', 200)]);
+
+    automationHookHandle($this->tenant->id, $run);
+
+    Http::assertSentCount(1);
+    Http::assertSent(fn (ClientRequest $request): bool => $request['answers'] === ['full_name' => 'Ada Lovelace', 'kid_name' => 'Kid A | Kid B']);
 });

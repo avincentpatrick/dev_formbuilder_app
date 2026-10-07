@@ -16,67 +16,94 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M145`, the builder preview stops losing every condition when a rule row is half-built: the draft projection screens rule rows through the engine's own lowering (closes `R-551873af`, measured LIVE this session) (`m145-preview-incomplete-rules`)
+## Status: NO ACTIVE CLAIM — `M145` is merged; `M146` is the during-testing batch (`D99` and `D100` put to the user by name first, then `R-f6567fc2`, `R-6c0f0e56`, `R-cf423290`, `R-b2d4a2c5`), and the bake-off goes ahead of it the moment the layout-3 samples and a key that reads arrive
 
-Taken 2026-10-07. Branch `m145-preview-incomplete-rules`, cut from `origin/main` at `f2ad4beb`, PR into `main`. The hand-off made M145 the
-bake-off unless the user brought layout-3 samples and a key; neither came with the prompt, so its fallback applies — `R-551873af`, the
-one early-testing row not waiting on the user. One row, because the tier has exactly one workable row; `D13` groups within a tier.
-Row: `docs/feature-backlog.md`, the `minor` starting *"The builder preview can lose every condition in silence, because its draft
-projection passes rule rows to the engine unchecked"*, filed **Latent** by `M121` with *"Reachability is unmeasured"*.
+## RELEASED — `M145`, the builder preview stops losing every condition when a rule row is half-built: the draft projection screens rule rows through the engine's own lowering (merged as PR #338, `6bfa810e`, 6/6 green on its FIRST run with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 
-### Evidence verified
-- `draft-snapshot.ts` pre-parses `relevant_expression` through `parsedOrNull()` (issue `unparsable_expression`) and `projectValidation()`
-  copies `rule_type`, `operator`, `rule_value`, `expression` and `related_field_key` verbatim — **held**.
-- `safeEvaluate()` degrades the whole form to everything-relevant, sets `engineFailed` and returns no errors — **held**; but the
-  module docblock and the test docblock cite it as `useFormRuntime.ts:310-319` and it sits at 361-370 now — **moved**; the number is
-  dropped and the function cited by name, never re-pointed.
-- `M116`'s publish gate (`StructuralValidationGate.php`, the two M116 arms: `rule_missing_related_field`, `rule_missing_operator`) —
-  **held**, and publish-only: `PublishService.php` is its only caller, and its own comment says the save door was left `nullable` so
-  the 600 ms autosave is not 422'd mid-edit.
-- The respondent notice `M121` added lives in `RuntimeSession.vue` (`data-engine-notice`); `PreviewRuntime.vue` calls
-  `createFormRuntime` directly and never reads `engineFailed` — **held**.
+Shipped 2026-10-07. Branch `m145-preview-incomplete-rules`, cut from `origin/main` at `f2ad4beb`. The claim is `1d367b26`, pushed before
+any file was opened. The hand-off made M145 the bake-off unless the user brought layout-3 samples and a Vision key; neither came with
+the prompt, so its fallback applied — `R-551873af`, the one early-testing row not waiting on the user, taken alone because the tier
+held exactly one workable row. Commits, in the stated order: the ninth test group measured red `53af9931`, the projection `595ba00e`,
+the real-browser case `8b2d246b`, the docs `486a76f8`. No tracker surgery: about 25 KB of headroom at the start (read it from
+`preflight`, never from here).
 
-### Premise verified
-- **"Latent — whether the builder's autosave can persist such a row was not checked" is FALSE NOW: it persists, and it is one
-  click away.** Basics → Requiredness *Conditional* → *Add condition*: `ValidationEditor.addRule()` seeds `required_if` with
-  `operator: null`, `related_field_key: null`; `UpdateFieldRequest` rules both columns plain `nullable` (its only cross-field rule is
-  the expression/rule_type XOR); `FormBuilderService::replaceValidations()` inserts the nulls; `BuilderPresenter` sends the row back
-  on reload. Three more paths: Validation tab → `greater_than_field` before a compared question is chosen; deleting or re-keying a
-  question another rule compares with (nothing rewrites `related_field_key`, so the key names nothing); a half-typed free-text rule.
-- **The preview reads the in-memory store, not the saved draft** (`PreviewPane.vue` builds the model from `props.store.fields.value`),
-  so even a row the server refused reaches `projectDraft()`. The remedy's home is the projection, as the row says.
-- **"For the rest of the session" is overstated for the preview:** `PreviewRuntime` is keyed on `shape`, rule columns are in
-  `shapeOf()`, so finishing the row rebuilds the engine. The loss is silent, not permanent — and silent is the defect.
-- **"A conditional row with no operator" is narrower than written:** only `required_if`/`skip_if` throw (`conditionForOperator()`'s
-  default arm); `required_with`/`skip_with` lower a null operator to `isNotNull`. A missing compared question throws for all six
-  related-field kinds (`relatedKeyOrThrow()` runs first), a grouped row with no `logic_operator` throws `malformed_logic_group`, a
-  null/null row throws `unlowerable_rule_type`, a half-typed expression throws from the parser.
-- `PreviewRuntime.vue` already renders `issuesByKey[field.key]` under the field, keyed by `issue.code` — so at most one issue of the
-  new code per field, or two chips collide.
+**Rows and namespaces:**
+- **Closed:** `R-551873af`, filed **Latent** by `M121` with *"reachability unmeasured"*, and measured LIVE first thing: the "Add
+  condition" seed is saved by the server (`UpdateFieldRequest` rules both columns plain `nullable`) and reaches the preview from the
+  in-memory store whether or not the server accepted it. Three corrections recorded at the row: the loss is silent, not permanent
+  (the preview is remounted on `shape` change); only `required_if`/`skip_if` throw on a missing operator; a missing compared
+  question throws for all six related-field kinds, so a deleted or re-keyed compared question is a trigger too.
+- **Filed:** a `minor` — deleting or re-keying a question another rule compares with leaves that rule pointing at nothing, and the
+  owner's next autosave saves it with no compared question, so publish refuses a rule the author never touched — and a `nit` —
+  `PreviewRuntime.vue` keys a field's issue chips by code. Both `during-testing` (`D72`: not one of the 19 comments).
+- **Decisions:** `D99` (what archiving does to the public link; `R-f6567fc2`, a `major`) and `D100` (the shape of a repeat group in
+  a spreadsheet; `R-6c0f0e56`, a `major`), filed SILENTLY under `D66` with `Awaits` tokens on the two rows, so the line shows them
+  blocked on the user rather than `ready`. The next session puts them to the user by name, because the tier it works holds work
+  rows blocked on them. **Namespaces spent:** the two decisions. No migration, no ADR — `0010` stays reserved for the bake-off.
+- **Outside the claim's list:** nothing. One ledger citation into the edited file (`draft-snapshot.ts:55-56`, the `public-runtime`
+  import lines, in `M118`'s `Encode.vue` docblock row) rotted when the docblock grew — 17 of 17 at the ceiling — and was repaired by
+  dropping the number, as the `M116` lesson prescribes; the ledger is back at 16.
 
-### Remedy verdict
-**Works.** A post-pass in `projectDraft()`, after every key is assigned (a rule may name a later field), runs each projected rule row
-through the engine's own `StructuredRuleLowering` (`lower` / `lowerCondition`) and `parseExpression` inside try/catch, classifying the
-row as `semantic-validator.ts`'s `family()` does and checking group connectives as `sortRows()` orders them. A row that would throw is
-OMITTED and one `incomplete_rule` issue is recorded for the field. No hand list of rule names — the `_with` exemption is inherited from
-the lowering itself, which is the module's own rule (no second parser, no unguarded mirror). Omission moves the shape, so the rebuild
-comes free; the chip renders from the live model without one.
+### What changed
+- **`resources/js/components/builder/draft-snapshot.ts`:** after the field loop has assigned every key, `screenValidations()` builds
+  the engine's own `ValidationRow` for each projected rule (the mirror of `buildEngineSchema()`), dispatches exactly as
+  `semantic-validator.ts`'s `family()` does — a free-text `expression` to `parseExpression`, the conditional four to
+  `StructuredRuleLowering.lowerCondition()`, the two field comparisons to `lower()`, a self-vs-literal constraint to nothing, a
+  row with neither half to the one arm written rather than called — and walks each `logic_group` in the engine's `[sequence, id]`
+  order refusing a later row with no connective. A refused row is OMITTED and the field gets ONE `incomplete_rule` issue (the preview
+  keys chips by code), with a second message when the rule names a question that is no longer in the draft. No list of rule names:
+  `required_with` with no operator is kept because the lowering keeps it. The module docblock cites `safeEvaluate()` by name now.
+- **`draft-snapshot.test.ts`:** the ninth state, eleven cases; case 9j drives the real `createFormRuntime` and reads `engineFailed`.
+- **`tests/e2e/builder-preview-authoring.spec.ts`:** a second test on a fresh form — two Text questions keyed by hand, the second
+  hidden behind `${trigger} = 'show'` typed as text; the engine hides it; the seed is added on the first; it STAYS hidden and the
+  chip under the owner reads "not finished". The assertion counts the textbox inside the row's wrapper, because the wrapper renders
+  for every field of a step and only the control is gated on relevance (`FieldRow.vue`).
+- **Proof:**
+  - **The tests first, measured red:** 8 of the 11 new cases failed against the unscreened projection (9, 9d, 9e, 9f, 9h, 9i, 9j,
+    9k), the three positives passed; then 33 passed.
+  - **Four hand mutations, each caught on the first run** (Vitest cannot use `mutate.php`; mutated by `perl -0pi`, run in the
+    container, restored by copy with the sha checked both ways): the catch keeps the row → 7 red; every conditional row omitted → 5;
+    keys known only for earlier fields → 1; the dedupe removed → 1.
+  - **The real browser, red before green:** the unfixed projection built and run first — the new test failed in all three projects
+    at the post-seed assertion, the hidden question's control present; the fix built and run — 6 passed (both tests, three
+    projects). `builder-axe.spec.ts`, the other spec that reaches the preview: **69 passed in 21.4 min** locally at one worker, after the fix.
+  - Whole Vitest suite **3,394 passed / 205 files**; `vue-tsc` clean (both configs); Pest `tests/Feature/Docs` 142 passed with the
+    known container-only `SuiteCollectionFloorTest`; Pint clean, bare, host; every host lint gate green; `pipeline-lint` and
+    `state --check` green. PHPStan cannot move: no PHP changed.
 
-Files: `resources/js/components/builder/draft-snapshot.ts`, `resources/js/components/builder/draft-snapshot.test.ts`,
-`tests/e2e/builder-preview-authoring.spec.ts` (a second test), `docs/feature-backlog.md` (the row closed; two rows filed — the stale
-compared-question defect, and the issue list keyed by code), `docs/claims/decisions.md` (`D99`, `D100` filed silently under `D66`, with
-`Awaits` tokens on `R-f6567fc2` and `R-6c0f0e56`), `docs/claims/lane-a.md`, and the regenerated `docs/pipeline.md`,
-`docs/backlog-triage.md`, `docs/gate-baselines.md`, `PROGRESS.md` (own block).
-Shared artefacts taken: `docs/**`, `PROGRESS.md` (own block), `tests/e2e/builder-preview-authoring.spec.ts`.
-Paired files taken: none — no `.vue` file, notification type, ability key or token changes (7(b-bis) read at claim time).
-Namespaces spent: `D99`, `D100`. No migration, no ADR — `0010` stays reserved for the bake-off.
-Prediction: eleven new Vitest cases, **8 red before the fix** (the seed, the stale key, `greater_than_field` without a compared
-question, the half-typed expression, the group connective, the shape equality, the real-engine case, the dedupe) and 3 green (the
-complete row, the later-field key, the `_with` exemption); four hand mutations each caught on the first run; the new E2E test red on
-the UNFIXED bundle at the "still not shown" assertion and green after; the whole Vitest suite green; `vue-tsc` clean; Pint clean; the
-citation ledger unchanged unless the edit shifts a cited `draft-snapshot.ts` line (`R-c32e2c6a`'s `:248-251` is already stale);
-PHPStan cannot move (no PHP); CI 6/6 on the first run. **Most expected wrong: the E2E red-before measurement** — the 300 ms rebuild
-debounce and the segmented control's selector are the two things not yet seen running.
+### How the prediction fared
+
+| Predicted | Actual |
+|---|---|
+| 8 of 11 new Vitest cases red before the fix, 3 green | **Right** — 9, 9d, 9e, 9f, 9h, 9i, 9j, 9k red; 9b, 9c, 9g green. |
+| Four hand mutations each caught on the first run | **Right** — but the first mutation's red set was 7, not the 8 the plan counted: the group-connective case never passes through the catch. |
+| The E2E test red on the UNFIXED bundle at the "still not shown" assertion, green after | **Right in the end, after two wrong runs** — see Unpredicted. |
+| Whole Vitest suite green; `vue-tsc` clean; Pint clean | **Right** (3,394 / 205; clean; clean). |
+| The citation ledger unchanged at 16/17 | **Wrong** — the docblock grew by nine lines and one citation into the import lines rotted (17/17, at the ceiling). Repaired by dropping the number; 16 again. |
+| PHPStan cannot move | **Right** — no PHP. |
+| CI 6/6 on the first run | **Right** — the first run, each job with real step counts, the same six counts as M144. |
+| ⚠️ Most expected WRONG: the E2E red-before measurement, because of the 300 ms debounce or the segmented control's selector | **Right to expect it, wrong about why.** Neither the debounce nor the selector argued. |
+
+**Unpredicted:**
+- **The e2e service's entrypoint is the Playwright CLI, so a bare spec path is `unknown command`** — and my script's `echo $?`
+  dutifully printed exit 1 for both runs while neither had started. Only reading the ten-line log said so. The form is
+  `docker compose run --rm e2e test <spec> -g <title>`. The M-series had recorded that `npx` fails there; the missing `test`
+  subcommand is the same trap one word over.
+- **The preview renders a row's WRAPPER for every field of a step and gates only the control on relevance.** `visibleSteps` keeps
+  every key in `fieldKeys` on purpose (its comment says filtering would change `erroredItems`), and `FieldRow.vue` puts `v-if`
+  on the control. So `toHaveCount(0)` on `[data-preview-field="dependent"]` counted an empty div, failed BEFORE the seed on both
+  bundles, and the accessibility snapshot Playwright saved showed no such question — the empty wrapper is invisible to it. The
+  assertion had to count the textbox inside the wrapper. Fifteen minutes of reading the preview model found it; a probe would have
+  found it faster.
+- **`scripts/gate-baselines.php` has no `--help` and RUNS on it**, rewriting `docs/gate-baselines.md` from whatever run it
+  finds. Restored from HEAD with the tree verified clean. `--run=<id>` is the form for the post-merge run.
+
+### The queue
+`M146` is the during-testing batch, composed and verified at claim time: put `D99` and `D100` to the user by name first (both block
+`major` work rows in that tier), then `R-f6567fc2` (the one hub row — `GuestSubmissionController.php`), `R-6c0f0e56`
+(`SubmissionRowProjector.php`), `R-cf423290` (`SubmissionInboxPresenter.php` and an index migration), `R-b2d4a2c5`
+(`UpdateFieldRequest.php`'s attribute names) — four disjoint remedy sets. The bake-off (`ocr-provider-bakeoff`, ADR-0010) goes ahead
+of all of it the moment the user brings about fifteen layout-3 samples and a key that reads where `ocr:bakeoff` runs.
 
 ## RELEASED — `M144`, Print blank layout 3: a phone and a number in one open box (`D98` A), and a long-text box sized from its `max_length` (merged as PR #337, `fe2591a0`, 6/6 green on its FIRST run with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

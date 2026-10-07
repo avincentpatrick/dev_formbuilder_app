@@ -79,7 +79,7 @@
          guidance's one non-negotiable once text answers are written freely rather than combed. Every
          string here is ASCII and every box is drawn, like everything else on the page. --}}
     <div class="banner">
-        <p class="banner__rule">THIS FORM IS READ BY A COMPUTER. Write in BLOCK CAPITALS. Where boxes are printed, write one letter or number in each box. Mark a choice with an X inside its box. Dates are day, month, year.</p>
+        <p class="banner__rule">THIS FORM IS READ BY A COMPUTER. Write in BLOCK CAPITALS. Where boxes are printed, write one letter or number in each box. Mark a choice with an X inside its box. Dates are day, month, year. If an answer needs more room, continue on another sheet and write the question number beside it.</p>
         <table class="banner__sample">
             <tr>
                 <td>Example:</td>
@@ -137,11 +137,17 @@
                         @if ($field['area'] === 'comb')
                             @include('pdf._blank-form-comb', ['groups' => $field['comb'], 'sample' => null])
                         @elseif ($field['area'] === 'line')
-                            {{-- One open box for a short text answer (layout 2): written freely in
-                                 block capitals, read as free text. --}}
+                            {{-- One open box (layout 2): written freely in block capitals and read as
+                                 free text - a short text, an email, a url, and since layout 3 (D98) a
+                                 phone or a number too, which the reader parses out of the text. --}}
                             <div class="line"></div>
                         @elseif ($field['area'] === 'ruled')
-                            <div class="ruled"></div>
+                            {{-- The long-text box, sized from the question's max_length (layout 3,
+                                 R-d696ba9e): the presenter says how many lines (three to ten), this
+                                 template says 20pt a line, so three lines IS the 60pt box layout 2
+                                 printed. The write-in fallback for an optionless choice list below
+                                 keeps the stylesheet's 60pt: its row carries no line count. --}}
+                            <div class="ruled" style="height: {{ $field['lines'] * 20 }}pt"></div>
                         @elseif ($field['area'] === 'choices')
                             {{-- The empty branch is deliberate: a choice field with no options cannot
                                  be published (StructuralValidationGate refuses it), but a hand-built

@@ -16,88 +16,138 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M143`, the OCR provider bake-off on real samples (H1d, ADR-0010) and one real scan on staging (m143-ocr-provider-bakeoff)
+## Status: ACTIVE CLAIM — `M143`, Print blank layout 2: the paper redesigned for a pen, a monochrome printer and the reader, and the reader made to follow it (m143-print-blank-layout-2)
 
-Taken 2026-10-07. Branch `m143-ocr-provider-bakeoff`, cut from `origin/main` at `ff88fc03`, PR into `main`.
-The user brought the time for OCR today (`D94`: OCR goes ahead of everything once its inputs arrive), and was sent the
-step list in chat: one staging form, about 15 hand-filled Print blank copies, scans and phone photos, correct answers
-for at least five, and a second Vision key for this laptop. Two rows, the whole remaining early-testing work bar a
-latent one:
-- **`ocr-provider-bakeoff`** (`docs/ocr-pipeline-design.md`, end-of-file marker): choose Cloud Vision or Document AI on
-  the samples, calibrate the 90/70 thresholds, write the reserved ADR-0010.
-- **`ocr-staging-scan`** (`docs/deployment-infrastructure.md`, end-of-file marker): one real scan saved through
-  staging's scans page, then the `.env` backup on the box deleted.
+Taken 2026-10-07. Branch `m143-print-blank-layout-2`, cut from `origin/main` at `ff88fc03`, PR into `main`.
+
+⚠️ **This is a claim EXTENSION that RETARGETS `M143`, pushed before any file below was opened.** The first `M143` claim
+(`6b282fc0`, the same morning) took the OCR provider bake-off and the staging scan. Before printing a single sample the
+user looked at the blank form and found it unorganized, with one-letter-per-box combs that limit respondents, on paper
+that will mostly print in monochrome; they asked for industry research and a plan first, then chose (in chat) to
+redesign the paper BEFORE printing samples. So this increment is the paper and the reader; **the bake-off, ADR-0010
+and the staging scan move to `M144`**, whose claim is written at this increment's close with the first claim's text
+re-verified (the samples must now be printed from layout 2). The decisions are `D96` (layout 2) and `D97` (Vision
+alone first; a vision-language-model arm only if G9 is missed; Document AI not pursued).
+
+Three rows:
+- **The redesign row**, filed by this increment in `docs/feature-backlog.md` and closed by it: the printed blank form
+  is hard to fill and hard to read back — combs for text, choices one per line, no question numbers, no instruction
+  that a computer reads the sheet, tenant colour on monochrome paper. `**Tier: early-testing.**`
+- **`R-d6546409`** (`docs/feature-backlog.md`, minor, during-testing, latent): the stamp identifies the schema, not the
+  layout, so a sheet printed before a layout change reads against the new one. Remedy prescribed: a layout revision
+  printed beside the stamp and read back.
+- **`R-6bbf9d73`** (`docs/feature-backlog.md`, nit, during-testing, live): the footer says "Scans of this form can be
+  read automatically" even when the form's scanning is switched off; a third sentence must be taught to the matcher
+  in the same change that prints it.
 
 ### Evidence verified
 
-Against `ff88fc03`:
-- **Held.** Both markers read `state=blocked` with the user as blocker; `docs/pipeline.md` puts them first and second
-  in early-testing.
-- **Held.** `config/ocr.php` carries `confidence.auto` 90 and `review` 70, read in one place
-  (`PrintedFormMatcher`'s thresholds, through `config()`).
-- **Held.** Both harness commands exist and boot on host PHP (`php artisan list ocr` lists `ocr:bakeoff` and
-  `ocr:bakeoff-layout`). `docs/ocr-pipeline-design.md` §9 is the runbook.
-- **Held.** `docs/adr/` has the one gap at 0010, and `state.php` names it reserved for H1d.
+Against `ff88fc03`, every file read in full:
+- **Held.** The paper is `BlankFormPrintPresenter::present()` → `resources/views/pdf/blank-form.blade.php` with
+  `_blank-form-comb` and `_blank-form-styles`; combs are 14×16pt on a 15.5pt pitch, max 30 cells, default 24,
+  numbers 10; one `<div class="choice">` per option; `.ruled` 46pt; the key stamp 7pt `#9a9a9a` floated right; the
+  head rule and h1 take `$brand['bg']` and the grid header `$brand['tint']`. Rendered the user's "Survey Question
+  Sampling" v1 to PDF and looked at it: it matches this description and the user's complaint.
+- **Held.** `OcrAnswerReader::choices()` matches the TAIL of a line to one label (`markBeforeLabel()`), so options
+  must be one per line; its own comment says "Today's layout always prints both, one per line".
+  `PrintedFormMatcher::startsWithLabel()` needs similarity ≥ 0.85, so a printed "2. Age" would not anchor "Age" by
+  label. `isStatic()` drops an answer line that is a SUBSTRING of any printed string.
+- **Held.** `R-d6546409`: `resolveVersion()` reads only the 8-hex checksum prefix; nothing on the paper says which
+  template printed it. `R-6bbf9d73`: the footer sentence is chosen from `ocr_compatible` alone, and `$static` in
+  `match()` knows only the positive sentence.
+- **Held, and it is the fact the build order turns on:** every OCR test goes through
+  `tests/Feature/Ocr/Support/PrintedPageTypesetter.php`, which synthesizes a Vision page with HAND-CODED geometry
+  (one choice per line, key at x 0.84, the header sentence hard-coded). A layout change leaves the OCR suite green
+  until that fixture is rewritten. So the fixture changes first, measured red.
 
 ### Premise verified
 
-- **The laptop key still cannot read.** `.env`'s `OCR_GOOGLE_VISION_KEY` still ends `CSmo`, the key in the
-  billing-off project (`M135`). The user is making a second key in "My First Project" (billing on, Vision only).
-  `bootstrap/cache` holds no `config.php` on this host, so the `.env` edit applies on the next host run with no
-  `config:cache`.
-- **The paper comes from staging, at the current build.** The deploy of `ec6a9ec9` succeeded (run `37543979213`), so
-  `ocr:bakeoff-layout` exists on the box. The print layout there is the one the matcher reads, and one set of paper
-  serves both rows.
-- **ADR-0010 is not a free-standing document.** `scripts/state.php` hard-codes `ADR_RESERVED = [10]` and refuses to
-  measure when the gaps disagree with it. CLAUDE.md's ADR-gap paragraph would turn false the moment 0010 exists. Both
-  change in the ADR's own commit. Eight ADRs, `docs/PRD.md` and `docs/data-dictionary.md` mention 0010 as reserved;
-  those are dated records, edited only where they state a forward fact.
-- **No test pins the configured thresholds.** The scorer's unit tests pass their own `['auto' => 90, 'review' => 70]`.
-  `ReadOcrScanJobTest` reads a page average, not a tier. So moving the config numbers reds nothing by itself (grep
-  measured).
-- **Document AI takes a service account, not an API key.** If the report points there, it is a decision put to the
-  user then, not built here.
-- **The backup `C:\meridian\env.pre-M135.bak` holds every staging secret.** Deleting it is one guarded block the user
-  runs, after the staging scan is saved.
-- **`PROGRESS.md` has 4,308 bytes of headroom** (preflight), so the close-out bullet very likely owes the tenth tracker
-  surgery.
+- **No field paper exists yet.** The first real Vision read anywhere was a test image on 2026-10-05; the staging scan
+  is still queued; the user has printed nothing. So refusing a sheet printed from layout 1 costs nobody anything
+  today, and reading layout 1 beside layout 2 is deliberately not built (filed as its own row).
+- **The server cannot touch pixels.** The app container installs `pdo_pgsql intl zip bcmath opcache pcntl redis` and
+  no `gd`/`imagick` (`docker/Dockerfile`; `php -m` in the running container agrees), so registration marks (no
+  warping) and a QR stamp (Vision has no barcode feature; PHP decoders need GD) cannot help this pipeline. Recorded,
+  not built. `bacon/bacon-qr-code` IS installed and used by `FormShareQrController` through `SvgImageBackEnd`, and
+  dompdf 3.1.6 draws SVG only through an `<img data:>` URI — against the blade's own "no images" contract.
+- **Hubs.** None of the print or OCR code files is a hub (`scripts/backlog-triage.php`'s derived set at `6b282fc0`:
+  the presenter 2 open rows, the blade 1, the matcher 1, the rest 0). Hub DOCS this increment stays out of:
+  `docs/data-dictionary.md`, `docs/PRD.md`, `docs/TESTING-GUIDE.md`, `docs/ux/design-system-reference.md`.
+- **Line citations that must survive.** `docs/ocr-pipeline-design.md:84` is cited by `ColumnFingerprint.php`,
+  `MappingDrift.php`, `mapping-model.test.ts` and `TabularDestinationTest.php`, so nothing above that line may move;
+  §2.5.2 begins two lines below it. `PrintAnswerArea.php:172` (the page-break arm) is cited by a closed row and this
+  file; it is kept line-neutral by trimming comments. `BlankFormPrintPresenter.php:417-420` (cited by
+  `FieldConfigRetentionTest.php`, two backlog rows) is ALREADY rotted — those lines are `cascadingGroups()`'s caption
+  paragraph, not the grid read they describe — so the numbers are dropped, never re-pointed. `blank-form.blade.php:83`,
+  `_blank-form-styles.blade.php:127` and `BlankFormPrintRenderer.php:80` will rot and are dropped the same way.
+- **The review page needs no frontend change.** `OcrScanReviewPresenter::notices()` returns data and `Encode.vue`
+  renders every notice by `v-for` keyed on `code`, so a new `layout_unconfirmed` notice renders as the others do.
+  `OcrScanReader::match()` already has `fail()` and `warnings[]`.
+- **`ValidationRuleType::MaxValue` exists**, so a number comb can be sized from an authored maximum; `Form` casts
+  `allow_ocr_single` to boolean, so the footer can read it.
+- **D13.** Three rows, one batch: they share the blade, the presenter and the matcher, and none is a hub. The
+  2026-08-09 layout decisions of record (`docs/ocr-pipeline-design.md` §2.5, `PrintAnswerArea`'s docblock) are
+  superseded by `D96`, recorded as such rather than rewritten away.
+- **No Vitest or E2E spec reaches `/print` or the typesetter** (`show.test.ts` checks only the button;
+  `ocr-review-axe.spec.ts` uses a seeded read scan). The diff is PHP, Blade and docs.
+- **`PROGRESS.md` has 4,308 bytes of headroom**, so the close-out owes the tenth tracker surgery.
 
 ### Remedy verdict
 
-- **The bake-off works as prescribed.** `M136` built the harness for exactly this. Its hand run on synthetic scans
-  matched the hand count (2 of 21 fields, 1 silent error). It measures G9 and silent errors per threshold and names
-  each correction's cause, which is what the provider choice is read from: not found or unreadable points at the
-  layout or matcher; wrong or withheld points at the recognizer.
-- **The staging scan works as prescribed.** The scans page has existed since `M129`, and staging has read for real
-  since `M135`.
-- **What cannot be measured before the samples:** whether the matcher needs a fix. If the report blames it, the fix is
-  in this increment, proved red-first, and the files below already name it.
+- **Layout 2, as the research prescribes and the user chose:** boxes square and pen-sized (18pt), fields spaced, a bold
+  instruction banner with sample characters, check boxes above the 3.5–4mm OMR floor (14pt), an X as the mark, one
+  open box for short text/email/url, combs kept for numbers, phone and dates, numbered questions, no colour. **Works
+  within dompdf's CSS 2.1** (inline-block spans wrap; verified by rendering a fixture PDF and looking, since no test
+  can assert wrapping). ⚠️ One size is derived, not chosen: `border-spacing` lands at both table edges too, so
+  18pt cells on a 20pt pitch fit **23**, not 24, in 178mm.
+- **`R-d6546409`'s remedy works** as "Layout 2" printed beside the stamp and read back by `layoutOf()`. ⚠️ Narrowed
+  from "absence = old paper": a refusal needs POSITIVE evidence (a legible running head with no token, or a lower
+  digit); a garbled or unread token is a warning, or a blurry new sheet would be refused.
+- **`R-6bbf9d73`'s remedy works** as written: three footer sentences, all three in `$static`.
+- **The reader change the layout forces:** `choices()` reads many options per line, crediting a mark to the label it
+  precedes (contiguous mark words walking back from the label to the previous label's end); `startsWithLabel()` also
+  compares with a leading "N." stripped. ⚠️ **The banner must NOT be added to `$static`:** its sample line normalises
+  to the same words as a real "X Yes" answer line, and `isStatic()`'s substring rule would blank every one.
 
-Files:
-- **Config:** `config/ocr.php` (the calibrated thresholds).
-- **New:** `docs/adr/0010-*.md`.
-- **Namespace bookkeeping:** `scripts/state.php` (`ADR_RESERVED`), `CLAUDE.md` (the ADR-gap paragraph).
-- **Docs:** `docs/ocr-pipeline-design.md` (§3 as-built and §9 results, both markers there), `docs/deployment-infrastructure.md`
-  (the `ocr-staging-scan` marker), `docs/PRD.md` (the G9 risk line, once measured).
-- **Only if the report blames the matcher:** `app/Services/Ocr/PrintedFormMatcher.php`, `OcrAnswerReader.php`,
-  `VisionDocumentParser.php`, and their tests under `tests/Feature/Ocr/` and `tests/Unit/Ocr/`.
+Files (every one named; D13 clause 2 — none is a hub):
+- **Model and enum:** `app/Enums/PrintAnswerArea.php` (new `Line` case, line-neutral above its page-break arm),
+  `app/Services/Forms/BlankFormPrintPresenter.php` (`LAYOUT`, `MAX_COMB_CELLS`, `DEFAULT_COMB_CELLS` removed,
+  `combGroups()` sizes, appended `numbered()` and `numericCells()`, `layout`/`accepts_scans`/`number` in the model).
+- **Paper:** `resources/views/pdf/blank-form.blade.php`, `resources/views/pdf/_blank-form-styles.blade.php`,
+  `resources/views/pdf/_blank-form-comb.blade.php` (only if the sample row reuses it),
+  `app/Services/Forms/BlankFormPrintRenderer.php` (`brand` dropped, two docblock paragraphs rewritten).
+- **Reader:** `app/Services/Ocr/OcrAnswerReader.php`, `app/Services/Ocr/PrintedFormMatcher.php`,
+  `app/Services/Ocr/OcrScanReader.php`, `app/Services/Ocr/OcrScanReviewPresenter.php`,
+  `app/Console/Commands/OcrBakeoffCommand.php`, `app/Services/Ocr/Bakeoff/OcrBakeoffScan.php` (docblock).
+- **Tests:** `tests/Feature/Ocr/Support/PrintedPageTypesetter.php`, `tests/Unit/Forms/PrintAnswerAreaTest.php`,
+  `tests/Feature/Forms/BlankFormPrintPresenterTest.php`, `tests/Feature/Forms/BlankFormPrintRendererTest.php`,
+  `tests/Feature/Forms/FieldConfigRetentionTest.php` (one citation dropped), `tests/Feature/Ocr/PrintedFormMatcherTest.php`,
+  `tests/Feature/Ocr/ReadOcrScanJobTest.php`, `tests/Feature/Ocr/OcrScanReviewTest.php`,
+  `tests/Feature/Ocr/Bakeoff/OcrBakeoffCommandTest.php`.
+- **Docs:** `docs/ocr-pipeline-design.md` (§2.5 as built, §3, §9 step 0, the `ocr-provider-bakeoff` marker's blocker;
+  nothing above line 84 moves), `docs/adr/0014-tenant-brand-ramp-generation.md` (a dated note at end of file).
 
-Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/backlog-triage.md`, `docs/gate-baselines.md`,
-`PROGRESS.md` (own block, and the archive if the surgery is owed), `PROGRESS_ARCHIVE.md`.
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/claims/decisions.md` (`D96`, `D97`), `docs/pipeline.md`,
+`docs/backlog-triage.md`, `docs/gate-baselines.md`, `PROGRESS.md` (own block, and the archive for the surgery),
+`PROGRESS_ARCHIVE.md`, and this file's own rotted citations (two lines, numbers dropped).
 
 Paired files taken: none known.
 
-Namespaces spent: ADR `0010`, the reserved one, filled rather than newly allocated. No migration, no decision unless the
-report calls for Document AI.
+Namespaces spent: decisions `D96` and `D97`. No migration. No ADR — `0010` stays reserved for `M144`.
 
-Prediction, written before any sample exists:
-- **Vision stays.** The matcher anchors on this product's own printed layout, so Document AI's form parser would be
-  finding fields we already know.
-- **Clean scans in block capitals meet G9 at the chosen thresholds.** Cursive is the main cause of corrections there,
-  as "wrong".
-- **Phone photos do worse, mostly as "not found" or a mis-split comb.** The deskew corrects rotation, not perspective.
-- ⚠️ **Most expected WRONG: the thresholds.** I expect Vision's handwriting confidence to sit below 90 even when the
-  value is right, so `auto` comes down. By how much is a guess.
+Build order, each its own commit: the model and enum (tests named) → the paper (render the fixture PDF and look) → the
+typesetter alone, **measured red** → the reader until green → the older-layout refusal → six mutations through
+`scripts/mutate.php` → docs, decisions, rows, the line. Gates: Pint bare on the host; PHPStan on the host AND in the
+container; Pest in the container with `tests/Feature/Forms` named explicitly; no Vitest or E2E change.
+
+Prediction, written before any file is opened:
+- **The typesetter rewrite reds the OCR suite in exactly these places:** the matcher's happy path (the X before
+  "Female" credited to "Male"; a yes/no line read as two marks → unreadable), the label-anchor case ("2. Age" scoring
+  under 0.85), the job's first case and the bake-off command's offline counts. Anything that stays green is a finding.
+- **All six mutations are caught.**
+- **dompdf wraps the inline choices cleanly** without the table fallback.
+- ⚠️ **Most expected WRONG:** a renderer or presenter assertion I have not listed — the audit found eleven pinned
+  assertions, and an increment that touches every print test has not yet gone through without one surprise.
 - CI 6/6 on the first run.
 
 ## RELEASED — `M142`, a condition on each form automation: it runs only for a response that matches (merged as PR #335, `ec6a9ec9`, 6/6 green on its first COMPLETED run with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
